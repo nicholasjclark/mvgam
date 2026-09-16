@@ -15,10 +15,10 @@ test_that("CAR constructor works for continuous-time AR", {
   expect_false(car_trend$ma)
   expect_equal(car_trend$p, 1)  # CAR always has p = 1
 
-  # CAR doesn't accept p parameter anymore (simplified constructor)
-  # CAR doesn't accept gr, subgr, or n_lv parameters
+  # CAR's signature excludes `p`, `gr` and `subgr`, and R raises for
+  # them. The factor arguments CAR takes in order to refuse them are
+  # covered in test-trend-map.R.
   expect_error(CAR(p = 2), "unused argument")
-  expect_error(CAR(n_lv = 2), "unused argument")
   expect_error(CAR(gr = "group"), "unused argument")
   expect_error(CAR(subgr = "subgroup"), "unused argument")
 

@@ -779,8 +779,6 @@ test_that("a trend that cannot take factors refuses them", {
     "series-specific changepoint modeling",
     fixed = TRUE
   )
-  # CAR carries no `n_lv` argument at all, so the refusal is R's.
-  expect_error(CAR(n_lv = 2), "unused argument")
   # A factor-compatible trend takes it.
   expect_silent(AR(n_lv = 2))
 })

@@ -310,6 +310,22 @@ test_that("PW refuses a factor request by either argument", {
                fixed = TRUE)
 })
 
+test_that("CAR refuses a factor request by either argument", {
+  # The other trend with no factor form, held to the same contract:
+  # one request, one refusal, carrying its own registered reason.
+  by_map <- expect_error(
+    CAR(trend_map = "identity"),
+    "Factor models are not supported for CAR trends"
+  )
+  by_n_lv <- expect_error(
+    CAR(n_lv = 2),
+    "Factor models are not supported for CAR trends"
+  )
+  expect_identical(conditionMessage(by_map), conditionMessage(by_n_lv))
+  expect_match(conditionMessage(by_n_lv), "irregular time intervals",
+               fixed = TRUE)
+})
+
 test_that("constructors fail-fast on malformed trend_map shapes", {
   # Numeric scalar (not matrix / df / single string) is rejected
   # at constructor time, not deferred to fit time.

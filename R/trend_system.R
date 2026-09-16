@@ -2321,20 +2321,22 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
 
 #' @rdname trend_constructors
 #' @export
-CAR = function(time = NA, series = NA, df = Inf) {
-  # CAR only supports first-order continuous autoregression (p=1)
-  # Use helper function for clean object creation
-  # All validation logic moved to validation layer (handles irregular time intervals, etc.)
+CAR = function(time = NA, series = NA, n_lv = NULL, trend_map = NULL,
+               df = Inf) {
+  # A continuous-time process evolves per series and has no factor
+  # form. The two arguments exist here to refuse a factor request
+  # with the reason the registry records, matching the refusal the
+  # other three routes to a factor CAR produce.
+  refuse_constructor_factor_request(n_lv, trend_map, "CAR")
+
   create_mvgam_trend(
     "CAR",  # Base trend type used for ALL dispatch
     df = assert_trend_df(df),
     .time = substitute(time),
     .series = substitute(series),
-    # CAR doesn't support gr, subgr, or n_lv - leave them as NULL
-    # Store parameters as-is
     p = 1,        # CAR is always first-order
-    ma = FALSE,   # CAR doesn't support MA
-    cor = FALSE   # CAR doesn't support correlation
+    ma = FALSE,   # CAR takes no moving-average term
+    cor = FALSE   # CAR takes no correlated innovations
   )
 }
 
@@ -2530,13 +2532,9 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
   checkmate::assert_int(n_changepoints, lower = 1)
   checkmate::assert_number(changepoint_scale, lower = 0)
 
-  # A factor request written on the constructor is answered here so
-  # the user hears it before any data is read; the same refusal
-  # meets the routes that reach a spec without passing through this
-  # constructor, and both compose it from the registry entry.
-  if (!is.null(n_lv) || !is.null(trend_map)) {
-    refuse_factor_request_for_trend("PW")
-  }
+  # A factor request written on the constructor is refused here.
+  # `CAR()` uses the same helper.
+  refuse_constructor_factor_request(n_lv, trend_map, "PW")
 
   # A logistic PW needs a carrying capacity, and an unsupplied `cap`
   # falls back to a column of that name further down. Whether the
@@ -2556,8 +2554,7 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
     n_changepoints = n_changepoints,
     changepoint_range = changepoint_range,
     changepoint_scale = changepoint_scale,
-    growth = growth,
-    n_lv = n_lv
+    growth = growth
   )
   return(trend_obj)
 }

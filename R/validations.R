@@ -1705,6 +1705,25 @@ refuse_factor_request_for_trend <- function(trend_name) {
 }
 
 
+#' Refuse a factor request written on a trend constructor
+#'
+#' `CAR()` and `PW()` take `n_lv` and `trend_map` only to refuse
+#' them. One helper composes that refusal from the registry entry,
+#' giving the same sentence as the routes that reach a spec without
+#' a constructor call.
+#'
+#' @param n_lv Whatever arrived as the constructor's `n_lv`.
+#' @param trend_map Whatever arrived as the constructor's `trend_map`.
+#' @param trend_name Registered trend name, such as `"PW"`.
+#' @return `invisible(TRUE)` when neither argument was written.
+#' @noRd
+refuse_constructor_factor_request <- function(n_lv, trend_map,
+                                              trend_name) {
+  if (is.null(n_lv) && is.null(trend_map)) return(invisible(TRUE))
+  refuse_factor_request_for_trend(trend_name)
+}
+
+
 #' Refuse a factor model on a trend that has no factor form
 #'
 #' Whether a trend decomposes into latent factors is recorded on the

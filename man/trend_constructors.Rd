@@ -33,7 +33,7 @@ AR(
   df = Inf
 )
 
-CAR(time = NA, series = NA, df = Inf)
+CAR(time = NA, series = NA, n_lv = NULL, trend_map = NULL, df = Inf)
 
 VAR(
   time = NA,

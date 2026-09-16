@@ -221,12 +221,12 @@ test_that("a multivariate CAR refuses every trend covariate", {
 })
 
 
-test_that("CAR refuses a factor decomposition, by both routes", {
-  # A continuous-time trend evolves per series, so it has no factor
-  # decomposition to offer. The refusal is registered against the
-  # trend type itself, and both routes a user can ask by have to
-  # reach it: a `trend_map` naming fewer factors than series, and
-  # `jsdgam()`, which is a factor model by construction.
+test_that("CAR refuses a factor decomposition, by every route", {
+  # A continuous-time trend evolves per series and has no factor
+  # decomposition. The refusal is registered against the trend type
+  # itself, for every route a user can ask by: a `trend_map` naming
+  # fewer factors than series, `jsdgam()`, which is a factor model by
+  # construction, and `n_lv` on the constructor.
   map_err <- expect_error(
     mvgam(
       formula = y ~ temp, trend_formula = ~ CAR(),
@@ -251,8 +251,11 @@ test_that("CAR refuses a factor decomposition, by both routes", {
     ),
     "Factor models are not supported for CAR trends"
   )
-  # One rule, so one message, whichever route asked.
+  # One rule, one message, whichever route asked. The constructor is
+  # the third spelling, and it composes from the same registry entry.
   expect_identical(conditionMessage(jsd_err),
+                   conditionMessage(map_err))
+  expect_identical(conditionMessage(expect_error(CAR(n_lv = 2))),
                    conditionMessage(map_err))
 })
 

@@ -1300,15 +1300,15 @@ axis_matrix <- function() {
     # the array is sized on one axis and subscripted on another.
     # Nothing has to reconcile the two, because a multivariate
     # `CAR()` takes no trend covariate and `by = lv_axis()` is one,
-    # and because `CAR()` takes no `n_lv` at all. Pinned so the day
-    # either restriction lifts is the day the grains have to be told
-    # apart.
+    # and because a factor `CAR()` meets the registry's refusal.
+    # Pinned: the day either restriction lifts is the day the two
+    # grains have to be told apart.
     list("by lv / CAR", "long",
          ~ s(env, by = lv_axis()) + CAR(), "refuse", "uni",
          "trend covariates"),
     list("by lv / CAR factor", "long",
          ~ s(env, by = lv_axis()) + CAR(n_lv = 2), "refuse", "uni",
-         "unused argument"),
+         "Factor models are not supported for CAR trends"),
 
     list("jsdgam species / 1", "long", 1L, "sound", "jsdgam_species"),
     list("jsdgam species / 2", "long", 2L, "sound", "jsdgam_species"),
