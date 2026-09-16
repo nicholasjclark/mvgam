@@ -218,8 +218,7 @@ hindcast_latent_state <- function(object, ndraws = NULL,
   # on any fit carrying more than one series: one species' first year
   # was reported as another's, and a unit could be handed an abundance
   # below the count observed there.
-  meta <- object$trend_metadata$variables %||%
-    list(time_var = "time", series_var = "series")
+  meta <- axis_vars(object)
   arrays <- extract_closure_unit_components(object)$arrays
   unit_df <- arrays$unit_grid
   if (is.null(unit_df)) {

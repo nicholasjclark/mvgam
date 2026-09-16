@@ -668,7 +668,7 @@ enrich_trend_metadata <- function(trend_metadata, trend_specs) {
     c(0L, trend_metadata$ar_lags, trend_metadata$ma_lags)
   )
   trend_metadata$has_cor <- isTRUE(spec$cor)
-  trend_metadata$n_lv <- spec$n_lv
+  trend_metadata$n_lv <- spec_n_lv(spec)
   # Innovation degrees of freedom, so forecasts draw from the same
   # distribution the model was fitted with rather than always normal.
   trend_metadata$df <- spec$df %||% Inf

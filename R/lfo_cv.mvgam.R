@@ -209,7 +209,7 @@ lfo_cv.mvgam <- function(object,
     )))
   }
 
-  time_var <- object$trend_metadata$variables$time_var %||% "time"
+  time_var <- axis_vars(object)$time_var
   # Only the time is demanded. Which rows belong to which series is
   # answered two lines below by `axis_row_series()`, from the record
   # rather than from a column, so a hierarchical frame whose series

@@ -408,8 +408,7 @@ build_training_arms <- function(object, series_levels, resp = NULL,
   # instead, so the arms it scores are cut by the same rule the
   # hindcast arms are, rather than by a second one written beside it.
   d <- data %||% mvgam_training_data(object)
-  meta_vars <- object$trend_metadata$variables %||%
-    list(time_var = "time", series_var = "series")
+  meta_vars <- axis_vars(object)
   time_var <- meta_vars$time_var
   series_var <- meta_vars$series_var
 
@@ -593,6 +592,28 @@ resolve_forecast_grid <- function(object, newdata, training,
              "'."),
       x = paste0(
         "Got columns: ", paste(names(newdata), collapse = ", "), "."
+      )
+    )), call. = FALSE)
+  }
+  # A horizon is a comparison against the last observed occasion, and
+  # `NA > last_time` is `NA`, which the subset and the sort then
+  # drop. The row leaves the grid, and a later layer treats the
+  # remaining occasions as discontinuous, naming an internal vector
+  # in its message.
+  if (anyNA(newdata[[time_var]])) {
+    bad <- which(is.na(newdata[[time_var]]))
+    stop(insight::format_error(c(
+      paste0("Every row of 'newdata' needs a value in '", time_var,
+             "'."),
+      x = paste0(
+        "Missing at row", if (length(bad) > 1L) "s " else " ",
+        paste(utils::head(bad, 5L), collapse = ", "),
+        if (length(bad) > 5L) ", ..." else "",
+        " (", length(bad), " in total)."
+      ),
+      i = paste0(
+        "A forecast is placed by its occasion. Supply a time for ",
+        "every row, or keep only the rows that have one."
       )
     )), call. = FALSE)
   }
@@ -1016,8 +1037,7 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
   } else {
     axis_row_series(object, fc_data) %||%
       factor(
-        fc_data[[object$trend_metadata$variables$series_var %||%
-                   "series"]],
+        fc_data[[axis_vars(object)$series_var]],
         levels = series_levels
       )
   }
@@ -1556,8 +1576,7 @@ extract_pw_cap_matrix <- function(object, fc_grid, spec, fc_times,
   # matched nothing and refused a cap the user did supply.
   series_ids <- axis_row_series(object, d)
   row_series <- if (is.null(series_ids)) {
-    as.character(d[[object$trend_metadata$variables$series_var %||%
-                      "series"]])
+    as.character(d[[axis_vars(object)$series_var]])
   } else {
     as.character(series_ids)
   }

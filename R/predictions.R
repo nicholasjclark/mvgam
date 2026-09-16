@@ -783,7 +783,7 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata,
                                           resp = resp)
   s_idx <- obs_struct$series_int
-  time_var <- mvgam_fit$trend_metadata$variables$time_var %||% "time"
+  time_var <- axis_vars(mvgam_fit)$time_var
   train_data <- mvgam_training_data(mvgam_fit)
   raw_t_idx <- if (time_var %in% names(newdata) &&
                      time_var %in% names(train_data)) {

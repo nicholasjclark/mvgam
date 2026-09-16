@@ -3795,25 +3795,39 @@ validate_newdata_complete <- function(newdata, object) {
              terms$offset, terms$index)),
     terms$response
   )
-  read <- intersect(read, names(newdata))
-  if (!length(read)) {
+  # A column the frame omits altogether is the widest gap of all, and
+  # narrowing to the columns present would pass it through. The axis
+  # columns are held out of that test: the axis record places a row
+  # whose series column the frame never carried.
+  absent <- setdiff(
+    setdiff(read, terms$index %||% character(0L)),
+    names(newdata)
+  )
+  present <- intersect(read, names(newdata))
+  gaps <- present[vapply(present, function(col) anyNA(newdata[[col]]),
+                         logical(1L))]
+  if (!length(absent) && !length(gaps)) {
     return(invisible(TRUE))
   }
-  gaps <- read[vapply(read, function(col) anyNA(newdata[[col]]),
-                      logical(1L))]
-  if (!length(gaps)) {
-    return(invisible(TRUE))
+  detail <- character(0L)
+  if (length(absent)) {
+    detail <- c(detail, paste0(
+      "Absent: ", paste0("'", absent, "'", collapse = ", "), "."
+    ))
   }
-  first <- vapply(gaps, function(col) which(is.na(newdata[[col]]))[1L],
-                  integer(1L))
-  stop(insight::format_error(c(
-    "'newdata' is missing values the model needs to predict.",
-    x = paste0(
-      "Missing in: ",
+  if (length(gaps)) {
+    first <- vapply(gaps, function(col) which(is.na(newdata[[col]]))[1L],
+                    integer(1L))
+    detail <- c(detail, paste0(
+      "Missing values in: ",
       paste0("'", gaps, "' (first at row ", first, ")",
              collapse = ", "),
       "."
-    ),
+    ))
+  }
+  stop(insight::format_error(c(
+    "'newdata' is missing values the model needs to predict.",
+    x = paste(detail, collapse = " "),
     i = paste0(
       "Supply a value for every row, or drop the rows that have ",
       "none. A missing response asks for a prediction; a missing ",
@@ -4722,7 +4736,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
       if (factor_active) {
         # Factor-model path: switch grain, emit factor-model codegen.
         has_by_lv <- TRUE
-        n_lv_for_grain <- parsed_trend$n_lv
+        n_lv_for_grain <- spec_n_lv(parsed_trend)
 
         # When Z is user-pinned (fully or partially), the rotation
         # concern that by = lv_axis() was designed to address is moot;
@@ -4817,76 +4831,10 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     }
   }
 
-  # Extract trend variables using existing safe functionality
-  trend_variables <- character(0)
-  all_formula_vars <- character(0)
-  if (!is.null(trend_formula)) {
-    # Use existing parse_trend_formula with precomputed dimensions to avoid redundant computation
-    parsed_trend_result <- parse_trend_formula(trend_formula, data,
-                                             .precomputed_dimensions = dimensions)
-    regular_terms <- parsed_trend_result$regular_terms %||% character(0)
-
-    # Extract all variables using brms formula parsing
-    all_formula_vars <- character(0)
-    for (term in regular_terms) {
-      # Add dummy response for brms parsing
-      term_formula <- as.formula(paste("y ~", term))
-      bterms <- brms::brmsterms(term_formula)
-      
-      # Extract predictor variables from fixed effects (excluding intercept)
-      term_vars <- character(0)
-      if (!is.null(bterms$dpars$mu$fe) && 
-          !identical(bterms$dpars$mu$fe, ~ 1)) {
-        term_vars <- c(term_vars, all.vars(bterms$dpars$mu$fe))
-      }
-      
-      # Extract variables from smooth terms  
-      if (!is.null(bterms$dpars$mu$sm)) {
-        sm_allvars <- attr(bterms$dpars$mu$sm, "allvars")
-        if (!is.null(sm_allvars)) {
-          sm_vars <- all.vars(sm_allvars)
-          sm_vars <- sm_vars[sm_vars != "1"]  # Remove intercept
-          term_vars <- c(term_vars, sm_vars)
-        }
-      }
-      
-      # Extract variables from GP terms
-      if (!is.null(bterms$dpars$mu$gp)) {
-        gp_allvars <- attr(bterms$dpars$mu$gp, "allvars")
-        if (!is.null(gp_allvars)) {
-          gp_vars <- all.vars(gp_allvars)
-          term_vars <- c(term_vars, gp_vars)
-        }
-      }
-      
-      # Extract variables from special predictors (monotonic effects, etc.)
-      if (!is.null(bterms$dpars$mu$sp)) {
-        sp_allvars <- attr(bterms$dpars$mu$sp, "allvars")
-        if (!is.null(sp_allvars)) {
-          sp_vars <- all.vars(sp_allvars)
-          term_vars <- c(term_vars, sp_vars)
-        }
-      }
-      
-      # Extract grouping variables from random effects (needed for data subsetting)
-      grouping_vars <- character(0)
-      if (!is.null(bterms$dpars$mu$re) && nrow(bterms$dpars$mu$re) > 0) {
-        for (i in seq_len(nrow(bterms$dpars$mu$re))) {
-          group_factor <- bterms$dpars$mu$re$group[i]
-          # Parse nested grouping like "series:habitat" -> c("series", "habitat")
-          group_components <- unlist(strsplit(group_factor, ":", fixed = TRUE))
-          # Exclude standard mvgam variables that are handled separately
-          group_components <- group_components[!group_components %in% c("series", "time")]
-          grouping_vars <- c(grouping_vars, group_components)
-        }
-      }
-      
-      trend_variables <- c(trend_variables, term_vars)
-      all_formula_vars <- c(all_formula_vars, term_vars, grouping_vars)
-    }
-    trend_variables <- unique(trend_variables)
-    all_formula_vars <- unique(all_formula_vars)
-  }
+  # The covariate columns of the trend formula, derived where the
+  # lightweight path derives them.
+  all_formula_vars <- trend_formula_covariates(trend_formula, data,
+                                               dimensions)
 
   # Add extracted variables to dimensions metadata for extract_trend_data
   # Use all_formula_vars (including grouping variables) for data subsetting
@@ -4952,6 +4900,60 @@ extract_and_validate_trend_components <- function(data, mv_spec,
 trend_covariate_names <- function(trend_variables) {
   checkmate::assert_character(trend_variables, any.missing = FALSE)
   setdiff(trend_variables, c("time", "series"))
+}
+
+
+#' The covariate columns of a trend formula
+#'
+#' Walked once for the fitting pipeline and for the lighter
+#' `stancode()` path. A walk of the regular terms passes over the
+#' trend constructor, while a bare `all.vars()` of the right-hand
+#' side lists the columns named inside `AR(gr = region)` as
+#' covariates. One walk keeps the two paths agreeing on a field that
+#' decides what `newdata` must carry and what the collapse to trend
+#' grain selects.
+#'
+#' @param trend_formula The trend formula, or `NULL`
+#' @param data The frame the formula is parsed against
+#' @param dimensions Precomputed dimensions for
+#'   `parse_trend_formula()`, or `NULL`
+#' @return Character vector of column names, with the grouping
+#'   factors of any random effect included.
+#' @noRd
+trend_formula_covariates <- function(trend_formula, data,
+                                     dimensions = NULL) {
+  if (is.null(trend_formula)) {
+    return(character(0))
+  }
+  parsed <- parse_trend_formula(trend_formula, data,
+                                .precomputed_dimensions = dimensions)
+  regular_terms <- parsed$regular_terms %||% character(0)
+  out <- character(0)
+  for (term in regular_terms) {
+    # A dummy response, since `brmsterms()` takes a two-sided formula.
+    bterms <- brms::brmsterms(stats::as.formula(paste("y ~", term)))
+    mu <- bterms$dpars$mu
+    term_vars <- character(0)
+    if (!is.null(mu$fe) && !identical(mu$fe, ~ 1)) {
+      term_vars <- c(term_vars, all.vars(mu$fe))
+    }
+    for (part in c("sm", "gp", "sp")) {
+      allvars <- attr(mu[[part]], "allvars")
+      if (!is.null(allvars)) {
+        term_vars <- c(term_vars, setdiff(all.vars(allvars), "1"))
+      }
+    }
+    # The grouping factors select the rows, and the axis columns are
+    # carried separately.
+    grouping <- character(0)
+    if (!is.null(mu$re) && nrow(mu$re) > 0) {
+      parts <- unlist(strsplit(as.character(mu$re$group), ":",
+                               fixed = TRUE))
+      grouping <- setdiff(parts, c("series", "time"))
+    }
+    out <- c(out, term_vars, grouping)
+  }
+  unique(out)
 }
 
 #' Collapse a (time, series)-grained data.frame to one row per unique
@@ -5069,8 +5071,8 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
 
     metadata <- mvgam_object$trend_metadata
     data <- newdata  # Use newdata as data for extraction
-    time_var <- metadata$variables$time_var %||% "time"
-    series_var <- metadata$variables$series_var %||% "series"
+    time_var <- axis_vars(mvgam_object)$time_var
+    series_var <- axis_vars(mvgam_object)$series_var
 
     # Get covariates from stored metadata instead of parsing formula
     trend_variables <- character(0)
@@ -5122,15 +5124,17 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     # which receives already-reduced trend data and just needs
     # metadata), synthesise a minimal `.precomputed_dimensions`
     # shell carrying just the predictor names. Only
-    # `$metadata$covariates` is read downstream in this code path,
-    # so a heavier brmsterms walk is unnecessary here. Unblocks
-    # the brms-special surface (trials / se / cens / me / mm / cs
-    # / car) that all reach this point via `stancode()`.
+    # `$metadata$covariates` is used downstream in this code path,
+    # and the walk that derives it is the fitting pipeline's own:
+    # the field reaches the fitted object by either route, and two
+    # derivations of it named different columns. Unblocks the
+    # brms-special surface (trials / se / cens / me / mm / cs /
+    # car) that all reach this point via `stancode()`.
     if (is.null(.precomputed_dimensions)) {
       .precomputed_dimensions <- list(
         metadata = list(
           covariates = setdiff(
-            extract_predictor_vars(trend_formula),
+            trend_formula_covariates(trend_formula, data),
             response_vars %||% character(0L)
           )
         )

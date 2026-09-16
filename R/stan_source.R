@@ -131,16 +131,73 @@ find_matching_closing_brace <- function(lines, start_line) {
 }
 
 
-#' The code on Stan source lines
+#' Stan source lines with their block comments removed
+#'
+#' A block comment opens on one line and closes on another, which a
+#' per-line substitution cannot follow: `.` matches no newline, and
+#' each line is substituted on its own. The scan here carries its
+#' state across the vector. A `/*` inside a string literal opens
+#' nothing, and neither does one that follows a line comment's `//`.
 #'
 #' @param lines Character vector of Stan source lines.
-#' @return `lines` without string literals or line comments. A brace
-#'   or a `;` in either is not code.
+#' @return `lines` with every block comment removed. String literals
+#'   and line comments are kept.
+#' @noRd
+stan_drop_block_comments <- function(lines) {
+  checkmate::assert_character(lines)
+  if (length(lines) == 0L) return(lines)
+  in_block <- FALSE
+  for (i in seq_along(lines)) {
+    chars <- strsplit(lines[i], "", fixed = TRUE)[[1L]]
+    n <- length(chars)
+    kept <- logical(n)
+    in_string <- FALSE
+    j <- 1L
+    while (j <= n) {
+      pair <- if (j < n) paste0(chars[j], chars[j + 1L]) else ""
+      if (in_block) {
+        if (identical(pair, "*/")) {
+          in_block <- FALSE
+          j <- j + 2L
+        } else {
+          j <- j + 1L
+        }
+      } else if (in_string) {
+        kept[j] <- TRUE
+        if (identical(chars[j], '"')) in_string <- FALSE
+        j <- j + 1L
+      } else if (identical(pair, "/*")) {
+        in_block <- TRUE
+        j <- j + 2L
+      } else if (identical(pair, "//")) {
+        kept[seq.int(j, n)] <- TRUE
+        j <- n + 1L
+      } else {
+        if (identical(chars[j], '"')) in_string <- TRUE
+        kept[j] <- TRUE
+        j <- j + 1L
+      }
+    }
+    lines[i] <- paste(chars[kept], collapse = "")
+  }
+  lines
+}
+
+
+#' The code on Stan source lines
+#'
+#' The block comments are removed across the whole vector before the
+#' per-line work. A comment spanning two lines needs both of them
+#' present in one call.
+#'
+#' @param lines Character vector of Stan source lines.
+#' @return `lines` without comments of either spelling and without
+#'   string literals. A brace or a `;` in any of them is not code.
 #' @noRd
 stan_line_code <- function(lines) {
   checkmate::assert_character(lines)
   # Strings first: a comment marker can be part of one.
-  sub("//.*$", "", gsub('"[^"]*"', "", lines))
+  sub("//.*$", "", gsub('"[^"]*"', "", stan_drop_block_comments(lines)))
 }
 
 

@@ -798,7 +798,7 @@ resolve_factor_loadings <- function(object = NULL,
         (if (!is.null(fixed_Z)) ncol(fixed_Z) else NULL)
     }
     if (is.null(n_series)) {
-      n_series <- object$series_info$n_series %||%
+      n_series <- mvgam_axes(object)$series$n %||%
         (if (!is.null(fixed_Z)) nrow(fixed_Z) else NULL)
     }
   }

@@ -22,9 +22,11 @@
 #'
 #' @noRd
 first_trend_spec <- function(object) {
-  ts <- object$mv_spec$trend_specs
-  if (is.null(ts)) return(NULL)
-  if (inherits(ts, "mvgam_trend")) ts else ts[[1L]]
+  # `trend_spec_head()` requires the entries to be lists before it
+  # takes the first. An unclassed specification written without a
+  # `trend` field otherwise gives up its first element, which is a
+  # column name where a specification is wanted.
+  trend_spec_head(object$mv_spec$trend_specs)
 }
 
 #' The responses a model reads, keyed as brms keys them

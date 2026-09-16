@@ -232,28 +232,14 @@ extract_declared_functions <- function(functions_block) {
   if (is.null(functions_block) || nchar(trimws(functions_block)) == 0) {
     return(character(0))
   }
-  
-  # Find function declarations: return_type function_name(
-  func_pattern <- "\\b[a-zA-Z_][a-zA-Z0-9_]*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\("
-  matches <- gregexpr(func_pattern, functions_block, perl = TRUE)
-  
-  if (length(matches[[1]]) == 1 && matches[[1]] == -1) {
+  # `parse_stan_functions()` parses a signature and matches the brace
+  # opening its body. A regex over `identifier identifier(` counts
+  # `return log1p(x);` as a declaration too.
+  parsed <- parse_stan_functions(functions_block)
+  if (length(parsed) == 0L) {
     return(character(0))
   }
-  
-  # Extract function names (second capture group)
-  func_matches <- regmatches(functions_block, matches)[[1]]
-  func_names <- character(0)
-  
-  for (match in func_matches) {
-    # Extract function name after return type
-    parts <- strsplit(trimws(gsub("\\(.*", "", match)), "\\s+")[[1]]
-    if (length(parts) >= 2) {
-      func_names <- c(func_names, parts[length(parts)])
-    }
-  }
-  
-  return(unique(func_names))
+  unique(vapply(parsed, function(f) f$name, character(1)))
 }
 
 #' Classify single mu expression by structural features

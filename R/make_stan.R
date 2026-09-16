@@ -714,9 +714,37 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
                                    silent = 1L, stanvars = NULL,
                                    validate = TRUE, ...) {
   reject_removed_args(list(...), fn = "stancode")
+  stancode <- mvgam_formula_component(
+    "stancode", object, data, family, prior, data2, sample_prior,
+    knots, drop_unused_levels, backend, threads, normalize,
+    save_model, silent, stanvars, validate, ...
+  )
+  class(stancode) <- c("mvgamstancode", "stancode", "character")
+  return(stancode)
+}
 
-  # Generate all Stan components using shared function
-  combined_components <- generate_stan_components_mvgam_formula(
+
+#' One component of the program an `mvgam_formula` describes
+#'
+#' `stancode()` and `standata()` take different components of one
+#' generated object and agree on everything reaching the generator:
+#' the same arguments in the same order, and the same refusal when
+#' the result arrives without the component named.
+#'
+#' @param component `"stancode"` or `"standata"`.
+#' @param object,data,family,prior,data2,sample_prior,knots Arguments
+#'   of `stancode.mvgam_formula()`, forwarded unchanged.
+#' @param drop_unused_levels,backend,threads,normalize Likewise.
+#' @param save_model,silent,stanvars,validate,... Likewise.
+#' @return The named component of the generated result.
+#' @noRd
+mvgam_formula_component <- function(component, object, data, family,
+                                    prior, data2, sample_prior, knots,
+                                    drop_unused_levels, backend,
+                                    threads, normalize, save_model,
+                                    silent, stanvars, validate, ...) {
+  checkmate::assert_choice(component, c("stancode", "standata"))
+  generated <- generate_stan_components_mvgam_formula(
     formula = object, data = data, family = family, prior = prior,
     data2 = data2, sample_prior = sample_prior,
     knots = knots, drop_unused_levels = drop_unused_levels,
@@ -725,24 +753,18 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
     validate = validate,
     ...
   )
-
-  # Validate and return stancode component
-  if (is.null(combined_components$combined_components$stancode)) {
+  out <- generated$combined_components[[component]]
+  if (is.null(out)) {
     stop(insight::format_error(c(
       cli::format_inline(
-        "Stan code generation missing {.field stancode} component."
+        "Stan generation missing {.field {component}} component."
       ),
       i = cli::format_inline(
         "The {.fn generate_combined_stancode_and_data} result is incomplete."
       )
     )))
   }
-
-  # Add mvgam-specific stancode class with brms compatibility
-  stancode <- combined_components$combined_components$stancode
-  
-  class(stancode) <- c("mvgamstancode", "stancode", "character")
-  return(stancode)
+  out
 }
 
 #' Stan program and data from a formula carrying a `trend_formula`
@@ -866,31 +888,13 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
                                    silent = 1L, stanvars = NULL,
                                    validate = TRUE, ...) {
   reject_removed_args(list(...), fn = "standata")
-
-  # Generate all Stan components using shared function
-  combined_components <- generate_stan_components_mvgam_formula(
-    formula = object, data = data, family = family, prior = prior,
-    data2 = data2, sample_prior = sample_prior,
-    knots = knots, drop_unused_levels = drop_unused_levels,
-    backend = backend, threads = threads, normalize = normalize,
-    save_model = save_model, silent = silent, stanvars = stanvars,
-    validate = validate, ...
+  standata <- mvgam_formula_component(
+    "standata", object, data, family, prior, data2, sample_prior,
+    knots, drop_unused_levels, backend, threads, normalize,
+    save_model, silent, stanvars, validate, ...
   )
 
-  # Validate and return standata component
-  if (is.null(combined_components$combined_components$standata)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Stan data generation missing {.field standata} component."
-      ),
-      i = cli::format_inline(
-        "The {.fn generate_combined_stancode_and_data} result is incomplete."
-      )
-    )))
-  }
-
   # Validate Stan data structure follows brms conventions
-  standata <- combined_components$combined_components$standata
   if (!is.list(standata)) {
     stop(insight::format_error(c(
       cli::format_inline(

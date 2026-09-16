@@ -46,7 +46,7 @@ plot_mvgam_series <- function(
 ) {
   checkmate::assert_class(object, "mvgam")
   resolve_resp(object, resp)
-  time_var <- object$trend_metadata$variables$time_var %||% "time"
+  time_var <- axis_vars(object)$time_var
   series_levels <- resolve_series_info(object)$series_levels
   test <- newdata %||% object$test_data
   if (!is.null(test) && !is.null(object$trend_metadata)) {

@@ -1663,6 +1663,37 @@ test_that("unwrapping the likelihood guard leaves other braces alone", {
   )
 })
 
+test_that("a block ends at the brace its header opened", {
+  code <- paste(c(
+    "data {",
+    "  int<lower=1> N;",
+    "}",
+    "",
+    "// a note",
+    "transformed data {",
+    "  int M = N;",
+    "}",
+    "parameters {",
+    "  real b;",
+    "}"
+  ), collapse = "\n")
+  # A blank line and a comment separate the data block's closing brace
+  # from the next header. The body stops at the brace.
+  expect_identical(
+    mvgam:::extract_stan_block_content(code, "data"),
+    "  int<lower=1> N;"
+  )
+  expect_identical(
+    mvgam:::extract_stan_block_content(code, "transformed data"),
+    "  int M = N;"
+  )
+  # An absent block and an empty one are told apart
+  expect_null(mvgam:::extract_stan_block_content(code, "model"))
+  expect_identical(
+    mvgam:::extract_stan_block_content("model {\n}", "model"), ""
+  )
+})
+
 test_that("a mixture family's program parses once polished", {
   data <- data.frame(
     y = c(rnorm(30, -2), rnorm(30, 2)),

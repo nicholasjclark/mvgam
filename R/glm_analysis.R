@@ -34,7 +34,7 @@ analyze_stan <- function(stan_code, response_names = NULL, trend_info = NULL) {
     stop(insight::format_error("Stan code cannot be empty"))
   }
 
-  glm_patterns <- detect_glm_patterns(stan_code)
+  glm_patterns <- glm_calls_present(stan_code)
   mu_classification <- classify_mu_patterns(stan_code, glm_patterns)
   optimization_plan <- determine_glm_preservation(glm_patterns, trend_info)
   response_mapping <- create_response_mapping(stan_code, response_names, glm_patterns)
@@ -83,8 +83,8 @@ analyze_stan <- function(stan_code, response_names = NULL, trend_info = NULL) {
 #
 # `brms::categorical()` has no entry because mvgam refuses it in
 # favour of `categ()`, and its per-category predictor has no single
-# `mu` to unwind into. A `categorical_logit_glm` line would therefore
-# be reported as an unrecognised family rather than silently rewritten.
+# `mu` to unwind into. A `categorical_logit_glm` line is refused as
+# an unrecognised family, at every site that detects a GLM call.
 glm_call_layout <- list(
   normal_id_glm = list(
     arguments = c("design_matrix", "intercept", "coefficients", "sigma"),
@@ -166,25 +166,25 @@ glm_family_of_line <- function(line) {
 
 #' Which GLM likelihoods a Stan program calls
 #'
+#' Detection takes the `_glm` suffix every brms GLM density carries,
+#' and `glm_family_of_line()` names the family of each hit. Detecting
+#' with the closed list of layouts instead would report a `_glm` call
+#' with no layout as absent, and the trend would be computed and
+#' never added to the linear predictor.
+#'
 #' @param stan_code Character vector of Stan source.
 #' @return Named logical over `mvgam_glm_families`.
 #' @noRd
 glm_calls_present <- function(stan_code) {
   checkmate::assert_character(stan_code, min.len = 1)
-  vapply(mvgam_glm_families, function(fam) {
-    any(grepl(paste0("target\\s*\\+=.*", stan_density_call_pattern(fam)),
-              stan_code))
-  }, logical(1L))
-}
-
-#' Detect GLM Patterns in Stan Code
-#'
-#' @param stan_code Character string containing Stan model code
-#' @return Named logical vector, one entry per GLM family
-#' @noRd
-detect_glm_patterns <- function(stan_code) {
-  checkmate::assert_character(stan_code, len = 1)
-  glm_calls_present(stan_code)
+  lines <- unlist(strsplit(stan_code, "\n", fixed = TRUE))
+  hits <- grep(
+    paste0("target\\s*\\+=.*", stan_density_call_pattern("_glm")),
+    lines, value = TRUE
+  )
+  found <- vapply(hits, glm_family_of_line, character(1),
+                  USE.NAMES = FALSE)
+  stats::setNames(mvgam_glm_families %in% found, mvgam_glm_families)
 }
 
 #' Classify Mu Construction Patterns

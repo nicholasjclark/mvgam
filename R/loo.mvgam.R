@@ -433,12 +433,14 @@ per_series_ic <- function(x, logliks,
 # Map each log_lik column to a series label, matching the grain
 # log_lik returns. For detection-family closure-unit fits (occ /
 # nmix variants) log_lik is per-unit; every visit row in a unit
-# shares the same species, so reading the first visit row of each
-# unit is sufficient. For row-grain fits the data's `series` column
-# maps directly. Multi-response custom families (mvn / mvt / diri
-# / multi / categ) put species on the K-vector axis WITHIN a unit
-# rather than across units; by_series is not meaningful there
-# and is rejected up front.
+# carries the same species, and the first visit row of each unit
+# names it. Which series a row belongs to is a property of the
+# model, and the axis record states it: a hierarchical fit names
+# its series from grouping columns, with no series column present.
+# Multi-response custom families (mvn / mvt / diri / multi /
+# categ) place species on the K-vector axis WITHIN a unit. No
+# species there has rows of its own, and by_series is rejected up
+# front.
 
 #'@noRd
 per_obs_series_labels <- function(x) {
@@ -453,20 +455,24 @@ per_obs_series_labels <- function(x) {
       i = "Use loo()/waic() without by_series to score per closure unit."
     )))
   }
-  data <- x$data %||% data.frame()
-  if (!"series" %in% names(data)) {
+  data <- mvgam_training_data(x) %||% data.frame()
+  series <- axis_row_series(x, data, required = TRUE)
+  if (is.null(series)) {
     stop(insight::format_error(c(
-      "by_series = TRUE requires a 'series' column on the fit's data.",
-      i = "Add a series factor before fitting if you want per-series IC."
+      "by_series = TRUE is not meaningful for a response-keyed fit.",
+      x = paste0(
+        "The series of this model are its responses, and every row ",
+        "carries all of them at once."
+      ),
+      i = paste0(
+        "Score the whole fit by calling loo()/waic() with ",
+        "by_series = FALSE."
+      )
     )))
   }
-  series_col <- as.character(data$series)
-  # The grain is the same question `kfold()` asks of its fold keys,
-  # so it is answered in the one place. Reading
-  # `uses_closure_unit_layout()` here was right only because the
-  # multi-response families are refused above; the predicate that
-  # names the grain does not lean on that.
-  loglik_col_values(x, data, series_col)
+  # `loglik_col_values()` settles the closure-unit grain for every
+  # caller, and `kfold()` puts its fold keys through the same call.
+  loglik_col_values(x, data, as.character(series))
 }
 
 #' Drop unscorable columns from a log-likelihood matrix

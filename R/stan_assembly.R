@@ -535,8 +535,12 @@ stan_prior_statement <- function(lhs, dist, normalize = TRUE) {
 # neither may be matched as one.
 #'@noRd
 strip_stan_comments <- function(x) {
-  bare <- gsub("/\\*.*?\\*/", "", x, perl = TRUE)
-  gsub("//[^\n]*", "", bare)
+  checkmate::assert_string(x)
+  # `stan_line_code()` removes both comment spellings and the string
+  # literals as well. A `;` or a `~` inside one belongs to the
+  # string, and statement splitting counts neither.
+  paste(stan_line_code(strsplit(x, "\n", fixed = TRUE)[[1L]]),
+        collapse = "\n")
 }
 
 
@@ -590,7 +594,7 @@ normalise_mvgam_sampling_statements <- function(stancode,
     # detection reads the code with comments removed while the
     # rewrite keeps whatever preceded the statement intact.
     lines <- strsplit(chunk, "\n", fixed = TRUE)[[1L]]
-    bare <- sub("//.*$", "", lines)
+    bare <- stan_line_code(lines)
     first <- which(grepl("~", bare, fixed = TRUE))[1L]
     if (is.na(first)) {
       return(chunk)
@@ -1254,11 +1258,17 @@ handle_response_trend_injection <- function(code_lines, resp_name) {
   mu_assign_lines <- which(grepl(mu_assign_pattern, code_lines, perl = TRUE))
   
   if (length(mu_assign_lines) == 0) {
-    insight::format_warning(
+    # The program still compiles, and this response's linear predictor
+    # holds no trend. Saying nothing leaves that undetectable.
+    warning(insight::format_warning(c(
       cli::format_inline(
-        "No mu assignment found for response {.field {resp_name}}"
-      )
-    )
+        "No mu assignment found for response {.field {resp_name}}."
+      ),
+      x = cli::format_inline(
+        "The fit for {.field {resp_name}} uses its observation terms alone."
+      ),
+      i = "Report the formula and family that produced this."
+    )), call. = FALSE)
     return(code_lines)
   }
   
@@ -7444,18 +7454,21 @@ extract_non_likelihood_from_model_block <- function(model_block, exclude_mu_line
   return(filtered_content)
 }
 
-#' Extract Stan Block Content with Functions Block Handling
+#' Extract the body of a named Stan block
 #'
 #' @description
-#' Extracts content from Stan code blocks. Uses specialized handling for functions
-#' blocks to avoid brace counting issues with nested function definitions.
+#' Gives the lines a Stan block encloses, without its header and
+#' without the brace that closes it.
 #'
-#' @param stancode Character string containing full Stan code
-#' @param block_name Name of block to extract ("functions", "data", "parameters", etc.)
-#' @return Character string with inner block content (trimmed), or NULL if block not found
+#' @param stancode Character string containing full Stan code.
+#' @param block_name One of `stan_block_names`, in any case and with
+#'   any internal spacing.
+#' @return Character string of the block's inner lines. `""` for a
+#'   block whose braces enclose nothing, and NULL for an absent block.
 #' @details
-#' For functions blocks, uses block boundary detection to avoid issues with nested braces.
-#' For other blocks, uses the existing line-by-line parsing approach.
+#' The functions block goes through `extract_stan_functions_block()`,
+#' which handles the nested braces of a function definition. Every
+#' other block takes its bounds from `stan_block_bounds()`.
 #' @noRd
 extract_stan_block_content <- function(stancode, block_name) {
   checkmate::assert_string(stancode, min.chars = 1)
@@ -7480,77 +7493,22 @@ extract_stan_block_content <- function(stancode, block_name) {
     return(result)
 
   } else {
-    # Existing logic for other blocks (preserved exactly)
+    # The block spans the brace its header opened. A blank line or a
+    # comment after that brace leaves it outside the body.
     lines <- strsplit(stancode, "\n")[[1]]
-    in_block <- FALSE
-    content_lines <- c()
-
-    # Create pattern to match block start (handle multi-word blocks like "transformed data")
-    clean_block_name <- gsub("\\s+", "\\\\s+", trimws(block_name))
-    block_pattern <- paste0("^\\s*", clean_block_name, "\\s*\\{")
-
-    for (i in seq_along(lines)) {
-      line <- lines[i]
-
-      # Check for block start
-      if (grepl(block_pattern, line, ignore.case = TRUE)) {
-        in_block <- TRUE
-        next  # Skip the opening brace line
-      }
-
-      # Check for block end using Stan's mandatory block order
-      if (in_block) {
-        # For generated quantities (last block), collect everything until end
-        if (tolower(gsub("\\s+", " ", trimws(block_name))) == "generated quantities") {
-          content_lines <- c(content_lines, line)
-          next
-        }
-
-        # For other blocks, the boundary is the header of whichever
-        # block Stan declares next. `stan_block_names` holds that
-        # order, so the succession is read from it rather than
-        # restated here.
-        this_block <- tolower(gsub("\\s+", " ", trimws(block_name)))
-        successor <- stan_block_names[
-          match(this_block, stan_block_names) + 1L
-        ]
-        next_block_pattern <- if (length(successor) == 1L &&
-                                    !is.na(successor)) {
-          stan_block_header(successor)
-        } else {
-          NULL
-        }
-
-        if (!is.null(next_block_pattern) && grepl(next_block_pattern, line, ignore.case = TRUE)) {
-          # Remove trailing brace if present
-          if (length(content_lines) > 0 &&
-              grepl("^\\s*\\}\\s*$", content_lines[length(content_lines)])) {
-            content_lines <- content_lines[-length(content_lines)]
-          }
-          break
-        }
-      }
-
-      # Collect content lines
-      if (in_block) {
-        content_lines <- c(content_lines, line)
-      }
-    }
-
-    # Handle case where block wasn't found
-    if (length(content_lines) == 0 && !in_block) {
+    block <- tolower(gsub("\\s+", " ", trimws(block_name)))
+    bounds <- stan_block_bounds(lines, block)
+    if (is.null(bounds)) {
       return(NULL)  # Block not found
     }
-
-    # For generated quantities (last block), remove trailing closing brace
-    if (tolower(gsub("\\s+", " ", trimws(block_name))) == "generated quantities" &&
-        length(content_lines) > 0) {
-      if (grepl("^\\s*\\}\\s*$", content_lines[length(content_lines)])) {
-        content_lines <- content_lines[-length(content_lines)]
-      }
+    # A block whose braces meet on one line has an empty body. An
+    # absent block gives NULL.
+    body <- if (bounds$end <= bounds$start + 1L) {
+      character(0)
+    } else {
+      lines[seq.int(bounds$start + 1L, bounds$end - 1L)]
     }
-
-    return(paste(content_lines, collapse = "\n"))
+    return(paste(body, collapse = "\n"))
   }
 }
 
@@ -7793,14 +7751,11 @@ extract_stan_identifiers <- function(stan_code) {
     return(character(0))
   }
 
-  # Remove comment portions from each line to avoid renaming words in comments
-  # This preserves code but removes // comments that contain English words
+  # A name inside a string literal is no identifier to rename, and a
+  # `//` inside one starts no comment. Comments of both spellings go
+  # with the literals.
   lines <- strsplit(stan_code, "\n")[[1]]
-  code_only_lines <- gsub("//.*$", "", lines)
-  code_without_comments <- paste(code_only_lines, collapse = "\n")
-
-  # Also remove multi-line comments (/* ... */)
-  code_without_comments <- gsub("/\\*.*?\\*/", "", code_without_comments, perl = TRUE)
+  code_without_comments <- paste(stan_line_code(lines), collapse = "\n")
 
   # Extract standalone identifiers using regex pattern for valid Stan identifiers
   # Pattern matches: letter or underscore, followed by letters, digits, underscores
@@ -8549,9 +8504,12 @@ normalize_function_signature <- function(signature) {
 normalize_function_body <- function(body_lines) {
   checkmate::assert_character(body_lines, any.missing = FALSE)
 
-  # Remove comments
-  body_lines <- gsub("//.*$", "", body_lines)
-  body_lines <- gsub("/\\*.*?\\*/", "", body_lines, perl = TRUE)
+  # Two bodies differing only inside a string literal are different
+  # functions, and the literal stays. A block comment spanning two
+  # lines needs the whole body present, and that strip runs first.
+  body_lines <- stan_drop_block_comments(body_lines)
+  body_lines <- vapply(body_lines, stan_drop_line_comment, character(1),
+                       USE.NAMES = FALSE)
 
   # Remove empty lines and trim whitespace
   body_lines <- trimws(body_lines)

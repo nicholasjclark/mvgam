@@ -165,6 +165,32 @@ mvgam_axes <- function(object) {
        time = NULL)
 }
 
+
+#' The columns a row is placed by
+#'
+#' The axes record names them once, where the axes are resolved. A
+#' fit saved before that record existed carries the names on its
+#' trend metadata, and they are taken from there. This function holds
+#' the literal defaults for the post-fit surface: a caller spelling
+#' its own default can name a different column from the one the model
+#' was fitted on.
+#'
+#' @param object A fitted `mvgam` object
+#' @return A list naming `time_var`, `series_var`, `gr_var` and
+#'   `subgr_var`. The two grouping entries are `NULL` on a fit with no
+#'   hierarchy.
+#' @noRd
+axis_vars <- function(object) {
+  rec <- mvgam_axes(object)$vars
+  meta <- object$trend_metadata$variables
+  list(
+    time_var = rec$time_var %||% meta$time_var %||% "time",
+    series_var = rec$series_var %||% meta$series_var %||% "series",
+    gr_var = rec$gr_var %||% meta$gr_var,
+    subgr_var = rec$subgr_var %||% meta$subgr_var
+  )
+}
+
 #' Whether a fit's series are its responses
 #'
 #' A wide `mvbf()` frame holds one row per occasion and one column per
@@ -247,10 +273,10 @@ axis_row_series <- function(object, data, required = FALSE) {
   if (is_response_keyed(object)) {
     return(NULL)
   }
-  meta <- object$trend_metadata
+  vars <- axis_vars(object)
   levs <- mvgam_axes(object)$series$levels
-  gr_var <- meta$variables$gr_var
-  subgr_var <- meta$variables$subgr_var
+  gr_var <- vars$gr_var
+  subgr_var <- vars$subgr_var
 
   # `factor()` given no levels takes the values' own, which is the
   # right answer for an object recording no axis and the wrong one
@@ -266,9 +292,8 @@ axis_row_series <- function(object, data, required = FALSE) {
     return(as_axis(hierarchical_series_values(data, gr_var, subgr_var)))
   }
 
-  series_var <- meta$variables$series_var %||% "series"
-  if (series_var %in% names(data)) {
-    return(as_axis(data[[series_var]]))
+  if (vars$series_var %in% names(data)) {
+    return(as_axis(data[[vars$series_var]]))
   }
   if (required) {
     stop(insight::format_error(c(

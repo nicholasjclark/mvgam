@@ -119,8 +119,8 @@ prepare_mvgam_frame <- function(object, data) {
   ensure_mvgam_variables(
     data = data,
     parsed_trend = NULL,
-    time_var = meta$variables$time_var %||% "time",
-    series_var = meta$variables$series_var %||% "series",
+    time_var = axis_vars(object)$time_var,
+    series_var = axis_vars(object)$series_var,
     response_vars = response_columns(object),
     metadata = meta
   )
@@ -254,19 +254,9 @@ get_observation_structure <- function(object, newdata = NULL,
 
   checkmate::assert_data_frame(newdata, min.rows = 1)
 
-  # Get variable names from stored metadata
-  metadata <- object$trend_metadata
-
-  if (is.null(metadata)) {
-    # Fallback for models without trend_metadata
-    time_var <- "time"
-    series_var <- "series"
-  } else {
-    time_var <- metadata$variables$time_var
-    if (is.null(time_var)) time_var <- "time"
-    series_var <- metadata$variables$series_var
-    if (is.null(series_var)) series_var <- "series"
-  }
+  vars <- axis_vars(object)
+  time_var <- vars$time_var
+  series_var <- vars$series_var
 
   # The trained model already knows its series structure
   # (object$standata$N_series_trend). For single-series models the
@@ -710,7 +700,7 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   n_lv <- detect_factor_n_lv(object)
   is_lv <- !is.null(n_lv)
   hierarchical <- named_var(spec$gr)
-  n_obs_series <- object$series_info$n_series %||%
+  n_obs_series <- mvgam_axes(object)$series$n %||%
     object$trend_components$n_trends
   n_series <- if (is_lv) as.integer(n_lv) else
     as.integer(n_obs_series)
