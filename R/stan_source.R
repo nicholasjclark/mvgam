@@ -1,9 +1,9 @@
-# Reading the Stan source brms generated.
+# The Stan source brms generated.
 #
-# mvgam splices its trend machinery into a program brms wrote, so it
-# has to locate blocks and statements in that text. The rules for
-# doing so live here rather than beside each caller, because they were
-# written more than once and the copies were free to disagree.
+# mvgam splices its trend machinery into a program brms wrote. That
+# means locating blocks and statements in the text. The rules for
+# doing so are collected here, because they were written more than
+# once and the copies were free to disagree.
 
 
 # The blocks of a Stan program, in the order one declares them.
@@ -17,9 +17,9 @@ stan_block_names <- c(
 #'
 #' @param block One of `stan_block_names`.
 #' @param own_line Require the brace to end the line. brms writes each
-#'   header that way, so the stricter form is safe where a caller
-#'   rewrites the surrounding source and wants no doubt about which
-#'   line it matched.
+#'   header that way. The stricter form suits a caller that rewrites
+#'   the surrounding source and needs certainty about which line it
+#'   matched.
 #' @return A regular expression matching that block's opening line.
 #' @noRd
 stan_block_header <- function(block, own_line = FALSE) {
@@ -71,8 +71,8 @@ stan_next_block_line <- function(lines, after, exclude = character(0)) {
 
 #' The lines a named Stan block spans
 #'
-#' Delegates to `find_matching_closing_brace()`, so a nested `{` in a
-#' loop or a local scope does not end the block early.
+#' Delegates to `find_matching_closing_brace()`. A nested `{` in a
+#' loop or a local scope leaves the block open.
 #'
 #' @param lines Character vector of Stan source lines.
 #' @param block One of `stan_block_names`.
@@ -234,8 +234,8 @@ statement_lines <- function(statements) {
 #'
 #' A `for` or `if` whose every statement goes takes its own header with
 #' it, and the brace closing it where the source kept one. Headers are
-#' examined last one first, so a loop emptied by an inner loop leaving
-#' is itself emptied.
+#' examined last one first. A loop emptied by an inner loop leaving is
+#' then emptied itself.
 #'
 #' @param lines The lines a block spans, its braces included.
 #' @param statements Rows of `stan_statements()` over `lines`.
@@ -250,7 +250,7 @@ emptied_blocks <- function(lines, statements, removed) {
     inner <- which(statements$start > statements$end[i] &
                      statements$start < last)
     # A blank line and a comment have an empty head. Neither computes
-    # anything, so neither keeps a block alive, and both leave with the
+    # anything. Neither keeps a block alive, and both leave with the
     # statements they described.
     code <- inner[nzchar(statements$head[inner])]
     if (length(code) == 0L || !all(removed[code])) next
@@ -266,8 +266,8 @@ emptied_blocks <- function(lines, statements, removed) {
 #'
 #' brms declares a group-level effect or a smooth coefficient in the
 #' transformed parameters block and assigns it there. `mu_trend`'s
-#' construction repeats that pair, so both precede the predictor using
-#' them, and the block written second drops what the first one wrote.
+#' construction repeats that pair. Both then precede the predictor
+#' using them, and the block written second drops what the first wrote.
 #' Comparison is by statement, since brms splits a density and its
 #' normalising constant over two lines.
 #'
@@ -282,8 +282,8 @@ drop_repeated_statements <- function(code, written) {
   as_block <- function(text) {
     c("model {", strsplit(text, "\n", fixed = TRUE)[[1L]], "}")
   }
-  # One statement per element, so indentation and the line a statement
-  # was split across cannot make two spellings of the same code differ.
+  # One statement per element. Indentation and the line a statement was
+  # split across then cannot make two spellings of one code differ.
   one_line_each <- function(lines, statements) {
     spans <- Map(seq.int, statements$start, statements$end)
     vapply(spans, function(span) {

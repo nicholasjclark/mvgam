@@ -242,10 +242,34 @@ third.**
 inside a string literal or a comment. `stan_line_code()` removes both
 first. The second also takes the next standalone `}` as a loop's
 closing brace, which holds only where the loop has no nested block.
-`clean_stan_comments()` (`stan_polish.R:517`) splits a line on
-`//` with the same blindness to a string literal. Four sites restate
-the `functions` header pattern that `stan_block_header()` composes.
-`stan_source.R` defines one helper for each of these questions.
+`clean_stan_comments()` (`stan_polish.R:517`) splits a line on `//`
+with the same blindness to a string literal. `stan_line_code()` is the
+wrong helper there. It also removes string literals, which suits
+analysis and corrupts emitted code. That site needs a comment stripper
+keeping strings intact.
+
+## One prior class, two scales
+
+**116. A partial `trend_map` writes its own loadings prior.**
+
+`make_partial_z_stanvars()` emits `Z_free_vec ~ student_t(3, 0, 1);`
+as a literal (`stan_assembly.R:2951`). The table's `Z` default is
+`student_t(3, 0, 0.5)` (`priors.R:128`). Every other factor path takes
+`get_trend_parameter_prior(prior, "Z")`
+(`stan_assembly.R:3177`). The free entries of a partial map carry
+twice the scale of a full one, and a user prior on class `Z` never
+reaches them.
+
+## Two derivations of one lag set
+
+**117. `generate_ar_monitor_params()` derives lags of its own.**
+
+`trend_system.R:806-820` computes `1:lags` from `trend_spec$p` or
+`trend_spec$lags`. The Stan generator calls `resolve_active_lags()`
+(`trend_propagation.R:720`), which honours an `ar_lags` override and
+returns `seq_len()`. Where `ar_lags` is supplied, the monitored
+parameters and the emitted program name different lags. At `p = 0` one
+gives `c(1, 0)` and the other `integer(0)`.
 
 ## Debt the code carries in recognisable shapes
 

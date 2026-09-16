@@ -497,7 +497,7 @@ clean_stan_comments <- function(lines) {
     line_trimmed <- trimws(line)
 
     # Track if we're in functions block
-    if (grepl("^functions\\s*\\{", line_trimmed)) {
+    if (grepl(stan_block_header("functions"), line_trimmed)) {
       in_functions_block <- TRUE
     } else if (grepl(stan_any_block_header(), line_trimmed)) {
       in_functions_block <- FALSE

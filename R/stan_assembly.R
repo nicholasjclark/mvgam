@@ -7463,54 +7463,16 @@ extract_stan_block_content <- function(stancode, block_name) {
   }
 
   if (block_name == "functions") {
-    # Special handling for functions block to avoid nested brace issues
-    lines <- strsplit(stancode, "\n")[[1]]
-
-    # Find functions block start with a broad pattern
-    functions_start <- which(grepl("^\\s*functions\\s*\\{", lines, ignore.case = TRUE))
-    if (length(functions_start) == 0) {
+    # One extractor for this block, since a second one bounded it by
+    # the next header and by a brace found scanning back from the end
+    # of the file, and the two disagreed on a trailing blank line.
+    result <- extract_stan_functions_block(stancode)
+    if (is.null(result)) {
       return(NULL)  # Block not found - consistent with other blocks
     }
-
-    # Find next Stan block start (pattern for all valid blocks)
-    next_block_pattern <- paste0("^\\s*(data|parameters|transformed\\s+data|",
-                                "transformed\\s+parameters|model|generated\\s+quantities)\\s*\\{")
-    next_block <- which(grepl(next_block_pattern, lines, ignore.case = TRUE))
-    next_block <- next_block[next_block > functions_start[1]]
-
-    if (length(next_block) == 0) {
-      # Functions block is last - find end of file or closing brace
-      end_line <- length(lines)
-      # Look for closing brace from end backwards
-      for (i in length(lines):functions_start[1]) {
-        if (grepl("^\\s*\\}\\s*$", lines[i])) {
-          end_line <- i - 1
-          break
-        }
-      }
-      content_lines <- lines[(functions_start[1] + 1):end_line]
-    } else {
-      # Extract content between functions { and next block
-      content_lines <- lines[(functions_start[1] + 1):(next_block[1] - 1)]
-    }
-
-    # Validate extracted content
-    if (length(content_lines) == 0) {
+    if (nchar(trimws(result)) == 0) {
       return("")  # Empty functions block
     }
-
-    # Remove trailing closing brace if present
-    last_line <- content_lines[length(content_lines)]
-    if (grepl("^\\s*\\}\\s*$", last_line)) {
-      content_lines <- content_lines[-length(content_lines)]
-    }
-
-    # Final validation - ensure we have actual content
-    result <- paste(content_lines, collapse = "\n")
-    if (nchar(trimws(result)) == 0) {
-      return("")  # Empty after cleaning
-    }
-
     return(result)
 
   } else {
@@ -8373,19 +8335,35 @@ extract_stan_functions_block <- function(stan_code) {
   lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
 
   # Find functions block start
-  functions_start <- grep("^\\s*functions\\s*\\{", lines, ignore.case = TRUE)
+  functions_start <- grep(stan_block_header("functions"), lines,
+                          ignore.case = TRUE)
   if (length(functions_start) == 0) {
     return(NULL)  # No functions block
   }
 
+  # The brace opened by the header closes the block, and a nested
+  # brace in a function body does not. That brace bounds the content
+  # exactly. The block's own closing line falls outside it.
+  closes_at <- find_matching_closing_brace(lines, functions_start[1])
+  if (!is.na(closes_at)) {
+    if (closes_at <= functions_start[1] + 1L) {
+      return("")
+    }
+    content_lines <- lines[(functions_start[1] + 1):(closes_at - 1L)]
+    return(paste(content_lines, collapse = "\n"))
+  }
+
+  # Braces that do not balance leave the next block's header as the
+  # bound, and the block's own closing line falls inside that span.
   next_block <- stan_next_block_line(
     lines, after = functions_start[1], exclude = "functions"
   )
   last <- if (is.na(next_block)) length(lines) else next_block - 1L
+  if (last <= functions_start[1]) {
+    return("")
+  }
   content_lines <- lines[(functions_start[1] + 1):last]
-
-  # Remove only the final closing brace of the functions block (if it exists)
-  if (length(content_lines) > 0 && grepl("^\\s*}\\s*$", content_lines[length(content_lines)])) {
+  if (grepl("^\\s*}\\s*$", content_lines[length(content_lines)])) {
     content_lines <- content_lines[-length(content_lines)]
   }
 
@@ -8459,11 +8437,9 @@ parse_stan_functions <- function(functions_content) {
           current_line <- lines[i]
           function_lines <- c(function_lines, current_line)
 
-          # Count braces in current line
-          open_braces <- nchar(gsub("[^{]", "", current_line))
-          close_braces <- nchar(gsub("[^}]", "", current_line))
-
-          brace_count <- brace_count + open_braces - close_braces
+          # A brace inside a string literal or a comment opens nothing,
+          # and the functions block is where brms writes most of both
+          brace_count <- brace_count + count_stan_braces(current_line)
 
           i <- i + 1
         }
@@ -8616,7 +8592,8 @@ replace_stan_functions_block <- function(stan_code, new_functions_content) {
   lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
 
   # Find functions block boundaries
-  functions_start <- grep("^\\s*functions\\s*\\{", lines, ignore.case = TRUE)
+  functions_start <- grep(stan_block_header("functions"), lines,
+                          ignore.case = TRUE)
   if (length(functions_start) == 0) {
     return(stan_code)  # No functions block to replace
   }
