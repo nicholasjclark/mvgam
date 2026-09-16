@@ -67,31 +67,6 @@ species at every site. Beta and the negative binomial stay correct on
 the same paths, which places the fault at the shared normaliser.
 Reproduce on the jsdgam fixtures before editing.
 
-## One series order, except in one drawn surface
-
-**105. `plot(type = "trend")` sorts its panels.**
-
-Every other per-series surface takes the model's own order. Two
-pictures then put different series in the same position, and on the
-hierarchical fit all six positions differ. The panel code and
-`plot(type = "series")` both take `resolve_series_info()`. The
-divergence enters upstream: `fitted_series_index()`
-(`sample_innovations.R:211`) falls back to `sort(unique(labels))`,
-and the axis record itself is built from `sort(unique(series_vals))`
-at `validations.R:3022`. Reproduce against `axes$series$levels`,
-which is the order the trend matrix numbers its columns.
-
-## No guard that an argument reaches the model
-
-**107. The prediction surface has no exhaustiveness test.**
-
-`tests/testthat/test-update.R:401-424` diffs `formals(mvgam)` against
-`update_inheritance_table()` and `mvgam_update_uninherited`, and
-requires a written reason for every exclusion. That test exists
-because a dropped `loadings_prior` had gone unnoticed. The prediction
-methods have no equivalent, which is how 101 went unnoticed. One test
-over their formals, naming each argument as forwarded or excused.
-
 ## Documentation that contradicts the code
 
 **108. Four pages describe something the code does otherwise.**
