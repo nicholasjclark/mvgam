@@ -234,6 +234,27 @@ For complex temporal dynamics, use the parameter options of a single trend type:
 \item For multivariate dynamics: \code{VAR(p = 2)} captures cross-series relationships
 }
 
+\strong{Stationarity of \code{AR(p)}}: a consecutive lag set with
+\code{p >= 2} is sampled as partial autocorrelations,
+\code{ar1_pacf_trend} through \code{ark_pacf_trend}, each
+declared on \code{(-1, 1)}. The Levinson-Durbin recursion derives
+\code{ar1_trend} through \code{ark_trend} from them, and every
+summary, forecast and hypothesis test uses those coefficients.
+Any vector of partial autocorrelations in \code{(-1, 1)} gives a
+stationary process. Bounding the coefficients directly admits
+explosive draws: \code{ar1_trend} and \code{ar2_trend} both at
+0.9 satisfy the declared bounds, and that process grows without
+limit. Priors for these models name the \code{ar{k}_pacf_trend}
+classes.
+
+\code{AR(p = 1)} samples \code{ar1_trend} directly. At one lag
+the declared interval is already the stationary region. A sparse
+lag set such as \code{AR(p = c(1, 12))} also samples
+\code{ar{k}_trend} directly and fixes its intermediate
+coefficients at zero, a constraint the recursion cannot express,
+and carries no stationarity guarantee. Both take priors on the
+\code{ar{k}_trend} classes.
+
 Use \code{vignette("mvgam_overview")} to see the full details of
 available stochastic trend types in \pkg{mvgam}, or view the rendered
 version on the package website at:

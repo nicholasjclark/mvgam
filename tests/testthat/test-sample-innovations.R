@@ -922,10 +922,12 @@ test_that("a sparse lag set is solved on its own companion", {
 
 
 test_that("an explosive autoregression keeps its innovations", {
-  # Each coefficient sits inside the unit interval while the process
-  # does not, which is why the bound on the parameter is not enough.
+  # A sparse lag set is the source of such a draw. Each coefficient
+  # holds the unit interval on its own, and the process they jointly
+  # define grows without limit. A contiguous lag set derives its
+  # coefficients from partial autocorrelations and cannot produce it.
   got <- ar_companion_multiplier(
-    list(matrix(0.9, nrow = 1L), matrix(0.9, nrow = 1L)), c(1L, 2L)
+    list(matrix(0.9, nrow = 1L), matrix(0.9, nrow = 1L)), c(1L, 12L)
   )
   expect_identical(as.numeric(got), 1)
 })

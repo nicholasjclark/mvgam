@@ -760,9 +760,6 @@ generate_monitor_params <- function(trend_spec) {
   return(all_params)
 }
 
-#' Generate RW-specific monitor parameters
-#' @param trend_spec RW trend specification
-#' @return Character vector of RW-specific parameters
 #' Parameters an `ma` term adds, by trend type
 #'
 #' Named once so the trends cannot drift apart on it. `RW()` and
@@ -794,6 +791,11 @@ ma_params_for <- function(trend_spec, trend_type) {
 }
 
 
+#' Generate RW-specific monitor parameters
+#'
+#' @param trend_spec RW trend specification
+#' @return Character vector of RW-specific parameters
+#'
 #' @noRd
 generate_rw_monitor_params <- function(trend_spec) {
   ma_params_for(trend_spec, "RW")
@@ -806,7 +808,11 @@ generate_rw_monitor_params <- function(trend_spec) {
 generate_ar_monitor_params <- function(trend_spec) {
   # One resolution of the lag set, shared with the Stan generator.
   lag_vec <- resolve_active_lags(trend_spec$p %||% 1, trend_spec$ar_lags)
-  ar_params <- paste0("ar", lag_vec, "_trend")
+  # A contiguous lag set samples partial autocorrelations and
+  # derives the coefficients from them. A derived quantity takes no
+  # prior, which makes the partial autocorrelation the editable row.
+  stem <- if (ar_lags_stationary(lag_vec)) "_pacf_trend" else "_trend"
+  ar_params <- paste0("ar", lag_vec, stem)
 
   # Under hierarchical sharing the per-series ar{lag}_trend
   # vectors still exist (one normal draw per series, per lag)
@@ -816,8 +822,8 @@ generate_ar_monitor_params <- function(trend_spec) {
   if (sharing == "hierarchical") {
     ar_params <- c(
       ar_params,
-      paste0("mu_ar", lag_vec, "_trend"),
-      paste0("sigma_ar", lag_vec, "_trend")
+      paste0("mu_ar", lag_vec, stem),
+      paste0("sigma_ar", lag_vec, stem)
     )
   }
 
@@ -944,6 +950,9 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
   } else if (is_ar_coefficient(param_name)) {
     lag <- gsub("ar(\\d+)_trend", "\\1", param_name)
     return(paste0("AR(", lag, ") coefficient"))
+  } else if (is_ar_partial(param_name)) {
+    lag <- gsub("ar(\\d+)_pacf_trend", "\\1", param_name)
+    return(paste0("AR partial autocorrelation at lag ", lag))
   } else if (grepl("^A_trend\\[", param_name)) {
     lag <- gsub("A_trend\\[(\\d+)\\]", "\\1", param_name)
     return(paste0("VAR coefficient matrix (lag ", lag, ")"))
@@ -1801,6 +1810,27 @@ print.mvgam_trend <- function(x, ...) {
 #'   \item For multiple time scales: `AR(p = c(1, 7, 30))` for daily, weekly, monthly
 #'   \item For multivariate dynamics: `VAR(p = 2)` captures cross-series relationships
 #' }
+#'
+#' **Stationarity of `AR(p)`**: a consecutive lag set with
+#' \code{p >= 2} is sampled as partial autocorrelations,
+#' \code{ar1_pacf_trend} through \code{ark_pacf_trend}, each
+#' declared on \code{(-1, 1)}. The Levinson-Durbin recursion derives
+#' \code{ar1_trend} through \code{ark_trend} from them, and every
+#' summary, forecast and hypothesis test uses those coefficients.
+#' Any vector of partial autocorrelations in \code{(-1, 1)} gives a
+#' stationary process. Bounding the coefficients directly admits
+#' explosive draws: \code{ar1_trend} and \code{ar2_trend} both at
+#' 0.9 satisfy the declared bounds, and that process grows without
+#' limit. Priors for these models name the \code{ar{k}_pacf_trend}
+#' classes.
+#'
+#' \code{AR(p = 1)} samples \code{ar1_trend} directly. At one lag
+#' the declared interval is already the stationary region. A sparse
+#' lag set such as \code{AR(p = c(1, 12))} also samples
+#' \code{ar{k}_trend} directly and fixes its intermediate
+#' coefficients at zero, a constraint the recursion cannot express,
+#' and carries no stationarity guarantee. Both take priors on the
+#' \code{ar{k}_trend} classes.
 #'
 #' @note **VAR fits and `init = 0`**: VAR uses the Heaps-2023
 #'   stationary joint-distribution initialisation. Setting

@@ -2160,9 +2160,12 @@ draw_trend_innovations <- function(n_draws, n_series, df = Inf) {
 #' settle into, and a `CAR()` trend decays by `ar^gap`, so under the
 #' irregular gaps it exists for there is no single stationary
 #' variance. All three keep the innovation covariance. So does any
-#' draw whose autoregression is jointly explosive, which `p > 1`
-#' allows even though each coefficient is bounded to the unit
-#' interval.
+#' draw whose autoregression is jointly explosive. A sparse lag set
+#' such as `p = c(1, 12)` admits such a draw. Each coefficient holds
+#' the unit interval on its own, and the process they jointly define
+#' can still grow without limit. A contiguous `p >= 2` samples
+#' partial autocorrelations and derives its coefficients from them.
+#' Every draw of that parameterisation settles.
 #'
 #' @param object A fitted `mvgam` object
 #' @param draws_mat Posterior draws, already subset to the draws in play

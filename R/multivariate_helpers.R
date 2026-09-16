@@ -393,3 +393,21 @@ is_trend_parameter <- function(pars) {
 is_ar_coefficient <- function(pars) {
   grepl("^ar[0-9]+_trend$", pars)
 }
+
+
+#' Is this parameter an autoregressive partial autocorrelation?
+#'
+#' A contiguous `AR(p >= 2)` trend samples `ar<k>_pacf_trend` and
+#' derives `ar<k>_trend` from it, which keeps every draw stationary.
+#' The two names hold different quantities. This pattern matches the
+#' partial autocorrelation. `is_ar_coefficient()` matches the
+#' coefficient. Each caller collects the one parameter set its own
+#' question asks about.
+#'
+#' @param pars Character vector of parameter names
+#' @return Logical vector
+#'
+#' @noRd
+is_ar_partial <- function(pars) {
+  grepl("^ar[0-9]+_pacf_trend$", pars)
+}

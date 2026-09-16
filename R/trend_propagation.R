@@ -725,6 +725,22 @@ resolve_active_lags <- function(p, override = NULL) {
 }
 
 
+# Internal: does this lag set take the partial autocorrelation
+# parameterisation? For contiguous lags 1..p with p >= 2 the
+# Levinson-Durbin recursion returns exactly the stationary AR(p)
+# coefficients from partial autocorrelations each inside (-1, 1).
+# A single lag needs no recursion: the declared interval is
+# already the stationary region. A sparse lag set fixes its
+# intermediate coefficients at zero. The recursion cannot express
+# that constraint, and those lag sets keep the bounded
+# coefficients they declare.
+#'@noRd
+ar_lags_stationary <- function(ar_lags) {
+  lags <- as.integer(ar_lags)
+  length(lags) >= 2L && identical(lags, seq_len(max(lags)))
+}
+
+
 # Internal: derive the active MA lag set. Every trend type that
 # allows an MA term fits q = 1, so the result is either `c(1L)` or
 # empty.

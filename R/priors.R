@@ -388,7 +388,9 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
   # coefficients stay in `monitor_params` because forecasting reads
   # them from there.
   if (identical(trend_obj$coef_sharing %||% "none", "hierarchical")) {
-    monitor_params <- monitor_params[!is_ar_coefficient(monitor_params)]
+    monitor_params <- monitor_params[
+      !(is_ar_coefficient(monitor_params) | is_ar_partial(monitor_params))
+    ]
   }
 
   if (length(monitor_params) == 0) {
@@ -556,6 +558,18 @@ get_parameter_type_default_prior <- function(param_name) {
   } else if (is_ar_coefficient(param_name)) {
     # AR coefficients: typically bounded [-1, 1] for stationarity
     return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))
+  } else if (is_ar_partial(param_name)) {
+    # Partial autocorrelation of a contiguous AR(p >= 2) trend. The
+    # interval is the stationarity condition itself: every vector of
+    # partial autocorrelations inside it gives a stationary
+    # coefficient vector.
+    return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))
+  } else if (grepl("^mu_ar[0-9]+_pacf_trend$", param_name)) {
+    # Population mean for a pooled partial autocorrelation
+    return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))
+  } else if (grepl("^sigma_ar[0-9]+_pacf_trend$", param_name)) {
+    # Population scale for a pooled partial autocorrelation
+    return(list(prior = "exponential(2)", lb = "0", ub = ""))
   } else if (grepl("^mu_ar[0-9]+_trend$", param_name)) {
     # Population mean for hierarchical AR coefficient (lag-specific)
     return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))

@@ -85,7 +85,13 @@ test_that("all trend types generate correct prior structures", {
 
   trend_specs <- list(
     RW = list(formula = ~ RW(), expected = c("sigma_trend")),
-    AR = list(formula = ~ AR(p = 2), expected = c("ar1_trend", "ar2_trend", "sigma_trend")),
+    # A contiguous AR(p >= 2) samples partial autocorrelations and
+    # derives the coefficients from them. A derived quantity takes
+    # no prior, which makes the partial autocorrelation the class
+    # a prior can name.
+    AR = list(formula = ~ AR(p = 2),
+              expected = c("ar1_pacf_trend", "ar2_pacf_trend",
+                           "sigma_trend")),
     VAR = list(formula = ~ VAR(p = 1), expected = c("A.*_trend", "sigma_trend")),
     ZMVN = list(formula = ~ ZMVN(), expected = c("sigma_trend")),
     # No `sigma_trend`: the piecewise path is a deterministic
@@ -631,8 +637,12 @@ test_that("generate_trend_priors creates correct structures", {
   # AR trend
   ar_spec <- mvgam:::parse_trend_formula(~ AR(p = 2))
   ar_priors <- mvgam:::generate_trend_priors(ar_spec, test_data)
-  expect_true(any(grepl("ar1_trend", ar_priors$class)))
-  expect_true(any(grepl("ar2_trend", ar_priors$class)))
+  expect_true(any(grepl("ar1_pacf_trend", ar_priors$class)))
+  expect_true(any(grepl("ar2_pacf_trend", ar_priors$class)))
+  # One lag keeps the coefficient itself as the settable class.
+  ar1_spec <- mvgam:::parse_trend_formula(~ AR(p = 1))
+  ar1_priors <- mvgam:::generate_trend_priors(ar1_spec, test_data)
+  expect_true(any(grepl("^ar1_trend$", ar1_priors$class)))
 })
 
 test_that("distributional models work correctly with trends", {

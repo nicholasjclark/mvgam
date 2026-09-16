@@ -1098,7 +1098,10 @@ already computes. A random walk has no stationary distribution,
 `ZMVN()` has no dynamics to settle into, and `CAR()` decays by
 `ar^gap` so irregular gaps admit no single variance; all three
 keep their innovation covariance, as does any draw whose
-autoregression is explosive.
+autoregression is explosive. A sparse lag set admits such a draw.
+A contiguous `AR(p >= 2)` samples partial autocorrelations and
+derives its coefficients through the Levinson-Durbin recursion,
+which leaves every draw of it stationary.
 
 **Surface B, Conditional state** (`forecast.mvgam()`,
 `hindcast.mvgam()`, `residuals()`, `pp_check()`): reads the

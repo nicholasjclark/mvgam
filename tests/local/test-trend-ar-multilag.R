@@ -20,6 +20,12 @@
 #
 # Cached at tests/local/fixtures/val_mvgam_ar_multilag.rds.
 #
+# A second, smaller fit covers the contiguous case `AR(p = 2)`,
+# which takes the partial autocorrelation parameterisation. Every
+# draw of that fit is stationary by construction, and the blocks at
+# the end of this file check it.
+# Cached at tests/local/fixtures/val_mvgam_ar_contiguous.rds.
+#
 # Run with:
 #   testthat::test_file("tests/local/test-trend-ar-multilag.R")
 
@@ -959,6 +965,93 @@ test_that("the series argument refuses what it cannot resolve", {
   expect_error(conditional_effects(fit, series = n_lev + 1L), "upper")
   expect_error(conditional_effects(fit, series = c("a", "b")),
                "NULL, 'all', a series name")
+})
+
+
+# -- Stationarity of a contiguous lag set ----------------------------
+
+# A contiguous `AR(p >= 2)` samples partial autocorrelations and
+# derives the coefficients through the Levinson-Durbin recursion. A
+# sparse lag set keeps the bounded coefficients, where a draw can be
+# explosive. This fit covers the contiguous case and checks the
+# property the recursion exists for.
+
+stat_cache <- cache_path("val_mvgam_ar_contiguous.rds")
+if (file.exists(stat_cache)) {
+  cat("[cache] Loading contiguous AR(p = 2) fit.\n")
+  fit_ar2 <- readRDS(stat_cache)
+} else {
+  cat("[fit ] mvgam(AR(p = 2), 2 x 96)\n")
+  set.seed(99L)
+  phi2 <- c(0.65, -0.4)
+  lat2 <- matrix(0, n_time, n_series)
+  for (s in seq_len(n_series)) {
+    e2 <- rnorm(n_time, 0, 0.5)
+    for (t in 3:n_time) {
+      lat2[t, s] <- phi2[1L] * lat2[t - 1L, s] +
+        phi2[2L] * lat2[t - 2L, s] + e2[t]
+    }
+  }
+  dat2 <- data.frame(
+    y = as.numeric(lat2) + rnorm(n_time * n_series, 0, 0.2),
+    time = rep(time_vals, times = n_series),
+    series = factor(rep(series_levels, each = n_time),
+                    levels = series_levels)
+  )
+  fit_ar2 <- mvgam(
+    y ~ 1, trend_formula = ~ AR(p = 2), data = dat2,
+    family = gaussian(), chains = 2L, iter = 1000L, warmup = 500L,
+    silent = 2, backend = "cmdstanr"
+  )
+  saveRDS(fit_ar2, stat_cache)
+}
+
+dm2 <- posterior::as_draws_matrix(fit_ar2$fit)
+
+
+test_that("a contiguous AR(p = 2) carries both parameterisations", {
+  # The partial autocorrelation is sampled and the coefficient is
+  # derived. Both reach the posterior, which lets every post-fit
+  # consumer keep taking `ar{lag}_trend` as the coefficient.
+  vars <- colnames(dm2)
+  expect_true(all(paste0("ar", 1:2, "_pacf_trend[1]") %in% vars))
+  expect_true(all(paste0("ar", 1:2, "_trend[1]") %in% vars))
+})
+
+
+test_that("every draw of a contiguous AR(p = 2) is stationary", {
+  # The claim the recursion exists for. Bounded coefficients leave
+  # about a quarter of the declared region explosive, and a draw
+  # taken there gives a latent state that grows without limit.
+  for (s in seq_len(n_series)) {
+    a1 <- as.numeric(dm2[, paste0("ar1_trend[", s, "]")])
+    a2 <- as.numeric(dm2[, paste0("ar2_trend[", s, "]")])
+    # The AR(2) stationarity region is the triangle these three
+    # inequalities give.
+    expect_true(all(abs(a2) < 1))
+    expect_true(all(a1 + a2 < 1))
+    expect_true(all(a2 - a1 < 1))
+  }
+})
+
+
+test_that("the partial autocorrelations hold their declared bounds", {
+  for (s in seq_len(n_series)) {
+    for (l in 1:2) {
+      pk <- as.numeric(dm2[, paste0("ar", l, "_pacf_trend[", s, "]")])
+      expect_true(all(abs(pk) < 1))
+    }
+  }
+})
+
+
+test_that("a sparse lag set keeps the bounded coefficients", {
+  # The scoping claim. A sparse lag set fixes its intermediate
+  # coefficients at zero, a constraint the recursion cannot state,
+  # and it keeps the plain declaration.
+  vars <- colnames(dm)
+  expect_false(any(grepl("pacf", vars, fixed = TRUE)))
+  expect_true(all(paste0("ar", lags, "_trend[1]") %in% vars))
 })
 
 

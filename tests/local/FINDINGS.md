@@ -83,21 +83,6 @@ repair for the correlated case: the stationary covariance solves
 `Sigma_x[i, j] = Sigma_eps[i, j] / (1 - phi_i phi_j)`. `VAR()`
 computes this already, through `initial_joint_var()`.
 
-## A box where the stationarity region is a triangle
-
-**111. `AR(p >= 2)` coefficients carry independent bounds.**
-
-`ar1_trend` and `ar2_trend` are each declared `<lower=-1, upper=1>`
-with `normal(0, 0.5)`, emitted at `stan_assembly.R:4449`, `:4469`,
-`:4471` and `:4484`. The prior table and the program agree on that.
-The AR(2) stationarity region is a triangle bounded by three
-inequalities: `|phi_2| < 1`; `phi_1 + phi_2 < 1`; `phi_2 - phi_1 < 1`.
-The box admits non-stationary draws such as `phi_1 = phi_2 = 0.9`.
-`VAR()` maps an unconstrained matrix through `AtoP()`
-(`stan_assembly.R:4936`) and `rev_mapping()` (`:4978`, Heaps 2023),
-which is stationary by construction. That mapping at dimension 1
-covers `AR(p)`.
-
 ## A test whose assertion count is not fixed
 
 **127. The suite's total moves between runs of one tree.**

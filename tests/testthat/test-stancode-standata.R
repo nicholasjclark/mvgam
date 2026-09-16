@@ -3925,54 +3925,90 @@ ar_step3_stancode <- function(tf) {
 # `\\s*` between comma-separated arguments so they survive
 # either spacing.
 
-test_that("AR(default + none) keeps the historical ar{lag}_trend declaration", {
+test_that("AR(p = 2, none) samples partial autocorrelations", {
   sc <- ar_step3_stancode(~ AR(p = 2))
+  # The sampled quantity carries the stationarity bound. Any pair
+  # of partial autocorrelations in (-1, 1) gives a stationary
+  # coefficient pair.
   expect_true(grepl(
-    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_trend;", sc
+    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_pacf_trend;", sc
   ))
   expect_true(grepl(
-    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar2_trend;", sc
+    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar2_pacf_trend;", sc
   ))
+  # `ar{lag}_trend` holds the coefficient under either
+  # parameterisation, which keeps every post-fit reader on one
+  # quantity.
+  expect_true(grepl("vector\\[N_lv_trend\\] ar1_trend;", sc))
+  expect_true(grepl("vector\\[N_lv_trend\\] ar2_trend;", sc))
+  expect_true(grepl("ar_pacf_to_coef", sc, fixed = TRUE))
   expect_false(grepl("ar1_shared\\b", sc))
   expect_false(grepl("mu_ar1_trend\\b", sc))
 })
 
-test_that("AR(default + shared) emits ar{lag}_shared and broadcasts to ar{lag}_trend", {
+test_that("AR(p = 1) and a sparse lag set keep the plain coefficient", {
+  # One lag needs no recursion: the declared interval is already
+  # the stationary region. A sparse lag set fixes its intermediate
+  # coefficients at zero, a constraint the recursion cannot state.
+  for (tf in list(~ AR(p = 1), ~ AR(p = c(2, 4)))) {
+    expect_false(grepl("pacf", ar_step3_stancode(tf), fixed = TRUE))
+  }
+  expect_true(grepl(
+    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_trend;",
+    ar_step3_stancode(~ AR(p = 1))
+  ))
+  expect_true(grepl(
+    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar4_trend;",
+    ar_step3_stancode(~ AR(p = c(2, 4)))
+  ))
+})
+
+test_that("AR(default + shared) emits one partial autocorrelation per lag", {
   sc <- ar_step3_stancode(~ AR(p = 2, coef_sharing = "shared"))
   expect_true(grepl(
-    "vector<lower=-1,\\s*upper=1>\\[1\\] ar1_shared;", sc
+    "vector<lower=-1,\\s*upper=1>\\[1\\] ar1_pacf_shared;", sc
   ))
   expect_true(grepl(
-    "vector<lower=-1,\\s*upper=1>\\[1\\] ar2_shared;", sc
+    "vector<lower=-1,\\s*upper=1>\\[1\\] ar2_pacf_shared;", sc
   ))
   expect_true(grepl(
-    "ar1_trend = rep_vector\\(ar1_shared\\[1\\], N_lv_trend\\);", sc
+    paste0("ar1_pacf_trend = rep_vector\\(ar1_pacf_shared\\[1\\],",
+           "\\s*N_lv_trend\\);"), sc
   ))
-  expect_true(grepl(stan_prior_line("ar1_shared", "normal(0, 0.5)"), sc,
-                      fixed = TRUE))
+  expect_true(grepl(
+    stan_prior_line("ar1_pacf_shared", "normal(0, 0.5)"), sc,
+    fixed = TRUE
+  ))
   expect_false(grepl(
     "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_trend;", sc
   ))
 })
 
-test_that("AR(default + hierarchical) emits mu/sigma hyperparams and pooled prior", {
+test_that("AR(default + hierarchical) pools the partial autocorrelation", {
   sc <- ar_step3_stancode(~ AR(p = 2, coef_sharing = "hierarchical"))
   expect_true(grepl(
-    "real<lower=-1,\\s*upper=1> mu_ar1_trend;", sc
+    "real<lower=-1,\\s*upper=1> mu_ar1_pacf_trend;", sc
   ))
-  expect_true(grepl("real<lower=0> sigma_ar1_trend;", sc))
+  expect_true(grepl("real<lower=0> sigma_ar1_pacf_trend;", sc))
   expect_true(grepl(
-    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_trend;", sc
+    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_pacf_trend;", sc
   ))
-  expect_true(grepl(stan_prior_line("mu_ar1_trend", "normal(0, 0.5)"), sc,
-                      fixed = TRUE))
-  expect_true(grepl(stan_prior_line("sigma_ar1_trend", "exponential(2)"),
-                      sc, fixed = TRUE))
   expect_true(grepl(
-    stan_prior_line("ar1_trend",
-                      "normal(mu_ar1_trend, sigma_ar1_trend)"), sc,
+    stan_prior_line("mu_ar1_pacf_trend", "normal(0, 0.5)"), sc,
     fixed = TRUE
   ))
+  expect_true(grepl(
+    stan_prior_line("sigma_ar1_pacf_trend", "exponential(2)"),
+    sc, fixed = TRUE
+  ))
+  expect_true(grepl(
+    stan_prior_line("ar1_pacf_trend",
+                      "normal(mu_ar1_pacf_trend, sigma_ar1_pacf_trend)"),
+    sc, fixed = TRUE
+  ))
+  # Pooling the partial autocorrelation keeps the derived
+  # coefficient stationary for every group.
+  expect_true(grepl("vector\\[N_lv_trend\\] ar1_trend;", sc))
 })
 
 
@@ -3985,10 +4021,10 @@ test_that("get_prior() surfaces mu_/sigma_ rows under coef_sharing = \"hierarchi
     data = dat
   )
   classes <- gp$class
-  expect_true("mu_ar1_trend" %in% classes)
-  expect_true("mu_ar2_trend" %in% classes)
-  expect_true("sigma_ar1_trend" %in% classes)
-  expect_true("sigma_ar2_trend" %in% classes)
+  expect_true("mu_ar1_pacf_trend" %in% classes)
+  expect_true("mu_ar2_pacf_trend" %in% classes)
+  expect_true("sigma_ar1_pacf_trend" %in% classes)
+  expect_true("sigma_ar2_pacf_trend" %in% classes)
   # The per-series coefficients are drawn from the population
   # distribution those hyperparameters describe, so they are the
   # model's structure rather than a prior anyone can set. Offering a

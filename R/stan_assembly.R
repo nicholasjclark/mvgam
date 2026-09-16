@@ -4434,58 +4434,83 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
   checkmate::assert_choice(coef_sharing,
                            c("none", "shared", "hierarchical"))
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  # A contiguous lag set samples partial autocorrelations and
+  # derives the coefficients from them. `ar{lag}_trend` holds the
+  # coefficient under either parameterisation, which keeps every
+  # reader of a fitted model on one quantity.
+  stationary <- ar_lags_stationary(ar_lags)
+  stem <- if (stationary) "_pacf_trend" else "_trend"
+  shared_stem <- if (stationary) "_pacf_shared" else "_shared"
   par_lines <- character(0)
   tpar_decl_lines <- character(0)
   tpar_assign_lines <- character(0)
   prior_lines <- character(0)
   for (lag in ar_lags) {
+    pooled <- paste0("ar", lag, stem)
     sampled <- switch(coef_sharing,
-      none = paste0("ar", lag, "_trend"),
-      shared = paste0("ar", lag, "_shared"),
-      hierarchical = paste0("ar", lag, "_trend")
+      none = pooled,
+      shared = paste0("ar", lag, shared_stem),
+      hierarchical = pooled
     )
     if (coef_sharing == "shared") {
       par_lines <- c(par_lines, paste0(
         "vector<lower=-1,upper=1>[1] ", sampled, ";"
       ))
       tpar_decl_lines <- c(tpar_decl_lines, paste0(
-        "vector[N_lv_trend] ar", lag, "_trend;"
+        "vector[N_lv_trend] ", pooled, ";"
       ))
       tpar_assign_lines <- c(tpar_assign_lines, paste0(
-        "ar", lag, "_trend = rep_vector(",
-        sampled, "[1], N_lv_trend);"
+        pooled, " = rep_vector(", sampled, "[1], N_lv_trend);"
       ))
       prior_str <- get_trend_parameter_prior(prior, sampled)
       if (!nzchar(prior_str)) {
-        prior_str <- get_trend_parameter_prior(
-          prior, paste0("ar", lag, "_trend")
-        )
+        prior_str <- get_trend_parameter_prior(prior, pooled)
       }
       prior_lines <- c(prior_lines, paste0(sampled, " ~ ", prior_str, ";"))
     } else if (coef_sharing == "hierarchical") {
-      mu_name <- paste0("mu_ar", lag, "_trend")
-      sigma_name <- paste0("sigma_ar", lag, "_trend")
+      mu_name <- paste0("mu_ar", lag, stem)
+      sigma_name <- paste0("sigma_ar", lag, stem)
       par_lines <- c(par_lines,
         paste0("real<lower=-1,upper=1> ", mu_name, ";"),
         paste0("real<lower=0> ", sigma_name, ";"),
-        paste0("vector<lower=-1,upper=1>[N_lv_trend] ar", lag, "_trend;")
+        paste0("vector<lower=-1,upper=1>[N_lv_trend] ", pooled, ";")
       )
       mu_prior <- get_trend_parameter_prior(prior, mu_name)
       sigma_prior <- get_trend_parameter_prior(prior, sigma_name)
       prior_lines <- c(prior_lines,
         paste0(mu_name, " ~ ", mu_prior, ";"),
         paste0(sigma_name, " ~ ", sigma_prior, ";"),
-        paste0(
-          "ar", lag, "_trend ~ normal(", mu_name, ", ", sigma_name, ");"
-        )
+        paste0(pooled, " ~ normal(", mu_name, ", ", sigma_name, ");")
       )
     } else {
       par_lines <- c(par_lines, paste0(
-        "vector<lower=-1,upper=1>[N_lv_trend] ar", lag, "_trend;"
+        "vector<lower=-1,upper=1>[N_lv_trend] ", pooled, ";"
       ))
       prior_str <- get_trend_parameter_prior(prior, sampled)
       prior_lines <- c(prior_lines, paste0(sampled, " ~ ", prior_str, ";"))
     }
+  }
+  # The Levinson-Durbin recursion, once per latent series. Every
+  # partial autocorrelation inside (-1, 1) gives a stationary
+  # coefficient vector, which is the constraint the declared
+  # bounds state exactly for one lag and overstate beyond it.
+  if (stationary) {
+    p_max <- max(as.integer(ar_lags))
+    idx <- seq_len(p_max)
+    tpar_decl_lines <- c(tpar_decl_lines, paste0(
+      "vector[N_lv_trend] ar", idx, "_trend;"
+    ))
+    tpar_assign_lines <- c(tpar_assign_lines, paste0(
+      "for (j in 1:N_lv_trend) {\n",
+      "  vector[", p_max, "] ar_coef_j = ar_pacf_to_coef(\n",
+      "    to_vector({",
+      paste0("ar", idx, "_pacf_trend[j]", collapse = ", "),
+      "})\n",
+      "  );\n",
+      paste0("  ar", idx, "_trend[j] = ar_coef_j[", idx, "];",
+             collapse = "\n"), "\n",
+      "}"
+    ))
   }
   parameters_sv <- brms::stanvar(
     name = "ar_parameters",
@@ -4517,6 +4542,42 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
     block = "model"
   )
   c(out, list(model_sv))
+}
+
+
+#' Stan function mapping partial autocorrelations to AR coefficients
+#'
+#' `pacf` holds one partial autocorrelation per lag, each inside
+#' (-1, 1). The returned vector holds the AR(p) coefficients they
+#' imply. Every such input gives a stationary process.
+#'
+#' @return A `functions` block stanvar
+#' @noRd
+ar_pacf_functions_stanvar <- function() {
+  brms::stanvar(
+    name = "ar_functions",
+    scode = paste0(
+      "  // Partial autocorrelations to AR coefficients by the\n",
+      "  // Levinson-Durbin recursion. Each element of `pacf` lies\n",
+      "  // inside (-1, 1), and the result is a stationary\n",
+      "  // coefficient vector for every such input.\n",
+      "  vector ar_pacf_to_coef(vector pacf) {\n",
+      "    int p = num_elements(pacf);\n",
+      "    vector[p] phi = rep_vector(0.0, p);\n",
+      "    vector[p] work;\n",
+      "    for (k in 1:p) {\n",
+      "      work = phi;\n",
+      "      work[k] = pacf[k];\n",
+      "      for (m in 1:(k - 1)) {\n",
+      "        work[m] = phi[m] - pacf[k] * phi[k - m];\n",
+      "      }\n",
+      "      phi = work;\n",
+      "    }\n",
+      "    return phi;\n",
+      "  }"
+    ),
+    block = "functions"
+  )
 }
 
 #' AR Trend Generator
@@ -4601,11 +4662,16 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   components <- add_hierarchical_support(components, trend_specs, data_info, prior)
 
   # 1/3. PARAMETERS, TPARAMETERS (decls), MODEL (priors) for AR
-  # coefficients. Branch on `coef_sharing`. The `"none"` path
-  # emits `ar{lag}_trend` directly in `parameters`; `"shared"`
-  # and `"hierarchical"` introduce derived `ar{lag}_trend`
-  # definitions in transformed parameters.
+  # coefficients. Branch on `coef_sharing`. Under a sparse lag set
+  # the `"none"` path declares `ar{lag}_trend` in `parameters`,
+  # and `"shared"` and `"hierarchical"` declare it in transformed
+  # parameters. A contiguous lag set declares `ar{lag}_pacf_trend`
+  # in `parameters` under every sharing mode and derives
+  # `ar{lag}_trend` from it through the Levinson-Durbin recursion.
   coef_sharing <- trend_specs$coef_sharing %||% "none"
+  if (ar_lags_stationary(ar_lags)) {
+    components <- append(components, list(ar_pacf_functions_stanvar()))
+  }
   ar_blocks <- build_ar_coef_stanvars(
     ar_lags = ar_lags,
     coef_sharing = coef_sharing,
