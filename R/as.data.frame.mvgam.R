@@ -304,11 +304,14 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   # user asked for. brms names its coefficient `b_<coef>`, or
   # `b_<resp>_<coef>` in one response of a multivariate formula.
   keep <- !endsWith(user, paste0("_", MVGAM_EMPTY_OBS_PLACEHOLDER))
-  # Stan's own working arrays are never a parameter a reader asked
-  # for, whatever they asked for. Dropping them here rather than
-  # through the fit's `exclude` list covers a fit saved before the
-  # names were known to be internal.
-  keep <- keep & mvgam_par_kind(user) != "internal"
+  # Stan's own working arrays are held out of the parameter set this
+  # projection returns. Filtering by kind covers a fit saved before
+  # those names carried the kind `internal`, which the fit's own
+  # `exclude` list would miss. `lprior` and `lp__` carry the kind
+  # `bookkeeping` and meet the same rule: the taxonomy records that
+  # no summary claims them.
+  keep <- keep &
+    !(mvgam_par_kind(user) %in% c("internal", "bookkeeping"))
   if (!all) {
     keep <- keep & !is_hidden_unrotated(user)
   }

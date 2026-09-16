@@ -68,7 +68,9 @@ test_that("as.matrix.mvgam(variable = NULL) returns all parameters", {
   # downstream refuses a `draws_matrix`.
   expect_true(is.matrix(out))
   expect_false(inherits(out, "draws"))
-  expect_equal(ncol(out), 18L)
+  # The stub declares 18 columns, two of them Stan's own `lp__` and
+  # `lprior`. A user-facing matrix carries the other 16.
+  expect_equal(ncol(out), 16L)
   # The draws object is still reachable by asking for it.
   expect_s3_class(posterior::as_draws_matrix(stub), "draws_matrix")
 })
@@ -225,7 +227,9 @@ test_that("rhat.mvgam returns a named numeric vector", {
   stub <- make_mvgam_stub()
   out <- rhat(stub)
   expect_type(out, "double")
-  expect_equal(length(out), 18L)
+  # One entry per user-facing parameter, with `lp__` and `lprior`
+  # left to the raw fit.
+  expect_equal(length(out), 16L)
 })
 
 test_that("rhat.mvgam(pars = ...) filters", {
@@ -320,7 +324,8 @@ test_that("ndraws / nchains / niterations / nvariables work", {
   expect_equal(ndraws(stub), 100L)
   expect_equal(nchains(stub), 2L)
   expect_equal(niterations(stub), 50L)
-  expect_equal(nvariables(stub), 18L)
+  # 18 columns declared, less `lp__` and `lprior`.
+  expect_equal(nvariables(stub), 16L)
 })
 
 test_that("getCall.mvgam returns the stored call", {
