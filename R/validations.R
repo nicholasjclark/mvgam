@@ -1352,7 +1352,7 @@ trend_map_from_dataframe <- function(input, series_levels) {
 #' @noRd
 any_trend_requires_regular_intervals <- function(trend_specs) {
   if (is.null(trend_specs)) return(FALSE)
-  rule <- "requires_regular_intervals"
+  rule <- rule_requires_regular_intervals
   specs <- if (inherits(trend_specs, "mvgam_trend")) {
     list(trend_specs)
   } else if (is_multivariate_trend_specs(trend_specs)) {

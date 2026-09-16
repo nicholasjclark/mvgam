@@ -105,8 +105,6 @@ test_that("RW constructor accepts factor models", {
     expect_equal(rw_trend$n_lv, 3)
     expect_equal(rw_trend$trend, "RW")
 
-    # Test validation rules are automatically assigned
-    expect_true("supports_factors" %in% rw_trend$validation_rules)
   })
 
   # RW without n_lv should work
@@ -116,10 +114,9 @@ test_that("RW constructor accepts factor models", {
     expect_null(rw_trend_no_lv$n_lv)
     expect_equal(rw_trend_no_lv$trend, "RW")
 
-    # Test validation rules are automatically assigned
-    expect_true("requires_regular_intervals" %in% rw_trend_no_lv$validation_rules)
-    expect_true("supports_factors" %in% rw_trend_no_lv$validation_rules)
-    expect_true("supports_hierarchical" %in% rw_trend_no_lv$validation_rules)
+    # The one declaration a trend carries.
+    expect_identical(rw_trend_no_lv$validation_rules,
+                     "requires_regular_intervals")
   })
 })
 

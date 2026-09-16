@@ -369,11 +369,10 @@ test_that("simplified RW constructor works correctly", {
     expect_false(rw_trend$cor)
     expect_null(rw_trend$n_lv)
 
-    # Test validation rules are automatically assigned
-    expect_true(length(rw_trend$validation_rules) > 0)
-    expect_true("requires_regular_intervals" %in% rw_trend$validation_rules)
-    expect_true("supports_factors" %in% rw_trend$validation_rules)
-    expect_true("supports_hierarchical" %in% rw_trend$validation_rules)
+    # RW indexes its lag by position, and the fitting path tests this
+    # declaration to require an even grid.
+    expect_identical(rw_trend$validation_rules,
+                     "requires_regular_intervals")
 
     # Test RW with parameters
     rw_ma_trend <- RW(ma = TRUE, cor = TRUE)
@@ -399,40 +398,20 @@ test_that("helper functions work correctly", {
   expect_false(defaults$cor)
   expect_null(defaults$n_lv)
 
-  # Test get_default_validation_rules
-  rw_rules <- get_default_validation_rules("RW")
-  expect_true("requires_regular_intervals" %in% rw_rules)
-  expect_true("supports_factors" %in% rw_rules)
-  expect_true("supports_hierarchical" %in% rw_rules)
-
-  ar_rules <- get_default_validation_rules("AR")
-  expect_equal(rw_rules, ar_rules)  # Should be same for stationary trends
-
-  car_rules <- get_default_validation_rules("CAR")
-  expect_true("allows_irregular_intervals" %in% car_rules)
-  expect_true("incompatible_with_factors" %in% car_rules)
-
-  # VAR is a true autoregressive multivariate trend; the Δt
-  # spacing enters the AR coefficient interpretation, so the
-  # regular-intervals rule must stay.
-  var_rules <- get_default_validation_rules("VAR")
-  expect_true("requires_regular_intervals" %in% var_rules)
-  expect_true("supports_factors" %in% var_rules)
-  expect_true("requires_minimum_series_count" %in% var_rules)
-
-  # ZMVN is `MVN(0, Sigma)` with covariance indexed by series
-  # only; time is a stacking dimension and Δt does NOT enter the
-  # likelihood (Stan: `to_vector(innovations_trend) ~ std_normal()`)
-  # nor the R-side propagator (`propagate_zmvn` does not accept a
-  # `time` arg). The regular-intervals rule should NOT fire so
-  # that ZMVN fits accept gappy / non-contiguous time grids, such
-  # as the jsdgam(unit = site) layout where dropping a fold of
-  # sites in a kfold refit leaves an irregular site axis.
-  zmvn_rules <- get_default_validation_rules("ZMVN")
-  expect_false("requires_regular_intervals" %in% zmvn_rules)
-  expect_true("supports_factors" %in% zmvn_rules)
-  expect_true("supports_hierarchical" %in% zmvn_rules)
-  expect_true("requires_minimum_series_count" %in% zmvn_rules)
+  # The one declaration, and the two trends exempt from it. ZMVN's
+  # likelihood is `MVN(0, Sigma)` with covariance indexed by series,
+  # and the time gap enters neither the Stan likelihood
+  # (`to_vector(innovations_trend) ~ std_normal()`) nor
+  # `propagate_zmvn()`, which takes no `time` argument. That admits a
+  # gappy grid, such as the `jsdgam(unit = site)` layout whose kfold
+  # refit drops a fold of sites.
+  for (tt in c("RW", "AR", "VAR", "PW")) {
+    expect_identical(get_default_validation_rules(tt),
+                     "requires_regular_intervals")
+  }
+  for (tt in c("CAR", "ZMVN")) {
+    expect_identical(get_default_validation_rules(tt), character(0))
+  }
 
   # Test apply_mvgam_trend_defaults
   partial_trend <- list(trend = "RW", ma = TRUE)
@@ -497,39 +476,9 @@ test_that("trend constructors use process_trend_params correctly", {
 })
 
 test_that("every rule constant is one a trend actually declares", {
-  # The vocabulary is only worth having if each entry appears in some
-  # trend's defaults; a constant nothing declares is a promise the
-  # package does not keep.
-  constants <- c(
-    rule_requires_regular_intervals, rule_allows_irregular_intervals,
-    rule_supports_factors, rule_incompatible_with_factors,
-    rule_supports_hierarchical, rule_incompatible_with_hierarchical,
-    rule_requires_minimum_series_count
-  )
-  declared <- unique(unlist(lapply(
-    c("RW", "AR", "VAR", "CAR", "PW", "ZMVN"), get_default_validation_rules
-  )))
-  expect_setequal(constants, declared)
-
-  # `requires_regular_intervals` is the one the fitting path reads, so
-  # it has to keep its exact spelling.
-  expect_equal(rule_requires_regular_intervals, "requires_regular_intervals")
-
-  # Test that validation rule assignment works for all trend types
-  trend_types <- c("RW", "AR", "VAR", "CAR", "PW", "ZMVN")
-  for (trend_type in trend_types) {
-    rules <- get_default_validation_rules(trend_type)
-    expect_true(length(rules) > 0,
-                label = paste("validation rules for", trend_type))
-    expect_true(all(rules %in% c(
-      "requires_regular_intervals", "allows_irregular_intervals",
-      "supports_factors", "incompatible_with_factors",
-      "supports_hierarchical", "incompatible_with_hierarchical",
-      "requires_hierarchical", "requires_seasonal_period",
-      "supports_multiple_seasonality", "incompatible_with_seasonal_smooths",
-      "requires_balanced_panels", "requires_minimum_series_count"
-    )), label = paste("recognised rule names for", trend_type))
-  }
+  # The constant and the string the fitting path tests are one value.
+  expect_equal(rule_requires_regular_intervals,
+               "requires_regular_intervals")
 })
 
 test_that("parameter suffix validation is robust", {

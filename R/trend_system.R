@@ -998,10 +998,8 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #' @section Self-Contained Validation Fields:
 #' \describe{
 #'   \item{validation_rules}{Character vector of what the trend assumes
-#'     about the data. Only `"requires_regular_intervals"` changes what
-#'     mvgam does; the rest record intent. See
-#'     `?validation_rules_vocabulary` for which and why.
-#'     Examples: c("requires_regular_intervals", "supports_factors")}
+#'     about the data. It holds `"requires_regular_intervals"` or
+#'     nothing. See `?validation_rules_vocabulary`.}
 #' }
 #'
 #' @section Self-Contained Parameter Monitoring Fields:
@@ -1027,7 +1025,8 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #'   \item{subgr}{Character string. Subgrouping variable name.
 #'     Default "series" but can be customized for hierarchical models.}
 #'   \item{n_lv}{Integer. Number of latent variables for factor models.
-#'     Only allowed when validation_rules includes "supports_factors".}
+#'     Allowed for the trends the registry records `supports_factors`
+#'     against: AR, RW, VAR and ZMVN.}
 #'   \item{cap}{Character string. Carrying capacity variable for logistic growth.
 #'     Required for PW models with growth = "logistic".}
 #'   \item{growth}{Character string. Growth type for piecewise models:
@@ -1074,13 +1073,11 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #' }
 #'
 #' @section Field Relationships and Validation Rules:
-#' The validation_rules field determines which other fields are valid:
 #' \itemize{
-#'   \item "supports_factors" + n_lv: Factor models allowed
-#'   \item "incompatible_with_factors" + n_lv: Error thrown
-#'   \item "supports_hierarchical" + gr/subgr: Hierarchical models allowed
-#'   \item "requires_regular_intervals": Regular time validation triggered
-#'   \item "allows_irregular_intervals": CAR-style irregular time handling
+#'   \item "requires_regular_intervals": regular time validation runs
+#'   \item n_lv and trend_map: the registry's `supports_factors` entry
+#'     decides, through `refuse_factor_request_for_trend()`
+#'   \item gr and subgr: the constructor defining them decides
 #' }
 #'
 #' @section Convention-Based Function Dispatch:
@@ -1126,11 +1123,7 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #'   series = "series",
 #'
 #'   # Self-contained validation
-#'   validation_rules = c(
-#'     "requires_regular_intervals",
-#'     "supports_factors",
-#'     "supports_hierarchical"
-#'   ),
+#'   validation_rules = "requires_regular_intervals",
 #'
 #'   # Self-contained monitoring
 #'   monitor_params = c("ar1_trend", "sigma_trend"),
@@ -1165,41 +1158,26 @@ NULL
 #' @description
 #' Every `mvgam_trend` object carries a `validation_rules` character
 #' vector saying what the trend's mathematics assumes about the data.
-#' The package reads those declarations directly; there is no rule
-#' engine, and declaring a rule does not by itself cause anything to be
-#' checked.
-#'
-#' Read this before adding a trend type, because only one declaration
-#' currently changes what mvgam does, and the rest are metadata.
+#' The vector holds one declaration,
+#' `"requires_regular_intervals"`, and the fitting path acts on it.
 #'
 #' @section What is enforced:
-#' `"requires_regular_intervals"` is the one declaration the fitting
-#' path acts on. `any_trend_requires_regular_intervals()` scans the
-#' trend specifications, and if any of them names it, the observed time
-#' column has to be evenly spaced or validation fails.
+#' `any_trend_requires_regular_intervals()` scans the trend
+#' specifications, and if any of them names the rule, the observed
+#' time column has to be evenly spaced or validation fails.
 #'
-#' This replaced a hardcoded test for `CAR`, which forced regular
-#' intervals on every other trend including `ZMVN`, whose likelihood is
-#' a multivariate normal indexed by series rather than time and is
-#' therefore exchangeable in time. Declaring the requirement on the
-#' trend rather than special-casing one name is what fixed that.
+#' `CAR()` and `ZMVN()` are the two trends that omit it. `CAR()`
+#' carries the elapsed gap into its kernel, and `ZMVN()`'s likelihood
+#' is a multivariate normal indexed by series, which is exchangeable
+#' in time. Every other trend indexes its lag by position.
 #'
-#' @section What is declarative only:
-#' The remaining rules record intent and are read by nothing:
-#' `"allows_irregular_intervals"`, `"supports_factors"`,
-#' `"incompatible_with_factors"`, `"supports_hierarchical"`,
-#' `"incompatible_with_hierarchical"` and
-#' `"requires_minimum_series_count"`. They are worth keeping because
-#' they describe each trend in one place, but do not add one expecting
-#' it to be honoured.
-#'
-#' Factor compatibility in particular is enforced somewhere else
-#' entirely. [register_trend_type()] takes `supports_factors` and
-#' `incompatibility_reason` arguments, and the registry raises the error
-#' when `n_lv` is given to a trend that cannot take it. A trend that
-#' declares `"incompatible_with_factors"` here but registers with
-#' `supports_factors = TRUE` will accept `n_lv` regardless of what this
-#' vector says.
+#' @section Factor and grouping support:
+#' The registry records factor support. [register_trend_type()] takes
+#' `supports_factors` and `incompatibility_reason`, and
+#' `refuse_factor_request_for_trend()` composes the refusal from that
+#' entry whichever route asked for a factor model. Hierarchical
+#' support follows the `gr` and `subgr` arguments a constructor
+#' defines.
 #'
 #' @section Adding a trend type:
 #' The declarations come from `get_default_validation_rules()`, which
@@ -1222,15 +1200,9 @@ NULL
 #' @author Nicholas J Clark
 NULL
 
-# The declarations a trend may carry. Only the first is acted on; see
-# `?validation_rules_vocabulary` for which and why.
+# The one declaration a trend carries; see
+# `?validation_rules_vocabulary`.
 rule_requires_regular_intervals <- "requires_regular_intervals"
-rule_allows_irregular_intervals <- "allows_irregular_intervals"
-rule_supports_factors <- "supports_factors"
-rule_incompatible_with_factors <- "incompatible_with_factors"
-rule_supports_hierarchical <- "supports_hierarchical"
-rule_incompatible_with_hierarchical <- "incompatible_with_hierarchical"
-rule_requires_minimum_series_count <- "requires_minimum_series_count"
 
 
 # =============================================================================
@@ -2838,58 +2810,16 @@ apply_mvgam_trend_defaults <- function(trend_obj) {
 get_default_validation_rules <- function(trend_type) {
   checkmate::assert_string(trend_type, min.chars = 1)
 
-  # Define rule sets for easy extension
-  stationary_trend_rules <- c(
-    rule_requires_regular_intervals,
-    rule_supports_factors,
-    rule_supports_hierarchical
-  )
-
-  irregular_trend_rules <- c(
-    rule_allows_irregular_intervals,
-    rule_incompatible_with_factors,
-    rule_incompatible_with_hierarchical
-  )
-
-  changepoint_trend_rules <- c(
-    rule_requires_regular_intervals,
-    rule_incompatible_with_factors,
-    rule_supports_hierarchical
-  )
-
-  multivariate_trend_rules <- c(
-    rule_requires_regular_intervals,
-    rule_supports_factors,
-    rule_supports_hierarchical,
-    rule_requires_minimum_series_count
-  )
-
-  # ZMVN is `x ~ MVN(0, Sigma)` with Sigma parameterised across
-  # series only; time enters as a stacking dimension, not as an
-  # autoregressive lag. Unlike VAR, the math is invariant to
-  # `Delta t`, so the regular-intervals rule should not fire. The
-  # remaining multivariate rules (factor support, hierarchical
-  # grouping, minimum series count) still apply.
-  static_multivariate_trend_rules <- c(
-    rule_supports_factors,
-    rule_supports_hierarchical,
-    rule_requires_minimum_series_count
-  )
-
-  # Assign rules based on trend type
-  rules <- switch(trend_type,
-    "RW" = stationary_trend_rules,
-    "AR" = stationary_trend_rules,
-    "VAR" = multivariate_trend_rules,
-    "CAR" = irregular_trend_rules,
-    "PW" = changepoint_trend_rules,
-    "ZMVN" = static_multivariate_trend_rules,
-
-    # Default for unknown trend types (extensible)
-    stationary_trend_rules
-  )
-
-  return(rules)
+  # `CAR()` carries the elapsed gap into its kernel, and `ZMVN()` is
+  # a multivariate normal indexed by series, with time entering as a
+  # stacking dimension. Every other trend indexes its lag by
+  # position, which an uneven grid breaks. An unregistered trend
+  # takes the stricter rule.
+  tolerates_uneven_grid <- c("CAR", "ZMVN")
+  if (trend_type %in% tolerates_uneven_grid) {
+    return(character(0))
+  }
+  rule_requires_regular_intervals
 }
 
 #' Create mvgam Trend Object

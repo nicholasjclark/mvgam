@@ -6,44 +6,29 @@
 \description{
 Every \code{mvgam_trend} object carries a \code{validation_rules} character
 vector saying what the trend's mathematics assumes about the data.
-The package reads those declarations directly; there is no rule
-engine, and declaring a rule does not by itself cause anything to be
-checked.
-
-Read this before adding a trend type, because only one declaration
-currently changes what mvgam does, and the rest are metadata.
+The vector holds one declaration,
+\code{"requires_regular_intervals"}, and the fitting path acts on it.
 }
 \section{What is enforced}{
 
-\code{"requires_regular_intervals"} is the one declaration the fitting
-path acts on. \code{any_trend_requires_regular_intervals()} scans the
-trend specifications, and if any of them names it, the observed time
-column has to be evenly spaced or validation fails.
+\code{any_trend_requires_regular_intervals()} scans the trend
+specifications, and if any of them names the rule, the observed
+time column has to be evenly spaced or validation fails.
 
-This replaced a hardcoded test for \code{CAR}, which forced regular
-intervals on every other trend including \code{ZMVN}, whose likelihood is
-a multivariate normal indexed by series rather than time and is
-therefore exchangeable in time. Declaring the requirement on the
-trend rather than special-casing one name is what fixed that.
+\code{CAR()} and \code{ZMVN()} are the two trends that omit it. \code{CAR()}
+carries the elapsed gap into its kernel, and \code{ZMVN()}'s likelihood
+is a multivariate normal indexed by series, which is exchangeable
+in time. Every other trend indexes its lag by position.
 }
 
-\section{What is declarative only}{
+\section{Factor and grouping support}{
 
-The remaining rules record intent and are read by nothing:
-\code{"allows_irregular_intervals"}, \code{"supports_factors"},
-\code{"incompatible_with_factors"}, \code{"supports_hierarchical"},
-\code{"incompatible_with_hierarchical"} and
-\code{"requires_minimum_series_count"}. They are worth keeping because
-they describe each trend in one place, but do not add one expecting
-it to be honoured.
-
-Factor compatibility in particular is enforced somewhere else
-entirely. \code{\link[=register_trend_type]{register_trend_type()}} takes \code{supports_factors} and
-\code{incompatibility_reason} arguments, and the registry raises the error
-when \code{n_lv} is given to a trend that cannot take it. A trend that
-declares \code{"incompatible_with_factors"} here but registers with
-\code{supports_factors = TRUE} will accept \code{n_lv} regardless of what this
-vector says.
+The registry records factor support. \code{\link[=register_trend_type]{register_trend_type()}} takes
+\code{supports_factors} and \code{incompatibility_reason}, and
+\code{refuse_factor_request_for_trend()} composes the refusal from that
+entry whichever route asked for a factor model. Hierarchical
+support follows the \code{gr} and \code{subgr} arguments a constructor
+defines.
 }
 
 \section{Adding a trend type}{

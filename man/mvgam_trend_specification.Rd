@@ -27,10 +27,8 @@ Default "series" with warning when not explicitly specified.}
 
 \describe{
 \item{validation_rules}{Character vector of what the trend assumes
-about the data. Only \code{"requires_regular_intervals"} changes what
-mvgam does; the rest record intent. See
-\code{?validation_rules_vocabulary} for which and why.
-Examples: c("requires_regular_intervals", "supports_factors")}
+about the data. It holds \code{"requires_regular_intervals"} or
+nothing. See \code{?validation_rules_vocabulary}.}
 }
 }
 
@@ -60,7 +58,8 @@ VAR models always set this to TRUE for optimal performance.}
 \item{subgr}{Character string. Subgrouping variable name.
 Default "series" but can be customized for hierarchical models.}
 \item{n_lv}{Integer. Number of latent variables for factor models.
-Only allowed when validation_rules includes "supports_factors".}
+Allowed for the trends the registry records \code{supports_factors}
+against: AR, RW, VAR and ZMVN.}
 \item{cap}{Character string. Carrying capacity variable for logistic growth.
 Required for PW models with growth = "logistic".}
 \item{growth}{Character string. Growth type for piecewise models:
@@ -113,13 +112,11 @@ NULL for univariate models, populated during multivariate parsing.}
 
 \section{Field Relationships and Validation Rules}{
 
-The validation_rules field determines which other fields are valid:
 \itemize{
-\item "supports_factors" + n_lv: Factor models allowed
-\item "incompatible_with_factors" + n_lv: Error thrown
-\item "supports_hierarchical" + gr/subgr: Hierarchical models allowed
-\item "requires_regular_intervals": Regular time validation triggered
-\item "allows_irregular_intervals": CAR-style irregular time handling
+\item "requires_regular_intervals": regular time validation runs
+\item n_lv and trend_map: the registry's \code{supports_factors} entry
+decides, through \code{refuse_factor_request_for_trend()}
+\item gr and subgr: the constructor defining them decides
 }
 }
 
@@ -175,11 +172,7 @@ ar_trend <- structure(list(
   series = "series",
 
   # Self-contained validation
-  validation_rules = c(
-    "requires_regular_intervals",
-    "supports_factors",
-    "supports_hierarchical"
-  ),
+  validation_rules = "requires_regular_intervals",
 
   # Self-contained monitoring
   monitor_params = c("ar1_trend", "sigma_trend"),
