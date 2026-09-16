@@ -303,18 +303,14 @@ and an `mvbind()` fit carry none. The field stays NULL while
 field. `sign_canonical.R:87-93` records this having already returned
 an object untouched with nothing said.
 
-## The suite's assertion count moves between runs
+## A test whose assertion count is not fixed
 
-**127. Two runs of one tree report different totals.**
+**127. The suite's total moves between runs of one tree.**
 
-`devtools::test()` reported 10417, then 10427 on a tree whose only
-change was in `R/`, then 10427 again once ten assertions were added to
-`test-stancode-standata.R`. That file's own count moved 1476 to 1486,
-measured on its own. Ten assertions ran and ten others did not. Every
-run reported no failures, no warnings and no skips. What moves is the
-number of assertions a test runs, which makes the total a poor signal
-for a regression. Record per-file counts on two runs of one tree to
-find the test whose count depends on a draw.
+Two runs of one tree gave totals ten apart, with no failures, no
+warnings and no skips in either. One test's assertion count depends on
+a draw, which makes the total a poor signal for a regression. Record
+per-file counts on two runs to name it.
 
 ## Debt the code carries in recognisable shapes
 
