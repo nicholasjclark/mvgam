@@ -288,12 +288,16 @@ test_that("per_obs_series_labels maps log_lik columns to series", {
   )
 })
 
-test_that("per_obs_series_labels rejects fits without a series column", {
+test_that("per_obs_series_labels refuses a frame naming no series", {
+  # Which series a row belongs to is the axis record's question. A
+  # hierarchical fit names its series from grouping columns with no
+  # series column present, and the refusal here covers a frame
+  # carrying neither.
   stub <- make_by_series_stub()
   stub$data$series <- NULL
   expect_error(
     mvgam:::per_obs_series_labels(stub),
-    "requires a 'series' column"
+    "names no series"
   )
 })
 

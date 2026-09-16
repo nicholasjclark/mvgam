@@ -4929,8 +4929,14 @@ trend_formula_covariates <- function(trend_formula, data,
   if (is.null(trend_formula)) {
     return(character(0))
   }
-  parsed <- parse_trend_formula(trend_formula, data,
-                                .precomputed_dimensions = dimensions)
+  # `parse_trend_formula()` requires the dimensions whenever `data`
+  # reaches it. The lighter `stancode()` path holds neither, and the
+  # split into trend terms and regular terms needs no frame.
+  parsed <- parse_trend_formula(
+    trend_formula,
+    data = if (is.null(dimensions)) NULL else data,
+    .precomputed_dimensions = dimensions
+  )
   regular_terms <- parsed$regular_terms %||% character(0)
   out <- character(0)
   for (term in regular_terms) {
