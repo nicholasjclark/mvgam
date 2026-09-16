@@ -1909,8 +1909,84 @@ test_that("times_trend names the design row it claims to", {
         as.numeric(sd$X_trend[sd$times_trend[, s], env_col]),
         as.numeric(frame$env[match(paste(grid, occupant[s]), key)]),
         tolerance = 1e-9,
-        label = paste(nm, occupant[s], "reads its own covariates")
+        label = paste(nm, occupant[s], "takes its own covariates")
       )
     }
+  }
+})
+
+
+test_that("spec_axis_vars resolves every shape a spec arrives in", {
+  # The pair is spelled `time_var` or `time`, and written flat or
+  # under `$trend_model`. A layer resolving it alone can name a
+  # different column from the one the model was fitted on.
+  expect_identical(
+    spec_axis_vars(NULL),
+    list(time_var = "time", series_var = "series")
+  )
+  expect_identical(
+    spec_axis_vars(list(time_var = "wk", series_var = "sp")),
+    list(time_var = "wk", series_var = "sp")
+  )
+  expect_identical(
+    spec_axis_vars(list(time = "wk", series = "sp")),
+    list(time_var = "wk", series_var = "sp")
+  )
+  expect_identical(
+    spec_axis_vars(list(trend_model = list(time = "wk",
+                                           series = "sp"))),
+    list(time_var = "wk", series_var = "sp")
+  )
+  # A named set holds one specification per response, and the first
+  # names the axis.
+  expect_identical(
+    spec_axis_vars(list(
+      yA = list(trend = "AR", time = "wk", series = "sp"),
+      yB = list(trend = "AR", time = "zz", series = "qq")
+    )),
+    list(time_var = "wk", series_var = "sp")
+  )
+  # `trend_spec_head()` takes a first element for a named
+  # multivariate set alone. An unnamed list of one gives the
+  # defaults, and a caller holding that shape takes the head first.
+  expect_identical(
+    spec_axis_vars(list(list(trend = "ZMVN", time = "wk",
+                             series = "sp"))),
+    list(time_var = "time", series_var = "series")
+  )
+})
+
+
+test_that("a trend keeps the columns its constructor names", {
+  # `zmvn_scale_confounded()` wraps a univariate specification in an
+  # unnamed list of one. Taking the axis from that list gives the
+  # default column names, and the confound check then counts series
+  # in a column the model never used.
+  set.seed(11)
+  d <- expand.grid(
+    wk = seq_len(20), sp = factor(c("a", "b", "c")),
+    stringsAsFactors = TRUE
+  )
+  d$y <- rnorm(nrow(d))
+  d$x <- rnorm(nrow(d))
+  shapes <- list(
+    ar = ~ AR(p = 1, time = wk, series = sp),
+    rw = ~ RW(time = wk, series = sp),
+    zmvn = ~ ZMVN(time = wk, series = sp),
+    car = ~ CAR(time = wk, series = sp),
+    factor_ar = ~ AR(p = 1, n_lv = 2, time = wk, series = sp)
+  )
+  for (nm in names(shapes)) {
+    prefit <- mvgam(
+      y ~ x, trend_formula = shapes[[nm]], data = d,
+      family = gaussian(), run_model = FALSE
+    )
+    vars <- axis_vars(prefit)
+    expect_identical(vars$time_var, "wk", label = paste(nm, "time"))
+    expect_identical(vars$series_var, "sp", label = paste(nm, "series"))
+    expect_identical(
+      as.integer(prefit$standata$N_series_trend), 3L,
+      label = paste(nm, "series count")
+    )
   }
 })

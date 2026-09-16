@@ -191,6 +191,29 @@ axis_vars <- function(object) {
   )
 }
 
+
+#' The columns a trend spec names
+#'
+#' A spec carries the pair under two spellings, `time_var` and
+#' `time`, at either of two depths, flat or under `$trend_model`.
+#' `spec_field()` settles the depth and both spellings are taken
+#' here. This function holds the literal defaults for the layers
+#' running before a fit exists, where `axis_vars()` has no object to
+#' take them from.
+#'
+#' @param spec A trend spec, a list of them, or `NULL`
+#' @return A list naming `time_var` and `series_var`.
+#' @noRd
+spec_axis_vars <- function(spec) {
+  spec <- trend_spec_head(spec)
+  list(
+    time_var = spec_field(spec, "time_var") %||%
+      spec_field(spec, "time") %||% "time",
+    series_var = spec_field(spec, "series_var") %||%
+      spec_field(spec, "series") %||% "series"
+  )
+}
+
 #' Whether a fit's series are its responses
 #'
 #' A wide `mvbf()` frame holds one row per occasion and one column per

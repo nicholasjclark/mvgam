@@ -316,15 +316,11 @@ build_stan_components <- function(formula, data, family = gaussian(),
     # Filter priors: only pass trend-related priors to trend setup
     trend_priors <- filter_priors_by_side(prior, "trend")
     
-    # Extract time/series variables from trend specs following existing pattern
-    if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
-      first_spec <- mv_spec$trend_specs[[1]]
-      time_var <- first_spec$time_var %||% first_spec$time %||% "time"
-      series_var <- first_spec$series_var %||% first_spec$series %||% "series"
-    } else {
-      time_var <- mv_spec$trend_specs$time_var %||% mv_spec$trend_specs$time %||% "time"
-      series_var <- mv_spec$trend_specs$series_var %||% mv_spec$trend_specs$series %||% "series"
-    }
+    # `trend_spec_head()` takes the first of a multivariate set and
+    # the spec itself for a univariate one.
+    axis_names <- spec_axis_vars(mv_spec$trend_specs)
+    time_var <- axis_names$time_var
+    series_var <- axis_names$series_var
     
     # Each response's column, named by the key brms suffixes its data
     # and parameters with: the frame is read by the one and the
@@ -495,8 +491,12 @@ zmvn_scale_confounded <- function(mv_spec, family, data) {
   ))
   if (!has_zmvn) return(FALSE)
 
-  series_var <- specs[[1L]]$series_var %||% specs[[1L]]$series %||%
-    "series"
+  # `specs` is a list of specifications by the line above, and an
+  # unnamed one of length one for a univariate trend.
+  # `trend_spec_head()` requires the multivariate predicate before
+  # taking a first element, which an unnamed list fails. The column
+  # comes from the first specification.
+  series_var <- spec_axis_vars(specs[[1L]])$series_var
   if (!series_var %in% colnames(data)) return(FALSE)
   if (length(unique(data[[series_var]])) > 1L) return(FALSE)
 

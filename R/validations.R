@@ -1403,8 +1403,7 @@ spec_series_values <- function(trend_spec, data) {
     )), call. = FALSE)
   }
   subgr <- groupings$subgr
-  series_var <- trend_spec$series %||%
-    trend_spec$trend_model$series %||% "series"
+  series_var <- spec_axis_vars(trend_spec)$series_var
   series <- if (named_var(subgr) && !identical(subgr, series_var) &&
                   subgr %in% colnames(data)) {
     hierarchical_series_values(data, gr_var, subgr)
@@ -1798,7 +1797,7 @@ enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
     # at `n_lv = n_series` does not apply. The downstream
     # invariant gates still reject `n_lv > n_series`.
     if (!is.null(spec$fixed_Z)) next
-    series_var <- spec$series_var %||% spec$series %||% "series"
+    series_var <- spec_axis_vars(spec)$series_var
     if (!series_var %in% colnames(data)) next
     n_series <- length(unique(data[[series_var]]))
     if (n_series < 2L) next

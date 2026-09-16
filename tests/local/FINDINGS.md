@@ -43,28 +43,6 @@ conditions still bypass it: a fit whose `trend_metadata$levels` is
 NULL and a frame whose series column is absent. One layer should own
 what a frame must carry.
 
-## One axis name, several resolvers
-
-**94. The pre-fit layers each resolve the axis columns themselves.**
-
-Eleven sites resolve the time and series column names before a fit
-exists, out of reach of the post-fit accessor `axis_vars()`
-(`axes.R:169`). Seven hold a trend spec alone and vary on two axes at
-once: the field spelling (`time_var` against `time`) at
-`make_stan.R:322-326` and `:498-499`, `trend_system.R:1554-1555` and
-`validations.R:1801`, and the depth (flat against `$trend_model`) at
-`validations.R:1406-1407`. `spec_field()` (`axes.R:49`) settles the
-depth and leaves the spelling. Four hold `data_info`:
-`stan_assembly.R:2445`, `:3782`, `:5611-5612` and `:6274-6275`.
-`data_info` is built at `stan_assembly.R:780-808` from
-`trend_specs$dimensions`, which holds the axes record and copies
-`time_var` and `series_var` out of it without the record. Two writers
-put the literal in: `create_mvgam_trend()`
-(`trend_system.R:2803-2804`) and `extract_time_series_dimensions()`
-(`validations.R:2990`). Eleven literal default arguments carry it
-further. One spec-level resolver, with `data_info` carrying the
-record.
-
 ## Nothing checks whether a model is identified
 
 **103. The stacked design's rank is never computed.**

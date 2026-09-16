@@ -1551,8 +1551,9 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
   # making shared trend covariates incompatible only in multivariate models
   if (identical(trend_model$trend, "CAR") && length(regular_terms) > 0 && !is.null(data)) {
     # Determine if this is a multivariate model by checking series count
-    series_var <- trend_model$series %||% "series"
-    time_var <- trend_model$time %||% "time"
+    axis_names <- spec_axis_vars(trend_model)
+    series_var <- axis_names$series_var
+    time_var <- axis_names$time_var
     
     # Try to count series - if series column exists, count unique values
     # If series column doesn't exist, assume univariate (single series)

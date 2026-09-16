@@ -2441,7 +2441,7 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
     # all falls back to reading one.
     series_groups <- data_info$series_groups
     if (is.null(series_groups)) {
-      series_var <- data_info$series_var %||% "series"
+      series_var <- data_info$series_var
       if (is.null(data_info$data[[series_var]])) {
         stop(insight::format_error(c(
           paste0("Series variable '", series_var, "' not found in data."),
@@ -3778,7 +3778,7 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
   )
   
   # Create series-to-group mapping (one entry per series, not per observation)
-  series_var <- data_info$series_var %||% "series"
+  series_var <- data_info$series_var
   group_levels <- sort(unique(data_info$data[[gr_var]]))
 
   # Ordered by the trend's own series axis, which is what Stan
@@ -5607,8 +5607,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #' @noRd
 calculate_car_time_distances <- function(data_info) {
   data <- data_info$data
-  time_var <- data_info$time_var %||% "time"
-  series_var <- data_info$series_var %||% "series"
+  time_var <- data_info$time_var
+  series_var <- data_info$series_var
 
   # Every series is observed on one shared grid, since a panel whose
   # series cover different times is refused before reaching here, so
@@ -6270,8 +6270,8 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     cap_matrix <- build_pw_cap_matrix(
       data = data_info$data,
       cap_var = trend_specs$cap %||% "cap",
-      time_var = data_info$time_var %||% "time",
-      series_var = data_info$series_var %||% "series",
+      time_var = data_info$time_var,
+      series_var = data_info$series_var,
       n_time = n_time_trend,
       n_series = n_series,
       family = pw_cap_link_family(data_info$families)
