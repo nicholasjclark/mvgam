@@ -3795,13 +3795,18 @@ validate_newdata_complete <- function(newdata, object) {
     terms$response
   )
   # A column the frame omits altogether is the widest gap of all, and
-  # narrowing to the columns present would pass it through. The axis
-  # columns are held out of that test: the axis record places a row
-  # whose series column the frame never carried.
-  absent <- setdiff(
-    setdiff(read, terms$index %||% character(0L)),
-    names(newdata)
+  # narrowing to the columns present would pass it through. The
+  # series column is held out of that test. The axis record places a
+  # row the frame never keyed, and a grouping names the series with
+  # no such column present. The time column is held to the test: an
+  # occasion has no substitute, and a frame omitting it was given
+  # predictions at whatever position the observation structure fell
+  # back to.
+  exempt <- setdiff(
+    terms$index %||% character(0L),
+    axis_vars(object)$time_var
   )
+  absent <- setdiff(setdiff(read, exempt), names(newdata))
   present <- intersect(read, names(newdata))
   gaps <- present[vapply(present, function(col) anyNA(newdata[[col]]),
                          logical(1L))]

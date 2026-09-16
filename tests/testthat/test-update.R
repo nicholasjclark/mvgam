@@ -425,6 +425,35 @@ test_that("every mvgam() argument is inherited or named as not", {
 })
 
 
+test_that("every prediction argument reaches the method's body", {
+  # `loadings_prior` went missing from a refit because nothing
+  # compared two lists. The prediction surface carries the same
+  # shape: an argument in a signature that no line consumes is taken
+  # from the user and dropped, and the call returns a plausible
+  # number computed from the default it was meant to override.
+  methods <- c(
+    "posterior_epred.mvgam", "posterior_predict.mvgam",
+    "posterior_linpred.mvgam", "predict.mvgam", "fitted.mvgam",
+    "forecast.mvgam", "hindcast.mvgam", "residuals.mvgam"
+  )
+  # An argument held for signature compatibility alone belongs here
+  # with its reason, the way `mvgam_update_uninherited` names one.
+  excused <- character(0)
+  for (m in methods) {
+    f <- getFromNamespace(m, "mvgam")
+    declared <- setdiff(names(formals(f)),
+                        c("object", "...", names(excused)))
+    consumed <- all.vars(body(f))
+    expect_identical(
+      setdiff(declared, consumed), character(0),
+      label = paste(m, "arguments absent from the body")
+    )
+  }
+  # Every excuse says something.
+  expect_true(all(nzchar(excused)))
+})
+
+
 test_that("denormalise_loadings_prior returns what mvgam accepts", {
   # The resolved spec renames two fields and adds sizes the
   # normaliser recomputes, so it cannot be handed back as it stands:
