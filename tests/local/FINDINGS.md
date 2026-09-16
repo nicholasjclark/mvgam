@@ -25,16 +25,6 @@ truncated, reaching Stan as
 intercept on the identity scale should carry the scalar's bound is a
 question for the family rather than for the axis work.
 
-## An exported constructor with three inert fields
-
-**91. `custom_trend()` stores three function names nothing fetches.**
-
-`custom_trend()` (`R/trend_system.R:1384`) is exported and asserts
-`forecast_fun`, `stancode_fun` and `standata_fun` as non-empty
-strings. No body in `R/` fetches any of the three, and the function
-has no caller. `register_custom_trend()` covers the same ground.
-Removing an exported function needs an API decision.
-
 ## Prediction accepts frames the axis layer refuses
 
 **92. `newdata` needs no time column.**
@@ -112,12 +102,14 @@ for a literal `"series"` column at `:457`, which is the question
 
 ## Copy-paste twins
 
-**100. Two pairs differ in one field.**
+**100. One pair differs in one field.**
 
-`make_stan.R:688-727` and `:781-833` share a 14-parameter signature,
+`stancode.mvgam_formula()` (`make_stan.R:704`) and
+`standata.mvgam_formula()` (`:856`) share a 14-parameter signature,
 their defaults and their roxygen. They differ in which component they
-extract. `make_stan.R:578-584` and `:587-593` test the same four
-conditions and return opposite verdicts.
+extract. Each repeats the generator call as well as the
+missing-component refusal. The repeated signature follows from S3
+dispatch and roxygen usage. The repeated body is removable.
 
 ## Nothing checks whether a model is identified
 
@@ -247,19 +239,6 @@ with the same blindness to a string literal. `stan_line_code()` is the
 wrong helper there. It also removes string literals, which suits
 analysis and corrupts emitted code. That site needs a comment stripper
 keeping strings intact.
-
-## Two fields nothing fetches
-
-**118. The trend dispatch metadata is written and never used.**
-
-`add_consistent_dispatch_metadata()` (`trend_system.R:3026-3029`)
-stores `monitor_generator` and `stanvar_generator` on every trend
-object. No body in `R/` fetches either. Dispatch happens twice
-elsewhere by the same naming convention: `stan_assembly.R:4017`
-composes the generator name, and `generate_monitor_params()` holds a
-switch over the six types. `test-trend-registry.R:590-596` asserts the
-two fields against the names that wrote them. Those assertions go with
-the fields.
 
 ## Debt the code carries in recognisable shapes
 

@@ -299,31 +299,11 @@ be considered when:
 
 \section{Custom Trend Development}{
 
-When creating custom trend types, define parameters and bounds using their
-base names (e.g., "sigma", "alpha"). The \code{process_trend_params()} function
-will automatically add the "_trend" suffix and handle bounds consistently.
-
-Example custom trend constructor pattern:
-\preformatted{
-custom_trend <- function(...) {
-  # Define parameters with bounds using base names
-  param_bounds <- list(
-    decay = c(0, 1),
-    amplitude = c(0, Inf),
-    phase = NULL  # NULL means no bounds needed
-  )
-
-  # Process automatically
-  processed <- process_trend_params(param_bounds)
-
-  # Use in trend object
-  structure(list(
-    trend = "Custom",
-    tpars = processed$tpars,  # c("decay_trend", "amplitude_trend")
-    bounds = processed$bounds # list(decay_trend = c(0, 1), ...)
-  ), class = "mvgam_trend")
-}
-}
+A new trend type is added with \code{\link[=register_custom_trend]{register_custom_trend()}}, which
+records the generator that Stan assembly looks up by name. A trend
+object built by hand carries a type the registry has no generator
+for, and Stan generation stops there. \code{?validation_rules_vocabulary}
+lists the functions a new trend defines.
 }
 
 \section{Identification}{

@@ -203,7 +203,6 @@ ensure_registry_initialized()           # Auto-load core trends
 
 # User extension functions
 register_custom_trend(name, ...)        # User-facing registration
-custom_trend(trend, tpars, ...)         # Create custom trend objects
 ```
 
 **Auto-registered Core Trends:**

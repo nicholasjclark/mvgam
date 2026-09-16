@@ -88,7 +88,6 @@ reference:
   - is.mvgam_trend
   - print.mvgam_trend
   - create_mvgam_trend
-  - custom_trend
   - register_custom_trend
   - register_trend_type
   - trend_registry

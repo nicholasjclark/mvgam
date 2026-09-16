@@ -1100,8 +1100,6 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #' \itemize{
 #'   \item trend_model: Legacy field, use trend instead
 #'   \item trend_type: Legacy field, use trend instead
-#'   \item stancode_fun: Legacy field, replaced by convention-based lookup
-#'   \item standata_fun: Legacy field, replaced by convention-based lookup
 #' }
 #'
 #' @section Class Structure Requirements:
@@ -1322,56 +1320,6 @@ mvgam_trend_pattern <- function() {
   trend_types <- mvgam_trend_registry()
   # Updated pattern to handle nested parentheses
   paste0("\\b(", paste(trend_types, collapse = "|"), ")\\s*\\([^)]*(?:\\([^)]*\\)[^)]*)*\\)")
-}
-
-#' Create custom trend types
-#'
-#' Allows users to define custom trend specifications. This is the main
-#'   extension point for adding new trend types.
-#'
-#' @param trend Character string naming the trend type
-#' @param tpars Character vector of trend-specific parameter names
-#' @param forecast_fun Character string naming the forecasting function
-#' @param stancode_fun Character string naming the Stan code generation function
-#' @param standata_fun Character string naming the Stan data preparation function
-#' @param bounds Named list of parameter bounds for prior specification
-#' @param characteristics Named list of trend characteristics and capabilities
-#' @param ... Additional parameters to store in the trend object
-#'
-#' @return A custom mvgam trend object
-#' @export
-#'
-custom_trend <- function(trend, tpars, forecast_fun, stancode_fun,
-                         standata_fun = NULL, bounds = list(),
-                         characteristics = list(), ...) {
-
-  # Input validation
-  checkmate::assert_string(trend, min.chars = 1)
-  checkmate::assert_character(tpars, min.len = 1)
-  checkmate::assert_string(forecast_fun, min.chars = 1)
-  checkmate::assert_string(stancode_fun, min.chars = 1)
-  checkmate::assert_list(bounds)
-  checkmate::assert_list(characteristics)
-
-  # Build trend object
-  trend_obj <- structure(list(
-    trend = trend,
-    label = trend,  # Can be updated by user
-    tpars = tpars,
-    monitor_pars = c(tpars, "trend"),
-    extract_pars = tpars,
-    forecast_fun = forecast_fun,
-    stancode_fun = stancode_fun,
-    standata_fun = standata_fun,
-    bounds = bounds,
-    characteristics = characteristics,
-    ...
-  ), class = c("mvgam_trend", "custom"))
-
-  # Validate the custom trend
-  validate_mvgam_trend(trend_obj)
-
-  return(trend_obj)
 }
 
 #' Find trend constructor terms in formula
@@ -1997,31 +1945,11 @@ print.mvgam_trend <- function(x, ...) {
 #' }
 #'
 #' @section Custom Trend Development:
-#' When creating custom trend types, define parameters and bounds using their
-#' base names (e.g., "sigma", "alpha"). The \code{process_trend_params()} function
-#' will automatically add the "_trend" suffix and handle bounds consistently.
-#'
-#' Example custom trend constructor pattern:
-#' \preformatted{
-#' custom_trend <- function(...) {
-#'   # Define parameters with bounds using base names
-#'   param_bounds <- list(
-#'     decay = c(0, 1),
-#'     amplitude = c(0, Inf),
-#'     phase = NULL  # NULL means no bounds needed
-#'   )
-#'
-#'   # Process automatically
-#'   processed <- process_trend_params(param_bounds)
-#'
-#'   # Use in trend object
-#'   structure(list(
-#'     trend = "Custom",
-#'     tpars = processed$tpars,  # c("decay_trend", "amplitude_trend")
-#'     bounds = processed$bounds # list(decay_trend = c(0, 1), ...)
-#'   ), class = "mvgam_trend")
-#' }
-#' }
+#' A new trend type is added with [register_custom_trend()], which
+#' records the generator that Stan assembly looks up by name. A trend
+#' object built by hand carries a type the registry has no generator
+#' for, and Stan generation stops there. `?validation_rules_vocabulary`
+#' lists the functions a new trend defines.
 #'
 #' @section Identification:
 #' Factor-model fits (\code{n_lv < n_series}) sample the loadings
@@ -2908,55 +2836,9 @@ create_mvgam_trend <- function(trend_type, ...,
   # Validate the assembled object
   validate_mvgam_trend(trend_obj)
 
-  # Add consistent dispatch metadata
-  trend_obj <- add_consistent_dispatch_metadata(trend_obj)
-
   return(trend_obj)
 }
 
-
-#' Get Trend Dispatch Function Name
-#'
-#' @description
-#' Generates consistent function names for trend dispatch based on convention.
-#' Ensures absolute consistency throughout the system.
-#'
-#' @param trend_type Base trend type (e.g., "AR", "RW", "VAR")
-#' @param function_type Type of function ("stanvar", "forecast", "monitor")
-#' @return String with properly formatted function name
-#' @noRd
-get_trend_dispatch_function <- function(trend_type, function_type) {
-  checkmate::assert_string(trend_type)
-  checkmate::assert_choice(function_type, c("stanvar", "monitor"))
-
-  trend_lower <- tolower(trend_type)
-
-  switch(function_type,
-    stanvar = paste0("generate_", trend_lower, "_trend_stanvars"),
-    monitor = paste0("generate_", trend_lower, "_monitor_params")
-  )
-}
-
-#' Enhance Trend Object with Consistent Dispatch
-#'
-#' @description
-#' Automatically adds consistent dispatch function names to trend object.
-#' Ensures all dispatch follows the same convention.
-#'
-#' @param trend_obj mvgam_trend object
-#' @return Trend object with consistent dispatch metadata
-#' @noRd
-add_consistent_dispatch_metadata <- function(trend_obj) {
-  trend_type <- trend_obj$trend
-
-  # Add monitor params generator name
-  trend_obj$monitor_generator <- get_trend_dispatch_function(trend_type, "monitor")
-
-  # Add stanvar generator name
-  trend_obj$stanvar_generator <- get_trend_dispatch_function(trend_type, "stanvar")
-
-  return(trend_obj)
-}
 
 
 # Validate innovation degrees of freedom supplied to a trend

@@ -68,7 +68,7 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 * Added `validate_newdata()` to check `newdata` against a fitted model's training data before predicting or forecasting
 * `AR()` and `VAR()` gained `ma = TRUE` for moving average terms, giving ARMA and VARMA processes, and `AR()` gained `coef_sharing` for pooling autoregressive coefficients across series (`"none"`, `"shared"` or `"hierarchical"`)
 * `trend_map` accepts `NA` entries so that part of the loading matrix can be fixed and the rest estimated
-* Added a registry for user-defined trends: `custom_trend()`, `create_mvgam_trend()`, `trend_param()`, `register_trend_type()` and `register_custom_trend()` define new process models, while `list_trend_types()` and `mvgam_trend_choices()` report what is available
+* Added a registry for user-defined trends: `create_mvgam_trend()`, `trend_param()`, `register_trend_type()` and `register_custom_trend()` define new process models, while `list_trend_types()` and `mvgam_trend_choices()` report what is available
 * Added `threads` as an argument to `mvgam()` and `jsdgam()` for within-chain parallelisation
 * Added `init = "pathfinder"` to `mvgam()` for drawing starting values from Stan's Pathfinder approximation
 * Added `mvgam_multiple()` to fit a model across multiply imputed datasets and pool the draws

@@ -532,33 +532,6 @@ test_that("simplified AR constructor works correctly", {
   })
 })
 
-test_that("consistent dispatch metadata is added automatically", {
-  suppressWarnings({
-    # Test RW gets correct dispatch metadata
-    rw_trend <- RW()
-    expect_equal(rw_trend$stanvar_generator, "generate_rw_trend_stanvars")
-    expect_equal(rw_trend$monitor_generator, "generate_rw_monitor_params")
-
-    # Test AR gets correct dispatch metadata
-    ar_trend <- AR()
-    expect_equal(ar_trend$stanvar_generator, "generate_ar_trend_stanvars")
-    expect_equal(ar_trend$monitor_generator, "generate_ar_monitor_params")
-  })
-})
-
-
-test_that("get_trend_dispatch_function generates correct names", {
-  # Test stanvar generator names
-  expect_equal(get_trend_dispatch_function("AR", "stanvar"), "generate_ar_trend_stanvars")
-  expect_equal(get_trend_dispatch_function("RW", "stanvar"), "generate_rw_trend_stanvars")
-  expect_equal(get_trend_dispatch_function("VAR", "stanvar"), "generate_var_trend_stanvars")
-
-  # Test monitor generator names
-  expect_equal(get_trend_dispatch_function("AR", "monitor"), "generate_ar_monitor_params")
-  expect_equal(get_trend_dispatch_function("RW", "monitor"), "generate_rw_monitor_params")
-  expect_equal(get_trend_dispatch_function("VAR", "monitor"), "generate_var_monitor_params")
-})
-
 test_that("create_mvgam_trend handles all parameters consistently", {
   suppressWarnings({
     # Test that all parameters use dot-prefix convention

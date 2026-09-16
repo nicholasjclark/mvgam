@@ -562,50 +562,53 @@ warn_pw_obs_intercept <- function(mv_spec, obs_formula) {
   )
 }
 
-# Internal: decide whether to suppress brms's `partial_log_lik_lpmf`
-# emission for the obs-side `setup_brms_lightweight()` call. Two
-# distinct cases need the gate:
+# Internal: which case makes brms's `partial_log_lik_lpmf` emission
+# unwanted for the obs-side `setup_brms_lightweight()` call. Two cases
+# need the gate, and both are decided from the same three inputs, so
+# one classification serves the two questions asked of them.
 #
 #   1. **Closure-unit and multi-response families.** These ship their
 #      own `partial_sum_<family>_lpmf` + inner `reduce_sum` call via
 #      mvgam-side stanvars. brms's outer `partial_log_lik_lpmf` would
 #      nest a second wrapper around `nmix_lpmf` / `occ_lpmf` /
-#      simplex / mvn-style lpmfs, but the brms function signature
+#      simplex / mvn-style lpmfs, and the brms function signature
 #      cannot see transformed-data args (`visit_idx`, `log_n_lookup`,
-#      etc.), so Stan validation fails. The fit-time
-#      `cpp_options$stan_threads = TRUE` still flows separately via
-#      `mvgam_single()` / `.compile_model_cmdstanr()`, so the inner
-#      `reduce_sum` still parallelises; we just stop brms from
-#      double-wrapping.
+#      etc.), which fails Stan validation. The fit-time
+#      `cpp_options$stan_threads = TRUE` travels separately through
+#      `mvgam_single()` / `.compile_model_cmdstanr()`, and the inner
+#      `reduce_sum` still parallelises. Only brms's double-wrapping
+#      is stopped.
 #
 #   2. **brms-native families combined with a `trend_formula`.** brms
 #      moves both the `mu` declaration and every linpred assignment
 #      into `partial_log_lik_lpmf` inside `functions {}`, and mvgam's
-#      obs-side trend injector (`R/stan_assembly.R:1346-1411` for
-#      `mu +=`, `:1571-1602` for `mu[n] = ...`) only searches
-#      `model {}`, so it cannot find the assignment it needs to splice
-#      the trend addition into. The combination compiles to a silent
-#      serial fit or hard crashes.
+#      obs-side trend injector searches `model {}` alone, which leaves
+#      the assignment it splices the trend addition into out of reach.
+#      The combination compiles to a silent serial fit or crashes.
 #
-# Case 1 is silent (mvgam's threading still works). Case 2 emits a
-# one-time warning so the user knows their parallelism request is
-# being ignored.
+# Case 1 is silent, since mvgam's own threading still works. Case 2
+# warns, through `warn_threads_trend_brms_native()`.
+#'@noRd
+brms_threading_case <- function(threads, family, mv_spec) {
+  if (!is.numeric(threads) || !isTRUE(threads > 1)) return("none")
+  if (uses_closure_unit_layout(family)) return("closure_unit")
+  if (is_multi_response_family(family)) return("multi_response")
+  if (!is.null(mv_spec) && isTRUE(mv_spec$has_trends)) {
+    return("trend_native")
+  }
+  "none"
+}
+
 #'@noRd
 suppress_brms_threading <- function(threads, family, mv_spec) {
-  if (!is.numeric(threads) || !isTRUE(threads > 1)) return(FALSE)
-  if (uses_closure_unit_layout(family)) return(TRUE)
-  if (is_multi_response_family(family)) return(TRUE)
-  if (!is.null(mv_spec) && isTRUE(mv_spec$has_trends)) return(TRUE)
-  FALSE
+  !identical(brms_threading_case(threads, family, mv_spec), "none")
 }
 
 #'@noRd
 threads_no_op_for_trend_brms_native <- function(threads, family, mv_spec) {
-  if (!is.numeric(threads) || !isTRUE(threads > 1)) return(FALSE)
-  if (is.null(mv_spec) || !isTRUE(mv_spec$has_trends)) return(FALSE)
-  if (uses_closure_unit_layout(family)) return(FALSE)
-  if (is_multi_response_family(family)) return(FALSE)
-  TRUE
+  identical(
+    brms_threading_case(threads, family, mv_spec), "trend_native"
+  )
 }
 
 #'@noRd

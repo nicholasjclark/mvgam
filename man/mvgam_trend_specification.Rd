@@ -145,8 +145,6 @@ During transition period, old fields may still be present:
 \itemize{
 \item trend_model: Legacy field, use trend instead
 \item trend_type: Legacy field, use trend instead
-\item stancode_fun: Legacy field, replaced by convention-based lookup
-\item standata_fun: Legacy field, replaced by convention-based lookup
 }
 }
 
