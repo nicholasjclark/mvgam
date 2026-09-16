@@ -161,8 +161,8 @@ columns.
 covariate value `newdata` omits. `posterior_epred.mvgam()`
 (`posterior_epred.R:449-525`) asserts nothing about the matrix it
 returns, and `ordinal_probs()` (`posterior_epred.R:1490`) asserts
-`eta` numeric with no `any.missing = FALSE`. Name the column, as the
-pre-fit covariate guard does.
+`eta` numeric with no `any.missing = FALSE`. Name the column the way
+the pre-fit covariate guard names it.
 
 ## No guard that an argument reaches the model
 
@@ -248,28 +248,18 @@ wrong helper there. It also removes string literals, which suits
 analysis and corrupts emitted code. That site needs a comment stripper
 keeping strings intact.
 
-## One prior class, two scales
+## Two fields nothing fetches
 
-**116. A partial `trend_map` writes its own loadings prior.**
+**118. The trend dispatch metadata is written and never used.**
 
-`make_partial_z_stanvars()` emits `Z_free_vec ~ student_t(3, 0, 1);`
-as a literal (`stan_assembly.R:2951`). The table's `Z` default is
-`student_t(3, 0, 0.5)` (`priors.R:128`). Every other factor path takes
-`get_trend_parameter_prior(prior, "Z")`
-(`stan_assembly.R:3177`). The free entries of a partial map carry
-twice the scale of a full one, and a user prior on class `Z` never
-reaches them.
-
-## Two derivations of one lag set
-
-**117. `generate_ar_monitor_params()` derives lags of its own.**
-
-`trend_system.R:806-820` computes `1:lags` from `trend_spec$p` or
-`trend_spec$lags`. The Stan generator calls `resolve_active_lags()`
-(`trend_propagation.R:720`), which honours an `ar_lags` override and
-returns `seq_len()`. Where `ar_lags` is supplied, the monitored
-parameters and the emitted program name different lags. At `p = 0` one
-gives `c(1, 0)` and the other `integer(0)`.
+`add_consistent_dispatch_metadata()` (`trend_system.R:3026-3029`)
+stores `monitor_generator` and `stanvar_generator` on every trend
+object. No body in `R/` fetches either. Dispatch happens twice
+elsewhere by the same naming convention: `stan_assembly.R:4017`
+composes the generator name, and `generate_monitor_params()` holds a
+switch over the six types. `test-trend-registry.R:590-596` asserts the
+two fields against the names that wrote them. Those assertions go with
+the fields.
 
 ## Debt the code carries in recognisable shapes
 

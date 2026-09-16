@@ -2444,9 +2444,9 @@ test_that("stancode handles smooth terms in trend_formula with correct declarati
 test_that("a trend term is computed once per iteration", {
   # brms declares a group-level effect and a smooth coefficient in the
   # trend model's transformed parameters and assigns each below its
-  # declaration, and mu_trend's construction needs the pair. Emitting
-  # both blocks wrote the assignment twice: the program parsed, the
-  # value was right, and every iteration computed it a second time.
+  # declaration, and mu_trend's construction needs the pair. A program
+  # emitting the assignment twice parses and samples correctly, and
+  # computes the same value a second time every iteration.
   data <- setup_stan_test_data()$univariate
 
   shapes <- list(
@@ -3610,12 +3610,22 @@ test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
   # Assembly loop in transformed parameters.
   expect_true(stan_pattern("Z\\[i, j\\] = Z_free_vec\\[idx\\];", code))
   expect_true(stan_pattern("Z\\[i, j\\] = Z_template\\[i, j\\];", code))
-  # Prior on the free vector only. The statement is compared
-  # literally rather than through `stan_pattern()`, which escapes
-  # a pattern and would also try to read this as a tilde form.
+  # Prior on the free vector only, taken from the `Z` row of the
+  # prior table. The statement is compared literally, since
+  # `stan_pattern()` escapes a pattern and also accepts a tilde
+  # spelling.
   expect_true(grepl(
-    stan_prior_line("Z_free_vec", "student_t(3, 0, 1)"),
+    stan_prior_line("Z_free_vec", "student_t(3, 0, 0.5)"),
     paste(as.character(code), collapse = "\n"), fixed = TRUE
+  ))
+  # A user prior on class `Z` reaches the free entries
+  code_user <- stancode(
+    mf, data = data, family = poisson(), validate = FALSE,
+    prior = brms::prior(normal(0, 2), class = "Z")
+  )
+  expect_true(grepl(
+    stan_prior_line("Z_free_vec", "normal(0, 2)"),
+    paste(as.character(code_user), collapse = "\n"), fixed = TRUE
   ))
   # User-supplied loadings bypass the QR identification path.
   expect_false(grepl("Z_tilde", code, fixed = TRUE))

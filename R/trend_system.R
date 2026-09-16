@@ -804,20 +804,8 @@ generate_rw_monitor_params <- function(trend_spec) {
 #' @return Character vector of AR-specific parameters
 #' @noRd
 generate_ar_monitor_params <- function(trend_spec) {
-  # AR coefficients for each lag
-  lags <- trend_spec$p %||% trend_spec$lags %||% 1
-  if (is.list(lags)) lags <- unlist(lags)
-
-  # Handle different lag specifications correctly:
-  # p=2 means AR(2) with lags 1:2 (standard AR model interpretation)
-  # p=c(1,3) means specific lags 1,3 (sparse AR model)
-  if (length(lags) == 1 && is.numeric(lags)) {
-    # Single integer: create standard AR(p) with all lags 1:p
-    lag_vec <- 1:lags
-  } else {
-    # Vector or multiple values: use specific lags only
-    lag_vec <- lags
-  }
+  # One resolution of the lag set, shared with the Stan generator.
+  lag_vec <- resolve_active_lags(trend_spec$p %||% 1, trend_spec$ar_lags)
   ar_params <- paste0("ar", lag_vec, "_trend")
 
   # Under hierarchical sharing the per-series ar{lag}_trend

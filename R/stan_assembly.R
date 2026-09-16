@@ -2675,11 +2675,9 @@ sort_stanvars <- function(stanvars) {
 
   # Level 0: whatever that predictor is built from. A group-level block
   # computes `r_1_1_trend` and a shrinkage prior computes `b_trend`,
-  # and the predictor adds both, so each is declared before it. The
-  # names come from the predictor's own code: one pattern per term type
-  # left every other term type out, which is how `horseshoe(1)` on
-  # `class = "b_trend"` produced a program using `b_trend` two lines
-  # above its declaration.
+  # and the predictor adds both, which places each before it. The
+  # names come from the predictor's own code, covering every term
+  # type.
   # A comment is prose, and its words are not names the predictor
   # uses, so each stanvar is compared on its code alone.
   code_only <- function(scode) {
@@ -2837,7 +2835,7 @@ generate_matrix_z_parameters <- function(is_factor_model, n_lv, n_series,
   }
   brms::stanvar(
     name = "Z",
-    scode = glue::glue("matrix[N_series_trend, N_lv_trend] Z;"),
+    scode = "matrix[N_series_trend, N_lv_trend] Z;",
     block = "parameters"
   )
 }
@@ -2880,18 +2878,20 @@ make_fixed_z_stanvars <- function(fixed_Z) {
 #'
 #' In transformed parameters Z is assembled by walking the
 #' matrix in row-major order and picking either the template
-#' value or the next `Z_free_vec` element. The prior
-#' `Z_free_vec ~ student_t(3, 0, 1)` mirrors the standard
-#' sampled-Z prior on the free entries only.
+#' value or the next `Z_free_vec` element. The free entries take
+#' the `Z` prior from the table, which is the one a fully sampled
+#' loadings matrix takes.
 #'
 #' @param fixed_Z A numeric `n_series x n_lv` matrix produced by
 #'   `normalise_trend_map()` with at least one NA (otherwise
 #'   `make_fixed_z_stanvars()` should be used).
+#' @param prior A `brmsprior` carrying any user prior on class `Z`.
 #' @return Combined `brms::stanvar` covering data / parameters /
 #'   tparameters / model blocks for the partial-Z code path.
 #' @noRd
-make_partial_z_stanvars <- function(fixed_Z) {
+make_partial_z_stanvars <- function(fixed_Z, prior = NULL) {
   checkmate::assert_matrix(fixed_Z, mode = "numeric")
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   if (!anyNA(fixed_Z)) {
     stop(insight::format_error(
       "make_partial_z_stanvars() requires NA entries in fixed_Z."
@@ -2948,7 +2948,8 @@ make_partial_z_stanvars <- function(fixed_Z) {
   )
   z_prior <- brms::stanvar(
     name = "Z_free_prior",
-    scode = "Z_free_vec ~ student_t(3, 0, 1);",
+    scode = paste0("Z_free_vec ~ ",
+                   get_trend_parameter_prior(prior, "Z"), ";"),
     block = "model"
   )
   combine_stanvars(
@@ -2975,7 +2976,8 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series,
     # Non-factor model: diagonal Z in transformed data
     z_matrix_stanvar <- brms::stanvar(
       name = "Z",
-      scode = glue::glue("matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));"),
+      scode = paste0("matrix[N_series_trend, N_lv_trend] Z = ",
+                     "diag_matrix(rep_vector(1.0, N_lv_trend));"),
       block = "tdata"
     )
     return(z_matrix_stanvar)
@@ -3010,12 +3012,14 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series,
 #' @param n_lv Number of latent variables
 #' @param n_series Number of observed series
 #' @param fixed_Z Optional user-supplied numeric Z. See branches above.
+#' @param prior A `brmsprior` carrying any user prior on class `Z`.
 #' @return List of stanvars for matrix Z across all required blocks
 #' @noRd
 generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
                                                   n_series,
                                                   fixed_Z = NULL,
-                                                  family = NULL) {
+                                                  family = NULL,
+                                                  prior = NULL) {
   # Validate inputs following CLAUDE.md standards
   checkmate::assert_logical(is_factor_model, len = 1)
   checkmate::assert_integerish(n_lv, len = 1, lower = 1)
@@ -3029,7 +3033,7 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
   #   the data block.
   if (!is.null(fixed_Z)) {
     if (anyNA(fixed_Z)) {
-      return(make_partial_z_stanvars(fixed_Z))
+      return(make_partial_z_stanvars(fixed_Z, prior = prior))
     }
     return(make_fixed_z_stanvars(fixed_Z))
   }
@@ -4240,7 +4244,8 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
     fixed_Z = trend_specs$fixed_Z,
-    family = data_info$family
+    family = data_info$family,
+    prior = prior
   )
   components <- append_if_not_null(components, matrix_z)
 
@@ -4580,7 +4585,8 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
     fixed_Z = trend_specs$fixed_Z,
-    family = data_info$family
+    family = data_info$family,
+    prior = prior
   )
   components <- append_if_not_null(components, matrix_z)
 
@@ -5504,7 +5510,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
     fixed_Z = trend_specs$fixed_Z,
-    family = data_info$family
+    family = data_info$family,
+    prior = prior
   )
 
   # Add trend computation stanvars (maps lv_trend through Z matrix)
@@ -5703,7 +5710,8 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
     fixed_Z = trend_specs$fixed_Z,
-    family = data_info$family
+    family = data_info$family,
+    prior = prior
   )
   components <- append_if_not_null(components, matrix_z)
 
@@ -5878,7 +5886,8 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
     fixed_Z = trend_specs$fixed_Z,
-    family = data_info$family
+    family = data_info$family,
+    prior = prior
   )
   components <- append_if_not_null(components, matrix_z)
 
@@ -6120,7 +6129,8 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
     fixed_Z = trend_specs$fixed_Z,
-    family = data_info$family
+    family = data_info$family,
+    prior = prior
   )
   components <- append_if_not_null(components, matrix_z)
 
@@ -7463,9 +7473,7 @@ extract_stan_block_content <- function(stancode, block_name) {
   }
 
   if (block_name == "functions") {
-    # One extractor for this block, since a second one bounded it by
-    # the next header and by a brace found scanning back from the end
-    # of the file, and the two disagreed on a trailing blank line.
+    # One extractor for this block.
     result <- extract_stan_functions_block(stancode)
     if (is.null(result)) {
       return(NULL)  # Block not found - consistent with other blocks
