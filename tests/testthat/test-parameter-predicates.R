@@ -85,14 +85,14 @@ test_that("the trend suffix decides which block a parameter prints in", {
   pars <- c("b_Intercept", "b_x", "b_pre_trend_score", "b_trending",
             "sigma_trend[1]", "ar1_trend[1]", "b_x_trend")
   # Observation-side effects keep the coefficients the user asked for.
-  expect_setequal(
+  expect_identical(
     pars[match_fixed_pars(pars, character())],
     c("b_Intercept", "b_x", "b_pre_trend_score", "b_trending")
   )
   # The trend block holds only what the trend model emitted.
   is_trend_block <- mvgam_par_side(pars) == "trend" &
     mvgam_par_kind(pars) != "state"
-  expect_setequal(
+  expect_identical(
     pars[is_trend_block],
     c("sigma_trend[1]", "ar1_trend[1]", "b_x_trend")
   )
@@ -121,7 +121,7 @@ test_that("one taxonomy answers for every consumer of a name", {
 
   # Every state spelling the generated Stan emits is a state, on the
   # one account rather than on three that disagreed.
-  expect_setequal(
+  expect_identical(
     pars[kind == "state"],
     c("trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
       "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
@@ -136,7 +136,7 @@ test_that("one taxonomy answers for every consumer of a name", {
   # and a structurally zero upper triangle, and `A_raw_trend` is the
   # unconstrained matrix the stationarity transform turns into
   # `A_trend`. `residual_cor()` takes each one from the raw draws.
-  expect_setequal(
+  expect_identical(
     pars[kind == "internal"],
     c("ma_innovations_trend[1,1]", "Q_tilde[1,1]", "z_1[1,1]",
       "L_Omega_trend[1,1]", "A_raw_trend[1,1,1]")
@@ -163,7 +163,7 @@ test_that("one taxonomy answers for every consumer of a name", {
   # and the parameter buckets add the Gaussian-process
   # hyperparameters. Stating the split here is what stops each
   # caller encoding it in a regex of its own.
-  expect_setequal(
+  expect_identical(
     pars[kind == "smooth_sd"],
     c("sds_1[1]", "sds_1_trend[1]")
   )
@@ -211,14 +211,14 @@ test_that("tidy() files each block under broom.mixed's effects class", {
   filed <- function(type) spec$params[[match(type, spec$type)]]
   effect <- function(type) spec$effect[[match(type, spec$type)]]
 
-  expect_setequal(filed("observation_beta"), c("b_Intercept", "b[1]"))
+  expect_identical(filed("observation_beta"), c("b_Intercept", "b[1]"))
   expect_identical(filed("observation_family_extra_param"), "sigma")
-  expect_setequal(filed("observation_smooth_param"),
-                  c("sds_1[1]", "sdgp_1[1]"))
-  expect_setequal(filed("observation_smooth_coef"),
-                  c("s_1_1[1]", "zgp_1[1]"))
-  expect_setequal(filed("random_effect_group_level"),
-                  c("sd_1[1]", "cor_1[1]"))
+  expect_identical(filed("observation_smooth_param"),
+                   c("sds_1[1]", "sdgp_1[1]"))
+  expect_identical(filed("observation_smooth_coef"),
+                   c("s_1_1[1]", "zgp_1[1]"))
+  expect_identical(filed("random_effect_group_level"),
+                   c("sd_1[1]", "cor_1[1]"))
   expect_identical(filed("random_effect_beta"), c("r_1_1[1]", "r_1_1[2]"))
   expect_identical(filed("trend_beta"), "b_Intercept_trend")
   expect_identical(filed("trend_model_param"), "ar1_trend[1]")
@@ -239,7 +239,9 @@ test_that("tidy() files each block under broom.mixed's effects class", {
   stub$fit <- posterior::as_draws_matrix(matrix(
     stats::rnorm(6L), nrow = 2L, dimnames = list(NULL, small)
   ))
-  expect_setequal(tidy(stub)$term, c("b_Intercept", "sigma"))
+  # Row order is the spec's class order, and the family extras are
+  # its first class.
+  expect_identical(tidy(stub)$term, c("sigma", "b_Intercept"))
   none <- tidy(stub, effects = "ran_vals")
   expect_identical(nrow(none), 0L)
   expect_identical(names(none),
