@@ -267,8 +267,6 @@ test_that("function discovery works with dynamic brms code", {
   stancode <- brms::make_stancode(Y ~ gp(X), data = test_data, family = gaussian(), parse = FALSE)
   context <- create_analysis_context(stancode)
 
-  # Should discover some declared functions (exact functions may vary with brms version)
-  expect_true(length(context$declared_functions) >= 0)  # May be 0 if no functions declared
   expect_true(length(context$all_functions) > 0)       # Should always have Stan functions
 
   # Should include Stan reserved words

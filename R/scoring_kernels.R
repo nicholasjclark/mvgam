@@ -364,8 +364,7 @@ twcrps_mcmc_object <- function(truth, fc, lower = -Inf,
 # `truths` is a `[n_series, h]` matrix; `fcs` is a length-
 # n_series list of `[ndraws, h]` forecast matrices.
 #'@noRd
-energy_mcmc_object <- function(truths, fcs, log = FALSE,
-                                 weights = NULL) {
+energy_mcmc_object <- function(truths, fcs, log = FALSE) {
   apply_multivariate_score(truths, fcs, energy_cell, log = log)
 }
 

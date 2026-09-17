@@ -39,12 +39,6 @@ local_verbose_warnings <- function(.env = parent.frame()) {
   )
 }
 
-# bayesplot's colour scheme is one global. A test that sets it and
-# stops there gives every later test that scheme. Restoring a
-# literal name assumes the session began with it. The six colours
-# `color_scheme_get()` returns are the ones the session had.
-# `color_scheme_set()` accepts them in that form, which restores an
-# unnamed or mixed scheme as exactly as a named one.
 # The condition an expression raises, or NULL for one that raises
 # none. `expect_error()` asserts a raise. These callers compare one
 # behaviour against another and need it as a value.
@@ -52,10 +46,15 @@ caught_error <- function(expr) {
   rlang::catch_cnd(expr, classes = "error")
 }
 
+# bayesplot's colour scheme is one global. A test that sets it and
+# stops there gives every later test that scheme. Restoring a
+# literal name assumes the session began with it. The package's own
+# `restore_color_scheme()` puts back whatever was there. One
+# definition covers the tests and the figures.
 local_color_scheme <- function(scheme, .env = parent.frame()) {
-  prior <- unname(unlist(bayesplot::color_scheme_get()))
+  prior <- bayesplot::color_scheme_get()
   bayesplot::color_scheme_set(scheme)
-  withr::defer(bayesplot::color_scheme_set(prior), envir = .env)
+  withr::defer(mvgam:::restore_color_scheme(prior), envir = .env)
   invisible(prior)
 }
 
@@ -65,6 +64,37 @@ local_color_scheme <- function(scheme, .env = parent.frame()) {
 # `standata()` separately, since each public dispatcher re-runs the
 # full pipeline (and triggers a fresh V8 isolate for the Stan code
 # polish step) on its own.
+# How many lines of a Stan program open a named block. The programs
+# are one string with embedded newlines. On a miss,
+# `gregexpr(pattern, code)[[1]]` is `-1L`. Its length is 1, matching
+# the length a single hit gives. `^` on that one string reaches only
+# the first line. A count of 1 passed on a program missing the block
+# entirely.
+stan_block_count <- function(code, block) {
+  lines <- strsplit(
+    paste(as.character(code), collapse = "\n"), "\n", fixed = TRUE
+  )[[1]]
+  sum(grepl(paste0("^\\s*", block, "\\s*\\{"), lines))
+}
+
+
+# The six blocks every assembled mvgam program declares once.
+STAN_BLOCKS <- c(
+  "data", "transformed data", "parameters",
+  "transformed parameters", "model", "generated quantities"
+)
+
+
+# How many times a pattern matches the whole program. `gregexpr()`
+# gives `-1L` for no match, whose length is 1, matching the length
+# one hit gives. A count taken from that length reported a missing
+# declaration as a single one.
+stan_match_count <- function(code, pattern) {
+  m <- gregexpr(pattern, paste(as.character(code), collapse = "\n"))[[1]]
+  if (identical(as.integer(m), -1L)) 0L else length(m)
+}
+
+
 mvgam_stan_setup <- function(formula, data, family = gaussian(), ...) {
   cc <- mvgam:::generate_stan_components_mvgam_formula(
     formula = formula, data = data, family = family, ...

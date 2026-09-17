@@ -47,15 +47,37 @@ mvgam_colour <- function(role, scheme = NULL) {
 }
 
 
-#' Run an expression with a temporary bayesplot colour scheme,
-#' restoring the prior scheme on exit. Suits short call-style
+#' Put back a scheme `color_scheme_get()` returned
+#'
+#' `color_scheme_set()` takes a scheme name or six colours. A scheme
+#' built from six colours is named "custom", and passing "custom"
+#' back raises `'arg' should be one of "blue", ...`. The colours
+#' restore that case. The name restores every other. A user who
+#' calls `bayesplot::color_scheme_set(c(...))` met that error from
+#' every mvgam figure.
+#'
+#' @param cs A scheme as `bayesplot::color_scheme_get()` returns it.
+#' @noRd
+restore_color_scheme <- function(cs) {
+  nm <- attr(cs, "scheme_name")
+  if (is.null(nm) || identical(nm, "custom")) {
+    bayesplot::color_scheme_set(unname(unlist(cs)))
+  } else {
+    bayesplot::color_scheme_set(nm)
+  }
+  invisible(NULL)
+}
+
+
+#' Run an expression under a different bayesplot colour scheme,
+#' putting the prior scheme back on exit. Suits short call-style
 #' wrappers (`with_color_scheme("red", do.call(...))`).
 #'
 #' @noRd
 with_color_scheme <- function(scheme, expr) {
-  prior <- attr(bayesplot::color_scheme_get(), "scheme_name")
+  prior <- bayesplot::color_scheme_get()
   bayesplot::color_scheme_set(scheme)
-  on.exit(bayesplot::color_scheme_set(prior), add = TRUE)
+  on.exit(restore_color_scheme(prior), add = TRUE)
   force(expr)
 }
 
@@ -67,13 +89,12 @@ with_color_scheme <- function(scheme, expr) {
 #'
 #' @noRd
 set_color_scheme_local <- function(scheme, envir = parent.frame()) {
-  prior <- attr(bayesplot::color_scheme_get(), "scheme_name")
+  prior <- bayesplot::color_scheme_get()
   bayesplot::color_scheme_set(scheme)
   do.call(
     base::on.exit,
     list(
-      substitute(bayesplot::color_scheme_set(prior),
-                 list(prior = prior)),
+      substitute(restore_color_scheme(prior), list(prior = prior)),
       add = TRUE
     ),
     envir = envir

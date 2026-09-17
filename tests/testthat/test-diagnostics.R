@@ -241,7 +241,9 @@ test_that("rhat.mvgam(pars = ...) filters", {
 test_that("neff_ratio.mvgam returns ratios <= 1 in [0,1]", {
   stub <- make_mvgam_stub(n_iter = 200L, n_chains = 4L)
   out <- neff_ratio(stub, pars = c("b_Intercept"))
-  expect_true(all(out > 0))
+  # The upper bound is the claim the name makes. An effective sample
+  # size above the draw count would break it.
+  expect_true(all(out > 0 & out <= 1))
 })
 
 test_that("compute_all_summaries() columns and measures match the draws", {

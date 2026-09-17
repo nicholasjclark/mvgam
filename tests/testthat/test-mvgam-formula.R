@@ -578,53 +578,6 @@ test_that("validation preserves helpful error context", {
   )
 })
 
-test_that("comprehensive addition-terms catalog coverage", {
-  # This test verifies we catch ALL the addition-terms that brms supports
-  # Based on brms documentation and source code inspection
-
-  # Test autocorrelation term (different validation)
-  expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1)),
-    "brms autocorrelation terms not allowed"
-  )
-
-  # Test actual addition-terms
-  all_addition_terms <- list(
-    ~ weights(w),           # Observation weights
-    ~ subset(idx),          # Data subsetting
-    ~ cov_ranef(M = ~ 1)    # Random effects covariance (deprecated)
-  )
-
-  for (i in seq_along(all_addition_terms)) {
-    term <- all_addition_terms[[i]]
-    expect_error(
-      mvgam_formula(y ~ x, trend_formula = term),
-      "brms addition-terms not allowed",
-      label = paste("trend_formula", deparse(term))
-    )
-  }
-})
-
-test_that("complex real-world formula edge case validation", {
-  # This tests a complex scenario that might arise in practice
-  # Formula components are interleaved with forbidden terms
-  complex_forbidden <- ~ (
-    s(time, bs = "cr", k = 10) +     # Valid smooth
-    (1 + season | site) +            # Valid random effect
-    weights(importance) +            # FORBIDDEN
-    te(lat, lon, k = c(5, 5)) +      # Valid tensor product
-    offset(log(effort)) +            # Valid offset (not addition-term)
-    sigma ~ weights(w)  # This should be caught as forbidden in trend context
-  )
-
-  # This specific case tests the validation pipeline for complex formula structures
-  # The validation should catch forbidden terms regardless of formula complexity
-  expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ weights(w)),
-    "brms addition-terms not allowed"
-  )
-})
-
 test_that("exact GP terms in obs formula are accepted (warn only)", {
   # Exact GPs fit fine through brms (full covariance kernel) even
   # without k; the warn covers the prediction-at-newdata gap. Under

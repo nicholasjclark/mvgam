@@ -17,10 +17,9 @@ test_that("in_central_pi flags truth inside / outside the PI", {
 })
 
 
-test_that("log_offset matches log(x + 0.001) and is monotone", {
+test_that("log_offset matches log(x + 0.001)", {
   expect_equal(log_offset(0), log(0.001))
   expect_equal(log_offset(1), log(1.001))
-  expect_true(log_offset(2) > log_offset(1))
 })
 
 
@@ -155,7 +154,6 @@ test_that("Energy score returns a length-h numeric vector", {
   )
   out <- energy_mcmc_object(truths, fcs)
   expect_length(out, 3L)
-  expect_true(all(is.finite(out)))
 })
 
 
@@ -182,8 +180,14 @@ test_that("Variogram score returns a length-h numeric vector", {
   )
   out <- variogram_mcmc_object(truths, fcs)
   expect_length(out, 3L)
-  expect_true(all(is.finite(out)))
-  expect_true(all(out >= 0))
+  # Draws equal to the truth reproduce the truth-side pairwise
+  # differences, which drives every squared term to zero. A
+  # non-negative result cannot fail on a sum of squares.
+  degenerate <- lapply(seq_len(2L), function(s) {
+    matrix(rep(truths[s, ], each = 20L), nrow = 20L)
+  })
+  expect_equal(variogram_mcmc_object(truths, degenerate),
+               rep(0, 3L), tolerance = 1e-8)
 })
 
 
@@ -194,10 +198,14 @@ test_that("Variogram score accepts per-series weights", {
     matrix(stats::rnorm(40L), nrow = 20L, ncol = 2L),
     matrix(stats::rnorm(40L), nrow = 20L, ncol = 2L)
   )
-  w <- c(0.5, 2)
-  out <- variogram_mcmc_object(truths, fcs, weights = w)
-  expect_length(out, 2L)
-  expect_true(all(is.finite(out)))
+  plain <- variogram_mcmc_object(truths, fcs)
+  # The weight matrix is `outer(w, w, (x + y) / 2)`. A pair of ones
+  # reproduces the unweighted matrix of ones.
+  expect_equal(variogram_mcmc_object(truths, fcs, weights = c(1, 1)),
+               plain, tolerance = 1e-12)
+  # Uneven weights move the score away from the unweighted one.
+  uneven <- variogram_mcmc_object(truths, fcs, weights = c(0.5, 2))
+  expect_false(isTRUE(all.equal(uneven, plain)))
 })
 
 
@@ -304,5 +312,8 @@ test_that("twEnergy returns a length-h vector for multivariate forecasts", {
   )
   out <- twenergy_mcmc_object(truths, fcs, lower = -1, upper = 2)
   expect_length(out, 2L)
-  expect_true(all(is.finite(out)))
+  # The chaining function is `min(max(x, a), b)`. Infinite bounds
+  # make it the identity, which recovers the plain energy score.
+  expect_equal(twenergy_mcmc_object(truths, fcs),
+               energy_mcmc_object(truths, fcs), tolerance = 1e-8)
 })

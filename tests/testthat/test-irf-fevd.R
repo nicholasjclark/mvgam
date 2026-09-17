@@ -248,9 +248,7 @@ test_that("posterior_transition_matrix() summarises the A matrix", {
     expect_equal(dim(out[[slot]]), c(3L, 3L))
   }
   expect_true(all(out$A_lower <= out$A))
-  expect_true(all(out$A >= -1e-12 + pmin(out$A_lower, out$A)))
   expect_true(all(out$A <= out$A_upper))
-  expect_true(all(out$prob_positive >= 0 & out$prob_positive <= 1))
 })
 
 
@@ -264,6 +262,10 @@ test_that("posterior_transition_matrix(summary = FALSE) keeps the draws", {
   # And the median under `robust`.
   rob <- posterior_transition_matrix(mock, robust = TRUE)
   expect_equal(rob$A, apply(arr, c(2, 3), stats::median),
+               ignore_attr = TRUE)
+  # The exceedance probability is the share of draws above zero. A
+  # [0, 1] bound on a mean of indicators excludes no result.
+  expect_equal(out$prob_positive, apply(arr > 0, c(2, 3), mean),
                ignore_attr = TRUE)
 })
 

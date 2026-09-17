@@ -175,20 +175,18 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   mf_obs_only <- mvgam_formula(y ~ x)
   code_obs_only <- stancode(mf_obs_only, data = data, family = poisson(), validate = TRUE)
 
-  # Check class structure follows mvgam convention with brms compatibility
-  expect_s3_class(code_obs_only, "mvgamstancode")
-  expect_s3_class(code_obs_only, "stancode")
-  expect_s3_class(code_obs_only, "character")
-  expect_equal(class(code_obs_only), c("mvgamstancode", "stancode", "character"))
+  # The whole class vector, in order. Three `expect_s3_class()`
+  # calls each named one element of what this line states.
+  expect_identical(class(code_obs_only),
+                   c("mvgamstancode", "stancode", "character"))
 
   # Model with trends - generate without validation first
   mf_with_trend <- mvgam_formula(y ~ x, trend_formula = ~ RW())
   code_with_trend <- stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE)
 
-  # Should have same class structure
-  expect_s3_class(code_with_trend, "mvgamstancode")
-  expect_s3_class(code_with_trend, "stancode")
-  expect_equal(class(code_with_trend), c("mvgamstancode", "stancode", "character"))
+  # Same class vector as the observation-only program.
+  expect_identical(class(code_with_trend),
+                   c("mvgamstancode", "stancode", "character"))
 
   # Should be longer than observation-only model
   expect_gt(nchar(code_with_trend), nchar(code_obs_only))
@@ -239,13 +237,10 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
   expect_false(grepl("mu_trend \\+= Intercept_trend", code_with_trend))
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in STAN_BLOCKS) {
+    expect_identical(stan_block_count(code_with_trend, blk), 1L)
+  }
 
 })
 
@@ -341,13 +336,10 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model with negat
   expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
   expect_true(stan_pattern("array\\[N\\] int obs_trend_series", code_with_trend))
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in STAN_BLOCKS) {
+    expect_identical(stan_block_count(code_with_trend, blk), 1L)
+  }
 
 })
 
@@ -436,13 +428,10 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
   expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
   expect_true(stan_pattern("array\\[N\\] int obs_trend_series", code_with_trend))
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in STAN_BLOCKS) {
+    expect_identical(stan_block_count(code_with_trend, blk), 1L)
+  }
 
 })
 
@@ -594,12 +583,15 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_false(grepl("\\{n_lags\\}", code_with_trend))
   expect_false(grepl("\\{response\\}", code_with_trend))
 
-  # Check for duplicate parameter declarations
-  sigma_trend_count <- length(gregexpr("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend)[[1]])
-  expect_equal(sigma_trend_count, 1)
-
-  L_Omega_count <- length(gregexpr("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_with_trend)[[1]])
-  expect_equal(L_Omega_count, 1)
+  # Declared once each. A count off `length(gregexpr(...))` gives 1
+  # for a declaration that is absent.
+  expect_identical(
+    stan_match_count(code_with_trend,
+                     "vector<lower=0>\\[N_lv_trend\\] sigma_trend;"), 1L)
+  expect_identical(
+    stan_match_count(code_with_trend,
+                     "cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;"),
+    1L)
 
   # Verify trend injection happens in a loop
   expect_true(stan_pattern("for \\(n in 1:N_count\\) \\{[^}]*mu_count\\[n\\] \\+= trend", code_with_trend))
@@ -722,14 +714,10 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_true(stan_pattern("vector\\[knots_count_1\\[2\\]\\] zs_count_1_2;", code_with_trend))
   expect_true(stan_pattern("vector\\[knots_count_1\\[3\\]\\] zs_count_1_3;", code_with_trend))
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*functions\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in c("functions", STAN_BLOCKS)) {
+    expect_identical(stan_block_count(code_with_trend, blk), 1L)
+  }
 
 })
 
@@ -949,17 +937,10 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     # Should NOT have vector ar1 coefficients without bounds
     expect_false(grepl("vector\\[N_lv_trend\\] ar1_trend;", code_with_trend))
 
-    # Check for no duplicated Stan blocks
-    expect_equal(length(gregexpr("^\\s*functions\\s*\\{", code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{",
-                                 code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{",
-                                 code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{",
-                                 code_with_trend)[[1]]), 1)
+    # Each block opens on exactly one line of the program.
+    for (blk in c("functions", STAN_BLOCKS)) {
+      expect_identical(stan_block_count(code_with_trend, blk), 1L)
+    }
 
   })
 
@@ -1131,14 +1112,10 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   # Should NOT have vector ar1 coefficients without bounds
   expect_false(grepl("vector\\[N_lv_trend\\] ar1_trend;", code_with_trend))
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*functions\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in c("functions", STAN_BLOCKS)) {
+    expect_identical(stan_block_count(code_with_trend, blk), 1L)
+  }
 
 })
 
@@ -1232,13 +1209,10 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
   expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
   expect_true(stan_pattern("array\\[N\\] int obs_trend_series", code_with_trend))
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in STAN_BLOCKS) {
+    expect_identical(stan_block_count(code_with_trend, blk), 1L)
+  }
 
 })
 
@@ -1378,13 +1352,10 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
   expect_true(stan_pattern("array\\[N\\] int obs_trend_series", code_with_trend))
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in STAN_BLOCKS) {
+    expect_identical(stan_block_count(code_with_trend, blk), 1L)
+  }
 
 })
 
@@ -1530,13 +1501,10 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
   expect_true(stan_pattern("target \\+= poisson_log_glm_lpmf\\(Y \\| to_matrix\\(mu\\), 0\\.0, mu_ones\\);", code_with_trend))
 
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in STAN_BLOCKS) {
+    expect_identical(stan_block_count(code_with_trend, blk), 1L)
+  }
 
 })
 
@@ -2319,15 +2287,10 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     # Monotonic effect usage in trend construction
     expect_true(stan_pattern("mo\\(simo_1_trend, Xmo_1_trend\\[n\\]\\)", code_with_trend))
 
-    # Check for no duplicated Stan blocks
-    expect_equal(length(gregexpr("^\\s*functions\\s*\\{", code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]),
-                 1)
-    expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-    expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+    # Each block opens on exactly one line of the program.
+    for (blk in c("functions", STAN_BLOCKS)) {
+      expect_identical(stan_block_count(code_with_trend, blk), 1L)
+    }
 
   })
 
@@ -2378,12 +2341,11 @@ test_that("stancode generates correct Stan blocks", {
   # Generate Stan code without validation for structure inspection
   code <- stancode(mf, data = data, family = poisson(), validate = TRUE)
 
-  # Each Stan block should appear exactly once
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in c("data", "parameters", "transformed parameters",
+                "model", "generated quantities")) {
+    expect_identical(stan_block_count(code, blk), 1L)
+  }
 
   # Stan blocks should be in correct order
   data_pos <- regexpr("data\\s*\\{", code)
@@ -2397,9 +2359,10 @@ test_that("stancode generates correct Stan blocks", {
   expect_true(tp_pos < model_pos)
   expect_true(model_pos < gq_pos)
 
-  # Should have exactly one lprior declaration (not duplicated)
-  lprior_decls <- gregexpr("real\\s+lprior\\s*=\\s*0;", code)[[1]]
-  expect_equal(length(lprior_decls), 1)
+  # One lprior declaration. A count off `length(gregexpr(...))`
+  # gives 1 for a declaration that is absent.
+  expect_identical(
+    stan_match_count(code, "real\\s+lprior\\s*=\\s*0;"), 1L)
 
   # Required variable declarations should be present
   expect_true(stan_pattern("vector\\[N\\]\\s*mu", code))
@@ -2583,12 +2546,11 @@ test_that("stancode handles multivariate specifications with shared RW trend and
   expect_s3_class(code_shared, "stancode")
   expect_gt(nchar(code_shared), 500)
 
-  # Should have exactly one of each Stan block (no duplicates)
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_shared)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_shared)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_shared)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_shared)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_shared)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in c("data", "parameters", "transformed parameters",
+                "model", "generated quantities")) {
+    expect_identical(stan_block_count(code_shared, blk), 1L)
+  }
 
   # Check proper block ordering
   data_pos <- regexpr("data\\s*\\{", code_shared)
@@ -2871,9 +2833,13 @@ test_that("standata.mvgam_formula returns proper list structure", {
   expect_equal(length(standata_result$obs_trend_time), standata_result$N)
   expect_equal(length(standata_result$obs_trend_series), standata_result$N)
 
-  # Mapping arrays should contain valid indices
-  expect_true(all(standata_result$obs_trend_time >= 1))
-  expect_true(all(standata_result$obs_trend_series >= 1))
+  # The series index and the time index, row for row. A `>= 1` bound
+  # passed on a permuted map, on a reversed one, and on one putting
+  # every row on series 1.
+  expect_identical(as.integer(standata_result$obs_trend_series),
+                   as.integer(data$series))
+  expect_identical(as.integer(standata_result$obs_trend_time),
+                   match(data$time, sort(unique(data$time))))
 })
 
 test_that("standata handles different data structures", {
@@ -3197,13 +3163,10 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_false(grepl("lv_trend\\[1, :\\] = scaled_innovations", code_with_trend))
   expect_false(grepl("lv_trend\\[i, :\\] = lv_trend\\[i-1", code_with_trend))
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in STAN_BLOCKS) {
+    expect_identical(stan_block_count(code_with_trend, blk), 1L)
+  }
 
 })
 
@@ -3303,13 +3266,10 @@ test_that("stancode handles distributional regression models correctly", {
   expect_false(grepl("innovations_trend_y", code_distributional))
   expect_false(grepl("sigma_trend_y", code_distributional))
 
-  # Check for no duplicated Stan blocks
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_distributional)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_distributional)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_distributional)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_distributional)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_distributional)[[1]]), 1)
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_distributional)[[1]]), 1)
+  # Each block opens on exactly one line of the program.
+  for (blk in STAN_BLOCKS) {
+    expect_identical(stan_block_count(code_distributional, blk), 1L)
+  }
 
 })
 
