@@ -321,7 +321,7 @@ test_that("an addition term is complete on the rows its response was seen", {
 })
 
 
-test_that("validate_no_covariate_nas() catches NAs reached via gp() / RE group", {
+test_that("gp() and RE group columns are checked for NAs", {
   set.seed(1L)
   simdat <- sim_mvgam(family = poisson(), n_series = 2L,
                        n_timepoints = 16L)
@@ -350,7 +350,7 @@ test_that("validate_no_covariate_nas() catches NAs reached via gp() / RE group",
 })
 
 
-test_that("validate_no_covariate_nas() counts NAs in matrix-column predictors", {
+test_that("NAs in matrix-column predictors are counted", {
   # Matrix-column predictors (distributed-lag style) are
   # carried as list entries rather than data.frame columns
   # because as.data.frame() would flatten them. Exercise the
@@ -375,8 +375,8 @@ test_that("lhs_columns() handles formula / brmsformula / mvbrmsformula", {
   expect_identical(lhs_columns(NULL),    character(0L))
   expect_identical(lhs_columns(~ x),     character(0L))
   expect_identical(lhs_columns(y ~ x),   "y")
-  expect_setequal(lhs_columns(cbind(y, trials) ~ x),
-                  c("y", "trials"))
+  expect_identical(lhs_columns(cbind(y, trials) ~ x),
+                   c("y", "trials"))
   # brmsformula: response on $formula slot.
   expect_identical(lhs_columns(brms::bf(y ~ x)), "y")
   # Two-arm bf(): still only the top response, not the dpar arm.
@@ -388,17 +388,18 @@ test_that("lhs_columns() handles formula / brmsformula / mvbrmsformula", {
 test_that("extract_predictor_vars() handles formula / brmsformula / bf arms", {
   expect_identical(extract_predictor_vars(NULL),     character(0L))
   expect_identical(extract_predictor_vars(y ~ 1),    character(0L))
-  expect_setequal(extract_predictor_vars(y ~ x + z), c("x", "z"))
-  expect_setequal(extract_predictor_vars(y ~ s(x, by = grp)),
-                  c("x", "grp"))
+  expect_identical(extract_predictor_vars(y ~ x + z), c("x", "z"))
+  expect_identical(extract_predictor_vars(y ~ s(x, by = grp)),
+                   c("x", "grp"))
   # Trend constructor bare names should be picked up.
-  expect_setequal(extract_predictor_vars(~ AR(time = week, series = sp)),
-                  c("week", "sp"))
-  # Two-arm bf() (closure-unit detection sub-formula).
+  expect_identical(extract_predictor_vars(~ AR(time = week, series = sp)),
+                   c("week", "sp"))
+  # A two-part bf() (closure-unit detection sub-formula).
   bf_two <- brms::bf(y ~ env, p ~ tod)
-  expect_setequal(extract_predictor_vars(bf_two), c("env", "tod"))
-  # List of formulas: union the predictors, drop duplicates.
-  expect_setequal(
+  expect_identical(extract_predictor_vars(bf_two), c("env", "tod"))
+  # List of formulas: the union of the predictors, in the order they
+  # first appear, with duplicates dropped.
+  expect_identical(
     extract_predictor_vars(list(y ~ x, ~ s(z, by = grp))),
     c("x", "z", "grp")
   )

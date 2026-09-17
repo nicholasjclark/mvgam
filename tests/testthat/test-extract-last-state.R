@@ -145,12 +145,14 @@ test_that("AR(p = 1) pulls ar1_trend per series", {
 
 test_that("AR(p = 3) pulls ar1/ar2/ar3 per series", {
   n_series <- 2L; n_time <- 6L
+  trend_mat <- matrix(seq_len(n_time * n_series),
+                       nrow = n_time, byrow = TRUE)
   draws <- make_draws(list(
     sigma_trend = c(0.5, 0.5),
     ar1_trend = c(0.1, 0.2),
     ar2_trend = c(0.3, 0.4),
     ar3_trend = c(0.5, 0.6),
-    trend = matrix(0, nrow = n_time, ncol = n_series)
+    trend = trend_mat
   ))
   meta <- list(trend_type = "AR", ar_lags = c(1L, 2L, 3L),
                ma_lags = integer(0), max_lag = 3L,
@@ -162,7 +164,9 @@ test_that("AR(p = 3) pulls ar1/ar2/ar3 per series", {
   expect_equal(as.numeric(res$params$ar[1, ]), c(0.1, 0.2))
   expect_equal(as.numeric(res$params$ar[2, ]), c(0.3, 0.4))
   expect_equal(as.numeric(res$params$ar[3, ]), c(0.5, 0.6))
-  expect_identical(dim(res$last_state$trends), c(3L, 2L))
+  # The history is the final max_lag rows, in their own order.
+  expect_equal(unname(res$last_state$trends),
+               unname(trend_mat[4:6, ]))
 })
 
 
@@ -170,12 +174,14 @@ test_that("AR(p = 3) pulls ar1/ar2/ar3 per series", {
 
 test_that("AR(p = c(1, 3, 12)) pulls only the active lag params", {
   n_series <- 2L; n_time <- 15L
+  trend_mat <- matrix(seq_len(n_time * n_series),
+                       nrow = n_time, byrow = TRUE)
   draws <- make_draws(list(
     sigma_trend = c(0.5, 0.5),
     ar1_trend = c(0.7, 0.5),
     ar3_trend = c(-0.1, 0.05),
     ar12_trend = c(0.2, 0.3),
-    trend = matrix(0, nrow = n_time, ncol = n_series)
+    trend = trend_mat
   ))
   meta <- list(trend_type = "AR",
                ar_lags = c(1L, 3L, 12L),
@@ -188,8 +194,10 @@ test_that("AR(p = c(1, 3, 12)) pulls only the active lag params", {
   expect_equal(as.numeric(res$params$ar[1, ]), c(0.7, 0.5))
   expect_equal(as.numeric(res$params$ar[2, ]), c(-0.1, 0.05))
   expect_equal(as.numeric(res$params$ar[3, ]), c(0.2, 0.3))
-  # Trend history must cover the maximum lag (12 rows).
-  expect_identical(dim(res$last_state$trends), c(12L, 2L))
+  # The history covers the maximum lag: the final 12 rows, in the
+  # order they were recorded.
+  expect_equal(unname(res$last_state$trends),
+               unname(trend_mat[4:15, ]))
 })
 
 
@@ -435,7 +443,8 @@ test_that("PW pulls k / m / delta from posterior and t_change from standata", {
   # Standata carries t_change_trend (fixed at fit time) and
   # cap_trend (logistic only); both are pulled by the helper.
   t_change_data <- c(5, 10, 15)
-  cap_data <- matrix(10, nrow = n_time, ncol = n_series)
+  cap_data <- matrix(seq_len(n_time * n_series),
+                      nrow = n_time, ncol = n_series)
   meta <- list(trend_type = "PW", ar_lags = integer(0),
                ma_lags = integer(0), max_lag = 0L,
                has_cor = FALSE)
@@ -453,9 +462,8 @@ test_that("PW pulls k / m / delta from posterior and t_change from standata", {
   expect_equal(res$params$delta, delta_post,
                 tolerance = 1e-12)
   expect_equal(res$params$t_change, c(5, 10, 15))
-  # cap is carried on last_state for the forecast caller.
-  expect_identical(dim(res$last_state$cap_train),
-                    c(n_time, n_series))
+  # last_state holds cap for the forecast caller, cell for cell.
+  expect_equal(unname(res$last_state$cap_train), unname(cap_data))
 })
 
 
