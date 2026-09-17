@@ -129,6 +129,18 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
       beta_shapes(family_pars$prob_row[, j], family_pars$phi[, j],
                   boundary_na = TRUE)
     }),
+    # The other two compositions have a marginal on the same
+    # argument. A multinomial's K counts are drawn jointly against the
+    # site's own total, and one component of that draw is
+    # `Binomial(N_site, p_k)`. A categorical unit records one species,
+    # which is that binomial at a single trial.
+    multi = spec("binom", function(j) {
+      list(size = family_pars$unit_total_row[j],
+           prob = family_pars$prob_row[, j])
+    }),
+    categ = spec("binom", function(j) {
+      list(size = 1L, prob = family_pars$prob_row[, j])
+    }),
     # A Tweedie puts a point mass at zero and is continuous above it,
     # so the spec records where that mass sits; a caller forming a
     # probability-integral transform needs to know the interval an

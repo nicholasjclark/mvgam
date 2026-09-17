@@ -20,17 +20,19 @@
 #'   transformed through that function directly. This covers the
 #'   single-parameter and location-scale families, the counts,
 #'   `beta` and `beta_binomial`, `com_binomial()` and `tweedie()`,
-#'   the ordinal families, and the multivariate `mvn()`, `mvt()` and
-#'   `diri()`. A discrete family randomises within the interval its
-#'   atom occupies, `[F(y - 1), F(y)]`; a continuous one has no atom
-#'   and the interval collapses to `F(y)`.
+#'   the ordinal families, and the multivariate `mvn()`, `mvt()`,
+#'   `diri()`, `multi()` and `categ()`. A composition family is
+#'   transformed through the marginal of one component: a Beta for
+#'   `diri()`, a Binomial against the site's own total for `multi()`,
+#'   and a Bernoulli for `categ()`. A discrete family randomises
+#'   within the interval its atom occupies, `[F(y - 1), F(y)]`; a
+#'   continuous one has no atom and the interval collapses to `F(y)`.
 #'
-#'   The mixtures and the closure-unit families -- zero-inflated,
-#'   hurdle, `mixture()`, `occ()`, `nmix()`, `multi()` and `categ()`
-#'   -- have no single distribution function to name, and take an
-#'   empirical PIT over [posterior_predict.mvgam()] draws instead
-#'   (the DHARMa / Hartig 2024 approach). The `Details` below give
-#'   what that route costs.
+#'   The mixtures and the detection families -- zero-inflated,
+#'   hurdle, `mixture()`, `occ()` and `nmix()` -- have no single
+#'   distribution function to name, and take an empirical PIT over
+#'   [posterior_predict.mvgam()] draws instead (the DHARMa / Hartig
+#'   2024 approach). The `Details` below give what that route costs.
 #'
 #' * `"ordinary"` -- the predictive error `y - posterior_predict(y)`
 #'   per draw. Matches `type = "ordinary"` in

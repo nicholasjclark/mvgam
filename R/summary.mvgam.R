@@ -102,20 +102,14 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   pars <- rownames(all_summaries)
 
   # `include_betas = FALSE` drops the trend-side per-cell arrays that
-  # dominate the printed summary on hierarchical or high-dimensional
-  # VAR fits (per-country A_group_trend, Sigma_group_trend, the full
-  # block-diagonal A_trend / Sigma_trend / Omega_trend). Global
-  # hyperparameters (Amu_trend, Aomega_trend, L_Omega_global_trend,
-  # alpha_cor_trend, sigma_group_trend[k, k] scalars) survive so the
-  # printed digest stays focused on parameters a reader would
-  # actually inspect.
+  # dominate the printed summary on a hierarchical or
+  # high-dimensional VAR fit. The Cholesky factors those matrices are
+  # built from carry the kind `internal` and never reach a printed
+  # summary. The hyperparameters a reader inspects directly stay,
+  # among them `Amu_trend`, `Aomega_trend`, `alpha_cor_trend` and the
+  # `sigma_group_trend` scalars.
   if (!isTRUE(include_betas)) {
-    heavy_pat <- paste0(
-      "^(A_raw_group_trend|A_group_trend|Sigma_group_trend|",
-      "L_deviation_group_trend|A_trend|Sigma_trend|Omega_trend|",
-      "L_Omega_trend)\\["
-    )
-    pars_to_keep <- !grepl(heavy_pat, pars)
+    pars_to_keep <- !is_trend_matrix_param(pars)
     if (any(!pars_to_keep)) {
       all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
       pars <- rownames(all_summaries)
@@ -603,6 +597,23 @@ match_dpar_smooth_pars <- function(pars, dpars) {
 #' @noRd
 is_trend_state_param <- function(pars) {
   mvgam_par_kind(pars) == "state"
+}
+
+
+#' The trend's per-cell matrix parameters
+#'
+#' A correlated or hierarchical trend estimates one entry per cell of
+#' a matrix, and a high-dimensional fit prints hundreds of those
+#' rows. `include_betas = FALSE` drops them. `par_taxonomy.R`
+#' declares the names, which keeps one account of what each name
+#' means.
+#'
+#' @param pars Character vector of parameter names
+#' @return Logical vector
+#'
+#' @noRd
+is_trend_matrix_param <- function(pars) {
+  grepl(MVGAM_PAR_MATRIX_PATTERN, pars)
 }
 
 # ==============================================================================

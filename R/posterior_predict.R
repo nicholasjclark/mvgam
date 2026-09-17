@@ -182,7 +182,11 @@ family_uses_integers <- function(family_name) {
     "zero_inflated_poisson", "zero_inflated_negbinomial",
     "zero_inflated_binomial", "zero_inflated_beta_binomial",
     "hurdle_poisson", "hurdle_negbinomial", "hurdle_cumulative",
-    "discrete_weibull", "com_poisson", "beta_nb", "com_binomial"
+    "discrete_weibull", "com_poisson", "beta_nb", "com_binomial",
+    # A multinomial's counts and a categorical's one-hot row are both
+    # whole numbers. Each observed value carries an atom, and the
+    # quantile residual randomises across that atom's interval.
+    "multi", "categ"
   )
 
   family_name %in% integer_families

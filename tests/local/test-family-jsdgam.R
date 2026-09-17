@@ -98,6 +98,30 @@ expect_drawn <- function(p) {
 }
 
 
+# The pairs of per-species matrices holding identical values. A list
+# of the right names and dimensions that carries one shared matrix
+# passes every shape check, and a fit giving two species one latent
+# column produces exactly that. Checking only the opening pair misses
+# a collision between the last two.
+#
+# Comparing the matrices states the claim that comparing their means
+# only approximates: a count family's per-species means are rationals
+# over one denominator and two of them tie by chance, which fails an
+# assertion nothing is wrong with.
+identical_species_pairs <- function(mats) {
+  same <- character(0)
+  for (i in seq_along(mats)) {
+    for (j in seq_along(mats)) {
+      if (j <= i) next
+      if (isTRUE(all.equal(mats[[i]], mats[[j]]))) {
+        same <- c(same, paste(names(mats)[i], names(mats)[j], sep = "="))
+      }
+    }
+  }
+  same
+}
+
+
 # Fold a wide site-by-species matrix into the long frame a jsdgam
 # reads, keyed by site and species. Every simulation below ends
 # here, so the frame's shape is stated once.
@@ -255,38 +279,88 @@ centred_loadings <- function(K, N_lv, sd = 0.7) {
 }
 
 
-sim_diri <- function() {
-  set.seed(601L)
-  K <- 4L
-  N_lv <- 2L
-  n_sites <- 30L
-  phi_true <- 30
+# The softmax families share one generator. `draw` is the part that
+# differs: a Dirichlet takes gamma variates and normalises them, a
+# multinomial takes counts against a fixed unit total, and a
+# categorical takes one species. Calling `draw` at the same point of
+# the loop keeps the random sequence identical across the three, so
+# each family's simulated truth matches what its cached fixture holds.
+sim_softmax_jsdm <- function(seed, n_sites, draw, extra = list(),
+                             integer_response = FALSE,
+                             K = 4L, N_lv = 2L) {
+  set.seed(seed)
   species_levels <- paste0("y", seq_len(K))
-
   Z_true <- centred_loadings(K, N_lv)
   env <- rnorm(n_sites)
   mu_intercept <- rnorm(K)
   mu_env_slope <- rnorm(K)
 
-  Y_wide <- matrix(NA_real_, nrow = n_sites, ncol = K)
+  Y_wide <- matrix(0, nrow = n_sites, ncol = K)
   for (i in seq_len(n_sites)) {
     lv_i <- rnorm(N_lv)
     eta_i <- mu_intercept + mu_env_slope * env[i] +
       as.numeric(Z_true %*% lv_i)
     p_i <- exp(eta_i) / sum(exp(eta_i))
-    gam <- rgamma(K, shape = p_i * phi_true, rate = 1)
-    Y_wide[i, ] <- gam / sum(gam)
+    Y_wide[i, ] <- draw(p_i, K)
   }
   colnames(Y_wide) <- species_levels
 
   sigma_true_cov <- tcrossprod(Z_true)
-  list(
-    K = K, N_lv = N_lv, species_levels = species_levels,
-    Z_true = Z_true, phi_true = phi_true,
-    sigma_true_cov = sigma_true_cov,
-    sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, K)),
-    mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
-    long_dat = as_long_jsdm(Y_wide, env, species_levels)
+  c(
+    list(
+      K = K, N_lv = N_lv, species_levels = species_levels,
+      Z_true = Z_true,
+      sigma_true_cov = sigma_true_cov,
+      sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, K)),
+      mu_intercept = mu_intercept, mu_env_slope = mu_env_slope,
+      env = env,
+      long_dat = as_long_jsdm(Y_wide, env, species_levels,
+                              integer_response = integer_response)
+    ),
+    extra
+  )
+}
+
+
+sim_diri <- function() {
+  phi_true <- 30
+  sim_softmax_jsdm(
+    seed = 601L, n_sites = 30L, extra = list(phi_true = phi_true),
+    draw = function(p, K) {
+      gam <- rgamma(K, shape = p * phi_true, rate = 1)
+      gam / sum(gam)
+    }
+  )
+}
+
+
+# `multi()` takes integer counts over the `K` species of a unit. The
+# softmax of the same linear predictor gives the cell probabilities,
+# and one multinomial draw per site holds the unit total fixed.
+sim_multi <- function() {
+  unit_total <- 30L
+  sim_softmax_jsdm(
+    seed = 605L, n_sites = 40L, integer_response = TRUE,
+    extra = list(unit_total = unit_total),
+    draw = function(p, K) as.numeric(stats::rmultinom(1L, unit_total, p))
+  )
+}
+
+
+# `categ()` takes a one-hot response, one chosen species per unit,
+# and the softmax gives the choice probabilities. A unit records no
+# within-unit co-occurrence, which leaves the residual correlation
+# unidentified at any site count. Both correlation floors are NULL
+# in its spec for that reason. What this fixture covers is the
+# post-fit surface for the family.
+sim_categ <- function() {
+  sim_softmax_jsdm(
+    seed = 607L, n_sites = 40L, integer_response = TRUE,
+    draw = function(p, K) {
+      z <- numeric(K)
+      z[sample.int(K, 1L, prob = p)] <- 1
+      z
+    }
   )
 }
 
@@ -307,7 +381,8 @@ SPECS <- list(
   nb = list(
     label = "negative binomial", family = quote(brms::negbinomial()),
     sim = sim_nb,
-    threshold_cor = 0.6, mae_max = 0.6, na_response = NA_integer_,
+    threshold_cor = 0.6, recovery_cor = 0.6,
+    mae_max = 0.6, na_response = NA_integer_,
     has_psi = FALSE,
     epred_ok = function(x) all(x > 0),
     predict_ok = function(x) all(x >= 0) && all(x == floor(x)),
@@ -327,7 +402,8 @@ SPECS <- list(
   mvt = list(
     label = "multivariate Student-t", family = quote(mvt()), sim = sim_mvt,
     identity_link = TRUE,
-    threshold_cor = 0.7, mae_max = 0.5, na_response = NA_real_,
+    threshold_cor = 0.7, recovery_cor = 0.7,
+    mae_max = 0.5, na_response = NA_real_,
     has_psi = TRUE,
     epred_ok = NULL, predict_ok = NULL,
     has_latent_state = FALSE,
@@ -344,7 +420,8 @@ SPECS <- list(
   mvn = list(
     label = "multivariate normal", family = quote(mvn()), sim = sim_mvn,
     identity_link = TRUE,
-    threshold_cor = 0.7, mae_max = 0.5, na_response = NA_real_,
+    threshold_cor = 0.7, recovery_cor = 0.7,
+    mae_max = 0.5, na_response = NA_real_,
     has_psi = TRUE,
     epred_ok = NULL, predict_ok = NULL,
     has_latent_state = FALSE,
@@ -360,13 +437,51 @@ SPECS <- list(
   ),
   diri = list(
     label = "Dirichlet", family = quote(diri()), sim = sim_diri,
-    threshold_cor = 0.7, mae_max = 0.5, na_response = NA_real_,
+    threshold_cor = 0.7, recovery_cor = 0.7,
+    mae_max = 0.5, na_response = NA_real_,
     has_psi = FALSE,
     epred_ok = function(x) all(x >= 0 & x <= 1),
     predict_ok = function(x) all(x >= 0 & x <= 1),
     has_latent_state = FALSE,
     fc_types = c("link", "expected", "trend", "response"),
     fc_response_ok = function(x) all(x >= 0 & x <= 1),
+    pp_check_extra = NULL,
+    plot_types = c("trend", "factors"),
+    optional_methods = c("residuals", "forecast_response_agrees"),
+    ce_response_ok = NULL,
+    me_integer_tell = FALSE
+  ),
+  multi = list(
+    label = "multinomial", family = quote(multi()), sim = sim_multi,
+    threshold_cor = 0.7, recovery_cor = 0.7,
+    mae_max = 0.5, na_response = NA_integer_,
+    has_psi = FALSE,
+    epred_ok = function(x) all(x >= 0),
+    predict_ok = function(x) all(x >= 0) && all(x == floor(x)),
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = function(x) all(x >= 0) && all(x == floor(x)),
+    pp_check_extra = NULL,
+    plot_types = c("trend", "factors"),
+    optional_methods = c("residuals", "forecast_response_agrees"),
+    ce_response_ok = NULL,
+    me_integer_tell = FALSE
+  ),
+  categ = list(
+    label = "categorical", family = quote(categ()), sim = sim_categ,
+    # One species per unit records no within-unit co-occurrence,
+    # which identifies neither the simulated correlation nor the
+    # agreement between two accounts of it. The post-fit claims
+    # below are what this family is held to.
+    threshold_cor = NULL, recovery_cor = NULL,
+    cond_ratio_max = 0.95,
+    mae_max = 0.6, na_response = NA_integer_,
+    has_psi = FALSE,
+    epred_ok = function(x) all(x >= 0 & x <= 1),
+    predict_ok = function(x) all(x %in% c(0, 1)),
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = function(x) all(x %in% c(0, 1)),
     pp_check_extra = NULL,
     plot_types = c("trend", "factors"),
     optional_methods = c("residuals", "forecast_response_agrees"),
@@ -380,9 +495,20 @@ SPECS <- list(
 
 fit_jsdm <- function(nm, spec, sim) {
   cache <- jsdm_cache(nm)
+  fit <- NULL
   if (file.exists(cache)) {
-    fit <- readRDS(cache)
-  } else {
+    cached <- readRDS(cache)
+    # A cached fit belongs to the simulation whose frame it was built
+    # from. Editing a simulator changes that frame, and the stored
+    # posterior then describes data the file does not generate.
+    # Comparing the response column catches that. Comparing the
+    # derived truth list does not: its field order moves without any
+    # value changing.
+    if (identical(cached$data$y, sim$long_dat$y)) {
+      fit <- cached
+    }
+  }
+  if (is.null(fit)) {
     fit <- jsdgam(
       formula = y ~ env * series,
       factor_formula = ~ -1,
@@ -426,50 +552,59 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     c(2L, 3L), mean
   )
 
-  test_that(says("the residual correlation recovers the simulated one"), {
-    # The off-diagonals are compared as a set, so this number is
-    # reached just as well by a fit that hands every species another
-    # species' latent column. The structural claims below are what
-    # separate the two cases.
-    expect_gt(cor_off, spec$threshold_cor)
-    expect_lt(mae_off, spec$mae_max)
-  })
+  # `recovery_cor` is the floor for recovering the simulated
+  # correlation, and `threshold_cor` the floor for the agreement
+  # between two accounts the same fit gives of it. A family whose
+  # design records no within-unit co-occurrence carries NULL for
+  # both: a single-trial categorical observes one species per unit,
+  # which identifies neither quantity however many units are
+  # simulated. The post-fit claims cover such a family instead.
+  if (!is.null(spec$recovery_cor)) {
+    test_that(says("the residual correlation recovers the simulated one"), {
+      # The off-diagonals are compared as a set. A fit that hands
+      # every species another species' latent column reaches this
+      # number just as well, and the structural claims that follow
+      # separate the two cases.
+      expect_gt(cor_off, spec$recovery_cor)
+      expect_lt(mae_off, spec$mae_max)
+    })
+  }
 
-  test_that(says("the reported correlation is the one the loadings imply"), {
-    # `residual_cor()` and the loadings are two accounts of the same
-    # quantity reached by different code, so they have to agree. The
-    # sharper claim is the second: permuting the loadings' rows has
-    # to make the agreement worse. If a permuted Z matches the
-    # reported matrix as well as the true ordering does, then neither
-    # surface carries any information about which species is which,
-    # and the recovery number above is measuring nothing.
-    implied_cov <- tcrossprod(Z_mean)
-    if (isTRUE(spec$has_psi)) {
-      psi_cols <- grep("^Psi\\[", colnames(dm), value = TRUE)
-      implied_cov <- implied_cov +
-        diag(colMeans(dm[, psi_cols, drop = FALSE])^2)
-    }
-    agreement <- function(M) {
-      cc <- cov2cor(M + diag(1e-8, K))
-      stats::cor(cc[upper.tri(cc)], post_off)
-    }
-    base <- agreement(implied_cov)
-    # The floor is the family's own recovery threshold rather than a
-    # flat number: the gap between the mean of the correlation and
-    # the correlation of the mean loadings widens as the posterior
-    # does, so a single-trial categorical agrees less than a
-    # multinomial for the same reason it recovers less. The claim
-    # that carries the weight is the permutation one below, which
-    # holds for every family whatever the level of agreement.
-    expect_gt(base, spec$threshold_cor)
-    for (perm in list(c(2:K, 1L), rev(seq_len(K)))) {
-      shuffled <- tcrossprod(Z_mean[perm, , drop = FALSE])
+  if (!is.null(spec$threshold_cor)) {
+    test_that(says("the reported correlation matches the loadings"), {
+      # `residual_cor()` and the loadings are two accounts of the same
+      # quantity reached by different code, and they have to agree.
+      # The sharper claim is the second: permuting the loadings' rows
+      # has to make the agreement worse. If a permuted Z matches the
+      # reported matrix as well as the true ordering does, then
+      # neither surface carries any information about which species is
+      # which, and the recovery number above is measuring nothing.
+      implied_cov <- tcrossprod(Z_mean)
       if (isTRUE(spec$has_psi)) {
-        shuffled <- shuffled + diag(diag(implied_cov - tcrossprod(Z_mean)))
+        psi_cols <- grep("^Psi\\[", colnames(dm), value = TRUE)
+        implied_cov <- implied_cov +
+          diag(colMeans(dm[, psi_cols, drop = FALSE])^2)
       }
-      expect_gt(base, agreement(shuffled))
-    }
-  })
+      agreement <- function(M) {
+        cc <- cov2cor(M + diag(1e-8, K))
+        stats::cor(cc[upper.tri(cc)], post_off)
+      }
+      base <- agreement(implied_cov)
+      # The floor is the family's own: the gap between the mean of the
+      # correlation and the correlation of the mean loadings widens
+      # with the posterior. The permutation claim below carries the
+      # weight, holding whatever the level of agreement.
+      expect_gt(base, spec$threshold_cor)
+      for (perm in list(c(2:K, 1L), rev(seq_len(K)))) {
+        shuffled <- tcrossprod(Z_mean[perm, , drop = FALSE])
+        if (isTRUE(spec$has_psi)) {
+          shuffled <- shuffled +
+            diag(diag(implied_cov - tcrossprod(Z_mean)))
+        }
+        expect_gt(base, agreement(shuffled))
+      }
+    })
+  }
 
   test_that(says("the species axis is the one the frame declared"), {
     axes <- mvgam:::mvgam_axes(fit)
@@ -479,7 +614,40 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     expect_identical(as.integer(fit$standata$N_series_trend), K)
   })
 
-  test_that(says("every prediction surface answers for every row"), {
+  test_that(says("naming a hidden parameter retrieves it"), {
+    # The default parameter set leaves out Stan's working arrays, the
+    # accumulators and the rotation-indeterminate factor block.
+    # Naming one explicitly is how a user retrieves a quantity the
+    # default omits, which is what `all` in `mvgam_user_pars()`
+    # provides. Applying the exclusion whatever the caller asked for
+    # left an explicitly named parameter unreachable, with the
+    # refusal naming no parameter the posterior holds.
+    default_pars <- names(mvgam:::mvgam_user_pars(fit))
+    all_pars <- names(mvgam:::mvgam_user_pars(fit, all = TRUE))
+    hidden <- setdiff(all_pars, default_pars)
+    expect_gt(length(hidden), 0L)
+    expect_identical(intersect(hidden, default_pars), character(0))
+
+    # A factor model hides its raw loadings, whose rotation no prior
+    # fixes. `variables()` omits them and a caller naming them gets
+    # them back.
+    expect_false(any(grepl("^Z\\[", variables(fit))))
+    expect_true(any(grepl("^Z\\[", hidden)))
+
+    # Asked for by its exact name, a hidden parameter comes back
+    # carrying its own posterior, draw for draw. A column of the
+    # right width holding some other parameter's values satisfies
+    # every shape check and fails this one.
+    all_map <- mvgam:::mvgam_user_pars(fit, all = TRUE)
+    probe <- hidden[[1L]]
+    drawn <- as.data.frame(fit, variable = probe)
+    expect_equal(
+      drawn[[probe]],
+      as.numeric(as_draws_matrix(fit$fit)[, all_map[[probe]]])
+    )
+  })
+
+  test_that(says("every prediction surface covers every row"), {
     ep <- posterior_epred(fit, draw_ids = 1:20)
     pp <- posterior_predict(fit, draw_ids = 1:20)
     expect_identical(dim(ep), c(20L, n_obs))
@@ -565,16 +733,27 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # `incl_autocor = TRUE` asks for the latent state the sampler put
     # at each row, where `FALSE` integrates it out, and the fitted
     # state sits far closer to the data it was fitted to. A method
-    # that answered both requests from one predictor would give the
-    # two the same error. Measured, the conditional error is at most a
-    # quarter of the marginal one on all four families.
+    # that used one predictor for both requests would give the two
+    # the same error.
+    #
+    # `cond_ratio_max` is the share of the marginal error the
+    # conditional one has to come under. A response carrying little
+    # information about the latent state improves less under
+    # conditioning: a single-trial categorical records one species per
+    # unit and reaches 0.87 where a multinomial reaches 0.18, and it
+    # names its own ceiling for that reason.
+    ratio_max <- if (is.null(spec$cond_ratio_max)) {
+      0.5
+    } else {
+      spec$cond_ratio_max
+    }
     ok <- !is.na(d$y)
     sq_err <- function(m) mean((colMeans(m)[ok] - d$y[ok])^2)
     for (method in list(posterior_epred, posterior_predict)) {
       marginal <- method(fit, newdata = d, draw_ids = 1:100)
       conditional <- method(fit, newdata = d, draw_ids = 1:100,
                             incl_autocor = TRUE)
-      expect_lt(sq_err(conditional), 0.5 * sq_err(marginal))
+      expect_lt(sq_err(conditional), ratio_max * sq_err(marginal))
     }
   })
 
@@ -752,18 +931,7 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     arms <- hindcast(fit, ndraws = 20L)$hindcasts
     expect_identical(names(arms), lev)
     expect_true(all(vapply(arms, function(a) NROW(a) > 0L, logical(1))))
-    # Every pair. Checking only the opening pair passes a fit that
-    # gave the last two species one latent column.
-    same <- character(0)
-    for (i in seq_along(arms)) {
-      for (j in seq_along(arms)) {
-        if (j <= i) next
-        if (isTRUE(all.equal(arms[[i]], arms[[j]]))) {
-          same <- c(same, paste(names(arms)[i], names(arms)[j], sep = "="))
-        }
-      }
-    }
-    expect_identical(same, character(0))
+    expect_identical(identical_species_pairs(arms), character(0))
     # Each arm holds that species' own occasions, so a hindcast cut
     # by the wrong axis has the wrong width.
     n_times <- length(unique(d$time))
@@ -791,11 +959,11 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
         expect_identical(dim(fc$forecasts[[s]]), c(20L, h))
         expect_true(all(is.finite(fc$forecasts[[s]])))
       }
-      # The species have to be told apart on every scale. An arm
-      # list of the right names holding one shared matrix passes
-      # every dimension check above.
-      arm_means <- vapply(fc$forecasts, mean, numeric(1))
-      expect_equal(length(unique(round(arm_means, 10L))), length(lev))
+      # The species have to be told apart on every scale, which the
+      # matrices state and their means only approximate.
+      expect_identical(
+        identical_species_pairs(fc$forecasts), character(0)
+      )
     }
     # `type = "expected"` is the family's mean, so it lands on the
     # scale `posterior_epred()` occupies over the training grid: the

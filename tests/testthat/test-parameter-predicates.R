@@ -111,6 +111,8 @@ test_that("one taxonomy answers for every consumer of a name", {
     "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
     "init_trend[1,1]", "ma_innovations_trend[1,1]",
     "Q_tilde[1,1]", "z_1[1,1]",
+    "L_Omega_trend[1,1]", "A_raw_trend[1,1,1]",
+    "A_trend[1,1,1]", "Sigma_trend[1,1]",
     "lscale_1[1]", "zs_1_1[1]", "Z[1,1]", "Z_tilde[1,1]"
   )
   kind <- mvgam_par_kind(pars)
@@ -130,11 +132,27 @@ test_that("one taxonomy answers for every consumer of a name", {
   # meaning outside the transformation that produced them, and
   # `mvgam_user_pars()` drops them before a reader meets a name.
   # `ma_innovations_trend` is the moving-average filter an
-  # `AR(ma = TRUE)` forms, which no post-fit code needs.
+  # `AR(ma = TRUE)` forms. A Cholesky factor prints a unit diagonal
+  # and a structurally zero upper triangle, and `A_raw_trend` is the
+  # unconstrained matrix the stationarity transform turns into
+  # `A_trend`. `residual_cor()` takes each one from the raw draws.
   expect_setequal(
     pars[kind == "internal"],
-    c("ma_innovations_trend[1,1]", "Q_tilde[1,1]", "z_1[1,1]")
+    c("ma_innovations_trend[1,1]", "Q_tilde[1,1]", "z_1[1,1]",
+      "L_Omega_trend[1,1]", "A_raw_trend[1,1,1]")
   )
+  # The per-cell matrices a reader interprets, which
+  # `include_betas = FALSE` drops.
+  expect_true(all(is_trend_matrix_param(
+    c("A_trend[1,1,1]", "Sigma_trend[1,1]", "Omega_trend[1,1]",
+      "A_group_trend[1,1,1]", "Sigma_group_trend[1,1,1]")
+  )))
+  # The scalar hyperparameters a summary keeps, and the rotated
+  # companion, which carries an identified form of its own.
+  expect_false(any(is_trend_matrix_param(
+    c("sigma_trend[1]", "ar1_trend[1]", "alpha_cor_trend",
+      "sigma_group_trend[1,1]", "A_trend_tilde[1,1,1]")
+  )))
   # The same prefix means different things on the two sides.
   expect_identical(unname(kind["sigma"]), "family")
   expect_identical(unname(kind["sigma_trend[1]"]), "dynamics")

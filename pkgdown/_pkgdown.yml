@@ -152,6 +152,9 @@ reference:
   - sim_closure_unit_data
   - summary.mvgam_sim_closure_unit
   - print.mvgam_sim_closure_unit_summary
+  - sim_jsdm
+  - summary.mvgam_sim_jsdm
+  - print.mvgam_sim_jsdm_summary
 
 - title: Prediction and forecasting
   desc: >

@@ -144,7 +144,9 @@ summary(simdat)
 For detection-error families (\code{\link[=occ]{occ()}} / \code{\link[=nmix]{nmix()}} variants),
 use \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} instead: the closure-unit
 grain (sites x visits) does not fit the time-series layout
-\code{sim_mvgam()} produces.
+\code{sim_mvgam()} produces. For multi-species site-by-species
+data with correlated species, use \code{\link[=sim_jsdm]{sim_jsdm()}}, which draws
+one row per species at each site.
 }
 \author{
 Nicholas J Clark

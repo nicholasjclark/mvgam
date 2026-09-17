@@ -37,7 +37,17 @@ Distributional regression on \code{mu} is the standard formula
 side: \code{bf(y | trials(trials) ~ x)}.}
 \item{\code{nu}}{real-valued dispersion exponent (link = \code{identity},
 \code{lb = -5}). \code{nu = 1} is binomial. Distributional regression
-is supported via \code{bf(y | trials(trials) ~ x, nu ~ z)}.}
+is supported via \code{bf(y | trials(trials) ~ x, nu ~ z)}.
+The support is \code{0:T}, a finite range. The normalising sum
+runs over \code{T + 1} positive terms at every real \code{nu}, which
+keeps the density proper with no lower bound on it. \code{lb = -5}
+is a numerical floor. The log factorial term grows with
+\code{-nu}, and gradients past that point are hard for the
+sampler. A scalar \code{nu} carries the floor as
+\verb{real<lower=-5>} with a prior truncated to match. A modelled
+\code{nu} is a linear predictor and carries no such declaration,
+leaving \code{nu[n]} free. Hold the predictor inside the range the
+data resolve, roughly \verb{(-1, 4)}.}
 }
 }
 

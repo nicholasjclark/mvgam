@@ -216,7 +216,9 @@
 #'   `posterior_epred`, etc.) applies; jsdgam-specific surfaces
 #'   (`ordinate`, `residual_cor`) recognise the additional class.
 #'
-#' @seealso [mvgam()], [lv_axis()], [residual_cor()],
+#' @seealso [sim_jsdm()] to simulate data this function fits, and
+#'   [sim_closure_unit_data()] for the `occ()` / `nmix()` case;
+#'   [mvgam()], [lv_axis()], [residual_cor()],
 #'   [ordinate()], [shared_variation()], [active_factors()],
 #'   [compare_loadings()], [methods_md()], [how_to_cite()]. A
 #'   worked online article walking through `jsdgam()` with a

@@ -295,6 +295,8 @@ models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
+\code{\link[=sim_jsdm]{sim_jsdm()}} to simulate data this function fits, and
+\code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} for the \code{occ()} / \code{nmix()} case;
 \code{\link[=mvgam]{mvgam()}}, \code{\link[=lv_axis]{lv_axis()}}, \code{\link[=residual_cor]{residual_cor()}},
 \code{\link[=ordinate]{ordinate()}}, \code{\link[=shared_variation]{shared_variation()}}, \code{\link[=active_factors]{active_factors()}},
 \code{\link[=compare_loadings]{compare_loadings()}}, \code{\link[=methods_md]{methods_md()}}, \code{\link[=how_to_cite]{how_to_cite()}}. A

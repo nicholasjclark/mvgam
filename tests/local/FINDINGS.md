@@ -15,21 +15,6 @@ gives 335 at 1.396, with two species pulled to 0.9 by a prior centred
 on 0.5. No fixed constant suits every response scale. A new default
 needs calibrating over a grid of true `Psi` and factor share.
 
-## com_binomial's nu bound differs by spelling
-
-**128. A modelled `nu` carries no bound.**
-
-`com_binomial()` declares `lb = c(NA, -5)` (`families.R:1019`), and
-brms turns that bound into `real<lower=-5> nu;` together with a
-truncated prior, `normal_lpdf(nu | 1, 1) - normal_lccdf(-5 | 1, 1)`.
-A modelled `nu` builds a linear predictor instead, where the bound
-applies to no declared parameter: the program holds a plain
-`normal_lpdf(Intercept_nu | 1, 1)` and `nu[n]` is free. Truncating
-the intercept would constrain the intercept and leave `nu[n]` free,
-which reconciles nothing. Settle what `com_binomial_lpmf()` requires
-of `nu` at the bottom of its range, then either constrain the linear
-predictor or state the asymmetry on the page.
-
 ## Prediction accepts frames the axis layer refuses
 
 **92. `newdata` needs no time column.**
@@ -42,17 +27,6 @@ unknown series level is now refused through
 conditions still bypass it: a fit whose `trend_metadata$levels` is
 NULL and a frame whose series column is absent. One layer should own
 what a frame must carry.
-
-## The composition families leave their own scale
-
-**104. `forecast(type = "expected")` departs from the simplex.**
-
-On categ, diri and multi, `posterior_epred()` on the training grid
-gives probabilities while the forecast on the extension of that grid
-gave values outside `[0, 1]`, and `hindcast()` gave 1 for every
-species at every site. Beta and the negative binomial stay correct on
-the same paths, which places the fault at the shared normaliser.
-Reproduce on the jsdgam fixtures before editing.
 
 ## One trend family, two initial distributions
 
@@ -77,6 +51,30 @@ Two runs of one tree gave totals ten apart, with no failures, no
 warnings and no skips in either. One test's assertion count depends on
 a draw, which makes the total a poor signal for a regression. Record
 per-file counts on two runs to name it.
+
+## One condition, several spellings
+
+**129. Warnings and messages carry six idioms.**
+
+`c4d77c95` rewrote 121 condition messages and the prose linter reports
+the whole set clean, which settled the wording. The syntax settled on
+the error path alone: 633 of 643 `stop()` sites format through
+`insight::format_error()` and 10 pass a bare string.
+
+Warnings and messages keep six spellings. Counted from parse data in
+`R/`: `rlang::warn()` at 33 sites, bare `message()` at 11,
+`insight::format_warning()` as the raiser at 8, `cli::cli_inform()` at
+3, `rlang::inform()` at 2, `warning()` at 2. `call. = FALSE` reaches
+about 120 of the 643 `stop()` calls. Twenty-three files mix two or
+more idioms and `backends.R` holds five.
+
+The cost is on both sides of the call. A reader meets one condition
+under several shapes, and a caller handling one class misses the rest,
+since `rlang::warn()` and `warning()` signal different classes. Pick
+one spelling per condition kind, apply it across the 59 warning and
+message sites and give `debt_scan.R` a mode counting the idioms so
+the count reaches one per kind. This is the same shape entry 89 lists
+as "one condition, several refusals", measured.
 
 ## Debt the code carries in recognisable shapes
 

@@ -105,7 +105,9 @@
 #'   For detection-error families ([occ()] / [nmix()] variants),
 #'   use [sim_closure_unit_data()] instead: the closure-unit
 #'   grain (sites x visits) does not fit the time-series layout
-#'   `sim_mvgam()` produces.
+#'   `sim_mvgam()` produces. For multi-species site-by-species
+#'   data with correlated species, use [sim_jsdm()], which draws
+#'   one row per species at each site.
 #'
 #' @examples
 #' # Three Poisson series with an AR(1) latent trend.

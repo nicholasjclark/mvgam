@@ -188,13 +188,20 @@ MVGAM_PAR_KIND_ORDER <- c(
 # same pattern as its observation-side counterpart, and the side is
 # what tells the two apart. Writing a second `.*_trend` variant of
 # each pattern is what let the two accounts drift.
-# The intermediates of the VAR stationarity transformation, and the
+# The intermediates of the VAR stationarity transformation, the
 # moving-average innovations an `AR(ma = TRUE)` or `RW(ma = TRUE)`
-# forms from the scaled ones. Stan saves every variable declared at
-# the top level of transformed parameters, and these reach the
-# posterior of any VAR, VARMA or ARMA fit without naming a quantity
-# a reader interprets. `scaled_innovations_trend` is the innovation
-# a forecast seed needs and is classified a state.
+# forms from the scaled ones, and the Cholesky factors a correlated
+# trend samples. Stan saves every variable declared at the top level
+# of transformed parameters, and these reach the posterior of any
+# VAR, VARMA or ARMA fit without naming a quantity a reader
+# interprets. A Cholesky factor carries a unit diagonal and a
+# structurally zero upper triangle, both of which print as a row
+# with no posterior width. `A_raw_trend` is the unconstrained matrix
+# the stationarity transform turns into `A_trend`. `residual_cor()`
+# and `shared_variation()` take all of them from
+# `posterior::as_draws_matrix(object$fit)`, which reaches the draws
+# without this projection. `scaled_innovations_trend` is the
+# innovation a forecast seed needs and is classified a state.
 #
 # The second alternation is brms's own group-level workspace, kept
 # in step with `brms:::exclude_pars_re()`: the standardised
@@ -209,7 +216,9 @@ MVGAM_PAR_KIND_ORDER <- c(
 #'@noRd
 MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "^(P_var|result_var|P_ma|result_ma|empty_theta|Q_tilde|",
-  "ma_innovations_trend)\\[",
+  "ma_innovations_trend|A_raw_trend|A_raw_group_trend|",
+  "L_Omega_trend|L_Sigma_trend|L_Omega_global_trend|",
+  "L_Omega_group_trend|L_deviation_group_trend|L_group_trend)\\[",
   "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\["
 )
 
@@ -217,6 +226,17 @@ MVGAM_PAR_INTERNAL_PATTERN <- paste0(
 MVGAM_PAR_STATE_PATTERN <- paste0(
   "^(trend|lv_trend|lv_trend_tilde|innovations_trend|",
   "scaled_innovations_trend|init_trend|mu_trend)\\["
+)
+
+# The per-cell matrix arrays a correlated or hierarchical trend
+# estimates. A reader interprets these directly, and a
+# high-dimensional fit prints hundreds of rows of them, which
+# `include_betas = FALSE` drops. The Cholesky factors they are built
+# from carry the kind `internal` and never reach a printed summary.
+#'@noRd
+MVGAM_PAR_MATRIX_PATTERN <- paste0(
+  "^(A_group_trend|Sigma_group_trend|A_trend|Sigma_trend|",
+  "Omega_trend)\\["
 )
 
 # `b[k]` is the positional form the population block takes before

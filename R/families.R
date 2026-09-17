@@ -916,7 +916,17 @@ beta_nb_stan_funs <- function() {
 #'     side: `bf(y | trials(trials) ~ x)`.}
 #'   \item{`nu`}{real-valued dispersion exponent (link = `identity`,
 #'     `lb = -5`). `nu = 1` is binomial. Distributional regression
-#'     is supported via `bf(y | trials(trials) ~ x, nu ~ z)`.}
+#'     is supported via `bf(y | trials(trials) ~ x, nu ~ z)`.
+#'     The support is `0:T`, a finite range. The normalising sum
+#'     runs over `T + 1` positive terms at every real `nu`, which
+#'     keeps the density proper with no lower bound on it. `lb = -5`
+#'     is a numerical floor. The log factorial term grows with
+#'     `-nu`, and gradients past that point are hard for the
+#'     sampler. A scalar `nu` carries the floor as
+#'     `real<lower=-5>` with a prior truncated to match. A modelled
+#'     `nu` is a linear predictor and carries no such declaration,
+#'     leaving `nu[n]` free. Hold the predictor inside the range the
+#'     data resolve, roughly `(-1, 4)`.}
 #' }
 #'
 #' @section Default priors:
@@ -6609,27 +6619,49 @@ multinomial_unit_totals <- function(object, newdata, arrays) {
   # supplies none, and summing nothing reports a total of zero, which
   # gives every category an expected count of zero and draws no
   # individuals. That is a forecast grid, so say what it is missing.
+  totals <- sum_within_closure_units(arrays, y)
+  # A forecast grid records no counts, and summing nothing gives a
+  # total of zero, which would draw no individuals at every category.
+  # The effort the training sites were surveyed under carries forward
+  # to such a site: a forecast states what the next survey of the same
+  # design would record.
   unseen <- which(arrays$n_rep == 0L)
   if (length(unseen)) {
+    totals[unseen] <- multinomial_training_total(object)
+  }
+  # Reduce to one total per unit, then take it back at row grain
+  # through the row-to-unit map the arrays already carry.
+  totals[arrays$row_unit]
+}
+
+
+#' The trial total a multinomial fit's training sites were surveyed at
+#'
+#' A site the model never saw supplies no counts of its own, and its
+#' prediction is made at the effort the fitted design carries. Where
+#' the training sites differ, the median limits the influence one
+#' unusually large or small survey has on the forecast's scale.
+#'
+#' @param object Fitted `mvgam` object with a `multi()` family.
+#' @return A single numeric trial total.
+#' @noRd
+multinomial_training_total <- function(object) {
+  train <- mvgam_training_data(object)
+  if (is.null(train)) {
     stop(insight::format_error(c(
-      "A multinomial site carries no counts. Its total is unknown.",
-      x = paste0(
-        "Sites with no observed category: ",
-        paste(utils::head(arrays$unit_labels[unseen], 5L),
-              collapse = ", "),
-        if (length(unseen) > 5L) ", ..." else "", "."
-      ),
+      "A multinomial forecast needs the fit's own training data.",
+      x = "The 'obs_data' and 'data' slots are empty on this fit.",
       i = paste0(
-        "'multi()' reads each site's trial total from its own ",
-        "counts. It can predict a site only where those counts are ",
-        "supplied. Use 'diri()' or 'categ()' to predict a ",
-        "composition with no total."
+        "A forecast site takes its trial total from the training ",
+        "design. Supply that site's counts in 'newdata', or refit ",
+        "with the data stored on the object."
       )
     )))
   }
-  # Reduce to one total per unit, then read it back at row grain
-  # through the row-to-unit map the arrays already carry.
-  sum_within_closure_units(arrays, y)[arrays$row_unit]
+  arrays <- closure_unit_arrays_for(object, train)
+  y <- as.numeric(train[[response_column(object)]])
+  totals <- sum_within_closure_units(arrays, y)[arrays$n_rep > 0L]
+  stats::median(totals)
 }
 
 
@@ -7536,13 +7568,23 @@ extract_simplex_response_components <- function(object,
     )
   }
 
+  # `multi()` scores a site's counts against that site's own total.
+  # The row-grain marginal is `Binomial(N_site, prob_row)`. That total
+  # is data, and this function resolves it in the same pass that
+  # builds the probabilities the marginal needs.
+  unit_total_row <- NULL
+  if (identical(resolve_family_name(object$family), "multi")) {
+    unit_total_row <- multinomial_unit_totals(object, newdata, arrays)
+  }
+
   list(
-    prob_row = prob_row,
-    phi      = phi_mat,
-    arrays   = arrays,
-    ndraws   = ndraws_actual,
-    N_obs    = N_obs,
-    N_unit   = N_unit
+    prob_row       = prob_row,
+    phi            = phi_mat,
+    unit_total_row = unit_total_row,
+    arrays         = arrays,
+    ndraws         = ndraws_actual,
+    N_obs          = N_obs,
+    N_unit         = N_unit
   )
 }
 

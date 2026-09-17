@@ -175,7 +175,9 @@ summary(simdat)
 }
 \seealso{
 \code{\link[=sim_mvgam]{sim_mvgam()}} for state-space time-series
-simulation; \code{\link[=pivot_detection_array]{pivot_detection_array()}} to re-pivot the
+simulation; \code{\link[=sim_jsdm]{sim_jsdm()}} for multi-species site-by-species
+data under a family with no detection process;
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} to re-pivot the
 returned \code{y_array} with custom covariate layouts;
 \code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}} for the families this simulator targets;
 \code{\link[=jsdgam]{jsdgam()}} for the multi-species joint fitter the

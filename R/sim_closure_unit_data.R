@@ -133,7 +133,9 @@
 #' @author Nicholas J Clark
 #'
 #' @seealso [sim_mvgam()] for state-space time-series
-#'   simulation; [pivot_detection_array()] to re-pivot the
+#'   simulation; [sim_jsdm()] for multi-species site-by-species
+#'   data under a family with no detection process;
+#'   [pivot_detection_array()] to re-pivot the
 #'   returned `y_array` with custom covariate layouts;
 #'   [occ()], [nmix()] for the families this simulator targets;
 #'   [`jsdgam()`] for the multi-species joint fitter the
