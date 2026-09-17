@@ -2,12 +2,24 @@
 # Signature parity, NAMESPACE wiring, validation paths — no fitted
 # objects required.
 
-test_that("insight S3 methods are registered on mvgam", {
-  for (g in c("find_formula", "find_response", "find_predictors",
-              "get_data", "model_info")) {
-    expect_true(
-      !is.null(getS3method(g, "mvgam", optional = TRUE)),
-      label = paste("insight::", g, ".mvgam registered")
+test_that("every S3 method mvgam registers is reachable", {
+  # Four blocks checked this, one package apiece and two of them
+  # holding a single pair. The table names each (generic, class) pair
+  # in one place, and a new registration is one row.
+  registered <- list(
+    c("find_formula", "mvgam"), c("find_response", "mvgam"),
+    c("find_predictors", "mvgam"), c("get_data", "mvgam"),
+    c("model_info", "mvgam"),
+    c("get_predict", "mvgam"), c("get_coef", "mvgam"),
+    c("get_vcov", "mvgam"), c("set_coef", "mvgam"),
+    c("conditional_effects", "mvgam"),
+    c("plot", "mvgam_conditional_effects"),
+    c("print", "mvgam_conditional_effects")
+  )
+  for (pair in registered) {
+    expect_false(
+      is.null(getS3method(pair[1L], pair[2L], optional = TRUE)),
+      label = paste0(pair[1L], ".", pair[2L], " registered")
     )
   }
 })
@@ -31,15 +43,6 @@ test_that("model_info describes each response of a multivariate fit", {
   expect_identical(insight::model_info(pf, response = "seen"), info$seen)
   expect_error(insight::model_info(pf, response = "mass"),
                "not a response of this model")
-})
-
-test_that("marginaleffects S3 methods are registered on mvgam", {
-  for (g in c("get_predict", "get_coef", "get_vcov", "set_coef")) {
-    expect_true(
-      !is.null(getS3method(g, "mvgam", optional = TRUE)),
-      label = paste("marginaleffects::", g, ".mvgam registered")
-    )
-  }
 })
 
 test_that(".onAttach sets marginaleffects_model_classes", {
@@ -309,25 +312,6 @@ test_that("a smooth's covariates are read off its call", {
   )
 })
 
-test_that("conditional_effects.mvgam is registered and re-exports the generic", {
-  expect_true(
-    !is.null(getS3method("conditional_effects", "mvgam", optional = TRUE))
-  )
-  exports <- getNamespaceExports("mvgam")
-  expect_true("conditional_effects" %in% exports)
-})
-
-test_that("plot/print methods on mvgam_conditional_effects are registered", {
-  expect_true(
-    !is.null(getS3method("plot", "mvgam_conditional_effects",
-                         optional = TRUE))
-  )
-  expect_true(
-    !is.null(getS3method("print", "mvgam_conditional_effects",
-                         optional = TRUE))
-  )
-})
-
 test_that("conditional_effects.mvgam signature has expected args", {
   fmls <- names(formals(getS3method("conditional_effects", "mvgam")))
   expect_true("x" %in% fmls)
@@ -406,7 +390,8 @@ test_that("resolve_series_arg errors when data has no series column", {
   )
 })
 
-test_that("conditional_effects rejects clashes between `...` and reserved args", {
+test_that(
+  "conditional_effects rejects clashes between `...` and reserved args", {
   # A stub is enough — the collision guard fires before any
   # plot_predictions / posterior_epred machinery runs.
   stub <- structure(
@@ -468,7 +453,8 @@ test_that("as.data.frame.mvgam_conditional_effects handles both shapes", {
 
 test_that("re-exports of marginaleffects entry points are wired", {
   exports <- getNamespaceExports("mvgam")
-  for (nm in c("predictions", "avg_predictions", "slopes", "avg_slopes",
+  for (nm in c("conditional_effects",
+               "predictions", "avg_predictions", "slopes", "avg_slopes",
                "comparisons", "avg_comparisons", "datagrid",
                "hypotheses", "plot_predictions",
                "plot_slopes", "plot_comparisons")) {

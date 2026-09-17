@@ -78,7 +78,10 @@ test_that("as.matrix.mvgam(variable = NULL) returns all parameters", {
 test_that("as.matrix.mvgam(variable = 'betas') extracts b_* only", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub, variable = "betas")
-  expect_setequal(colnames(out), c("b_Intercept", "b_x"))
+  # Column order is the order a caller indexes by position and the
+  # order the selection declared. Comparing the sets alone passed on
+  # a permutation.
+  expect_identical(colnames(out), c("b_Intercept", "b_x"))
 })
 
 test_that("as.matrix.mvgam(variable = 'trend_betas') extracts b_trend[", {
@@ -86,13 +89,13 @@ test_that("as.matrix.mvgam(variable = 'trend_betas') extracts b_trend[", {
   out <- as.matrix(stub, variable = "trend_betas")
   # Both positional `b_trend[k]` and the brms-aliased
   # `b_<term>_trend` count as trend-side fixed effects.
-  expect_setequal(colnames(out), c("b_trend[1]", "b_x_trend"))
+  expect_identical(colnames(out), c("b_trend[1]", "b_x_trend"))
 })
 
 test_that("as.matrix.mvgam(variable = 'obs_params') excludes _trend", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub, variable = "obs_params")
-  expect_setequal(colnames(out), c("sigma", "phi"))
+  expect_identical(colnames(out), c("sigma", "phi"))
 })
 
 test_that("as.matrix.mvgam(variable = 'smooth_params') excludes _trend", {
@@ -135,13 +138,13 @@ test_that("trend_params on trend-formula fit picks _trend block", {
 test_that("variable = mix of keyword and regex composes", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub, variable = c("betas", "^sd_"), regex = TRUE)
-  expect_setequal(colnames(out), c("b_Intercept", "b_x", "sd_1[1]"))
+  expect_identical(colnames(out), c("b_Intercept", "b_x", "sd_1[1]"))
 })
 
 test_that("variable = explicit name vector works (no regex)", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub, variable = c("b_Intercept", "sigma"))
-  expect_setequal(colnames(out), c("b_Intercept", "sigma"))
+  expect_identical(colnames(out), c("b_Intercept", "sigma"))
 })
 
 test_that("free pattern that matches nothing errors informatively", {
@@ -197,7 +200,7 @@ test_that("coef.mvgam returns named posterior means of b_* by default", {
   stub <- make_mvgam_stub()
   out <- coef(stub)
   expect_type(out, "double")
-  expect_setequal(names(out), c("b_Intercept", "b_x"))
+  expect_identical(names(out), c("b_Intercept", "b_x"))
 })
 
 test_that("coef.mvgam(summary = FALSE) returns the full chain", {
@@ -211,16 +214,17 @@ test_that("fixef.mvgam returns a brms-shaped summary matrix", {
   stub <- make_mvgam_stub()
   out <- fixef(stub)
   expect_true(is.matrix(out))
-  expect_setequal(colnames(out), c("Estimate", "Est.Error",
+  # Both orders are what a reader sees in the printed table.
+  expect_identical(colnames(out), c("Estimate", "Est.Error",
                                     "Q2.5", "Q97.5"))
-  expect_setequal(rownames(out), c("Intercept", "x"))
+  expect_identical(rownames(out), c("Intercept", "x"))
 })
 
 test_that("fixef.mvgam(summary = FALSE) returns the draws matrix", {
   stub <- make_mvgam_stub()
   out <- fixef(stub, summary = FALSE)
   expect_true(is.matrix(out))
-  expect_setequal(colnames(out), c("Intercept", "x"))
+  expect_identical(colnames(out), c("Intercept", "x"))
 })
 
 test_that("rhat.mvgam returns a named numeric vector", {
@@ -235,7 +239,7 @@ test_that("rhat.mvgam returns a named numeric vector", {
 test_that("rhat.mvgam(pars = ...) filters", {
   stub <- make_mvgam_stub()
   out <- rhat(stub, pars = c("b_Intercept", "sigma"))
-  expect_setequal(names(out), c("b_Intercept", "sigma"))
+  expect_identical(names(out), c("b_Intercept", "sigma"))
 })
 
 test_that("neff_ratio.mvgam returns ratios <= 1 in [0,1]", {
@@ -285,7 +289,7 @@ test_that("posterior_summary.mvgam returns a brms-shaped matrix", {
   stub <- make_mvgam_stub()
   out <- posterior_summary(stub, pars = c("b_Intercept", "sigma"))
   expect_true(is.matrix(out))
-  expect_setequal(colnames(out), c("Estimate", "Est.Error",
+  expect_identical(colnames(out), c("Estimate", "Est.Error",
                                     "Q2.5", "Q97.5"))
 })
 
@@ -349,7 +353,8 @@ test_that("prior_summary errors when fit has no prior slot", {
                regexp = "not stored with a prior table")
 })
 
-test_that("extract_prior_from_setup returns the merged full table when user supplies a partial prior", {
+test_that(
+  "extract_prior_from_setup merges a partial user prior into the table", {
   # The stored prior table on an mvgam fit must include every
   # parameter class the model exposes, with the user-supplied row
   # tagged source = 'user' and the defaults preserved with
@@ -389,7 +394,8 @@ test_that("extract_prior_from_setup returns the merged full table when user supp
   expect_true(any(intercept_row$source == "default"))
 })
 
-test_that("extract_prior_from_setup returns the default table verbatim when no user prior", {
+test_that(
+  "extract_prior_from_setup returns the default table verbatim", {
   # NULL user prior -> full default table, with every row tagged
   # default or (vectorized).
   dat <- data.frame(
@@ -459,7 +465,7 @@ test_that("lift detects per-distance theta_dist_<NAME> kernel priors", {
   )
   out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
   expect_equal(nrow(out), 2L)
-  expect_setequal(out$class, c("theta_dist_phylo", "theta_dist_geo"))
+  expect_identical(out$class, c("theta_dist_phylo", "theta_dist_geo"))
   expect_true(all(out$source == "mvgam"))
 })
 
@@ -476,8 +482,8 @@ test_that("lift detects both MGP varrho_inv priors with distinct coefs", {
   out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
   expect_equal(nrow(out), 2L)
   expect_true(all(out$class == "varrho_inv"))
-  expect_setequal(out$coef, c("1", "2:N_lv_trend"))
-  expect_setequal(
+  expect_identical(out$coef, c("1", "2:N_lv_trend"))
+  expect_identical(
     out$prior,
     c("inv_gamma(mgp_a1, 1)", "inv_gamma(mgp_a2, 1)")
   )
@@ -539,14 +545,14 @@ test_that("lift preserves brmsprior columns when appending mvgam rows", {
   )
   out <- mvgam:::lift_mvgam_stanvar_priors(base, sc)
   # Columns of the union are preserved.
-  expect_setequal(names(out), names(base))
+  expect_identical(names(out), names(base))
   # User row still there and tagged "user".
   user_row <- out[out$class == "b" & out$coef == "x", , drop = FALSE]
   expect_equal(user_row$source, "user")
   # Two mvgam rows added.
   mvgam_rows <- out[out$source == "mvgam", , drop = FALSE]
   expect_equal(nrow(mvgam_rows), 2L)
-  expect_setequal(mvgam_rows$class, c("Z_free_vec", "Psi"))
+  expect_identical(mvgam_rows$class, c("Z_free_vec", "Psi"))
 })
 
 test_that("lift rejects non-brmsprior prior input", {
@@ -566,7 +572,8 @@ test_that("bayes_R2.mvgam errors for multivariate without resp", {
   )
 })
 
-test_that("hidden_unrotated_factor_pars hides rotation-indeterminate factor params", {
+test_that(
+  "hidden_unrotated_factor_pars hides rotation-indeterminate params", {
   # Free-Z factor fit: Z_tilde[ present means raw Z, raw lv_trend,
   # innovations, Q_tilde and the latent-factor variance block all
   # get the rotation-indeterminacy hide pattern applied together.
@@ -581,7 +588,7 @@ test_that("hidden_unrotated_factor_pars hides rotation-indeterminate factor para
   hidden <- pars_free[grepl(pat, pars_free)]
   surviving <- pars_free[!grepl(pat, pars_free)]
   # All raw / rotation-indeterminate params are hidden.
-  expect_setequal(
+  expect_identical(
     hidden,
     c("sigma_trend[1]", "sigma_trend[2]",
       "L_Omega_trend[1,1]", "L_Omega_trend[2,1]", "Sigma_trend[1,1]",
@@ -590,14 +597,15 @@ test_that("hidden_unrotated_factor_pars hides rotation-indeterminate factor para
       "scaled_innovations_trend[1,1]")
   )
   # Identified counterparts + obs-side params survive.
-  expect_setequal(
+  expect_identical(
     surviving,
     c("Intercept", "b_x", "shape",
       "Z_tilde[1,1]", "Z_tilde[2,1]", "lv_trend_tilde[1,1]")
   )
 })
 
-test_that("hidden_unrotated_factor_pars is a no-op without QR-identified counterparts", {
+test_that(
+  "hidden_unrotated_factor_pars returns NULL for a non-factor fit", {
   # Non-factor fit: no Z_tilde, no lv_trend_tilde, no A_trend_tilde.
   # The variance block must survive because it is properly identified
   # in non-factor trend fits.
@@ -619,6 +627,7 @@ test_that("hidden_unrotated_factor_pars adds A_trend hide on VAR factor fits", {
   )
   pat <- mvgam:::hidden_unrotated_factor_pars(pars_var)
   expect_true(grepl("\\^A_trend\\\\\\[", pat))
-  expect_true(grepl("A_trend\\[1\\]\\[1,1\\]", grep(pat, pars_var, value = TRUE)[1]))
+  expect_true(grepl("A_trend\\[1\\]\\[1,1\\]",
+                    grep(pat, pars_var, value = TRUE)[1]))
 })
 

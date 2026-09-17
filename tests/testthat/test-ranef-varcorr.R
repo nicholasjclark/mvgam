@@ -79,10 +79,14 @@ test_that("mvgam_ranef_aliases produces r_/sd_/cor_ aliases for (x|grp)", {
   expect_identical(class(map), "character")
   expect_true(!is.null(names(map)))
   # r_<group>[<level>,<coef>] aliases for 6 levels x 2 coefs.
-  r_aliases <- grep("^r_grp\\[", names(map), value = TRUE)
-  expect_length(r_aliases, 12L)
-  expect_true("r_grp[a,Intercept]" %in% names(map))
-  expect_true("r_grp[f,x]" %in% names(map))
+  # Naming the twelve is stronger than counting them. A count of 12
+  # was true of any twelve aliases, a set repeating one level and
+  # dropping another included.
+  expect_setequal(
+    grep("^r_grp\\[", names(map), value = TRUE),
+    paste0("r_grp[", rep(letters[1:6], each = 2L), ",",
+           c("Intercept", "x"), "]")
+  )
   # sd_<group>__<coef> aliases for each coef.
   expect_true("sd_grp__Intercept" %in% names(map))
   expect_true("sd_grp__x" %in% names(map))
@@ -166,8 +170,13 @@ test_that("mvgam_ranef_aliases handles multiple grouping factors", {
     class = "mvgam"
   )
   map <- mvgam_ranef_aliases(stub)
-  # 3 levels of grp + 4 levels of site = 7 r_ aliases; 2 sd_ aliases.
-  expect_length(grep("^r_(grp|site)\\[", names(map)), 7L)
+  # Naming them is stronger than counting. There are 3 levels of grp
+  # and 4 of site, each intercept-only.
+  expect_setequal(
+    grep("^r_(grp|site)\\[", names(map), value = TRUE),
+    c(paste0("r_grp[", letters[1:3], ",Intercept]"),
+      paste0("r_site[", LETTERS[1:4], ",Intercept]"))
+  )
   expect_true("sd_grp__Intercept" %in% names(map))
   expect_true("sd_site__Intercept" %in% names(map))
   # No cor blocks (intercept-only).
@@ -266,7 +275,8 @@ test_that("mvgam_ranef_aliases reads nlpar per row under shared-ID syntax", {
   )
 })
 
-test_that("mvgam_ranef_aliases prefixes nlpar so duplicate (group, coef) survive", {
+test_that(
+  "mvgam_ranef_aliases prefixes nlpar so duplicate (group, coef) survive", {
   # Reason: a nl fit with (1 | species) under BOTH nlpar a and nlpar
   # b would otherwise alias sd_species__Intercept twice and fail
   # posterior's duplicate-name check. brms emits
