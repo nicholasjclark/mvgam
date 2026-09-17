@@ -370,25 +370,29 @@ extract_ma_coefs <- function(one_draw, n_series, n_lv) {
 empty_errors <- function() NULL
 
 
-# Internal: pull the last `max_ma` rows of the MA-applied
-# innovation matrix `ma_innovations_trend[t, j]` from a single
-# posterior draw. The kernel uses these as the past
-# `errors[t - j]` terms when propagating forward, so they must
-# come from the actual posterior draws of the in-sample MA
-# innovations rather than fresh zero seeds.
+# Internal: the last `max_ma` rows of the scaled innovation matrix
+# `scaled_innovations_trend[t, j]` from a single posterior draw.
+# The kernel uses these as the past `errors[t - j]` terms when
+# propagating forward, and each one is the innovation that draw
+# sampled at that occasion.
 #'@noRd
-extract_ma_innovations <- function(one_draw, n_series, n_lv,
-                                     max_ma, n_time) {
+extract_innovation_history <- function(one_draw, n_series, n_lv,
+                                       max_ma, n_time) {
   if (max_ma == 0L) return(NULL)
   start_t <- n_time - max_ma + 1L
   out <- matrix(0, nrow = max_ma, ncol = n_series)
   for (t in seq_len(max_ma)) {
     abs_t <- start_t + t - 1L
     for (s in seq_len(n_series)) {
-      nm <- paste0("ma_innovations_trend[", abs_t, ",", s, "]")
+      # The kernel multiplies its MA coefficient by a past
+      # innovation, which is what `scaled_innovations_trend` holds.
+      # `ma_innovations_trend` holds the moving average already
+      # formed from it, and seeding with that would apply the
+      # coefficient twice.
+      nm <- paste0("scaled_innovations_trend[", abs_t, ",", s, "]")
       val <- one_draw[[nm]]
       if (is.null(val)) {
-        # `ma_innovations_trend` is not in the posterior (e.g.
+        # `scaled_innovations_trend` is not in the posterior (e.g.
         # excluded via `exclude`). Returning NULL seeds the
         # kernel's MA history with zeros, which biases the
         # first forecast step by `theta * e[T]` for an ARMA
@@ -397,8 +401,8 @@ extract_ma_innovations <- function(one_draw, n_series, n_lv,
         if (!identical(Sys.getenv("TESTTHAT"), "true")) {
           rlang::warn(
             paste0(
-              "ARMA MA innovation 'ma_innovations_trend' is ",
-              "not in the posterior; first forecast step uses ",
+              "ARMA innovation 'scaled_innovations_trend' is ",
+              "absent from the posterior; first forecast step uses ",
               "zero past innovations and may be biased."
             ),
             .frequency = "once",
@@ -457,8 +461,8 @@ extract_arma_state <- function(one_draw, meta, n_series, n_lv, fit,
       trends = extract_trend_history(one_draw, n_series, n_lv,
                                        meta$max_lag, n_time,
                                        state_var = state_var),
-      errors = extract_ma_innovations(one_draw, n_series, n_lv,
-                                        max_ma, n_time)
+      errors = extract_innovation_history(one_draw, n_series, n_lv,
+                                          max_ma, n_time)
     )
   )
 }

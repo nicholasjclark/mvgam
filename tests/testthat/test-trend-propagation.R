@@ -69,14 +69,61 @@ test_that("propagate_trend(AR(p = 2)) for 4 series with shared coefs", {
 })
 
 
-test_that("propagate_trend(AR(p = 2, ma = TRUE)) ARMA path works", {
-  out <- propagate_trend(
-    AR(p = 2L, ma = TRUE),
-    params = list(ar = c(0.5, 0.2), theta = 0.3, sigma = 0.5),
-    h = 50L, n_series = 1L
+test_that("the forecast kernel runs the recursion the Stan program fits", {
+  # The generated Stan forms `u_t = e_t + theta * e_{t-1}` and takes
+  # `x_t = phi * x_{t-1} + u_t`. The kernel multiplies its
+  # coefficient by a past raw innovation. Writing both out here and
+  # running them on one innovation sequence is the comparison a
+  # string assertion on the generated program cannot make. Weighting
+  # the previous formed value in Stan leaves these equal at the first
+  # horizon and apart at every later one.
+  phi <- 0.6; theta <- 0.5; h <- 8L
+  set.seed(7L)
+  e_hist <- rnorm(30L)
+  x <- numeric(30L)
+  x[1L] <- e_hist[1L]
+  for (t in 2:30L) {
+    x[t] <- phi * x[t - 1L] + e_hist[t] + theta * e_hist[t - 1L]
+  }
+  e_fut <- rnorm(h)
+  fitted_fwd <- numeric(h)
+  prev_x <- x[30L]
+  prev_e <- e_hist[30L]
+  for (k in seq_len(h)) {
+    fitted_fwd[k] <- phi * prev_x + e_fut[k] + theta * prev_e
+    prev_x <- fitted_fwd[k]
+    prev_e <- e_fut[k]
+  }
+  kernel <- trend_arma_recursC(
+    ar_lags = 1L, ma_lags = 1L, drift = 0,
+    A = array(phi, dim = c(1L, 1L, 1L)),
+    B = array(theta, dim = c(1L, 1L, 1L)),
+    innovations = matrix(c(e_hist[30L], e_fut), ncol = 1L),
+    linpreds = matrix(0, nrow = h + 1L, ncol = 1L),
+    last_trends = matrix(x[30L], nrow = 1L, ncol = 1L),
+    h = h
   )
-  expect_identical(dim(out), c(50L, 1L))
-  expect_true(all(is.finite(out)))
+  expect_equal(as.numeric(kernel[, 1L]), fitted_fwd, tolerance = 1e-12)
+})
+
+
+test_that("propagate_trend(AR(p = 2, ma = TRUE)) settles at its own variance", {
+  # An ARMA(2, 1) settles at the variance its companion gives. A
+  # recursion that dropped the moving-average weight, or applied it
+  # to the wrong quantity, settles somewhere else.
+  set.seed(19L)
+  ar <- c(0.5, 0.2)
+  theta <- 0.3
+  out <- replicate(400L, propagate_trend(
+    AR(p = 2L, ma = TRUE),
+    params = list(ar = ar, theta = theta, sigma = 1),
+    h = 1L, n_series = 1L
+  ))
+  target <- ar_companion_multiplier(
+    lapply(ar, function(a) matrix(a, 1L, 1L)), 1:2,
+    matrix(theta, 1L, 1L)
+  )[1L, 1L]
+  expect_lt(abs(stats::var(as.numeric(out)) - target) / target, 0.25)
 })
 
 

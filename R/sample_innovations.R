@@ -2187,53 +2187,72 @@ ar_stationary_multiplier <- function(object, draws_mat, n_series) {
   if (any(vapply(phi, is.null, logical(1L)))) {
     return(NULL)
   }
-  mult <- if (identical(as.integer(lags), 1L)) {
-    denom <- 1 - phi[[1L]]^2
-    ifelse(denom > .Machine$double.eps, 1 / denom, 1)
-  } else {
-    ar_companion_multiplier(phi, as.integer(lags))
-  }
-  # An `ma` term filters the innovations before the recursion sees
-  # them, widening what the autoregression then settles around.
   theta <- if (isTRUE(spec$ma)) {
     read_draws_vector(draws_mat, "theta1_trend", n_series,
                       required = FALSE)
   } else {
     NULL
   }
-  if (!is.null(theta)) {
-    d_ma <- 1 - theta^2
-    mult <- mult * ifelse(d_ma > .Machine$double.eps, 1 / d_ma, 1)
+  # One Lyapunov solve covers every order the trend allows, with a
+  # moving-average term carried as an extra companion state. A single
+  # lag without that term keeps its closed form, which costs one
+  # division per draw.
+  if (identical(as.integer(lags), 1L) && is.null(theta)) {
+    denom <- 1 - phi[[1L]]^2
+    return(ifelse(denom > .Machine$double.eps, 1 / denom, 1))
   }
-  mult
+  ar_companion_multiplier(phi, as.integer(lags), theta)
 }
 
 
-#' Stationary variance of a scalar autoregression of order above one
+#' Stationary variance of a scalar autoregression
 #'
 #' Solves the state's own Lyapunov equation on the companion form,
 #' which covers a sparse lag set such as `p = c(1, 12)` without
 #' special casing: the lags the user did not ask for simply carry a
-#' zero coefficient. A draw the doubling solver cannot settle is
-#' explosive, and keeps its innovation variance.
+#' zero coefficient. `theta` adds one companion state holding the
+#' innovation, which makes the same solve cover a moving-average
+#' term of order one at any autoregressive order. A draw the
+#' doubling solver cannot settle is explosive, and keeps its
+#' innovation variance.
+#'
+#' @param phi List of `[ndraws, n_series]` coefficient matrices, one
+#'   per active lag
+#' @param lags Integer vector of active autoregressive lags
+#' @param theta Optional `[ndraws, n_series]` moving-average
+#'   coefficients
+#' @return A `[ndraws, n_series]` matrix of variance multipliers
 #'
 #' @noRd
-ar_companion_multiplier <- function(phi, lags) {
+ar_companion_multiplier <- function(phi, lags, theta = NULL) {
   ndraws <- nrow(phi[[1L]])
   n_series <- ncol(phi[[1L]])
   max_lag <- max(lags)
+  # A moving-average term adds one state holding the innovation,
+  # which carries `theta` into the step that follows. The innovation
+  # then enters the state twice, which the covariance states through
+  # its two off-diagonal entries.
+  dim_c <- max_lag + if (is.null(theta)) 0L else 1L
   out <- matrix(1, ndraws, n_series)
-  innov <- matrix(0, max_lag, max_lag)
+  innov <- matrix(0, dim_c, dim_c)
   innov[1L, 1L] <- 1
+  if (!is.null(theta)) {
+    innov[1L, dim_c] <- 1
+    innov[dim_c, 1L] <- 1
+    innov[dim_c, dim_c] <- 1
+  }
   sub_rows <- if (max_lag > 1L) seq.int(2L, max_lag) else integer(0)
   for (d in seq_len(ndraws)) {
     for (s in seq_len(n_series)) {
-      companion <- matrix(0, max_lag, max_lag)
+      companion <- matrix(0, dim_c, dim_c)
       for (li in seq_along(lags)) {
         companion[1L, lags[li]] <- phi[[li]][d, s]
       }
       if (length(sub_rows) > 0L) {
         companion[cbind(sub_rows, sub_rows - 1L)] <- 1
+      }
+      if (!is.null(theta)) {
+        companion[1L, dim_c] <- theta[d, s]
       }
       v <- solve_dlyap(companion, innov)[1L, 1L]
       if (is.finite(v) && v > 0 && v < 1e8) {

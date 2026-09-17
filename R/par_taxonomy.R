@@ -188,10 +188,13 @@ MVGAM_PAR_KIND_ORDER <- c(
 # same pattern as its observation-side counterpart, and the side is
 # what tells the two apart. Writing a second `.*_trend` variant of
 # each pattern is what let the two accounts drift.
-# The intermediates of the VAR stationarity transformation. Stan
-# saves every variable declared at the top level of transformed
-# parameters, so these reach the posterior of any VAR or VARMA fit
-# and would otherwise be offered to a reader as parameters.
+# The intermediates of the VAR stationarity transformation, and the
+# moving-average innovations an `AR(ma = TRUE)` or `RW(ma = TRUE)`
+# forms from the scaled ones. Stan saves every variable declared at
+# the top level of transformed parameters, and these reach the
+# posterior of any VAR, VARMA or ARMA fit without naming a quantity
+# a reader interprets. `scaled_innovations_trend` is the innovation
+# a forecast seed needs and is classified a state.
 #
 # The second alternation is brms's own group-level workspace, kept
 # in step with `brms:::exclude_pars_re()`: the standardised
@@ -205,14 +208,15 @@ MVGAM_PAR_KIND_ORDER <- c(
 # vector is a different parameter, which is aliased and kept.
 #'@noRd
 MVGAM_PAR_INTERNAL_PATTERN <- paste0(
-  "^(P_var|result_var|P_ma|result_ma|empty_theta|Q_tilde)\\[",
+  "^(P_var|result_var|P_ma|result_ma|empty_theta|Q_tilde|",
+  "ma_innovations_trend)\\[",
   "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\["
 )
 
 #'@noRd
 MVGAM_PAR_STATE_PATTERN <- paste0(
   "^(trend|lv_trend|lv_trend_tilde|innovations_trend|",
-  "scaled_innovations_trend|mu_trend)\\["
+  "scaled_innovations_trend|init_trend|mu_trend)\\["
 )
 
 # `b[k]` is the positional form the population block takes before

@@ -195,15 +195,19 @@ test_that("AR(p = c(1, 3, 12)) pulls only the active lag params", {
 
 # ----- ARMA (MA innovations history) -----------------------------
 
-test_that("ARMA pulls theta and the last MA-innovation row", {
+test_that("ARMA pulls theta and the last raw innovation row", {
   n_series <- 2L; n_time <- 5L
-  ma_inn <- matrix(seq.int(1, n_time * n_series) / 10,
+  raw_inn <- matrix(seq.int(1, n_time * n_series) / 10,
                     nrow = n_time, byrow = TRUE)
+  # The formed moving average is given values of its own, which lets
+  # the assertions below name which of the two the seed came from.
+  formed <- raw_inn * 3
   draws <- make_draws(list(
     sigma_trend = c(0.5, 0.5),
     ar1_trend = c(0.4, 0.6),
     theta1_trend = c(0.2, -0.3),
-    ma_innovations_trend = ma_inn,
+    scaled_innovations_trend = raw_inn,
+    ma_innovations_trend = formed,
     trend = matrix(0, nrow = n_time, ncol = n_series)
   ))
   meta <- list(trend_type = "AR", ar_lags = 1L,
@@ -215,9 +219,16 @@ test_that("ARMA pulls theta and the last MA-innovation row", {
   expect_true("theta" %in% names(res$params))
   expect_equal(res$params$theta, c(0.2, -0.3))
   expect_identical(dim(res$last_state$errors), c(1L, 2L))
-  # Last row of ma_innovations_trend.
+  # The kernel multiplies its coefficient by a past innovation, which
+  # makes the raw row the seed it needs.
   expect_equal(as.numeric(res$last_state$errors[1, ]),
-                as.numeric(ma_inn[n_time, ]))
+                as.numeric(raw_inn[n_time, ]))
+  # The formed moving average carries the coefficient already, and
+  # seeding with it would apply theta a second time.
+  expect_false(isTRUE(all.equal(
+    as.numeric(res$last_state$errors[1, ]),
+    as.numeric(formed[n_time, ])
+  )))
 })
 
 

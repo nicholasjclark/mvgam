@@ -113,7 +113,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     heavy_pat <- paste0(
       "^(A_raw_group_trend|A_group_trend|Sigma_group_trend|",
       "L_deviation_group_trend|A_trend|Sigma_trend|Omega_trend|",
-      "L_Omega_trend|init_trend)\\["
+      "L_Omega_trend)\\["
     )
     pars_to_keep <- !grepl(heavy_pat, pars)
     if (any(!pars_to_keep)) {
@@ -248,6 +248,14 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   } else {
     NULL
   }
+
+  # `trend_model` is the bare type, which the `cor` and `ZMVN` tests
+  # match against. The printed line also names the order the trend
+  # was fitted at, which `printed_trend_label()` renders from the
+  # fit's own metadata. A summary object carries neither that
+  # metadata nor `trend_components`, and the helper's fallback then
+  # reports a fitted ARMA as `None`.
+  out$trend_label <- printed_trend_label(object)
 
   # The same counts `print()` shows, read the same way. Reading
   # `series_info` here instead left a hierarchical fit printing four
@@ -721,7 +729,11 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   # Section 4: Trend information
   if (!is.null(x$trend_formula) || !is.null(x$trend_model)) {
     if (!is.null(x$trend_model)) {
-      cat(" Trends: ", x$trend_model, "()", sep = "")
+      # `summary()` stores the label because the helper needs the
+      # fit's metadata, which a summary object does not carry. The
+      # bare type gives `AR` for a plain AR(1), for `AR(p = 3)` and
+      # for `AR(p = 1, ma = TRUE)` alike.
+      cat(" Trends: ", x$trend_label %||% x$trend_model, sep = "")
       # Add trend formula if it has predictors
       if (!is.null(x$trend_formula)) {
         trend_rhs <- if (length(x$trend_formula) == 3) {
@@ -950,7 +962,18 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
   imp_convergence <- lapply(seq_along(individual_fits), function(i) {
     draws <- posterior::as_draws(individual_fits[[i]]$fit)
 
-    # Compute convergence diagnostics only
+    # The worst R-hat and smallest ESS reported here are the numbers a
+    # reader attributes to a model parameter. Taking them over every
+    # saved variable lets one latent state at one occasion set both,
+    # and a trend carries thousands of those. `mvgam_user_pars()` is
+    # the projection every user-facing reader shares.
+    keep <- intersect(
+      unname(mvgam_user_pars(individual_fits[[i]])),
+      posterior::variables(draws)
+    )
+    if (length(keep) > 0L) {
+      draws <- posterior::subset_draws(draws, variable = keep)
+    }
     summ <- without_ess_cap_notice(posterior::summarise_draws(
       draws,
       posterior::default_convergence_measures()

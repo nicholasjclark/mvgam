@@ -109,6 +109,8 @@ test_that("one taxonomy answers for every consumer of a name", {
     "sds_1_trend[1]", "sd_g__Intercept_trend",
     "trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
     "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
+    "init_trend[1,1]", "ma_innovations_trend[1,1]",
+    "Q_tilde[1,1]", "z_1[1,1]",
     "lscale_1[1]", "zs_1_1[1]", "Z[1,1]", "Z_tilde[1,1]"
   )
   kind <- mvgam_par_kind(pars)
@@ -120,7 +122,18 @@ test_that("one taxonomy answers for every consumer of a name", {
   expect_setequal(
     pars[kind == "state"],
     c("trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
-      "innovations_trend[1,1]", "scaled_innovations_trend[1,1]")
+      "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
+      "init_trend[1,1]")
+  )
+  # Stan saves every variable declared at the top level of
+  # transformed parameters. The working arrays among them carry no
+  # meaning outside the transformation that produced them, and
+  # `mvgam_user_pars()` drops them before a reader meets a name.
+  # `ma_innovations_trend` is the moving-average filter an
+  # `AR(ma = TRUE)` forms, which no post-fit code needs.
+  expect_setequal(
+    pars[kind == "internal"],
+    c("ma_innovations_trend[1,1]", "Q_tilde[1,1]", "z_1[1,1]")
   )
   # The same prefix means different things on the two sides.
   expect_identical(unname(kind["sigma"]), "family")

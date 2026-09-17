@@ -4279,14 +4279,7 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     name = "rw_tparameters",
     scode = glue::glue("
       // Latent states with RW dynamics
-      {if(has_ma) 'matrix[N_time_trend, N_lv_trend] ma_innovations_trend = scaled_innovations_trend;' else ''}
-
-      {if(has_ma) '// Apply MA(1) transformation
-      for (i in 2:N_time_trend) {{
-        for (j in 1:N_lv_trend) {{
-          ma_innovations_trend[i, j] += theta1_trend[j] * ma_innovations_trend[i-1, j];
-        }}
-      }}' else ''}
+      {ma_innovations_stanblock(has_ma)}
 
       // Apply RW dynamics
       lv_trend[1, :] = {if(has_ma) 'ma_innovations_trend' else 'scaled_innovations_trend'}[1, :];
@@ -4580,6 +4573,36 @@ ar_pacf_functions_stanvar <- function() {
   )
 }
 
+
+#' Stan block declaring and filling the moving-average innovations
+#'
+#' `RW()` and `AR()` carry one moving-average term. One emitter keeps
+#' the two generators on the same recursion.
+#' `ma_innovations_trend[i]` holds `e[i] + theta * e[i - 1]`, a
+#' first-order moving average of the scaled innovations. Row one is
+#' the innovation itself, which is what a first-order term gives at
+#' the first occasion.
+#'
+#' @param has_ma Logical, whether the trend carries an `ma` term
+#' @return Character scalar, empty when the term was not asked for
+#' @noRd
+ma_innovations_stanblock <- function(has_ma) {
+  if (!isTRUE(has_ma)) {
+    return("")
+  }
+  paste0(
+    "matrix[N_time_trend, N_lv_trend] ma_innovations_trend",
+    " = scaled_innovations_trend;\n",
+    "      // Moving-average term of order one on the innovations\n",
+    "      for (i in 2:N_time_trend) {\n",
+    "        for (j in 1:N_lv_trend) {\n",
+    "          ma_innovations_trend[i, j] = scaled_innovations_trend[i, j]\n",
+    "            + theta1_trend[j] * scaled_innovations_trend[i - 1, j];\n",
+    "        }\n",
+    "      }"
+  )
+}
+
 #' AR Trend Generator
 #'
 #' @description
@@ -4753,14 +4776,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     name = "ar_tparameters",
     scode = glue::glue("
       // Latent states with AR dynamics
-      {if(has_ma) 'matrix[N_time_trend, N_lv_trend] ma_innovations_trend = scaled_innovations_trend;' else ''}
-
-      {if(has_ma) '// Apply MA(1) transformation
-      for (i in 2:N_time_trend) {{
-        for (j in 1:N_lv_trend) {{
-          ma_innovations_trend[i, j] += theta1_trend[j] * ma_innovations_trend[i-1, j];
-        }}
-      }}' else ''}
+      {ma_innovations_stanblock(has_ma)}
 
       {ar_init_block}
 

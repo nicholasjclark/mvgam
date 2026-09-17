@@ -65,9 +65,10 @@ stopifnot(!identical(series_levels, sort(series_levels)))
 time_vals <- seq_len(n_time) + 2L
 
 # ARMA(1, 1): the state depends on its own past and on the previous
-# innovation. The MA weight is large enough to be identified.
-phi_true <- 0.55
-theta_true <- 0.45
+# innovation. The two weights are set well apart, which lets the
+# recovery block below tell a fitted pair from a swapped one.
+phi_true <- 0.7
+theta_true <- 0.3
 sigma_true <- 0.3
 
 latent <- matrix(0, nrow = n_time, ncol = n_series)
@@ -142,11 +143,21 @@ test_that("ma = TRUE adds a moving-average term and its innovations", {
   expect_true(grepl("theta1_trend", sc_ma, fixed = TRUE))
   expect_false(grepl("theta1_trend", sc_plain, fixed = TRUE))
 
-  # A moving average is a weighted sum of past innovations, so the
-  # program has to keep them. Without this the coefficient exists and
+  # A moving average is a weighted sum of past innovations. The
+  # program has to keep them. Without them the coefficient exists and
   # multiplies nothing.
   expect_true(grepl("ma_innovations_trend", sc_ma, fixed = TRUE))
   expect_false(grepl("ma_innovations_trend", sc_plain, fixed = TRUE))
+
+  # The weight lands on the previous innovation. Weighting the
+  # previous formed value accumulates every earlier innovation
+  # geometrically, which gives an autoregression of order two and
+  # makes the two coefficients exchangeable.
+  expect_true(grepl(
+    "ma_innovations_trend[i, j] = scaled_innovations_trend[i, j]",
+    sc_ma, fixed = TRUE
+  ))
+  expect_false(grepl("ma_innovations_trend[i - 1", sc_ma, fixed = TRUE))
 
   # The autoregressive half is unchanged, so `ma = TRUE` adds rather
   # than replaces.
@@ -270,22 +281,21 @@ test_that("both halves of the ARMA are estimated, one per series", {
 
   ar_hat <- vapply(ar_cols, function(k) mean(dm[, k]), numeric(1))
   ma_hat <- vapply(ma_cols, function(k) mean(dm[, k]), numeric(1))
-  expect_true(all(is.finite(ar_hat)))
-  expect_true(all(is.finite(ma_hat)))
 
-  # Both weights are real in the simulation, so neither should come
-  # back at zero: an MA coefficient pinned to zero is the signature
-  # of a term that is declared but never enters the recursion.
-  expect_true(all(abs(ma_hat) > 0.05))
-  # Stationary and invertible, which is what the parameterisation is
-  # meant to guarantee.
+  # Stationary and invertible, which is what the parameterisation
+  # guarantees.
   expect_true(all(abs(ar_hat) < 1))
   expect_true(all(abs(ma_hat) < 1))
 
-  # Recovery, loosely: an ARMA(1,1) trades phi against theta, so the
-  # tolerance is wide and the sign is the informative part.
-  expect_true(all(ar_hat > 0))
-  expect_true(all(ma_hat > 0))
+  # The simulation forms a first-order moving average of the
+  # innovations. A program weighting the previous formed value gives
+  # an autoregression of order two whose two coefficients are
+  # exchangeable, which leaves the posterior symmetric about
+  # phi = theta and each marginal uninformative. The simulated
+  # weights are 0.4 apart. Recovering each one near its own truth is
+  # the claim a swapped or exchangeable pair fails.
+  expect_lt(max(abs(ar_hat - phi_true)), 0.25)
+  expect_lt(max(abs(ma_hat - theta_true)), 0.25)
 })
 
 
@@ -383,13 +393,25 @@ test_that("the two-dimensional gp effect varies in both margins", {
     )
     colMeans(posterior_epred(fit, newdata = grid, ndraws = 200L))
   }
-  lo <- profile_at(unname(stats::quantile(dat$x2, 0.15)))
-  hi <- profile_at(unname(stats::quantile(dat$x2, 0.85)))
+  # The simulated surface is `0.9 sin(x1 * 1.4) cos(x2 * 1.4)`, whose
+  # amplitude along x1 scales with `cos(x2 * 1.4)`. At an x2 where
+  # that cosine is near zero the true profile is flat, and a constant
+  # threshold would then be asking the fit for variation the
+  # simulation never had. Each profile is held against the surface it
+  # was drawn from.
+  true_profile <- function(x2_val) {
+    0.9 * sin(xs * 1.4) * cos(x2_val * 1.4)
+  }
+  x2_lo <- unname(stats::quantile(dat$x2, 0.15))
+  x2_hi <- unname(stats::quantile(dat$x2, 0.85))
+  lo <- profile_at(x2_lo)
+  hi <- profile_at(x2_hi)
   expect_true(all(is.finite(lo)))
   expect_true(all(is.finite(hi)))
-  # Each profile varies along x1 ...
-  expect_gt(stats::sd(lo), 0.05)
-  expect_gt(stats::sd(hi), 0.05)
+  # Each profile varies along x1, by at least half of what the
+  # simulated surface varies by at the same x2.
+  expect_gt(stats::sd(lo), 0.5 * stats::sd(true_profile(x2_lo)))
+  expect_gt(stats::sd(hi), 0.5 * stats::sd(true_profile(x2_hi)))
   # ... and the two profiles are not the same curve shifted, which is
   # all an additive model could produce.
   expect_gt(stats::sd(hi - lo), 0.02)

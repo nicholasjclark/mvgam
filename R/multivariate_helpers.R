@@ -365,15 +365,20 @@ as_plain_matrix <- function(x) {
 #' The `_trend\\[` alternative is why this differs from a bare
 #' `grepl("_trend$", ...)`. A posterior draw carries an index, so
 #' `sigma_trend[1]` has to match; a prior class never does, which is
-#' why the prior tables test the suffix on its own rather than calling
+#' why the prior tables test the suffix on its own and do not call
 #' here.
+#'
+#' A rotated companion carries `_trend_tilde`, as `A_trend_tilde` does
+#' for `A_trend`. Testing the bare suffix filed those on the
+#' observation side, where `mvgam_par_kind()` has no branch for them
+#' and they reach a summary under the kind `other`.
 #'
 #' @param pars Character vector of parameter names
 #' @return Logical vector
 #'
 #' @noRd
 is_trend_parameter <- function(pars) {
-  grepl("_trend$|_trend\\[", pars)
+  grepl("_trend(_tilde)?($|\\[)", pars)
 }
 
 

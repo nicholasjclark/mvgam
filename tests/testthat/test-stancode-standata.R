@@ -385,7 +385,20 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
 
   # MA transformation should be applied to the entire matrix first
   expect_true(stan_pattern("for \\(i in 2:N_time_trend\\)", code_with_trend))
-  expect_true(stan_pattern("ma_innovations_trend\\[i, j\\] \\+= theta1_trend\\[j\\] \\* ma_innovations_trend\\[i-1, j\\];", code_with_trend))
+  # A first-order moving average weights the previous innovation.
+  # Weighting the previous filtered value accumulates every earlier
+  # innovation geometrically, which gives an autoregression.
+  expect_true(stan_pattern(
+    "ma_innovations_trend\\[i, j\\] = scaled_innovations_trend\\[i, j\\]",
+    code_with_trend
+  ))
+  expect_true(stan_pattern(
+    paste0("theta1_trend\\[j\\]\\s*\\*\\s*",
+           "scaled_innovations_trend\\[i - 1, j\\];"),
+    code_with_trend
+  ))
+  expect_false(grepl("ma_innovations_trend[i - 1", code_with_trend,
+                     fixed = TRUE))
 
   # Initialization: First 4 time points should use MA innovations
   expect_true(stan_pattern("for \\(i in 1:4\\)", code_with_trend))
