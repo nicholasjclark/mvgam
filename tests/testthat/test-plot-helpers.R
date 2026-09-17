@@ -176,8 +176,8 @@ test_that("resolve_factor_loadings broadcasts a fixed Z across draws", {
     fixed_Z = fixed_Z, draws_mat = draws_mat,
     n_series = 4L, n_lv = 2L
   )
-  expect_equal(dim(out), c(7L, 4L, 2L))
-  # Every draw broadcasts the same matrix.
+  # Every draw broadcasts the same matrix. A wrong shape fails here
+  # before any dimension check would.
   for (d in seq_len(7L)) {
     expect_equal(out[d, , ], unname(fixed_Z))
   }
@@ -202,12 +202,14 @@ test_that("resolve_factor_loadings parses Z[i,j] when no fixed_Z", {
     draws_mat = draws_mat,
     n_series = n_series, n_lv = n_lv
   )
-  expect_equal(dim(out), c(ndraws, n_series, n_lv))
-  expect_equal(out[1L, 1L, 1L], unname(draws_mat[1L, "Z[1,1]"]))
-  expect_equal(
-    out[ndraws, n_series, n_lv],
-    unname(draws_mat[ndraws, sprintf("Z[%d,%d]", n_series, n_lv)])
-  )
+  # Every (series, factor) cell. Two corners left the interior free,
+  # and swapping series 2 with series 3 passed them both.
+  for (s in seq_len(n_series)) {
+    for (k in seq_len(n_lv)) {
+      expect_equal(out[, s, k],
+                   unname(draws_mat[, sprintf("Z[%d,%d]", s, k)]))
+    }
+  }
 })
 
 test_that("resolve_factor_loadings errors on incomplete inputs", {

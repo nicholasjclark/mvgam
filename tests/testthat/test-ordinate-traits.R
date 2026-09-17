@@ -38,10 +38,10 @@ test_that("ordinate_trait_arrows() returns one row per numeric trait", {
     species_names = paste0("sp", 1:5),
     arrow_scale = 1
   )
-  expect_s3_class(out, "data.frame")
-  expect_equal(NROW(out), 2L)
   expect_named(out, c("x", "y", "trait_name"))
-  expect_setequal(out$trait_name, c("body_size", "fecundity"))
+  # Row order follows the trait columns. `expect_setequal()` passed
+  # on a swap, which puts each arrow on the other trait.
+  expect_identical(out$trait_name, c("body_size", "fecundity"))
 })
 
 test_that("ordinate_trait_arrows() aligns rows via rownames when set", {
@@ -58,10 +58,28 @@ test_that("ordinate_trait_arrows() aligns rows via rownames when set", {
     traits = traits, loadings_2d = Z,
     species_names = sp, arrow_scale = 1
   )
-  # Caller's species_names order is what gets used; the helper aligns
-  # internally. Arrow should be non-NULL with one row for body_size.
-  expect_equal(NROW(out), 1L)
-  expect_equal(out$trait_name, "body_size")
+  expect_identical(out$trait_name, "body_size")
+  # The same traits, already in `sp` order, give the same arrow.
+  aligned <- data.frame(body_size = c(2, 1, 3, 4, 5))
+  rownames(aligned) <- sp
+  expect_equal(
+    out[, c("x", "y")],
+    mvgam:::ordinate_trait_arrows(
+      traits = aligned, loadings_2d = Z,
+      species_names = sp, arrow_scale = 1
+    )[, c("x", "y")]
+  )
+  # Taking the scrambled values in order gives a different arrow,
+  # which is what a helper skipping the rownames would return.
+  verbatim <- data.frame(body_size = c(5, 2, 4, 3, 1))
+  rownames(verbatim) <- sp
+  expect_false(isTRUE(all.equal(
+    out[, c("x", "y")],
+    mvgam:::ordinate_trait_arrows(
+      traits = verbatim, loadings_2d = Z,
+      species_names = sp, arrow_scale = 1
+    )[, c("x", "y")]
+  )))
 })
 
 test_that("ordinate_trait_arrows() errors when row count mismatches", {
@@ -129,9 +147,8 @@ test_that("ordinate_trait_layers() returns NULL when trait_dat is NULL", {
 test_that("ordinate_trait_layers() returns layer list when trait_dat supplied", {
   trait_dat <- data.frame(x = 0.5, y = -0.3, trait_name = "body_size")
   layers <- mvgam:::ordinate_trait_layers(trait_dat)
-  expect_type(layers, "list")
   # geom_segment + repel label layer.
-  expect_true(length(layers) >= 2L)
+  expect_length(layers, 2L)
 })
 
 test_that("ordinate_extract_fit_traits() finds traits on a single-trend fit", {

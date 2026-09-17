@@ -14,8 +14,10 @@ test_that("validate_newdata coerces newdata$series to training levels", {
   )
   nd <- data.frame(time = 4:5, series = "s2")
   out <- validate_newdata(nd, data)
-  expect_true(is.factor(out$series))
-  expect_equal(levels(out$series), c("s1", "s2"))
+  # The rows still name s2. Checking the level set alone passed on a
+  # coercion putting every row on s1.
+  expect_identical(out$series,
+                   factor(c("s2", "s2"), levels = c("s1", "s2")))
 })
 
 test_that("validate_newdata errors on series outside training levels", {
@@ -75,8 +77,11 @@ test_that("mvgam() forwards newdata through to test_data persistence", {
     y ~ 1, data = data_train, newdata = test_df,
     family = gaussian()
   )
-  # The validator coerced newdata$series to the training levels.
-  expect_true(is.factor(captured$newdata$series))
-  expect_equal(levels(captured$newdata$series), c("s1", "s2"))
+  # The validator coerced newdata$series to the training levels and
+  # kept each row on the series it named.
+  expect_identical(
+    captured$newdata$series,
+    factor(c("s1", "s2", "s1"), levels = c("s1", "s2"))
+  )
   expect_identical(fit$test_data, captured$newdata)
 })
