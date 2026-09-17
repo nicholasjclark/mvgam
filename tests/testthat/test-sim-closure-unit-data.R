@@ -142,20 +142,59 @@ test_that("y_array round-trips through pivot_detection_array()", {
     type = 1L, family = occ(),
     n_species = 3L, n_sites = 20L, seed = 8L
   )
+  env <- stats::rnorm(20L)
+  tod <- matrix(stats::runif(20L * 4L), nrow = 20L)
   pivoted <- pivot_detection_array(
     s$y_array,
-    site_covs = data.frame(env = stats::rnorm(20L)),
-    obs_covs  = list(tod_c = matrix(stats::runif(20L * 1L * 4L),
-                                     nrow = 20L)),
-    site_col   = "site", season_col = "time",
-    visit_col  = "visit", series_col = "series",
-    y_col      = "y"
+    site_covs = data.frame(env = env),
+    obs_covs  = list(tod_c = tod),
+    site_col   = "site", visit_col = "visit",
+    series_col = "series", y_col = "y"
   )
-  # The pivoted long-form should have one row per
-  # (species, site, season=1, visit) cell.
-  expect_equal(nrow(pivoted), 3L * 20L * 1L * 4L)
-  expect_true(all(c("series", "site", "visit", "y") %in%
-                    names(pivoted)))
+  # A single season carries no column of its own, and `time` is the
+  # closure-unit identifier.
+  expect_identical(
+    names(pivoted),
+    c("series", "site", "visit", "time", "y", "env", "tod_c")
+  )
+  sp <- as.integer(pivoted$series)
+  si <- pivoted$site
+  vi <- pivoted$visit
+  # Visit runs fastest, then species, then site.
+  expect_identical(vi, rep(1:4, times = 60L))
+  expect_identical(sp, rep(rep(1:3, each = 4L), 20L))
+  expect_identical(si, rep(1:20, each = 12L))
+  expect_identical(levels(pivoted$series), paste0("sp_", 1:3))
+  # One season makes the closure-unit time the site index.
+  expect_identical(pivoted$time, si)
+  # The round trip itself: every cell equals the array value at its
+  # own (species, site, season = 1, visit).
+  expect_identical(pivoted$y, s$y_array[cbind(sp, si, 1L, vi)])
+  # Site covariates repeat by site; visit covariates index
+  # (site, visit).
+  expect_identical(pivoted$env, env[si])
+  expect_equal(pivoted$tod_c, tod[cbind(si, vi)])
+})
+
+
+test_that("colliding output column names are refused", {
+  s <- sim_closure_unit_data(
+    type = 1L, family = occ(), n_sites = 5L, seed = 3L
+  )
+  # `season_col` given the default `time_col` name wrote both to one
+  # column and returned a frame with no closure-unit identifier.
+  expect_error(
+    pivot_detection_array(s$y_array, season_col = "time"),
+    "Output column names must be distinct"
+  )
+  expect_error(
+    pivot_detection_array(s$y_array, site_col = "y"),
+    "Output column names must be distinct"
+  )
+  expect_error(
+    pivot_detection_array(s$y_array, series_col = "site"),
+    "Output column names must be distinct"
+  )
 })
 
 

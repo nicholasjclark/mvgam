@@ -135,7 +135,8 @@
 #' @param series_col Name of the species column. Defaults to
 #'   `"series"`.
 #' @param y_col Name of the detection / count column. Defaults to
-#'   `"y"`.
+#'   `"y"`. This and the other `*_col` arguments must each name a
+#'   different output column.
 #' @param multi_season Character scalar controlling the
 #'   multi-season `time` encoding. `"fused"` (default) fuses
 #'   `(site, season)` into a single `time` axis so each
@@ -151,9 +152,10 @@
 #'
 #' @return A long-format `data.frame` with columns
 #'   `(series, time, site, season, visit, y, <site_covs>,
-#'   <season_covs>, <site_season_covs>, <obs_covs>)`. Rows where
-#'   `y` is `NA` are dropped so closure units can vary in the
-#'   number of observed visits / seasons.
+#'   <season_covs>, <site_season_covs>, <obs_covs>)`. Single-species
+#'   input returns no `series` column and single-season input no
+#'   `season` column. Rows where `y` is `NA` are dropped. Closure
+#'   units may vary in the number of observed visits / seasons.
 #'
 #' @author Nicholas J Clark
 #' @export
@@ -178,6 +180,23 @@ pivot_detection_array <- function(y,
   checkmate::assert_string(series_col)
   checkmate::assert_string(y_col)
   multi_season <- match.arg(multi_season)
+
+  # Each of these arguments names a separate output column. A name
+  # used twice overwrites one column with another, and the frame
+  # comes back without it.
+  out_cols <- c(series = series_col, site = site_col,
+                 season = season_col, visit = visit_col,
+                 time = time_col, y = y_col)
+  if (anyDuplicated(out_cols)) {
+    dup <- unique(out_cols[duplicated(out_cols)])
+    clash <- paste0("'", names(out_cols)[out_cols %in% dup], "_col'")
+    stop(insight::format_error(c(
+      "Output column names must be distinct.",
+      x = paste0("Arguments sharing a name: ",
+                 paste(clash, collapse = ", "), "."),
+      i = "Give each of them a different column name."
+    )))
+  }
 
   # Coerce `y` to a canonical 4D `[N, J, T, K]` array. Single-species
   # and single-season cases slot in via singleton axes that drop /

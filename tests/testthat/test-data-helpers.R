@@ -256,7 +256,7 @@ test_that("3D pivot output passes through build_closure_unit_arrays", {
   expect_true(all(arrays$n_rep == K))
 })
 
-test_that("4D multi-season pivot output passes through build_closure_unit_arrays", {
+test_that("4D multi-season pivot passes build_closure_unit_arrays", {
   set.seed(11L)
   N <- 3L; J <- 5L; T_ <- 2L; K <- 4L
   y <- array(rbinom(N * J * T_ * K, 1L, 0.4),
@@ -276,21 +276,17 @@ test_that("2D single-species pivot composes with mvgam(family = occ())", {
   J <- 12L; K <- 3L
   y <- matrix(rbinom(J * K, 1L, 0.5), J, K)
   sc <- data.frame(env = rnorm(J))
-  long <- pivot_detection_array(
-    y, site_covs = sc, series_col = "series", site_col = "time"
-  )
-  # mvgam single-species: needs `time` + `series` columns. The
-  # helper drops `series` for single-species; mvgam adds it as a
-  # constant level downstream. Force a single series here so the
-  # closure-unit codegen path can resolve.
+  long <- pivot_detection_array(y, site_covs = sc)
+  # `time` is the closure-unit identifier the helper writes itself.
+  expect_identical(names(long),
+                   c("site", "visit", "time", "y", "env"))
+  # The helper drops `series` for single-species input, and mvgam
+  # adds it as a constant level when fitting. A single series is
+  # added here because the codegen path requires one.
   long$series <- factor("only")
-  long$time <- long$time  # already a column
-  expect_no_error(
-    mvgam_formula(y ~ 1)
-  )
-  # Compile via stancode (no fit) to confirm the long-format frame
-  # threads through the codegen path.
   mf <- mvgam_formula(y ~ 1)
+  # Codegen alone, with no fit, is enough to confirm the frame is
+  # accepted.
   expect_no_error(
     suppressWarnings(stancode(
       mf, data = long, family = occ(), validate = FALSE

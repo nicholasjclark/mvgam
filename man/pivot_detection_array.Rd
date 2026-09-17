@@ -97,7 +97,8 @@ the observation \code{formula}).}
 \code{"series"}.}
 
 \item{y_col}{Name of the detection / count column. Defaults to
-\code{"y"}.}
+\code{"y"}. This and the other \verb{*_col} arguments must each name a
+different output column.}
 
 \item{multi_season}{Character scalar controlling the
 multi-season \code{time} encoding. \code{"fused"} (default) fuses
@@ -114,9 +115,10 @@ activated. Ignored for single-season inputs (2D matrix, 3D
 }
 \value{
 A long-format \code{data.frame} with columns
-\verb{(series, time, site, season, visit, y, <site_covs>, <season_covs>, <site_season_covs>, <obs_covs>)}. Rows where
-\code{y} is \code{NA} are dropped so closure units can vary in the
-number of observed visits / seasons.
+\verb{(series, time, site, season, visit, y, <site_covs>, <season_covs>, <site_season_covs>, <obs_covs>)}. Single-species
+input returns no \code{series} column and single-season input no
+\code{season} column. Rows where \code{y} is \code{NA} are dropped. Closure
+units may vary in the number of observed visits / seasons.
 }
 \description{
 Convert the multi-dimensional detection histories used by
