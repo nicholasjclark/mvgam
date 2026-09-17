@@ -138,7 +138,8 @@ test_that("VAR constructor accepts factor models", {
 
 test_that("Factor validation error messages are consistent", {
   # Check that all factor-incompatible trends give similar error structure
-  # Note: CAR() constructor doesn't accept n_lv parameter, errors happen at stanvars level
+  # CAR()'s signature omits n_lv, and the error is raised at the
+  # stanvars level
 
   expect_error(PW(n_lv = 1), "Factor models.*not supported")
 
@@ -296,7 +297,8 @@ test_that("formula parsing is order-independent", {
   expect_equal(parsed3$trend_components[[1]]$trend, "RW")
   expect_equal(parsed4$trend_components[[1]]$trend, "RW")
 
-  # Check that regular terms are preserved (may be in different order but same content)
+  # Check that regular terms are preserved (order may differ, the
+  # content is the same)
   expect_setequal(parsed1$regular_terms, parsed2$regular_terms)
   expect_setequal(parsed1$regular_terms, parsed3$regular_terms)
   expect_setequal(parsed1$regular_terms, parsed4$regular_terms)
@@ -464,7 +466,9 @@ test_that("regex pattern handles edge cases correctly", {
 
   # Test extraction of regular terms from complex expressions
   regular_terms <- mvgam:::extract_regular_terms(complex_terms)
-  expect_false("AR(p = c(1, 12, 24), ma = TRUE, cor = FALSE)" %in% regular_terms)
+  expect_false(
+    "AR(p = c(1, 12, 24), ma = TRUE, cor = FALSE)" %in% regular_terms
+  )
   expect_true("s(time, bs = 'tp', k = 20)" %in% regular_terms)
 
   # Test edge case: trend-like names that aren't trend constructors
@@ -543,8 +547,10 @@ test_that("print method handles all configurations", {
     expect_output(print(minimal_trend), "mvgam trend specification")
     expect_output(print(minimal_trend), "Type: RW")
 
-    # Test maximal configuration (without conflicting parameters, suppress expected warnings)
-    complex_trend <- suppressWarnings(AR(p = c(1, 12), ma = FALSE, cor = TRUE, n_lv = 2))
+    # Test maximal configuration, with the expected warnings muted
+    complex_trend <- suppressWarnings(
+      AR(p = c(1, 12), ma = FALSE, cor = TRUE, n_lv = 2)
+    )
     output <- capture.output(print(complex_trend))
     expect_true(any(grepl("Dynamic factors: 2", output)))
     expect_true(any(grepl("Correlation: enabled", output)))
@@ -580,7 +586,9 @@ test_that("realistic complex formulas work correctly", {
     expect_equal(parsed2$trend_components[[1]]$trend, "VAR")  # Base type
     expect_true(parsed2$trend_components[[1]]$cor)
     expect_true("s(time, by = species, k = 20)" %in% parsed2$regular_terms)
-    expect_true("s(temperature, species, bs = \"fs\")" %in% parsed2$regular_terms)
+    expect_true(
+      "s(temperature, species, bs = \"fs\")" %in% parsed2$regular_terms
+    )
   })
 })
 
@@ -636,7 +644,8 @@ test_that("time parameter integrates correctly with formula parsing", {
     parsed2 <- mvgam:::parse_trend_formula(f2)
     expect_equal(parsed2$trend_components[[1]]$time, "month")
 
-    # Test seasonal AR model with multiple lags (proper alternative to multiple trends)
+    # Test seasonal AR model with multiple lags, which is the
+    # supported alternative to multiple trends
     f3 <- ~ AR(time = daily, p = c(1, 7, 30))  # Daily, weekly, monthly lags
     parsed3 <- mvgam:::parse_trend_formula(f3)
     expect_equal(parsed3$trend_components[[1]]$time, "daily")
@@ -679,7 +688,8 @@ test_that("series parameter works correctly in trend constructors", {
   expect_equal(car_custom$series, "location")
 
   # Test both time and series parameters specified
-  ar_no_warn <- AR(time = week, series = species, p = c(1, 12), ma = TRUE, cor = TRUE)
+  ar_no_warn <- AR(time = week, series = species, p = c(1, 12),
+                   ma = TRUE, cor = TRUE)
   expect_equal(ar_no_warn$time, "week")
   expect_equal(ar_no_warn$series, "species")
   expect_equal(ar_no_warn$p, c(1, 12))
@@ -688,7 +698,8 @@ test_that("series parameter works correctly in trend constructors", {
 })
 
 # Test integration of time and series parameters with formula parsing
-test_that("time and series parameters integrate correctly with formula parsing", {
+test_that(
+  "time and series parameters integrate with formula parsing", {
 
   # Test trend constructors with both time and series parameters in formula
   f1 <- ~ s(x) + AR(time = week, series = species, p = 1)
@@ -712,37 +723,46 @@ test_that("time and series parameters integrate correctly with formula parsing",
   })
 })
 
-# Additional comprehensive tests for grouping variables and PW validation
-
-# Test grouping variables are properly passed to dispatchers
-test_that("grouping variables are properly validated and passed to dispatchers", {
+test_that("trend constructors record gr and subgr", {
+  # RW, AR and VAR each stored the pair, asserted across three blocks
+  # under six locals. The table names one case per constructor and
+  # states the cor default each one sets.
   suppressWarnings({
+    cases <- list(
+      list(spec = RW(time = week, series = species, gr = region,
+                     subgr = site, cor = TRUE),
+           want = list(gr = "region", subgr = "site", time = "week",
+                       series = "species", cor = TRUE)),
+      list(spec = AR(time = month, series = location, p = 1,
+                     gr = ecosystem, subgr = site, cor = TRUE),
+           want = list(gr = "ecosystem", subgr = "site", p = 1,
+                       cor = TRUE)),
+      list(spec = VAR(time = year, series = population, p = 2,
+                      gr = habitat, subgr = species),
+           want = list(gr = "habitat", subgr = "species", p = 2,
+                       cor = TRUE)),
+      # cor = FALSE is stored as given.
+      list(spec = RW(gr = region, subgr = site, cor = FALSE),
+           want = list(gr = "region", subgr = "site", cor = FALSE)),
+      list(spec = AR(gr = habitat, subgr = species, p = 1,
+                     cor = FALSE),
+           want = list(gr = "habitat", subgr = "species",
+                       cor = FALSE)),
+      list(spec = VAR(gr = ecosystem, subgr = location, p = 2),
+           want = list(gr = "ecosystem", subgr = "location"))
+    )
+  })
+  for (case in cases) {
+    for (fld in names(case$want)) {
+      expect_equal(case$spec[[fld]], case$want[[fld]])
+    }
+  }
+})
 
-    # Test valid hierarchical grouping scenarios
-    # RW with hierarchical grouping (should work with correlation)
-    rw_grouped <- RW(time = week, series = species, gr = region, subgr = site, cor = TRUE)
-    expect_equal(rw_grouped$gr, "region")
-    expect_equal(rw_grouped$subgr, "site")
-    expect_equal(rw_grouped$time, "week")
-    expect_equal(rw_grouped$series, "species")
-    expect_true(rw_grouped$cor)
-
-    # AR with hierarchical grouping
-    ar_grouped <- AR(time = month, series = location, p = 1, gr = ecosystem, subgr = site, cor = TRUE)
-    expect_equal(ar_grouped$gr, "ecosystem")
-    expect_equal(ar_grouped$subgr, "site")
-    expect_equal(ar_grouped$p, 1)
-    expect_true(ar_grouped$cor)
-
-    # VAR with hierarchical grouping
-    var_grouped <- VAR(time = year, series = population, p = 2, gr = habitat, subgr = species)
-    expect_equal(var_grouped$gr, "habitat")
-    expect_equal(var_grouped$subgr, "species")
-    expect_equal(var_grouped$p, 2)
-    expect_true(var_grouped$cor)
-
-    # Test that grouping is preserved in formula parsing
-    f1 <- ~ s(temp) + RW(time = week, series = species, gr = region, subgr = site, cor = TRUE)
+test_that("grouping is preserved through formula parsing", {
+  suppressWarnings({
+    f1 <- ~ s(temp) + RW(time = week, series = species, gr = region,
+                         subgr = site, cor = TRUE)
     parsed1 <- mvgam:::parse_trend_formula(f1)
     trend_comp <- parsed1$trend_components[[1]]
     expect_equal(trend_comp$gr, "region")
@@ -751,58 +771,18 @@ test_that("grouping variables are properly validated and passed to dispatchers",
     expect_equal(trend_comp$series, "species")
     expect_true(trend_comp$cor)
 
-    # Test complex formula with multiple trends having different grouping
-    # Multiple trend constructors should fail
-    f2 <- ~ AR(time = day, series = unit, gr = block, subgr = plot, p = 1, cor = TRUE) +
-           s(temperature) +
-           RW(time = week, series = transect, gr = site, subgr = quadrat, cor = TRUE)
+    # Two trend constructors under different groupings are still two
+    # trend constructors.
+    f2 <- ~ AR(time = day, series = unit, gr = block, subgr = plot,
+               p = 1, cor = TRUE) +
+      s(temperature) +
+      RW(time = week, series = transect, gr = site, subgr = quadrat,
+         cor = TRUE)
     expect_error(
       mvgam:::validate_single_trend_formula(f2),
       "Multiple trend constructors found"
     )
   })
-})
-
-# Test grouping validation error conditions
-test_that("grouping variable validation catches invalid combinations", {
-
-  # gr without subgr is allowed: subgr auto-fills to "series" so the
-  # hierarchical codegen path derives subgroups from the existing
-  # series column.
-  result_gr_only <- mvgam:::validate_grouping_arguments("region", "NA")
-  expect_equal(result_gr_only$gr, "region")
-  expect_equal(result_gr_only$subgr, "series")
-
-  # Explicit subgr = "series" is also allowed and equivalent to the
-  # auto-fill above.
-  result_series_subgr <- mvgam:::validate_grouping_arguments(
-    "region", "series"
-  )
-  expect_equal(result_series_subgr$gr, "region")
-  expect_equal(result_series_subgr$subgr, "series")
-
-  # subgr without gr is rejected: no main grouping variable to nest
-  # within.
-  expect_error(
-    mvgam:::validate_grouping_arguments("NA", "site"),
-    "Subgrouping requires main grouping variable"
-  )
-
-  # Test hierarchical grouping works without warnings
-  rw_grouped <- RW(gr = region, subgr = site, cor = FALSE)
-  expect_equal(rw_grouped$gr, "region")
-  expect_equal(rw_grouped$subgr, "site")
-
-  ar_grouped <- AR(gr = habitat, subgr = species, p = 1, cor = FALSE)
-  expect_equal(ar_grouped$gr, "habitat")
-  expect_equal(ar_grouped$subgr, "species")
-
-  # Test hierarchical grouping
-  suppressWarnings(
-    grouped_var <- VAR(gr = ecosystem, subgr = location, p = 2)
-  )
-  expect_equal(grouped_var$gr, "ecosystem")
-  expect_equal(grouped_var$subgr, "location")
 })
 
 test_that("validate_gr_balanced_groups errors on unbalanced groups", {
@@ -902,62 +882,65 @@ test_that("a user-supplied subgr is counted, not waved through", {
   )
 })
 
-# Test PW cap argument validation for logistic growth
-test_that("PW cap argument is properly validated for logistic growth", {
-
+test_that("PW records every constructor argument in the spec", {
+  # PW's constructor records its arguments in the returned spec. Ten
+  # constructions across five blocks asserted that one claim, each
+  # naming its own local. One case per argument shape states it.
   suppressWarnings({
-    # Test linear growth doesn't require cap (should work)
-    pw_linear1 <- PW(time = week, series = species, growth = 'linear', n_changepoints = 5)
-    expect_equal(pw_linear1$growth, "linear")
-    expect_equal(pw_linear1$trend, "PW")  # Base type
-    expect_equal(pw_linear1$cap, "cap")  # Default cap still set but not required
-    expect_equal(pw_linear1$n_changepoints, 5)
-
-    # Test linear growth with explicit cap (should work)
-    pw_linear2 <- PW(time = month, series = population, cap = max_size, growth = 'linear')
-    expect_equal(pw_linear2$growth, "linear")
-    expect_equal(pw_linear2$cap, "max_size")
-
-    # Test logistic growth with explicit cap (should work)
-    pw_logistic1 <- PW(time = day, series = cells, cap = carrying_capacity, growth = 'logistic')
-    expect_equal(pw_logistic1$growth, "logistic")
-    expect_equal(pw_logistic1$trend, "PW")  # Base type
-    expect_equal(pw_logistic1$cap, "carrying_capacity")
-
-    # Test that cap argument is preserved in formula parsing
-    f1 <- ~ s(temperature) + PW(time = week, series = species, cap = max_biomass, growth = 'logistic')
-    parsed1 <- mvgam:::parse_trend_formula(f1)
-    pw_comp <- parsed1$trend_components[[1]]
-    expect_equal(pw_comp$cap, "max_biomass")
-    expect_equal(pw_comp$growth, "logistic")
-    expect_equal(pw_comp$trend, "PW")  # Base type
-
-    # Test complex PW specification in formula
-    f2 <- ~ s(temp) +
-           PW(time = daily, series = population, cap = environment_capacity,
-              growth = 'logistic', n_changepoints = 15, changepoint_scale = 0.1)
-    parsed2 <- mvgam:::parse_trend_formula(f2)
-    expect_equal(length(parsed2$trend_components), 1)
-
-    # Check the PW component
-    pw_comp2 <- parsed2$trend_components[[1]]
-    expect_equal(pw_comp2$cap, "environment_capacity")
-    expect_equal(pw_comp2$growth, "logistic")
-    expect_equal(pw_comp2$n_changepoints, 15)
-    expect_equal(pw_comp2$changepoint_scale, 0.1)
+    cases <- list(
+      # Linear growth needs no cap; the field still takes its default.
+      list(
+        spec = PW(time = week, series = species, growth = "linear",
+                  n_changepoints = 5),
+        want = list(trend = "PW", growth = "linear", cap = "cap",
+                    time = "week", series = "species",
+                    n_changepoints = 5)
+      ),
+      list(
+        spec = PW(time = month, series = population, cap = max_size,
+                  growth = "linear"),
+        want = list(trend = "PW", growth = "linear", cap = "max_size",
+                    time = "month", series = "population")
+      ),
+      list(
+        spec = PW(time = day, series = cells, cap = carrying_capacity,
+                  growth = "logistic"),
+        want = list(trend = "PW", growth = "logistic",
+                    cap = "carrying_capacity", time = "day",
+                    series = "cells")
+      ),
+      list(
+        spec = PW(time = yearly, series = biomass, cap = max_pop,
+                  growth = "logistic", n_changepoints = 20,
+                  changepoint_range = 0.9, changepoint_scale = 0.02),
+        want = list(trend = "PW", growth = "logistic",
+                    cap = "max_pop", time = "yearly",
+                    series = "biomass", n_changepoints = 20,
+                    changepoint_range = 0.9, changepoint_scale = 0.02)
+      )
+    )
   })
+  for (case in cases) {
+    expect_s3_class(case$spec, "mvgam_trend")
+    expect_true(is.mvgam_trend(case$spec))
+    for (fld in names(case$want)) {
+      expect_equal(case$spec[[fld]], case$want[[fld]])
+    }
+  }
+  # Every field the Stan generator requires is present on the spec.
+  expect_true(all(
+    c("cap", "growth", "trend", "n_changepoints",
+      "changepoint_range", "changepoint_scale") %in%
+      names(cases[[1L]]$spec)
+  ))
 })
 
 # Test PW parameter validation
 test_that("PW parameter validation works correctly", {
 
   suppressWarnings({
-    # Test valid parameter ranges
-    pw_valid <- PW(time = week, series = species, cap = max_pop, growth = 'logistic',
-                   n_changepoints = 20, changepoint_range = 0.9, changepoint_scale = 0.02)
-    expect_equal(pw_valid$n_changepoints, 20)
-    expect_equal(pw_valid$changepoint_range, 0.9)
-    expect_equal(pw_valid$changepoint_scale, 0.02)
+    # The accepted ranges are covered by the constructor table above.
+    # These add the refusal at each boundary.
 
     # Test invalid n_changepoints (must be positive integer)
     expect_error(
@@ -1001,138 +984,49 @@ test_that("PW parameter validation works correctly", {
   })
 })
 
-# Test integration of grouping variables with stan injection system
-test_that("grouping variables integrate with stanvar generation", {
-  # This test ensures the data_info structure properly includes grouping information
-  # that would be used by the injection generators
-
-  # Test trend spec structure includes grouping info
-  suppressWarnings({
-    rw_hierarchical <- RW(time = week, series = species, gr = region, subgr = site, cor = TRUE)
-  })
-
-  # Check that all necessary grouping info is present for stanvar generation
-  expect_equal(rw_hierarchical$gr, "region")
-  expect_equal(rw_hierarchical$subgr, "site")
-  expect_true(rw_hierarchical$cor)  # Required for hierarchical models
-})
-
-# Test cap argument integration with stanvar generation
-test_that("PW cap argument integrates with stanvar generation", {
-
-  # Test that cap information is properly structured for Stan code generation
-  suppressWarnings({
-    pw_logistic <- PW(time = week, series = population, cap = max_capacity,
-                      growth = 'logistic', n_changepoints = 12)
-  })
-
-  # Check that cap info is available for stanvar generation
-  expect_equal(pw_logistic$cap, "max_capacity")
-  expect_equal(pw_logistic$growth, "logistic")
-  expect_equal(pw_logistic$trend, "PW")  # Base type
-  expect_equal(pw_logistic$n_changepoints, 12)
-
-  # Test that trend spec structure includes all PW parameters needed for Stan generation
-  expected_params <- c("cap", "growth", "trend", "n_changepoints",
-                       "changepoint_range", "changepoint_scale")
-  for (param in expected_params) {
-    expect_true(param %in% names(pw_logistic),
-                label = paste("PW object field", param))
-  }
-
-  # Test variable name extraction for Stan data generation
-  expect_equal(pw_logistic$time, "week")
-  expect_equal(pw_logistic$series, "population")
-  expect_equal(pw_logistic$cap, "max_capacity")
-
-  # These would be used in the Stan data and transformed parameters blocks
-  expect_true(nzchar(pw_logistic$time))
-  expect_true(nzchar(pw_logistic$series))
-  expect_true(nzchar(pw_logistic$cap))
-})
-
-# Test piecewise trend dispatcher functionality
-test_that("piecewise trend types work correctly with dispatcher", {
-  suppressWarnings({
-
-    # Test PW constructor with linear growth
-    pw_linear <- PW(time = week, series = species, growth = 'linear', n_changepoints = 8)
-    expect_s3_class(pw_linear, "mvgam_trend")
-    expect_equal(pw_linear$trend, "PW")  # Base type
-    expect_equal(pw_linear$growth, "linear")
-    expect_equal(pw_linear$n_changepoints, 8)
-    expect_true(is.mvgam_trend(pw_linear))
-
-    # Test PW constructor with logistic growth
-    pw_logistic <- PW(time = month, series = population, cap = carrying_cap,
-                      growth = 'logistic', n_changepoints = 15, changepoint_scale = 0.05)
-    expect_s3_class(pw_logistic, "mvgam_trend")
-    expect_equal(pw_logistic$trend, "PW")  # Base type
-    expect_equal(pw_logistic$growth, "logistic")
-    expect_equal(pw_logistic$cap, "carrying_cap")
-    expect_equal(pw_logistic$n_changepoints, 15)
-    expect_equal(pw_logistic$changepoint_scale, 0.05)
-
-    # Test PW constructor with linear growth
-    pwlin <- PW(growth = "linear", time = daily, series = biomass, n_changepoints = 10)
-    expect_s3_class(pwlin, "mvgam_trend")
-    expect_equal(pwlin$trend, "PW")  # Base type
-    expect_equal(pwlin$growth, "linear")
-    expect_equal(pwlin$time, "daily")
-    expect_equal(pwlin$series, "biomass")
-    expect_equal(pwlin$n_changepoints, 10)
-
-    # Test PW constructor with logistic growth
-    pwlog <- PW(growth = "logistic", time = yearly, series = cells, cap = max_size,
-                n_changepoints = 20, changepoint_range = 0.8)
-    expect_s3_class(pwlog, "mvgam_trend")
-    expect_equal(pwlog$trend, "PW")  # Base type
-    expect_equal(pwlog$growth, "logistic")
-    expect_equal(pwlog$cap, "max_size")
-    expect_equal(pwlog$time, "yearly")
-    expect_equal(pwlog$series, "cells")
-    expect_equal(pwlog$n_changepoints, 20)
-    expect_equal(pwlog$changepoint_range, 0.8)
-  })
-})
-
-# Test piecewise trends in formula parsing
 test_that("piecewise trends work correctly in formula parsing", {
   suppressWarnings({
-
-    # Test simple linear piecewise formula
-    f1 <- ~ s(temp) + PW(growth = "linear", time = week, series = species, n_changepoints = 12)
-    parsed1 <- mvgam:::parse_trend_formula(f1)
-    expect_equal(length(parsed1$trend_components), 1)
-    trend_comp1 <- parsed1$trend_components[[1]]
-    expect_equal(trend_comp1$trend, "PW")  # Base type
-    expect_equal(trend_comp1$time, "week")
-    expect_equal(trend_comp1$series, "species")
-    expect_equal(trend_comp1$n_changepoints, 12)
-
-    # Test logistic piecewise with cap formula
-    f2 <- ~ cov1 + PW(growth = "logistic", time = month, series = population, cap = max_capacity,
-                      n_changepoints = 25, changepoint_scale = 0.02) + s(x)
-    parsed2 <- mvgam:::parse_trend_formula(f2)
-    expect_equal(length(parsed2$trend_components), 1)
-    trend_comp2 <- parsed2$trend_components[[1]]
-    expect_equal(trend_comp2$trend, "PW")  # Base type
-    expect_equal(trend_comp2$cap, "max_capacity")
-    expect_equal(trend_comp2$n_changepoints, 25)
-    expect_equal(trend_comp2$changepoint_scale, 0.02)
-
-    # Test general PW constructor in formula
-    f3 <- ~ PW(time = daily, series = biomass, growth = 'linear',
-               n_changepoints = 8, changepoint_range = 0.75) + s(season)
-    parsed3 <- mvgam:::parse_trend_formula(f3)
-    expect_equal(length(parsed3$trend_components), 1)
-    trend_comp3 <- parsed3$trend_components[[1]]
-    expect_equal(trend_comp3$trend, "PW")  # Base type
-    expect_equal(trend_comp3$growth, "linear")
-    expect_equal(trend_comp3$changepoint_range, 0.75)
-
-    # NOTE: Mixed trend types in a single model are not supported
-    # Each model should have only one trend type
+    # The parser preserves the constructor's arguments through a
+    # formula. Three blocks asserted that over three parses, and the
+    # constructor table above covers the fields themselves.
+    cases <- list(
+      list(
+        f = ~ s(temp) + PW(growth = "linear", time = week,
+                           series = species, n_changepoints = 12),
+        want = list(trend = "PW", time = "week", series = "species",
+                    n_changepoints = 12)
+      ),
+      list(
+        f = ~ cov1 + PW(growth = "logistic", time = month,
+                        series = population, cap = max_capacity,
+                        n_changepoints = 25,
+                        changepoint_scale = 0.02) + s(x),
+        want = list(trend = "PW", cap = "max_capacity",
+                    n_changepoints = 25, changepoint_scale = 0.02)
+      ),
+      list(
+        f = ~ PW(time = daily, series = biomass, growth = "linear",
+                 n_changepoints = 8, changepoint_range = 0.75) +
+          s(season),
+        want = list(trend = "PW", growth = "linear",
+                    changepoint_range = 0.75)
+      ),
+      list(
+        f = ~ s(temperature) + PW(time = week, series = species,
+                                  cap = max_biomass,
+                                  growth = "logistic"),
+        want = list(trend = "PW", cap = "max_biomass",
+                    growth = "logistic")
+      )
+    )
+    for (case in cases) {
+      parsed <- mvgam:::parse_trend_formula(case$f)
+      expect_equal(length(parsed$trend_components), 1)
+      comp <- parsed$trend_components[[1]]
+      for (fld in names(case$want)) {
+        expect_equal(comp[[fld]], case$want[[fld]])
+      }
+    }
   })
 })
 

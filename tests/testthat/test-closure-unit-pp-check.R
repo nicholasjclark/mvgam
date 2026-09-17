@@ -32,7 +32,8 @@ mock_pp_check_object <- function(data, family = occ()) {
 # the unit grain from residuals.mvgam.
 # ------------------------------------------------------------
 
-test_that("closure_unit_pp_check_setup() collapses non-resid yrep to the per-unit grain", {
+test_that(
+  "closure_unit_pp_check_setup() collapses non-resid yrep to unit grain", {
   d <- make_pp_check_grid(n_unit = 4L, n_visit = 3L)
   obj <- mock_pp_check_object(d)
   yrep <- matrix(
@@ -62,7 +63,8 @@ test_that("closure_unit_pp_check_setup() collapses non-resid yrep to the per-uni
   expect_identical(res$first_visits, c(1L, 4L, 7L, 10L))
 })
 
-test_that("closure_unit_pp_check_setup() preserves the per-unit yrep grain on resid_* types", {
+test_that(
+  "closure_unit_pp_check_setup() keeps the unit yrep grain on resid_*", {
   d <- make_pp_check_grid()
   obj <- mock_pp_check_object(d)
   # residuals.mvgam returns [ndraws x N_unit]; mimic that shape.
@@ -86,7 +88,8 @@ test_that("closure_unit_pp_check_setup() preserves the per-unit yrep grain on re
 # the closure-unit grain.
 # ------------------------------------------------------------
 
-test_that("pp_check.mvgam blocks closure-unit-incompatible types early with a clear pointer", {
+test_that(
+  "pp_check.mvgam blocks closure-unit-incompatible types with a pointer", {
   d <- make_pp_check_grid()
   obj <- mock_pp_check_object(d)
   blocked <- c("scatter_avg", "scatter_avg_grouped",
@@ -108,7 +111,8 @@ test_that("pp_check.mvgam blocks closure-unit-incompatible types early with a cl
 # unit. The fixture `tod` varies within a unit; `elev` does not.
 # ------------------------------------------------------------
 
-test_that("check_closure_unit_var_unit_constant() rejects per-visit-varying covariates", {
+test_that(
+  "check_closure_unit_var_unit_constant() rejects per-visit covariates", {
   d <- make_pp_check_grid()
   arrays <- build_closure_unit_arrays(
     d, response_var = "y", default_cap = 1L
@@ -119,7 +123,8 @@ test_that("check_closure_unit_var_unit_constant() rejects per-visit-varying cova
   )
 })
 
-test_that("check_closure_unit_var_unit_constant() accepts unit-constant covariates", {
+test_that(
+  "check_closure_unit_var_unit_constant() accepts unit-constant covars", {
   d <- make_pp_check_grid()
   arrays <- build_closure_unit_arrays(
     d, response_var = "y", default_cap = 1L
@@ -266,7 +271,8 @@ for (fam_name in c("mvgam_dirichlet", "mvgam_mvnormal")) {
   })
 }
 
-test_that("pp_check_mv_category() returns NULL for non-multi-response families", {
+test_that(
+  "pp_check_mv_category() returns NULL for non-multi-response families", {
   obj <- structure(
     list(family = gaussian(),
          formula = y ~ 1,
@@ -337,7 +343,8 @@ test_that("complete_closure_unit_newdata stamps nmix(PB) cap from template", {
   expect_identical(out$cap, rep(7L, 4L))
 })
 
-test_that("complete_closure_unit_newdata stamps nmix('royle_nichols') cap = 25", {
+test_that(
+  "complete_closure_unit_newdata stamps nmix('royle_nichols') cap = 25", {
   stub <- stub_with_family(nmix("royle_nichols"))
   out  <- mvgam:::complete_closure_unit_newdata(
     stub, make_stripped_grid(3L)
@@ -345,7 +352,8 @@ test_that("complete_closure_unit_newdata stamps nmix('royle_nichols') cap = 25",
   expect_identical(out$cap, rep(25L, 3L))
 })
 
-test_that("complete_closure_unit_newdata stamps nmix('poisson_poisson') cap from template", {
+test_that(
+  "complete_closure_unit_newdata stamps nmix('poisson_poisson') cap", {
   stub <- stub_with_family(nmix("poisson_poisson"))
   out  <- mvgam:::complete_closure_unit_newdata(
     stub, make_stripped_grid(3L)
@@ -353,7 +361,8 @@ test_that("complete_closure_unit_newdata stamps nmix('poisson_poisson') cap from
   expect_identical(out$cap, rep(7L, 3L))
 })
 
-test_that("complete_closure_unit_newdata is a no-op for non-closure-unit families", {
+test_that(
+  "complete_closure_unit_newdata returns other families' newdata as is", {
   stub <- structure(
     list(family = gaussian(),
          formula = y ~ env,
@@ -365,7 +374,8 @@ test_that("complete_closure_unit_newdata is a no-op for non-closure-unit familie
   expect_identical(out, grid)
 })
 
-test_that("complete_closure_unit_newdata is a no-op when columns already present", {
+test_that(
+  "complete_closure_unit_newdata returns a complete frame as is", {
   stub <- stub_with_family(occ())
   full <- stub$data[1:3, , drop = FALSE]
   out  <- mvgam:::complete_closure_unit_newdata(stub, full)
@@ -373,7 +383,8 @@ test_that("complete_closure_unit_newdata is a no-op when columns already present
   expect_identical(out, full)
 })
 
-test_that("complete_closure_unit_newdata fills only the missing identifier cols", {
+test_that(
+  "complete_closure_unit_newdata fills only missing identifier cols", {
   stub <- stub_with_family(occ())
   partial <- data.frame(
     series = factor("1", levels = c("1", "2")),
@@ -422,7 +433,8 @@ test_that("complete_closure_unit_newdata overrides datagrid-pinned time", {
   expect_identical(out$visit, rep(1L, 5L))
 })
 
-test_that("complete_closure_unit_newdata respects user-supplied long-format newdata", {
+test_that(
+  "complete_closure_unit_newdata respects user long-format newdata", {
   # The complement to the grid-path overwrite: when the user passes
   # real long-format data (visit + cap present), the helper must
   # leave (series, time, visit, cap) untouched. Forecasting and

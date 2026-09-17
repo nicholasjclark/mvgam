@@ -92,7 +92,8 @@ test_that("all trend types generate correct prior structures", {
     AR = list(formula = ~ AR(p = 2),
               expected = c("ar1_pacf_trend", "ar2_pacf_trend",
                            "sigma_trend")),
-    VAR = list(formula = ~ VAR(p = 1), expected = c("A.*_trend", "sigma_trend")),
+    VAR = list(formula = ~ VAR(p = 1),
+               expected = c("A.*_trend", "sigma_trend")),
     ZMVN = list(formula = ~ ZMVN(), expected = c("sigma_trend")),
     # No `sigma_trend`: the piecewise path is a deterministic
     # function of its changepoints, so there is no innovation.
@@ -160,16 +161,25 @@ test_that("all trend types generate correct prior structures", {
       if (!trend_in_test) next
 
       # Test mvgam with complex trend formula
-      mf_complex_trend <- mvgam_formula(y ~ 1, trend_formula = test_spec$mvgam_trend)
-      mvgam_priors <- get_prior(mf_complex_trend, data = test_data, family = gaussian())
+      mf_complex_trend <- mvgam_formula(
+        y ~ 1, trend_formula = test_spec$mvgam_trend
+      )
+      mvgam_priors <- get_prior(
+        mf_complex_trend, data = test_data, family = gaussian()
+      )
 
       # Get brms priors for equivalent complex predictors
-      brms_priors <- brms::get_prior(test_spec$brms_equivalent, data = test_data, family = gaussian())
+      brms_priors <- brms::get_prior(
+        test_spec$brms_equivalent, data = test_data, family = gaussian()
+      )
 
       # Extract trend components from mvgam (identified by _trend suffix)
-      mvgam_trend_priors <- mvgam_priors[grepl("_trend$", mvgam_priors$class), , drop = FALSE]
+      mvgam_trend_priors <- mvgam_priors[
+        grepl("_trend$", mvgam_priors$class), , drop = FALSE
+      ]
 
-      # Test equivalence: every brms prior (except Intercept) should appear with _trend suffix
+      # Test equivalence: every brms prior (except Intercept) should
+      # appear with a _trend suffix
       # Trend formulas exclude intercepts by default
       # brms's `sigma` maps onto the trend's innovation scale, so a
       # trend that samples no innovation has nothing to map it to.
@@ -188,7 +198,8 @@ test_that("all trend types generate correct prior structures", {
 
           # Find matching mvgam trend prior
           matching_rows <- mvgam_trend_priors[
-            grepl(paste0("^", brms_row$class, "_trend$"), mvgam_trend_priors$class) &
+            grepl(paste0("^", brms_row$class, "_trend$"),
+                  mvgam_trend_priors$class) &
             mvgam_trend_priors$coef == brms_row$coef &
             mvgam_trend_priors$group == brms_row$group, , drop = FALSE]
 
@@ -219,8 +230,12 @@ test_that("all trend types generate correct prior structures", {
   # Test no-intercept formulas with different trend types
   no_intercept_specs <- list(
     RW_no_int = list(formula = ~ -1 + RW(), expected = c("sigma_trend")),
-    AR_no_int = list(formula = ~ x - 1 + AR(p = 1), expected = c("b_trend", "ar1_trend", "sigma_trend")),
-    ZMVN_simple = list(formula = ~ -1, expected = c("sigma_trend"))  # Should default to ZMVN
+    AR_no_int = list(
+      formula = ~ x - 1 + AR(p = 1),
+      expected = c("b_trend", "ar1_trend", "sigma_trend")
+    ),
+    # `~ -1` defaults to ZMVN
+    ZMVN_simple = list(formula = ~ -1, expected = c("sigma_trend"))
   )
 
   for (test_name in names(no_intercept_specs)) {
@@ -256,12 +271,15 @@ test_that("multivariate models handle priors correctly", {
   expect_true(length(trend_classes) > 0)  # trend parameters
 
   # Factor model (n_lv < n_series) - requires multivariate data
-  test_data_mv <- create_test_data(n = 20, n_series = 3)  # Ensure n_series > n_lv
+  # Ensure n_series > n_lv
+  test_data_mv <- create_test_data(n = 20, n_series = 3)
   mf_factor <- mvgam_formula(
     y ~ x,
     trend_formula = ~ AR(p = 1, cor = TRUE, n_lv = 2)  # n_lv < n_series
   )
-  priors_factor <- get_prior(mf_factor, data = test_data_mv, family = gaussian())
+  priors_factor <- get_prior(
+    mf_factor, data = test_data_mv, family = gaussian()
+  )
 
   # Check for factor loading parameter Z (should exist for factor models)
   all_classes <- priors_factor$class
@@ -297,7 +315,9 @@ test_that("multivariate models handle priors correctly", {
     mvgam_priors <- get_prior(mf_edge, data = test_data, family = gaussian())
 
     # Test brms equivalence for complex predictors if they exist
-    obs_brms_priors <- brms::get_prior(case_spec$formula, data = test_data, family = gaussian())
+    obs_brms_priors <- brms::get_prior(
+      case_spec$formula, data = test_data, family = gaussian()
+    )
 
     # Extract trend and observation components (identified by _trend suffix)
     trend_rows <- grepl("_trend$", mvgam_priors$class)
@@ -384,7 +404,9 @@ test_that("get_prior.mvgam_formula works with all formula types", {
 
   # No-intercept trend formulas
   mf_no_intercept <- mvgam_formula(y ~ x, trend_formula = ~ -1)
-  priors_no_int <- get_prior(mf_no_intercept, data = test_data, family = gaussian())
+  priors_no_int <- get_prior(
+    mf_no_intercept, data = test_data, family = gaussian()
+  )
   expect_s3_class(priors_no_int, "brmsprior")
 
   # Should have trend parameters
@@ -396,7 +418,9 @@ test_that("get_prior.mvgam_formula works with all formula types", {
 
   # No-intercept with predictors
   mf_no_int_pred <- mvgam_formula(y ~ 1, trend_formula = ~ x - 1)
-  priors_no_int_pred <- get_prior(mf_no_int_pred, data = test_data, family = gaussian())
+  priors_no_int_pred <- get_prior(
+    mf_no_int_pred, data = test_data, family = gaussian()
+  )
   expect_s3_class(priors_no_int_pred, "brmsprior")
 
   trend_rows_pred <- grepl("_trend$", priors_no_int_pred$class)
@@ -547,9 +571,11 @@ test_that("distributional models work correctly with trends", {
   priors_multi <- get_prior(mf_multi, data = test_data)
 
   # Should have parameters for mu, sigma, and nu
-  expect_true(any(grepl("Intercept", priors_multi$class[priors_multi$dpar == ""])))     # mu
-  expect_true(any(grepl("Intercept", priors_multi$class[priors_multi$dpar == "sigma"]))) # sigma
-  expect_true(any(grepl("Intercept", priors_multi$class[priors_multi$dpar == "nu"])))    # nu
+  for (par in c("", "sigma", "nu")) {
+    expect_true(any(grepl(
+      "Intercept", priors_multi$class[priors_multi$dpar == par]
+    )))
+  }
   expect_true(any(grepl("_trend$", priors_multi$class)))  # trend parameters
 })
 
@@ -563,7 +589,7 @@ test_that("multivariate responses with mvbind work correctly", {
     series = factor(rep(c("A", "B"), each = 20))
   )
 
-  # Combined bf() objects with different families (Pattern 4 from quick-reference)
+  # Combined bf() objects with different families
   mv_formula <- brms::bf(count ~ x, family = poisson()) +
                 brms::bf(biomass ~ x, family = gaussian())
   mf_mvbind <- mvgam_formula(mv_formula, trend_formula = ~ VAR(p = 1))
@@ -624,7 +650,9 @@ test_that("non-Gaussian families work with trends", {
 
     # Test with trend
     mf_family <- mvgam_formula(family_spec$formula, trend_formula = ~ AR(p = 1))
-    priors_family <- get_prior(mf_family, data = test_data, family = family_spec$family)
+    priors_family <- get_prior(
+      mf_family, data = test_data, family = family_spec$family
+    )
 
     expect_s3_class(priors_family, "brmsprior")
 
@@ -672,8 +700,12 @@ test_that("embedded family edge cases work correctly", {
   expect_true(any(grepl("_trend$", priors_embedded$class)))  # trend
 
   # Complex embedded case with multiple parameters
-  bf_complex_embedded <- brms::bf(count ~ x, zi ~ x1, family = zero_inflated_poisson())
-  mf_complex_embedded <- mvgam_formula(bf_complex_embedded, trend_formula = ~ AR(p = 1))
+  bf_complex_embedded <- brms::bf(
+    count ~ x, zi ~ x1, family = zero_inflated_poisson()
+  )
+  mf_complex_embedded <- mvgam_formula(
+    bf_complex_embedded, trend_formula = ~ AR(p = 1)
+  )
 
   expect_no_error({
     priors_complex_embedded <- get_prior(mf_complex_embedded, data = test_data)
@@ -787,7 +819,8 @@ test_that("each response gets the defaults of its own family", {
   expect_identical(sum(merged$class == "shape"), 1L)
 })
 
-test_that("get_prior() reports a family written inside bf() as the fit uses it", {
+test_that(
+  "get_prior() reports a family written inside bf() as the fit uses it", {
   # A family inside `bf()` was left to brms, which reported its own
   # fallbacks while the fit sampled under mvgam's defaults, and on a
   # multivariate formula every response naming no family was reported

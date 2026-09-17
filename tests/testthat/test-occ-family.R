@@ -30,7 +30,8 @@ test_that("occ() returns a customfamily with mu/p dpars and logit links", {
   expect_equal(fam$linkinv(0), 0.5)
 })
 
-test_that("occ() tags closure-unit, binary-response and predict-type attributes", {
+test_that(
+  "occ() tags closure-unit, binary-response and predict-type attrs", {
   fam <- occ()
   expect_true(uses_closure_unit_layout(fam))
   expect_true(isTRUE(attr(fam, "mvgam_binary_response", exact = TRUE)))
@@ -62,7 +63,8 @@ make_occ_data <- function(n_unit = 5, n_visit = 4, seed = 1) {
   )
 }
 
-test_that("validate_closure_unit_data() accepts occ data without a cap column", {
+test_that(
+  "validate_closure_unit_data() treats cap as optional for occ", {
   d <- make_occ_data()
   expect_invisible(validate_closure_unit_data(
     d, response_var = "y",
@@ -86,7 +88,8 @@ test_that("validate_closure_unit_data() rejects non-binary y under occ", {
   )
 })
 
-test_that("validate_closure_unit_data() warns (not errors) for occ with all-single-visit + no covariates", {
+test_that(
+  "validate_closure_unit_data() demotes occ single-visit to a warning", {
   d <- make_occ_data(n_unit = 5, n_visit = 1)
   local_verbose_warnings()
   withr::with_envvar(c(TESTTHAT = ""), {
@@ -105,7 +108,8 @@ test_that("validate_closure_unit_data() warns (not errors) for occ with all-sing
   })
 })
 
-test_that("validate_closure_unit_data() hard-errors on N_unit < 2 for both branches", {
+test_that(
+  "validate_closure_unit_data() hard-errors on N_unit < 2, both branches", {
   # Single closure unit with multiple visits: no draws from the
   # state distribution, structurally degenerate for any closure
   # family.
@@ -128,7 +132,8 @@ test_that("validate_closure_unit_data() hard-errors on N_unit < 2 for both branc
 # build_closure_unit_arrays() with default_cap (occ path)
 # ------------------------------------------------------------
 
-test_that("build_closure_unit_arrays() injects default_cap when cap column absent", {
+test_that(
+  "build_closure_unit_arrays() injects default_cap when cap is absent", {
   d <- make_occ_data(n_unit = 3, n_visit = 4)
   arrs <- build_closure_unit_arrays(
     d, response_var = "y", default_cap = 1L
@@ -145,13 +150,16 @@ test_that("build_closure_unit_arrays() injects default_cap when cap column absen
 # Stancode + standata emission via the mvgam_formula pipeline
 # ------------------------------------------------------------
 
-test_that("stancode(mvgam_formula(...)) for occ emits the occ_lpmf signature and no K_max", {
+test_that(
+  "stancode() for occ emits the occ_lpmf signature and omits K_max", {
   d <- make_occ_data()
   mf <- mvgam_formula(bf(y ~ elev, p ~ tod))
   sc <- as.character(stancode(mf, data = d, family = occ()))
   sd <- standata(mf, data = d, family = occ())
   # All four lpmf overloads emitted.
-  expect_match(sc, "real occ_lpmf\\(\\s*array\\[\\] int y,\\s*vector mu,\\s*vector p,")
+  expect_match(
+    sc, "real occ_lpmf\\(\\s*array\\[\\] int y,\\s*vector mu,\\s*vector p,"
+  )
   expect_match(sc, "rep_vector\\(p, N\\)")
   expect_match(sc, "rep_vector\\(mu, N\\)")
   # target += occ_lpmf(Y | mu, p, N_unit, n_rep, Y_max, visit_idx)
@@ -162,7 +170,8 @@ test_that("stancode(mvgam_formula(...)) for occ emits the occ_lpmf signature and
   expect_true(all(sd$Y_max %in% c(0L, 1L)))
 })
 
-test_that("stancode for occ without a p sub-formula declares scalar p in (0, 1)", {
+test_that(
+  "stancode for occ declares scalar p in (0, 1) when p is unmodelled", {
   d <- make_occ_data()
   mf <- mvgam_formula(y ~ elev)
   sc <- as.character(stancode(mf, data = d, family = occ()))
@@ -174,7 +183,8 @@ test_that("stancode for occ without a p sub-formula declares scalar p in (0, 1)"
 # closure-unit families
 # ------------------------------------------------------------
 
-test_that("dispatch_closure_unit_method() resolves nmix + occ for every method_kind", {
+test_that(
+  "dispatch_closure_unit_method() resolves nmix + occ for each kind", {
   # `is.function()` was true of all eight cells whatever kernel each
   # returned. Naming them is what separates a correct routing from
   # one that gives occ the N-mixture sampler.
