@@ -1,4 +1,4 @@
-# One factor model, three observation families.
+# One factor model, six observation families.
 #
 # A `jsdgam` puts the same latent structure under every family it
 # supports: K species load on N_lv factors through Z, each site
@@ -8,26 +8,23 @@
 # the user declared, does each row read the latent cell the sampler
 # gave it, do the hindcast arms and the loadings and the residual
 # correlation all agree about which species is which -- and only
-# the response scale, the recovered nuisance parameter and the
+# the response scale, the nuisance parameter and the
 # identification constraint differ.
 #
 # Those shared questions live in `jsdgam_battery()` and are asked
 # once per family. What belongs to one family alone is written out
 # below it: the negative binomial's shape, the multivariate
 # Student-t's scale and tail, and the sum-to-zero constraint and
-# unit simplex a Dirichlet composition has to respect. The three
-# families here span the three shapes a jsdgam response takes -- a
+# unit simplex a Dirichlet composition has to respect. The six
+# families span the three shapes a jsdgam response takes -- a
 # count, an unbounded continuous vector, and a composition -- so a
 # fault in the shared machinery cannot hide behind one of them.
 #
-# The simulations are not shared. Each family draws its truth in
-# its own order: the negative binomial takes its intercepts from
-# `runif` where the other two take theirs from `rnorm`, and the
-# Dirichlet centres its loadings before emitting from a softmax.
-# One simulator parameterised over all three would therefore put
-# every family on a different draw from the one its cached fit was
-# built on. Each is kept verbatim, under its own seed, so the
-# caches stay valid and a rerun loads rather than samples.
+# The simulations are shared. `sim_jsdm()` draws the site-by-species
+# matrix for every family in this file, and each spec names the
+# species count, the site count, the seed and the family parameters
+# it takes. What differs between families is the observation draw,
+# which `sim_jsdm()` selects from the family object.
 #
 # Two of the shared claims are structural rather than
 # family-specific, so every family is held to them: that a frame maps
@@ -58,8 +55,6 @@
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
-  library(dplyr)
-  library(tidyr)
   library(posterior)
   library(testthat)
 })
@@ -122,245 +117,47 @@ identical_species_pairs <- function(mats) {
 }
 
 
-# Fold a wide site-by-species matrix into the long frame a jsdgam
-# reads, keyed by site and species. Every simulation below ends
-# here, so the frame's shape is stated once.
-as_long_jsdm <- function(Y_wide, env, species_levels, time_offset = 0L,
-                         integer_response = FALSE) {
-  wide <- as.data.frame(Y_wide)
-  wide$site <- seq_len(nrow(Y_wide))
-  wide$env <- env
-  out <- pivot_longer(
-    wide, all_of(species_levels),
-    names_to = "series", values_to = "y"
-  ) |>
-    mutate(
-      series = factor(series, levels = species_levels),
-      time = site + time_offset
-    ) |>
-    arrange(time, series)
-  if (integer_response) out$y <- as.integer(out$y)
-  as.data.frame(out)
-}
-
-
-# ---- Simulations -----------------------------------------------------
+# One simulation for every family in the file. `sim_jsdm()` draws
+# the site-by-species matrix and returns the long frame `jsdgam()`
+# takes, and this maps its names onto the four fields the
+# assertions below use.
 #
-# Each reproduces its own file's draw exactly: same seed, same
-# random calls in the same order. Changing any of them invalidates
-# that family's cached fit.
-
-sim_nb <- function() {
-  set.seed(608L)
-  K <- 5L
-  N_lv <- 2L
-  n_sites <- 60L
-  phi_true <- 4
-  species_levels <- paste0("sp", seq_len(K))
-
-  Z_true <- matrix(rnorm(K * N_lv, sd = 0.8), nrow = K, ncol = N_lv)
-  env <- rnorm(n_sites)
-  mu_intercept <- runif(K, 0.4, 1.4)
-  mu_env_slope <- rnorm(K, sd = 0.4)
-  lv_sim <- matrix(rnorm(n_sites * N_lv), nrow = n_sites, ncol = N_lv)
-
-  Y_wide <- matrix(NA_integer_, nrow = n_sites, ncol = K)
-  for (i in seq_len(n_sites)) {
-    eta_i <- mu_intercept + mu_env_slope * env[i] +
-      as.numeric(Z_true %*% lv_sim[i, ])
-    Y_wide[i, ] <- rnbinom(K, mu = exp(eta_i), size = phi_true)
-  }
-  colnames(Y_wide) <- species_levels
-
-  sigma_true_cov <- tcrossprod(Z_true)
+# Two latent factors for every family, which keeps the loadings
+# matrix the same shape across the file.
+jsdm_sim <- function(spec) {
+  s <- sim_jsdm(
+    family      = eval(spec$family),
+    n_species   = spec$n_species,
+    n_sites     = spec$n_sites,
+    n_lv        = 2L,
+    family_pars = spec$sim_pars,
+    seed        = spec$seed
+  )
   list(
-    K = K, N_lv = N_lv, species_levels = species_levels,
-    Z_true = Z_true, phi_true = phi_true, lv_sim = lv_sim,
-    sigma_true_cov = sigma_true_cov,
-    sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, K)),
-    mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
-    long_dat = as_long_jsdm(Y_wide, env, species_levels,
-                            integer_response = TRUE)
+    long_dat       = s$data_train,
+    K              = s$n_species,
+    N_lv           = s$n_lv,
+    species_levels = levels(s$data_train$series),
+    truth          = s$truth
   )
 }
 
 
-sim_mvt <- function() {
-  set.seed(605L)
-  K <- 4L
-  N_lv <- 2L
-  n_sites <- 30L
-  nu_true <- 5
-  species_levels <- paste0("y", seq_len(K))
-
-  Z_true <- matrix(rnorm(K * N_lv, sd = 0.7), nrow = K, ncol = N_lv)
-  psi_true <- rep(0.5, K)
-  sigma_true_cov <- tcrossprod(Z_true) +
-    diag(psi_true^2 * nu_true / (nu_true - 2))
-
-  env <- rnorm(n_sites)
-  mu_intercept <- rnorm(K)
-  mu_env_slope <- rnorm(K)
-
-  # Conditional form: each site draws latent scores, then the
-  # per-row residual is scalar Student-t at scale psi[k] and
-  # shared nu.
-  lv_sim <- matrix(rnorm(n_sites * N_lv), nrow = n_sites, ncol = N_lv)
-  Y_wide <- matrix(NA_real_, nrow = n_sites, ncol = K)
-  for (i in seq_len(n_sites)) {
-    mu_i <- mu_intercept + mu_env_slope * env[i] +
-      as.numeric(Z_true %*% lv_sim[i, ])
-    Y_wide[i, ] <- mu_i + psi_true * rt(K, df = nu_true)
-  }
-  colnames(Y_wide) <- species_levels
-
+# The columns a cached fit was built from. Comparing the response
+# alone admits a stale fit: two simulators on one seed can draw the
+# same values and give the species different names, and the cached
+# posterior then carries an axis the frame does not name. A discrete
+# family hides that. `rmultinom()` and `sample.int()` return the same
+# draw under a change too small to move a count. The derived truth
+# list is no better as a key. Its field order moves with no value
+# changing.
+sim_frame_key <- function(d) {
   list(
-    K = K, N_lv = N_lv, species_levels = species_levels,
-    Z_true = Z_true, psi_true = psi_true, nu_true = nu_true,
-    lv_sim = lv_sim, sigma_true_cov = sigma_true_cov,
-    sigma_true_cor = cov2cor(sigma_true_cov),
-    mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
-    long_dat = as_long_jsdm(Y_wide, env, species_levels)
-  )
-}
-
-
-# Five species on two factors, where `mvt` above takes four. That is
-# deliberate: a factor model separates a per-species residual scale
-# from the factor covariance only when `(K - m)^2 >= K + m`, which
-# four species on two factors fails and five satisfies. The `Psi`
-# recovery claim below is therefore about an identified quantity,
-# which the same claim on the `mvt` fixture is not.
-sim_mvn <- function() {
-  set.seed(907L)
-  K <- 5L
-  N_lv <- 2L
-  n_sites <- 40L
-  species_levels <- paste0("y", seq_len(K))
-
-  Z_true <- matrix(rnorm(K * N_lv, sd = 0.7), nrow = K, ncol = N_lv)
-  psi_true <- rep(0.5, K)
-  sigma_true_cov <- tcrossprod(Z_true) + diag(psi_true^2)
-
-  env <- rnorm(n_sites)
-  mu_intercept <- rnorm(K)
-  mu_env_slope <- rnorm(K)
-
-  # Conditional form: each site draws its latent scores, then the
-  # per-row residual is normal at scale psi[k].
-  lv_sim <- matrix(rnorm(n_sites * N_lv), nrow = n_sites, ncol = N_lv)
-  Y_wide <- matrix(NA_real_, nrow = n_sites, ncol = K)
-  for (i in seq_len(n_sites)) {
-    mu_i <- mu_intercept + mu_env_slope * env[i] +
-      as.numeric(Z_true %*% lv_sim[i, ])
-    Y_wide[i, ] <- mu_i + rnorm(K, sd = psi_true)
-  }
-  colnames(Y_wide) <- species_levels
-
-  list(
-    K = K, N_lv = N_lv, species_levels = species_levels,
-    Z_true = Z_true, psi_true = psi_true,
-    lv_sim = lv_sim, sigma_true_cov = sigma_true_cov,
-    sigma_true_cor = cov2cor(sigma_true_cov),
-    mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
-    long_dat = as_long_jsdm(Y_wide, env, species_levels)
-  )
-}
-
-
-# The three softmax families share a shape: centre the true
-# loadings into the identified subspace the sum_to_zero_vector
-# parameterisation explores, then emit from softmax(eta).
-centred_loadings <- function(K, N_lv, sd = 0.7) {
-  Z <- matrix(rnorm(K * N_lv, sd = sd), nrow = K, ncol = N_lv)
-  Z <- scale(Z, center = TRUE, scale = FALSE)
-  attr(Z, "scaled:center") <- NULL
-  Z
-}
-
-
-# The softmax families share one generator. `draw` is the part that
-# differs: a Dirichlet takes gamma variates and normalises them, a
-# multinomial takes counts against a fixed unit total, and a
-# categorical takes one species. Calling `draw` at the same point of
-# the loop keeps the random sequence identical across the three, so
-# each family's simulated truth matches what its cached fixture holds.
-sim_softmax_jsdm <- function(seed, n_sites, draw, extra = list(),
-                             integer_response = FALSE,
-                             K = 4L, N_lv = 2L) {
-  set.seed(seed)
-  species_levels <- paste0("y", seq_len(K))
-  Z_true <- centred_loadings(K, N_lv)
-  env <- rnorm(n_sites)
-  mu_intercept <- rnorm(K)
-  mu_env_slope <- rnorm(K)
-
-  Y_wide <- matrix(0, nrow = n_sites, ncol = K)
-  for (i in seq_len(n_sites)) {
-    lv_i <- rnorm(N_lv)
-    eta_i <- mu_intercept + mu_env_slope * env[i] +
-      as.numeric(Z_true %*% lv_i)
-    p_i <- exp(eta_i) / sum(exp(eta_i))
-    Y_wide[i, ] <- draw(p_i, K)
-  }
-  colnames(Y_wide) <- species_levels
-
-  sigma_true_cov <- tcrossprod(Z_true)
-  c(
-    list(
-      K = K, N_lv = N_lv, species_levels = species_levels,
-      Z_true = Z_true,
-      sigma_true_cov = sigma_true_cov,
-      sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, K)),
-      mu_intercept = mu_intercept, mu_env_slope = mu_env_slope,
-      env = env,
-      long_dat = as_long_jsdm(Y_wide, env, species_levels,
-                              integer_response = integer_response)
-    ),
-    extra
-  )
-}
-
-
-sim_diri <- function() {
-  phi_true <- 30
-  sim_softmax_jsdm(
-    seed = 601L, n_sites = 30L, extra = list(phi_true = phi_true),
-    draw = function(p, K) {
-      gam <- rgamma(K, shape = p * phi_true, rate = 1)
-      gam / sum(gam)
-    }
-  )
-}
-
-
-# `multi()` takes integer counts over the `K` species of a unit. The
-# softmax of the same linear predictor gives the cell probabilities,
-# and one multinomial draw per site holds the unit total fixed.
-sim_multi <- function() {
-  unit_total <- 30L
-  sim_softmax_jsdm(
-    seed = 605L, n_sites = 40L, integer_response = TRUE,
-    extra = list(unit_total = unit_total),
-    draw = function(p, K) as.numeric(stats::rmultinom(1L, unit_total, p))
-  )
-}
-
-
-# `categ()` takes a one-hot response, one chosen species per unit,
-# and the softmax gives the choice probabilities. A unit records no
-# within-unit co-occurrence, which leaves the residual correlation
-# unidentified at any site count. Both correlation floors are NULL
-# in its spec for that reason. What this fixture covers is the
-# post-fit surface for the family.
-sim_categ <- function() {
-  sim_softmax_jsdm(
-    seed = 607L, n_sites = 40L, integer_response = TRUE,
-    draw = function(p, K) {
-      z <- numeric(K)
-      z[sample.int(K, 1L, prob = p)] <- 1
-      z
-    }
+    y      = d$y,
+    series = as.character(d$series),
+    levels = levels(d$series),
+    env    = d$env,
+    time   = d$time
   )
 }
 
@@ -379,8 +176,9 @@ sim_categ <- function() {
 
 SPECS <- list(
   nb = list(
-    label = "negative binomial", family = quote(brms::negbinomial()),
-    sim = sim_nb,
+    family = quote(brms::negbinomial()),
+    n_species = 5L, n_sites = 60L, seed = 608L,
+    sim_pars = list(size = 4),
     loadings_identified = TRUE, na_response = NA_integer_,
     has_psi = FALSE,
     epred_ok = function(x) all(x > 0),
@@ -399,7 +197,13 @@ SPECS <- list(
     me_integer_tell = TRUE
   ),
   mvt = list(
-    label = "multivariate Student-t", family = quote(mvt()), sim = sim_mvt,
+    family = quote(mvt()),
+    # Five species on two factors satisfies
+    # `(n_species - n_lv)^2 >= n_species + n_lv`. At four species
+    # the package warns that the per-species scale is unidentified,
+    # and this file allows no warnings.
+    n_species = 5L, n_sites = 30L, seed = 605L,
+    sim_pars = list(Psi = 0.5, nu = 5),
     identity_link = TRUE,
     loadings_identified = TRUE, na_response = NA_real_,
     has_psi = TRUE,
@@ -416,7 +220,9 @@ SPECS <- list(
     me_integer_tell = FALSE
   ),
   mvn = list(
-    label = "multivariate normal", family = quote(mvn()), sim = sim_mvn,
+    family = quote(mvn()),
+    n_species = 5L, n_sites = 40L, seed = 907L,
+    sim_pars = list(Psi = 0.5),
     identity_link = TRUE,
     loadings_identified = TRUE, na_response = NA_real_,
     has_psi = TRUE,
@@ -433,7 +239,9 @@ SPECS <- list(
     me_integer_tell = FALSE
   ),
   diri = list(
-    label = "Dirichlet", family = quote(diri()), sim = sim_diri,
+    family = quote(diri()),
+    n_species = 4L, n_sites = 30L, seed = 601L,
+    sim_pars = list(phi = 30),
     loadings_identified = TRUE, na_response = NA_real_,
     has_psi = FALSE,
     epred_ok = function(x) all(x >= 0 & x <= 1),
@@ -448,7 +256,9 @@ SPECS <- list(
     me_integer_tell = FALSE
   ),
   multi = list(
-    label = "multinomial", family = quote(multi()), sim = sim_multi,
+    family = quote(multi()),
+    n_species = 4L, n_sites = 40L, seed = 605L,
+    sim_pars = list(unit_total = 30L),
     loadings_identified = TRUE, na_response = NA_integer_,
     has_psi = FALSE,
     epred_ok = function(x) all(x >= 0),
@@ -463,7 +273,9 @@ SPECS <- list(
     me_integer_tell = FALSE
   ),
   categ = list(
-    label = "categorical", family = quote(categ()), sim = sim_categ,
+    family = quote(categ()),
+    n_species = 4L, n_sites = 40L, seed = 607L,
+    sim_pars = list(),
     # One species per unit records no within-unit co-occurrence,
     # which identifies no ordering of the loadings. The post-fit
     # claims below are what this family is held to.
@@ -493,10 +305,7 @@ fit_jsdm <- function(nm, spec, sim) {
     # A cached fit belongs to the simulation whose frame it was built
     # from. Editing a simulator changes that frame, and the stored
     # posterior then describes data the file does not generate.
-    # Comparing the response column catches that. Comparing the
-    # derived truth list does not: its field order moves without any
-    # value changing.
-    if (identical(cached$data$y, sim$long_dat$y)) {
+    if (identical(sim_frame_key(cached$data), sim_frame_key(sim$long_dat))) {
       fit <- cached
     }
   }
@@ -514,9 +323,8 @@ fit_jsdm <- function(nm, spec, sim) {
       backend = "cmdstanr"
     )
   }
-  truth <- sim[setdiff(names(sim), "long_dat")]
-  if (!identical(attr(fit, "sim_truth"), truth)) {
-    attr(fit, "sim_truth") <- truth
+  if (!identical(attr(fit, "sim_truth"), sim$truth)) {
+    attr(fit, "sim_truth") <- sim$truth
     saveRDS(fit, cache)
   }
   fit
@@ -1407,7 +1215,7 @@ built <- new.env(parent = emptyenv())
 
 for (nm in names(SPECS)) {
   spec <- SPECS[[nm]]
-  sim <- spec$sim()
+  sim <- jsdm_sim(spec)
   fit <- fit_jsdm(nm, spec, sim)
   assign(nm, list(spec = spec, sim = sim, fit = fit), envir = built)
   jsdgam_battery(nm, spec, sim, fit)
@@ -1460,8 +1268,8 @@ test_that("mvn: Psi is separable from the factor covariance", {
   # Five species on two factors satisfies `(K - m)^2 >= K + m`, the
   # condition under which a per-species residual scale is separable
   # from the factor covariance. This block checks the fixture's own
-  # premise. At four species the same parameter is one arbitrary
-  # point on a ridge, and `mvt` carries no such claim.
+  # premise, which the package itself warns about when a design
+  # fails it.
   obj <- get("mvn", envir = built)
   expect_gte((obj$sim$K - obj$sim$N_lv)^2, obj$sim$K + obj$sim$N_lv)
   dm <- as_draws_matrix(obj$fit$fit)

@@ -15,18 +15,35 @@ gives 335 at 1.396, with two species pulled to 0.9 by a prior centred
 on 0.5. No fixed constant suits every response scale. A new default
 needs calibrating over a grid of true `Psi` and factor share.
 
+The prior is written at `families.R:4428`, inside
+`make_psi_stanvars()`, whose signature takes no prior argument. A
+prior passed with `class = "Psi"` is dropped without a refusal:
+`is_mvgam_managed_class()` files it on the mvgam side
+(`brms_integration.R:728-733`) where nothing consumes it. That same
+`Psi ~ exponential(1)` is listed in `prior_summary()`
+(`brms_integration.R:1024-1035`). The table advertises a prior the
+user cannot set.
+
 ## Prediction accepts frames the axis layer refuses
 
-**92. `newdata` needs no time column.**
+**92. Two conditions bypass the level check.**
 
-`predictions.R:788-794` continues when the time column is absent.
-`ensure_mvgam_variables()` carries the time assertion
-(`validations.R:4174`), and the prediction path never calls it. An
-unknown series level is now refused through
-`validate_prediction_factor_levels()` (`predictions.R:481-484`). Two
-conditions still bypass it: a fit whose `trend_metadata$levels` is
-NULL and a frame whose series column is absent. One layer should own
-what a frame must carry.
+Two frames reach prediction with no level check at all: a fit whose
+`trend_metadata$levels` is NULL returns early (`predictions.R:482`,
+`validations.R:3849-3851`) and a frame with no series column never
+reaches the comparison (`validations.R:3889`).
+`validate_newdata_complete()` exempts that column by design
+(`validations.R:3798-3805`).
+
+The time column is held only while `mvgam_term_list()` keeps it.
+`varying_meta_vars()` drops a meta var that is constant in the
+training data, leaving a fit whose time column never varies outside
+the check.
+
+`ensure_mvgam_variables()` carries a second copy of the time
+assertion (`validations.R:4211`) and the prediction path never calls
+it. Two layers assert one fact. One layer should own what a frame
+must carry.
 
 ## One trend family, two initial distributions
 
@@ -65,8 +82,8 @@ Warnings and messages keep six spellings. Counted from parse data in
 `R/`: `rlang::warn()` at 33 sites, bare `message()` at 11,
 `insight::format_warning()` as the raiser at 8, `cli::cli_inform()` at
 3, `rlang::inform()` at 2, `warning()` at 2. `call. = FALSE` reaches
-about 120 of the 643 `stop()` calls. Twenty-three files mix two or
-more idioms and `backends.R` holds five.
+125 of the 643 `stop()` calls. Six files mix two or more idioms and
+`backends.R` holds four.
 
 The cost is on both sides of the call. A reader meets one condition
 under several shapes, and a caller handling one class misses the rest,
@@ -87,8 +104,8 @@ before anything is removed.
 
 | shape | the mark it leaves | count |
 |---|---|---|
-| one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `inherits(..., "mvbrmsformula")` asked in place of the question meant | 55, 40, 43 |
-| a literal standing in for a missing value | `%||% "y"`, `%||% "series"`, `%||% "explicit"` | 120 |
+| one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `inherits(..., "mvbrmsformula")` asked in place of the question meant | 57, 40, 43 |
+| a literal standing in for a missing value | `%||% "y"`, `%||% "series"`, `%||% "explicit"` | 98 |
 | a missing column skipped | `intersect(x, names(data))`, `if (!col %in% names(df)) next` | 25 |
 | a stored copy of a derivable fact | object slots and metadata fields written once and read in a few places | not counted |
 | one condition, several refusals | the same fault refused with different wording at different layers | not counted |
@@ -98,8 +115,8 @@ The scan's `suppress` count was examined site by site and holds no
 debt: each of the six replaces a coercion warning with a refusal
 naming the column, or takes the Pareto k out of the object it
 suppressed and reports it. `raw_axis` concentrates in
-`forecast.mvgam.R`, which carries 22 of its 55. Several of the rest
-are the layers that build the axis. The `sort(unique(...))`
+`forecast.mvgam.R`. Several of the rest are the layers that build
+the axis. The `sort(unique(...))`
 sites in `sample_innovations.R` are guarded last resorts, each
 carrying a comment naming the order it falls back to.
 
