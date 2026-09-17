@@ -452,14 +452,12 @@ test_that("response support matches brms for every shared family", {
     for (pname in names(probes)) {
       y <- probes[[pname]]
       dat <- data.frame(y = y, x = seq_along(y))
-      brms_ok <- !inherits(try(
-        brms::make_standata(y ~ 1, data = dat, family = fam),
-        silent = TRUE
-      ), "try-error")
-      mvgam_ok <- !inherits(try(
-        validate_response_for_family(y, fam, "y"),
-        silent = TRUE
-      ), "try-error")
+      brms_ok <- is.null(caught_error(
+        brms::make_standata(y ~ 1, data = dat, family = fam)
+      ))
+      mvgam_ok <- is.null(caught_error(
+        validate_response_for_family(y, fam, "y")
+      ))
       # Named so a failure says which family and which probe.
       expect_equal(
         mvgam_ok, brms_ok,

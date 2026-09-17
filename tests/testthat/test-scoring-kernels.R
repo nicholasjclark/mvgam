@@ -8,6 +8,7 @@
 # ----- Shared utility tests ---------------------------------------
 
 test_that("in_central_pi flags truth inside / outside the PI", {
+  set.seed(1L)
   fc <- stats::rnorm(2000L, mean = 0, sd = 1)
   # Truth at 0 lies inside any sensible central PI.
   expect_equal(in_central_pi(fc, 0, 0.9), 1L)
@@ -24,6 +25,7 @@ test_that("log_offset matches log(x + 0.001) and is monotone", {
 
 
 test_that("apply_univariate_score returns [h, 2] with NA on NA truth", {
+  set.seed(2L)
   truth <- c(1, NA, 3)
   fc <- matrix(stats::rnorm(30L), nrow = 10L, ncol = 3L)
   out <- apply_univariate_score(truth, fc, function(t, f, ...) {
@@ -67,6 +69,7 @@ test_that("CRPS of a degenerate forecast (all draws equal truth) is 0", {
 
 
 test_that("CRPS of a wider forecast is larger than a narrower one", {
+  set.seed(3L)
   truth <- 0
   fc_narrow <- matrix(stats::rnorm(2000L, sd = 0.1),
                        nrow = 1000L, ncol = 2L)
@@ -90,6 +93,7 @@ test_that("DRPS of a degenerate count forecast equal to truth is 0", {
 
 
 test_that("DRPS skips NA truth and leaves the row NA", {
+  set.seed(4L)
   fc <- matrix(rpois(200L, 5), nrow = 100L, ncol = 2L)
   out <- drps_mcmc_object(truth = c(5L, NA), fc = fc)
   expect_true(!is.na(out[1, "score"]))
@@ -107,6 +111,7 @@ test_that("SIS with a degenerate forecast equal to truth is 0", {
 
 
 test_that("SIS penalises a miss outside the PI", {
+  set.seed(5L)
   # Forecast: tight around 0; truth at 10 (far above the 95% PI).
   fc <- matrix(stats::rnorm(1000L, sd = 0.1),
                 nrow = 1000L, ncol = 1L)
@@ -141,6 +146,7 @@ test_that("Brier MSE matches mean((truth - fc)^2)", {
 # ----- Energy -----------------------------------------------------
 
 test_that("Energy score returns a length-h numeric vector", {
+  set.seed(6L)
   truths <- matrix(c(0, 1, 0.5, 1.5,
                      -1, 0), nrow = 2L, ncol = 3L)
   fcs <- list(
@@ -167,6 +173,7 @@ test_that("Energy of a degenerate forecast (draws = truth) is ~0", {
 # ----- Variogram --------------------------------------------------
 
 test_that("Variogram score returns a length-h numeric vector", {
+  set.seed(7L)
   truths <- matrix(c(0, 1, 0.5, 1.5,
                      -1, 0), nrow = 2L, ncol = 3L)
   fcs <- list(
@@ -181,6 +188,7 @@ test_that("Variogram score returns a length-h numeric vector", {
 
 
 test_that("Variogram score accepts per-series weights", {
+  set.seed(8L)
   truths <- matrix(c(0, 1, 0.5, 1.5), nrow = 2L, ncol = 2L)
   fcs <- list(
     matrix(stats::rnorm(40L), nrow = 20L, ncol = 2L),
@@ -196,6 +204,7 @@ test_that("Variogram score accepts per-series weights", {
 # ----- Log score --------------------------------------------------
 
 test_that("Log score is finite and decreases as fc concentrates on truth", {
+  set.seed(9L)
   fc_wide <- matrix(stats::rnorm(1000L, sd = 2),
                      nrow = 500L, ncol = 2L)
   fc_narrow <- matrix(stats::rnorm(1000L, sd = 0.3),
@@ -212,6 +221,7 @@ test_that("Log score is finite and decreases as fc concentrates on truth", {
 # ----- DSS --------------------------------------------------------
 
 test_that("DSS matches its analytic formula on Gaussian draws", {
+  set.seed(10L)
   truth <- 0
   fc <- matrix(stats::rnorm(5000L, mean = 0, sd = 1),
                 nrow = 5000L, ncol = 1L)
@@ -237,6 +247,7 @@ test_that("Quantile score is 0 when truth equals the alpha quantile", {
 
 
 test_that("Quantile score differs across levels and is finite-positive", {
+  set.seed(11L)
   # When truth lies in the upper tail, the 0.95-quantile pinball
   # loss applies the larger asymmetric weight (0.95 vs 0.05),
   # so QS_0.95 is the larger of the two. Asserting that
@@ -257,6 +268,7 @@ test_that("Quantile score differs across levels and is finite-positive", {
 # ----- Threshold-weighted CRPS ------------------------------------
 
 test_that("twCRPS with (a = -Inf, b = Inf) equals plain CRPS", {
+  set.seed(12L)
   truth <- 1
   fc <- matrix(stats::rnorm(500L), nrow = 500L, ncol = 1L)
   plain <- crps_mcmc_object(truth, fc)
@@ -268,6 +280,7 @@ test_that("twCRPS with (a = -Inf, b = Inf) equals plain CRPS", {
 
 
 test_that("twCRPS with a > truth focuses scoring on the upper tail", {
+  set.seed(13L)
   truth <- 0
   fc <- matrix(stats::rnorm(500L), nrow = 500L, ncol = 1L)
   plain <- crps_mcmc_object(truth, fc)
@@ -283,6 +296,7 @@ test_that("twCRPS with a > truth focuses scoring on the upper tail", {
 # ----- Threshold-weighted Energy ----------------------------------
 
 test_that("twEnergy returns a length-h vector for multivariate forecasts", {
+  set.seed(14L)
   truths <- matrix(c(0, 1, 0.5, 1.5), nrow = 2L, ncol = 2L)
   fcs <- list(
     matrix(stats::rnorm(40L), nrow = 20L, ncol = 2L),

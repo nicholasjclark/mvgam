@@ -1439,11 +1439,14 @@ test_that("a denominator of zero is a legal binomial observation", {
 # own, computed the right thing. This drives both and requires them to
 # agree, so a family cannot be added to one and not the other.
 epred_kernel_for <- function(family_name) {
-  tryCatch(
-    get(paste0("posterior_epred_", family_name),
-        envir = asNamespace("mvgam"), mode = "function"),
-    error = function(e) NULL
-  )
+  # `epred_kernel()` resolves the same name the same way. A family
+  # with no kernel gives NULL. A kernel that fails to load still
+  # raises.
+  nm <- paste0("posterior_epred_", family_name)
+  if (!exists(nm, mode = "function", envir = asNamespace("mvgam"))) {
+    return(NULL)
+  }
+  get(nm, mode = "function", envir = asNamespace("mvgam"))
 }
 
 test_that("compute_family_epred agrees with every family's own mean kernel", {

@@ -191,19 +191,9 @@ test_that("dispatch_closure_unit_method() errors on a non-closure family", {
   )
 })
 
-# ------------------------------------------------------------
-# predict.mvgam type-dispatch gate via mvgam_predict_types
-# ------------------------------------------------------------
-
-test_that("predict.mvgam(type = 'latent_state') errors on a non-closure-unit family", {
-  d <- make_occ_data()
-  # Use an mvgam fit with gaussian() to drive the gate without
-  # requiring a long MCMC run for occ itself.
-  d$y_real <- as.numeric(d$y)
-  fit <- mvgam(y_real ~ elev, data = d, chains = 1, iter = 100,
-               warmup = 50, silent = 2, refresh = 0)
-  expect_error(
-    predict(fit, type = "latent_state"),
-    "not available for this family"
-  )
-})
+# The `predict.mvgam` type gate is asserted in `test-predict.R`,
+# which calls it with `structure(list(), class = "mvgam")`. The
+# guard examines two family attributes and no draws. A fitted model
+# proves nothing the stub does not. The version here compiled and
+# sampled a Stan program for the same refusal, at 36.9 seconds of
+# the suite's runtime for 43 expectations.

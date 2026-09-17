@@ -850,13 +850,12 @@ test_that("the step check names the grid, not an observation", {
          validation_rules = "requires_regular_intervals"),
     class = "mvgam_trend"
   )
-  err <- tryCatch(
+  err <- conditionMessage(expect_error(
     mvgam:::assert_forecast_times_steppable(
       fc_times = list(s1 = 31), training = training,
       trend_spec = spec, step = 1
-    ),
-    error = function(e) conditionMessage(e)
-  )
+    )
+  ))
   expect_type(err, "character")
   expect_match(err, "training grid runs to time 40", fixed = TRUE)
   # The word that was wrong. The series was last seen at 30 here, so

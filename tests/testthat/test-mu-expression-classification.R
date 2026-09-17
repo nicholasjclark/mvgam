@@ -118,11 +118,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
     stancode <- test_case$generate_code()
 
     # Test basic functionality - should not error
-    result <- tryCatch({
-      extract_mu_construction_with_classification(stancode)
-    }, error = function(e) {
-      fail(paste("Classification failed for", test_case$name, ":", e$message))
-    })
+    result <- extract_mu_construction_with_classification(stancode)
 
     # Test return structure
     pattern <- paste("Pattern:", test_case$name)

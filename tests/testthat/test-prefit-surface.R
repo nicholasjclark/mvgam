@@ -57,10 +57,8 @@ test_that("a prefit failure names the state it is in", {
   offenders <- character(0)
   for (gen in gens) {
     args <- c(list(pf), needs[[gen]])
-    out <- suppressWarnings(
-      tryCatch(do.call(gen, args), error = function(e) e)
-    )
-    if (inherits(out, "error") &&
+    out <- suppressWarnings(caught_error(do.call(gen, args)))
+    if (!is.null(out) &&
           grepl(internal_draws_error, conditionMessage(out),
                 fixed = TRUE)) {
       offenders <- c(offenders, gen)

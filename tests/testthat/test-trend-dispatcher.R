@@ -846,13 +846,12 @@ test_that("validate_gr_balanced_groups errors on unbalanced groups", {
 
   # Error message names the offending group counts so the user can
   # see exactly which groups are off.
-  err <- tryCatch(
+  err <- conditionMessage(expect_error(
     mvgam:::validate_gr_balanced_groups(
       list(gr = "habitat", subgr = "NA", series = "series"),
       unbalanced
-    ),
-    error = function(e) conditionMessage(e)
-  )
+    )
+  ))
   expect_match(err, "forest=3")
   expect_match(err, "grassland=2")
 })

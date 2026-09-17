@@ -179,33 +179,15 @@ function's locals exactly, the fit among them.
 (`update.mvgam.R:573-589`). The bindings it re-evaluates have to
 survive. The frame they came from does not.
 
-## The suite carries the shapes it tests against
+## An expectation that runs only sometimes
 
-**131. Four shapes across `tests/testthat`, each confirmed at its site.**
-
-A Stan model is fitted in CI at `test-occ-family.R:202`, with no
-`seed` and no `run_model = FALSE`. Nothing mocks it. The assertion
-beneath wants one error path from `predict(type = "latent_state")`.
-
-`test-scoring-kernels.R` sets no seed anywhere. Eleven of its
-assertions depend on a drawn value. Line 216 draws `rnorm(5000)` and
-compares the result to an analytic one at `tolerance = 0.05`. The
-five kernel-shape blocks in `test-log-lik.R:27-71` draw responses
-under no seed, and an extreme `rnbinom` or `rbeta` draw reaches a
-log density of `-Inf`.
-
-Two files mutate state they never restore. `test-trend-registry.R`
-clears `trend_registry` eleven times with no `withr::defer()`, and
-line 230 overwrites the core `AR` entry until the clear at 238; any
-failure between the two leaves the registry wrong for every later
-file in that worker. `test-plot-helpers.R` restores bayesplot's
-colour scheme to a literal. The value it replaced is never captured.
-
-`try()` and `tryCatch()` appear at twelve sites. `skip()` appears at
-none.
+**131. Assertion counts vary with the data in two files.**
 
 An expectation under an `if` or inside a handler counts once when
 its branch runs and not at all otherwise. A green total then covers
 assertions nothing reached. `test-axis-ordering.R` holds about
-thirty of these. `test-stancode-standata.R:5824` returns early from
-a helper whose caller then compares nothing.
+thirty of these, driven per cell from its shared helpers. Two
+helpers return early with no expectation registered:
+`test-axis-ordering.R:864` and `test-stancode-standata.R:5824`. The
+comment at the first records that a quiet return looks the same in
+the output as a pass.

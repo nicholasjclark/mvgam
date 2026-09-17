@@ -719,35 +719,32 @@ test_that("bf() with dpar formulas in trend_formula errors with hint", {
     "Distributional-parameter formulas"
   )
 
-  err <- tryCatch(
+  err <- conditionMessage(expect_error(
     mvgam_formula(
       y ~ 1,
       trend_formula = bf(~ AR(p = 1), sigma ~ z)
-    ),
-    error = function(e) conditionMessage(e)
-  )
+    )
+  ))
   expect_match(err, "'sigma'")
   expect_match(err, "obs", ignore.case = TRUE)
 
   # Multiple dpars should be named in the error too.
-  err_multi <- tryCatch(
+  err_multi <- conditionMessage(expect_error(
     mvgam_formula(
       y ~ 1,
       trend_formula = bf(~ AR(p = 1), sigma ~ z, nu ~ z)
-    ),
-    error = function(e) conditionMessage(e)
-  )
+    )
+  ))
   expect_match(err_multi, "'sigma'")
   expect_match(err_multi, "'nu'")
 
   # bf() trend_formula WITHOUT pforms still hits the generic
   # "Must be a formula" assertion. We do not steal that error message.
-  err_no_pforms <- tryCatch(
+  err_no_pforms <- conditionMessage(expect_error(
     mvgam_formula(
       y ~ 1,
       trend_formula = bf(~ AR(p = 1))
-    ),
-    error = function(e) conditionMessage(e)
-  )
+    )
+  ))
   expect_no_match(err_no_pforms, "Distributional-parameter")
 })

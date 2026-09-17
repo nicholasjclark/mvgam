@@ -1,3 +1,17 @@
+# `trend_registry` is package state, and a testthat worker runs
+# several files in one process. The tests below clear it eleven
+# times and overwrite the core `AR` entry once. A failure between a
+# clear and its re-registration would hand every later file in that
+# worker an empty or altered registry. This restores the core set
+# when the file ends.
+withr::defer(
+  {
+    rm(list = ls(envir = trend_registry), envir = trend_registry)
+    register_core_trends()
+  },
+  teardown_env()
+)
+
 test_that("Trend registry initializes correctly", {
   # Clear registry for clean testing
   rm(list = ls(envir = trend_registry), envir = trend_registry)
@@ -264,19 +278,16 @@ test_that("Main dispatcher uses registry correctly", {
   # This should work without error (assuming AR generator exists)
   # We can't test the actual output without the full generator functions
   # but we can test that dispatch works
-  expect_silent({
-    # This will call ensure_registry_initialized, get_trend_info
-    # and the generator
-    tryCatch(
-      generate_trend_injection_stanvars(trend_specs, data_info),
-      error = function(e) {
-        # Expected to fail because we don't have complete generator functions
-        # but it should get past the registry parts
-        expect_false(grepl("Unknown trend type", e$message))
-        expect_false(grepl("not supported.*factor", e$message))
-      }
-    )
-  })
+  # The registry lookup and the factor-support check both pass. An
+  # error past them comes from the mock generator, which returns an
+  # incomplete stanvar list. Both assertions run whether or not the
+  # call raises, which fixes the count at two.
+  err <- caught_error(
+    generate_trend_injection_stanvars(trend_specs, data_info)
+  )
+  msg <- if (is.null(err)) "" else conditionMessage(err)
+  expect_false(grepl("Unknown trend type", msg))
+  expect_false(grepl("not supported.*factor", msg))
 })
 
 # Tests for parameter processing function

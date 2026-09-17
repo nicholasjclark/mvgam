@@ -39,6 +39,26 @@ local_verbose_warnings <- function(.env = parent.frame()) {
   )
 }
 
+# bayesplot's colour scheme is one global. A test that sets it and
+# stops there gives every later test that scheme. Restoring a
+# literal name assumes the session began with it. The six colours
+# `color_scheme_get()` returns are the ones the session had.
+# `color_scheme_set()` accepts them in that form, which restores an
+# unnamed or mixed scheme as exactly as a named one.
+# The condition an expression raises, or NULL for one that raises
+# none. `expect_error()` asserts a raise. These callers compare one
+# behaviour against another and need it as a value.
+caught_error <- function(expr) {
+  rlang::catch_cnd(expr, classes = "error")
+}
+
+local_color_scheme <- function(scheme, .env = parent.frame()) {
+  prior <- unname(unlist(bayesplot::color_scheme_get()))
+  bayesplot::color_scheme_set(scheme)
+  withr::defer(bayesplot::color_scheme_set(prior), envir = .env)
+  invisible(prior)
+}
+
 # Build both Stan code and Stan data from one
 # `generate_stan_components_mvgam_formula()` call. Tests that need
 # both surfaces should use this instead of calling `stancode()` and

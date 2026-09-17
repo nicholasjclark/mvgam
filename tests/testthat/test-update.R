@@ -390,7 +390,7 @@ test_that("an ordinary mvgam fit is not caught by that guard", {
   )
   # It gets past the jsdgam check and fails later for its own reasons,
   # rather than being refused as a joint model.
-  err <- tryCatch(update(stub), error = function(e) conditionMessage(e))
+  err <- conditionMessage(expect_error(update(stub)))
   expect_false(grepl("jsdgam", err))
 })
 

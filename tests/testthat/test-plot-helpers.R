@@ -19,8 +19,7 @@ test_that("mvgam_palette returns the bayesplot scheme vector", {
 })
 
 test_that("with_color_scheme restores the prior scheme on exit", {
-  bayesplot::color_scheme_set("blue")
-  on.exit(bayesplot::color_scheme_set("blue"))
+  local_color_scheme("blue")
   out <- mvgam:::with_color_scheme("red", mvgam:::mvgam_palette())
   expect_equal(out[1L], "#DCBCBC")
   prior <- attr(bayesplot::color_scheme_get(), "scheme_name")
@@ -28,8 +27,7 @@ test_that("with_color_scheme restores the prior scheme on exit", {
 })
 
 test_that("with_color_scheme restores on expression error", {
-  bayesplot::color_scheme_set("red")
-  on.exit(bayesplot::color_scheme_set("red"))
+  local_color_scheme("red")
   expect_error(
     mvgam:::with_color_scheme("blue", stop("boom"))
   )
@@ -235,8 +233,7 @@ test_that("resolve_factor_loadings errors on incomplete inputs", {
 # while every other panel followed it.
 
 test_that("mvgam_colour reads a scheme entry by its role", {
-  bayesplot::color_scheme_set("red")
-  on.exit(bayesplot::color_scheme_set("blue"), add = TRUE)
+  local_color_scheme("red")
   expect_equal(mvgam:::mvgam_colour("light"), "#DCBCBC")
   expect_equal(mvgam:::mvgam_colour("dark_highlight"), "#7C0000")
   # Explicit scheme wins over the active one.
