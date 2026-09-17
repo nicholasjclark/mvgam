@@ -58,7 +58,7 @@ make_identity_hier_params <- function(n_draws, n_groups, n_sub,
 }
 
 
-test_that("extract_hierarchical_cholesky_params builds correct shapes", {
+test_that("extract_hierarchical_cholesky_params maps columns to slots", {
   n_draws <- 8
   n_groups <- 2
   n_sub <- 2
@@ -77,17 +77,7 @@ test_that("extract_hierarchical_cholesky_params builds correct shapes", {
                c(n_draws, n_groups, n_sub, n_sub))
   expect_equal(dim(params$sigma_group_trend),
                c(n_draws, n_groups, n_sub))
-})
-
-
-test_that("extract_hierarchical_cholesky_params preserves named values", {
-  n_draws <- 6
-  draws_mat <- make_hier_draws_mat(n_draws, n_groups = 2, n_sub = 2)
-  group_info <- list(n_groups = 2, n_subgroups = 2, group_inds = c(1, 1, 2, 2))
-
-  params <- extract_hierarchical_cholesky_params(draws_mat, group_info)
-
-  # Spot-check: posterior column maps to the correct array slot
+  # Each posterior column reaches the array slot its name indexes.
   expect_equal(
     params$alpha_cor_trend,
     as.numeric(draws_mat[, "alpha_cor_trend"])
@@ -107,7 +97,7 @@ test_that("extract_hierarchical_cholesky_params preserves named values", {
 })
 
 
-test_that("get_trend_covariance_structure routes hier VAR through Cholesky extractor", {
+test_that("a hier VAR routes through the Cholesky extractor", {
   # Regression guard for the residual_cor hierarchical VAR bug:
   # before the dispatch alias was added,
   # `get_trend_covariance_structure()` left
@@ -179,7 +169,7 @@ test_that("extract_hierarchical_cholesky_params errors on missing param", {
 })
 
 
-test_that("extract_hierarchical_diagonal_params broadcasts sigma_group_trend per series", {
+test_that("diagonal params broadcast sigma_group_trend per series", {
   # Diagonal-hierarchical path: each series s reads from
   # sigma_group_trend[group_inds[s], sub_idx_of_s_within_group], where
   # sub_idx follows the Stan loop order in
@@ -209,7 +199,7 @@ test_that("extract_hierarchical_diagonal_params broadcasts sigma_group_trend per
 })
 
 
-test_that("extract_hierarchical_diagonal_params respects non-contiguous group_inds", {
+test_that("diagonal params respect non-contiguous group_inds", {
   # If series are interleaved across groups (e.g. group_inds c(1, 2, 1, 2)),
   # sub_idx must still follow the Stan loop order (cumulative count within
   # each group as series indices are scanned 1..N_lv_trend).
@@ -246,7 +236,7 @@ test_that("extract_hierarchical_diagonal_params errors on missing param", {
 })
 
 
-test_that("extract_hierarchical_diagonal_params output feeds transform_diagonal_innovations", {
+test_that("transform_diagonal_innovations accepts the diagonal params", {
   # Integration check: the broadcast sigma_trend matrix is the exact
   # shape transform_diagonal_innovations expects, and the per-series
   # variance of the transformed innovations recovers (sigma_group^2).
@@ -583,9 +573,11 @@ test_that("sample_process_errors returns zeros for deterministic trends", {
 
   out_default <- sample_process_errors(obj)
   expect_equal(dim(out_default), c(1L, 6L))
+  expect_true(all(out_default == 0))
 
   out_ids <- sample_process_errors(obj, draw_ids = c(2L, 5L, 7L))
   expect_equal(dim(out_ids), c(3L, 6L))
+  expect_true(all(out_ids == 0))
 })
 
 
@@ -833,7 +825,10 @@ test_that("extract_sigma_and_cov: a grouped trend reads its own parameters", {
   for (i in 1:n_sub) for (j in 1:n_sub) {
     one_draw[sprintf("L_Omega_global_trend[%d,%d]", i, j)] <- L_global[i, j]
   }
-  L_dev <- list(diag(n_sub), matrix(c(1, -0.4, 0, sqrt(1 - 0.16)), nrow = n_sub))
+  L_dev <- list(
+    diag(n_sub),
+    matrix(c(1, -0.4, 0, sqrt(1 - 0.16)), nrow = n_sub)
+  )
   sigmas <- list(c(1, 2), c(3, 0.5))
   for (g in seq_len(n_groups)) {
     for (i in 1:n_sub) for (j in 1:n_sub) {
@@ -867,7 +862,7 @@ test_that("extract_sigma_and_cov: a grouped trend reads its own parameters", {
   expect_equal(diag(out$Sigma), out$sigma^2, ignore_attr = TRUE)
 })
 
-test_that("hierarchical_group_cholesky: alpha weights population against group", {
+test_that("hierarchical_group_cholesky weights by alpha", {
   L_global <- matrix(c(1, 0.8, 0, 0.6), nrow = 2L)
   L_dev <- diag(2L)
   sigma <- c(1, 1)
@@ -953,7 +948,7 @@ test_that("correlated series settle at the exact cross-covariance", {
 })
 
 
-test_that("a draw with a singular stationary covariance keeps its innovations", {
+test_that("a singular stationary covariance keeps innovations", {
   # Perfectly correlated innovations under equal coefficients leave
   # the stationary correlation singular, without a Cholesky factor.
   # That draw is left as it was, and the draw beside it is still

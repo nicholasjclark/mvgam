@@ -165,7 +165,7 @@ test_that("obs_uncertainty = FALSE returns family mean for response", {
       matrix(2, nrow = 2L, ncol = nrow(newdata))
     },
     draw_observations = function(...) {
-      stop("draw_observations should not be called when obs_uncertainty = FALSE")
+      stop("draw_observations ran under obs_uncertainty = FALSE")
     }
   )
   hc <- hindcast(fit, type = "response", obs_uncertainty = FALSE)
@@ -303,13 +303,22 @@ test_that("Multi-series hindcast returns one matrix per series", {
                                            component, ...) {
       matrix(0, nrow = 2L, ncol = nrow(newdata))
     },
+    # Each cell is keyed to the series and the time of the row it
+    # was built from, and the two series have different keys.
     draw_observations = function(object, linpred, newdata, draw_ids,
                                  resp = NULL) {
-      matrix(0L, nrow = nrow(linpred), ncol = nrow(newdata))
+      key <- 100L * match(as.character(newdata$series), c("a", "b")) +
+        as.integer(newdata$time)
+      matrix(rep(key, each = nrow(linpred)),
+             nrow = nrow(linpred), ncol = nrow(newdata))
     }
   )
   hc <- hindcast(fit, type = "response")
   expect_named(hc$hindcasts, c("a", "b"))
-  expect_identical(dim(hc$hindcasts[["a"]]), c(2L, 8L))
-  expect_identical(dim(hc$hindcasts[["b"]]), c(2L, 8L))
+  expect_identical(hc$hindcasts[["a"]],
+                   matrix(rep(100L + 1:8, each = 2L), nrow = 2L))
+  expect_identical(hc$hindcasts[["b"]],
+                   matrix(rep(200L + 1:8, each = 2L), nrow = 2L))
+  expect_equal(hc$train_times[["a"]], 1:8)
+  expect_equal(hc$train_times[["b"]], 1:8)
 })
