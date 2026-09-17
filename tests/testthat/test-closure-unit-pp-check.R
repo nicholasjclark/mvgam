@@ -44,13 +44,22 @@ test_that("closure_unit_pp_check_setup() collapses non-resid yrep to the per-uni
   )
   expect_identical(length(res$y), 4L)
   expect_identical(dim(res$yrep), c(5L, 4L))
-  # Each y_unit must equal sum of the visits in that unit.
+  expect_identical(res$arrays$N_unit, 4L)
+  # The collapse is what this names, and both sides collapse. Taking
+  # the dimensions of `yrep` admitted any 5 x 4 matrix, including one
+  # summing another unit's visits into each column. `visit_row`
+  # numbers the rows of the frame, the axis carrying both `d$y` and
+  # the columns of `yrep`.
   for (g in seq_len(res$arrays$N_unit)) {
-    idx <- res$arrays$visit_idx[g, seq_len(res$arrays$n_rep[g])]
+    idx <- res$arrays$visit_row[g, seq_len(res$arrays$n_rep[g])]
     expect_equal(unname(res$y[g]), sum(d$y[idx]))
+    expect_equal(unname(res$yrep[, g]),
+                 rowSums(yrep[, idx, drop = FALSE]))
   }
-  # First-visits lookup carries one obs index per unit.
-  expect_identical(length(res$first_visits), 4L)
+  # Each unit occupies three consecutive rows of the grid, and its
+  # first visit is its first row. Counting them passed a lookup
+  # naming one row four times.
+  expect_identical(res$first_visits, c(1L, 4L, 7L, 10L))
 })
 
 test_that("closure_unit_pp_check_setup() preserves the per-unit yrep grain on resid_* types", {
@@ -62,7 +71,10 @@ test_that("closure_unit_pp_check_setup() preserves the per-unit yrep grain on re
     obj, newdata = d,
     yrep = per_unit_resid, type = "resid_hist"
   )
-  expect_identical(dim(res$yrep), c(7L, 4L))
+  # Preservation is the claim. Comparing dimensions admitted any
+  # 7 x 4 matrix, an aggregated one included; the matrix itself is
+  # what passes through untouched.
+  expect_identical(res$yrep, per_unit_resid)
   # y is zeros at unit length for resid_* (bayesplot's
   # ppc_error_hist receives y = 0 + (-1)*resid).
   expect_identical(res$y, rep(0, 4L))

@@ -69,32 +69,6 @@ repair for the correlated case: the stationary covariance solves
 `Sigma_x[i, j] = Sigma_eps[i, j] / (1 - phi_i phi_j)`. `VAR()`
 computes this already, through `initial_joint_var()`.
 
-## A test whose outcome depends on what ran before it
-
-**127. Two runs of the suite in one session disagree.**
-
-Three tests assert on a warning rlang raises once per R session
-(`.frequency = "once"`). A second `devtools::test()` in that session
-meets a cache already set. Measured across two runs in one session:
-10537 expectations and no failures on the first, the same 10537 and
-three failures on the second. The three land one apiece in:
-
-- `test-trend-registry.R`
-- `test-occ-family.R`
-- `test-closure-unit-families.R`
-
-An expectation count is blind to this. A failing `expect_warning()`
-still counts one.
-
-`register_custom_trend()` (`trend_system.R:427`) raises with no
-`TESTTHAT` check and reaches the suite directly. The other two
-raisers check it, and each test reaches its assertion by unsetting
-that with `withr::with_envvar(c(TESTTHAT = ""))`.
-
-Under `rlib_warning_verbosity = "verbose"` rlang ignores the
-frequency cache. Nothing in `R/` resets it, and ten further sites
-raise under the same idiom.
-
 ## One condition, several spellings
 
 **129. Two condition kinds carry more than one spelling.**
@@ -179,15 +153,3 @@ function's locals exactly, the fit among them.
 (`update.mvgam.R:573-589`). The bindings it re-evaluates have to
 survive. The frame they came from does not.
 
-## An expectation that runs only sometimes
-
-**131. Assertion counts vary with the data in two files.**
-
-An expectation under an `if` or inside a handler counts once when
-its branch runs and not at all otherwise. A green total then covers
-assertions nothing reached. `test-axis-ordering.R` holds about
-thirty of these, driven per cell from its shared helpers. Two
-helpers return early with no expectation registered:
-`test-axis-ordering.R:864` and `test-stancode-standata.R:5824`. The
-comment at the first records that a quiet return looks the same in
-the output as a pass.

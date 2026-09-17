@@ -175,12 +175,40 @@ test_that("stancode for occ without a p sub-formula declares scalar p in (0, 1)"
 # ------------------------------------------------------------
 
 test_that("dispatch_closure_unit_method() resolves nmix + occ for every method_kind", {
+  # `is.function()` was true of all eight cells whatever kernel each
+  # returned. Naming them is what separates a correct routing from
+  # one that gives occ the N-mixture sampler.
+  expected <- list(
+    nmix = list(
+      epred        = mvgam:::posterior_epred_nmix,
+      predict      = mvgam:::posterior_predict_nmix,
+      log_lik      = mvgam:::log_lik_nmix,
+      latent_state = mvgam:::posterior_latent_N_pb
+    ),
+    occ = list(
+      epred        = mvgam:::posterior_epred_occ,
+      predict      = mvgam:::posterior_predict_occ,
+      log_lik      = mvgam:::log_lik_occ,
+      latent_state = mvgam:::posterior_occupancy
+    )
+  )
   fams <- list(nmix = nmix(), occ = occ())
-  for (kind in c("epred", "predict", "log_lik", "latent_state")) {
-    for (nm in names(fams)) {
-      fn <- dispatch_closure_unit_method(fams[[nm]], kind)
-      expect_true(is.function(fn))
+  for (nm in names(fams)) {
+    for (kind in names(expected[[nm]])) {
+      expect_identical(
+        dispatch_closure_unit_method(fams[[nm]], kind),
+        expected[[nm]][[kind]]
+      )
     }
+  }
+  # The two families resolve to separate kernels wherever the latent
+  # state differs. They share the `epred` kernel, which the table
+  # above records by naming it for both.
+  for (kind in c("predict", "log_lik", "latent_state")) {
+    expect_false(identical(
+      dispatch_closure_unit_method(fams$nmix, kind),
+      dispatch_closure_unit_method(fams$occ, kind)
+    ))
   }
 })
 

@@ -496,23 +496,7 @@ test_that("validation system handles edge cases", {
 
 # Test extensibility and custom trends
 test_that("custom trend registration works correctly", {
-
-  # Create a custom trend constructor
-  custom_constructor <- function(param = 1) {
-    structure(
-      list(
-        trend = "CUSTOM",
-        param = param,
-        tpars = "custom_param_trend",
-        characteristics = list(supports_factors = FALSE)
-      ),
-      class = "mvgam_trend"
-    )
-  }
-
-  # Create a simple generator function for the custom trend
   custom_generator <- function(trend_specs, data_info) {
-    # Simple generator that returns basic stanvars
     list(
       custom_param = brms::stanvar(
         name = "custom_param",
@@ -522,23 +506,32 @@ test_that("custom trend registration works correctly", {
     )
   }
 
-  # Register the custom trend with the registry system
-  mvgam:::register_trend_type("CUSTOM", supports_factors = FALSE,
-                               generator_func = custom_generator,
-                               incompatibility_reason = "Custom trend for testing")
+  # The registry is one environment for the whole session and nothing
+  # removes a name from it. Leaving CUSTOM in place gave every later
+  # file a seventh trend type: measured, `mvgam_trend_choices()`
+  # returned AR, CAR, CUSTOM, PW, RW, VAR, ZMVN once this file ran.
+  before <- mvgam_trend_choices()
+  withr::defer(rm("CUSTOM", envir = mvgam:::trend_registry))
 
-  # Test it appears in registry
-  choices <- mvgam_trend_choices()
-  expect_true("CUSTOM" %in% choices)
+  mvgam:::register_trend_type(
+    "CUSTOM", supports_factors = FALSE,
+    generator_func = custom_generator,
+    incompatibility_reason = "Custom trend for testing"
+  )
 
-  # Test pattern includes custom trend
-  pattern <- mvgam:::mvgam_trend_pattern()
-  expect_true(grepl("CUSTOM", pattern))
-
-  # Test formula parsing with custom trend
-  f1 <- ~ s(time) + CUSTOM(param = 5) + cov1
-  # Note: This would require the custom constructor to be available
-  # in the evaluation environment
+  # Registering adds the one name and leaves the rest alone.
+  expect_setequal(setdiff(mvgam_trend_choices(), before), "CUSTOM")
+  expect_true(grepl("CUSTOM", mvgam:::mvgam_trend_pattern()))
+  # The registered entry is what the accessor returns, generator
+  # included. This test also defined a constructor it never called
+  # and a formula it never asserted on; neither one reached the
+  # registry.
+  info <- mvgam:::get_trend_info("CUSTOM")
+  expect_false(info$supports_factors)
+  expect_identical(info$generator, custom_generator)
+  expect_identical(
+    info$incompatibility_reason, "Custom trend for testing"
+  )
 })
 
 # Test print method edge cases
@@ -594,18 +587,12 @@ test_that("realistic complex formulas work correctly", {
 # Test time parameter functionality
 test_that("time parameter works correctly in trend constructors", {
 
- # Test default time parameter (defaults to NA, resolved at model fitting)
-  rw_default <- RW()
-  expect_true(is.na(rw_default$time) || rw_default$time == "time")
-
-  ar_default <- AR(p = 1)
-  expect_true(is.na(ar_default$time) || ar_default$time == "time")
-
-  var_default <- VAR(p = 1)
-  expect_true(is.na(var_default$time) || var_default$time == "time")
-
-  car_default <- CAR()
-  expect_true(is.na(car_default$time) || car_default$time == "time")
+  # Every constructor defaults `time` to the column name "time". The
+  # disjunction in each of these also accepted NA, which is what a
+  # constructor that stopped defaulting would return.
+  for (spec in list(RW(), AR(p = 1), VAR(p = 1), CAR())) {
+    expect_identical(spec$time, "time")
+  }
 
   # Test explicit time parameter with unquoted variable names
   rw_custom <- RW(time = week)
@@ -672,18 +659,11 @@ test_that("time parameter integrates correctly with formula parsing", {
 # Test series parameter functionality
 test_that("series parameter works correctly in trend constructors", {
 
-  # Test default series parameter (defaults to NA, resolved at model fitting)
-  rw_default <- RW()
-  expect_true(is.na(rw_default$series) || rw_default$series == "series")
-
-  ar_default <- AR(p = 1)
-  expect_true(is.na(ar_default$series) || ar_default$series == "series")
-
-  var_default <- VAR(p = 1)
-  expect_true(is.na(var_default$series) || var_default$series == "series")
-
-  car_default <- CAR()
-  expect_true(is.na(car_default$series) || car_default$series == "series")
+  # Every constructor defaults `series` to the column name "series".
+  # The disjunction in each of these also accepted NA.
+  for (spec in list(RW(), AR(p = 1), VAR(p = 1), CAR())) {
+    expect_identical(spec$series, "series")
+  }
 
   # Test explicit series parameter with unquoted variable names
   rw_custom <- RW(series = species)
@@ -1026,18 +1006,6 @@ test_that("grouping variables integrate with stanvar generation", {
   # This test ensures the data_info structure properly includes grouping information
   # that would be used by the injection generators
 
-  # Test data structure that would be passed to injection generators
-  test_data_info <- list(
-    n_lv = 3,
-    n_series = 6,
-    n_groups = 2,        # From gr variable
-    n_subgroups = 3      # From subgr variable
-  )
-
-  # Test that hierarchical grouping info would be available
-  expect_equal(test_data_info$n_groups, 2)
-  expect_equal(test_data_info$n_subgroups, 3)
-
   # Test trend spec structure includes grouping info
   suppressWarnings({
     rw_hierarchical <- RW(time = week, series = species, gr = region, subgr = site, cor = TRUE)
@@ -1047,11 +1015,6 @@ test_that("grouping variables integrate with stanvar generation", {
   expect_equal(rw_hierarchical$gr, "region")
   expect_equal(rw_hierarchical$subgr, "site")
   expect_true(rw_hierarchical$cor)  # Required for hierarchical models
-
-  # Test that generate_trend_injection_stanvars would receive proper structure
-  # (This is a structural test - the actual function would need data_info)
-  expect_true(!is.null(rw_hierarchical$gr) && rw_hierarchical$gr != 'NA')
-  expect_true(!is.null(rw_hierarchical$subgr) && rw_hierarchical$subgr != 'series')
 })
 
 # Test cap argument integration with stanvar generation
@@ -1154,7 +1117,6 @@ test_that("piecewise trends work correctly in formula parsing", {
     expect_equal(length(parsed2$trend_components), 1)
     trend_comp2 <- parsed2$trend_components[[1]]
     expect_equal(trend_comp2$trend, "PW")  # Base type
-    expect_equal(trend_comp2$trend, "PW")  # Base type
     expect_equal(trend_comp2$cap, "max_capacity")
     expect_equal(trend_comp2$n_changepoints, 25)
     expect_equal(trend_comp2$changepoint_scale, 0.02)
@@ -1187,21 +1149,19 @@ test_that("piecewise trends integrate correctly with registry system", {
   expect_true(grepl("PW", pattern))
   # Pattern should include base PW type
 
-  # Test registry info for piecewise trends
+  # Registry info for the piecewise entry. The same call appeared
+  # three times under three comments about PW variants, with "PW" as
+  # the argument each time.
   pw_info <- mvgam:::get_trend_info("PW")
   expect_type(pw_info, "list")
-  expect_false(pw_info$supports_factors)  # PW doesn't support factors
+  expect_false(pw_info$supports_factors)
   expect_type(pw_info$generator, "closure")
-
-  # Test that we can get PW info (PWlinear is a trend variant)
-  pwlin_info <- mvgam:::get_trend_info("PW")
-  expect_type(pwlin_info, "list")
-  expect_false(pwlin_info$supports_factors)
-
-  # Test that PWlogistic also uses PW registry entry
-  pwlog_info <- mvgam:::get_trend_info("PW")
-  expect_type(pwlog_info, "list")
-  expect_false(pwlog_info$supports_factors)
+  # A factor-incompatible entry stores the reason shown to a user.
+  expect_true(nzchar(pw_info$incompatibility_reason))
+  # The variant spellings name no registry entry of their own.
+  expect_error(
+    mvgam:::get_trend_info("PWlinear"), "Unknown trend type"
+  )
 })
 
 # Test piecewise parameter validation edge cases

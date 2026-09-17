@@ -99,13 +99,13 @@ test_that("setup_brms_lightweight includes trend information in output", {
     trend_formula = ~ 1
   )
 
-  # Should include trend_formula in output
   expect_true("trend_formula" %in% names(setup))
   expect_true(inherits(setup$trend_formula, "formula"))
 
-  # Should include trend_specs when trend_formula provided
-  expect_true("trend_specs" %in% names(setup))
-  expect_true(is.list(setup$trend_specs) || is.null(setup$trend_specs))
+  # A trend formula naming no constructor defaults to ZMVN. Admitting
+  # a list or a NULL took whatever the parse returned, a parse that
+  # produced nothing included.
+  expect_identical(setup$trend_specs$trend_specs$trend, "ZMVN")
 })
 
 test_that("setup_brms_lightweight maintains all original functionality", {
@@ -124,7 +124,8 @@ test_that("setup_brms_lightweight maintains all original functionality", {
 
   # Should have all required components
   required_components <- c("formula", "data", "family", "stancode",
-                          "standata", "prior", "brmsterms", "brmsfit")
+                          "standata", "prior", "brmsterms", "brmsfit",
+                          "setup_time")
 
   for (component in required_components) {
     expect_true(component %in% names(setup),
@@ -137,47 +138,6 @@ test_that("setup_brms_lightweight maintains all original functionality", {
   expect_true(is.character(setup$stancode))
   expect_true(is.list(setup$standata))
   expect_true(inherits(setup$prior, "brmsprior"))
-})
-
-test_that("setup_brms_lightweight validates setup components", {
-  data <- data.frame(
-    y = rnorm(20),
-    x = rnorm(20),
-    time = 1:20,
-    series = factor(rep(1:2, each = 10))
-  )
-
-  # Valid setup should pass validation
-  expect_no_error({
-    setup <- setup_brms_lightweight(
-      formula = y ~ x,
-      data = data
-    )
-  })
-
-  # The validate_setup_components should be called internally
-  # If it reaches this point without error, validation passed
-  expect_true(TRUE)
-})
-
-test_that("setup_brms_lightweight handles multivariate formulas", {
-  data <- data.frame(
-    y1 = rnorm(20),
-    y2 = rnorm(20),
-    x = rnorm(20),
-    time = 1:20,
-    series = factor(rep(1:2, each = 10))
-  )
-
-  # Test with simple multivariate-like data structure
-  # Even if complex multivariate formulas aren't supported yet,
-  # the function should handle the data without error
-  expect_no_error({
-    setup <- setup_brms_lightweight(
-      formula = y1 ~ x,  # Simple formula with multivariate data
-      data = data
-    )
-  })
 })
 
 test_that("setup_brms_lightweight error handling works correctly", {
@@ -222,32 +182,17 @@ test_that("setup_brms_lightweight mock backend works for inspection", {
   # Mock backend should create a brmsfit object
   expect_true(inherits(setup$brmsfit, "brmsfit"))
 
-  # Stan code should be extractable
+  # A character count passed on any string at all. The mock backend
+  # emits a whole Stan program, with each block opening on one line.
   expect_true(is.character(setup$stancode))
-  expect_true(nchar(setup$stancode) > 0)
-
-  # Stan data should be extractable
+  for (blk in c("functions", STAN_BLOCKS)) {
+    expect_identical(stan_block_count(setup$stancode, blk), 1L)
+  }
+  # Stan data carries the response and the row count brms took from
+  # the frame, which counting its elements left unexamined.
   expect_true(is.list(setup$standata))
-  expect_true(length(setup$standata) > 0)
-})
-
-test_that("setup_brms_lightweight performance tracking works", {
-  data <- data.frame(
-    y = rnorm(20),
-    x = rnorm(20),
-    time = 1:20,
-    series = factor(rep(1:2, each = 10))
-  )
-
-  setup <- setup_brms_lightweight(
-    formula = y ~ x,
-    data = data
-  )
-
-  # Should track setup time
-  expect_true("setup_time" %in% names(setup))
-  expect_true(is.numeric(setup$setup_time))
-  expect_true(setup$setup_time >= 0)
+  expect_identical(setup$standata$N, nrow(data))
+  expect_identical(as.numeric(setup$standata$Y), data$y)
 })
 
 # Integration tests with existing validation functions
@@ -263,35 +208,38 @@ test_that("setup_brms_lightweight handles various trend formula types", {
     series = factor(rep(1:2, each = 10))
   )
 
-  # Test formula without trend constructors (should default to ZMVN)
-  setup_default <- setup_brms_lightweight(
-    formula = y ~ x,
-    data = data,
-    trend_formula = ~ gp(time, k = 6)
+  # Each formula names the trend model its parse has to reach. The
+  # three cases were separated only by `is.list()`, which is true of
+  # every parse and of one that fell back to the default.
+  # `~ 1` is pinned in "includes trend information in output" on its
+  # own fixture. These two add a formula whose terms name no
+  # constructor and one that names RW.
+  cases <- list(
+    list(tf = ~ gp(time, k = 6), trend = "ZMVN"),
+    list(
+      tf = ~ temperature + RW(time = time, series = series) + habitat,
+      trend = "RW"
+    )
   )
+  for (case in cases) {
+    setup <- setup_brms_lightweight(
+      formula = y ~ x, data = data, trend_formula = case$tf
+    )
+    expect_identical(setup$trend_specs$trend_specs$trend, case$trend)
+  }
 
-  expect_true("trend_specs" %in% names(setup_default))
-  expect_true(is.list(setup_default$trend_specs))
-
-  # Test formula with explicit trend constructor
-  setup_explicit <- setup_brms_lightweight(
-    formula = y ~ x,
-    data = data,
-    trend_formula = ~ temperature + RW(time = time, series = series) + habitat
+  # brms cannot evaluate a trend constructor. The parse hands it a
+  # base formula with the constructor removed and the covariates
+  # around it kept.
+  explicit <- setup_brms_lightweight(
+    formula = y ~ x, data = data,
+    trend_formula =
+      ~ temperature + RW(time = time, series = series) + habitat
   )
-
-  expect_true("trend_specs" %in% names(setup_explicit))
-  expect_true(is.list(setup_explicit$trend_specs))
-
-  # Test intercept-only trend formula
-  setup_intercept <- setup_brms_lightweight(
-    formula = y ~ x,
-    data = data,
-    trend_formula = ~ 1
+  expect_identical(
+    all.vars(explicit$trend_specs$base_formula),
+    c("temperature", "habitat")
   )
-
-  expect_true("trend_specs" %in% names(setup_intercept))
-  expect_true(is.list(setup_intercept$trend_specs))
 })
 
 test_that("setup_brms_lightweight integrates with existing validation", {
