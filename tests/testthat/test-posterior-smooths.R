@@ -255,7 +255,11 @@ test_that("subset_draws_rows validates ndraws and draw_ids", {
   mat <- matrix(rnorm(20L), nrow = 10L)
   expect_identical(nrow(subset_draws_rows(mat, NULL, NULL)), 10L)
   expect_identical(nrow(subset_draws_rows(mat, 5L, NULL)), 5L)
-  expect_identical(nrow(subset_draws_rows(mat, NULL, c(1L, 3L))), 2L)
+  # `draw_ids` names the rows it keeps, and comparing them is
+  # stronger than counting them. `ndraws` samples its rows instead,
+  # and the line above asserts its count.
+  expect_identical(subset_draws_rows(mat, NULL, c(1L, 3L)),
+                   mat[c(1L, 3L), ])
   # A count covering every row keeps them in the order they were
   # sampled rather than shuffling them.
   expect_identical(subset_draws_rows(mat, 10L, NULL), mat)
@@ -372,7 +376,11 @@ test_that("spaghetti draws one line per draw from its own columns", {
   built <- ggplot2::ggplot_build(build_mvgam_smooth_plot(df, "mu: s(x)"))
   lines <- built$data[[2L]]
   expect_identical(length(unique(lines$group)), 3L)
-  expect_equal(sort(lines$y), sort(as.numeric(eta)))
+  # Each group is one draw, in its own order. Comparing the sorted
+  # values matched the same multiset for a transposed eta.
+  for (g in seq_len(nrow(eta))) {
+    expect_equal(lines$y[lines$group == g], eta[g, ])
+  }
 })
 
 

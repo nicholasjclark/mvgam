@@ -44,15 +44,21 @@ test_that("build_trait_slopes_formula rewrites obs into nl bf with shared RE", {
 test_that("default_trait_slopes_priors covers every nlpar once", {
   pri <- mvgam:::default_trait_slopes_priors(y ~ env1 + env2)
   expect_s3_class(pri, "brmsprior")
-  # Each of a/b1/b2 should have a normal(0,1) b prior + student_t sd.
-  expect_setequal(
-    unique(pri$nlpar),
-    c("a", "b1", "b2")
+  # `unique()` discards the repetition the word "once" rules out, and
+  # a table carrying a duplicated nlpar passed. The rows themselves
+  # are named: one `b` and one `sd` for each of a, b1 and b2.
+  expect_identical(
+    paste(pri$nlpar, pri$class),
+    c("a b", "a sd", "b1 b", "b1 sd", "b2 b", "b2 sd")
   )
-  expect_setequal(unique(pri$class), c("b", "sd"))
+  expect_identical(
+    pri$prior,
+    rep(c("normal(0, 1)", "student_t(3, 0, 2.5)"), 3L)
+  )
 })
 
-test_that("build_trait_slopes_formula errors on a formula with no fixed terms", {
+test_that(
+  "build_trait_slopes_formula errors on an empty right-hand side", {
   # `y ~ -1` produces no intercept and no slope_terms, so the
   # wrapper has nothing to attach trait_slopes to. The rewrite
   # must error early with a hint pointing the user back to

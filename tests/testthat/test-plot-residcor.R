@@ -31,15 +31,15 @@ test_that("gather_matrix masks upper triangle and diagonal", {
   m <- matrix(seq_len(9L), nrow = 3L,
               dimnames = list(letters[1:3], letters[1:3]))
   out <- mvgam:::gather_matrix(m)
-  # setequal, not sorted equality: R CMD check runs under LC_COLLATE=C
-  # where uppercase sorts before lowercase, so a sorted comparison is
-  # locale-dependent.
-  expect_setequal(colnames(out), c("value", "Var1", "Var2"))
-  expect_equal(nrow(out), 9L)
-  na_rows <- out[is.na(out$value), ]
-  diag_rows <- na_rows[as.character(na_rows$Var1) ==
-                         as.character(na_rows$Var2), ]
-  expect_equal(nrow(diag_rows), 3L)
+  expect_identical(colnames(out), c("Var1", "Var2", "value"))
+  expect_identical(nrow(out), 9L)
+  # Counting the masked diagonal left the other half of the name
+  # untested. A helper masking the diagonal alone keeps six values
+  # and passed. The cells that survive are the lower triangle, and
+  # naming them covers both halves at once.
+  kept <- out[!is.na(out$value), ]
+  expect_identical(paste0(kept$Var1, kept$Var2), c("ba", "ca", "cb"))
+  expect_identical(kept$value, c(2L, 3L, 6L))
 })
 
 test_that("cluster_cormat reorders a scrambled chain", {
@@ -52,12 +52,11 @@ test_that("cluster_cormat reorders a scrambled chain", {
   perm <- c(3L, 1L, 4L, 2L)
   scrambled <- natural[perm, perm]
   idx <- mvgam:::cluster_cormat(scrambled)
-  reordered <- scrambled[idx, idx]
-  # The recovered ordering should bring large-correlation
-  # neighbours back into adjacency: at least one of the abs(
-  # diagonal-adjacent) entries should exceed 0.7.
-  adj <- abs(c(reordered[1, 2], reordered[2, 3], reordered[3, 4]))
-  expect_gt(max(adj), 0.7)
+  # The chain comes back exactly. Requiring one adjacent pair to
+  # clear 0.7 asserted something the scrambled matrix already
+  # managed.
+  expect_identical(perm[idx], 1:4)
+  expect_equal(scrambled[idx, idx], natural)
 })
 
 test_that("cluster_cormat short-circuits for n <= 2", {
