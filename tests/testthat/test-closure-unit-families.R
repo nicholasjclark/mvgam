@@ -101,14 +101,23 @@ test_that("is_simplex_response_family() detects only simplex MV families", {
   expect_false(is_simplex_response_family(gaussian()))
 })
 
-test_that("validate_supported_family() admits multi-response customfamily objects", {
-  expect_invisible(validate_supported_family(mock_multi_response_family()))
-  expect_invisible(
-    validate_supported_family(mock_multi_response_family(simplex = TRUE))
+test_that("validate_supported_family() admits every supported family", {
+  # Seven blocks asserted this one call, one family apiece, spread
+  # down the file. The table names each family the validator admits
+  # in one place.
+  admitted <- list(
+    mock_multi_response_family(),
+    mock_multi_response_family(simplex = TRUE),
+    nmix(), nmix("royle_nichols"), nmix("poisson_poisson"), occ(),
+    diri(), multi(), categ(), mvn(), mvt(), tweedie()
   )
+  for (fam in admitted) {
+    expect_invisible(validate_supported_family(fam))
+  }
 })
 
-test_that("validate_supported_family() points naked brms multi-category families at the mvgam wrapper", {
+test_that(
+  "validate_supported_family() points naked brms families at the wrapper", {
   expect_error(validate_supported_family(brms::dirichlet()), "diri\\(\\)")
   expect_error(validate_supported_family(brms::multinomial()),
                "multi\\(\\)")
@@ -160,11 +169,8 @@ test_that("diri() returns a custom family with the right tags", {
   )
 })
 
-test_that("diri() composes with validate_supported_family", {
-  expect_invisible(validate_supported_family(diri()))
-})
-
-test_that("prepare_closure_unit_family() groups dirichlet rows by site, not by (species, site)", {
+test_that(
+  "prepare_closure_unit_family() groups dirichlet rows by site", {
   fam <- diri()
   dat <- make_dirichlet_long_data(n_sites = 5L, n_species = 4L)
   fam_prep <- mvgam:::prepare_closure_unit_family(
@@ -264,10 +270,6 @@ test_that("multi() returns a custom family with the right tags", {
   )
 })
 
-test_that("multi() composes with validate_supported_family", {
-  expect_invisible(validate_supported_family(multi()))
-})
-
 test_that("multi_stan_funs() emits the lpmf body with mu_unit[1] anchor", {
   sc <- mvgam:::multi_stan_funs()
   expect_match(sc, "real multi_lpmf(", fixed = TRUE)
@@ -335,10 +337,6 @@ test_that("categ() returns a custom family with the right tags", {
   expect_true(isTRUE(
     attr(fam, "mvgam_binary_response", exact = TRUE)
   ))
-})
-
-test_that("categ() composes with validate_supported_family", {
-  expect_invisible(validate_supported_family(categ()))
 })
 
 test_that("categ_stan_funs() emits the lpmf body with mu_unit[1] anchor", {
@@ -423,10 +421,6 @@ test_that("mvn() returns a custom family with the right tags", {
     attr(fam, "mvgam_vars", exact = TRUE),
     c("N_unit", "n_rep", "visit_idx", "visit_component", "Psi")
   )
-})
-
-test_that("mvn() composes with validate_supported_family", {
-  expect_invisible(validate_supported_family(mvn()))
 })
 
 test_that("mvn_stan_funs() emits a per-unit normal_lpdf using Psi as the SD", {
@@ -540,10 +534,6 @@ test_that("mvt() returns a custom family with the right tags", {
   )
 })
 
-test_that("mvt() composes with validate_supported_family", {
-  expect_invisible(validate_supported_family(mvt()))
-})
-
 test_that("mvt_stan_funs() emits per-row student_t_lpdf with Psi and nu", {
   sc <- mvgam:::mvt_stan_funs()
   expect_match(sc, "real mvt_lpdf(", fixed = TRUE)
@@ -633,7 +623,8 @@ test_that("prepare_closure_unit_family() wires mvt() vars and stanvars", {
 # ------------------------------------------------------------
 
 
-test_that("generate_matrix_z_parameters() emits sum_to_zero_vector for simplex families", {
+test_that(
+  "generate_matrix_z_parameters() emits sum_to_zero_vector for simplex", {
   sv_simplex <- mvgam:::generate_matrix_z_parameters(
     is_factor_model = TRUE, n_lv = 2L, n_series = 4L,
     simplex = TRUE
@@ -653,7 +644,8 @@ test_that("generate_matrix_z_parameters() emits sum_to_zero_vector for simplex f
   expect_match(tparam_sc, "Z[, l] = Z_cols[l];", fixed = TRUE)
 })
 
-test_that("generate_matrix_z_parameters() emits plain free Z for non-simplex families", {
+test_that(
+  "generate_matrix_z_parameters() emits plain free Z for non-simplex", {
   sv <- mvgam:::generate_matrix_z_parameters(
     is_factor_model = TRUE, n_lv = 2L, n_series = 4L,
     simplex = FALSE
@@ -695,7 +687,8 @@ test_that("generate_factor_model() rejects non-family objects on `family`", {
 # helper for K-shared-only obs formulas.
 # ------------------------------------------------------------
 
-test_that("default_simplex_population_priors() returns student_t for b + Intercept", {
+test_that(
+  "default_simplex_population_priors() returns student_t for b + Intercept", {
   pr <- mvgam:::default_simplex_population_priors()
   expect_s3_class(pr, "brmsprior")
   expect_true(any(pr$class == "b"))
@@ -703,7 +696,8 @@ test_that("default_simplex_population_priors() returns student_t for b + Interce
   expect_true(all(grepl("student_t\\(3, 0, 2\\.5\\)", pr$prior)))
 })
 
-test_that("warn_simplex_obs_formula_lacks_species() detects K-shared-only forms", {
+test_that(
+  "warn_simplex_obs_formula_lacks_species() detects K-shared-only forms", {
   local_verbose_warnings()
   withr::with_envvar(c(TESTTHAT = ""), {
     # Warns when no species term
@@ -824,7 +818,8 @@ test_that("build_closure_unit_arrays() handles ragged visit counts", {
   expect_identical(arrs$visit_idx[3, 2:3], c(1L, 1L))
 })
 
-test_that("build_closure_unit_arrays() supports custom column names (predict path)", {
+test_that(
+  "build_closure_unit_arrays() supports custom column names", {
   d <- data.frame(
     site    = factor(rep(1L:2L, each = 3L)),
     visit_t = rep(1L, 6),
@@ -842,7 +837,8 @@ test_that("build_closure_unit_arrays() supports custom column names (predict pat
   expect_identical(arrs$K_max, c(15L, 15L))
 })
 
-test_that("build_closure_unit_arrays() reflects changed cap when called on newdata", {
+test_that(
+  "build_closure_unit_arrays() reflects a changed cap on newdata", {
   d_fit <- make_nmix_data(n_unit = 3, n_visit = 2)
   arrs_fit <- build_closure_unit_arrays(d_fit, response_var = "y")
   expect_identical(arrs_fit$K_max, rep(20L, 3))
@@ -961,7 +957,8 @@ test_that("validate_closure_unit_data() errors on negative counts", {
   )
 })
 
-test_that("validate_closure_unit_data() errors when all units single-visit with no covariates", {
+test_that(
+  "validate_closure_unit_data() errors on single visits for counts", {
   d <- make_nmix_data(n_unit = 5, n_visit = 1)
   # Count families (binary_response = FALSE) hard-error on this
   # configuration because lambda has unbounded support and the
@@ -979,7 +976,8 @@ test_that("validate_closure_unit_data() errors when all units single-visit with 
   )
 })
 
-test_that("validate_closure_unit_data() accepts single-visit data when a covariate is supplied", {
+test_that(
+  "validate_closure_unit_data() accepts single visits given a covariate", {
   d <- make_nmix_data(n_unit = 5, n_visit = 1)
   # With at least one covariate in either layer the model is
   # identifiable from cross-unit shared structure.
@@ -992,15 +990,6 @@ test_that("validate_closure_unit_data() accepts single-visit data when a covaria
 })
 
 # ------------------------------------------------------------
-# validate_supported_family() admits customfamily objects
-# ------------------------------------------------------------
-
-test_that("validate_supported_family() admits nmix() and tweedie() customfamily objects", {
-  expect_invisible(validate_supported_family(nmix()))
-  expect_invisible(validate_supported_family(tweedie()))
-})
-
-# ------------------------------------------------------------
 # Stan emission contract tests via brms make_stancode round-trip
 # ------------------------------------------------------------
 #
@@ -1009,7 +998,8 @@ test_that("validate_supported_family() admits nmix() and tweedie() customfamily 
 # closure-unit arrays land in standata and the nmix lpdf
 # function block lands in stancode with the expected signature.
 
-test_that("stancode under nmix() includes the lpdf signature and data declarations", {
+test_that(
+  "stancode under nmix() includes the lpdf signature and data decls", {
   d <- make_nmix_data(n_unit = 4, n_visit = 3)
   mf <- mvgam_formula(y ~ elev)
   sc <- as.character(stancode(mf, data = d, family = nmix()))
@@ -1073,7 +1063,8 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
   # vector instead of calling scalar log() per iteration.
   expect_match(
     sc,
-    "nmix_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, visit_idx, log_n_lookup)",
+    paste0("nmix_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, ",
+           "visit_idx, log_n_lookup)"),
     fixed = TRUE
   )
   expect_match(sc, "int K_max_global = max(K_max);", fixed = TRUE)
@@ -1114,14 +1105,13 @@ test_that("stancode under occ() emits partial_sum + reduce_sum scaffold", {
   # All four signature overloads (vec/vec, vec/scalar, scalar/vec,
   # scalar/scalar) must land so the brms emission resolves regardless
   # of whether mu / p are dpars or constants.
-  expect_match(sc, "real occ_lpmf(array[] int y, vector mu, vector p, int N_unit,",
-               fixed = TRUE)
-  expect_match(sc, "real occ_lpmf(array[] int y, vector mu, real p, int N_unit,",
-               fixed = TRUE)
-  expect_match(sc, "real occ_lpmf(array[] int y, real mu, vector p, int N_unit,",
-               fixed = TRUE)
-  expect_match(sc, "real occ_lpmf(array[] int y, real mu, real p, int N_unit,",
-               fixed = TRUE)
+  for (sig in c("vector mu, vector p", "vector mu, real p",
+                "real mu, vector p", "real mu, real p")) {
+    expect_match(
+      sc, paste0("real occ_lpmf(array[] int y, ", sig, ", int N_unit,"),
+      fixed = TRUE
+    )
+  }
   # Likelihood call wires the standata args correctly.
   expect_match(
     sc,
@@ -1135,7 +1125,8 @@ test_that("stancode under occ() emits partial_sum + reduce_sum scaffold", {
   expect_false(grepl("log_n_lookup", sc, fixed = TRUE))
 })
 
-test_that("stancode under nmix('royle_nichols') emits partial_sum + reduce_sum scaffold", {
+test_that(
+  "stancode under nmix('royle_nichols') emits partial_sum + reduce_sum", {
   d <- make_nmix_data(n_unit = 4, n_visit = 3)
   d$y <- as.integer(d$y > 0L)
   mf <- mvgam_formula(y ~ elev)
@@ -1167,7 +1158,8 @@ test_that("stancode under nmix('royle_nichols') emits partial_sum + reduce_sum s
   # Likelihood call.
   expect_match(
     sc,
-    "nmix_royle_nichols_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, visit_idx)",
+    paste0("nmix_royle_nichols_lpmf(Y | mu, p, N_unit, n_rep, ",
+           "K_max, Y_max, visit_idx)"),
     fixed = TRUE
   )
   # Data: K_max alongside the binary Y_max indicator.
@@ -1188,7 +1180,8 @@ test_that("stancode under nmix('royle_nichols') emits partial_sum + reduce_sum s
                fixed = TRUE)
 })
 
-test_that("RN Haines closed form (Y_max = 0) matches brute-force marginalisation to round-off", {
+test_that(
+  "RN Haines closed form matches brute-force marginalisation", {
   # Pin the Poisson-MGF identity used in the Stan code at machine
   # precision. The closed form `lp = lambda * (z - 1)` with
   # `z = prod_t (1 - r_t)` must agree with the truncated sum
@@ -1224,7 +1217,8 @@ test_that("RN Haines closed form (Y_max = 0) matches brute-force marginalisation
   }
 })
 
-test_that("stancode under nmix('poisson_poisson') emits partial_sum + log_n_lookup + reduce_sum", {
+test_that(
+  "stancode under nmix('poisson_poisson') emits log_n_lookup", {
   d <- make_nmix_data(n_unit = 4, n_visit = 3)
   mf <- mvgam_formula(y ~ elev)
   sc <- as.character(stancode(mf, data = d, family = nmix("poisson_poisson")))
@@ -1279,7 +1273,8 @@ test_that("stancode under nmix('poisson_poisson') emits partial_sum + log_n_look
   expect_match(sc, "for (k in kg_lo : Kg)", fixed = TRUE)
 })
 
-test_that("nmix('poisson_poisson') k_start_ppm bound collapses to 1 for low-count units", {
+test_that(
+  "nmix('poisson_poisson') k_start_ppm collapses to 1 for low counts", {
   # Low Y_max stays at k_start = 1 (no skipped cells); high Y_max
   # gets a Poisson-tail-derived lower bound (~ Y_max - 7*sqrt(Y_max),
   # floor 1). Asserts the standata column matches the closed form.
@@ -1309,7 +1304,8 @@ test_that("nmix('poisson_poisson') k_start_ppm bound collapses to 1 for low-coun
   expect_identical(as.integer(sd$k_start_ppm), expected)
 })
 
-test_that("nmix log-space recurrence matches brute-force log-sum-exp on canonical cases", {
+test_that(
+  "nmix log-space recurrence matches brute-force log-sum-exp", {
   # Independent R-side implementation of the Stan log-space ratio
   # recurrence in nmix_stan_funs(). Asserting both forms agree to
   # machine precision protects the Stan emission against silent
@@ -1369,7 +1365,8 @@ test_that("nmix log-space recurrence matches brute-force log-sum-exp on canonica
   }
 })
 
-test_that("standata under nmix() carries the closure-unit arrays with correct values", {
+test_that(
+  "standata under nmix() carries the closure-unit array values", {
   d <- make_nmix_data(n_unit = 5, n_visit = 2, seed = 7)
   mf <- mvgam_formula(y ~ elev)
   sd <- standata(mf, data = d, family = nmix())
@@ -1382,7 +1379,8 @@ test_that("standata under nmix() carries the closure-unit arrays with correct va
   expect_equal(as.integer(sd$visit_idx), as.integer(arrs$visit_idx))
 })
 
-test_that("standata K_max updates when newdata carries a different cap column", {
+test_that(
+  "standata K_max updates from a different cap column on newdata", {
   d_fit  <- make_nmix_data(n_unit = 4, n_visit = 3)
   d_pred <- d_fit
   d_pred$cap <- 99L
@@ -1398,7 +1396,8 @@ test_that("standata K_max updates when newdata carries a different cap column", 
   expect_identical(sd_fit$visit_idx, sd_pred$visit_idx)
 })
 
-test_that("stancode under nmix() emits vector-p path when a detection sub-formula is supplied", {
+test_that(
+  "stancode under nmix() emits the vector-p path for a detection formula", {
   d <- make_nmix_data(n_unit = 4, n_visit = 3)
   d$tod <- stats::runif(nrow(d))
   mf <- mvgam_formula(brms::bf(y ~ elev, p ~ tod))
@@ -1450,7 +1449,8 @@ test_that("how_to_cite reference_db carries the Royle-Nichols 2003 entry", {
 # nmix("royle_nichols") — Stan emission, dispatcher, recovery
 # ------------------------------------------------------------
 
-test_that("nmix('royle_nichols') constructor exposes the RN family name and binary-response flag", {
+test_that(
+  "nmix('royle_nichols') constructor exposes the RN binary-response attr", {
   fam <- nmix("royle_nichols")
   expect_identical(fam$name, "nmix_royle_nichols")
   expect_true(isTRUE(attr(fam, "mvgam_closure_unit", exact = TRUE)))
@@ -1477,7 +1477,8 @@ test_that("nmix('royle_nichols') constructor exposes the RN family name and bina
 # nmix("poisson_poisson"): constructor + identifiability warn
 # ------------------------------------------------------------
 
-test_that("nmix('poisson_poisson') constructor exposes the PPM family name and count-response config", {
+test_that(
+  "nmix('poisson_poisson') constructor exposes the PPM name and config", {
   fam <- nmix("poisson_poisson")
   expect_identical(fam$name, "nmix_poisson_poisson")
   expect_true(isTRUE(attr(fam, "mvgam_closure_unit", exact = TRUE)))
@@ -1499,7 +1500,8 @@ test_that("nmix('poisson_poisson') constructor exposes the PPM family name and c
 # Stan models. The constructor / predicate / how_to_cite contract
 # coverage stays in this file (above and below).
 
-test_that("nmix('poisson_poisson') intercept-only spec runs through prepare_closure_unit_family()", {
+test_that(
+  "nmix('poisson_poisson') intercept-only spec prepares cleanly", {
   set.seed(99)
   n_unit <- 15L; n_visit <- 3L
   # 3 visits per closure unit (same series, same time across the
@@ -1693,7 +1695,8 @@ test_that("closure_unit_key_vars() keys a multi-response unit on time alone", {
   )
 })
 
-test_that("prepare_closure_unit_family() routes multi_season grouping into standata N_unit", {
+test_that(
+  "prepare_closure_unit_family() routes multi_season into N_unit", {
   # Build a 3-axis closure-unit dataset: 2 species x 3 sites x 2
   # seasons x 2 visits = 24 rows. Single-season grouping (series,
   # time) collapses across sites and yields 2 * 2 = 4 closure

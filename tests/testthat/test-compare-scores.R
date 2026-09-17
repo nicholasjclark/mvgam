@@ -10,6 +10,7 @@
 make_mock_forecast <- function(n_series = 2L, h = 5L,
                                  ndraws = 30L, type = "response",
                                  family = "gaussian",
+                                 obs_offset = 0,
                                  seed = 1L) {
   set.seed(seed)
   series_names <- factor(
@@ -21,7 +22,9 @@ make_mock_forecast <- function(n_series = 2L, h = 5L,
             nrow = ndraws, ncol = h)
   })
   names(forecasts) <- levels(series_names)
-  test_observations <- lapply(seq_len(n_series), function(s) rep(s, h))
+  test_observations <- lapply(
+    seq_len(n_series), function(s) rep(s + obs_offset, h)
+  )
   names(test_observations) <- levels(series_names)
   structure(
     list(
@@ -72,10 +75,13 @@ test_that("compare_scores returns a tidy long-format frame for crps", {
   expect_named(out, c("model", "series", "eval_horizon",
                        "score", "in_interval"))
   expect_s3_class(out$model, "factor")
-  expect_setequal(levels(out$model), c("fc1", "fc2"))
+  # Level order decides the legend and the colour assignment, and for
+  # `series` the order the panels are drawn in, with all_series last.
+  # Comparing the sets alone passed on a swap.
+  expect_identical(levels(out$model), c("fc1", "fc2"))
   # 2 series + 1 all_series = 3; 5 horizons; 2 models = 30 rows.
   expect_identical(nrow(out), 30L)
-  expect_setequal(levels(out$series), c("s1", "s2", "all_series"))
+  expect_identical(levels(out$series), c("s1", "s2", "all_series"))
 })
 
 
@@ -84,19 +90,28 @@ test_that("compare_scores honours model_names", {
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps",
                          model_names = c("alpha", "beta"))
-  expect_setequal(levels(out$model), c("alpha", "beta"))
+  # The names arrive in the order they were supplied.
+  expect_identical(levels(out$model), c("alpha", "beta"))
 })
 
 
 test_that("compare_scores forwards score_args to score()", {
-  fc1 <- make_mock_forecast(seed = 1L)
-  fc2 <- make_mock_forecast(seed = 2L)
-  out <- compare_scores(fc1, fc2, score = "crps",
-                         score_args = list(interval_width = 0.5))
-  # The score frame from score() carries interval_width per row,
-  # but compare_scores collapses to just the score + in_interval.
-  # Confirm at least that no error is raised and the shape is OK.
-  expect_identical(nrow(out), 30L)
+  # The default fixture puts every observation at the centre of its
+  # own predictive distribution, where an interval of any width
+  # contains it: 20 of 20 scored rows covered at both 0.9 and 0.5.
+  # A row count was all that remained to assert, and it is the same
+  # count the test above already makes. One SD of offset separates
+  # the two widths.
+  fc1 <- make_mock_forecast(seed = 1L, obs_offset = 1)
+  fc2 <- make_mock_forecast(seed = 2L, obs_offset = 1)
+  wide <- compare_scores(fc1, fc2, score = "crps")
+  narrow <- compare_scores(fc1, fc2, score = "crps",
+                            score_args = list(interval_width = 0.5))
+  expect_identical(nrow(narrow), 30L)
+  # The default interval still covers every scored row; halving it
+  # leaves a handful. Dropping `score_args` returns 20 here.
+  expect_identical(sum(wide$in_interval, na.rm = TRUE), 20)
+  expect_lt(sum(narrow$in_interval, na.rm = TRUE), 10L)
 })
 
 
@@ -137,7 +152,7 @@ test_that("compare_elpds returns a long-format frame", {
   expect_named(out, c("model", "eval_time", "elpd",
                        "pareto_k", "refit_here"))
   expect_identical(nrow(out), 6L)
-  expect_setequal(levels(out$model), c("m1", "m2"))
+  expect_identical(levels(out$model), c("m1", "m2"))
 })
 
 
@@ -158,7 +173,7 @@ test_that("compare_elpds honours model_names", {
   m1 <- make_mock_lfo(c(-1, -2, -3))
   m2 <- make_mock_lfo(c(-3, -4, -5))
   out <- compare_elpds(m1, m2, model_names = c("fast", "slow"))
-  expect_setequal(levels(out$model), c("fast", "slow"))
+  expect_identical(levels(out$model), c("fast", "slow"))
 })
 
 
@@ -193,18 +208,21 @@ test_that("summary.mvgam_compare_scores joint -> wide horizon x model", {
   out <- compare_scores(fc1, fc2, score = "energy")
   s <- summary(out)
   expect_s3_class(s, "tbl_df")
-  # Joint score: idvar = eval_horizon, one column per model.
-  expect_setequal(names(s), c("eval_horizon", "fc1", "fc2"))
+  # Joint score: idvar = eval_horizon, one column per model. A reader
+  # compares across the columns in the order they are given, and the
+  # set alone passed on a reordering.
+  expect_identical(names(s), c("eval_horizon", "fc1", "fc2"))
   expect_identical(nrow(s), 5L)
 })
 
 
-test_that("summary.mvgam_compare_scores univariate -> series + horizon x model", {
+test_that(
+  "summary.mvgam_compare_scores univariate -> series + horizon x model", {
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
   s <- summary(out)
-  expect_setequal(names(s),
+  expect_identical(names(s),
                    c("series", "eval_horizon", "fc1", "fc2"))
   # 2 series x 5 horizons = 10 rows.
   expect_identical(nrow(s), 10L)
@@ -249,7 +267,7 @@ test_that("plot.mvgam_compare_scores relative pivot drops the baseline", {
   p <- plot(out, relative = "fc1")
   expect_s3_class(p, "ggplot")
   # Baseline dropped, so only fc2 remains.
-  expect_setequal(levels(p$data$model), "fc2")
+  expect_identical(levels(p$data$model), "fc2")
   # The Δ in the y-label confirms the relative branch was taken.
   expect_match(p$labels$y, "Δ")
 })
@@ -282,7 +300,7 @@ test_that("plot.mvgam_compare_elpds relative drops baseline", {
   m1 <- make_mock_lfo(c(-1, -2, -3))
   m2 <- make_mock_lfo(c(-3, -4, -5))
   p <- plot(compare_elpds(m1, m2), relative = "m1")
-  expect_setequal(levels(p$data$model), "m2")
+  expect_identical(levels(p$data$model), "m2")
   expect_match(p$labels$y, "Δ")
 })
 

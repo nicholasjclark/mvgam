@@ -29,7 +29,8 @@ make_update_stub <- function(n_iter = 50L, n_chains = 2L) {
       prior = data.frame(prior = "(flat)", class = "b"),
       data = data.frame(y = rnorm(10), x = rnorm(10)),
       standata = list(X = X, K = ncol(X), Kc = ncol(X) - 1L),
-      stancode = "data { int N; } parameters { real mu; } model { mu ~ normal(0,1); }",
+      stancode = paste0("data { int N; } parameters { real mu; } ",
+                        "model { mu ~ normal(0,1); }"),
       backend = "cmdstanr",
       algorithm = "sampling",
       call = call("mvgam", formula = y ~ x)
@@ -96,7 +97,8 @@ test_that("update.mvgam rejects non-logical recompile", {
 
 # ---- mvgam_update_call helper --------------------------------------
 
-test_that("mvgam_update_call inherits formula from object when formula. is NULL", {
+test_that(
+  "mvgam_update_call inherits formula from object when formula. is NULL", {
   stub <- make_update_stub()
   out <- mvgam_update_call(stub, formula. = NULL, newdata = NULL, dots = list())
   expect_identical(out$formula, stub$formula)
@@ -146,7 +148,8 @@ test_that("mvgam_update_call inherits the initial-value specification", {
   expect_identical(out$init, "pathfinder")
 })
 
-test_that("mvgam_update_call drops the inherited warmup when iter is overridden", {
+test_that(
+  "mvgam_update_call drops the inherited warmup when iter is overridden", {
   # `warmup` cannot be inherited on its own: mvgam derives it as
   # `iter %/% 2`, so pairing the original fit's warmup with a smaller
   # user-supplied `iter` asks Stan for a negative sampling count and
@@ -436,21 +439,18 @@ test_that("every prediction argument reaches the method's body", {
     "posterior_linpred.mvgam", "predict.mvgam", "fitted.mvgam",
     "forecast.mvgam", "hindcast.mvgam", "residuals.mvgam"
   )
-  # An argument held for signature compatibility alone belongs here
-  # with its reason, the way `mvgam_update_uninherited` names one.
-  excused <- character(0)
+  # No method needs an excuse. The empty `excused` vector written
+  # here made `all(nzchar(excused))` true by vacuity, and its
+  # `names()` contributed nothing to the setdiff either.
   for (m in methods) {
     f <- getFromNamespace(m, "mvgam")
-    declared <- setdiff(names(formals(f)),
-                        c("object", "...", names(excused)))
+    declared <- setdiff(names(formals(f)), c("object", "..."))
     consumed <- all.vars(body(f))
     expect_identical(
       setdiff(declared, consumed), character(0),
       label = paste(m, "arguments absent from the body")
     )
   }
-  # Every excuse says something.
-  expect_true(all(nzchar(excused)))
 })
 
 
