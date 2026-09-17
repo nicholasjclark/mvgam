@@ -527,18 +527,18 @@ clean_ll = function(x, logliks) {
   # than let a number stand unqualified.
   if (!identical(Sys.getenv("TESTTHAT"), "true")) {
     rlang::warn(
-      insight::format_message(c(
+      c(
         paste0(
           n_replaced,
-          " log-likelihood values were not finite. They were refilled ",
-          "from the finite draws of their own observation."
+          " log-likelihood values were NaN or infinite. They were ",
+          "refilled from the finite draws of their own observation."
         ),
         i = paste0(
           "The reported ELPD is optimistic by whatever those draws ",
           "would have contributed. It usually means the family gave ",
-          "an observation no support under part of the posterior."
+          "an observation zero density under part of the posterior."
         )
-      )),
+      ),
       .frequency = "once",
       .frequency_id = "mvgam_clean_ll_refill"
     )

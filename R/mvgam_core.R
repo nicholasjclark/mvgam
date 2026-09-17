@@ -1763,7 +1763,9 @@ fit_multiple_imputation_models <- function(formula, trend_formula, data_list,
   silent <- list(...)$silent %||% 1L
   for (i in seq_len(n_datasets)) {
     if (silent < 2) {
-      message("Fitting imputed model ", i, " out of ", n_datasets)
+      rlang::inform(
+        paste0("Fitting imputed model ", i, " out of ", n_datasets)
+      )
     }
 
     # Fit model using standard mvgam_single function

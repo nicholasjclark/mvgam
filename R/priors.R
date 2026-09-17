@@ -61,6 +61,17 @@ common_trend_priors <- list(
     dimension = "vector"
   ),
 
+  # The residual scale the mvn() and mvt() families declare. It
+  # carries no `_trend` suffix because the parameter is named after
+  # the quantity, and it resolves through the same chain as every
+  # entry here.
+  Psi = list(
+    default = "exponential(1)",
+    bounds = c(0, NA),
+    description = "Residual standard deviation per response component",
+    dimension = "vector"
+  ),
+
   ar1_trend = list(
     default = "normal(0, 0.5)",
     bounds = c(-1, 1),

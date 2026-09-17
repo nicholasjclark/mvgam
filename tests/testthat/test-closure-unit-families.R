@@ -477,6 +477,43 @@ test_that("make_mvn_stanvars() declares the SD-scale Psi parameter and prior", {
   expect_match(model_sc, "Psi ~ exponential(1);", fixed = TRUE)
 })
 
+test_that("a user prior on Psi reaches the emitted statement", {
+  # `Psi` had no route from the `prior` argument to the stanvar. The
+  # statement was written as a literal while `prior_summary()` listed
+  # it, and a prior given with `class = "Psi"` was dropped in silence.
+  dat <- make_mvn_long_data()
+  arrays <- mvgam:::build_closure_unit_arrays(
+    dat, response_var = "y",
+    compute_y_max = FALSE,
+    unit_grouping_vars = "time"
+  )
+  default_sc <- extract_block_scode(
+    mvgam:::make_mvn_stanvars(arrays), "model"
+  )
+  user_sc <- extract_block_scode(
+    mvgam:::make_mvn_stanvars(
+      arrays, brms::prior("exponential(2)", class = "Psi")
+    ),
+    "model"
+  )
+  expect_match(default_sc, "Psi ~ exponential(1);", fixed = TRUE)
+  expect_match(user_sc, "Psi ~ exponential(2);", fixed = TRUE)
+  # One route serves both families that declare the parameter.
+  mvt_sc <- extract_block_scode(
+    mvgam:::make_mvt_stanvars(
+      arrays, brms::prior("student_t(3, 0, 1)", class = "Psi")
+    ),
+    "model"
+  )
+  expect_match(mvt_sc, "Psi ~ student_t(3, 0, 1);", fixed = TRUE)
+  # The default comes from the shared table, the same source that
+  # builds the reported prior.
+  expect_identical(
+    mvgam:::get_default_trend_parameter_prior("Psi")$prior,
+    "exponential(1)"
+  )
+})
+
 test_that("prepare_closure_unit_family() groups mvn rows by site", {
   fam <- mvn()
   dat <- make_mvn_long_data(n_sites = 5L, n_species = 4L)

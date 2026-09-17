@@ -84,12 +84,10 @@ get_covariance_pattern <- function(trend_type) {
     # Default to cholesky_scaled for unknown types (most common pattern)
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_message(
-          c(
-            paste0("Unknown trend type '", trend_type, "' encountered."),
-            i = "Defaulting to 'cholesky_scaled' covariance pattern.",
-            i = "Register custom trends in trend_covariance_patterns."
-          )
+        c(
+          paste0("Unknown trend type '", trend_type, "' encountered."),
+          i = "Defaulting to 'cholesky_scaled' covariance pattern.",
+          i = "Register custom trends in trend_covariance_patterns."
         ),
         .frequency = "once",
         .frequency_id = paste0("unknown_trend_cov_", trend_type)
@@ -452,13 +450,11 @@ get_trend_type <- function(object) {
   if (!is.null(object$trend_formula)) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_message(
-          c(
-            "Could not determine trend type from object structure.",
-            i = paste0(
-              "Trend formula present but type not stored in ",
-              "'trend_components' or 'trend_metadata'."
-            )
+        c(
+          "The trend type is absent from the object structure.",
+          i = paste0(
+            "A trend formula is present, and 'trend_components' and ",
+            "'trend_metadata' both leave the type empty."
           )
         ),
         .frequency = "once",

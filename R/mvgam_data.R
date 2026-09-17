@@ -242,7 +242,7 @@ mvgam_data <- function(data,
   } else {
     fam_name
   }
-  cli::cli_inform(c(
+  rlang::inform(c(
     "v" = paste0("Data check passed for family '", fam_label, "'."),
     "*" = paste0("series: ", n_series, " level(s)"),
     "*" = paste0("time:   ", min(data$time, na.rm = TRUE),
@@ -285,7 +285,7 @@ mvgam_data <- function(data,
 #' @method print mvgam_data
 #' @export
 print.mvgam_data <- function(x, ...) {
-  cli::cli_inform(c(
+  rlang::inform(c(
     paste0("Validated data for family '",
            resolve_family_name(x$family), "'."),
     "*" = paste0("series: ", x$n_series, " level(s)"),

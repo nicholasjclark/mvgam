@@ -472,7 +472,7 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
   surface <- dots$incl_autocor
   dots$incl_autocor <- NULL
   if (is.null(psis_object)) {
-    message("Running PSIS to compute weights")
+    rlang::inform("Running PSIS to compute weights")
     set.seed(aligned_seed)
     loo_object <- do.call(
       loo, c(list(object, resp = resp, save_psis = TRUE), dots)

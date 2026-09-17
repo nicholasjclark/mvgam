@@ -189,7 +189,7 @@ compile_model <- function(model, backend, ...) {
   args <- list(...)
   args$model_code <- model
   if (silent < 2) {
-    message("Compiling Stan program...")
+    rlang::inform("Compiling Stan program...")
   }
   if (use_threading(threads, force = TRUE)) {
     if (utils::packageVersion("rstan") >= "2.26") {
@@ -361,7 +361,7 @@ fit_model <- function(model, backend, ...) {
 
   # do the actual sampling
   if (silent < 2) {
-    message("Start sampling")
+    rlang::inform("Start sampling")
   }
   if (algorithm %in% c("sampling", "fixed_param")) {
     c(args) <- nlist(warmup, thin, control, show_messages = !silent)
@@ -481,7 +481,7 @@ fit_model <- function(model, backend, ...) {
 
   # do the actual sampling
   if (silent < 2) {
-    message("Start sampling")
+    rlang::inform("Start sampling")
   }
   threading_on <- use_threading(threads, force = TRUE)
 
@@ -494,7 +494,7 @@ fit_model <- function(model, backend, ...) {
   if (pathfinder_init) {
     require_package("cmdstanr", version = "0.8.1")
     if (silent < 2) {
-      message("Running Pathfinder to obtain initial values")
+      rlang::inform("Running Pathfinder to obtain initial values")
     }
     args$init <- run_pathfinder(model, args, chains, threading_on,
                                 threads, silent)

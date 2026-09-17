@@ -755,16 +755,17 @@ jsdgam_phylo_to_dist <- function(phylo, species_levels) {
     if (!ape::is.ultrametric(phylo)) {
       if (!identical(Sys.getenv("TESTTHAT"), "true")) {
         rlang::warn(
-          insight::format_message(c(
+          c(
             paste0(
-              "Phylogeny passed to 'phylo' is not ultrametric."
+              "Phylogeny passed to 'phylo' has unequal root-to-tip ",
+              "path lengths."
             ),
             i = paste0(
               "Cophenetic distances use raw path lengths; the ",
               "loadings-prior pipeline rescales the matrix to ",
               "max(d) = 1 before constructing the kernel."
             )
-          )),
+          ),
           .frequency = "once",
           .frequency_id = "jsdgam_non_ultrametric_phylo"
         )

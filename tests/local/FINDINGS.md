@@ -2,28 +2,6 @@
 
 Each entry is a task, deleted once its fix is verified.
 
-## mvn()
-
-**5. `Psi` has no prior class.**
-
-`mvn()` and `mvt()` estimate one residual scale per component, and
-its prior is written into a stanvar. A user who knows their response
-scale cannot set the parameter that moves the posterior. Measured
-against a truth of 2.0: `gamma(4, 2)` gives 34 divergences at Psi
-rhat 1.009, `exponential(1)` gives 225 at 1.084 and `gamma(4, 8)`
-gives 335 at 1.396, with two species pulled to 0.9 by a prior centred
-on 0.5. No fixed constant suits every response scale. A new default
-needs calibrating over a grid of true `Psi` and factor share.
-
-The prior is written at `families.R:4428`, inside
-`make_psi_stanvars()`, whose signature takes no prior argument. A
-prior passed with `class = "Psi"` is dropped without a refusal:
-`is_mvgam_managed_class()` files it on the mvgam side
-(`brms_integration.R:728-733`) where nothing consumes it. That same
-`Psi ~ exponential(1)` is listed in `prior_summary()`
-(`brms_integration.R:1024-1035`). The table advertises a prior the
-user cannot set.
-
 ## Prediction accepts frames the axis layer refuses
 
 **92. Two conditions bypass the level check.**
@@ -68,31 +46,6 @@ stationarity, and the `t = 1` likelihood absorbs that into
 repair for the correlated case: the stationary covariance solves
 `Sigma_x[i, j] = Sigma_eps[i, j] / (1 - phi_i phi_j)`. `VAR()`
 computes this already, through `initial_joint_var()`.
-
-## One condition, several spellings
-
-**129. Two condition kinds carry more than one spelling.**
-
-`Rscript tests/local/debt_scan.R idioms` counts the spellings per
-kind:
-
-| kind | spellings | sites |
-|---|---|---|
-| warning_once | 2 | `rlang::warn()` 19, the same wrapped in `insight::format_message()` 8 |
-| message | 3 | `message()` 11, `cli::cli_inform()` 3, `rlang::inform()` 2 |
-
-`rlang::warn()` renders a named `c()` vector as bullets on its own.
-The eight sites wrapped in `insight::format_message()` reach the
-same result by a second route.
-
-Some bare `message()` calls print progress, such as "Compiling Stan
-program...". Others carry a condition a user acts on.
-
-The cost is on both sides of the call. A reader meets one condition
-under several shapes. A caller handling one class misses the rest,
-since `rlang::warn()` and `message()` signal different classes. Pick
-one formatter for the `warning_once` kind and one spelling per
-message kind, until `idioms` reports one spelling for every kind.
 
 ## Debt the code carries in recognisable shapes
 

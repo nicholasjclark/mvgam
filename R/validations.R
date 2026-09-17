@@ -587,14 +587,14 @@ validate_closure_unit_data <- function(data,
     if (binary_y_check) {
       if (!identical(Sys.getenv("TESTTHAT"), "true")) {
         rlang::warn(
-          insight::format_message(c(
-            "Every closure unit has a single visit and no covariates.",
+          c(
+            "Every closure unit has a single visit and zero covariates.",
             i = paste0(
               "Only the product of state and detection probability ",
               "is identified by data; the individual parameters ",
               "are prior-dominated (Royle and Dorazio 2008, ch. 3.5)."
             )
-          )),
+          ),
           .frequency = "once",
           .frequency_id = "closure_unit_all_single_visit"
         )
@@ -620,7 +620,7 @@ validate_closure_unit_data <- function(data,
   if (single_visit_share > 0.3 && !all(rep_counts == 1L)) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_message(c(
+        c(
           paste0(
             "More than 30% of closure units have a single visit ",
             "(", round(100 * single_visit_share),
@@ -632,7 +632,7 @@ validate_closure_unit_data <- function(data,
             "single-visit units, posterior identifiability ",
             "depends largely on the covariate structure."
           )
-        )),
+        ),
         .frequency = "once",
         .frequency_id = "closure_unit_single_visit"
       )
@@ -2483,7 +2483,7 @@ maybe_warn_exact_gp <- function(gp_term) {
     ),
     sep = "\n"
   )
-  message(body)
+  rlang::inform(body)
 }
 
 #' Warn (once) on exact GP terms
@@ -3348,7 +3348,7 @@ eval_silent <- function(expr, type = "output", silent = TRUE, ...) {
         invokeRestart("muffleMessage")
       },
       error = function(e) {
-        if (length(held)) message(paste(held, collapse = ""))
+        if (length(held)) rlang::inform(paste(held, collapse = ""))
       }
     ))
   }
@@ -3679,7 +3679,7 @@ warn_series_superseded <- function(data, series_var, series_values,
     return(invisible(NULL))
   }
   rlang::warn(
-    insight::format_message(c(
+    c(
       paste0(
         "The '", series_var, "' column was replaced by the series that '",
         gr_var, "' and '", subgr_var, "' define."
@@ -3689,13 +3689,13 @@ warn_series_superseded <- function(data, series_var, series_values,
       ),
       i = paste0(
         "Hierarchical trends name a series by its grouping variables, ",
-        "so supplying '", series_var, "' is not needed."
+        "and '", series_var, "' is redundant here."
       ),
       i = paste0(
         "Every post-fit summary, plot and forecast labels this series ",
         "'", derived[1L], "'."
       )
-    )),
+    ),
     .frequency = "once",
     .frequency_id = "mvgam_series_superseded"
   )

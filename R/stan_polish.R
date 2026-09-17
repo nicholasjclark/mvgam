@@ -105,14 +105,16 @@ get_stanc_v8_context <- function(silent = TRUE) {
   }
   if (!requireNamespace("V8", quietly = TRUE)) {
     if (!silent) {
-      message("V8 package not available for Stan formatting")
+      rlang::inform("Stan formatting requires the V8 package.")
     }
     return(NULL)
   }
   stanc_js_path <- system.file("stanc.js", package = "StanHeaders")
   if (!file.exists(stanc_js_path)) {
     if (!silent) {
-      message("StanHeaders stanc.js not found")
+      rlang::inform(
+        "Stan formatting requires stanc.js from StanHeaders."
+      )
     }
     return(NULL)
   }

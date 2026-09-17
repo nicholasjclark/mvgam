@@ -574,11 +574,13 @@ check_tweedie_truncation <- function(object, resp = NULL) {
     mu^(2 - mtheta) / ((2 - mtheta) * mphi)
   }))
   lambda_max <- max(lambda)
-  message(
-    "Tweedie truncation diagnostic: M = ", M,
-    ", max(lambda) at posterior mean = ",
-    format(lambda_max, digits = 3),
-    " (ratio = ", format(lambda_max / M, digits = 3), ")."
+  rlang::inform(
+    paste0(
+      "Tweedie truncation diagnostic. M = ", M,
+      ", max(lambda) at posterior mean = ",
+      format(lambda_max, digits = 3),
+      " (ratio = ", format(lambda_max / M, digits = 3), ")."
+    )
   )
   if (lambda_max > 0.7 * M) {
     insight::format_warning(c(
@@ -4412,11 +4414,15 @@ warn_unidentified_component_scale <- function(n_lv, n_species,
 #'
 #' @param K Number of response components per closure unit.
 #' @param prefix Stanvar name prefix, `"mvn"` or `"mvt"`.
+#' @param prior A `brmsprior`, or `NULL` to take the shared default.
+#'   A row with `class = "Psi"` names the distribution `Psi` is
+#'   sampled under, and `common_trend_priors` supplies it otherwise.
 #' @return A list of two `brms::stanvar` objects.
 #' @noRd
-make_psi_stanvars <- function(K, prefix) {
+make_psi_stanvars <- function(K, prefix, prior = NULL) {
   checkmate::assert_int(K, lower = 1)
   checkmate::assert_choice(prefix, c("mvn", "mvt"))
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   list(
     param = brms::stanvar(
       name  = paste0(prefix, "_Psi_param"),
@@ -4425,7 +4431,9 @@ make_psi_stanvars <- function(K, prefix) {
     ),
     prior = brms::stanvar(
       name  = paste0(prefix, "_Psi_prior"),
-      scode = "  Psi ~ exponential(1);",
+      scode = paste0(
+        "  Psi ~ ", get_trend_parameter_prior(prior, "Psi"), ";"
+      ),
       block = "model"
     )
   )
@@ -4454,7 +4462,7 @@ make_psi_stanvars <- function(K, prefix) {
 #' @inheritParams make_closure_unit_arrays_stanvars
 #' @return A `brmsstanvars` object.
 #' @noRd
-make_mvn_stanvars <- function(arrays) {
+make_mvn_stanvars <- function(arrays, prior = NULL) {
   # K (number of response components per closure unit) is constant
   # across sites for multi-response families. Bake the literal K
   # into the `Psi` declaration so the parameter declaration is
@@ -4464,7 +4472,7 @@ make_mvn_stanvars <- function(arrays) {
   # `sort_stanvars()` ordering, leaving `N_series_trend` out of
   # scope when Stan parses the parameters block).
   K <- as.integer(arrays$max_rep)
-  psi <- make_psi_stanvars(K, "mvn")
+  psi <- make_psi_stanvars(K, "mvn", prior)
   psi_param <- psi$param
   psi_prior <- psi$prior
   combine_stanvars(
@@ -4636,9 +4644,9 @@ mvt_stan_funs <- function() {
 #' @inheritParams make_closure_unit_arrays_stanvars
 #' @return A `brmsstanvars` object.
 #' @noRd
-make_mvt_stanvars <- function(arrays) {
+make_mvt_stanvars <- function(arrays, prior = NULL) {
   K <- as.integer(arrays$max_rep)
-  psi <- make_psi_stanvars(K, "mvt")
+  psi <- make_psi_stanvars(K, "mvt", prior)
   psi_param <- psi$param
   psi_prior <- psi$prior
   nu_param <- brms::stanvar(
@@ -5377,12 +5385,16 @@ make_nmix_poisson_poisson_stanvars <- function(arrays) {
 #'   state formula contains at least one covariate.
 #' @param has_det_covariates Logical; TRUE if a detection
 #'   sub-formula was supplied.
+#' @param prior A `brmsprior`, or `NULL`. The family builders emit
+#'   their own sampling statements. This argument carries a user
+#'   prior through to them.
 #' @return The family with `mvgam_stanvars` attribute populated
 #'   and `vars` set.
 #' @noRd
 prepare_closure_unit_family <- function(family, data, response_var,
                                          has_obs_covariates = FALSE,
-                                         has_det_covariates = FALSE) {
+                                         has_det_covariates = FALSE,
+                                         prior = NULL) {
   family_name <- family$name
   binary_y_check <- is_binary_response_family(family)
   default_cap <- closure_unit_default_cap(family)
@@ -5430,8 +5442,8 @@ prepare_closure_unit_family <- function(family, data, response_var,
     diri                 = make_diri_stanvars(arrays),
     multi                = make_multi_stanvars(arrays),
     categ                = make_categ_stanvars(arrays),
-    mvn                  = make_mvn_stanvars(arrays),
-    mvt                  = make_mvt_stanvars(arrays),
+    mvn                  = make_mvn_stanvars(arrays, prior),
+    mvt                  = make_mvt_stanvars(arrays, prior),
     refuse_missing_family_dispatch(family_name, "its Stan code")
   )
   attr(family, "mvgam_stanvars") <- family_stanvars
@@ -5461,8 +5473,11 @@ prepare_closure_unit_family <- function(family, data, response_var,
       !has_obs_covariates && !has_det_covariates) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_message(c(
-          "nmix(\"poisson_poisson\") with intercept-only mu and p is weakly identified.",
+        c(
+          paste0(
+            "nmix(\"poisson_poisson\") with intercept-only mu and p ",
+            "is weakly identified."
+          ),
           x = paste0(
             "Only the product `lambda * p` is identified by the ",
             "Neyman Type A marginal; individual posteriors on ",
@@ -5473,7 +5488,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
             "`bf(y ~ ..., p ~ x)`), or supply an informative prior ",
             "on at least one intercept via the `prior` argument."
           )
-        )),
+        ),
         .frequency    = "once",
         .frequency_id = "nmix_poisson_poisson_intercept_only"
       )

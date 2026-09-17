@@ -223,6 +223,6 @@ print.mvgam_forecast <- function(x, ...) {
                          collapse = ", "), ")")
     )
   }
-  cli::cli_inform(bullets)
+  rlang::inform(bullets)
   invisible(x)
 }

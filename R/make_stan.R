@@ -142,7 +142,8 @@ build_stan_components <- function(formula, data, family = gaussian(),
       data               = data,
       response_var       = response_var,
       has_obs_covariates = has_obs_covs,
-      has_det_covariates = has_det_covs
+      has_det_covariates = has_det_covs,
+      prior              = prior
     )
   }
 
