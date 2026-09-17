@@ -57,13 +57,27 @@ test_that("log_lik_negbinomial returns finite [ndraws x nobs]", {
 
 test_that("log_lik_binomial uses trials per observation", {
   s <- .make_synthetic(mu = 0)
-  y <- rbinom(8, size = 10, prob = 0.5)
+  y  <- c(1L, 3L, 2L, 5L, 4L, 0L, 6L, 2L)
+  tr <- c(6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L)
   out <- log_lik_binomial(
     linpred = s$linpred, link = "logit", y = y,
-    family_pars = list(), trials = rep(10, 8)
+    family_pars = list(), trials = tr
   )
   expect_equal(dim(out), c(50, 8))
   expect_true(all(is.finite(out)))
+  # The denominator varies by row, which is what the name claims. A
+  # constant `trials` and a shape check together passed a kernel
+  # dropping the argument, and these two differ.
+  want <- vapply(seq_along(y), function(j) {
+    stats::dbinom(y[j], size = tr[j],
+                  prob = stats::plogis(s$linpred[, j]), log = TRUE)
+  }, numeric(50L))
+  expect_equal(out, want)
+  expect_false(isTRUE(all.equal(
+    out,
+    log_lik_binomial(linpred = s$linpred, link = "logit", y = y,
+                     family_pars = list(), trials = rep(10L, 8L))
+  )))
 })
 
 test_that("log_lik_beta returns finite densities on (0, 1)", {
@@ -129,13 +143,15 @@ test_that("dispatch_log_lik errors clearly for unknown family", {
   expect_false(grepl("R/", msg, fixed = TRUE))
 })
 
-test_that("log_lik.mvgam method is registered as S3", {
-  expect_true(
-    inherits(
-      getS3method("log_lik", "mvgam", optional = TRUE),
-      "function"
+test_that("every log-lik S3 method is registered", {
+  # Three blocks checked this, one generic apiece. The table names
+  # them in one place.
+  for (g in c("log_lik", "waic", "logLik")) {
+    expect_false(
+      is.null(getS3method(g, "mvgam", optional = TRUE)),
+      label = paste0(g, ".mvgam registered")
     )
-  )
+  }
 })
 
 test_that("log_lik.mvgam signature matches brms log_lik.brmsfit", {
@@ -147,15 +163,6 @@ test_that("log_lik.mvgam signature matches brms log_lik.brmsfit", {
   expect_true(all(parity_args %in% mvgam_args))
   # mvgam adds process_error, which brms doesn't have
   expect_true("process_error" %in% mvgam_args)
-})
-
-test_that("waic.mvgam method is registered as S3", {
-  expect_true(
-    inherits(
-      getS3method("waic", "mvgam", optional = TRUE),
-      "function"
-    )
-  )
 })
 
 test_that("waic.mvgam signature matches brms waic.brmsfit", {
@@ -175,16 +182,6 @@ test_that("loo.mvgam no longer calls removed logLik / extract_family_pars", {
 
 
 # logLik.mvgam: stats::logLik S3 method enabling AIC()/BIC().
-test_that("logLik.mvgam method is registered as S3", {
-  expect_true(
-    inherits(
-      getS3method("logLik", "mvgam", optional = TRUE),
-      "function"
-    )
-  )
-})
-
-
 test_that("logLik.mvgam(pointwise = FALSE) returns scalar with df + nobs", {
   ll_mat <- matrix(c(-1, -2, -3, -4, -5, -6), nrow = 2, byrow = TRUE)
   testthat::local_mocked_bindings(

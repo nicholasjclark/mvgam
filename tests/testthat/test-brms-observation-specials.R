@@ -63,7 +63,9 @@ test_that("trials() plumbs through to mvgam stancode and standata", {
   sd_ <- standata(mf, data = d, family = binomial(),
                   trend_formula = ~ AR(p = 1))
   expect_true("trials" %in% names(sd_))
-  expect_length(sd_$trials, nrow(d))
+  # The column the user named is what arrives. A length check passed
+  # on a constant, and on any other column of the frame.
+  expect_identical(as.integer(sd_$trials), as.integer(d$ntrials))
   expect_match(as.character(sc), "binomial.*\\|.*trials")
 })
 
@@ -77,7 +79,7 @@ test_that("se() plumbs through and combines with sigma in the likelihood", {
   sd_ <- standata(mf, data = d, family = gaussian(),
                   trend_formula = ~ AR(p = 1))
   expect_true("se" %in% names(sd_))
-  expect_length(sd_$se, nrow(d))
+  expect_identical(as.numeric(sd_$se), as.numeric(d$sex))
   # brms emits `sqrt(square(sigma) + se2)` when sigma = TRUE.
   expect_match(as.character(sc), "sqrt\\(square\\(sigma\\) \\+ se2\\)")
 })
@@ -105,8 +107,10 @@ test_that("me() plumbs through measurement-error parameters and prior", {
                   trend_formula = ~ AR(p = 1))
   # Distinctive me() standata keys.
   expect_true(all(c("Xn_1", "noise_1", "Mme_1") %in% names(sd_)))
-  expect_length(sd_$Xn_1, nrow(d))
-  expect_length(sd_$noise_1, nrow(d))
+  # The noisy covariate and its standard error arrive as the columns
+  # `me(x, sdx)` names. Lengths alone passed with the two swapped.
+  expect_identical(as.numeric(sd_$Xn_1), as.numeric(d$x))
+  expect_identical(as.numeric(sd_$noise_1), as.numeric(d$sdx))
   # Latent-observation prior connecting noisy x to error-free Xme.
   expect_match(as.character(sc), "normal_lpdf\\(Xn_1 \\| Xme_1, noise_1\\)")
 })
@@ -164,12 +168,14 @@ test_that("car() resolves its data2 adjacency and emits spatial CAR code", {
                   %in% names(sd_)))
   expect_identical(as.integer(sd_$Nloc), 10L)
   # Spatial-CAR pairwise-difference penalty appears in the model.
-  expect_match(as.character(sc), "dot_self\\(zcar\\[edges1\\] - zcar\\[edges2\\]\\)")
+  expect_match(as.character(sc),
+               "dot_self\\(zcar\\[edges1\\] - zcar\\[edges2\\]\\)")
 })
 
 # ---- Trend-side formula_ad gatekeeper -------------------------------
 
-test_that("mvgam_formula() rejects every formula_ad special on trend_formula except mi()", {
+test_that(
+  "mvgam_formula() rejects every formula_ad special except mi()", {
   banned <- c(
     "se", "cens", "trunc", "trials", "weights", "rate",
     "vreal", "vint", "subset", "index", "dec", "cat", "thres"
@@ -192,7 +198,8 @@ test_that("mvgam_formula() allows mi() on trend_formula", {
   )
 })
 
-test_that("structural detector does not false-positive on user names sharing substrings with addition-term names", {
+test_that(
+  "a covariate sharing a name with an addition term is accepted", {
   # `defense` shares the substring `se` with the `se()` ad-term;
   # `se_x` starts with `se`; `mi_score` starts with `mi`. The
   # earlier regex-on-deparsed-string detector matched all three.
@@ -211,7 +218,8 @@ test_that("structural detector does not false-positive on user names sharing sub
 
 # ---- Structural walker primitives -----------------------------------
 
-test_that("collect_call_names walks nested calls and resolves namespace heads", {
+test_that(
+  "collect_call_names walks nested calls and resolves namespaces", {
   expect_setequal(
     collect_call_names(quote(s(x) + AR(p = 1))),
     c("+", "s", "AR")
@@ -411,7 +419,8 @@ test_that("a response named with an underscore or a dot builds a trend model", {
   expect_identical(as.integer(fit$standata$obs_trend_time_masskg), 1:20)
 })
 
-test_that("a multivariate response keeps every outcome past its addition terms", {
+test_that(
+  "a multivariate response keeps every outcome past its aterms", {
   expect_equal(
     response_columns(mvbind(y1, y2) | weights(w) ~ x),
     c(y1 = "y1", y2 = "y2")

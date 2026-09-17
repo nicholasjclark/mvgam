@@ -90,7 +90,8 @@ test_that("detect_var_trend() recognises all four VAR-type spellings", {
 
 # ---- Extractor -----------------------------------------------------
 
-test_that("extract_var_posterior() returns correctly shaped (A, Sigma) arrays", {
+test_that(
+  "extract_var_posterior() returns shaped (A, Sigma) arrays", {
   mock <- build_var_mock(K = 3L, ndraws = 25L)
   vp <- extract_var_posterior(mock)
   expect_identical(vp$K, 3L)
@@ -110,7 +111,8 @@ test_that("extract_var_posterior() reads the correct column for each (i, j)", {
   expect_equal(vp$Sigma[2L, 1L, 1L], 1.25)
 })
 
-test_that("extract_var_posterior() errors when the expected column is missing", {
+test_that(
+  "extract_var_posterior() errors on a missing column", {
   mock <- build_var_mock(K = 2L, ndraws = 3L)
   drop_col <- "A_trend[1,1,1]"
   mock$fit <- mock$fit[, setdiff(colnames(mock$fit), drop_col), drop = FALSE]
@@ -203,7 +205,8 @@ test_that("orthogonalised IRF at horizon 1 equals P %*% e_j", {
   expect_equal(as.numeric(irf_orth[[2L]][1L, ]), as.numeric(P[, 2L]))
 })
 
-test_that("var_fecov() builds a forecast-error covariance with positive diagonal", {
+test_that(
+  "var_fecov() builds a forecast-error covariance, diagonal positive", {
   K <- 2L
   A <- matrix(c(0.3, 0.05, 0.1, 0.2), K, K)
   Sigma <- diag(K) + 0.3
@@ -333,7 +336,9 @@ test_that("var_process_labels names the series where they are the processes", {
 test_that("the VAR posterior carries one label per process", {
   mock <- build_var_mock(K = 3L, ndraws = 5L)
   vp <- extract_var_posterior(mock)
-  expect_length(vp$labels, 3L)
+  # The mock carries no series names, and the labels take the index
+  # form the test above pins for var_process_labels().
+  expect_identical(vp$labels, c("Process_1", "Process_2", "Process_3"))
   # Both kernels read the labels off the posterior, so a surface
   # cannot spell them a second way.
   irf_gen <- gen_irf(list(K = 3L, labels = vp$labels,
