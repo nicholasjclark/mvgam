@@ -85,6 +85,46 @@ test_that("the summary header carries every formula and every link", {
 })
 
 
+test_that("the trend line names the order and drops an empty formula", {
+  # A summary object carries no trend metadata, and the helper that
+  # renders the order needs it. `summary()` stores the rendered
+  # label. Without the stored label a fitted ARMA printed as
+  # `Trends: None`, denying a trend the sampler had estimated.
+  expect_equal(
+    format_trend_line(list(trend_model = "AR",
+                           trend_label = "ARMA(1, 1)")),
+    " Trends: ARMA(1, 1) "
+  )
+  # A fit saved before the label existed still names its type.
+  expect_equal(
+    format_trend_line(list(trend_model = "AR")),
+    " Trends: AR "
+  )
+  # A trend formula carrying only a constructor reduces to `~0`, and
+  # one with an intercept alone to `~1`. Neither names a predictor.
+  expect_equal(
+    format_trend_line(list(trend_model = "AR", trend_formula = ~0)),
+    " Trends: AR "
+  )
+  expect_equal(
+    format_trend_line(list(trend_model = "AR", trend_formula = ~1)),
+    " Trends: AR "
+  )
+  # A formula carrying a predictor is named, with the response
+  # dropped from a two-sided one.
+  expect_equal(
+    format_trend_line(list(trend_model = "AR", trend_formula = ~ elev)),
+    " Trends: AR; formula: ~elev "
+  )
+  expect_equal(
+    format_trend_line(list(trend_model = "AR", trend_formula = y ~ elev)),
+    " Trends: AR; formula: ~elev "
+  )
+  # A fit with no trend prints no line.
+  expect_equal(format_trend_line(list()), "")
+})
+
+
 test_that("is_trend_state_param() names the states and nothing else", {
   # The trend's time-indexed states, which no summary block claims.
   expect_true(all(is_trend_state_param(c(

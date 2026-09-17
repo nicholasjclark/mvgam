@@ -727,28 +727,9 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   }
 
   # Section 4: Trend information
-  if (!is.null(x$trend_formula) || !is.null(x$trend_model)) {
-    if (!is.null(x$trend_model)) {
-      # `summary()` stores the label because the helper needs the
-      # fit's metadata, which a summary object does not carry. The
-      # bare type gives `AR` for a plain AR(1), for `AR(p = 3)` and
-      # for `AR(p = 1, ma = TRUE)` alike.
-      cat(" Trends: ", x$trend_label %||% x$trend_model, sep = "")
-      # Add trend formula if it has predictors
-      if (!is.null(x$trend_formula)) {
-        trend_rhs <- if (length(x$trend_formula) == 3) {
-          formula(delete.response(terms(x$trend_formula)))
-        } else {
-          x$trend_formula
-        }
-        trend_str <- format(trend_rhs)
-        # Only show if not just ~1
-        if (!grepl("^~\\s*1\\s*$", trend_str)) {
-          cat("; formula: ", trend_str, sep = "")
-        }
-      }
-      cat(" \n", sep = "")
-    }
+  trend_line <- format_trend_line(x)
+  if (nzchar(trend_line)) {
+    cat(trend_line, "\n", sep = "")
   }
 
   # Section 5: Sampling information (brms style with continuation line).
@@ -824,6 +805,41 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   cat("Use `how_to_cite(fit)` for a citation-ready model description.\n")
 
   invisible(x)
+}
+
+
+#' The trend line a summary prints
+#'
+#' A summary object carries neither the trend metadata nor the
+#' `trend_components` that `printed_trend_label()` needs. `summary()`
+#' stores the label that helper renders from the fit. The bare type
+#' gives `AR` for a plain AR(1), for `AR(p = 3)` and for
+#' `AR(p = 1, ma = TRUE)` alike.
+#'
+#' A trend formula carrying only a constructor reduces to `~0`, and
+#' one with an intercept alone to `~1`. Neither names a predictor a
+#' reader acts on, and both are left out.
+#'
+#' @param x An `mvgam_summary` object
+#' @return Character scalar, empty when the fit carries no trend
+#' @noRd
+format_trend_line <- function(x) {
+  if (is.null(x$trend_model)) {
+    return("")
+  }
+  out <- paste0(" Trends: ", x$trend_label %||% x$trend_model)
+  if (!is.null(x$trend_formula)) {
+    trend_rhs <- if (length(x$trend_formula) == 3L) {
+      stats::formula(stats::delete.response(stats::terms(x$trend_formula)))
+    } else {
+      x$trend_formula
+    }
+    trend_str <- format(trend_rhs)
+    if (!grepl("^~\\s*[01]\\s*$", trend_str)) {
+      out <- paste0(out, "; formula: ", trend_str)
+    }
+  }
+  paste0(out, " ")
 }
 
 

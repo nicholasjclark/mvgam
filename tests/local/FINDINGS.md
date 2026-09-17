@@ -54,20 +54,6 @@ species at every site. Beta and the negative binomial stay correct on
 the same paths, which places the fault at the shared normaliser.
 Reproduce on the jsdgam fixtures before editing.
 
-## Documentation that contradicts the code
-
-**108. Four pages describe something the code does otherwise.**
-
-`?sim_closure_unit_data` puts the Royle-Nichols detection predictor
-on the log scale while the family declares `logit` and the simulator
-uses `plogis()`. `?jsdgam` documents an `n_lv < n_species` bound the
-validator deliberately leaves unenforced. Two published comparisons
-rank trend models by `elpd_loo`, which is unreliable on a
-latent-trend fit, with nothing pointing at `lfo_cv()`. `mvn()`'s
-`forecast(type = "response")` refuses a family `hindcast()` draws.
-No file fits `mvn()` any more, and that one needs a fixture before it
-can be settled.
-
 ## One trend family, two initial distributions
 
 **110. The stationary initialisation reaches one AR path only.**
