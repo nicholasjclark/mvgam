@@ -3982,7 +3982,9 @@ as_one_logical = function(x, allow_na = FALSE) {
   x <- as.logical(x)
   if (length(x) != 1L || anyNA(x) && !allow_na) {
     s <- deparse0(s, max_char = 100L)
-    stop("Cannot coerce '", s, "' to a single logical value.", call. = FALSE)
+    stop(insight::format_error(
+      paste0("'", s, "' must be a single logical value.")
+    ))
   }
   x
 }

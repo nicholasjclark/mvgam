@@ -1260,7 +1260,7 @@ handle_response_trend_injection <- function(code_lines, resp_name) {
   if (length(mu_assign_lines) == 0) {
     # The program still compiles, and this response's linear predictor
     # holds no trend. Saying nothing leaves that undetectable.
-    warning(insight::format_warning(c(
+    insight::format_warning(c(
       cli::format_inline(
         "No mu assignment found for response {.field {resp_name}}."
       ),
@@ -1268,7 +1268,7 @@ handle_response_trend_injection <- function(code_lines, resp_name) {
         "The fit for {.field {resp_name}} uses its observation terms alone."
       ),
       i = "Report the formula and family that produced this."
-    )), call. = FALSE)
+    ))
     return(code_lines)
   }
   
@@ -6783,13 +6783,15 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
         # Only error if there are still truly missing variables after full search
         if (length(missing_vars) > 0) {
           missing_str <- paste(missing_vars, collapse = ", ")
-          stop(
-            "Variable mapping missing required variables: ", missing_str, ". ",
-            "These variables were referenced in mu construction but not found ",
-            "in any Stan block (data, parameters, transformed data, ",
-            "transformed parameters or computed variables).",
-            call. = FALSE
-          )
+          stop(insight::format_error(c(
+            "The variable mapping is missing required variables.",
+            x = paste0("Missing: ", missing_str, "."),
+            i = paste0(
+              "Every variable used in mu construction has to be declared ",
+              "in a Stan block: data, parameters, transformed data, ",
+              "transformed parameters or computed variables."
+            )
+          )))
         }
       }
 

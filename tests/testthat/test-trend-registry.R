@@ -217,6 +217,7 @@ test_that("Custom trend registration works", {
 })
 
 test_that("Overwriting existing trend types gives warning", {
+  local_verbose_warnings()
   # Clear and initialize registry
   rm(list = ls(envir = trend_registry), envir = trend_registry)
   register_core_trends()

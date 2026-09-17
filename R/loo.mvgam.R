@@ -348,10 +348,9 @@ split_mod_dots = function(x, ..., model_names = NULL, other = TRUE) {
   out <- dots[!is_mvgam]
 
   if (length(out)) {
-    stop(
-      "Only model objects can be passed to '...' for this method.",
-      call. = FALSE
-    )
+    stop(insight::format_error(
+      "Only model objects can be passed to '...' for this method."
+    ))
   }
   models
 }

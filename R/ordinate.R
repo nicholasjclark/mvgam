@@ -615,20 +615,18 @@ ordinate.mvgam <- function(
   # declared. The notice describes the plot being returned, so it is
   # raised on each call rather than once per session.
   if (!is.null(object$trend_metadata$fixed_Z) && rotation != "none") {
-    rlang::warn(
-      message = c(
-        paste0(
-          "'rotation = \"", rotation, "\"' re-rotates the ",
-          "structural loadings supplied via 'trend_map'."
-        ),
-        i = paste0(
-          "The biplot shows ordination gradients, not the declared ",
-          "factor structure. Pass 'rotation = \"none\"' to keep the ",
-          "declared axes, or read 'plot_factors()' for the fixed ",
-          "loadings."
-        )
+    insight::format_warning(c(
+      paste0(
+        "'rotation = \"", rotation, "\"' re-rotates the ",
+        "structural loadings supplied via 'trend_map'."
+      ),
+      i = paste0(
+        "The biplot shows ordination gradients in place of the ",
+        "declared factor structure. Pass 'rotation = \"none\"' to ",
+        "keep the declared axes, or call 'plot_factors()' for the ",
+        "fixed loadings."
       )
-    )
+    ))
   }
 
   svd_comp <- ordinate_factor_components(object, alpha, rotation)
@@ -671,15 +669,13 @@ resolve_auto_traits <- function(traits, object) {
   # The overlay the caller asked for is absent from the plot being
   # returned, so the notice belongs to the call and not the session.
   if (is.null(found)) {
-    rlang::warn(
-      message = c(
-        "traits = 'auto' requested but the fit carries no traits.",
-        i = paste0(
-          "Pass an explicit data.frame to 'traits', or refit ",
-          "with jsdgam(traits = ...). Skipping the overlay."
-        )
+    insight::format_warning(c(
+      "Argument 'traits = \"auto\"' requires a fit built with traits.",
+      i = paste0(
+        "Pass an explicit data.frame to 'traits', or refit ",
+        "with jsdgam(traits = ...). Skipping the overlay."
       )
-    )
+    ))
   }
   found
 }

@@ -25,6 +25,20 @@ expect_range <- function(object, lower = -Inf, upper = Inf, ...) {
 SM <- suppressMessages
 SW <- suppressWarnings
 
+# A warning raised with `rlang::warn(.frequency = "once")` is shown
+# once per R session. A second `devtools::test()` in one session
+# meets a cache already set. An `expect_warning()` on such a warning
+# then fails where the first run passed. A failing expectation still
+# counts one, leaving the suite total unchanged. Under `"verbose"`
+# rlang ignores the frequency cache. The scope is the calling test
+# alone. Every other test keeps the cache.
+local_verbose_warnings <- function(.env = parent.frame()) {
+  withr::local_options(
+    rlib_warning_verbosity = "verbose",
+    .local_envir = .env
+  )
+}
+
 # Build both Stan code and Stan data from one
 # `generate_stan_components_mvgam_formula()` call. Tests that need
 # both surfaces should use this instead of calling `stancode()` and

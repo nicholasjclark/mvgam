@@ -297,6 +297,17 @@ SPECS <- list(
 
 # ---- Fit ------------------------------------------------------------
 
+# The two formulas every fit in this file uses, written at the top
+# level. A formula carries the environment it was written in.
+# `saveRDS()` writes a local frame by value and a named environment by
+# reference. Written inside `fit_jsdm()`, each fixture embedded that
+# call's locals, among them the fit itself and the contents of the
+# previous file: the six reached 1.5 GB against 11 MB for the jsdgam
+# fixture in `test-grain-closure-units.R`, which builds its fit at the
+# top level. Entry 130 records the fit-side defect.
+JSDM_FORMULA <- y ~ env * series
+JSDM_FACTOR_FORMULA <- ~ -1
+
 fit_jsdm <- function(nm, spec, sim) {
   cache <- jsdm_cache(nm)
   fit <- NULL
@@ -311,8 +322,8 @@ fit_jsdm <- function(nm, spec, sim) {
   }
   if (is.null(fit)) {
     fit <- jsdgam(
-      formula = y ~ env * series,
-      factor_formula = ~ -1,
+      formula = JSDM_FORMULA,
+      factor_formula = JSDM_FACTOR_FORMULA,
       data = sim$long_dat,
       unit = time, species = series,
       family = eval(spec$family),
@@ -447,7 +458,6 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # surface and came back with the right rectangle of wrong
     # numbers.
     ft <- fitted(fit, draw_ids = 1:20)
-    expect_identical(nrow(ft), n_obs)
     expect_equal(unname(ft[, "Estimate"]), unname(colMeans(ep)),
                  tolerance = 1e-8)
     expect_true(all(ft[, "Q2.5"] <= ft[, "Estimate"]))

@@ -72,7 +72,9 @@ NULL
 #' @export
 summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
   if (length(probs) != 2L) {
-    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
+    stop(insight::format_error(
+      "Argument 'probs' must be a vector of length 2."
+    ))
   }
   validate_proportional(min(probs))
   validate_proportional(max(probs))

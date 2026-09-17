@@ -754,10 +754,10 @@ warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
   if (!threads_no_op_for_trend_brms_native(threads, family, mv_spec)) {
     return()
   }
-  # Fire per fit rather than once per session so a batch script
-  # that re-fits after a config change keeps seeing the warning
-  # every time its threads request is dropped.
-  rlang::warn(
+  # This warning is raised on every fit. A batch script that re-fits
+  # after a config change keeps seeing it each time its threads
+  # request is dropped.
+  insight::format_warning(
     paste0(
       "`threads_per_chain > 1` is ignored for brms-native ",
       "families combined with a `trend_formula`. mvgam's trend ",

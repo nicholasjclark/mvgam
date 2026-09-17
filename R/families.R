@@ -581,7 +581,7 @@ check_tweedie_truncation <- function(object, resp = NULL) {
     " (ratio = ", format(lambda_max / M, digits = 3), ")."
   )
   if (lambda_max > 0.7 * M) {
-    rlang::warn(insight::format_message(c(
+    insight::format_warning(c(
       "Tweedie truncation 'M' may be too small.",
       x = paste0(
         "max(lambda) at the posterior mean is ",
@@ -593,7 +593,7 @@ check_tweedie_truncation <- function(object, resp = NULL) {
         "tweedie(M = ", ceiling(lambda_max * 2), "L) and ",
         "compare the 'mphi' / 'mtheta' posteriors."
       )
-    )))
+    ))
   }
   invisible(NULL)
 }
@@ -7818,23 +7818,13 @@ log_lik_multi <- function(linpred, link, y, family_pars, trials) {
   out
 }
 
-#' Per-row probability for a `categ()` fit
-#'
-#' Each row's expected value is the probability that this category
-#' is the observed one, i.e. `softmax(mu_unit)[k]`. Returns a
-#' probability matrix on the response scale.
-#'
-#' @inheritParams posterior_epred_diri
-#' @return `[ndraws x N_obs]` matrix of probabilities.
-#' @noRd
-posterior_epred_categ <- function(object, newdata = NULL,
-                                   draw_ids = NULL, ndraws = NULL,
-                                   linpred = NULL) {
-  extract_simplex_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE,
-    linpred = linpred
-  )$prob_row
-}
+# Per-row probability for a `categ()` fit. Each row's expected value
+# is the probability that this category is the observed one,
+# `softmax(mu_unit)[k]`. `diri()` gives that same quantity from one
+# definition. The categ name stays bound because `epred_kernel()`
+# reaches a family through
+# `exists(paste0("posterior_epred_", family))`.
+posterior_epred_categ <- posterior_epred_diri
 
 #' Per-row response RNG for a `categ()` fit
 #'

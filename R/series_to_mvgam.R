@@ -35,7 +35,9 @@ series_to_mvgam <- function(series, freq, train_prop = 0.85) {
   }
 
   if (type == 'wrong') {
-    stop("series must be either a ts or xts object")
+    stop(insight::format_error(
+      "Argument 'series' must be either a 'ts' or an 'xts' object."
+    ))
   }
 
   # Extract information on years and seasons from the series object

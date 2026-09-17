@@ -274,7 +274,7 @@ score_univariate <- function(object, series_names, score,
     fc <- object$forecasts[[lv]]
     if (is.null(truth) || length(truth) == 0L ||
         is.null(fc) || ncol(fc) == 0L) {
-      return(empty_univariate_df(score, interval_width))
+      return(empty_score_df())
     }
     kernel_out <- dispatch_univariate_score(
       score, truth, fc,
@@ -301,10 +301,13 @@ score_univariate <- function(object, series_names, score,
 
 
 # Internal: empty per-series stub when a series has no held-out
-# data. Keeps the result shape uniform across series so callers
-# can rbind / map without special-casing.
+# data. The result shape stays uniform across series, which lets
+# callers rbind / map without special-casing. The univariate and
+# multivariate branches held two definitions of this one frame,
+# each taking a `score` and an `interval_width` that neither uses.
+# A zero-row frame carries no such value.
 #'@noRd
-empty_univariate_df <- function(score, interval_width) {
+empty_score_df <- function() {
   data.frame(
     score = numeric(0L),
     in_interval = numeric(0L),
@@ -384,7 +387,7 @@ score_multivariate <- function(object, series_names, score,
     fc <- object$forecasts[[lv]]
     if (is.null(truth) || length(truth) == 0L ||
         is.null(fc) || ncol(fc) == 0L) {
-      return(empty_multivariate_df(score, interval_width))
+      return(empty_score_df())
     }
     cov_indicator <- vapply(
       seq_along(truth), function(j) {
@@ -415,20 +418,6 @@ score_multivariate <- function(object, series_names, score,
     stringsAsFactors = FALSE
   )
   series_score
-}
-
-
-# Internal: empty per-series stub for the multivariate path.
-#'@noRd
-empty_multivariate_df <- function(score, interval_width) {
-  data.frame(
-    score = numeric(0L),
-    in_interval = numeric(0L),
-    interval_width = numeric(0L),
-    eval_horizon = integer(0L),
-    score_type = character(0L),
-    stringsAsFactors = FALSE
-  )
 }
 
 

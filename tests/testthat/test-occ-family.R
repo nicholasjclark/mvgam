@@ -88,6 +88,7 @@ test_that("validate_closure_unit_data() rejects non-binary y under occ", {
 
 test_that("validate_closure_unit_data() warns (not errors) for occ with all-single-visit + no covariates", {
   d <- make_occ_data(n_unit = 5, n_visit = 1)
+  local_verbose_warnings()
   withr::with_envvar(c(TESTTHAT = ""), {
     # Inverted: TESTTHAT off so the rlang::warn fires, then assert
     # it is a warning rather than an error (the occ branch demotes

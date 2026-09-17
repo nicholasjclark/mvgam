@@ -192,7 +192,7 @@ test_that("resolve_auto_traits('auto') notices a fit with no traits", {
   # plot, so every call earns the notice and not just the first.
   expect_warning(
     out <- mvgam:::resolve_auto_traits("auto", stub_fit),
-    "carries no traits"
+    "requires a fit built with traits"
   )
   expect_null(out)
 })

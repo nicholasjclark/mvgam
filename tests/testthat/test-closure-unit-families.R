@@ -704,6 +704,7 @@ test_that("default_simplex_population_priors() returns student_t for b + Interce
 })
 
 test_that("warn_simplex_obs_formula_lacks_species() detects K-shared-only forms", {
+  local_verbose_warnings()
   withr::with_envvar(c(TESTTHAT = ""), {
     # Warns when no species term
     expect_warning(

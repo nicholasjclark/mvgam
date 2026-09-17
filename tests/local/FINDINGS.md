@@ -8,7 +8,7 @@ Each entry is a task, deleted once its fix is verified.
 
 `mvn()` and `mvt()` estimate one residual scale per component, and
 its prior is written into a stanvar. A user who knows their response
-scale cannot set the one thing that moves the posterior. Measured
+scale cannot set the parameter that moves the posterior. Measured
 against a truth of 2.0: `gamma(4, 2)` gives 34 divergences at Psi
 rhat 1.009, `exponential(1)` gives 225 at 1.084 and `gamma(4, 8)`
 gives 335 at 1.396, with two species pulled to 0.9 by a prior centred
@@ -41,9 +41,14 @@ training data, leaving a fit whose time column never varies outside
 the check.
 
 `ensure_mvgam_variables()` carries a second copy of the time
-assertion (`validations.R:4211`) and the prediction path never calls
-it. Two layers assert one fact. One layer should own what a frame
-must carry.
+assertion (`validations.R:4213`), a bare `checkmate::assert_names()`
+whose message names no remedy. `validate_newdata_complete()` has one
+call site (`predictions.R:481`, inside `extract_component_linpred()`)
+and `ensure_mvgam_variables()` is reached through
+`prepare_mvgam_frame()` (`sample_innovations.R:119`). The two guard
+different entry points. Deleting either opens a hole on the routes
+the other misses. What is duplicated is the wording: one condition
+raised under two messages. Both sites should raise one refusal.
 
 ## One trend family, two initial distributions
 
@@ -52,46 +57,68 @@ must carry.
 A plain `AR(p = 1)` starts the latent state at its stationary scale:
 `lv_trend[1, j] = scaled_innovations_trend[1, j] / sqrt(1 - square(ar1_trend[j]))`.
 Every other AR path starts from the raw innovation instead:
-correlated innovations, a lag above one and a moving-average term. At
-`ar1 = 0.9` the first state is 2.3 times under-dispersed against
+
+- correlated innovations
+- a lag above one
+- a moving-average term
+
+At `ar1 = 0.9` the first state is 2.3 times under-dispersed against
 stationarity, and the `t = 1` likelihood absorbs that into
 `sigma_trend` and `ar1_trend`. Element-wise scaling is the wrong
 repair for the correlated case: the stationary covariance solves
 `Sigma_x[i, j] = Sigma_eps[i, j] / (1 - phi_i phi_j)`. `VAR()`
 computes this already, through `initial_joint_var()`.
 
-## A test whose assertion count is not fixed
+## A test whose outcome depends on what ran before it
 
-**127. The suite's total moves between runs of one tree.**
+**127. Two runs of the suite in one session disagree.**
 
-Two runs of one tree gave totals ten apart, with no failures, no
-warnings and no skips in either. One test's assertion count depends on
-a draw, which makes the total a poor signal for a regression. Record
-per-file counts on two runs to name it.
+Three tests assert on a warning rlang raises once per R session
+(`.frequency = "once"`). A second `devtools::test()` in that session
+meets a cache already set. Measured across two runs in one session:
+10537 expectations and no failures on the first, the same 10537 and
+three failures on the second. The three land one apiece in:
+
+- `test-trend-registry.R`
+- `test-occ-family.R`
+- `test-closure-unit-families.R`
+
+An expectation count is blind to this. A failing `expect_warning()`
+still counts one.
+
+`register_custom_trend()` (`trend_system.R:427`) raises with no
+`TESTTHAT` check and reaches the suite directly. The other two
+raisers check it, and each test reaches its assertion by unsetting
+that with `withr::with_envvar(c(TESTTHAT = ""))`.
+
+Under `rlib_warning_verbosity = "verbose"` rlang ignores the
+frequency cache. Nothing in `R/` resets it, and ten further sites
+raise under the same idiom.
 
 ## One condition, several spellings
 
-**129. Warnings and messages carry six idioms.**
+**129. Two condition kinds carry more than one spelling.**
 
-`c4d77c95` rewrote 121 condition messages and the prose linter reports
-the whole set clean, which settled the wording. The syntax settled on
-the error path alone: 633 of 643 `stop()` sites format through
-`insight::format_error()` and 10 pass a bare string.
+`Rscript tests/local/debt_scan.R idioms` counts the spellings per
+kind:
 
-Warnings and messages keep six spellings. Counted from parse data in
-`R/`: `rlang::warn()` at 33 sites, bare `message()` at 11,
-`insight::format_warning()` as the raiser at 8, `cli::cli_inform()` at
-3, `rlang::inform()` at 2, `warning()` at 2. `call. = FALSE` reaches
-125 of the 643 `stop()` calls. Six files mix two or more idioms and
-`backends.R` holds four.
+| kind | spellings | sites |
+|---|---|---|
+| warning_once | 2 | `rlang::warn()` 19, the same wrapped in `insight::format_message()` 8 |
+| message | 3 | `message()` 11, `cli::cli_inform()` 3, `rlang::inform()` 2 |
+
+`rlang::warn()` renders a named `c()` vector as bullets on its own.
+The eight sites wrapped in `insight::format_message()` reach the
+same result by a second route.
+
+Some bare `message()` calls print progress, such as "Compiling Stan
+program...". Others carry a condition a user acts on.
 
 The cost is on both sides of the call. A reader meets one condition
-under several shapes, and a caller handling one class misses the rest,
-since `rlang::warn()` and `warning()` signal different classes. Pick
-one spelling per condition kind, apply it across the 59 warning and
-message sites and give `debt_scan.R` a mode counting the idioms so
-the count reaches one per kind. This is the same shape entry 89 lists
-as "one condition, several refusals", measured.
+under several shapes. A caller handling one class misses the rest,
+since `rlang::warn()` and `message()` signal different classes. Pick
+one formatter for the `warning_once` kind and one spelling per
+message kind, until `idioms` reports one spelling for every kind.
 
 ## Debt the code carries in recognisable shapes
 
@@ -116,19 +143,69 @@ debt: each of the six replaces a coercion warning with a refusal
 naming the column, or takes the Pareto k out of the object it
 suppressed and reports it. `raw_axis` concentrates in
 `forecast.mvgam.R`. Several of the rest are the layers that build
-the axis. The `sort(unique(...))`
-sites in `sample_innovations.R` are guarded last resorts, each
+the axis. The `sort(unique(...))` sites in `sample_innovations.R`
+are guarded last resorts, each
 carrying a comment naming the order it falls back to.
 
 The tests carry the same debt. A stub that fakes a class with
 `structure(y ~ x, class = c("brmsformula", "formula"))` lets an
 assertion pass on an object no user could build. So does a stub
-carrying slots a real fit no longer has. Assertions that compare
-counts or use
-`expect_setequal()` pass where the claim being tested is an order or
-a value.
+carrying slots absent from a real fit. Assertions that compare
+counts or use `expect_setequal()` pass where the claim being tested
+is an order or a value.
 
 The scans are cheap, and a count falls only when code is deleted.
 Each remaining shape gets one pass. A pass removes the rival, the
 fallback or the proxy, adds an assertion that fails before the change
 and records the count before and after.
+
+## A saved fit embeds the frame that called it
+
+**130. `formula` and `trend_call` keep their calling environment.**
+
+An mvgam fit stores `formula` and `trend_call` as formulas, and a
+formula carries the environment it was written in. R serialises a
+named environment by reference and a local frame by value. A
+`jsdgam()` call at top level captures the global environment and
+costs nothing. The same call inside a function captures that
+function's frame and writes every local of it into the file.
+
+One small fit, everything held constant apart from where the
+formula was written: 14.85 MB written inside the calling function,
+0.19 MB written at top level. The objects serialised are that
+function's locals exactly, the fit among them.
+
+`update.mvgam()` rebuilds `environment(trend_call)`
+(`update.mvgam.R:573-589`). The bindings it re-evaluates have to
+survive. The frame they came from does not.
+
+## The suite carries the shapes it tests against
+
+**131. Four shapes across `tests/testthat`, each confirmed at its site.**
+
+A Stan model is fitted in CI at `test-occ-family.R:202`, with no
+`seed` and no `run_model = FALSE`. Nothing mocks it. The assertion
+beneath wants one error path from `predict(type = "latent_state")`.
+
+`test-scoring-kernels.R` sets no seed anywhere. Eleven of its
+assertions depend on a drawn value. Line 216 draws `rnorm(5000)` and
+compares the result to an analytic one at `tolerance = 0.05`. The
+five kernel-shape blocks in `test-log-lik.R:27-71` draw responses
+under no seed, and an extreme `rnbinom` or `rbeta` draw reaches a
+log density of `-Inf`.
+
+Two files mutate state they never restore. `test-trend-registry.R`
+clears `trend_registry` eleven times with no `withr::defer()`, and
+line 230 overwrites the core `AR` entry until the clear at 238; any
+failure between the two leaves the registry wrong for every later
+file in that worker. `test-plot-helpers.R` restores bayesplot's
+colour scheme to a literal. The value it replaced is never captured.
+
+`try()` and `tryCatch()` appear at twelve sites. `skip()` appears at
+none.
+
+An expectation under an `if` or inside a handler counts once when
+its branch runs and not at all otherwise. A green total then covers
+assertions nothing reached. `test-axis-ordering.R` holds about
+thirty of these. `test-stancode-standata.R:5824` returns early from
+a helper whose caller then compares nothing.

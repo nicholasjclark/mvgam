@@ -9,6 +9,7 @@
 # Run from the package root:
 #   Rscript tests/local/debt_scan.R           # a count per shape
 #   Rscript tests/local/debt_scan.R try       # every site of one shape
+#   Rscript tests/local/debt_scan.R idioms    # spellings per condition
 #
 # Shapes: try, default, narrow, raw_axis, rebuild, mv_class, suppress,
 # double, dead_param, dead_dots. `dead_param` loads the package and
@@ -200,6 +201,66 @@ message_sites <- function(path) {
   do.call(rbind, out)
 }
 
+# Which spelling raises each kind of condition. Entry 129 asks for one
+# spelling per kind, and this counts the distance from that. Parse data
+# separates a raiser from a formatter nested inside it, and
+# `.frequency` separates the once-per-session warning from the per-call
+# one.
+condition_idioms <- function(files) {
+  name_of <- function(fn) {
+    if (is.name(fn)) {
+      as.character(fn)
+    } else if (is.call(fn) && length(fn) == 3L) {
+      as.character(fn[[3L]])
+    } else {
+      ""
+    }
+  }
+  rows <- list()
+  note <- function(kind, spelling) {
+    rows[[length(rows) + 1L]] <<-
+      data.frame(kind = kind, spelling = spelling)
+  }
+  walk <- function(x) {
+    if (!is.call(x)) return(invisible(NULL))
+    nm <- name_of(x[[1L]])
+    arg1 <- if (length(x) >= 2L) x[[2L]] else NULL
+    wraps <- function(what) {
+      is.call(arg1) && identical(name_of(arg1[[1L]]), what)
+    }
+    if (identical(nm, "stop")) {
+      note("error", if (wraps("format_error")) "format_error" else "bare")
+    } else if (identical(nm, "warning")) {
+      note("warning", "warning")
+    } else if (identical(nm, "format_warning")) {
+      note("warning", "format_warning")
+    } else if (identical(nm, "warn")) {
+      once <- ".frequency" %in% names(x)
+      note(
+        if (once) "warning_once" else "warning",
+        if (wraps("format_message")) "warn + format_message" else "warn"
+      )
+    } else if (identical(nm, "message")) {
+      note("message", "message")
+    } else if (identical(nm, "cli_inform")) {
+      note("message", "cli_inform")
+    } else if (identical(nm, "inform")) {
+      note("message", "inform")
+    }
+    for (i in seq_along(x)) {
+      if (!is.null(x[[i]])) try(walk(x[[i]]), silent = TRUE)
+    }
+    invisible(NULL)
+  }
+  for (path in files) {
+    e <- tryCatch(parse(path, keep.source = FALSE),
+                  error = function(e) NULL)
+    if (is.null(e)) next
+    for (ex in e) walk(ex)
+  }
+  do.call(rbind, rows)
+}
+
 args <- commandArgs(trailingOnly = TRUE)
 files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
 
@@ -209,6 +270,20 @@ if (length(args) && identical(args[[1L]], "dead_param")) {
   hits <- dead_dots()
   cat(nrow(hits), "functions drop their dots\n")
   print(hits, right = FALSE)
+} else if (length(args) && identical(args[[1L]], "idioms")) {
+  hits <- condition_idioms(files)
+  counts <- as.data.frame(
+    table(hits$kind, hits$spelling), stringsAsFactors = FALSE
+  )
+  names(counts) <- c("kind", "spelling", "sites")
+  counts <- counts[counts$sites > 0L, ]
+  counts <- counts[order(counts$kind, -counts$sites), ]
+  print(counts, right = FALSE, row.names = FALSE)
+  per_kind <- table(counts$kind)
+  cat("\nspellings per kind:\n")
+  print(data.frame(kind = names(per_kind),
+                   spellings = as.integer(per_kind)),
+        right = FALSE, row.names = FALSE)
 } else if (length(args) && identical(args[[1L]], "messages")) {
   sites <- do.call(rbind, lapply(files, message_sites))
   writeLines(paste0("## ", sites$file, ":", sites$line, "\n\n",

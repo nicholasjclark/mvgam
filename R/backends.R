@@ -384,7 +384,7 @@ fit_model <- function(model, backend, ...) {
         out <- brms::do_call(rstan::sampling, args)
       } else {
         if (cores > 1L) {
-          rlang::warn(insight::format_message("Argument 'cores' is ignored when using 'future'."))
+          insight::format_warning("Argument 'cores' is ignored when using 'future'.")
         }
         args$chains <- 1L
         out <- futures <- vector("list", chains)
@@ -528,7 +528,7 @@ fit_model <- function(model, backend, ...) {
         out <- brms::do_call(model$sample, args)
       } else {
         if (cores > 1L) {
-          rlang::warn(insight::format_message("Argument 'cores' is ignored when using 'future'."))
+          insight::format_warning("Argument 'cores' is ignored when using 'future'.")
         }
         args$chains <- 1L
         out <- futures <- vector("list", chains)

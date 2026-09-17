@@ -260,14 +260,14 @@ pp_check.mvgam <- function(
     )
     valid_types <- sub("^ppc_", "", valid_types)
     if (!type %in% valid_types) {
-      stop(
-        "Type '",
-        type,
-        "' is not a valid ppc type. ",
-        "Valid types are:\n",
-        paste0("'", valid_types, "'", collapse = ", "),
-        call. = FALSE
-      )
+      stop(insight::format_error(c(
+        "Argument 'type' must name a valid ppc type.",
+        x = paste0("Given: '", type, "'."),
+        i = paste0(
+          "Valid types are: ",
+          paste0("'", valid_types, "'", collapse = ", "), "."
+        )
+      )))
     }
   }
 
@@ -418,25 +418,21 @@ pp_check.mvgam <- function(
   psis_weighted <- any(c("psis_object", "lw") %in% ppc_formals)
   if ("group" %in% ppc_formals) {
     if (is.null(group)) {
-      stop(
-        "Argument 'group' is required for ppc type '",
-        type,
-        "'.",
-        call. = FALSE
-      )
+      stop(insight::format_error(
+        paste0("Argument 'group' is required for ppc type '", type, "'.")
+      ))
     }
     if (!group %in% valid_vars) {
-      stop(
-        "Variable '",
-        group,
-        "' could not be found in the data.",
-        call. = FALSE
-      )
+      stop(insight::format_error(
+        paste0("Variable '", group, "' is absent from the data.")
+      ))
     }
   }
   if ("x" %in% ppc_formals) {
     if (!is.null(x) && !x %in% valid_vars) {
-      stop("Variable '", x, "' could not be found in the data.", call. = FALSE)
+      stop(insight::format_error(
+        paste0("Variable '", x, "' is absent from the data.")
+      ))
     }
   }
   for_pred <- names(dots) %in% pred_formals
@@ -618,9 +614,9 @@ pp_check.mvgam <- function(
   # every other family the grain is still the row and this is the
   # same narrowing it always was.
   if (anyNA(y)) {
-    warning(insight::format_message(
+    insight::format_warning(
       "Observations with a missing response are omitted from the plot."
-    ))
+    )
     take <- !is.na(y)
     y <- y[take]
     yrep <- yrep[, take, drop = FALSE]
@@ -681,7 +677,9 @@ pp_check.mvgam <- function(
   }
   if (!is.null(group)) {
     if (!exists(group, newdata)) {
-      stop(paste0("Variable ", group, " not in newdata"), call. = FALSE)
+      stop(insight::format_error(
+        paste0("Variable '", group, "' is absent from 'newdata'.")
+      ))
     }
     ppc_args$group <- newdata[[group]]
 
