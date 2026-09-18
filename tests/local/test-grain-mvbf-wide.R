@@ -767,6 +767,23 @@ test_that("conditional_effects answers per response, on its own scale", {
 })
 
 
+test_that("a wide fit draws its observations for every response", {
+  # The fan-out leaves one response in scope. That response names
+  # the column the observations come from, which lets a request for
+  # points and a rug reach the panel.
+  for (r in responses) {
+    got <- with_warnings(
+      conditional_effects(fit, resp = r, points = TRUE, rug = TRUE)
+    )
+    panel <- plot(got$value, plot = FALSE)[[1L]]
+    geoms <- vapply(panel$layers, function(l) class(l$geom)[1L],
+                    character(1L))
+    expect_true(any(grepl("GeomPoint", geoms, fixed = TRUE)))
+    expect_true(any(grepl("GeomRug", geoms, fixed = TRUE)))
+  }
+})
+
+
 test_that("the criticism surface runs on a wide fit", {
   loo_warnings <- character(0)
   ic <- withCallingHandlers(

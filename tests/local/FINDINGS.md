@@ -94,7 +94,24 @@ empty result against the frame in hand. The values they need are
 the frame's. Lines 467, 686 and 1707 each guard a past regression.
 The scan matches a raw `[[` of either axis and reports both alike.
 The count overstates the debt by those 24. The series axis in that
-file comes from the record at every site. The `sort(unique(...))` sites in `sample_innovations.R`
+file comes from the record at every site.
+
+All 43 `mv_class` hits were examined too. Twenty-six check the
+input's type before the formula reaches brms, or rebuild a brms
+object in place. Ten ask the class
+where the count of responses is the question meant, and the two
+agree on every formula shape mvgam accepts: `bf(mvbind(y1, y2) ~ x)`
+already takes the class `mvbrmsformula`, which makes `inherits()`
+and `length(response_columns()) > 1L` equivalent. Seven
+re-implement `response_formulas()`'s body, each with a stated
+obstacle to calling it: three run before validation, one tolerates
+junk input by contract and one needs the univariate case spelled
+`""` for the prior table.
+
+Two of the three counted shapes carry false positives in the main.
+A pass on either moves code and leaves what a user meets unchanged.
+The counts locate the sites. Examining each site is what finds a
+defect. The `sort(unique(...))` sites in `sample_innovations.R`
 are guarded last resorts, each
 carrying a comment naming the order it falls back to.
 
@@ -132,6 +149,31 @@ statements, and whether the stripping guards against a comment
 landing away from the line it describes is unverified.
 `polish_generated_stan_code()` in `R/stan_polish.R` is where to
 look.
+
+## Arguments a plot accepts and drops
+
+**116. `conditional_effects()` leaves out its points and rug.**
+
+`points = TRUE` and `rug = TRUE` reach `points_alpha` and `rug` at
+`R/conditional_effects.mvgam.R:141-152`. Both travel into
+`marginaleffects::plot_predictions()` through `pp_args`. The drawn
+panel shows `GeomRibbon` with two `GeomLine` layers. A factor term
+shows `GeomPointrange`. A `GeomPoint` or `GeomRug` layer is
+absent on every fixture measured: the wide `mvbf` fit on all three
+responses, a VAR fit on `y ~ elev * region + (1 | block)` and a
+univariate fit with an offset and a `gp()` term.
+
+The branch above them suppresses both on a multivariate fit, for a
+stated reason that fails twice over. `mv_resp_fan_out()` returns
+for the `resp = NULL` case, which leaves one response in scope at
+that line. The overlays are missing from univariate fits too.
+Deleting the branch changes none of the drawn layers, which places
+the cause downstream.
+
+Where to look: `plot_predictions()` draws the raw data itself, and
+it takes that data through `insight::get_data()` on the mvgam
+object. `tests/local/test-grain-mvbf-wide.R` has the failing
+assertion.
 
 ## The gate that proves an assertion can fail
 

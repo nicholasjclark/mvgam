@@ -135,9 +135,8 @@ conditional_effects.mvgam <- function(x,
   # owns the per-branch validation and surfaces typed errors.
   series_mode <- resolve_series_arg(series, x)
 
-  # Observation rugs and overlaid points only make sense on response
-  # scale, and only for univariate fits (multivariate `mvbind`
-  # responses don't have a single column to anchor points on).
+  # Observation rugs and overlaid points apply on the response
+  # scale. A multivariate fit suppresses both here.
   on_response <- identical(type, "response")
   is_mv <- brms::is.mvbrmsformula(x$formula)
   points_alpha <- 0
