@@ -13,12 +13,10 @@
 var_trend_types <- c("VAR", "VAR1", "VARcor", "VAR1cor")
 
 detect_var_trend <- function(object) {
-  # Read through the shared resolver rather than the first of the
-  # three places a trend type is recorded. Reading only
-  # `trend_components$types` refused `irf()`, `fevd()`,
-  # `stability()` and `posterior_transition_matrix()` on a fit
-  # whose type was recoverable from its metadata, while
-  # `summary()` named it correctly from the same object.
+  # `get_trend_type()` resolves the trend type for the whole
+  # package, including the empty case it reports as "None". A
+  # direct lookup of `trend_components$types` here would make a
+  # second reader of one fact.
   trend_type <- get_trend_type(object)
   if (is.null(trend_type) || is.na(trend_type)) {
     return(NULL)

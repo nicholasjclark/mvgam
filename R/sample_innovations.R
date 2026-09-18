@@ -264,7 +264,6 @@ get_observation_structure <- function(object, newdata = NULL,
   # directly from object metadata + newdata's time column, without
   # invoking ensure_mvgam_variables.
   n_series_trained <- object$standata$N_series_trend %||%
-    object$trend_metadata$dimensions$n_series %||%
     length(levels(as.factor(
       attr(mvgam_training_data(object), "mvgam_series")
     )))
@@ -410,9 +409,8 @@ build_single_series_observation_structure <- function(newdata, time_var,
 #' @details
 #' Lookup order:
 #' 1. `trend_components$types\[1\]` - primary source used by summary/print
-#' 2. `trend_metadata$trend$trend_type` - fallback metadata source
-#' 3. `trend_formula` existence check - issues warning if type unclear
-#' 4. Returns "None" if no trend model detected
+#' 2. `trend_formula` existence check - issues warning if type unclear
+#' 3. Returns "None" if no trend model detected
 #'
 #' @noRd
 get_trend_type <- function(object) {
@@ -427,20 +425,7 @@ get_trend_type <- function(object) {
     }
   }
 
-  # Secondary source: trend_metadata$trend$trend_type. The guard
-  # tests for a list rather than for non-NULL: `$` on an atomic
-  # vector is an error, not NULL, so a fit whose `trend$` slot
-  # holds a bare character vector took the fallback path into a
-  # stop() instead of through it.
-  metadata <- object$trend_metadata
-  if (!is.null(metadata) && is.list(metadata$trend)) {
-    trend_type <- metadata$trend$trend_type
-    if (!is.null(trend_type) && !is.na(trend_type)) {
-      return(trend_type)
-    }
-  }
-
-  # Tertiary: check trend_formula existence (indicates trends present)
+  # Secondary: check trend_formula existence (indicates trends present)
   if (!is.null(object$trend_formula)) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(

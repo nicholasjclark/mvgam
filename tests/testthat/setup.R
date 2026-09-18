@@ -181,8 +181,7 @@ mk_factor_obj <- function(n_series = 3L, n_lv = 2L, ndraws = 50L,
           list(n_lv = n_lv), class = "mvgam_trend"
         )),
         trend_metadata = list(
-          n_lv = n_lv,
-          trend = list(trend_type = "ZMVN")
+          n_lv = n_lv
         ),
         trend_components = list(types = "ZMVN"),
         fit = draws_mat

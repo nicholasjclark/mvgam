@@ -33,8 +33,7 @@ make_lfo_mock <- function(n_time = 40L, n_series = 1L) {
     family = poisson(),
     trend_metadata = list(
       trend_type = "AR",
-      variables = list(time_var = "time", series_var = "series"),
-      dimensions = list(n_series = n_series)
+      variables = list(time_var = "time", series_var = "series")
     ),
     backend = "rstan"
   )
@@ -327,8 +326,7 @@ make_lfo_mock_shifted <- function(n_time = 35L, offset = 2009L) {
     family = poisson(),
     trend_metadata = list(
       trend_type = "AR",
-      variables = list(time_var = "time", series_var = "series"),
-      dimensions = list(n_series = 1L)
+      variables = list(time_var = "time", series_var = "series")
     ),
     backend = "rstan"
   )
@@ -396,8 +394,7 @@ test_that("lfo_cv handles irregular CAR-style time grids", {
     family = poisson(),
     trend_metadata = list(
       trend_type = "CAR",
-      variables = list(time_var = "time", series_var = "series"),
-      dimensions = list(n_series = 1L)
+      variables = list(time_var = "time", series_var = "series")
     ),
     backend = "rstan"
   )
@@ -434,8 +431,7 @@ test_that("Mismatched per-series time grids error", {
     family = poisson(),
     trend_metadata = list(
       trend_type = "AR",
-      variables = list(time_var = "time", series_var = "series"),
-      dimensions = list(n_series = 2L)
+      variables = list(time_var = "time", series_var = "series")
     ),
     backend = "rstan"
   )
@@ -649,7 +645,7 @@ test_that("mvgam_loo_compare_diagnostics threshold overlays", {
 
 # ---- loo_model_weights.mvgam_lfo --------------------------------
 
-test_that("loo_model_weights.mvgam_lfo returns pseudobma_weights summing to 1", {
+test_that("loo_model_weights.mvgam_lfo pseudobma_weights sum to 1", {
   m1 <- mk_mvgam_lfo(c(-1, -2, -3))
   m2 <- mk_mvgam_lfo(c(-3, -4, -5))
   w <- loo_model_weights(m1, m2)
@@ -684,7 +680,7 @@ test_that("loo_model_weights.mvgam_lfo errors when ELPDs are missing", {
 })
 
 
-test_that("loo_model_weights.mvgam_lfo method='stacking' errs without $log_lik", {
+test_that("loo_model_weights.mvgam_lfo stacking errs on missing $log_lik", {
   m1 <- mk_mvgam_lfo(c(-1, -2, -3))
   m2 <- mk_mvgam_lfo(c(-2, -3, -4))
   expect_error(
@@ -729,7 +725,7 @@ test_that("loo_model_weights.mvgam_lfo method='stacking' runs with $log_lik", {
 })
 
 
-test_that("loo_model_weights.mvgam_lfo method='stacking' errs on width mismatch", {
+test_that("loo_model_weights.mvgam_lfo stacking errs on width mismatch", {
   m_a <- mk_mvgam_lfo(c(-1, -1, -1))
   m_b <- mk_mvgam_lfo(c(-2, -2, -2))
   m_a$log_lik <- matrix(stats::rnorm(100L * 30L), nrow = 100L)

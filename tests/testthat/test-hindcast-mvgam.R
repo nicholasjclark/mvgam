@@ -45,8 +45,7 @@ make_hindcast_mock <- function(series_levels = "s1",
       ma_lags = integer(0L),
       max_lag = 1L,
       has_cor = FALSE,
-      variables = list(time_var = "time", series_var = "series"),
-      dimensions = list(n_series = length(series_levels))
+      variables = list(time_var = "time", series_var = "series")
     ),
     standata = list(
       N_series_trend = length(series_levels),

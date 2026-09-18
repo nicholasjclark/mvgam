@@ -52,8 +52,7 @@ make_mock_mvgam <- function(series_levels = "s1", n_time = 10L,
       ma_lags = ma_lags,
       max_lag = max_lag,
       has_cor = FALSE,
-      variables = list(time_var = "time", series_var = "series"),
-      dimensions = list(n_series = length(series_levels))
+      variables = list(time_var = "time", series_var = "series")
     ),
     standata = list(
       N_series_trend = length(series_levels),
