@@ -21,6 +21,17 @@ repair for the correlated case: the stationary covariance solves
 `Sigma_x[i, j] = Sigma_eps[i, j] / (1 - phi_i phi_j)`. `VAR()`
 computes this already, through `initial_joint_var()`.
 
+A grouped `AR(p = 1, gr = ...)` takes the stationary branch and is
+wrong in the other direction. `trend_specs$cor` is FALSE there,
+which applies the per-series divisor, while the innovations are
+correlated within group through `L_group_trend`
+(`stan_assembly.R:3917`). The diagonal is right. The covariance
+across series inside a group is wrong. That makes four paths in all.
+
+`L_Sigma_trend` is declared inside an anonymous block
+(`stan_assembly.R:2197-2200`). A correlated-case repair builds its
+covariance from `sigma_trend` and `L_Omega_trend` instead.
+
 ## Debt the code carries in recognisable shapes
 
 **89. Six shapes remain, and a scan counts three of them.**
