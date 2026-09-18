@@ -1389,6 +1389,16 @@ hidden_unrotated_factor_pars <- function(pars) {
       "^Sigma_trend\\["
     )
   }
+  # `coef_sharing = "shared"` samples one coefficient per lag and
+  # broadcasts it across the series. The per-series copies repeat the
+  # sampled scalar's value, and reporting all of them presents one
+  # quantity as several. The sampled name stays, and the copies are
+  # reachable by name.
+  shared <- grep("^shared_ar[0-9]+(_pacf)?_trend\\[", pars, value = TRUE)
+  if (length(shared) > 0L) {
+    stems <- unique(sub("^shared_(.*)\\[.*$", "\\1", shared))
+    patterns <- c(patterns, paste0("^", stems, "\\["))
+  }
   if (length(patterns) == 0L) return(NULL)
   paste(patterns, collapse = "|")
 }
@@ -1890,6 +1900,38 @@ hierarchical_group_cholesky <- function(alpha, L_global, L_deviation,
 }
 
 
+#' The Cholesky factor of one group's trend covariance, for one draw
+#'
+#' The rescale stores a stationary factor in `L_group_stationary`
+#' wherever it reached one. Absent that, the factor recomposes from
+#' the population correlation, the group's own deviation and the
+#' group's scales. The innovation transform and `residual_cor()` both
+#' call this, which states the preference once.
+#'
+#' @param params Parameter list from `get_trend_covariance_structure()`
+#' @param d Draw index
+#' @param g Group index
+#' @param n_sub Number of subgroups, the block dimension
+#' @return Lower-triangular matrix `L` with `L %*% t(L)` the group's
+#'   covariance
+#'
+#' @noRd
+group_trend_factor <- function(params, d, g, n_sub) {
+  L_stat <- params$L_group_stationary
+  if (!is.null(L_stat)) {
+    return(matrix(L_stat[d, g, , ], n_sub, n_sub))
+  }
+  hierarchical_group_cholesky(
+    alpha = params[[HIER_COV_PARS$alpha]][d],
+    L_global = matrix(params[[HIER_COV_PARS$global]][d, , ],
+                      n_sub, n_sub),
+    L_deviation = matrix(params[[HIER_COV_PARS$deviation]][d, g, , ],
+                         n_sub, n_sub),
+    sigma = params[[HIER_COV_PARS$sigma]][d, g, ]
+  )
+}
+
+
 #' Transform Innovations: Hierarchical Cholesky Pattern
 #'
 #' For models declared with `gr=` grouping. The per-group covariance is
@@ -1948,9 +1990,6 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
   L_glob_arr <- params$L_Omega_global_trend
   L_dev_arr <- params$L_deviation_group_trend
   sigma_arr <- params$sigma_group_trend
-  # Present when the rescale reached the stationary form for this
-  # trend, which covers a grouped AR(1).
-  L_stat_arr <- params$L_group_stationary
 
   checkmate::assert_numeric(alpha, len = ndraws, any.missing = FALSE)
   # Local helper: dim() returns integer; build expected as integer too
@@ -1994,21 +2033,8 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
   result <- matrix(0, ndraws, n_times * n_series)
 
   for (d in seq_len(ndraws)) {
-    # drop = FALSE not needed for 3D->2D slice; R returns a matrix.
-    L_glob_d <- L_glob_arr[d, , ]
-    alpha_d <- alpha[d]
-
     for (g in seq_len(n_groups)) {
-      L_full <- if (is.null(L_stat_arr)) {
-        hierarchical_group_cholesky(
-          alpha = alpha_d,
-          L_global = L_glob_d,
-          L_deviation = L_dev_arr[d, g, , ],
-          sigma = sigma_arr[d, g, ]
-        )
-      } else {
-        matrix(L_stat_arr[d, g, , ], n_sub, n_sub)
-      }
+      L_full <- group_trend_factor(params, d, g, n_sub)
 
       series_g <- series_by_group[[g]]
 
@@ -2233,8 +2259,13 @@ rescale_params_to_stationary <- function(params, object, draws_mat,
     }
     if (!is.null(omega)) {
       params$Sigma_trend <- omega
+      return(params)
     }
-    return(params)
+    # A grouped VAR gives the extraction the per-group correlation
+    # parameters, which leaves `Sigma_trend` out of `params` and `k`
+    # empty above. The program gives its first state `Omega_trend`
+    # over every series, and each group's block becomes one factor.
+    return(stationary_group_var_params(params, draws_mat, group_info))
   }
   if (!identical(trend_type, "AR")) {
     return(params)
@@ -2385,6 +2416,49 @@ stationary_correlated_params <- function(params, phi) {
   }
   params$sigma_trend <- sigma
   params$L_Omega_trend <- L
+  params
+}
+
+
+#' Stationary covariance of a grouped VAR, one factor per group
+#'
+#' The program solves `Omega = A Omega A' + Sigma` over every series
+#' and gives its first latent state that covariance. Groups keep to
+#' their own block of it, and each block becomes one Cholesky factor
+#' in `L_group_stationary`. A draw whose block fails the
+#' decomposition keeps its innovation factor.
+#'
+#' @noRd
+stationary_group_var_params <- function(params, draws_mat, group_info) {
+  group_inds <- as.integer(group_info$group_inds %||% integer(0))
+  if (length(group_inds) == 0L) {
+    return(params)
+  }
+  n_lv <- length(group_inds)
+  omega <- read_draws_matrix(draws_mat, "Omega_trend", n_lv, n_lv,
+                             required = FALSE)
+  if (is.null(omega)) {
+    return(params)
+  }
+  n_groups <- as.integer(group_info$n_groups)
+  n_sub <- as.integer(group_info$n_subgroups)
+  ndraws <- dim(omega)[1L]
+
+  L_stat <- array(0, dim = c(ndraws, n_groups, n_sub, n_sub))
+  for (d in seq_len(ndraws)) {
+    for (g in seq_len(n_groups)) {
+      members <- which(group_inds == g)
+      blk <- matrix(omega[d, members, members], n_sub, n_sub)
+      ev <- eigen(blk, symmetric = TRUE, only.values = TRUE)$values
+      ok <- min(ev) > sqrt(.Machine$double.eps) * max(ev)
+      L_stat[d, g, , ] <- if (ok) {
+        t(chol(blk))
+      } else {
+        group_trend_factor(params, d, g, n_sub)
+      }
+    }
+  }
+  params$L_group_stationary <- L_stat
   params
 }
 

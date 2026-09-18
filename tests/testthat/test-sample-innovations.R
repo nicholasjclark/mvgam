@@ -169,6 +169,31 @@ test_that("extract_hierarchical_cholesky_params errors on missing param", {
 })
 
 
+test_that("a shared AR coefficient hides its broadcast copies", {
+  # `coef_sharing = "shared"` samples one scalar per lag and copies
+  # it across the series. The copies repeat that scalar, and the
+  # default parameter view keeps the sampled name.
+  shared_pars <- c("shared_ar1_trend[1]", "ar1_trend[1]",
+                   "ar1_trend[2]", "sigma_trend[1]")
+  hidden <- is_hidden_unrotated(shared_pars)
+  expect_identical(shared_pars[hidden],
+                   c("ar1_trend[1]", "ar1_trend[2]"))
+
+  # The partial-autocorrelation spelling a contiguous `p >= 2` fit
+  # uses takes the same rule.
+  pacf_pars <- c("shared_ar1_pacf_trend[1]", "ar1_pacf_trend[1]",
+                 "ar1_pacf_trend[2]")
+  expect_identical(pacf_pars[is_hidden_unrotated(pacf_pars)],
+                   c("ar1_pacf_trend[1]", "ar1_pacf_trend[2]"))
+
+  # `coef_sharing = "hierarchical"` draws each series' coefficient
+  # from a population distribution, and each one is its own quantity.
+  hier_pars <- c("mu_ar1_trend[1]", "sigma_ar1_trend[1]",
+                 "ar1_trend[1]", "ar1_trend[2]")
+  expect_false(any(is_hidden_unrotated(hier_pars)))
+})
+
+
 test_that("stationary_from_chol lifts a matrix by the joint factor", {
   # A stationary covariance satisfies `Gamma = Phi Gamma Phi' + M`
   # for `Phi = diag(phi)` and `M = L L'`. That identity is the claim.
@@ -229,6 +254,63 @@ test_that("the flat stationary split rebuilds its own covariance", {
       diag(s1, nrow = n)
     expect_equal(rebuilt, target, tolerance = 1e-12)
   }
+})
+
+
+test_that("a grouped VAR takes its stationary blocks from Omega_trend", {
+  # The program solves `Omega = A Omega A' + Sigma` over every series
+  # and gives its first latent state that covariance. Groups keep to
+  # their own block of it, and each block becomes one factor.
+  n_g <- 2L
+  n_s <- 2L
+  n_lv <- n_g * n_s
+  ndraws <- 4L
+  group_info <- list(n_groups = n_g, n_subgroups = n_s,
+                     group_inds = c(1L, 1L, 2L, 2L))
+
+  blk1 <- matrix(c(0.40, 0.10, 0.10, 0.25), 2, 2)
+  blk2 <- matrix(c(0.30, -0.05, -0.05, 0.20), 2, 2)
+  omega <- matrix(0, n_lv, n_lv)
+  omega[1:2, 1:2] <- blk1
+  omega[3:4, 3:4] <- blk2
+
+  nms <- as.vector(outer(
+    seq_len(n_lv), seq_len(n_lv),
+    function(i, j) sprintf("Omega_trend[%d,%d]", i, j)
+  ))
+  draws_mat <- matrix(rep(as.numeric(omega), each = ndraws),
+                      nrow = ndraws, dimnames = list(NULL, nms))
+
+  eye <- as.numeric(diag(n_s))
+  params <- list(
+    alpha_cor_trend = rep(0.5, ndraws),
+    L_Omega_global_trend = array(rep(eye, each = ndraws),
+                                 c(ndraws, n_s, n_s)),
+    L_deviation_group_trend = array(rep(eye, each = ndraws * n_g),
+                                    c(ndraws, n_g, n_s, n_s)),
+    sigma_group_trend = array(1, c(ndraws, n_g, n_s))
+  )
+
+  out <- stationary_group_var_params(params, draws_mat, group_info)
+  L_stat <- out$L_group_stationary
+  expect_false(is.null(L_stat))
+  expect_identical(dim(L_stat), c(ndraws, n_g, n_s, n_s))
+  for (d in seq_len(ndraws)) {
+    expect_equal(tcrossprod(matrix(L_stat[d, 1, , ], n_s, n_s)), blk1)
+    expect_equal(tcrossprod(matrix(L_stat[d, 2, , ], n_s, n_s)), blk2)
+  }
+
+  # The identity matrices above make the innovation covariance the
+  # unit matrix, which the blocks depart from. A fit whose parameters
+  # came back unlifted would fail here.
+  expect_gt(max(abs(tcrossprod(matrix(L_stat[1, 1, , ], n_s, n_s)) -
+                      diag(n_s))), 0.1)
+
+  # A fit with no grouping gives the parameters back as they were.
+  expect_identical(
+    stationary_group_var_params(params, draws_mat, list()),
+    params
+  )
 })
 
 

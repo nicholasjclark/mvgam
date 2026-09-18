@@ -1246,7 +1246,22 @@ test_that("summary, print and the tidiers name the shared parameter", {
   for (tbl in list(vars, td$term, ps)) {
     expect_true(any(grepl("^shared_ar1_trend", tbl)))
   }
-  expect_true(any(grepl("^ar1_trend\\[", vars)))
+  # The per-series copies repeat that scalar. The default view leaves
+  # them out, and naming one retrieves it.
+  expect_false(any(grepl("^ar1_trend\\[", vars)))
+  named <- as.data.frame(fit_sh, variable = "^ar1_trend\\[",
+                         regex = TRUE)
+  # A draws data frame ends with `.chain`, `.iteration` and `.draw`,
+  # which index the rows.
+  cols <- setdiff(colnames(named), c(".chain", ".iteration", ".draw"))
+  expect_gt(length(cols), 0L)
+  expect_true(all(grepl("^ar1_trend\\[", cols)))
+  # Every copy equals the sampled scalar, which is what makes
+  # reporting each of them a repetition.
+  scalar <- as.numeric(dm_sh[, "shared_ar1_trend[1]"])
+  for (nm in cols) {
+    expect_equal(as.numeric(named[[nm]]), scalar)
+  }
 
   # A prior can still be set on the name `get_prior()` offers.
   gp <- get_prior(y ~ 1,

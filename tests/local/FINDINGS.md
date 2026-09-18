@@ -52,36 +52,6 @@ observation formula with predictors declares `b` for the
 population-level coefficients, and Stan refuses a shadowing loop
 variable.
 
-## One sampled scalar, three printed rows
-
-**112. `coef_sharing = "shared"` reports the coefficient three
-times.**
-
-`summary()` on a two-series `AR(p = 1, coef_sharing = "shared")` fit
-prints three rows holding one number:
-
-| parameter | Estimate | Est.Error | Rhat | Bulk_ESS |
-|---|---|---|---|---|
-| `shared_ar1_trend[1]` | 0.68 | 0.09 | 1.04 | 30.02 |
-| `ar1_trend[1]` | 0.68 | 0.09 | 1.04 | 30.02 |
-| `ar1_trend[2]` | 0.68 | 0.09 | 1.04 | 30.02 |
-
-`rep_vector` copies the sampled scalar into every series. The three
-rows hold one quantity. `variables()`, `tidy()` and
-`posterior_summary()` list all three as well. A reader meets three
-parameters where the model samples one.
-
-`is_hidden_unrotated()` is the existing mechanism for this shape. It
-hides the rotation-indeterminate `Z` while `Z_tilde` is present.
-`mvgam_user_pars(all = TRUE)` still reaches the hidden block. The
-same treatment would leave `shared_ar{lag}_trend` in the default
-view and keep `ar{lag}_trend` reachable for the consumers that take
-it, `forecast()` and the trend recursion among them.
-
-Under `"hierarchical"` each per-series coefficient is its own draw
-from `normal(mu_ar{lag}_trend, sigma_ar{lag}_trend)`, which leaves
-that mode unaffected.
-
 ## Debt the code carries in recognisable shapes
 
 **89. Six shapes remain, and a scan counts three of them.**
