@@ -86,9 +86,15 @@ before anything is removed.
 The scan's `suppress` count was examined site by site and holds no
 debt: each of the six replaces a coercion warning with a refusal
 naming the column, or takes the Pareto k out of the object it
-suppressed and reports it. `raw_axis` concentrates in
-`forecast.mvgam.R`. Several of the rest are the layers that build
-the axis. The `sort(unique(...))` sites in `sample_innovations.R`
+suppressed and reports it. All 24 `raw_axis` hits in
+`forecast.mvgam.R` were examined line by line. Every one takes a
+time column whose name already comes from `axis_vars()`. These
+functions subset rows, order them, drop duplicates and type an
+empty result against the frame in hand. The values they need are
+the frame's. Lines 467, 686 and 1707 each guard a past regression.
+The scan matches a raw `[[` of either axis and reports both alike.
+The count overstates the debt by those 24. The series axis in that
+file comes from the record at every site. The `sort(unique(...))` sites in `sample_innovations.R`
 are guarded last resorts, each
 carrying a comment naming the order it falls back to.
 
@@ -126,5 +132,31 @@ statements, and whether the stripping guards against a comment
 landing away from the line it describes is unverified.
 `polish_generated_stan_code()` in `R/stan_polish.R` is where to
 look.
+
+## The gate that proves an assertion can fail
+
+**115. The axis mutation gate is absent from the test suite.**
+
+The axis work names a mutation gate as its safeguard: reintroduce
+each historical axis defect one at a time and require the suite to
+fail on each. Five were listed, and three of them passed silently
+before the matrix was written.
+
+A search of the repository comes back empty. `assignInNamespace`
+is absent everywhere. `local_mocked_bindings()` appears in
+`test-trend-map.R`, `test-update.R`, `test-fitted.R` and
+`test-plot-factors.R`, each time for a different purpose. Every
+occurrence of `mutation` inside `test-axis-ordering.R` is the word
+`permutation`.
+
+The gate ran once and stayed uncommitted. A failure demonstrated
+once outside the suite leaves the next change unguarded. A pass is
+defined by an assertion that fails before the change. Each
+remaining axis pass in entry 89 needs the gate to show that.
+
+The five mutations to restore: a row block cut into one stretch per
+response, an alphabetical series axis, a time index numbered by
+first appearance, a transposed `times_trend` and `group_inds_trend`
+built in row order. A permuted `trend_map` is the sixth.
 
 
