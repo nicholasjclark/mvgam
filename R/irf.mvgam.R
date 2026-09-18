@@ -86,6 +86,7 @@ irf.mvgam <- function(
   checkmate::assert_flag(summary)
   checkmate::assert_flag(future)
   rlang::check_dots_empty()
+  require_fitted_model(object, "irf")
   assert_var_trend(object, surface = "irf()")
   var_post <- extract_var_posterior(object, ndraws, draw_ids)
 

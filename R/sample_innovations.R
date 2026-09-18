@@ -409,8 +409,9 @@ build_single_series_observation_structure <- function(newdata, time_var,
 #' @details
 #' Lookup order:
 #' 1. `trend_components$types\[1\]` - primary source used by summary/print
-#' 2. `trend_formula` existence check - issues warning if type unclear
-#' 3. Returns "None" if no trend model detected
+#' 2. `trend_metadata$trend_type` - the field a prefit records
+#' 3. `trend_formula` existence check - issues warning if type unclear
+#' 4. Returns "None" if no trend model detected
 #'
 #' @noRd
 get_trend_type <- function(object) {
@@ -425,7 +426,16 @@ get_trend_type <- function(object) {
     }
   }
 
-  # Secondary: check trend_formula existence (indicates trends present)
+  # On a prefit `trend_components` is empty, and
+  # `trend_metadata$trend_type` names the type. `trend_order_label()`
+  # takes that same field for the printed label, which gave `print()`
+  # and this resolver two results for one object.
+  recorded <- object$trend_metadata$trend_type
+  if (!is.null(recorded) && !is.na(recorded[1L])) {
+    return(recorded[1L])
+  }
+
+  # Tertiary: check trend_formula existence (indicates trends present)
   if (!is.null(object$trend_formula)) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(

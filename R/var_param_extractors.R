@@ -360,6 +360,7 @@ posterior_transition_matrix <- function(object, groups = NULL,
   checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
                             any.missing = FALSE, unique = TRUE)
+  require_fitted_model(object, "posterior_transition_matrix")
   probs <- sort(probs)
 
   one_matrix <- function(group) {

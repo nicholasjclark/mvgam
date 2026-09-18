@@ -75,6 +75,7 @@ fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
   checkmate::assert_flag(summary)
   checkmate::assert_flag(future)
   rlang::check_dots_empty()
+  require_fitted_model(object, "fevd")
   assert_var_trend(object, surface = "fevd()")
   var_post <- extract_var_posterior(object, ndraws, draw_ids)
 

@@ -577,20 +577,26 @@ test_that("hindcast arms are the series, in order, and distinct", {
 test_that("the VAR methods gate on one trend-type source", {
   # `irf()`, `fevd()` and `posterior_transition_matrix()` each call
   # `assert_var_trend()`, which takes `detect_var_trend()` and then
-  # `get_trend_type()`. That resolver has one source,
-  # `trend_components$types`. A second branch over a nested
-  # `trend_metadata$trend` list was deleted after measuring all 54
-  # cached fits: 42 record a type in `trend_components$types` and
-  # 12 are trendless, which accounts for every one.
+  # `get_trend_type()`. That resolver takes `trend_components$types`
+  # first and `trend_metadata$trend_type` second. A fitted model
+  # fills both slots; a prefit fills the second alone.
   expect_identical(fit$trend_components$types[1L], "VAR")
+  expect_identical(fit$trend_metadata$trend_type, "VAR")
   expect_identical(get_trend_type(fit), "VAR")
   expect_identical(detect_var_trend(fit), "VAR")
 
-  # Emptying that one source stops all three methods. A rival
-  # resolver would name the type here and leave them running on a
-  # type this object stopped recording.
-  blanked <- fit
-  blanked$trend_components$types <- NA_character_
+  # Emptying the first slot leaves the recorded type, which is the
+  # shape a prefit arrives in. Taking the first slot alone reported
+  # "None" for every prefit, and the three methods below then
+  # refused a VAR naming the trend type as the reason.
+  one_slot <- fit
+  one_slot$trend_components$types <- NA_character_
+  expect_identical(get_trend_type(one_slot), "VAR")
+  expect_identical(detect_var_trend(one_slot), "VAR")
+
+  # Emptying both slots stops all three methods.
+  blanked <- one_slot
+  blanked$trend_metadata$trend_type <- NULL
   expect_identical(get_trend_type(blanked), "None")
   expect_null(detect_var_trend(blanked))
   for (meth in list(function(x) irf(x, h = 2L),

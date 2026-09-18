@@ -91,6 +91,40 @@ test_that("a prefit states what it has and what it lacks", {
 })
 
 
+test_that("a VAR prefit names its trend and the posterior it needs", {
+  # The registry loop above builds a trendless prefit. The VAR
+  # methods stop at the trend-type gate there, before their draws.
+  # A VAR prefit drives them one step further.
+  set.seed(11)
+  dat <- data.frame(
+    y = rnorm(60), time = rep(1:20, times = 3L),
+    series = factor(rep(c("a", "b", "c"), each = 20L))
+  )
+  pf <- suppressWarnings(mvgam(
+    y ~ 1, trend_formula = ~ VAR(cor = TRUE), data = dat,
+    family = gaussian(), run_model = FALSE, silent = 2
+  ))
+  expect_s3_class(pf, "mvgam_prefit")
+
+  # `trend_components` is empty until a fit runs, and the type is in
+  # `trend_metadata`. Both resolvers take the second.
+  expect_null(pf$trend_components$types)
+  expect_identical(get_trend_type(pf), "VAR")
+  expect_identical(detect_var_trend(pf), "VAR")
+
+  # Each method states the posterior it needs, in place of the
+  # trend-type refusal and in place of the internal draws error.
+  for (meth in list(function(x) irf(x, h = 2L),
+                    function(x) fevd(x, h = 2L),
+                    posterior_transition_matrix)) {
+    err <- expect_error(meth(pf), "requires a fitted Stan model")
+    expect_match(conditionMessage(err), "run_model", fixed = TRUE)
+    expect_false(grepl(internal_draws_error, conditionMessage(err),
+                       fixed = TRUE))
+  }
+})
+
+
 test_that("mvgam_multiple gives one prefit when run_model is FALSE", {
   set.seed(9)
   mk <- function() {
