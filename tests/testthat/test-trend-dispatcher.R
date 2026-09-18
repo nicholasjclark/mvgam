@@ -741,13 +741,14 @@ test_that("trend constructors record gr and subgr", {
                       gr = habitat, subgr = species),
            want = list(gr = "habitat", subgr = "species", p = 2,
                        cor = TRUE)),
-      # cor = FALSE is stored as given.
-      list(spec = RW(gr = region, subgr = site, cor = FALSE),
-           want = list(gr = "region", subgr = "site", cor = FALSE)),
-      list(spec = AR(gr = habitat, subgr = species, p = 1,
-                     cor = FALSE),
+      # A grouping resolves `cor` to TRUE, matching the program,
+      # which declares the group correlation parameters whenever
+      # `gr` is named.
+      list(spec = RW(gr = region, subgr = site),
+           want = list(gr = "region", subgr = "site", cor = TRUE)),
+      list(spec = AR(gr = habitat, subgr = species, p = 1),
            want = list(gr = "habitat", subgr = "species",
-                       cor = FALSE)),
+                       cor = TRUE)),
       list(spec = VAR(gr = ecosystem, subgr = location, p = 2),
            want = list(gr = "ecosystem", subgr = "location"))
     )
@@ -757,6 +758,34 @@ test_that("trend constructors record gr and subgr", {
       expect_equal(case$spec[[fld]], case$want[[fld]])
     }
   }
+})
+
+test_that("a grouping refuses cor = FALSE", {
+  # The generated program declares the group correlation parameters
+  # whenever `gr` is named, for either value of `cor`. An explicit
+  # `cor = FALSE` states a model mvgam lacks a form for, and each
+  # constructor taking `gr` refuses it, as `VAR()` and `ZMVN()` do.
+  err <- suppressWarnings(expect_error(
+    AR(p = 1, gr = region, subgr = species, cor = FALSE),
+    "grouped trend requires correlated innovations"
+  ))
+  # The refusal names the columns the caller supplied.
+  expect_match(conditionMessage(err), "species", fixed = TRUE)
+  expect_match(conditionMessage(err), "region", fixed = TRUE)
+
+  suppressWarnings(expect_error(
+    RW(gr = region, subgr = site, cor = FALSE),
+    "grouped trend requires correlated innovations"
+  ))
+
+  # Leaving `cor` unset resolves it to TRUE for a grouped trend and
+  # leaves it FALSE for an ungrouped one.
+  expect_true(suppressWarnings(
+    AR(p = 1, gr = region, subgr = species)$cor
+  ))
+  expect_true(suppressWarnings(RW(gr = region, subgr = site)$cor))
+  expect_false(suppressWarnings(AR(p = 1)$cor))
+  expect_false(suppressWarnings(RW()$cor))
 })
 
 test_that("grouping is preserved through formula parsing", {

@@ -1733,9 +1733,15 @@ print.mvgam_trend <- function(x, ...) {
 #' @param cor \code{Logical}. Include correlated process errors as part of a
 #'   multivariate normal process model? If \code{TRUE} and if
 #'   \code{n_series > 1} in the supplied data, a fully structured covariance
-#'   matrix will be estimated for the process errors. Default is \code{FALSE}.
-#'   Note: For \code{VAR()} models, correlation is always enabled (\code{cor = TRUE})
-#'   as this is essential for optimal performance.
+#'   matrix will be estimated for the process errors. \code{AR()} and
+#'   \code{RW()} default to \code{NULL}, which resolves to \code{FALSE}
+#'   for an ungrouped trend and to \code{TRUE} whenever \code{gr} names
+#'   a grouping variable: a grouped trend estimates correlations among
+#'   the \code{subgr} units within each level of \code{gr}, which is
+#'   the model \code{gr} exists to specify. \code{VAR()} and
+#'   \code{ZMVN()} always estimate correlations and refuse
+#'   \code{cor = FALSE}, as do \code{AR(gr = ...)} and
+#'   \code{RW(gr = ...)}.
 #'
 #' @param p Specification of the autoregressive lag set. The
 #'   semantics differ slightly across trend types:
@@ -1830,6 +1836,10 @@ print.mvgam_trend <- function(x, ...) {
 #'   correlation matrix \eqn{\Omega_{global}} (larger values of
 #'   \eqn{\alpha_{cor}} indicate a greater degree of shrinkage, i.e. a greater
 #'   degree of partial pooling).
+#'
+#'   A grouped trend estimates correlations among the `subgr` units
+#'   within each level of `gr`. `cor` defaults to `TRUE` for such a
+#'   trend, and an explicit `cor = FALSE` is refused.
 #'
 #'   When used within a `VAR()` model, this essentially sets up a hierarchical
 #'   panel vector autoregression where both the autoregressive and correlation
@@ -2149,7 +2159,7 @@ RW = function(
     time = NA,
     series = NA,
     ma = FALSE,
-    cor = FALSE,
+    cor = NULL,
     gr = NA,
     subgr = NA,
     n_lv = NULL,
@@ -2158,7 +2168,7 @@ RW = function(
 
   # Basic input validation for trend-specific parameters
   checkmate::assert_logical(ma, len = 1)
-  checkmate::assert_logical(cor, len = 1)
+  checkmate::assert_logical(cor, len = 1, null.ok = TRUE)
   assert_trend_map_input(trend_map)
 
   # Use helper function for clean object creation
@@ -2189,7 +2199,7 @@ RW = function(
 
 #' @rdname trend_constructors
 #' @export
-AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
+AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = NULL,
               gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL,
               coef_sharing = c("none", "shared", "hierarchical"),
               df = Inf) {
@@ -2202,7 +2212,7 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
 
   # Basic input validation
   checkmate::assert_logical(ma, len = 1)
-  checkmate::assert_logical(cor, len = 1)
+  checkmate::assert_logical(cor, len = 1, null.ok = TRUE)
   assert_trend_map_input(trend_map)
   coef_sharing <- match.arg(coef_sharing)
 
@@ -2505,6 +2515,10 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'   correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
 #'   correlation matrix \eqn{\Omega_{global}}. If `gr` is supplied then `subgr`
 #'   *must* also be supplied
+#'
+#'   A grouped trend estimates correlations among the `subgr` units
+#'   within each level of `gr`. `cor` defaults to `TRUE` for such a
+#'   trend, and an explicit `cor = FALSE` is refused.
 #'
 #' @param subgr A subgrouping `factor` variable specifying which element in
 #'   `data` represents the different observational units. Defaults to `series`
@@ -2830,6 +2844,30 @@ create_mvgam_trend <- function(trend_type, ...,
     cap = cap_var,
     ...
   )
+
+  # A grouping estimates correlations among the `subgr` units within
+  # each level of `gr`. The generated Stan program declares the group
+  # correlation parameters whenever `gr` is named, for either value of
+  # `cor`. `cor` resolves to TRUE for a grouped trend, and an explicit
+  # `cor = FALSE` is refused the way `VAR()` and `ZMVN()` refuse it.
+  if (named_var(gr_var)) {
+    if (isFALSE(trend_obj$cor)) {
+      stop(insight::format_error(c(
+        "A grouped trend requires correlated innovations.",
+        x = paste0(
+          "'gr' models correlations among the '", subgr_var,
+          "' units within each level of '", gr_var, "'."
+        ),
+        i = paste0(
+          "Drop 'cor = FALSE' to keep the grouping, or drop 'gr' and ",
+          "'subgr' for independent per-series innovations."
+        )
+      )))
+    }
+    trend_obj$cor <- TRUE
+  } else if (is.null(trend_obj$cor)) {
+    trend_obj$cor <- FALSE
+  }
 
   # Override validation rules if provided
   if (!is.null(.validation_rules)) {

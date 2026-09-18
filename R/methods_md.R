@@ -2189,9 +2189,6 @@ trend_eps_vec <- function(obj) {
 
 #' @noRd
 innovation_rows <- function(obj, is_vector, has_cor, gr = NULL) {
-  # Hierarchical grouping forces cross-series correlation
-  # (see AR() / VAR() `@param gr`).
-  if (!is.null(gr)) has_cor <- TRUE
   sig <- sigma_symbol(gr)
   eps_vec <- trend_eps_vec(obj)
 
@@ -2411,7 +2408,6 @@ render_latent_car <- function(obj, notation) {
 render_latent_zmvn <- function(obj, notation) {
   has_cor <- isTRUE(obj$trend_metadata$has_cor)
   gr <- trend_grouping_var(obj)
-  if (!is.null(gr)) has_cor <- TRUE
   cov <- if (has_cor) {
     sigma_symbol(gr)
   } else {

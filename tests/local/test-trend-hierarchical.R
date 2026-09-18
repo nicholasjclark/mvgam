@@ -1262,3 +1262,34 @@ test_that("residual_cor(by_group = TRUE) returns one block per region", {
   expect_false(isTRUE(all.equal(res[["_global"]]$cor[off],
                                 res[[regions[1L]]]$cor[off])))
 })
+
+
+test_that("the two grouped spellings are one model", {
+  # `gr` and `subgr` declare correlations among the subgroups within
+  # each group, and the generated program declares those parameters
+  # whenever `gr` is named. Both spellings resolve to one spec.
+  bare <- suppressWarnings(AR(gr = region, subgr = species))
+  stated <- suppressWarnings(AR(gr = region, subgr = species,
+                                cor = TRUE))
+  expect_true(bare$cor)
+  expect_identical(bare, stated)
+
+  # The marginal prediction path draws correlated innovations here. A
+  # grouped fit treated as independent discarded the within-group
+  # correlation the sampler produced, leaving every marginal surface
+  # uncorrelated while the program correlated them.
+  cs <- mvgam:::get_trend_covariance_structure(fit)
+  expect_true(cs$hierarchical)
+  expect_true(cs$has_correlations)
+  expect_identical(
+    mvgam:::covariance_structure_key(cs$hierarchical, cs$pattern),
+    "hier.cholesky_scaled"
+  )
+
+  # The per-group parameters are the ones in hand.
+  expect_true(all(
+    c("alpha_cor_trend", "L_Omega_global_trend",
+      "L_deviation_group_trend", "sigma_group_trend") %in%
+      names(cs$params)
+  ))
+})

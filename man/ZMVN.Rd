@@ -51,7 +51,11 @@ where \eqn{\Omega_{global}} is a \emph{global} correlation matrix,
 \eqn{p} is a weighting parameter controlling how strongly the local
 correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
 correlation matrix \eqn{\Omega_{global}}. If \code{gr} is supplied then \code{subgr}
-\emph{must} also be supplied}
+\emph{must} also be supplied
+
+A grouped trend estimates correlations among the \code{subgr} units
+within each level of \code{gr}. \code{cor} defaults to \code{TRUE} for such a
+trend, and an explicit \code{cor = FALSE} is refused.}
 
 \item{subgr}{A subgrouping \code{factor} variable specifying which element in
 \code{data} represents the different observational units. Defaults to \code{series}
@@ -89,9 +93,15 @@ latent process is used per series.}
 \item{cor}{\code{Logical}. Include correlated process errors as part of a
 multivariate normal process model? If \code{TRUE} and if
 \code{n_series > 1} in the supplied data, a fully structured covariance
-matrix will be estimated for the process errors. Default is \code{FALSE}.
-Note: For \code{VAR()} models, correlation is always enabled (\code{cor = TRUE})
-as this is essential for optimal performance.}
+matrix will be estimated for the process errors. \code{AR()} and
+\code{RW()} default to \code{NULL}, which resolves to \code{FALSE}
+for an ungrouped trend and to \code{TRUE} whenever \code{gr} names
+a grouping variable: a grouped trend estimates correlations among
+the \code{subgr} units within each level of \code{gr}, which is
+the model \code{gr} exists to specify. \code{VAR()} and
+\code{ZMVN()} always estimate correlations and refuse
+\code{cor = FALSE}, as do \code{AR(gr = ...)} and
+\code{RW(gr = ...)}.}
 
 \item{trend_map}{Optional \code{data.frame} specifying which latent
 process each series maps onto, giving fixed (rather than estimated)

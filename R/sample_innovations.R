@@ -562,8 +562,7 @@ covariance_param_specs <- list(
     hierarchical = c("Sigma_group_trend")
   ),
   diagonal = list(
-    simple = c("sigma_trend"),
-    hierarchical = c("sigma_group_trend")
+    simple = c("sigma_trend")
   ),
   none = list(simple = character(0), hierarchical = character(0))
 )
@@ -613,7 +612,8 @@ covariance_structure_key <- function(hierarchical, effective_pattern) {
 #'     \item \code{pattern}: Covariance pattern type
 #'     \item \code{n_series}: Number of series
 #'     \item \code{hierarchical}: Whether model uses hierarchical structure
-#'     \item \code{has_correlations}: Whether cor=TRUE in trend constructor
+#'     \item \code{has_correlations}: Whether \code{cor} resolved to
+#'       TRUE on the trend spec. A grouping resolves it to TRUE.
 #'     \item \code{ndraws}: Number of posterior draws extracted
 #'     \item \code{params}: List of extracted parameter matrices
 #'     \item \code{group_info}: Group structure (if hierarchical)
@@ -659,11 +659,12 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   pattern <- get_covariance_pattern(trend_type)
 
   specs <- object$trend_components$specifications
-  has_correlations <- if (inherits(specs, "mvgam_trend")) {
-    isTRUE(specs$cor)
-  } else {
-    isTRUE(specs[[1]]$cor)
-  }
+  spec_one <- if (inherits(specs, "mvgam_trend")) specs else specs[[1]]
+  # `create_mvgam_trend()` resolves `cor` to TRUE for a grouped trend,
+  # matching the program, which declares the group correlation
+  # parameters whenever `gr` is named. The grouping clause here covers
+  # fits saved before that resolution existed.
+  has_correlations <- isTRUE(spec_one$cor) || named_var(spec_one$gr)
 
   if (pattern == "none") {
     return(list(
@@ -703,8 +704,8 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   n_series_int <- as.integer(n_series)
 
   # Dispatch posterior-parameter extraction on (hierarchical, pattern).
-  # Multi-index params (Cholesky factors, full covariance, hierarchical
-  # diagonal) require explicit named-column lookup; extract_named_params()
+  # Multi-index params (Cholesky factors, full covariance) require
+  # explicit named-column lookup; extract_named_params()
   # sorts only by first index, which is brittle for 2D+ arrays where the
   # secondary order then depends on the source storage convention.
   # The fallback covers patterns that are single-index (e.g. simple
@@ -720,8 +721,6 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   params <- switch(
     dispatch_key,
     "hier.cholesky_scaled"  = extract_hierarchical_cholesky_params(
-                                draws_mat, group_info),
-    "hier.diagonal"         = extract_hierarchical_diagonal_params(
                                 draws_mat, group_info),
     "flat.cholesky_scaled"  = extract_simple_cholesky_params(
                                 draws_mat, n_series_int),
@@ -1114,65 +1113,6 @@ extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
     L_deviation_group_trend = L_dev,
     sigma_group_trend = sigma_grp
   )
-}
-
-
-#' Extract Hierarchical Diagonal Parameters Broadcast to Per-Series Sigma
-#'
-#' For hierarchical models with `cor = FALSE` (RW(gr=), AR(gr=), ZMVN(gr=)
-#' with diagonal innovation covariance), the posterior holds per-group SDs
-#' as `sigma_group_trend\[g, k\]`. The innovation sampler operates on a flat
-#' per-series `sigma_trend\[d, s\]` matrix, so we broadcast each series to
-#' its group's `k`-th entry, where `k` is the series' index within its
-#' group as ordered in the Stan codegen (matches the `if
-#' (group_inds_trend\[s\] == g_idx) { k += 1; ... }` loop in
-#' `generate_hierarchical_correlation_parameters()`).
-#'
-#' @return List with `sigma_trend`: matrix \[ndraws x n_series\]
-#'
-#' @noRd
-extract_hierarchical_diagonal_params <- function(draws_mat, group_info) {
-  checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
-  checkmate::assert_list(group_info)
-  checkmate::assert_names(
-    names(group_info),
-    must.include = c("n_groups", "n_subgroups", "group_inds")
-  )
-
-  ndraws <- nrow(draws_mat)
-  n_groups <- as.integer(group_info$n_groups)
-  n_sub <- as.integer(group_info$n_subgroups)
-  group_inds <- as.integer(group_info$group_inds)
-  n_series <- length(group_inds)
-  all_cols <- colnames(draws_mat)
-
-  pull_col <- function(name) {
-    if (!name %in% all_cols) {
-      stop(insight::format_error(c(
-        paste0("Posterior parameter '", name, "' not found."),
-        i = "Required for hierarchical diagonal covariance."
-      )))
-    }
-    as.numeric(draws_mat[, name])
-  }
-
-  # Sub-index of each series within its group, matching Stan loop order.
-  sub_idx <- integer(n_series)
-  group_counter <- integer(n_groups)
-  for (s in seq_len(n_series)) {
-    g <- group_inds[s]
-    group_counter[g] <- group_counter[g] + 1L
-    sub_idx[s] <- group_counter[g]
-  }
-
-  sigma_trend <- matrix(0, ndraws, n_series)
-  for (s in seq_len(n_series)) {
-    sigma_trend[, s] <- pull_col(
-      sprintf("sigma_group_trend[%d,%d]", group_inds[s], sub_idx[s])
-    )
-  }
-
-  list(sigma_trend = sigma_trend)
 }
 
 

@@ -243,8 +243,13 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     NULL
   }
 
-  # `trend_model` is the bare type, which the `cor` and `ZMVN` tests
-  # match against. The printed line also names the order the trend
+  # `trend_model` is the bare constructor type, which a correlated
+  # `AR()` and an independent one share. Whether this fit estimates
+  # cross-series correlations comes from the trend metadata, where
+  # the trend spec recorded it.
+  out$trend_has_cor <- isTRUE(object$trend_metadata$has_cor)
+
+  # The `ZMVN` test in `build_next_steps()` matches the bare type. The printed line also names the order the trend
   # was fitted at, which `printed_trend_label()` renders from the
   # fit's own metadata. A summary object carries neither that
   # metadata nor `trend_components`, and the helper's fallback then
@@ -864,8 +869,7 @@ format_trend_line <- function(x) {
 build_next_steps <- function(x) {
   has_factors <- !is.null(x$loadings) || !is.null(x$loadings_prior)
   trend_model <- x$trend_model %||% ""
-  has_cor_trend <- has_factors ||
-    grepl("cor$|cor[a-z]|ZMVN", trend_model)
+  has_cor_trend <- has_factors || isTRUE(x$trend_has_cor)
   has_covariates <- !is.null(x$fixed) &&
     nrow(x$fixed) > 1L
   forecastable <- !grepl("^ZMVN", trend_model)

@@ -44,28 +44,50 @@ observation formula with predictors declares `b` for the
 population-level coefficients, and Stan refuses a shadowing loop
 variable.
 
-## One grouped process, two stationary scales
+## One stationary rule, two implementations
 
-**113. The marginal surface scales a grouped trend per series.**
+**113. A grouped `AR()` reports the innovation correlation where a
+flat one reports the stationary correlation.**
 
-`stationary_correlated_params()` (`sample_innovations.R:2371`)
-computes `Gamma0[i, j] = Sigma[i, j] / (1 - ar_i * ar_j)` for a
-correlated `AR(1)`, which is what the Stan program now starts at.
-The grouped branch (`:2318-2344`) multiplies `sigma_group_trend`
-by `sqrt(mult)` per series, where `mult` holds the per-series
-`1 / (1 - ar^2)`. Stan's grouped program starts at the joint form
-taken over each group's member series.
+`residual_cor()` states one rule for both shapes
+(`residual_cor.R:74-87`). It summarises the covariance the latent
+states settle at, and its roxygen says "a hierarchical `AR()` has
+its per-group scales lifted the same way". Measured on a fitted
+`AR(gr = region, subgr = species)` over 200 draws:
 
-The comment above the correlated branch (`:2302-2307`) sets out
-why a factor applied series by series differs from the joint form.
-It measures the gap at a fifth of the cross-covariance on a fitted
-pair. That reasoning covers the grouped case. The grouped branch
-uses the form it argues against.
+| group | innovation | stationary | reported |
+|---|---|---|---|
+| 1 | 0.10813 | 0.07632 | 0.10813 |
+| 2 | 0.09470 | 0.06868 | 0.09470 |
 
-`ar_stationary_multiplier()` supplies a per-series vector. A
-grouped repair needs each group's `Sigma_group` with the `ar1` of
-its member series, which `group_inds_trend` already maps. A
-grouped factor model is refused ("Hierarchical AR models cannot
+Two mechanisms produce that.
+
+`rescale_params_to_stationary()`'s grouped branch
+(`sample_innovations.R:2258-2284`) multiplies
+`sigma_group_trend[, g, k]` by a per-series `sqrt(mult)` and leaves
+the three correlation parameters as they were. The off-diagonal
+becomes `S[i, j] / sqrt((1 - phi_i^2)(1 - phi_j^2))` where
+stationarity gives `S[i, j] / (1 - phi_i * phi_j)`. The flat branch
+computes the second form through `stationary_correlated_params()`
+(`:2311`), and the comment at `:2242-2247` names the first an
+approximation worth a fifth of the cross-covariance. The diagonal is
+lifted correctly, which leaves the reported matrix a hybrid:
+stationary variances with innovation correlations.
+
+`compute_residcor_hierarchical()` (`residual_cor.R:531-562`) builds
+every block from the three correlation parameters. The scales stay
+outside its arithmetic, which leaves the lift invisible to the
+reported correlation whatever the rescale does to them.
+
+A repair goes through `hierarchical_group_cholesky()` (`:1882-1890`),
+which recombines the three correlation parameters and the group's
+scales per draw. `L_Omega_global_trend` and
+`L_deviation_group_trend` are shared across groups. A per-group
+stationary correction lies beyond what the pair expresses. The
+factor enters as its own slot per group, which the helper prefers
+when present.
+
+A grouped factor model is refused ("Hierarchical AR models cannot
 use factor models"), which fixes each group's member count at its
 subgroup count.
 
