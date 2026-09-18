@@ -784,10 +784,18 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
                                           resp = resp)
   s_idx <- obs_struct$series_int
   time_var <- axis_vars(mvgam_fit)$time_var
+  # The grid the trend was fitted on, from the record that owns it.
+  # A fit saved before that record existed rebuilds the grid from the
+  # stored frame, which gives the same vector wherever both are
+  # present.
   train_data <- mvgam_training_data(mvgam_fit)
+  fitted_times <- mvgam_axes(mvgam_fit)$time$values
+  if (is.null(fitted_times) && time_var %in% names(train_data)) {
+    fitted_times <- sort(unique(train_data[[time_var]]))
+  }
   raw_t_idx <- if (time_var %in% names(newdata) &&
-                     time_var %in% names(train_data)) {
-    match(newdata[[time_var]], sort(unique(train_data[[time_var]])))
+                     !is.null(fitted_times)) {
+    match(newdata[[time_var]], fitted_times)
   } else {
     NULL
   }
