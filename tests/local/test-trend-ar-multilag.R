@@ -1045,6 +1045,31 @@ test_that("the partial autocorrelations hold their declared bounds", {
 })
 
 
+test_that("a contiguous AR(p = 2) starts at its stationary distribution", {
+  # The first two states are built from the partial autocorrelations
+  # by the Levinson-Durbin recursion. Ground truth here is the closed
+  # form for p = 2, written from the definition: the marginal variance
+  # is sigma^2 / ((1 - pacf1^2) (1 - pacf2^2)), and the second state
+  # adds the order-one predictor pacf1 * lv[1] to an innovation of
+  # variance sigma^2 / (1 - pacf2^2). Stored draws keep about nine
+  # significant digits.
+  for (s in seq_len(n_series)) {
+    lv1 <- as.numeric(dm2[, paste0("lv_trend[1,", s, "]")])
+    lv2 <- as.numeric(dm2[, paste0("lv_trend[2,", s, "]")])
+    z1 <- as.numeric(dm2[, paste0("innovations_trend[1,", s, "]")])
+    z2 <- as.numeric(dm2[, paste0("innovations_trend[2,", s, "]")])
+    sg <- as.numeric(dm2[, paste0("sigma_trend[", s, "]")])
+    p1 <- as.numeric(dm2[, paste0("ar1_pacf_trend[", s, "]")])
+    p2 <- as.numeric(dm2[, paste0("ar2_pacf_trend[", s, "]")])
+    gamma0 <- sg^2 / ((1 - p1^2) * (1 - p2^2))
+    expected1 <- sqrt(gamma0) * z1
+    expected2 <- p1 * expected1 + sqrt(sg^2 / (1 - p2^2)) * z2
+    expect_equal(lv1, expected1, tolerance = 1e-6)
+    expect_equal(lv2, expected2, tolerance = 1e-6)
+  }
+})
+
+
 test_that("a sparse lag set keeps the bounded coefficients", {
   # The scoping claim. A sparse lag set fixes its intermediate
   # coefficients at zero, a constraint the recursion cannot state,

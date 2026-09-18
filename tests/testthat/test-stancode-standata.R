@@ -1909,41 +1909,49 @@ test_that("AR(p=1) latent state at t=1 uses stationary marginal init", {
 })
 
 
-test_that("AR(p>1) and AR with MA keep innovation-only init", {
-  # The stationary initialisation covers three AR paths: AR(p=1)
-  # with independent innovations, AR(p=1) with correlated
-  # innovations and a grouped AR(p=1). Two families remain outside
-  # it, each needing a different stationary covariance:
-  #
-  #   * AR(p>1)          : Yule-Walker on the companion form, which
-  #                        `initial_joint_var()` supplies in the VAR
-  #                        generator today
-  #   * AR(p=1, ma=TRUE) : the ARMA(1, 1) stationary variance
-  #                        involves the MA coefficient, and the
-  #                        t = 1 innovation enters the recursion
-  #                        again at t = 2
-  #
-  # Both keep the per-lag innovation-only initialisation until the
-  # matching covariance exists.
+test_that("a contiguous AR(p>1) starts at its stationary distribution", {
+  # The first p states are drawn from their joint stationary
+  # distribution by `ar_stationary_init()`, which builds them from
+  # the partial autocorrelations through the Levinson-Durbin
+  # recursion. The marginal variance is sigma^2 / prod(1 - pacf^2),
+  # and conditioning on m earlier states multiplies it by
+  # prod_{k<=m}(1 - pacf_k^2). The per-series divisor and the
+  # correlated form each belong to a different program.
   data <- setup_stan_test_data()$multivariate
-  for (tf in list(
-    ~ AR(p = 2),
-    ~ AR(p = 1, ma = TRUE)
-  )) {
-    mf <- mvgam_formula(count ~ 1 + x, trend_formula = tf)
-    code <- as.character(stancode(
-      mf, data = data, family = poisson(), validate = TRUE
-    ))
-    lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
-    expect_false(any(grepl(
-      "sqrt\\(1\\s*-\\s*square\\(ar1_trend", lines
-    )))
-    expect_false(any(grepl("Gamma_init", lines, fixed = TRUE)))
-    expect_true(any(grepl(
-      "lv_trend\\[i,\\s*:\\s*\\]\\s*=\\s*(scaled_|ma_)innovations_trend",
-      lines
-    )))
-  }
+  mf <- mvgam_formula(count ~ 1 + x, trend_formula = ~ AR(p = 2))
+  code <- as.character(stancode(
+    mf, data = data, family = poisson(), validate = TRUE
+  ))
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  expect_false(any(grepl(
+    "sqrt\\(1\\s*-\\s*square\\(ar1_trend", lines
+  )))
+  expect_false(any(grepl("Gamma_init", lines, fixed = TRUE)))
+  expect_true(any(grepl("lv_trend\\[1\\s*:\\s*2,\\s*j\\]", lines)))
+  expect_true(any(grepl("ar_stationary_init\\(pacf_j", lines)))
+})
+
+
+test_that("an ARMA term keeps innovation-only init", {
+  # The ARMA(1, 1) stationary variance involves the MA coefficient,
+  # and the t = 1 innovation enters the recursion again at t = 2.
+  # The pair (lv_0, eps_0) is the quantity to match, which needs a
+  # parameter the program lacks. The raw start stays until then.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(count ~ 1 + x,
+                      trend_formula = ~ AR(p = 1, ma = TRUE))
+  code <- as.character(stancode(
+    mf, data = data, family = poisson(), validate = TRUE
+  ))
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  expect_false(any(grepl(
+    "sqrt\\(1\\s*-\\s*square\\(ar1_trend", lines
+  )))
+  expect_false(any(grepl("Gamma_init", lines, fixed = TRUE)))
+  expect_true(any(grepl(
+    "lv_trend\\[i,\\s*:\\s*\\]\\s*=\\s*(scaled_|ma_)innovations_trend",
+    lines
+  )))
 })
 
 

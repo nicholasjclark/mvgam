@@ -4539,11 +4539,13 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
 }
 
 
-#' Stan function mapping partial autocorrelations to AR coefficients
+#' Stan functions for the partial autocorrelation parameterisation
 #'
-#' `pacf` holds one partial autocorrelation per lag, each inside
-#' (-1, 1). The returned vector holds the AR(p) coefficients they
-#' imply. Every such input gives a stationary process.
+#' `ar_pacf_to_coef` maps one partial autocorrelation per lag, each
+#' inside (-1, 1), to the AR(p) coefficients they imply. Every such
+#' input gives a stationary process. `ar_stationary_init` applies
+#' the same recursion at each order to draw the first p states from
+#' their joint stationary distribution.
 #'
 #' @return A `functions` block stanvar
 #' @noRd
@@ -4568,6 +4570,35 @@ ar_pacf_functions_stanvar <- function() {
       "      phi = work;\n",
       "    }\n",
       "    return phi;\n",
+      "  }\n",
+      "\n",
+      "  // Stationary initial states for a scalar AR(p), from the\n",
+      "  // partial autocorrelations the program samples. `pacf`\n",
+      "  // gives one value per lag inside (-1, 1), `sigma` the\n",
+      "  // innovation standard deviation and `z` the p standard\n",
+      "  // normal draws. The marginal variance is\n",
+      "  // sigma^2 / prod(1 - pacf^2), and conditioning on m\n",
+      "  // earlier states multiplies it by prod_{k<=m}(1 - pacf_k^2).\n",
+      "  // Each order's coefficients come from the recursion above,\n",
+      "  // applied to the leading m partial autocorrelations.\n",
+      "  vector ar_stationary_init(vector pacf, real sigma, vector z) {\n",
+      "    int p = num_elements(pacf);\n",
+      "    vector[p] state;\n",
+      "    real v = square(sigma);\n",
+      "    for (k in 1:p) {\n",
+      "      v /= (1 - square(pacf[k]));\n",
+      "    }\n",
+      "    state[1] = sqrt(v) * z[1];\n",
+      "    for (m in 1:(p - 1)) {\n",
+      "      vector[m] phi_m = ar_pacf_to_coef(pacf[1:m]);\n",
+      "      real mean_m = 0;\n",
+      "      v *= (1 - square(pacf[m]));\n",
+      "      for (j in 1:m) {\n",
+      "        mean_m += phi_m[j] * state[m - j + 1];\n",
+      "      }\n",
+      "      state[m + 1] = mean_m + sqrt(v) * z[m + 1];\n",
+      "    }\n",
+      "    return state;\n",
       "  }"
     ),
     block = "functions"
@@ -4737,10 +4768,20 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # `stationary_correlated_params()` computes the same quantity for
   # marginal prediction, and the two agree once both are in place.
   #
-  # Two shapes keep the raw innovation start:
-  #   * AR(p>1): the stationary covariance needs the Yule-Walker
-  #     solve on the companion form, which `initial_joint_var()` in
-  #     the VAR generator provides today.
+  # A contiguous AR(p>1) with independent innovations starts at its
+  # joint stationary distribution too. The marginal variance is
+  # sigma^2 / prod(1 - pacf^2) and conditioning on m earlier states
+  # multiplies it by prod_{k<=m}(1 - pacf_k^2), which the
+  # Levinson-Durbin recursion already in the program supplies at
+  # each order. `ar_stationary_init()` draws the first p states
+  # from that sequence.
+  #
+  # Three shapes keep the raw innovation start:
+  #   * a sparse lag set, where the declared bounds leave
+  #     stationarity unchecked and `cholesky_decompose` would
+  #     reject some draws. `ar_lags_stationary()` is the gate.
+  #   * a correlated or grouped AR(p>1), which needs the
+  #     multivariate Yule-Walker solve on the companion form.
   #   * ARMA(1, 1): the stationary variance involves ar1 and the MA
   #     coefficient together, and the t = 1 innovation enters the
   #     recursion again at t = 2.
@@ -4818,13 +4859,31 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "          * to_vector(innovations_trend[1, :]));\n",
       "      }"
     )
+  } else if (ar_lags_stationary(ar_lags) && !has_ma && !cor) {
+    idx_init <- seq_len(max_lag)
+    paste0(
+      "      // AR(p) stationary initialisation: the first ", max_lag,
+      " states are\n",
+      "      // drawn from their joint stationary distribution, built\n",
+      "      // from the partial autocorrelations by the\n",
+      "      // Levinson-Durbin recursion.\n",
+      "      for (j in 1:N_lv_trend) {\n",
+      "        vector[", max_lag, "] pacf_j;\n",
+      "        vector[", max_lag, "] z_j;\n",
+      paste0("        pacf_j[", idx_init, "] = ar", idx_init,
+             "_pacf_trend[j];", collapse = "\n"), "\n",
+      paste0("        z_j[", idx_init, "] = innovations_trend[",
+             idx_init, ", j];", collapse = "\n"), "\n",
+      "        lv_trend[1:", max_lag, ", j]\n",
+      "          = ar_stationary_init(pacf_j, sigma_trend[j], z_j);\n",
+      "      }"
+    )
   } else {
     paste0(
       "      // Initialize first ", max_lag, " time points from innovations.\n",
-      "      // Higher-order AR(p) and ARMA models would need the\n",
-      "      // Yule-Walker stationary covariance (AR) or the ARMA\n",
-      "      // stationary variance to match the AR(1) treatment below;\n",
-      "      // both are deferred.\n",
+      "      // A sparse lag set, a correlated or grouped AR(p>1) and\n",
+      "      // an ARMA term each keep this start, for the reasons the\n",
+      "      // comment above records.\n",
       "      for (i in 1:", max_lag, ") {\n",
       "        lv_trend[i, :] = ",
       if (has_ma) "ma_innovations_trend" else "scaled_innovations_trend",
