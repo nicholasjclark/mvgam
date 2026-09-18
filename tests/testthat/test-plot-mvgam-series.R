@@ -49,29 +49,35 @@
 
 
 test_that("resolve_series_index defaults make sense", {
-  expect_equal(mvgam:::resolve_series_index(NULL, 1L), 1L)
-  expect_equal(mvgam:::resolve_series_index(NULL, 4L), "all")
-  expect_equal(mvgam:::resolve_series_index("all", 4L), "all")
-  expect_equal(mvgam:::resolve_series_index(2L, 4L), 2L)
+  lv1 <- "s1"
+  lv4 <- c("s1", "s2", "s3", "s4")
+  expect_equal(mvgam:::resolve_series_index(NULL, lv1), 1L)
+  expect_equal(mvgam:::resolve_series_index(NULL, lv4), "all")
+  expect_equal(mvgam:::resolve_series_index("all", lv4), "all")
+  expect_equal(mvgam:::resolve_series_index(2L, lv4), 2L)
+  # A name reaches the index every other series-aware surface gives
+  # it. This plot once took indices alone, and a reader of its panel
+  # labels had no value to pass back.
+  expect_equal(mvgam:::resolve_series_index("s3", lv4), 3L)
+  expect_equal(mvgam:::resolve_series_index("s1", lv4), 1L)
 })
 
 test_that("resolve_series_index rejects invalid input", {
+  lv4 <- c("s1", "s2", "s3", "s4")
+  # The name and the count are checked against the model's own
+  # levels. An unknown name reports which names exist.
   expect_error(
-    mvgam:::resolve_series_index(-1, 4L),
-    "positive integer index"
+    mvgam:::resolve_series_index("foo", lv4),
+    "Unknown series name"
   )
   expect_error(
-    mvgam:::resolve_series_index("foo", 4L),
-    "positive integer index"
+    mvgam:::resolve_series_index(c(1L, 2L), lv4),
+    "names one series"
   )
-  expect_error(
-    mvgam:::resolve_series_index(99L, 4L),
-    "positive integer index"
-  )
-  expect_error(
-    mvgam:::resolve_series_index(1.5, 4L),
-    "positive integer index"
-  )
+  # Out of range, fractional and negative indices are all refused.
+  expect_error(mvgam:::resolve_series_index(-1, lv4))
+  expect_error(mvgam:::resolve_series_index(99L, lv4))
+  expect_error(mvgam:::resolve_series_index(1.5, lv4))
 })
 
 test_that("series_long_df extracts the right columns and labels rows", {

@@ -119,7 +119,7 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
                                 null.ok = TRUE)
   set_color_scheme_local("red")
 
-  series_idx <- resolve_series_index(series, length(series_levels))
+  series_idx <- resolve_series_index(series, series_levels)
   dat$series <- factor(dat$series, levels = series_levels)
   s_name <- if (identical(series_idx, "all")) NULL else {
     series_levels[series_idx]
@@ -178,27 +178,33 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
 
 # Internal: coerce the user-facing `series` arg to either the
 # literal string `"all"` or a 1-based integer index into the
-# series levels. `NULL` defaults to `"all"` for multi-series
-# fits and `1` for single-series.
+# series levels. `NULL` names every series on a multi-series fit,
+# and names its single series on a one-series fit.
+#
+# `resolve_series()` owns the grammar every series-aware surface
+# takes: `NULL`, `"all"`, a name and an index. This function once
+# received a count alone. A name had nothing to check against, and
+# this surface refused a series by name while the forecast plot and
+# `conditional_effects()` accepted it. A reader of the panel labels
+# then had no value to pass back.
 #'@noRd
-resolve_series_index <- function(series, n_series) {
+resolve_series_index <- function(series, series_levels) {
+  n_series <- length(series_levels)
   if (is.null(series)) {
     return(if (n_series > 1L) "all" else 1L)
   }
-  if (is.character(series) && length(series) == 1L &&
-        series == "all") {
+  idx <- resolve_series(series, series_levels)
+  if (length(idx) == n_series && n_series > 1L) {
     return("all")
   }
-  ok <- is.numeric(series) && length(series) == 1L &&
-    !is.na(series) && series == as.integer(series) && series >= 1L
-  if (!ok || series > n_series) {
+  if (length(idx) != 1L) {
     stop(insight::format_error(c(
-      "'series' must be 'all' or a positive integer index.",
-      x = paste0("Got: ", deparse(series), "."),
-      i = paste0("Available series: 1..", n_series, ".")
+      "'series' names one series on this plot.",
+      x = paste0("Got ", length(idx), " of ", n_series, " series."),
+      i = "Use 'all' to draw every series."
     )))
   }
-  as.integer(series)
+  idx
 }
 
 
