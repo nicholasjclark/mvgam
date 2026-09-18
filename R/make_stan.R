@@ -220,10 +220,6 @@ build_stan_components <- function(formula, data, family = gaussian(),
     mv_spec$trend_specs, data, family = family
   )
 
-  # PW trends define their own intercept via `m_trend`. An
-  # observation-side intercept competes with it for the same
-  # constant offset, so soft-warn the user once per session.
-  warn_pw_obs_intercept(mv_spec, obs_formula)
   warn_zmvn_single_series(mv_spec, family, data)
 
   # Two cases need brms threading suppressed at the stancode level.
@@ -529,41 +525,6 @@ warn_zmvn_single_series <- function(mv_spec, family, data) {
 }
 
 
-# Internal: soft-warn when a PW trend coincides with an
-# observation-side intercept. Both terms shift the linear
-# predictor by a constant, so leaving both in the model creates
-# a non-identifiable pair. Mirrors the Prophet convention of
-# fitting with no obs intercept.
-#'@noRd
-warn_pw_obs_intercept <- function(mv_spec, obs_formula) {
-  trend_specs <- mv_spec$trend_specs
-  if (is.null(trend_specs)) return()
-  specs_list <- if (is_multivariate_trend_specs(trend_specs)) {
-    trend_specs
-  } else {
-    list(trend_specs)
-  }
-  has_pw <- any(vapply(
-    specs_list,
-    function(s) identical(s$trend, "PW"),
-    logical(1L)
-  ))
-  if (!has_pw) return()
-  if (!has_obs_intercept(obs_formula)) return()
-  warn_confound(
-    "pw_obs_intercept",
-    paste0(
-      "Observation formula has an intercept while the trend is ",
-      "PW. The PW trend's 'm_trend' parameter and the observation ",
-      "intercept compete for the same constant offset. Consider ",
-      "fitting with a no-intercept observation formula (e.g. ",
-      "'y ~ -1' or 'y ~ 0 + ...'). The PW intercept is then ",
-      "uniquely identified."
-    )
-  )
-}
-
-
 # Internal: one emission path for the confound notices.
 #
 # Each of these names a pairing the model still samples under, where
@@ -772,19 +733,6 @@ warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
   )
 }
 
-
-# Internal: detect whether the RHS of an observation formula
-# implies a fitted intercept term. Returns TRUE for `y ~ 1`,
-# `y ~ x`, `y ~ s(x)`, etc. (anything that brms / mgcv would
-# expand with an implicit intercept) and FALSE for explicit no-
-# intercept forms `y ~ -1 + ...`, `y ~ 0 + ...`.
-#'@noRd
-has_obs_intercept <- function(formula) {
-  if (is.null(formula) || !inherits(formula, "formula")) {
-    return(FALSE)
-  }
-  attr(stats::terms(formula), "intercept") == 1L
-}
 
 #' Generate Stan Model Code for mvgam Formula
 #'

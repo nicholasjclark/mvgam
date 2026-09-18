@@ -426,7 +426,7 @@ test_that("Unsupported trend type errors with the right message", {
 
 # ----- PW (piecewise) posterior pulling --------------------------
 
-test_that("PW pulls k / m / delta from posterior and t_change from standata", {
+test_that("a logistic PW pulls k / m / delta and t_change from standata", {
   n_series <- 2L; n_lv <- 2L; n_time <- 20L
   n_change <- 3L
   # Delta matrix [n_change, n_lv] with distinct values so we
@@ -445,9 +445,11 @@ test_that("PW pulls k / m / delta from posterior and t_change from standata", {
   t_change_data <- c(5, 10, 15)
   cap_data <- matrix(seq_len(n_time * n_series),
                       nrow = n_time, ncol = n_series)
+  # The logistic form samples `m_trend`, and `trend_metadata`
+  # persists the growth for post-fit callers.
   meta <- list(trend_type = "PW", ar_lags = integer(0),
                ma_lags = integer(0), max_lag = 0L,
-               has_cor = FALSE)
+               has_cor = FALSE, pw_growth = "logistic")
   fit <- make_mock_fit(draws, n_series, n_lv, n_time, meta)
   fit$standata$N_change_trend <- n_change
   fit$standata$t_change_trend <- t_change_data
@@ -482,4 +484,8 @@ test_that("PW handles no-changepoint case gracefully", {
   res <- extract_last_state(fit, 1L)
   expect_identical(dim(res$params$delta), c(0L, 2L))
   expect_length(res$params$t_change, 0L)
+  # This stub omits the growth, which resolves to linear. A linear
+  # PW takes its level from the observation formula, and the offset
+  # passed to the kernel is zero for every series.
+  expect_equal(res$params$m, c(0, 0))
 })

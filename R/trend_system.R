@@ -859,8 +859,13 @@ generate_car_monitor_params <- function(trend_spec) {
 #' @return Character vector of PW-specific parameters
 #' @noRd
 generate_pw_monitor_params <- function(trend_spec) {
-  # Piecewise trend parameters
-  return(c("k_trend", "m_trend", "delta_trend"))
+  # Piecewise trend parameters. The logistic form adds the `m_trend`
+  # offset that positions its curve along time.
+  c(
+    "k_trend",
+    if (pw_is_logistic(trend_spec)) "m_trend",
+    "delta_trend"
+  )
 }
 
 #' Normalize trend type for consistent lookup
@@ -886,6 +891,28 @@ get_trend_name <- function(trend_spec) {
   raw <- trend_spec$trend %||% trend_spec$trend_type
   if (is.null(raw) || !length(raw)) return(NA_character_)
   normalize_trend_type(as.character(raw)[1L])
+}
+
+
+# Internal: the growth form of a PW model, from either carrier of
+# the fact. A `PW()` spec names the field `growth`, validated with
+# `match.arg()`. A fitted object's `trend_metadata` persists the same
+# value as `pw_growth`, which post-fit callers have in hand where the
+# spec is out of reach. Prophet's default form is linear.
+#'@noRd
+pw_growth <- function(x) {
+  if (is.null(x)) return("linear")
+  x$growth %||% x$pw_growth %||% "linear"
+}
+
+
+# Internal: whether a PW model uses the logistic form. The logistic
+# form needs a carrying capacity, and its `m_trend` offset positions
+# the curve along time. For the linear form, the observation formula
+# supplies the level.
+#'@noRd
+pw_is_logistic <- function(x) {
+  identical(pw_growth(x), "logistic")
 }
 
 # -----------------------------------------------------------------------------
@@ -2395,12 +2422,11 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #'
 #' @details
 #' *Offsets and intercepts*:
-#' For each of these trend models, an offset parameter is included in the trend
-#' estimation process. This parameter will be incredibly difficult to identify
-#' if you also include an intercept in the observation formula. For that
-#' reason, it is highly recommended that you drop the intercept from the
-#' formula (i.e. `y ~ x + 0` or `y ~ x - 1`, where `x` are your optional
-#' predictor terms).
+#' A logistic piecewise trend estimates an offset (`m_trend`) that
+#' positions its curve along the time axis. A linear piecewise trend
+#' takes its level from the observation formula, matching every other
+#' trend model in \pkg{mvgam}, which leaves `y ~ 1` as the ordinary
+#' spelling for it.
 #'
 #' *Logistic growth and the cap variable*:
 #' When forecasting growth, there is often some maximum achievable point that a
@@ -2425,16 +2451,15 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #'
 #' @examples
 #' \dontrun{
-#' # Linear PW on a single Poisson series. `y ~ -1` removes the
-#' # observation intercept so the PW trend's `m_trend` parameter
-#' # is the unique constant offset (otherwise the two compete for
-#' # the same constant on the link scale).
+#' # Linear PW on a single Poisson series. The observation
+#' # intercept supplies the level, matching the other trend
+#' # models in mvgam.
 #' set.seed(2024)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L)
 #'
 #' mod <- mvgam(
-#'   y ~ -1,
+#'   y ~ 1,
 #'   trend_formula = ~ PW(growth = "linear"),
 #'   data          = simdat$data_train,
 #'   family        = poisson(),
@@ -2443,10 +2468,10 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' )
 #' summary(mod, include_betas = FALSE)
 #'
-#' # PW exposes the base growth rate (k_trend), offset (m_trend)
-#' # and the changepoint rate deltas (delta_trend[changepoint,
-#' # series]). Visualise the full set with the trend_params
-#' # keyword.
+#' # A linear PW exposes the base growth rate (k_trend) and the
+#' # changepoint rate deltas (delta_trend[changepoint, series]).
+#' # A logistic PW adds the offset (m_trend). Visualise the full
+#' # set with the trend_params keyword.
 #' mcmc_plot(mod, variable = "trend_params", type = "intervals")
 #' }
 #'

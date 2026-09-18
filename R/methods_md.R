@@ -928,7 +928,7 @@ trend_order_label <- function(obj) {
     "CAR"  = "CAR",
     "ZMVN" = "ZMVN",
     "PW"   = paste0(
-      "PW(", obj$trend_metadata$pw_growth %||% "linear", ")"
+      "PW(", pw_growth(obj$trend_metadata), ")"
     ),
     tt
   )

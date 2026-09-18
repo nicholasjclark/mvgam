@@ -6,16 +6,16 @@
 # claims here are about `t_change_trend` and `delta_trend` rather than
 # about the fitted line as a whole.
 #
-# The observation side carries an offset and a two-dimensional
-# smooth, neither of which any other local file exercises:
+# The observation side takes an offset and a two-dimensional
+# smooth. This file is where that pairing is exercised:
 #
-#   model: y ~ -1 + offset(log_effort) + s(x1, x2, k = 12),
+#   model: y ~ 1 + offset(log_effort) + s(x1, x2, k = 12),
 #          trend_formula = ~ PW(n_changepoints = 8)
 #
-# The `-1` is deliberate. PW carries its own intercept (`m_trend`),
-# and an observation intercept competes with it for the same constant;
-# the package warns about exactly that, so the formula is written the
-# way the warning asks for.
+# The intercept is deliberate. A linear PW takes its level from the
+# observation formula, matching every other trend model in the
+# package. The `m_trend` offset belongs to logistic growth, where it
+# positions the curve along the time axis.
 #
 # An offset is a covariate whose coefficient is fixed at one, so it
 # has to reach Stan as data in row order. A two-dimensional smooth is
@@ -111,7 +111,7 @@ dat$y <- rpois(
   exp(1.1 + as.numeric(latent) + surface + dat$log_effort)
 )
 
-obs_formula <- y ~ -1 + offset(log_effort) + s(x1, x2, k = 12)
+obs_formula <- y ~ 1 + offset(log_effort) + s(x1, x2, k = 12)
 
 sim_truth <- list(
   n_series = n_series, n_time = n_time, n_change = n_change,
@@ -229,12 +229,14 @@ test_that("the trend runs on the series axis, one rate per series", {
   expect_identical(as.integer(sd$obs_trend_series),
                    match(as.character(dat$series), series_levels))
 
-  # The program gives every series its own base rate, offset and set
-  # of adjustments. A `delta` shared across series would fit a
-  # single break pattern to both and lose the per-series dynamics.
+  # The program gives every series its own base rate and set of
+  # adjustments. A `delta` shared across series would fit a single
+  # break pattern to both and lose the per-series dynamics.
   sc <- as.character(stancode(prefit))
   expect_true(grepl("vector[N_lv_trend] k_trend", sc, fixed = TRUE))
-  expect_true(grepl("vector[N_lv_trend] m_trend", sc, fixed = TRUE))
+  # A linear PW takes its level from the observation formula. The
+  # `m_trend` offset belongs to logistic growth.
+  expect_false(grepl("vector[N_lv_trend] m_trend", sc, fixed = TRUE))
   expect_true(grepl(
     "matrix[N_change_trend, N_lv_trend] delta_trend", sc,
     fixed = TRUE
@@ -261,9 +263,10 @@ test_that("the offset reaches Stan as data, in the frame's row order", {
   # It varies by row, so the check above is not satisfied by any
   # constant vector.
   expect_gt(stats::sd(as.numeric(sd$offsets)), 0)
-  # And no coefficient is estimated for it: `-1` leaves the design
-  # with no population-level columns at all.
-  expect_identical(as.integer(sd$K), 0L)
+  # The offset keeps its coefficient fixed at one. The design has a
+  # single population-level column, the intercept that supplies the
+  # level for this linear PW.
+  expect_identical(as.integer(sd$K), 1L)
 })
 
 
@@ -323,12 +326,12 @@ test_that("the rate adjustments are one per changepoint per series", {
       expect_true(paste0("delta_trend[", c_i, ",", s_i, "]") %in% cols)
     }
   }
-  # A base rate and an offset per series, not per row or per
-  # changepoint.
+  # A base rate per series, at the series grain.
   expect_length(grep("^k_trend\\[", colnames(dm), value = TRUE),
                 n_series)
-  expect_length(grep("^m_trend\\[", colnames(dm), value = TRUE),
-                n_series)
+  # A linear PW leaves the level to the observation intercept. The
+  # offset is absent from the draws.
+  expect_length(grep("^m_trend\\[", colnames(dm), value = TRUE), 0L)
   # The adjustments are shrunk toward zero by a double-exponential
   # prior, so most are small and a few are not: a vector that is
   # entirely zero means no break was found anywhere.
@@ -339,10 +342,9 @@ test_that("the rate adjustments are one per changepoint per series", {
 
 
 test_that("the latent trend tracks the simulated piecewise path", {
-  # The trend is identified only up to a level here, since the
-  # observation formula has no intercept and `m_trend` carries it, so
-  # the comparison is on correlation with the simulated path rather
-  # than on the values.
+  # The trend is identified up to a level here. The observation
+  # intercept takes that level, which makes correlation with the
+  # simulated path the comparison to make.
   trend_hat <- matrix(NA_real_, n_time, n_series)
   for (t in seq_len(n_time)) {
     for (s in seq_len(n_series)) {
@@ -691,8 +693,12 @@ test_that("the cap the refusal names as sufficient is sufficient", {
     trend_formula = ~ PW(growth = "logistic"),
     data = capped, family = poisson(), run_model = FALSE, silent = 2
   )
-  expect_true(grepl("= logistic_trend(",
-                    as.character(stancode(built)), fixed = TRUE))
+  sc <- as.character(stancode(built))
+  expect_true(grepl("= logistic_trend(", sc, fixed = TRUE))
+  # The logistic form samples the offset that positions its curve
+  # along the time axis, which the linear form leaves to the
+  # observation intercept.
+  expect_true(grepl("vector[N_lv_trend] m_trend", sc, fixed = TRUE))
 })
 
 

@@ -97,8 +97,10 @@ test_that("all trend types generate correct prior structures", {
     ZMVN = list(formula = ~ ZMVN(), expected = c("sigma_trend")),
     # No `sigma_trend`: the piecewise path is a deterministic
     # function of its changepoints, so there is no innovation.
+    # A linear PW takes its level from the observation formula. The
+    # `m_trend` offset belongs to logistic growth.
     PW = list(formula = ~ PW(),
-              expected = c("k_trend", "m_trend", "delta_trend")),
+              expected = c("k_trend", "delta_trend")),
     CAR = list(formula = ~ CAR(), expected = c("ar1_trend", "sigma_trend"))
   )
 

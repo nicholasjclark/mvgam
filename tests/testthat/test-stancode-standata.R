@@ -3138,9 +3138,9 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_true(stan_pattern("while \\(\\(cp_idx <= S\\) && \\(t\\[i\\] >= t_change_trend\\[cp_idx\\]\\)\\)", code_with_trend))
 
   # Check for linear trend function
-  expect_true(stan_pattern("vector linear_trend\\(real k, real m, vector delta, vector t, matrix Kappa_trend,", code_with_trend))
+  expect_true(stan_pattern("vector linear_trend\\(real k, vector delta, vector t, matrix Kappa_trend,", code_with_trend))
   expect_true(stan_pattern("Function to compute a linear trend with changepoints", code_with_trend, fixed = TRUE))
-  expect_true(stan_pattern("return \\(k \\+ Kappa_trend \\* delta\\) \\.\\* t \\+ \\(m \\+ Kappa_trend \\* \\(-t_change_trend \\.\\* delta\\)\\);", code_with_trend))
+  expect_true(stan_pattern("return \\(k \\+ Kappa_trend \\* delta\\) \\.\\* t \\+ \\(Kappa_trend \\* \\(-t_change_trend \\.\\* delta\\)\\);", code_with_trend))
 
   # 2. Data Block - Piecewise-specific data structures
   # Standard trend dimensions
@@ -3177,7 +3177,11 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   # 4. Parameters Block - PW-specific parameters
   # Base trend parameters
   expect_true(stan_pattern("vector\\[N_lv_trend\\] k_trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_lv_trend\\] m_trend;", code_with_trend))
+  # A linear PW takes its level from the observation formula. The
+  # offset parameter belongs to logistic growth.
+  expect_false(
+    stan_pattern("vector\\[N_lv_trend\\] m_trend;", code_with_trend)
+  )
   expect_true(stan_pattern("matrix\\[N_change_trend, N_lv_trend\\] delta_trend;", code_with_trend))
 
   # Standard observation model parameters
@@ -3200,7 +3204,7 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
 
   # Linear trend computation
   expect_true(stan_pattern("for \\(s in 1 : N_lv_trend\\)", code_with_trend))
-  expect_true(stan_pattern("lv_trend\\[1 : N_time_trend, s\\] = linear_trend\\(k_trend\\[s\\], m_trend\\[s\\],", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[1 : N_time_trend, s\\] = linear_trend\\(k_trend\\[s\\],", code_with_trend))
   expect_true(stan_pattern("to_vector\\(delta_trend\\[ : , s\\]\\), time_trend,", code_with_trend))
   expect_true(stan_pattern("Kappa_trend,", code_with_trend))
   expect_true(stan_pattern("t_change_trend\\);", code_with_trend))
@@ -3219,7 +3223,7 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
 
   # 6. Model Block - Priors and likelihood
   # PW-specific priors (check existence, not specific distributions)
-  expect_true(stan_pattern("m_trend ~", code_with_trend))
+  expect_false(stan_pattern("m_trend ~", code_with_trend))
   expect_true(stan_pattern("k_trend ~", code_with_trend))
   expect_true(stan_pattern("to_vector\\(delta_trend\\) ~", code_with_trend))
 

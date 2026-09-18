@@ -127,6 +127,14 @@ Each remaining shape gets one pass. A pass removes the rival, the
 fallback or the proxy, adds an assertion that fails before the change
 and records the count before and after.
 
+The PW growth form took one such pass. Seven sites each spelled
+`$growth %||% "linear"` for themselves, each free to disagree with
+the others. `pw_growth()` and `pw_is_logistic()` resolve that fact
+once, in `R/trend_system.R`. The pass also deleted a dead `growth`
+formal on the PW stanvar generator, a `trend_specs$type` fallback
+the constructor leaves empty and a third copy of the refusal that
+checks the growth value. Count before: 7. Count after: 1.
+
 ## Generated Stan the user reads
 
 **114. Every comment mvgam writes into a trend stanvar is dropped.**

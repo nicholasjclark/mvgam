@@ -77,12 +77,11 @@ a model with particular piecewise trend models.
 }
 \details{
 \emph{Offsets and intercepts}:
-For each of these trend models, an offset parameter is included in the trend
-estimation process. This parameter will be incredibly difficult to identify
-if you also include an intercept in the observation formula. For that
-reason, it is highly recommended that you drop the intercept from the
-formula (i.e. \code{y ~ x + 0} or \code{y ~ x - 1}, where \code{x} are your optional
-predictor terms).
+A logistic piecewise trend estimates an offset (\code{m_trend}) that
+positions its curve along the time axis. A linear piecewise trend
+takes its level from the observation formula, matching every other
+trend model in \pkg{mvgam}, which leaves \code{y ~ 1} as the ordinary
+spelling for it.
 
 \emph{Logistic growth and the cap variable}:
 When forecasting growth, there is often some maximum achievable point that a
@@ -105,16 +104,15 @@ log-transformed under a \code{poisson()} or \code{negbinomial()} family. Give
 }
 \examples{
 \dontrun{
-# Linear PW on a single Poisson series. `y ~ -1` removes the
-# observation intercept so the PW trend's `m_trend` parameter
-# is the unique constant offset (otherwise the two compete for
-# the same constant on the link scale).
+# Linear PW on a single Poisson series. The observation
+# intercept supplies the level, matching the other trend
+# models in mvgam.
 set.seed(2024)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L)
 
 mod <- mvgam(
-  y ~ -1,
+  y ~ 1,
   trend_formula = ~ PW(growth = "linear"),
   data          = simdat$data_train,
   family        = poisson(),
@@ -123,10 +121,10 @@ mod <- mvgam(
 )
 summary(mod, include_betas = FALSE)
 
-# PW exposes the base growth rate (k_trend), offset (m_trend)
-# and the changepoint rate deltas (delta_trend[changepoint,
-# series]). Visualise the full set with the trend_params
-# keyword.
+# A linear PW exposes the base growth rate (k_trend) and the
+# changepoint rate deltas (delta_trend[changepoint, series]).
+# A logistic PW adds the offset (m_trend). Visualise the full
+# set with the trend_params keyword.
 mcmc_plot(mod, variable = "trend_params", type = "intervals")
 }
 

@@ -511,6 +511,10 @@ test_that("each prediction type answers with the quantity it names", {
   # on one type alone, and the arms here differ enough that no two
   # types can be confused for one another.
   withr::local_options(marginaleffects_model_classes = "mvgam")
+  # The outcome-scale estimate is sampled afresh on each call, and the
+  # median of a fresh sample moves between runs. A pinned seed holds
+  # every draw below fixed, which keeps this comparison reproducible.
+  withr::local_seed(2027L)
   grid <- dat[seq(1L, n_time, length.out = 6L), , drop = FALSE]
 
   for (r in responses) {
@@ -548,13 +552,15 @@ test_that("each prediction type answers with the quantity it names", {
     # the granularity of the family rather than by a small fraction.
     # The continuous arm has no such floor and is held tightly.
     tol_response <- if (r == "mass") 0.1 else 1.0
-    expect_lte(max(abs(ask("response") - as.numeric(med))),
-               tol_response)
+    # One sample, used twice. Two calls would produce two different
+    # samples and compare them against one another.
+    resp_est <- ask("response")
+    expect_lte(max(abs(resp_est - as.numeric(med))), tol_response)
 
-    # And the outcome-scale answer sits in the family's support,
-    # which is what says the type reached this arm's likelihood
-    # rather than the first one's.
-    expect_true(support_ok[[r]](ask("response")))
+    # And the outcome-scale estimate satisfies the family's support
+    # check, confirming the type reached this response's own
+    # likelihood and skipped the first response's.
+    expect_true(support_ok[[r]](resp_est))
 
     # The three are distinct wherever the link is not the identity,
     # so a type collapsed onto another cannot pass unnoticed.

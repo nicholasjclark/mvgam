@@ -217,14 +217,14 @@ sim_mvgam <- function(type = 1L,
     # bypass the propagate_trend dispatcher (whose PW arm is
     # tuned for forecast-horizon changepoint sampling) and
     # evaluate the kernel directly at the training time grid.
-    growth <- trend_model$growth %||% "linear"
+    growth <- pw_growth(trend_model)
     pw_trendC(
       t = as.numeric(seq_len(n_timepoints)),
       k = as.numeric(trend_args$params$k),
       m = as.numeric(trend_args$params$m),
       delta = trend_args$params$delta,
       t_change = as.numeric(trend_args$params$t_change),
-      cap = if (identical(growth, "logistic")) {
+      cap = if (pw_is_logistic(trend_model)) {
         trend_args$params$cap
       } else {
         matrix(0, 0L, 0L)
@@ -902,8 +902,7 @@ fill_pw_trend_defaults <- function(trend_model, params,
     }
     params$delta <- delta_mat
   }
-  if (identical(trend_model$growth %||% "linear", "logistic")
-      && is.null(params$cap)) {
+  if (pw_is_logistic(trend_model) && is.null(params$cap)) {
     params$cap <- matrix(
       exp(params$m[1L]) * 3,
       nrow = n_timepoints, ncol = n_series

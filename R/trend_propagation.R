@@ -181,15 +181,7 @@ propagate_car <- function(params, h, n_series, last_state, time) {
 propagate_pw <- function(trend_model, params, h, n_series,
                            fc_times, training_times, cap = NULL,
                            changepoint_range = NULL) {
-  growth <- trend_model$growth %||% "linear"
-  if (!(growth %in% c("linear", "logistic"))) {
-    stop(insight::format_error(c(
-      paste0(
-        "'growth' must be 'linear' or 'logistic'."
-      ),
-      x = paste0("Got: '", growth, "'.")
-    )))
-  }
+  growth <- pw_growth(trend_model)
   if (is.null(fc_times) || length(fc_times) != h) {
     stop(insight::format_error(c(
       "PW propagation requires 'fc_times' of length h.",
@@ -225,9 +217,9 @@ propagate_pw <- function(trend_model, params, h, n_series,
   }
   # `params$delta` is the training-time per-series rate-change
   # matrix [n_train_change, n_series]. `params$t_change` is the
-  # shared training-time changepoint vector. `params$k` and
-  # `params$m` are length-n_series vectors of base growth /
-  # intercept.
+  # shared training-time changepoint vector. `params$k` is a
+  # length-n_series vector of base growth rates. `params$m` is the
+  # logistic form's offset, and zero for a linear fit.
   t_change_train <- as.numeric(params$t_change %||% numeric(0L))
   delta_train <- params$delta
   if (is.null(delta_train)) {
@@ -680,7 +672,7 @@ enrich_trend_metadata <- function(trend_metadata, trend_specs) {
   if (identical(spec$trend, "PW")) {
     trend_metadata$pw_changepoint_range <-
       spec$changepoint_range %||% 0.8
-    trend_metadata$pw_growth <- spec$growth %||% "linear"
+    trend_metadata$pw_growth <- pw_growth(spec)
   }
   trend_metadata
 }

@@ -1499,15 +1499,10 @@ compute_pw_forecast_extras <- function(object, training,
   training_times <- sort(unique(unlist(training$times)))
 
   # Logistic PW needs a cap matrix [h, n_series] from newdata.
-  # Detect from the trend_model spec. Linear PW leaves cap NULL.
-  trend_specs <- object$mv_spec$trend_specs
-  spec <- if (is_multivariate_trend_specs(trend_specs)) {
-    trend_specs[[1L]]
-  } else {
-    trend_specs
-  }
-  growth <- spec$growth %||% "linear"
-  cap <- if (identical(growth, "logistic")) {
+  # `first_trend_spec()` resolves the spec for every caller, and a
+  # linear PW leaves cap NULL.
+  spec <- first_trend_spec(object)
+  cap <- if (pw_is_logistic(spec)) {
     extract_pw_cap_matrix(object, fc_grid, spec, fc_times,
                             series_levels,
                             family = pw_cap_link_family(

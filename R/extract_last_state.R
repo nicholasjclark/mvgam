@@ -639,25 +639,30 @@ extract_zmvn_state <- function(one_draw, n_series, n_lv, fit) {
 
 
 # PW (piecewise linear / logistic): pulls the per-series
-# growth (`k_trend[s]`), intercept (`m_trend[s]`), and
-# changepoint-effect matrix (`delta_trend[i, s]`) from the
-# posterior, plus the fit-time changepoint times
-# `t_change_trend` from `standata`. The latter is not a
-# sampled parameter -- it is fixed at fit time on a regular
-# grid over the training history. The `cap_trend` data array
-# (logistic only) is also pulled here so the forecast caller
-# can read it without re-touching standata.
+# growth (`k_trend[s]`) and the changepoint-effect matrix
+# (`delta_trend[i, s]`) from the posterior, plus the fit-time
+# changepoint times `t_change_trend` from `standata`. The
+# latter is a fixed quantity, set at fit time on a regular
+# grid over the training history. A logistic fit adds the
+# `m_trend[s]` offset. The `cap_trend` data array of a
+# logistic fit is also pulled here, which saves the forecast
+# caller a second pass over standata.
 #'@noRd
 extract_pw_state <- function(one_draw, meta, n_series, n_lv,
                                 fit) {
   k_nms <- paste0("k_trend[", seq_len(n_lv), "]")
-  m_nms <- paste0("m_trend[", seq_len(n_lv), "]")
   k_vec <- broadcast_to_series(
     as.numeric(one_draw[k_nms]), n_series
   )
-  m_vec <- broadcast_to_series(
-    as.numeric(one_draw[m_nms]), n_series
-  )
+  # The logistic form samples `m_trend`. For the linear form, the
+  # observation formula supplies the level and the offset is zero.
+  # `meta` is the fit's `trend_metadata`, which persists the growth.
+  m_vec <- if (pw_is_logistic(meta)) {
+    m_nms <- paste0("m_trend[", seq_len(n_lv), "]")
+    broadcast_to_series(as.numeric(one_draw[m_nms]), n_series)
+  } else {
+    rep(0, n_series)
+  }
 
   # `delta_trend` is declared `matrix[N_change_trend, N_lv_trend]`
   # in Stan, so the posterior names are `delta_trend[i, j]` with

@@ -4539,6 +4539,128 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
 }
 
 
+#' Stan functions for a stationary joint initial distribution
+#'
+#' `kronecker_prod` and `initial_joint_var` together solve the
+#' Lyapunov equation on the companion form, which gives the
+#' covariance a stationary VAR(p) or VARMA(p, q) draws its first
+#' `p + q` states from. A correlated `AR(p > 1)` needs that same
+#' solve with diagonal coefficient matrices. One trend constructor
+#' is allowed per formula. A program emits this block once.
+#'
+#' @return A `functions` block stanvar
+#' @noRd
+stationary_joint_functions_stanvar <- function() {
+  brms::stanvar(
+    name = "stationary_joint_functions",
+    scode = "
+      /**
+       * Compute Kronecker product of two matrices
+       * Used in companion matrix approach for VARMA initialization
+       * @param A First matrix (m x n)
+       * @param B Second matrix (p x q)
+       * @return Kronecker product A (x) B (mp x nq)
+       */
+      matrix kronecker_prod(matrix A, matrix B) {
+        int m = rows(A);
+        int n = cols(A);
+        int p = rows(B);
+        int q = cols(B);
+        matrix[m * p, n * q] C;
+
+        for (i in 1:m) {
+          for (j in 1:n) {
+            int row_start = (i - 1) * p + 1;
+            int row_end = (i - 1) * p + p;
+            int col_start = (j - 1) * q + 1;
+            int col_end = (j - 1) * q + q;
+            C[row_start:row_end, col_start:col_end] = A[i, j] * B;
+          }
+        }
+        return C;
+      }
+
+      /**
+       * Compute joint stationary covariance for VARMA(p,q) initialization
+       * Heaps 2022 companion matrix approach for stationary distribution
+       * @param Sigma Innovation covariance matrix (m x m)
+       * @param phi Array of stationary VAR coefficient matrices
+       * @param theta Array of stationary MA coefficient matrices
+       * @return Joint covariance matrix Omega for (y_0,...,y_{1-p},eps_0,...,eps_{1-q})
+       */
+      matrix initial_joint_var(matrix Sigma, array[] matrix phi, array[] matrix theta) {
+        int p = size(phi);
+        int q = size(theta);
+        int m = rows(Sigma);
+        matrix[(p + q) * m, (p + q) * m] companion_mat = rep_matrix(0.0, (p + q) * m, (p + q) * m);
+        matrix[(p + q) * m, (p + q) * m] companion_var = rep_matrix(0.0, (p + q) * m, (p + q) * m);
+        matrix[(p + q) * m * (p + q) * m, (p + q) * m * (p + q) * m] tmp;
+        matrix[(p + q) * m, (p + q) * m] Omega;
+
+        // Construct companion matrix (phi_tilde) following Heaps 2022.
+        // The VAR component fills the leading m rows with phi.
+        for (i in 1:p) {
+          companion_mat[1:m, ((i - 1) * m + 1):(i * m)] = phi[i];
+          if (i > 1) {
+            // Identity blocks for VAR lags
+            for (j in 1:m) {
+              companion_mat[(i - 1) * m + j, (i - 2) * m + j] = 1.0;
+            }
+          }
+        }
+
+        // The MA component fills the columns the p lags leave over.
+        for (i in 1:q) {
+          companion_mat[1:m, ((p + i - 1) * m + 1):((p + i) * m)] = theta[i];
+        }
+
+        // Identity blocks for MA lags (if q > 1)
+        if (q > 1) {
+          for (i in 2:q) {
+            for (j in 1:m) {
+              companion_mat[(p + i - 1) * m + j, (p + i - 2) * m + j] = 1.0;
+            }
+          }
+        }
+
+        // Construct innovation covariance matrix (Sigma_tilde).
+        // The y_t innovations make the leading m by m submatrix.
+        companion_var[1:m, 1:m] = Sigma;
+        // The eps_t innovation blocks and cross-covariance terms
+        // exist when an MA component is present (q > 0). Absent
+        // this guard, pure VAR(p) fits (q = 0) would index out of
+        // bounds: companion_var is sized (p + q) * m x (p + q) * m,
+        // which collapses to p * m when q = 0, while the MA blocks
+        // address rows / columns (p * m + 1):((p + 1) * m) that a
+        // q = 0 program lacks.
+        if (q > 0) {
+          companion_var[(p * m + 1):((p + 1) * m), (p * m + 1):((p + 1) * m)] = Sigma;  // For eps_t innovations
+          companion_var[1:m, (p * m + 1):((p + 1) * m)] = Sigma;  // Cross-covariance
+          companion_var[(p * m + 1):((p + 1) * m), 1:m] = Sigma;  // Symmetric cross-covariance
+        }
+
+        // Solve Lyapunov equation: Omega = Sigma_tilde + Phi_tilde * Omega * Phi_tilde'
+        // Vectorized form: vec(Omega) = (I - Phi_tilde (x) Phi_tilde)^{-1} vec(Sigma_tilde)
+        tmp = diag_matrix(rep_vector(1.0, (p + q) * m * (p + q) * m)) -
+              kronecker_prod(companion_mat, companion_mat);
+
+        Omega = to_matrix(tmp \\ to_vector(companion_var), (p + q) * m, (p + q) * m);
+
+        // Ensure numerical symmetry of result
+        for (i in 1:(rows(Omega) - 1)) {
+          for (j in (i + 1):rows(Omega)) {
+            Omega[j, i] = Omega[i, j];
+          }
+        }
+
+        return Omega;
+      }
+    ",
+    block = "functions"
+  )
+}
+
+
 #' Stan functions for the partial autocorrelation parameterisation
 #'
 #' `ar_pacf_to_coef` maps one partial autocorrelation per lag, each
@@ -5145,32 +5267,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       }
 
       /**
-       * Compute Kronecker product of two matrices
-       * Used in companion matrix approach for VARMA initialization
-       * @param A First matrix (m x n)
-       * @param B Second matrix (p x q)
-       * @return Kronecker product A (x) B (mp x nq)
-       */
-      matrix kronecker_prod(matrix A, matrix B) {
-        int m = rows(A);
-        int n = cols(A);
-        int p = rows(B);
-        int q = cols(B);
-        matrix[m * p, n * q] C;
-
-        for (i in 1:m) {
-          for (j in 1:n) {
-            int row_start = (i - 1) * p + 1;
-            int row_end = (i - 1) * p + p;
-            int col_start = (j - 1) * q + 1;
-            int col_end = (j - 1) * q + q;
-            C[row_start:row_end, col_start:col_end] = A[i, j] * B;
-          }
-        }
-        return C;
-      }
-
-      /**
        * Perform reverse mapping from partial autocorrelations to stationary coefficients
        * Heaps 2022 Algorithm for computing phi coefficients from P matrices
        * @param P Array of partial autocorrelation matrices (modern syntax)
@@ -5241,82 +5337,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
           phiGamma[2, i] = Gamma_trans[i]';
         }
         return phiGamma;
-      }
-
-      /**
-       * Compute joint stationary covariance for VARMA(p,q) initialization
-       * Heaps 2022 companion matrix approach for stationary distribution
-       * @param Sigma Innovation covariance matrix (m x m)
-       * @param phi Array of stationary VAR coefficient matrices
-       * @param theta Array of stationary MA coefficient matrices
-       * @return Joint covariance matrix Omega for (y_0,...,y_{1-p},eps_0,...,eps_{1-q})
-       */
-      matrix initial_joint_var(matrix Sigma, array[] matrix phi, array[] matrix theta) {
-        int p = size(phi);
-        int q = size(theta);
-        int m = rows(Sigma);
-        matrix[(p + q) * m, (p + q) * m] companion_mat = rep_matrix(0.0, (p + q) * m, (p + q) * m);
-        matrix[(p + q) * m, (p + q) * m] companion_var = rep_matrix(0.0, (p + q) * m, (p + q) * m);
-        matrix[(p + q) * m * (p + q) * m, (p + q) * m * (p + q) * m] tmp;
-        matrix[(p + q) * m, (p + q) * m] Omega;
-
-        // Construct companion matrix (phi_tilde) following Heaps 2022
-        // VAR component: phi matrices in top-left block
-        for (i in 1:p) {
-          companion_mat[1:m, ((i - 1) * m + 1):(i * m)] = phi[i];
-          if (i > 1) {
-            // Identity blocks for VAR lags
-            for (j in 1:m) {
-              companion_mat[(i - 1) * m + j, (i - 2) * m + j] = 1.0;
-            }
-          }
-        }
-
-        // MA component: theta matrices in top-right block
-        for (i in 1:q) {
-          companion_mat[1:m, ((p + i - 1) * m + 1):((p + i) * m)] = theta[i];
-        }
-
-        // Identity blocks for MA lags (if q > 1)
-        if (q > 1) {
-          for (i in 2:q) {
-            for (j in 1:m) {
-              companion_mat[(p + i - 1) * m + j, (p + i - 2) * m + j] = 1.0;
-            }
-          }
-        }
-
-        // Construct innovation covariance matrix (Sigma_tilde).
-        // y_t innovations always sit in the top-left block.
-        companion_var[1:m, 1:m] = Sigma;
-        // The eps_t innovation blocks and cross-covariance terms
-        // only exist when an MA component is present (q > 0).
-        // Without this guard, pure VAR(p) fits (q = 0) would
-        // index out of bounds: companion_var is sized
-        // (p + q) * m x (p + q) * m, which collapses to p * m
-        // when q = 0, while the MA blocks below address rows /
-        // columns (p * m + 1):((p + 1) * m) that don't exist.
-        if (q > 0) {
-          companion_var[(p * m + 1):((p + 1) * m), (p * m + 1):((p + 1) * m)] = Sigma;  // For eps_t innovations
-          companion_var[1:m, (p * m + 1):((p + 1) * m)] = Sigma;  // Cross-covariance
-          companion_var[(p * m + 1):((p + 1) * m), 1:m] = Sigma;  // Symmetric cross-covariance
-        }
-
-        // Solve Lyapunov equation: Omega = Sigma_tilde + Phi_tilde * Omega * Phi_tilde'
-        // Vectorized form: vec(Omega) = (I - Phi_tilde (x) Phi_tilde)^{-1} vec(Sigma_tilde)
-        tmp = diag_matrix(rep_vector(1.0, (p + q) * m * (p + q) * m)) -
-              kronecker_prod(companion_mat, companion_mat);
-
-        Omega = to_matrix(tmp \\ to_vector(companion_var), (p + q) * m, (p + q) * m);
-
-        // Ensure numerical symmetry of result
-        for (i in 1:(rows(Omega) - 1)) {
-          for (j in (i + 1):rows(Omega)) {
-            Omega[j, i] = Omega[i, j];
-          }
-        }
-
-        return Omega;
       }
     ",
     block = "functions"
@@ -5730,14 +5750,18 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Create components list based on model type
   base_components <- if (is_varma) {
-    # VARMA case: include MA parameters (8 components: Z + var-specific + data)
-    list(matrix_z, var_functions_stanvar, var_tdata_stanvar, var_data_stanvar,
-         var_parameters_stanvar, var_ma_parameters_stanvar,
-         var_tparameters_stanvar, var_model_stanvar)
+    # VARMA case: include MA parameters (9 components: Z + var-specific + data)
+    list(matrix_z, var_functions_stanvar,
+         stationary_joint_functions_stanvar(), var_tdata_stanvar,
+         var_data_stanvar, var_parameters_stanvar,
+         var_ma_parameters_stanvar, var_tparameters_stanvar,
+         var_model_stanvar)
   } else {
-    # VAR-only case: no MA parameters (7 components: Z + var-specific + data)
-    list(matrix_z, var_functions_stanvar, var_tdata_stanvar, var_data_stanvar,
-         var_parameters_stanvar, var_tparameters_stanvar, var_model_stanvar)
+    # VAR-only case: no MA parameters (8 components: Z + var-specific + data)
+    list(matrix_z, var_functions_stanvar,
+         stationary_joint_functions_stanvar(), var_tdata_stanvar,
+         var_data_stanvar, var_parameters_stanvar,
+         var_tparameters_stanvar, var_model_stanvar)
   }
 
   # Add trend computation (required for all VAR models)
@@ -6171,11 +6195,9 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #'
 #' @param trend_specs Trend specification for PW model containing parameters
 #'   like n_changepoints (number of changepoints), changepoint_scale (prior scale),
-#'   type/growth (trend pattern)
+#'   growth (trend pattern)
 #' @param data_info Data information including dimensions (n_obs, n_series, n_time)
 #'   and time structure for changepoint placement
-#' @param growth Growth pattern: "linear" or "logistic" (optional, overrides
-#'   trend_specs$type or trend_specs$growth)
 #' @param prior A brmsprior object containing custom prior specifications for
 #'   PW trend parameters (k_trend, m_trend, delta_trend, sigma_trend). If NULL,
 #'   uses defaults from trend registry. Default NULL.
@@ -6185,7 +6207,7 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #'     \item Common trend data (dimensions and indices)
 #'     \item Changepoint specifications (locations and scales)
 #'     \item Growth rate parameters (k_trend for baseline growth)
-#'     \item Offset parameters (m_trend for trend baseline)
+#'     \item Offset parameters (m_trend, for logistic growth)
 #'     \item Changepoint effects (delta_trend for rate changes)
 #'     \item Innovation variance (sigma_trend if applicable)
 #'     \item Trend computation in transformed parameters
@@ -6297,12 +6319,11 @@ build_pw_cap_matrix <- function(data, cap_var, time_var, series_var,
 
 
 #' @noRd
-generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
+generate_pw_trend_stanvars <- function(trend_specs, data_info,
                                        prior = NULL) {
   # Input validation
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_list(data_info, names = "named")
-  checkmate::assert_string(growth, null.ok = TRUE)
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
 
   # Extract key parameters
@@ -6313,8 +6334,9 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # could disagree with the constructor.
   n_changepoints <- trend_specs$n_changepoints
   changepoint_scale <- trend_specs$changepoint_scale
-  # Use growth parameter if provided, otherwise fall back to trend_specs$type or trend_specs$growth
-  trend_type <- growth %||% trend_specs$type %||% trend_specs$growth %||% "linear"
+  # `pw_growth()` resolves the growth form for every caller that needs
+  # it, and `PW()` validates the value with `match.arg()`.
+  trend_type <- pw_growth(trend_specs)
   n_obs <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
 
@@ -6325,9 +6347,9 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
 
   if (!trend_type %in% c("linear", "logistic")) {
     stop(insight::format_error(c(
-      "Piecewise trend type must be 'linear' or 'logistic'.",
-      x = paste0("Got type = '", trend_type, "'."),
-      i = "Use type = 'linear' or type = 'logistic'."
+      "Piecewise growth must be 'linear' or 'logistic'.",
+      x = paste0("Got growth = '", trend_type, "'."),
+      i = "Use growth = 'linear' or growth = 'logistic' in 'PW()'."
     )))
   }
 
@@ -6398,12 +6420,14 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
         return cap_trend .* inv_logit((k + Kappa_trend * delta) .* (t - (m + Kappa_trend * gamma)));
       }
 
-      vector linear_trend(real k, real m, vector delta, vector t, matrix Kappa_trend,
+      vector linear_trend(real k, vector delta, vector t, matrix Kappa_trend,
                           vector t_change_trend) {
         /* Function to compute a linear trend with changepoints */
 
         /* credit goes to the Prophet development team at Meta */
-        return (k + Kappa_trend * delta) .* t + (m + Kappa_trend * (-t_change_trend .* delta));
+        /* Prophet's offset `m` is dropped here. The observation
+           formula supplies the level for the linear form. */
+        return (k + Kappa_trend * delta) .* t + (Kappa_trend * (-t_change_trend .* delta));
       }
     ",
     block = "functions"
@@ -6505,15 +6529,20 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   )
 
   # Parameters block - piecewise trend parameters
+  # The logistic form positions its curve along time with `m_trend`.
+  # For the linear form, the observation formula supplies the level.
+  pw_offset_decl <- if (trend_type == "logistic") {
+    "// trend offset parameters\nvector[N_lv_trend] m_trend;\n"
+  } else {
+    ""
+  }
   pw_parameters_stanvar <- brms::stanvar(
     name = "pw_parameters",
     scode = glue::glue("
       // base trend growth rates
       vector[N_lv_trend] k_trend;
 
-      // trend offset parameters
-      vector[N_lv_trend] m_trend;
-
+      {pw_offset_decl}
       // trend rate adjustments per series
       matrix[N_change_trend, N_lv_trend] delta_trend;
     "),
@@ -6546,7 +6575,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
 
         // linear trend estimates
         for (s in 1 : N_lv_trend) {{
-          lv_trend[1 : N_time_trend, s] = linear_trend(k_trend[s], m_trend[s],
+          lv_trend[1 : N_time_trend, s] = linear_trend(k_trend[s],
                                       to_vector(delta_trend[ : , s]), time_trend, Kappa_trend,
                                       t_change_trend);
         }}
@@ -6577,7 +6606,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     name = "pw_model",
     scode = paste(c(
       "      // PW trend priors",
-      pw_prior_line("m_trend"),
+      if (trend_type == "logistic") pw_prior_line("m_trend"),
       pw_prior_line("k_trend"),
       pw_prior_line("delta_trend", vectorise = TRUE)
     ), collapse = "\n"),
