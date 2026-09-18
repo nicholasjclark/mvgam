@@ -531,6 +531,11 @@ compute_residcor_hierarchical <- function(object, cov_struct, by_group,
   alpha <- cov_struct$params$alpha_cor_trend
   L_glob_arr <- cov_struct$params$L_Omega_global_trend
   L_dev_arr <- cov_struct$params$L_deviation_group_trend
+  # Present when the rescale reached the stationary form, which covers
+  # a grouped AR(1). The global entry stays the population
+  # correlation, a hyperparameter shared by every group, which has no
+  # single autoregressive coefficient to settle against.
+  L_stat_arr <- cov_struct$params$L_group_stationary
 
   # Population-level correlation matrix per draw.
   glob_cov <- array(0, dim = c(ndraws, n_sub, n_sub))
@@ -557,9 +562,15 @@ compute_residcor_hierarchical <- function(object, cov_struct, by_group,
   for (g in seq_len(n_groups)) {
     grp_cov <- array(0, dim = c(ndraws, n_sub, n_sub))
     for (d in seq_len(ndraws)) {
-      glob_d <- tcrossprod(L_glob_arr[d, , ])
-      dev_d <- tcrossprod(L_dev_arr[d, g, , ])
-      grp_cov[d, , ] <- alpha[d] * glob_d + (1 - alpha[d]) * dev_d
+      if (is.null(L_stat_arr)) {
+        glob_d <- tcrossprod(L_glob_arr[d, , ])
+        dev_d <- tcrossprod(L_dev_arr[d, g, , ])
+        grp_cov[d, , ] <- alpha[d] * glob_d + (1 - alpha[d]) * dev_d
+      } else {
+        grp_cov[d, , ] <- tcrossprod(
+          matrix(L_stat_arr[d, g, , ], n_sub, n_sub)
+        )
+      }
     }
     # Each group's per-series labels reuse the subgroup names since
     # subgroup defines the cor matrix dimension; group identity is

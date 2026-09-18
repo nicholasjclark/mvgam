@@ -169,6 +169,69 @@ test_that("extract_hierarchical_cholesky_params errors on missing param", {
 })
 
 
+test_that("stationary_from_chol lifts a matrix by the joint factor", {
+  # A stationary covariance satisfies `Gamma = Phi Gamma Phi' + M`
+  # for `Phi = diag(phi)` and `M = L L'`. That identity is the claim.
+  # Comparing against the division the function performs would test
+  # the implementation against itself.
+  n <- 3L
+  R <- matrix(0.4, n, n)
+  diag(R) <- 1
+  L <- t(chol(R))
+  phi <- c(0.8, 0.15, -0.4)
+
+  got <- stationary_from_chol(L, phi)
+  Phi <- diag(phi, nrow = n)
+  expect_equal(got, Phi %*% got %*% t(Phi) + tcrossprod(L))
+
+  # Zero coefficients leave the innovation covariance alone, which
+  # separates the lift from an unconditional rescale.
+  expect_equal(stationary_from_chol(L, rep(0, n)), tcrossprod(L))
+
+  # A coefficient on the unit circle leaves the lift undefined, and
+  # the caller keeps the innovation form.
+  expect_null(stationary_from_chol(L, c(1, 0.2, 0.3)))
+  expect_null(stationary_from_chol(L, c(-1, 0.2, 0.3)))
+})
+
+
+test_that("the flat stationary split rebuilds its own covariance", {
+  # A posterior stores a Cholesky correlation factor whose rows land
+  # a little off unit norm. The scale and correlation it returns have
+  # to rebuild `diag(sigma) %*% Gamma %*% diag(sigma)` all the same,
+  # which pins the split itself.
+  n <- 3L
+  ndraws <- 5L
+  R <- matrix(0.3, n, n)
+  diag(R) <- 1
+  L0 <- t(chol(R))
+  # A perturbation the size of the precision a stored draw carries.
+  L0[2L, 1L] <- L0[2L, 1L] + 1e-8
+  expect_gt(max(abs(diag(tcrossprod(L0)) - 1)), 0)
+
+  params <- list(
+    sigma_trend = matrix(seq(0.5, 0.9, length.out = ndraws * n),
+                         ndraws, n),
+    L_Omega_trend = array(rep(as.numeric(L0), each = ndraws),
+                          c(ndraws, n, n))
+  )
+  phi <- matrix(rep(c(0.7, 0.2, -0.3), each = ndraws), ndraws, n)
+
+  out <- stationary_correlated_params(params, phi)
+  for (d in seq_len(ndraws)) {
+    m <- 1 / (1 - outer(phi[d, ], phi[d, ]))
+    s0 <- params$sigma_trend[d, ]
+    target <- diag(s0, nrow = n) %*% (tcrossprod(L0) * m) %*%
+      diag(s0, nrow = n)
+    s1 <- out$sigma_trend[d, ]
+    rebuilt <- diag(s1, nrow = n) %*%
+      tcrossprod(matrix(out$L_Omega_trend[d, , ], n, n)) %*%
+      diag(s1, nrow = n)
+    expect_equal(rebuilt, target, tolerance = 1e-12)
+  }
+})
+
+
 test_that("hierarchical transform: identity Chol + unit sigma is identity", {
   n_draws <- 4
   n_times <- 6

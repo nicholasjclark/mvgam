@@ -1264,6 +1264,76 @@ test_that("residual_cor(by_group = TRUE) returns one block per region", {
 })
 
 
+test_that("a grouped AR(1) settles at the joint stationary covariance", {
+  # The generated program starts group `g` at
+  # `Gamma[a, b] = Sigma[a, b] / (1 - ar1[a] * ar1[b])` over that
+  # group's member series. The marginal prediction path draws its
+  # innovations from the same covariance, and this states the two as
+  # one identity per draw. Scaling each series' own sigma by
+  # `1 / sqrt(1 - ar1^2)` gives the geometric mean of the two
+  # factors, which agrees with the program when the coefficients of a
+  # group match and parts from it as they spread.
+  cs <- mvgam:::get_trend_covariance_structure(fit)
+  L_stat <- cs$params$L_group_stationary
+  expect_false(is.null(L_stat))
+
+  gi <- cs$group_info
+  n_groups <- as.integer(gi$n_groups)
+  n_sub <- as.integer(gi$n_subgroups)
+  group_inds <- as.integer(gi$group_inds)
+  expect_identical(dim(L_stat)[2:4], c(n_groups, n_sub, n_sub))
+
+  read_chol <- function(stem, d, g = NULL) {
+    M <- matrix(0, n_sub, n_sub)
+    for (i in seq_len(n_sub)) {
+      for (j in seq_len(n_sub)) {
+        nm <- if (is.null(g)) {
+          sprintf("%s[%d,%d]", stem, i, j)
+        } else {
+          sprintf("%s[%d,%d,%d]", stem, g, i, j)
+        }
+        M[i, j] <- as.numeric(dm_all[d, nm])
+      }
+    }
+    M
+  }
+
+  # A handful of draws spread across the chain. The claim is an
+  # identity per draw, which an average over draws would blur.
+  draws <- unique(round(seq(1, dim(L_stat)[1L], length.out = 12L)))
+  for (d in draws) {
+    a <- as.numeric(dm_all[d, "alpha_cor_trend"])
+    glob <- tcrossprod(read_chol("L_Omega_global_trend", d))
+    for (g in seq_len(n_groups)) {
+      dev <- tcrossprod(read_chol("L_deviation_group_trend", d, g))
+      s_raw <- vapply(seq_len(n_sub), function(k) {
+        as.numeric(dm_all[d, sprintf("sigma_group_trend[%d,%d]", g, k)])
+      }, numeric(1))
+      innov <- diag(s_raw) %*% (a * glob + (1 - a) * dev) %*% diag(s_raw)
+
+      # The member order the program scans: series index ascending
+      # within the group.
+      members <- which(group_inds == g)
+      ph <- vapply(members, function(k) {
+        as.numeric(dm_all[d, paste0("ar1_trend[", k, "]")])
+      }, numeric(1))
+
+      # A stationary covariance satisfies `Gamma = Phi Gamma Phi' + S`
+      # for `Phi = diag(ar1)` over the group's members and `S` the
+      # innovation covariance. One matrix satisfies that identity.
+      got <- tcrossprod(matrix(L_stat[d, g, , ], n_sub, n_sub))
+      Phi <- diag(ph, nrow = n_sub)
+      expect_equal(got, Phi %*% got %*% t(Phi) + innov,
+                   tolerance = 1e-10)
+      # The lift moved the covariance. A stored innovation factor
+      # would satisfy the identity above with every coefficient at
+      # zero and fail here.
+      expect_gt(max(abs(got - innov)), 1e-6)
+    }
+  }
+})
+
+
 test_that("the two grouped spellings are one model", {
   # `gr` and `subgr` declare correlations among the subgroups within
   # each group, and the generated program declares those parameters

@@ -1948,6 +1948,9 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
   L_glob_arr <- params$L_Omega_global_trend
   L_dev_arr <- params$L_deviation_group_trend
   sigma_arr <- params$sigma_group_trend
+  # Present when the rescale reached the stationary form for this
+  # trend, which covers a grouped AR(1).
+  L_stat_arr <- params$L_group_stationary
 
   checkmate::assert_numeric(alpha, len = ndraws, any.missing = FALSE)
   # Local helper: dim() returns integer; build expected as integer too
@@ -1996,12 +1999,16 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
     alpha_d <- alpha[d]
 
     for (g in seq_len(n_groups)) {
-      L_full <- hierarchical_group_cholesky(
-        alpha = alpha_d,
-        L_global = L_glob_d,
-        L_deviation = L_dev_arr[d, g, , ],
-        sigma = sigma_arr[d, g, ]
-      )
+      L_full <- if (is.null(L_stat_arr)) {
+        hierarchical_group_cholesky(
+          alpha = alpha_d,
+          L_global = L_glob_d,
+          L_deviation = L_dev_arr[d, g, , ],
+          sigma = sigma_arr[d, g, ]
+        )
+      } else {
+        matrix(L_stat_arr[d, g, , ], n_sub, n_sub)
+      }
 
       series_g <- series_by_group[[g]]
 
@@ -2261,6 +2268,18 @@ rescale_params_to_stationary <- function(params, object, draws_mat,
   }
   n_groups <- dim(sg)[2L]
   n_sub <- dim(sg)[3L]
+
+  # A grouped AR(1) settles at `Gamma[a, b] = Sigma[a, b] /
+  # (1 - phi_a * phi_b)` over the member series of one group, which is
+  # the form the generated program starts its first state at. The
+  # result is stored as one Cholesky factor per draw and group, which
+  # the innovation transform and `residual_cor()` both prefer.
+  phi <- ar_lag_one_draws(object, draws_mat, n_groups * n_sub)
+  if (!is.null(phi) && !is.null(group_info$group_inds)) {
+    return(stationary_group_params(params, phi, group_info,
+                                   n_groups, n_sub))
+  }
+
   mult <- ar_stationary_multiplier(object, draws_mat, n_groups * n_sub)
   if (is.null(mult) || is.null(group_info$group_inds)) {
     return(params)
@@ -2301,6 +2320,33 @@ ar_lag_one_draws <- function(object, draws_mat, n_series) {
 }
 
 
+#' Stationary counterpart of a matrix, one coefficient per row
+#'
+#' Takes the lower Cholesky factor `L` of a symmetric matrix `M` and
+#' returns `M[i, j] / (1 - phi_i * phi_j)`, the covariance an AR(1)
+#' vector process with diagonal coefficients settles at. The caller
+#' decides what `M` is: a correlation for the flat path, a group's
+#' covariance for the grouped one.
+#'
+#' A draw can leave the result a hair outside the positive-definite
+#' cone through rounding, which is one draw of many. Such a draw
+#' returns NULL and its caller keeps the innovation form.
+#'
+#' @noRd
+stationary_from_chol <- function(L, phi) {
+  m <- 1 / (1 - outer(phi, phi))
+  if (any(!is.finite(m)) || any(diag(m) <= 0)) {
+    return(NULL)
+  }
+  out <- tcrossprod(L) * m
+  ev <- eigen(out, symmetric = TRUE, only.values = TRUE)$values
+  if (min(ev) <= sqrt(.Machine$double.eps) * max(ev)) {
+    return(NULL)
+  }
+  out
+}
+
+
 #' Stationary covariance of correlated AR(1) series
 #'
 #' `Gamma0[i, j] = Sigma[i, j] / (1 - ar_i * ar_j)`, returned in the
@@ -2323,27 +2369,61 @@ stationary_correlated_params <- function(params, phi) {
     return(params)
   }
   for (d in seq_len(ndraws)) {
-    m <- 1 / (1 - outer(phi[d, ], phi[d, ]))
-    if (any(!is.finite(m)) || any(diag(m) <= 0)) {
+    # `L_Omega_trend` is the correlation factor. A stored draw rounds
+    # its rows off unit norm, and normalising by the result's own
+    # diagonal absorbs that, which keeps the scale and the correlation
+    # reconstructing the covariance they describe.
+    gamma_d <- stationary_from_chol(matrix(L[d, , ], n, n), phi[d, ])
+    if (is.null(gamma_d)) {
       next
     }
-    Ld <- matrix(L[d, , ], n, n)
-    omega <- tcrossprod(Ld) * m
-    root <- sqrt(diag(m))
-    omega <- omega / outer(root, root)
+    root <- sqrt(diag(gamma_d))
+    omega <- gamma_d / outer(root, root)
     diag(omega) <- 1
-    # A draw can leave `omega` a hair outside the positive-definite
-    # cone through rounding, and it is one draw of many rather than a
-    # fault to report. It keeps its innovations and the rest proceed.
-    # Its eigenvalues say so before the decomposition is attempted.
-    ev <- eigen(omega, symmetric = TRUE, only.values = TRUE)$values
-    if (min(ev) <= sqrt(.Machine$double.eps) * max(ev)) {
-      next
-    }
     sigma[d, ] <- sigma[d, ] * root
     L[d, , ] <- t(chol(omega))
   }
   params$sigma_trend <- sigma
   params$L_Omega_trend <- L
+  params
+}
+
+
+#' Stationary covariance of a grouped AR(1), one factor per group
+#'
+#' `Gamma[a, b] = Sigma[a, b] / (1 - phi_a * phi_b)` over the member
+#' series of one group, returned as a lower Cholesky factor per draw
+#' and group. Groups are independent, which makes each block its own
+#' problem. A draw whose block fails the decomposition keeps its
+#' innovation factor.
+#'
+#' @noRd
+stationary_group_params <- function(params, phi, group_info,
+                                    n_groups, n_sub) {
+  group_inds <- as.integer(group_info$group_inds)
+  alpha <- params[[HIER_COV_PARS$alpha]]
+  L_glob <- params[[HIER_COV_PARS$global]]
+  L_dev <- params[[HIER_COV_PARS$deviation]]
+  sg <- params[[HIER_COV_PARS$sigma]]
+  ndraws <- length(alpha)
+
+  L_stat <- array(0, dim = c(ndraws, n_groups, n_sub, n_sub))
+  for (d in seq_len(ndraws)) {
+    L_glob_d <- matrix(L_glob[d, , ], n_sub, n_sub)
+    for (g in seq_len(n_groups)) {
+      L_g <- hierarchical_group_cholesky(
+        alpha = alpha[d],
+        L_global = L_glob_d,
+        L_deviation = matrix(L_dev[d, g, , ], n_sub, n_sub),
+        sigma = sg[d, g, ]
+      )
+      # The member order the program scans: the series index ascending
+      # within the group, which `which()` already gives.
+      members <- which(group_inds == g)
+      gamma_g <- stationary_from_chol(L_g, phi[d, members])
+      L_stat[d, g, , ] <- if (is.null(gamma_g)) L_g else t(chol(gamma_g))
+    }
+  }
+  params$L_group_stationary <- L_stat
   params
 }
