@@ -2232,6 +2232,7 @@ build_closure_unit_arrays <- function(data,
                                        default_cap_buffer = NULL,
                                        compute_y_max = TRUE,
                                        unit_grouping_vars = NULL,
+                                       series_levels = NULL,
                                        drop_unobserved_units = TRUE) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(response_var)
@@ -2243,6 +2244,8 @@ build_closure_unit_arrays <- function(data,
   checkmate::assert_integerish(default_cap_buffer, lower = 0L,
                                len = 1L, null.ok = TRUE)
   checkmate::assert_flag(compute_y_max)
+  checkmate::assert_character(series_levels, min.len = 1L,
+                              any.missing = FALSE, null.ok = TRUE)
   checkmate::assert_flag(drop_unobserved_units)
   if (is.null(unit_grouping_vars)) {
     # No family is in scope here, so the accessor is asked for the
@@ -2376,10 +2379,18 @@ build_closure_unit_arrays <- function(data,
   if (!series_var %in% unit_grouping_vars &&
         series_var %in% names(data)) {
     series_col <- data[[series_var]]
-    component <- if (is.factor(series_col)) {
-      as.integer(series_col)
-    } else {
-      as.integer(factor(series_col))
+    # The fitted levels arrive from the caller, which has the fit in
+    # scope. Numbering off the frame alone shifts every later
+    # component wherever a unit omits one.
+    levs <- series_levels %||% levels(as.factor(series_col))
+    component <- match(as.character(series_col), levs)
+    if (anyNA(component)) {
+      unknown <- unique(as.character(series_col)[is.na(component)])
+      stop(insight::format_error(c(
+        "A row names a series beyond the fitted set.",
+        x = paste0("Found: ", paste(unknown, collapse = ", "), "."),
+        i = paste0("Fitted series are ", paste(levs, collapse = ", "), ".")
+      )), call. = FALSE)
     }
     visit_component <- matrix(1L, nrow = n_unit, ncol = max_rep)
     for (g in seq_len(n_unit)) {
@@ -6221,6 +6232,9 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
     default_cap_buffer = closure_unit_default_cap_buffer(fam),
     compute_y_max = !is_multi_response_family(fam),
     unit_grouping_vars = closure_unit_key_vars(fam),
+    # The series the model was fitted on. A frame missing one then
+    # keeps every component on its own residual scale.
+    series_levels = names(fitted_series_index(object)),
     drop_unobserved_units = FALSE
   )
 }
