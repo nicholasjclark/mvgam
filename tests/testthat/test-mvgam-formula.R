@@ -140,8 +140,8 @@ test_that("print.mvgam_formula works correctly", {
   expect_true(any(grepl("s\\(time\\)", output2)))
 
   # Print should return object invisibly
-  expect_invisible(print(mf1))
-  returned <- print(mf1)
+  capture.output(expect_invisible(print(mf1)))
+  capture.output(returned <- print(mf1))
   expect_identical(returned, mf1)
 })
 

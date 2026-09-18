@@ -55,15 +55,20 @@ test_that("a prefit failure names the state it is in", {
   expect_gt(length(gens), 50L)
 
   offenders <- character(0)
-  for (gen in gens) {
-    args <- c(list(pf), needs[[gen]])
-    out <- suppressWarnings(caught_error(do.call(gen, args)))
-    if (!is.null(out) &&
-          grepl(internal_draws_error, conditionMessage(out),
-                fixed = TRUE)) {
-      offenders <- c(offenders, gen)
+  # The registry lists `print()`, which emits the prefit block.
+  # Capturing that keeps the console quiet while every method still
+  # runs.
+  capture.output(
+    for (gen in gens) {
+      args <- c(list(pf), needs[[gen]])
+      out <- suppressWarnings(caught_error(do.call(gen, args)))
+      if (!is.null(out) &&
+            grepl(internal_draws_error, conditionMessage(out),
+                  fixed = TRUE)) {
+        offenders <- c(offenders, gen)
+      }
     }
-  }
+  )
   # Named rather than counted: a failure here states which methods.
   expect_identical(paste(offenders, collapse = ", "), "")
 })

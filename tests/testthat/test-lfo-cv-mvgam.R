@@ -282,7 +282,7 @@ test_that("print.mvgam_lfo runs without error and returns invisibly", {
   )
   out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
                  score = "elpd", silent = 2L)
-  expect_invisible(print(out))
+  capture.output(expect_invisible(print(out)))
   expect_output(print(out), "Approximate leave-future-out")
   expect_output(print(out), "ELPD")
 })
