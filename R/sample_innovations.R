@@ -1338,10 +1338,9 @@ factor_state_param_pattern <- function(pars) {
   }
 }
 
-# Returns the regex matching parameter-draws that the summary
-# / tidy classifiers should hide because their rotation- or
-# sign-indeterminate raw form has an identified counterpart in
-# the posterior. Covers:
+# Returns the regex matching parameter-draws the summary / tidy
+# classifiers hide, each a raw form of a quantity the posterior
+# reports under another name. Covers:
 #   * Raw loadings `Z[i, j]` when `Z_tilde[i, j]` is present
 #     (free-Z factor fits with the Heaps & Jermyn QR rotation).
 #   * Raw factor paths `lv_trend[t, k]` and the upstream
@@ -1349,14 +1348,17 @@ factor_state_param_pattern <- function(pars) {
 #     when `lv_trend_tilde[t, k]` is present (same condition).
 #   * Unrotated VAR dynamics `A_trend[lag][i, j]` when
 #     `A_trend_tilde[lag][i, j]` is present.
-# Each raw family is rotation-indeterminate by design and shows
-# poor Rhat / low ESS while the identified counterpart is well
-# behaved; hiding the raw form here keeps convergence diagnostics,
-# `summary.mvgam()` print, `posterior_summary.mvgam()` and the
-# variable-keyword machinery focused on the identified params.
-# Returns NULL when nothing needs hiding.
+#   * Per-series copies of a shared AR coefficient when the
+#     sampled `shared_ar{k}_trend[.]` scalar is present.
+# The rotation- and sign-indeterminate families show poor Rhat /
+# low ESS while the identified counterpart is well behaved, and
+# the shared copies repeat one sampled value. Hiding the raw form
+# here keeps convergence diagnostics, `summary.mvgam()` print,
+# `posterior_summary.mvgam()` and the variable-keyword machinery
+# on the reported names. Returns NULL when the pattern set is
+# empty.
 #'@noRd
-hidden_unrotated_factor_pars <- function(pars) {
+hidden_par_pattern <- function(pars) {
   patterns <- character(0L)
   if (any(grepl("^A_trend_tilde\\[", pars))) {
     patterns <- c(patterns, "^A_trend\\[")
@@ -1403,29 +1405,27 @@ hidden_unrotated_factor_pars <- function(pars) {
   paste(patterns, collapse = "|")
 }
 
-# Which of `pars` are rotation- / sign-indeterminate raw
-# factor-model parameters, as a logical mask. Callers want the
-# answer in two shapes -- a mask to combine with other conditions,
-# and a filtered vector -- so the regex from
-# `hidden_unrotated_factor_pars()` is applied here once and
-# `filter_hidden_unrotated()` is defined in terms of it. Four
-# places used to rebuild the mask inline, and they had drifted:
-# one applied it to a single parameter bucket rather than to all
-# of them, which is how `L_Omega_trend` reached `tidy()` while
-# every other accessor hid it.
+# Which of `pars` the default parameter view hides, as a logical
+# mask. Callers need two shapes: a mask to combine with other
+# conditions, and a filtered vector. The regex from
+# `hidden_par_pattern()` is applied here once, and
+# `filter_hidden_pars()` is defined in terms of it. A mask
+# rebuilt inline at each call site drifts: one such copy covered
+# a single parameter bucket, which let `L_Omega_trend` reach
+# `tidy()` while every other accessor hid it.
 #'@noRd
-is_hidden_unrotated <- function(pars) {
-  hide_pat <- hidden_unrotated_factor_pars(pars)
+is_hidden_par <- function(pars) {
+  hide_pat <- hidden_par_pattern(pars)
   if (is.null(hide_pat)) return(rep(FALSE, length(pars)))
   grepl(hide_pat, pars)
 }
 
-# Return the input vector with the parameters `is_hidden_unrotated()`
-# names dropped. Used by `variables.mvgam()`,
-# `extract_mvgam_draws()` and `summary.mvgam()`.
+# Return the input vector with the names `is_hidden_par()` marks
+# dropped. Used by `variables.mvgam()`, `extract_mvgam_draws()`
+# and `summary.mvgam()`.
 #'@noRd
-filter_hidden_unrotated <- function(pars) {
-  pars[!is_hidden_unrotated(pars)]
+filter_hidden_pars <- function(pars) {
+  pars[!is_hidden_par(pars)]
 }
 
 # Internal: return a `[ndraws, n_series, n_lv]` loading array

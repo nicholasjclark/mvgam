@@ -311,13 +311,13 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   # `bookkeeping` and meet the same rule: the taxonomy records that
   # no summary claims them.
   # A caller that named a parameter sets `all`, which reaches the
-  # working arrays and the accumulators together with the
-  # rotation-indeterminate block. Naming one is how a user retrieves
-  # a quantity the default view leaves out.
+  # working arrays and the accumulators together with the hidden
+  # block. Naming one is how a user retrieves a quantity the
+  # default view leaves out.
   if (!all) {
     keep <- keep &
       !(mvgam_par_kind(user) %in% c("internal", "bookkeeping"))
-    keep <- keep & !is_hidden_unrotated(user)
+    keep <- keep & !is_hidden_par(user)
   }
   raw <- raw[keep]
   user <- user[keep]

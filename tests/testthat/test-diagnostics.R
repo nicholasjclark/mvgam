@@ -573,7 +573,7 @@ test_that("bayes_R2.mvgam errors for multivariate without resp", {
 })
 
 test_that(
-  "hidden_unrotated_factor_pars hides rotation-indeterminate params", {
+  "hidden_par_pattern hides rotation-indeterminate params", {
   # Free-Z factor fit: Z_tilde[ present means raw Z, raw lv_trend,
   # innovations, Q_tilde and the latent-factor variance block all
   # get the rotation-indeterminacy hide pattern applied together.
@@ -584,7 +584,7 @@ test_that(
     "lv_trend[1,1]", "lv_trend_tilde[1,1]",
     "innovations_trend[1,1]", "scaled_innovations_trend[1,1]"
   )
-  pat <- mvgam:::hidden_unrotated_factor_pars(pars_free)
+  pat <- mvgam:::hidden_par_pattern(pars_free)
   hidden <- pars_free[grepl(pat, pars_free)]
   surviving <- pars_free[!grepl(pat, pars_free)]
   # All raw / rotation-indeterminate params are hidden.
@@ -605,7 +605,7 @@ test_that(
 })
 
 test_that(
-  "hidden_unrotated_factor_pars returns NULL for a non-factor fit", {
+  "hidden_par_pattern returns NULL for a non-factor fit", {
   # Non-factor fit: no Z_tilde, no lv_trend_tilde, no A_trend_tilde.
   # The variance block must survive because it is properly identified
   # in non-factor trend fits.
@@ -613,19 +613,19 @@ test_that(
     "Intercept", "b_x", "sigma_trend[1]", "L_Omega_trend[1,1]",
     "Sigma_trend[1,1]"
   )
-  pat <- mvgam:::hidden_unrotated_factor_pars(pars_nonfactor)
+  pat <- mvgam:::hidden_par_pattern(pars_nonfactor)
   expect_null(pat)
-  # filter_hidden_unrotated returns the input unchanged.
+  # filter_hidden_pars returns the input unchanged.
   expect_identical(
-    mvgam:::filter_hidden_unrotated(pars_nonfactor), pars_nonfactor
+    mvgam:::filter_hidden_pars(pars_nonfactor), pars_nonfactor
   )
 })
 
-test_that("hidden_unrotated_factor_pars adds A_trend hide on VAR factor fits", {
+test_that("hidden_par_pattern adds A_trend hide on VAR factor fits", {
   pars_var <- c(
     "Z_tilde[1,1]", "A_trend[1][1,1]", "A_trend_tilde[1][1,1]"
   )
-  pat <- mvgam:::hidden_unrotated_factor_pars(pars_var)
+  pat <- mvgam:::hidden_par_pattern(pars_var)
   expect_true(grepl("\\^A_trend\\\\\\[", pat))
   expect_true(grepl("A_trend\\[1\\]\\[1,1\\]",
                     grep(pat, pars_var, value = TRUE)[1]))

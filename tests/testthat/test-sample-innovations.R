@@ -175,7 +175,7 @@ test_that("a shared AR coefficient hides its broadcast copies", {
   # default parameter view keeps the sampled name.
   shared_pars <- c("shared_ar1_trend[1]", "ar1_trend[1]",
                    "ar1_trend[2]", "sigma_trend[1]")
-  hidden <- is_hidden_unrotated(shared_pars)
+  hidden <- is_hidden_par(shared_pars)
   expect_identical(shared_pars[hidden],
                    c("ar1_trend[1]", "ar1_trend[2]"))
 
@@ -183,14 +183,14 @@ test_that("a shared AR coefficient hides its broadcast copies", {
   # uses takes the same rule.
   pacf_pars <- c("shared_ar1_pacf_trend[1]", "ar1_pacf_trend[1]",
                  "ar1_pacf_trend[2]")
-  expect_identical(pacf_pars[is_hidden_unrotated(pacf_pars)],
+  expect_identical(pacf_pars[is_hidden_par(pacf_pars)],
                    c("ar1_pacf_trend[1]", "ar1_pacf_trend[2]"))
 
   # `coef_sharing = "hierarchical"` draws each series' coefficient
   # from a population distribution, and each one is its own quantity.
   hier_pars <- c("mu_ar1_trend[1]", "sigma_ar1_trend[1]",
                  "ar1_trend[1]", "ar1_trend[2]")
-  expect_false(any(is_hidden_unrotated(hier_pars)))
+  expect_false(any(is_hidden_par(hier_pars)))
 })
 
 

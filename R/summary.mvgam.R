@@ -116,13 +116,13 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     }
   }
 
-  # Hide rotation- / sign-indeterminate raw factor-model parameters
-  # whenever their QR-identified counterparts are also in the posterior
-  # (Heaps & Jermyn 2024). Keeps the downstream convergence advisor
-  # and loadings table focused on identified Z_tilde / lv_trend_tilde
-  # rather than warning on Rhat noise from params with no fixed
-  # rotation under the prior.
-  identified <- filter_hidden_unrotated(pars)
+  # Hide each raw form whose reported counterpart is in the same
+  # posterior: rotation- and sign-indeterminate factor parameters
+  # against their QR-identified forms (Heaps & Jermyn 2024), and
+  # broadcast shared-coefficient copies against the sampled scalar.
+  # The downstream convergence advisor and loadings table then work
+  # from the reported names.
+  identified <- filter_hidden_pars(pars)
   if (length(identified) < length(pars)) {
     all_summaries <- all_summaries[identified, , drop = FALSE]
     pars <- rownames(all_summaries)
@@ -458,16 +458,15 @@ match_family_pars <- function(pars, has_dpar_formulas = character()) {
 #'
 #' What is left on the trend side once the formula effects and the
 #' states are accounted for: the innovation scales, the
-#' autoregressive coefficients and the correlation blocks. The
-#' rotation-indeterminate draws are hidden when their identified
-#' counterparts are present.
+#' autoregressive coefficients and the correlation blocks. Draws
+#' whose reported counterpart is in the same posterior are hidden.
 #'
 #' @param pars Character vector of all parameter names
 #' @return Logical vector
 #'
 #' @noRd
 match_trend_specific_pars <- function(pars) {
-  mvgam_par_kind(pars) == "dynamics" & !is_hidden_unrotated(pars)
+  mvgam_par_kind(pars) == "dynamics" & !is_hidden_par(pars)
 }
 
 #' Match factor loading parameter names

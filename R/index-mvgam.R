@@ -103,11 +103,11 @@ categorize_mvgam_parameters <- function(x) {
     observation_betas = pick(betas, "observation"),
     observation_smoothpars = pick(smooths, "observation"),
     observation_re_params = pick(ranef, "observation"),
-    # The rotation-indeterminate loadings are left out, as
-    # `variables()` leaves them out: their identified counterparts
-    # are in the same posterior.
+    # The raw loadings and the broadcast coefficient copies are
+    # left out, as `variables()` leaves them out: what reports each
+    # quantity is in the same posterior under another name.
     trend_pars = all_pars[kind %in% c("dynamics", "loading") &
-                            !is_hidden_unrotated(all_pars)],
+                            !is_hidden_par(all_pars)],
     trend_betas = pick(betas, "trend"),
     trend_smoothpars = pick(smooths, "trend"),
     trend_re_params = pick(ranef, "trend")

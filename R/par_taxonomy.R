@@ -103,11 +103,11 @@ mvgam_par_kind <- function(pars, dpars = character()) {
   # slot claims them.
   take(grepl(MVGAM_PAR_STATE_PATTERN, pars), "state")
 
-  # Factor loadings bridge the two sides and carry no suffix, so
-  # they are named before the side is consulted. A rotated fit
-  # carries both bases and both are loadings; which one a reader is
-  # shown is settled by `is_hidden_unrotated()`, not here, so that
-  # the raw block is classified rather than falling through.
+  # Factor loadings bridge the two sides and their names lack a
+  # side suffix, which puts them here before the side is consulted.
+  # A rotated fit has both bases and both are loadings;
+  # `is_hidden_par()` settles which one a reader sees, leaving this
+  # line to classify the raw block.
   take(grepl("^Z(_tilde)?\\[", pars), "loading")
 
   # A distributional parameter with its own formula owns its
