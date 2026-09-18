@@ -150,26 +150,6 @@ landing away from the line it describes is unverified.
 `polish_generated_stan_code()` in `R/stan_polish.R` is where to
 look.
 
-## Arguments a plot accepts and drops
-
-**116. A multivariate `conditional_effects()` leaves out its
-points.**
-
-`points = TRUE` overlays the observations on a univariate fit at
-every type sharing the observations' scale. On the wide `mvbf` fit
-the rug appears and the points stay absent, across all three
-responses.
-
-`insight::find_response()` on that fit gives `count, seen, mass`.
-The overlay inside `marginaleffects::plot_predictions()` needs one
-observation column and meets three. The rug needs predictor
-values, which every row supplies. It appears on the same panel.
-
-Where to look: `response_column(x, resp)` names the column for the
-response in scope, and mvgam could add the layer to the panel
-`plot_predictions()` returns.
-`tests/local/test-grain-mvbf-wide.R` has three failing assertions.
-
 ## The gate that proves an assertion can fail
 
 **115. The axis mutation gate is absent from the test suite.**

@@ -285,6 +285,23 @@ conditional_effects.mvgam <- function(x,
     # the correct response on the y-axis.
     if (!is.null(resp)) {
       p <- p + ggplot2::labs(y = resp)
+      # The overlay inside `plot_predictions()` takes the
+      # observation column from `insight::find_response()`, which
+      # names every response on a wide fit. One column is what it
+      # needs. `resp` names that one, and the layer goes on here
+      # against the frame the panel was given.
+      if (points_alpha > 0) {
+        pts <- pp_args$newdata %||% x$data
+        p <- p + ggplot2::geom_point(
+          data = pts,
+          mapping = ggplot2::aes(
+            x = .data[[cond[1L]]],
+            y = .data[[response_column(x, resp)]]
+          ),
+          alpha = points_alpha,
+          inherit.aes = FALSE
+        )
+      }
     }
     p
   })
