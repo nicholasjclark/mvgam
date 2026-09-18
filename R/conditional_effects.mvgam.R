@@ -246,11 +246,27 @@ conditional_effects.mvgam <- function(x,
       pp_args$resp <- resp
     }
     if (identical(series_mode$kind, "all")) {
-      pp_args$condition <- c(cond, "series")
+      # marginaleffects validates `condition` against the model's own
+      # variables. A column added to the frame here never reaches it.
+      # A fit deriving its series from `gr` and `subgr` has no such
+      # variable, and the refusal names that.
+      series_var <- axis_vars(x)$series_var
+      if (!series_var %in% names(x$data)) {
+        stop(insight::format_error(c(
+          "Faceting by series needs a series column in the data.",
+          x = "The fit derives its series from the trend grouping.",
+          i = paste0(
+            "Name one series with 'series = <name>', or add a '",
+            series_var, "' column to the data."
+          )
+        )), call. = FALSE)
+      }
+      pp_args$condition <- c(cond, series_var)
     } else if (identical(series_mode$kind, "one")) {
       # Restrict the prediction grid to one series's observations.
+      rows <- axis_row_series(x, x$data) %||% x$data$series
       pp_args$newdata <- x$data[
-        x$data$series == series_mode$level, , drop = FALSE
+        !is.na(rows) & rows == series_mode$level, , drop = FALSE
       ]
     }
     p <- do.call(marginaleffects::plot_predictions,
@@ -463,19 +479,17 @@ resolve_series_arg <- function(series, x) {
   if (is.null(series)) {
     return(list(kind = "none", level = NA_character_))
   }
-  if (!"series" %in% names(x$data)) {
+  # The axis record names the series. A fit whose series comes from
+  # `gr` and `subgr` carries no series column, and this function
+  # refused four series the record names.
+  series_levels <- mvgam_axes(x)$series$levels
+  if (!length(series_levels)) {
     stop(insight::format_error(c(
-      paste0(
-        "'series' was supplied but the model's data has no ",
-        "'series' column."
-      ),
-      i = paste0(
-        "Drop the 'series' argument for fits without multiple ",
-        "time series."
-      )
+      "'series' selects among the series a model records.",
+      x = "The fit records an empty series axis.",
+      i = "Drop the 'series' argument for a fit with one time series."
     )))
   }
-  series_levels <- levels(x$data$series)
   if (length(series) != 1L) {
     stop(insight::format_error(
       "'series' must be NULL, 'all', a series name or a 1-based index."

@@ -321,15 +321,31 @@ test_that("conditional_effects.mvgam signature has expected args", {
   expect_true("series" %in% fmls)
 })
 
-# Build a minimal mvgam-class stub carrying just the slots
-# `resolve_series_arg` reads. Keeps these tests fast (~1 ms each).
+# Build a minimal mvgam-class stub carrying the axis record
+# `resolve_series_arg` needs. A fit records its series on the axis. A
+# stub holding a `series` column alone describes an object no
+# constructor builds: a hierarchical fit records four series and
+# carries no such column.
 series_stub <- function(levels = c("s1", "s2", "s3"),
                         with_series_col = TRUE) {
   dat <- data.frame(y = seq_along(levels))
   if (with_series_col) {
     dat$series <- factor(levels, levels = levels)
   }
-  structure(list(data = dat), class = "mvgam")
+  structure(
+    list(
+      data = dat,
+      trend_metadata = list(
+        axes = list(
+          series = list(levels = levels, source = "explicit",
+                        n = length(levels), groups = NULL),
+          time = NULL
+        ),
+        variables = list(series_var = "series")
+      )
+    ),
+    class = c("mvgam", "brmsfit")
+  )
 }
 
 test_that("resolve_series_arg(NULL) returns kind = 'none'", {
@@ -380,13 +396,28 @@ test_that("resolve_series_arg errors on length-N vector", {
   )
 })
 
-test_that("resolve_series_arg errors when data has no series column", {
-  expect_error(
-    mvgam:::resolve_series_arg(
-      "s1",
-      series_stub(with_series_col = FALSE)
+test_that("resolve_series_arg resolves a level from the axis record", {
+  # A hierarchical fit records its series and derives them from `gr`
+  # and `subgr`. The old column test refused four series the record
+  # names. The levels now come from the axis, and a frame carrying
+  # only the response resolves the same level.
+  no_col <- series_stub(with_series_col = FALSE)
+  out <- mvgam:::resolve_series_arg("s2", no_col)
+  expect_equal(out$kind, "one")
+  expect_equal(out$level, "s2")
+})
+
+test_that("resolve_series_arg errors on an empty series axis", {
+  empty <- structure(
+    list(
+      data = data.frame(y = 1:3),
+      trend_metadata = list(axes = list(series = NULL, time = NULL))
     ),
-    regexp = "no 'series' column"
+    class = c("mvgam", "brmsfit")
+  )
+  expect_error(
+    mvgam:::resolve_series_arg("s1", empty),
+    regexp = "empty series axis"
   )
 })
 
