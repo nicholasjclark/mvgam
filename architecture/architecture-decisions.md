@@ -1094,7 +1094,16 @@ companion Lyapunov equation, which covers a sparse lag set such
 as `p = c(1, 12)` without special casing; correlated series take
 `Sigma[i, j] / (1 - ar_i * ar_j)` exactly; `VAR()` reads
 `Omega_trend`, the stationary joint variance its Stan model
-already computes. A random walk has no stationary distribution,
+already computes. The Stan program starts at the same quantity for
+two of these. A plain `AR(1)` divides its first innovation by
+`sqrt(1 - ar^2)`, and a correlated `AR(1)` scales its first
+innovation row by the Cholesky factor of that same
+`Gamma[a, b] = Sigma[a, b] / (1 - ar_a * ar_b)`. Three shapes
+still describe different first states on the two sides. A grouped
+`AR(1)` uses the joint group form in Stan while
+`sample_innovations.R` scales `sigma_group_trend` by a per-series
+factor. `AR(p > 1)` and `AR(p = 1, ma = TRUE)` keep the raw
+innovation start in Stan while the R side solves both. A random walk has no stationary distribution,
 `ZMVN()` has no dynamics to settle into, and `CAR()` decays by
 `ar^gap` so irregular gaps admit no single variance; all three
 keep their innovation covariance, as does any draw whose

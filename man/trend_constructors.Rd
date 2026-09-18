@@ -72,9 +72,9 @@ as this is essential for optimal performance.}
 
 \item{gr}{An optional grouping variable, which must be a \code{factor} in the
 supplied \code{data}, for setting up hierarchical residual correlation
-structures. If specified, this will automatically set \code{cor = TRUE} and set
-up a model where the residual correlations for a specific level of \code{gr}
-are modelled hierarchically:
+structures. If specified, this sets up a model where the residual
+correlations for a specific level of \code{gr} are modelled
+hierarchically:
 
 \eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} +
   (1 - \alpha_{cor})\Omega_{group, local}},
@@ -208,7 +208,7 @@ coefficients vary across latent series in \code{AR()}. The
 default \code{"none"} estimates an independent coefficient
 vector per series (one \verb{ar\{lag\}_trend} entry per latent
 process per lag). \code{"shared"} collapses to a single
-\verb{ar\{lag\}_shared} scalar per lag, broadcast across all
+\verb{shared_ar\{lag\}_trend} scalar per lag, broadcast across all
 series in \verb{transformed parameters}. \code{"hierarchical"} adds
 per-lag population-mean (\verb{mu_ar\{lag\}_trend}) and scale
 (\verb{sigma_ar\{lag\}_trend}) hyperparameters with a pooled
@@ -284,10 +284,15 @@ vary across the latent series. The three settings and the
 Stan parameters each declares are:
 \tabular{ll}{
 \strong{coef_sharing}    \tab \strong{Stan parameters with priors} \cr
-\code{"none"}                 \tab \verb{ar\{lag\}_trend} per series \cr
-\code{"shared"}               \tab \verb{ar\{lag\}_shared} (one per lag) \cr
-\code{"hierarchical"}         \tab \verb{mu_ar\{lag\}_trend}, \verb{sigma_ar\{lag\}_trend}, \verb{ar\{lag\}_trend} per series \cr
+\code{"none"}                 \tab \verb{ar\{lag\}\{stem\}_trend} per series \cr
+\code{"shared"}               \tab \verb{shared_ar\{lag\}\{stem\}_trend} (one per lag) \cr
+\code{"hierarchical"}         \tab \verb{mu_ar\{lag\}\{stem\}_trend}, \verb{sigma_ar\{lag\}\{stem\}_trend} \cr
 }
+\code{{stem}} is \verb{_pacf} for a contiguous lag set of two or more
+lags, where the sampled quantity is a partial autocorrelation,
+and empty for \code{p = 1} and for a sparse lag set such as
+\code{p = c(1, 3)}. \code{AR(p = 2)} samples \code{ar1_pacf_trend} and
+\code{AR(p = 1)} samples \code{ar1_trend}.
 All variants synthesise the same \verb{ar\{lag\}_trend[j]} symbol
 in \verb{transformed parameters}, so downstream code
 (forecasting, IRF, FEVD, summary printing) is unchanged.

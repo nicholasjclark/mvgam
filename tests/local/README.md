@@ -105,6 +105,19 @@ twelve. A model that read the vector's maximum would emit twelve
 coefficients and fit at least as well, so only a fitted posterior says
 which lags exist.
 
+Two smaller fits cover how AR coefficients are parameterised.
+`AR(p = 2)` takes the contiguous case, where partial autocorrelations
+are sampled and the coefficients derived, making every draw stationary
+by construction. `AR(p = 1, coef_sharing = "shared")` samples one
+coefficient and broadcasts it to both series. Two series each drawing
+an independent coefficient from one narrow posterior give matching
+estimates, matching dimensions and a matching summary; the two models
+separate on identity within each individual draw, which a posterior
+supplies. That fit drives the prediction routes, the forecast
+recursion, the hindcast blocks and the tidiers. The same section
+checks that `get_prior()` names the parameter each sharing mode
+samples across contiguous and sparse lag sets.
+
 **test-trend-arma.R** fits `AR(p = 1, ma = TRUE)` on two gaussian
 series over eighty occasions, under a two-dimensional `gp(x1, x2)`.
 There is no `ARMA()` constructor, so the moving-average term is an

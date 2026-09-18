@@ -1055,4 +1055,224 @@ test_that("a sparse lag set keeps the bounded coefficients", {
 })
 
 
+# -- One coefficient shared across series ----------------------------
+
+# `coef_sharing = "shared"` samples one coefficient per lag and
+# broadcasts it to every series through `rep_vector`. Two series each
+# drawing an independent coefficient from one narrow posterior give
+# matching estimates, matching dimensions and a matching summary.
+# Identity within each individual draw separates the two models, and
+# a posterior supplies that.
+#
+# The fit then drives the post-fit battery. A broadcast coefficient
+# has to reach the prediction routes, the forecast recursion, the
+# hindcast blocks and the tidiers under one name.
+#
+#   truth: 2 series, 96 occasions, gaussian, one AR(1) coefficient
+#          governing both series
+#   model: y ~ 1, trend_formula = ~ AR(p = 1, coef_sharing = "shared")
+#
+# Cached at tests/local/fixtures/val_mvgam_ar_shared.rds.
+
+set.seed(4242L)
+phi_shared <- 0.7
+lat_sh <- matrix(0, n_time, n_series)
+for (s in seq_len(n_series)) {
+  e_sh <- rnorm(n_time, 0, 0.5)
+  for (t in 2:n_time) {
+    lat_sh[t, s] <- phi_shared * lat_sh[t - 1L, s] + e_sh[t]
+  }
+}
+dat_sh <- data.frame(
+  y = as.numeric(lat_sh) + rnorm(n_time * n_series, 0, 0.2),
+  time = rep(time_vals, times = n_series),
+  series = factor(rep(series_levels, each = n_time),
+                  levels = series_levels)
+)
+
+make_future_sh <- function(h) {
+  ft <- max(time_vals) + seq_len(h)
+  data.frame(
+    time = rep(ft, times = n_series),
+    series = factor(rep(series_levels, each = h),
+                    levels = series_levels),
+    y = NA_real_
+  )
+}
+
+shared_cache <- cache_path("val_mvgam_ar_shared.rds")
+if (file.exists(shared_cache)) {
+  cat("[cache] Loading shared-coefficient AR(1) fit.\n")
+  fit_sh <- readRDS(shared_cache)
+} else {
+  cat("[fit ] mvgam(AR(p = 1, coef_sharing = shared), 2 x 96)\n")
+  fit_sh <- mvgam(
+    y ~ 1, trend_formula = ~ AR(p = 1, coef_sharing = "shared"),
+    data = dat_sh, family = gaussian(), chains = 2L, iter = 1000L,
+    warmup = 500L, silent = 2, backend = "cmdstanr"
+  )
+  saveRDS(fit_sh, shared_cache)
+}
+
+dm_sh <- posterior::as_draws_matrix(fit_sh$fit)
+
+
+test_that("the program samples one coefficient and broadcasts it", {
+  # The generated Stan states the whole mechanism: a length-one
+  # vector in `parameters`, a `rep_vector` filling the per-series
+  # vector, and the prior on the sampled scalar.
+  sc <- as.character(stancode(fit_sh))
+  flat <- gsub("\\s+", "", sc)
+  expect_true(grepl("vector<lower=-1,upper=1>[1]shared_ar1_trend;", flat,
+                    fixed = TRUE))
+  expect_true(grepl(
+    "ar1_trend=rep_vector(shared_ar1_trend[1],N_lv_trend);",
+    flat, fixed = TRUE))
+  # The per-series vector is derived, which leaves the scalar as the
+  # one AR coefficient with a prior.
+  expect_true(grepl("shared_ar1_trend|0,0.5", flat))
+  expect_false(grepl("pacf", flat, fixed = TRUE))
+})
+
+
+test_that("every draw gives both series the same coefficient", {
+  # The claim no program check can make. Two series sampling
+  # independent coefficients from one narrow posterior agree on
+  # average and differ draw by draw; a broadcast agrees within each
+  # individual draw exactly.
+  a1 <- as.numeric(dm_sh[, "ar1_trend[1]"])
+  a2 <- as.numeric(dm_sh[, "ar1_trend[2]"])
+  expect_identical(a1, a2)
+  expect_identical(a1, as.numeric(dm_sh[, "shared_ar1_trend[1]"]))
+  # Both vary, which makes the identity above a real constraint.
+  expect_gt(stats::sd(a1), 1e-6)
+  expect_true(all(abs(a1) < 1))
+  expect_length(
+    grep("^shared_ar1_trend\\[", colnames(dm_sh), value = TRUE), 1L)
+  expect_length(grep("^ar1_trend\\[", colnames(dm_sh), value = TRUE),
+                n_series)
+})
+
+
+test_that("the trend axis matches the series the fit was given", {
+  sd_sh <- fit_sh$standata
+  ax <- mvgam:::mvgam_axes(fit_sh)
+  expect_identical(as.character(ax$series$levels), series_levels)
+  expect_identical(as.integer(ax$time$values), time_vals)
+  expect_identical(as.integer(sd_sh$N_time_trend), n_time)
+  expect_identical(as.integer(sd_sh$N_series_trend), n_series)
+  expect_identical(as.integer(sd_sh$obs_trend_series),
+                   match(as.character(dat_sh$series), series_levels))
+})
+
+
+test_that("every prediction route covers every row", {
+  n_obs <- nrow(dat_sh)
+  ep <- posterior_epred(fit_sh, ndraws = 20L)
+  pp <- posterior_predict(fit_sh, ndraws = 20L)
+  lp <- posterior_linpred(fit_sh, ndraws = 20L)
+  expect_identical(dim(ep), c(20L, n_obs))
+  expect_identical(dim(pp), c(20L, n_obs))
+  expect_identical(dim(lp), c(20L, n_obs))
+  expect_true(all(is.finite(ep)))
+  expect_identical(nrow(fitted(fit_sh, ndraws = 20L)), n_obs)
+  expect_identical(nrow(residuals(fit_sh, ndraws = 20L)), n_obs)
+  ll <- log_lik(fit_sh, ndraws = 20L)
+  expect_identical(dim(ll), c(20L, n_obs))
+  expect_true(all(is.finite(ll)))
+})
+
+
+test_that("the one-step forecast uses the shared coefficient", {
+  # One coefficient governs both series, making the one-step trend
+  # forecast that shared value times the last latent state. A
+  # recursion taking a per-series coefficient from elsewhere, or
+  # taking the scalar at the wrong index, lands somewhere else while
+  # staying finite and correctly shaped.
+  fc <- forecast(fit_sh, newdata = make_future_sh(1L), ndraws = NULL,
+                 type = "trend")
+  phi <- as.numeric(dm_sh[, "shared_ar1_trend[1]"])
+  for (s in seq_len(n_series)) {
+    st <- as.numeric(
+      dm_sh[, paste0("lv_trend[", n_time, ",", s, "]")]
+    )
+    expect_equal(mean(fc$forecasts[[series_levels[s]]][, 1L]),
+                 mean(phi * st), tolerance = 0.1)
+  }
+})
+
+
+test_that("the forecast object is keyed and ordered by the fit", {
+  h <- 5L
+  future_times <- max(time_vals) + seq_len(h)
+  fc <- forecast(fit_sh, newdata = make_future_sh(h), ndraws = 20L,
+                 type = "link")
+  expect_identical(names(fc$forecasts), series_levels)
+  for (s in series_levels) {
+    expect_identical(as.integer(fc$test_times[[s]]), future_times)
+    expect_identical(as.integer(fc$train_times[[s]]), time_vals)
+    expect_identical(ncol(fc$forecasts[[s]]), h)
+  }
+})
+
+
+test_that("hindcast blocks match the conditional epred cells", {
+  hc <- hindcast(fit_sh, type = "expected")
+  blocks <- hc$hindcasts
+  expect_identical(names(blocks), series_levels)
+  cells <- unlist(lapply(names(blocks), function(s) {
+    rows <- which(as.character(dat_sh$series) == s)
+    rows[order(dat_sh$time[rows])]
+  }))
+  ep <- posterior_epred(fit_sh, incl_autocor = TRUE)
+  expect_equal(unname(ep[, cells, drop = FALSE]),
+               unname(do.call(cbind, blocks)))
+})
+
+
+test_that("summary, print and the tidiers name the shared parameter", {
+  txt <- capture.output(summary(fit_sh))
+  expect_gt(length(txt), 10L)
+  expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
+
+  vars <- variables(fit_sh)
+  td <- tidy(fit_sh, effects = "all")
+  ps <- rownames(posterior_summary(fit_sh))
+  # The sampled scalar appears under one name everywhere it is
+  # reported, and the derived vector keeps its own name.
+  # The sampled scalar reaches all three reporting tables. `tidy()`
+  # walks the parameter taxonomy, where a name without the `_trend`
+  # suffix lands on the observation side and reaches no bucket.
+  for (tbl in list(vars, td$term, ps)) {
+    expect_true(any(grepl("^shared_ar1_trend", tbl)))
+  }
+  expect_true(any(grepl("^ar1_trend\\[", vars)))
+
+  # A prior can still be set on the name `get_prior()` offers.
+  gp <- get_prior(y ~ 1,
+                  trend_formula = ~ AR(p = 1, coef_sharing = "shared"),
+                  data = dat_sh, family = gaussian())
+  ar_rows <- gp$class[grepl("ar[0-9]", gp$class)]
+  expect_identical(sort(unique(ar_rows)), "shared_ar1_trend")
+
+  aug <- augment(fit_sh)
+  expect_identical(nrow(aug), nrow(dat_sh))
+  expect_equal(as.numeric(aug$.observed), as.numeric(dat_sh$y))
+})
+
+
+test_that("pp_check and the plotting methods draw something", {
+  drawn <- function(p) {
+    expect_s3_class(p, "ggplot")
+    layers <- ggplot2::ggplot_build(p)$data
+    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+  }
+  drawn(pp_check(fit_sh, ndraws = 20L))
+  for (ty in c("residuals", "trend", "series")) {
+    drawn(plot(fit_sh, type = ty))
+  }
+  drawn(mcmc_plot(fit_sh))
+})
+
+
 cat("\nDone.\n")

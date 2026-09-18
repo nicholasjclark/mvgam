@@ -711,14 +711,8 @@ derive_ar_lags <- function(spec) {
 # `c(1L, 2L)`. Vector `p` (e.g. `c(2, 4)`) is treated as the
 # sparse lag set: `c(2L, 4L)`. NULL or zero-length `p` returns
 # `integer(0)` (trend has no AR dynamics).
-#
-# An optional `override` argument lets the Stan generators pass
-# in a pre-parsed `trend_specs$ar_lags` when it has already been
-# resolved upstream; this keeps both callers using the same
-# resolution rule even when one of them caches the result.
 #'@noRd
-resolve_active_lags <- function(p, override = NULL) {
-  if (!is.null(override)) return(as.integer(override))
+resolve_active_lags <- function(p) {
   if (is.null(p) || length(p) == 0L) return(integer(0))
   if (length(p) == 1L) return(seq_len(as.integer(p)))
   as.integer(p)
@@ -738,6 +732,53 @@ resolve_active_lags <- function(p, override = NULL) {
 ar_lags_stationary <- function(ar_lags) {
   lags <- as.integer(ar_lags)
   length(lags) >= 2L && identical(lags, seq_len(max(lags)))
+}
+
+
+# Internal: the infix an AR coefficient name takes for this lag
+# set. A lag set on the partial autocorrelation parameterisation
+# spells its sampled parameters `ar{lag}_pacf_*`. One rule for the
+# Stan generator and for the prior surface.
+#'@noRd
+ar_coef_stem <- function(ar_lags) {
+  if (ar_lags_stationary(ar_lags)) "_pacf" else ""
+}
+
+
+# Internal: the scalar an `AR()` samples per lag under
+# `coef_sharing = "shared"`. The `_trend` suffix places the name on
+# the trend side for `is_trend_parameter()`, which the parameter
+# taxonomy, `tidy()` and the set of names mvgam intercepts before
+# brms sees them all consult. The prefix matches `mu_ar{lag}_trend`
+# and `sigma_ar{lag}_trend`, the hyperparameters the hierarchical
+# mode samples.
+#'@noRd
+ar_shared_coef_names <- function(ar_lags) {
+  paste0("shared_ar", ar_lags, ar_coef_stem(ar_lags), "_trend")
+}
+
+
+# Internal: every AR coefficient parameter mvgam owns for this lag
+# set and sharing mode. Three consumers share the list: the prior
+# surface, the summary labels and the set of names mvgam intercepts
+# before brms sees them. Each of the three needs the per-series
+# coefficient, which stays in the list under every mode.
+# `generate_trend_priors_from_monitor_params()` narrows the list to
+# the rows a user can edit.
+#'@noRd
+ar_monitor_coef_names <- function(ar_lags, coef_sharing = "none") {
+  stem <- ar_coef_stem(ar_lags)
+  coefs <- paste0("ar", ar_lags, stem, "_trend")
+  switch(
+    coef_sharing,
+    none = coefs,
+    shared = c(ar_shared_coef_names(ar_lags), coefs),
+    hierarchical = c(
+      coefs,
+      paste0("mu_ar", ar_lags, stem, "_trend"),
+      paste0("sigma_ar", ar_lags, stem, "_trend")
+    )
+  )
 }
 
 

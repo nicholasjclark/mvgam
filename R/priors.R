@@ -390,15 +390,18 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
     monitor_params <- setdiff(monitor_params, "L_Omega_trend")
   }
 
-  # Under partial pooling a per-series coefficient is drawn from the
-  # population distribution its own hyperparameters describe, so
-  # `ar{lag}_trend ~ normal(mu_ar{lag}_trend, sigma_ar{lag}_trend)` is
-  # the model rather than a prior. Offering a row for it promises an
-  # override that would break the pooling; the editable rows are the
-  # two hyperparameters, which the generator does read. The
-  # coefficients stay in `monitor_params` because forecasting reads
-  # them from there.
-  if (identical(trend_obj$coef_sharing %||% "none", "hierarchical")) {
+  # Under either sharing mode the per-series coefficient is derived
+  # from something else the program samples: a broadcast scalar under
+  # `"shared"`, and a population mean and scale under
+  # `"hierarchical"`. A prior row for the derived vector promises an
+  # override the program would discard. The editable rows are the
+  # parameters each mode samples.
+  #
+  # The coefficients stay in `monitor_params`, which also supplies
+  # the summary labels and the set of names mvgam intercepts before
+  # brms sees them.
+  sharing <- trend_obj$coef_sharing %||% "none"
+  if (sharing %in% c("shared", "hierarchical")) {
     monitor_params <- monitor_params[
       !(is_ar_coefficient(monitor_params) | is_ar_partial(monitor_params))
     ]

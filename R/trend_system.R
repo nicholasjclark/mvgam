@@ -691,11 +691,17 @@ generate_monitor_params <- function(trend_spec) {
   # Extract trend type (normalize for registry lookup)
   trend_type <- get_trend_name(trend_spec)
 
-  # Most trends sample an innovation scale, but not all, and a model
-  # that does not must not report one: a prior set on it is either
-  # refused or silently dropped, even though the user reads the class
-  # name off the table that offered it.
-  base_params <- if (samples_innovation_scale(trend_spec)) {
+  # A grouped trend scales its innovations through `L_group_trend`,
+  # declaring `sigma_group_trend` with a group-scoped correlation
+  # block. The ungrouped spellings stay out of its prior surface,
+  # which keeps every offered class one the program declares.
+  is_grouped <- named_var(trend_spec$gr)
+
+  # Most trends sample an innovation scale. The prior surface names
+  # it where the program declares it. A prior set on an absent class
+  # is either refused or silently dropped, and the class name came
+  # from the table that offered it.
+  base_params <- if (!is_grouped && samples_innovation_scale(trend_spec)) {
     "sigma_trend"
   } else {
     character(0)
@@ -720,7 +726,7 @@ generate_monitor_params <- function(trend_spec) {
   # Add correlation parameters if enabled
   # Note: Sigma_trend is computed from sigma_trend * L_Omega_trend in Stan,
   # so users should not place priors on it directly
-  correlation_params <- if (trend_spec$cor %||% FALSE) {
+  correlation_params <- if (!is_grouped && (trend_spec$cor %||% FALSE)) {
     "L_Omega_trend"
   } else {
     character(0)
@@ -745,8 +751,9 @@ generate_monitor_params <- function(trend_spec) {
   }
 
   # Add hierarchical correlation parameters if grouping is specified
-  hierarchical_params <- if (named_var(trend_spec$gr)) {
-    c("alpha_cor_trend", "L_Omega_global_trend", "L_deviation_group_trend", "sigma_group_trend")
+  hierarchical_params <- if (is_grouped) {
+    c("alpha_cor_trend", "L_Omega_global_trend",
+      "L_deviation_group_trend", "sigma_group_trend")
   } else {
     character(0)
   }
@@ -807,25 +814,13 @@ generate_rw_monitor_params <- function(trend_spec) {
 #' @noRd
 generate_ar_monitor_params <- function(trend_spec) {
   # One resolution of the lag set, shared with the Stan generator.
-  lag_vec <- resolve_active_lags(trend_spec$p %||% 1, trend_spec$ar_lags)
-  # A contiguous lag set samples partial autocorrelations and
-  # derives the coefficients from them. A derived quantity takes no
-  # prior, which makes the partial autocorrelation the editable row.
-  stem <- if (ar_lags_stationary(lag_vec)) "_pacf_trend" else "_trend"
-  ar_params <- paste0("ar", lag_vec, stem)
-
-  # Under hierarchical sharing the per-series ar{lag}_trend
-  # vectors still exist (one normal draw per series, per lag)
-  # AND there is a population mean + scale per lag. Add those
-  # so `get_prior()` surfaces an editable row for each.
+  lag_vec <- resolve_active_lags(trend_spec$p %||% 1)
+  # Every AR parameter the sharing mode gives this spec, including
+  # the per-series coefficient that summary labels and the brms
+  # interception set both need. The prior generator narrows the list
+  # to the rows a user can edit.
   sharing <- trend_spec$coef_sharing %||% "none"
-  if (sharing == "hierarchical") {
-    ar_params <- c(
-      ar_params,
-      paste0("mu_ar", lag_vec, stem),
-      paste0("sigma_ar", lag_vec, stem)
-    )
-  }
+  ar_params <- ar_monitor_coef_names(lag_vec, sharing)
 
   c(ar_params, ma_params_for(trend_spec, "AR"))
 }
@@ -1821,9 +1816,9 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #' @param gr An optional grouping variable, which must be a `factor` in the
 #'   supplied `data`, for setting up hierarchical residual correlation
-#'   structures. If specified, this will automatically set `cor = TRUE` and set
-#'   up a model where the residual correlations for a specific level of `gr`
-#'   are modelled hierarchically:
+#'   structures. If specified, this sets up a model where the residual
+#'   correlations for a specific level of `gr` are modelled
+#'   hierarchically:
 #'
 #'   \eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} +
 #'   (1 - \alpha_{cor})\Omega_{group, local}},
@@ -1858,7 +1853,7 @@ print.mvgam_trend <- function(x, ...) {
 #'   default `"none"` estimates an independent coefficient
 #'   vector per series (one `ar{lag}_trend` entry per latent
 #'   process per lag). `"shared"` collapses to a single
-#'   `ar{lag}_shared` scalar per lag, broadcast across all
+#'   `shared_ar{lag}_trend` scalar per lag, broadcast across all
 #'   series in `transformed parameters`. `"hierarchical"` adds
 #'   per-lag population-mean (`mu_ar{lag}_trend`) and scale
 #'   (`sigma_ar{lag}_trend`) hyperparameters with a pooled
@@ -1898,10 +1893,15 @@ print.mvgam_trend <- function(x, ...) {
 #' Stan parameters each declares are:
 #' \tabular{ll}{
 #'   \strong{coef_sharing}    \tab \strong{Stan parameters with priors} \cr
-#'   `"none"`                 \tab `ar{lag}_trend` per series \cr
-#'   `"shared"`               \tab `ar{lag}_shared` (one per lag) \cr
-#'   `"hierarchical"`         \tab `mu_ar{lag}_trend`, `sigma_ar{lag}_trend`, `ar{lag}_trend` per series \cr
+#'   `"none"`                 \tab `ar{lag}{stem}_trend` per series \cr
+#'   `"shared"`               \tab `shared_ar{lag}{stem}_trend` (one per lag) \cr
+#'   `"hierarchical"`         \tab `mu_ar{lag}{stem}_trend`, `sigma_ar{lag}{stem}_trend` \cr
 #' }
+#' `{stem}` is `_pacf` for a contiguous lag set of two or more
+#' lags, where the sampled quantity is a partial autocorrelation,
+#' and empty for `p = 1` and for a sparse lag set such as
+#' `p = c(1, 3)`. `AR(p = 2)` samples `ar1_pacf_trend` and
+#' `AR(p = 1)` samples `ar1_trend`.
 #' All variants synthesise the same `ar{lag}_trend[j]` symbol
 #' in `transformed parameters`, so downstream code
 #' (forecasting, IRF, FEVD, summary printing) is unchanged.

@@ -4384,10 +4384,10 @@ generate_trend_priors_stanvar <- function(param_names, prior = NULL, stanvar_nam
 #' * none: one `vector<lower=-1,upper=1>\[N_lv_trend\]
 #'   ar{lag}_trend` per lag, sampled directly with the standard
 #'   trend prior.
-#' * shared: one `vector<lower=-1,upper=1>\[1\] ar{lag}_shared`
-#'   per lag in `parameters`; per-series `ar{lag}_trend`
-#'   synthesised in `transformed parameters` via `rep_vector`
-#'   so downstream code is unchanged.
+#' * shared: one `vector<lower=-1,upper=1>\[1\]
+#'   shared_ar{lag}_trend` per lag in `parameters`; per-series
+#'   `ar{lag}_trend` synthesised in `transformed parameters` via
+#'   `rep_vector` so downstream code is unchanged.
 #' * hierarchical: per-lag `real mu_ar{lag}_trend` plus
 #'   `real<lower=0> sigma_ar{lag}_trend` hyperparameters in
 #'   `parameters` alongside the per-series `ar{lag}_trend`;
@@ -4417,7 +4417,7 @@ build_ar_coef_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
 #'
 #' Default prior path. Branches on `coef_sharing`. The
 #' parameter that carries the user-tunable prior is named
-#' `ar{lag}_shared` under shared mode and `ar{lag}_trend`
+#' `shared_ar{lag}_trend` under shared mode and `ar{lag}_trend`
 #' otherwise; the model-block prior emission targets the
 #' sampled parameter name.
 #'
@@ -4432,17 +4432,18 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
   # coefficient under either parameterisation, which keeps every
   # reader of a fitted model on one quantity.
   stationary <- ar_lags_stationary(ar_lags)
-  stem <- if (stationary) "_pacf_trend" else "_trend"
-  shared_stem <- if (stationary) "_pacf_shared" else "_shared"
+  stem <- paste0(ar_coef_stem(ar_lags), "_trend")
+  shared_names <- ar_shared_coef_names(ar_lags)
   par_lines <- character(0)
   tpar_decl_lines <- character(0)
   tpar_assign_lines <- character(0)
   prior_lines <- character(0)
-  for (lag in ar_lags) {
+  for (li in seq_along(ar_lags)) {
+    lag <- ar_lags[li]
     pooled <- paste0("ar", lag, stem)
     sampled <- switch(coef_sharing,
       none = pooled,
-      shared = paste0("ar", lag, shared_stem),
+      shared = shared_names[li],
       hierarchical = pooled
     )
     if (coef_sharing == "shared") {
@@ -4658,7 +4659,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(n_obs, lower = 1)
 
-  ar_lags <- resolve_active_lags(p, trend_specs$ar_lags)
+  ar_lags <- resolve_active_lags(p)
   checkmate::assert_integerish(ar_lags, lower = 1, any.missing = FALSE)
 
   is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
@@ -4719,33 +4720,73 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   })
   ar_sum <- paste(ar_terms, collapse = " + ")
 
-  # AR(1) without MA, without cross-series correlation: use the
-  # stationary marginal Normal(0, sigma / sqrt(1 - ar1^2)) to
-  # initialise lv_trend[1, :] so the prior on the first latent
-  # state matches the AR(1) stationary distribution, not the
-  # marginal Normal(0, sigma) of a single innovation.
+  # The first latent state starts at the spread the process settles
+  # into. An AR(1) with independent innovations divides the t = 1
+  # innovation by sqrt(1 - ar1^2), giving the stationary marginal
+  # Normal(0, sigma / sqrt(1 - ar1^2)).
   #
-  # Out of scope here:
-  #   * AR(p>1): stationary covariance requires the AR(p)
-  #     Yule-Walker solve, currently only implemented in the VAR
-  #     generator (`initial_joint_var` in
-  #     `generate_var_trend_stanvars`).
-  #   * ARMA(1, 1): stationary variance involves both ar1 and the
-  #     MA coefficient.
-  #   * AR(p=1, cor=TRUE): the per-series correction below is
-  #     correct for the diagonal of the joint stationary
-  #     covariance, but the off-diagonal cross-covariance for the
-  #     correlated-innovation AR(1) is
-  #     sigma[i]*sigma[j]*Omega[i, j] / (1 - ar1[i]*ar1[j]),
-  #     not the implied
-  #     sigma[i]*sigma[j]*Omega[i, j]
-  #       / sqrt((1 - ar1[i]^2)*(1 - ar1[j]^2)).
-  #     A correct correction would multiply the t=1 row of
-  #     scaled_innovations_trend by a Cholesky factor of the joint
-  #     stationary covariance rather than the per-series scalar
-  #     used here.
+  # Correlated innovations settle at the joint stationary covariance
+  # Gamma[a, b] = Sigma[a, b] / (1 - ar1[a] * ar1[b]), whose Cholesky
+  # factor scales the first row of standard normals. The per-series
+  # divisor is right on the diagonal alone: off it the correlated
+  # AR(1) settles at
+  #   sigma[a]*sigma[b]*Omega[a, b] / (1 - ar1[a]*ar1[b]),
+  # against the divisor's implied
+  #   sigma[a]*sigma[b]*Omega[a, b]
+  #     / sqrt((1 - ar1[a]^2)*(1 - ar1[b]^2)).
+  # `stationary_correlated_params()` computes the same quantity for
+  # marginal prediction, and the two agree once both are in place.
+  #
+  # Two shapes keep the raw innovation start:
+  #   * AR(p>1): the stationary covariance needs the Yule-Walker
+  #     solve on the companion form, which `initial_joint_var()` in
+  #     the VAR generator provides today.
+  #   * ARMA(1, 1): the stationary variance involves ar1 and the MA
+  #     coefficient together, and the t = 1 innovation enters the
+  #     recursion again at t = 2.
+  #
+  # A grouped trend (`gr =`) scales its innovations through
+  # `L_group_trend` within each group. Its first row settles at the
+  # same joint form, taken over the series of one group.
   cor <- isTRUE(trend_specs$cor %||% FALSE)
-  ar_init_block <- if (identical(max_lag, 1L) && !has_ma && !cor) {
+  has_gr <- named_var(trend_specs$gr)
+  ar_init_block <- if (identical(max_lag, 1L) && !has_ma && has_gr) {
+    paste0(
+      "      // Grouped AR(1) stationary initialisation:\n",
+      "      // Gamma[a, b] = Sigma_group[a, b] / (1 - ar1[a] * ar1[b])\n",
+      "      // over the series of one group. `members` repeats the\n",
+      "      // ascending scan that fills scaled_innovations_trend,\n",
+      "      // holding subgroup position k on one series in both.\n",
+      "      for (g_idx in 1:N_groups_trend) {\n",
+      "        array[N_subgroups_trend] int members;\n",
+      "        int k_init = 0;\n",
+      "        for (s in 1:N_lv_trend) {\n",
+      "          if (group_inds_trend[s] == g_idx) {\n",
+      "            k_init += 1;\n",
+      "            members[k_init] = s;\n",
+      "          }\n",
+      "        }\n",
+      "        matrix[N_subgroups_trend, N_subgroups_trend] Gamma_init\n",
+      "          = Sigma_group_trend[g_idx];\n",
+      "        for (a_init in 1:N_subgroups_trend) {\n",
+      "          for (b_init in 1:N_subgroups_trend) {\n",
+      "            Gamma_init[a_init, b_init] = Gamma_init[a_init, b_init]\n",
+      "              / (1 - ar1_trend[members[a_init]]\n",
+      "                   * ar1_trend[members[b_init]]);\n",
+      "          }\n",
+      "        }\n",
+      "        vector[N_subgroups_trend] z_init;\n",
+      "        for (m_init in 1:N_subgroups_trend) {\n",
+      "          z_init[m_init] = innovations_trend[1, members[m_init]];\n",
+      "        }\n",
+      "        vector[N_subgroups_trend] init_g\n",
+      "          = cholesky_decompose(Gamma_init) * z_init;\n",
+      "        for (m_init in 1:N_subgroups_trend) {\n",
+      "          lv_trend[1, members[m_init]] = init_g[m_init];\n",
+      "        }\n",
+      "      }"
+    )
+  } else if (identical(max_lag, 1L) && !has_ma && !cor) {
     paste0(
       "      // AR(1) stationary marginal initialisation:\n",
       "      // lv_trend[1, j] ~ Normal(0, sigma_trend[j] / sqrt(1 - ar1_trend[j]^2)).\n",
@@ -4755,6 +4796,26 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "      for (j in 1:N_lv_trend) {\n",
       "        lv_trend[1, j] = scaled_innovations_trend[1, j]\n",
       "                         / sqrt(1 - square(ar1_trend[j]));\n",
+      "      }"
+    )
+  } else if (identical(max_lag, 1L) && !has_ma && cor) {
+    paste0(
+      "      // Correlated AR(1) stationary initialisation:\n",
+      "      // Gamma[a, b] = Sigma[a, b] / (1 - ar1[a] * ar1[b]).\n",
+      "      // Sigma_trend is the innovation covariance this program\n",
+      "      // already declares. The braces keep Gamma_init out of\n",
+      "      // the posterior.\n",
+      "      {\n",
+      "        matrix[N_lv_trend, N_lv_trend] Gamma_init = Sigma_trend;\n",
+      "        for (a_init in 1:N_lv_trend) {\n",
+      "          for (b_init in 1:N_lv_trend) {\n",
+      "            Gamma_init[a_init, b_init] = Gamma_init[a_init, b_init]\n",
+      "              / (1 - ar1_trend[a_init] * ar1_trend[b_init]);\n",
+      "          }\n",
+      "        }\n",
+      "        lv_trend[1, :] = to_row_vector(\n",
+      "          cholesky_decompose(Gamma_init)\n",
+      "          * to_vector(innovations_trend[1, :]));\n",
       "      }"
     )
   } else {

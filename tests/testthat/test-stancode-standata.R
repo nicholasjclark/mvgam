@@ -841,8 +841,16 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
 
     # AR(1) latent variable dynamics
     expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
-    expect_true(stan_pattern("lv_trend\\[i,:\\] = scaled_innovations_trend\\[i,:\\];",
-                      code_with_trend))
+    # Correlated innovations settle at the joint stationary
+    # covariance Gamma[a, b] = Sigma[a, b] / (1 - ar1[a] * ar1[b]),
+    # whose Cholesky factor scales the first row of innovations.
+    expect_true(stan_pattern(
+      "matrix\\[N_lv_trend, N_lv_trend\\] Gamma_init = Sigma_trend;",
+      code_with_trend))
+    expect_true(stan_pattern(
+      paste0("lv_trend\\[1,:\\] = to_row_vector\\(cholesky_decompose\\(",
+             "Gamma_init\\) \\* to_vector\\(innovations_trend\\[1,:\\]\\)\\);"),
+      code_with_trend))
     expect_true(stan_pattern("for \\(i in 2:N_time_trend\\)", code_with_trend))
     expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
     expect_true(stan_pattern("lv_trend\\[i,j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1,j\\] \\+ scaled_innovations_trend\\[i,j\\];", code_with_trend))
@@ -1038,7 +1046,16 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
 
   # AR(1) latent variable dynamics
   expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
-  expect_true(stan_pattern("lv_trend\\[i,:\\] = scaled_innovations_trend\\[i,:\\];", code_with_trend))
+  # Correlated innovations settle at the joint stationary covariance
+  # Gamma[a, b] = Sigma[a, b] / (1 - ar1[a] * ar1[b]), whose Cholesky
+  # factor scales the first row of innovations.
+  expect_true(stan_pattern(
+    "matrix\\[N_lv_trend, N_lv_trend\\] Gamma_init = Sigma_trend;",
+    code_with_trend))
+  expect_true(stan_pattern(
+    paste0("lv_trend\\[1,:\\] = to_row_vector\\(cholesky_decompose\\(",
+           "Gamma_init\\) \\* to_vector\\(innovations_trend\\[1,:\\]\\)\\);"),
+    code_with_trend))
   expect_true(stan_pattern("for \\(i in 2:N_time_trend\\)", code_with_trend))
   expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
   expect_true(stan_pattern("lv_trend\\[i,j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1,j\\] \\+ scaled_innovations_trend\\[i,j\\];", code_with_trend))
@@ -1892,29 +1909,26 @@ test_that("AR(p=1) latent state at t=1 uses stationary marginal init", {
 })
 
 
-test_that("AR(p>1) / AR with MA / AR with cor keep innovation-only init", {
-  # The AR(p=1) stationary marginal correction in
-  # `generate_ar_trend_stanvars()` applies only to AR(p=1) WITHOUT
-  # MA and WITHOUT cross-series correlation. The three families
-  # outside that scope would each need a different stationary
-  # covariance:
+test_that("AR(p>1) and AR with MA keep innovation-only init", {
+  # The stationary initialisation covers three AR paths: AR(p=1)
+  # with independent innovations, AR(p=1) with correlated
+  # innovations and a grouped AR(p=1). Two families remain outside
+  # it, each needing a different stationary covariance:
   #
-  #   * AR(p>1)            : Yule-Walker for AR(p) (only in VAR
-  #                          generator today via `initial_joint_var`)
-  #   * AR(p=1, ma=TRUE)   : ARMA(1, 1) stationary variance
-  #                          involves the MA coefficient
-  #   * AR(p=1, cor=TRUE)  : joint stationary covariance with
-  #                          off-diagonal
-  #                          sigma[i]*sigma[j]*Omega[i, j] /
-  #                          (1 - ar1[i]*ar1[j])
+  #   * AR(p>1)          : Yule-Walker on the companion form, which
+  #                        `initial_joint_var()` supplies in the VAR
+  #                        generator today
+  #   * AR(p=1, ma=TRUE) : the ARMA(1, 1) stationary variance
+  #                        involves the MA coefficient, and the
+  #                        t = 1 innovation enters the recursion
+  #                        again at t = 2
   #
-  # All three must keep the per-lag innovation-only initialisation
-  # rather than accept a partial AR(1)-style correction.
+  # Both keep the per-lag innovation-only initialisation until the
+  # matching covariance exists.
   data <- setup_stan_test_data()$multivariate
   for (tf in list(
     ~ AR(p = 2),
-    ~ AR(p = 1, ma = TRUE),
-    ~ AR(p = 1, cor = TRUE)
+    ~ AR(p = 1, ma = TRUE)
   )) {
     mf <- mvgam_formula(count ~ 1 + x, trend_formula = tf)
     code <- as.character(stancode(
@@ -1924,11 +1938,72 @@ test_that("AR(p>1) / AR with MA / AR with cor keep innovation-only init", {
     expect_false(any(grepl(
       "sqrt\\(1\\s*-\\s*square\\(ar1_trend", lines
     )))
+    expect_false(any(grepl("Gamma_init", lines, fixed = TRUE)))
     expect_true(any(grepl(
       "lv_trend\\[i,\\s*:\\s*\\]\\s*=\\s*(scaled_|ma_)innovations_trend",
       lines
     )))
   }
+})
+
+
+test_that("a correlated AR(1) starts at the joint stationary covariance", {
+  # Element-wise scaling by 1/sqrt(1 - ar1^2) gives the right
+  # marginal variance and the wrong cross-series covariance. The
+  # stationary covariance of a correlated AR(1) solves
+  # Gamma = A Gamma A' + Sigma with A = diag(ar1), giving entries
+  # Gamma[a, b] = Sigma[a, b] / (1 - ar1[a] * ar1[b]). The two forms
+  # agree on the diagonal alone. The per-series divisor belongs to
+  # the independent-innovation program.
+  #
+  # `a_init` and `b_init` name the loop indices because a brms
+  # observation formula with predictors already declares `b` for the
+  # population-level coefficients, and Stan refuses the shadow.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(count ~ 1 + x,
+                      trend_formula = ~ AR(p = 1, cor = TRUE))
+  code <- as.character(stancode(
+    mf, data = data, family = poisson(), validate = TRUE
+  ))
+  expect_true(stan_pattern(
+    "matrix\\[N_lv_trend, N_lv_trend\\] Gamma_init = Sigma_trend;", code))
+  expect_true(stan_pattern(
+    paste0("Gamma_init\\[a_init, b_init\\] = Gamma_init\\[a_init, b_init\\]",
+           " / \\(1 - ar1_trend\\[a_init\\] \\* ar1_trend\\[b_init\\]\\);"),
+    code))
+  expect_true(stan_pattern(
+    paste0("lv_trend\\[1,:\\] = to_row_vector\\(cholesky_decompose\\(",
+           "Gamma_init\\) \\* to_vector\\(innovations_trend\\[1,:\\]\\)\\);"),
+    code))
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  expect_false(any(grepl("sqrt\\(1\\s*-\\s*square\\(ar1_trend", lines)))
+})
+
+
+test_that("a grouped AR(1) starts at its group stationary covariance", {
+  # `L_group_trend` correlates innovations within each group. The
+  # first row settles at Sigma_group[a, b] / (1 - ar1[a] * ar1[b])
+  # taken over that group's series. The scalar divisor would give
+  # every within-group off-diagonal the wrong value while leaving
+  # each diagonal right.
+  #
+  # `members` repeats the ascending scan that fills
+  # `scaled_innovations_trend`, which keeps subgroup position k on
+  # one series in both places.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(count ~ 1 + x,
+                      trend_formula = ~ AR(p = 1, gr = habitat))
+  code <- as.character(stancode(
+    mf, data = data, family = poisson(), validate = TRUE
+  ))
+  expect_true(stan_pattern(
+    paste0("matrix\\[N_subgroups_trend, N_subgroups_trend\\] Gamma_init",
+           " = Sigma_group_trend\\[g_idx\\];"), code))
+  expect_true(stan_pattern("members\\[k_init\\] = s;", code))
+  expect_true(stan_pattern(
+    "lv_trend\\[1, members\\[m_init\\]\\] = init_g\\[m_init\\];", code))
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  expect_false(any(grepl("sqrt\\(1\\s*-\\s*square\\(ar1_trend", lines)))
 })
 
 
@@ -3873,6 +3948,63 @@ test_that("loadings_prior errors when combined with a fully-fixed trend_map", {
 })
 
 
+test_that("get_prior offers only trend classes the program declares", {
+  # A prior set on a class the program never declares reaches
+  # nothing, and the class name came from the table that offered it.
+  # Grouping is where the two drift apart: the generated program
+  # swaps `sigma_trend` and `L_Omega_trend` for `sigma_group_trend`
+  # with the global and deviation blocks.
+  data <- setup_stan_test_data()$multivariate
+
+  declared <- function(code) {
+    lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+    i0 <- grep("^parameters \\{", lines)
+    i1 <- grep("^transformed parameters \\{|^model \\{", lines)
+    i1 <- i1[i1 > i0][1L]
+    ids <- sub(";.*$", "", trimws(lines[(i0 + 1L):(i1 - 1L)]))
+    ids <- vapply(strsplit(ids, "[[:space:]]+"), function(z) {
+      if (length(z) == 0L) "" else z[length(z)]
+    }, character(1))
+    ids[nzchar(ids) & !grepl("[{}]", ids)]
+  }
+
+  # A fixed `trend_map` hands the loadings to Stan as data, where a
+  # prior on that class would reach nothing.
+  Z_fixed <- matrix(c(1, 0, 0, 1, 1, 1, 0, 1),
+                    nrow = 4L, ncol = 2L, byrow = TRUE)
+  rownames(Z_fixed) <- paste0("series", 1:4)
+
+  specs <- list(
+    ~ 1 + AR(p = 1),
+    ~ 1 + AR(p = 1, cor = TRUE),
+    ~ 1 + AR(p = 2, coef_sharing = "shared"),
+    ~ 1 + AR(p = 2, coef_sharing = "hierarchical"),
+    ~ 1 + AR(p = 1, gr = habitat),
+    ~ 1 + RW(gr = habitat),
+    ~ 1 + ZMVN(gr = habitat),
+    ~ 1 + AR(p = 1, df = NA),
+    ~ 1 + AR(p = 1, gr = habitat, df = NA),
+    ~ 1 + AR(p = 1, n_lv = 2),
+    ~ 1 + AR(p = 1, trend_map = Z_fixed)
+  )
+
+  offenders <- character(0)
+  for (tf in specs) {
+    mf <- mvgam_formula(count ~ 1 + x, trend_formula = tf)
+    code <- as.character(stancode(mf, data = data, family = poisson()))
+    gp <- get_prior(mf, data = data, family = poisson())
+    offered <- unique(gp$class[grepl("_trend$|^Z$", gp$class)])
+    absent <- setdiff(offered, declared(code))
+    if (length(absent)) {
+      offenders <- c(offenders, paste0(
+        deparse(tf[[2L]]), ": ", paste(absent, collapse = ", ")
+      ))
+    }
+  }
+  expect_identical(offenders, character(0))
+})
+
+
 # ---- AR() prior + coef_sharing surface (Step 3) -------------------
 
 # Shared fixture for the four valid combinations + the
@@ -3915,7 +4047,7 @@ test_that("AR(p = 2, none) samples partial autocorrelations", {
   expect_true(grepl("vector\\[N_lv_trend\\] ar1_trend;", sc))
   expect_true(grepl("vector\\[N_lv_trend\\] ar2_trend;", sc))
   expect_true(grepl("ar_pacf_to_coef", sc, fixed = TRUE))
-  expect_false(grepl("ar1_shared\\b", sc))
+  expect_false(grepl("shared_ar1", sc))
   expect_false(grepl("mu_ar1_trend\\b", sc))
 })
 
@@ -3938,18 +4070,21 @@ test_that("AR(p = 1) and a sparse lag set keep the plain coefficient", {
 
 test_that("AR(default + shared) emits one partial autocorrelation per lag", {
   sc <- ar_step3_stancode(~ AR(p = 2, coef_sharing = "shared"))
+  # The `_trend` suffix places the sampled scalar on the trend side
+  # for `is_trend_parameter()`, which the parameter taxonomy and
+  # `tidy()` both consult.
   expect_true(grepl(
-    "vector<lower=-1,\\s*upper=1>\\[1\\] ar1_pacf_shared;", sc
+    "vector<lower=-1,\\s*upper=1>\\[1\\] shared_ar1_pacf_trend;", sc
   ))
   expect_true(grepl(
-    "vector<lower=-1,\\s*upper=1>\\[1\\] ar2_pacf_shared;", sc
+    "vector<lower=-1,\\s*upper=1>\\[1\\] shared_ar2_pacf_trend;", sc
   ))
   expect_true(grepl(
-    paste0("ar1_pacf_trend = rep_vector\\(ar1_pacf_shared\\[1\\],",
+    paste0("ar1_pacf_trend = rep_vector\\(shared_ar1_pacf_trend\\[1\\],",
            "\\s*N_lv_trend\\);"), sc
   ))
   expect_true(grepl(
-    stan_prior_line("ar1_pacf_shared", "normal(0, 0.5)"), sc,
+    stan_prior_line("shared_ar1_pacf_trend", "normal(0, 0.5)"), sc,
     fixed = TRUE
   ))
   expect_false(grepl(
