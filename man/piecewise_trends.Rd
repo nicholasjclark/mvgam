@@ -77,11 +77,16 @@ a model with particular piecewise trend models.
 }
 \details{
 \emph{Offsets and intercepts}:
+A linear piecewise trend takes its level from the observation
+formula, matching every other trend model in \pkg{mvgam}, which
+leaves \code{y ~ 1} as the ordinary spelling for it.
+
 A logistic piecewise trend estimates an offset (\code{m_trend}) that
-positions its curve along the time axis. A linear piecewise trend
-takes its level from the observation formula, matching every other
-trend model in \pkg{mvgam}, which leaves \code{y ~ 1} as the ordinary
-spelling for it.
+positions its curve along the time axis. It contributes
+\code{cap * inv_logit(...)} on the link scale, which saturates the
+expectation at the \code{cap} you supply when the observation formula
+omits its intercept (\code{y ~ -1} or \code{y ~ 0 + ...}). An intercept
+there raises the ceiling above \code{cap}.
 
 \emph{Logistic growth and the cap variable}:
 When forecasting growth, there is often some maximum achievable point that a

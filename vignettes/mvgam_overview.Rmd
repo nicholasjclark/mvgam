@@ -385,21 +385,21 @@ The constructor compiles the Prophet kernel of
 [Taylor and Letham (2018)](https://doi.org/10.1080/00031305.2017.1380080).
 It fits a piecewise linear or piecewise logistic trajectory with
 growth rate changes at a set of changepoints
-$\{s_1, \dots, s_S\}$. The lag-zero rate is $k$, the offset is
-$m$, and the magnitude shift at changepoint $s_j$ is $\delta_j$.
-Let $a(t)$ be the $\mathbb{R}^S$ indicator with
-$a_j(t) = \mathbb{1}\{t \geq s_j\}$ and $\gamma$ the
-offset-correction vector that keeps the trajectory continuous.
-Linear growth:
+$\{s_1, \dots, s_S\}$. The lag-zero rate is $k$ and the magnitude
+shift at changepoint $s_j$ is $\delta_j$. Let $a(t)$ be the
+$\mathbb{R}^S$ indicator with $a_j(t) = \mathbb{1}\{t \geq s_j\}$
+and $\gamma$ the offset-correction vector that keeps the
+trajectory continuous. Linear growth passes through the origin,
+and the observation formula supplies the level:
 
 \begin{align*}
 z_t & = \bigl(k + a(t)^\top \delta\bigr) t
-       + \bigl(m + a(t)^\top \gamma\bigr)
+       + a(t)^\top \gamma
 \end{align*}
 
-Logistic growth uses the same $(k, m, \delta)$ but maps through
-a sigmoid with a (possibly time-varying) carrying capacity
-$C(t)$:
+Logistic growth adds an offset $m$ to $(k, \delta)$ and maps the
+trajectory through a sigmoid with a (possibly time-varying)
+carrying capacity $C(t)$:
 
 \begin{align*}
 z_t & = \frac{C(t)}{1 + \exp\!\bigl(

@@ -2422,11 +2422,16 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #'
 #' @details
 #' *Offsets and intercepts*:
+#' A linear piecewise trend takes its level from the observation
+#' formula, matching every other trend model in \pkg{mvgam}, which
+#' leaves `y ~ 1` as the ordinary spelling for it.
+#'
 #' A logistic piecewise trend estimates an offset (`m_trend`) that
-#' positions its curve along the time axis. A linear piecewise trend
-#' takes its level from the observation formula, matching every other
-#' trend model in \pkg{mvgam}, which leaves `y ~ 1` as the ordinary
-#' spelling for it.
+#' positions its curve along the time axis. It contributes
+#' `cap * inv_logit(...)` on the link scale, which saturates the
+#' expectation at the `cap` you supply when the observation formula
+#' omits its intercept (`y ~ -1` or `y ~ 0 + ...`). An intercept
+#' there raises the ceiling above `cap`.
 #'
 #' *Logistic growth and the cap variable*:
 #' When forecasting growth, there is often some maximum achievable point that a
