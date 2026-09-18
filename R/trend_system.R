@@ -1460,16 +1460,7 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
   # problem itself. `data` expands a `.` into the columns it holds.
   tf_safe <- stats::terms(trend_formula, data = data, keep.order = TRUE)
 
-  # Check for response variable (brms pattern)
-  if (attr(tf_safe, "response") > 0) {
-    stop(insight::format_error(c(
-      "Response variable not allowed in trend formula.",
-      x = "Trend formulas should only contain predictors.",
-      i = cli::format_inline(
-        "Remove the response variable from {.field trend_formula}."
-      )
-    )))
-  }
+  refuse_trend_formula_response(trend_formula)
 
   # Extract term labels (mvgam pattern)
   tf <- attr(tf_safe, 'term.labels')
@@ -1538,16 +1529,7 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
   }
 
   # Create base formula without trend constructors using structure-preserving rlang approach
-  offset_attr <- attr(tf_safe, 'offset')
-
-  if (!is.null(offset_attr)) {
-    stop(insight::format_error(c(
-      "Offsets not allowed in trend_formula.",
-      i = cli::format_inline(
-        "Check for invalid syntax in {.field trend_formula}."
-      )
-    )))
-  }
+  refuse_trend_formula_offset(tf_safe)
 
   # Use rlang-based approach to preserve complex formula structures like (1|series)
   base_formula <- parse_base_formula_safe(trend_formula, trend_terms)
@@ -1589,8 +1571,6 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
 
   # Calculate dimensions from data for proper parameter filtering
   if (!is.null(data)) {
-    # Add regular_terms to trend_model for covariate extraction
-    trend_model$regular_terms <- regular_terms
     
     # Dimensions are computed once by the caller and passed down; there
     # is deliberately no fallback that recomputes them here, so the
@@ -1615,9 +1595,7 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
     trend_components = trend_components,
     trend_model = trend_model,
     trend_terms = trend_terms,
-    regular_terms = regular_terms,
-    offset_terms = character(0),
-    original_formula = trend_formula
+    regular_terms = regular_terms
   ))
 }
 

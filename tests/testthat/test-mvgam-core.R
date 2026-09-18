@@ -82,6 +82,32 @@ test_that("threads travels only when it was set", {
 })
 
 
+test_that("a refusal names the caller's own value", {
+  # `as_one_logical()` builds its refusal with
+  # `deparse0(s, max_char = 100L)`. `deparse0()` forwarded `...`
+  # straight to `base::deparse()`, which takes no `max_char`. Every
+  # caller supplying a bad value then met "unused argument
+  # (max_char = 100)". The message naming their own value never
+  # appeared. Good input never reaches that branch, and the whole
+  # error path went unexercised.
+  expect_true(mvgam:::as_one_logical(TRUE))
+  err <- expect_error(mvgam:::as_one_logical(c(TRUE, FALSE)))
+  expect_false(
+    grepl("unused argument", conditionMessage(err), fixed = TRUE)
+  )
+
+  # The truncation the caller asks for.
+  long <- str2lang(paste(rep("aaaaaaaaaa", 30L), collapse = " + "))
+  full <- mvgam:::deparse0(long)
+  cut <- mvgam:::deparse0(long, max_char = 50L)
+  expect_gt(nchar(full), 50L)
+  expect_equal(nchar(cut), 53L)
+  expect_true(endsWith(cut, "..."))
+  expect_equal(substr(cut, 1L, 50L), substr(full, 1L, 50L))
+  expect_equal(mvgam:::deparse0(quote(x + y)), "x + y")
+})
+
+
 test_that("imputations are pooled only when they share an axis", {
   # The check once compared columns literally named `time` and
   # `series`. A model whose axis came from other columns was pooled

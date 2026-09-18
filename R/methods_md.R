@@ -2460,17 +2460,20 @@ render_latent_pw <- function(obj, notation) {
 # (skipped when trend_map pins Z). Mirrors the Stan emission in
 # generate_factor_model() / make_loadings_prior_stanvars().
 
+# `detect_factor_n_lv()` returns a count only where the user asked for
+# latent factors. The raw `n_lv` slot counts the trend's latent
+# columns, which every fit has, and a description built from that slot
+# described a `Z` the model never sampled, with a prior and a QR
+# annotation to match.
 #' @noRd
 methods_md_has_factor_model <- function(obj) {
-  n_lv <- obj$trend_metadata$n_lv
-  !is.null(n_lv) && is.numeric(n_lv) && length(n_lv) == 1L &&
-    n_lv > 0L
+  !is.null(detect_factor_n_lv(obj))
 }
 
 #' @noRd
 factor_model_rows <- function(obj, notation) {
-  if (!methods_md_has_factor_model(obj)) return(list())
-  n_lv <- obj$trend_metadata$n_lv
+  n_lv <- detect_factor_n_lv(obj)
+  if (is.null(n_lv)) return(list())
   fixed_Z <- obj$trend_metadata$fixed_Z
   spec <- first_trend_spec(obj)
   loadings_spec <- spec$loadings_prior_spec

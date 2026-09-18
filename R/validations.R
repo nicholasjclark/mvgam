@@ -2211,17 +2211,25 @@ validate_response_shapes <- function(data, formula, family) {
 }
 
 
-#' Utility function equivalent to base::deparse0
+#' Deparse an expression to one string
 #'
 #' @description
-#' Provides deparse0 functionality for compatibility with older R versions.
+#' `base::deparse()` returns one element per line. This joins them and
+#' truncates the result where a caller asks for a bounded length, which
+#' is what a message naming the user's own expression needs.
 #'
 #' @param expr Expression to deparse
+#' @param max_char Keep at most this many characters, marking a
+#'   truncation with an ellipsis. `NULL` keeps the whole string.
 #' @param ... Additional arguments passed to deparse
 #' @return Character string representation of the expression
 #' @noRd
-deparse0 <- function(expr, ...) {
-  paste(deparse(expr, ...), collapse = "")
+deparse0 <- function(expr, max_char = NULL, ...) {
+  out <- paste(deparse(expr, ...), collapse = "")
+  if (!is.null(max_char) && nchar(out) > max_char) {
+    out <- paste0(substr(out, 1L, max_char), "...")
+  }
+  out
 }
 
 #' Check if Formula is Nonlinear
@@ -2747,37 +2755,64 @@ validate_list_trend_formula <- function(formula_list) {
 #' @param context Optional context for error messages
 #' @param allow_response Logical; whether to allow response variables (TRUE for multivariate identification)
 #' @noRd
+# Two refusals, each written once here: a trend formula naming a
+# response, and a trend formula with an offset among its terms. The
+# user's entry point raises them through
+# `validate_single_trend_formula()`, and `parse_trend_formula()` raises
+# them for the callers that reach it directly.
+#' @noRd
+refuse_trend_formula_response <- function(formula) {
+  if (length(formula) != 3L) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    "A trend formula names predictors only.",
+    x = paste0("Found the response '", deparse(formula[[2L]]), "'."),
+    i = paste0(
+      "Write the response in the observation 'formula' and give ",
+      "'trend_formula' its right-hand side alone, as in ",
+      "'trend_formula = ~ AR(p = 1)'."
+    )
+  )), call. = FALSE)
+}
+
+# The caller passes the `terms` object it already built. Recomputing it
+# here would drop the `data` that expanded a `.`.
+#' @noRd
+refuse_trend_formula_offset <- function(terms_obj) {
+  if (is.null(attr(terms_obj, "offset"))) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    "Offsets apply to the observation model.",
+    x = "Found an offset term in 'trend_formula'.",
+    i = paste0(
+      "Write it as 'formula = y ~ x + offset(log_exposure)'. The ",
+      "latent trend models the dynamics."
+    )
+  )), call. = FALSE)
+}
+
 validate_single_trend_formula <- function(formula, context = NULL, allow_response = FALSE) {
   if (is.null(formula)) return(NULL)
 
   checkmate::assert_class(formula, "formula")
 
-  # Check for response variable handling
-  if (length(formula) == 3) {
-    if (!allow_response) {
-      context_msg <- if (!is.null(context)) paste("in", context) else ""
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Trend formula {context_msg} should not have a response variable."
-        ),
-        i = cli::format_inline(
-          "Use: {.code trend_formula = ~ RW()}, not {.code trend_formula = y ~ RW()}"
-        ),
-        i = cli::format_inline(
-          "For multivariate models, use: {.code trend_formula = bf(y1 ~ AR(), y2 ~ RW())}"
-        )
-      )))
-    }
-    # If response variables are allowed, continue with validation but note it's for multivariate
+  if (!allow_response) {
+    refuse_trend_formula_response(formula)
   }
 
   # Extract string for validation
   formula_str <- formula2str_mvgam(formula)
 
+  refuse_trend_formula_offset(stats::terms(formula))
+
   # Validate trend formula restrictions
-  validate_trend_formula_restrictions(formula_str,
-                                     c("offsets", "brms_autocor", "addition_terms", "multiple_constructors"),
-                                     formula)
+  validate_trend_formula_restrictions(
+    formula_str,
+    c("brms_autocor", "addition_terms", "multiple_constructors"),
+    formula
+  )
 
   # Check for exact GP usage (gp() without k parameter)
   validate_exact_gp_usage(formula)
@@ -2795,9 +2830,11 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
 #' @param restrictions Character vector of restriction types to check
 #' @param formula Original formula object (for offset checking)
 #' @noRd
-validate_trend_formula_restrictions <- function(formula_str,
-                                               restrictions = c("brms_autocor", "addition_terms", "multiple_constructors", "offsets"),
-                                               formula = NULL) {
+validate_trend_formula_restrictions <- function(
+  formula_str,
+  restrictions = c("brms_autocor", "addition_terms",
+                   "multiple_constructors"),
+  formula = NULL) {
   checkmate::assert_string(formula_str)
   restrictions <- match.arg(restrictions, several.ok = TRUE)
 
@@ -2855,26 +2892,14 @@ validate_trend_formula_restrictions <- function(formula_str,
       },
       error_header = "Multiple trend constructors found in single {.field trend_formula}:",
       error_reason = "Each trend formula must contain exactly one trend constructor.",
-      error_suggestion = c("For multiple trends, use response-specific formulas:",
-                          "{.code trend_formula = list(y1 = ~ AR(), y2 = ~ RW())}")
-    ),
-
-    "offsets" = list(
-      patterns = function(formula_str, formula = NULL) {
-        has_offset_function <- grepl("\\boffset\\s*\\(", formula_str, perl = TRUE)
-        has_offset_attr <- FALSE
-        if (!is.null(formula) && inherits(formula, "formula")) {
-          terms_obj <- terms(formula)
-          has_offset_attr <- !is.null(attr(terms_obj, 'offset'))
-        }
-        if (has_offset_function || has_offset_attr) {
-          structure("offset()", names = "detected")
-        } else character(0)
-      },
-      error_header = "Offset terms not allowed in {.field trend_formula}.",
-      error_reason = "Offsets interfere with State-Space dynamics.",
-      error_suggestion = c("Include offsets in the main observation {.field formula} instead:",
-                          "Use {.code formula = y ~ x + offset(log_exposure)} not {.code trend_formula = ~ RW() + offset(z)}")
+      # One string per suggestion. `c()` names a two-element `i` entry
+      # `i1` and `i2`, which `insight::format_error()` renders as one
+      # run with no separator: the reader met `formulas:` followed
+      # immediately by the code.
+      error_suggestion = paste(
+        "For multiple trends, use response-specific formulas:",
+        "{.code trend_formula = list(y1 = ~ AR(), y2 = ~ RW())}"
+      )
     )
   )
 

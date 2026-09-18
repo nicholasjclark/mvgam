@@ -360,7 +360,7 @@ test_that("formula parsing handles edge cases correctly", {
     # Test that offset terms are properly rejected in trend formulas
     expect_error(
       mvgam:::parse_trend_formula(~ I(x^2) + RW() + offset(z)),
-      "Offsets not allowed in trend_formula"
+      "Offsets apply to the observation model"
     )
 
     # Test whitespace handling
@@ -382,7 +382,7 @@ test_that("formula parsing error handling works comprehensively", {
   # Test formula with response variable
   expect_error(
     mvgam:::parse_trend_formula(y ~ RW()),
-    "Response variable not allowed"
+    "names predictors only"
   )
 
   # Test formula with no trend constructors - should default to ZMVN
@@ -660,7 +660,7 @@ test_that("time parameter integrates correctly with formula parsing", {
     # Test that offset rejection works with various formulas
     expect_error(
       mvgam:::parse_trend_formula(~ s(temp) + CAR() + offset(effort)),
-      "Offsets not allowed in trend_formula"
+      "Offsets apply to the observation model"
     )
   })
 })
