@@ -454,7 +454,7 @@ test_that("Newdata that names no time or no series errors", {
       newdata = data.frame(notime = 11:12, y = NA_integer_),
       type = "response"
     ),
-    "must contain the time column"
+    "Column 'time' is absent"
   )
   expect_error(
     forecast(

@@ -113,6 +113,49 @@ test_that("mvgam_multiple gives one prefit when run_model is FALSE", {
 })
 
 
+test_that("a prefit built inside a function omits that function's locals", {
+  # A formula records the environment it was written in, and a model
+  # frame's `terms` attribute records the one it was built in.
+  # `saveRDS()` writes an unnamed environment by value, and a model
+  # fitted inside a function then writes every local of that function
+  # into the file. `utils::object.size()` does not follow an
+  # environment; the saved file's size does.
+  set.seed(5)
+  dat <- data.frame(
+    y = rpois(20, 3),
+    time = seq_len(20L),
+    x = rnorm(20),
+    series = factor(rep("s1", 20L))
+  )
+  build <- function(d) {
+    ballast <- rnorm(5e5)
+    suppressWarnings(mvgam(
+      y ~ x, trend_formula = ~ AR(p = 1), data = d,
+      family = poisson(), run_model = FALSE, silent = 2
+    ))
+  }
+  pf <- build(dat)
+
+  path <- tempfile(fileext = ".rds")
+  on.exit(unlink(path), add = TRUE)
+  saveRDS(pf, path)
+  ballast_mb <- as.numeric(utils::object.size(numeric(5e5))) / 1024^2
+  expect_gt(ballast_mb, 3)
+  expect_lt(file.size(path) / 1024^2, ballast_mb / 3)
+
+  # Each carrier is named. A regression then states which one came
+  # back, beyond the file having grown.
+  expect_false(exists("ballast", envir = environment(pf$formula),
+                      inherits = TRUE))
+  expect_false(exists("ballast", envir = environment(pf$trend_call),
+                      inherits = TRUE))
+  tm <- attr(pf$obs_model$data, "terms")
+  expect_s3_class(tm, "terms")
+  expect_false(exists("ballast", envir = environment(tm),
+                      inherits = TRUE))
+})
+
+
 test_that("update rebuilds a prefit past the algorithm it recorded", {
   pf <- build_prefit()
   # A prefit records `algorithm = "none"`, which no backend lists.

@@ -399,7 +399,7 @@ test_that("the refusals carry messages a user can act on", {
   time_err <- expect_error(
     mvgam:::resolve_forecast_grid(prefit, no_time, training,
                                   series_levels),
-    "must contain the time column"
+    "Column 'time' is absent"
   )
   expect_match(conditionMessage(time_err), "time", fixed = TRUE)
   # And it lists what the frame did carry, so the user can see the

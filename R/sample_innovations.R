@@ -380,13 +380,7 @@ get_observation_structure <- function(object, newdata = NULL,
 #' @noRd
 build_single_series_observation_structure <- function(newdata, time_var,
                                                        level_label) {
-  if (!time_var %in% names(newdata)) {
-    stop(insight::format_error(c(
-      paste0("Required time variable '", time_var,
-             "' not found in newdata."),
-      i = "Add a time column or pass newdata that retains it."
-    )))
-  }
+  refuse_absent_time_column(newdata, time_var)
   time_indices <- newdata[[time_var]]
   unique_times <- sort(unique(time_indices))
   n_obs <- nrow(newdata)

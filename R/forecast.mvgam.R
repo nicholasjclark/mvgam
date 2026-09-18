@@ -586,15 +586,7 @@ resolve_forecast_grid <- function(object, newdata, training,
   # grouping names them without any `series` column at all: asking
   # for one refused a hierarchical fit the very frame it was fitted
   # on, at a layer that had no need to ask.
-  if (!time_var %in% names(newdata)) {
-    stop(insight::format_error(c(
-      paste0("'newdata' must contain the time column '", time_var,
-             "'."),
-      x = paste0(
-        "Got columns: ", paste(names(newdata), collapse = ", "), "."
-      )
-    )), call. = FALSE)
-  }
+  refuse_absent_time_column(newdata, time_var)
   # A horizon is a comparison against the last observed occasion, and
   # `NA > last_time` is `NA`, which the subset and the sort then
   # drop. The row leaves the grid, and a later layer treats the

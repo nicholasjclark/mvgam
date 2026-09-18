@@ -217,14 +217,7 @@ lfo_cv.mvgam <- function(object,
   # same guard was reasoned out of `resolve_forecast_grid()` and its
   # comment says why; asking for the column here refused every
   # `mvbf()` fit the frame it was fitted on.
-  if (!time_var %in% names(all_data)) {
-    stop(insight::format_error(c(
-      paste0("'newdata' must contain the time column '", time_var,
-             "'."),
-      i = paste0("Got columns: ",
-                 paste(names(all_data), collapse = ", "), ".")
-    )))
-  }
+  refuse_absent_time_column(all_data, time_var)
   # Every series must share a time grid: a rolling origin has no
   # single meaning when series are observed at different times, so
   # that case is refused rather than silently misaligned.

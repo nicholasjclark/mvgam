@@ -44,8 +44,6 @@ The Stan program:
 \itemize{
 \item \code{stancode} The combined Stan program as a \code{character} string
 \item \code{standata} The \code{standata} list the program was fitted to
-\item \code{exclude} Parameter names withheld from summaries, \code{lprior} and
-\code{lp__}
 }
 
 The model specification, used by prediction and forecasting:

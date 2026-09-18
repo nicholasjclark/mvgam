@@ -49,9 +49,6 @@
 #'
 #'   - `standata` The `standata` list the program was fitted to
 #'
-#'   - `exclude` Parameter names withheld from summaries, `lprior` and
-#'     `lp__`
-#'
 #'   The model specification, used by prediction and forecasting:
 #'
 #'   - `mv_spec` The parsed model specification, including the trend

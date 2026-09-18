@@ -1210,7 +1210,10 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       cli::format_inline(
         "{.field obs_setup} missing required {.field brmsfit} component."
       ),
-      x = "The observation model setup must include a brmsfit object for predictions.",
+      x = paste0(
+        "The observation model setup must include a brmsfit object ",
+        "for predictions."
+      ),
       i = "Check setup_brms_lightweight() implementation."
     )))
   }
@@ -1220,7 +1223,10 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       cli::format_inline(
         "{.field trend_setup} missing required {.field brmsfit} component."
       ),
-      x = "The trend model setup must include a brmsfit object for predictions.",
+      x = paste0(
+        "The trend model setup must include a brmsfit object for ",
+        "predictions."
+      ),
       i = "Check setup_brms_lightweight() implementation."
     )))
   }
@@ -1257,7 +1263,7 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       # them via the mvgam stanvar substitution path).
       prior = assemble_stored_prior_table(
         obs_priors      = obs_setup$prior,
-        trend_priors    = if (!is.null(trend_setup)) trend_setup$prior else NULL,
+        trend_priors    = trend_setup$prior,
         user_prior      = user_prior,
         combined_stancode = combined_stancode %||% obs_setup$stancode
       ),
@@ -1300,6 +1306,8 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
     class = c("mvgam", "brmsfit")
   )
 
+  mvgam_object <- prune_stored_formula_envs(mvgam_object)
+
   mvgam_object$criteria <- list()
   # `$call` is stamped by the user-facing entry point that built
   # this, which is the only frame holding the symbols the user
@@ -1320,6 +1328,92 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   return(mvgam_object)
 }
 
+
+# A formula records the environment it was written in, and `saveRDS`
+# serialises an unnamed environment by value. A model fitted inside a
+# function then writes that function's locals into the file: measured
+# at 15.23 MB against 0.60 MB for the same model written at top
+# level. The expression still resolves the names it uses, which are
+# copied into a fresh environment whose parent is the first named
+# ancestor. A named environment is serialised by reference and is
+# returned unchanged.
+#' @noRd
+prune_formula_env <- function(f) {
+  if (!inherits(f, "formula")) {
+    return(f)
+  }
+  env <- environment(f)
+  if (is.null(env) || nzchar(environmentName(env))) {
+    return(f)
+  }
+  anchor <- env
+  while (!identical(anchor, emptyenv()) &&
+           !nzchar(environmentName(anchor))) {
+    anchor <- parent.env(anchor)
+  }
+  if (identical(anchor, emptyenv())) {
+    anchor <- globalenv()
+  }
+  # `all.names()` covers a function the user defined and named in the
+  # formula, which is reached the same way a variable is.
+  used <- unique(all.names(f))
+  keep <- Filter(
+    function(nm) {
+      exists(nm, envir = env, inherits = TRUE) &&
+        !exists(nm, envir = anchor, inherits = TRUE)
+    },
+    used
+  )
+  bindings <- lapply(keep, function(nm) get(nm, envir = env))
+  names(bindings) <- keep
+  environment(f) <- list2env(bindings, parent = anchor)
+  f
+}
+
+
+# Nine formulas are reachable on a fitted object, each keeping its own
+# environment: the three named slots, four within `mv_spec`, and the
+# main formula of each stored brmsfit. Pruning the named slots leaves
+# the other six pointing at the calling frame, and one reference
+# writes that frame into the file. `utils::object.size()` does not
+# follow an environment and reports none of this; the size of the
+# saved file does.
+#' @noRd
+prune_stored_formula_envs <- function(x, depth = 0L) {
+  if (inherits(x, "formula")) {
+    return(prune_formula_env(x))
+  }
+  if (depth > 6L) {
+    return(x)
+  }
+  # A model frame keeps its `terms` attribute, and a terms object
+  # records the environment the formula was evaluated in. brms builds
+  # those frames while the model is being set up, giving each one a
+  # reference to the caller that no formula slot shares.
+  at <- attributes(x)
+  for (nm in names(at)) {
+    if (inherits(at[[nm]], "formula")) {
+      attr(x, nm) <- prune_formula_env(at[[nm]])
+    }
+  }
+  if (is.data.frame(x) || !is.list(x) || !length(x)) {
+    return(x)
+  }
+  attrs <- attributes(x)
+  y <- unclass(x)
+  for (i in seq_along(y)) {
+    # Assigning NULL back into a list deletes the element, and a slot
+    # a fit legitimately leaves empty has to survive the walk.
+    if (is.null(y[[i]])) {
+      next
+    }
+    y[[i]] <- prune_stored_formula_envs(y[[i]], depth + 1L)
+  }
+  attributes(y) <- attrs
+  y
+}
+
+
 # Build a no-fit mvgam stub from generated stan_components. Used by
 # the `run_model = FALSE` path: callers get an mvgam-shaped
 # list with `stancode`, `standata`, `obs_data`, `trend_metadata` and
@@ -1328,16 +1422,18 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
 # to the `mvgam` one; `print()`, `stancode()`, `standata()` and
 # `methods_md()` answer on it. The `mvgam_prefit` class records that
 # no sampling happened.
-create_mvgam_stub_from_stan_components <- function(stan_components,
-                                                   formula,
-                                                   trend_formula,
-                                                   family,
-                                                   data,
-                                                   data_name,
-                                                   newdata,
-                                                   backend,
-                                                   save_pars = brms::save_pars(),
-                                                   user_prior = NULL) {
+create_mvgam_stub_from_stan_components <- function(
+  stan_components,
+  formula,
+  trend_formula,
+  family,
+  data,
+  data_name,
+  newdata,
+  backend,
+  save_pars = brms::save_pars(),
+  user_prior = NULL
+) {
   obs_setup <- stan_components$obs_setup
   trend_setup <- stan_components$trend_setup
   mv_spec <- stan_components$mv_spec
@@ -1359,7 +1455,7 @@ create_mvgam_stub_from_stan_components <- function(stan_components,
       # the one `run_model = TRUE` produces.
       prior = assemble_stored_prior_table(
         obs_priors      = obs_setup$prior,
-        trend_priors    = if (!is.null(trend_setup)) trend_setup$prior else NULL,
+        trend_priors    = trend_setup$prior,
         user_prior      = user_prior,
         combined_stancode = stan_components$combined_components$stancode
       ),
@@ -1383,7 +1479,7 @@ create_mvgam_stub_from_stan_components <- function(stan_components,
     ),
     class = c("mvgam", "mvgam_prefit")
   )
-  mvgam_object
+  prune_stored_formula_envs(mvgam_object)
 }
 
 

@@ -1452,7 +1452,7 @@ newdata_variants <- function(frame, prefit) {
   )
   bad <- list(
     "no time column" = list(
-      frame = no_time, message = "[Mm]ust include"
+      frame = no_time, message = "is absent from the data"
     ),
     "a missing time" = list(
       frame = na_time, message = "missing values"

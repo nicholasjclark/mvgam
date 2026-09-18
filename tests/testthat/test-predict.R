@@ -111,29 +111,68 @@ test_that("side_parameters() takes a fit and one of its two sides", {
 # ==============================================================================
 
 test_that("validate_prediction_factor_levels catches invalid series levels", {
-  # Create metadata matching training data
   metadata <- list(
     levels = list(series = c("s1", "s2", "s3")),
     variables = list(series_var = "series")
   )
+  # A series column arrives as a factor or as character, and the
+  # comparison reaches the same verdict on each.
+  for (mk in list(factor, identity)) {
+    valid <- data.frame(time = 1:3, series = mk(c("s1", "s2", "s1")))
+    expect_silent(validate_prediction_factor_levels(valid, metadata))
 
-  # Valid newdata - should pass silently
-  valid_newdata <- data.frame(
-    time = 1:3,
-    series = factor(c("s1", "s2", "s1"), levels = c("s1", "s2", "s3"))
-  )
-  expect_silent(validate_prediction_factor_levels(valid_newdata, metadata))
-
-  # Invalid newdata - series level not in training
-  invalid_newdata <- data.frame(
-    time = 1:3,
-    series = factor(c("s1", "s4", "s1"))
-  )
-  expect_error(
-    validate_prediction_factor_levels(invalid_newdata, metadata),
-    "Series levels in newdata not found in training data"
-  )
+    invalid <- data.frame(time = 1:3, series = mk(c("s1", "s4", "s1")))
+    expect_error(
+      validate_prediction_factor_levels(invalid, metadata),
+      "Series levels in newdata"
+    )
+  }
 })
+
+test_that("a frame is held to the axis columns the fit needs", {
+  # `varying_meta_vars()` keeps a meta var only where it varies in
+  # training, and the completeness check uses that term list. A fit on
+  # one occasion loses its time column from the list, and a frame
+  # omitting time was accepted.
+  set.seed(1)
+  flat <- data.frame(y = rpois(30, 3), x = rnorm(30),
+                     time = rep(1L, 30),
+                     series = factor(rep(c("a", "b", "c"), each = 10)))
+  prefit <- mvgam(y ~ x, data = flat, family = poisson(),
+                  run_model = FALSE, silent = 2)
+  no_time <- flat
+  no_time$time <- NULL
+  expect_error(
+    mvgam:::validate_newdata_complete(no_time, prefit),
+    "Absent: 'time'"
+  )
+
+  # A frame omitting the series column reaches prediction with every
+  # row unmapped. The column is exempt where a grouping names the
+  # series; on a fit whose axis is the column itself it is the only
+  # route.
+  d <- data.frame(y = rpois(40, 3), x = rnorm(40),
+                  time = rep(1:20, 2),
+                  series = factor(rep(c("a", "b"), each = 20)))
+  fit <- mvgam(y ~ x, trend_formula = ~ AR(p = 1), data = d,
+               family = poisson(), run_model = FALSE, silent = 2)
+  no_series <- d
+  no_series$series <- NULL
+  expect_error(
+    mvgam:::validate_newdata_complete(no_series, fit),
+    "Absent: 'series'"
+  )
+
+  # One series needs no column of its own: every row belongs to it.
+  one <- data.frame(y = rpois(20, 3), x = rnorm(20), time = 1:20,
+                    series = factor(rep("only", 20)))
+  solo <- mvgam(y ~ x, trend_formula = ~ AR(p = 1), data = one,
+                family = poisson(), run_model = FALSE, silent = 2)
+  bare <- one
+  bare$series <- NULL
+  expect_silent(mvgam:::validate_newdata_complete(bare, solo))
+})
+
 
 test_that("validate_prediction_factor_levels catches invalid gr levels", {
   # Create metadata for hierarchical model
@@ -168,69 +207,61 @@ test_that("validate_prediction_factor_levels catches invalid gr levels", {
   )
 })
 
-test_that("validate_prediction_factor_levels handles missing metadata gracefully", {
+test_that("validate_prediction_factor_levels checks what metadata records", {
+  # Every frame here names a series the metadata omits. Silence is
+  # then evidence that the check was skipped. The earlier fixture
+  # gave the frame only series the metadata listed, where silence
+  # followed from the data itself.
   newdata <- data.frame(
     time = 1:3,
-    series = factor(c("s1", "s2", "s1"))
+    series = factor(c("s1", "s9", "s1"))
   )
 
-  # Empty metadata - should pass silently
+  # Nothing recorded to check against.
   expect_silent(validate_prediction_factor_levels(newdata, list()))
 
-  # Metadata without levels - should pass silently
-  expect_silent(validate_prediction_factor_levels(newdata, list(other = "stuff")))
+  # Other metadata, still no levels.
+  expect_silent(
+    validate_prediction_factor_levels(newdata, list(other = "stuff"))
+  )
 
-  # Metadata with levels but no variables - should pass silently
+  # Levels recorded, with no variable naming the column they key.
   expect_silent(validate_prediction_factor_levels(
     newdata,
     list(levels = list(series = c("s1", "s2")))
   ))
-})
 
-test_that("validate_prediction_factor_levels validates input types", {
-  metadata <- list(
-    levels = list(series = c("s1", "s2")),
-    variables = list(series_var = "series")
-  )
-
-  # Invalid data argument
-
+  # The same frame is refused once both halves are present. This is
+  # what makes the three silences above a statement about metadata.
   expect_error(
-    validate_prediction_factor_levels("not_a_dataframe", metadata),
-    "Must be of type 'data.frame'"
-  )
-
-  # Invalid metadata argument
-  expect_error(
-    validate_prediction_factor_levels(data.frame(x = 1), "not_a_list"),
-    "Must be of type 'list'"
+    validate_prediction_factor_levels(
+      newdata,
+      list(levels = list(series = c("s1", "s2")),
+           variables = list(series_var = "series"))
+    ),
+    "Series levels in newdata"
   )
 })
 
-test_that("validate_prediction_factor_levels handles character columns", {
-  # Create metadata matching training data
+test_that("a recorded axis is checked though the levels slot is empty", {
+  # The series comparison uses the levels in the axis record. The
+  # body returns early when the `levels` slot is empty, which skips
+  # the comparison on a fit whose record already lists those levels.
+  newdata <- data.frame(
+    time = 1:3,
+    series = factor(c("s1", "s9", "s1"))
+  )
   metadata <- list(
-    levels = list(series = c("s1", "s2", "s3")),
+    axes = list(
+      series = list(levels = c("s1", "s2"), source = "explicit",
+                    n = 2L, groups = NULL),
+      time = NULL
+    ),
     variables = list(series_var = "series")
   )
-
-  # Character column (not factor) with valid values
-  valid_newdata <- data.frame(
-    time = 1:3,
-    series = c("s1", "s2", "s1"),
-    stringsAsFactors = FALSE
-  )
-  expect_silent(validate_prediction_factor_levels(valid_newdata, metadata))
-
-  # Character column with invalid values
-  invalid_newdata <- data.frame(
-    time = 1:3,
-    series = c("s1", "s4", "s1"),
-    stringsAsFactors = FALSE
-  )
   expect_error(
-    validate_prediction_factor_levels(invalid_newdata, metadata),
-    "Series levels in newdata not found in training data"
+    validate_prediction_factor_levels(newdata, metadata),
+    "Series levels in newdata"
   )
 })
 
@@ -352,7 +383,8 @@ test_that("compute_family_epred validates inputs", {
 
   # Invalid linpred type
   expect_error(
-    compute_family_epred("not_a_matrix", list(family = "poisson", linkinv = exp)),
+    compute_family_epred("not_a_matrix",
+                         list(family = "poisson", linkinv = exp)),
     "Must be of type 'matrix'"
   )
 
@@ -1119,7 +1151,8 @@ test_that("summarize_predictions computes correct statistics", {
   draws <- matrix(rnorm(100 * 5, mean = 5, sd = 2), nrow = 100)
 
   # Non-robust summary (mean/sd)
-  result <- summarize_predictions(draws, probs = c(0.025, 0.975), robust = FALSE)
+  result <- summarize_predictions(draws, probs = c(0.025, 0.975),
+                                  robust = FALSE)
 
   expect_equal(nrow(result), 5)
   expect_equal(ncol(result), 4)

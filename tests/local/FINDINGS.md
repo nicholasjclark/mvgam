@@ -2,32 +2,6 @@
 
 Each entry is a task, deleted once its fix is verified.
 
-## Prediction accepts frames the axis layer refuses
-
-**92. Two conditions bypass the level check.**
-
-Two frames reach prediction with no level check at all: a fit whose
-`trend_metadata$levels` is NULL returns early (`predictions.R:482`,
-`validations.R:3849-3851`) and a frame with no series column never
-reaches the comparison (`validations.R:3889`).
-`validate_newdata_complete()` exempts that column by design
-(`validations.R:3798-3805`).
-
-The time column is held only while `mvgam_term_list()` keeps it.
-`varying_meta_vars()` drops a meta var that is constant in the
-training data, leaving a fit whose time column never varies outside
-the check.
-
-`ensure_mvgam_variables()` carries a second copy of the time
-assertion (`validations.R:4213`), a bare `checkmate::assert_names()`
-whose message names no remedy. `validate_newdata_complete()` has one
-call site (`predictions.R:481`, inside `extract_component_linpred()`)
-and `ensure_mvgam_variables()` is reached through
-`prepare_mvgam_frame()` (`sample_innovations.R:119`). The two guard
-different entry points. Deleting either opens a hole on the routes
-the other misses. What is duplicated is the wording: one condition
-raised under two messages. Both sites should raise one refusal.
-
 ## One trend family, two initial distributions
 
 **110. The stationary initialisation reaches one AR path only.**
@@ -86,23 +60,4 @@ Each remaining shape gets one pass. A pass removes the rival, the
 fallback or the proxy, adds an assertion that fails before the change
 and records the count before and after.
 
-## A saved fit embeds the frame that called it
-
-**130. `formula` and `trend_call` keep their calling environment.**
-
-An mvgam fit stores `formula` and `trend_call` as formulas, and a
-formula carries the environment it was written in. R serialises a
-named environment by reference and a local frame by value. A
-`jsdgam()` call at top level captures the global environment and
-costs nothing. The same call inside a function captures that
-function's frame and writes every local of it into the file.
-
-One small fit, everything held constant apart from where the
-formula was written: 14.85 MB written inside the calling function,
-0.19 MB written at top level. The objects serialised are that
-function's locals exactly, the fit among them.
-
-`update.mvgam()` rebuilds `environment(trend_call)`
-(`update.mvgam.R:573-589`). The bindings it re-evaluates have to
-survive. The frame they came from does not.
 

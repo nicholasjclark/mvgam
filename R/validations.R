@@ -3784,14 +3784,47 @@ hierarchical_series_values <- function(data, gr_var, subgr_var) {
 # and a factor column takes its reference level with nothing to mark
 # it. The response is excluded, because a missing response is how a
 # forecast frame names the occasions it wants predicted.
+# One refusal for the column that places a frame's rows. It names the
+# column, the columns the frame does carry, and what to do.
+#' @noRd
+refuse_absent_time_column <- function(data, column) {
+  checkmate::assert_string(column)
+  if (column %in% names(data)) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    paste0("Column '", column, "' is absent from the data."),
+    x = paste0(
+      "Supplied: ", paste0("'", names(data), "'", collapse = ", "), "."
+    ),
+    i = paste0(
+      "Every row names an occasion for the latent trend. Add '",
+      column, "' to the data, or name its column with the trend ",
+      "constructor's 'time' argument."
+    )
+  )), call. = FALSE)
+}
+
+
 #' @noRd
 validate_newdata_complete <- function(newdata, object) {
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   checkmate::assert_class(object, "mvgam")
   terms <- mvgam_term_list(object)
+  vars <- axis_vars(object)
+  axes <- mvgam_axes(object)
+  # The term list keeps a meta variable only where it varies in the
+  # training data, and a fit on one occasion drops its time column
+  # from that list. The axis names the column whatever the training
+  # values did. The time comes from there.
+  time_var <- if (named_var(vars$time_var)) {
+    vars$time_var
+  } else {
+    character(0L)
+  }
   read <- setdiff(
     unique(c(terms$conditional, terms$random, terms$aterms,
-             terms$offset, terms$index)),
+             terms$offset, terms$index, time_var)),
     terms$response
   )
   # A column the frame omits altogether is the widest gap of all, and
@@ -3802,10 +3835,16 @@ validate_newdata_complete <- function(newdata, object) {
   # occasion has no substitute, and a frame omitting it was given
   # predictions at whatever position the observation structure fell
   # back to.
-  exempt <- setdiff(
-    terms$index %||% character(0L),
-    axis_vars(object)$time_var
-  )
+  exempt <- setdiff(terms$index %||% character(0L), vars$time_var)
+  # Where the column itself names several series and no grouping can
+  # derive them, a row's series comes from that column alone. Every
+  # row of a single-series fit belongs to the same series, and the
+  # column adds nothing there.
+  if (identical(axes$series$source, "explicit") &&
+        length(axes$series$levels) > 1L &&
+        !(named_var(vars$gr_var) && named_var(vars$subgr_var))) {
+    exempt <- setdiff(exempt, vars$series_var)
+  }
   absent <- setdiff(setdiff(read, exempt), names(newdata))
   present <- intersect(read, names(newdata))
   gaps <- present[vapply(present, function(col) anyNA(newdata[[col]]),
@@ -3845,11 +3884,12 @@ validate_prediction_factor_levels <- function(data, metadata) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(metadata, names = "named")
 
-  # Validate required metadata structure
-  if (is.null(metadata$levels)) {
-    return(invisible(TRUE))
+  # Each block guards its own input. The series comparison uses the
+  # axis record, and the grouping comparisons use the recorded
+  # levels. A metadata list naming neither passes through untouched.
+  if (!is.null(metadata$levels)) {
+    checkmate::assert_list(metadata$levels, names = "named")
   }
-  checkmate::assert_list(metadata$levels, names = "named")
 
   if (is.null(metadata$variables)) {
     return(invisible(TRUE))
@@ -4194,9 +4234,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     }
 
     # Validate factor levels in prediction context
-    if (!is.null(metadata$levels)) {
-      validate_prediction_factor_levels(data, metadata)
-    }
+    validate_prediction_factor_levels(data, metadata)
   }
 
   # Always create implicit time mapping for consistency.
@@ -4210,7 +4248,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   # the middle. The mapping stays a bijection either way, so nothing
   # downstream can notice. Sorted input, which is the usual shape and
   # the one every fixture carries, is unaffected.
-  checkmate::assert_names(names(data), must.include = time_var)
+  refuse_absent_time_column(data, time_var)
   unique_times <- sort(unique(data[[time_var]]))
   time_mapping <- setNames(seq_along(unique_times), unique_times)
   attr(data, "mvgam_time") <- time_mapping[as.character(data[[time_var]])]
@@ -5127,8 +5165,9 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     checkmate::assert_class(trend_formula, "formula")
     checkmate::assert_string(time_var)
     checkmate::assert_string(series_var)
-    # Only require time_var - series_var can be created via attributes if missing
-    checkmate::assert_names(names(data), must.include = time_var)
+    # Only the time column is required here. The series axis is
+    # derived from a grouping where the frame carries one.
+    refuse_absent_time_column(data, time_var)
 
     # Pre-computed dimensions are the fast path. When a caller
     # comes through that has not threaded them in (e.g. the

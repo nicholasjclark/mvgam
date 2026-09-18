@@ -245,8 +245,15 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
       )
 
       if (rhs_str == "0" || rhs_str == "-1") {
-        # Direct assignment for clean no-intercept formula
-        formula <- as.formula("trend_y ~ 0")
+        # Direct assignment for clean no-intercept formula.
+        # `as.formula()` with no `env` takes this function's frame,
+        # which contains the mock brmsfit and the training data. A
+        # refit resolves the constructor's names against the
+        # environment the user wrote the formula in.
+        formula <- stats::as.formula(
+          "trend_y ~ 0",
+          env = environment(formula)
+        )
       } else if (has_intercept_check) {
         # Has intercept: keep intercept to get Intercept_trend prior
         formula <- update(formula, trend_y ~ .)
@@ -1111,8 +1118,8 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     ))
   }
 
-  # Validate trend formula structure
-  trend_validation <- validate_trend_formula_brms(trend_formula)
+  # Refuses a malformed trend formula.
+  validate_trend_formula_brms(trend_formula)
 
   # Check if main formula is multivariate
   is_mv_main <- is_multivariate_formula(formula)
@@ -1201,10 +1208,8 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     is_multivariate = is_mv_main,
     trend_specs = trend_specs,
     base_formula = base_formula,
-    validation = trend_validation,
     cached_formulas = list(
-      formula = formula,
-      trend_formula = trend_formula
+      formula = formula
     )
   ))
 }
