@@ -152,28 +152,23 @@ look.
 
 ## Arguments a plot accepts and drops
 
-**116. `conditional_effects()` leaves out its points and rug.**
+**116. A multivariate `conditional_effects()` leaves out its
+points.**
 
-`points = TRUE` and `rug = TRUE` reach `points_alpha` and `rug` at
-`R/conditional_effects.mvgam.R:141-152`. Both travel into
-`marginaleffects::plot_predictions()` through `pp_args`. The drawn
-panel shows `GeomRibbon` with two `GeomLine` layers. A factor term
-shows `GeomPointrange`. A `GeomPoint` or `GeomRug` layer is
-absent on every fixture measured: the wide `mvbf` fit on all three
-responses, a VAR fit on `y ~ elev * region + (1 | block)` and a
-univariate fit with an offset and a `gp()` term.
+`points = TRUE` overlays the observations on a univariate fit at
+every type sharing the observations' scale. On the wide `mvbf` fit
+the rug appears and the points stay absent, across all three
+responses.
 
-The branch above them suppresses both on a multivariate fit, for a
-stated reason that fails twice over. `mv_resp_fan_out()` returns
-for the `resp = NULL` case, which leaves one response in scope at
-that line. The overlays are missing from univariate fits too.
-Deleting the branch changes none of the drawn layers, which places
-the cause downstream.
+`insight::find_response()` on that fit gives `count, seen, mass`.
+The overlay inside `marginaleffects::plot_predictions()` needs one
+observation column and meets three. The rug needs predictor
+values, which every row supplies. It appears on the same panel.
 
-Where to look: `plot_predictions()` draws the raw data itself, and
-it takes that data through `insight::get_data()` on the mvgam
-object. `tests/local/test-grain-mvbf-wide.R` has the failing
-assertion.
+Where to look: `response_column(x, resp)` names the column for the
+response in scope, and mvgam could add the layer to the panel
+`plot_predictions()` returns.
+`tests/local/test-grain-mvbf-wide.R` has three failing assertions.
 
 ## The gate that proves an assertion can fail
 

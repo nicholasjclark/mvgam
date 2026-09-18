@@ -45,11 +45,13 @@ the ecological quantity of interest separate from detection
 probability.}
 
 \item{points}{Logical or numeric. If \code{TRUE} (or a non-zero alpha
-between 0 and 1) and \code{type = "response"}, raw observations are
-overlaid on the plot.}
+between 0 and 1), raw observations are overlaid on the plot.
+The overlay applies where the drawn quantity shares the
+observations' scale, which covers \code{type = "response"} and
+\code{type = "expected"}.}
 
-\item{rug}{Logical. If \code{TRUE} and \code{type = "response"}, rug tick
-marks are drawn along the axes.}
+\item{rug}{Logical. If \code{TRUE}, rug tick marks are drawn along the
+axes, on the same scales the points overlay applies to.}
 
 \item{process_error}{Logical. Passed to \code{plot_predictions()} /
 \code{get_predict.mvgam}. Defaults to \code{FALSE}, so the trend

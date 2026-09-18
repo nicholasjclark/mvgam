@@ -23,10 +23,12 @@
 #'   the ecological quantity of interest separate from detection
 #'   probability.
 #' @param points Logical or numeric. If `TRUE` (or a non-zero alpha
-#'   between 0 and 1) and `type = "response"`, raw observations are
-#'   overlaid on the plot.
-#' @param rug Logical. If `TRUE` and `type = "response"`, rug tick
-#'   marks are drawn along the axes.
+#'   between 0 and 1), raw observations are overlaid on the plot.
+#'   The overlay applies where the drawn quantity shares the
+#'   observations' scale, which covers `type = "response"` and
+#'   `type = "expected"`.
+#' @param rug Logical. If `TRUE`, rug tick marks are drawn along the
+#'   axes, on the same scales the points overlay applies to.
 #' @param process_error Logical. Passed to `plot_predictions()` /
 #'   `get_predict.mvgam`. Defaults to `FALSE`, so the trend
 #'   contributes its deterministic submodel and the panel shows the
@@ -135,12 +137,16 @@ conditional_effects.mvgam <- function(x,
   # owns the per-branch validation and surfaces typed errors.
   series_mode <- resolve_series_arg(series, x)
 
-  # Observation rugs and overlaid points apply on the response
-  # scale. A multivariate fit suppresses both here.
-  on_response <- identical(type, "response")
-  is_mv <- brms::is.mvbrmsformula(x$formula)
+  # Observation rugs and overlaid points apply where the drawn
+  # quantity shares the observations' scale. `response` and
+  # `expected` both do. `link`, `variance`, `latent_state` and
+  # `detection` each name a different scale. Both overlays stay off
+  # there. The fan-out above leaves one response in scope on a
+  # multivariate fit, which supplies the column the points come
+  # from.
+  obs_scale <- type %in% c("response", "expected")
   points_alpha <- 0
-  if (on_response && !is_mv) {
+  if (obs_scale) {
     if (isTRUE(points)) {
       points_alpha <- 0.5
     } else if (is.numeric(points) && length(points) == 1L &&
@@ -148,7 +154,7 @@ conditional_effects.mvgam <- function(x,
       points_alpha <- as.numeric(points)
     }
   }
-  if (!on_response || is_mv) rug <- FALSE
+  if (!obs_scale) rug <- FALSE
 
   cond_labs <- if (is.null(effects)) {
     detect_conditional_effects(x)
