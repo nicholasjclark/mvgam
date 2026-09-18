@@ -39,6 +39,45 @@ test_that("sim_smooth errors on invalid inputs", {
 })
 
 
+# ---- sim_family_rng ------------------------------------------------
+
+test_that("sim_family_rng draws through the links a fit predicts on", {
+  # The link switch here held five entries while `inv_link()` applies
+  # seventeen. A probit, cloglog or cauchit model predicted and could
+  # not be simulated. The draws are checked as Bernoulli values: a
+  # working inverse link and one returning the linear predictor
+  # untouched both give a vector of the right length.
+  set.seed(3L)
+  eta <- rnorm(20L)
+  for (lk in c("logit", "probit", "cloglog", "cauchit")) {
+    y <- sim_family_rng(eta, stats::binomial(link = lk))
+    expect_length(y, 20L)
+    expect_true(all(y %in% c(0L, 1L)))
+  }
+})
+
+
+test_that("a positive-mean family refuses a link that turns it negative", {
+  # `rgamma()` returns NaN for a negative rate and raises a warning.
+  # A caller then took NAs for simulated data. The refusal names the
+  # family, the link and how many values fell out.
+  eta <- c(-1, 1, 2)
+  err <- expect_error(
+    sim_family_rng(eta, stats::Gamma(link = "inverse")),
+    "has to be positive"
+  )
+  expect_match(conditionMessage(err), "inverse", fixed = TRUE)
+
+  # The same family draws cleanly where the link keeps the mean above
+  # zero. The guard turns away the pairing and leaves the family
+  # usable.
+  y <- sim_family_rng(eta, stats::Gamma(link = "log"))
+  expect_length(y, 3L)
+  expect_false(anyNA(y))
+  expect_true(all(y > 0))
+})
+
+
 # ---- sim_gp_cov ----------------------------------------------------
 
 test_that("sim_gp_cov uses the length-scale its arguments set", {

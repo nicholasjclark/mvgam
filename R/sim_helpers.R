@@ -135,19 +135,26 @@ sim_family_rng <- function(eta, family, pars = list()) {
   # as the brms-native families with one code path.
   fam_name <- resolve_family_name(family)
   link <- family$link
-  inv_link <- switch(
-    link,
-    "identity" = identity,
-    "log" = exp,
-    "logit" = function(x) 1 / (1 + exp(-x)),
-    "inverse" = function(x) 1 / x,
-    "sqrt" = function(x) x^2,
+  # `inv_link()` holds every link the prediction surface applies. A
+  # five-entry switch here refused probit, cloglog and cauchit at
+  # simulation time while the same model predicted through them.
+  mu <- inv_link(eta, link)
+  # A family on the positive line needs a positive mean. Under the
+  # inverse link a negative `eta` gives a negative `mu`, and
+  # `rgamma()` and `rpois()` return NaN with a warning a caller can
+  # miss. The refusal names the pairing the caller chose.
+  positive_mean <- c("poisson", "negbinomial", "gamma", "tweedie",
+                     "beta_nb")
+  if (fam_name %in% positive_mean && any(mu <= 0)) {
     stop(insight::format_error(c(
-      "Unsupported link in 'sim_family_rng'.",
-      x = paste0("Got: '", link, "'.")
-    )))
-  )
-  mu <- inv_link(eta)
+      paste0("A '", fam_name, "' mean has to be positive."),
+      x = paste0(
+        sum(mu <= 0), " of ", length(mu),
+        " values are zero or below under the '", link, "' link."
+      ),
+      i = "Use a link that keeps the mean positive, such as 'log'."
+    )), call. = FALSE)
+  }
   switch(
     fam_name,
     "gaussian" = stats::rnorm(
