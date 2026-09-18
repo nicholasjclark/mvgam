@@ -150,53 +150,6 @@ landing away from the line it describes is unverified.
 `polish_generated_stan_code()` in `R/stan_polish.R` is where to
 look.
 
-## One trend family, two innovation scalings
-
-**117. The CAR program and its forecast kernel step different
-processes.**
-
-The generated program steps the latent state as
-
-    lv_trend[i, j] = pow(ar1_trend[j], time_dis[i, j])
-                     * lv_trend[i - 1, j]
-                     + scaled_innovations_trend[i, j]
-
-with `scaled_innovations_trend = innovations_trend *
-diag_matrix(sigma_trend)`. The innovation keeps one standard
-deviation at every gap.
-
-`car1_recursC()` at `src/trend_funs.cpp:151` steps it as
-
-    trend[t] = phi^dt * trend[t-1]
-               + sigma * sqrt((1 - phi^(2 dt)) / (1 - phi^2)) * z[t]
-
-The two agree at `dt = 1`, where that square root is 1. Elsewhere
-they differ by that factor. A stationary continuous-time AR(1)
-takes the second form, where a longer gap decays more and gathers
-more innovation variance together.
-
-Simulating both recursions over 200000 draws gives the marginal
-variance against the stationary value:
-
-| gaps | phi = 0.5 | phi = 0.8 | phi = 0.95 |
-|---|---|---|---|
-| all 1 | 1.001 | 0.996 | 0.990 |
-| all 2 | 0.797 | 0.605 | 0.525 |
-| all 0.5 | 1.503 | 1.787 | 1.827 |
-| 0.5 / 1 / 3 | 0.767 | 0.595 | 0.631 |
-
-A regular grid conceals this. An irregular grid is what `CAR()`
-exists for.
-
-The same program starts at the raw innovation,
-`lv_trend[1, j] = scaled_innovations_trend[1, j]`, where the
-stationary start is `sigma_trend[j] / sqrt(1 - ar1_trend[j]^2)`.
-
-`tests/local/test-trend-car-irregular.R` asserts that the gap
-reaches the program, the sizing and the refusals. The innovation
-scaling and the marginal variance stay untested. Its own simulator
-draws `rnorm(1, 0, sigma_true * sqrt(d))`, a third form again.
-
 ## The gate that proves an assertion can fail
 
 **115. The axis mutation gate is absent from the test suite.**

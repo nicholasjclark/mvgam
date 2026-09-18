@@ -265,6 +265,15 @@ coefficients at zero, a constraint the recursion cannot express,
 and carries no stationarity guarantee. Both take priors on the
 \code{ar{k}_trend} classes.
 
+\code{CAR()} steps a continuous-time AR(1) over the gaps the data
+records. Across a gap \code{dt} the decay is
+\code{ar1_trend^dt} and the innovation standard deviation is
+\code{sigma_trend * sqrt((1 - ar1_trend^(2 dt)) /
+(1 - ar1_trend^2))}. The decay and the innovation scale together.
+The marginal variance is then
+\code{sigma_trend^2 / (1 - ar1_trend^2)} at every occasion of an
+irregular grid, and the first state comes from that marginal.
+
 Use \code{vignette("mvgam_overview")} to see the full details of
 available stochastic trend types in \pkg{mvgam}, or view the rendered
 version on the package website at:

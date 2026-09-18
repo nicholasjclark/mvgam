@@ -596,6 +596,38 @@ test_that("the newdata battery holds on an irregular grid", {
 })
 
 
+test_that("the CAR innovation scales with the gap it spans", {
+  # `car1_recursC()` steps the state as
+  #   phi^dt * prev + sigma * sqrt((1 - phi^(2 dt)) / (1 - phi^2)) * z
+  # The sampled program describes that same process. Ground truth
+  # here is that formula, taken from the stationary continuous-time
+  # AR(1). Building it from the generated program would test the
+  # program against itself. The first state comes from the
+  # stationary marginal, sigma / sqrt(1 - phi^2). Stored draws keep
+  # about nine significant digits.
+  dm <- posterior::as_draws_matrix(fit$fit)
+  td <- fit$standata$time_dis
+  for (s in seq_along(series_levels)) {
+    phi <- as.numeric(dm[, paste0("ar1_trend[", s, "]")])
+    sg <- as.numeric(dm[, paste0("sigma_trend[", s, "]")])
+    lv1 <- as.numeric(dm[, paste0("lv_trend[1,", s, "]")])
+    z1 <- as.numeric(dm[, paste0("innovations_trend[1,", s, "]")])
+    expect_equal(lv1, sg * z1 / sqrt(1 - phi^2), tolerance = 1e-6)
+    worst <- 0
+    for (i in 2:n_time) {
+      lv_i <- as.numeric(dm[, paste0("lv_trend[", i, ",", s, "]")])
+      lv_p <- as.numeric(dm[, paste0("lv_trend[", i - 1L, ",", s, "]")])
+      z_i <- as.numeric(dm[, paste0("innovations_trend[", i, ",", s, "]")])
+      dt <- as.numeric(td[i, s])
+      step <- phi^dt * lv_p +
+        sg * sqrt((1 - phi^(2 * dt)) / (1 - phi^2)) * z_i
+      worst <- max(worst, max(abs(lv_i - step)))
+    }
+    expect_lt(worst, 1e-6)
+  }
+})
+
+
 test_that("a newdata missing a model covariate is refused by name", {
   # `temp` carries a slope on the observation side, so a frame
   # without it cannot be predicted from. The refusal has to name the

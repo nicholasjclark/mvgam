@@ -1811,6 +1811,15 @@ print.mvgam_trend <- function(x, ...) {
 #' and carries no stationarity guarantee. Both take priors on the
 #' \code{ar{k}_trend} classes.
 #'
+#' \code{CAR()} steps a continuous-time AR(1) over the gaps the data
+#' records. Across a gap \code{dt} the decay is
+#' \code{ar1_trend^dt} and the innovation standard deviation is
+#' \code{sigma_trend * sqrt((1 - ar1_trend^(2 dt)) /
+#' (1 - ar1_trend^2))}. The decay and the innovation scale together.
+#' The marginal variance is then
+#' \code{sigma_trend^2 / (1 - ar1_trend^2)} at every occasion of an
+#' irregular grid, and the first state comes from that marginal.
+#'
 #' @note **VAR fits and `init = 0`**: VAR uses the Heaps-2023
 #'   stationary joint-distribution initialisation. Setting
 #'   `init = 0` in the call to [mvgam()] starts all parameters

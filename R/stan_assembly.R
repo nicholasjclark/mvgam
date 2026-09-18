@@ -5966,16 +5966,21 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     scode = glue::glue("
       // CAR latent variable evolution using shared innovation system
 
-      // Initialize first time point with innovations
+      // Start at the stationary marginal of the continuous-time AR(1)
       for (j in 1:N_lv_trend) {{
-        lv_trend[1, j] = scaled_innovations_trend[1, j];
+        lv_trend[1, j] = scaled_innovations_trend[1, j]
+                         / sqrt(1 - square(ar1_trend[j]));
       }}
 
-      // Apply continuous-time AR evolution for subsequent time points
+      // Apply continuous-time AR evolution for subsequent time points.
+      // The gap scales the decay and the innovation together. The
+      // marginal variance stays put across an irregular grid.
       for (j in 1:N_lv_trend) {{
         for (i in 2:N_time_trend) {{
           lv_trend[i, j] = pow(ar1_trend[j], time_dis[i, j]) * lv_trend[i - 1, j]
-                         + scaled_innovations_trend[i, j];
+                         + scaled_innovations_trend[i, j]
+                           * sqrt((1 - pow(ar1_trend[j], 2 * time_dis[i, j]))
+                                  / (1 - square(ar1_trend[j])));
         }}
       }}
     "),

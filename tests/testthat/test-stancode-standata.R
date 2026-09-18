@@ -2279,17 +2279,26 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     # CAR latent variable evolution
     expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
-    # CAR initialization (first time point)
+    # CAR first state, at the stationary marginal of the
+    # continuous-time AR(1)
     expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
-    expect_true(stan_pattern("lv_trend\\[1, j\\] = scaled_innovations_trend\\[1, j\\];",
-                      code_with_trend))
+    expect_true(stan_pattern(paste0(
+      "lv_trend\\[1, j\\] = scaled_innovations_trend\\[1, j\\]",
+      " / sqrt\\(1 - square\\(ar1_trend\\[j\\]\\)\\);"
+    ), code_with_trend))
 
     # CAR continuous-time evolution (key differentiator)
     expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
     expect_true(stan_pattern("for \\(i in 2:N_time_trend\\)", code_with_trend))
     expect_true(stan_pattern("lv_trend\\[i, j\\] = pow\\(ar1_trend\\[j\\], time_dis\\[i, j\\]\\) \\*
   lv_trend\\[i - 1, j\\]", code_with_trend))
-    expect_true(stan_pattern("\\+ scaled_innovations_trend\\[i, j\\];", code_with_trend))
+    # The gap scales the innovation as well as the decay, which is
+    # what `car1_recursC()` steps the forecast with.
+    expect_true(stan_pattern(paste0(
+      "\\+ scaled_innovations_trend\\[i, j\\]",
+      " \\* sqrt\\(\\(1 - pow\\(ar1_trend\\[j\\], 2 \\* time_dis\\[i, j\\]\\)\\)",
+      " / \\(1 - square\\(ar1_trend\\[j\\]\\)\\)\\);"
+    ), code_with_trend))
 
     # Universal trend computation pattern
     expect_true(stan_pattern("matrix\\[N_time_trend, N_series_trend\\] trend;", code_with_trend))
