@@ -441,6 +441,28 @@ test_that("lift detects Z_free_vec partial-Z loadings prior", {
   expect_equal(out$source, "mvgam")
 })
 
+test_that("lift strips comments before matching priors and bounds", {
+  # A program keeps its comments, and a comment can carry the shape of
+  # a prior or of a bounded declaration. Each here names bounds and a
+  # prior the code contradicts.
+  sc <- paste(
+    "parameters {",
+    "  // vector<lower=0, upper=5>[N] ar1_trend;",
+    "  vector<lower=-1, upper=1>[N] ar1_trend;",
+    "}",
+    "model {",
+    "  /* ar1_trend ~ normal(0, 9); */",
+    "  // ar1_trend ~ cauchy(0, 1);",
+    "  ar1_trend ~ normal(0, 0.5);",
+    "}",
+    sep = "\n"
+  )
+  out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
+  expect_equal(nrow(out), 1L)
+  expect_equal(out$prior, "normal(0, 0.5)")
+  expect_equal(c(out$lb, out$ub), c("-1", "1"))
+})
+
 test_that("lift detects a length-scale prior in either spelling", {
   # brms writes `target += dist_lpdf(x | args)` and mvgam writes
   # `x ~ dist(args)`, and a fitted model carries both, so the scan

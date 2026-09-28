@@ -992,11 +992,27 @@ test_that("a moving-average trend is named as one", {
   expect_identical(
     mvgam:::trend_order_label(fake("VAR", 1L, 1L)), "VARMA(1, 1)"
   )
-  # The two the label has to tell apart do not collide.
-  expect_false(identical(
-    mvgam:::trend_order_label(fake("AR", 1L, integer(0))),
-    mvgam:::trend_order_label(fake("AR", 1L, 1L))
-  ))
+  # A contiguous lag set is named by its order. Listing the lags
+  # printed `AR(p = 2, ma = TRUE)` as `ARMA(1, 2, 1)`, the spelling of
+  # an ARIMA order with one difference.
+  expect_identical(
+    mvgam:::trend_order_label(fake("AR", 1:2, integer(0))), "AR(2)"
+  )
+  expect_identical(
+    mvgam:::trend_order_label(fake("AR", 1:2, 1L)), "ARMA(2, 1)"
+  )
+  expect_identical(
+    mvgam:::trend_order_label(fake("VAR", 1:3, integer(0))), "VAR(3)"
+  )
+  # A sparse set has no order that names it, and lists its lags.
+  expect_identical(
+    mvgam:::trend_order_label(fake("AR", c(1L, 12L), integer(0))),
+    "AR({1, 12})"
+  )
+  expect_identical(
+    mvgam:::trend_order_label(fake("AR", c(1L, 12L), 1L)),
+    "ARMA({1, 12}, 1)"
+  )
   expect_true(mvgam:::trend_has_ma(fake("AR", 1L, 1L)))
   expect_false(mvgam:::trend_has_ma(fake("AR", 1L, integer(0))))
 })

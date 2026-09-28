@@ -74,7 +74,12 @@
 #'   `"link"` returns the link-scale linear predictor; `"trend"`
 #'   returns the latent-trend trajectory on the link scale.
 #' @param ndraws Optional integer; the number of posterior draws
-#'   to use. Defaults to all available draws.
+#'   to use, taken at random. Defaults to all available draws.
+#' @param draw_ids Optional integer vector of the posterior draws to
+#'   use, in the order given. Supply one of `ndraws` or `draw_ids`.
+#'   Passing the same `draw_ids` to another method, such as
+#'   `posterior_predict()` or `stability()`, pairs each forecast draw
+#'   with the same iteration there.
 #' @param coef_uncertainty Logical. When `FALSE`, every forecast
 #'   draw uses the first posterior draw of every coefficient in
 #'   the observation and trend formulas: fixed effects, smooth
@@ -139,6 +144,7 @@ forecast.mvgam <- function(object,
                             type = c("response", "link",
                                        "expected", "trend"),
                             ndraws = NULL,
+                            draw_ids = NULL,
                             coef_uncertainty = TRUE,
                             trend_uncertainty = TRUE,
                             obs_uncertainty = TRUE,
@@ -152,7 +158,7 @@ forecast.mvgam <- function(object,
   # construction, so refuse what nothing reads.
   rlang::check_dots_empty()
   type <- match.arg(type)
-  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_flag(coef_uncertainty)
   checkmate::assert_flag(trend_uncertainty)
   checkmate::assert_flag(obs_uncertainty)
@@ -222,7 +228,7 @@ forecast.mvgam <- function(object,
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
   total_draws <- nrow(draws_mat)
-  draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
+  draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
 
   training <- build_training_arms(object, series_levels, resp = resp)
   fc_grid <- resolve_forecast_grid(object, newdata, training,

@@ -224,19 +224,13 @@ test_that("ARMA pulls theta and the last raw innovation row", {
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
   res <- extract_last_state(fit, 1L)
-  expect_true("theta" %in% names(res$params))
   expect_equal(res$params$theta, c(0.2, -0.3))
-  expect_identical(dim(res$last_state$errors), c(1L, 2L))
   # The kernel multiplies its coefficient by a past innovation, which
-  # makes the raw row the seed it needs.
+  # makes the raw row the seed it needs. The formed moving average
+  # carries the coefficient already, three times the raw row here.
+  expect_identical(dim(res$last_state$errors), c(1L, 2L))
   expect_equal(as.numeric(res$last_state$errors[1, ]),
                 as.numeric(raw_inn[n_time, ]))
-  # The formed moving average carries the coefficient already, and
-  # seeding with it would apply theta a second time.
-  expect_false(isTRUE(all.equal(
-    as.numeric(res$last_state$errors[1, ]),
-    as.numeric(formed[n_time, ])
-  )))
 })
 
 
@@ -267,6 +261,54 @@ test_that("VAR pulls Heaps-transformed A_trend with lag-first indexing", {
   expect_named(res$params, c("A", "sigma", "Sigma"))
   expect_identical(dim(res$params$A), c(2L, 2L, 1L))
   expect_equal(res$params$A[, , 1], A1)
+})
+
+
+test_that("VARMA seeds the forecast with the last innovation it fitted", {
+  # The program applies `D_trend`, the transform of `D_raw_trend`, and
+  # never stores its innovations. It centres `lv_t` on
+  # `A_1 lv_{t-1} + A_2 lv_{t-2} + D e_{t-1}`. The path below runs on
+  # one time axis from t = -1, and `init_trend` is then packed in the
+  # companion order `Omega_trend` gives it, most recent first:
+  # `(lv_0, lv_{-1}, e_0)`. The extractor has to recover the last
+  # innovation. `D_raw_trend` carries values the program never applies.
+  n <- 2L
+  n_time <- 6L
+  A <- list(matrix(c(0.5, 0.1, -0.2, 0.3), n, n),
+            matrix(c(0.2, 0, 0.1, -0.1), n, n))
+  D <- matrix(c(0.4, -0.2, 0.1, 0.3), n, n)
+  set.seed(31L)
+  # Row r of `path` and `E` is occasion r - 2. Rows 1 and 2 are the two
+  # occasions before the first.
+  path <- matrix(0, n_time + 2L, n)
+  E <- matrix(stats::rnorm((n_time + 2L) * n), n_time + 2L, n)
+  path[1:2, ] <- matrix(stats::rnorm(2L * n), 2L, n)
+  for (r in 3:(n_time + 2L)) {
+    path[r, ] <- A[[1L]] %*% path[r - 1L, ] + A[[2L]] %*% path[r - 2L, ] +
+      D %*% E[r - 1L, ] + E[r, ]
+  }
+  init <- c(path[2L, ], path[1L, ], E[2L, ])
+  lv <- path[3:(n_time + 2L), ]
+  A_arr <- array(0, dim = c(2L, n, n))
+  A_arr[1L, , ] <- A[[1L]]
+  A_arr[2L, , ] <- A[[2L]]
+  draws <- make_draws(list(
+    sigma_trend = c(1, 1),
+    L_Omega_trend = diag(n),
+    A_trend = A_arr,
+    D_trend = array(D, dim = c(1L, n, n)),
+    D_raw_trend = array(-D, dim = c(1L, n, n)),
+    init_trend = init,
+    lv_trend = lv,
+    trend = lv
+  ))
+  meta <- list(trend_type = "VAR", ar_lags = 1:2, ma_lags = 1L,
+               max_lag = 2L, has_cor = TRUE)
+  fit <- make_mock_fit(draws, n, n_lv = n, n_time, meta)
+  res <- extract_last_state(fit, 1L)
+  expect_equal(res$params$theta_cube[, , 1L], D)
+  expect_equal(as.numeric(res$last_state$errors), E[n_time + 2L, ],
+               tolerance = 1e-12)
 })
 
 

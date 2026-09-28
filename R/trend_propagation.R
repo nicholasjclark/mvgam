@@ -576,19 +576,24 @@ validate_last_state <- function(last_state, max_ar, max_ma,
 
 
 # Build the full innovations matrix used by trend_arma_recursC.
-# Rows 0..max_lag-1 hold MA history (from last_state$errors when
-# supplied, zero otherwise); rows max_lag..(h+max_lag-1) hold the
-# new forecast-step innovations drawn from MVN(0, Sigma).
+# The first `max_lag` rows hold the innovation history and the rest
+# hold the forecast-step innovations drawn from MVN(0, Sigma).
+#
+# At its first step the kernel takes the lag-j innovation from
+# history row `max_lag - j + 1`, which makes the last history row
+# `e_T`. A fitted state carries `max_ma` rows and a burn-in carries
+# `max_lag`. Both end at `e_T`, and the rows supplied fill the end of
+# the history: an `AR(p = 2, ma = TRUE)` state places its one row at
+# the second of two.
 #'@noRd
 assemble_innovations <- function(last_errors, h, n_series, Sigma,
                                    max_lag) {
   total <- h + max_lag
   out <- matrix(0, nrow = total, ncol = n_series)
-  if (max_lag > 0L) {
-    if (!is.null(last_errors) && nrow(last_errors) >= max_lag) {
-      out[seq_len(max_lag), ] <-
-        last_errors[seq_len(max_lag), , drop = FALSE]
-    }
+  n_hist <- if (is.null(last_errors)) 0L else nrow(last_errors)
+  if (n_hist > 0L) {
+    checkmate::assert_int(n_hist, upper = max_lag)
+    out[seq.int(max_lag - n_hist + 1L, max_lag), ] <- last_errors
   }
   if (h > 0L) {
     out[(max_lag + 1L):total, ] <- rmvn(
@@ -711,6 +716,18 @@ resolve_active_lags <- function(p) {
 }
 
 
+# Internal: is every lag from 1 to the maximum present? The companion
+# form then holds the whole autoregression in `max(lags)` states, and
+# the Levinson-Durbin recursion below can express the coefficient set.
+# A sparse set such as `c(1, 12)` fixes its intermediate coefficients
+# at zero.
+#'@noRd
+ar_lags_contiguous <- function(ar_lags) {
+  lags <- as.integer(ar_lags)
+  length(lags) > 0L && identical(lags, seq_len(max(lags)))
+}
+
+
 # Internal: does this lag set take the partial autocorrelation
 # parameterisation? For contiguous lags 1..p with p >= 2 the
 # Levinson-Durbin recursion returns exactly the stationary AR(p)
@@ -722,8 +739,7 @@ resolve_active_lags <- function(p) {
 # coefficients they declare.
 #'@noRd
 ar_lags_stationary <- function(ar_lags) {
-  lags <- as.integer(ar_lags)
-  length(lags) >= 2L && identical(lags, seq_len(max(lags)))
+  length(ar_lags) >= 2L && ar_lags_contiguous(ar_lags)
 }
 
 

@@ -448,21 +448,18 @@ extract_transition_matrix_draws <- function(object, group) {
   is_hier <- is_hierarchical_var(all_cols)
 
   if (is_hier && is.null(group)) {
-    K <- as.integer(object$standata$N_subgroups_trend %||% 3L)
+    K <- object$standata$N_subgroups_trend
+    checkmate::assert_int(K, lower = 1L)
     labs <- subgroup_labels(object, K)
-    diag_col <- "Amu_trend[1,1]"
-    off_col <- "Amu_trend[2,1]"
-    missing_cols <- setdiff(c(diag_col, off_col), all_cols)
-    if (length(missing_cols)) {
-      stop(insight::format_error(c(
-        paste0("Posterior parameter '", missing_cols[1L],
-               "' not found."),
-        i = "Required to assemble the global 'Amu_trend' A matrix."
-      )))
-    }
+    # `Amu_trend[1, 1]` is the population mean of the diagonal and
+    # `Amu_trend[2, 1]` of the off-diagonal entries.
+    amu <- read_draws_matrix(
+      draws_mat, "Amu_trend", 2L, 1L,
+      needed_for = "the global 'Amu_trend' A matrix"
+    )
     ndraws <- nrow(draws_mat)
-    diag_draws <- as.numeric(draws_mat[, diag_col])
-    off_draws <- as.numeric(draws_mat[, off_col])
+    diag_draws <- amu[, 1L, 1L]
+    off_draws <- amu[, 2L, 1L]
     out <- vapply(seq_len(ndraws), function(d) {
       m <- matrix(off_draws[d], K, K)
       diag(m) <- diag_draws[d]

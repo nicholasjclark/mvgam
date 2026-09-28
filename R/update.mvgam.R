@@ -276,25 +276,23 @@ mvgam_dry_stancode <- function(call_args) {
 }
 
 
-# Internal: normalise a stancode string for byte-for-byte
-# comparison against `object$stancode`. Mirrors the strip brms
-# uses in `stancode(version = FALSE)` and inside
-# `update.brmsfit`: the head of an mvgam-generated stancode is a
-# single `// Generated with mvgam X.Y.Z using brms X.Y.Z` comment.
-# The version values can drift across sessions but the Stan body
-# is what drives compilation, so stripping a leading `//` comment
-# line lets a version-only difference fall through. The strip is
-# conditional on the line actually being a comment, so if the
-# header convention is ever removed or replaced the normaliser
-# degrades gracefully (no Stan code is ever lost).
-#'@noRd
+# Internal: normalise a stancode string to the code it compiles. Two
+# programs are the same model when their code matches. The head of an
+# mvgam program is a `// Generated with mvgam X.Y.Z using brms X.Y.Z`
+# comment whose versions drift across sessions, and the comments the
+# generators write change with their wording. Comments of both
+# spellings go, string literals stay, and each line is trimmed with
+# empty lines dropped.
 mvgam_normalise_stancode <- function(stancode) {
   if (is.null(stancode)) {
     return(character(0L))
   }
-  txt <- as.character(stancode)
-  txt <- sub("^//[^\n]*\n", "", txt)
-  trimws(txt)
+  lines <- strsplit(paste(stancode, collapse = "\n"), "\n",
+                    fixed = TRUE)[[1L]]
+  lines <- stan_drop_block_comments(lines)
+  lines <- trimws(vapply(lines, stan_drop_line_comment, character(1),
+                         USE.NAMES = FALSE))
+  paste(lines[nzchar(lines)], collapse = "\n")
 }
 
 

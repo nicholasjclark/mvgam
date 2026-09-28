@@ -260,10 +260,11 @@ test_that("the density at zero is the compound-Poisson zero mass", {
                tolerance = 1e-10)
   # What the agreement above is worth. Each substitution below is a
   # way the two custom parameters could reach the density wrongly
-  # while every value stayed finite and positive, and each one
-  # breaks it by orders of magnitude more than the tolerance.
+  # while every value stayed finite and positive, and each one moves
+  # a zero probability by more than 0.05, eight orders of magnitude
+  # past the tolerance.
   swapped <- exp(-mu^(2 - phi) / (power * (2 - phi)))
-  expect_gt(max(abs(exp(ll[, zero]) - swapped[, zero])), 1)
+  expect_gt(max(abs(exp(ll[, zero]) - swapped[, zero])), 0.05)
   flat_phi <- exp(-mu^(2 - power) / (2 - power))
   expect_gt(max(abs(exp(ll[, zero]) - flat_phi[, zero])), 0.05)
   flat_power <- exp(-mu^0.5 / (phi * 0.5))

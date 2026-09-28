@@ -69,8 +69,6 @@ fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
                        summary = TRUE, probs = c(0.025, 0.975),
                        future = FALSE, ...) {
   validate_pos_integer(h)
-  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
-  checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
   validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_flag(summary)
   checkmate::assert_flag(future)

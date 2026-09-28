@@ -331,6 +331,11 @@ if (!identical(attr(fit, "sim_truth"), sim_truth)) {
 dm <- posterior::as_draws_matrix(fit$fit)
 
 
+test_that("the cached fit ran the program the package generates", {
+  expect_current_program(fit)
+})
+
+
 test_that("the trend is the loadings times the factors, draw by draw", {
   # The axis chain, checked on values. `trend[t, s]` is declared as
   # `Z[s, ] . lv_trend[t, ]`, and because `Z` is data here both sides

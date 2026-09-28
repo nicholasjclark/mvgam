@@ -174,15 +174,17 @@ can be replaced through the \code{prior} argument, for example
 alongside \code{sigma_trend}, so the class name can be read from
 there.
 
-Two caveats. The bound of \code{2} is required rather than
-conventional: below it the innovations have no finite variance and
-the stationary initialisation of an autoregressive trend is
-undefined. And the degrees of freedom are informed only through
-the tail of the latent process, so they are weakly identified in
-short series; expect the posterior to lean on its prior below
-roughly 200 time points. Not available for \code{VAR()}, which
-samples its states directly, or \code{PW()}, which has no
-innovations.}
+Three caveats. The bound of \code{2} is required: below it the
+innovations have no finite variance, and an autoregressive trend
+has no stationary covariance to start from. Above it, the first
+states of an autoregressive trend take the stationary mean and
+covariance. Their distribution matches the stationary law exactly
+under Gaussian innovations alone. A finite mix of t variates has
+heavier tails than the infinite sum that defines that law. The
+degrees of freedom are informed only through the tail of the
+latent process and are weakly identified in short series: below
+roughly 200 time points, the posterior stays close to its prior. Not available for \code{VAR()}, which samples its states
+directly, or \code{PW()}, which has no innovations.}
 
 \item{p}{Specification of the autoregressive lag set. The
 semantics differ slightly across trend types:

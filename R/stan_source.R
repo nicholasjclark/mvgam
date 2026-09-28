@@ -299,6 +299,9 @@ stan_statements <- function(lines, bounds) {
 
   body <- seq.int(bounds$start + 1L,
                   length.out = bounds$end - bounds$start - 1L)
+  # Comments are stripped from the body as a whole. A block comment
+  # spanning several lines is then removed from each line it covers.
+  codes <- trimws(stan_line_code(lines[body]))
   start <- end <- integer(0)
   top <- logical(0)
   depth <- 0L
@@ -308,7 +311,7 @@ stan_statements <- function(lines, bounds) {
     first <- i
     at_top <- depth == 0L && !governed
     repeat {
-      code <- trimws(stan_line_code(lines[body[i]]))
+      code <- codes[i]
       depth <- depth + count_stan_braces(code)
       delimited <- grepl("[;{}]", code)
       header <- !delimited && grepl("^(for|if|else|while)\\b", code)
@@ -323,7 +326,36 @@ stan_statements <- function(lines, bounds) {
     i <- i + 1L
   }
   data.frame(start = start, end = end, top = top,
-             head = trimws(stan_line_code(lines[start])))
+             head = codes[match(start, body)])
+}
+
+
+#' Statements with the comments written above them
+#'
+#' A run of comment lines directly above a statement describes it, and
+#' joins it: the row's `start` moves up to the first comment line. A
+#' blank line ends the run, and a comment that no statement follows
+#' stays a row of its own with an empty head.
+#'
+#' @inheritParams stan_statements
+#' @return The rows of `stan_statements()`, comment runs merged into
+#'   the statement each precedes
+#' @noRd
+stan_commented_statements <- function(lines, bounds) {
+  st <- stan_statements(lines, bounds)
+  comment <- !nzchar(st$head) & nzchar(trimws(lines[st$start]))
+  keep <- rep(TRUE, nrow(st))
+  # `nxt` is the row a comment above would join, or 0 for none.
+  nxt <- 0L
+  for (i in rev(seq_len(nrow(st)))) {
+    if (comment[i] && nxt > 0L) {
+      st$start[nxt] <- st$start[i]
+      keep[i] <- FALSE
+    } else {
+      nxt <- if (nzchar(st$head[i])) i else 0L
+    }
+  }
+  st[keep, , drop = FALSE]
 }
 
 

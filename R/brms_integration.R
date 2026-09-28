@@ -969,7 +969,7 @@ mvgam_tilde_statement_params <- function(sc) {
 #' @noRd
 mvgam_unnormalized_terms <- function(stancode) {
   checkmate::assert_character(stancode, null.ok = TRUE)
-  sc <- paste(as.character(stancode), collapse = "\n")
+  sc <- strip_stan_comments(paste(as.character(stancode), collapse = "\n"))
   if (!nzchar(sc)) {
     return(character(0L))
   }
@@ -1036,7 +1036,10 @@ lift_mvgam_stanvar_priors <- function(prior, stancode) {
     .var.name = "stancode"
   )
   if (is.null(stancode)) return(prior)
-  sc <- paste(as.character(stancode), collapse = "\n")
+  # A comment can carry a statement's shape, as the AR(1) start's
+  # `lv_trend[1, j] ~ Normal(...)` does, and the program's comments are
+  # kept.
+  sc <- strip_stan_comments(paste(as.character(stancode), collapse = "\n"))
   if (!nzchar(sc)) return(prior)
 
   rows <- mvgam_stancode_prior_rows(sc)

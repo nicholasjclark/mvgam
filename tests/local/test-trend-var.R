@@ -260,6 +260,11 @@ for (i in seq_len(n_series)) {
 }
 
 
+test_that("the cached fit ran the program the package generates", {
+  expect_current_program(fit)
+})
+
+
 test_that("A is one square matrix over the series", {
   cols <- grep("^A_trend\\[", colnames(dm_all), value = TRUE)
   expect_length(cols, n_series * n_series)

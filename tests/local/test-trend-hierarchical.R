@@ -171,6 +171,11 @@ if (!identical(attr(fit, "sim_truth"), sim_truth)) {
 dm_all <- posterior::as_draws_matrix(fit$fit)
 
 
+test_that("the cached fit ran the program the package generates", {
+  expect_current_program(fit)
+})
+
+
 test_that("the derived axis is the one the frame declares", {
   # The whole point of a grouping is that the series identifier is
   # derived rather than read, so the order it comes out in is the

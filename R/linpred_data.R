@@ -110,7 +110,10 @@ validate_group_level_args <- function(re_formula, allow_new_levels,
 #' `ndraws` takes that many draws at random; `draw_ids` names the ones
 #' to read. A call giving both asks for two different subsets, and the
 #' resolver honours the indices while the count goes unread. The pair
-#' is refused here, at the boundary a user's arguments enter.
+#' is refused here, at the boundary a user's arguments enter, as is a
+#' count that is no count or an index that names no draw. Every
+#' post-fit method taking either selector checks them through this
+#' call alone.
 #'
 #' The internal seams are not held to this. `resolve_family_pars()`
 #' reads `ndraws` as the number of rows its answer has to have, beside
@@ -120,6 +123,9 @@ validate_group_level_args <- function(re_formula, allow_new_levels,
 #' @return `NULL`, invisibly
 #' @noRd
 validate_draw_selectors <- function(ndraws, draw_ids) {
+  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1L, any.missing = FALSE,
+                               min.len = 1L, null.ok = TRUE)
   if (!is.null(ndraws) && !is.null(draw_ids)) {
     stop(insight::format_error(c(
       "Specify only one of 'ndraws' or 'draw_ids'.",

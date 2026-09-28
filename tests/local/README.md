@@ -63,8 +63,9 @@ is sourced, so it cannot be set from inside one.
 Fits cache under `tests/local/fixtures/`, which is gitignored and
 created on demand. Delete a file there to refit that model; delete the
 directory to refit everything. No build step and no shared fixture:
-each file owns the models it fits, so a file can be run on its own
-from a clean clone.
+each file owns the models it fits, and any one file runs on its own
+from a clean clone. `helper-*.R` holds the ground truth several files
+share, and testthat sources it before each file here.
 
 ## Failing assertions are the point
 
@@ -118,11 +119,65 @@ recursion, the hindcast blocks and the tidiers. The same section
 checks that `get_prior()` names the parameter each sharing mode
 samples across contiguous and sparse lag sets.
 
+**test-trend-ar-correlated.R** fits `AR(p = 2, cor = TRUE)` on three
+gaussian series over 150 occasions. Every other `AR()` fit here gives
+each series an independent innovation, which leaves the trend
+covariance diagonal. Combining an order above one with a correlation
+between series is what makes the initial state a joint quantity: the
+first two latent states come from the stationary covariance of the
+companion state, and no elementwise formula reproduces it. The coefficients are
+spread widely across the three series, which separates the stationary
+cross-covariance `1 / (1 - ar_i * ar_j)` from the geometric mean of
+each series' own factor by 0.099 in correlation at the median. Ground
+truth is a Neumann sum written from the definition, which leaves every
+assertion testing the package against that identity. Three wrong
+implementations that keep every value finite and every dimension right
+land between 0.73 and 0.90 away from the draws: scaling the innovations
+by `Sigma` alone, the one-lag closed form applied to two lags and the
+two states filled in the opposite time order. The file first asserts
+that the cached fit ran the program the package generates today, which
+turns a stale cache into a failure.
+
+**test-stationary-start-functions.R** fits nothing. It compiles every
+start block an `AR()` trend emits, wrapped as functions and exposed to
+R: the scalar closed forms at one lag, `ar_stationary_init()` for
+independent series above one lag and the joint start over every
+series, one group and each series alone, with and without a
+moving-average term, together with `ar_diag_joint_var()`. Each start is
+evaluated at every unit variate. The covariance that map implies for
+the state at `t = p` must equal a Neumann sum over the full companion,
+on random shapes of one to five series, a shape whose AR and MA
+polynomials cancel and two near-unit-root shapes, the second at a
+partial autocorrelation of 0.9999 where the factored covariance is
+least well conditioned. Two checks show the comparison can fail: the
+two series' companions swapped, which transposes every cross-series
+block, and the moving-average term dropped.
+
+**test-trend-ar-stationary-start.R** fits six small gaussian models
+over six series in two groups: `AR(p = 2)` grouped, `AR(p = 1,
+ma = TRUE)` correlated and grouped, and `AR(p = 2, ma = TRUE)`
+independent, correlated and grouped. The functions file checks the
+distribution. This file checks the wiring around it: which innovation rows
+fill which variates, which coefficients reach which series and which
+series make up a group. Each fit rebuilds `lv_trend[1:p, ]` from the
+draw's own parameters against a Neumann sum. A gate reverses each
+group's member order and requires the rebuild to fail. The same fits
+then drive the marginal covariance each shape lifts to, a one-step
+forecast against the draw's conditional mean, the hindcast's series
+keys, `posterior_epred()`, the marginal `posterior_predict()`,
+`print()`, `residual_cor()` and the plots.
+
 **test-trend-arma.R** fits `AR(p = 1, ma = TRUE)` on two gaussian
 series over eighty occasions, under a two-dimensional `gp(x1, x2)`.
 There is no `ARMA()` constructor, so the moving-average term is an
 argument that can be accepted and dropped. The file's claim is the
-contrast between the same model with and without it.
+contrast between the same model with and without it. The term also
+decides where the trend starts: a stationary ARMA(1, 1) has
+`cov(lv_1, eps_1) = sigma^2`, which makes the conditional mean of
+`lv_1` the innovation and the conditional standard deviation
+`(ar1 + theta1) * sigma / sqrt(1 - ar1^2)`. This fit checks that
+construction with independent innovations, draw by draw against a
+ground truth written from the definition.
 
 **test-trend-pw.R** fits `PW(n_changepoints = 8)` on two Poisson series
 over sixty occasions, under an offset and a two-dimensional smooth. A

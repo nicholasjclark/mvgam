@@ -116,9 +116,10 @@ test_that(
   mock <- build_var_mock(K = 2L, ndraws = 3L)
   drop_col <- "A_trend[1,1,1]"
   mock$fit <- mock$fit[, setdiff(colnames(mock$fit), drop_col), drop = FALSE]
+  # The refusal names the cell the posterior lacks.
   expect_error(
     extract_var_posterior(mock),
-    paste0("'", "A_trend\\[1,1,1\\]", "' not found")
+    "Missing: A_trend\\[1,1,1\\]"
   )
 })
 

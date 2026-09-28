@@ -102,8 +102,6 @@ log_lik.mvgam <- function(object,
   checkmate::assert_class(object, "mvgam")
   require_fitted_model(object, "log_lik")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
-  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
-  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_string(resp, null.ok = TRUE)
   validate_group_level_args(re_formula, allow_new_levels,

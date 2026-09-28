@@ -275,6 +275,38 @@ test_that("mvgam_normalise_stancode keeps stancode without a header", {
 })
 
 
+test_that("mvgam_normalise_stancode compares code alone", {
+  # A comment anywhere, of either spelling, changes no model. A string
+  # literal holding a comment marker is code, and a change to code is
+  # a different model.
+  plain <- paste(
+    "data { int N; }",
+    "model {",
+    '  if (N < 1) reject("N // must be positive");',
+    "}",
+    sep = "\n"
+  )
+  commented <- paste(
+    "data { int N; }  // the count",
+    "/* a block comment",
+    "   over two lines */",
+    "model {",
+    "  // guard",
+    '  if (N < 1) reject("N // must be positive");',
+    "}",
+    sep = "\n"
+  )
+  expect_identical(mvgam_normalise_stancode(plain),
+                   mvgam_normalise_stancode(commented))
+  expect_match(mvgam_normalise_stancode(plain), "N // must be positive",
+               fixed = TRUE)
+  expect_false(identical(
+    mvgam_normalise_stancode(plain),
+    mvgam_normalise_stancode(sub("N < 1", "N < 2", plain, fixed = TRUE))
+  ))
+})
+
+
 # ---- Legacy fit detection ------------------------------------------
 
 test_that("update.mvgam errors on legacy fits lacking trend_call", {

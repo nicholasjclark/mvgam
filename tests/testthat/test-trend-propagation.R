@@ -107,23 +107,77 @@ test_that("the forecast kernel runs the recursion the Stan program fits", {
 })
 
 
+test_that("an ARMA(2, 1) step from a fitted state carries theta * e_T", {
+  # A fitted state holds two states and one innovation. The first
+  # forecast step is `ar1 y_T + ar2 y_{T-1} + theta e_T` plus a fresh
+  # innovation, which a negligible scale removes. The history was
+  # copied only when it filled both lag rows, which zeroed `e_T` here.
+  ar <- c(0.5, 0.2)
+  theta <- 0.6
+  y <- c(-0.4, 1.3)
+  e_T <- 0.9
+  out <- propagate_trend(
+    AR(p = 2L, ma = TRUE),
+    params = list(ar = ar, theta = theta, sigma = 1e-10),
+    h = 1L, n_series = 1L,
+    last_state = list(trends = matrix(y, ncol = 1L),
+                      errors = matrix(e_T, 1L, 1L))
+  )
+  expect_equal(as.numeric(out),
+               ar[1L] * y[2L] + ar[2L] * y[1L] + theta * e_T,
+               tolerance = 1e-8)
+})
+
+
+test_that("a burn-in hands on its final states and innovations", {
+  # With no fitted state, propagation runs 200 steps from zero and
+  # continues from the last of them. Known innovations replace the
+  # draws, and a recursion written from the definition,
+  #   y_t = ar1 y_{t-1} + ar2 y_{t-2} + e_t + theta e_{t-1},
+  # gives the states the hand-over must carry. A hand-over one row out
+  # of step pairs `e_{T-1}` with `y_T` and fails here, where a variance
+  # check moves by 2%.
+  ar <- c(0.5, 0.2)
+  theta <- 0.6
+  burn_in <- 200L
+  max_lag <- 2L
+  e <- sin(seq_len(burn_in + max_lag))
+  local_mocked_bindings(
+    rmvn = function(n, mu, Sigma) matrix(e[seq_len(n)], n, length(mu))
+  )
+  state <- run_burnin(
+    ar_lags = 1:2, ma_lags = 1L, drift = 0,
+    A_cube = array(ar, c(1L, 1L, 2L)), B_cube = array(theta, c(1L, 1L, 1L)),
+    Sigma = matrix(1), n_series = 1L, burn_in = burn_in, max_lag = max_lag
+  )
+  # Rows 1 to `max_lag` of the innovations are the history before the
+  # first step, and the steps take the rest.
+  y <- numeric(burn_in + max_lag)
+  for (t in max_lag + seq_len(burn_in)) {
+    y[t] <- ar[1L] * y[t - 1L] + ar[2L] * y[t - 2L] + e[t] +
+      theta * e[t - 1L]
+  }
+  expect_equal(as.numeric(state$trends), tail(y, max_lag),
+               tolerance = 1e-12)
+  expect_equal(as.numeric(state$errors), tail(e, max_lag))
+})
+
+
 test_that("propagate_trend(AR(p = 2, ma = TRUE)) settles at its own variance", {
-  # An ARMA(2, 1) settles at the variance its companion gives. A
-  # recursion that dropped the moving-average weight, or applied it
-  # to the wrong quantity, settles somewhere else.
+  # An ARMA(2, 1) settles at `1 + sum(psi_j^2)` for its moving-average
+  # weights, which `stats::ARMAtoMA()` gives. Dropping the moving-average
+  # term settles 32% lower, and 1600 draws put the tolerance at 4
+  # standard errors.
   set.seed(19L)
   ar <- c(0.5, 0.2)
   theta <- 0.3
-  out <- replicate(400L, propagate_trend(
+  out <- replicate(1600L, propagate_trend(
     AR(p = 2L, ma = TRUE),
     params = list(ar = ar, theta = theta, sigma = 1),
     h = 1L, n_series = 1L
   ))
-  target <- ar_companion_multiplier(
-    lapply(ar, function(a) matrix(a, 1L, 1L)), 1:2,
-    matrix(theta, 1L, 1L)
-  )[1L, 1L]
-  expect_lt(abs(stats::var(as.numeric(out)) - target) / target, 0.25)
+  target <- 1 + sum(stats::ARMAtoMA(ar, theta, 2000L)^2)
+  expect_lt(abs(stats::var(as.numeric(out)) - target) / target, 0.15)
 })
 
 

@@ -63,10 +63,10 @@ test_that("extract_hierarchical_cholesky_params maps columns to slots", {
   n_groups <- 2
   n_sub <- 2
   draws_mat <- make_hier_draws_mat(n_draws, n_groups, n_sub)
-  group_info <- list(
-    n_groups = n_groups, n_subgroups = n_sub,
-    group_inds = c(1, 1, 2, 2)
-  )
+  group_info <- get_group_info(list(
+    N_groups_trend = n_groups, N_subgroups_trend = n_sub,
+    group_inds_trend = c(1, 1, 2, 2)
+  ))
 
   params <- extract_hierarchical_cholesky_params(draws_mat, group_info)
 
@@ -194,32 +194,6 @@ test_that("a shared AR coefficient hides its broadcast copies", {
 })
 
 
-test_that("stationary_from_chol lifts a matrix by the joint factor", {
-  # A stationary covariance satisfies `Gamma = Phi Gamma Phi' + M`
-  # for `Phi = diag(phi)` and `M = L L'`. That identity is the claim.
-  # Comparing against the division the function performs would test
-  # the implementation against itself.
-  n <- 3L
-  R <- matrix(0.4, n, n)
-  diag(R) <- 1
-  L <- t(chol(R))
-  phi <- c(0.8, 0.15, -0.4)
-
-  got <- stationary_from_chol(L, phi)
-  Phi <- diag(phi, nrow = n)
-  expect_equal(got, Phi %*% got %*% t(Phi) + tcrossprod(L))
-
-  # Zero coefficients leave the innovation covariance alone, which
-  # separates the lift from an unconditional rescale.
-  expect_equal(stationary_from_chol(L, rep(0, n)), tcrossprod(L))
-
-  # A coefficient on the unit circle leaves the lift undefined, and
-  # the caller keeps the innovation form.
-  expect_null(stationary_from_chol(L, c(1, 0.2, 0.3)))
-  expect_null(stationary_from_chol(L, c(-1, 0.2, 0.3)))
-})
-
-
 test_that("the flat stationary split rebuilds its own covariance", {
   # A posterior stores a Cholesky correlation factor whose rows land
   # a little off unit norm. The scale and correlation it returns have
@@ -242,7 +216,10 @@ test_that("the flat stationary split rebuilds its own covariance", {
   )
   phi <- matrix(rep(c(0.7, 0.2, -0.3), each = ndraws), ndraws, n)
 
-  out <- stationary_correlated_params(params, phi)
+  out <- stationary_correlated_params(
+    params,
+    ar_stationary_factor(list(lags = 1L, phi = list(phi), theta = NULL))
+  )
   for (d in seq_len(ndraws)) {
     m <- 1 / (1 - outer(phi[d, ], phi[d, ]))
     s0 <- params$sigma_trend[d, ]
@@ -265,8 +242,10 @@ test_that("a grouped VAR takes its stationary blocks from Omega_trend", {
   n_s <- 2L
   n_lv <- n_g * n_s
   ndraws <- 4L
-  group_info <- list(n_groups = n_g, n_subgroups = n_s,
-                     group_inds = c(1L, 1L, 2L, 2L))
+  group_info <- get_group_info(list(
+    N_groups_trend = n_g, N_subgroups_trend = n_s,
+    group_inds_trend = c(1L, 1L, 2L, 2L)
+  ))
 
   blk1 <- matrix(c(0.40, 0.10, 0.10, 0.25), 2, 2)
   blk2 <- matrix(c(0.30, -0.05, -0.05, 0.20), 2, 2)
@@ -320,8 +299,10 @@ test_that("hierarchical transform: identity Chol + unit sigma is identity", {
   n_series <- 4
   n_groups <- 2
   n_sub <- 2
-  group_info <- list(n_groups = n_groups, n_subgroups = n_sub,
-                      group_inds = c(1, 1, 2, 2))
+  group_info <- get_group_info(list(
+    N_groups_trend = n_groups, N_subgroups_trend = n_sub,
+    group_inds_trend = c(1, 1, 2, 2)
+  ))
   params <- make_identity_hier_params(
     n_draws, n_groups, n_sub,
     sigma_per_group = list(c(1, 1), c(1, 1))
@@ -348,8 +329,10 @@ test_that("hierarchical transform: per-group sigma scales per-series var", {
   n_series <- 4
   n_groups <- 2
   n_sub <- 2
-  group_info <- list(n_groups = n_groups, n_subgroups = n_sub,
-                      group_inds = c(1, 1, 2, 2))
+  group_info <- get_group_info(list(
+    N_groups_trend = n_groups, N_subgroups_trend = n_sub,
+    group_inds_trend = c(1, 1, 2, 2)
+  ))
   sigma_g1 <- c(2, 3)
   sigma_g2 <- c(4, 5)
   params <- make_identity_hier_params(
@@ -389,8 +372,10 @@ test_that("hierarchical transform: groups are independent", {
   n_series <- 4
   n_groups <- 2
   n_sub <- 2
-  group_info <- list(n_groups = n_groups, n_subgroups = n_sub,
-                      group_inds = c(1, 1, 2, 2))
+  group_info <- get_group_info(list(
+    N_groups_trend = n_groups, N_subgroups_trend = n_sub,
+    group_inds_trend = c(1, 1, 2, 2)
+  ))
   params <- make_identity_hier_params(
     n_draws, n_groups, n_sub,
     sigma_per_group = list(c(1, 1), c(1, 1))
@@ -419,8 +404,10 @@ test_that("hierarchical transform errors on dim mismatches", {
   n_series <- 4
   n_groups <- 2
   n_sub <- 2
-  group_info <- list(n_groups = n_groups, n_subgroups = n_sub,
-                      group_inds = c(1, 1, 2, 2))
+  group_info <- get_group_info(list(
+    N_groups_trend = n_groups, N_subgroups_trend = n_sub,
+    group_inds_trend = c(1, 1, 2, 2)
+  ))
   good <- make_identity_hier_params(
     n_draws, n_groups, n_sub, list(c(1, 1), c(1, 1))
   )
@@ -674,8 +661,10 @@ test_that("hierarchical transform produces non-trivial within-group cor", {
   n_series <- 4
   n_groups <- 2
   n_sub <- 2
-  group_info <- list(n_groups = n_groups, n_subgroups = n_sub,
-                      group_inds = c(1, 1, 2, 2))
+  group_info <- get_group_info(list(
+    N_groups_trend = n_groups, N_subgroups_trend = n_sub,
+    group_inds_trend = c(1, 1, 2, 2)
+  ))
 
   # Target within-group correlation rho = 0.7
   rho <- 0.7
@@ -820,11 +809,18 @@ test_that("bin_draws() keeps the shape of a posterior at a fraction of it", {
   expect_equal(bin_draws(numeric(0), bins = 10L)$counts, 0L)
 })
 
+# One posterior draw in the shape `extract_last_state()` passes its
+# helpers: a one-row matrix named by Stan parameter.
+one_draw_matrix <- function(values) {
+  matrix(values, nrow = 1L, dimnames = list(NULL, names(values)))
+}
+
 test_that("extract_sigma_and_cov: a single series gives a 1x1 covariance", {
   # `diag(x)` for a length-one x builds an x-by-x identity rather than
   # a 1x1 matrix holding x, so a one-series correlated trend needs its
   # own path to avoid a non-conformable Sigma.
-  one_draw <- c("sigma_trend[1]" = 0.4, "L_Omega_trend[1,1]" = 1)
+  one_draw <- one_draw_matrix(c("sigma_trend[1]" = 0.4,
+                                "L_Omega_trend[1,1]" = 1))
   out <- extract_sigma_and_cov(one_draw, n_series = 1L, n_lv = 1L,
                                has_cor = TRUE)
 
@@ -834,11 +830,13 @@ test_that("extract_sigma_and_cov: a single series gives a 1x1 covariance", {
 })
 
 test_that("extract_sigma_and_cov: two series scale the correlation both ways", {
-  one_draw <- c(
+  # A posterior stores every element of a Cholesky factor, the zero
+  # above the diagonal included.
+  one_draw <- one_draw_matrix(c(
     "sigma_trend[1]" = 2, "sigma_trend[2]" = 3,
-    "L_Omega_trend[1,1]" = 1,
+    "L_Omega_trend[1,1]" = 1, "L_Omega_trend[1,2]" = 0,
     "L_Omega_trend[2,1]" = 0.6, "L_Omega_trend[2,2]" = 0.8
-  )
+  ))
   out <- extract_sigma_and_cov(one_draw, n_series = 2L, n_lv = 2L,
                                has_cor = TRUE)
 
@@ -875,10 +873,13 @@ test_that("extract_sigma_and_cov: a grouped trend reads its own parameters", {
       one_draw[sprintf("sigma_group_trend[%d,%d]", g, k)] <- sigmas[[g]][k]
     }
   }
-  group_info <- list(n_groups = n_groups, n_subgroups = n_sub,
-                     group_inds = group_inds)
+  group_info <- get_group_info(list(
+    N_groups_trend = n_groups, N_subgroups_trend = n_sub,
+    group_inds_trend = group_inds
+  ))
 
-  out <- extract_hierarchical_sigma_and_cov(one_draw, 4L, group_info)
+  out <- extract_hierarchical_sigma_and_cov(one_draw_matrix(one_draw), 4L,
+                                            group_info)
 
   expect_equal(dim(out$Sigma), c(4L, 4L))
   expect_equal(out$sigma, c(1, 2, 3, 0.5), ignore_attr = TRUE)
@@ -916,78 +917,165 @@ test_that("hierarchical_group_cholesky weights by alpha", {
 })
 
 
-# A marginal prediction integrates over the state's own spread, so the
-# covariance the innovation transforms read is the stationary one. The
-# tests below pin that arithmetic against closed forms, since a fitted
-# fixture can only ever show one corner of it.
+# A marginal prediction integrates over the state's own spread, and
+# the covariance the innovation transforms take is the stationary one.
+# A fitted fixture shows one corner of that arithmetic, and the tests
+# below pin the rest against closed forms and the companion definition.
+
+# Leading `m x m` block of the stationary covariance of a companion
+# state, `sum_k A^k Q A'^k`. Written from the definition, it calls
+# nothing from the package.
+neumann_lead <- function(A, Q, m, n_terms = 3000L) {
+  out <- matrix(0, nrow(A), ncol(A))
+  Ak <- diag(nrow(A))
+  for (k in 0:n_terms) {
+    out <- out + Ak %*% Q %*% t(Ak)
+    Ak <- Ak %*% A
+  }
+  out[seq_len(m), seq_len(m)]
+}
+
+# One draw's coefficients in the shape `ar_coef_draws()` returns.
+one_draw_coefs <- function(lags, phi, theta = NULL) {
+  list(lags = lags,
+       phi = lapply(phi, function(v) matrix(v, nrow = 1L)),
+       theta = if (is.null(theta)) NULL else matrix(theta, nrow = 1L))
+}
+
+stationary_factor <- function(...) {
+  f <- ar_stationary_factor(one_draw_coefs(...))
+  matrix(f[1L, , ], dim(f)[2L], dim(f)[3L])
+}
 
 
-test_that("an AR(2) companion solve matches the closed form", {
+test_that("one lag settles at 1 / (1 - phi_a phi_b) for every pair", {
+  # The cross-covariance factor of two series takes both coefficients,
+  # and the off-diagonal cells of the assertion check that product.
+  phi <- c(0.8, 0.15, -0.4)
+  expect_equal(stationary_factor(1L, list(phi)),
+               1 / (1 - outer(phi, phi)), tolerance = 1e-10)
+  # Zero coefficients leave the innovation covariance alone.
+  expect_equal(stationary_factor(1L, list(rep(0, 3L))), matrix(1, 3L, 3L))
+})
+
+
+test_that("two lags settle at the AR(2) closed form", {
   # Var = s2 (1 - p2) / ((1 + p2)((1 - p2)^2 - p1^2))
   p1 <- c(0.4, -0.3, 0.5)
   p2 <- c(0.2, 0.25, -0.4)
-  got <- ar_companion_multiplier(
-    list(matrix(p1, nrow = 1L), matrix(p2, nrow = 1L)), c(1L, 2L)
-  )
-  want <- (1 - p2) / ((1 + p2) * ((1 - p2)^2 - p1^2))
-  expect_equal(as.numeric(got), want, tolerance = 1e-6)
+  got <- diag(stationary_factor(1:2, list(p1, p2)))
+  expect_equal(got, (1 - p2) / ((1 + p2) * ((1 - p2)^2 - p1^2)),
+               tolerance = 1e-10)
 })
 
 
-test_that("an AR(1) companion solve agrees with the scalar form", {
-  # The two routes into the same quantity must not drift apart.
-  phi <- c(0.7, -0.5, 0.05)
-  got <- ar_companion_multiplier(list(matrix(phi, nrow = 1L)), 1L)
-  expect_equal(as.numeric(got), 1 / (1 - phi^2), tolerance = 1e-8)
+test_that("a sparse lag set settles at its own companion's block", {
+  # `p = c(1, 12)` carries zeros at the lags in between. The companion
+  # below places them by hand. The two series take different
+  # coefficients, which sends their stationary correlation to 0.20 from
+  # an innovation correlation of 0.6. Scaling each variance on its own
+  # would leave it at 0.6.
+  phi1 <- c(0.8, -0.5)
+  phi12 <- c(0.1, 0.1)
+  S <- matrix(c(1, 0.6, 0.6, 1), 2L, 2L)
+  m <- 2L
+  A <- matrix(0, 12L * m, 12L * m)
+  A[1:m, 1:m] <- diag(phi1)
+  A[1:m, (11L * m + 1L):(12L * m)] <- diag(phi12)
+  A[cbind((m + 1L):(12L * m), 1:(11L * m))] <- 1
+  Q <- matrix(0, 12L * m, 12L * m)
+  Q[1:m, 1:m] <- S
+  want <- neumann_lead(A, Q, m)
+  got <- S * stationary_factor(c(1L, 12L), list(phi1, phi12))
+  expect_equal(got, want, tolerance = 1e-10)
+  expect_lt(abs(stats::cov2cor(got)[1L, 2L] - 0.2), 0.01)
 })
 
 
-test_that("a sparse lag set is solved on its own companion", {
-  # `p = c(1, 12)` declares no coefficient between the two, which the
-  # companion carries as a zero rather than as a special case.
-  phi <- list(matrix(0.3, nrow = 1L), matrix(0.4, nrow = 1L))
-  got <- ar_companion_multiplier(phi, c(1L, 12L))
-  expect_true(is.finite(got[1L, 1L]))
-  expect_gt(got[1L, 1L], 1)
+test_that("an explosive autoregression takes an NA factor", {
+  # A sparse lag set produces such a draw. Each coefficient lies inside
+  # the unit interval on its own, and the process they jointly define
+  # grows without limit. The second, stationary draw keeps its factor.
+  f <- ar_stationary_factor(list(
+    lags = c(1L, 12L),
+    phi = list(matrix(c(0.9, 0.3), 2L), matrix(c(0.9, 0.2), 2L)),
+    theta = NULL
+  ))
+  expect_true(is.na(f[1L, 1L, 1L]))
+  expect_true(is.finite(f[2L, 1L, 1L]))
 })
 
 
-test_that("an explosive autoregression keeps its innovations", {
-  # A sparse lag set is the source of such a draw. Each coefficient
-  # holds the unit interval on its own, and the process they jointly
-  # define grows without limit. A contiguous lag set derives its
-  # coefficients from partial autocorrelations and cannot produce it.
-  got <- ar_companion_multiplier(
-    list(matrix(0.9, nrow = 1L), matrix(0.9, nrow = 1L)), c(1L, 12L)
-  )
-  expect_identical(as.numeric(got), 1)
+test_that("a draw a step from a unit root settles at its closed form", {
+  # `ar1 = 1 - 1e-7` needs 10^8 weights to settle, and a truncated sum
+  # would call the draw explosive and keep its innovation variance, a
+  # factor of 5 x 10^6 too small. The draw takes the companion solve,
+  # which the closed forms below check. The ARMA(1, 1) variance is
+  # `(1 + 2 ar1 theta + theta^2) / (1 - ar1^2)`.
+  ar1 <- c(1 - 1e-7, 0.99995)
+  theta <- c(0, 0.4)
+  f <- ar_stationary_factor(list(
+    lags = 1L, phi = list(matrix(ar1, 1L)), theta = matrix(theta, 1L)
+  ))
+  want <- (1 + 2 * ar1 * theta + theta^2) / (1 - ar1^2)
+  expect_equal(diag(matrix(f[1L, , ], 2L, 2L)), want, tolerance = 1e-6)
+  # A unit root has no stationary distribution.
+  expect_true(is.na(stationary_factor(1L, list(1))[1L, 1L]))
 })
 
 
-test_that("correlated series settle at the exact cross-covariance", {
-  # Gamma0[i, j] = Sigma[i, j] / (1 - ar_i * ar_j), which is not the
-  # geometric mean of each series' own factor.
+test_that("the variances alone match the full factor's diagonal", {
+  # Independent series ask for no cross-covariance and sum their own
+  # weights alone.
+  phi <- list(matrix(c(0.5, -0.3, 0.8, 0.1), 2L), matrix(0.2, 2L, 2L))
+  co <- list(lags = 1:2, phi = phi, theta = NULL)
+  full <- ar_stationary_factor(co)
+  own <- ar_stationary_factor(co, cross = FALSE)
+  expect_equal(own[, 1L, 1L], full[, 1L, 1L])
+  expect_equal(own[, 2L, 2L], full[, 2L, 2L])
+  expect_identical(own[, 1L, 2L], c(0, 0))
+})
+
+
+test_that("correlated ARMA(2, 1) series settle at the companion block", {
+  # Two lags and a moving-average term leave no closed form. The
+  # companion state is `(y_t, y_{t-1}, eps_t)`, and `eps_t` enters
+  # the state twice, once in `y_t` and once in its own block.
   n <- 2L
   sigma <- matrix(c(0.8, 1.3), nrow = 1L)
   omega <- matrix(c(1, 0.6, 0.6, 1), n, n)
   L <- array(t(chol(omega)), dim = c(1L, n, n))
-  phi <- matrix(c(0.8, 0.1), nrow = 1L)
-  out <- stationary_correlated_params(
-    list(sigma_trend = sigma, L_Omega_trend = L), phi
-  )
+  p1 <- c(0.5, -0.2)
+  p2 <- c(0.3, 0.4)
+  th <- c(0.6, -0.5)
+  lift <- function(theta) {
+    stationary_correlated_params(
+      list(sigma_trend = sigma, L_Omega_trend = L),
+      ar_stationary_factor(one_draw_coefs(1:2, list(p1, p2), theta))
+    )
+  }
+  out <- lift(th)
   got <- diag(out$sigma_trend[1L, ]) %*%
     tcrossprod(matrix(out$L_Omega_trend[1L, , ], n, n)) %*%
     diag(out$sigma_trend[1L, ])
-  sig <- diag(sigma[1L, ]) %*% omega %*% diag(sigma[1L, ])
-  expect_equal(got, sig / (1 - outer(phi[1L, ], phi[1L, ])),
-                tolerance = 1e-10)
+
+  S <- diag(sigma[1L, ]) %*% omega %*% diag(sigma[1L, ])
+  Z <- matrix(0, n, n)
+  A <- rbind(cbind(diag(p1), diag(p2), diag(th)),
+             cbind(diag(n), Z, Z),
+             cbind(Z, Z, Z))
+  Q <- rbind(cbind(S, Z, S), cbind(Z, Z, Z), cbind(S, Z, S))
+  expect_equal(got, neumann_lead(A, Q, n), tolerance = 1e-10)
+  # Dropping the moving-average term moves the scales by more than
+  # 0.1, which shows the assertion above tests the term.
+  expect_gt(max(abs(lift(NULL)$sigma_trend - out$sigma_trend)), 0.1)
 })
 
 
 test_that("a singular stationary covariance keeps innovations", {
   # Perfectly correlated innovations under equal coefficients leave
   # the stationary correlation singular, without a Cholesky factor.
-  # That draw is left as it was, and the draw beside it is still
+  # That draw is left as it was, and the second draw is still
   # transformed.
   n <- 2L
   sigma <- matrix(c(0.8, 1.3, 0.8, 1.3), nrow = 2L, byrow = TRUE)
@@ -996,7 +1084,8 @@ test_that("a singular stationary covariance keeps innovations", {
   L[2L, , ] <- t(chol(matrix(c(1, 0.6, 0.6, 1), n, n)))
   phi <- matrix(c(0.5, 0.5, 0.8, 0.1), nrow = 2L, byrow = TRUE)
   out <- stationary_correlated_params(
-    list(sigma_trend = sigma, L_Omega_trend = L), phi
+    list(sigma_trend = sigma, L_Omega_trend = L),
+    ar_stationary_factor(list(lags = 1L, phi = list(phi), theta = NULL))
   )
   expect_identical(out$sigma_trend[1L, ], sigma[1L, ])
   expect_identical(out$L_Omega_trend[1L, , ], L[1L, , ])

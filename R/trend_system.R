@@ -33,6 +33,11 @@ trend_registry <- new.env(parent = emptyenv())
 #'
 #' @param name Character string name of the trend type
 #' @param supports_factors Logical indicating if trend supports factor models (n_lv parameter)
+#' @param stationary_source How the covariance a marginal prediction
+#'   integrates over is obtained: `"lift"` raises the innovation
+#'   covariance to the stationary one, `"omega"` takes the stationary
+#'   covariance the Stan model already derives, `"none"` keeps the
+#'   innovation covariance.
 #' @param samples_innovation_scale Logical; does the trend sample an
 #'   innovation standard deviation? `FALSE` for a deterministic trend
 #'   such as `PW()`, whose path is a function of its changepoints.
@@ -43,11 +48,13 @@ trend_registry <- new.env(parent = emptyenv())
 #' @export
 register_trend_type <- function(name, supports_factors = FALSE,
                                samples_innovation_scale = TRUE,
+                               stationary_source = "none",
                                generator_func,
                                incompatibility_reason = NULL, prior_spec = NULL) {
   checkmate::assert_string(name, min.chars = 1)
   checkmate::assert_logical(supports_factors, len = 1)
   checkmate::assert_logical(samples_innovation_scale, len = 1)
+  checkmate::assert_choice(stationary_source, c("none", "lift", "omega"))
   checkmate::assert_function(generator_func, args = c("trend_specs", "data_info"))
   checkmate::assert_list(prior_spec, null.ok = TRUE, names = "named")
 
@@ -86,6 +93,7 @@ register_trend_type <- function(name, supports_factors = FALSE,
   trend_registry[[name]] <- list(
     supports_factors = supports_factors,
     samples_innovation_scale = samples_innovation_scale,
+    stationary_source = stationary_source,
     generator = generator_func,
     incompatibility_reason = incompatibility_reason,
     prior_spec = prior_spec
@@ -234,6 +242,7 @@ auto_register_trend_types <- function() {
       supports_factors = trend_info$supports_factors,
       samples_innovation_scale =
         trend_info$samples_innovation_scale %||% TRUE,
+      stationary_source = trend_info$stationary_source %||% "none",
       generator_func = generator_func,
       incompatibility_reason = trend_info$incompatibility_reason
     )
@@ -337,6 +346,9 @@ validate_trend_properties <- function(trend_info, trend_type, func_name) {
 ar_trend_properties <- function() {
   list(
     supports_factors = TRUE,
+    # Every lag set settles at the covariance
+    # `ar_stationary_factor()` computes from the moving-average weights.
+    stationary_source = "lift",
     incompatibility_reason = NULL
   )
 }
@@ -346,6 +358,8 @@ ar_trend_properties <- function() {
 rw_trend_properties <- function() {
   list(
     supports_factors = TRUE,
+    # A random walk has no stationary distribution.
+    stationary_source = "none",
     incompatibility_reason = NULL
   )
 }
@@ -355,6 +369,9 @@ rw_trend_properties <- function() {
 var_trend_properties <- function() {
   list(
     supports_factors = TRUE,
+    # The Stan model already derives `Omega_trend` from `A_trend` and
+    # `Sigma_trend`. Nothing is recomputed here.
+    stationary_source = "omega",
     incompatibility_reason = NULL
   )
 }
@@ -364,6 +381,9 @@ var_trend_properties <- function() {
 zmvn_trend_properties <- function() {
   list(
     supports_factors = TRUE,
+    # Nothing propagates the state between times, which makes the
+    # innovation covariance the state's own covariance.
+    stationary_source = "none",
     incompatibility_reason = NULL
   )
 }
@@ -373,6 +393,9 @@ zmvn_trend_properties <- function() {
 car_trend_properties <- function() {
   list(
     supports_factors = FALSE,
+    # Damping of `ar^gap` gives each gap its own variance, and the
+    # irregular grid `CAR()` exists for admits no single one.
+    stationary_source = "none",
     incompatibility_reason = "Continuous-time AR requires series-specific irregular time intervals, incompatible with factor structure"
   )
 }
@@ -385,6 +408,7 @@ pw_trend_properties <- function() {
     # The piecewise path is a deterministic function of its
     # changepoints, so there is no innovation to carry a scale.
     samples_innovation_scale = FALSE,
+    stationary_source = "none",
     incompatibility_reason = "Piecewise trends require series-specific changepoint modeling, incompatible with factor structure"
   )
 }
@@ -673,6 +697,31 @@ samples_innovation_scale <- function(trend_spec) {
   info <- get_trend_info(get_trend_name(trend_spec))
   isTRUE(info$samples_innovation_scale) &&
     !loadings_spec_traits(trend_spec$loadings_prior_spec)$mgp
+}
+
+
+#' How a trend's stationary covariance is obtained
+#'
+#' One registry fact replacing a string comparison against the trend
+#' type. A marginal prediction integrates over the covariance the
+#' latent state settles at, and each kernel supplies that differently:
+#' `"lift"` raises the innovation covariance, `"omega"` takes what the
+#' Stan model already derived, `"none"` keeps the innovation
+#' covariance. A custom trend declares its own through
+#' `<name>_trend_properties()` and defaults to `"none"`. A fit with no
+#' trend, which `get_trend_type()` reports as `"None"`, has no
+#' covariance to lift.
+#'
+#' @param trend_type A registered trend type name, or `"None"`
+#' @return One of `"none"`, `"lift"` or `"omega"`
+#' @noRd
+trend_stationary_source <- function(trend_type) {
+  checkmate::assert_string(trend_type, min.chars = 1)
+  if (identical(trend_type, "None")) {
+    return("none")
+  }
+  ensure_registry_initialized()
+  get_trend_info(trend_type)$stationary_source
 }
 
 
@@ -1745,15 +1794,17 @@ print.mvgam_trend <- function(x, ...) {
 #'   alongside \code{sigma_trend}, so the class name can be read from
 #'   there.
 #'
-#'   Two caveats. The bound of \code{2} is required rather than
-#'   conventional: below it the innovations have no finite variance and
-#'   the stationary initialisation of an autoregressive trend is
-#'   undefined. And the degrees of freedom are informed only through
-#'   the tail of the latent process, so they are weakly identified in
-#'   short series; expect the posterior to lean on its prior below
-#'   roughly 200 time points. Not available for \code{VAR()}, which
-#'   samples its states directly, or \code{PW()}, which has no
-#'   innovations.
+#'   Three caveats. The bound of \code{2} is required: below it the
+#'   innovations have no finite variance, and an autoregressive trend
+#'   has no stationary covariance to start from. Above it, the first
+#'   states of an autoregressive trend take the stationary mean and
+#'   covariance. Their distribution matches the stationary law exactly
+#'   under Gaussian innovations alone. A finite mix of t variates has
+#'   heavier tails than the infinite sum that defines that law. The
+#'   degrees of freedom are informed only through the tail of the
+#'   latent process and are weakly identified in short series: below
+#'   roughly 200 time points, the posterior stays close to its prior. Not available for \code{VAR()}, which samples its states
+#'   directly, or \code{PW()}, which has no innovations.
 #' @param ma \code{Logical}. Include moving average terms of order \code{1}?
 #'   Default is \code{FALSE}.
 #'

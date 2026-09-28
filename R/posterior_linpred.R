@@ -381,8 +381,6 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   checkmate::assert_flag(transform)
   checkmate::assert_logical(process_error, len = 1)
   trend_state <- autocor_to_trend_state(incl_autocor)
-  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
-                                any.missing = FALSE)
   checkmate::assert_string(dpar, null.ok = TRUE)
   validate_draw_selectors(ndraws, draw_ids)
   rlang::check_dots_empty()

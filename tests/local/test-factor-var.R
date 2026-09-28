@@ -222,6 +222,11 @@ if (!identical(attr(fit, "sim_truth"), sim_truth)) {
 dm <- posterior::as_draws_matrix(fit$fit)
 
 
+test_that("the cached fit ran the program the package generates", {
+  expect_current_program(fit)
+})
+
+
 test_that("the trend is the loadings times the factors, draw by draw", {
   # `Z` is a parameter on this route, so both sides of
   # `trend[t, s] = Z[s, ] . lv_trend[t, ]` come out of the same draw

@@ -9,6 +9,7 @@
   ...,
   type = c("response", "link", "expected", "trend", "latent_state"),
   ndraws = NULL,
+  draw_ids = NULL,
   obs_uncertainty = TRUE,
   process_error = FALSE,
   resp = NULL
@@ -34,7 +35,13 @@ for the \code{nmix} variants) at each closure unit as an
 \code{summary()}, \code{as.data.frame()} and \code{plot()} methods.}
 
 \item{ndraws}{Optional integer; the number of posterior draws
-to use. Defaults to all available draws.}
+to use, taken at random. Defaults to all available draws.}
+
+\item{draw_ids}{Optional integer vector of the posterior draws to
+use, in the order given. Supply one of \code{ndraws} or \code{draw_ids}.
+Passing the same \code{draw_ids} to another method, such as
+\code{posterior_predict()} or \code{stability()}, pairs each forecast draw
+with the same iteration there.}
 
 \item{obs_uncertainty}{Logical. When \code{FALSE}, skips
 observation-family sampling for \code{type = "response"},

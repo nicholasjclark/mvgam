@@ -905,20 +905,27 @@ trend_has_ma <- function(obj) {
 }
 
 
+# Internal: the conventional label of a trend, such as `AR(2)` or
+# `ARMA(2, 1)`. A contiguous lag set is named by its order. A sparse
+# one lists its lags in braces, `AR({1, 12})`: no order expresses it,
+# and a bare list of lags would spell an ARIMA order.
 #' @noRd
 trend_order_label <- function(obj) {
   tt <- obj$trend_metadata$trend_type
   if (is.null(tt)) return("")
   ar_lags <- obj$trend_metadata$ar_lags %||% integer(0L)
   ma_lags <- obj$trend_metadata$ma_lags %||% integer(0L)
+  order_of <- function(lags) {
+    if (ar_lags_contiguous(lags)) {
+      return(as.character(max(lags)))
+    }
+    paste0("{", paste(lags, collapse = ", "), "}")
+  }
   arma_label <- function(prefix) {
     if (!length(ma_lags)) {
-      return(paste0(prefix, "(", paste(ar_lags, collapse = ", "), ")"))
+      return(paste0(prefix, "(", order_of(ar_lags), ")"))
     }
-    paste0(
-      prefix, "MA(", paste(ar_lags, collapse = ", "), ", ",
-      paste(ma_lags, collapse = ", "), ")"
-    )
+    paste0(prefix, "MA(", order_of(ar_lags), ", ", order_of(ma_lags), ")")
   }
   switch(
     tt,

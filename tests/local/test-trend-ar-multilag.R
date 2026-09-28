@@ -317,20 +317,20 @@ if (!identical(attr(fit, "sim_truth"), sim_truth)) {
 dm <- posterior::as_draws_matrix(fit$fit)
 
 
+test_that("the cached fit ran the program the package generates", {
+  expect_current_program(fit)
+})
+
+
 test_that("print names every lag the model carries", {
   # A bare `AR` is what `print()` reported for this fit, so all
   # three lags this file exists to exercise were invisible in the
-  # first summary a user sees. The label is checked against the lags
-  # the fit recorded rather than against a string written here.
-  lags <- fit$trend_metadata$ar_lags
-  expect_gt(length(lags), 1L)
+  # first summary a user sees. A sparse set has no order that names
+  # it, and the braces keep the list from spelling an ARIMA order.
   txt <- capture.output(print(fit))
   i <- grep("^Trend model", txt)
   expect_length(i, 1L)
-  expect_identical(
-    trimws(txt[i + 1L]),
-    paste0("AR(", paste(lags, collapse = ", "), ")")
-  )
+  expect_identical(trimws(txt[i + 1L]), "AR({1, 3, 12})")
   expect_false(any(grepl("<environment:", txt, fixed = TRUE)))
 })
 
@@ -1009,6 +1009,11 @@ if (file.exists(stat_cache)) {
 dm2 <- posterior::as_draws_matrix(fit_ar2$fit)
 
 
+test_that("the cached AR(2) fit ran the current program", {
+  expect_current_program(fit_ar2)
+})
+
+
 test_that("a contiguous AR(p = 2) carries both parameterisations", {
   # The partial autocorrelation is sampled and the coefficient is
   # derived. Both reach the posterior, which lets every post-fit
@@ -1140,6 +1145,11 @@ if (file.exists(shared_cache)) {
 }
 
 dm_sh <- posterior::as_draws_matrix(fit_sh$fit)
+
+
+test_that("the cached shared fit ran the current program", {
+  expect_current_program(fit_sh)
+})
 
 
 test_that("the program samples one coefficient and broadcasts it", {

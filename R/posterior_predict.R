@@ -1470,8 +1470,6 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   checkmate::assert_logical(process_error, len = 1)
   checkmate::assert_logical(incl_autocor, len = 1,
                             any.missing = FALSE)
-  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
-  checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
   validate_draw_selectors(ndraws, draw_ids)
   validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
   checkmate::assert_string(resp, null.ok = TRUE)

@@ -333,7 +333,9 @@ backfill_declared_bounds <- function(prior, stancode) {
   if (!is.data.frame(prior) || nrow(prior) == 0L) return(prior)
   if (!all(c("class", "lb", "ub") %in% names(prior))) return(prior)
   if (is.null(stancode)) return(prior)
-  sc <- paste(as.character(stancode), collapse = "\n")
+  # A comment can carry a declaration's shape, and the program's
+  # comments are kept.
+  sc <- strip_stan_comments(paste(as.character(stancode), collapse = "\n"))
   if (!nzchar(sc)) return(prior)
   declared <- stancode_declared_bounds(sc)
   if (!length(declared)) return(prior)

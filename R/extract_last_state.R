@@ -31,16 +31,6 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   meta <- get_enriched_trend_metadata(fit)
   if (is.null(meta) || is.null(meta$trend_type)) return(NULL)
 
-  # `as_draws_matrix` returns a `[ndraws, nvars]` posterior
-  # matrix with no chain/iteration/draw metadata columns.
-  # Coerce one row to a plain named numeric vector so the
-  # per-cell lookups below behave as expected -- a row subset
-  # of a `draws_matrix` keeps the matrix class, on which
-  # `[["nm"]]` raises "subscript out of bounds". Going via
-  # `setNames(as.numeric(...), colnames(...))` also sidesteps
-  # the "Dropping 'draws_df' class" warnings raised by
-  # `[.draws_df`.
-  #
   # Callers running a per-draw loop (forecast.mvgam) build the
   # matrix once and pass it via `draws_mat` to skip the
   # `as_draws_matrix` cost on every iteration.
@@ -55,10 +45,10 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
                  ", total draws = ", total_draws, ".")
     )))
   }
-  one_draw <- setNames(
-    as.numeric(draws_mat[draw_id, ]),
-    colnames(draws_mat)
-  )
+  # One draw as a plain one-row matrix, the shape
+  # `read_draws_vector()` and `read_draws_matrix()` take.
+  one_draw <- matrix(as.numeric(draws_mat[draw_id, ]), nrow = 1L,
+                     dimnames = list(NULL, colnames(draws_mat)))
 
   n_series <- as.integer(fit$standata$N_series_trend %||% 1L)
   n_lv <- as.integer(fit$standata$N_lv_trend %||% n_series)
@@ -193,16 +183,8 @@ extract_trend_history <- function(one_draw, n_series, n_lv, max_lag,
   # `"lv_trend"` when the caller is running a factor model and
   # wants the LV-grain state that `propagate_trend()` will step
   # forward before projecting back to series scale via Z.
-  start_t <- n_time - max_lag + 1L
-  out <- matrix(0, nrow = max_lag, ncol = n_series)
-  for (t in seq_len(max_lag)) {
-    abs_t <- start_t + t - 1L
-    for (s in seq_len(n_series)) {
-      nm <- paste0(state_var, "[", abs_t, ",", s, "]")
-      out[t, s] <- as.numeric(one_draw[[nm]])
-    }
-  }
-  out
+  draw_block(one_draw, state_var, n_time, n_series,
+             rows = seq.int(n_time - max_lag + 1L, n_time))
 }
 
 
@@ -213,30 +195,51 @@ extract_trend_history <- function(one_draw, n_series, n_lv, max_lag,
 # case to all series).
 #'@noRd
 extract_ar_coefs <- function(one_draw, ar_lags, n_series, n_lv) {
-  m_a <- length(ar_lags)
-  out <- matrix(0, nrow = m_a, ncol = n_series)
-  for (k in seq_len(m_a)) {
-    lag <- ar_lags[k]
-    nms <- paste0("ar", lag, "_trend[", seq_len(n_lv), "]")
-    vec <- as.numeric(one_draw[nms])
-    out[k, ] <- broadcast_to_series(vec, n_series)
+  out <- matrix(0, nrow = length(ar_lags), ncol = n_series)
+  for (k in seq_along(ar_lags)) {
+    out[k, ] <- broadcast_to_series(
+      draw_vector(one_draw, paste0("ar", ar_lags[k], "_trend"), n_lv),
+      n_series
+    )
   }
   out
 }
 
 
-# Internal: broadcast a length-`n_lv` parameter vector to
-# `n_series`. When `n_lv == 1` (shared parameter across series),
-# repeat the single value across series. When `n_lv == n_series`,
-# return as-is. When `1 < n_lv < n_series` (latent-factor or
-# hierarchical fits), take the first `n_series` elements; the
-# full mapping contract for those cases requires hierarchical
-# trend support that 'extract_last_state' does not yet have.
+# Internal: a parameter vector at the grain of the state being
+# stepped. One value is a coefficient shared across series and
+# repeats. A factor fit arrives with `n_series` set to its latent
+# count, and every other fit carries one value per series, which
+# leaves any other length a fault in the caller.
 #'@noRd
 broadcast_to_series <- function(vec, n_series) {
   if (length(vec) == n_series) return(vec)
   if (length(vec) == 1L) return(rep(vec, n_series))
-  vec[seq_len(n_series)]
+  stop(insight::format_error(c(
+    "A trend parameter's length differs from the state it describes.",
+    x = paste0("Values: ", length(vec), ", series: ", n_series, "."),
+    i = "Each series takes its own value or all share one."
+  )), call. = FALSE)
+}
+
+
+# Internal: one draw's vector parameter, `prefix[1..n]` or
+# `prefix[lead, 1..n]`, through the reader every draws consumer
+# shares. `one_draw` is a one-row draws matrix.
+#'@noRd
+draw_vector <- function(one_draw, prefix, n, lead = NULL) {
+  as.numeric(read_draws_vector(one_draw, prefix, n, lead = lead))
+}
+
+
+# Internal: one draw's matrix parameter as a `length(rows) x n_col`
+# matrix. `lead` selects one slot of an array of matrices.
+#'@noRd
+draw_block <- function(one_draw, prefix, n_row, n_col, lead = NULL,
+                       rows = seq_len(n_row)) {
+  matrix(read_draws_matrix(one_draw, prefix, n_row, n_col, lead = lead,
+                           rows = rows),
+         nrow = length(rows), ncol = n_col)
 }
 
 
@@ -272,18 +275,11 @@ extract_sigma_and_cov <- function(one_draw, n_series, n_lv,
       one_draw, n_series, group_info
     ))
   }
-  sigma_nms <- paste0("sigma_trend[", seq_len(n_lv), "]")
   sigma_vec <- broadcast_to_series(
-    as.numeric(one_draw[sigma_nms]), n_series
+    draw_vector(one_draw, "sigma_trend", n_lv), n_series
   )
   Sigma <- if (has_cor) {
-    L <- matrix(0, nrow = n_series, ncol = n_series)
-    for (i in seq_len(n_series)) {
-      for (j in seq_len(i)) {
-        nm <- paste0("L_Omega_trend[", i, ",", j, "]")
-        L[i, j] <- as.numeric(one_draw[[nm]])
-      }
-    }
+    L <- draw_block(one_draw, "L_Omega_trend", n_series, n_series)
     # `diag(x)` for a length-one x builds an x-by-x identity rather
     # than a 1x1 matrix holding x, so the scaling is applied by row
     # and column instead.
@@ -321,35 +317,26 @@ extract_hierarchical_sigma_and_cov <- function(one_draw, n_series,
   )
 
   read_matrix <- function(prefix, group = NULL) {
-    nms <- stan_matrix_names(prefix, n_sub, n_sub, lead = group)
-    matrix(as.numeric(one_draw[nms]), nrow = n_sub, ncol = n_sub)
+    draw_block(one_draw, prefix, n_sub, n_sub, lead = group)
   }
 
-  alpha <- as.numeric(one_draw[[HIER_COV_PARS$alpha]])
+  alpha <- draws_columns(one_draw, HIER_COV_PARS$alpha,
+                         HIER_COV_PARS$alpha)
   L_global <- read_matrix(HIER_COV_PARS$global)
-
-  # Each series' position within its own group, which is the row of
-  # that group's covariance the series occupies.
-  within_pos <- as.integer(
-    stats::ave(seq_along(group_inds), group_inds, FUN = seq_along)
-  )
 
   sigma_vec <- numeric(n_series)
   Sigma <- matrix(0, nrow = n_series, ncol = n_series)
   for (g in seq_len(n_groups)) {
-    sigma_g <- as.numeric(one_draw[
-      stan_vector_names(HIER_COV_PARS$sigma, n_sub, lead = g)
-    ])
+    sigma_g <- draw_vector(one_draw, HIER_COV_PARS$sigma, n_sub, lead = g)
     L_dev <- read_matrix(HIER_COV_PARS$deviation, group = g)
     L_full <- hierarchical_group_cholesky(
       alpha = alpha, L_global = L_global, L_deviation = L_dev,
       sigma = sigma_g
     )
-    series_g <- which(group_inds == g)
-    pos_g <- within_pos[series_g]
-    sigma_vec[series_g] <- sigma_g[pos_g]
-    Sigma[series_g, series_g] <- tcrossprod(L_full)[pos_g, pos_g,
-                                                    drop = FALSE]
+    # A group's k-th row belongs to its k-th member series.
+    members <- group_info$members[[g]]
+    sigma_vec[members] <- sigma_g
+    Sigma[members, members] <- tcrossprod(L_full)
   }
   list(sigma = sigma_vec, Sigma = Sigma)
 }
@@ -359,15 +346,9 @@ extract_hierarchical_sigma_and_cov <- function(one_draw, n_series,
 # MA component. Returns a length-`n_series` numeric vector.
 #'@noRd
 extract_ma_coefs <- function(one_draw, n_series, n_lv) {
-  nms <- paste0("theta1_trend[", seq_len(n_lv), "]")
-  broadcast_to_series(as.numeric(one_draw[nms]), n_series)
+  broadcast_to_series(draw_vector(one_draw, "theta1_trend", n_lv),
+                      n_series)
 }
-
-
-# Internal: empty `errors` history when the trend has no MA
-# terms. propagate_trend treats NULL or zero-row identically.
-#'@noRd
-empty_errors <- function() NULL
 
 
 # Internal: the last `max_ma` rows of the scaled innovation matrix
@@ -379,42 +360,12 @@ empty_errors <- function() NULL
 extract_innovation_history <- function(one_draw, n_series, n_lv,
                                        max_ma, n_time) {
   if (max_ma == 0L) return(NULL)
-  start_t <- n_time - max_ma + 1L
-  out <- matrix(0, nrow = max_ma, ncol = n_series)
-  for (t in seq_len(max_ma)) {
-    abs_t <- start_t + t - 1L
-    for (s in seq_len(n_series)) {
-      # The kernel multiplies its MA coefficient by a past
-      # innovation, which is what `scaled_innovations_trend` holds.
-      # `ma_innovations_trend` holds the moving average already
-      # formed from it, and seeding with that would apply the
-      # coefficient twice.
-      nm <- paste0("scaled_innovations_trend[", abs_t, ",", s, "]")
-      val <- one_draw[[nm]]
-      if (is.null(val)) {
-        # `scaled_innovations_trend` is not in the posterior (e.g.
-        # excluded via `exclude`). Returning NULL seeds the
-        # kernel's MA history with zeros, which biases the
-        # first forecast step by `theta * e[T]` for an ARMA
-        # model. Emit a one-time warning so the caller knows
-        # the fallback was taken.
-        if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-          rlang::warn(
-            paste0(
-              "ARMA innovation 'scaled_innovations_trend' is ",
-              "absent from the posterior; first forecast step uses ",
-              "zero past innovations and may be biased."
-            ),
-            .frequency = "once",
-            .frequency_id = "mvgam_ma_innov_missing"
-          )
-        }
-        return(NULL)
-      }
-      out[t, s] <- as.numeric(val)
-    }
-  }
-  out
+  # The kernel multiplies its MA coefficient by a past innovation,
+  # which is what `scaled_innovations_trend` holds.
+  # `ma_innovations_trend` holds the moving average already formed
+  # from it, and seeding with that would apply the coefficient twice.
+  draw_block(one_draw, "scaled_innovations_trend", n_time, n_series,
+             rows = seq.int(n_time - max_ma + 1L, n_time))
 }
 
 
@@ -485,34 +436,28 @@ extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
   # of `propagate_trend(..., params = list(A = ...))`.
   A_cube <- array(0, dim = c(n_series, n_series, m_a))
   for (k in seq_len(m_a)) {
-    lag <- meta$ar_lags[k]
-    for (i in seq_len(n_series)) {
-      for (j in seq_len(n_series)) {
-        nm <- paste0("A_trend[", lag, ",", i, ",", j, "]")
-        A_cube[i, j, k] <- as.numeric(one_draw[[nm]])
-      }
-    }
+    A_cube[, , k] <- draw_block(one_draw, "A_trend", n_series, n_series,
+                                lead = meta$ar_lags[k])
   }
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
                                  has_cor = TRUE, standata = fit$standata)
   params <- list(A = A_cube,
                   sigma = scov$sigma,
                   Sigma = scov$Sigma)
+  errors <- NULL
   if (length(meta$ma_lags) > 0L) {
+    # The program applies `D_trend`, the stationary transform of
+    # `D_raw_trend`, and indexes it `D_trend[lag, i, j]` like
+    # `A_trend`.
     m_b <- length(meta$ma_lags)
-    # D_raw_trend follows the same `array[lag] matrix[...]`
-    # convention: index as `D_raw_trend[lag, i, j]`.
     B_cube <- array(0, dim = c(n_series, n_series, m_b))
     for (j_lag in seq_len(m_b)) {
-      lag <- meta$ma_lags[j_lag]
-      for (i in seq_len(n_series)) {
-        for (j in seq_len(n_series)) {
-          nm <- paste0("D_raw_trend[", lag, ",", i, ",", j, "]")
-          B_cube[i, j, j_lag] <- as.numeric(one_draw[[nm]])
-        }
-      }
+      B_cube[, , j_lag] <- draw_block(one_draw, "D_trend", n_series,
+                                      n_series, lead = meta$ma_lags[j_lag])
     }
     params$theta_cube <- B_cube
+    errors <- varma_last_innovation(one_draw, A_cube, B_cube[, , 1L],
+                                    meta$ar_lags, n_series, n_time)
   }
   list(
     params = params,
@@ -520,9 +465,41 @@ extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
       trends = extract_trend_history(one_draw, n_series, n_lv,
                                        meta$max_lag, n_time,
                                        state_var = state_var),
-      errors = empty_errors()
+      errors = errors
     )
   )
+}
+
+
+# Internal: the innovation at the last fitted occasion of a
+# VARMA(p, 1), which the first forecast step multiplies by `D`.
+#
+# The program never stores it. Its likelihood centres `lv_t` on
+#   mu_t = sum_i A_i lv_{t-i} + D e_{t-1},  e_t = lv_t - mu_t,
+# taking a state before the first occasion from `init_trend`. That
+# vector follows `Omega_trend`'s companion order, most recent first:
+# block `k <= p` holds `lv_{1-k}` and block `p + 1` holds `e_0`. The
+# same recursion run forward here gives `e_T`.
+#
+# @return A `1 x n` matrix holding `e_T`
+#'@noRd
+varma_last_innovation <- function(one_draw, A_cube, D, ar_lags, n,
+                                  n_time) {
+  p <- max(ar_lags)
+  init <- draw_vector(one_draw, "init_trend", (p + 1L) * n)
+  init_block <- function(k) init[((k - 1L) * n + 1L):(k * n)]
+  lv <- draw_block(one_draw, "lv_trend", n_time, n)
+  e_prev <- init_block(p + 1L)
+  for (t in seq_len(n_time)) {
+    mu <- as.numeric(D %*% e_prev)
+    for (k in seq_along(ar_lags)) {
+      i <- ar_lags[k]
+      lagged <- if (t - i <= 0L) init_block(i - t + 1L) else lv[t - i, ]
+      mu <- mu + as.numeric(A_cube[, , k] %*% lagged)
+    }
+    e_prev <- lv[t, ] - mu
+  }
+  matrix(e_prev, nrow = 1L)
 }
 
 
@@ -535,14 +512,10 @@ extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
 extract_car_state <- function(one_draw, meta, n_series, fit) {
   n_lv <- as.integer(fit$standata$N_lv_trend %||% n_series)
   n_time <- as.integer(fit$standata$N_time_trend)
-  phi_nms <- paste0("ar1_trend[", seq_len(n_lv), "]")
-  phi <- broadcast_to_series(
-    as.numeric(one_draw[phi_nms]), n_series
-  )
-  sigma_nms <- paste0("sigma_trend[", seq_len(n_lv), "]")
-  sigma <- broadcast_to_series(
-    as.numeric(one_draw[sigma_nms]), n_series
-  )
+  phi <- broadcast_to_series(draw_vector(one_draw, "ar1_trend", n_lv),
+                             n_series)
+  sigma <- broadcast_to_series(draw_vector(one_draw, "sigma_trend", n_lv),
+                               n_series)
   trends_hist <- extract_trend_history(
     one_draw, n_series, n_lv, max_lag = 1L, n_time = n_time
   )
@@ -551,7 +524,7 @@ extract_car_state <- function(one_draw, meta, n_series, fit) {
     params = list(phi = phi, sigma = sigma),
     last_state = list(
       trends = trends_hist,
-      errors = empty_errors(),
+      errors = NULL,
       time = last_time
     )
   )
@@ -632,7 +605,7 @@ extract_zmvn_state <- function(one_draw, n_series, n_lv, fit) {
     params = list(Sigma = scov$Sigma, sigma = scov$sigma),
     last_state = list(
       trends = matrix(0, nrow = 0L, ncol = n_series),
-      errors = empty_errors()
+      errors = NULL
     )
   )
 }
@@ -650,16 +623,13 @@ extract_zmvn_state <- function(one_draw, n_series, n_lv, fit) {
 #'@noRd
 extract_pw_state <- function(one_draw, meta, n_series, n_lv,
                                 fit) {
-  k_nms <- paste0("k_trend[", seq_len(n_lv), "]")
-  k_vec <- broadcast_to_series(
-    as.numeric(one_draw[k_nms]), n_series
-  )
+  k_vec <- broadcast_to_series(draw_vector(one_draw, "k_trend", n_lv),
+                               n_series)
   # The logistic form samples `m_trend`. For the linear form, the
   # observation formula supplies the level and the offset is zero.
   # `meta` is the fit's `trend_metadata`, which persists the growth.
   m_vec <- if (pw_is_logistic(meta)) {
-    m_nms <- paste0("m_trend[", seq_len(n_lv), "]")
-    broadcast_to_series(as.numeric(one_draw[m_nms]), n_series)
+    broadcast_to_series(draw_vector(one_draw, "m_trend", n_lv), n_series)
   } else {
     rep(0, n_series)
   }
@@ -670,18 +640,9 @@ extract_pw_state <- function(one_draw, meta, n_series, n_lv,
   n_change <- as.integer(fit$standata$N_change_trend %||% 0L)
   delta <- matrix(0, nrow = n_change, ncol = n_series)
   if (n_change > 0L) {
+    raw <- draw_block(one_draw, "delta_trend", n_change, n_lv)
     for (i in seq_len(n_change)) {
-      for (j in seq_len(n_lv)) {
-        nm <- paste0("delta_trend[", i, ",", j, "]")
-        val <- one_draw[[nm]]
-        if (is.null(val)) next
-        # Broadcast n_lv = 1 to all series.
-        if (n_lv == 1L) {
-          delta[i, ] <- as.numeric(val)
-        } else if (j <= n_series) {
-          delta[i, j] <- as.numeric(val)
-        }
-      }
+      delta[i, ] <- broadcast_to_series(raw[i, ], n_series)
     }
   }
   t_change <- as.numeric(fit$standata$t_change_trend %||%
@@ -700,7 +661,7 @@ extract_pw_state <- function(one_draw, meta, n_series, n_lv,
     ),
     last_state = list(
       trends = matrix(0, nrow = 0L, ncol = n_series),
-      errors = empty_errors(),
+      errors = NULL,
       cap_train = cap
     )
   )

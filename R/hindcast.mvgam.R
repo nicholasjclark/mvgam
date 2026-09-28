@@ -52,12 +52,6 @@ hindcast <- function(object, ...) {
 #'   for the `nmix` variants) at each closure unit as an
 #'   `mvgam_latent_state` object with its own `print()`,
 #'   `summary()`, `as.data.frame()` and `plot()` methods.
-#' @param ndraws Optional integer; the number of posterior draws
-#'   to use. Defaults to all available draws.
-#' @param obs_uncertainty Logical. When `FALSE`, skips
-#'   observation-family sampling for `type = "response"`,
-#'   returning the family mean instead.
-#'   Defaults to `TRUE`.
 #' @param process_error Logical. When `FALSE` (the default),
 #'   hindcasts read the Stan-fitted latent state directly
 #'   (`trend[t, s]` and `mu_trend[t, s]` from the posterior), and
@@ -105,6 +99,7 @@ hindcast.mvgam <- function(object,
                                     "expected", "trend",
                                     "latent_state"),
                            ndraws = NULL,
+                           draw_ids = NULL,
                            obs_uncertainty = TRUE,
                            process_error = FALSE,
                            resp = NULL) {
@@ -117,7 +112,7 @@ hindcast.mvgam <- function(object,
   # construction, so refuse what nothing reads.
   rlang::check_dots_empty()
   type <- match.arg(type)
-  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_flag(obs_uncertainty)
   checkmate::assert_flag(process_error)
   checkmate::assert_string(resp, null.ok = TRUE)
@@ -133,7 +128,7 @@ hindcast.mvgam <- function(object,
   # honours the unit grain.
   if (type == "latent_state") {
     return(hindcast_latent_state(object, ndraws = ndraws,
-                                   resp = resp))
+                                 draw_ids = draw_ids, resp = resp))
   }
 
   # Multivariate fan-out: one `mvgam_forecast` per response, in a
@@ -149,7 +144,7 @@ hindcast.mvgam <- function(object,
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
   total_draws <- nrow(draws_mat)
-  draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
+  draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
 
   training <- build_training_arms(object, series_levels, resp = resp)
   hindcasts <- build_hindcast_arms(
@@ -181,8 +176,7 @@ hindcast.mvgam <- function(object,
 # the unit index; for multi-season designs it is the season).
 #'@noRd
 hindcast_latent_state <- function(object, ndraws = NULL,
-                                    resp = NULL) {
-  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+                                  draw_ids = NULL, resp = NULL) {
   checkmate::assert_string(resp, null.ok = TRUE)
   # Sharing the closure-unit pipeline is not the same as having a
   # latent state to report, and this asked only the first. `mvn()`,
@@ -191,7 +185,7 @@ hindcast_latent_state <- function(object, ndraws = NULL,
   require_closure_unit_predict_type(object$family, "latent_state")
 
   total_draws <- nrow(posterior::as_draws_matrix(object$fit))
-  draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
+  draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
 
   kernel <- dispatch_closure_unit_method(object$family,
                                             "latent_state")

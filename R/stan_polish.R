@@ -10,6 +10,10 @@
 #' @return The polished Stan program as one string
 #'
 #' @details
+#' Every comment the generators and brms write is kept. A comment
+#' written directly above a statement moves with it when the statement
+#' is regrouped.
+#'
 #' The preprocessing steps run once. Their result is formatted with the
 #' stanc.js bundled in StanHeaders, and returned unformatted when V8 or
 #' stanc.js is unavailable or stanc rejects the program. Formatting is
@@ -25,12 +29,10 @@ polish_generated_stan_code <- function(stan_code, silent = TRUE) {
   lines <- strsplit(paste(stan_code, collapse = "\n"), "\n",
                     fixed = TRUE)[[1]]
   lines <- update_stan_header(lines)
-  lines <- clean_stan_comments(lines)
   lines <- fix_blank_lines(lines)
   lines <- reorganize_lprior_statements(lines)
   lines <- reorganize_target_statements(lines)
   lines <- reorganize_model_block_statements(lines)
-  lines <- add_targeted_comments(lines)
   preprocessed_code <- paste(lines, collapse = "\n")
 
   try_stanheaders_formatting(preprocessed_code, silent) %||%
@@ -243,146 +245,6 @@ update_stan_header <- function(lines) {
   return(lines)
 }
 
-#' Add Targeted Comments to Stan Code
-#'
-#' Adds specific, useful comments to explain key data structures and
-#' computational steps that are not obvious from variable names alone.
-#'
-#' @param lines Character vector of Stan code lines
-#'
-#' @return Character vector with targeted comments added
-#'
-#' @noRd
-add_targeted_comments <- function(lines) {
-  if (length(lines) == 0) return(lines)
-
-  # Comment 1: Z matrix - factor loadings matrix
-  z_pattern <- "matrix\\[N_series_trend,\\s*N_lv_trend\\]\\s*Z\\s*="
-  z_lines <- grep(z_pattern, lines)
-  if (length(z_lines) > 0) {
-    lines <- insert_comment_before_line(lines, z_lines[1],
-                                        "  // Factor loadings matrix: maps latent variables to observed series")
-  }
-
-  # Comment 2: lv_trend matrix - latent variable trajectories
-  lv_pattern <- "matrix\\[N_time_trend,\\s*N_lv_trend\\]\\s*lv_trend\\s*;"
-  lv_lines <- grep(lv_pattern, lines)
-  if (length(lv_lines) > 0) {
-    lines <- insert_comment_before_line(lines, lv_lines[1],
-                                        "  // Latent variable trajectories over time")
-  }
-
-  # Comment 3: trend matrix - final trend values
-  trend_pattern <- "matrix\\[N_time_trend,\\s*N_series_trend\\]\\s*trend\\s*;"
-  trend_lines <- grep(trend_pattern, lines)
-  if (length(trend_lines) > 0) {
-    lines <- insert_comment_before_line(lines, trend_lines[1],
-                                        "  // Final trend values for each time point and series")
-  }
-
-  # Comment 4: Trend mapping computation
-  trend_loop_pattern <- "for\\s*\\(\\s*i\\s*in\\s*1\\s*:\\s*N_time_trend\\)\\s*\\{"
-  trend_loop_lines <- grep(trend_loop_pattern, lines)
-  if (length(trend_loop_lines) > 0) {
-    # Check if this is the trend mapping loop (contains dot_product and trend assignment)
-    for (line_idx in trend_loop_lines) {
-      # Look ahead a few lines to see if this contains trend mapping
-      check_range <- line_idx:(min(line_idx + 10, length(lines)))
-      if (any(grepl("trend\\[.*\\].*=.*dot_product", lines[check_range]))) {
-        lines <- insert_comment_before_line(lines, line_idx,
-                                            "  // Map latent variables to trend values via factor loadings")
-        break
-      }
-    }
-  }
-
-  # Comment 5: Observation linear predictors and likelihoods
-  likelihood_pattern <- "if\\s*\\(\\s*!prior_only\\s*\\)\\s*\\{"
-  likelihood_lines <- grep(likelihood_pattern, lines)
-  if (length(likelihood_lines) > 0) {
-    lines <- insert_comment_before_line(
-      lines, likelihood_lines[1],
-      "  // Observation linear predictors and likelihoods (skipped when sampling from prior only)"
-    )
-  }
-
-  # Comment 6: First target += statement for likelihood calculations
-  # Find the if (!prior_only) block
-  prior_only_pattern <- "if\\s*\\(\\s*!prior_only\\s*\\)\\s*\\{"
-  prior_only_lines <- grep(prior_only_pattern, lines)
-
-  if (length(prior_only_lines) > 0) {
-    prior_only_start <- prior_only_lines[1]
-    prior_only_end <- find_matching_closing_brace(lines, prior_only_start)
-
-    if (!is.na(prior_only_end)) {
-      # Find first target += within this block
-      target_pattern <- "target\\s*\\+="
-      for (i in (prior_only_start + 1):(prior_only_end - 1)) {
-        if (grepl(target_pattern, lines[i])) {
-          # Check if there's already a "Likelihood calculations" comment above it
-          comment_above <- if (i > 1) trimws(lines[i - 1]) else ""
-          if (!grepl("Likelihood calculations", comment_above)) {
-            lines <- insert_comment_before_line(lines, i,
-                                                "    // Likelihood calculations")
-          }
-          break  # Only comment the first target += statement
-        }
-      }
-    }
-  }
-
-  # Comment 7: Prior log-probability accumulator
-  lprior_init_pattern <- "real\\s+lprior\\s*=\\s*0\\s*;"
-  lprior_init_lines <- grep(lprior_init_pattern, lines)
-  if (length(lprior_init_lines) > 0) {
-    lines <- insert_comment_before_line(lines, lprior_init_lines[1],
-                                        "  // Prior log-probability accumulator")
-  }
-
-  # Comment 8: Prior contributions (target += lprior should be first in final section)
-  # Find target += lprior in model block
-  model_pattern <- stan_block_header("model", own_line = TRUE)
-  model_lines <- grep(model_pattern, lines)
-
-  if (length(model_lines) > 0) {
-    model_start <- model_lines[1]
-    model_end <- find_matching_closing_brace(lines, model_start)
-
-    if (!is.na(model_end)) {
-      # Find target += lprior line in model block
-      for (i in (model_start + 1):(model_end - 1)) {
-        if (grepl("^\\s*target\\s*\\+=\\s*lprior", lines[i])) {
-          # Check if there's already a "Prior contributions" comment above it
-          comment_above <- if (i > 1) trimws(lines[i - 1]) else ""
-          if (!grepl("Prior contributions", comment_above)) {
-            lines <- insert_comment_before_line(lines, i,
-                                                "  // Prior contributions")
-          }
-          break  # Only comment the first target += lprior
-        }
-      }
-    }
-  }
-
-  return(lines)
-}
-
-#' Insert Comment Before Line
-#' @param lines Character vector of Stan code lines
-#' @param line_num Line number to insert before
-#' @param comment Comment text to insert
-#' @return Character vector with comment inserted
-#' @noRd
-insert_comment_before_line <- function(lines, line_num, comment) {
-  if (line_num < 1 || line_num > length(lines)) return(lines)
-
-  before <- if (line_num == 1) character(0) else lines[1:(line_num - 1)]
-  after <- lines[line_num:length(lines)]
-
-  c(before, comment, after)
-}
-
 #' Gather the prior accumulations in transformed parameters
 #'
 #' Moves every top-level `lprior +=` statement to the line after
@@ -402,7 +264,7 @@ reorganize_lprior_statements <- function(lines) {
   tparams <- stan_block_bounds(lines, "transformed parameters")
   if (is.null(tparams)) return(lines)
 
-  st <- stan_statements(lines, tparams)
+  st <- stan_commented_statements(lines, tparams)
   init <- which(st$top & grepl("^real\\s+lprior\\s*=\\s*0\\s*;", st$head))
   moving <- st$top & grepl("^lprior\\s*\\+=", st$head)
   if (length(init) == 0L || !any(moving)) return(lines)
@@ -431,7 +293,7 @@ reorganize_target_statements <- function(lines) {
   guard <- prior_only_bounds(lines, model)
   if (is.null(guard)) return(lines)
 
-  st <- stan_statements(lines, guard)
+  st <- stan_commented_statements(lines, guard)
   moving <- st$top & grepl("^target\\s*\\+=", st$head)
   if (!any(moving)) return(lines)
 
@@ -478,78 +340,13 @@ relocate_lines <- function(lines, moved, before) {
   c(lines[kept[kept < before]], lines[moved], lines[kept[kept >= before]])
 }
 
-#' Clean Stan Comments
-#'
-#' Removes ALL comments and empty lines from all blocks except functions block.
-#' Preserves all comments and empty lines within functions block for documentation.
-#'
-#' @param lines Character vector of Stan code lines
-#'
-#' @return Character vector with cleaned comments and empty lines
-#'
-#' @noRd
-clean_stan_comments <- function(lines) {
-  if (length(lines) == 0) return(lines)
-
-  result <- character(0)
-  in_functions_block <- FALSE
-
-  for (i in seq_along(lines)) {
-    line <- lines[i]
-    line_trimmed <- trimws(line)
-
-    # Track if we're in functions block
-    if (grepl(stan_block_header("functions"), line_trimmed)) {
-      in_functions_block <- TRUE
-    } else if (grepl(stan_any_block_header(), line_trimmed)) {
-      in_functions_block <- FALSE
-    }
-
-    # Check if this is the header (first line with "Generated with")
-    is_header <- (i == 1 && grepl("^//\\s*Generated with", line_trimmed))
-
-    # Handle comments
-    if (in_functions_block || is_header) {
-      # Functions block or header: preserve everything
-      result <- c(result, line)
-
-    } else {
-      # All other blocks: remove ALL comments and empty lines
-      if (grepl("//", line)) {
-        code_part <- stan_drop_line_comment(line)
-        code_trimmed <- trimws(code_part, which = "right")
-        # Only keep line if there's actual code
-        if (nzchar(code_trimmed)) {
-          result <- c(result, code_trimmed)
-        }
-        # Skip comment-only lines entirely
-      } else {
-        # No comment - only keep if not empty
-        line_trimmed <- trimws(line)
-        if (nzchar(line_trimmed)) {
-          result <- c(result, line)
-        }
-        # Skip completely empty lines
-      }
-    }
-
-    # Handle closing braces (they reset block tracking)
-    if (grepl("^\\}\\s*$", line_trimmed)) {
-      if (in_functions_block) {
-        # Functions block ends when we see another block start
-        in_functions_block <- FALSE
-      }
-    }
-  }
-
-  return(result)
-}
-
 #' Reorganize Model Block into Three Sections
 #'
 #' Reorganizes model block statements into clean sections: priors first,
 #' if (!prior_only) block unchanged, then the top-level target +=
-#' statements with `target += lprior;` first. Statements move whole.
+#' statements with `target += lprior;` first. Statements move whole,
+#' each with the comment written directly above it. A comment with no
+#' statement below it is dropped.
 #'
 #' @param lines Character vector of Stan code lines
 #' @return Character vector with reorganized model block
@@ -559,13 +356,19 @@ reorganize_model_block_statements <- function(lines) {
 
   model <- stan_block_bounds(lines, "model")
   if (is.null(model)) return(lines)
-  guard <- prior_only_bounds(lines, model)
 
-  st <- stan_statements(lines, model)
-  in_guard <- if (is.null(guard)) {
-    rep(FALSE, nrow(st))
-  } else {
-    st$start >= guard$start & st$start <= guard$end
+  st <- stan_commented_statements(lines, model)
+  guard <- which(
+    st$top & grepl("^if\\s*\\(\\s*!prior_only\\s*\\)\\s*\\{$", st$head)
+  )[1L]
+  guard_lines <- integer(0)
+  in_guard <- rep(FALSE, nrow(st))
+  if (!is.na(guard)) {
+    guard_end <- find_matching_closing_brace(lines, st$end[guard])
+    if (!is.na(guard_end)) {
+      guard_lines <- seq.int(st$start[guard], guard_end)
+      in_guard <- st$start >= st$start[guard] & st$start <= guard_end
+    }
   }
   target <- st$top & !in_guard & grepl("^target\\s*\\+=", st$head)
   lprior <- target & grepl("^target\\s*\\+=\\s*lprior\\s*;", st$head)
@@ -573,7 +376,7 @@ reorganize_model_block_statements <- function(lines) {
 
   new_model <- c(
     lines[statement_lines(st[other, ])],
-    if (!is.null(guard)) c("", lines[guard$start:guard$end]),
+    if (length(guard_lines)) c("", lines[guard_lines]),
     if (any(target)) {
       c("", lines[statement_lines(st[lprior, ])],
         lines[statement_lines(st[target & !lprior, ])])

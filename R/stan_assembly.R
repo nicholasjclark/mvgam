@@ -1675,9 +1675,7 @@ inject_multivariate_trends_into_linear_predictors <- function(
     base_stancode <- paste(code_lines, collapse = "\n")
   }
 
-  # Detect VARMA components for trend injection
   checkmate::assert_string(base_stancode)
-  has_varma_components <- any(grepl("D_trend|ma_.*_trend", base_stancode))
 
   # Handle non-GLM responses using shared transformation handler
   if (length(non_glm_responses) > 0) {
@@ -2185,7 +2183,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
   if (is_hierarchical) {
     # Hierarchical case: only declare scaled_innovations_trend, hierarchical system will compute it
     final_innovations_code <- paste0("
-    // Scaled innovations declaration (computation handled by hierarchical system)
+    // Innovations scaled by each group's Cholesky factor, filled below
     matrix[N_time_trend, ", effective_dim, "] scaled_innovations_trend;")
   } else if (cor) {
     # Simple correlated case
@@ -2193,7 +2191,8 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     // Scaled innovations after applying correlations
     matrix[N_time_trend, ", effective_dim, "] scaled_innovations_trend;
 
-    // Apply correlation transformation using efficient non-centered parameterization
+    // Non-centred correlated innovations: standard normals times the
+    // Cholesky factor of Sigma
     {
       matrix[", effective_dim, ", ", effective_dim, "] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
       scaled_innovations_trend = innovations_trend * L_Sigma_trend';
@@ -2203,9 +2202,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     final_innovations_code <- paste0("
     // Scaled innovations (uncorrelated case)
     matrix[N_time_trend, ", effective_dim, "] scaled_innovations_trend;
-
-    // Apply scaling using vectorized operations
-    scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);")
+    ", independent_scaling_stancode())
   }
 
   scaled_innovations_stanvar <- brms::stanvar(
@@ -2230,6 +2227,32 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
 is_gaussian_df <- function(df) {
   is.null(df) || (length(df) == 1L && !is.na(df) && is.infinite(df))
 }
+
+#' Prior for one vector of identity-scale innovations
+#'
+#' The innovation law in one place, for a single vector. The matrix
+#' form loops over rows and calls this for each. `init_innovations_trend`
+#' supplies the extra standard variates an ARMA start needs, and takes
+#' the same law as an innovation row.
+#'
+#' @param target Stan expression for the vector
+#' @param effective_dim Number of latent series
+#' @param df `Inf` for Gaussian innovations, `NA` to estimate the
+#'   degrees of freedom, or a finite number above 2 to fix them
+#' @return Character vector of Stan statements
+#' @noRd
+innovation_vector_prior <- function(target, effective_dim, df = Inf) {
+  if (is_gaussian_df(df)) {
+    return(paste0(target, " ~ std_normal();"))
+  }
+  nu <- if (is.na(df)) "nu_trend" else format(df, digits = 15)
+  c(
+    paste0(target, " ~ multi_student_t_cholesky(", nu, ","),
+    paste0("  rep_vector(0.0, ", effective_dim, "),"),
+    paste0("  identity_matrix(", effective_dim, "));")
+  )
+}
+
 
 #' Stan sampling statement for the trend innovations
 #'
@@ -2270,12 +2293,10 @@ innovation_sampling_code <- function(effective_dim, df = Inf) {
   if (is_gaussian_df(df)) {
     return("to_vector(innovations_trend) ~ std_normal();")
   }
-  nu <- if (is.na(df)) "nu_trend" else format(df, digits = 15)
   c(
     "for (t_inn in 1 : N_time_trend) {",
-    paste0("  innovations_trend[t_inn]' ~ multi_student_t_cholesky(", nu, ","),
-    paste0("    rep_vector(0.0, ", effective_dim, "),"),
-    paste0("    identity_matrix(", effective_dim, "));"),
+    paste0("  ", innovation_vector_prior("innovations_trend[t_inn]'",
+                                         effective_dim, df)),
     "}"
   )
 }
@@ -3678,11 +3699,11 @@ generate_trend_computation_tparameters <- function(n_lv, n_series,
     "
   } else {
     "
-      // Derived latent trends using universal computation pattern
+      // Trend of each series at each occasion
       matrix[N_time_trend, N_series_trend] trend;
 
-      // Universal trend computation: state-space dynamics + linear predictors
-      // dot_product captures dynamic component, mu_trend captures trend_formula
+      // Loadings times the latent states, plus the predictor that
+      // trend_formula gives
       for (i in 1:N_time_trend) {
         for (s in 1:N_series_trend) {
           trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
@@ -3800,13 +3821,28 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
   # Generate group_inds_trend array (maps each series to its group)
   group_inds_stanvar <- brms::stanvar(
     x = group_inds_array,
-    name = "group_inds_trend", 
+    name = "group_inds_trend",
     scode = "array[N_series_trend] int<lower=1> group_inds_trend;",
     block = "data"
   )
-  
-  # Return combined stanvars following established pattern
-  return(combine_stanvars(n_groups_stanvar, n_subgroups_stanvar, group_inds_stanvar))
+
+  # The member series of each group, from `group_members()`, the
+  # derivation every R path shares. Every block of the program that
+  # takes a group's series takes them from here.
+  group_members <- do.call(rbind, group_members(group_inds_array,
+                                                n_subgroups))
+  group_members_stanvar <- brms::stanvar(
+    x = group_members,
+    name = "group_members_trend",
+    scode = paste0(
+      "array[N_groups_trend, N_subgroups_trend] int<lower=1> ",
+      "group_members_trend;"
+    ),
+    block = "data"
+  )
+
+  combine_stanvars(n_groups_stanvar, n_subgroups_stanvar,
+                   group_inds_stanvar, group_members_stanvar)
 }
 
 #' Generate Parameters Block Injections for Hierarchical Correlations
@@ -3880,7 +3916,8 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups, 
   
   # Common correlation matrix computation for all hierarchical models
   common_correlation_code <- "
-  // Compute group-specific correlation matrices using shared infrastructure
+  // Each group's correlation: the global factor and the group's own
+  // deviation, mixed by alpha_cor_trend
   for (g_idx in 1:N_groups_trend) {
     L_Omega_group_trend[g_idx] = combine_cholesky(
       L_Omega_global_trend, 
@@ -3899,30 +3936,12 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups, 
   innovation_scaling_code <- if (needs_innovation_scaling) {
     "
   
-  // Apply group-specific innovation scaling (only for AR/RW/ZMVN models)
-  for (t in 1:N_time_trend) {
-    for (g_idx in 1:N_groups_trend) {
-      vector[N_subgroups_trend] group_innov;
-      
-      // Collect innovations for this group's series  
-      int k = 0;
-      for (s in 1:N_lv_trend) {
-        if (group_inds_trend[s] == g_idx) {
-          k += 1;
-          group_innov[k] = innovations_trend[t, s];
-        }
-      }
-      
-      // Scale using Cholesky factor and distribute back
-      vector[N_subgroups_trend] scaled = L_group_trend[g_idx] * group_innov;
-      k = 0;
-      for (s in 1:N_lv_trend) {
-        if (group_inds_trend[s] == g_idx) {
-          k += 1;
-          scaled_innovations_trend[t, s] = scaled[k];
-        }
-      }
-    }
+  // Scale each group's innovations by its Cholesky factor, every
+  // occasion in one product
+  for (g_idx in 1:N_groups_trend) {
+    scaled_innovations_trend[ : , group_members_trend[g_idx]]
+      = innovations_trend[ : , group_members_trend[g_idx]]
+        * L_group_trend[g_idx]';
   }"
   } else {
     # VAR/CAR/PW models sample directly, no innovation scaling needed
@@ -4132,7 +4151,6 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
   n_series <- data_info$n_series %||% 1
   n_lv <- trend_specs$n_lv %||% n_series
   is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
-  use_grouping <- named_var(trend_specs$gr)
 
   # Cross-cutting system validation (integration between factor models and hierarchical correlations)
   validate_no_factor_hierarchical(trend_specs, n_series, trend_type)
@@ -4278,7 +4296,6 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   rw_tparameters_stanvar <- brms::stanvar(
     name = "rw_tparameters",
     scode = glue::glue("
-      // Latent states with RW dynamics
       {ma_innovations_stanblock(has_ma)}
 
       // Apply RW dynamics
@@ -4474,7 +4491,13 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
       prior_lines <- c(prior_lines,
         paste0(mu_name, " ~ ", mu_prior, ";"),
         paste0(sigma_name, " ~ ", sigma_prior, ";"),
-        paste0(pooled, " ~ normal(", mu_name, ", ", sigma_name, ");")
+        paste0(pooled, " ~ normal(", mu_name, ", ", sigma_name, ");"),
+        # Each series' coefficient is bounded to (-1, 1), and the
+        # population density truncated there carries a normaliser that
+        # moves with the hyperparameters.
+        paste0("target += -N_lv_trend * log_diff_exp(normal_lcdf(1 | ",
+               mu_name, ", ", sigma_name, "), normal_lcdf(-1 | ",
+               mu_name, ", ", sigma_name, "));")
       )
     } else {
       par_lines <- c(par_lines, paste0(
@@ -4519,7 +4542,7 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
     tpar_sv <- brms::stanvar(
       name = "ar_sharing_tparameters",
       scode = paste0(
-        "// Broadcast shared AR coefficients across series\n",
+        "// AR coefficients derived from the sampled parameters\n",
         paste(tpar_decl_lines, collapse = "\n"), "\n",
         paste(tpar_assign_lines, collapse = "\n")
       ),
@@ -4544,16 +4567,30 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
 #' `kronecker_prod` and `initial_joint_var` together solve the
 #' Lyapunov equation on the companion form, which gives the
 #' covariance a stationary VAR(p) or VARMA(p, q) draws its first
-#' `p + q` states from. A correlated `AR(p > 1)` needs that same
-#' solve with diagonal coefficient matrices. One trend constructor
-#' is allowed per formula. A program emits this block once.
+#' `p + q` states from.
 #'
+#' An `AR()` trend has diagonal coefficient matrices, which lets its
+#' solve split by pairs of series. `ar_diag_joint_var` takes one
+#' companion of side `p` per series and solves each pair on its own.
+#' The full companion costs one dense solve of side `(p m)^2` at every
+#' gradient. Measured on a correlated `AR(p = 2)` against `AR(p = 1)`,
+#' that put the gradient at 9 times the cost of the one-lag model on 6
+#' series and 170 times on 15. The pairwise solve brings 15 series to
+#' 2.2 times. A moving-average start filters a draw from this same
+#' covariance and needs nothing further.
+#'
+#' One trend constructor is allowed per formula. A program emits this
+#' block once, holding only the functions it calls.
+#'
+#' @param kernel `"var"` for the full companion solve a `VAR()` trend
+#'   calls, `"ar"` for the pairwise solve an `AR()` trend calls
 #' @return A `functions` block stanvar
 #' @noRd
-stationary_joint_functions_stanvar <- function() {
+stationary_joint_functions_stanvar <- function(kernel = "var") {
+  checkmate::assert_choice(kernel, c("var", "ar"))
   brms::stanvar(
     name = "stationary_joint_functions",
-    scode = "
+    scode = paste0("
       /**
        * Compute Kronecker product of two matrices
        * Used in companion matrix approach for VARMA initialization
@@ -4580,7 +4617,8 @@ stationary_joint_functions_stanvar <- function() {
         return C;
       }
 
-      /**
+",
+      if (identical(kernel, "var")) "      /**
        * Compute joint stationary covariance for VARMA(p,q) initialization
        * Heaps 2022 companion matrix approach for stationary distribution
        * @param Sigma Innovation covariance matrix (m x m)
@@ -4626,13 +4664,9 @@ stationary_joint_functions_stanvar <- function() {
         // Construct innovation covariance matrix (Sigma_tilde).
         // The y_t innovations make the leading m by m submatrix.
         companion_var[1:m, 1:m] = Sigma;
-        // The eps_t innovation blocks and cross-covariance terms
-        // exist when an MA component is present (q > 0). Absent
-        // this guard, pure VAR(p) fits (q = 0) would index out of
-        // bounds: companion_var is sized (p + q) * m x (p + q) * m,
-        // which collapses to p * m when q = 0, while the MA blocks
-        // address rows / columns (p * m + 1):((p + 1) * m) that a
-        // q = 0 program lacks.
+        // A moving-average part (q > 0) adds the eps_t block and its
+        // cross-covariance with y_t, in rows and columns p * m + 1 to
+        // (p + 1) * m.
         if (q > 0) {
           companion_var[(p * m + 1):((p + 1) * m), (p * m + 1):((p + 1) * m)] = Sigma;  // For eps_t innovations
           companion_var[1:m, (p * m + 1):((p + 1) * m)] = Sigma;  // Cross-covariance
@@ -4655,7 +4689,54 @@ stationary_joint_functions_stanvar <- function() {
 
         return Omega;
       }
-    ",
+" else "
+      /**
+       * Joint stationary covariance of p consecutive states of an AR(p)
+       * with diagonal coefficients.
+       *
+       * The state runs `(y_t, ..., y_{t-p+1})`, block i at rows
+       * `(i - 1) * m + 1` to `i * m`, the layout `initial_joint_var`
+       * uses. Series a and b evolve as two scalar companions `A_a` and
+       * `A_b` driven by innovations with covariance `Sigma[a, b]`. Their
+       * cross-covariance is `Sigma[a, b] * X`, where
+       * `X = A_a X A_b' + e_1 e_1'`. Each pair is a solve of side `p^2`.
+       *
+       * @param Sigma Innovation covariance (m x m)
+       * @param phi Coefficient vectors, one per lag
+       * @return Covariance of side `p * m`
+       */
+      matrix ar_diag_joint_var(matrix Sigma, array[] vector phi) {
+        int p = size(phi);
+        int m = rows(Sigma);
+        array[m] matrix[p, p] A;
+        vector[p * p] q = rep_vector(0.0, p * p);
+        matrix[p * m, p * m] Omega;
+        q[1] = 1;
+        for (a in 1:m) {
+          A[a] = rep_matrix(0.0, p, p);
+          for (k in 1:p) {
+            A[a][1, k] = phi[k][a];
+          }
+          for (k in 2:p) {
+            A[a][k, k - 1] = 1;
+          }
+        }
+        for (a in 1:m) {
+          for (b in a:m) {
+            matrix[p, p] X = to_matrix(
+              (identity_matrix(p * p) - kronecker_prod(A[b], A[a])) \\ q,
+              p, p);
+            for (i in 1:p) {
+              for (j in 1:p) {
+                Omega[(i - 1) * m + a, (j - 1) * m + b] = Sigma[a, b] * X[i, j];
+                Omega[(j - 1) * m + b, (i - 1) * m + a] = Sigma[a, b] * X[i, j];
+              }
+            }
+          }
+        }
+        return Omega;
+      }
+"),
     block = "functions"
   )
 }
@@ -4669,9 +4750,13 @@ stationary_joint_functions_stanvar <- function() {
 #' the same recursion at each order to draw the first p states from
 #' their joint stationary distribution.
 #'
+#' @param with_init Emit `ar_stationary_init()`, which only an
+#'   `AR(p > 1)` with independent innovations and no moving-average
+#'   term calls
 #' @return A `functions` block stanvar
 #' @noRd
-ar_pacf_functions_stanvar <- function() {
+ar_pacf_functions_stanvar <- function(with_init = TRUE) {
+  checkmate::assert_flag(with_init)
   brms::stanvar(
     name = "ar_functions",
     scode = paste0(
@@ -4692,7 +4777,9 @@ ar_pacf_functions_stanvar <- function() {
       "      phi = work;\n",
       "    }\n",
       "    return phi;\n",
-      "  }\n",
+      "  }",
+      if (!with_init) "" else paste0(
+      "\n",
       "\n",
       "  // Stationary initial states for a scalar AR(p), from the\n",
       "  // partial autocorrelations the program samples. `pacf`\n",
@@ -4722,6 +4809,7 @@ ar_pacf_functions_stanvar <- function() {
       "    }\n",
       "    return state;\n",
       "  }"
+      )
     ),
     block = "functions"
   )
@@ -4747,14 +4835,228 @@ ma_innovations_stanblock <- function(has_ma) {
   paste0(
     "matrix[N_time_trend, N_lv_trend] ma_innovations_trend",
     " = scaled_innovations_trend;\n",
-    "      // Moving-average term of order one on the innovations\n",
-    "      for (i in 2:N_time_trend) {\n",
-    "        for (j in 1:N_lv_trend) {\n",
-    "          ma_innovations_trend[i, j] = scaled_innovations_trend[i, j]\n",
-    "            + theta1_trend[j] * scaled_innovations_trend[i - 1, j];\n",
-    "        }\n",
+    "      // Moving-average term of order one: row i adds theta times\n",
+    "      // innovation row i - 1\n",
+    "      ma_innovations_trend[2:N_time_trend]\n",
+    "        += diag_post_multiply(\n",
+    "          scaled_innovations_trend[1:(N_time_trend - 1)], theta1_trend);"
+  )
+}
+
+#' Stan statement scaling independent innovations by their SDs
+#'
+#' Column j of the innovations takes `sigma_trend[j]`. The
+#' column-scaling product costs `O(T n)`, against `O(T n^2)` for a
+#' product with a dense diagonal matrix.
+#'
+#' @return Character scalar
+#' @noRd
+independent_scaling_stancode <- function() {
+  paste0("scaled_innovations_trend",
+         " = diag_post_multiply(innovations_trend, sigma_trend);")
+}
+
+#' Stan text opening a loop over groups with each group's members
+#'
+#' `group_members_trend` lists each group's series in ascending order,
+#' the order `scaled_innovations_trend` takes them in. Position `k`
+#' names the same series in both. Every grouped init opens with this.
+#'
+#' @return Character scalar opening a per-group loop
+#' @noRd
+group_members_stanblock <- function() {
+  paste0(
+    "      for (g_idx in 1:N_groups_trend) {\n",
+    "        array[N_subgroups_trend] int members\n",
+    "          = group_members_trend[g_idx];\n"
+  )
+}
+
+
+#' Stan text for the scalar stationary start of one lag
+#'
+#' Independent innovations at one lag. Without a moving-average term the
+#' t = 1 innovation divided by `sqrt(1 - ar1^2)` has the stationary
+#' marginal. With one, `lv_1` given the first innovation, which the
+#' t = 2 step reuses, has mean `eps_1` and standard deviation
+#' `(ar1 + theta1) sigma / sqrt(1 - ar1^2)`.
+#'
+#' @param has_ma Whether a moving-average term applies
+#' @return Character scalar of Stan statements
+#' @noRd
+scalar_init_stanblock <- function(has_ma) {
+  checkmate::assert_flag(has_ma)
+  if (!has_ma) {
+    paste0(
+      "      // AR(1) stationary marginal initialisation:\n",
+      "      // lv_trend[1, j] ~ Normal(0, sigma_trend[j] / sqrt(1 - ar1_trend[j]^2)).\n",
+      "      // Scales the t = 1 innovation by 1/sqrt(1 - ar1^2) so the\n",
+      "      // implied marginal at the first time point matches the AR(1)\n",
+      "      // stationary variance instead of the innovation variance.\n",
+      "      for (j in 1:N_lv_trend) {\n",
+      "        lv_trend[1, j] = scaled_innovations_trend[1, j]\n",
+      "                         / sqrt(1 - square(ar1_trend[j]));\n",
+      "      }"
+    )
+  } else {
+    paste0(
+      "      // ARMA(1,1) stationary initialisation: lv_trend[1, j] takes\n",
+      "      // its conditional mean, the t = 1 innovation, plus the\n",
+      "      // conditional spread\n",
+      "      //   (ar1 + theta1) * sigma / sqrt(1 - ar1^2).\n",
+      "      // The pair (lv_1, eps_1) then holds its stationary joint\n",
+      "      // distribution, and eps_1 reaches the t = 2 step unchanged.\n",
+      "      for (j in 1:N_lv_trend) {\n",
+      "        lv_trend[1, j] = scaled_innovations_trend[1, j]\n",
+      "                         + (ar1_trend[j] + theta1_trend[j])\n",
+      "                           * sigma_trend[j]\n",
+      "                           / sqrt(1 - square(ar1_trend[j]))\n",
+      "                           * init_innovations_trend[j];\n",
+      "      }"
+    )
+  }
+}
+
+#' Stan text for the independent AR(p) stationary start
+#'
+#' Each series draws its first `p` states through
+#' `ar_stationary_init()`, from its own partial autocorrelations.
+#'
+#' @param max_lag Order p, at least 2
+#' @return Character scalar of Stan statements
+#' @noRd
+pacf_init_stanblock <- function(max_lag) {
+  checkmate::assert_int(max_lag, lower = 2L)
+  idx_init <- seq_len(max_lag)
+  paste0(
+    "      // AR(p) stationary initialisation: the first ", max_lag,
+    " states are\n",
+    "      // drawn from their joint stationary distribution, built\n",
+    "      // from the partial autocorrelations by the\n",
+    "      // Levinson-Durbin recursion.\n",
+    "      for (j in 1:N_lv_trend) {\n",
+    "        vector[", max_lag, "] pacf_j;\n",
+    "        vector[", max_lag, "] z_j;\n",
+    paste0("        pacf_j[", idx_init, "] = ar", idx_init,
+           "_pacf_trend[j];", collapse = "\n"), "\n",
+    paste0("        z_j[", idx_init, "] = innovations_trend[",
+           idx_init, ", j];", collapse = "\n"), "\n",
+    "        lv_trend[1:", max_lag, ", j]\n",
+    "          = ar_stationary_init(pacf_j, sigma_trend[j], z_j);\n",
     "      }"
   )
+}
+
+#' Stan text for a joint stationary start over a set of series
+#'
+#' The first `p` latent states of a contiguous AR(p) over one set of
+#' series: every series at once, the members of one group, or a single
+#' series. `idx` names the set as a Stan multi-index, `":"`, `"members"`
+#' or `"{j_ser}"`, and every coefficient, variate and state is taken
+#' through it.
+#'
+#' The `p` most recent states of a stationary AR(p) path `x` have the
+#' covariance `ar_diag_joint_var()` returns, and at `p = 1` the closed
+#' form `Sigma[a, b] / (1 - phi[a] phi[b])`. Its Cholesky factor maps
+#' standard variates onto them. Block i of the drawn state is the i-th
+#' most recent state.
+#'
+#' Without a moving-average term the drawn states are `lv_1, ..., lv_p`
+#' themselves, from innovation rows 1 to p.
+#'
+#' With one, the latent path is the filter `lv_t = x_t + theta x_{t-1}`
+#' of `x` driven by the same innovations. The states `x_{p-1}, ..., x_0`
+#' are drawn, taking innovation rows 1 to p - 1 and
+#' `init_innovations_trend` as variates. `x_p` steps from them with the
+#' innovation at t = p, which the step at t = p + 1 reuses, and the
+#' filter gives `lv_1, ..., lv_p`. At `p = 1` this is
+#' `lv_1 = eps_1 + (phi + theta) x_0`, the conditional of `lv_1` on the
+#' innovation the t = 2 step reuses. Only the AR(p) covariance is
+#' factored. It is positive definite for every stationary draw, those
+#' where the AR and MA polynomials share a root included.
+#'
+#' Under Gaussian innovations the drawn states hold the stationary law.
+#' Under Student-t innovations they hold its mean and covariance.
+#'
+#' @param max_lag Order p
+#' @param dim_expr Stan dimension of the set
+#' @param cov_expr Stan expression for the set's innovation covariance
+#' @param idx Stan multi-index naming the set's series
+#' @param has_ma Whether a moving-average term applies
+#' @param header Comment lines introducing the block
+#' @param open,close Lines wrapping the block
+#' @param indent Leading whitespace inside the wrapper
+#' @return Character scalar of Stan statements
+#' @noRd
+joint_init_stanblock <- function(max_lag, dim_expr, cov_expr, idx,
+                                 has_ma, header = "",
+                                 open = "      {\n",
+                                 close = "      }",
+                                 indent = "        ") {
+  checkmate::assert_int(max_lag, lower = 1L)
+  checkmate::assert_string(idx, min.chars = 1L)
+  checkmate::assert_flag(has_ma)
+  single <- identical(dim_expr, "1")
+  # A parameter vector at the set's series. The set of every series is
+  # the whole vector.
+  at <- function(name) {
+    if (identical(idx, ":")) name else paste0(name, "[", idx, "]")
+  }
+  # `k` copies of the set's dimension, folded at one.
+  times <- function(k) {
+    ifelse(k == 1L, dim_expr, paste0(k, " * ", dim_expr))
+  }
+  # Blocks k of a vector stacking one value per series of the set.
+  blk <- function(k) {
+    if (single) return(paste0(k, ":", k))
+    paste0(ifelse(k == 1L, "1", paste0(times(k - 1L), " + 1")), ":",
+           times(k))
+  }
+  line <- function(...) paste0(indent, ..., ";\n", collapse = "")
+  lags <- seq_len(max_lag)
+  n_state <- if (single) max_lag else times(max_lag)
+  state_cov <- if (max_lag == 1L) {
+    paste0(cov_expr, " ./ (1 - phi_init[1] * phi_init[1]')")
+  } else {
+    paste0("ar_diag_joint_var(", cov_expr, ", phi_init)")
+  }
+  rows <- seq_len(max_lag - has_ma)
+  draw <- paste0(
+    line("array[", max_lag, "] vector[", dim_expr, "] phi_init"),
+    line("phi_init[", lags, "] = ", at(paste0("ar", lags, "_trend"))),
+    line("vector[", n_state, "] z_init"),
+    if (length(rows) > 0L) {
+      line("z_init[", blk(rows), "] = innovations_trend[", rows, ", ", idx,
+           "]'")
+    },
+    if (has_ma) {
+      line("z_init[", blk(max_lag), "] = ", at("init_innovations_trend"))
+    },
+    line("vector[", n_state, "] state_init\n",
+         indent, "  = cholesky_decompose(", state_cov, ") * z_init")
+  )
+  fill <- if (has_ma) {
+    older <- seq_len(max_lag - 1L)
+    theta <- at("theta1_trend")
+    paste0(
+      line("lv_trend[", max_lag, ", ", idx, "]\n",
+           indent, "  = (scaled_innovations_trend[", max_lag, ", ", idx,
+           "]'\n",
+           paste0(indent, "     + phi_init[", lags, "] .* state_init[",
+                  blk(lags), "]\n", collapse = ""),
+           indent, "     + ", theta, " .* state_init[", blk(1L), "])'"),
+      if (length(older) > 0L) {
+        line("lv_trend[", max_lag - older, ", ", idx, "]\n",
+             indent, "  = (state_init[", blk(older), "]\n",
+             indent, "     + ", theta, " .* state_init[", blk(older + 1L),
+             "])'")
+      }
+    )
+  } else {
+    line("lv_trend[", max_lag - lags + 1L, ", ", idx, "] = state_init[",
+         blk(lags), "]'")
+  }
+  paste0(header, open, draw, fill, close)
 }
 
 #' AR Trend Generator
@@ -4818,6 +5120,29 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
   has_ma <- trend_specs$ma %||% FALSE
   max_lag <- max(ar_lags)
+  # Resolved once here: the init branch below and the emission gate
+  # for the joint stationary functions both ask this question.
+  cor <- isTRUE(trend_specs$cor %||% FALSE)
+  has_gr <- named_var(trend_specs$gr)
+  # A contiguous lag set above one lag samples partial
+  # autocorrelations, which makes every draw jointly stationary. The
+  # multi-lag starts below need that guarantee, and a sparse set lacks
+  # it: its coefficients are bounded one at a time.
+  pacf_lags <- ar_lags_stationary(ar_lags)
+  stationary_start <- identical(max_lag, 1L) || pacf_lags
+  # Independent innovations at one lag take the scalar closed form, and
+  # above one lag without a moving-average term each series' own
+  # partial autocorrelations through `ar_stationary_init()`.
+  scalar_start <- identical(max_lag, 1L) && !cor
+  pacf_init_start <- pacf_lags && !cor && !has_ma
+  # Every other stationary shape takes `joint_init_stanblock()`:
+  # correlated or grouped innovations at any order, and a
+  # moving-average term above one lag.
+  joint_start <- stationary_start && !scalar_start && !pacf_init_start
+  # A moving-average start needs one vector of standard variates
+  # beyond the innovation rows it takes.
+  ma_variates <- stationary_start && has_ma
+  innov_df <- trend_specs$df %||% Inf
 
   # Cross-cutting validation handled by injection function
 
@@ -4846,8 +5171,15 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # in `parameters` under every sharing mode and derives
   # `ar{lag}_trend` from it through the Levinson-Durbin recursion.
   coef_sharing <- trend_specs$coef_sharing %||% "none"
-  if (ar_lags_stationary(ar_lags)) {
-    components <- append(components, list(ar_pacf_functions_stanvar()))
+  if (pacf_lags) {
+    components <- append(
+      components,
+      list(ar_pacf_functions_stanvar(with_init = pacf_init_start))
+    )
+  }
+  if (joint_start && max_lag > 1L) {
+    components <- append(components,
+                         list(stationary_joint_functions_stanvar("ar")))
   }
   ar_blocks <- build_ar_coef_stanvars(
     ar_lags = ar_lags,
@@ -4865,6 +5197,25 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     )
     components <- append(components, list(ma_parameters_stanvar))
   }
+  if (ma_variates) {
+    components <- append(components, list(
+      brms::stanvar(
+        name = "ar_arma_init_parameters",
+        scode = "vector[N_lv_trend] init_innovations_trend;",
+        block = "parameters"
+      ),
+      brms::stanvar(
+        name = "ar_arma_init_model",
+        scode = paste(
+          c("// Standard variates for the ARMA stationary start",
+            innovation_vector_prior("init_innovations_trend",
+                                    "N_lv_trend", innov_df)),
+          collapse = "\n"
+        ),
+        block = "model"
+      )
+    ))
+  }
 
   # 2. TPARAMETERS block - AR dynamics computation (always needed)
   # Build AR dynamics terms
@@ -4873,139 +5224,72 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   })
   ar_sum <- paste(ar_terms, collapse = " + ")
 
-  # The first latent state starts at the spread the process settles
-  # into. An AR(1) with independent innovations divides the t = 1
-  # innovation by sqrt(1 - ar1^2), giving the stationary marginal
-  # Normal(0, sigma / sqrt(1 - ar1^2)).
+  # The first `p` latent states start at the joint distribution the
+  # process settles into.
   #
-  # Correlated innovations settle at the joint stationary covariance
-  # Gamma[a, b] = Sigma[a, b] / (1 - ar1[a] * ar1[b]), whose Cholesky
-  # factor scales the first row of standard normals. The per-series
-  # divisor is right on the diagonal alone: off it the correlated
-  # AR(1) settles at
-  #   sigma[a]*sigma[b]*Omega[a, b] / (1 - ar1[a]*ar1[b]),
-  # against the divisor's implied
-  #   sigma[a]*sigma[b]*Omega[a, b]
-  #     / sqrt((1 - ar1[a]^2)*(1 - ar1[b]^2)).
-  # `stationary_correlated_params()` computes the same quantity for
-  # marginal prediction, and the two agree once both are in place.
+  # An AR(1) with independent innovations divides the t = 1 innovation
+  # by sqrt(1 - ar1^2), giving the stationary marginal
+  # Normal(0, sigma / sqrt(1 - ar1^2)). An ARMA(1, 1) conditions on its
+  # first innovation, which the t = 2 step reuses: the pair
+  # `(lv_1, eps_1)` has `cov(lv_1, eps_1) = sigma^2`, and `lv_1` given
+  # `eps_1` has mean `eps_1` and spread
+  # `(ar1 + theta1) sigma / sqrt(1 - ar1^2)`.
   #
-  # A contiguous AR(p>1) with independent innovations starts at its
-  # joint stationary distribution too. The marginal variance is
-  # sigma^2 / prod(1 - pacf^2) and conditioning on m earlier states
-  # multiplies it by prod_{k<=m}(1 - pacf_k^2), which the
-  # Levinson-Durbin recursion already in the program supplies at
-  # each order. `ar_stationary_init()` draws the first p states
-  # from that sequence.
+  # A contiguous AR(p > 1) with independent innovations draws each
+  # series' first p states through `ar_stationary_init()`. The
+  # marginal variance is sigma^2 / prod(1 - pacf^2), and conditioning
+  # on m earlier states multiplies it by prod_{k<=m}(1 - pacf_k^2),
+  # which the Levinson-Durbin recursion supplies at each order.
   #
-  # Three shapes keep the raw innovation start:
-  #   * a sparse lag set, where the declared bounds leave
-  #     stationarity unchecked and `cholesky_decompose` would
-  #     reject some draws. `ar_lags_stationary()` is the gate.
-  #   * a correlated or grouped AR(p>1), which needs the
-  #     multivariate Yule-Walker solve on the companion form.
-  #   * ARMA(1, 1): the stationary variance involves ar1 and the MA
-  #     coefficient together, and the t = 1 innovation enters the
-  #     recursion again at t = 2.
+  # Correlated or grouped innovations, and a moving-average term above
+  # one lag, take `joint_init_stanblock()` over the set of series one
+  # covariance spans. A grouped trend scales its innovations through
+  # `L_group_trend` within each group, and the set is that group.
+  # `stationary_correlated_params()` and `stationary_group_params()`
+  # give marginal prediction the same covariance.
   #
-  # A grouped trend (`gr =`) scales its innovations through
-  # `L_group_trend` within each group. Its first row settles at the
-  # same joint form, taken over the series of one group.
-  cor <- isTRUE(trend_specs$cor %||% FALSE)
-  has_gr <- named_var(trend_specs$gr)
-  ar_init_block <- if (identical(max_lag, 1L) && !has_ma && has_gr) {
-    paste0(
-      "      // Grouped AR(1) stationary initialisation:\n",
-      "      // Gamma[a, b] = Sigma_group[a, b] / (1 - ar1[a] * ar1[b])\n",
-      "      // over the series of one group. `members` repeats the\n",
-      "      // ascending scan that fills scaled_innovations_trend,\n",
-      "      // holding subgroup position k on one series in both.\n",
-      "      for (g_idx in 1:N_groups_trend) {\n",
-      "        array[N_subgroups_trend] int members;\n",
-      "        int k_init = 0;\n",
-      "        for (s in 1:N_lv_trend) {\n",
-      "          if (group_inds_trend[s] == g_idx) {\n",
-      "            k_init += 1;\n",
-      "            members[k_init] = s;\n",
-      "          }\n",
-      "        }\n",
-      "        matrix[N_subgroups_trend, N_subgroups_trend] Gamma_init\n",
-      "          = Sigma_group_trend[g_idx];\n",
-      "        for (a_init in 1:N_subgroups_trend) {\n",
-      "          for (b_init in 1:N_subgroups_trend) {\n",
-      "            Gamma_init[a_init, b_init] = Gamma_init[a_init, b_init]\n",
-      "              / (1 - ar1_trend[members[a_init]]\n",
-      "                   * ar1_trend[members[b_init]]);\n",
-      "          }\n",
-      "        }\n",
-      "        vector[N_subgroups_trend] z_init;\n",
-      "        for (m_init in 1:N_subgroups_trend) {\n",
-      "          z_init[m_init] = innovations_trend[1, members[m_init]];\n",
-      "        }\n",
-      "        vector[N_subgroups_trend] init_g\n",
-      "          = cholesky_decompose(Gamma_init) * z_init;\n",
-      "        for (m_init in 1:N_subgroups_trend) {\n",
-      "          lv_trend[1, members[m_init]] = init_g[m_init];\n",
-      "        }\n",
-      "      }"
-    )
-  } else if (identical(max_lag, 1L) && !has_ma && !cor) {
-    paste0(
-      "      // AR(1) stationary marginal initialisation:\n",
-      "      // lv_trend[1, j] ~ Normal(0, sigma_trend[j] / sqrt(1 - ar1_trend[j]^2)).\n",
-      "      // Scales the t = 1 innovation by 1/sqrt(1 - ar1^2) so the\n",
-      "      // implied marginal at the first time point matches the AR(1)\n",
-      "      // stationary variance instead of the innovation variance.\n",
-      "      for (j in 1:N_lv_trend) {\n",
-      "        lv_trend[1, j] = scaled_innovations_trend[1, j]\n",
-      "                         / sqrt(1 - square(ar1_trend[j]));\n",
-      "      }"
-    )
-  } else if (identical(max_lag, 1L) && !has_ma && cor) {
-    paste0(
-      "      // Correlated AR(1) stationary initialisation:\n",
-      "      // Gamma[a, b] = Sigma[a, b] / (1 - ar1[a] * ar1[b]).\n",
-      "      // Sigma_trend is the innovation covariance this program\n",
-      "      // already declares. The braces keep Gamma_init out of\n",
-      "      // the posterior.\n",
-      "      {\n",
-      "        matrix[N_lv_trend, N_lv_trend] Gamma_init = Sigma_trend;\n",
-      "        for (a_init in 1:N_lv_trend) {\n",
-      "          for (b_init in 1:N_lv_trend) {\n",
-      "            Gamma_init[a_init, b_init] = Gamma_init[a_init, b_init]\n",
-      "              / (1 - ar1_trend[a_init] * ar1_trend[b_init]);\n",
-      "          }\n",
-      "        }\n",
-      "        lv_trend[1, :] = to_row_vector(\n",
-      "          cholesky_decompose(Gamma_init)\n",
-      "          * to_vector(innovations_trend[1, :]));\n",
-      "      }"
-    )
-  } else if (ar_lags_stationary(ar_lags) && !has_ma && !cor) {
-    idx_init <- seq_len(max_lag)
-    paste0(
-      "      // AR(p) stationary initialisation: the first ", max_lag,
-      " states are\n",
-      "      // drawn from their joint stationary distribution, built\n",
-      "      // from the partial autocorrelations by the\n",
-      "      // Levinson-Durbin recursion.\n",
-      "      for (j in 1:N_lv_trend) {\n",
-      "        vector[", max_lag, "] pacf_j;\n",
-      "        vector[", max_lag, "] z_j;\n",
-      paste0("        pacf_j[", idx_init, "] = ar", idx_init,
-             "_pacf_trend[j];", collapse = "\n"), "\n",
-      paste0("        z_j[", idx_init, "] = innovations_trend[",
-             idx_init, ", j];", collapse = "\n"), "\n",
-      "        lv_trend[1:", max_lag, ", j]\n",
-      "          = ar_stationary_init(pacf_j, sigma_trend[j], z_j);\n",
-      "      }"
+  # A sparse lag set keeps the raw innovation start, with or without a
+  # moving-average term. Its declared bounds leave stationarity
+  # unchecked, and `cholesky_decompose` would reject some draws.
+  # `pacf_lags` above is the gate.
+  ar_init_block <- if (scalar_start) {
+    scalar_init_stanblock(has_ma)
+  } else if (pacf_init_start) {
+    pacf_init_stanblock(max_lag)
+  } else if (joint_start) {
+    # The set of series one covariance spans: a group's members, every
+    # series when their innovations correlate, or each series alone.
+    set <- if (has_gr) {
+      list(dim = "N_subgroups_trend", cov = "Sigma_group_trend[g_idx]",
+           idx = "members", open = group_members_stanblock(),
+           label = "each group")
+    } else if (cor) {
+      list(dim = "N_lv_trend", cov = "Sigma_trend", idx = ":",
+           open = "      {\n", label = "the correlated series")
+    } else {
+      list(dim = "1",
+           cov = "rep_matrix(square(sigma_trend[j_ser]), 1, 1)",
+           idx = "{j_ser}",
+           open = "      for (j_ser in 1:N_lv_trend) {\n",
+           label = "each series")
+    }
+    joint_init_stanblock(
+      max_lag = max_lag, dim_expr = set$dim, cov_expr = set$cov,
+      idx = set$idx, has_ma = has_ma,
+      header = paste0(
+        "      // ", if (has_ma) "ARMA(p, 1)" else "AR(p)",
+        " stationary initialisation over ", set$label, ":\n",
+        "      // the first ", max_lag, " states from the joint ",
+        "stationary covariance.\n"
+      ),
+      open = set$open
     )
   } else {
     paste0(
       "      // Initialize first ", max_lag, " time points from innovations.\n",
-      "      // A sparse lag set, a correlated or grouped AR(p>1) and\n",
-      "      // an ARMA term each keep this start, for the reasons the\n",
-      "      // comment above records.\n",
+      "      // A sparse lag set keeps this start: its coefficients\n",
+      "      // are bounded one at a time, which leaves the joint\n",
+      "      // stationary distribution undefined for some draws.\n",
       "      for (i in 1:", max_lag, ") {\n",
       "        lv_trend[i, :] = ",
       if (has_ma) "ma_innovations_trend" else "scaled_innovations_trend",
@@ -5017,7 +5301,6 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   ar_tparameters_stanvar <- brms::stanvar(
     name = "ar_tparameters",
     scode = glue::glue("
-      // Latent states with AR dynamics
       {ma_innovations_stanblock(has_ma)}
 
       {ar_init_block}
@@ -5176,29 +5459,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         "Hierarchical VAR requires grouping specification"
       ))
     }
-    n_groups <- hierarchical_info$n_groups
-    n_subgroups <- hierarchical_info$n_subgroups
-
-    # Generate group_inds matrix: maps (group, subgroup) -> series index
-    # Based on sorted data where series = interaction(gr, subgr)
-    group_inds <- matrix(
-      1:(n_groups * n_subgroups),
-      nrow = n_groups,
-      ncol = n_subgroups,
-      byrow = TRUE
-    )
-
-    # Generate Stan code for group_inds initialization
-    group_inds_code <- paste(
-      sapply(1:nrow(group_inds), function(i) {
-        paste0("group_inds_trend[", i, "] = {",
-               paste(group_inds[i, ], collapse = ", "), "};")
-      }),
-      collapse = "\n        "
-    )
-
-    # VAR models use group-specific coefficients with shared hyperpriors
-    # and block-structured matrices for proper within-group interactions only
   }
 
   # Determine model type with validation. Pass the unset
@@ -5207,7 +5467,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # without an explicit `n_lv` is not promoted to a factor model.
   is_varma <- ma_lags > 0
   is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
-  use_grouping <- named_var(trend_specs$gr)
 
   # Additional validation for logical consistency
   checkmate::assert_logical(is_varma, len = 1)
@@ -5269,7 +5528,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       /**
        * Perform reverse mapping from partial autocorrelations to stationary coefficients
        * Heaps 2022 Algorithm for computing phi coefficients from P matrices
-       * @param P Array of partial autocorrelation matrices (modern syntax)
+       * @param P Array of partial autocorrelation matrices
        * @param Sigma Innovation covariance matrix
        * @return Array containing phi coefficients and Gamma matrices [2, p]
        */
@@ -5387,15 +5646,13 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     scode = glue::glue("
       {var_specific_params}
 
-      // Shared hierarchical hyperparameters for A_raw coefficients (across all groups)
-      // [1] = diagonal elements, [2] = off-diagonal elements
-      array[2] vector[{lags}] Amu_trend;     // Shared means
-      array[2] vector<lower=0>[{lags}] Aomega_trend;  // Shared precisions
+      // Means and precisions of the A_raw_trend coefficient priors,
+      // [1] for the diagonal and [2] for the off-diagonal elements
+      array[2] vector[{lags}] Amu_trend;
+      array[2] vector<lower=0>[{lags}] Aomega_trend;
 
       // Joint initialization vector for stationary distribution
       vector[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * N_lv_trend') else paste0(lags, ' * N_lv_trend')}] init_trend;
-
-      // VAR dynamics
     "),
     block = "parameters"
   )
@@ -5412,7 +5669,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       array[{ma_lags}] matrix[N_lv_trend, N_lv_trend] D_raw_trend;
 
       // Hierarchical hyperparameters for D_raw_trend (MA) coefficients
-      // Mirrors A_raw_trend hyperparameter structure for consistency
       // [1] = diagonal elements, [2] = off-diagonal elements
       array[2] vector[{ma_lags}] Dmu_trend;           // Means for D_raw_trend elements
       array[2] vector<lower=0>[{ma_lags}] Domega_trend;  // Precisions for D_raw_trend elements
@@ -5451,25 +5707,11 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "      for (lag in 1:N_lags_trend) {\n",
       "        A_trend[lag] = rep_matrix(0, N_lv_trend, N_lv_trend);\n",
       "      }\n\n",
-      "      // Block-diagonal assembly using series-iteration pattern\n",
-      "      for (g_idx in 1:N_groups_trend) {\n",
-      "        // Collect series indices for this group\n", 
-      "        array[N_subgroups_trend] int group_series;\n",
-      "        int k = 0;\n",
-      "        for (s in 1:N_lv_trend) {\n",
-      "          if (group_inds_trend[s] == g_idx) {\n",
-      "            k += 1;\n",
-      "            group_series[k] = s;\n",
-      "          }\n",
-      "        }\n\n",
-      "        // Insert group matrices into appropriate blocks\n",
-      "        for (i in 1:k) {\n",
-      "          for (j in 1:k) {\n",
-      "            Sigma_trend[group_series[i], group_series[j]] = Sigma_group_trend[g_idx][i, j];\n",
-      "            for (lag in 1:N_lags_trend) {\n",
-      "              A_trend[lag][group_series[i], group_series[j]] = A_group_trend[g_idx, lag][i, j];\n",
-      "            }\n",
-      "          }\n",
+      "      // Each group's blocks, placed at its member series\n",
+      group_members_stanblock(),
+      "        Sigma_trend[members, members] = Sigma_group_trend[g_idx];\n",
+      "        for (lag in 1:N_lags_trend) {\n",
+      "          A_trend[lag][members, members] = A_group_trend[g_idx, lag];\n",
       "        }\n",
       "      }"
     )
@@ -5532,7 +5774,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       {if(is_varma) 'Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);' else 'array[1] matrix[N_lv_trend, N_lv_trend] empty_theta; empty_theta[1] = rep_matrix(0.0, N_lv_trend, N_lv_trend); Omega_trend = initial_joint_var(Sigma_trend, A_trend, empty_theta[1:0]);'}
 
       {if(is_varma) glue::glue('
-      // Initialize MA error term from init_trend 
+      // The MA error before the first occasion, from init_trend
       ma_init_trend = init_trend[({lags} * N_lv_trend + 1):({lags + 1} * N_lv_trend)];
       ') else ''}
     "),
@@ -5599,7 +5841,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     domega_user_prior <- get_trend_parameter_prior(prior, "Domega_trend")
     paste0(
       "      // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)\n",
-      "      // Following same structure as VAR coefficients but conditional on ma_lags > 0\n",
       "      for (ma_lag in 1:", ma_lags, ") {\n",
       "        // Diagonal elements prior for MA coefficients\n",
       "        diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));\n\n",
@@ -5661,17 +5902,16 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         // VAR component: Add autoregressive terms
         for (i in 1:{lags}) {{
           if (t - i <= 0) {{
-            // Use values from earlier than series start (from init_trend)
-            int init_idx = {lags} + 1 - i;
-            if (init_idx > 0 && init_idx <= {lags}) {{
-              vector[N_lv_trend] lagged_lv;
-              int start_idx = (init_idx - 1) * N_lv_trend + 1;
-              int end_idx = init_idx * N_lv_trend;
-              lagged_lv = init_trend[start_idx:end_idx];
-              mu_t_trend[t] += A_trend[i] * lagged_lv;
-            }}
+            // A state before the first occasion comes from init_trend,
+            // ordered most recent first as Omega_trend orders it:
+            // block k holds lv_{{1 - k}}, which puts lv_{{t - i}} at
+            // block i - t + 1.
+            int init_idx = i - t + 1;
+            mu_t_trend[t] += A_trend[i]
+              * init_trend[((init_idx - 1) * N_lv_trend + 1):
+                           (init_idx * N_lv_trend)];
           }} else {{
-            // Use regular lv_trend values
+            // A lag inside the series
             mu_t_trend[t] += A_trend[i] * {lv_transpose_lag};
           }}
         }}
@@ -5679,10 +5919,10 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         {if(is_varma) glue::glue('
         // MA component: Add moving average term for VARMA
         if (t - 1 <= 0) {{
-          // Use initial MA error for first time point
+          // The MA error before the first occasion
           mu_t_trend[t] += D_trend[1] * ma_init_trend;
         }} else {{
-          // Compute MA error inline (eliminates circular dependency)
+          // The MA error at t - 1: the state less its conditional mean
           mu_t_trend[t] += D_trend[1] * ({lv_transpose_prev} - mu_t_trend[t - 1]);
         }}
         ') else ''}
@@ -5699,9 +5939,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
       {omega_prior}
 
-      // Hyperpriors for hierarchical VAR coefficient means and precisions.
-      // `Amu_trend` and `Aomega_trend` are array[2] vector[lags], so the
-      // override (or default) MUST be emitted per-lag here.
+      // Hyperpriors on the coefficient means and precisions: [1] for the
+      // diagonal and [2] for the off-diagonal elements, each a vector
+      // over lags.
       for (lag in 1:2) {{
         Amu_trend[lag] ~ {amu_user_prior};
         Aomega_trend[lag] ~ {aomega_user_prior};
@@ -5771,7 +6011,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Added by selective calls rather than through
   # add_hierarchical_support(), which would also emit blocks the VAR
   # template declares for itself.
-  if (is_hierarchical && !is.null(hierarchical_info)) {
+  if (is_hierarchical) {
     # Validate hierarchical_info has required fields
     checkmate::assert_names(names(hierarchical_info), 
                             must.include = c("n_groups", "n_subgroups"))
@@ -5979,7 +6219,10 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # CAR innovation computation in transformed parameters
   car_innovation_computation_stanvar <- brms::stanvar(
     name = "car_innovation_computation",
-    scode = "matrix[N_time_trend, N_lv_trend] scaled_innovations_trend;\n  scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);",
+    scode = paste0(
+      "matrix[N_time_trend, N_lv_trend] scaled_innovations_trend;\n  ",
+      independent_scaling_stancode()
+    ),
     block = "tparameters"
   )
   components <- append(components, list(car_innovation_computation_stanvar))
@@ -5988,8 +6231,6 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   car_tparameters_stanvar <- brms::stanvar(
     name = "car_tparameters",
     scode = glue::glue("
-      // CAR latent variable evolution using shared innovation system
-
       // Start at the stationary marginal of the continuous-time AR(1)
       for (j in 1:N_lv_trend) {{
         lv_trend[1, j] = scaled_innovations_trend[1, j]
@@ -6103,7 +6344,6 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   n_lv <- trend_specs$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
   n_obs <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
-  use_grouping <- named_var(trend_specs$gr)
 
   # Validate dimensions
   checkmate::assert_int(n_obs, lower = 1)
@@ -6554,9 +6794,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
     pw_transformed_parameters_stanvar <- brms::stanvar(
       name = "pw_transformed_parameters",
       scode = glue::glue("
-        // Logistic piecewise trends
-
-        // logistic trend estimates
+        // Each latent series follows its own logistic piecewise trend
         for (s in 1 : N_lv_trend) {{
           lv_trend[1 : N_time_trend, s] = logistic_trend(k_trend[s], m_trend[s],
                                         to_vector(delta_trend[ : , s]), time_trend,
@@ -6571,9 +6809,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
     pw_transformed_parameters_stanvar <- brms::stanvar(
       name = "pw_transformed_parameters",
       scode = glue::glue("
-        // Linear piecewise trends
-
-        // linear trend estimates
+        // Each latent series follows its own linear piecewise trend
         for (s in 1 : N_lv_trend) {{
           lv_trend[1 : N_time_trend, s] = linear_trend(k_trend[s],
                                       to_vector(delta_trend[ : , s]), time_trend, Kappa_trend,
@@ -8582,13 +8818,28 @@ parse_stan_functions <- function(functions_content) {
   lines <- strsplit(functions_content, "\n", fixed = TRUE)[[1]]
   functions_list <- list()
   i <- 1
+  # The comment lines written directly above the next function, which
+  # document it and travel with it.
+  doc <- character(0)
 
   while (i <= length(lines)) {
     line <- lines[i]
 
-    # Skip empty lines, comments, and closing braces
-    if (grepl("^\\s*$", line) || grepl("^\\s*//", line) ||
-        grepl("^\\s*/\\*", line) || grepl("^\\s*}\\s*$", line)) {
+    if (grepl("^\\s*//", line)) {
+      doc <- c(doc, line)
+      i <- i + 1
+      next
+    }
+    if (grepl("^\\s*/\\*", line)) {
+      closes <- i - 1L + which(grepl("\\*/", lines[i:length(lines)]))[1L]
+      if (is.na(closes)) closes <- length(lines)
+      doc <- c(doc, lines[i:closes])
+      i <- closes + 1L
+      next
+    }
+    # A blank line or a stray closing brace ends a comment run.
+    if (grepl("^\\s*$", line) || grepl("^\\s*}\\s*$", line)) {
+      doc <- character(0)
       i <- i + 1
       next
     }
@@ -8651,14 +8902,18 @@ parse_stan_functions <- function(functions_content) {
           start_line = start_line,
           end_line = i - 1,
           full_lines = function_lines,
-          body_lines = if (length(function_lines) > 1) function_lines[-1] else character(0)
+          body_lines = if (length(function_lines) > 1) function_lines[-1] else character(0),
+          doc_lines = doc
         )
+        doc <- character(0)
 
         functions_list[[length(functions_list) + 1]] <- current_function
       } else {
+        doc <- character(0)
         i <- i + 1
       }
     } else {
+      doc <- character(0)
       i <- i + 1
     }
   }
@@ -8772,9 +9027,9 @@ reconstruct_functions_block <- function(unique_functions) {
     return("")
   }
 
-  function_strings <- sapply(unique_functions, function(f) {
-    paste(f$full_lines, collapse = "\n")
-  })
+  function_strings <- vapply(unique_functions, function(f) {
+    paste(c(f$doc_lines, f$full_lines), collapse = "\n")
+  }, character(1))
 
   return(paste(function_strings, collapse = "\n\n"))
 }

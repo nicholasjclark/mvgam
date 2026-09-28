@@ -503,8 +503,6 @@ has_stochastic_trend <- function(object) {
 sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
                                    draw_ids = NULL, resp = NULL) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
-  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   checkmate::assert_character(resp, min.len = 1L, any.missing = FALSE,
                               null.ok = TRUE)
   validate_draw_selectors(ndraws, draw_ids)
@@ -768,8 +766,6 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
 #' @noRd
 validate_covariance_inputs <- function(object, ndraws, draw_ids) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
-  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   validate_draw_selectors(ndraws, draw_ids)
 
   # A prefit is the user-facing shape of this condition and carries
@@ -946,43 +942,15 @@ extract_indexed_array_2d <- function(draws_mat, name, nrow, ncol,
   checkmate::assert_int(nrow, lower = 1)
   checkmate::assert_int(ncol, lower = 1)
   checkmate::assert_integerish(prefix_ids, lower = 1L, min.len = 0L)
-  ndraws <- base::nrow(draws_mat)
-  all_cols <- colnames(draws_mat)
-  # Build column names in column-major order (i varies fastest so
-  # the flat vector maps directly onto a [ndraws, nrow, ncol]
-  # array via R's default column-major fill), then take the whole
-  # block in one matrix slice. The earlier per-cell loop cost one
-  # named-column lookup per (nrow * ncol) iterations; a 24 x 24
-  # `Sigma_trend` block on a wide draws matrix took long enough to
-  # dominate `irf()` wall-clock on hierarchical VAR fits.
-  ij <- expand.grid(i = seq_len(nrow), j = seq_len(ncol))
-  if (length(prefix_ids)) {
-    prefix_str <- paste(as.integer(prefix_ids), collapse = ",")
-    col_names <- sprintf(
-      paste0(name, "[", prefix_str, ",%d,%d]"), ij$i, ij$j
-    )
-  } else {
-    col_names <- sprintf(paste0(name, "[%d,%d]"), ij$i, ij$j)
+  lead <- if (length(prefix_ids)) {
+    paste(as.integer(prefix_ids), collapse = ",")
   }
-  missing_cols <- setdiff(col_names, all_cols)
-  if (length(missing_cols)) {
-    stop(insight::format_error(c(
-      paste0("Posterior parameter '", missing_cols[1L], "' not found."),
-      i = paste0("Required for ", required_for, ".")
-    )))
-  }
-  # Fast path when no per-draw transform is requested: one array()
-  # call over the whole column-major slice.
-  if (is.null(transform)) {
-    out <- array(as.numeric(draws_mat[, col_names, drop = FALSE]),
-                 dim = c(ndraws, nrow, ncol))
-  } else {
-    flat <- draws_mat[, col_names, drop = FALSE]
-    stacked <- vapply(seq_len(ndraws), function(d) {
-      as.numeric(transform(matrix(as.numeric(flat[d, ]), nrow, ncol)))
-    }, numeric(nrow * ncol))
-    out <- aperm(array(stacked, dim = c(nrow, ncol, ndraws)),
-                 c(3, 1, 2))
+  out <- read_draws_matrix(draws_mat, name, nrow, ncol, lead = lead,
+                           needed_for = required_for)
+  if (!is.null(transform)) {
+    for (d in seq_len(base::nrow(draws_mat))) {
+      out[d, , ] <- transform(matrix(out[d, , ], nrow, ncol))
+    }
   }
   if (!is.null(labels)) {
     dimnames(out) <- list(NULL, labels, labels)
@@ -1004,34 +972,14 @@ extract_simple_cholesky_params <- function(draws_mat, n_series) {
 
 #' Extract Simple Full Covariance Parameters as Structured Arrays
 #'
-#' Builds a \[ndraws, n, n\] array for `Sigma_trend` via direct
-#' column-name lookup so reconstruction is order-safe.
+#' A \[ndraws, n, n\] array of `Sigma_trend`, located by name.
 #'
 #' @noRd
 extract_simple_full_cov_params <- function(draws_mat, n_series) {
   checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
   checkmate::assert_int(n_series, lower = 1)
-  ndraws <- nrow(draws_mat)
-  all_cols <- colnames(draws_mat)
-
-  pull_col <- function(name) {
-    if (!name %in% all_cols) {
-      stop(insight::format_error(c(
-        paste0("Posterior parameter '", name, "' not found."),
-        i = "Required for full-covariance trend."
-      )))
-    }
-    as.numeric(draws_mat[, name])
-  }
-
-  Sigma <- array(0, c(ndraws, n_series, n_series))
-  for (j in seq_len(n_series)) {
-    for (i in seq_len(n_series)) {
-      Sigma[, i, j] <- pull_col(sprintf("Sigma_trend[%d,%d]", i, j))
-    }
-  }
-
-  list(Sigma_trend = Sigma)
+  list(Sigma_trend = read_draws_matrix(draws_mat, "Sigma_trend",
+                                       n_series, n_series))
 }
 
 
@@ -1118,11 +1066,46 @@ extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
 
 #' @noRd
 get_group_info <- function(standata) {
+  group_inds <- as.integer(standata$group_inds_trend)
   list(
     n_groups = standata$N_groups_trend,
     n_subgroups = standata$N_subgroups_trend,
-    group_inds = standata$group_inds_trend
+    group_inds = group_inds,
+    members = group_members(group_inds, standata$N_subgroups_trend)
   )
+}
+
+
+#' The member series of each group of a grouped trend
+#'
+#' Ascending series order within each group. The Stan data
+#' `group_members_trend` is built from this, and every R path that
+#' takes a group's series takes them from it. A group's coefficients,
+#' variates and covariance block then fall on the same series on both
+#' sides.
+#'
+#' @param group_inds Group index of each series
+#' @param n_subgroups Series per group. The Stan program sizes every
+#'   group's arrays by it.
+#' @return A list with one integer vector per group
+#'
+#' @noRd
+group_members <- function(group_inds, n_subgroups) {
+  checkmate::assert_integerish(group_inds, lower = 1, any.missing = FALSE,
+                               min.len = 1L)
+  checkmate::assert_int(n_subgroups, lower = 1L)
+  members <- lapply(seq_len(max(group_inds)),
+                    function(g) which(group_inds == g))
+  sizes <- lengths(members)
+  if (any(sizes != n_subgroups)) {
+    stop(insight::format_error(c(
+      "Every group of a grouped trend needs the same number of series.",
+      x = paste0("Group sizes: ", paste(sizes, collapse = ", "),
+                 "; each group's arrays hold ", n_subgroups, "."),
+      i = "Give each group one series per level of 'subgr'."
+    )), call. = FALSE)
+  }
+  members
 }
 
 
@@ -1795,14 +1778,17 @@ HIER_COV_PARS <- list(
 #' @param prefix Parameter name
 #' @param n_row,n_col Matrix dimensions
 #' @param lead Leading index for a per-group matrix, or `NULL`
-#' @return Character vector of length `n_row * n_col`
+#' @param rows The rows to name, all of them by default. A caller
+#'   taking the last few occasions of a long matrix names those alone.
+#' @return Character vector of length `length(rows) * n_col`
 #'
 #' @noRd
-stan_matrix_names <- function(prefix, n_row, n_col, lead = NULL) {
+stan_matrix_names <- function(prefix, n_row, n_col, lead = NULL,
+                              rows = seq_len(n_row)) {
   head <- if (is.null(lead)) "" else paste0(lead, ",")
   paste0(prefix, "[", head,
-         rep(seq_len(n_row), times = n_col), ",",
-         rep(seq_len(n_col), each = n_row), "]")
+         rep(rows, times = n_col), ",",
+         rep(seq_len(n_col), each = length(rows)), "]")
 }
 
 
@@ -1820,56 +1806,84 @@ stan_vector_names <- function(prefix, n, lead = NULL) {
 }
 
 
-#' Read a vector parameter's draws
+#' Draws at a set of Stan names, the core both readers below share
 #'
-#' Pairs the naming convention with the read, so a caller states the
-#' parameter once rather than spelling its Stan names again.
+#' One `match()` both locates the columns and finds any the posterior
+#' lacks. A missing name is refused with the parameter it belongs to,
+#' or returns `NULL` for a parameter only some trend kernels carry.
 #'
+#' @param draws_mat A draws matrix, one row per draw. A single draw is
+#'   a one-row matrix.
+#' @param nms Stan names, from `stan_vector_names()` or
+#'   `stan_matrix_names()`
+#' @param prefix The parameter the names belong to, for the refusal
 #' @param required Whether a missing name is an error. `FALSE` returns
-#'   `NULL`, for a parameter only some trend kernels carry.
+#'   `NULL`.
+#' @param needed_for What the parameter is needed for, named in the
+#'   refusal, or `NULL`
+#' @return A numeric vector running down `nms` within each draw, draws
+#'   varying fastest, or `NULL`
+#'
+#' @noRd
+draws_columns <- function(draws_mat, nms, prefix, required = TRUE,
+                          needed_for = NULL) {
+  idx <- match(nms, colnames(draws_mat))
+  if (anyNA(idx)) {
+    if (!isTRUE(required)) {
+      return(NULL)
+    }
+    stop(insight::format_error(c(
+      paste0("Posterior parameter '", prefix, "' is incomplete."),
+      x = paste0("Missing: ", paste(utils::head(nms[is.na(idx)], 3L),
+                                    collapse = ", "), "."),
+      i = if (is.null(needed_for)) {
+        "Refit keeping it in the saved draws."
+      } else {
+        paste0("Required for ", needed_for, ".")
+      }
+    )), call. = FALSE)
+  }
+  as.numeric(draws_mat[, idx, drop = FALSE])
+}
+
+
+#' Draws of a vector parameter
+#'
+#' Pairs the naming convention with the lookup. A caller names the
+#' parameter once, and this builds its Stan names.
+#'
+#' @inheritParams draws_columns
+#' @param prefix Parameter name
+#' @param n Vector length
+#' @param lead Leading index for a per-group vector, or `NULL`
 #' @return `[ndraws x n]` matrix, or `NULL`
 #'
 #' @noRd
 read_draws_vector <- function(draws_mat, prefix, n, lead = NULL,
                               required = TRUE) {
-  nm <- stan_vector_names(prefix, n, lead = lead)
-  missing <- setdiff(nm, colnames(draws_mat))
-  if (length(missing) > 0L) {
-    if (!isTRUE(required)) {
-      return(NULL)
-    }
-    stop(insight::format_error(c(
-      paste0("Posterior parameter '", prefix, "' is incomplete."),
-      x = paste0("Missing: ", paste(utils::head(missing, 3L),
-                                    collapse = ", "), ".")
-    )))
-  }
-  matrix(as.numeric(draws_mat[, nm]), nrow = nrow(draws_mat))
+  vals <- draws_columns(draws_mat, stan_vector_names(prefix, n, lead = lead),
+                        prefix, required)
+  if (is.null(vals)) NULL else matrix(vals, nrow = nrow(draws_mat))
 }
 
 
-#' Read a matrix parameter's draws
+#' Draws of a matrix parameter
 #'
 #' @inheritParams read_draws_vector
-#' @return `[ndraws x n_row x n_col]` array, or `NULL`
+#' @param n_row,n_col Matrix dimensions
+#' @param rows The rows to return, all of them by default
+#' @return `[ndraws x length(rows) x n_col]` array, or `NULL`
 #'
 #' @noRd
 read_draws_matrix <- function(draws_mat, prefix, n_row, n_col,
-                              lead = NULL, required = TRUE) {
-  nm <- stan_matrix_names(prefix, n_row, n_col, lead = lead)
-  missing <- setdiff(nm, colnames(draws_mat))
-  if (length(missing) > 0L) {
-    if (!isTRUE(required)) {
-      return(NULL)
-    }
-    stop(insight::format_error(c(
-      paste0("Posterior parameter '", prefix, "' is incomplete."),
-      x = paste0("Missing: ", paste(utils::head(missing, 3L),
-                                    collapse = ", "), ".")
-    )))
+                              lead = NULL, required = TRUE,
+                              rows = seq_len(n_row), needed_for = NULL) {
+  nms <- stan_matrix_names(prefix, n_row, n_col, lead = lead, rows = rows)
+  vals <- draws_columns(draws_mat, nms, prefix, required, needed_for)
+  if (is.null(vals)) {
+    return(NULL)
   }
-  array(as.numeric(draws_mat[, nm]),
-        dim = c(nrow(draws_mat), n_row, n_col))
+  array(vals, dim = c(nrow(draws_mat), length(rows), n_col))
 }
 
 
@@ -1971,7 +1985,7 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
   checkmate::assert_list(group_info)
   checkmate::assert_names(
     names(group_info),
-    must.include = c("n_groups", "n_subgroups", "group_inds")
+    must.include = c("n_groups", "n_subgroups", "group_inds", "members")
   )
 
   n_groups <- as.integer(group_info$n_groups)
@@ -2019,46 +2033,22 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
   check_dims(sigma_arr, "sigma_group_trend",
              c(ndraws, n_groups, n_sub))
 
-  # Each series's rank within its group (1-based). Vectorized via ave().
-  within_pos <- as.integer(
-    ave(seq_along(group_inds), group_inds, FUN = seq_along)
-  )
-
-  # Pre-compute series indices grouped by group_id
-  series_by_group <- split(seq_len(n_series), group_inds)
-
-  # Pre-compute (start, end) column ranges per series in z / result
-  series_col_start <- (seq_len(n_series) - 1L) * n_times + 1L
+  # The columns of `z` and of the result holding one group's series,
+  # `[n_times, n_sub]` with column k the group's k-th member. Series
+  # `s` occupies columns `(s - 1) * n_times + 1:n_times`.
+  group_cols <- lapply(group_info$members, function(members) {
+    outer(seq_len(n_times), (members - 1L) * n_times, "+")
+  })
 
   result <- matrix(0, ndraws, n_times * n_series)
-
   for (d in seq_len(ndraws)) {
     for (g in seq_len(n_groups)) {
-      L_full <- group_trend_factor(params, d, g, n_sub)
-
-      series_g <- series_by_group[[g]]
-
-      # Stack z columns for these series into [n_times, n_sub] in
-      # within-group order. z layout: cols (s-1)*n_times + 1:n_times.
-      z_g <- matrix(0, n_times, n_sub)
-      for (k in seq_along(series_g)) {
-        s <- series_g[k]
-        col_range <- series_col_start[s] + (0:(n_times - 1L))
-        z_g[, within_pos[s]] <- z[d, col_range]
-      }
-
-      # Transform: x = z %*% t(L) gives MVN with cov L %*% t(L)
-      innov_g <- z_g %*% t(L_full)
-
-      # Place innovations back into result
-      for (k in seq_along(series_g)) {
-        s <- series_g[k]
-        col_range <- series_col_start[s] + (0:(n_times - 1L))
-        result[d, col_range] <- innov_g[, within_pos[s]]
-      }
+      cols <- group_cols[[g]]
+      # `z L'` has covariance `L L'` in each row.
+      result[d, cols] <- matrix(z[d, cols], n_times, n_sub) %*%
+        t(group_trend_factor(params, d, g, n_sub))
     }
   }
-
   result
 }
 
@@ -2103,38 +2093,25 @@ draw_trend_innovations <- function(n_draws, n_series, df = Inf) {
 }
 
 
-#' Variance of the latent state a marginal prediction integrates over
+#' Coefficients of a trend's autoregression, one matrix per lag
 #'
-#' A marginal prediction answers for a latent state drawn from its own
-#' distribution, not from a single innovation. A stationary
-#' autoregression settles wider than the innovations driving it: an
-#' AR(1) at `sigma^2 / (1 - ar^2)`, which is the very scaling the Stan
-#' model uses to draw its first state. Sampling the innovation
-#' covariance instead leaves every marginal prediction too narrow and,
-#' through a non-identity link, its mean biased with it.
-#'
-#' Three assumptions are stated rather than solved. A random walk has
-#' no stationary distribution, a `ZMVN()` trend has no dynamics to
-#' settle into, and a `CAR()` trend decays by `ar^gap`, so under the
-#' irregular gaps it exists for there is no single stationary
-#' variance. All three keep the innovation covariance. So does any
-#' draw whose autoregression is jointly explosive. A sparse lag set
-#' such as `p = c(1, 12)` admits such a draw. Each coefficient holds
-#' the unit interval on its own, and the process they jointly define
-#' can still grow without limit. A contiguous `p >= 2` samples
-#' partial autocorrelations and derives its coefficients from them.
-#' Every draw of that parameterisation settles.
+#' One collection for every consumer of the stationary distribution.
+#' The lag set comes from the trend spec, each lag's coefficients from
+#' the draws under the name the generator emitted, and a
+#' moving-average term from `theta1_trend`. A fit with no
+#' autoregression, or missing a coefficient the spec names, returns
+#' `NULL`, and its caller keeps the innovation covariance.
 #'
 #' @param object A fitted `mvgam` object
 #' @param draws_mat Posterior draws, already subset to the draws in play
 #' @param n_series Number of series or latent factors
-#' @return A `[ndraws x n_series]` matrix of variance multipliers, or
-#'   `NULL` when the trend keeps its innovation covariance
+#' @return A list with `lags`, `phi` (one `[ndraws, n_series]` matrix
+#'   per lag) and `theta`, or `NULL`
 #'
 #' @noRd
-ar_stationary_multiplier <- function(object, draws_mat, n_series) {
+ar_coef_draws <- function(object, draws_mat, n_series) {
   spec <- trend_spec_for_residcor(object)
-  lags <- resolve_active_lags(spec$p)
+  lags <- as.integer(resolve_active_lags(spec$p))
   if (length(lags) == 0L) {
     return(NULL)
   }
@@ -2151,103 +2128,274 @@ ar_stationary_multiplier <- function(object, draws_mat, n_series) {
   } else {
     NULL
   }
-  # One Lyapunov solve covers every order the trend allows, with a
-  # moving-average term carried as an extra companion state. A single
-  # lag without that term keeps its closed form, which costs one
-  # division per draw.
-  if (identical(as.integer(lags), 1L) && is.null(theta)) {
-    denom <- 1 - phi[[1L]]^2
-    return(ifelse(denom > .Machine$double.eps, 1 / denom, 1))
-  }
-  ar_companion_multiplier(phi, as.integer(lags), theta)
+  list(lags = lags, phi = phi, theta = theta)
 }
 
 
-#' Stationary variance of a scalar autoregression
+#' Stationary covariance factors of diagonal-coefficient AR series
 #'
-#' Solves the state's own Lyapunov equation on the companion form,
-#' which covers a sparse lag set such as `p = c(1, 12)` without
-#' special casing: the lags the user did not ask for simply carry a
-#' zero coefficient. `theta` adds one companion state holding the
-#' innovation, which makes the same solve cover a moving-average
-#' term of order one at any autoregressive order. A draw the
-#' doubling solver cannot settle is explosive, and keeps its
-#' innovation variance.
+#' Each series of an `AR()` trend is a scalar autoregression, with a
+#' moving-average term of order one where the trend has one. Its
+#' moving-average weights run `psi_0 = 1` and
+#' `psi_j = sum_k ar_k psi_{j - lag_k} + theta [j == 1]`, and two series
+#' with innovation covariance `Sigma[a, b]` settle at
+#' `Sigma[a, b] * F[a, b]` for `F[a, b] = sum_j psi_{a, j} psi_{b, j}`.
+#' One sum covers every lag set, contiguous or sparse, with or without
+#' a moving-average term, and gives the cross-covariances as exactly as
+#' the variances.
 #'
-#' @param phi List of `[ndraws, n_series]` coefficient matrices, one
-#'   per active lag
-#' @param lags Integer vector of active autoregressive lags
-#' @param theta Optional `[ndraws, n_series]` moving-average
-#'   coefficients
-#' @return A `[ndraws, n_series]` matrix of variance multipliers
+#' The weights are advanced for every draw at once, and a draw stops
+#' once each of its series has held below `tol` for a full cycle
+#' of the largest lag. A weight passing `1 / tol` marks the draw
+#' explosive. A draw near a unit root settles slowly, and one still
+#' running at `max_terms` takes `companion_factor()`, which needs no
+#' truncation. A sparse lag set bounds its coefficients one at a time
+#' and admits an explosive draw; the partial autocorrelations of a
+#' contiguous set do not.
+#'
+#' @param ar_coefs The collected coefficients from `ar_coef_draws()`
+#' @param cross Whether to sum the cross-covariances. Without them the
+#'   off-diagonal cells hold zero.
+#' @param tol Weight size below which a series has settled
+#' @param max_terms Weights summed before a draw takes the companion
+#'   solve
+#' @return `[ndraws, n, n]` array of `F`, with `NA` throughout the
+#'   draws that have no stationary distribution
 #'
 #' @noRd
-ar_companion_multiplier <- function(phi, lags, theta = NULL) {
+ar_stationary_factor <- function(ar_coefs, cross = TRUE, tol = 1e-10,
+                                 max_terms = 2000L) {
+  checkmate::assert_list(ar_coefs)
+  checkmate::assert_integerish(ar_coefs$lags, lower = 1, min.len = 1,
+                               any.missing = FALSE)
+  checkmate::assert_list(ar_coefs$phi, types = "matrix",
+                         len = length(ar_coefs$lags))
+  checkmate::assert_matrix(ar_coefs$theta, null.ok = TRUE)
+  checkmate::assert_flag(cross)
+  checkmate::assert_number(tol, lower = 0)
+  checkmate::assert_int(max_terms, lower = 1L)
+  phi <- ar_coefs$phi
+  lags <- ar_coefs$lags
+  theta <- ar_coefs$theta
   ndraws <- nrow(phi[[1L]])
-  n_series <- ncol(phi[[1L]])
+  n <- ncol(phi[[1L]])
   max_lag <- max(lags)
-  # A moving-average term adds one state holding the innovation,
-  # which carries `theta` into the step that follows. The innovation
-  # then enters the state twice, which the covariance states through
-  # its two off-diagonal entries.
-  dim_c <- max_lag + if (is.null(theta)) 0L else 1L
-  out <- matrix(1, ndraws, n_series)
-  innov <- matrix(0, dim_c, dim_c)
-  innov[1L, 1L] <- 1
-  if (!is.null(theta)) {
-    innov[1L, dim_c] <- 1
-    innov[dim_c, 1L] <- 1
-    innov[dim_c, dim_c] <- 1
+  # The pairs summed, one column each: the upper triangle, or the
+  # diagonal alone when no cross-covariance is asked for.
+  pairs <- if (cross) {
+    which(upper.tri(diag(n), diag = TRUE), arr.ind = TRUE)
+  } else {
+    cbind(seq_len(n), seq_len(n))
   }
-  sub_rows <- if (max_lag > 1L) seq.int(2L, max_lag) else integer(0)
-  for (d in seq_len(ndraws)) {
-    for (s in seq_len(n_series)) {
-      companion <- matrix(0, dim_c, dim_c)
-      for (li in seq_along(lags)) {
-        companion[1L, lags[li]] <- phi[[li]][d, s]
-      }
-      if (length(sub_rows) > 0L) {
-        companion[cbind(sub_rows, sub_rows - 1L)] <- 1
-      }
-      if (!is.null(theta)) {
-        companion[1L, dim_c] <- theta[d, s]
-      }
-      v <- solve_dlyap(companion, innov)[1L, 1L]
-      if (is.finite(v) && v > 0 && v < 1e8) {
-        out[d, s] <- v
-      }
+  pair_a <- pairs[, 1L]
+  pair_b <- pairs[, 2L]
+  out <- matrix(0, ndraws, length(pair_a))
+  bad <- rep(FALSE, ndraws)
+  # The working set: `rows` names its draws, `acc` their running sums,
+  # `past[[k]]` their `psi_{j - k}`, the most recent first. A settled
+  # draw stays in it with its weights zeroed until a fifth of the set
+  # has settled, and the set is then compacted.
+  rows <- seq_len(ndraws)
+  psi <- matrix(1, ndraws, n)
+  acc <- out + 1
+  past <- rep(list(matrix(0, ndraws, n)), max_lag)
+  last_large <- integer(ndraws)
+  explosive <- rep(FALSE, ndraws)
+  live <- rep(TRUE, ndraws)
+  for (j in seq_len(max_terms)) {
+    past <- c(list(psi), past[-max_lag])
+    psi <- Reduce(`+`, Map(function(ph, ps) ph[rows, , drop = FALSE] * ps,
+                           phi, past[lags]))
+    if (j == 1L && !is.null(theta)) {
+      psi <- psi + theta
+    }
+    psi[!live, ] <- 0
+    acc <- acc + psi[, pair_a, drop = FALSE] * psi[, pair_b, drop = FALSE]
+    size <- abs(psi[, 1L])
+    for (k in seq_len(n)[-1L]) {
+      size <- pmax(size, abs(psi[, k]))
+    }
+    last_large[size >= tol] <- j
+    explosive <- explosive | size > 1 / tol
+    live <- live & !explosive & (j - last_large < max_lag)
+    if (!any(live)) {
+      break
+    }
+    if (sum(live) <= 0.8 * length(live)) {
+      out[rows, ] <- acc
+      bad[rows[explosive]] <- TRUE
+      rows <- rows[live]
+      acc <- acc[live, , drop = FALSE]
+      psi <- psi[live, , drop = FALSE]
+      past <- lapply(past, function(ps) ps[live, , drop = FALSE])
+      last_large <- last_large[live]
+      explosive <- explosive[live]
+      live <- live[live]
     }
   }
-  out
+  out[rows, ] <- acc
+  bad[rows[explosive]] <- TRUE
+  out[bad, ] <- NA_real_
+  factor <- array(if (cross) NA_real_ else 0, dim = c(ndraws, n, n))
+  for (k in seq_along(pair_a)) {
+    factor[, pair_a[k], pair_b[k]] <- out[, k]
+    factor[, pair_b[k], pair_a[k]] <- out[, k]
+  }
+  # Draws still live ran out of terms before settling.
+  for (d in rows[live & j == max_terms]) {
+    exact <- companion_factor(
+      lapply(phi, function(ph) ph[d, ]), lags,
+      if (is.null(theta)) NULL else theta[d, ]
+    )
+    factor[d, , ] <- if (cross) exact else diag(diag(exact), n)
+  }
+  factor
+}
+
+
+#' Stationary covariance factor of one draw from its companion
+#'
+#' The joint companion of every series, with unit innovation weight on
+#' every pair, settles at `X = sum_k A^k Q A'^k`, whose leading block is
+#' `F`. The doubling `X <- X + A X A'`, `A <- A^2` sums `2^k` terms at
+#' step `k`. For spectral radius `r` it needs `log2(1 / (1 - r))` steps
+#' where the weight sum needs `1 / (1 - r)` terms. Powers of `A` that stop shrinking mark a spectral
+#' radius of one or more.
+#'
+#' @param phi Coefficient vectors, one per lag, one value per series
+#' @param lags The lags `phi` belongs to
+#' @param theta Moving-average coefficients, or `NULL`
+#' @return `n x n` matrix of `F`, or `NA` throughout for a draw with no
+#'   stationary distribution
+#'
+#' @noRd
+companion_factor <- function(phi, lags, theta) {
+  n <- length(phi[[1L]])
+  has_ma <- !is.null(theta)
+  width <- max(lags) + has_ma
+  side <- width * n
+  block <- function(i) (i - 1L) * n + seq_len(n)
+  A <- matrix(0, side, side)
+  for (k in seq_along(lags)) {
+    A[cbind(block(1L), block(lags[k]))] <- phi[[k]]
+  }
+  if (max(lags) > 1L) {
+    shifted <- seq_len((max(lags) - 1L) * n)
+    A[cbind(shifted + n, shifted)] <- 1
+  }
+  noise <- block(1L)
+  if (has_ma) {
+    A[cbind(block(1L), block(width))] <- theta
+    noise <- c(noise, block(width))
+  }
+  X <- matrix(0, side, side)
+  X[noise, noise] <- 1
+  # 64 doublings sum 2^64 terms. A draw still unsettled there has a
+  # spectral radius of one to working precision.
+  for (step in seq_len(64L)) {
+    X <- X + A %*% tcrossprod(X, A)
+    A <- A %*% A
+    size <- max(abs(A))
+    if (size < 1e-15) {
+      return(X[block(1L), block(1L), drop = FALSE])
+    }
+    if (!is.finite(size) || size > 1e12) {
+      break
+    }
+  }
+  matrix(NA_real_, n, n)
+}
+
+
+#' Say how many draws kept their innovation covariance
+#'
+#' A draw with no stationary distribution keeps its innovation form in
+#' a marginal prediction and in `residual_cor()`. Only a sparse lag set
+#' produces one, and the count tells a user how much of the posterior
+#' that covers.
+#'
+#' @param factor The array from `ar_stationary_factor()`
+#' @return `NULL`, invisibly
+#'
+#' @noRd
+warn_explosive_draws <- function(factor) {
+  checkmate::assert_array(factor, d = 3L)
+  n_bad <- sum(is.na(factor[, 1L, 1L]))
+  if (n_bad > 0L && !identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::warn(
+      insight::format_warning(c(
+        paste0(n_bad, " of ", dim(factor)[1L], " posterior draws have ",
+               "an explosive autoregression."),
+        i = paste0("The explosive draws keep their innovation ",
+                   "covariance in marginal predictions and ",
+                   "'residual_cor()'. A sparse lag set bounds each ",
+                   "coefficient on its own and admits them.")
+      )),
+      .frequency = "once",
+      .frequency_id = "mvgam_explosive_ar_draws"
+    )
+  }
+  invisible(NULL)
+}
+
+
+#' Is this matrix a covariance with a Cholesky factor?
+#'
+#' Symmetrises the rounding asymmetry of a stored draw, then tests
+#' the result for positive definiteness against its own largest
+#' eigenvalue. A draw failing the test keeps its innovation form,
+#' which is one draw of many.
+#'
+#' @param x A square numeric matrix
+#' @return `x`, symmetrised, or `NULL`
+#'
+#' @noRd
+as_stationary_cov <- function(x) {
+  if (any(!is.finite(x))) {
+    return(NULL)
+  }
+  x <- (x + t(x)) / 2
+  ev <- eigen(x, symmetric = TRUE, only.values = TRUE)$values
+  if (min(ev) <= sqrt(.Machine$double.eps) * max(ev)) {
+    return(NULL)
+  }
+  x
 }
 
 
 #' Rescale a trend's innovation covariance to its stationary spread
 #'
-#' Applied once, on the parameters every innovation transform reads,
-#' so the diagonal, correlated, grouped and factor paths all inherit
-#' it without restating the rule.
+#' Applied once, on the parameters every innovation transform uses,
+#' which gives the diagonal, correlated, grouped and factor paths the
+#' rule without restating it.
 #'
-#' A `VAR()` fit needs no rescaling here: its Stan model already
-#' carries `Omega_trend`, the stationary joint variance of the
-#' companion state, and the leading block of that is what a marginal
+#' A `VAR()` fit needs no rescaling here. Its Stan model already
+#' supplies `Omega_trend`, the stationary joint variance of the
+#' companion state, whose leading block is the covariance a marginal
 #' prediction integrates over.
 #'
-#' The multiplier scales each series' own variance exactly. Any
-#' correlation between series rides through unchanged, which is exact
-#' when they share an autoregressive coefficient and an approximation
-#' when they do not, since a stationary cross-covariance carries
-#' `1 / (1 - ar_i * ar_j)` rather than the geometric mean of the two
-#' series' own factors.
+#' An `AR()` trend takes `ar_stationary_factor()`, exact for every lag
+#' set in the cross-covariances as well as the variances.
 #'
 #' @noRd
 rescale_params_to_stationary <- function(params, object, draws_mat,
                                           group_info = NULL) {
+  checkmate::assert_list(params)
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_list(group_info, null.ok = TRUE)
   # A multivariate fit names its trend type after the response, and a
   # shared trend still answers for every one of them, so the name is
   # dropped before the kernel is identified.
   trend_type <- unname(as.character(get_trend_type(object)))[1L]
-  if (identical(trend_type, "VAR")) {
+  # Which kernels settle, and how each one supplies the covariance, is
+  # one registry fact. A custom trend declares its own and defaults to
+  # keeping its innovation covariance.
+  stat_source <- trend_stationary_source(trend_type)
+  if (identical(stat_source, "none")) {
+    return(params)
+  }
+  if (identical(stat_source, "omega")) {
     # Sized from the covariance being replaced, since a shared or
     # factor trend carries fewer latent series than the fit has
     # responses.
@@ -2267,144 +2415,66 @@ rescale_params_to_stationary <- function(params, object, draws_mat,
     # over every series, and each group's block becomes one factor.
     return(stationary_group_var_params(params, draws_mat, group_info))
   }
-  if (!identical(trend_type, "AR")) {
-    return(params)
-  }
-  # The multiplier is sized from the scales it multiplies rather than
-  # from the fit's series count: a trend shared across responses, a
-  # factor trend and a `trend_map` fit all carry fewer latent series
-  # than the observation model has, and reading the wrong width would
-  # silently leave the covariance unscaled.
-  if (!is.null(params$sigma_trend)) {
-    n <- ncol(params$sigma_trend)
-    # Correlated series settle at `Sigma[i, j] / (1 - ar_i * ar_j)`,
-    # which is not the geometric mean of each series' own factor. The
-    # gap grows with the spread of the coefficients, reaching a fifth
-    # of the cross-covariance on a fitted pair, so it is computed
-    # rather than approximated wherever the lag-one coefficients are
-    # the whole autoregression.
-    phi <- ar_lag_one_draws(object, draws_mat, n)
-    if (!is.null(params$L_Omega_trend) && !is.null(phi)) {
-      return(stationary_correlated_params(params, phi))
-    }
-    mult <- ar_stationary_multiplier(object, draws_mat, n)
-    if (!is.null(mult) && identical(dim(mult), dim(params$sigma_trend))) {
-      params$sigma_trend <- params$sigma_trend * sqrt(mult)
-    }
-    return(params)
-  }
+  # The factor is sized from the scales it lifts. A trend shared across
+  # responses, a factor trend and a `trend_map` fit all carry fewer
+  # latent series than the observation model has, and a series count
+  # would overstate them.
   sg <- params[[HIER_COV_PARS$sigma]]
-  if (is.null(sg) || length(dim(sg)) != 3L) {
+  grouped <- is.null(params$sigma_trend)
+  n <- if (grouped) dim(sg)[2L] * dim(sg)[3L] else ncol(params$sigma_trend)
+  ar_coefs <- ar_coef_draws(object, draws_mat, n)
+  if (is.null(ar_coefs)) {
     return(params)
   }
-  n_groups <- dim(sg)[2L]
-  n_sub <- dim(sg)[3L]
-
-  # A grouped AR(1) settles at `Gamma[a, b] = Sigma[a, b] /
-  # (1 - phi_a * phi_b)` over the member series of one group, which is
-  # the form the generated program starts its first state at. The
-  # result is stored as one Cholesky factor per draw and group, which
-  # the innovation transform and `residual_cor()` both prefer.
-  phi <- ar_lag_one_draws(object, draws_mat, n_groups * n_sub)
-  if (!is.null(phi) && !is.null(group_info$group_inds)) {
-    return(stationary_group_params(params, phi, group_info,
-                                   n_groups, n_sub))
+  # Independent series use the variances alone.
+  independent <- !grouped && is.null(params$L_Omega_trend)
+  factor <- ar_stationary_factor(ar_coefs, cross = !independent)
+  warn_explosive_draws(factor)
+  if (grouped) {
+    return(stationary_group_params(params, factor, group_info))
   }
-
-  mult <- ar_stationary_multiplier(object, draws_mat, n_groups * n_sub)
-  if (is.null(mult) || is.null(group_info$group_inds)) {
-    return(params)
+  if (!independent) {
+    return(stationary_correlated_params(params, factor))
   }
-  scale <- sqrt(mult)
-  # Which series a group's scale belongs to is read from the fit's own
-  # `group_inds_trend`, the same mapping the innovation transform
-  # aligns on. Assuming the series run group-major would agree with it
-  # only when the groups happen to be contiguous.
-  group_inds <- as.integer(group_info$group_inds)
-  within_pos <- as.integer(
-    stats::ave(seq_along(group_inds), group_inds, FUN = seq_along)
-  )
-  for (sr in seq_along(group_inds)) {
-    if (sr <= ncol(scale)) {
-      sg[, group_inds[sr], within_pos[sr]] <-
-        sg[, group_inds[sr], within_pos[sr]] * scale[, sr]
-    }
-  }
-  params[[HIER_COV_PARS$sigma]] <- sg
+  # The diagonal of each draw's factor. A draw with no stationary
+  # distribution keeps its innovation scale.
+  nd <- dim(factor)[1L]
+  cell <- rep(seq_len(n), each = nd)
+  mult <- matrix(factor[cbind(rep(seq_len(nd), n), cell, cell)], nd, n)
+  mult[is.na(mult)] <- 1
+  params$sigma_trend <- params$sigma_trend * sqrt(mult)
   params
 }
 
 
-#' Lag-one coefficients when they are the whole autoregression
+#' Stationary covariance of correlated AR series
 #'
-#' Returns `NULL` for a higher-order or sparse lag set, where the
-#' stationary cross-covariance no longer reduces to a lag-one form.
+#' `Gamma = Sigma * F` elementwise, returned in the scale-and-correlation
+#' form every innovation transform takes. A diagonal scaling commutes
+#' with the elementwise product, and the lift takes the correlation
+#' factor with the scales multiplied in after. A draw with no
+#' stationary covariance, or one rounding leaves outside the
+#' positive-definite cone, keeps its innovations.
 #'
-#' @noRd
-ar_lag_one_draws <- function(object, draws_mat, n_series) {
-  spec <- trend_spec_for_residcor(object)
-  lags <- resolve_active_lags(spec$p)
-  if (!identical(as.integer(lags), 1L) || isTRUE(spec$ma)) {
-    return(NULL)
-  }
-  read_draws_vector(draws_mat, "ar1_trend", n_series, required = FALSE)
-}
-
-
-#' Stationary counterpart of a matrix, one coefficient per row
-#'
-#' Takes the lower Cholesky factor `L` of a symmetric matrix `M` and
-#' returns `M[i, j] / (1 - phi_i * phi_j)`, the covariance an AR(1)
-#' vector process with diagonal coefficients settles at. The caller
-#' decides what `M` is: a correlation for the flat path, a group's
-#' covariance for the grouped one.
-#'
-#' A draw can leave the result a hair outside the positive-definite
-#' cone through rounding, which is one draw of many. Such a draw
-#' returns NULL and its caller keeps the innovation form.
+#' @param params Extracted trend parameters
+#' @param factor The array from `ar_stationary_factor()`
+#' @return `params`, with `sigma_trend` and `L_Omega_trend` lifted
 #'
 #' @noRd
-stationary_from_chol <- function(L, phi) {
-  m <- 1 / (1 - outer(phi, phi))
-  if (any(!is.finite(m)) || any(diag(m) <= 0)) {
-    return(NULL)
-  }
-  out <- tcrossprod(L) * m
-  ev <- eigen(out, symmetric = TRUE, only.values = TRUE)$values
-  if (min(ev) <= sqrt(.Machine$double.eps) * max(ev)) {
-    return(NULL)
-  }
-  out
-}
-
-
-#' Stationary covariance of correlated AR(1) series
-#'
-#' `Gamma0[i, j] = Sigma[i, j] / (1 - ar_i * ar_j)`, returned in the
-#' scale-and-correlation form the innovation transform reads. A draw
-#' whose result is not a covariance keeps its innovations.
-#'
-#' @noRd
-stationary_correlated_params <- function(params, phi) {
+stationary_correlated_params <- function(params, factor) {
+  checkmate::assert_matrix(params$sigma_trend)
+  checkmate::assert_array(params$L_Omega_trend, d = 3L)
+  checkmate::assert_array(factor, d = 3L)
   sigma <- params$sigma_trend
   L <- params$L_Omega_trend
-  ndraws <- nrow(sigma)
   n <- ncol(sigma)
-  if (n == 1L) {
-    # One series has no cross-covariance to get right, so it takes the
-    # scalar factor without a decomposition per draw.
-    denom <- 1 - phi[, 1L]^2
-    keep <- denom > .Machine$double.eps
-    sigma[keep, 1L] <- sigma[keep, 1L] / sqrt(denom[keep])
-    params$sigma_trend <- sigma
-    return(params)
-  }
-  for (d in seq_len(ndraws)) {
+  for (d in seq_len(nrow(sigma))) {
     # `L_Omega_trend` is the correlation factor. A stored draw rounds
     # its rows off unit norm, and normalising by the result's own
     # diagonal absorbs that, which keeps the scale and the correlation
     # reconstructing the covariance they describe.
-    gamma_d <- stationary_from_chol(matrix(L[d, , ], n, n), phi[d, ])
+    gamma_d <- as_stationary_cov(tcrossprod(matrix(L[d, , ], n, n)) *
+                                   matrix(factor[d, , ], n, n))
     if (is.null(gamma_d)) {
       next
     }
@@ -2420,42 +2490,34 @@ stationary_correlated_params <- function(params, phi) {
 }
 
 
-#' Stationary covariance of a grouped VAR, one factor per group
+#' Stationary Cholesky factors of a grouped trend, one per group
 #'
-#' The program solves `Omega = A Omega A' + Sigma` over every series
-#' and gives its first latent state that covariance. Groups keep to
-#' their own block of it, and each block becomes one Cholesky factor
-#' in `L_group_stationary`. A draw whose block fails the
-#' decomposition keeps its innovation factor.
+#' Groups are independent, which makes each group's block of the
+#' stationary covariance its own problem. A draw whose block has no
+#' factor keeps its innovation factor.
+#'
+#' @param params Extracted trend parameters
+#' @param group_info The fit's grouping, from `get_group_info()`
+#' @param ndraws Number of draws
+#' @param block Function of the draw, the group's member series and the
+#'   group's innovation factor, returning that group's block
+#' @return `params`, with `L_group_stationary` added
 #'
 #' @noRd
-stationary_group_var_params <- function(params, draws_mat, group_info) {
-  group_inds <- as.integer(group_info$group_inds %||% integer(0))
-  if (length(group_inds) == 0L) {
-    return(params)
-  }
-  n_lv <- length(group_inds)
-  omega <- read_draws_matrix(draws_mat, "Omega_trend", n_lv, n_lv,
-                             required = FALSE)
-  if (is.null(omega)) {
-    return(params)
-  }
+stationary_group_factors <- function(params, group_info, ndraws, block) {
+  checkmate::assert_list(params)
+  checkmate::assert_list(group_info$members, types = "integerish",
+                         min.len = 1L)
+  checkmate::assert_int(ndraws, lower = 1L)
+  checkmate::assert_function(block, nargs = 3L)
   n_groups <- as.integer(group_info$n_groups)
   n_sub <- as.integer(group_info$n_subgroups)
-  ndraws <- dim(omega)[1L]
-
   L_stat <- array(0, dim = c(ndraws, n_groups, n_sub, n_sub))
   for (d in seq_len(ndraws)) {
     for (g in seq_len(n_groups)) {
-      members <- which(group_inds == g)
-      blk <- matrix(omega[d, members, members], n_sub, n_sub)
-      ev <- eigen(blk, symmetric = TRUE, only.values = TRUE)$values
-      ok <- min(ev) > sqrt(.Machine$double.eps) * max(ev)
-      L_stat[d, g, , ] <- if (ok) {
-        t(chol(blk))
-      } else {
-        group_trend_factor(params, d, g, n_sub)
-      }
+      L_g <- group_trend_factor(params, d, g, n_sub)
+      gamma_g <- as_stationary_cov(block(d, group_info$members[[g]], L_g))
+      L_stat[d, g, , ] <- if (is.null(gamma_g)) L_g else t(chol(gamma_g))
     }
   }
   params$L_group_stationary <- L_stat
@@ -2463,41 +2525,50 @@ stationary_group_var_params <- function(params, draws_mat, group_info) {
 }
 
 
-#' Stationary covariance of a grouped AR(1), one factor per group
+#' Stationary covariance of a grouped VAR, one factor per group
 #'
-#' `Gamma[a, b] = Sigma[a, b] / (1 - phi_a * phi_b)` over the member
-#' series of one group, returned as a lower Cholesky factor per draw
-#' and group. Groups are independent, which makes each block its own
-#' problem. A draw whose block fails the decomposition keeps its
-#' innovation factor.
+#' The program solves `Omega = A Omega A' + Sigma` over every series
+#' and gives its first latent state that covariance. Each group's block
+#' of it becomes that group's factor.
 #'
 #' @noRd
-stationary_group_params <- function(params, phi, group_info,
-                                    n_groups, n_sub) {
-  group_inds <- as.integer(group_info$group_inds)
-  alpha <- params[[HIER_COV_PARS$alpha]]
-  L_glob <- params[[HIER_COV_PARS$global]]
-  L_dev <- params[[HIER_COV_PARS$deviation]]
-  sg <- params[[HIER_COV_PARS$sigma]]
-  ndraws <- length(alpha)
-
-  L_stat <- array(0, dim = c(ndraws, n_groups, n_sub, n_sub))
-  for (d in seq_len(ndraws)) {
-    L_glob_d <- matrix(L_glob[d, , ], n_sub, n_sub)
-    for (g in seq_len(n_groups)) {
-      L_g <- hierarchical_group_cholesky(
-        alpha = alpha[d],
-        L_global = L_glob_d,
-        L_deviation = matrix(L_dev[d, g, , ], n_sub, n_sub),
-        sigma = sg[d, g, ]
-      )
-      # The member order the program scans: the series index ascending
-      # within the group, which `which()` already gives.
-      members <- which(group_inds == g)
-      gamma_g <- stationary_from_chol(L_g, phi[d, members])
-      L_stat[d, g, , ] <- if (is.null(gamma_g)) L_g else t(chol(gamma_g))
-    }
+stationary_group_var_params <- function(params, draws_mat, group_info) {
+  checkmate::assert_list(params)
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_list(group_info)
+  n_lv <- length(group_info$group_inds)
+  omega <- read_draws_matrix(draws_mat, "Omega_trend", n_lv, n_lv,
+                             required = FALSE)
+  if (is.null(omega)) {
+    return(params)
   }
-  params$L_group_stationary <- L_stat
-  params
+  stationary_group_factors(
+    params, group_info, dim(omega)[1L],
+    function(d, members, L_g) {
+      matrix(omega[d, members, members], length(members), length(members))
+    }
+  )
+}
+
+
+#' Stationary covariance of a grouped AR, one factor per group
+#'
+#' `Gamma = Sigma_g * F[members, members]` over the member series of
+#' one group.
+#'
+#' @param params Extracted trend parameters
+#' @param factor The array from `ar_stationary_factor()`
+#' @param group_info The fit's grouping, from `get_group_info()`
+#' @return `params`, with `L_group_stationary` added
+#'
+#' @noRd
+stationary_group_params <- function(params, factor, group_info) {
+  checkmate::assert_array(factor, d = 3L)
+  stationary_group_factors(
+    params, group_info, dim(factor)[1L],
+    function(d, members, L_g) {
+      n_sub <- length(members)
+      tcrossprod(L_g) * matrix(factor[d, members, members], n_sub, n_sub)
+    }
+  )
 }

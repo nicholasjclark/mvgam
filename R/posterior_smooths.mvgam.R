@@ -80,9 +80,6 @@ posterior_smooths.mvgam <- function(object, smooth, newdata = NULL,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_string(smooth)
   checkmate::assert_data_frame(newdata, min.rows = 1L, null.ok = TRUE)
-  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
-  checkmate::assert_integerish(draw_ids, lower = 1L, min.len = 1L,
-                               null.ok = TRUE)
   validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_string(dpar, null.ok = TRUE)
   checkmate::assert_string(nlpar, null.ok = TRUE)

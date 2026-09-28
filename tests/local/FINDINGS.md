@@ -2,69 +2,6 @@
 
 Each entry is a task, deleted once its fix is verified.
 
-## One trend family, two initial distributions
-
-**110. Three AR shapes still start off their stationary distribution.**
-
-Four paths now start at the stationary distribution. A plain
-`AR(p = 1)` divides the first innovation by `sqrt(1 - ar1^2)`. A
-correlated `AR(p = 1, cor = TRUE)` and a grouped
-`AR(p = 1, gr = ...)` scale the first innovation row by the Cholesky
-factor of `Gamma[a, b] = Sigma[a, b] / (1 - ar1[a] * ar1[b])`, taken
-over the series of one group in the grouped case. A contiguous
-`AR(p > 1)` with independent innovations draws its first `p` states
-through `ar_stationary_init()`, built from the partial
-autocorrelations. The marginal variance is
-`sigma^2 / prod(1 - pacf^2)`. Conditioning on `m` earlier states
-multiplies it by `prod_{k<=m}(1 - pacf_k^2)`. Measured against the
-companion-form Lyapunov solution, the two agree to 4.4e-11 relative
-through `p = 7`.
-
-Three shapes still start from the raw innovation:
-
-- a correlated `AR(p > 1)`
-- a grouped `AR(p > 1)`
-- a moving-average term
-
-At `ar1 = 0.9` the first state is 2.3 times under-dispersed against
-stationarity, and the `t = 1` likelihood absorbs that into
-`sigma_trend` and `ar1_trend`.
-
-The R marginal path lifts these same shapes.
-`ar_stationary_multiplier()` solves the companion form and scales the
-innovation standard deviations. On a grouped fit the scales move by
-20.9 for `AR(p = 2)` and by 6.38 for `AR(p = 1, ma = TRUE)` against
-their posterior values, while the program starts both from the raw
-innovation. Starting the program at stationarity settles each.
-
-The two multivariate shapes need the Yule-Walker solve on the
-companion form, which `initial_joint_var()` supplies in the VAR
-generator today. That function shares one `functions` stanvar with
-`sqrtm`, `AtoP`, `kronecker_prod` and `rev_mapping`. The split is
-clean: `initial_joint_var()` calls `kronecker_prod`, while `AtoP`
-and `rev_mapping` call `sqrtm` and form a closed group. The size of
-the solve is the thing to weigh. It allocates a square matrix of
-side `((p + q) * m)^2`, which reaches 144 on six correlated series
-at `p = 2` and 3600 on twenty series at `p = 3`.
-
-`ARMA(1, 1)` needs the pair `(lv_0, eps_0)`. Scaling just the first
-innovation row matches the marginal variance and makes `lv[1]`
-and `eps[1]` perfectly correlated, where the stationary process has
-`cov(lv_1, eps_1) = sigma^2`. `lv[2]` takes `eps[1]` again, which
-makes the joint distribution the quantity to match. A new
-`init_innovations_trend` parameter supplies `eps_0`.
-
-A sparse lag set keeps the raw start by design. `ar1_trend` and
-`ar3_trend` are declared as bounded parameters whose stationarity is
-unchecked. `cholesky_decompose` would reject such a draw.
-`ar_lags_stationary()` is the gate. It admits contiguous lag sets
-from `p = 2` upward.
-
-Loop indices in a generated block take an `_init` suffix. A brms
-observation formula with predictors declares `b` for the
-population-level coefficients, and Stan refuses a shadowing loop
-variable.
-
 ## Debt the code carries in recognisable shapes
 
 **89. Six shapes remain, and a scan counts three of them.**
@@ -135,29 +72,6 @@ formal on the PW stanvar generator, a `trend_specs$type` fallback
 the constructor leaves empty and a third copy of the refusal that
 checks the growth value. Count before: 7. Count after: 1.
 
-## Generated Stan the user reads
-
-**114. Every comment mvgam writes into a trend stanvar is dropped.**
-
-`stancode()` on `AR(p = 1)`, `AR(p = 2)` and
-`AR(p = 1, cor = TRUE)` returns a program where each mvgam-authored
-comment is absent:
-
-- the initialisation comment on all three branches
-- the `Latent states with AR dynamics` header
-- the `Partial autocorrelations to AR coefficients` note in the
-  functions block
-
-Seven `//` lines survive inside the same transformed parameters
-block, and each one is brms's own.
-
-A reader of the generated program sees brms's account of its blocks
-while the trend's account goes missing. The polish step reorganises
-statements, and whether the stripping guards against a comment
-landing away from the line it describes is unverified.
-`polish_generated_stan_code()` in `R/stan_polish.R` is where to
-look.
-
 ## The gate that proves an assertion can fail
 
 **115. The axis mutation gate is absent from the test suite.**
@@ -184,4 +98,56 @@ response, an alphabetical series axis, a time index numbered by
 first appearance, a transposed `times_trend` and `group_inds_trend`
 built in row order. A permuted `trend_map` is the sixth.
 
+## Assertions that state one claim several times
 
+**118. The CI suite repeats 562 assertions verbatim.**
+
+`tests/testthat` contains 6345 `expect_*` calls across 83 files.
+After normalising whitespace, 55 files contain assertions appearing
+more than once within the same file and 562 of those occurrences are
+repeats beyond the first. `test-stancode-standata.R` contributes 278
+of them against 1374 assertions in that file.
+
+One habit produces the count: a test written for a single trend shape
+asserts the whole generated program again, including the lines every
+program shares. `matrix[N_time_trend, N_lv_trend] lv_trend;` is
+asserted in seven tests, `vector<lower=0>[N_lv_trend] sigma_trend;`
+in six, `target += lprior;` in five and `int<lower=1> N_lv_trend;` in
+four. Each of these is identical in every program mvgam emits. A
+change to the shared skeleton fails five tests. Each failure names a
+test for one trend shape.
+
+One pass already ran on the correlated AR(1) init. Three tests
+asserted it. Two of them had the factor structure as their subject
+and took the init assertions verbatim from the third. Those copies
+are deleted. The claim belongs to `"a correlated AR(1) starts at the
+joint stationary covariance"`.
+
+A second pass ran on the stationary-start work. Counting whole
+`expect_*` call bodies with whitespace normalised, `tests/testthat`
+holds 6147 assertions across 83 files. An assertion repeats inside a
+single file in 62 of them, giving 639 occurrences beyond the first.
+`test-stancode-standata.R` contributes 293 of those against 1330. That
+normalisation differs from the one giving 562 above. The two counts
+measure the same habit by different rules and do not compare.
+
+The pass deleted seven copies. A new correlated AR(2) local file
+restated `AR(p = 2)`'s two parameterisation checks and its
+stationarity triangle. Those five assertions belong to
+`test-trend-ar-multilag.R`, and the fit's own existence proves the
+triangle: a draw off the stationary region has no Cholesky factor and
+never enters the posterior. Two more restated the recursion on the
+moving average and the raw start. The sparse-lag ARMA block in
+`test-stancode-standata.R` owns both.
+
+The shared post-fit battery is a separate matter and holds no debt.
+`expect_identical(dim(ep), c(20L, n_obs))` appears in nine local files
+and `expect_true(all(is.finite(ep)))` in twelve, each against a
+different fit. The README states why: every file drives the same
+questions because most defects found here belonged to a method, with
+the trend that exposed them incidental.
+
+The count locates sites. Examining each one separates a repeat that
+states an invariant twice from a claim about one shape that shares
+its text. The split to aim for: one test owning the shared skeleton,
+with each shape test asserting what distinguishes it.

@@ -8,6 +8,7 @@ register_trend_type(
   name,
   supports_factors = FALSE,
   samples_innovation_scale = TRUE,
+  stationary_source = "none",
   generator_func,
   incompatibility_reason = NULL,
   prior_spec = NULL
@@ -21,6 +22,12 @@ register_trend_type(
 \item{samples_innovation_scale}{Logical; does the trend sample an
 innovation standard deviation? \code{FALSE} for a deterministic trend
 such as \code{PW()}, whose path is a function of its changepoints.}
+
+\item{stationary_source}{How the covariance a marginal prediction
+integrates over is obtained: \code{"lift"} raises the innovation
+covariance to the stationary one, \code{"omega"} takes the stationary
+covariance the Stan model already derives, \code{"none"} keeps the
+innovation covariance.}
 
 \item{generator_func}{Function that generates Stan code for this trend type}
 

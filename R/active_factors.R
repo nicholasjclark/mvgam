@@ -20,15 +20,8 @@
 #' @return Numeric `[ndraws, n_lv]` matrix.
 #' @noRd
 resolve_column_scales <- function(object, draws_mat, n_lv) {
-  ndraws <- nrow(draws_mat)
-  cols <- paste0("sigma_trend[", seq_len(n_lv), "]")
-  present <- cols %in% colnames(draws_mat)
-  if (!any(present)) {
-    return(matrix(1, nrow = ndraws, ncol = n_lv))
-  }
-  out <- matrix(1, nrow = ndraws, ncol = n_lv)
-  out[, present] <- as.matrix(draws_mat[, cols[present], drop = FALSE])
-  out
+  read_draws_vector(draws_mat, "sigma_trend", n_lv, required = FALSE) %||%
+    matrix(1, nrow = nrow(draws_mat), ncol = n_lv)
 }
 
 

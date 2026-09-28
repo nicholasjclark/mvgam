@@ -612,6 +612,16 @@ test_that("resolve_draw_indices() is the one rule for choosing draws", {
     resolve_draw_indices(100L, ndraws = NULL, draw_ids = c(1L, 101L)),
     "exceed available draws"
   )
+  # An index that names no draw is refused. Zero and a negative index
+  # would drop rows under R's subsetting, a fraction would truncate and
+  # a missing index would pass an `NA` row through.
+  # The check runs once, where a user's arguments enter.
+  for (bad in list(c(0L, 3L), c(-1L, 3L), c(1.5, 3), c(NA, 3L))) {
+    expect_error(validate_draw_selectors(NULL, bad), "draw_ids")
+  }
+  expect_error(validate_draw_selectors(0L, NULL), "ndraws")
+  expect_error(validate_draw_selectors(5L, 1:5),
+               "only one of 'ndraws' or 'draw_ids'")
   # No count and no indices means every draw, in the order sampled.
   expect_equal(resolve_draw_indices(10L, NULL, NULL), seq_len(10L))
   # A count covering the posterior also keeps that order. Returning

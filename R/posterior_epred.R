@@ -461,8 +461,6 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   require_fitted_model(object, "posterior_epred")
   checkmate::assert_logical(process_error, len = 1)
   trend_state <- autocor_to_trend_state(incl_autocor)
-  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
-                                any.missing = FALSE)
   validate_draw_selectors(ndraws, draw_ids)
   rlang::check_dots_empty()
 

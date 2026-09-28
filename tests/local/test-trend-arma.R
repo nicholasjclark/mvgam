@@ -11,6 +11,17 @@
 # without `ma = TRUE` must differ, and differ by the moving-average
 # machinery specifically rather than by anything else.
 #
+# The moving-average term also decides where the trend starts. A
+# stationary ARMA(1, 1) has `cov(lv_1, eps_1) = sigma^2`, which makes
+# the conditional mean of `lv_1` given `eps_1` the innovation itself
+# and the conditional standard deviation
+# `(ar1 + theta1) * sigma / sqrt(1 - ar1^2)`. `eps_1` reaches the
+# t = 2 step again. That reuse makes the pair the quantity to match
+# and leaves the spread needing variates of its own. This fit checks
+# that construction with independent innovations, and
+# `test-trend-ar-stationary-start.R` checks its correlated and grouped
+# forms.
+#
 # The observation side carries a two-dimensional `gp()`, which is a
 # single basis over a pair of covariates rather than two bases. No
 # other local file has one.
@@ -154,10 +165,11 @@ test_that("ma = TRUE adds a moving-average term and its innovations", {
   # geometrically, which gives an autoregression of order two and
   # makes the two coefficients exchangeable.
   expect_true(grepl(
-    "ma_innovations_trend[i, j] = scaled_innovations_trend[i, j]",
-    sc_ma, fixed = TRUE
+    "diag_post_multiply(scaled_innovations_trend[1:(N_time_trend-1)]",
+    gsub("\\s+", "", sc_ma), fixed = TRUE
   ))
-  expect_false(grepl("ma_innovations_trend[i - 1", sc_ma, fixed = TRUE))
+  expect_false(grepl("ma_innovations_trend[1:", gsub("\\s+", "", sc_ma),
+                     fixed = TRUE))
 
   # The autoregressive half is unchanged, so `ma = TRUE` adds rather
   # than replaces.
@@ -252,6 +264,38 @@ if (!identical(attr(fit, "sim_truth"), sim_truth)) {
 
 dm <- posterior::as_draws_matrix(fit$fit)
 
+
+test_that("the cached fit ran the program the package generates", {
+  expect_current_program(fit)
+})
+
+
+test_that("the ARMA start is its stationary pair", {
+  # A stationary ARMA(1, 1) has `cov(lv_1, eps_1) = sigma^2`, which
+  # makes the conditional mean of `lv_1` given `eps_1` the innovation
+  # itself and the conditional standard deviation
+  # `(ar1 + theta1) * sigma / sqrt(1 - ar1^2)`. Ground truth below is
+  # written from that definition.
+  #
+  # The innovation alone is the conditional mean, with the spread
+  # omitted. A start at the mean implies a marginal variance of
+  # `sigma^2`, where stationarity requires
+  # `sigma^2 (1 + 2 ar1 theta1 + theta1^2) / (1 - ar1^2)`.
+  for (s in seq_len(n_series)) {
+    a1 <- as.numeric(dm[, sprintf("ar1_trend[%d]", s)])
+    th <- as.numeric(dm[, sprintf("theta1_trend[%d]", s)])
+    sg <- as.numeric(dm[, sprintf("sigma_trend[%d]", s)])
+    z1 <- as.numeric(dm[, sprintf("innovations_trend[1,%d]", s)])
+    u <- as.numeric(dm[, sprintf("init_innovations_trend[%d]", s)])
+    lv1 <- as.numeric(dm[, sprintf("lv_trend[1,%d]", s)])
+    eps1 <- sg * z1
+    expect_equal(lv1, eps1 + (a1 + th) * sg / sqrt(1 - a1^2) * u,
+                 tolerance = 1e-6)
+    # The gate that shows the line above can fail. A start at the
+    # conditional mean alone leaves this difference at zero.
+    expect_gt(max(abs(lv1 - eps1)), 1e-3)
+  }
+})
 
 test_that("print names the ARMA, and leaves out the environment", {
   # `print()` is the first thing a user calls, and it reported this
@@ -615,23 +659,6 @@ test_that("every per-series plot panels in the model's own order", {
   expect_identical(panel_order("series"), series_levels)
   expect_identical(panel_order("trend"), series_levels)
   expect_identical(names(hindcast(fit)$hindcasts), series_levels)
-})
-
-
-test_that("print names the trend the fit was given", {
-  # The first thing a user calls. This file exists to tell an ARMA
-  # from an AR, and `print()` reports both as `AR`: the lag order and
-  # the moving-average term are dropped, so the two models are
-  # indistinguishable in the output. `summary()` carries
-  # `theta1_trend`, so the information is there to report.
-  out <- capture.output(print(fit))
-  trend_line <- out[which(grepl("^Trend model", out)) + 1L]
-  expect_match(trend_line, "ma", ignore.case = TRUE)
-
-  # And it prints the formula environments, two lines of pointer that
-  # change between sessions and describe nothing about the model.
-  expect_identical(grep("<environment: 0x", out, value = TRUE),
-                   character(0))
 })
 
 

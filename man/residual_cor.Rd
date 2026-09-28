@@ -103,8 +103,15 @@ correlation describes where the process sits rather than how far
 one step moves it. The two coincide only when nothing propagates
 the state between times. They differ for \code{VAR()} and \code{VARMA()},
 where \code{Omega_trend} solves \verb{Omega = A Omega A' + Sigma}, and for
-\code{AR(cor = TRUE)}, whose scales are lifted to their stationary
-values before the correlation is taken. For \code{ZMVN()} there is no
+\code{AR(cor = TRUE)}, which takes the leading block of the same solve
+over the companion form of its lag set, a moving-average term
+included. At one lag that block is
+\code{Sigma[a, b] / (1 - ar_a * ar_b)}. The correlation moves with the
+scales at every order and for every lag set. A sparse lag set such
+as \code{p = c(1, 12)} bounds its coefficients one at a time and admits
+a jointly explosive draw, which has no stationary covariance. Such a
+draw keeps its innovation covariance, and a warning gives the count
+once per session. For \code{ZMVN()} there is no
 propagation and for \code{RW()} no stationary distribution exists, so
 both report the innovation covariance itself. A grouping variable
 does not change which rule applies: a hierarchical \code{AR()} has its
