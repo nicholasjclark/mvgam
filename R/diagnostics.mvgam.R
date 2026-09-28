@@ -531,43 +531,19 @@ flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
 }
 
 
-# Internal: fire the post-fit advisor warning when
-# `flag_by_lv_full_rank_funnel()` is TRUE and the user did not
-# silence runtime output via `silent = 2`. Suppressed under
-# `TESTTHAT = true` by `mvgam_warn_once_user()`.
+# Internal: warn after a fit when `flag_by_lv_full_rank_funnel()` finds
+# the funnel.
 #'@noRd
-warn_by_lv_full_rank_funnel <- function(mvgam_fit, silent) {
-  if (identical(as.integer(silent), 2L)) return(invisible(NULL))
+warn_by_lv_full_rank_funnel <- function(mvgam_fit) {
   if (!flag_by_lv_full_rank_funnel(mvgam_fit)) return(invisible(NULL))
-  mvgam_warn_once_user(
-    message = paste0(
-      "Convergence diagnostics suggest 'Z' is weakly identified at ",
-      "'n_lv = n_series' with the default iid prior. Consider ",
-      "'loadings_prior = \"mgp\"' for column shrinkage, or pin ",
-      "loadings with a 'trend_map' (e.g. diag(n_series)) for a ",
-      "non-factor model."
+  warn_once(
+    c(
+      "'Z' is weakly identified at 'n_lv = n_series' under the default prior.",
+      i = "Use 'loadings_prior = \"mgp\"' to shrink columns.",
+      i = "Or pin the loadings with 'trend_map' to fit a non-factor model."
     ),
-    class = "mvgam_by_lv_full_rank_funnel"
+    "mvgam_by_lv_full_rank_funnel"
   )
 }
 
 
-# Internal: one-shot user-facing rlang warning that is suppressed
-# under `testthat`. Centralises the
-# `Sys.getenv("TESTTHAT")` + `.frequency = "once"` idiom used by
-# several runtime advisors. The `class` argument doubles as the
-# rlang `.frequency_id` so each call site gets its own one-shot
-# counter.
-#'@noRd
-mvgam_warn_once_user <- function(message, class) {
-  checkmate::assert_string(message)
-  checkmate::assert_string(class)
-  if (identical(Sys.getenv("TESTTHAT"), "true")) return(invisible(NULL))
-  rlang::warn(
-    message,
-    class = class,
-    .frequency = "once",
-    .frequency_id = class
-  )
-  invisible(NULL)
-}

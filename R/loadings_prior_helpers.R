@@ -220,8 +220,7 @@ validate_pairwise_distance <- function(mat, n_series, name,
     stop(insight::format_error(c(
       paste0(
         "Distance matrix '", name, "' contains NA values."
-      ),
-      i = "All pairwise distances must be present."
+      )
     )))
   }
   if (any(mat < -tol)) {
@@ -229,10 +228,6 @@ validate_pairwise_distance <- function(mat, n_series, name,
       paste0(
         "Distance matrix '", name,
         "' contains negative entries."
-      ),
-      i = paste0(
-        "Distances must be >= 0; check the matrix or apply ",
-        "an absolute value if it encodes a signed quantity."
       )
     )))
   }

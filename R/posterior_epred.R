@@ -133,16 +133,13 @@ compute_family_epred <- function(linpred, family, trials = NULL,
 
     # Default: try inverse link with warning for unknown families
     {
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          c(
-            paste0("Unknown family '", family_name, "', using inverse link."),
-            "i" = "Expected values may not be correct for complex families."
-          ),
-          .frequency = "once",
-          .frequency_id = paste0("epred_unknown_family_", family_name)
-        )
-      }
+      warn_once(
+        c(
+          paste0("Unknown family '", family_name, "', using inverse link."),
+          "i" = "Expected values may not be correct for complex families."
+        ),
+        paste0("epred_unknown_family_", family_name)
+      )
       family$linkinv(linpred)
     }
   )
@@ -228,7 +225,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
           "Dimension mismatch for '", dpar_name, "' in variance computation."
         ),
         x = paste0(
-          "Got [", nrow(value), " x ", ncol(value), "]; expected [",
+          "Got [", nrow(value), " x ", ncol(value), "]. Expected [",
           nrow(mu), " x ", ncol(mu), "]."
         )
       )))
@@ -251,15 +248,13 @@ compute_family_variance <- function(mu, family, sigma = NULL,
         ))
       }
       checkmate::assert_numeric(trials, lower = 0)
-      if (any(trials == 0) &&
-          !identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
+      if (any(trials == 0)) {
+        warn_once(
           c(
             "'trials' contains zeros.",
             i = "Variance is NaN for binomial observations with 0 trials."
           ),
-          .frequency = "once",
-          .frequency_id = "binomial_variance_zero_trials"
+          "binomial_variance_zero_trials"
         )
       }
       if (length(trials) == 1L) {
@@ -775,7 +770,7 @@ family_mean_from_kernel <- function(family_name, mu, family_pars,
       stop(insight::format_error(c(
         paste0("Dimension mismatch for '", dpar, "' in E[Y]."),
         x = paste0("Got [", nrow(value), " x ", ncol(value),
-                   "]; expected [", nrow(mu), " x ", ncol(mu), "].")
+                   "]. Expected [", nrow(mu), " x ", ncol(mu), "].")
       )))
     }
   }
@@ -1178,14 +1173,11 @@ mean_discrete_weibull <- function(mu, shape, M = 1000, thres = 0.001) {
   if (opt_M <= M) {
     M <- opt_M
   } else {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        c("Approximating the mean of discrete_weibull may be inaccurate.",
-          "i" = "Series did not converge within M terms."),
-        .frequency = "once",
-        .frequency_id = "mean_discrete_weibull_convergence"
-      )
-    }
+    warn_once(
+      c("Approximating the mean of discrete_weibull may be inaccurate.",
+        "i" = "Series did not converge within M terms."),
+      "mean_discrete_weibull_convergence"
+    )
   }
   out <- 0
   for (y in seq_len(M)) {
@@ -1265,14 +1257,11 @@ mean_com_poisson <- function(mu, shape, M = 10000, thres = 1e-16,
     }
 
     if (!converged) {
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          c("Approximating the mean of com_poisson may be inaccurate.",
-            "i" = "Series did not converge within M terms."),
-          .frequency = "once",
-          .frequency_id = "mean_com_poisson_convergence"
-        )
-      }
+      warn_once(
+        c("Approximating the mean of com_poisson may be inaccurate.",
+          "i" = "Series did not converge within M terms."),
+        "mean_com_poisson_convergence"
+      )
     }
     out[use_exact] <- exp(log_num - log_Z)
   }

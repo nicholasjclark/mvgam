@@ -260,12 +260,7 @@ bridge_sampler.mvgam <- function(samples, recompile = FALSE, ...) {
         "Densities dropping a normalising constant: ",
         paste(offenders, collapse = ", "), "."
       ),
-      i = paste0(
-        "Refit with 'normalize = TRUE', which is the default. A ",
-        "model built with 'normalize = FALSE' samples faster, but ",
-        "its log marginal likelihood carries an offset that does ",
-        "not cancel between models of different dimension."
-      )
+      i = "Refit with 'normalize = TRUE'."
     )))
   }
   if (isTRUE(recompile)) {
@@ -395,14 +390,8 @@ predictive_error.mvgam <- function(object, newdata = NULL,
   resp_name <- response_column(object, resp)
   if (!resp_name %in% names(data)) {
     stop(insight::format_error(c(
-      paste0(
-        "Cannot compute predictive errors: response '",
-        resp_name, "' not in 'newdata'."
-      ),
-      i = paste0(
-        "Pass a 'newdata' that includes the response column ",
-        "or omit 'newdata' to use the training data."
-      )
+      paste0("'newdata' lacks the response column '", resp_name, "'."),
+      i = "Omit 'newdata' to use the training data."
     )))
   }
   pred_fun <- if (identical(method, "posterior_predict")) {
@@ -422,8 +411,8 @@ predictive_error.mvgam <- function(object, newdata = NULL,
     stop(insight::format_error(c(
       "Internal: predictor output and response length disagree.",
       x = paste0(
-        "Predictor columns: ", ncol(preds),
-        "; response observations: ", length(y), "."
+        "Predictor columns: ", ncol(preds), ". Response observations: ",
+        length(y), "."
       )
     )))
   }
@@ -483,6 +472,20 @@ nsamples.mvgam <- function(object, ...) {
 #'@noRd
 mvgam_training_data <- function(object) {
   object$obs_data %||% object$data
+}
+
+
+# Internal: the frame a prediction method works on, `newdata` or else
+# the training data.
+#'@noRd
+prediction_frame <- function(object, newdata = NULL) {
+  out <- newdata %||% mvgam_training_data(object)
+  if (is.null(out)) {
+    stop(insight::format_error(
+      "The fitted object holds no training data. Supply 'newdata'."
+    ))
+  }
+  out
 }
 
 

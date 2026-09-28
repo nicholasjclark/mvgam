@@ -324,27 +324,50 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # downstream regeneration, so the mock fit, the assembled Stan
   # program and the assembled Stan data are all built under the same
   # basis expansions, factor levels and prior-only setting.
-  mock_setup <- do.call(brms::brm, c(
-    list(
-      formula = formula,
-      data = data,
-      family = family,
-      stanvars = stanvars,
-      prior = prior,
-      data2 = data2,
-      threads = brm_threads,
-      backend = "mock",
-      mock_fit = 1,
-      rename = FALSE
-    ),
-    codegen_args_for(codegen, mvgam_codegen_stancode_options)
-  ))
+  #
+  # brms announces the defaults it settles, such as `rescor` on a
+  # multivariate formula, with `message()`. `silent = 2` turns
+  # messages off, as it does for `brms::brm()`.
+  mock_setup <- eval_silent(
+    do.call(brms::brm, c(
+      list(
+        formula = formula,
+        data = data,
+        family = family,
+        stanvars = stanvars,
+        prior = prior,
+        data2 = data2,
+        threads = brm_threads,
+        backend = "mock",
+        mock_fit = 1,
+        rename = FALSE
+      ),
+      codegen_args_for(codegen, mvgam_codegen_stancode_options)
+    )),
+    type = "message",
+    silent = isTRUE(getOption("mvgam.silent", 1L) >= 2L)
+  )
 
   # Add version metadata to prevent restructure() from calling update()
   # standata() and prepare_predictions() call restructure() which checks version
   # and attempts update() if version is NULL or < "1.0". Multivariate models
   # update() throws an error. Adding current brms version prevents this.
   mock_setup$version <- list(brms = utils::packageVersion("brms"))
+
+  # The program and its data are generated again from `formula`, once
+  # per response for the data. A multivariate formula that leaves
+  # `rescor` unset has it settled and announced by brms on every
+  # pass. The mock fit settled it once, and the formula carries that
+  # value from here. A bare `mvbind(y1, y2) ~ x` becomes the
+  # `mvbrmsformula` that `bf()` makes of it.
+  if (inherits(mock_setup$formula, "mvbrmsformula")) {
+    if (!inherits(formula, "mvbrmsformula")) {
+      formula <- brms::bf(formula)
+    }
+    if (is.null(formula$rescor)) {
+      formula$rescor <- isTRUE(mock_setup$formula$rescor)
+    }
+  }
 
   # NB: the placeholder column is retained in `data` (and in
   # `mock_setup$data`) because mvgam's stancode regenerator,

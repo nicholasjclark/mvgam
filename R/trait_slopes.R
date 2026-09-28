@@ -138,10 +138,7 @@ validate_trait_slopes <- function(trait_slopes, obs_formula, data,
           if (length(bad) > 6L) " ..." else "",
           "."
         ),
-        i = paste0(
-          "Traits must be constant per species; per-observation",
-          " covariates belong in 'formula'."
-        )
+        i = "A covariate that varies within species belongs in 'formula'."
       )))
     }
   }
@@ -163,11 +160,7 @@ validate_trait_slopes <- function(trait_slopes, obs_formula, data,
         "Offending term(s): ",
         paste(shQuote(hits), collapse = ", "), "."
       ),
-      i = paste0(
-        "Move smooth specials into the trait_slopes sub-formula",
-        " (e.g. trait_slopes = ~ s(trait1)) or fit without",
-        " trait_slopes."
-      )
+      i = "Write smooths in the 'trait_slopes' formula."
     )))
   }
   invisible(NULL)

@@ -527,6 +527,39 @@ glm_mu_names <- function(resp_name) {
   c(mu = paste0("mu", suffix), ones = paste0("mu_ones", suffix))
 }
 
+#' Whether a response's GLM call takes the predictor brms declared
+#'
+#' brms declares `mu` and passes it as the GLM intercept when the
+#' predictor holds a term the GLM arguments have no slot for, an
+#' offset among them. The design matrix and coefficients stay in the
+#' call. mvgam then adds the trend to that vector and keeps the call
+#' brms wrote. A call rewritten to take `to_matrix(mu)` would drop
+#' `X * b`.
+#'
+#' @param stan_code Character string of the observation program.
+#' @param resp_name The response key, `""` for a univariate model.
+#' @return `TRUE` when every GLM call on the response passes its
+#'   declared `mu` as the intercept.
+#' @noRd
+glm_takes_declared_mu <- function(stan_code, resp_name) {
+  checkmate::assert_string(stan_code)
+  checkmate::assert_string(resp_name)
+  y_var <- if (nzchar(resp_name)) paste0("Y_", resp_name) else "Y"
+  code_lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
+  glm_lines <- grep(
+    paste0(stan_density_call_pattern("_glm"), "\\(", y_var, " \\|"),
+    code_lines, value = TRUE
+  )
+  if (!length(glm_lines)) {
+    return(FALSE)
+  }
+  mu_var <- glm_mu_names(resp_name)[["mu"]]
+  all(vapply(glm_lines, function(line) {
+    params <- parse_glm_parameters_from_line(line, glm_family_of_line(line))
+    identical(params$intercept, mu_var)
+  }, logical(1L)))
+}
+
 #' Determine Mu Construction Type
 #'
 #' @description

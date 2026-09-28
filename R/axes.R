@@ -94,6 +94,31 @@ spec_n_lv <- function(spec) {
   if (is.null(value)) NULL else as.integer(value)
 }
 
+#' The time axis: each distinct time once, earliest first
+#'
+#' A trend recursion steps along the index this defines. The index
+#' runs in the order the times do, whatever order the rows arrive in.
+#'
+#' @param times Per-row times
+#' @return The distinct times, sorted
+#' @noRd
+time_axis_values <- function(times) {
+  sort(unique(times))
+}
+
+#' The series axis of a frame that names its series in a column
+#'
+#' A factor column declares its order and the axis keeps it, counting
+#' only the levels something is observed at. A character column
+#' declares none and is sorted.
+#'
+#' @param series_vals Per-row series identifiers
+#' @return The distinct series, in axis order
+#' @noRd
+series_axis_values <- function(series_vals) {
+  sort(unique(series_vals))
+}
+
 #' The group each series on the axis belongs to
 #'
 #' Answers in the axis's own order, taken from the rows the axis was

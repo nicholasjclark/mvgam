@@ -87,15 +87,13 @@ test_that("by = lv_axis() without n_lv is accepted (non-factor path)", {
   # internally to `by = series` and the standard (time, series)
   # codepath handles the rest. has_by_lv stays FALSE on the
   # trend metadata.
-  mod <- suppressWarnings(
-    mvgam(
-      formula = y ~ -1,
-      trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      data = dat,
-      family = gaussian(),
-      run_model = FALSE,
-      silent = 2
-    )
+  mod <- mvgam(
+    formula = y ~ -1,
+    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
+    data = dat,
+    family = gaussian(),
+    run_model = FALSE,
+    silent = 2
   )
   expect_false(isTRUE(mod$trend_metadata$has_by_lv))
 })
@@ -110,16 +108,14 @@ test_that("by = lv_axis() with n_lv = n_series is accepted (factor path)", {
   # owns the identifiability decision; a post-fit advisor warns the
   # user when convergence is poor (see flag_by_lv_full_rank_funnel).
   # The validator only rejects n_lv > n_series.
-  mod <- suppressWarnings(
-    mvgam(
-      formula = y ~ -1,
-      trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      trend_map = matrix(NA_real_, nrow = 3L, ncol = 3L),
-      data = dat,
-      family = gaussian(),
-      run_model = FALSE,
-      silent = 2
-    )
+  mod <- mvgam(
+    formula = y ~ -1,
+    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
+    trend_map = matrix(NA_real_, nrow = 3L, ncol = 3L),
+    data = dat,
+    family = gaussian(),
+    run_model = FALSE,
+    silent = 2
   )
   expect_true(isTRUE(mod$trend_metadata$has_by_lv))
   expect_equal(mod$trend_metadata$n_lv_for_grain, 3L)
@@ -131,7 +127,7 @@ test_that("by = lv_axis() with n_lv > n_series still errors", {
   dat$series <- factor(dat$series)
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
-  suppressWarnings(expect_error(
+  expect_error(
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
@@ -141,8 +137,8 @@ test_that("by = lv_axis() with n_lv > n_series still errors", {
       run_model = FALSE,
       silent = 2
     ),
-    "cannot exceed|requires a factor model"
-  ))
+    "Got n_lv = 4, n_series = 3"
+  )
 })
 
 # 3. Display-relabel: had_by_lv marker + by_lv_rewrite_tokens helper -----
@@ -198,13 +194,11 @@ test_that("had_by_lv is set on non-factor by_lv fits (validation only)", {
   dat$series <- factor(dat$series)
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
-  mod <- suppressWarnings(
-    mvgam(
-      formula = y ~ -1,
-      trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      data = dat, family = gaussian(),
-      run_model = FALSE, silent = 2
-    )
+  mod <- mvgam(
+    formula = y ~ -1,
+    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
+    data = dat, family = gaussian(),
+    run_model = FALSE, silent = 2
   )
   # Non-factor path: has_by_lv stays FALSE (codegen takes the
   # standard (time, series) path) but had_by_lv is TRUE so display
@@ -219,14 +213,12 @@ test_that("had_by_lv is set on factor by_lv fits", {
   dat$series <- factor(dat$series)
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
-  mod <- suppressWarnings(
-    mvgam(
-      formula = y ~ -1,
-      trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      trend_map = matrix(NA_real_, nrow = 3L, ncol = 3L),
-      data = dat, family = gaussian(),
-      run_model = FALSE, silent = 2
-    )
+  mod <- mvgam(
+    formula = y ~ -1,
+    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
+    trend_map = matrix(NA_real_, nrow = 3L, ncol = 3L),
+    data = dat, family = gaussian(),
+    run_model = FALSE, silent = 2
   )
   expect_true(isTRUE(mod$trend_metadata$has_by_lv))
   expect_true(isTRUE(mod$trend_metadata$had_by_lv))
@@ -238,13 +230,11 @@ test_that("had_by_lv stays FALSE for fits without by_lv", {
   dat$series <- factor(dat$series)
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
-  mod <- suppressWarnings(
-    mvgam(
-      formula = y ~ -1,
-      trend_formula = ~ s(elev, k = 5) - 1,
-      data = dat, family = gaussian(),
-      run_model = FALSE, silent = 2
-    )
+  mod <- mvgam(
+    formula = y ~ -1,
+    trend_formula = ~ s(elev, k = 5) - 1,
+    data = dat, family = gaussian(),
+    run_model = FALSE, silent = 2
   )
   expect_false(isTRUE(mod$trend_metadata$has_by_lv))
   expect_false(isTRUE(mod$trend_metadata$had_by_lv))
@@ -262,13 +252,11 @@ test_that("trend_call preserves original by = lv_axis() for update.mvgam", {
   dat$series <- factor(dat$series)
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
-  mod <- suppressWarnings(
-    mvgam(
-      formula = y ~ -1,
-      trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      data = dat, family = gaussian(),
-      run_model = FALSE, silent = 2
-    )
+  mod <- mvgam(
+    formula = y ~ -1,
+    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
+    data = dat, family = gaussian(),
+    run_model = FALSE, silent = 2
   )
   # `trend_call` carries the user's literal text.
   expect_match(

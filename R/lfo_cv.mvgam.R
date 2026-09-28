@@ -78,8 +78,9 @@
 #'   posterior) so the result can feed `loo::loo_model_weights()`
 #'   for log-score stacking. Defaults to `FALSE` because the
 #'   matrix can be large.
-#' @param silent Verbosity level between `0` and `2`. See
-#'   [mvgam] for the contract.
+#' @param silent Integer in `\{0, 1, 2\}`. `0` prints each refit
+#'   and its sampler start and finish lines. `1` (default) and `2`
+#'   print nothing from the refits.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `list` of class `mvgam_lfo` containing:
@@ -190,14 +191,16 @@ lfo_cv.mvgam <- function(object,
   if (!is.null(data)) {
     if (is.null(newdata)) {
       insight::format_warning(c(
-        "'data' is deprecated; use 'newdata' instead.",
-        i = "Forwarding the supplied value to 'newdata'."
+        "'data' is deprecated. Use 'newdata' instead.",
+        i = "The supplied value was passed on to 'newdata'."
       ))
       newdata <- data
     } else {
-      insight::format_warning(
-        "Both 'data' and 'newdata' supplied; using 'newdata'."
-      )
+      insight::format_warning(c(
+        "Both 'data' and 'newdata' were supplied.",
+        i = "Using 'newdata'.",
+        i = "'data' is deprecated."
+      ))
     }
   }
 
@@ -992,8 +995,7 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
       stop(insight::format_error(c(
         "Cannot compare: fc_horizon differs across models.",
         x = paste0("Model ", i, " uses fc_horizon = ",
-                   models[[i]]$fc_horizon,
-                   "; model 1 uses ", ref_h, ".")
+                   models[[i]]$fc_horizon, ". Model 1 uses ", ref_h, ".")
       )))
     }
   }
@@ -1001,9 +1003,8 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
   for (i in seq_along(models)) {
     if (is.null(models[[i]]$elpds)) {
       stop(insight::format_error(c(
-        paste0("Model ", i, " has no ELPDs; nothing to compare."),
-        i = paste0("Call lfo_cv(..., score = 'elpd') (or include 'elpd' ",
-                   "in the score vector) to populate ELPDs.")
+        paste0("Model ", i, " has no ELPDs to compare."),
+        i = "Include 'elpd' in the 'score' argument of lfo_cv()."
       )))
     }
   }
@@ -1141,9 +1142,8 @@ loo_model_weights.mvgam_lfo <- function(x, ...,
   total_elpd <- vapply(models, function(m) {
     if (is.null(m$elpds)) {
       stop(insight::format_error(c(
-        "An mvgam_lfo object has no ELPDs; cannot weight.",
-        i = paste0("Call lfo_cv(..., score = 'elpd') (or include 'elpd' ",
-                   "in the score vector) to populate ELPDs.")
+        "An mvgam_lfo object has no ELPDs to weight.",
+        i = "Include 'elpd' in the 'score' argument of lfo_cv()."
       )))
     }
     sum(m$elpds, na.rm = TRUE)
@@ -1185,7 +1185,7 @@ stack_mvgam_lfo <- function(models, model_names) {
       stop(insight::format_error(c(
         "Pointwise log-likelihood matrices have different widths.",
         x = paste0("Model ", i, " has ", ncol(ll_list[[i]]),
-                   " columns; model 1 has ", ref_cols, "."),
+                   " columns. Model 1 has ", ref_cols, "."),
         i = paste0("Run lfo_cv() again on all models against the ",
                    "same newdata and rolling-origin grid.")
       )))

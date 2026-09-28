@@ -370,16 +370,7 @@ fit_model <- function(model, backend, ...) {
     }
     if (future) {
       if (!requireNamespace("future", quietly = TRUE)) {
-        rlang::inform(
-          message = paste0(
-            'Package "future" is required for parallel chain processing.\n',
-            'Please install it with: install.packages("future")\n',
-            'Falling back to standard parallel processing with cores argument.'
-          ),
-          .frequency = "once",
-          .frequency_id = "future_rstan_fitting"
-        )
-        # Fall back to standard parallel processing
+        inform_future_missing()
         c(args) <- nlist(chains, cores)
         out <- brms::do_call(rstan::sampling, args)
       } else {
@@ -474,6 +465,7 @@ fit_model <- function(model, backend, ...) {
     args$opencl_ids <- opencl$ids
   }
   dots <- list(...)
+  refuse_unknown_cmdstanr_args(model, algorithm, names(dots))
   args[names(dots)] <- dots
   args[names(control)] <- control
 
@@ -515,16 +507,7 @@ fit_model <- function(model, backend, ...) {
     }
     if (future) {
       if (!requireNamespace("future", quietly = TRUE)) {
-        rlang::inform(
-          message = paste0(
-            'Package "future" is required for parallel chain processing.\n',
-            'Please install it with: install.packages("future")\n',
-            'Falling back to standard parallel processing with cores argument.'
-          ),
-          .frequency = "once",
-          .frequency_id = "future_cmdstanr_fitting"
-        )
-        # Fall back to standard parallel processing
+        inform_future_missing()
         out <- brms::do_call(model$sample, args)
       } else {
         if (cores > 1L) {
@@ -613,7 +596,7 @@ fit_model <- function(model, backend, ...) {
     stan_variables <- out$metadata()$stan_variables
   }
 
-  out <- brms::read_csv_as_stanfit(
+  out <- read_cmdstan_stanfit(
     output_files, variables = stan_variables,
     model = model, exclude = exclude, algorithm = algorithm
   )
@@ -745,7 +728,7 @@ assert_stan_version <- function(backend, min_version, feature = NULL) {
   live <- live_stan_version(backend)
   if (is.na(live)) {
     stop(insight::format_error(c(
-      "The 'cmdstanr' backend needs CmdStan, which is not installed.",
+      "CmdStan is not installed.",
       i = "Install it with `cmdstanr::install_cmdstan()`."
     )))
   }
@@ -939,6 +922,71 @@ validate_silent <- function(silent) {
   silent
 }
 
+#' A stanfit from CmdStan output, without Pathfinder's `path__`
+#'
+#' cmdstanr 0.9.0 writes a `path__` column to Pathfinder output and
+#' lists it among `$metadata()$stan_variables`. brms 2.23.0 knows the
+#' `lp__` and `lp_approx__` columns of each algorithm and not this one.
+#' Passed through as a variable, `path__` makes `read_cmdstan_csv()`
+#' stop. Left out, cmdstanr returns the column in the draws anyway,
+#' and brms names it in `fnames_oi` with no dimension entry, which
+#' shifts every name after it. The column records which path a draw
+#' came from. It is removed at both points.
+#'
+#' @inheritParams brms::read_csv_as_stanfit
+#' @return A `stanfit` object.
+#' @noRd
+read_cmdstan_stanfit <- function(files, variables, model, exclude,
+                                 algorithm) {
+  out <- brms::read_csv_as_stanfit(
+    files, variables = setdiff(variables, "path__"),
+    model = model, exclude = exclude, algorithm = algorithm
+  )
+  if (!"path__" %in% out@sim$fnames_oi) {
+    return(out)
+  }
+  out@sim$samples <- lapply(out@sim$samples, function(chain) {
+    chain$path__ <- NULL
+    means <- attr(chain, "mean_pars")
+    attr(chain, "mean_pars") <- means[names(means) != "path__"]
+    chain
+  })
+  out@sim$fnames_oi <- setdiff(out@sim$fnames_oi, "path__")
+  out@sim$n_flatnames <- length(out@sim$fnames_oi)
+  out
+}
+
+
+#' Refuse sampler arguments the cmdstanr method lacks
+#'
+#' Called with argument names `mvgam()` forwards to the sampler. rstan
+#' names an unknown argument itself. cmdstanr reports only an R
+#' `unused argument` error against a renamed placeholder.
+#'
+#' @param model A compiled `CmdStanModel`.
+#' @param algorithm The validated algorithm.
+#' @param arg_names Names of the forwarded arguments.
+#' @return `NULL`, invisibly.
+#' @noRd
+refuse_unknown_cmdstanr_args <- function(model, algorithm, arg_names) {
+  method <- switch(algorithm,
+    sampling = , fixed_param = "sample",
+    meanfield = , fullrank = "variational",
+    algorithm
+  )
+  unknown <- setdiff(arg_names, names(formals(model[[method]])))
+  if (length(unknown)) {
+    stop(insight::format_error(c(
+      paste0("Unknown argument for cmdstanr's '$", method, "()': ",
+             paste0("'", unknown, "'", collapse = ", "), "."),
+      i = paste0("Check the name against '?cmdstanr::model-method-",
+                 method, "'.")
+    )), call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+
 #' Run Stan's Pathfinder on a Compiled cmdstanr Model
 #' @description
 #' Shared by the `algorithm = "pathfinder"` fitting branch and the
@@ -969,6 +1017,13 @@ run_pathfinder <- function(model, args, chains, threading_on, threads,
   # resolving to either value.
   missing_names <- setdiff(names(defaults), names(args))
   args[missing_names] <- defaults[missing_names]
+  # A Pathfinder start receives the arguments assembled for
+  # `$sample()`. Those Pathfinder lacks, such as `save_warmup`, stay
+  # with the sampler. cmdstanr's methods name every argument they take.
+  accepted <- names(formals(model$pathfinder))
+  if (!"..." %in% accepted) {
+    args <- args[names(args) %in% accepted]
+  }
   # Start the quasi-Newton search in a tight ball around the
   # unconstrained origin unless the caller asked for something else.
   # Reason: neither extreme is safe. From Stan's default U(-2, 2), a
@@ -1220,4 +1275,15 @@ is_equal <- function(x, y, check.attributes = FALSE, ...) {
 #' @noRd
 is_NA <- function(x) {
   length(x) == 1L && is.na(x)
+}
+
+
+# Internal: say once per session that `future = TRUE` needs the future
+# package. Both backends then run their chains through 'cores'.
+#'@noRd
+inform_future_missing <- function() {
+  inform_once(
+    "'future = TRUE' requires the 'future' package.",
+    "mvgam_future_missing"
+  )
 }

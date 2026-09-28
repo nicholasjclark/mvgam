@@ -29,10 +29,7 @@ mvgam_split_models <- function(x, ..., model_names = NULL,
          any(!nzchar(other_names)))) {
     stop(insight::format_error(c(
       "All non-model arguments must be named.",
-      i = paste0(
-        "Pass mvgam fits positionally; pass other arguments ",
-        "with explicit names."
-      )
+      i = "Pass mvgam fits by position."
     )))
   }
   models <- c(list(x), dots[is_model_dot])

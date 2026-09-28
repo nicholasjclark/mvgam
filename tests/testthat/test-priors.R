@@ -642,7 +642,7 @@ test_that("non-Gaussian families work with trends", {
   family_tests <- list(
     poisson = list(formula = count ~ x, family = poisson()),
     binomial = list(formula = binary ~ x, family = binomial()),
-    gamma = list(formula = y ~ x, family = Gamma()),
+    gamma = list(formula = y ~ x, family = Gamma(link = "log")),
     exponential = list(formula = y ~ x, family = exponential()),
     beta = list(formula = I((y + 10) / 20) ~ x, family = Beta())
   )
@@ -1125,11 +1125,13 @@ test_that("every surface names a trend prior class the same way", {
 
 
 test_that("a reported innovation scale is one the model samples", {
-  # Two ways to lose `sigma_trend`, and the table has to know about
-  # both. `PW()` never had one: its path is a function of the
+  # Three things remove `sigma_trend`, and the table reports each.
+  # `PW()` never had one: its path is a function of the
   # changepoints. Multiplicative gamma process shrinkage derives it
-  # as `sqrt(Psi_diag)` instead, so a prior set on it is refused.
-  # Either way, offering the row invites a prior the fit cannot take.
+  # as `sqrt(Psi_diag)`. Sampled loadings absorb the factors' scale,
+  # which fixes it at 1. A loading fixed by `trend_map` pins that
+  # scale and the model samples it again. Offering the row where the
+  # model fixes the scale invites a prior the fit cannot take.
   dat <- data.frame(
     y = rpois(40, 5), time = rep(1:20, 2),
     series = factor(rep(c("a", "b"), each = 20))
@@ -1138,7 +1140,9 @@ test_that("a reported innovation scale is one the model samples", {
     list(tf = ~ PW(), args = list(), sampled = FALSE),
     list(tf = ~ RW(), args = list(), sampled = TRUE),
     list(tf = ~ AR(p = 1), args = list(), sampled = TRUE),
-    list(tf = ~ ZMVN(n_lv = 2), args = list(), sampled = TRUE),
+    list(tf = ~ ZMVN(n_lv = 2), args = list(), sampled = FALSE),
+    list(tf = ~ ZMVN(n_lv = 1, trend_map = matrix(c(1, NA), 2, 1)),
+         args = list(), sampled = TRUE),
     list(tf = ~ ZMVN(n_lv = 2),
          args = list(loadings_prior = list(column_shrinkage = "mgp")),
          sampled = FALSE)
@@ -1146,10 +1150,8 @@ test_that("a reported innovation scale is one the model samples", {
   for (case in cases) {
     mf <- mvgam_formula(y ~ -1, case$tf)
     common <- list(mf, data = dat, family = poisson())
-    tab <- suppressWarnings(
-      do.call(get_prior, c(common, case$args))
-    )
-    sc <- suppressWarnings(do.call(stancode, c(common, case$args)))
+    tab <- do.call(get_prior, c(common, case$args))
+    sc <- do.call(stancode, c(common, case$args))
     expect_equal("sigma_trend" %in% tab$class, case$sampled)
     # Sampled in either spelling: a normalised program writes the
     # density call rather than a tilde.

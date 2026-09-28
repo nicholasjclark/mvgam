@@ -87,8 +87,13 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 #### Validation Patterns
 1. **Input Validation**: Use `checkmate::assert_*()` for all function parameters
 2. **Error Messages**: Use `insight::format_error()` for user-friendly error formatting
-3. **Warnings**: Use `insight::format_warning()` for informative warnings
-4. **Session Warnings**: Use `if (!identical(Sys.getenv("TESTTHAT"), "true")) rlang::warn(..., .frequency = "once")` for one-time warnings
+3. **Warnings**: Use `insight::format_warning()` for a warning raised on every call
+4. **Session Warnings**: Use `warn_once(message, id)` (`R/utils-conditions.R`) for a warning raised once per session. Never hand-write `rlang::warn(.frequency = "once")` or read `Sys.getenv("TESTTHAT")` in package code
+5. **Session Messages**: Use `inform_once(message, id)` for an informational message shown once per session. Per-call messages use `rlang::inform()` inside `if (silent < 2)`
+6. **`silent`**: `silent = 2` suppresses messages, never warnings (as in `brms::brm()`). `mvgam()` and `jsdgam()` store it in `options(mvgam.silent)` for the call
+7. **Testing once-per-session conditions**: `warn_once()` and `inform_once()` are quiet under testthat. A test asserting one clears the variable with `withr::local_envvar(TESTTHAT = "")`
+
+See "User-Facing Conditions" in `architecture/architecture-decisions.md` for the reasons.
 
 #### Message Formatting Standards
 
@@ -107,6 +112,11 @@ them; existing non-conforming sites should be updated when touched.
   constraint exists
 - Single-line messages may stay as a bare string argument; no need to
   wrap them in `c()` just to satisfy the convention
+- One plain sentence per element. Never pad a line with a clause joined
+  by `;`, `, which`, `, and`, `, but` or `, so`: make it its own `x =`
+  or `i =` bullet, or delete it if it does not help the user act
+- Say what the user needs in the fewest words: "'future = TRUE' requires
+  the 'future' package." Never contort a sentence to dodge a lint word
 
 Correct (multi-line):
 ```r

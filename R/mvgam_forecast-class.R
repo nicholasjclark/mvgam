@@ -205,24 +205,24 @@ print.mvgam_forecast <- function(x, ...) {
     0L
   }
   ensemble_w <- attr(x, "weights", exact = TRUE)
-  bullets <- c(
+  lines <- c(
     paste0("mvgam_forecast (type '", x$type %||% "response", "')"),
-    "*" = paste0("family:    ", x$family %||% "unknown"),
-    "*" = paste0("series:    ", n_series),
-    "*" = paste0("hindcast:  ", n_train, " timepoints"),
-    "*" = paste0("forecast:  ", n_test,
-                 if (n_test == 0L) " (none; hindcast only)" else " timepoints"),
-    "*" = paste0("draws:     ", n_draws)
+    paste0("  family:    ", x$family %||% "unknown"),
+    paste0("  series:    ", n_series),
+    paste0("  hindcast:  ", n_train, " timepoints"),
+    paste0("  forecast:  ", n_test,
+           if (n_test == 0L) " (hindcast only)" else " timepoints"),
+    paste0("  draws:     ", n_draws)
   )
   if (!is.null(ensemble_w)) {
-    bullets <- c(
-      bullets,
-      "*" = paste0("ensemble:  ", length(ensemble_w),
-                   " components (weights ",
-                   paste(sprintf("%.2f", as.numeric(ensemble_w)),
-                         collapse = ", "), ")")
+    lines <- c(
+      lines,
+      paste0("  ensemble:  ", length(ensemble_w),
+             " components (weights ",
+             paste(sprintf("%.2f", as.numeric(ensemble_w)),
+                   collapse = ", "), ")")
     )
   }
-  rlang::inform(bullets)
+  cat(lines, sep = "\n")
   invisible(x)
 }

@@ -401,10 +401,7 @@ apply_censoring <- function(ll, cens, rcens, spec, linpred, y) {
     if (is.null(rcens)) {
       stop(insight::format_error(c(
         "Interval-censored rows carry no upper bound.",
-        i = paste0(
-          "Give the interval end as the third argument to 'cens()', ",
-          "as in 'y | cens(censored, upper) ~ ...'."
-        )
+        i = "Give it as the third argument: 'cens(censored, upper)'."
       )), call. = FALSE)
     }
     cdf_y <- dist_cdf(spec, linpred, y)
@@ -496,11 +493,7 @@ apply_addition_terms <- function(ll, object, resp, family_name, link,
         cli::format_inline(paste0(
           "'cens()' and 'trunc()' are unavailable for family ",
           "{.val {family_name}}."
-        )),
-        i = paste0(
-          "Both need the family's distribution function, which mvgam ",
-          "does not define for this family."
-        )
+        ))
       )), call. = FALSE)
     }
     ll <- apply_censoring(ll, terms$cens, terms$rcens, spec, linpred, y)

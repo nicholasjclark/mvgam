@@ -146,7 +146,7 @@ mvgam_r_eff_log_lik <- function(x, ll, draw_ids = NULL) {
   if (is.null(chain_id)) {
     return(rep(1, n_obs))
   }
-  loo::relative_eff(exp(ll), chain_id = chain_id)
+  without_ess_cap_notice(loo::relative_eff(exp(ll), chain_id = chain_id))
 }
 
 
@@ -272,7 +272,7 @@ loglik_col_values <- function(object, data, x, n_cols = NULL) {
   if (!is.null(n_cols) && length(out) != n_cols) {
     stop(insight::format_error(c(
       "The log-likelihood and the frame cover different observations.",
-      x = paste0("log_lik returned ", n_cols, " columns; the frame ",
+      x = paste0("log_lik returned ", n_cols, " columns. The frame ",
                  "gives ", length(out), " ", label, "."),
       i = paste0(
         "The frame passed here differs from the one the model was ",
@@ -359,13 +359,10 @@ require_loo_pairing <- function(object, fn_name) {
     stop(insight::format_error(c(
       paste0("'", fn_name, "' is not available for family '",
              resolve_family_name(family), "'."),
-      x = paste0(
-        "The likelihood is scored once per closure unit while a ",
-        "linear predictor has one value per visit. Summing log-odds ",
-        "across the visits of a unit names no quantity."
-      ),
+      x = "The likelihood is scored once per closure unit.",
+      x = "A linear predictor has one value per visit.",
       i = paste0(
-        "Use 'loo_epred' or 'loo_predict', which aggregate a unit's ",
+        "Use 'loo_epred' or 'loo_predict'. Both aggregate a unit's ",
         "visits the way the per-unit density does."
       )
     )), call. = FALSE)
@@ -411,12 +408,13 @@ narrow_to_scored <- function(x, scored_from) {
       max(scored) > n_x) {
     stop(insight::format_error(c(
       "Paired quantities cover different observations.",
-      x = paste0("Supplied ", n_x, " observations; scored ",
+      x = paste0("Supplied ", n_x, " observations. Scored ",
                  n_scored, "."),
       i = paste0(
         "A 'psis_object' built from a different model or response ",
-        "does this; leave it unset to have it computed here."
-      )
+        "causes this."
+      ),
+      i = "Leave 'psis_object' unset to have it computed here."
     )))
   }
   if (is.null(dim(x))) {
@@ -718,15 +716,10 @@ loo_subsample.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
   stop(insight::format_error(c(
     "'loo_subsample()' is not supported for 'mvgam' fits.",
     x = paste0(
-      "'loo::loo_subsample()' calls the log-likelihood as a function",
-      " (pointwise = TRUE). That interface needs a log-density",
-      " function for each observation, and mvgam does not expose one."
+      "'loo::loo_subsample()' needs a log-density function for each",
+      " observation. mvgam does not expose one."
     ),
-    i = paste0(
-      "Use 'loo(x)' on the full log-likelihood matrix. Subsampling",
-      " offers no efficiency gain when 'log_lik.mvgam' already",
-      " returns the full matrix in one call."
-    )
+    i = "Use 'loo(x)' on the full log-likelihood matrix."
   )))
 }
 
@@ -768,10 +761,7 @@ loo_model_weights.mvgam <- function(x, ..., model_names = NULL) {
       (is.null(names(rest)) || any(nchar(names(rest)) == 0L))) {
     stop(insight::format_error(c(
       "All non-model arguments to 'loo_model_weights()' must be named.",
-      i = paste0(
-        "Pass 'method', 'optim_method', 'cores' (etc.) as named",
-        " arguments; pass mvgam fits positionally."
-      )
+      i = "Pass mvgam fits by position."
     )))
   }
   loos <- lapply(models, loo)

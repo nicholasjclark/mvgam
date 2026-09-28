@@ -263,15 +263,8 @@ stub and say which helper to reach for. Where the model can be
 written as an \code{\link[=mvgam_formula]{mvgam_formula()}}, calling \code{\link[=stancode]{stancode()}} or
 \code{\link[=standata]{standata()}} on that object says the same thing more directly;
 \code{run_model = FALSE} is the route for a specification that only
-\code{\link[=jsdgam]{jsdgam()}} knows how to build. Both
-dispatch on \code{mvgam_formula} and share the exact same trend /
-\code{loadings_prior} pipeline used internally by \code{mvgam()} /
-\code{jsdgam()}, so they surface the same Stan code and data without
-any of the stub object's downstream limitations. A one-time
-\code{rlang::warn()} per session fires when this argument is \code{FALSE};
-repeated calls within the same R session do not re-warn (the
-warning is rate-limited via \code{.frequency = "regularly"}).
-Defaults to \code{TRUE}.}
+\code{\link[=jsdgam]{jsdgam()}} knows how to build. Both helpers build the same Stan
+code and data as \code{mvgam()}. Defaults to \code{TRUE}.}
 
 \item{...}{Additional arguments passed to Stan fitting. Two are worth
 calling out. \code{algorithm} selects how the posterior is explored and

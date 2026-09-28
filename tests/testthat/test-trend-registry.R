@@ -232,6 +232,7 @@ test_that("Custom trend registration works", {
 
 test_that("Overwriting existing trend types gives warning", {
   local_verbose_warnings()
+  withr::local_envvar(TESTTHAT = "")
   # Clear and initialize registry
   rm(list = ls(envir = trend_registry), envir = trend_registry)
   register_core_trends()
@@ -372,31 +373,29 @@ test_that("process_trend_params preserves existing _trend suffix", {
 
 test_that("simplified RW constructor works correctly", {
   # Test simplified RW constructor using helper functions
-  suppressWarnings({
-    # Test basic RW constructor
-    rw_trend <- RW()
-    expect_s3_class(rw_trend, "mvgam_trend")
-    expect_equal(rw_trend$trend, "RW")
-    expect_false(rw_trend$ma)
-    expect_false(rw_trend$cor)
-    expect_null(rw_trend$n_lv)
+  # Test basic RW constructor
+  rw_trend <- RW()
+  expect_s3_class(rw_trend, "mvgam_trend")
+  expect_equal(rw_trend$trend, "RW")
+  expect_false(rw_trend$ma)
+  expect_false(rw_trend$cor)
+  expect_null(rw_trend$n_lv)
 
-    # RW indexes its lag by position, and the fitting path tests this
-    # declaration to require an even grid.
-    expect_identical(rw_trend$validation_rules,
-                     "requires_regular_intervals")
+  # RW indexes its lag by position, and the fitting path tests this
+  # declaration to require an even grid.
+  expect_identical(rw_trend$validation_rules,
+                   "requires_regular_intervals")
 
-    # Test RW with parameters
-    rw_ma_trend <- RW(ma = TRUE, cor = TRUE)
-    expect_true(rw_ma_trend$ma)
-    expect_true(rw_ma_trend$cor)
+  # Test RW with parameters
+  rw_ma_trend <- RW(ma = TRUE, cor = TRUE)
+  expect_true(rw_ma_trend$ma)
+  expect_true(rw_ma_trend$cor)
 
-    # Test RW with custom variables
-    rw_custom <- RW(time = week, series = species, ma = TRUE)
-    expect_equal(rw_custom$time, "week")
-    expect_equal(rw_custom$series, "species")
-    expect_true(rw_custom$ma)
-  })
+  # Test RW with custom variables
+  rw_custom <- RW(time = week, series = species, ma = TRUE)
+  expect_equal(rw_custom$time, "week")
+  expect_equal(rw_custom$series, "species")
+  expect_true(rw_custom$ma)
 })
 
 test_that("helper functions work correctly", {
@@ -435,56 +434,52 @@ test_that("helper functions work correctly", {
   expect_true(length(complete_trend$validation_rules) > 0)  # Auto-assigned
 
   # Test create_mvgam_trend helper
-  suppressWarnings({
-    trend_obj <- create_mvgam_trend("RW", ma = TRUE, cor = FALSE)
-    expect_s3_class(trend_obj, "mvgam_trend")
-    expect_equal(trend_obj$trend, "RW")
-    expect_true(trend_obj$ma)
-    expect_false(trend_obj$cor)
-    expect_equal(trend_obj$time, "time")
-    expect_equal(trend_obj$series, "series")
-  })
+  trend_obj <- create_mvgam_trend("RW", ma = TRUE, cor = FALSE)
+  expect_s3_class(trend_obj, "mvgam_trend")
+  expect_equal(trend_obj$trend, "RW")
+  expect_true(trend_obj$ma)
+  expect_false(trend_obj$cor)
+  expect_equal(trend_obj$time, "time")
+  expect_equal(trend_obj$series, "series")
 })
 
 test_that("trend constructors use process_trend_params correctly", {
   # Test that actual trend constructors produce correct parameter names
-  suppressWarnings({
-    # Test basic RW constructor (parameter processing moved to Stan assembly)
-    rw_trend <- RW()
-    expect_s3_class(rw_trend, "mvgam_trend")
-    expect_equal(rw_trend$trend, "RW")
-    expect_false(rw_trend$ma)
+  # Test basic RW constructor (parameter processing moved to Stan assembly)
+  rw_trend <- RW()
+  expect_s3_class(rw_trend, "mvgam_trend")
+  expect_equal(rw_trend$trend, "RW")
+  expect_false(rw_trend$ma)
 
-    # Test RW with ma = TRUE
-    rw_ma_trend <- RW(ma = TRUE)
-    expect_equal(rw_ma_trend$trend, "RW")
-    expect_true(rw_ma_trend$ma)
+  # Test RW with ma = TRUE
+  rw_ma_trend <- RW(ma = TRUE)
+  expect_equal(rw_ma_trend$trend, "RW")
+  expect_true(rw_ma_trend$ma)
 
-    # Test AR constructor (complex parameter processing moved to Stan assembly)
-    ar1_trend <- AR(p = 1)
-    expect_equal(ar1_trend$trend, "AR")  # Base type for all dispatch
-    expect_equal(ar1_trend$p, 1)
+  # Test AR constructor (complex parameter processing moved to Stan assembly)
+  ar1_trend <- AR(p = 1)
+  expect_equal(ar1_trend$trend, "AR")  # Base type for all dispatch
+  expect_equal(ar1_trend$p, 1)
 
-    ar2_trend <- AR(p = 2)
-    expect_equal(ar2_trend$trend, "AR")  # Base type for all dispatch
-    expect_equal(ar2_trend$p, 2)
+  ar2_trend <- AR(p = 2)
+  expect_equal(ar2_trend$trend, "AR")  # Base type for all dispatch
+  expect_equal(ar2_trend$p, 2)
 
-    # Test VAR constructor
-    var_trend <- VAR(p = 1)
-    expect_equal(var_trend$trend, "VAR")  # Base type for all dispatch
-    expect_equal(var_trend$p, 1)
-    expect_true(var_trend$cor)  # VAR always has cor = TRUE
+  # Test VAR constructor
+  var_trend <- VAR(p = 1)
+  expect_equal(var_trend$trend, "VAR")  # Base type for all dispatch
+  expect_equal(var_trend$p, 1)
+  expect_true(var_trend$cor)  # VAR always has cor = TRUE
 
-    # Test CAR constructor (basic structure only - detailed tests will be added after simplification)
-    car_trend <- CAR()
-    expect_equal(car_trend$trend, "CAR")
+  # Test CAR constructor (basic structure only - detailed tests will be added after simplification)
+  car_trend <- CAR()
+  expect_equal(car_trend$trend, "CAR")
 
-    # Test AR with MA
-    ar_ma_trend <- AR(p = 1, ma = TRUE)
-    expect_equal(ar_ma_trend$trend, "AR")  # Base type for all dispatch
-    expect_equal(ar_ma_trend$p, 1)
-    expect_true(ar_ma_trend$ma)
-  })
+  # Test AR with MA
+  ar_ma_trend <- AR(p = 1, ma = TRUE)
+  expect_equal(ar_ma_trend$trend, "AR")  # Base type for all dispatch
+  expect_equal(ar_ma_trend$p, 1)
+  expect_true(ar_ma_trend$ma)
 })
 
 test_that("every rule constant is one a trend actually declares", {
@@ -509,61 +504,57 @@ test_that("parameter suffix validation is robust", {
 
 test_that("simplified AR constructor works correctly", {
   # Test simplified AR constructor using create_mvgam_trend helper
-  suppressWarnings({
-    # Test basic AR constructor
-    ar_trend <- AR()
-    expect_s3_class(ar_trend, "mvgam_trend")
-    expect_equal(ar_trend$trend, "AR")  # Base type for dispatch
-    expect_equal(ar_trend$p, 1)  # Default p = 1
-    expect_false(ar_trend$ma)
-    expect_false(ar_trend$cor)
-    expect_null(ar_trend$n_lv)
+  # Test basic AR constructor
+  ar_trend <- AR()
+  expect_s3_class(ar_trend, "mvgam_trend")
+  expect_equal(ar_trend$trend, "AR")  # Base type for dispatch
+  expect_equal(ar_trend$p, 1)  # Default p = 1
+  expect_false(ar_trend$ma)
+  expect_false(ar_trend$cor)
+  expect_null(ar_trend$n_lv)
 
-    # Test AR with custom parameters
-    ar_custom <- AR(p = 3, ma = TRUE, cor = TRUE, n_lv = 2)
-    expect_equal(ar_custom$trend, "AR")  # Always base type
-    expect_equal(ar_custom$p, 3)
-    expect_true(ar_custom$ma)
-    expect_true(ar_custom$cor)
-    expect_equal(ar_custom$n_lv, 2)
+  # Test AR with custom parameters
+  ar_custom <- AR(p = 3, ma = TRUE, cor = TRUE, n_lv = 2)
+  expect_equal(ar_custom$trend, "AR")  # Always base type
+  expect_equal(ar_custom$p, 3)
+  expect_true(ar_custom$ma)
+  expect_true(ar_custom$cor)
+  expect_equal(ar_custom$n_lv, 2)
 
-    # Test AR with vector p
-    ar_vector <- AR(p = c(1, 12))
-    expect_equal(ar_vector$trend, "AR")  # Still base type
-    expect_equal(ar_vector$p, c(1, 12))
+  # Test AR with vector p
+  ar_vector <- AR(p = c(1, 12))
+  expect_equal(ar_vector$trend, "AR")  # Still base type
+  expect_equal(ar_vector$p, c(1, 12))
 
-    # Test AR with custom time/series variables
-    ar_vars <- AR(time = month, series = site)
-    expect_equal(ar_vars$time, "month")
-    expect_equal(ar_vars$series, "site")
+  # Test AR with custom time/series variables
+  ar_vars <- AR(time = month, series = site)
+  expect_equal(ar_vars$time, "month")
+  expect_equal(ar_vars$series, "site")
 
-    # Test AR with grouping variables
-    ar_grouped <- AR(gr = region, subgr = species)
-    expect_equal(ar_grouped$gr, "region")
-    expect_equal(ar_grouped$subgr, "species")
-  })
+  # Test AR with grouping variables
+  ar_grouped <- AR(gr = region, subgr = species)
+  expect_equal(ar_grouped$gr, "region")
+  expect_equal(ar_grouped$subgr, "species")
 })
 
 test_that("create_mvgam_trend handles all parameters consistently", {
-  suppressWarnings({
-    # Test that all parameters use dot-prefix convention
-    # Use a valid trend type (RW) for this test
-    trend_obj <- create_mvgam_trend(
-      "RW",
-      .time = quote(month),
-      .series = quote(site),
-      .gr = quote(region),
-      .subgr = quote(species),
-      custom_param = 42
-    )
+  # Test that all parameters use dot-prefix convention
+  # Use a valid trend type (RW) for this test
+  trend_obj <- create_mvgam_trend(
+    "RW",
+    .time = quote(month),
+    .series = quote(site),
+    .gr = quote(region),
+    .subgr = quote(species),
+    custom_param = 42
+  )
 
-    expect_equal(trend_obj$trend, "RW")
-    expect_equal(trend_obj$time, "month")
-    expect_equal(trend_obj$series, "site")
-    expect_equal(trend_obj$gr, "region")
-    expect_equal(trend_obj$subgr, "species")
-    expect_equal(trend_obj$custom_param, 42)
-  })
+  expect_equal(trend_obj$trend, "RW")
+  expect_equal(trend_obj$time, "month")
+  expect_equal(trend_obj$series, "site")
+  expect_equal(trend_obj$gr, "region")
+  expect_equal(trend_obj$subgr, "species")
+  expect_equal(trend_obj$custom_param, 42)
 })
 
 test_that("get_covariance_pattern() matches dictionary keys case-insensitively", {

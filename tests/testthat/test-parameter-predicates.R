@@ -44,6 +44,41 @@ test_that("a fit keeps the parameters brms keeps", {
 })
 
 
+test_that("a trend with no design leaves its zero mu_trend unstored", {
+  # Every draw of a `mu_trend` the program never assigns to is zero,
+  # and its R-hat and effective sample size are undefined. A trend
+  # formula with terms writes to it, and the draws vary.
+  set.seed(3L)
+  dat <- data.frame(
+    y = rpois(60L, 4), x = rnorm(60L), time = rep(1:30, 2L),
+    series = factor(rep(c("a", "b"), each = 30L))
+  )
+  code_of <- function(trend) {
+    stancode(mvgam_formula(y ~ 1, trend_formula = trend), data = dat,
+             family = poisson())
+  }
+  zero <- list(~ RW(), ~ AR(p = 2), ~ VAR(), ~ -1 + AR(cor = TRUE))
+  for (trend in zero) {
+    expect_true(mu_trend_is_zero(code_of(trend)))
+  }
+  designed <- list(~ x + RW(), ~ s(x, k = 4) + AR())
+  for (trend in designed) {
+    expect_false(mu_trend_is_zero(code_of(trend)))
+  }
+  expect_false(mu_trend_is_zero(NULL))
+
+  # The exclusion follows `save_pars()` as brms's own do
+  code <- code_of(~ RW())
+  expect_true("mu_trend" %in% mvgam_excluded_pars(NULL, stancode = code))
+  expect_false("mu_trend" %in% mvgam_excluded_pars(
+    NULL, stancode = code, save_pars = brms::save_pars(all = TRUE)
+  ))
+  expect_false("mu_trend" %in% mvgam_excluded_pars(
+    NULL, stancode = code, save_pars = brms::save_pars(manual = "mu_trend")
+  ))
+})
+
+
 test_that("parameters are ordered by class, bookkeeping last", {
   pars <- c("lp__", "trend[1,1]", "sigma", "lprior", "b_x", "b_Intercept",
             "sd_g__Intercept", "Intercept", "sds_1", "r_g[a,Intercept]",

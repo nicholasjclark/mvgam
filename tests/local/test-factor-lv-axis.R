@@ -1137,16 +1137,17 @@ test_that("a narrowed likelihood is paired with the rows it kept", {
   expect_identical(ncol(cleaned), nrow(d) - n_missing)
   expect_length(attr(cleaned, "scored_columns"), ncol(cleaned))
 
-  # `loo()` and `waic()` read the narrowed matrix and answer, which
-  # is what places the fault below in the pairing rather than in the
-  # narrowing. Asserted first so that they run.
-  expect_true(is.finite(
-    suppressWarnings(loo(fit))$estimates["elpd_loo", "Estimate"]
-  ))
-  expect_true(is.finite(
-    suppressWarnings(waic(fit))$estimates["elpd_waic", "Estimate"]
-  ))
-
+  # `loo()` and `waic()` return finite estimates from the narrowed
+  # matrix, which places the fault below in the pairing. They are
+  # asserted first and run whatever the pairing does. This posterior
+  # leaves some Pareto k high and some `p_waic` above 0.4, and every
+  # warning either method raises is one of those diagnostics.
+  loo_warnings <- capture_warnings(ic <- loo(fit))
+  expect_match(loo_warnings, "Pareto k diagnostic")
+  expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+  waic_warnings <- capture_warnings(ic <- waic(fit))
+  expect_match(waic_warnings, "p_waic estimates greater than 0.4")
+  expect_true(is.finite(ic$estimates["elpd_waic", "Estimate"]))
 })
 
 
@@ -1156,7 +1157,9 @@ test_that("a narrowed likelihood is paired with the rows it kept", {
 # first would hide the second.
 
 test_that("loo splits the likelihood it was given", {
-  by_series <- suppressWarnings(loo(fit, by_series = TRUE))
+  # Every warning raised is a Pareto k notice, one per series.
+  loo_warnings <- capture_warnings(by_series <- loo(fit, by_series = TRUE))
+  expect_match(loo_warnings, "Pareto k diagnostic")
   expect_s3_class(by_series, "data.frame")
   expect_true(all(is.finite(by_series$elpd_loo)))
 })
@@ -1171,13 +1174,17 @@ test_that("a refit rebuilds the model that was fitted", {
   # series axis instead of the factor axis, and the refit carries one
   # smooth per series where the fit has one per factor.
   #
-  # Asserted on the program rather than on the call, because a call
-  # that names `n_lv` is not the claim; a refit that builds the same
-  # model is.
-  refit <- suppressWarnings(update(
-    fit, newdata = mvgam:::mvgam_training_data(fit),
-    chains = 1L, iter = 2L, silent = 2L, refresh = 0
-  ))
+  # The claim is a refit that builds the same model, and it is
+  # asserted on the program. A call that names `n_lv` proves nothing.
+  # `run_model = FALSE` builds the program and its data without
+  # sampling. The frame's missing responses draw brms's notice, which
+  # this file asserts wherever it arises.
+  expect_warning(
+    refit <- update(
+      fit, newdata = mvgam:::mvgam_training_data(fit), run_model = FALSE
+    ),
+    "Rows containing NAs"
+  )
   parent_sd <- standata(fit)
   refit_sd <- standata(refit)
   # Compared by value: the two paths agree on the count while
@@ -1201,7 +1208,7 @@ test_that("a refit rebuilds the model that was fitted", {
 
 
 test_that("kfold partitions the rows the likelihood scored", {
-  kf <- suppressWarnings(kfold(fit, K = 2L))
+  kf <- kfold(fit, K = 2L)
   expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
 })
 

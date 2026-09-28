@@ -49,8 +49,8 @@ returning the family mean instead.
 Defaults to \code{TRUE}.}
 
 \item{process_error}{Logical. When \code{FALSE} (the default),
-hindcasts read the Stan-fitted latent state directly
-(\code{trend[t, s]} and \code{mu_trend[t, s]} from the posterior), and
+hindcasts take the Stan-fitted latent state directly
+(\code{trend[t, s]} from the posterior), and
 \code{type = "response"} samples only observation-family noise on
 top of that exact state. When \code{TRUE}, fresh innovations are
 drawn from the trend's covariance structure and added to the

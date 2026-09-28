@@ -74,11 +74,7 @@ plot_factors <- function(
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv)) {
     stop(insight::format_error(c(
-      "Object does not contain any latent dynamic factors.",
-      i = paste0(
-        "Latent factor plots require an LV trend ",
-        "(e.g. `trend_formula = ~ AR(n_lv = 2)`)."
-      )
+      "The model has no latent factors to plot."
     )))
   }
 

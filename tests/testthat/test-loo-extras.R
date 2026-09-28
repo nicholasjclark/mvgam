@@ -322,16 +322,15 @@ test_that("per_obs_series_labels rejects mv-custom families", {
 test_that("per_series_ic returns one elpd row per series", {
   stub <- make_by_series_stub()
   set.seed(7L)
-  logliks <- matrix(rnorm(40 * 8L, mean = -1, sd = 0.5),
-                    nrow = 40L, ncol = 8L)
-  # Reason: synthetic rnorm log-lik gives loo() no dependence
-  # structure to smooth over, so high Pareto-k is expected. The
-  # assertions below check the shape of the returned frame, not
-  # the numerical quality of the fit, so silence the pareto-k
-  # warning at this call site rather than making it noise.
-  out_loo <- suppressWarnings(
-    mvgam:::per_series_ic(stub, logliks, criterion = "loo")
+  # One row per stub draw (2 chains of 80). Draws autocorrelated as
+  # MCMC draws are keep each effective sample size below the draw
+  # count and every Pareto k under the threshold. The assertions
+  # check the shape of the frame.
+  logliks <- -1 + 0.1 * apply(
+    matrix(rnorm(160L * 8L), nrow = 160L), 2L,
+    function(z) as.numeric(stats::filter(z, 0.3, "recursive"))
   )
+  out_loo <- mvgam:::per_series_ic(stub, logliks, criterion = "loo")
   expect_s3_class(out_loo, "data.frame")
   expect_setequal(out_loo$series, c("a", "b"))
   expect_named(out_loo,

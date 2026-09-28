@@ -124,16 +124,13 @@ extract_truncation_bounds <- function(object, nobs) {
     } else if (length(unique(finite_lb)) == 1) {
       lb <- rep(unique(finite_lb), nobs)
     } else {
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          c(
-            "Variable truncation bounds are not supported for predictions.",
-            "i" = "Truncation will be ignored for posterior_predict."
-          ),
-          .frequency = "once",
-          .frequency_id = "mvgam_variable_trunc_lb"
-        )
-      }
+      warn_once(
+        c(
+          "Variable truncation bounds are not supported for predictions.",
+          "i" = "Truncation will be ignored for posterior_predict."
+        ),
+        "mvgam_variable_trunc_lb"
+      )
       lb <- NULL
     }
   }
@@ -146,16 +143,13 @@ extract_truncation_bounds <- function(object, nobs) {
     } else if (length(unique(finite_ub)) == 1) {
       ub <- rep(unique(finite_ub), nobs)
     } else {
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          c(
-            "Variable truncation bounds are not supported for predictions.",
-            "i" = "Truncation will be ignored for posterior_predict."
-          ),
-          .frequency = "once",
-          .frequency_id = "mvgam_variable_trunc_ub"
-        )
-      }
+      warn_once(
+        c(
+          "Variable truncation bounds are not supported for predictions.",
+          "i" = "Truncation will be ignored for posterior_predict."
+        ),
+        "mvgam_variable_trunc_ub"
+      )
       ub <- NULL
     }
   }
@@ -296,22 +290,19 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
   # Warn if significant clamping occurred (>1% matches brms threshold)
   clamp_frac <- n_clamped / total_samples
   if (clamp_frac > 0.01) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        c(
-          paste0(
-            round(clamp_frac * 100, 1), "% of samples (",
-            n_clamped, " of ", total_samples, ") were clamped."
-          ),
-          "i" = paste(
-            "This may indicate the truncation region is too narrow",
-            "relative to the posterior predictive distribution."
-          )
+    warn_once(
+      c(
+        paste0(
+          round(clamp_frac * 100, 1), "% of samples (",
+          n_clamped, " of ", total_samples, ") were clamped."
         ),
-        .frequency = "once",
-        .frequency_id = "mvgam_truncation_clamp"
-      )
-    }
+        "i" = paste(
+          "This may indicate the truncation region is too narrow",
+          "relative to the posterior predictive distribution."
+        )
+      ),
+      "mvgam_truncation_clamp"
+    )
   }
 
   # Convert back to vector if input was vector
@@ -1093,7 +1084,7 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
         "' was predicted from a different number of draws than the ",
         "linear predictor."
       ),
-      x = paste0("Got ", nrow(out), " rows; expected ", ndraws, ".")
+      x = paste0("Got ", nrow(out), " rows. Expected ", ndraws, ".")
     )))
   }
   if (!is.null(nobs) && ncol(out) != nobs) {
@@ -1102,10 +1093,10 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
         "Distributional parameter '", dpar, "' was predicted for a ",
         "different number of rows than the linear predictor covers."
       ),
-      x = paste0("Got ", ncol(out), " columns; expected ", nobs, "."),
+      x = paste0("Got ", ncol(out), " columns. Expected ", nobs, "."),
       i = paste0(
-        "This happens when a covariate in the '", dpar, "' formula is ",
-        "missing from the prediction data. Supply it in 'newdata'."
+        "A covariate of the '", dpar, "' formula may be missing from ",
+        "'newdata'."
       )
     )))
   }

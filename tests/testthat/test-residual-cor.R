@@ -462,30 +462,6 @@ test_that("residual_cor hierarchical with by_group = TRUE returns list", {
 
 # ---- error paths ------------------------------------------------------
 
-test_that("residual_cor errors when trend pattern = none", {
-  cov_struct <- list(pattern = "none", n_series = 0L,
-                     hierarchical = FALSE, has_correlations = FALSE,
-                     ndraws = 0L, params = list(), group_info = NULL)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
-  expect_error(residual_cor(build_fake_mvgam()), "no covariance")
-})
-
-
-test_that("residual_cor errors when correlations not requested", {
-  cov_struct <- list(pattern = "cholesky_scaled", n_series = 3L,
-                     hierarchical = FALSE, has_correlations = FALSE,
-                     ndraws = 50L, params = list(), group_info = NULL)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
-  expect_error(residual_cor(build_fake_mvgam()), "independent")
-})
-
-
 test_that("residual_cor.jsdgam errors when called on an unfitted object", {
   # jsdgam now routes through the shared factor-loadings branch in
   # `compute_residual_cor()`, so an empty / unfitted jsdgam object
@@ -594,4 +570,28 @@ test_that("print.mvgam_residcor returns the object invisibly", {
   out <- capture.output(invisible(print(res)))
   expect_true(any(grepl("Residual correlations", out)))
   expect_true(any(grepl("Pattern", out)))
+})
+
+
+test_that("residual_cor refuses a trend with independent series", {
+  # A trend without a process-error matrix, one with a diagonal matrix
+  # and a Cholesky trend fitted without correlations all reach the
+  # same refusal.
+  structs <- list(
+    none = list(pattern = "none", n_series = 2L, hierarchical = FALSE,
+                has_correlations = FALSE),
+    diagonal = list(pattern = "diagonal", n_series = 2L,
+                    hierarchical = FALSE, has_correlations = FALSE),
+    independent = modifyList(
+      mk_chol_cov_struct(c(1, 1), diag(2)), list(has_correlations = FALSE)
+    )
+  )
+  for (cov_struct in structs) {
+    testthat::local_mocked_bindings(
+      get_trend_covariance_structure = function(object) cov_struct,
+      .package = "mvgam"
+    )
+    expect_error(residual_cor(build_fake_mvgam()),
+                 "no correlation between series")
+  }
 })

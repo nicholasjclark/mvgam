@@ -944,9 +944,12 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       response_names <- names(dimensions$mappings)
       response_glm_usage <- detect_glm_usage(obs_setup$stancode, response_names)
 
-      # Create mu_ones stanvars only for responses that use GLM
+      # A response needs mu_ones when mvgam rewrites its GLM call to
+      # take `to_matrix(mu)`. A call that takes brms's declared mu
+      # keeps its own coefficients.
       for (resp_name in names(response_glm_usage)) {
-        if (isTRUE(response_glm_usage[[resp_name]])) {
+        if (isTRUE(response_glm_usage[[resp_name]]) &&
+            !glm_takes_declared_mu(obs_setup$stancode, resp_name)) {
           mu_ones_name <- paste0("mu_ones_", resp_name)
           mu_ones_stanvar <- stanvar(
             x = 1,
@@ -963,9 +966,9 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
         }
       }
     } else {
-      # UNIVARIATE: Use original logic with generic mu_ones
       detected_glm_types <- detect_glm_usage(obs_setup$stancode)
-      if (length(detected_glm_types) > 0) {
+      if (length(detected_glm_types) > 0 &&
+          !glm_takes_declared_mu(obs_setup$stancode, "")) {
         # Create mu_ones data stanvar for GLM beta parameter
         mu_ones_stanvar <- stanvar(
           x = 1,
@@ -1575,25 +1578,33 @@ inject_multivariate_trends_into_linear_predictors <- function(
       # call is read by the per-family layout, which names the design
       # matrix, intercept and coefficients brms actually wrote. An arm
       # with no intercept passes `0` and an uncentred `X`, and neither
-      # can be assumed. The call is then rewritten to read `mu_<resp>`.
+      # can be assumed.
       glm_pattern <- paste0(stan_density_call_pattern("_glm"),
                             "\\(Y_", resp_name, " \\|")
       glm_lines <- which(grepl(glm_pattern, code_lines))
       if (!length(glm_lines)) {
         stop(insight::format_error(c(
           paste0("No GLM likelihood was found for response '", resp_name,
-                 "', which brms was detected to write one for."),
-          i = "The trend cannot be added to a likelihood it cannot find."
+                 "'."),
+          i = "Please report this internal mvgam bug."
         )), call. = FALSE)
       }
+      # An offset makes brms declare `mu_<resp>` and pass it as the GLM
+      # intercept. The trend then adds to that vector, and the call
+      # keeps the design matrix and coefficients brms gave it.
+      takes_mu <- glm_takes_declared_mu(
+        paste(code_lines, collapse = "\n"), resp_name
+      )
       glm_params <- NULL
       for (line_idx in glm_lines) {
         old_line <- code_lines[line_idx]
         glm_type <- glm_family_of_line(old_line)
         glm_params <- parse_glm_parameters_from_line(old_line, glm_type)
-        code_lines[line_idx] <- transform_single_glm_call(
-          old_line, glm_type, glm_params
-        )
+        if (!takes_mu) {
+          code_lines[line_idx] <- transform_single_glm_call(
+            old_line, glm_type, glm_params
+          )
+        }
       }
 
       # Add mu_<resp> computation in model block using shared utility
@@ -1604,15 +1615,12 @@ inject_multivariate_trends_into_linear_predictors <- function(
         # addition.
         insert_point <- find_prior_only_insertion_point(code_lines, model_info)
 
-        # Create mu computation code for GLM responses
-        # Check if this variable already exists in base_stancode
-        existing_mu_pattern <- paste0("vector\\[N_", resp_name, "\\]\\s+mu_", resp_name)
-        existing_mu_lines <- grep(existing_mu_pattern, code_lines, value = TRUE)
-        
-        if (length(existing_mu_lines) > 0) {
-          # Existing mu variable found - add trend effects to it
-          
-          # Find the for loop that modifies mu_resp and insert after its closing brace
+        if (takes_mu) {
+          # Add the trend to the declared mu_<resp>, after the loop
+          # brms wrote to modify it where there is one
+          existing_mu_pattern <- paste0(
+            "vector\\[N_", resp_name, "\\]\\s+mu_", resp_name
+          )
           for_loop_pattern <- paste0("for \\(n in 1:N_", resp_name, "\\)")
           for_loop_lines <- which(grepl(for_loop_pattern, code_lines))
           
@@ -1640,10 +1648,7 @@ inject_multivariate_trends_into_linear_predictors <- function(
           )
           
         } else {
-          # No existing mu variable found - create from scratch
-          
-          # Create full mu computation with declaration, from the
-          # arguments the GLM call carried
+          # Declare mu_<resp> from the arguments the GLM call carried
           mu_var <- glm_mu_names(resp_name)[["mu"]]
           intercept <- glm_params$intercept
           offset <- if (is.null(intercept) || identical(intercept, "0")) {
@@ -2083,15 +2088,18 @@ combine_stanvars <- function(...) {
 #' @param n_lv Number of latent variables
 #' @param n_series Number of time series
 #' @param cor Logical, whether to include correlation parameters
-#' @param factor_model Logical, whether this is a factor model
+#' @param unit_factors Logical, `TRUE` when the model samples every
+#'   loading, which fixes the factor innovations at unit scale and
+#'   zero correlation (see `samples_factor_loadings()`)
 #' @param hierarchical_info List with hierarchical structure info (NULL for simple models)
 #' @return List of stanvar objects for shared parameters
 #' @noRd
 generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
-                                               factor_model = FALSE,
+                                               unit_factors = FALSE,
                                                mgp_scale = FALSE,
                                                hierarchical_info = NULL) {
   checkmate::assert_flag(mgp_scale)
+  checkmate::assert_flag(unit_factors)
 
   # Determine effective dimension for innovations using symbolic names
   effective_dim <- "N_lv_trend"
@@ -2115,7 +2123,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     # one leaves only their product identified. Deriving it here
     # gives the column one scale, and puts that scale on innovations
     # drawn from `std_normal()`, which is where it can be traversed.
-    if (!mgp_scale) {
+    if (!mgp_scale && !unit_factors) {
       sigma_stanvar <- brms::stanvar(
         name = "sigma_trend",
         scode = paste0(
@@ -2130,7 +2138,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     # correlation is asked for, including at one latent dimension
     # where it is a 1x1 identity, because the post-fit extractors
     # read `L_Omega_trend` without first checking the dimension.
-    if (cor) {
+    if (cor && !unit_factors) {
       # Cholesky factor for correlation matrix
       l_omega_stanvar <- brms::stanvar(
         name = "L_Omega_trend",
@@ -2138,7 +2146,8 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
         block = "parameters"
       )
       stanvar_components <- append(stanvar_components, list(l_omega_stanvar))
-
+    }
+    if (cor) {
       # Derived covariance matrix in transformed parameters. The
       # scaled Cholesky factor is the intermediate, not the reported
       # quantity: `Sigma_trend` is read as a covariance wherever it
@@ -2177,15 +2186,23 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
       "\n    vector<lower=0>[", effective_dim,
       "] sigma_trend = sqrt(Psi_diag);"
     )
+  } else if (unit_factors) {
+    unit_factor_scale_scode(effective_dim)
   } else {
     ""
+  }
+  if (unit_factors && cor && !is_hierarchical) {
+    sigma_decl <- paste0(
+      sigma_decl, "\n    cholesky_factor_corr[", effective_dim,
+      "] L_Omega_trend = identity_matrix(", effective_dim, ");"
+    )
   }
   if (is_hierarchical) {
     # Hierarchical case: only declare scaled_innovations_trend, hierarchical system will compute it
     final_innovations_code <- paste0("
     // Innovations scaled by each group's Cholesky factor, filled below
     matrix[N_time_trend, ", effective_dim, "] scaled_innovations_trend;")
-  } else if (cor) {
+  } else if (cor && !unit_factors) {
     # Simple correlated case
     final_innovations_code <- paste0("
     // Scaled innovations after applying correlations
@@ -2357,8 +2374,10 @@ nu_trend_stanvars <- function(df, prior = NULL) {
 generate_innovation_model <- function(effective_dim, cor = FALSE,
                                       is_hierarchical = FALSE,
                                       prior = NULL, df = Inf,
-                                      mgp_scale = FALSE) {
+                                      mgp_scale = FALSE,
+                                      unit_factors = FALSE) {
   checkmate::assert_flag(mgp_scale)
+  checkmate::assert_flag(unit_factors)
 
   innovation_code <- innovation_sampling_code(effective_dim, df)
 
@@ -2378,11 +2397,11 @@ generate_innovation_model <- function(effective_dim, cor = FALSE,
     # `sigma_trend` is a transformed parameter equal to
     # `sqrt(Psi_diag)`, so it carries the MGP prior already and a
     # sampling statement on it would be a second, contradictory one.
-    if (sigma_prior_str != "" && !mgp_scale) {
+    if (sigma_prior_str != "" && !mgp_scale && !unit_factors) {
       prior_code <- c(prior_code, glue::glue("sigma_trend ~ {sigma_prior_str};"))
     }
 
-    if (cor) {
+    if (cor && !unit_factors) {
       # Read through the shared resolver so a user prior on the
       # correlation factor is honoured rather than overwritten by a
       # literal, and so the prior table reports what is sampled.
@@ -3123,10 +3142,10 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 #' parameters that index over the latent factor dimension `K`
 #' and whose interpretation only makes sense in the identified
 #' basis: `Z_tilde`, `lv_trend_tilde`, and (VAR only)
-#' `A_trend_tilde`. Per-factor scalar parameters
-#' (`ar1_trend`, `ar{p}_trend`, `theta1_trend`,
-#' `sigma_trend`, `L_Omega_trend`, `Sigma_trend`) are NOT
-#' rotated. They remain in the unrotated `Z` basis, where
+#' `A_trend_tilde`. The factor innovations have identity
+#' covariance, which the rotation leaves unchanged. Per-factor
+#' scalar parameters (`ar1_trend`, `ar{p}_trend`, `theta1_trend`)
+#' stay unrotated. They remain in the unrotated `Z` basis, where
 #' element `k` describes factor `k` of the sampled `Z`. After
 #' rotation, factor `k` of `lv_trend_tilde` is a linear
 #' combination of the unrotated factors under `Q_tilde`, so
@@ -3809,11 +3828,7 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
   if (is.null(series_groups)) {
     stop(insight::format_error(c(
       "A hierarchical trend reached Stan assembly with no series groups.",
-      x = cli::format_inline(
-        "{.field {gr_var}} names the grouping, but the axis ",
-        "carries no groups for it."
-      ),
-      i = "The series axis and its groups are resolved together."
+      i = "Please report this internal mvgam bug."
     )), call. = FALSE)
   }
   group_inds_array <- match(series_groups, group_levels)
@@ -4083,7 +4098,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     n_lv <- trend_specs$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
     n_series <- data_info$n_series %||% 1
     cor <- trend_specs$cor %||% FALSE
-    factor_model <- !is.null(trend_specs$n_lv) && trend_specs$n_lv < n_series
+    unit_factors <- samples_factor_loadings(trend_specs)
 
     # Generate shared innovation stanvars
     # The MGP column scale and a free `sigma_trend` are the same
@@ -4114,11 +4129,12 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
         )
       )))
     }
+    refuse_unit_factor_priors(prior, unit_factors)
     shared_stanvars <- generate_shared_innovation_stanvars(
       n_lv = n_lv,
       n_series = n_series,
       cor = cor,
-      factor_model = factor_model,
+      unit_factors = unit_factors,
       mgp_scale = mgp_scale,
       hierarchical_info = hierarchical_info
     )
@@ -4133,7 +4149,8 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
       is_hierarchical = is_hierarchical,
       prior = prior,
       df = trend_specs$df %||% Inf,
-      mgp_scale = mgp_scale
+      mgp_scale = mgp_scale,
+      unit_factors = unit_factors
     )
 
     # Combine shared stanvars with priors properly using combine_stanvars
@@ -4286,7 +4303,8 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (has_ma) {
     rw_parameters_stanvar <- brms::stanvar(
       name = "rw_parameters",
-      scode = "vector<lower=-1,upper=1>[N_lv_trend] theta1_trend;",
+      scode = paste0("// MA coefficient\n",
+                     "vector<lower=-1,upper=1>[N_lv_trend] theta1_trend;"),
       block = "parameters"
     )
     components <- append(components, list(rw_parameters_stanvar))
@@ -4356,13 +4374,17 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #' @param param_names Character vector of parameter names (e.g., c("ar1_trend", "sigma_trend"))
 #' @param prior brmsprior object or NULL
 #' @param stanvar_name Name for the stanvar object
+#' @param heading A Stan comment written above the statements, or NULL
 #' @return stanvar object with priors, or NULL if no priors specified
 #' @noRd
-generate_trend_priors_stanvar <- function(param_names, prior = NULL, stanvar_name = "trend_priors") {
+generate_trend_priors_stanvar <- function(param_names, prior = NULL,
+                                          stanvar_name = "trend_priors",
+                                          heading = NULL) {
   # Input validation
   checkmate::assert_character(param_names, min.len = 1, any.missing = FALSE)
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   checkmate::assert_string(stanvar_name, min.chars = 1)
+  checkmate::assert_string(heading, null.ok = TRUE)
 
   # Extract prior strings for each parameter
   prior_lines <- sapply(param_names, function(param_name) {
@@ -4383,7 +4405,7 @@ generate_trend_priors_stanvar <- function(param_names, prior = NULL, stanvar_nam
     return(brms::stanvar(
       x = NULL,
       name = stanvar_name,
-      scode = paste0(prior_lines, collapse = "\n"),
+      scode = paste(c(heading, prior_lines), collapse = "\n"),
       block = "model"
     ))
   } else {
@@ -4843,6 +4865,54 @@ ma_innovations_stanblock <- function(has_ma) {
   )
 }
 
+#' Stan declaration fixing the factor innovations at unit scale
+#'
+#' Used where the model samples every loading. See
+#' `samples_factor_loadings()` for the identification argument.
+#'
+#' @param dim Stan dimension of the factors.
+#' @return Character scalar, led by a newline.
+#' @noRd
+unit_factor_scale_scode <- function(dim = "N_lv_trend") {
+  checkmate::assert_string(dim, min.chars = 1L)
+  paste0(
+    "\n    // Sampled loadings absorb the factors' scale, and unit",
+    "\n    // innovations identify it",
+    "\n    vector<lower=0>[", dim, "] sigma_trend = rep_vector(1.0, ",
+    dim, ");"
+  )
+}
+
+#' Refuse a prior on a factor scale the model fixes
+#'
+#' With every loading sampled, `sigma_trend` is 1 and `L_Omega_trend`
+#' is the identity, and a prior on either has nothing to act on.
+#'
+#' @param prior A `brmsprior`, or NULL.
+#' @param unit_factors Whether the model samples every loading.
+#' @return `NULL`, invisibly, when nothing is refused.
+#' @noRd
+refuse_unit_factor_priors <- function(prior, unit_factors) {
+  checkmate::assert_flag(unit_factors)
+  if (!unit_factors || is.null(prior)) {
+    return(invisible(NULL))
+  }
+  fixed <- c("sigma_trend", "L_Omega_trend")
+  given <- fixed[vapply(fixed, function(cls) {
+    !is.null(extract_prior_string(prior, cls, handle_suffix = TRUE))
+  }, logical(1L))]
+  if (length(given)) {
+    stop(insight::format_error(c(
+      paste0("'", given[1L], "' is fixed in a factor model with ",
+             "sampled loadings."),
+      x = paste0("The factors take unit innovation scale and zero ",
+                 "correlation. The loadings 'Z' carry both."),
+      i = "Set a prior on 'Z', or fix loadings with 'trend_map'."
+    )), call. = FALSE)
+  }
+  invisible(NULL)
+}
+
 #' Stan statement scaling independent innovations by their SDs
 #'
 #' Column j of the innovations takes `sigma_trend[j]`. The
@@ -5121,8 +5191,11 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   has_ma <- trend_specs$ma %||% FALSE
   max_lag <- max(ar_lags)
   # Resolved once here: the init branch below and the emission gate
-  # for the joint stationary functions both ask this question.
-  cor <- isTRUE(trend_specs$cor %||% FALSE)
+  # for the joint stationary functions both ask this question. Sampled
+  # loadings fix the factor correlation at the identity, which leaves
+  # each factor its own independent start.
+  cor <- isTRUE(trend_specs$cor %||% FALSE) &&
+    !samples_factor_loadings(trend_specs)
   has_gr <- named_var(trend_specs$gr)
   # A contiguous lag set above one lag samples partial
   # autocorrelations, which makes every draw jointly stationary. The
@@ -5192,7 +5265,8 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (has_ma) {
     ma_parameters_stanvar <- brms::stanvar(
       name = "ar_ma_parameters",
-      scode = "vector<lower=-1,upper=1>[N_lv_trend] theta1_trend;",
+      scode = paste0("// MA coefficient\n",
+                     "vector<lower=-1,upper=1>[N_lv_trend] theta1_trend;"),
       block = "parameters"
     )
     components <- append(components, list(ma_parameters_stanvar))
@@ -5324,7 +5398,8 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     ma_model_stanvar <- generate_trend_priors_stanvar(
       param_names = "theta1_trend",
       prior = prior,
-      stanvar_name = "ar_ma_model"
+      stanvar_name = "ar_ma_model",
+      heading = "// MA coefficient prior"
     )
     components <- append_if_not_null(components, ma_model_stanvar)
   }
@@ -5448,6 +5523,11 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Check for hierarchical grouping requirements
   is_hierarchical <- named_var(trend_specs$gr)
   hierarchical_info <- NULL
+
+  # Sampled loadings absorb the factors' scale and correlation, which
+  # fixes Sigma_trend at the identity
+  unit_factors <- samples_factor_loadings(trend_specs)
+  refuse_unit_factor_priors(prior, unit_factors)
 
   if (is_hierarchical) {
     # Cross-cutting validation handled by injection function
@@ -5601,21 +5681,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     block = "functions"
   )
 
-  # VAR/VARMA transformed data with hyperparameter constants and utility arrays
-
-  # Dynamic parts that need variable interpolation
-  dynamic_part <- glue::glue("
-      // Zero mean vector for VARMA process (following Heaps 2022)
-      vector[N_lv_trend] trend_zeros = rep_vector(0.0, N_lv_trend);
-
-  ")
-
-  var_tdata_stanvar <- brms::stanvar(
-    name = "var_tdata",
-    scode = dynamic_part,
-    block = "tdata"
-  )
-  
   # Add lag count as data variable to eliminate hardcoded loop bounds
   var_data_stanvar <- brms::stanvar(
     x = lags,
@@ -5634,10 +5699,14 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   } else {
     paste0(
       "      // Standard VAR: single raw matrix\n",
-      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] A_raw_trend;\n\n",
-      "      // Standard variance and correlation parameters\n",
-      "      vector<lower=0>[N_lv_trend] sigma_trend;\n",
-      "      cholesky_factor_corr[N_lv_trend] L_Omega_trend;"
+      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] A_raw_trend;",
+      if (!unit_factors) {
+        paste0(
+          "\n\n      // Standard variance and correlation parameters\n",
+          "      vector<lower=0>[N_lv_trend] sigma_trend;\n",
+          "      cholesky_factor_corr[N_lv_trend] L_Omega_trend;"
+        )
+      }
     )
   }
 
@@ -5687,7 +5756,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "      array[N_groups_trend, ", lags, "] matrix[N_subgroups_trend, N_subgroups_trend] A_group_trend;\n\n",
       "      // Compute group-specific covariances using hierarchical correlation structure\n",
       "      for (g_idx in 1:N_groups_trend) {\n",
-      "        // Use shared combine_cholesky function to eliminate duplication\n",
+      "        // The global correlation mixed with the group's own deviation\n",
       "        matrix[N_subgroups_trend, N_subgroups_trend] L_Omega_group_trend =\n",
       "          combine_cholesky(L_Omega_global_trend, L_deviation_group_trend[g_idx], alpha_cor_trend);\n",
       "        Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(\n",
@@ -5717,6 +5786,13 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     )
   } else {
     paste0(
+      if (unit_factors) {
+        paste0(
+          unit_factor_scale_scode(), "\n",
+          "    cholesky_factor_corr[N_lv_trend] L_Omega_trend = ",
+          "identity_matrix(N_lv_trend);\n\n"
+        )
+      },
       "      // Standard VAR: single covariance matrix and transformation\n",
       "      matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);\n",
       "      cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);\n\n",
@@ -5866,13 +5942,14 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   lv_transpose_lag <- "lv_trend[t - i, :]'"
   lv_transpose_prev <- "lv_trend[t - 1, :]'"
 
-  # Conditional correlation prior for hierarchical vs non-hierarchical
-  omega_prior <- if(!is_hierarchical) {
+  # A hierarchical VAR has no L_Omega_trend. The stanvars of its
+  # grouped correlation carry their own priors.
+  omega_prior <- if (!is_hierarchical && !unit_factors) {
     paste0("// LKJ correlation prior on Cholesky factor\n      ",
            "L_Omega_trend ~ ",
            get_trend_parameter_prior(prior, "L_Omega_trend"), ";")
   } else {
-    "// Hierarchical correlation priors handled by add_hierarchical_support()"
+    ""
   }
 
   # Resolve user overrides for the array-shaped hyperpriors. They
@@ -5956,8 +6033,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # per-lag loop emitted above / in `varma_ma_priors`; routing them
   # through the top-level generator would double-assign the prior and
   # emit a scalar-on-array Stan statement.
-  if (is_hierarchical) {
-    # Hierarchical models: sigma_group_trend handled by shared hierarchical system
+  if (is_hierarchical || unit_factors) {
+    # A grouped VAR scales through sigma_group_trend, and sampled
+    # loadings fix the factor scale at 1
     var_params_to_prior <- character(0)
   } else {
     # Non-hierarchical models use sigma_trend
@@ -5990,16 +6068,15 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Create components list based on model type
   base_components <- if (is_varma) {
-    # VARMA case: include MA parameters (9 components: Z + var-specific + data)
+    # VARMA adds the MA parameters to the VAR components
     list(matrix_z, var_functions_stanvar,
-         stationary_joint_functions_stanvar(), var_tdata_stanvar,
+         stationary_joint_functions_stanvar(),
          var_data_stanvar, var_parameters_stanvar,
          var_ma_parameters_stanvar, var_tparameters_stanvar,
          var_model_stanvar)
   } else {
-    # VAR-only case: no MA parameters (8 components: Z + var-specific + data)
     list(matrix_z, var_functions_stanvar,
-         stationary_joint_functions_stanvar(), var_tdata_stanvar,
+         stationary_joint_functions_stanvar(),
          var_data_stanvar, var_parameters_stanvar,
          var_tparameters_stanvar, var_model_stanvar)
   }
@@ -6166,10 +6243,9 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # CAR does not support hierarchical correlations
   if (named_var(trend_specs$gr)) {
-    rlang::warn(
+    warn_once(
       "CAR trends do not support hierarchical correlations; ignoring 'gr' parameter",
-      .frequency = "once",
-      .frequency_id = "CAR_group_error"
+      "CAR_group_error"
     )
   }
 
@@ -6434,8 +6510,9 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #' requirements.
 #'
 #' @param trend_specs Trend specification for PW model containing parameters
-#'   like n_changepoints (number of changepoints), changepoint_scale (prior scale),
-#'   growth (trend pattern)
+#'   like n_changepoints (number of changepoints) and growth (trend
+#'   pattern). The changepoint scale reaches the model through the
+#'   `delta_trend` prior.
 #' @param data_info Data information including dimensions (n_obs, n_series, n_time)
 #'   and time structure for changepoint placement
 #' @param prior A brmsprior object containing custom prior specifications for
@@ -6568,12 +6645,10 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
 
   # Extract key parameters
   n_lv <- trend_specs$n_lv %||% 1
-  # `PW()` sets each of these, so reading them straight off the spec
-  # keeps one source; the assertions below catch a spec that arrives
-  # without them rather than falling back to a hardcoded default that
-  # could disagree with the constructor.
+  # `PW()` sets the changepoint count, and the assertion below stops
+  # a spec that arrives without one. A hardcoded fallback could
+  # disagree with the constructor.
   n_changepoints <- trend_specs$n_changepoints
-  changepoint_scale <- trend_specs$changepoint_scale
   # `pw_growth()` resolves the growth form for every caller that needs
   # it, and `PW()` validates the value with `match.arg()`.
   trend_type <- pw_growth(trend_specs)
@@ -6610,10 +6685,9 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
   )
   components <- append_if_not_null(components, matrix_z)
 
-  # Functions block - Prophet-style piecewise functions
-  pw_functions_stanvar <- brms::stanvar(
-    name = "pw_functions",
-    scode = "
+  # Functions block - Prophet-style piecewise functions. Each growth
+  # form emits the one trend function its transformed parameters call.
+  pw_changepoint_scode <- "
       matrix get_changepoint_matrix(vector t, vector t_change_trend, int T, int S) {
         /* Function to sort changepoints */
 
@@ -6634,6 +6708,9 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
         return Kappa;
       }
 
+  "
+  pw_growth_scode <- if (identical(trend_type, "logistic")) {
+    "
       vector logistic_gamma(real k, real m, vector delta, vector t_change_trend, int S) {
         /* Function to compute a logistic trend with changepoints */
 
@@ -6660,6 +6737,9 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
         return cap_trend .* inv_logit((k + Kappa_trend * delta) .* (t - (m + Kappa_trend * gamma)));
       }
 
+    "
+  } else {
+    "
       vector linear_trend(real k, vector delta, vector t, matrix Kappa_trend,
                           vector t_change_trend) {
         /* Function to compute a linear trend with changepoints */
@@ -6669,13 +6749,16 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
            formula supplies the level for the linear form. */
         return (k + Kappa_trend * delta) .* t + (Kappa_trend * (-t_change_trend .* delta));
       }
-    ",
+    "
+  }
+  pw_functions_stanvar <- brms::stanvar(
+    name = "pw_functions",
+    scode = paste0(pw_changepoint_scode, pw_growth_scode),
     block = "functions"
   )
 
   # Validate PW-specific parameters
   checkmate::assert_number(n_changepoints, lower = 0)
-  checkmate::assert_number(changepoint_scale, lower = 0)
   changepoint_range <- trend_specs$changepoint_range
   checkmate::assert_number(changepoint_range, lower = 0, upper = 1)
 
@@ -6723,13 +6806,6 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
     x = as.numeric(t_change_values),
     name = "t_change_trend",
     scode = "vector[N_change_trend] t_change_trend;",
-    block = "data"
-  )
-
-  change_scale_stanvar <- brms::stanvar(
-    x = changepoint_scale,
-    name = "change_scale_trend",
-    scode = "real<lower=0> change_scale_trend;",
     block = "data"
   )
 
@@ -6854,7 +6930,6 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
     pw_functions_stanvar,
     n_change_stanvar,
     t_change_stanvar,
-    change_scale_stanvar,
     pw_transformed_data_stanvar,
     pw_parameters_stanvar,
     pw_transformed_parameters_stanvar,
@@ -8670,22 +8745,11 @@ create_times_trend_matrix <- function(n_time,
         "Series in 'data' do not share the same time grid."
       ),
       x = paste0(
-        "Got ", n_trend_rows,
-        " observations across ", n_time,
-        " unique time points; mvgam expects ", n_time, " x ",
-        second_axis_size, " = ", n_time * second_axis_size,
-        " rows (one per (time, ",
-        if (has_by_lv) "latent factor" else "series",
-        ") cell)."
+        "Got ", n_trend_rows, " rows over ", n_time, " times. Expected ",
+        n_time * second_axis_size, ", one per time and ",
+        if (has_by_lv) "latent factor" else "series", "."
       ),
-      i = paste0(
-        "Pad 'data' to give every ",
-        if (has_by_lv) "latent factor" else "series",
-        " a row at each unique time ",
-        "(set 'y' to NA at unobserved cells). CAR() trends handle ",
-        "irregular gaps within a series natively, but each series ",
-        "must still align on the shared union of time points."
-      )
+      i = "Give an unobserved cell a row with a missing response."
     )), call. = FALSE)
   }
 

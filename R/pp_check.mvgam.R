@@ -494,28 +494,26 @@ pp_check.mvgam <- function(
   } else {
     if (type %in% resid_nongrouped && !is.null(ndraws) &&
           ndraws < 50L) {
-      rlang::warn(
+      warn_once(
         paste0(
           "ndraws < 50 for '", type, "' may produce apparent ",
           "extreme residuals from PIT support underflow on ",
           "observations in the predictive tail. Consider ",
           "ndraws >= 500 for a stable empirical PIT."
         ),
-        .frequency = "once",
-        .frequency_id = "mvgam_pp_check_resid_low_ndraws"
+        "mvgam_pp_check_resid_low_ndraws"
       )
     }
     if (type %in% resid_grouped && !is.null(ndraws) &&
           ndraws > 12L) {
-      rlang::warn(
+      warn_once(
         paste0(
           "ndraws > 12 for '", type, "' may collapse the ",
           "bayesplot facet panels (one panel per draw x group) ",
           "to invisible at typical canvas sizes. Consider ",
           "ndraws <= 8."
         ),
-        .frequency = "once",
-        .frequency_id = "mvgam_pp_check_resid_grouped_high_ndraws"
+        "mvgam_pp_check_resid_grouped_high_ndraws"
       )
     }
   }
@@ -859,16 +857,7 @@ check_closure_unit_var_unit_constant <- function(values, arrays,
           "Covariate '", var_name,
           "' is not constant within every closure unit."
         ),
-        x = paste0(
-          "Closure-unit pp_check operates at the unit grain ",
-          "(one value per site x season); '", var_name,
-          "' varies within at least one closure unit."
-        ),
-        i = paste0(
-          "Drop '", var_name,
-          "' from `group =` / `x =`, or use a unit-constant ",
-          "covariate (e.g. a site-level trait)."
-        )
+        i = "Closure-unit checks plot one value per unit."
       )))
     }
   }

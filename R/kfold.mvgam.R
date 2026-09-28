@@ -72,9 +72,9 @@
 #'   fold) or when `folds` is supplied. Default `"grouped"`.
 #' @param seed Optional integer. Forwarded to `set.seed()` before
 #'   the fold split so the partition is reproducible.
-#' @param silent Integer in `\{0, 1, 2\}`. `0` prints per-fold
-#'   progress; `1` (default) prints only the refit count; `2`
-#'   silences output.
+#' @param silent Integer in `\{0, 1, 2\}`. `0` prints each refit
+#'   and its sampler start and finish lines. `1` (default) prints
+#'   the refit count. `2` prints nothing.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An object of class `c("mvgam_kfold", "kfold", "loo")`
@@ -456,7 +456,7 @@ refit_score_one_fold <- function(object, data, fold_ids,
         "(", length(held_rows), "rows held out) ...\n")
   }
 
-  refit <- refit_on_held_out(object, train_data, max(silent, 1L))
+  refit <- refit_on_held_out(object, train_data, silent)
 
   # Held data may contain factor levels the refit never saw (the
   # whole point of leave-one-group-out is that the group was
@@ -522,13 +522,9 @@ mask_heldout_response <- function(object, data, held_rows) {
     stop(insight::format_error(c(
       "Could not find the response column to hold a fold out on.",
       x = paste0("The model's response is ",
-                 paste(resp, collapse = ", "),
-                 "; the training frame holds ",
-                 paste(names(data), collapse = ", "), "."),
-      i = paste0(
-        "A fold is held out by masking its response. The response ",
-        "column has to be present."
-      )
+                 paste(resp, collapse = ", "), "."),
+      x = paste0("The training frame holds ",
+                 paste(names(data), collapse = ", "), ".")
     )))
   }
   for (r in present) {
@@ -889,22 +885,28 @@ build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
 #' Refit a model on a training window whose held-out rows are masked
 #'
 #' Every cross-validation method here holds a fold out by setting its
-#' response to `NA` rather than by deleting rows, so the trend grid
-#' the refit is built on matches the parent's. brms warns whenever it
-#' drops rows whose response is missing, and those rows are the fold:
-#' the notice describes the method working and names nothing the
-#' caller can act on. It is muffled by its own text rather than by
-#' silencing the refit, so anything else the refit raises still
-#' reaches the caller.
+#' response to `NA`. Deleting the rows would move the trend grid off
+#' the parent's. brms warns whenever it drops rows whose response is
+#' missing. Those rows are the fold, which the method masked itself,
+#' and the notice names nothing the caller can act on. The handler
+#' muffles that one warning by its text. Every other warning from the
+#' refit reaches the caller.
+#'
+#' A refit runs one verbosity level below the calling method, and its
+#' sampler prints no iteration lines (`refresh = 0`, as brms sets for
+#' its own refits). At the default `silent = 1` the method's own
+#' progress lines are the only output. At `silent = 0` each refit adds
+#' its sampler start and finish lines.
 #'
 #' @param object The fitted model to refit.
 #' @param train_data The training frame, held-out responses masked.
-#' @param silent Verbosity passed to [update()].
+#' @param silent Verbosity of the calling method, `0` to `2`.
 #' @return The refitted model.
 #' @noRd
 refit_on_held_out <- function(object, train_data, silent = 1L) {
   withCallingHandlers(
-    update(object, newdata = train_data, silent = silent),
+    update(object, newdata = train_data,
+           silent = min(silent + 1L, 2L), refresh = 0),
     warning = function(w) {
       if (grepl("Rows containing NAs", conditionMessage(w),
                 fixed = TRUE)) {

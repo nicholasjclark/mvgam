@@ -150,7 +150,7 @@ mu_biomass += mu_biomass_trend;
 **Key Factor Model Requirements**:
 1. **Detection**: Factor models triggered by `is_factor_model_spec(n_lv, n_series)` (R/validations.R), TRUE for `n_lv <= n_series` on compatible trend types
 2. **Validation**: Registry-based compatibility checking prevents invalid factor models
-3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
+3. **Variance Constraint**: With every loading sampled, the factor innovations are fixed at unit scale and zero correlation. `samples_factor_loadings()` (`R/trend_system.R`) decides this once for the prior surface and both Stan generators. The program keeps `sigma_trend` and `L_Omega_trend` as transformed parameters equal to 1 and the identity. Forecasting and the covariance extractors use them unchanged. A prior on either is refused. A `trend_map` fixes loadings and pins the factors' scale, and those fits keep a sampled scale and correlation. Multiplicative gamma process shrinkage derives the scale as `sqrt(Psi_diag)` and is unaffected
 4. **Matrix Z Location**: Four branches handled by `generate_matrix_z_multiblock_stanvars()`:
    - Sampled Z (default factor model): `parameters` block declares `matrix[N_series_trend, N_lv_trend] Z`; the default prior is `to_vector(Z) ~ student_t(3, 0, 0.5)`; identification is post-hoc via thin QR in generated quantities (see "Post-hoc QR identification" below).
    - Sampled Z with structured prior: when `loadings_prior` is supplied, the default iid prior is replaced with a per-column matrix-normal `Z[, i] ~ multi_normal_cholesky(0, L_Phi * sqrt(Psi_diag[i]))`. See "Structured loadings priors" below.
@@ -165,7 +165,7 @@ mu_biomass += mu_biomass_trend;
 
 **Single Z resolver**: `resolve_factor_loadings()` in `R/plot_helpers.R` is the one place that returns per-draw Z for any consumer (residual_cor, plot_factors, ordinate, sample_innovations). It prefers identified `Z_tilde[i, j]` posterior columns when present and falls back to `Z[i, j]` for partial-Z fits whose encoded pattern is preserved without rotation. The fixed-Z branch broadcasts the user matrix unchanged.
 
-**Post-hoc QR identification (Heaps & Jermyn 2024)**: Free-Z factor models sample `Z` unconstrained and identify it in generated quantities via `Z_tilde = qr_thin_R(Z')'`, `Q_tilde = qr_thin_Q(Z')'`, with the matching rotation `lv_trend_tilde = lv_trend * Q_tilde'` applied to the latent factor paths. For VAR-trend factor models, the lag-coefficient array also rotates: `A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'`. `qr_thin_R` guarantees a non-negative diagonal on the upper-triangular factor, so the saved `Z_tilde` has the canonical positive-diagonal lower-triangular form and the `2^k` sign-mode equivalence is removed by construction. The factorisation is exact: `Z_tilde * Q_tilde == Z` for every draw, so the implied `Z_tilde * lv_trend_tilde'` product equals the unidentified `Z * lv_trend'` and the likelihood is unchanged. Per-factor scalar parameters (`ar1_trend`, `sigma_trend`, `L_Omega_trend`, `theta1_trend`) remain in the unrotated latent basis and the summary surface flags this explicitly in its identification scope footnote.
+**Post-hoc QR identification (Heaps & Jermyn 2024)**: A factor model with free loadings samples `Z` unconstrained. Generated quantities identify it through `Z_tilde = qr_thin_R(Z')'` and `Q_tilde = qr_thin_Q(Z')'`, and rotate the factor paths to match with `lv_trend_tilde = lv_trend * Q_tilde'`. A VAR factor model rotates its lag coefficients as well: `A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'`. `qr_thin_R` returns an upper triangle with a non-negative diagonal. Transposed, it gives the saved `Z_tilde` a lower triangular form with a positive diagonal, which removes the `2^k` sign modes. The factorisation is exact: `Z_tilde * Q_tilde == Z` in every draw. The product `Z_tilde * lv_trend_tilde'` equals `Z * lv_trend'` and leaves the likelihood unchanged. The per-factor coefficients `ar1_trend` and `theta1_trend` stay in the unrotated basis, and the footnote on identification scope in `summary()` states this.
 
 **Sign-canonical saved draws**: `sign_canonicalise_factors()` in `R/sign_canonical.R` is retained as a defensive belt for the partial-Z code path. For free-Z fits the post-hoc QR already guarantees a positive `Z_tilde` diagonal, so the function short-circuits when `Z_tilde[i, j]` columns are present in the posterior. For fully-fixed-Z and partial-Z fits the user-supplied pattern is preserved without sign flips: rotating those entries would corrupt the structural hypothesis the user encoded.
 
@@ -257,6 +257,55 @@ transformed parameters {
 **Principle**: Validate during model setup, not Stan compilation
 **Implementation**: Check trend compatibility, formula conflicts, data structure early
 
+### 4. User-Facing Conditions
+
+**Decision**: Each kind of condition has one spelling. The spelling
+decides when it reaches the user.
+
+| Kind | Spelling | Reaches the user |
+|---|---|---|
+| Error | `stop(insight::format_error(...))` | always |
+| Warning, every call | `insight::format_warning(...)` | always, tests included |
+| Warning, once per session | `warn_once(message, id)` | first time per session; quiet under testthat |
+| Message, once per session | `inform_once(message, id)` | first time per session; quiet under testthat and at `silent = 2` |
+| Message, every call | `rlang::inform(...)` inside `if (silent < 2)` | when `silent < 2` |
+
+`R/utils-conditions.R` defines `warn_once()` and `inform_once()`.
+The `id` names the counter and becomes the condition class. Package
+code outside that file never calls `Sys.getenv("TESTTHAT")` or passes
+`.frequency = "once"`. `debt_scan.R idioms` checks both.
+
+**`silent`** turns off messages alone. brms does the same:
+`?brms::brm` says `silent = 2` suppresses informational messages, and
+no brms warning checks `silent`. A warning reports a problem and
+reaches the user at every verbosity. `mvgam()` and `jsdgam()` store
+the call's `silent` in the `mvgam.silent` option until the call
+returns. `inform_once()` takes it from that option.
+
+**Why testthat silences the session warnings**: the suite allows no
+warnings. A warning spent in one test would also be missing from the
+later test that asserts it. That test clears the variable with
+`withr::local_envvar(TESTTHAT = "")`. A warning raised on every call
+reaches every test, and each test that triggers one asserts it.
+
+**Missing responses**: brms's "Rows containing NAs were excluded
+from the model" and `pp_check()`'s "Observations with a missing
+response are omitted from the plot" stay warnings on every call. A
+user who did not mean to leave a response missing learns it from
+these, and rows would otherwise leave the likelihood unannounced.
+Tests assert them by text. `refit_on_held_out()` muffles brms's notice
+for the fold it masked itself.
+
+**Message text**: the main line states the problem. Details go in
+`x =` bullets and the fix in `i =` bullets. Each bullet is one plain
+sentence. A clause joined by `;`, `, which`, `, and` or `, but`
+becomes its own sentence or bullet. Text that does not help the user
+act is deleted.
+
+`tests/local/debt_scan.R idioms` counts the spellings per kind and
+`tests/local/debt_scan.R messages` extracts every message for the
+prose linter.
+
 ## Ecosystem Integration Principles
 
 ### 1. One projection of a fit's parameter names
@@ -336,12 +385,9 @@ terms of them.
   time when the family supplies one.
 
   Only the case with a native brms family plus a trend formula
-  raises an extra warning, signalled once per session via the
-  class `mvgam_threads_trend_brms_native`. The reason is that
-  no mvgam `reduce_sum` exists to fall back on for that
-  combination, so the user's parallelism intent is a true
-  no-op. The other branch stays silent, because the families
-  it covers emit their own `reduce_sum` and threading still
+  raises an extra warning, on every call. No mvgam `reduce_sum`
+  exists for that combination. The threads request has no effect.
+  The other branch stays silent. The families it covers emit their own `reduce_sum` and threading still
   works as intended. Both branches are deliberate temporary
   deviations from this preserve-optimizations principle. The
   branch with a native brms family plus a trend formula can
@@ -1086,31 +1132,30 @@ of the signal, where `hindcast()` and `forecast()` are what to
 reach for.
 
 What it settles into is the stationary distribution, not one
-innovation: an AR(1) at `sigma^2 / (1 - ar^2)`, which is the same
-scaling the Stan model uses for its own first state. Sampling the
+innovation: an AR(1) at `sigma^2 / (1 - ar^2)`. Sampling the
 innovation covariance instead left the marginal mean 12% low
-against a simulation with known truth. `AR(p)` solves the
-companion Lyapunov equation, which covers a sparse lag set such
-as `p = c(1, 12)` without special casing; correlated series take
-`Sigma[i, j] / (1 - ar_i * ar_j)` exactly; `VAR()` reads
-`Omega_trend`, the stationary joint variance its Stan model
-already computes. The Stan program starts at the same quantity for
-two of these. A plain `AR(1)` divides its first innovation by
-`sqrt(1 - ar^2)`, and a correlated `AR(1)` scales its first
-innovation row by the Cholesky factor of that same
-`Gamma[a, b] = Sigma[a, b] / (1 - ar_a * ar_b)`. Three shapes
-still describe different first states on the two sides. A grouped
-`AR(1)` uses the joint group form in Stan while
-`sample_innovations.R` scales `sigma_group_trend` by a per-series
-factor. `AR(p > 1)` and `AR(p = 1, ma = TRUE)` keep the raw
-innovation start in Stan while the R side solves both. A random walk has no stationary distribution,
-`ZMVN()` has no dynamics to settle into, and `CAR()` decays by
-`ar^gap` so irregular gaps admit no single variance; all three
-keep their innovation covariance, as does any draw whose
-autoregression is explosive. A sparse lag set admits such a draw.
-A contiguous `AR(p >= 2)` samples partial autocorrelations and
-derives its coefficients through the Levinson-Durbin recursion,
-which leaves every draw of it stationary.
+against a simulation with known truth. `AR()` takes
+`ar_stationary_factor()` (`R/sample_innovations.R`): the
+moving-average weights of each series give
+`Gamma[a, b] = Sigma[a, b] * sum_j psi_a,j psi_b,j`, exact for
+contiguous and sparse lag sets, with or without a moving-average
+term. A draw close to a unit root takes an exact companion solve.
+`VAR()` takes `Omega_trend`, the stationary joint variance its Stan
+model already computes.
+
+The Stan program starts every contiguous `AR()` at the same law:
+the scalar closed forms at one lag, `ar_stationary_init()` for
+independent series above one lag and `joint_init_stanblock()` for
+correlated or grouped innovations at any order and for a
+moving-average term above one lag. A random walk has no stationary
+distribution and `ZMVN()` has no dynamics to settle into. `CAR()`
+decays by `ar^gap`, and irregular gaps admit no single variance. All
+three keep their innovation covariance. A sparse lag set bounds its
+coefficients one at a time and a draw can be explosive. It keeps the
+raw start in Stan. Such a draw keeps its innovation
+covariance on the R side, and `warn_explosive_draws()` counts them. A
+contiguous `AR(p >= 2)` samples partial autocorrelations, which keeps
+every draw stationary.
 
 **Surface B, Conditional state** (`forecast.mvgam()`,
 `hindcast.mvgam()`, `residuals()`, `pp_check()`): reads the

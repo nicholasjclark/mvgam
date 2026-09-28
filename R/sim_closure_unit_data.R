@@ -174,7 +174,7 @@ sim_closure_unit_data <- function(type = 1L,
   if (n_lv > 0L && n_species < 2L) {
     stop(insight::format_error(c(
       "n_lv > 0 requires n_species >= 2.",
-      i = "Latent factors share structure across species; with one species the loadings are not identified."
+      i = "With one species the loadings are not identified."
     )))
   }
   fam_name <- resolve_family_name(family) %||% ""

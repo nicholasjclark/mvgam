@@ -983,9 +983,7 @@ test_that("a mixture's quantile residuals are standard normal", {
   # scale the construction guarantees rather than to what the pooled
   # route happened to give.
   for (f in list(fit, fit3)) {
-    r <- suppressWarnings(
-      residuals(f, type = "quantile", summary = FALSE, ndraws = 200L)
-    )
+    r <- residuals(f, type = "quantile", summary = FALSE, ndraws = 200L)
     expect_lt(abs(stats::sd(r, na.rm = TRUE) - 1), 0.25)
     # And no column is pinned, which is finding 21's continuous half.
     constant <- apply(r, 2L, function(z) {
@@ -1015,13 +1013,11 @@ test_that("the fit describes itself through the standard accessors", {
 
 test_that("k-fold partitions a frame with no gaps in it", {
   # 80 consecutive occasions on one series, no missing time and no
-  # missing response. A fold takes half the rows, `update()` is
-  # handed that subset and rebuilds the trend grid from it, so the
-  # holes the split makes are read as irregular spacing. The
-  # held-out rows are missing responses rather than missing time,
-  # which is the distinction the fit itself already draws.
+  # missing response. A fold masks the response of half the rows and
+  # keeps the grid. A refit handed the subset frame treated the holes
+  # the split made as irregular spacing.
   expect_identical(sort(unique(diff(sort(dat$time)))), 1L)
-  kf <- suppressWarnings(kfold(fit, K = 2L))
+  kf <- kfold(fit, K = 2L)
   expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
 })
 

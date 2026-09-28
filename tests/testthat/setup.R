@@ -58,12 +58,6 @@ local_color_scheme <- function(scheme, .env = parent.frame()) {
   invisible(prior)
 }
 
-# Build both Stan code and Stan data from one
-# `generate_stan_components_mvgam_formula()` call. Tests that need
-# both surfaces should use this instead of calling `stancode()` and
-# `standata()` separately, since each public dispatcher re-runs the
-# full pipeline (and triggers a fresh V8 isolate for the Stan code
-# polish step) on its own.
 # How many lines of a Stan program open a named block. The programs
 # are one string with embedded newlines. On a miss,
 # `gregexpr(pattern, code)[[1]]` is `-1L`. Its length is 1, matching
@@ -95,6 +89,10 @@ stan_match_count <- function(code, pattern) {
 }
 
 
+# Stan code and Stan data from one
+# `generate_stan_components_mvgam_formula()` call. `stancode()` and
+# `standata()` each run the whole pipeline, and each starts a V8
+# isolate to polish the code. A test needing both calls this once.
 mvgam_stan_setup <- function(formula, data, family = gaussian(), ...) {
   cc <- mvgam:::generate_stan_components_mvgam_formula(
     formula = formula, data = data, family = family, ...

@@ -438,7 +438,7 @@ predict_variance <- function(object, newdata, process_error,
   if (nrow(mu_full) != total_draws) {
     stop(insight::format_error(c(
       "Internal: posterior_epred row count does not match total draws.",
-      x = paste0("Expected ", total_draws, " rows in mu; got ",
+      x = paste0("Expected ", total_draws, " rows in mu. Got ",
                  nrow(mu_full), ".")
     )))
   }
@@ -491,7 +491,7 @@ predict_variance <- function(object, newdata, process_error,
     if (nrow(x) != n_rows) {
       stop(insight::format_error(c(
         "Internal: dpar row count does not match mu row count.",
-        x = paste0("dpar has ", nrow(x), " rows; mu has ", n_rows, ".")
+        x = paste0("dpar has ", nrow(x), " rows. mu has ", n_rows, ".")
       )))
     }
     if (ncol(x) == n_cols) return(x)
@@ -501,7 +501,7 @@ predict_variance <- function(object, newdata, process_error,
     }
     stop(insight::format_error(c(
       "Internal: unexpected dpar column count.",
-      x = paste0("Got ", ncol(x), " columns; expected 1 or ",
+      x = paste0("Got ", ncol(x), " columns. Expected 1 or ",
                  n_cols, ".")
     )))
   }

@@ -29,13 +29,15 @@
 #' @param standata The combined Stan data, which names the smooth and
 #'   measurement-error blocks the program declares.
 #' @param save_pars A `brms::save_pars()` object.
+#' @param stancode The combined Stan program, or NULL.
 #' @return Character vector of Stan variable names. Both backends
-#'   ignore a name the program does not declare, so the list needs no
-#'   intersection with the program.
+#'   ignore a name the program does not declare. The list is not
+#'   intersected with the program.
 #' @noRd
 mvgam_excluded_pars <- function(obs_model, trend_model = NULL,
                                 standata = NULL,
-                                save_pars = brms::save_pars()) {
+                                save_pars = brms::save_pars(),
+                                stancode = NULL) {
   checkmate::assert_class(save_pars, "save_pars")
   out <- brms_working_pars(obs_model, standata, save_pars, suffix = "")
   if (!is.null(trend_model)) {
@@ -44,7 +46,43 @@ mvgam_excluded_pars <- function(obs_model, trend_model = NULL,
       brms_working_pars(trend_model, standata, save_pars, suffix = "_trend")
     )
   }
+  if (!save_pars$all && mu_trend_is_zero(stancode)) {
+    out <- c(out, "mu_trend")
+  }
   unique(setdiff(out, save_pars$manual))
+}
+
+
+#' Does the program leave `mu_trend` at its zero start?
+#'
+#' A trend formula with no terms gives `mu_trend` no design. The
+#' program declares it as `rep_vector(0.0, N_trend)` and never assigns
+#' to it again, and every draw of it is zero. Stored, it adds `N_trend`
+#' columns of zeros to each draw, and its R-hat and effective sample
+#' size are undefined: rstan warns on every fit, and `rhat()` and
+#' `neff_ratio()` report `NA` for each entry. `trend` carries
+#' `mu_trend`, and no post-fit method extracts the vector by name.
+#'
+#' @param stancode The combined Stan program, or NULL.
+#' @return `TRUE` when the program declares `mu_trend` at zero and
+#'   never assigns to it afterwards.
+#' @noRd
+mu_trend_is_zero <- function(stancode) {
+  if (is.null(stancode)) {
+    return(FALSE)
+  }
+  code <- stan_line_code(strsplit(
+    paste(stancode, collapse = "\n"), "\n", fixed = TRUE
+  )[[1L]])
+  zero_start <- grepl(
+    "\\bmu_trend\\s*=\\s*rep_vector\\(\\s*0(\\.0*)?\\s*,", code
+  )
+  assigned <- grepl(
+    "\\bmu_trend\\b(\\s*\\[[^]]*\\])?\\s*[-+*/]?=(?!=)", code,
+    perl = TRUE
+  )
+  sum(zero_start) == 1L && sum(assigned) == 1L &&
+    identical(which(zero_start), which(assigned))
 }
 
 

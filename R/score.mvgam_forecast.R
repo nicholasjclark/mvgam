@@ -222,10 +222,8 @@ validate_scoreable_forecast <- function(object, score) {
   if (identical(object$type, "trend")) {
     stop(insight::format_error(c(
       "Cannot score a 'trend'-type forecast.",
-      x = paste0(
-        "test_observations are on the response scale; the ",
-        "forecast is on the latent-state link scale."
-      ),
+      x = "test_observations are on the response scale.",
+      x = "The forecast is on the latent-state link scale.",
       i = paste0(
         "Re-run 'forecast()' with type = 'response' or ",
         "'expected'."

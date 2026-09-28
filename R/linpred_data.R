@@ -129,10 +129,8 @@ validate_draw_selectors <- function(ndraws, draw_ids) {
   if (!is.null(ndraws) && !is.null(draw_ids)) {
     stop(insight::format_error(c(
       "Specify only one of 'ndraws' or 'draw_ids'.",
-      x = paste0("'ndraws' asks for ", ndraws, " draws while ",
-                 "'draw_ids' names ", length(draw_ids), "."),
-      i = paste0("'draw_ids' names the draws to read; 'ndraws' takes ",
-                 "that many at random.")
+      x = paste0("Got 'ndraws' = ", ndraws, " and ", length(draw_ids),
+                 " 'draw_ids'.")
     )), call. = FALSE)
   }
   invisible(NULL)

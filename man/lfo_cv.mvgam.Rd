@@ -72,8 +72,9 @@ posterior) so the result can feed \code{loo::loo_model_weights()}
 for log-score stacking. Defaults to \code{FALSE} because the
 matrix can be large.}
 
-\item{silent}{Verbosity level between \code{0} and \code{2}. See
-\link{mvgam} for the contract.}
+\item{silent}{Integer in \verb{\\\{0, 1, 2\\\}}. \code{0} prints each refit
+and its sampler start and finish lines. \code{1} (default) and \code{2}
+print nothing from the refits.}
 
 \item{data}{Deprecated. Use \code{newdata} instead.}
 }

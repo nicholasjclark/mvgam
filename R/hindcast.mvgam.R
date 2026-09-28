@@ -4,10 +4,10 @@
 # train_* / hindcasts slots populated and test_* / forecasts
 # slots NULL.
 #
-# Semantic note: by default hindcasts read the Stan-fitted latent
+# Semantic note: by default hindcasts take the Stan-fitted latent
 # state directly from the posterior (`process_error = FALSE`).
-# `trend[t, s]`, `mu_trend[t, s]` and `innovations_trend[t, s]`
-# are all stored in the Stan output, so reconstruction is exact.
+# `trend[t, s]` is stored in the Stan output and already carries
+# the trend formula's predictor. Reconstruction is exact.
 # This surfaces overfit-vs-predict gaps directly: a random walk
 # with sigma -> 0 absorbs the response into the trend, so its
 # hindcast response draws hug the training values even when the
@@ -53,8 +53,8 @@ hindcast <- function(object, ...) {
 #'   `mvgam_latent_state` object with its own `print()`,
 #'   `summary()`, `as.data.frame()` and `plot()` methods.
 #' @param process_error Logical. When `FALSE` (the default),
-#'   hindcasts read the Stan-fitted latent state directly
-#'   (`trend[t, s]` and `mu_trend[t, s]` from the posterior), and
+#'   hindcasts take the Stan-fitted latent state directly
+#'   (`trend[t, s]` from the posterior), and
 #'   `type = "response"` samples only observation-family noise on
 #'   top of that exact state. When `TRUE`, fresh innovations are
 #'   drawn from the trend's covariance structure and added to the

@@ -156,10 +156,10 @@ test_that("the MGP column scale reaches the trend through sigma_trend", {
   set.seed(1L)
   d <- sim_mvgam(family = poisson(), n_series = 6L,
                   n_timepoints = 20L)$data_train
-  m <- suppressWarnings(mvgam(
+  m <- mvgam(
     y ~ 1, trend_formula = ~ AR(n_lv = 3), data = d, family = poisson(),
     loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
-  ))
+  )
   ln <- strsplit(paste(as.character(m$model_file %||% m$stancode),
                         collapse = "\n"), "\n")[[1]]
   expect_equal(sum(grepl("Psi_diag = exp(cumulative_sum", ln,
@@ -263,7 +263,7 @@ test_that("assert_loadings_prior_compatible errors on partial trend_map", {
       list(features_mat = matrix(0, 3L, 1L)),
       matrix(c(1, NA, 0, NA, 1, 0), nrow = 3L)
     ),
-    "cannot combine with a partial 'trend_map'"
+    "fixes 4 of 6 entries"
   )
 })
 
@@ -273,7 +273,7 @@ test_that("assert_loadings_prior_compatible errors on fully-fixed trend_map", {
       list(features_mat = matrix(0, 3L, 1L)),
       matrix(c(1, 0, 0, 0, 1, 0), nrow = 3L)
     ),
-    "cannot combine with a fully-fixed 'trend_map'"
+    "fixes 6 of 6 entries"
   )
 })
 
@@ -352,14 +352,14 @@ test_that("MGP shrinkage is refused on trends that cannot carry it", {
           family = poisson(),
           loadings_prior = list(column_shrinkage = "mgp"),
           run_model = FALSE),
-    "not available for 'VAR\\(\\)'"
+    "Got 'VAR\\(\\)'"
   )
   # The trends that do carry it are unaffected.
   for (tf in list(~ AR(n_lv = 3), ~ RW(n_lv = 3), ~ ZMVN(n_lv = 3))) {
-    expect_no_error(suppressWarnings(mvgam(
+    expect_no_error(mvgam(
       y ~ 1, trend_formula = tf, data = d, family = poisson(),
       loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
-    )))
+    ))
   }
   # The refusal is specific to the MGP column scale. It fires
   # during spec validation, before code generation, so it does not
@@ -369,7 +369,7 @@ test_that("MGP shrinkage is refused on trends that cannot carry it", {
           family = poisson(),
           loadings_prior = list(column_shrinkage = "mgp"),
           run_model = FALSE),
-    "shared innovation scale"
+    "Got 'VAR\\(\\)'"
   )
 })
 
@@ -393,11 +393,11 @@ test_that("loadings_prior requires a trend to carry it", {
   expect_match(conditionMessage(err), "trend_formula", fixed = TRUE)
 
   # With a trend carrying factors the same argument still builds.
-  expect_no_error(suppressWarnings(mvgam(
+  expect_no_error(mvgam(
     y ~ 1, trend_formula = ~ AR(n_lv = 3), data = d,
     family = poisson(),
     loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
-  )))
+  ))
 })
 
 

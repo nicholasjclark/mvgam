@@ -234,6 +234,10 @@ condition_idioms <- function(files) {
       note("warning", "warning")
     } else if (identical(nm, "format_warning")) {
       note("warning", "format_warning")
+    } else if (identical(nm, "warn_once")) {
+      note("warning_once", "warn_once")
+    } else if (identical(nm, "inform_once")) {
+      note("message_once", "inform_once")
     } else if (identical(nm, "warn")) {
       once <- ".frequency" %in% names(x)
       note(
@@ -271,7 +275,10 @@ if (length(args) && identical(args[[1L]], "dead_param")) {
   cat(nrow(hits), "functions drop their dots\n")
   print(hits, right = FALSE)
 } else if (length(args) && identical(args[[1L]], "idioms")) {
-  hits <- condition_idioms(files)
+  # `R/utils-conditions.R` defines the once-per-session idioms from
+  # `rlang` and is left out of both counts.
+  outside <- setdiff(files, file.path("R", "utils-conditions.R"))
+  hits <- condition_idioms(outside)
   counts <- as.data.frame(
     table(hits$kind, hits$spelling), stringsAsFactors = FALSE
   )
@@ -284,6 +291,17 @@ if (length(args) && identical(args[[1L]], "dead_param")) {
   print(data.frame(kind = names(per_kind),
                    spellings = as.integer(per_kind)),
         right = FALSE, row.names = FALSE)
+  # A session counter or a testthat check spelled out anywhere else
+  # duplicates `warn_once()` or `inform_once()`.
+  own <- unlist(lapply(outside, function(path) {
+    code <- getParseData(parse(path, keep.source = TRUE))
+    hit <- code$token %in% c("SYMBOL_SUB", "STR_CONST") &
+      code$text %in% c(".frequency", "\"TESTTHAT\"", "'TESTTHAT'")
+    if (any(hit)) paste0(path, ":", code$line1[hit]) else NULL
+  }))
+  cat("\nsession counter or testthat check outside",
+      "R/utils-conditions.R:", length(own), "\n")
+  if (length(own)) writeLines(own)
 } else if (length(args) && identical(args[[1L]], "messages")) {
   sites <- do.call(rbind, lapply(files, message_sites))
   writeLines(paste0("## ", sites$file, ":", sites$line, "\n\n",

@@ -134,14 +134,20 @@ test_that("mm() plumbs through multiple-membership grouping structure", {
 test_that("cs() plumbs through category-specific effects for cumulative", {
   d <- make_specials_data()
   mf <- mvgam_formula(yord ~ cs(x), trend_formula = ~ AR(p = 1))
-  # brms warns that cs() is experimental for cumulative families;
-  # mvgam should pass that warning through, not error.
-  sc <- suppressWarnings(stancode(
-    mf, data = d, family = cumulative(), trend_formula = ~ AR(p = 1)
-  ))
-  sd_ <- suppressWarnings(standata(
-    mf, data = d, family = cumulative(), trend_formula = ~ AR(p = 1)
-  ))
+  # brms warns that cs() is experimental for cumulative families.
+  # mvgam passes the warning to the user once per call.
+  expect_warning(
+    sc <- stancode(
+      mf, data = d, family = cumulative(), trend_formula = ~ AR(p = 1)
+    ),
+    "Category specific effects"
+  )
+  expect_warning(
+    sd_ <- standata(
+      mf, data = d, family = cumulative(), trend_formula = ~ AR(p = 1)
+    ),
+    "Category specific effects"
+  )
   expect_true(all(c("Xcs", "Kcs", "nthres") %in% names(sd_)))
   expect_match(as.character(sc), "matrix\\[N, nthres\\] mucs = Xcs \\* bcs")
 })

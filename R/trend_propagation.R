@@ -446,8 +446,8 @@ build_arma_A <- function(trend_type, params, ar_lags, n_series) {
       stop(insight::format_error(c(
         "'A' has the wrong shape.",
         x = paste0(
-          "Got: [", paste(dim(A_cube), collapse = ", "),
-          "]; expected: [", n_series, ", ", n_series, ", ",
+          "Got [", paste(dim(A_cube), collapse = ", "),
+          "]. Expected [", n_series, ", ", n_series, ", ",
           m_a, "]."
         )
       )))
@@ -462,8 +462,8 @@ build_arma_A <- function(trend_type, params, ar_lags, n_series) {
       stop(insight::format_error(c(
         "'ar' has the wrong shape.",
         x = paste0(
-          "Got: [", paste(dim(ar_coefs), collapse = ", "),
-          "]; expected: [", m_a, ", ", n_series, "]."
+          "Got [", paste(dim(ar_coefs), collapse = ", "),
+          "]. Expected [", m_a, ", ", n_series, "]."
         )
       )))
     }
@@ -472,8 +472,8 @@ build_arma_A <- function(trend_type, params, ar_lags, n_series) {
       stop(insight::format_error(c(
         "'ar' has the wrong length.",
         x = paste0(
-          "Got length: ", length(ar_coefs),
-          "; expected: ", m_a, "."
+          "Got length ", length(ar_coefs),
+          ". Expected ", m_a, "."
         )
       )))
     }
@@ -505,8 +505,8 @@ build_arma_B <- function(has_ma, params, m_b, n_series) {
       stop(insight::format_error(c(
         "'theta_cube' has the wrong shape.",
         x = paste0(
-          "Got: [", paste(dim(B_cube), collapse = ", "),
-          "]; expected: [", n_series, ", ", n_series, ", ",
+          "Got [", paste(dim(B_cube), collapse = ", "),
+          "]. Expected [", n_series, ", ", n_series, ", ",
           m_b, "]."
         )
       )))

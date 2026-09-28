@@ -260,31 +260,14 @@ compute_residual_cor <- function(object, by_group, partial, summary,
   cov_struct <- get_trend_covariance_structure(object)
   series_names <- get_residcor_series_names(object, cov_struct)
 
-  if (cov_struct$pattern == "none") {
-    stop(insight::format_error(c(
-      "Cannot compute residual correlations: trend has no covariance.",
-      x = "The fitted trend type does not emit a process-error matrix.",
-      i = paste0(
-        "Use a trend that supports correlated innovations, e.g. ",
-        "VAR(), VARMA(), RW(cor = TRUE) / AR(cor = TRUE) / ",
-        "ZMVN(cor = TRUE) or any trend with n_lv > 0."
-      )
-    )))
-  }
-
-  if (cov_struct$pattern == "diagonal" ||
+  if (cov_struct$pattern %in% c("none", "diagonal") ||
       (cov_struct$pattern == "cholesky_scaled" &&
        !cov_struct$has_correlations)) {
     stop(insight::format_error(c(
-      paste0(
-        "Cannot compute residual correlations: trend innovations ",
-        "are independent."
-      ),
-      x = "The fitted trend has no cross-series covariance structure.",
+      "The fitted trend has no correlation between series.",
       i = paste0(
-        "Refit with cor = TRUE on the trend constructor (e.g. ",
-        "RW(cor = TRUE), AR(cor = TRUE) or ZMVN(cor = TRUE)), use ",
-        "VAR() / VARMA() or add n_lv = k for a latent-factor fit."
+        "Correlated trends: 'VAR()', 'VARMA()', a constructor with ",
+        "'cor = TRUE' and a factor model with 'n_lv'."
       )
     )))
   }
@@ -457,7 +440,7 @@ extract_cov_draws_flat <- function(cov_struct) {
         "Internal: 'Sigma_trend' dimensions do not match.",
         x = paste0(
           "Got ", paste(dim(Sigma_arr), collapse = "x"),
-          "; expected ", ndraws, "x", p, "x", p, "."
+          ". Expected ", ndraws, "x", p, "x", p, "."
         )
       )))
     }

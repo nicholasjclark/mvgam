@@ -111,12 +111,17 @@ extract_linpred_from_prep <- function(prep, resp = NULL, dpar = NULL) {
 compose_linpred <- function(prep, form, resp, dpar) {
   draws <- as_plain_matrix(posterior::as_draws_matrix(prep$draws))
   n_obs <- predictor_nobs(prep, resp)
+  # Columns are positions in the frame. `b %*% t(X)` takes the design
+  # matrix's row names as column names. A predictor with
+  # population-level terms carried labels and one without carried
+  # none. A closure-unit broadcast then copied a unit's first-row
+  # label onto each of its visits.
   if (identical(dpar %||% "mu", "mu")) {
     if (isTRUE(attr(form$formula, "nl"))) {
-      return(nonlinear_linpred(prep, draws, form, resp, n_obs))
+      return(unname(nonlinear_linpred(prep, draws, form, resp, n_obs)))
     }
-    return(linear_terms_pred(prep, draws, form$formula, resp, NULL, NULL,
-                             n_obs))
+    return(unname(linear_terms_pred(prep, draws, form$formula, resp,
+                                    NULL, NULL, n_obs)))
   }
   dpar_form <- form$pforms[[dpar]]
   if (is.null(dpar_form)) {
@@ -134,7 +139,7 @@ compose_linpred <- function(prep, form, resp, dpar) {
                  "predictor, or give the non-linear form to the mean.")
     )), call. = FALSE)
   }
-  linear_terms_pred(prep, draws, dpar_form, resp, dpar, NULL, n_obs)
+  unname(linear_terms_pred(prep, draws, dpar_form, resp, dpar, NULL, n_obs))
 }
 
 
@@ -591,7 +596,7 @@ nonlinear_linpred <- function(prep, draws, form, resp, n_obs) {
   if (!is.matrix(mu) || !identical(dim(mu), c(nrow(draws), n_obs))) {
     stop(insight::format_error(c(
       "The non-linear formula did not give one value per draw and row.",
-      x = paste0("Expected ", nrow(draws), " x ", n_obs, "; got ",
+      x = paste0("Expected ", nrow(draws), " x ", n_obs, ". Got ",
                  paste(dim(as.matrix(mu)), collapse = " x "), "."),
       i = "Write the expression with element-wise operators."
     )), call. = FALSE)

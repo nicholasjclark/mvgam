@@ -1011,14 +1011,14 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # The refusal names the family and what it does offer, rather
     # than naming the package's own internals.
     for (r in names(routes)) {
-      expect_error(suppressWarnings(routes[[r]]()),
+      expect_error(routes[[r]](),
                    "is not available for this family")
     }
 
     # `summary()` closes with a list of next steps, and it must not
     # send a reader to a call every one of those routes refuses.
     txt <- paste(
-      utils::capture.output(suppressWarnings(summary(fit))),
+      utils::capture.output(summary(fit)),
       collapse = " "
     )
     expect_false(grepl("latent_state", txt, fixed = TRUE))
@@ -1548,7 +1548,7 @@ test_that("n_lv reaches the ceiling the validator sets", {
   # One factor past the species count adds no rank, and is refused
   # with the reason and a remedy.
   err <- expect_error(build(n_lv = n_sp + 1L),
-                      "cannot exceed the number of species")
+                      "at most the number of species")
   msg <- conditionMessage(err)
   expect_match(msg, "rank at most", fixed = TRUE)
   expect_match(msg, "mgp_a2", fixed = TRUE)

@@ -756,13 +756,16 @@ test_that("the marginal expectation redraws innovations each call", {
 
 
 test_that("kfold refits a fold without rebuilding the time grid", {
-  # A fold holds rows out, and a held-out row is a missing response
-  # rather than a missing occasion. `mvgam()` already draws that
-  # distinction: an `NA` response shrinks the likelihood and leaves
-  # `N_time_trend` alone. The refit rebuilds the axis from the subset
-  # frame instead, so the trend meets a grid with holes in it and
-  # refuses the fold it was asked to fit.
-  kf <- kfold(fit, K = 2L)
+  # A held-out row is a missing response. `mvgam()` drops it from the
+  # likelihood and keeps `N_time_trend`. A refit built from a frame
+  # with the rows deleted met a grid with holes, and the AR trend
+  # refused it.
+  # At the default `silent = 1` the refit count is the whole of the
+  # output. The refits printed every sampler iteration line.
+  out <- capture.output(
+    expect_no_message(kf <- kfold(fit, K = 2L, exact = TRUE))
+  )
+  expect_identical(out, "kfold: refitting 2 fold(s) ...")
   expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
 })
 
@@ -848,7 +851,7 @@ test_that("the derived identifier follows the declared level order", {
 })
 
 
-test_that("a superseded series column warns once, and obeys silent", {
+test_that("a superseded series column warns once, whatever 'silent'", {
   vars <- fit$trend_metadata$variables
   derived <- mvgam:::hierarchical_series_values(
     fit$data, vars$gr_var, vars$subgr_var
@@ -876,9 +879,11 @@ test_that("a superseded series column warns once, and obeys silent", {
   withr::local_options(mvgam.silent = 0L)
   expect_equal(count_warnings(), 1L)
 
+  # `silent = 2` turns messages off. A warning reports a problem and
+  # reaches the user at every verbosity.
   rlang::reset_warning_verbosity("mvgam_series_superseded")
   withr::local_options(mvgam.silent = 2L)
-  expect_equal(count_warnings(), 0L)
+  expect_equal(count_warnings(), 1L)
 })
 
 
@@ -1343,9 +1348,9 @@ test_that("the two grouped spellings are one model", {
   # `gr` and `subgr` declare correlations among the subgroups within
   # each group, and the generated program declares those parameters
   # whenever `gr` is named. Both spellings resolve to one spec.
-  bare <- suppressWarnings(AR(gr = region, subgr = species))
-  stated <- suppressWarnings(AR(gr = region, subgr = species,
-                                cor = TRUE))
+  bare <- AR(gr = region, subgr = species)
+  stated <- AR(gr = region, subgr = species,
+                                cor = TRUE)
   expect_true(bare$cor)
   expect_identical(bare, stated)
 

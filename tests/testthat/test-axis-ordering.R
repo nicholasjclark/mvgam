@@ -1331,10 +1331,13 @@ axis_matrix <- function() {
 }
 
 
-test_that("every model configuration keeps its axes sound", {
+# The battery run over a set of `axis_matrix()` cells. The test below
+# runs it on every cell, and the mutation gate at the foot of this
+# file runs it on the cells a reintroduced defect reaches.
+check_axis_cells <- function(cells) {
   frames <- axis_frames()
 
-  for (cell in axis_matrix()) {
+  for (cell in cells) {
     frame <- frames[[cell$frame]]
     wide <- cell$route %in% c("wide", "jsdgam_mv")
     resp <- if (wide) c("zebra", "apple", "mango") else NULL
@@ -1363,6 +1366,19 @@ test_that("every model configuration keeps its axes sound", {
     expect_postfit_sound(sd, resp, cell$label, frame, cell$frame)
     expect_postfit_refuses(sd, cell$label, frame, cell$frame)
   }
+}
+
+# The `sound` cells of `axis_matrix()` a predicate selects. The gate
+# names one cell per defect, which keeps its cost to seconds.
+axis_cells <- function(keep) {
+  Filter(
+    function(cell) identical(cell$expect, "sound") && keep(cell),
+    axis_matrix()
+  )
+}
+
+test_that("every model configuration keeps its axes sound", {
+  check_axis_cells(axis_matrix())
 })
 
 
@@ -1733,16 +1749,18 @@ test_that("a level nothing observes changes nothing", {
 })
 
 
-test_that("no axis depends on the order the rows arrive in", {
-  # An index built from row position rather than row content gives a
-  # different answer for every permutation, and stays in range either
-  # way, so only this comparison notices.
+# An index built from row position changes with every permutation of
+# the rows and stays in range under each. Comparing a frame with its
+# shuffle exposes it. The check builds the wide frame with each trend in
+# `wide_trends`, and each stacked frame in `frame_names` with one AR.
+check_axis_row_order <- function(
+    wide_trends = list(~ AR(p = 1), ~ RW(), ~ ZMVN(n_lv = 2),
+                       ~ env + AR(p = 1)),
+    frame_names = c("long", "hier_col", "unused")) {
   frames <- axis_frames()
   set.seed(99L)
 
-  wide_cells <- list(~ AR(p = 1), ~ RW(), ~ ZMVN(n_lv = 2),
-                     ~ env + AR(p = 1))
-  for (tf in wide_cells) {
+  for (tf in wide_trends) {
     lab <- paste(deparse(tf), collapse = "")
     a <- axis_prefit(frames$wide, tf, "wide")$standata
     perm <- sample.int(nrow(frames$wide))
@@ -1763,7 +1781,7 @@ test_that("no axis depends on the order the rows arrive in", {
 
   # An observation keeps its own indices, so undoing the shuffle
   # restores the mapping exactly.
-  for (nm in c("long", "hier_col", "unused")) {
+  for (nm in frame_names) {
     tf <- if (nm == "hier_col") {
       ~ AR(p = 1, gr = region, subgr = species)
     } else {
@@ -1795,13 +1813,17 @@ test_that("no axis depends on the order the rows arrive in", {
       as.integer(b$N_subgroups_trend), label = paste(nm, "subgroups")
     )
   }
+}
+
+test_that("every axis holds under any row order", {
+  check_axis_row_order()
 })
 
 
-test_that("the time index runs in the order the times do", {
-  # A trend advances along this index, so numbering the times by the
-  # order they first appear makes a recursion walk the timeline in
-  # whatever order the frame was assembled.
+# A trend recursion advances along the time index. Numbered by first
+# appearance, that index walks the timeline in the order the frame
+# was assembled in.
+check_time_index_order <- function() {
   frames <- axis_frames()
   set.seed(101L)
   shuffled <- frames$long[sample.int(nrow(frames$long)), ]
@@ -1811,6 +1833,10 @@ test_that("the time index runs in the order the times do", {
     as.integer(sd$obs_trend_time),
     as.integer(match(shuffled$time, sort(unique(shuffled$time))))
   )
+}
+
+test_that("the time index runs in the order the times do", {
+  check_time_index_order()
 })
 
 
@@ -1873,16 +1899,16 @@ test_that("irregular time distances agree with the time index", {
 
 
 
-test_that("times_trend names the design row it claims to", {
-  # `mu_trend[times_trend[i, s]]` is the only consumer of this map, so
-  # entry (i, s) has to be the design row holding series s's covariate
-  # at time i. Transposing the fill keeps the shape, keeps every index
-  # in range and keeps the map a bijection onto the design, and hands
-  # all but the diagonal another series' covariates.
-  #
-  # The series occupying each column is read from `obs_trend_series`,
-  # the fit's own record, rather than from the stored levels, so the
-  # check does not lean on a second account of the axis.
+# The trend assembly indexes `mu_trend[times_trend[i, s]]`.
+# Entry (i, s) must be the design row holding series s's covariate at
+# time i. A transposed fill keeps the shape, the bounds and the
+# bijection onto the design, and gives every off-diagonal cell another
+# series' covariates.
+#
+# Each column's occupant comes from `obs_trend_series`, the fit's own
+# record. The stored levels are a second account of the axis, and a
+# check computed from them would share any defect they carry.
+check_times_trend_rows <- function() {
   frames <- axis_frames()
   for (nm in c("long", "hier_col")) {
     tf <- if (nm == "hier_col") {
@@ -1913,6 +1939,10 @@ test_that("times_trend names the design row it claims to", {
       )
     }
   }
+}
+
+test_that("times_trend names the design row it claims to", {
+  check_times_trend_rows()
 })
 
 
@@ -1987,6 +2017,128 @@ test_that("a trend keeps the columns its constructor names", {
     expect_identical(
       as.integer(prefit$standata$N_series_trend), 3L,
       label = paste(nm, "series count")
+    )
+  }
+})
+
+
+# The axis defects this file was written against, each put back into
+# the package one at a time. A mutant pairs the bindings that
+# reintroduce a defect with the checks above that reach it.
+axis_mutants <- function() {
+  real_mapping <- mvgam:::generate_obs_trend_mapping
+  real_times_trend <- mvgam:::create_times_trend_matrix
+  list(
+    # Each response's rows cut from one stretch of a stacked frame.
+    # Part of each response is then indexed to another response's
+    # trend column.
+    "one row block per response" = list(
+      mocks = list(generate_obs_trend_mapping = function(...) {
+        out <- real_mapping(...)
+        axis <- mvgam:::mvgam_response_axis(list(...)$data)
+        if (!is.null(axis)) {
+          n <- length(out$obs_trend_series)
+          out$obs_trend_series <- as.integer(
+            ceiling(seq_len(n) * length(axis) / n)
+          )
+        }
+        out
+      }),
+      check = function() {
+        check_axis_cells(axis_cells(function(cell) {
+          identical(cell$label, "wide / gaps")
+        }))
+      }
+    ),
+    "alphabetical series axis" = list(
+      mocks = list(series_axis_values = function(series_vals) {
+        sort(unique(as.character(series_vals)))
+      }),
+      check = function() {
+        check_axis_cells(axis_cells(function(cell) {
+          identical(cell$label, "explicit / AR1")
+        }))
+      }
+    ),
+    "time index by first appearance" = list(
+      mocks = list(time_axis_values = function(times) unique(times)),
+      check = check_time_index_order
+    ),
+    # Filled down the columns, which is the transpose of the design's
+    # time-major layout.
+    "transposed times_trend" = list(
+      mocks = list(create_times_trend_matrix = function(...) {
+        sv <- real_times_trend(...)
+        x <- sv[[1L]]$sdata
+        sv[[1L]]$sdata <- matrix(
+          sort(as.integer(x)), nrow = nrow(x), ncol = ncol(x)
+        )
+        sv
+      }),
+      check = check_times_trend_rows
+    ),
+    "group_inds_trend in row order" = list(
+      mocks = list(
+        axis_group_values = function(data, spec, series_vals,
+                                     series_axis) {
+          gr_var <- mvgam:::spec_groupings(spec)$gr
+          if (is.null(gr_var) || !gr_var %in% names(data)) {
+            return(NULL)
+          }
+          first_rows <- !duplicated(as.character(series_vals))
+          as.character(data[[gr_var]])[first_rows]
+        }
+      ),
+      check = function() {
+        check_axis_row_order(wide_trends = list(), frame_names = "hier_col")
+      }
+    ),
+    "trend_map rows in supplied order" = list(
+      mocks = list(
+        series_row_order = function(supplied, series_levels, subject) {
+          mvgam:::assert_series_coverage(supplied, series_levels, subject)
+          seq_along(series_levels)
+        }
+      ),
+      check = function() {
+        check_axis_cells(axis_cells(function(cell) {
+          identical(cell$label, "trend_map frame / long")
+        }))
+      }
+    )
+  )
+}
+
+# How many expectations a check fails with the mutant's bindings in
+# place. The handler muffles every expectation, passing or failing.
+# The gate's own test then reports only the count asserted on it.
+axis_mutant_failures <- function(mutant) {
+  do.call(
+    testthat::local_mocked_bindings,
+    c(mutant$mocks, list(.package = "mvgam", .env = environment()))
+  )
+  failures <- 0L
+  withCallingHandlers(
+    mutant$check(),
+    expectation = function(e) {
+      if (inherits(e, "expectation_failure")) {
+        failures <<- failures + 1L
+      }
+      invokeRestart("muffle_expectation")
+    }
+  )
+  failures
+}
+
+test_that("the axis checks fail on every defect they guard", {
+  # The checks above pass on the current package. That shows nothing
+  # unless each one also fails on the defect it names, and three of
+  # these defects once passed every check in this file.
+  mutants <- axis_mutants()
+  for (nm in names(mutants)) {
+    expect_gt(
+      axis_mutant_failures(mutants[[nm]]), 0L,
+      label = paste(nm, "failures")
     )
   }
 })

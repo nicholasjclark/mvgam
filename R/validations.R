@@ -189,8 +189,8 @@ validate_family <- function(family, link = NULL) {
         stop(insight::format_error(c(
           paste0("A link cannot be given with the family name '",
                  family[1], "'."),
-          i = paste0("Write the family as a call, as in '", family[1],
-                     "()', and give its arguments there.")
+          i = paste0("Give the link inside the call: '", family[1],
+                     "(link = ...)'.")
         )), call. = FALSE)
       }
       return(constructor())
@@ -373,17 +373,9 @@ validate_closure_unit_data <- function(data,
   }
   for (col in required_cols) {
     if (!col %in% colnames(data)) {
-      stop(insight::format_error(c(
-        paste0(
-          "Closure-unit families require column '", col,
-          "' to be present in 'data'."
-        ),
-        i = paste0(
-          "Each row of 'data' is one visit; the ", grouping_label,
-          " tuple identifies a closure unit and '", cap_var,
-          "' bounds the latent state per unit."
-        )
-      )))
+      stop(insight::format_error(
+        paste0("Closure-unit families require column '", col, "' in 'data'.")
+      ))
     }
   }
 
@@ -434,16 +426,9 @@ validate_closure_unit_data <- function(data,
     ))
   }
   if (any(abs(y_obs - y_int[observed]) > 1e-8)) {
-    stop(insight::format_error(c(
-      paste0(
-        "Non-integer values found in response '",
-        response_var, "'."
-      ),
-      i = paste0(
-        "Closure-unit families model integer counts; round or ",
-        "cast '", response_var, "' to integer before fitting."
-      )
-    )))
+    stop(insight::format_error(
+      paste0("Non-integer values found in response '", response_var, "'.")
+    ))
   }
   if (binary_y_check && any(y_int[observed] > 1L, na.rm = TRUE)) {
     bad <- which(!is.na(y_int) & y_int > 1L)[1L]
@@ -490,11 +475,6 @@ validate_closure_unit_data <- function(data,
       x = paste0(
         "Row ", bad, ": ", cap_var, " = ", cap_int[bad],
         ", ", response_var, " = ", y_int[bad], "."
-      ),
-      i = paste0(
-        "Each closure unit's '", cap_var, "' must be at least ",
-        "the largest observed count in that unit; raise '",
-        cap_var, "' or drop the offending row."
       )
     )))
   }
@@ -567,9 +547,8 @@ validate_closure_unit_data <- function(data,
         " combination found."
       ),
       i = paste0(
-        "Each closure unit is one draw from the state ",
-        "distribution; a single draw cannot identify the ",
-        "distribution parameters regardless of the visit count."
+        "A single unit is one draw from the state distribution, ",
+        "however many visits it has."
       )
     )))
   }
@@ -585,20 +564,17 @@ validate_closure_unit_data <- function(data,
   # et al. 2012, Dennis et al. 2015, Kery 2018). Refuse the fit.
   if (all(rep_counts == 1L) && !any_covariates) {
     if (binary_y_check) {
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          c(
-            "Every closure unit has a single visit and zero covariates.",
-            i = paste0(
-              "Only the product of state and detection probability ",
-              "is identified by data; the individual parameters ",
-              "are prior-dominated (Royle and Dorazio 2008, ch. 3.5)."
-            )
-          ),
-          .frequency = "once",
-          .frequency_id = "closure_unit_all_single_visit"
-        )
-      }
+      warn_once(
+        c(
+          "Every closure unit has a single visit and zero covariates.",
+          i = paste0(
+            "Only the product of state and detection probability ",
+            "is identified by data; the individual parameters ",
+            "are prior-dominated (Royle and Dorazio 2008, ch. 3.5)."
+          )
+        ),
+        "closure_unit_all_single_visit"
+      )
     } else {
       stop(insight::format_error(c(
         "The closure-unit count family is not identified.",
@@ -618,25 +594,22 @@ validate_closure_unit_data <- function(data,
   }
   single_visit_share <- mean(rep_counts == 1L)
   if (single_visit_share > 0.3 && !all(rep_counts == 1L)) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        c(
-          paste0(
-            "More than 30% of closure units have a single visit ",
-            "(", round(100 * single_visit_share),
-            "% single-visit units)."
-          ),
-          i = paste0(
-            "State and detection probability share information ",
-            "only via the formulae; with this proportion of ",
-            "single-visit units, posterior identifiability ",
-            "depends largely on the covariate structure."
-          )
+    warn_once(
+      c(
+        paste0(
+          "More than 30% of closure units have a single visit ",
+          "(", round(100 * single_visit_share),
+          "% single-visit units)."
         ),
-        .frequency = "once",
-        .frequency_id = "closure_unit_single_visit"
-      )
-    }
+        i = paste0(
+          "State and detection probability share information ",
+          "only via the formulae; with this proportion of ",
+          "single-visit units, posterior identifiability ",
+          "depends largely on the covariate structure."
+        )
+      ),
+      "closure_unit_single_visit"
+    )
   }
 
   invisible(TRUE)
@@ -805,15 +778,8 @@ validate_no_covariate_nas <- function(data, formulas,
       "Columns referenced by the formula contain ",
       "missing values in '", context, "'."
     ),
-    x = paste(bad_lines, collapse = "; "),
-    i = paste0(
-      "mvgam preserves NAs in the response to maintain the ",
-      "time grid (the likelihood skips those rows). A covariate ",
-      "must be complete for the trend pipeline to align across ",
-      "timepoints, and the same holds for an addition term on a ",
-      "row whose response was observed. Drop the NA rows, impute ",
-      "the column or remove it from the formula before fitting."
-    )
+    stats::setNames(bad_lines, rep("x", length(bad_lines))),
+    i = "A missing response is allowed. The likelihood skips its row."
   )))
 }
 
@@ -1129,25 +1095,14 @@ require_fitted_model <- function(object, fn = NULL) {
   if (!inherits(object, "mvgam_prefit")) {
     return(invisible(TRUE))
   }
-  detail <- if (is.null(fn)) {
-    paste0(
-      "A posterior is required here, and an unfitted stub was ",
-      "supplied (`run_model = FALSE`)."
-    )
-  } else {
-    paste0(
-      fn, "() requires a fitted Stan model and an unfitted ",
-      "stub was supplied (`run_model = FALSE`)."
-    )
-  }
   stop(insight::format_error(c(
-    "No fitted model found in mvgam object.",
-    x = detail,
-    i = paste0(
-      "Use `stancode()` and `standata()` to inspect the generated ",
-      "Stan code and data without fitting; refit with ",
-      "`run_model = TRUE` (the default) to use this method."
-    )
+    if (is.null(fn)) {
+      "A fitted model is required."
+    } else {
+      paste0(fn, "() requires a fitted model.")
+    },
+    x = "The object was built with `run_model = FALSE`.",
+    i = "`stancode()` and `standata()` work on it."
   )), call. = FALSE)
 }
 
@@ -1220,8 +1175,7 @@ trend_map_from_matrix <- function(input, series_levels) {
       x = paste0(
         "Expected ", n_series, " (one per series), got ",
         nrow(input), "."
-      ),
-      i = "Rows correspond to series; columns to latent factors."
+      )
     )))
   }
   # A matrix carries rownames, and a user who writes them is saying
@@ -1257,15 +1211,12 @@ trend_map_from_matrix <- function(input, series_levels) {
   zero_rows <- which(rowSums(abs(fixed_only)) == 0 & !row_has_any_free)
   if (length(zero_rows) > 0L) {
     stop(insight::format_error(c(
-      "'trend_map' has zero-loading rows; those series are unmodelled.",
+      "Every series must load on at least one factor in 'trend_map'.",
       x = paste0(
         "Series with no loadings: ",
         paste0("'", series_levels[zero_rows], "'", collapse = ", "), "."
       ),
-      i = paste0(
-        "Every series must load on at least one factor (set a ",
-        "finite non-zero loading or NA to sample the entry)."
-      )
+      i = "NA marks an entry to be sampled."
     )))
   }
   # Fully-free columns (every entry NA) are identified up to
@@ -1311,10 +1262,6 @@ trend_map_from_dataframe <- function(input, series_levels) {
       x = paste0(
         "Got: ",
         paste0(sort(unique(t)), collapse = ", "), "."
-      ),
-      i = paste0(
-        "Latent factors are indexed 1..K with no gaps; ",
-        "renumber the mapping if needed."
       )
     )))
   }
@@ -1627,17 +1574,12 @@ validate_n_lv_ceiling <- function(n_lv, n_species,
   n_lv_int <- as.integer(n_lv)
   if (n_lv_int > n_species) {
     stop(insight::format_error(c(
-      paste0(
-        "'n_lv' cannot exceed the number of ", noun, "."
-      ),
+      paste0("'n_lv' must be at most the number of ", noun, "."),
       x = paste0(
         "Got n_lv = ", n_lv_int, ", n_", noun, " = ", n_species, "."
       ),
       i = paste0(
-        "The marginal residual covariance has rank at most n_",
-        noun, ". Additional columns of 'Z' add no expressive ",
-        "capacity. With `loadings_prior = \"mgp\"`, increase ",
-        "'mgp_a2' (e.g. to 5) for stronger column shrinkage."
+        "The residual covariance has rank at most n_", noun, "."
       )
     )))
   }
@@ -1855,12 +1797,9 @@ validate_grouping_arguments <- function(gr, subgr) {
   }
 
   if (!is.null(subgr) && is.null(gr)) {
-    stop(insight::format_error(c(
-      "Subgrouping requires main grouping variable.",
-      x = cli::format_inline(
-        "Cannot specify {.field subgr = {subgr}} without {.field gr}."
-      )
-    )))
+    stop(insight::format_error(
+      paste0("'subgr = ", subgr, "' requires a main grouping 'gr'.")
+    ))
   }
 
   return(list(gr = gr, subgr = subgr))
@@ -1880,6 +1819,8 @@ validate_regular_time_intervals <- function(time_values, time_var = "time") {
   checkmate::assert_numeric(time_values, min.len = 2)
 
   # Calculate intervals between consecutive time points
+  # Spacing is a property of the sorted distinct times, whatever order
+  # the time index takes them in.
   intervals <- diff(sort(unique(time_values)))
 
   # Check for regular intervals (allowing small numerical tolerance)
@@ -1889,14 +1830,12 @@ validate_regular_time_intervals <- function(time_values, time_var = "time") {
 
   if (!is_regular) {
     stop(insight::format_error(c(
-      cli::format_inline(
-        "Irregular time intervals detected in {.field {time_var}}."
+      paste0("The trend needs regularly spaced times in '", time_var, "'."),
+      x = paste0(
+        "Gaps between times range from ", min(intervals), " to ",
+        max(intervals), "."
       ),
-      x = "Some trends require regular time spacing.",
-      x = cli::format_inline(
-        "Interval range: {min(intervals)} to {max(intervals)}"
-      ),
-      i = "Consider using CAR() for irregular intervals or interpolate data."
+      i = "'CAR()' models a trend over irregular times."
     )))
   }
 
@@ -2447,51 +2386,24 @@ trend_constructor_calls <- function(formula_str) {
   matches[nzchar(matches)]
 }
 
-#' Per-session memo of exact-GP terms that have already warned.
-#' Keys are the literal `gp_term` strings (e.g. `"gp(x)"`); the
-#' value is `TRUE`. Reset between R sessions automatically; not
-#' user-facing.
-#' @noRd
-.exact_gp_warned <- new.env(parent = emptyenv())
-
-#' Fire the "exact GP, no newdata prediction" warning at most once
-#' per term per session. Silent under `TESTTHAT=true` so the test
-#' suite does not surface the noise.
+#' Tell the user once per term and session that an exact GP term
+#' predicts in-sample alone. `inform_once()` keeps the count and
+#' honours `silent >= 2`.
 #' @noRd
 maybe_warn_exact_gp <- function(gp_term) {
-  if (identical(Sys.getenv("TESTTHAT"), "true")) return(invisible())
-  # Honour `silent >= 2` (mirrors brms / mvgam silent semantics:
-  # 0 = chatty, 1 = default, 2 = also suppress mvgam notices).
-  # mvgam() / jsdgam() stash the entry-time `silent` on this
-  # option so deep validators can read it without threading.
-  if (isTRUE(getOption("mvgam.silent", 0L) >= 2L)) {
-    return(invisible())
-  }
-  if (isTRUE(.exact_gp_warned[[gp_term]])) return(invisible())
-  assign(gp_term, TRUE, envir = .exact_gp_warned)
-  # NOTE: do not wrap the message body in `insight::format_warning()`
-  # -- that function emits a warning as a side effect on top of
-  # returning the formatted string, so combining it with message()
-  # produces two user-facing notices for one logical event.
-  # Build the multi-line body by hand and emit via message() so the
-  # user sees exactly one prefixed notice per (term, session).
   example <- gsub("\\)$", ", k = 20)", gp_term)
-  body <- paste(
-    cli::format_inline(
-      "Exact GP term in {.field {gp_term}} (no {.field k} given)."
+  inform_once(
+    c(
+      cli::format_inline(
+        "Exact GP term in {.field {gp_term}} (no {.field k} given)."
+      ),
+      i = "Prediction at 'newdata' requires the approximate form.",
+      i = cli::format_inline(
+        "Pass {.field k}, as in {.code {example}}, to use it."
+      )
     ),
-    cli::format_inline(
-      "i Fit + in-sample inference work; ",
-      "prediction at newdata is not wired up for exact GPs."
-    ),
-    cli::format_inline(
-      "i Pass {.field k} (e.g. {.code {example}}) to use the ",
-      "Hilbert-space approximate form, which supports prediction ",
-      "at newdata."
-    ),
-    sep = "\n"
+    paste0("mvgam_exact_gp_", gp_term)
   )
-  rlang::inform(body)
 }
 
 #' Warn (once) on exact GP terms
@@ -2526,9 +2438,8 @@ validate_exact_gp_usage <- function(formula) {
       if (is.na(k) || identical(k, "NA")) {
         # One mvgam() call reaches this from the observation validator,
         # the trend validator and `setup_brms_lightweight()`. The
-        # warning is kept to once per term per session by a package
-        # environment; rlang's `.frequency` did not hold across the
-        # re-entries.
+        # notice's id carries the term, and it shows once per term
+        # per session.
         maybe_warn_exact_gp(paste(deparse(gp_call), collapse = ""))
       }
     }
@@ -2768,11 +2679,7 @@ refuse_trend_formula_response <- function(formula) {
   stop(insight::format_error(c(
     "A trend formula names predictors only.",
     x = paste0("Found the response '", deparse(formula[[2L]]), "'."),
-    i = paste0(
-      "Write the response in the observation 'formula' and give ",
-      "'trend_formula' its right-hand side alone, as in ",
-      "'trend_formula = ~ AR(p = 1)'."
-    )
+    i = "Write the response in the observation 'formula'."
   )), call. = FALSE)
 }
 
@@ -3034,7 +2941,6 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   time_vals <- get_time_for_grouping(data)
   series_vals <- get_series_for_grouping(data)
 
-  unique_times <- unique(time_vals)
   # A response-keyed frame states its axis rather than implying it
   # through the row values, and states it in formula order, so it is
   # taken as given below rather than sorted back to alphabetical.
@@ -3043,7 +2949,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   # frame's own series sorted. Keeping a sorted and an unsorted
   # spelling of the same axis is what let two readers disagree.
   response_axis <- mvgam_response_axis(data)
-  series_axis <- response_axis %||% sort(unique(series_vals))
+  series_axis <- response_axis %||% series_axis_values(series_vals)
 
   # The group each axis entry belongs to, read from the rows that
   # define the axis. `group_inds_trend[s]` is subscripted by the
@@ -3058,10 +2964,10 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   min_time <- min(time_vals, na.rm = TRUE)
   max_time <- max(time_vals, na.rm = TRUE)
 
-  sorted_unique_times <- sort(unique_times)
+  sorted_unique_times <- time_axis_values(time_vals)
 
   dimensions <- list(
-    n_time = length(unique_times),          # Number of unique time points
+    n_time = length(sorted_unique_times),   # Number of unique time points
     n_series = length(series_axis),         # Number of series
     n_obs = nrow(data),                    # Total observations
     time_range = c(min_time, max_time),    # Time range
@@ -3084,7 +2990,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   time_values <- if (is.null(original_time)) {
     sorted_unique_times
   } else {
-    sort(unique(original_time))
+    time_axis_values(original_time)
   }
   # What `forecast()` extends the grid by. A regular grid has one gap and
   # an irregular one has no single step, which is stated as `NA` rather
@@ -3125,7 +3031,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     # of the same fact, free to disagree with it.
     time = list(
       values = time_values,
-      n = length(unique_times),
+      n = length(sorted_unique_times),
       step = time_step
     ),
     # The columns of `Z` and of `lv_trend`. A model with no factor
@@ -3432,38 +3338,17 @@ apply_trend_map_alias <- function(trend_specs, mvgam_trend_map) {
     return(trend_specs)
   }
   if (is.null(trend_specs)) {
-    stop(insight::format_error(c(
-      "Argument 'trend_map' requires a 'trend_formula'.",
-      x = paste0(
-        "The mapping is stored on a trend spec, which ",
-        "'trend_formula' creates. 'Z' would be dropped before the ",
-        "Stan data is built, and the model fitted would be an ",
-        "ordinary GAM."
-      ),
-      i = paste0(
-        "Write the trend the factors belong to, such as ",
-        "'trend_formula = ~ AR(p = 1)', or drop 'trend_map'."
-      )
-    )), call. = FALSE)
+    stop(insight::format_error(
+      "Argument 'trend_map' requires a 'trend_formula'."
+    ), call. = FALSE)
   }
   is_multivar <- is_multivariate_trend_specs(trend_specs)
   specs <- if (is_multivar) trend_specs else list(trend_specs)
   for (i in seq_along(specs)) {
     if (!is.null(specs[[i]]$trend_map)) {
-      stop(insight::format_error(c(
-        paste0(
-          "'trend_map' supplied at both trend constructor and ",
-          "'mvgam()' (collision)."
-        ),
-        x = paste0(
-          "Trend spec '", names(specs)[i] %||% i,
-          "' has 'trend_map' on the constructor; mvgam() ",
-          "also supplies it at the top level."
-        ),
-        i = paste0(
-          "Drop the mvgam()-level 'trend_map' argument ",
-          "(constructor-level takes precedence)."
-        )
+      stop(insight::format_error(paste0(
+        "'trend_map' is given both to 'mvgam()' and to the trend ",
+        "constructor for '", names(specs)[i] %||% i, "'."
       )))
     }
     specs[[i]]$trend_map <- mvgam_trend_map
@@ -3504,17 +3389,7 @@ attach_loadings_prior_spec <- function(trend_specs, spec) {
   if (is.null(trend_specs)) {
     stop(insight::format_error(c(
       "Argument 'loadings_prior' requires a 'trend_formula'.",
-      x = paste0(
-        "The prior applies to the factor loadings 'Z', which a ",
-        "trend carrying latent factors has. 'trend_formula' ",
-        "creates that trend, and the prior would otherwise be ",
-        "dropped in silence."
-      ),
-      i = paste0(
-        "Write the trend the factors belong to, such as ",
-        "'trend_formula = ~ AR(n_lv = 2)', or drop ",
-        "'loadings_prior'."
-      )
+      x = "The prior applies to the loadings of a factor trend."
     )), call. = FALSE)
   }
   is_multivar <- is_multivariate_trend_specs(trend_specs)
@@ -3585,12 +3460,7 @@ normalise_trend_map_on_specs <- function(trend_specs, data) {
             "Mismatched spec(s): ",
             paste(offending, collapse = ", "), "."
           ),
-          i = paste0(
-            "mvgam uses one shared trend component across ",
-            "responses; supply the same 'trend_map' for every ",
-            "spec (or set it once at the top level via ",
-            "'mvgam(trend_map = ...)')."
-          )
+          i = "Set 'trend_map' once, in 'mvgam(trend_map = ...)'."
         )))
       }
     }
@@ -3686,15 +3556,6 @@ extract_factor_levels <- function(data, var_name) {
 #'@noRd
 warn_series_superseded <- function(data, series_var, series_values,
                                    gr_var, subgr_var) {
-  if (identical(Sys.getenv("TESTTHAT"), "true")) {
-    return(invisible(NULL))
-  }
-  # `silent >= 2` suppresses mvgam's own notices. mvgam() and jsdgam()
-  # stash the entry-time value on this option so validators this deep
-  # can read it without it being threaded through every call.
-  if (isTRUE(getOption("mvgam.silent", 0L) >= 2L)) {
-    return(invisible(NULL))
-  }
   if (is.null(series_var) || !series_var %in% names(data)) {
     return(invisible(NULL))
   }
@@ -3703,7 +3564,7 @@ warn_series_superseded <- function(data, series_var, series_values,
   if (identical(supplied, derived)) {
     return(invisible(NULL))
   }
-  rlang::warn(
+  warn_once(
     c(
       paste0(
         "The '", series_var, "' column was replaced by the series that '",
@@ -3721,8 +3582,7 @@ warn_series_superseded <- function(data, series_var, series_values,
         "'", derived[1L], "'."
       )
     ),
-    .frequency = "once",
-    .frequency_id = "mvgam_series_superseded"
+    "mvgam_series_superseded"
   )
   invisible(NULL)
 }
@@ -3776,12 +3636,7 @@ assert_grouping_columns <- function(data, gr_var, subgr_var) {
   }
   stop(insight::format_error(c(
     "Columns needed to identify each series are missing from 'newdata'.",
-    x = cli::format_inline("Missing: {.field {missing}}."),
-    i = cli::format_inline(paste0(
-      "This model groups its trend by {.field {gr_var}} and ",
-      "{.field {subgr_var}}, which together name a series. ",
-      "'newdata' must carry both."
-    ))
+    x = cli::format_inline("Missing: {.field {missing}}.")
   )), call. = FALSE)
 }
 
@@ -3895,12 +3750,8 @@ validate_newdata_complete <- function(newdata, object) {
   }
   stop(insight::format_error(c(
     "'newdata' is missing values the model needs to predict.",
-    x = paste(detail, collapse = " "),
-    i = paste0(
-      "Supply a value for every row, or drop the rows that have ",
-      "none. A missing response asks for a prediction; a missing ",
-      "predictor leaves the model nothing to predict from."
-    )
+    stats::setNames(detail, rep("x", length(detail))),
+    i = "A missing response is allowed and marks a row to predict."
   )), call. = FALSE)
 }
 
@@ -4274,7 +4125,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   # downstream can notice. Sorted input, which is the usual shape and
   # the one every fixture carries, is unaffected.
   refuse_absent_time_column(data, time_var)
-  unique_times <- sort(unique(data[[time_var]]))
+  unique_times <- time_axis_values(data[[time_var]])
   time_mapping <- setNames(seq_along(unique_times), unique_times)
   attr(data, "mvgam_time") <- time_mapping[as.character(data[[time_var]])]
   attr(data, "mvgam_time_source") <- "implicit"
@@ -4815,8 +4666,8 @@ extract_and_validate_trend_components <- function(data, mv_spec,
         has_fixed_Z <- !is.null(parsed_trend$fixed_Z) ||
           !is.null(parsed_trend$Z)
         if (has_fixed_Z) {
-          mvgam_warn_once_user(
-            message = paste0(
+          warn_once(
+            paste0(
               "'by = lv_axis()' was supplied with a user-pinned ",
               "'trend_map' (numeric entries on Z). The per-factor ",
               "smooths still fit, but factor identification is ",
@@ -5607,10 +5458,7 @@ normalise_loadings_prior <- function(input, data2, data,
         "'loadings_prior' must supply at least one of ",
         "'features', 'distances' or 'column_shrinkage = \"mgp\"'."
       ),
-      i = paste0(
-        "An empty spec collapses to the default iid prior; ",
-        "drop the argument."
-      )
+      i = "Leave 'loadings_prior' out to use the default iid prior."
     )))
   }
   series_levels <- argument_series_levels(data, "loadings_prior")
@@ -5787,14 +5635,6 @@ resolve_distances_input <- function(distances, data2) {
 }
 
 
-# Check that `loadings_prior` is coherent with `trend_map`:
-# - cannot combine with fully-fixed Z (no parameters left to put
-#   a prior on)
-# - cannot combine with partial Z (NAs in trend_map mark free
-#   entries, but Heaps' framework treats all entries jointly)
-# Both error. Called from make_stan after both arguments have
-# been normalised.
-#'@noRd
 # Defensive consistency check on a normalised loadings-prior
 # spec, called from `make_loadings_prior_stanvars()` before
 # stanvar emission. Validates that the required fields are
@@ -5882,14 +5722,7 @@ assert_distance_names_unreserved <- function(nms) {
         "'loadings_prior$distances' names cannot start with ",
         "'dist_'."
       ),
-      x = paste0(
-        "Reserved: ",
-        paste0("'", bad, "'", collapse = ", "), "."
-      ),
-      i = paste0(
-        "Stan emission uses 'dist_<name>' / 'theta_dist_<name>' ",
-        "internally; rename to avoid collisions."
-      )
+      x = paste0("Got: ", paste0("'", bad, "'", collapse = ", "), ".")
     )))
   }
   invisible(NULL)
@@ -5924,17 +5757,11 @@ assert_column_shrinkage_compatible <- function(loadings_prior_spec, trend) {
   }
   stop(insight::format_error(c(
     paste0(
-      "Multiplicative gamma process shrinkage is not available for ",
-      "'", trend_nm, "()' trends."
+      "Multiplicative gamma process shrinkage applies to ",
+      paste0("'", mgp_capable_trends, "()'", collapse = ", "),
+      " trends."
     ),
-    x = paste0(
-      "The column scale is applied through the shared innovation ",
-      "scale, which '", trend_nm, "()' does not use."
-    ),
-    i = paste0(
-      "Use column_shrinkage = 'iid' or a trend that carries it: ",
-      paste0(mgp_capable_trends, "()", collapse = ", "), "."
-    )
+    x = paste0("Got '", trend_nm, "()'.")
   )))
 }
 
@@ -5956,31 +5783,11 @@ assert_loadings_prior_compatible <- function(loadings_prior_spec,
   if (is.null(loadings_prior_spec) || is.null(trend_map_Z)) {
     return(invisible(NULL))
   }
-  any_free <- anyNA(trend_map_Z)
-  if (any_free) {
-    stop(insight::format_error(c(
-      paste0(
-        "'loadings_prior' cannot combine with a partial 'trend_map' ",
-        "(mixed fixed entries and NAs)."
-      ),
-      i = paste0(
-        "Drop 'trend_map' to apply the structured prior to a free ",
-        "loadings matrix (the n_lv argument alone triggers the ",
-        "factor model), or drop 'loadings_prior' to keep the ",
-        "user-supplied partial pattern. An all-NA mask is treated ",
-        "as 'no fixed entries' upstream and does combine cleanly ",
-        "with 'loadings_prior'."
-      )
-    )))
-  }
   stop(insight::format_error(c(
-    paste0(
-      "'loadings_prior' cannot combine with a fully-fixed ",
-      "'trend_map'."
-    ),
-    i = paste0(
-      "Fixed loadings have no free parameters to put a prior on; ",
-      "drop one of the two arguments."
+    "'loadings_prior' requires every 'trend_map' entry to be NA.",
+    x = paste0(
+      "The 'trend_map' fixes ", sum(!is.na(trend_map_Z)), " of ",
+      length(trend_map_Z), " entries."
     )
   )))
 }
@@ -6255,23 +6062,13 @@ assert_forecast_times_steppable <- function(fc_times, training,
         ),
         x = paste0(
           "The training grid runs to time ", past[length(past)],
-          ". The next ", length(fut), " times for series '", lv,
-          "' are ", expected[1L], " to ",
-          expected[length(expected)], "; got ", fut[1L], " to ",
+          ". Series '",
+          lv, "' needs times ", expected[1L], " to ",
+          expected[length(expected)], ". Got ", fut[1L], " to ",
           fut[length(fut)], "."
         ),
-        i = paste0(
-          "This trend advances one step per time point: a gap ",
-          "would be forecast as though it were not there. Supply ",
-          "every intervening time or use 'CAR()', which carries ",
-          "the elapsed gap."
-        ),
-        i = paste0(
-          "The grid is where the latent state runs. On a frame ",
-          "padded with unobserved rows it reaches past the last ",
-          "response. Occasions inside it already carry a state, ",
-          "which 'hindcast()' reads."
-        )
+        i = "'CAR()' models a trend over irregular times.",
+        i = "'hindcast()' covers times inside the training grid."
       )))
     }
   }

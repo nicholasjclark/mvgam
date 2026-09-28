@@ -177,5 +177,5 @@ test_that("loo and waic refuse the parity arguments they cannot honour", {
   expect_error(waic(fit, compare = FALSE), "cannot honour")
   expect_error(waic(fit, model_names = "m"), "cannot honour")
   # The two that are honoured still answer.
-  expect_s3_class(suppressWarnings(loo(fit, save_psis = TRUE)), "psis_loo")
+  expect_s3_class(loo(fit, save_psis = TRUE), "psis_loo")
 })

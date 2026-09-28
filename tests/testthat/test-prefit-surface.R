@@ -27,10 +27,10 @@ build_prefit <- function() {
     x = rnorm(40),
     series = factor(rep(c("a", "b"), each = 20L))
   )
-  suppressWarnings(mvgam(
+  mvgam(
     y ~ x, data = dat, family = poisson(),
     run_model = FALSE, silent = 2
-  ))
+  )
 }
 
 
@@ -46,10 +46,13 @@ test_that("a prefit failure names the state it is in", {
   # of this loop.
   refits <- c("update", "kfold", "lfo_cv", "add_criterion",
               "loo_subsample", "loo_moment_match")
+  # `parnames()` returns `variables()`, which the loop drives, and its
+  # brms generic raises a deprecation warning on every call.
+  deprecated <- "parnames"
   gens <- sort(sub("\\.mvgam$", "", as.character(
     utils::.S3methods(class = "mvgam")
   )))
-  gens <- setdiff(gens, refits)
+  gens <- setdiff(gens, c(refits, deprecated))
   # The registry is the source. A method added later is driven here
   # without an edit to this file.
   expect_gt(length(gens), 50L)
@@ -61,7 +64,7 @@ test_that("a prefit failure names the state it is in", {
   capture.output(
     for (gen in gens) {
       args <- c(list(pf), needs[[gen]])
-      out <- suppressWarnings(caught_error(do.call(gen, args)))
+      out <- caught_error(do.call(gen, args))
       if (!is.null(out) &&
             grepl(internal_draws_error, conditionMessage(out),
                   fixed = TRUE)) {
@@ -87,7 +90,8 @@ test_that("a prefit states what it has and what it lacks", {
   # produced it, rather than failing inside posterior.
   err <- expect_error(summary(pf))
   expect_match(conditionMessage(err), "run_model", fixed = TRUE)
-  expect_match(conditionMessage(err), "No fitted model", fixed = TRUE)
+  expect_match(conditionMessage(err), "requires a fitted model",
+               fixed = TRUE)
 })
 
 
@@ -100,10 +104,10 @@ test_that("a VAR prefit names its trend and the posterior it needs", {
     y = rnorm(60), time = rep(1:20, times = 3L),
     series = factor(rep(c("a", "b", "c"), each = 20L))
   )
-  pf <- suppressWarnings(mvgam(
+  pf <- mvgam(
     y ~ 1, trend_formula = ~ VAR(cor = TRUE), data = dat,
     family = gaussian(), run_model = FALSE, silent = 2
-  ))
+  )
   expect_s3_class(pf, "mvgam_prefit")
 
   # `trend_components` is empty until a fit runs, and the type is in
@@ -117,7 +121,7 @@ test_that("a VAR prefit names its trend and the posterior it needs", {
   for (meth in list(function(x) irf(x, h = 2L),
                     function(x) fevd(x, h = 2L),
                     posterior_transition_matrix)) {
-    err <- expect_error(meth(pf), "requires a fitted Stan model")
+    err <- expect_error(meth(pf), "requires a fitted model")
     expect_match(conditionMessage(err), "run_model", fixed = TRUE)
     expect_false(grepl(internal_draws_error, conditionMessage(err),
                        fixed = TRUE))
@@ -139,10 +143,10 @@ test_that("mvgam_multiple gives one prefit when run_model is FALSE", {
   # inside it. One stub comes back from the first dataset, under
   # either `combine`.
   for (comb in c(TRUE, FALSE)) {
-    pf <- suppressWarnings(mvgam_multiple(
+    pf <- mvgam_multiple(
       y ~ 1, data_list = list(mk(), mk()), family = poisson(),
       combine = comb, run_model = FALSE, silent = 2
-    ))
+    )
     expect_s3_class(pf, "mvgam_prefit")
     expect_false(inherits(pf, "mvgam_pooled"))
     expect_null(pf$fit)
@@ -168,10 +172,10 @@ test_that("a prefit built inside a function omits that function's locals", {
   )
   build <- function(d) {
     ballast <- rnorm(5e5)
-    suppressWarnings(mvgam(
+    mvgam(
       y ~ x, trend_formula = ~ AR(p = 1), data = d,
       family = poisson(), run_model = FALSE, silent = 2
-    ))
+    )
   }
   pf <- build(dat)
 
@@ -200,7 +204,7 @@ test_that("update rebuilds a prefit past the algorithm it recorded", {
   # A prefit records `algorithm = "none"`, which no backend lists.
   # Handing that back refused the very call that takes a prefit on to
   # a fit. `run_model = FALSE` keeps the check free of sampling.
-  again <- suppressWarnings(update(pf, run_model = FALSE))
+  again <- update(pf, run_model = FALSE)
   expect_s3_class(again, "mvgam_prefit")
   expect_type(stancode(again), "character")
 })

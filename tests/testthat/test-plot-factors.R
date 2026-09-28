@@ -162,7 +162,7 @@ test_that("non-LV model raises an informative error", {
                                            class = "mvgam_trend"))
   )
   class(obj) <- "mvgam"
-  expect_error(mvgam:::plot_factors(obj), "latent dynamic factors")
+  expect_error(mvgam:::plot_factors(obj), "no latent factors to plot")
 })
 
 test_that("label_contribution toggles the percentage facet labels", {

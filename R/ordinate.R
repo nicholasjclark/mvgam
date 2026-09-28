@@ -373,12 +373,7 @@ ordinate_trait_arrows <- function(traits, loadings_2d,
   if (!is.data.frame(traits) && !is.matrix(traits)) {
     stop(insight::format_error(c(
       "Argument 'traits' must be a data.frame or matrix.",
-      i = paste0(
-        "Rows correspond to species; columns are trait values. ",
-        "Either set 'rownames(traits)' to the fit's species ",
-        "labels, or supply one row per species in series_levels ",
-        "order."
-      )
+      i = "Give one row per species, named by 'rownames(traits)'."
     )))
   }
   traits <- as.data.frame(traits)
@@ -489,21 +484,15 @@ ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
                                  traits = NULL,
                                  trait_arrow_scale = 1) {
   if (any(which_lvs > svd_comp$n_lv)) {
-    suggestion <- if (svd_comp$n_lv == 1L) {
-      "Refit with n_lv >= 2 or inspect factors via 'plot_factors()'."
-    } else {
-      paste0(
-        "Choose two factors from 1..", svd_comp$n_lv, "."
-      )
-    }
     stop(insight::format_error(c(
       "Selected latent variables exceed the model's `n_lv`.",
       x = paste0(
-        "Requested which_lvs = ",
-        paste(which_lvs, collapse = ", "),
-        "; available n_lv = ", svd_comp$n_lv, "."
+        "Requested which_lvs = ", paste(which_lvs, collapse = ", "),
+        ". The model has n_lv = ", svd_comp$n_lv, "."
       ),
-      i = suggestion
+      i = if (svd_comp$n_lv == 1L) {
+        "A one-factor model plots with 'plot_factors()'."
+      }
     )))
   }
   if (length(site_names) != NROW(svd_comp$scores)) {

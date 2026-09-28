@@ -609,7 +609,7 @@ test_that("time regularity is gated on the trend's own rules", {
     suppressMessages(
       mvgam_data(dat, trend_model = AR(p = 1), family = poisson())
     ),
-    "Irregular time intervals"
+    "Gaps between times range from 1 to 3"
   )
 
   # Both surfaces answer from the same rules.

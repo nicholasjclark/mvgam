@@ -975,16 +975,14 @@ fill_multivariate_trend_defaults <- function(trend_model,
     # since the simulated data will reflect VAR(1) dynamics
     # with a higher-lag label and any VAR(p > 1) fit will
     # estimate near-zero coefficients at lags >= 2.
-    if (n_lags > 1L &&
-        !identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
+    if (n_lags > 1L) {
+      warn_once(
         paste0(
           "VAR(p > 1) default A populates lag 1 only; ",
           "higher lags are zero. Supply 'params$A' to ",
           "sim_mvgam() for genuine VAR(p > 1) dynamics."
         ),
-        .frequency = "once",
-        .frequency_id = "mvgam_sim_var_default_p_gt_1"
+        "mvgam_sim_var_default_p_gt_1"
       )
     }
     # Scale off-diagonal by n_series - 1 so the row sums stay

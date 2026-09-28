@@ -321,9 +321,7 @@ resolve_observation_family <- function(formula, family) {
     stop(insight::format_error(c(
       paste0("'", resolve_family_name(alone[[1L]]), "()' cannot be one ",
              "response of a multivariate model."),
-      x = paste0("Its data are laid out by unit, and its likelihood is ",
-                 "written for that layout."),
-      i = "Fit that response in a model of its own."
+      x = "Closure-unit families lay out their likelihood by unit."
     )), call. = FALSE)
   }
   list(formula = formula, family = family)
@@ -586,15 +584,15 @@ check_tweedie_truncation <- function(object, resp = NULL) {
     insight::format_warning(c(
       "Tweedie truncation 'M' may be too small.",
       x = paste0(
-        "max(lambda) at the posterior mean is ",
+        "max(lambda) at the posterior mean (",
         format(lambda_max, digits = 3),
-        ", which is more than 70% of M = ", M, "."
+        ") exceeds 70% of M = ", M, "."
       ),
       i = paste0(
         "Refit with a larger truncation such as ",
-        "tweedie(M = ", ceiling(lambda_max * 2), "L) and ",
-        "compare the 'mphi' / 'mtheta' posteriors."
-      )
+        "tweedie(M = ", ceiling(lambda_max * 2), "L)."
+      ),
+      i = "Compare the 'mphi' and 'mtheta' posteriors across the two fits."
     ))
   }
   invisible(NULL)
@@ -2499,9 +2497,8 @@ build_closure_unit_arrays <- function(data,
             response_var, "' = ", Y_max[g], "."
           ),
           i = paste0(
-            "Cap must be at least the unit's observed maximum",
-            " count; raise the '", cap_var, "' value or drop",
-            " the column to use the data-driven default."
+            "Drop the '", cap_var, "' column to use the data-driven ",
+            "default."
           )
         )))
       }
@@ -3313,6 +3310,35 @@ occ <- function(multi_season = FALSE) {
   fam
 }
 
+#' Stan lines that dispatch a closure-unit partial sum to reduce_sum
+#'
+#' Every closure-unit lpmf wrapper builds the unit index `g_seq`,
+#' picks a grainsize and returns the `reduce_sum()` call. The wrapper
+#' builds `g_seq` locally, which keeps the index out of the data that
+#' brms passes to the likelihood. The grainsize targets about eight
+#' chunks. Without threading that costs eight serial dispatches per
+#' leapfrog step, against `N_unit` at a grainsize of one. With up to
+#' eight threads TBB maps the chunks across cores.
+#'
+#' @param partial_sum Name of the Stan partial-sum function.
+#' @param args Character vector of the indented argument lines that
+#'   follow `g_seq, grainsize` in the call.
+#' @return Character vector of Stan lines.
+#' @noRd
+closure_unit_reduce_sum_lines <- function(partial_sum, args) {
+  checkmate::assert_string(partial_sum)
+  checkmate::assert_character(args, min.len = 1L)
+  c(
+    "    array[N_unit] int g_seq;",
+    "    for (g in 1 : N_unit) g_seq[g] = g;",
+    "    int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
+    "    return reduce_sum(",
+    paste0("      ", partial_sum, ", g_seq, grainsize,"),
+    args,
+    "    );"
+  )
+}
+
 #' Stan function block for the closure-unit single-season
 #' occupancy lpmf
 #'
@@ -3347,7 +3373,7 @@ occ <- function(multi_season = FALSE) {
 #' @noRd
 occ_stan_funs <- function(max_rep) {
   checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
-  paste(
+  paste(c(
     "  // Per-closure-unit partial sum body. reduce_sum (called from",
     "  // the occ_lpmf wrapper) hands this function a slice [start:end]",
     "  // of the closure-unit index and gets back the partial log-",
@@ -3407,17 +3433,10 @@ occ_stan_funs <- function(max_rep) {
     "    // per-thread partial sum sees them precomputed.",
     "    vector[num_elements(mu)] logit_psi = logit(mu);",
     "    vector[num_elements(p)]  logit_p   = logit(p);",
-    "    // Closure-unit index sliced by reduce_sum. Constructed",
-    "    // locally so no extra data array is threaded through brms.",
-    "    array[N_unit] int g_seq;",
-    "    for (g in 1 : N_unit) g_seq[g] = g;",
-    "    // grainsize heuristic targets ~8 chunks; matches the",
-    "    // nmix wrapper. See ?nmix_stan_funs for the rationale.",
-    "    int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
-    "    return reduce_sum(",
-    "      partial_sum_occ_lpmf, g_seq, grainsize,",
-    "      y, logit_psi, logit_p, n_rep, Y_max, visit_idx",
-    "    );",
+    closure_unit_reduce_sum_lines(
+      "partial_sum_occ_lpmf",
+      "      y, logit_psi, logit_p, n_rep, Y_max, visit_idx"
+    ),
     "  }",
     "",
     "  // Scalar-p entry point: broadcasts to per-visit length",
@@ -3462,9 +3481,8 @@ occ_stan_funs <- function(max_rep) {
     "    int N = num_elements(y);",
     "    return occ_lpmf(y | rep_vector(mu, N), rep_vector(p, N),",
     "                    N_unit, n_rep, Y_max, visit_idx);",
-    "  }",
-    sep = "\n"
-  )
+    "  }"
+  ), collapse = "\n")
 }
 
 #' Build the closure-unit Stan stanvars for an `occ()` fit
@@ -4387,11 +4405,12 @@ warn_unidentified_component_scale <- function(n_lv, n_species,
   if ((n_species - n_lv)^2 >= n_species + n_lv) return(invisible(NULL))
   ceiling_lv <- identified_factor_ceiling(n_species)
   advice <- if (ceiling_lv >= 1L) {
-    paste0("Use 'n_lv = ", ceiling_lv, "' or fewer to estimate ",
-           "the residual scales, or add species.")
+    paste0("To estimate the residual scales, use 'n_lv = ", ceiling_lv,
+           "' or fewer or add species.")
   } else {
-    paste0("No factor count separates the two at ", n_species,
-           " species; add species to estimate the residual scales.")
+    paste0("At ", n_species, " species every factor count leaves the ",
+           "split unidentified. Add species to estimate the residual ",
+           "scales.")
   }
   insight::format_warning(c(
     paste0(
@@ -4400,14 +4419,17 @@ warn_unidentified_component_scale <- function(n_lv, n_species,
     ),
     x = paste0(
       "Family '", resolve_family_name(family), "' splits each site's ",
-      "covariance into a factor part and a per-species part, and ",
-      "that split needs (n_species - n_lv)^2 >= n_species + n_lv."
+      "covariance into a factor part and a per-species part."
     ),
+    x = paste0("Identifying the per-species part needs ",
+               "(n_species - n_lv)^2 >= n_species + n_lv."),
     i = paste0(
       "'residual_cor()', 'shared_variation()' and the predictions ",
-      "read the combined covariance and are unaffected. 'Psi' is ",
-      "not estimable per species here. A poor Rhat on it reflects ",
-      "this design. It does not signal a sampler fault."
+      "use the combined covariance and are unaffected."
+    ),
+    i = paste0(
+      "A poor Rhat on 'Psi' reflects this design and does not signal ",
+      "a sampler fault."
     ),
     i = advice
   ))
@@ -4728,7 +4750,7 @@ make_mvt_stanvars <- function(arrays, prior = NULL) {
 #' @noRd
 nmix_stan_funs <- function(max_rep) {
   checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
-  paste(
+  paste(c(
     "  // Per-visit implementation. brms passes `mu` and `p` as",
     "  // vectors when either dpar carries a sub-formula (e.g.",
     "  // bf(y ~ s(elev), p ~ s(tod))). The overloaded scalar",
@@ -4814,23 +4836,11 @@ nmix_stan_funs <- function(max_rep) {
     "    vector[num_elements(mu)] log_mu  = log(mu);",
     "    vector[num_elements(p)]  logit_p = logit(p);",
     "    vector[num_elements(p)]  log1m_p = log1m(p);",
-    "    // Closure-unit index sliced by reduce_sum. Constructed",
-    "    // locally so no extra data array is threaded through brms.",
-    "    array[N_unit] int g_seq;",
-    "    for (g in 1 : N_unit) g_seq[g] = g;",
-    "    // grainsize heuristic targets ~8 chunks. With no",
-    "    // threading: 8 serial dispatches per leapfrog (vs N_unit",
-    "    // at grainsize = 1). With threads = 1..8: TBB maps the 8",
-    "    // chunks across cores. With more than 8 threads the",
-    "    // chunks bound parallelism but per-chunk work amortises",
-    "    // the synchronisation overhead. Users can override at",
-    "    // fit time by passing a custom stanvar.",
-    "    int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
-    "    return reduce_sum(",
-    "      partial_sum_nmix_lpmf, g_seq, grainsize,",
-    "      y, log_mu, logit_p, log1m_p, n_rep,",
-    "      K_max, Y_max, visit_idx, log_n_lookup",
-    "    );",
+    closure_unit_reduce_sum_lines(
+      "partial_sum_nmix_lpmf",
+      c("      y, log_mu, logit_p, log1m_p, n_rep,",
+        "      K_max, Y_max, visit_idx, log_n_lookup")
+    ),
     "  }",
     "",
     "  // Scalar-p entry point: broadcasts to the per-visit",
@@ -4849,9 +4859,8 @@ nmix_stan_funs <- function(max_rep) {
     "    return nmix_lpmf(y | mu, rep_vector(p, N), N_unit,",
     "                     n_rep, K_max, Y_max, visit_idx,",
     "                     log_n_lookup);",
-    "  }",
-    sep = "\n"
-  )
+    "  }"
+  ), collapse = "\n")
 }
 
 #' Stan function block for the Royle-Nichols nmix variant
@@ -4876,7 +4885,7 @@ nmix_stan_funs <- function(max_rep) {
 #' @noRd
 nmix_royle_nichols_stan_funs <- function(max_rep) {
   checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
-  paste(
+  paste(c(
     "  // Per-closure-unit partial sum body. reduce_sum (called from",
     "  // the nmix_royle_nichols_lpmf wrapper) hands this function a",
     "  // slice [start:end] of the closure-unit index. When the model",
@@ -4962,13 +4971,10 @@ nmix_royle_nichols_stan_funs <- function(max_rep) {
     "    // per-thread partial sum sees them precomputed.",
     "    vector[num_elements(mu)] log_mu   = log(mu);",
     "    vector[num_elements(p)]  log_1m_r = log1m(p);",
-    "    array[N_unit] int g_seq;",
-    "    for (g in 1 : N_unit) g_seq[g] = g;",
-    "    int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
-    "    return reduce_sum(",
-    "      partial_sum_nmix_royle_nichols_lpmf, g_seq, grainsize,",
-    "      y, log_mu, log_1m_r, n_rep, K_max, Y_max, visit_idx",
-    "    );",
+    closure_unit_reduce_sum_lines(
+      "partial_sum_nmix_royle_nichols_lpmf",
+      "      y, log_mu, log_1m_r, n_rep, K_max, Y_max, visit_idx"
+    ),
     "  }",
     "",
     "  // Scalar-p entry point: broadcasts to the per-visit",
@@ -4987,9 +4993,8 @@ nmix_royle_nichols_stan_funs <- function(max_rep) {
     "      y | mu, rep_vector(p, N), N_unit,",
     "      n_rep, K_max, Y_max, visit_idx",
     "    );",
-    "  }",
-    sep = "\n"
-  )
+    "  }"
+  ), collapse = "\n")
 }
 
 #' Stan function block for the Poisson-Poisson nmix variant
@@ -5021,7 +5026,7 @@ nmix_royle_nichols_stan_funs <- function(max_rep) {
 #' @noRd
 nmix_poisson_poisson_stan_funs <- function(max_rep) {
   checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
-  paste(
+  paste(c(
     "  // Per-closure-unit partial sum body. reduce_sum (called from",
     "  // the nmix_poisson_poisson_lpmf wrapper) hands this function a",
     "  // slice [start:end] of the closure-unit index. When the model",
@@ -5104,14 +5109,11 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "    // per-thread partial sum sees them precomputed.",
     "    vector[num_elements(mu)] log_mu = log(mu);",
     "    vector[num_elements(p)]  log_p  = log(p);",
-    "    array[N_unit] int g_seq;",
-    "    for (g in 1 : N_unit) g_seq[g] = g;",
-    "    int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
-    "    return reduce_sum(",
-    "      partial_sum_nmix_poisson_poisson_lpmf, g_seq, grainsize,",
-    "      y, log_mu, log_p, p, n_rep, K_max, Y_max, visit_idx,",
-    "      log_n_lookup, k_start_ppm",
-    "    );",
+    closure_unit_reduce_sum_lines(
+      "partial_sum_nmix_poisson_poisson_lpmf",
+      c("      y, log_mu, log_p, p, n_rep, K_max, Y_max, visit_idx,",
+        "      log_n_lookup, k_start_ppm")
+    ),
     "  }",
     "",
     "  // Scalar-p entry point: broadcasts to the per-visit",
@@ -5132,9 +5134,8 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "      y | mu, rep_vector(p, N), N_unit,",
     "      n_rep, K_max, Y_max, visit_idx, log_n_lookup, k_start_ppm",
     "    );",
-    "  }",
-    sep = "\n"
-  )
+    "  }"
+  ), collapse = "\n")
 }
 
 #' Assemble the shared closure-unit Stan stanvar bundle
@@ -5482,28 +5483,23 @@ prepare_closure_unit_family <- function(family, data, response_var,
   # intercept with an informative prior.
   if (identical(family_name, "nmix_poisson_poisson") &&
       !has_obs_covariates && !has_det_covariates) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        c(
-          paste0(
-            "nmix(\"poisson_poisson\") with intercept-only mu and p ",
-            "is weakly identified."
-          ),
-          x = paste0(
-            "Only the product `lambda * p` is identified by the ",
-            "Neyman Type A marginal; individual posteriors on ",
-            "`lambda` and `p` are dominated by their priors."
-          ),
-          i = paste0(
-            "Add a covariate to either formula (`y ~ x` or ",
-            "`bf(y ~ ..., p ~ x)`), or supply an informative prior ",
-            "on at least one intercept via the `prior` argument."
-          )
+    warn_once(
+      c(
+        paste0(
+          "nmix(\"poisson_poisson\") with intercept-only mu and p ",
+          "is weakly identified."
         ),
-        .frequency    = "once",
-        .frequency_id = "nmix_poisson_poisson_intercept_only"
-      )
-    }
+        x = paste0(
+          "The data identify only the product `lambda * p`. The priors ",
+          "set `lambda` and `p` apart."
+        ),
+        i = paste0(
+          "Add a covariate to either formula, as in `y ~ x` or ",
+          "`bf(y ~ ..., p ~ x)`, or give one intercept an informative prior."
+        )
+      ),
+      "nmix_poisson_poisson_intercept_only"
+    )
   }
   # Stash the arrays on the family so downstream code (predict /
   # posterior_predict / log_lik) can reuse the same closure-unit
@@ -6284,12 +6280,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
       i = "Use family = nmix() or family = occ()."
     )))
   }
-  newdata <- newdata %||% mvgam_training_data(object)
-  if (is.null(newdata)) {
-    stop(insight::format_error(
-      "Training data not stored on object; supply 'newdata'."
-    ))
-  }
+  newdata <- prediction_frame(object, newdata)
   response_var <- response_column(object)
   binary_y_check <- is_binary_response_family(object$family)
   default_cap <- closure_unit_default_cap(object$family)
@@ -6453,10 +6444,8 @@ visit_to_unit_lookup <- function(arrays, n_visit) {
   if (length(out) != n_visit) {
     stop(insight::format_error(c(
       "Closure-unit row map does not cover the prediction frame.",
-      x = paste0("Rows mapped: ", length(out),
-                 "; visits predicted: ", n_visit, "."),
-      i = paste0("The frame passed to the prediction differs from ",
-                 "the one the unit arrays were built on.")
+      x = paste0("The map covers ", length(out), " rows."),
+      x = paste0("The prediction frame holds ", n_visit, " visits.")
     )))
   }
   out
@@ -7179,12 +7168,7 @@ extract_mv_response_components <- function(object, newdata = NULL,
       "extract_mv_response_components() requires an mv-response fit."
     ))
   }
-  newdata <- newdata %||% mvgam_training_data(object)
-  if (is.null(newdata)) {
-    stop(insight::format_error(
-      "Training data not stored on object; supply 'newdata'."
-    ))
-  }
+  newdata <- prediction_frame(object, newdata)
   # `Psi` is one entry per species in the order the fit numbered
   # them, so which entry a row reads is a question about the model
   # rather than about the frame. Re-factoring the frame's own column
@@ -7247,10 +7231,8 @@ extract_mv_response_components <- function(object, newdata = NULL,
   if (length(missing_cols) > 0L) {
     stop(insight::format_error(c(
       "Posterior is missing Psi columns for mv-response family.",
-      x = paste0(
-        "Expected: ", paste(psi_cols, collapse = ", "),
-        "; missing: ", paste(missing_cols, collapse = ", "), "."
-      )
+      x = paste0("Expected: ", paste(psi_cols, collapse = ", "), "."),
+      x = paste0("Missing: ", paste(missing_cols, collapse = ", "), ".")
     )))
   }
   # A plain numeric matrix, not the `draws_matrix` the posterior
@@ -7377,10 +7359,8 @@ log_lik_mvn <- function(linpred, link, y, family_pars, trials) {
   if (!identical(dim(Psi_row), c(ndraws, N_obs))) {
     stop(insight::format_error(c(
       "log_lik_mvn: Psi_row dimensions do not match linpred.",
-      x = paste0(
-        "Psi_row: ", paste(dim(Psi_row), collapse = "x"),
-        "; expected ", ndraws, "x", N_obs, "."
-      )
+      x = paste0("Psi_row is ", paste(dim(Psi_row), collapse = "x"),
+                 ". Expected ", ndraws, "x", N_obs, ".")
     )))
   }
   y_mat <- matrix(y, nrow = ndraws, ncol = N_obs, byrow = TRUE)
@@ -7537,12 +7517,7 @@ extract_simplex_response_components <- function(object,
       "extract_simplex_response_components() requires a simplex-response fit."
     ))
   }
-  newdata <- newdata %||% mvgam_training_data(object)
-  if (is.null(newdata)) {
-    stop(insight::format_error(
-      "Training data not stored on object; supply 'newdata'."
-    ))
-  }
+  newdata <- prediction_frame(object, newdata)
   arrays <- closure_unit_arrays_for(object, newdata)
 
   # Resolve draw_ids up front so the mu linpred and the per-row phi

@@ -1133,15 +1133,15 @@ disable_trend_prior_autoscale <- function(priors) {
         next
       }
       stop(insight::format_error(c(
-        "A shrinkage prior on the trend is written unscaled.",
+        "A shrinkage prior on the trend must set 'autoscale = FALSE'.",
         x = paste0(
           "'", texts[i], "' was given for class '", priors$class[i], "'."
         ),
         i = paste0(
           "Autoscaling multiplies the prior by the family's residual ",
-          "scale, and the trend's own scale is 'sigma_trend', one per ",
-          "latent series. Write 'autoscale = FALSE'."
-        )
+          "scale."
+        ),
+        i = "The trend's scale is 'sigma_trend', one per latent series."
       )), call. = FALSE)
     }
     call$autoscale <- FALSE
@@ -1239,15 +1239,12 @@ map_prior_to_stan_string <- function(prior_row) {
   # Check for distribution name followed by parentheses with parameters
   stan_pattern <- "^[a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^\\(\\)]*\\)$"
   if (!grepl(stan_pattern, extracted_prior)) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        paste("Prior string", shQuote(extracted_prior),
-              "may not be valid Stan syntax.",
-              "Expected format: distribution_name(parameters)"),
-        .frequency = "once",
-        .frequency_id = "mvgam_stan_syntax"
-      )
-    }
+    warn_once(
+      paste("Prior string", shQuote(extracted_prior),
+        "may not be valid Stan syntax.",
+        "Expected format: distribution_name(parameters)"),
+      "mvgam_stan_syntax"
+    )
   }
 
   return(extracted_prior)
@@ -1633,17 +1630,13 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
       )
       stop(insight::format_error(c(
         paste0(
-          "Distributional-parameter formulas (e.g. 'sigma ~ z') ",
+          "Distributional-parameter formulas such as 'sigma ~ z' ",
           "are not supported inside 'trend_formula'."
         ),
         x = paste0(
           "Found dpar formula(s): ", dpar_names, "."
         ),
-        i = paste0(
-          "Use bf(...) in 'formula' (the observation model) for ",
-          "distributional parameters. Open an issue if you need ",
-          "them on the trend side."
-        )
+        i = "Write them with bf(...) in the observation 'formula'."
       )))
     }
 
@@ -1970,15 +1963,7 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   if (!is.null(trend_map)) {
     stop(insight::format_error(c(
       "'get_prior()' cannot describe a fit that supplies 'trend_map'.",
-      x = paste0(
-        "Fixed loadings move 'Z' to the data block and partial ",
-        "loadings replace it with 'Z_free_vec'. Their classes ",
-        "differ from the free-loadings table this returns."
-      ),
-      i = paste0(
-        "Read the priors off the emitted program with ",
-        "'stancode()', which takes 'trend_map'."
-      )
+      i = "Call 'stancode()' with the same 'trend_map' to see the priors."
     )))
   }
 

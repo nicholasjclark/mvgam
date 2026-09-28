@@ -70,6 +70,14 @@ get_predict.mvgam <- function(model,
                               process_error = FALSE) {
   checkmate::assert_class(model, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
+  # conditional_effects() sets the response and the trend setting on
+  # its copy of the model. marginaleffects would warn on both as
+  # arguments.
+  preset <- attr(model, "mvgam_predict_args", exact = TRUE)
+  if (!is.null(preset)) {
+    resp <- resp %||% preset$resp
+    process_error <- preset$process_error
+  }
   checkmate::assert_logical(process_error, len = 1L)
   # `marginaleffects::datagrid()` drops every column the model
   # formula does not reference, so a closure-unit family's grid
@@ -207,7 +215,7 @@ get_predict.mvgam <- function(model,
       stop(insight::format_error(c(
         "Dimension mismatch between predicted columns and newdata rows.",
         x = cli::format_inline(
-          "Draws have {ncol(draws)} columns; newdata has {nrow(newdata)} rows."
+          "Draws have {ncol(draws)} columns. newdata has {nrow(newdata)} rows."
         ),
         i = "Pass the same `newdata` that produced the draws."
       )))
@@ -249,7 +257,7 @@ get_predict.mvgam <- function(model,
   stop(insight::format_error(c(
     "Unexpected posterior draws shape for mvgam.",
     x = cli::format_inline(
-      "Got dim length {length(dim(draws))}; expected 2 or 3."
+      "Got dim length {length(dim(draws))}. Expected 2 or 3."
     )
   )))
 }
@@ -263,7 +271,7 @@ get_coef.mvgam <- function(model, trend_effects = FALSE, ...) {
 
   if (trend_effects && is.null(model$trend_formula)) {
     stop(insight::format_error(
-      "No trend formula on this model; trend coefficients do not exist."
+      "'trend_effects = TRUE' needs a model fitted with a 'trend_formula'."
     ))
   }
 
@@ -295,12 +303,10 @@ get_vcov.mvgam <- function(model, vcov = NULL, ...) {
   # *estimator* is the request mvgam cannot honour, and
   # `get_vcov.brmsfit` draws the line in the same place.
   if (!is.null(vcov) && !is.logical(vcov)) {
-    insight::format_warning(
-      paste0(
-        "The `vcov` argument is not supported for mvgam objects; ",
-        "uncertainty propagation uses posterior draws."
-      )
-    )
+    insight::format_warning(c(
+      "The 'vcov' argument is not supported for mvgam objects.",
+      i = "Uncertainty is propagated through the posterior draws."
+    ))
   }
   NULL
 }

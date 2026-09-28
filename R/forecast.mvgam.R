@@ -797,8 +797,8 @@ build_training_tail_data <- function(training, max_lag) {
 # centralised. Slices to the chosen draws.
 #
 # `process_error` controls the latent-state pathway:
-# FALSE uses the Stan-fitted `trend[t, s]` and `mu_trend[t, s]`
-# directly (deterministic-state hindcast); TRUE draws fresh
+# FALSE uses the Stan-fitted `trend[t, s]`, the latent states plus
+# `mu_trend`, directly (deterministic-state hindcast); TRUE draws fresh
 # innovations from the trend's covariance and adds them on top via
 # posterior_epred / posterior_predict's marginal MC pathway.
 # Hindcasts default to FALSE so a
@@ -952,8 +952,7 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
     if (is.list(obs_linpred) && !is.matrix(obs_linpred)) {
       stop(insight::format_error(c(
         "Hindcast received a list-shaped obs linpred with no 'resp' scope.",
-        i = paste0("Multivariate fits should fan out via the ",
-                   "'hindcast.mvgam' entry; this is an internal bug.")
+        i = "Please report this internal mvgam bug."
       )))
     }
     linpred <- obs_linpred + fitted_states
@@ -978,8 +977,7 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
   if (is.list(full) && !is.matrix(full)) {
     stop(insight::format_error(c(
       "Hindcast received a list-shaped posterior with no 'resp' scope.",
-      i = paste0("Multivariate fits should fan out via the ",
-                 "'hindcast.mvgam' entry; this is an internal bug.")
+      i = "Please report this internal mvgam bug."
     )))
   }
   full[draw_idx, , drop = FALSE]
@@ -1612,10 +1610,8 @@ transform_pw_cap_to_link <- function(cap_mat, family, cap_var = "cap") {
         "PW logistic: cap values are not finite after applying ",
         "the '", family$link, "' link transform."
       ),
-      x = paste0(
-        "Check that all '", cap_var, "' values are valid on the ",
-        "response scale (e.g. strictly positive for a log link)."
-      )
+      i = paste0("A log link needs strictly positive '", cap_var,
+                 "' values.")
     )))
   }
   out

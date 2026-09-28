@@ -82,17 +82,14 @@ get_covariance_pattern <- function(trend_type) {
 
   if (is.null(pattern)) {
     # Default to cholesky_scaled for unknown types (most common pattern)
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        c(
-          paste0("Unknown trend type '", trend_type, "' encountered."),
-          i = "Defaulting to 'cholesky_scaled' covariance pattern.",
-          i = "Register custom trends in trend_covariance_patterns."
-        ),
-        .frequency = "once",
-        .frequency_id = paste0("unknown_trend_cov_", trend_type)
-      )
-    }
+    warn_once(
+      c(
+        paste0("Unknown trend type '", trend_type, "' encountered."),
+        i = "Defaulting to 'cholesky_scaled' covariance pattern.",
+        i = "Register custom trends in trend_covariance_patterns."
+      ),
+      paste0("unknown_trend_cov_", trend_type)
+    )
     pattern <- "cholesky_scaled"
   }
 
@@ -437,19 +434,16 @@ get_trend_type <- function(object) {
 
   # Tertiary: check trend_formula existence (indicates trends present)
   if (!is.null(object$trend_formula)) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        c(
-          "The trend type is absent from the object structure.",
-          i = paste0(
-            "A trend formula is present, and 'trend_components' and ",
-            "'trend_metadata' both leave the type empty."
-          )
-        ),
-        .frequency = "once",
-        .frequency_id = "unknown_trend_type"
-      )
-    }
+    warn_once(
+      c(
+        "The trend type is absent from the object structure.",
+        i = paste0(
+          "A trend formula is present, and 'trend_components' and ",
+          "'trend_metadata' both leave the type empty."
+        )
+      ),
+      "unknown_trend_type"
+    )
   }
 
   # Default to None if no trend model present
@@ -838,9 +832,7 @@ resolve_draw_indices <- function(total_draws, ndraws, draw_ids) {
     if (ndraws > total_draws) {
       stop(insight::format_error(c(
         "Requested more draws than the posterior holds.",
-        x = paste0("Asked for ", ndraws, "; the fit has ",
-                   total_draws, "."),
-        i = "Lower 'ndraws', or leave it unset to use every draw."
+        x = paste0("Asked for ", ndraws, ". The fit has ", total_draws, ".")
       )))
     }
     if (ndraws == total_draws) {
@@ -1101,8 +1093,7 @@ group_members <- function(group_inds, n_subgroups) {
     stop(insight::format_error(c(
       "Every group of a grouped trend needs the same number of series.",
       x = paste0("Group sizes: ", paste(sizes, collapse = ", "),
-                 "; each group's arrays hold ", n_subgroups, "."),
-      i = "Give each group one series per level of 'subgr'."
+                 ". Each group needs ", n_subgroups, ".")
     )), call. = FALSE)
   }
   members
@@ -2321,18 +2312,17 @@ companion_factor <- function(phi, lags, theta) {
 warn_explosive_draws <- function(factor) {
   checkmate::assert_array(factor, d = 3L)
   n_bad <- sum(is.na(factor[, 1L, 1L]))
-  if (n_bad > 0L && !identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      insight::format_warning(c(
+  if (n_bad > 0L) {
+    warn_once(
+      c(
         paste0(n_bad, " of ", dim(factor)[1L], " posterior draws have ",
                "an explosive autoregression."),
         i = paste0("The explosive draws keep their innovation ",
                    "covariance in marginal predictions and ",
                    "'residual_cor()'. A sparse lag set bounds each ",
                    "coefficient on its own and admits them.")
-      )),
-      .frequency = "once",
-      .frequency_id = "mvgam_explosive_ar_draws"
+      ),
+      "mvgam_explosive_ar_draws"
     )
   }
   invisible(NULL)

@@ -130,14 +130,9 @@ shared_variation.mvgam <- function(object,
 
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv)) {
-    stop(insight::format_error(c(
-      "shared_variation() requires a latent-factor fit.",
-      x = "The fitted trend model has no `n_lv` (no factors).",
-      i = paste0(
-        "Refit with a factor constructor (e.g. ",
-        "`trend_formula = ~ AR(p = 1, n_lv = 2)`)."
-      )
-    )))
+    stop(insight::format_error(
+      "shared_variation() requires a latent-factor fit."
+    ))
   }
 
   series_names <- resolve_series_info(object)$series_levels

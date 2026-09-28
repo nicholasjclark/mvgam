@@ -190,6 +190,29 @@ test_that("run_pathfinder() reports a failed approximation rather than passing i
   )
 })
 
+test_that("run_pathfinder() drops sampler arguments Pathfinder lacks", {
+  # An `init = "pathfinder"` start receives the list built for
+  # `$sample()`. The caller's sampler arguments are in that list.
+  model <- list(pathfinder = function(data = NULL, seed = NULL,
+                                      init = NULL, num_paths = NULL,
+                                      show_messages = NULL,
+                                      show_exceptions = NULL,
+                                      refresh = NULL) {
+    out <- as.list(environment())
+    out$return_codes <- function() 0L
+    out
+  })
+  got <- mvgam:::run_pathfinder(
+    model,
+    args = list(data = list(N = 1), seed = 2, init = NULL,
+                refresh = 0, save_warmup = TRUE),
+    chains = 2, threading_on = FALSE, threads = NULL, silent = 2
+  )
+  expect_identical(got$refresh, 0)
+  expect_identical(got$num_paths, 2)
+})
+
+
 test_that("run_pathfinder() forwards threads only when threading is on", {
   args <- list(data = list(N = 1), seed = 2, init = NULL)
   off <- mvgam:::run_pathfinder(

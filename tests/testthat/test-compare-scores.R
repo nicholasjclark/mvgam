@@ -181,12 +181,8 @@ test_that("compare_elpds honours model_names", {
 
 test_that("print.mvgam_forecast emits a single-screen header", {
   fc <- make_mock_forecast(n_series = 2L, h = 5L, ndraws = 30L)
-  # cli::cli_inform routes through rlang's signal mechanism, not
-  # the regular message() stream, so testthat::capture_messages()
-  # is the right capture; capture.output(type = "message") returns
-  # an empty vector for this output.
-  msg <- testthat::capture_messages(print(fc))
-  blob <- paste(msg, collapse = "\n")
+  # A print method writes to standard output.
+  blob <- paste(capture.output(print(fc)), collapse = "\n")
   expect_lt(nchar(blob), 1000L)
   expect_match(blob, "mvgam_forecast")
   expect_match(blob, "series:.*2")
@@ -197,8 +193,7 @@ test_that("print.mvgam_forecast emits a single-screen header", {
 test_that("print.mvgam_forecast adds an ensemble bullet when weighted", {
   fc <- make_mock_forecast()
   attr(fc, "weights") <- c(spline = 0.2, ar = 0.5, var = 0.3)
-  msg <- testthat::capture_messages(print(fc))
-  expect_match(paste(msg, collapse = "\n"), "ensemble:.*3 components")
+  expect_output(print(fc), "ensemble:.*3 components")
 })
 
 
@@ -311,8 +306,7 @@ test_that("print.mvgam_forecast handles hindcast-only fits", {
   # Give it a hindcast so the print isn't completely empty.
   fc$hindcasts <- list(s1 = matrix(0, nrow = 10L, ncol = 8L),
                         s2 = matrix(0, nrow = 10L, ncol = 8L))
-  msg <- testthat::capture_messages(print(fc))
-  blob <- paste(msg, collapse = "\n")
-  expect_match(blob, "hindcast.*8 timepoints")
-  expect_match(blob, "forecast.*0")
+  blob <- paste(capture.output(print(fc)), collapse = "\n")
+  expect_match(blob, "hindcast:  8 timepoints")
+  expect_match(blob, "forecast:  0 \\(hindcast only\\)")
 })

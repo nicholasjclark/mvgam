@@ -364,21 +364,21 @@ strip_by_lv_rewrite_tokens <- function(cond_labs, had_by_lv) {
 
 
 #' Emit the deprecation warning for `by = trend` (legacy jsdgam
-#' syntax). Suppressed under testthat so CI stays quiet; the warning
-#' is shown once per session for users via `mvgam_warn_once_user()`.
+#' syntax). Raised once per session through `warn_once()`, quiet
+#' under testthat.
 #'
 #' Called once per validator pass when
 #' `detect_and_rewrite_by_lv()` reports `deprecated_trend_seen`.
 #'
 #' @noRd
 warn_legacy_trend_by <- function() {
-  mvgam_warn_once_user(
-    message = paste0(
+  warn_once(
+    paste0(
       "'by = trend' in 'trend_formula' is deprecated. Use ",
       "'by = lv_axis()' instead. mvgam will continue to accept ",
       "'by = trend' but the legacy spelling may be removed in a ",
       "future release."
     ),
-    class = "mvgam_by_trend_deprecated"
+    "mvgam_by_trend_deprecated"
   )
 }

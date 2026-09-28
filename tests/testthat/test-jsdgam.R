@@ -41,7 +41,7 @@ test_that("jsdgam accepts brmsformula (bf) in addition to plain formula", {
   # sub-formulas (`phi ~ env` for diri(), `p ~ visit_cov` for
   # occ() / nmix()) compose with `jsdgam()`. Plain `bf(y ~ x)`
   # round-trips identically to a plain `formula`.
-  suppressWarnings(expect_no_error(
+  expect_no_error(
     jsdgam(
       formula = brms::bf(y ~ elev),
       factor_formula = ~ -1,
@@ -49,12 +49,12 @@ test_that("jsdgam accepts brmsformula (bf) in addition to plain formula", {
       family = poisson(), n_lv = 2L,
       run_model = FALSE, silent = 2
     )
-  ))
+  )
 })
 
 test_that("jsdgam rejects non-formula non-brmsformula 'formula' arg", {
   dat <- build_jsdgam_toy()
-  suppressWarnings(expect_error(
+  expect_error(
     jsdgam(
       formula = "y ~ elev",  # bare string, not parsed
       factor_formula = ~ -1,
@@ -63,7 +63,7 @@ test_that("jsdgam rejects non-formula non-brmsformula 'formula' arg", {
       run_model = FALSE, silent = 2
     ),
     "Must inherit from class"
-  ))
+  )
 })
 
 test_that("jsdgam accepts n_lv = n_species under iid prior (user owns ID)", {
@@ -74,27 +74,27 @@ test_that("jsdgam accepts n_lv = n_species under iid prior (user owns ID)", {
   # flag_by_lv_full_rank_funnel). validate_n_lv_ceiling() only
   # rejects n_lv > n_species.
   dat <- build_jsdgam_toy()
-  suppressWarnings(expect_no_error(
+  expect_no_error(
     jsdgam(
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, species = species,
       family = poisson(), n_lv = 4L,
       run_model = FALSE, silent = 2
     )
-  ))
+  )
 })
 
 test_that("jsdgam rejects n_lv > n_species under iid prior", {
   dat <- build_jsdgam_toy()
-  suppressWarnings(expect_error(
+  expect_error(
     jsdgam(
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, species = species,
       family = poisson(), n_lv = 5L,
       run_model = FALSE, silent = 2
     ),
-    "cannot exceed"
-  ))
+    "Got n_lv = 5, n_species = 4"
+  )
 })
 
 test_that("jsdgam allows n_lv = n_species under MGP loadings_prior", {
@@ -113,7 +113,7 @@ test_that("jsdgam allows n_lv = n_species under MGP loadings_prior", {
 
 test_that("jsdgam rejects n_lv > n_species even under MGP", {
   dat <- build_jsdgam_toy()
-  suppressWarnings(expect_error(
+  expect_error(
     jsdgam(
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, species = species,
@@ -121,8 +121,8 @@ test_that("jsdgam rejects n_lv > n_species even under MGP", {
       loadings_prior = "mgp",
       run_model = FALSE, silent = 2
     ),
-    "cannot exceed the number of species"
-  ))
+    "at most the number of species"
+  )
 })
 
 test_that("jsdgam rejects n_lv = 0", {
@@ -198,12 +198,12 @@ test_that("jsdgam refuses to overwrite existing 'series' column", {
 
 test_that("jsdgam returns c('mvgam', 'jsdgam') and the metadata slots", {
   dat <- build_jsdgam_toy()
-  mod <- suppressWarnings(jsdgam(
+  mod <- jsdgam(
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  ))
+  )
   expect_s3_class(mod, "jsdgam")
   expect_s3_class(mod, "mvgam")
   expect_identical(class(mod)[1L:2L], c("mvgam", "jsdgam"))
@@ -221,12 +221,12 @@ test_that("jsdgam preserves the unit column name on prepped_trend_model", {
   dat <- build_jsdgam_toy()
   dat$site <- dat$time
   dat$time <- NULL
-  mod <- suppressWarnings(jsdgam(
+  mod <- jsdgam(
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = site, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  ))
+  )
   expect_identical(
     attr(mod$model_data, "prepped_trend_model")$unit,
     "site"
@@ -238,12 +238,12 @@ test_that("jsdgam preserves the unit column name on prepped_trend_model", {
 
 test_that("jsdgam composes with the standard mvgam pipeline", {
   dat <- build_jsdgam_toy()
-  mod <- suppressWarnings(jsdgam(
+  mod <- jsdgam(
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  ))
+  )
   # `run_model = FALSE` returns the stub mvgam shape with stancode +
   # standata populated and a NULL $fit; the end-to-end smoke fit
   # lives in tests/local/.
@@ -256,13 +256,13 @@ test_that("jsdgam composes with the standard mvgam pipeline", {
 
 test_that("jsdgam with by = lv_axis() composes the per-factor smooth path", {
   dat <- build_jsdgam_toy(n_time = 60L)
-  mod <- suppressWarnings(jsdgam(
+  mod <- jsdgam(
     formula = y ~ 1,
     factor_formula = ~ s(elev, k = 5L, by = lv_axis()) - 1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  ))
+  )
   expect_true(isTRUE(mod$trend_metadata$has_by_lv))
   expect_equal(mod$trend_metadata$n_lv_for_grain, 2L)
   expect_equal(mod$standata$N_lv_trend, 2L)
@@ -307,7 +307,7 @@ test_that("build_jsdgam_loadings_prior errors on alias + explicit conflict", {
       loadings_prior = list(features = data.frame(x = 1:4)),
       species_levels = species_4()
     ),
-    "EITHER an explicit"
+    "aliases were both supplied"
   )
 })
 
@@ -447,14 +447,14 @@ jsdgam_loadings_fixture <- function() {
 
 test_that("traits + phylo route through standata.mvgam_formula cleanly", {
   fx <- jsdgam_loadings_fixture()
-  sd <- suppressWarnings(standata(
+  sd <- standata(
     fx$mf, data = fx$data, family = poisson(),
     trend_map = fx$trend_map,
     loadings_prior = list(
       features = fx$traits,
       distances = list(phylo = fx$d_mat)
     )
-  ))
+  )
   # Feature matrix: 1 numeric + 3 one-hot diet columns = 4 features
   expect_true(!is.null(sd$row_features))
   expect_equal(nrow(sd$row_features), 4L)
@@ -467,10 +467,10 @@ test_that("traits + phylo route through standata.mvgam_formula cleanly", {
 
 test_that("default (no aliases) yields no row_features / dist_* slots", {
   fx <- jsdgam_loadings_fixture()
-  sd <- suppressWarnings(standata(
+  sd <- standata(
     fx$mf, data = fx$data, family = poisson(),
     trend_map = fx$trend_map
-  ))
+  )
   expect_false("dist_phylo" %in% names(sd))
   expect_false("row_features" %in% names(sd))
 })
@@ -530,12 +530,12 @@ test_that("the trend a jsdgam builds is the correlated latent prior", {
   # `ZMVN(cor = TRUE, subgr = "series")` pin: such a pin would say
   # nothing the default does not, and its `subgr` would be refused
   # outright, since a subgroup without a group is an error.
-  mod <- suppressWarnings(jsdgam(
+  mod <- jsdgam(
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  ))
+  )
   spec <- mod$mv_spec$trend_specs
   expect_identical(spec$trend, "ZMVN")
   expect_true(isTRUE(spec$cor))

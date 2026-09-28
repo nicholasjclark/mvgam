@@ -594,18 +594,17 @@ test_that("pp_check refuses an argument nothing reads", {
 
   # Both audiences it does read still reach their own side: `alpha`
   # is the kernel's and `process_error` is the prediction method's.
-  expect_s3_class(
-    suppressWarnings(
-      pp_check(fit, resp = "count", ndraws = 10L, alpha = 0.5)
-    ),
-    "ggplot"
+  # The count response has gaps, which the plot omits and says so.
+  expect_warning(
+    p <- pp_check(fit, resp = "count", ndraws = 10L, alpha = 0.5),
+    "missing response are omitted"
   )
-  expect_s3_class(
-    suppressWarnings(
-      pp_check(fit, resp = "count", ndraws = 10L, process_error = FALSE)
-    ),
-    "ggplot"
+  expect_s3_class(p, "ggplot")
+  expect_warning(
+    p <- pp_check(fit, resp = "count", ndraws = 10L, process_error = FALSE),
+    "missing response are omitted"
   )
+  expect_s3_class(p, "ggplot")
 })
 
 
@@ -744,9 +743,10 @@ test_that("conditional_effects answers per response, on its own scale", {
   # A wide fit has one effect per response, so the result is keyed by
   # response first and by covariate within. Returning a single set
   # would give one curve for three likelihoods.
-  got <- with_warnings(conditional_effects(fit))
-  expect_true(all(grepl("not known to be supported", got$warnings)))
-  ce <- got$value
+  # conditional_effects() gives each response to get_predict.mvgam on
+  # its own copy of the model. marginaleffects then has no argument to
+  # warn about.
+  expect_no_warning(ce <- conditional_effects(fit))
   expect_identical(names(ce), responses)
 
   for (r in responses) {

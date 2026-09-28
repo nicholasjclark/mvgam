@@ -91,6 +91,11 @@ build_stan_components <- function(formula, data, family = gaussian(),
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
   checkmate::assert_int(threads, lower = 1)
   checkmate::assert_int(silent, lower = 0, upper = 2)
+  # `stancode()` and `standata()` reach here without passing through
+  # `mvgam()`, which records `silent` for its own call. The mock brms
+  # fit below takes its verbosity from the option.
+  old_silent <- options(mvgam.silent = silent)
+  on.exit(options(old_silent), add = TRUE)
 
   # One list carries the brms code-generation options from here to
   # the mock fit and on to every regeneration underneath it, so the
@@ -114,6 +119,18 @@ build_stan_components <- function(formula, data, family = gaussian(),
   resolved <- resolve_observation_family(obs_formula, family)
   obs_formula <- resolved$formula
   family <- resolved$family
+
+  # The likelihood skips a missing response and the trend grid keeps
+  # its occasion. A missing covariate leaves a row the program cannot
+  # build. Refusing it here covers
+  # every route to a program, `stancode()` and `standata()` as well
+  # as `mvgam()`.
+  validate_no_covariate_nas(
+    data          = data,
+    formulas      = list(obs_formula, trend_formula),
+    response_vars = lhs_columns(obs_formula),
+    context       = "data"
+  )
 
   # Closure-unit families (nmix, future occ / royle_nichols /
   # poisson_poisson) carry per-data Stan stanvars that are built
@@ -509,8 +526,7 @@ zmvn_scale_confounded <- function(mv_spec, family, data) {
 #' @noRd
 warn_zmvn_single_series <- function(mv_spec, family, data) {
   if (!zmvn_scale_confounded(mv_spec, family, data)) return()
-  warn_confound(
-    "zmvn_single_series",
+  warn_once(
     paste0(
       "A 'ZMVN()' trend on one series shares its scale with the ",
       "observation error. The latent state has no temporal ",
@@ -520,27 +536,8 @@ warn_zmvn_single_series <- function(mv_spec, family, data) {
       "with temporal structure such as 'AR()' or 'RW()'. ",
       "Alternatively, set a prior that says which scale you mean ",
       "to pin."
-    )
-  )
-}
-
-
-# Internal: one emission path for the confound notices.
-#
-# Each of these names a pairing the model still samples under, where
-# the priors alone divide an effect between two terms. They are held
-# back under `TESTTHAT` for the reason recorded in FINDINGS: a
-# once-per-session notice asserted in a suite reports whatever was
-# raised before it.
-#'@noRd
-warn_confound <- function(id, message) {
-  if (isTRUE(identical(Sys.getenv("TESTTHAT"), "true"))) {
-    return(invisible(NULL))
-  }
-  rlang::warn(
-    message,
-    .frequency = "once",
-    .frequency_id = paste0("mvgam_", id)
+    ),
+    "mvgam_zmvn_single_series"
   )
 }
 
@@ -644,8 +641,7 @@ warn_confounded_design <- function(sdata) {
     return(invisible(NULL))
   }
   dependent <- colnames(m)[q$pivot[seq.int(q$rank + 1L, ncol(m))]]
-  warn_confound(
-    "confounded_design",
+  warn_once(
     paste0(
       "The observation and trend designs share ",
       ncol(m) - q$rank, " direction",
@@ -657,7 +653,8 @@ warn_confounded_design <- function(sdata) {
       "the same fitted values, and the priors alone set the split ",
       "between them. Drop the repeated term from one formula, or set ",
       "a prior pinning the side that carries it."
-    )
+    ),
+    "mvgam_confounded_design"
   )
 }
 
@@ -712,7 +709,6 @@ threads_no_op_for_trend_brms_native <- function(threads, family, mv_spec) {
 
 #'@noRd
 warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
-  if (isTRUE(identical(Sys.getenv("TESTTHAT"), "true"))) return()
   if (!threads_no_op_for_trend_brms_native(threads, family, mv_spec)) {
     return()
   }

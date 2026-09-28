@@ -238,6 +238,22 @@ test_that("each surface answers on the grain it belongs to", {
 })
 
 
+test_that("a visit's expectation follows its row and carries no unit label", {
+  # Every visit of a unit takes that unit's state. The columns are
+  # positions in the frame, as for every other family. Broadcasting
+  # the state carried each unit's first-row label onto all of its
+  # visits. A shuffled frame gives each visit the value it had in
+  # place.
+  set.seed(3L)
+  perm <- sample.int(nrow(dat))
+  ep <- posterior_epred(fit, newdata = dat, draw_ids = 1:5)
+  ep_shuffled <- posterior_epred(fit, newdata = dat[perm, ], draw_ids = 1:5)
+  expect_null(dimnames(ep))
+  expect_equal(ep[, perm], ep_shuffled)
+  expect_null(dimnames(posterior_linpred(fit, newdata = dat, draw_ids = 1:5)))
+})
+
+
 test_that("seeing the species settles the state at that unit", {
   # The one claim occupancy makes that arithmetic cannot soften: a
   # unit where the species was detected is occupied, so its
@@ -418,6 +434,8 @@ test_that("too few draws for a residual histogram is called out", {
   # for the PIT to fill in, and below that the histogram shows
   # outliers that are an artefact of the method rather than of the
   # fit. Silence here would let a reader take those for a finding.
+  # Once-per-session warnings are quiet under testthat.
+  withr::local_envvar(TESTTHAT = "")
   got <- with_warnings(pp_check(fit, type = "resid_hist", ndraws = 8L))
   expect_s3_class(got$value, "ggplot")
   expect_true(any(grepl("PIT support underflow", got$warnings)))
@@ -838,21 +856,23 @@ test_that("the checks read a unit that lost a visit", {
   obj <- gappy_fits()
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
-  # One type per shape: a density over the units, an interval per
+  # One type per shape. A density over the units, an interval per
   # unit, a scalar statistic, a PSIS-weighted check and a residual
-  # panel, since they narrow different quantities.
+  # panel each narrow a different quantity. Every draw is used: PSIS
+  # fits its tail to 20 draws poorly and warns for each unit.
+  #
+  # bayesplot 1.15.0 draws intervals with a `size` aesthetic that
+  # ggplot2 4.0 deprecates. The deprecation comes from bayesplot, and
+  # only lifecycle notices are quieted here.
+  withr::local_options(lifecycle_verbosity = "quiet")
   for (ty in c("dens_overlay", "intervals", "stat",
                "loo_pit_overlay", "resid_hist")) {
-    expect_s3_class(
-      suppressWarnings(pp_check(obj$gappy, type = ty, ndraws = 20L)),
-      "ggplot"
-    )
+    expect_s3_class(pp_check(obj$gappy, type = ty), "ggplot")
   }
-  # `group` travels the same narrowing by a different route, mapped
-  # to one value per unit before it is narrowed rather than after.
+  # `group` travels the same narrowing by a different route. It is
+  # mapped to one value per unit, and the mapped values are narrowed.
   expect_s3_class(
-    suppressWarnings(pp_check(obj$gappy, type = "stat_grouped",
-                              group = "series", ndraws = 20L)),
+    pp_check(obj$gappy, type = "stat_grouped", group = "series"),
     "ggplot"
   )
 })
@@ -894,7 +914,7 @@ test_that("a fold survives an unmade visit", {
   # above lost: it reports the count that survives rather than the
   # count the fit holds.
   obj <- gappy_fits()
-  kf <- suppressWarnings(kfold(obj$gappy, K = 2L))
+  kf <- kfold(obj$gappy, K = 2L)
   expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
 })
 
@@ -1633,11 +1653,9 @@ test_that("multi-season: the fit reports its own dimensions", {
   expect_setequal(names(neff_ratio(fit)), names(rhat(fit)))
 
   # An effective sample size is undefined for a parameter that never
-  # moves, and this trend carries no design, so its 48 `mu_trend`
-  # entries are structurally zero and come back `NA`. The claim is
-  # that the two sets coincide: an `NA` against a parameter that
-  # does move would be a diagnostic failing silently, and the
-  # single-season fit has neither.
+  # moves, and only such a parameter may report `NA`. An `NA` against
+  # a parameter that does move would be a diagnostic failing
+  # silently.
   nr <- neff_ratio(fit)
   dm <- as_draws_matrix(fit)
   moves <- apply(dm[, names(nr), drop = FALSE], 2L, stats::sd) > 0
@@ -1778,14 +1796,12 @@ test_that("latent_state and latent_N are one type under two names", {
   # Two names for one quantity is exactly the shape that goes wrong
   # quietly, so the claim is that they are the same numbers and not
   # merely that both return something.
-  suppressWarnings({
-    gp_state <- marginaleffects::get_predict(
-      fit, newdata = dat, type = "latent_state"
-    )
-    gp_n <- marginaleffects::get_predict(
-      fit, newdata = dat, type = "latent_N"
-    )
-  })
+  gp_state <- marginaleffects::get_predict(
+    fit, newdata = dat, type = "latent_state"
+  )
+  gp_n <- marginaleffects::get_predict(
+    fit, newdata = dat, type = "latent_N"
+  )
   expect_identical(nrow(gp_state), nrow(gp_n))
   expect_equal(gp_state$estimate, gp_n$estimate)
   # And they are the latent state rather than the response: an
@@ -1793,9 +1809,7 @@ test_that("latent_state and latent_N are one type under two names", {
   # answer for these data is not.
   expect_true(all(gp_state$estimate >= 0 & gp_state$estimate <= 1))
 
-  ce <- suppressWarnings(
-    conditional_effects(fit, type = "latent_state")
-  )
+  ce <- conditional_effects(fit, type = "latent_state")
   expect_s3_class(ce, "mvgam_conditional_effects")
   expect_gt(length(ce), 0L)
   # A panel that received no data still returns a ggplot, so the

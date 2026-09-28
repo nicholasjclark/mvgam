@@ -156,11 +156,7 @@ mvgam_data <- function(data,
         "Multi-response families are not supported by ",
         "'mvgam_data()'."
       ),
-      i = paste0(
-        "Pass the data directly to mvgam() or jsdgam(); ",
-        "validation runs there with the full multi-column ",
-        "response pipeline."
-      )
+      i = "mvgam() and jsdgam() validate these data themselves."
     )))
   }
 
@@ -285,14 +281,15 @@ mvgam_data <- function(data,
 #' @method print mvgam_data
 #' @export
 print.mvgam_data <- function(x, ...) {
-  rlang::inform(c(
+  cat(
     paste0("Validated data for family '",
            resolve_family_name(x$family), "'."),
-    "*" = paste0("series: ", x$n_series, " level(s)"),
-    "*" = paste0("time:   ", x$time_range[1L],
-                 " to ", x$time_range[2L]),
-    "*" = paste0("n obs:  ", length(x$data[[1L]]))
-  ))
+    paste0("  series: ", x$n_series, " level(s)"),
+    paste0("  time:   ", x$time_range[1L],
+           " to ", x$time_range[2L]),
+    paste0("  n obs:  ", nrow(x$data)),
+    sep = "\n"
+  )
   invisible(x)
 }
 

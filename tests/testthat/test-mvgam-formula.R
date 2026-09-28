@@ -600,19 +600,18 @@ test_that("exact GP terms in trend formula are accepted (warn only)", {
   )
 })
 
-test_that("exact GP notice fires once per term per session (TESTTHAT off)", {
-  # Flip off the testthat guard so the validator notice
-  # actually surfaces. Surface via message() now (not
-  # warning) -- expect_message catches it cleanly and the
-  # session memo prevents repeats within one call.
-  withr::with_envvar(c(TESTTHAT = ""), {
-    # Use a fresh term ("gp(z)") so the per-session memo
-    # built from earlier tests does not silence this one.
-    expect_message(
-      mvgam_formula(y ~ gp(z), trend_formula = ~ 1),
-      "Exact GP term"
-    )
-  })
+test_that("exact GP notice shows once per term, and obeys silent", {
+  # The notice is a message, quiet under testthat and at `silent = 2`.
+  # A fresh term keeps the once-per-session count of earlier tests
+  # away from this one.
+  withr::local_envvar(TESTTHAT = "")
+  expect_message(
+    mvgam_formula(y ~ gp(z), trend_formula = ~ 1),
+    "Exact GP term"
+  )
+  expect_no_message(mvgam_formula(y ~ gp(z), trend_formula = ~ 1))
+  withr::local_options(mvgam.silent = 2L)
+  expect_no_message(mvgam_formula(y ~ gp(z2), trend_formula = ~ 1))
 })
 
 test_that("approximate GP terms are allowed", {

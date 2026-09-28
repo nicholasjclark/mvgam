@@ -395,17 +395,15 @@ compute_closure_unit_residuals <- function(object, newdata, type,
   # {0, ..., n_rep}, so QQ-tails can read as heavier than N(0, 1)
   # under a correctly-specified model.
   if (type == "quantile" &&
-        !identical(Sys.getenv("TESTTHAT"), "true") &&
         any(agg$arrays$n_rep <= 4L)) {
-    rlang::warn(
+    warn_once(
       paste0(
         "Quantile residuals at the unit grain of a closure-unit fit ",
         "have coarse PIT support when 'n_rep' is small. ",
         "Compare QQ-plots with simulated N(0, 1) envelopes ",
         "when any closure unit has <= 4 visits."
       ),
-      .frequency = "once",
-      .frequency_id = "mvgam_closure_unit_residuals_low_n_rep"
+      "mvgam_closure_unit_residuals_low_n_rep"
     )
   }
   switch(

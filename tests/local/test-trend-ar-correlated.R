@@ -408,7 +408,7 @@ test_that("the factor plot refuses a fit whose latents are its series", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   expect_error(plot(fit, type = "factors"),
-               "does not contain any latent dynamic factors")
+               "has no latent factors to plot")
   for (ty in c("trend", "series", "residuals")) {
     expect_s3_class(plot(fit, type = ty), "ggplot")
   }

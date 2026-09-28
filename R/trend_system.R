@@ -448,11 +448,10 @@ register_custom_trend <- function(name, supports_factors = FALSE, generator_func
 
   # Check for existing registration
   if (exists(name, envir = trend_registry)) {
-    rlang::warn(
+    warn_once(
       c(paste0("Overwriting existing trend type: ", name),
         "i" = "This will replace the existing registration"),
-      .frequency = "once",
-      .frequency_id = paste0("trend_overwrite_", name)
+      paste0("trend_overwrite_", name)
     )
   }
 
@@ -696,7 +695,29 @@ samples_innovation_scale <- function(trend_spec) {
   ensure_registry_initialized()
   info <- get_trend_info(get_trend_name(trend_spec))
   isTRUE(info$samples_innovation_scale) &&
-    !loadings_spec_traits(trend_spec$loadings_prior_spec)$mgp
+    !loadings_spec_traits(trend_spec$loadings_prior_spec)$mgp &&
+    !samples_factor_loadings(trend_spec)
+}
+
+
+#' Does this trend sample its factor loadings?
+#'
+#' A factor model with `n_lv` and no `trend_map` samples every entry
+#' of `Z`. The likelihood sees the factors only through `Z %*% lv`,
+#' where any scale or rotation of the factors passes into the
+#' loadings. Identification needs the factor innovations at unit
+#' scale and zero correlation, which leaves `Z` to carry the
+#' covariance among series. A `trend_map` fixes some or all loadings,
+#' which pins the factors' scale, and those keep a sampled scale and
+#' correlation.
+#'
+#' @param trend_spec An `mvgam_trend` object or trend specification.
+#' @return `TRUE` when every loading is sampled.
+#' @noRd
+samples_factor_loadings <- function(trend_spec) {
+  checkmate::assert_list(trend_spec)
+  !is.null(trend_spec$n_lv) && is.null(trend_spec$trend_map) &&
+    is.null(trend_spec$fixed_Z)
 }
 
 
@@ -775,7 +796,8 @@ generate_monitor_params <- function(trend_spec) {
   # Add correlation parameters if enabled
   # Note: Sigma_trend is computed from sigma_trend * L_Omega_trend in Stan,
   # so users should not place priors on it directly
-  correlation_params <- if (!is_grouped && (trend_spec$cor %||% FALSE)) {
+  correlation_params <- if (!is_grouped && (trend_spec$cor %||% FALSE) &&
+                            !samples_factor_loadings(trend_spec)) {
     "L_Omega_trend"
   } else {
     character(0)
@@ -2357,14 +2379,7 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
   if (isFALSE(cor)) {
     stop(insight::format_error(c(
       "VAR(cor = FALSE) is not supported.",
-      x = paste0(
-        "VAR processes are correlated by definition; the ",
-        "innovation covariance matrix is part of the model."
-      ),
-      i = paste0(
-        "Use AR(p = ", p, ") if you want independent per-series ",
-        "autoregressions."
-      )
+      i = "'AR()' fits independent series."
     )))
   }
   # Validate VAR order parameter. Scalar p (e.g. p = 2) is the
@@ -2381,15 +2396,8 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
       paste0(
         "Sparse-lag VAR (vector 'p') is not supported."
       ),
-      x = paste0(
-        "Got 'p' of length ", length(p), ": ",
-        paste(p, collapse = ", "), "."
-      ),
-      i = paste0(
-        "Pass a scalar 'p' (e.g. p = 2) for consecutive lags ",
-        "1..p. Use AR(p = c(...)) for sparse-lag autoregression ",
-        "on a single series."
-      )
+      x = paste0("Got 'p' = ", paste(p, collapse = ", "), "."),
+      i = "'AR()' takes sparse lags."
     )))
   }
   checkmate::assert_int(p, lower = 1)

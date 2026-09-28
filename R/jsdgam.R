@@ -413,14 +413,8 @@ jsdgam <- function(formula,
   if (!identical(unit_chr, "time")) {
     if ("time" %in% names(data_train)) {
       stop(insight::format_error(c(
-        paste0(
-          "'data' already contains a 'time' column, but 'unit = ",
-          unit_chr, "' was supplied."
-        ),
-        i = paste0(
-          "Drop the 'time' column or set 'unit = time' before calling",
-          " 'jsdgam()'."
-        )
+        "'data' already contains a 'time' column.",
+        x = paste0("'unit = ", unit_chr, "' names a different column.")
       )))
     }
     data_train$time <- data_train[[unit_chr]]
@@ -431,13 +425,9 @@ jsdgam <- function(formula,
     if (!identical(species_chr, "series")) {
       if ("series" %in% names(data_train)) {
         stop(insight::format_error(c(
-          paste0(
-            "'data' already contains a 'series' column, but 'species = ",
-            species_chr, "' was supplied."
-          ),
-          i = paste0(
-            "Drop the 'series' column or set 'species = series' before",
-            " calling 'jsdgam()'."
+          "'data' already contains a 'series' column.",
+          x = paste0(
+            "'species = ", species_chr, "' names a different column."
           )
         )))
       }
@@ -493,14 +483,14 @@ jsdgam <- function(formula,
     stop(insight::format_error(c(
       "'trait_slopes' is not supported with a multivariate 'formula'.",
       x = paste0(
-        "The species-level random effect it builds groups rows by a ",
-        "'series' column, which a formula naming one response per ",
-        "species does not carry."
+        "The species-level random effect of 'trait_slopes' groups rows ",
+        "by a 'series' column."
       ),
-      i = paste0(
-        "Pass a single-response 'formula' with a 'species' column ",
-        "or fit without 'trait_slopes'."
-      )
+      x = paste0(
+        "A formula with one response per species carries no 'series' ",
+        "column."
+      ),
+      i = "Pass a single-response 'formula' with a 'species' column."
     )))
   }
   if (!is.null(trait_slopes)) {
@@ -669,7 +659,6 @@ jsdgam <- function(formula,
 #
 # @noRd
 warn_simplex_obs_formula_lacks_species <- function(formula, species_chr) {
-  if (identical(Sys.getenv("TESTTHAT"), "true")) return(invisible(NULL))
   if (!inherits(formula, "formula") && !inherits(formula, "brmsformula")) {
     return(invisible(NULL))
   }
@@ -678,7 +667,7 @@ warn_simplex_obs_formula_lacks_species <- function(formula, species_chr) {
   if (species_chr %in% rhs_vars || "series" %in% rhs_vars) {
     return(invisible(NULL))
   }
-  rlang::warn(
+  warn_once(
     paste0(
       "All fixed effects in 'formula' are shared across categories. ",
       "The factor model 'Z' will carry the per-category differentiation. ",
@@ -686,8 +675,7 @@ warn_simplex_obs_formula_lacks_species <- function(formula, species_chr) {
       "'y ~ env * ", species_chr, "' or ",
       "'y ~ 0 + ", species_chr, " + env:", species_chr, "'."
     ),
-    .frequency = "once",
-    .frequency_id = "jsdgam_simplex_no_species_interaction"
+    "jsdgam_simplex_no_species_interaction"
   )
   invisible(NULL)
 }
@@ -710,13 +698,10 @@ build_jsdgam_loadings_prior <- function(traits,
   if (!is.null(loadings_prior) && has_alias) {
     stop(insight::format_error(c(
       paste0(
-        "Supply EITHER an explicit 'loadings_prior' OR the ",
-        "'traits' / 'phylo' aliases."
+        "'loadings_prior' and the 'traits' / 'phylo' aliases were both ",
+        "supplied."
       ),
-      i = paste0(
-        "The aliases are compiled into a 'loadings_prior' spec ",
-        "internally; pick one entry point per fit."
-      )
+      x = "The aliases build their own 'loadings_prior'."
     )))
   }
   if (!is.null(loadings_prior)) return(loadings_prior)
@@ -753,23 +738,16 @@ jsdgam_phylo_to_dist <- function(phylo, species_levels) {
   if (inherits(phylo, "phylo")) {
     insight::check_if_installed("ape")
     if (!ape::is.ultrametric(phylo)) {
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          c(
-            paste0(
-              "Phylogeny passed to 'phylo' has unequal root-to-tip ",
-              "path lengths."
-            ),
-            i = paste0(
-              "Cophenetic distances use raw path lengths; the ",
-              "loadings-prior pipeline rescales the matrix to ",
-              "max(d) = 1 before constructing the kernel."
-            )
+      warn_once(
+        c(
+          paste0(
+            "Phylogeny passed to 'phylo' has unequal root-to-tip ",
+            "path lengths."
           ),
-          .frequency = "once",
-          .frequency_id = "jsdgam_non_ultrametric_phylo"
-        )
-      }
+          i = "The cophenetic distances are rescaled to a maximum of 1."
+        ),
+        "jsdgam_non_ultrametric_phylo"
+      )
     }
     d <- ape::cophenetic.phylo(phylo)
   } else if (is.matrix(phylo) || is.data.frame(phylo)) {

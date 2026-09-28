@@ -351,10 +351,10 @@ test_that("a refit runs on a design mvgam wrote a column for", {
   # Both fits are driven because they differ in what the trend side
   # carries, and the placeholder belongs to the observation side.
   for (fit in list(fit_free, fit_conf)) {
-    refit <- suppressWarnings(update(
-      fit, newdata = mvgam:::mvgam_training_data(fit),
-      chains = 1L, iter = 2L, silent = 2L, refresh = 0
-    ))
+    # `run_model = FALSE` builds the program without sampling it.
+    refit <- update(
+      fit, newdata = mvgam:::mvgam_training_data(fit), run_model = FALSE
+    )
     expect_s3_class(refit, "mvgam")
     # The refit is the same program, not merely a program.
     expect_identical(
@@ -386,6 +386,6 @@ test_that("cross-validation reaches a fit with no observation terms", {
   # VAR article uses. `lfo_cv()` takes the same route, so one of the
   # two is driven here and the other is left to the fixtures that
   # exercise it on a longer grid.
-  kf <- suppressWarnings(kfold(fit_free, K = 2L, silent = 2L))
+  kf <- kfold(fit_free, K = 2L, silent = 2L)
   expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
 })

@@ -205,10 +205,7 @@ conditional_effects.mvgam <- function(x,
         paste(shQuote(clash), collapse = ", "),
         " through `...`."
       ),
-      i = paste0(
-        "These are set by conditional_effects.mvgam; pass via the ",
-        "named arguments instead."
-      )
+      i = "conditional_effects() sets these itself."
     )))
   }
 
@@ -228,6 +225,14 @@ conditional_effects.mvgam <- function(x,
   # wire token so the upstream check passes. get_predict.mvgam maps
   # `latent_N` back to predict(type = "latent_state").
   wire_type <- if (identical(type, "latent_state")) "latent_N" else type
+  # marginaleffects warns on each argument its per-class list omits,
+  # and the list has no entry for mvgam. The response and the trend
+  # setting go to get_predict.mvgam on this copy of the model. The
+  # response makes the multivariate draws a single matrix.
+  model <- x
+  attr(model, "mvgam_predict_args") <- list(
+    resp = resp, process_error = process_error
+  )
   out <- lapply(cond_labs, function(cond) {
     pp_args <- list(
       condition = cond,
@@ -236,20 +241,6 @@ conditional_effects.mvgam <- function(x,
       points = points_alpha,
       rug = rug
     )
-    # Forward process_error only when TRUE. get_predict.mvgam defaults
-    # it to FALSE, so omitting the default keeps behaviour identical
-    # while avoiding marginaleffects' "argument not known to be
-    # supported" note on the common conditional_effects path.
-    if (isTRUE(process_error)) {
-      pp_args$process_error <- TRUE
-    }
-    if (!is.null(resp)) {
-      # Multivariate: thread the per-response selector through to
-      # get_predict.mvgam so its posterior_predict / posterior_epred
-      # calls return a single matrix and the marginaleffects pipeline
-      # does not error on the list-shaped multi-response draws.
-      pp_args$resp <- resp
-    }
     if (identical(series_mode$kind, "all")) {
       # marginaleffects validates `condition` against the model's own
       # variables. A column added to the frame here never reaches it.
@@ -275,7 +266,7 @@ conditional_effects.mvgam <- function(x,
       ]
     }
     p <- do.call(marginaleffects::plot_predictions,
-                  c(list(x), pp_args, list(...))) +
+                  c(list(model), pp_args, list(...))) +
       ggplot2::scale_fill_discrete(label = round_legend_labels) +
       ggplot2::scale_colour_discrete(label = round_legend_labels) +
       mvgam_theme()
@@ -527,8 +518,7 @@ resolve_series_arg <- function(series, x) {
       stop(insight::format_error(c(
         "'series' index is out of range.",
         x = paste0(
-          "Got: ", series, "; valid range is 1 to upper bound ",
-          n_levels, "."
+          "Got ", series, ". Valid indices run from 1 to ", n_levels, "."
         ),
         i = paste0(
           "Available levels: ",

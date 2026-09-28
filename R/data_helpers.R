@@ -347,7 +347,7 @@ resolve_y_layout <- function(y, species) {
     # `unmarkedFrameOccuMulti`-style named list of `[J, K]` matrices.
     if (length(y) == 0L) {
       stop(insight::format_error(
-        "'y' is an empty list; supply at least one species matrix."
+        "'y' is an empty list of species matrices."
       ))
     }
     nm <- names(y)
@@ -541,8 +541,7 @@ pivot_species_matrix <- function(Y,
         paste(unique(colnames(Y)[duplicated(colnames(Y))]),
               collapse = ", "),
         "."
-      ),
-      i = "Each column of 'Y' is one species; names become factor levels."
+      )
     )))
   }
   species <- colnames(Y) %||% paste0("sp", seq_len(N))

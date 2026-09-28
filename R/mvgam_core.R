@@ -58,14 +58,20 @@ mvgam_nuts_control_args <- c(
   "adapt_delta", "max_treedepth", "adapt_engaged", "metric", "stepsize"
 )
 
-# Reason: `fit_model()` is called with an explicit argument list and
-# no dots. A NUTS setting written beside the formula reaches neither
-# backend, and the fit samples at Stan's defaults while the call
-# looks like it addressed the divergences it was raised for.
-# Measured on a poisson AR(1): a bare `adapt_delta = 0.99` sampled at
-# delta 0.8, while `control = list(adapt_delta = 0.99)` sampled at
-# 0.99. The bare spelling moves into `control`, which both backends
-# read, and which `control_params()` reports.
+# The fit settings `mvgam_single()` takes from its dots and passes to
+# `fit_model()` by name. With the code generator's formals and the
+# NUTS settings, they are the dots withheld from the sampler.
+mvgam_fit_settings <- c(
+  "algorithm", "iter", "warmup", "thin", "chains", "cores", "threads",
+  "opencl", "init", "seed", "control", "silent", "future",
+  "cpp_options", "stanc_options"
+)
+
+# Reason: rstan takes the NUTS settings only inside `control`. A bare
+# `adapt_delta = 0.99` once sampled at delta 0.8 on a poisson AR(1),
+# while `control = list(adapt_delta = 0.99)` sampled at 0.99. The bare
+# spelling moves into `control`, which both backends accept and
+# `control_params()` reports.
 lift_sampler_control <- function(dots, control = NULL) {
   bare <- intersect(names(dots), mvgam_nuts_control_args)
   if (!length(bare)) {
@@ -149,22 +155,21 @@ translate_samples_burnin <- function(dots) {
       "Do not mix 'samples'/'burnin' with 'iter'/'warmup'.",
       x = "Both name pairs configure the same sampler budget.",
       i = paste0(
-        "Prefer 'iter'/'warmup' (brms convention); ",
-        "'samples'/'burnin' are deprecated."
+        "'samples' and 'burnin' are deprecated in favour of 'iter' and ",
+        "'warmup'."
       )
     )))
   }
-  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      paste0(
-        "mvgam(): 'samples' and 'burnin' are deprecated; use ",
-        "'iter' (total iterations, warmup + post-warmup) and ",
+  warn_once(
+    c(
+      "mvgam(): 'samples' and 'burnin' are deprecated.",
+      i = paste0(
+        "Use 'iter' (total iterations, warmup + post-warmup) and ",
         "'warmup' instead."
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_samples_burnin_deprecated"
-    )
-  }
+      )
+    ),
+    "mvgam_samples_burnin_deprecated"
+  )
   samples <- dots$samples %||% 1000L
   burnin  <- dots$burnin  %||% 1000L
   dots$iter    <- samples + burnin
@@ -415,15 +420,8 @@ mvgam_imputation_forwarded <- c(
 #'   written as an [`mvgam_formula()`], calling [`stancode()`] or
 #'   [`standata()`] on that object says the same thing more directly;
 #'   `run_model = FALSE` is the route for a specification that only
-#'   [`jsdgam()`] knows how to build. Both
-#'   dispatch on `mvgam_formula` and share the exact same trend /
-#'   `loadings_prior` pipeline used internally by `mvgam()` /
-#'   `jsdgam()`, so they surface the same Stan code and data without
-#'   any of the stub object's downstream limitations. A one-time
-#'   `rlang::warn()` per session fires when this argument is `FALSE`;
-#'   repeated calls within the same R session do not re-warn (the
-#'   warning is rate-limited via `.frequency = "regularly"`).
-#'   Defaults to `TRUE`.
+#'   [`jsdgam()`] knows how to build. Both helpers build the same Stan
+#'   code and data as `mvgam()`. Defaults to `TRUE`.
 #' @param save_pars A [brms::save_pars()] object naming which
 #'   parameters the posterior keeps. A model is built from working
 #'   variables it also reports under another name: the standardised
@@ -706,25 +704,13 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   )
   newdata <- validate_newdata(newdata, data)
 
-  # Pre-fit covariate NA guard. brms' validate_data() default
-  # `na_action = na_omit` silently drops rows with NAs in any
-  # model-frame column. That is fine for the response (mvgam
-  # preserves the trend time grid separately), but a missing
-  # covariate row breaks dimension alignment downstream in Stan
-  # and only shows up as an opaque chain-failure error. Catch it
-  # here naming the offending column(s).
-  resp_vars <- lhs_columns(formula)
-  validate_no_covariate_nas(
-    data           = data,
-    formulas       = list(formula, trend_formula),
-    response_vars  = resp_vars,
-    context        = "data"
-  )
+  # `build_stan_components()` refuses a missing covariate in `data`.
+  # `newdata` does not reach it and is checked here.
   if (!is.null(newdata)) {
     validate_no_covariate_nas(
       data           = newdata,
       formulas       = list(formula, trend_formula),
-      response_vars  = resp_vars,
+      response_vars  = lhs_columns(formula),
       context        = "newdata"
     )
   }
@@ -838,7 +824,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # MGP-prior fits, n_lv != n_series fits, and clean Rhats.
   if (isTRUE(run_model) && inherits(mvgam_object, "mvgam") &&
       !is.null(mvgam_object$fit)) {
-    warn_by_lv_full_rank_funnel(mvgam_object, silent = call_silent)
+    warn_by_lv_full_rank_funnel(mvgam_object)
   }
 
   return(mvgam_object)
@@ -889,10 +875,6 @@ validate_newdata <- function(newdata, data) {
       x = paste0(
         "Unknown levels: ",
         paste0("'", bad, "'", collapse = ", "), "."
-      ),
-      i = paste0(
-        "newdata$series must be a subset of levels(data$series); ",
-        "additional series at fit time are not supported."
       )
     )))
   }
@@ -994,11 +976,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     stop(insight::format_error(c(
       "'chains' must be at least 1.",
       x = paste0("Got 'chains' = ", chains, "."),
-      i = paste0(
-        "Ask for the program without a posterior with ",
-        "`run_model = FALSE`, which `stancode()` and `standata()` ",
-        "read."
-      )
+      i = "Use 'run_model = FALSE' to build the model without sampling."
     )), call. = FALSE)
   }
   cores <- dots$cores %||% 1
@@ -1012,7 +990,8 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     obs_model = stan_components$obs_setup$brmsfit,
     trend_model = stan_components$trend_setup$brmsfit,
     standata = stan_components$combined_components$standata,
-    save_pars = save_pars
+    save_pars = save_pars,
+    stancode = stan_components$combined_components$stancode
   )
   seed <- dots$seed %||% sample.int(.Machine$integer.max, 1)
   control <- lift_sampler_control(dots, dots$control %||% NULL)
@@ -1052,26 +1031,35 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   if (!is.null(cpp_options))   compile_args$cpp_options   <- cpp_options
   if (!is.null(stanc_options)) compile_args$stanc_options <- stanc_options
   compiled_model <- do.call(compile_model, compile_args)
-  
-  combined_fit <- fit_model(
-    model = compiled_model,
-    backend = backend,
-    sdata = stan_components$combined_components$standata,
-    algorithm = algorithm,
-    iter = iter,
-    warmup = warmup,
-    thin = thin,
-    chains = chains,
-    cores = cores,
-    threads = threads,
-    opencl = opencl,
-    init = init,
-    exclude = exclude,
-    seed = seed,
-    control = control,
-    silent = silent,
-    future = future
-  )
+
+  # Every other named argument goes to the sampler, as `...` does in
+  # `brms::brm()`: `refresh`, `save_warmup`, `output_dir` and the rest.
+  consumed <- c(names(formals(build_stan_components)),
+                mvgam_fit_settings, mvgam_nuts_control_args)
+  sampler_dots <- dots[!names(dots) %in% consumed]
+
+  combined_fit <- do.call(fit_model, c(
+    list(
+      model = compiled_model,
+      backend = backend,
+      sdata = stan_components$combined_components$standata,
+      algorithm = algorithm,
+      iter = iter,
+      warmup = warmup,
+      thin = thin,
+      chains = chains,
+      cores = cores,
+      threads = threads,
+      opencl = opencl,
+      init = init,
+      exclude = exclude,
+      seed = seed,
+      control = control,
+      silent = silent,
+      future = future
+    ),
+    sampler_dots
+  ))
   
   check_chains_finished(combined_fit, chains, algorithm)
 
@@ -1906,8 +1894,7 @@ pool_mvgam_fits <- function(fits) {
                "from imputation 1."),
         x = paste0("Pooled trend draws would mix different occasions or ",
                    "series under one label."),
-        i = paste0("Impute only the response and covariates; the time ",
-                   "and series columns must be identical across datasets.")
+        i = "Impute only the response and covariates."
       )))
     }
   }

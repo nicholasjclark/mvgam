@@ -55,9 +55,9 @@ fold) or when \code{folds} is supplied. Default \code{"grouped"}.}
 \item{seed}{Optional integer. Forwarded to \code{set.seed()} before
 the fold split so the partition is reproducible.}
 
-\item{silent}{Integer in \verb{\\\{0, 1, 2\\\}}. \code{0} prints per-fold
-progress; \code{1} (default) prints only the refit count; \code{2}
-silences output.}
+\item{silent}{Integer in \verb{\\\{0, 1, 2\\\}}. \code{0} prints each refit
+and its sampler start and finish lines. \code{1} (default) prints
+the refit count. \code{2} prints nothing.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

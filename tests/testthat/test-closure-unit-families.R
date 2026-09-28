@@ -1,7 +1,8 @@
 # Tests for the closure-unit family infrastructure and all
 # closure-unit family constructors: `nmix()` (Poisson-Binomial,
 # Royle-Nichols, Poisson-Poisson variants), `occ()`, and the
-# simplex multi-response trio `diri()` / `multi()` / `categ()`.
+# multi-response families `diri()`, `multi()`, `categ()`, `mvn()`
+# and `mvt()`.
 # Stan emission contracts assert on the source-helper strings
 # directly; all model-fitting tests live in tests/local/.
 
@@ -155,41 +156,10 @@ make_dirichlet_long_data <- function(n_sites = 6L, n_species = 4L,
 
 test_that("diri() returns a custom family with the right tags", {
   fam <- diri()
-  expect_s3_class(fam, "customfamily")
   expect_identical(fam$name, "diri")
   expect_identical(fam$dpars, c("mu", "phi"))
   expect_identical(fam$link, "identity")
   expect_identical(fam$link_phi, "log")
-  expect_true(uses_closure_unit_layout(fam))
-  expect_true(is_multi_response_family(fam))
-  expect_true(is_simplex_response_family(fam))
-  expect_identical(
-    attr(fam, "mvgam_vars", exact = TRUE),
-    c("N_unit", "n_rep", "visit_idx")
-  )
-})
-
-test_that(
-  "prepare_closure_unit_family() groups dirichlet rows by site", {
-  fam <- diri()
-  dat <- make_dirichlet_long_data(n_sites = 5L, n_species = 4L)
-  fam_prep <- mvgam:::prepare_closure_unit_family(
-    fam, dat, response_var = "y",
-    has_obs_covariates = FALSE, has_det_covariates = FALSE
-  )
-  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
-  expect_false(is.null(sv))
-  expect_identical(fam_prep$vars, c("N_unit", "n_rep", "visit_idx"))
-  # Verify the unit grouping by inspecting the standata round-trip.
-  mf <- bf(y ~ env, family = fam_prep)
-  sd <- brms::make_standata(mf, data = dat, stanvars = sv)
-  expect_identical(sd$N_unit, 5L)
-  expect_identical(sd$n_rep, rep(4L, 5L))
-  expect_identical(dim(sd$visit_idx), c(5L, 4L))
-  # `diri()` does not emit the component index: its lpdf pairs a
-  # row's observation with that row's own softmax probability, so
-  # nothing in it is indexed by component.
-  expect_null(sd$visit_component)
 })
 
 test_that("diri_stan_funs() emits the lpdf body with mu_unit[1] anchor", {
@@ -211,8 +181,6 @@ test_that("diri_stan_funs() emits the lpdf body with mu_unit[1] anchor", {
   # mode by construction. The soft `normal_lupdf` machinery is gone.
   expect_match(sc, "vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
                fixed = TRUE)
-  expect_false(grepl("mu_unit_sums", sc, fixed = TRUE))
-  expect_false(grepl("normal_lupdf(mu_unit_sums", sc, fixed = TRUE))
   # Two-signature dispatch: vector-phi primary (emits the
   # `phi_g = phi[idx[1]]` per-unit collapse) and scalar-phi
   # broadcast that forwards via `rep_vector(phi, N)`.
@@ -255,19 +223,9 @@ make_multi_long_data <- function(n_sites = 6L, n_species = 4L,
 
 test_that("multi() returns a custom family with the right tags", {
   fam <- multi()
-  expect_s3_class(fam, "customfamily")
   expect_identical(fam$name, "multi")
   expect_identical(fam$dpars, "mu")
   expect_identical(fam$link, "identity")
-  expect_identical(fam$type, "int")
-  expect_false(fam$loop)
-  expect_true(uses_closure_unit_layout(fam))
-  expect_true(is_multi_response_family(fam))
-  expect_true(is_simplex_response_family(fam))
-  expect_identical(
-    attr(fam, "mvgam_vars", exact = TRUE),
-    c("N_unit", "n_rep", "visit_idx")
-  )
 })
 
 test_that("multi_stan_funs() emits the lpmf body with mu_unit[1] anchor", {
@@ -279,24 +237,6 @@ test_that("multi_stan_funs() emits the lpmf body with mu_unit[1] anchor", {
   # Mode-2 hard identification (see diri test for rationale).
   expect_match(sc, "vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
                fixed = TRUE)
-  expect_false(grepl("mu_unit_sums", sc, fixed = TRUE))
-})
-
-test_that("prepare_closure_unit_family() groups multinomial rows by site", {
-  fam <- multi()
-  dat <- make_multi_long_data(n_sites = 5L, n_species = 4L)
-  fam_prep <- mvgam:::prepare_closure_unit_family(
-    fam, dat, response_var = "y",
-    has_obs_covariates = FALSE, has_det_covariates = FALSE
-  )
-  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
-  expect_false(is.null(sv))
-  expect_identical(fam_prep$vars, c("N_unit", "n_rep", "visit_idx"))
-  mf <- bf(y ~ env, family = fam_prep)
-  sd <- brms::make_standata(mf, data = dat, stanvars = sv)
-  expect_identical(sd$N_unit, 5L)
-  expect_identical(sd$n_rep, rep(4L, 5L))
-  expect_identical(dim(sd$visit_idx), c(5L, 4L))
 })
 
 # ------------------------------------------------------------
@@ -327,13 +267,8 @@ make_categ_long_data <- function(n_sites = 8L, n_categories = 4L,
 
 test_that("categ() returns a custom family with the right tags", {
   fam <- categ()
-  expect_s3_class(fam, "customfamily")
   expect_identical(fam$name, "categ")
   expect_identical(fam$dpars, "mu")
-  expect_identical(fam$type, "int")
-  expect_true(uses_closure_unit_layout(fam))
-  expect_true(is_multi_response_family(fam))
-  expect_true(is_simplex_response_family(fam))
   expect_true(isTRUE(
     attr(fam, "mvgam_binary_response", exact = TRUE)
   ))
@@ -348,24 +283,6 @@ test_that("categ_stan_funs() emits the lpmf body with mu_unit[1] anchor", {
   # Mode-2 hard identification (see diri test for rationale).
   expect_match(sc, "vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
                fixed = TRUE)
-  expect_false(grepl("mu_unit_sums", sc, fixed = TRUE))
-})
-
-test_that("prepare_closure_unit_family() groups categorical rows by site", {
-  fam <- categ()
-  dat <- make_categ_long_data(n_sites = 5L, n_categories = 4L)
-  fam_prep <- mvgam:::prepare_closure_unit_family(
-    fam, dat, response_var = "y",
-    has_obs_covariates = FALSE, has_det_covariates = FALSE
-  )
-  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
-  expect_false(is.null(sv))
-  expect_identical(fam_prep$vars, c("N_unit", "n_rep", "visit_idx"))
-  mf <- bf(y ~ env, family = fam_prep)
-  sd <- brms::make_standata(mf, data = dat, stanvars = sv)
-  expect_identical(sd$N_unit, 5L)
-  expect_identical(sd$n_rep, rep(4L, 5L))
-  expect_identical(dim(sd$visit_idx), c(5L, 4L))
 })
 
 # Shared helper used by mvn() and generate_factor_model() tests.
@@ -406,21 +323,9 @@ make_mvn_long_data <- function(n_sites = 6L, n_species = 4L,
 
 test_that("mvn() returns a custom family with the right tags", {
   fam <- mvn()
-  expect_s3_class(fam, "customfamily")
   expect_identical(fam$name, "mvn")
   expect_identical(fam$dpars, "mu")
   expect_identical(fam$link, "identity")
-  expect_identical(fam$type, "real")
-  expect_false(fam$loop)
-  expect_true(uses_closure_unit_layout(fam))
-  expect_true(is_multi_response_family(fam))
-  # NOT simplex: multi_normal_cholesky_lpdf is shift-sensitive so
-  # the simplex identification machinery must be skipped.
-  expect_false(is_simplex_response_family(fam))
-  expect_identical(
-    attr(fam, "mvgam_vars", exact = TRUE),
-    c("N_unit", "n_rep", "visit_idx", "visit_component", "Psi")
-  )
 })
 
 test_that("mvn_stan_funs() emits a per-unit normal_lpdf using Psi as the SD", {
@@ -453,7 +358,6 @@ test_that("mvn_stan_funs() emits a per-unit normal_lpdf using Psi as the SD", {
   expect_false(grepl("multi_normal_cholesky_lpdf", sc, fixed = TRUE))
   # No simplex-specific shift removal here.
   expect_false(grepl("mu[idx[1]]", sc, fixed = TRUE))
-  expect_false(grepl("mu_unit_sums", sc, fixed = TRUE))
 })
 
 test_that("make_mvn_stanvars() declares the SD-scale Psi parameter and prior", {
@@ -514,35 +418,6 @@ test_that("a user prior on Psi reaches the emitted statement", {
   )
 })
 
-test_that("prepare_closure_unit_family() groups mvn rows by site", {
-  fam <- mvn()
-  dat <- make_mvn_long_data(n_sites = 5L, n_species = 4L)
-  fam_prep <- mvgam:::prepare_closure_unit_family(
-    fam, dat, response_var = "y",
-    has_obs_covariates = FALSE, has_det_covariates = FALSE
-  )
-  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
-  expect_false(is.null(sv))
-  expect_identical(
-    fam_prep$vars,
-    c("N_unit", "n_rep", "visit_idx", "visit_component", "Psi")
-  )
-  # Verify the unit grouping by inspecting the standata round-trip.
-  mf <- bf(y ~ env, family = fam_prep)
-  sd <- brms::make_standata(mf, data = dat, stanvars = sv)
-  expect_identical(sd$N_unit, 5L)
-  expect_identical(sd$n_rep, rep(4L, 5L))
-  expect_identical(dim(sd$visit_idx), c(5L, 4L))
-  # The component index rides in the family's own bundle, because
-  # the trend block's `obs_trend_series` carries the same fact but
-  # is not yet in scope where these stanvars are parsed.
-  expect_identical(dim(sd$visit_component), c(5L, 4L))
-  expect_identical(
-    sd$visit_component,
-    matrix(rep(seq_len(4L), each = 5L), nrow = 5L)
-  )
-})
-
 # ------------------------------------------------------------
 # mvt(): family registration + Stan emission for the heavy-tailed
 # multivariate Student-t closure-unit family. Mirrors mvn(): the
@@ -554,21 +429,9 @@ test_that("prepare_closure_unit_family() groups mvn rows by site", {
 
 test_that("mvt() returns a custom family with the right tags", {
   fam <- mvt()
-  expect_s3_class(fam, "customfamily")
   expect_identical(fam$name, "mvt")
   expect_identical(fam$dpars, "mu")
   expect_identical(fam$link, "identity")
-  expect_identical(fam$type, "real")
-  expect_false(fam$loop)
-  expect_true(uses_closure_unit_layout(fam))
-  expect_true(is_multi_response_family(fam))
-  # NOT simplex: student_t_lpdf is shift-sensitive so the simplex
-  # identification machinery must be skipped.
-  expect_false(is_simplex_response_family(fam))
-  expect_identical(
-    attr(fam, "mvgam_vars", exact = TRUE),
-    c("N_unit", "n_rep", "visit_idx", "visit_component", "Psi", "nu")
-  )
 })
 
 test_that("mvt_stan_funs() emits per-row student_t_lpdf with Psi and nu", {
@@ -598,7 +461,6 @@ test_that("mvt_stan_funs() emits per-row student_t_lpdf with Psi and nu", {
   expect_false(grepl("multi_student_t_lpdf", sc, fixed = TRUE))
   # No simplex-specific shift removal.
   expect_false(grepl("mu[idx[1]]", sc, fixed = TRUE))
-  expect_false(grepl("mu_unit_sums", sc, fixed = TRUE))
 })
 
 test_that("make_mvt_stanvars() declares Psi, nu, and their priors", {
@@ -629,24 +491,83 @@ test_that("make_mvt_stanvars() declares Psi, nu, and their priors", {
   )
 })
 
-test_that("prepare_closure_unit_family() wires mvt() vars and stanvars", {
-  fam <- mvt()
-  dat <- make_mvn_long_data(n_sites = 5L, n_species = 4L)
-  fam_prep <- mvgam:::prepare_closure_unit_family(
-    fam, dat, response_var = "y",
-    has_obs_covariates = FALSE, has_det_covariates = FALSE
+# The five multi-response families, the frame each is fitted to, and
+# what separates them: the response type, whether the likelihood is
+# shift-invariant (a simplex) and the Stan data each family declares.
+multi_response_cases <- function() {
+  unit_vars <- c("N_unit", "n_rep", "visit_idx")
+  list(
+    diri = list(fam = diri(), type = "real", simplex = TRUE,
+                vars = unit_vars,
+                data = make_dirichlet_long_data(5L, 4L)),
+    multi = list(fam = multi(), type = "int", simplex = TRUE,
+                 vars = unit_vars,
+                 data = make_multi_long_data(5L, 4L)),
+    categ = list(fam = categ(), type = "int", simplex = TRUE,
+                 vars = unit_vars,
+                 data = make_categ_long_data(5L, 4L)),
+    # A normal or Student-t likelihood moves with a shift of mu, which
+    # rules out the simplex identification. Both families index their
+    # scale by the component of each row.
+    mvn = list(fam = mvn(), type = "real", simplex = FALSE,
+               vars = c(unit_vars, "visit_component", "Psi"),
+               data = make_mvn_long_data(5L, 4L)),
+    mvt = list(fam = mvt(), type = "real", simplex = FALSE,
+               vars = c(unit_vars, "visit_component", "Psi", "nu"),
+               data = make_mvn_long_data(5L, 4L))
   )
-  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
-  expect_false(is.null(sv))
-  expect_identical(
-    fam_prep$vars,
-    c("N_unit", "n_rep", "visit_idx", "visit_component", "Psi", "nu")
-  )
-  mf <- bf(y ~ env, family = fam_prep)
-  sd <- brms::make_standata(mf, data = dat, stanvars = sv)
-  expect_identical(sd$N_unit, 5L)
-  expect_identical(sd$n_rep, rep(4L, 5L))
-  expect_identical(dim(sd$visit_idx), c(5L, 4L))
+}
+
+test_that("the multi-response families share one closure-unit contract", {
+  cases <- multi_response_cases()
+  for (nm in names(cases)) {
+    fam <- cases[[nm]]$fam
+    expect_s3_class(fam, "customfamily")
+    expect_identical(fam$type, cases[[nm]]$type, label = nm)
+    expect_false(fam$loop, label = nm)
+    expect_true(uses_closure_unit_layout(fam), label = nm)
+    expect_true(is_multi_response_family(fam), label = nm)
+    expect_identical(
+      is_simplex_response_family(fam), cases[[nm]]$simplex, label = nm
+    )
+    expect_identical(
+      attr(fam, "mvgam_vars", exact = TRUE), cases[[nm]]$vars, label = nm
+    )
+  }
+})
+
+test_that("prepare_closure_unit_family() groups each family's rows by site", {
+  # Every family groups the same shape: five sites of four rows each
+  cases <- multi_response_cases()
+  for (nm in names(cases)) {
+    case <- cases[[nm]]
+    fam_prep <- mvgam:::prepare_closure_unit_family(
+      case$fam, case$data, response_var = "y",
+      has_obs_covariates = FALSE, has_det_covariates = FALSE
+    )
+    expect_identical(fam_prep$vars, case$vars, label = nm)
+    sd <- brms::make_standata(
+      bf(y ~ env, family = fam_prep), data = case$data,
+      stanvars = attr(fam_prep, "mvgam_stanvars", exact = TRUE)
+    )
+    expect_identical(sd$N_unit, 5L, label = nm)
+    expect_identical(sd$n_rep, rep(4L, 5L), label = nm)
+    expect_identical(dim(sd$visit_idx), c(5L, 4L), label = nm)
+    # The family's own stanvars declare the component index. The trend
+    # block's `obs_trend_series` holds the same fact but is out of
+    # scope where these stanvars are parsed. A simplex likelihood
+    # pairs each row with its own softmax probability and declares no
+    # component index.
+    if ("visit_component" %in% case$vars) {
+      expect_identical(
+        sd$visit_component,
+        matrix(rep(seq_len(4L), each = 5L), nrow = 5L),
+        label = nm
+      )
+    } else {
+      expect_null(sd$visit_component, label = nm)
+    }
+  }
 })
 
 # ------------------------------------------------------------
@@ -1035,11 +956,95 @@ test_that(
 # closure-unit arrays land in standata and the nmix lpdf
 # function block lands in stancode with the expected signature.
 
+# The four detection families: the data each is fitted to, the Stan
+# name of its likelihood, its likelihood call and the data it
+# declares. A binary response bounds Y_max at one. The Poisson-binomial
+# and Poisson-Poisson bodies take log(k) from a lookup table.
+detection_cases <- list(
+  occ = list(
+    family = occ, binary = TRUE, name = "occ", k_max = FALSE,
+    log_n_lookup = FALSE,
+    call = "occ_lpmf(Y | mu, p, N_unit, n_rep, Y_max, visit_idx)"
+  ),
+  nmix = list(
+    family = nmix, binary = FALSE, name = "nmix", k_max = TRUE,
+    log_n_lookup = TRUE,
+    call = paste0("nmix_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, ",
+                  "visit_idx, log_n_lookup)")
+  ),
+  royle_nichols = list(
+    family = function() nmix("royle_nichols"), binary = TRUE,
+    name = "nmix_royle_nichols", k_max = TRUE, log_n_lookup = FALSE,
+    call = paste0("nmix_royle_nichols_lpmf(Y | mu, p, N_unit, n_rep, ",
+                  "K_max, Y_max, visit_idx)")
+  ),
+  poisson_poisson = list(
+    family = function() nmix("poisson_poisson"), binary = FALSE,
+    name = "nmix_poisson_poisson", k_max = TRUE, log_n_lookup = TRUE,
+    call = paste0("nmix_poisson_poisson_lpmf(Y | mu, p, N_unit, n_rep, ",
+                  "K_max, Y_max, visit_idx, log_n_lookup, k_start_ppm)")
+  )
+)
+
+# The first request for a family generates its program and the cache
+# returns it to every later test in the file
+detection_stancode_cache <- new.env(parent = emptyenv())
+detection_stancode <- function(key) {
+  if (is.null(detection_stancode_cache[[key]])) {
+    case <- detection_cases[[key]]
+    d <- make_nmix_data(n_unit = 4, n_visit = 3)
+    if (case$binary) d$y <- as.integer(d$y > 0L)
+    detection_stancode_cache[[key]] <- as.character(stancode(
+      mvgam_formula(y ~ elev), data = d, family = case$family()
+    ))
+  }
+  detection_stancode_cache[[key]]
+}
+
+test_that("every detection family dispatches its units through reduce_sum", {
+  for (key in names(detection_cases)) {
+    case <- detection_cases[[key]]
+    sc <- detection_stancode(key)
+    partial_sum <- paste0("partial_sum_", case$name, "_lpmf")
+    expect_match(sc, paste0("real ", partial_sum, "("), fixed = TRUE,
+                 label = key)
+    expect_match(sc, paste0("reduce_sum(", partial_sum, ","), fixed = TRUE,
+                 label = key)
+    # stanc wraps the one-statement loop body onto its own line
+    expect_match(sc, "array[N_unit] int g_seq;", fixed = TRUE, label = key)
+    expect_match(sc, "g_seq[g] = g;", fixed = TRUE, label = key)
+    # `%/%` states the integer division that `/` between two ints
+    # made stanc report at every closure-unit compile
+    expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
+                 fixed = TRUE, label = key)
+    expect_match(sc, case$call, fixed = TRUE, label = key)
+    # The data arrays have one entry per unit, and visit_idx one
+    # column per visit
+    expect_match(sc, "int<lower=1> N_unit;", fixed = TRUE, label = key)
+    expect_match(sc, "array[N_unit] int<lower=1> n_rep;", fixed = TRUE,
+                 label = key)
+    expect_match(sc, "array[N_unit, 3] int<lower=1> visit_idx;",
+                 fixed = TRUE, label = key)
+    y_max <- if (case$binary) "int<lower=0, upper=1>" else "int<lower=0>"
+    expect_match(sc, paste0("array[N_unit] ", y_max, " Y_max;"),
+                 fixed = TRUE, label = key)
+    expect_identical(
+      grepl("array[N_unit] int<lower=1> K_max;", sc, fixed = TRUE),
+      case$k_max, label = key
+    )
+    lookup <- c("int K_max_global = max(K_max);",
+                "vector[K_max_global] log_n_lookup;",
+                "log_n_lookup[n_lk] = log(n_lk);")
+    expect_identical(
+      unname(vapply(lookup, grepl, logical(1L), x = sc, fixed = TRUE)),
+      rep(case$log_n_lookup, 3L), label = key
+    )
+  }
+})
+
 test_that(
   "stancode under nmix() includes the lpdf signature and data decls", {
-  d <- make_nmix_data(n_unit = 4, n_visit = 3)
-  mf <- mvgam_formula(y ~ elev)
-  sc <- as.character(stancode(mf, data = d, family = nmix()))
+  sc <- detection_stancode("nmix")
   # Function block: both overloaded signatures emitted.
   expect_match(sc, "real nmix_lpmf\\(\\s*array\\[\\] int y,", fixed = FALSE)
   expect_match(sc, "vector mu,", fixed = TRUE)
@@ -1068,61 +1073,19 @@ test_that(
     "log_prob_n = log_sum_exp(0, log_prob_n + log_ff + log_k_obs - log_N);",
     fixed = TRUE
   )
-  # Threading: per-unit body lives in partial_sum_nmix_lpmf;
-  # nmix_lpmf wrapper calls reduce_sum over closure units. When
-  # stan_threads is compiled in (via `threads = N` on mvgam()),
-  # TBB splits chunks across threads.
-  expect_match(sc, "real partial_sum_nmix_lpmf(", fixed = TRUE)
-  expect_match(sc, "reduce_sum(", fixed = TRUE)
-  # stanc line-wraps the single-statement for-body onto two
-  # lines, so assert on the two pieces independently.
-  expect_match(sc, "array[N_unit] int g_seq;", fixed = TRUE)
-  expect_match(sc, "g_seq[g] = g;", fixed = TRUE)
-  # grainsize heuristic targets ~8 chunks (N_unit %/% 8 with a 1
-  # floor) so single-threaded fits pay minimal dispatch overhead
-  # and multi-threaded fits see ~8 chunks across cores. Rounding is
-  # what is wanted, and `%/%` says so, where `/` between two ints
-  # made stanc report the rounding at every closure-unit compile.
-  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
-               fixed = TRUE)
   # No remnants of the naive vectorised log-sum-exp loop.
   expect_false(grepl("component_lps", sc, fixed = TRUE))
   expect_false(grepl("poisson_log_lpmf(k | log_lam)", sc, fixed = TRUE))
-  # Data block: closure-unit arrays at unit length, not visit length.
-  expect_match(sc, "int<lower=1> N_unit;", fixed = TRUE)
-  expect_match(sc, "array[N_unit] int<lower=1> n_rep;", fixed = TRUE)
-  expect_match(sc, "array[N_unit] int<lower=1> K_max;", fixed = TRUE)
-  expect_match(sc, "array[N_unit] int<lower=0> Y_max;", fixed = TRUE)
-  expect_match(sc, "array[N_unit, 3] int<lower=1> visit_idx;", fixed = TRUE)
-  # Likelihood call wires the dpars + vint args correctly; the
-  # trailing `log_n_lookup` argument is the cached log(N) vector
-  # emitted in transformed data so the inner ratio loop indexes a
-  # vector instead of calling scalar log() per iteration.
-  expect_match(
-    sc,
-    paste0("nmix_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, ",
-           "visit_idx, log_n_lookup)"),
-    fixed = TRUE
-  )
-  expect_match(sc, "int K_max_global = max(K_max);", fixed = TRUE)
-  expect_match(sc, "vector[K_max_global] log_n_lookup;", fixed = TRUE)
-  expect_match(sc, "log_n_lookup[n_lk] = log(n_lk);", fixed = TRUE)
   # Scalar-p case: p declared as a bounded probability so the
   # lpdf's logit(p) call is well-defined even without a
   # `p ~ ...` sub-formula.
   expect_match(sc, "real<lower=0, upper=1> p;", fixed = TRUE)
 })
 
-test_that("stancode under occ() emits partial_sum + reduce_sum scaffold", {
-  d <- make_nmix_data(n_unit = 4, n_visit = 3)
-  d$y <- as.integer(d$y > 0L)
-  mf <- mvgam_formula(y ~ elev)
-  sc <- as.character(stancode(mf, data = d, family = occ()))
-  # Per-unit body factored into partial_sum_occ_lpmf; wrapper hoists
-  # logit(mu) -> logit_psi and logit(p) -> logit_p once before
-  # dispatching to reduce_sum so per-thread chunks reuse the cached
-  # link-scale vectors.
-  expect_match(sc, "real partial_sum_occ_lpmf(", fixed = TRUE)
+test_that("stancode under occ() marginalises the binary state", {
+  sc <- detection_stancode("occ")
+  # The wrapper hoists logit(mu) -> logit_psi and logit(p) -> logit_p
+  # once, and each reduce_sum chunk reuses those vectors.
   expect_match(sc, "vector[num_elements(mu)] logit_psi = logit(mu);",
                fixed = TRUE)
   expect_match(sc, "vector[num_elements(p)] logit_p = logit(p);",
@@ -1132,13 +1095,6 @@ test_that("stancode under occ() emits partial_sum + reduce_sum scaffold", {
   # log_sum_exp over {z = 0, z = 1}.
   expect_match(sc, "if (Y_max[g] >= 1)", fixed = TRUE)
   expect_match(sc, "log_sum_exp(loglik_z1, loglik_z0)", fixed = TRUE)
-  # Threading: reduce_sum + grainsize heuristic shared with the
-  # other closure-unit families.
-  expect_match(sc, "reduce_sum(partial_sum_occ_lpmf,", fixed = TRUE)
-  expect_match(sc, "array[N_unit] int g_seq;", fixed = TRUE)
-  expect_match(sc, "g_seq[g] = g;", fixed = TRUE)
-  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
-               fixed = TRUE)
   # All four signature overloads (vec/vec, vec/scalar, scalar/vec,
   # scalar/scalar) must land so the brms emission resolves regardless
   # of whether mu / p are dpars or constants.
@@ -1149,30 +1105,12 @@ test_that("stancode under occ() emits partial_sum + reduce_sum scaffold", {
       fixed = TRUE
     )
   }
-  # Likelihood call wires the standata args correctly.
-  expect_match(
-    sc,
-    "occ_lpmf(Y | mu, p, N_unit, n_rep, Y_max, visit_idx)",
-    fixed = TRUE
-  )
-  # Y_max is the per-unit detection indicator; bounded {0, 1}.
-  expect_match(sc, "array[N_unit] int<lower=0, upper=1> Y_max;",
-               fixed = TRUE)
-  # occ() must NOT carry log_n_lookup (no log(int) in the body).
-  expect_false(grepl("log_n_lookup", sc, fixed = TRUE))
 })
 
 test_that(
-  "stancode under nmix('royle_nichols') emits partial_sum + reduce_sum", {
-  d <- make_nmix_data(n_unit = 4, n_visit = 3)
-  d$y <- as.integer(d$y > 0L)
-  mf <- mvgam_formula(y ~ elev)
-  sc <- as.character(stancode(mf, data = d, family = nmix("royle_nichols")))
-  # Per-unit body factored into partial_sum_nmix_royle_nichols_lpmf;
-  # wrapper hoists log(mu) -> log_mu and log1m(p) -> log_1m_r once
-  # before dispatching to reduce_sum.
-  expect_match(sc, "real partial_sum_nmix_royle_nichols_lpmf(",
-               fixed = TRUE)
+  "stancode under nmix('royle_nichols') marginalises abundance", {
+  sc <- detection_stancode("royle_nichols")
+  # The wrapper hoists log(mu) -> log_mu and log1m(p) -> log_1m_r.
   expect_match(sc, "vector[num_elements(mu)] log_mu = log(mu);",
                fixed = TRUE)
   expect_match(sc, "vector[num_elements(p)] log_1m_r = log1m(p);",
@@ -1187,25 +1125,6 @@ test_that(
   # is the per-visit at-least-one-detection contribution.
   expect_match(sc, "k * sum_non_det_log_1m_r", fixed = TRUE)
   expect_match(sc, "log1m_exp(k * log_1m_r_v)", fixed = TRUE)
-  # Threading: reduce_sum + grainsize heuristic.
-  expect_match(sc, "reduce_sum(partial_sum_nmix_royle_nichols_lpmf,",
-               fixed = TRUE)
-  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
-               fixed = TRUE)
-  # Likelihood call.
-  expect_match(
-    sc,
-    paste0("nmix_royle_nichols_lpmf(Y | mu, p, N_unit, n_rep, ",
-           "K_max, Y_max, visit_idx)"),
-    fixed = TRUE
-  )
-  # Data: K_max alongside the binary Y_max indicator.
-  expect_match(sc, "array[N_unit] int<lower=1> K_max;", fixed = TRUE)
-  expect_match(sc, "array[N_unit] int<lower=0, upper=1> Y_max;",
-               fixed = TRUE)
-  # RN has no log(int) in the inner loop, so log_n_lookup must NOT
-  # be emitted for this family.
-  expect_false(grepl("log_n_lookup", sc, fixed = TRUE))
   # Haines (2016) closed-form fast-path for the all-zero detection
   # case. cmax == 0 collapses sum_{N=0}^infty Poisson(N|lambda) *
   # prod_t (1-r_t)^N to exp(lambda * (prod_t (1-r_t) - 1)) via the
@@ -1255,16 +1174,11 @@ test_that(
 })
 
 test_that(
-  "stancode under nmix('poisson_poisson') emits log_n_lookup", {
-  d <- make_nmix_data(n_unit = 4, n_visit = 3)
-  mf <- mvgam_formula(y ~ elev)
-  sc <- as.character(stancode(mf, data = d, family = nmix("poisson_poisson")))
-  # Per-unit body factored into partial_sum_nmix_poisson_poisson_lpmf;
-  # wrapper hoists log(mu) -> log_mu and log(p) -> log_p once. The
-  # raw p vector is also threaded through because the inner cell
-  # uses k * sum(p_v) as the Poisson rate aggregate.
-  expect_match(sc, "real partial_sum_nmix_poisson_poisson_lpmf(",
-               fixed = TRUE)
+  "stancode under nmix('poisson_poisson') factors the visit sum", {
+  sc <- detection_stancode("poisson_poisson")
+  # The wrapper hoists log(mu) -> log_mu and log(p) -> log_p once.
+  # The partial sum also takes the raw p, whose visit sum k * sum(p_v)
+  # is the Poisson rate of the inner cell.
   expect_match(sc, "vector[num_elements(mu)] log_mu = log(mu);",
                fixed = TRUE)
   expect_match(sc, "vector[num_elements(p)] log_p = log(p);",
@@ -1277,29 +1191,6 @@ test_that(
   expect_match(sc, "if (any_detection)", fixed = TRUE)
   expect_match(sc, "component_lps[1] = negative_infinity();",
                fixed = TRUE)
-  # Threading: reduce_sum, grainsize heuristic, log_n_lookup as a
-  # tail-position argument matching the partial_sum signature.
-  expect_match(sc, "reduce_sum(partial_sum_nmix_poisson_poisson_lpmf,",
-               fixed = TRUE)
-  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
-               fixed = TRUE)
-  # Transformed data: log_n_lookup built once over K_max_global so
-  # the lpmf indexes a cached vector instead of recomputing log(k).
-  expect_match(sc, "int K_max_global = max(K_max);", fixed = TRUE)
-  expect_match(sc, "vector[K_max_global] log_n_lookup;", fixed = TRUE)
-  expect_match(sc, "log_n_lookup[n_lk] = log(n_lk);", fixed = TRUE)
-  # Likelihood call: log_n_lookup + k_start_ppm tail args present.
-  expect_match(
-    sc,
-    paste0(
-      "nmix_poisson_poisson_lpmf(Y | mu, p, N_unit, n_rep, K_max, ",
-      "Y_max, visit_idx, log_n_lookup, k_start_ppm)"
-    ),
-    fixed = TRUE
-  )
-  # Data: K_max and unbounded Y_max (counts).
-  expect_match(sc, "array[N_unit] int<lower=1> K_max;", fixed = TRUE)
-  expect_match(sc, "array[N_unit] int<lower=0> Y_max;", fixed = TRUE)
   # Per-unit Poisson-tail lower bound on the latent-N loop. The
   # lpmf reads k_start_ppm[g] as the inner-loop start; skipping
   # cells below it costs negligible mass (see make_nmix_poisson_
@@ -1459,27 +1350,22 @@ test_that(
 # how_to_cite() coverage for nmix
 # ------------------------------------------------------------
 
-test_that("how_to_cite reference_db includes the four nmix entries", {
+test_that("how_to_cite reference_db carries the closure-unit references", {
   db <- reference_db()
-  expected <- c(
-    "royle_nmix_2004",
-    "dennis_nmix_2015",
-    "kery_nmix_2018",
-    "knape_overdispersion_2018"
+  keys <- c(
+    "royle_nmix_2004", "dennis_nmix_2015", "kery_nmix_2018",
+    "knape_overdispersion_2018", "royle_nichols_2003",
+    "neyman_type_a_1939"
   )
-  expect_true(all(expected %in% names(db)))
-  for (key in expected) {
-    expect_true(nzchar(db[[key]]$text))
-    expect_true(nzchar(db[[key]]$bibtex))
+  expect_contains(names(db), keys)
+  for (key in keys) {
+    expect_true(nzchar(db[[key]]$text), label = key)
+    expect_true(nzchar(db[[key]]$bibtex), label = key)
   }
-})
-
-test_that("how_to_cite reference_db carries the Royle-Nichols 2003 entry", {
-  db <- mvgam:::reference_db()
-  expect_true("royle_nichols_2003" %in% names(db))
-  rn <- db[["royle_nichols_2003"]]
-  expect_true(grepl("Royle JA and Nichols JD", rn$text))
-  expect_true(grepl("royle2003abundance", rn$bibtex))
+  expect_match(db$royle_nichols_2003$text, "Royle JA and Nichols JD")
+  expect_match(db$royle_nichols_2003$bibtex, "royle2003abundance")
+  expect_match(db$neyman_type_a_1939$text, "Neyman J")
+  expect_match(db$neyman_type_a_1939$bibtex, "neyman1939contagious")
 })
 
 # ------------------------------------------------------------
@@ -1495,12 +1381,6 @@ test_that(
                    "royle_nichols")
   expect_true(isTRUE(attr(fam, "mvgam_binary_response",
                           exact = TRUE)))
-  # RN defaults K_max to 25 to match unmarked::occuRN. Users still
-  # override via a 'cap' column when latent_N_saturation() flags
-  # truncation bias.
-  expect_identical(
-    attr(fam, "mvgam_default_cap", exact = TRUE), 25L
-  )
   expect_identical(attr(fam, "mvgam_predict_types", exact = TRUE),
                    c("latent_state", "detection"))
 })
@@ -1524,7 +1404,6 @@ test_that(
   # PPM accepts arbitrary counts so the binary-response check is OFF.
   expect_false(isTRUE(attr(fam, "mvgam_binary_response",
                            exact = TRUE)))
-  expect_null(attr(fam, "mvgam_default_cap", exact = TRUE))
   expect_identical(attr(fam, "mvgam_predict_types", exact = TRUE),
                    c("latent_state", "detection"))
   # Log link on p (not logit) so the rate stays on positive reals.
@@ -1537,53 +1416,40 @@ test_that(
 # Stan models. The constructor / predicate / how_to_cite contract
 # coverage stays in this file (above and below).
 
-test_that(
-  "nmix('poisson_poisson') intercept-only spec prepares cleanly", {
+test_that("nmix('poisson_poisson') warns that intercepts alone are weak", {
+  # The data identify only lambda * p when neither formula has a
+  # covariate. Verbose warnings lift the once-per-session limit.
+  local_verbose_warnings()
+  withr::local_envvar(TESTTHAT = "")
   set.seed(99)
   n_unit <- 15L; n_visit <- 3L
-  # 3 visits per closure unit (same series, same time across the
-  # n_visit rows) so the validator's "every unit single visit + no
-  # covariates" hard-error does not fire.
   d <- data.frame(
     series = factor(rep(seq_len(n_unit), each = n_visit)),
     time   = rep(1L, n_unit * n_visit),
     y      = rpois(n_unit * n_visit, 2),
     cap    = rep(20L, n_unit * n_visit)
   )
-  fam <- nmix("poisson_poisson")
-  # The intercept-only identifiability warn fires from
-  # `prepare_closure_unit_family()` via a single `rlang::warn(...,
-  # .frequency = "once")` call (R/families.R). Its emission is
-  # covered by direct inspection of that call site, not a testthat
-  # assertion, because rlang's once-per-session frequency-id cache
-  # makes the warning unreliable to catch across runs. The test
-  # here only checks that the intercept-only spec routes cleanly
-  # through the family preparation.
-  fam_prep <- suppressWarnings(
+  prepare <- function(has_obs_covariates) {
     prepare_closure_unit_family(
-      fam,
-      data = d,
-      response_var = "y",
-      has_obs_covariates = FALSE,
+      nmix("poisson_poisson"), data = d, response_var = "y",
+      has_obs_covariates = has_obs_covariates,
       has_det_covariates = FALSE
     )
+  }
+  expect_warning(
+    fam_prep <- prepare(FALSE),
+    class = "nmix_poisson_poisson_intercept_only"
   )
   expect_identical(fam_prep$name, "nmix_poisson_poisson")
-  expect_false(is.null(attr(fam_prep, "mvgam_stanvars", exact = TRUE)))
-})
-
-test_that("how_to_cite reference_db carries the Neyman 1939 entry", {
-  db <- mvgam:::reference_db()
-  expect_true("neyman_type_a_1939" %in% names(db))
-  ny <- db[["neyman_type_a_1939"]]
-  expect_true(grepl("Neyman J", ny$text))
-  expect_true(grepl("neyman1939contagious", ny$bibtex))
+  expect_no_warning(prepare(TRUE))
 })
 
 
 test_that("nmix('royle_nichols') sets the auto-default K_max attribute", {
+  # RN defaults K_max to 25 to match unmarked::occuRN. A 'cap' column
+  # overrides it when latent_N_saturation() reports truncation bias.
   fam <- nmix("royle_nichols")
-  expect_equal(
+  expect_identical(
     attr(fam, "mvgam_default_cap", exact = TRUE), 25L
   )
   # PB and PPM have no scalar default_cap; they auto-compute

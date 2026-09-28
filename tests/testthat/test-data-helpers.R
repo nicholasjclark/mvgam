@@ -288,8 +288,8 @@ test_that("2D single-species pivot composes with mvgam(family = occ())", {
   # Codegen alone, with no fit, is enough to confirm the frame is
   # accepted.
   expect_no_error(
-    suppressWarnings(stancode(
+    stancode(
       mf, data = long, family = occ(), validate = FALSE
-    ))
+    )
   )
 })

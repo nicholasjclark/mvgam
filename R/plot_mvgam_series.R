@@ -140,10 +140,8 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
   if (is.factor(dat$y)) {
     if (!is.ordered(dat$y)) {
       stop(insight::format_error(c(
-        paste0("Response '", response,
-               "' is an unordered factor, which has no series to plot."),
-        i = paste0("A histogram, an autocorrelation and an empirical CDF ",
-                   "all need the response to be ordered.")
+        paste0("Response '", response, "' is an unordered factor."),
+        i = "The series plots need an ordered response."
       )))
     }
     ordinal_levels <- levels(dat$y)

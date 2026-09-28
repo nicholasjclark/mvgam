@@ -100,7 +100,7 @@ test_that("matrix with all-zero rows errors", {
                  nrow = 3L, ncol = 2L, byrow = TRUE)
   expect_error(
     mvgam:::normalise_trend_map(Z_in, .make_data(3L)),
-    "zero-loading"
+    "must load on at least one factor"
   )
 })
 
@@ -372,10 +372,10 @@ test_that("trend_map requires a trend_formula to map onto", {
   expect_match(conditionMessage(err), "trend_formula", fixed = TRUE)
 
   # The same argument with a trend to carry it still builds.
-  expect_no_error(suppressWarnings(mvgam(
+  expect_no_error(mvgam(
     y ~ 1, trend_formula = ~ AR(p = 1), trend_map = tm, data = d,
     family = poisson(), run_model = FALSE
-  )))
+  ))
 })
 
 test_that("apply_trend_map_alias grafts onto a single spec", {

@@ -192,9 +192,10 @@ loo.mvgam <- function(x, ...,
         paste0("'", names(unhonoured)[unhonoured], "'", collapse = ", "),
         "."
       ),
+      i = "Rank models with 'loo_compare()'.",
       i = paste0(
-        "Rank models with 'loo_compare()'; 'k_threshold' and the ",
-        "'*_args' lists configure refits mvgam does not run."
+        "'k_threshold' and the '*_args' lists configure refits mvgam ",
+        "does not run."
       )
     )))
   }
@@ -460,12 +461,8 @@ per_obs_series_labels <- function(x) {
     stop(insight::format_error(c(
       "by_series = TRUE is not meaningful for a response-keyed fit.",
       x = paste0(
-        "The series of this model are its responses, and every row ",
-        "carries all of them at once."
-      ),
-      i = paste0(
-        "Score the whole fit by calling loo()/waic() with ",
-        "by_series = FALSE."
+        "The series of this model are its responses. Every row ",
+        "carries all of them."
       )
     )))
   }
@@ -525,24 +522,21 @@ clean_ll = function(x, logliks) {
   # The refill is a repair, and the elpd it feeds is optimistic by
   # however much of the likelihood was unusable, so say so rather
   # than let a number stand unqualified.
-  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      c(
-        paste0(
-          n_replaced,
-          " log-likelihood values were NaN or infinite. They were ",
-          "refilled from the finite draws of their own observation."
-        ),
-        i = paste0(
-          "The reported ELPD is optimistic by whatever those draws ",
-          "would have contributed. It usually means the family gave ",
-          "an observation zero density under part of the posterior."
-        )
+  warn_once(
+    c(
+      paste0(
+        n_replaced,
+        " log-likelihood values were NaN or infinite. They were ",
+        "refilled from the finite draws of their own observation."
       ),
-      .frequency = "once",
-      .frequency_id = "mvgam_clean_ll_refill"
-    )
-  }
+      i = paste0(
+        "The reported ELPD is optimistic by whatever those draws ",
+        "would have contributed. It usually means the family gave ",
+        "an observation zero density under part of the posterior."
+      )
+    ),
+    "mvgam_clean_ll_refill"
+  )
 
   # return
   attr(logliks, "scored_columns") <- scored
