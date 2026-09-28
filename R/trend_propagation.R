@@ -235,12 +235,11 @@ propagate_pw <- function(trend_model, params, h, n_series,
                               .var.name = "params$m")
 
   # `hist_size` must match the value Stan saw at fit time. The
-  # PW Stan generator uses `floor(n_time * changepoint_range)`
-  # (Prophet's convention from Taylor & Letham 2018), so re-use
-  # that here when `changepoint_range` is supplied. Falls back
-  # to the full training span only for callers that don't pass
-  # it (e.g. unit tests that build a synthetic spec by hand).
-  full_span <- max(training_times) - min(training_times) + 1
+  # PW Stan generator uses `floor(n_time_observed *
+  # changepoint_range)` (Prophet's convention from Taylor & Letham
+  # 2018), where `n_time_observed` counts the occasions carrying a
+  # response. Without `changepoint_range` the whole history counts.
+  full_span <- length(unique(training_times))
   hist_size <- if (!is.null(changepoint_range)) {
     floor(full_span * as.numeric(changepoint_range))
   } else {

@@ -1840,6 +1840,15 @@ closure_unit_key_vars <- function(family, series_var = "series",
 }
 
 
+# Internal: the columns that key a fitted model's closure units. The
+# fit records the time and series columns its trend named.
+#'@noRd
+fit_closure_unit_keys <- function(object) {
+  vars <- axis_vars(object)
+  closure_unit_key_vars(object$family, vars$series_var, vars$time_var)
+}
+
+
 #' Per-unit K_max buffer for count closure-unit families
 #'
 #' Reads the `mvgam_default_cap_buffer` family attribute. When set
@@ -1908,7 +1917,7 @@ closure_unit_axis_levels <- function(object) {
 # describes or replicated wholesale from the training data.
 #'@noRd
 closure_units_are_intact <- function(object, newdata) {
-  key <- closure_unit_key_vars(object$family)
+  key <- fit_closure_unit_keys(object)
   if (is.null(key) || !all(key %in% names(newdata))) {
     return(FALSE)
   }
@@ -1965,10 +1974,12 @@ complete_simplex_grid <- function(object, newdata,
     return(NULL)
   }
   resp <- response_column(object)
+  vars <- axis_vars(object)
   # The covariate setting of a row is everything that is not the
   # category axis, the unit identifiers, or the response.
   held <- setdiff(names(newdata),
-                  c("series", "time", "visit", "cap", "rowid", resp))
+                  c(vars$series_var, vars$time_var, "visit", "cap",
+                    "rowid", resp))
   key <- if (length(held)) {
     do.call(paste, c(lapply(held, function(v) {
       as.character(newdata[[v]])
@@ -1983,14 +1994,14 @@ complete_simplex_grid <- function(object, newdata,
   # One block of K rows per setting, carrying that setting's
   # covariates and sharing a unit identifier.
   out <- newdata[rep(first_row, each = K), , drop = FALSE]
-  out$series <- factor(rep(levs, times = n_set), levels = levs)
-  out$time <- rep(seq_len(n_set), each = K)
+  out[[vars$series_var]] <- factor(rep(levs, times = n_set), levels = levs)
+  out[[vars$time_var]] <- rep(seq_len(n_set), each = K)
   out$visit <- 1L
   out[[resp]] <- 1 / K
   rownames(out) <- NULL
   # Which completed row each original row asked about. The component
   # is read off the axis for the reason `closure_unit_axis_levels()`
-  # gives: the categories are the model's, and `out$series` above is
+  # gives: the categories are the model's, and the series column above is
   # built from those, so the index back into it has to be resolved
   # the same way.
   asked <- as.integer(axis_row_series(object, newdata))
@@ -2000,7 +2011,8 @@ complete_simplex_grid <- function(object, newdata,
       "A prediction grid names a category the model does not have.",
       x = paste0(
         "Unknown: ",
-        paste(unique(setdiff(as.character(newdata$series), levs)),
+        paste(unique(setdiff(as.character(newdata[[vars$series_var]]),
+                             levs)),
               collapse = ", "), "."
       ),
       i = paste0("The model's categories are: ",
@@ -2083,13 +2095,14 @@ complete_closure_unit_newdata <- function(object, newdata,
   # grid needs it built. Real long-format newdata keeps the labels it
   # arrived with, which forecasting and multi-season fits depend on.
   if (!is_grid) return(newdata)
-  if (!"series" %in% names(newdata)) {
+  vars <- axis_vars(object)
+  if (!vars$series_var %in% names(newdata)) {
     # The levels come from the axis rather than from the training
     # column, which carries none of its own when the user supplied a
     # character series and orders them differently when a grouping
     # superseded it.
-    newdata$series <- factor(
-      as.character(template$series),
+    newdata[[vars$series_var]] <- factor(
+      as.character(template[[vars$series_var]]),
       levels = closure_unit_axis_levels(object)
     )
   }
@@ -2098,7 +2111,7 @@ complete_closure_unit_newdata <- function(object, newdata,
   # `datagrid()` pins `time` at a single typical value drawn from
   # training, which would otherwise collapse the whole grid into
   # one unit and flatten the predicted curve.
-  newdata$time  <- seq_len(nrow(newdata))
+  newdata[[vars$time_var]] <- seq_len(nrow(newdata))
   newdata$visit <- 1L
   # A grid's response is whatever value `datagrid()` held it at, and
   # a synthetic unit has no observation behind it, so the safe
@@ -5400,13 +5413,16 @@ make_nmix_poisson_poisson_stanvars <- function(arrays) {
 #' @param prior A `brmsprior`, or `NULL`. The family builders emit
 #'   their own sampling statements. This argument carries a user
 #'   prior through to them.
+#' @param series_var,time_var The series and time columns the trend
+#'   names, which key a closure unit.
 #' @return The family with `mvgam_stanvars` attribute populated
 #'   and `vars` set.
 #' @noRd
 prepare_closure_unit_family <- function(family, data, response_var,
                                          has_obs_covariates = FALSE,
                                          has_det_covariates = FALSE,
-                                         prior = NULL) {
+                                         prior = NULL,
+                                         series_var, time_var) {
   family_name <- family$name
   binary_y_check <- is_binary_response_family(family)
   default_cap <- closure_unit_default_cap(family)
@@ -5417,7 +5433,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
   # unit is a site keyed by `time` alone, its rows being the K
   # response components, while a detection unit is keyed by
   # `(series, time)` with replicate visits inside.
-  unit_grouping_vars <- closure_unit_key_vars(family)
+  unit_grouping_vars <- closure_unit_key_vars(family, series_var, time_var)
   if (!multi_response) {
     # cap is required only when neither a scalar default nor a
     # data-driven buffer is configured. Count families (PB / PPM)
@@ -5435,11 +5451,15 @@ prepare_closure_unit_family <- function(family, data, response_var,
       cap_required       = is.null(default_cap) &&
                             is.null(default_cap_buffer),
       default_cap        = default_cap,
-      unit_grouping_vars = unit_grouping_vars
+      unit_grouping_vars = unit_grouping_vars,
+      series_var         = series_var,
+      time_var           = time_var
     )
   }
   arrays <- build_closure_unit_arrays(
     data, response_var = response_var,
+    series_var         = series_var,
+    time_var           = time_var,
     default_cap        = default_cap,
     default_cap_buffer = default_cap_buffer,
     compute_y_max      = !multi_response,
@@ -6221,13 +6241,16 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
   # owns that question rather than one of its two spellings.
   newdata <- newdata %||% mvgam_training_data(object)
   fam <- object$family
+  vars <- axis_vars(object)
   build_closure_unit_arrays(
     newdata,
     response_var = response_column(object),
+    series_var = vars$series_var,
+    time_var = vars$time_var,
     default_cap = closure_unit_default_cap(fam),
     default_cap_buffer = closure_unit_default_cap_buffer(fam),
     compute_y_max = !is_multi_response_family(fam),
-    unit_grouping_vars = closure_unit_key_vars(fam),
+    unit_grouping_vars = fit_closure_unit_keys(object),
     # The series the model was fitted on. A frame missing one then
     # keeps every component on its own residual scale.
     series_levels = names(fitted_series_index(object)),
@@ -6298,9 +6321,12 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   # data layout (long format, K rows per site) but neither
   # require a cap column nor run the binary-y check.
   aggregates <- is_closure_unit_family(object$family)
+  vars <- axis_vars(object)
   validate_closure_unit_data(
     newdata,
     response_var       = response_var,
+    series_var         = vars$series_var,
+    time_var           = vars$time_var,
     identifiability    = FALSE,
     binary_y_check     = binary_y_check && aggregates,
     # A family declaring a data-driven buffer needs no `cap` column

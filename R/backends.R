@@ -655,7 +655,9 @@ fit_model <- function(model, backend, ...) {
 #' @noRd
 compiled_model <- function(x) {
   stopifnot(is.mvgam(x))
-  backend <- x$backend %||% "rstan"
+  backend <- x$backend
+  checkmate::assert_choice(backend, backend_choices(),
+                           .var.name = "x$backend")
   if (backend == "rstan") {
     out <- rstan::get_stanmodel(x$fit)
   } else if (backend == "cmdstanr") {

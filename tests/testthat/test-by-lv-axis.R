@@ -141,6 +141,20 @@ test_that("by = lv_axis() with n_lv > n_series still errors", {
   )
 })
 
+test_that("the n_lv ceiling counts series the responses define", {
+  # A frame whose responses are its series has no series column. The
+  # ceiling once counted that column, found none and passed three
+  # factors on two series.
+  set.seed(1)
+  wide <- data.frame(time = 1:30, y1 = rpois(30, 3), y2 = rpois(30, 3))
+  expect_error(
+    mvgam(bf(mvbind(y1, y2) ~ 1) + set_rescor(FALSE),
+          trend_formula = ~ AR(n_lv = 3), data = wide, family = poisson(),
+          run_model = FALSE, silent = 2),
+    "Got n_lv = 3, n_series = 2"
+  )
+})
+
 # 3. Display-relabel: had_by_lv marker + by_lv_rewrite_tokens helper -----
 
 test_that("by_lv_rewrite_tokens returns both AST rewrite targets", {

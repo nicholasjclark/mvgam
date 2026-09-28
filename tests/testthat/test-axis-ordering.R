@@ -1305,7 +1305,7 @@ axis_matrix <- function() {
     # grains have to be told apart.
     list("by lv / CAR", "long",
          ~ s(env, by = lv_axis()) + CAR(), "refuse", "uni",
-         "trend covariates"),
+         "on a single series only"),
     list("by lv / CAR factor", "long",
          ~ s(env, by = lv_axis()) + CAR(n_lv = 2), "refuse", "uni",
          "Factor models are not supported for CAR trends"),
@@ -1896,6 +1896,75 @@ test_that("irregular time distances agree with the time index", {
 })
 
 
+test_that("CAR gaps and the PW cap are placed by the axis seams", {
+  # Both were built from a second sort of the frame, free to differ
+  # from the index the seams define. The seam is replaced with the
+  # first-appearance order, and the gaps and caps have to follow it.
+  local_mocked_bindings(time_axis_values = function(times) unique(times))
+  times <- c(1, 2, 5, 6, 11, 12, 20)
+  set.seed(4L)
+  d <- expand.grid(time = times, series = c("a", "b"),
+                   stringsAsFactors = FALSE)
+  d <- d[sample.int(nrow(d)), ]
+  d$series <- factor(d$series)
+  d$y <- rpois(nrow(d), 5)
+  sd <- standata(
+    mvgam_formula(y ~ 1, trend_formula = ~ CAR()),
+    data = d, family = poisson(), silent = 2L
+  )
+  # The time at each index position, taken from the rows.
+  index_time <- numeric(as.integer(sd$N_time_trend))
+  index_time[sd$obs_trend_time] <- d$time
+  expect_equal(
+    as.numeric(sd$time_dis[-1L, 1L]),
+    pmax(1e-3, diff(index_time)),
+    tolerance = 1e-8
+  )
+
+  # PW takes a regular grid.
+  d_pw <- expand.grid(time = 1:8, series = c("a", "b"),
+                      stringsAsFactors = FALSE)
+  d_pw <- d_pw[sample.int(nrow(d_pw)), ]
+  d_pw$series <- factor(d_pw$series)
+  d_pw$y <- rpois(nrow(d_pw), 5)
+  d_pw$cap <- 100 * d_pw$time
+  sd_pw <- standata(
+    mvgam_formula(
+      y ~ 1,
+      trend_formula = ~ PW(growth = "logistic", n_changepoints = 2)
+    ),
+    data = d_pw, family = poisson(), silent = 2L
+  )
+  index_time <- numeric(as.integer(sd_pw$N_time_trend))
+  index_time[sd_pw$obs_trend_time] <- d_pw$time
+  # A log link puts the cap on the log scale.
+  expect_equal(as.numeric(sd_pw$cap_trend[, 1L]), log(100 * index_time),
+               tolerance = 1e-8)
+})
+
+
+test_that("a PW cap follows the series the axis holds", {
+  # The cap columns were taken from the column's factor levels, which
+  # count a level with no rows. The frame below was refused for a cap
+  # on a series it does not have.
+  set.seed(6L)
+  d <- expand.grid(time = 1:12, series = c("a", "c"),
+                   stringsAsFactors = FALSE)
+  d$series <- factor(d$series, levels = c("a", "b", "c"))
+  d$y <- rpois(nrow(d), 5)
+  d$cap <- ifelse(d$series == "a", 40, 80)
+  sd <- standata(
+    mvgam_formula(
+      y ~ 1,
+      trend_formula = ~ PW(growth = "logistic", n_changepoints = 2)
+    ),
+    data = d, family = poisson(), silent = 2L
+  )
+  expect_identical(dim(sd$cap_trend), c(12L, 2L))
+  expect_equal(as.numeric(sd$cap_trend[1L, ]), log(c(40, 80)))
+})
+
+
 
 
 
@@ -1943,6 +2012,25 @@ check_times_trend_rows <- function() {
 
 test_that("times_trend names the design row it claims to", {
   check_times_trend_rows()
+})
+
+
+test_that("the axis record takes its series source from the frame", {
+  # `ensure_mvgam_variables()` records how the series were named. A
+  # frame holding the series without that record is refused.
+  frame <- data.frame(
+    time = rep(1:4, 2L), series = factor(rep(c("a", "b"), each = 4L)),
+    y = 1:8
+  )
+  prepared <- ensure_mvgam_variables(frame, NULL, "time", "series",
+                                     c(y = "y"))
+  dims <- extract_time_series_dimensions(prepared, "time", "series")
+  expect_identical(dims$axes$series$source, "explicit")
+  attr(prepared, "mvgam_series_source") <- NULL
+  expect_error(
+    extract_time_series_dimensions(prepared, "time", "series"),
+    "mvgam_series_source"
+  )
 })
 
 

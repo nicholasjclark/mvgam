@@ -361,3 +361,15 @@ test_that("print.mvgam_sim delegates to summary print", {
   out <- capture.output(invisible(print(sim)))
   expect_true(any(grepl("Simulated mvgam dataset", out)))
 })
+
+test_that("sim_mvgam() takes a trend constructor and names its trend", {
+  # A trend given by name is refused at the entry point, before any
+  # series is drawn. The name "None" simulates no trend.
+  expect_error(sim_mvgam(trend_model = "AR"), "trend_model")
+  sim <- sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 25L,
+                   trend_model = AR(p = 2), seed = 4L)
+  expect_identical(summary(sim)$trend, "AR")
+  none <- sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 25L,
+                    trend_model = "None", seed = 4L)
+  expect_identical(summary(none)$trend, "None")
+})

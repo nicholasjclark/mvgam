@@ -39,7 +39,7 @@ switches on the trend name. A new trend needs, in order:
 \item a \verb{generate_<name>_trend_stanvars()} function, found by name
 from the registry, that emits the Stan blocks;
 \item a \verb{<name>_trend_properties()} function returning at least
-\code{supports_factors}, also found by name;
+\code{supports_factors} and \code{stationary_source}, also found by name;
 \item a \verb{forecast_<name>_rcpp()} function if the trend is to be
 forecast;
 \item a branch in \code{get_default_validation_rules()} if the trend

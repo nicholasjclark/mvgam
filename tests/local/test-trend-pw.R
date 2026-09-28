@@ -854,4 +854,27 @@ test_that("pp_check and the plotting methods draw something for PW", {
   drawn(mcmc_plot(fit))
 })
 
+
+test_that("a PW forecast continues a trend fitted on calendar years", {
+  # Stan fits the piecewise trend on the time index, 1 to N_time. The
+  # forecast evaluated it at the user's own time, which put a fit on
+  # years 2001 to 2030 at t = 2031: a log-scale trend near 1.3 at the
+  # end of the history was forecast at about 150.
+  set.seed(3L)
+  yrs <- data.frame(year = 2001:2030, series = factor("a"))
+  yrs$y <- rpois(30L, exp(1 + 0.03 * seq_len(30L)))
+  fit_yrs <- mvgam(
+    y ~ 1, trend_formula = ~ PW(time = year, n_changepoints = 4),
+    data = yrs, family = poisson(), chains = 2L, iter = 400L,
+    silent = 2, refresh = 0
+  )
+  last <- median(hindcast(fit_yrs, type = "trend")$hindcasts$a[, 30L])
+  step1 <- median(forecast(
+    fit_yrs, newdata = data.frame(year = 2031L, series = factor("a")),
+    type = "trend"
+  )$forecasts$a[, 1L])
+  # One year on, a trend of slope near 0.03 moves by far less than 1
+  expect_lt(abs(step1 - last), 0.5)
+})
+
 cat("\nDone.\n")

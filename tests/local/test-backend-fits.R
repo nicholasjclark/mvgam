@@ -55,6 +55,10 @@ test_that("every cmdstanr algorithm returns a posterior mvgam can use", {
   for (algorithm in c("pathfinder", "laplace", "meanfield", "fullrank")) {
     fit <- suppressMessages(fit_ar(algorithm = algorithm, silent = 2L,
                                    refresh = 0))
+    # The stanfit's `@sim` holds no algorithm, and the fit records
+    # the one `mvgam()` ran. `update()` inherits the slot, and a
+    # wrong record would refit an approximation with NUTS.
+    expect_identical(fit$algorithm, algorithm)
     vars <- posterior::variables(posterior::as_draws(fit$fit))
     expect_identical(anyDuplicated(vars), 0L)
     expect_false("path__" %in% vars)

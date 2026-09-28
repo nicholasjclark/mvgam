@@ -25,8 +25,8 @@
 #' @param trend_model An optional `mvgam_trend` constructor (e.g.
 #'   `AR(p = 1)`, `VAR(p = 2, cor = TRUE)`, `CAR()`, `ZMVN()`).
 #'   `NULL` (the default) selects the type's preferred trend (see
-#'   *Details*). Sparse-lag specs like `AR(p = c(1, 3, 12))` are
-#'   supported natively.
+#'   *Details*), and `"None"` simulates no trend. Sparse-lag specs
+#'   like `AR(p = c(1, 3, 12))` are supported natively.
 #' @param prop_trend Numeric in `[0, 1]` controlling the fraction
 #'   of total link-scale variance contributed by the latent
 #'   trend. `NULL` uses a type-specific default
@@ -140,6 +140,12 @@ sim_mvgam <- function(type = 1L,
   )
   checkmate::assert_number(prop_missing, lower = 0, upper = 0.5)
   checkmate::assert_list(family_pars)
+  checkmate::assert(
+    checkmate::check_null(trend_model),
+    checkmate::check_class(trend_model, "mvgam_trend"),
+    checkmate::check_choice(trend_model, "None"),
+    .var.name = "trend_model"
+  )
   family <- validate_family(family)
   fam_name <- resolve_family_name(family)
 
@@ -376,13 +382,11 @@ sim_mvgam <- function(type = 1L,
 summary.mvgam_sim <- function(object, ...) {
   checkmate::assert_class(object, "mvgam_sim")
   rlang::check_dots_empty()
-  trend_label <- if (is.null(object$trend_model)) {
-    "None"
+  # `trend_model = "None"` simulates no trend and is stored as given.
+  trend_label <- if (inherits(object$trend_model, "mvgam_trend")) {
+    object$trend_model$trend
   } else {
-    object$trend_model$trend %||%
-      object$trend_model$label %||%
-      object$trend_model$type %||%
-      "Unknown"
+    "None"
   }
   smooths <- object$true_smooths %||% list()
   structure(

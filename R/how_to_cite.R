@@ -788,7 +788,9 @@ how_to_cite.mvgam <- function(object, ...) {
     " mgcv (Wood 2017) packages."
   )
 
-  trend_model <- object$trend_components$types[1L] %||% ""
+  # A prefit records its trend type in its metadata alone.
+  # `get_trend_type()` checks the fitted slot and the metadata.
+  trend_model <- get_trend_type(object)
 
   # Every response's family is cited. A multivariate model can take a
   # tweedie response beside a poisson one, and the family given beside
@@ -1055,7 +1057,9 @@ how_to_cite.mvgam <- function(object, ...) {
 
   # Stan backend + algorithm.
   refs <- c(refs, "stan")
-  backend <- object$backend %||% "rstan"
+  backend <- object$backend
+  checkmate::assert_choice(backend, backend_choices(),
+                           .var.name = "object$backend")
   stan_text <- " The mvgam-constructed model and data were passed to Stan"
   if (backend == "cmdstanr") {
     stan_text <- paste0(
@@ -1073,7 +1077,9 @@ how_to_cite.mvgam <- function(object, ...) {
     refs <- c(refs, "rstan")
   }
 
-  algorithm <- object$algorithm %||% "sampling"
+  algorithm <- object$algorithm
+  checkmate::assert_choice(algorithm, c(algorithm_choices(), "none"),
+                           .var.name = "object$algorithm")
   info <- extract_sampling_info(object)
   if (algorithm == "sampling") {
     if (!is.null(info)) {

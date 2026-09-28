@@ -188,14 +188,19 @@ plot.mvgam_fevd = function(x, series = NULL, contributing = NULL, ...) {
     ) %>%
     dplyr::ungroup() -> mean_evds
 
+  # The processes keep the order the object gives them, which is the
+  # fit's series axis. Sorting the labels ordered the legend, the
+  # colours and the panels alphabetically instead.
+  mean_evds$Series <- factor(mean_evds$Series, levels = source_names)
+  mean_evds$target <- factor(mean_evds$target, levels = target_names)
+
   # FEVD bars encode a categorical partition (which series
   # contributed how much of the forecast variance), so use the
   # colour-blind-safe Okabe-Ito qualitative palette rather than
   # the single-hue bayesplot scheme used for the ribbon plots.
   # `mvgam_categorical_palette()` recycles when N > 8.
-  series_levels <- sort(unique(mean_evds$Series))
-  fill_values <- mvgam_categorical_palette(length(series_levels))
-  names(fill_values) <- series_levels
+  fill_values <- mvgam_categorical_palette(length(source_names))
+  names(fill_values) <- source_names
 
   ggplot2::ggplot(
     mean_evds,

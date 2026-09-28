@@ -36,6 +36,22 @@ test_that("resolve_kfold_group() errors on missing columns", {
   )
 })
 
+test_that("a fold is held out of every response or refused", {
+  # With one response column absent, only the others were masked and
+  # the fold was scored with that response still in the likelihood.
+  set.seed(3L)
+  d <- data.frame(y1 = rnorm(12), y2 = rnorm(12), x = rnorm(12))
+  prefit <- mvgam(
+    brms::bf(brms::mvbind(y1, y2) ~ x) + brms::set_rescor(FALSE),
+    data = d, family = gaussian(), run_model = FALSE, silent = 2
+  )
+  masked <- mvgam:::mask_heldout_response(prefit, d, 1:3)
+  expect_true(all(is.na(masked$y1[1:3])))
+  expect_true(all(is.na(masked$y2[1:3])))
+  d$y2 <- NULL
+  expect_error(mvgam:::mask_heldout_response(prefit, d, 1:3), "'y2'")
+})
+
 test_that("build_kfold_partition() respects group integrity", {
   set.seed(7L)
   group_key <- rep(c("a", "b", "c", "d"), each = 3L)

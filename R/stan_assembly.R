@@ -795,6 +795,8 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       unique_times = dimensions$unique_times,
       unique_series = dimensions$unique_series,
       series_groups = dimensions$series_groups,
+      row_time = dimensions$row_time,
+      row_series = dimensions$row_series,
       # Reason: PW logistic needs `data` and every response's family
       # to build cap_trend (cap column read from data,
       # link-transformed).
@@ -2426,6 +2428,33 @@ generate_innovation_model <- function(effective_dim, cor = FALSE,
   combine_stanvars(innovation_stanvar, df_stanvars)
 }
 
+# Internal: the number of series the trend runs on. `data_info` takes
+# it from the resolved dimensions, and every Stan generator sizes its
+# arrays with it.
+#'@noRd
+data_info_n_series <- function(data_info) {
+  n_series <- data_info$n_series
+  checkmate::assert_int(n_series, lower = 1, .var.name = "data_info$n_series")
+  as.integer(n_series)
+}
+
+
+# Internal: the group of each entry on the series axis, in axis order.
+# `extract_time_series_dimensions()` resolves it for every trend that
+# names 'gr', and Stan subscripts `group_inds_trend` with it.
+#'@noRd
+hierarchical_series_groups <- function(data_info) {
+  series_groups <- data_info$series_groups
+  if (is.null(series_groups)) {
+    stop(insight::format_error(c(
+      "A hierarchical trend reached Stan assembly with no series groups.",
+      i = "Please report this internal mvgam bug."
+    )), call. = FALSE)
+  }
+  series_groups
+}
+
+
 #' Extract Hierarchical Information from Data Specifications
 #'
 #' Processes data specifications to extract hierarchical grouping structure.
@@ -2463,44 +2492,19 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
     ))
   }
 
-  # The number of series in each group. A factor model sets this
-  # explicitly; otherwise it comes from the series-to-group mapping.
-  # The Stan template declares one block size for every group, so
-  # the counts have to agree, which `validate_gr_balanced_groups()`
-  # establishes before anything reaches here. `max()` therefore
-  # reads the shared count rather than papering over a difference:
-  # a group holding fewer series than the block it is given draws a
-  # slice of a correlation matrix it never asked for, and nothing
-  # downstream notices.
-  if (!is.null(data_info$n_subgroups)) {
-    n_subgroups <- data_info$n_subgroups
-  } else {
-    # A hierarchical trend names its series by its grouping, so the
-    # resolved axis answers this whether or not the frame also
-    # carries a series column. Only a frame that resolved no axis at
-    # all falls back to reading one.
-    series_groups <- data_info$series_groups
-    if (is.null(series_groups)) {
-      series_var <- data_info$series_var
-      if (is.null(data_info$data[[series_var]])) {
-        stop(insight::format_error(c(
-          paste0("Series variable '", series_var, "' not found in data."),
-          i = "Cannot derive n_subgroups for hierarchical trend."
-        )))
-      }
-      series_groups <- series_group_values(
-        data_info$data, series_var, gr_var
-      )
-    }
-    n_subgroups <- max(as.integer(table(series_groups)))
-  }
+  # The number of series in each group, from the group of each entry
+  # on the resolved series axis. The Stan template declares one block
+  # size for every group, and `validate_gr_balanced_groups()` has
+  # established that the counts agree, so `max()` takes the shared
+  # count.
+  series_groups <- hierarchical_series_groups(data_info)
+  n_subgroups <- max(as.integer(table(series_groups)))
 
   list(
     has_groups = TRUE,
     n_groups = n_groups,
     n_subgroups = n_subgroups,
-    gr_var = gr_var,
-    subgr_var = trend_specs$subgr %||% 'NA'
+    gr_var = gr_var
   )
 }
 
@@ -3824,13 +3828,7 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
   # Ordered by the trend's own series axis, which is what Stan
   # subscripts this array with. The order is resolved where the axis
   # is, so this reads it rather than deriving a second answer.
-  series_groups <- data_info$series_groups
-  if (is.null(series_groups)) {
-    stop(insight::format_error(c(
-      "A hierarchical trend reached Stan assembly with no series groups.",
-      i = "Please report this internal mvgam bug."
-    )), call. = FALSE)
-  }
+  series_groups <- hierarchical_series_groups(data_info)
   group_inds_array <- match(series_groups, group_levels)
   
   # Generate group_inds_trend array (maps each series to its group)
@@ -4095,8 +4093,8 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
   shared_stanvars <- NULL
   if (uses_shared_innovations) {
     # Extract relevant parameters for shared system
-    n_lv <- trend_specs$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
-    n_series <- data_info$n_series %||% 1
+    n_lv <- trend_specs$n_lv %||% data_info_n_series(data_info)
+    n_series <- data_info_n_series(data_info)
     cor <- trend_specs$cor %||% FALSE
     unit_factors <- samples_factor_loadings(trend_specs)
 
@@ -4165,7 +4163,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
 
   # Read the dimensions once, then validate them
   n_obs <- data_info$n_obs
-  n_series <- data_info$n_series %||% 1
+  n_series <- data_info_n_series(data_info)
   n_lv <- trend_specs$n_lv %||% n_series
   is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
 
@@ -4264,7 +4262,7 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Extract dimensions and configuration
   n_lv <- trend_specs$n_lv %||% 1
-  n_series <- data_info$n_series %||% 1
+  n_series <- data_info_n_series(data_info)
   n_obs <- data_info$n_obs
 
   # Validate dimensions
@@ -5176,7 +5174,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Extract dimensions and configuration
   n_lv <- trend_specs$n_lv %||% 1
   p <- trend_specs$p %||% 1
-  n_series <- data_info$n_series %||% 1
+  n_series <- data_info_n_series(data_info)
   n_obs <- data_info$n_obs
 
   # Validate dimensions
@@ -5243,7 +5241,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # parameters. A contiguous lag set declares `ar{lag}_pacf_trend`
   # in `parameters` under every sharing mode and derives
   # `ar{lag}_trend` from it through the Levinson-Durbin recursion.
-  coef_sharing <- trend_specs$coef_sharing %||% "none"
+  coef_sharing <- ar_coef_sharing(trend_specs)
   if (pacf_lags) {
     components <- append(
       components,
@@ -5482,10 +5480,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Validate required data_info components
   checkmate::assert_int(data_info$n_obs, lower = 1)
-  checkmate::assert_int(data_info$n_series %||% 1, lower = 1)
 
   # Extract key parameters with validation
-  n_series <- data_info$n_series %||% 1
+  n_series <- data_info_n_series(data_info)
   n_lv <- trend_specs$n_lv %||% n_series
   lags <- trend_specs$p %||% 1
   ma_lags <- trend_specs$ma_lags %||% 0
@@ -6164,10 +6161,11 @@ calculate_car_time_distances <- function(data_info) {
   # it numbered the series by factor level where the observation
   # mapping numbers them by position on the axis; and it filled the
   # matrix by counting rows, so row `k` held the `k`th observed gap
-  # rather than the gap at time `k`. The grid answers all three.
-  times <- sort(unique(data[[time_var]]))
-  n_series <- data_info$n_series %||%
-    length(data_info$unique_series %||% 1L)
+  # where the gap at time `k` belonged. The grid removes all three.
+  # The seam that builds the time index supplies it, which keeps the
+  # gaps in the order of the index they attach to.
+  times <- time_axis_values(data[[time_var]])
+  n_series <- data_info_n_series(data_info)
 
   # Step `t` carries the distance from `t - 1`. The first has no
   # predecessor, and Stan raises it to a power, so it takes 1 rather
@@ -6227,8 +6225,8 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
 
   # Extract dimensions and configuration
-  n_lv <- trend_specs$n_lv %||% data_info$n_series %||% 1
-  n_series <- data_info$n_series %||% 1
+  n_lv <- trend_specs$n_lv %||% data_info_n_series(data_info)
+  n_series <- data_info_n_series(data_info)
   n_obs <- data_info$n_obs
 
   # Validate dimensions
@@ -6417,9 +6415,9 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
 
   # Extract key parameters following original ZMVN pattern
-  n_lv <- trend_specs$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
+  n_lv <- trend_specs$n_lv %||% data_info_n_series(data_info)
   n_obs <- data_info$n_obs
-  n_series <- data_info$n_series %||% 1
+  n_series <- data_info_n_series(data_info)
 
   # Validate dimensions
   checkmate::assert_int(n_obs, lower = 1)
@@ -6550,12 +6548,14 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 # missing, non-finite, non-positive on the response scale, or
 # non-finite after the link transform.
 #'@noRd
-build_pw_cap_matrix <- function(data, cap_var, time_var, series_var,
+build_pw_cap_matrix <- function(data, cap_var, row_time, row_series,
                                   n_time, n_series, family) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(cap_var, min.chars = 1L)
-  checkmate::assert_string(time_var)
-  checkmate::assert_string(series_var)
+  checkmate::assert_integer(row_time, len = nrow(data), lower = 1L,
+                            any.missing = FALSE)
+  checkmate::assert_integer(row_series, len = nrow(data), lower = 1L,
+                            any.missing = FALSE, null.ok = TRUE)
   checkmate::assert_int(n_time, lower = 1L)
   checkmate::assert_int(n_series, lower = 1L)
 
@@ -6587,45 +6587,23 @@ build_pw_cap_matrix <- function(data, cap_var, time_var, series_var,
     )))
   }
 
-  times <- as.numeric(data[[time_var]])
-  series_fac <- as.factor(data[[series_var]])
-  series_levels <- levels(series_fac)
-  if (length(series_levels) < n_series) {
-    stop(insight::format_error(c(
-      paste0(
-        "PW: '", series_var, "' has fewer levels than n_series."
-      ),
-      x = paste0(
-        "Got ", length(series_levels), " levels, expected at least ",
-        n_series, "."
-      )
-    )))
-  }
-  time_levels <- sort(unique(times))
-  if (length(time_levels) < n_time) {
-    stop(insight::format_error(c(
-      paste0(
-        "PW: '", time_var, "' has fewer unique values than n_time."
-      ),
-      x = paste0(
-        "Got ", length(time_levels), " unique times, expected ",
-        n_time, "."
-      )
-    )))
-  }
-  time_idx <- match(times, time_levels)
-
+  # Each row's cell comes from the axes the dimensions resolved, so
+  # column `s` is series `s` of the trend. Numbering by the series
+  # column's factor levels counted a level with no rows and shifted
+  # every later series into the wrong column.
   out <- matrix(NA_real_, nrow = n_time, ncol = n_series)
-  for (s in seq_len(n_series)) {
-    rows <- which(series_fac == series_levels[s])
-    if (length(rows) == 0L) next
-    out[time_idx[rows], s] <- as.numeric(cap_vals[rows])
+  if (is.null(row_series)) {
+    # A response-keyed frame gives each row every response, which
+    # applies its cap to every series at that time
+    out[row_time, ] <- as.numeric(cap_vals)
+  } else {
+    out[cbind(row_time, row_series)] <- as.numeric(cap_vals)
   }
   if (any(is.na(out))) {
     stop(insight::format_error(c(
       paste0(
         "PW logistic: '", cap_var, "' missing for some (time, ",
-        series_var, ") cells in training data."
+        "series) cells in training data."
       ),
       i = "Each training (time, series) cell needs a cap value."
     )))
@@ -6653,7 +6631,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
   # it, and `PW()` validates the value with `match.arg()`.
   trend_type <- pw_growth(trend_specs)
   n_obs <- data_info$n_obs
-  n_series <- data_info$n_series %||% 1
+  n_series <- data_info_n_series(data_info)
 
   # Validate dimensions and trend type
   checkmate::assert_int(n_obs, lower = 1)
@@ -6816,9 +6794,9 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info,
   if (trend_type == "logistic") {
     cap_matrix <- build_pw_cap_matrix(
       data = data_info$data,
-      cap_var = trend_specs$cap %||% "cap",
-      time_var = data_info$time_var,
-      series_var = data_info$series_var,
+      cap_var = pw_cap_var(trend_specs),
+      row_time = data_info$row_time,
+      row_series = data_info$row_series,
       n_time = n_time_trend,
       n_series = n_series,
       family = pw_cap_link_family(data_info$families)
@@ -9163,12 +9141,22 @@ count_observed_times <- function(data, time_var, response_vars) {
   if (!is.data.frame(data) || is.null(data[[time_var]])) {
     return(NULL)
   }
-  present <- intersect(response_vars, names(data))
-  if (!length(present)) {
+  # Every response counts toward the history the changepoints are
+  # spread over, and a frame missing one is refused
+  absent <- setdiff(response_vars, names(data))
+  if (length(absent)) {
+    stop(insight::format_error(c(
+      "The observation frame lacks a response column.",
+      x = paste0(
+        "Missing: ", paste0("'", absent, "'", collapse = ", "), "."
+      )
+    )), call. = FALSE)
+  }
+  if (!length(response_vars)) {
     return(NULL)
   }
   observed <- rep(FALSE, nrow(data))
-  for (resp in present) {
+  for (resp in response_vars) {
     observed <- observed | !is.na(data[[resp]])
   }
   if (!any(observed)) {

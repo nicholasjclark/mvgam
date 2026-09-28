@@ -618,8 +618,10 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, full_draws,
   # consecutive block of `n_lv` columns in `mu_factor_long` belongs to
   # one newdata row, which `byrow = TRUE` keeps in the reshape below.
   trend_vars <- mvgam_fit$trend_metadata$covariates %||% character(0)
-  attach_cols <- intersect(unique(c(trend_vars, "time")),
-                            colnames(newdata))
+  attach_cols <- intersect(
+    unique(c(trend_vars, axis_vars(mvgam_fit)$time_var)),
+    colnames(newdata)
+  )
   lv_newdata <- tidyr::expand_grid(
     .row_id = seq_len(n_rows),
     .trend  = factor(seq_len(n_lv))

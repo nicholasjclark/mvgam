@@ -843,17 +843,17 @@ test_that("the step check names the grid, not an observation", {
   # the refusal must not call the grid's last position an
   # observation: it named a time the series was never seen at and
   # then offered a horizon starting past it.
-  training <- list(times = list(s1 = 1:40))
-  spec <- structure(
-    list(trend = "AR",
-         validation_rules = "requires_regular_intervals"),
-    class = "mvgam_trend"
+  set.seed(12L)
+  d <- data.frame(time = 1:40, series = factor("s1"),
+                  y = c(rnorm(30), rep(NA, 10)))
+  # The padding rows leave the likelihood, and brms says so.
+  expect_warning(
+    prefit <- mvgam(y ~ 1, trend_formula = ~ AR(p = 1), data = d,
+                    family = gaussian(), run_model = FALSE, silent = 2),
+    "Rows containing NAs were excluded"
   )
   err <- conditionMessage(expect_error(
-    mvgam:::assert_forecast_times_steppable(
-      fc_times = list(s1 = 31), training = training,
-      trend_spec = spec, step = 1
-    )
+    mvgam:::assert_forecast_times_steppable(list(s1 = 31), prefit)
   ))
   expect_type(err, "character")
   expect_match(err, "training grid runs to time 40", fixed = TRUE)
@@ -866,8 +866,46 @@ test_that("the step check names the grid, not an observation", {
 
   # The control: a frame that does continue the grid is accepted, so
   # this is not a check that refuses everything.
-  expect_true(mvgam:::assert_forecast_times_steppable(
-    fc_times = list(s1 = 41), training = training,
-    trend_spec = spec, step = 1
-  ))
+  expect_true(mvgam:::assert_forecast_times_steppable(list(s1 = 41),
+                                                      prefit))
+})
+
+
+test_that("a wide frame padded at the end is stepped from its grid", {
+  # The grid was gathered from each response's training rows. Where
+  # the responses are the series, those hold its observed rows alone,
+  # and the grid seemed to end at the last observation. Times inside
+  # the grid then passed as a continuation, and the trend stepped on
+  # from the grid's true end under them.
+  set.seed(13L)
+  d <- data.frame(time = 1:12,
+                  y1 = c(rnorm(10), NA, NA), y2 = c(rnorm(10), NA, NA))
+  expect_warning(
+    prefit <- mvgam(
+      brms::bf(brms::mvbind(y1, y2) ~ 1) + brms::set_rescor(FALSE),
+      trend_formula = ~ AR(p = 1), data = d, family = gaussian(),
+      run_model = FALSE, silent = 2
+    ),
+    "Rows containing NAs were excluded"
+  )
+  series_levels <- mvgam:::resolve_series_info(prefit)$series_levels
+  training <- mvgam:::build_training_arms(prefit, series_levels)
+  expect_identical(max(unlist(training$times)), 10L)
+  fc <- mvgam:::resolve_forecast_grid(
+    prefit, data.frame(time = 11:12), training, series_levels
+  )
+  expect_error(
+    mvgam:::assert_forecast_times_steppable(fc$times, prefit),
+    "training grid runs to time 12"
+  )
+  fc_past <- mvgam:::resolve_forecast_grid(
+    prefit, data.frame(time = 13:14), training, series_levels
+  )
+  expect_true(mvgam:::assert_forecast_times_steppable(fc_past$times,
+                                                      prefit))
+  # The tail that centres the stored state is the end of the same
+  # grid. Taken from the training rows it ended at the last
+  # observation.
+  tail_rows <- mvgam:::build_training_tail_data(prefit, training, 2L)
+  expect_equal(tail_rows$time, c(11, 12))
 })

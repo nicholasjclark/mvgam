@@ -67,14 +67,12 @@ each file owns the models it fits, and any one file runs on its own
 from a clean clone. `helper-*.R` holds the ground truth several files
 share, and testthat sources it before each file here.
 
-## Failing assertions are the point
+## An assertion states a promise
 
-Some assertions in these files fail, and they are meant to. Each one
-states what the documentation or the neighbouring method promises, and
-fails because the package does something else. `FINDINGS.md` records
-every one of them with the measurement behind it. An assertion is
-never weakened to make a file green: a red test with a finding beside
-it is the record that the defect is still open.
+Each assertion states what the documentation or the neighbouring
+method promises. A failing one marks a defect in the package, and the
+fix goes in the package. An assertion is never weakened to make a file
+green.
 
 ## What each file fits, and why the model has to be fitted
 

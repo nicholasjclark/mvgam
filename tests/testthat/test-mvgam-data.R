@@ -67,33 +67,50 @@ test_that("a positive mean under a zero-admitting link warns with a trend", {
   # `insight` wraps at the console width, so the pattern tolerates a
   # line break where the message happens to fold.
   expect_warning(
-    warn_positive_mean_link_with_trend(Gamma(), ~ AR(p = 1)),
+    warn_positive_mean_link_with_trend(y ~ 1, Gamma(), ~ AR(p = 1)),
     "positive linear\\s+predictor"
   )
   # `inverse.gaussian()` arrives with the `1/mu^2` link.
   expect_warning(
     warn_positive_mean_link_with_trend(
-      stats::inverse.gaussian(), ~ AR(p = 1)
+      y ~ 1, stats::inverse.gaussian(), ~ AR(p = 1)
     ),
     "inverse.gaussian"
   )
 
   # The log link keeps the mean positive for any predictor.
   expect_silent(
-    warn_positive_mean_link_with_trend(Gamma(link = "log"), ~ AR(p = 1))
+    warn_positive_mean_link_with_trend(y ~ 1, Gamma(link = "log"), ~ AR(p = 1))
   )
   # A trendless GLM keeps the inverse link without trouble, which is
   # why the trend is part of the condition.
-  expect_silent(warn_positive_mean_link_with_trend(Gamma(), NULL))
+  expect_silent(warn_positive_mean_link_with_trend(y ~ 1, Gamma(), NULL))
   # `lognormal()` carries `mu` as a log-scale location taking any
   # sign, and identity is its right link. A check built from
   # `mvgam_response_support` would group it with Gamma and warn on
   # every lognormal trend fit.
   expect_silent(
-    warn_positive_mean_link_with_trend(brms::lognormal(), ~ AR(p = 1))
+    warn_positive_mean_link_with_trend(y ~ 1, brms::lognormal(), ~ AR(p = 1))
   )
   expect_silent(
-    warn_positive_mean_link_with_trend(poisson(), ~ AR(p = 1))
+    warn_positive_mean_link_with_trend(y ~ 1, poisson(), ~ AR(p = 1))
+  )
+  # A family given by name is checked as the object it names. By name
+  # brms gives Gamma the log link, and the identity link is named.
+  expect_silent(
+    warn_positive_mean_link_with_trend(y ~ 1, "Gamma", ~ AR(p = 1))
+  )
+  expect_warning(
+    warn_positive_mean_link_with_trend(
+      y ~ 1, c("Gamma", "identity"), ~ AR(p = 1)
+    ),
+    "link = \"identity\""
+  )
+  # A response's own family is checked where `family` is harmless.
+  mixed <- bf(y1 ~ 1, family = Gamma()) + bf(y2 ~ 1) + set_rescor(FALSE)
+  expect_warning(
+    warn_positive_mean_link_with_trend(mixed, poisson(), ~ AR(p = 1)),
+    "Family 'gamma'"
   )
 })
 

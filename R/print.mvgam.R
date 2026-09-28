@@ -117,11 +117,7 @@ printed_trend_label <- function(x) {
   if (nzchar(label %||% "")) {
     return(label)
   }
-  types <- x$trend_components$types
-  if (!is.null(types)) {
-    return(types[[1L]])
-  }
-  "None"
+  get_trend_type(x)
 }
 
 

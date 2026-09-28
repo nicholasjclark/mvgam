@@ -221,3 +221,34 @@ test_that("resolve_auto_traits() errors on unknown string", {
     "string value must be 'auto'"
   )
 })
+
+test_that("the sites are labelled by the fit's own time axis", {
+  # Labels came from a column named `time` on the frame. A fit whose
+  # time column is named otherwise had its sites numbered 1 to n.
+  set.seed(9L)
+  years <- c(2004L, 2001L, 2003L, 2002L, 2005L, 2000L)
+  d <- expand.grid(year = years, sp = factor(c("a", "b", "c")))
+  d$y <- rnorm(nrow(d))
+  prefit <- mvgam(
+    y ~ 1,
+    trend_formula = ~ AR(p = 1, n_lv = 2, time = year, series = sp),
+    data = d, family = gaussian(), run_model = FALSE, silent = 2
+  )
+  # The draws are the one thing a prefit lacks. The rotation is
+  # replaced with scores of the right size, and the plot builder
+  # hands back the labels it was given.
+  local_mocked_bindings(
+    ordinate_factor_components = function(object, alpha, rotation) {
+      list(scores = matrix(0, length(years), 2L),
+           loadings = matrix(0, 3L, 2L), n_lv = 2L)
+    },
+    ordinate_build_plot = function(svd_comp, which_lvs, biplot,
+                                   label_sites, site_names, ...) {
+      site_names
+    }
+  )
+  expect_identical(
+    as.numeric(mvgam:::ordinate.mvgam(prefit)), as.numeric(sort(years))
+  )
+})
+

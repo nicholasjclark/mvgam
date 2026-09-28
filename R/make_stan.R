@@ -132,8 +132,20 @@ build_stan_components <- function(formula, data, family = gaussian(),
     context       = "data"
   )
 
-  # Closure-unit families (nmix, future occ / royle_nichols /
-  # poisson_poisson) carry per-data Stan stanvars that are built
+  # Parse multivariate trends and validate. The trend names the time
+  # and series columns, which key a closure unit below.
+  if (is.null(mv_spec <- parse_multivariate_trends(obs_formula, trend_formula))) {
+    stop(insight::format_error(c(
+      "Failed to parse trend formula specification.",
+      i = cli::format_inline(
+        "Check your {.arg trend_formula} syntax and constructor arguments."
+      )
+    )))
+  }
+  axis_names <- spec_axis_vars(mv_spec$trend_specs)
+
+  # Closure-unit families (`nmix()` and its variants, `occ()`, and the
+  # multi-response families) carry per-data Stan stanvars that are built
   # at fit time from the user's observation data: unit indexing
   # arrays, per-unit upper truncation (K_max), per-unit max obs
   # (Y_max), and the family-specific lpdf function block. The
@@ -160,7 +172,9 @@ build_stan_components <- function(formula, data, family = gaussian(),
       response_var       = response_var,
       has_obs_covariates = has_obs_covs,
       has_det_covariates = has_det_covs,
-      prior              = prior
+      prior              = prior,
+      series_var         = axis_names$series_var,
+      time_var           = axis_names$time_var
     )
   }
 
@@ -176,16 +190,6 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # c.stanvars merge.
   obs_stanvars <- attach_family_stanvars(stanvars, families)
   trend_stanvars_in <- stanvars
-
-  # Parse multivariate trends and validate
-  if (is.null(mv_spec <- parse_multivariate_trends(obs_formula, trend_formula))) {
-    stop(insight::format_error(c(
-      "Failed to parse trend formula specification.",
-      i = cli::format_inline(
-        "Check your {.arg trend_formula} syntax and constructor arguments."
-      )
-    )))
-  }
 
   # Apply the top-level `trend_map` alias to the parsed trend
   # specs. Collision detection: error if the user supplied
@@ -230,14 +234,6 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # `n_lv` and a `trend_map` normalised to a fixed `Z`.
   enforce_factor_support_against_specs(mv_spec$trend_specs)
 
-  # The `n_lv` ceiling, shared with `jsdgam()` so more factors than
-  # series is refused in one place. Reads `n_lv` from the possibly
-  # nested trend spec list.
-  enforce_n_lv_ceiling_against_data(
-    mv_spec$trend_specs, data, family = family
-  )
-
-  warn_zmvn_single_series(mv_spec, family, data)
 
   # Two cases need brms threading suppressed at the stancode level.
   # Both rewrite the local `threads` so brms's downstream
@@ -332,7 +328,6 @@ build_stan_components <- function(formula, data, family = gaussian(),
     
     # `trend_spec_head()` takes the first of a multivariate set and
     # the spec itself for a univariate one.
-    axis_names <- spec_axis_vars(mv_spec$trend_specs)
     time_var <- axis_names$time_var
     series_var <- axis_names$series_var
     
@@ -343,7 +338,8 @@ build_stan_components <- function(formula, data, family = gaussian(),
     
     # Consolidated trend processing - replaces dual path architecture
     components <- extract_and_validate_trend_components(
-      data, mv_spec, response_vars, time_var, series_var, trend_formula
+      data, mv_spec, response_vars, time_var, series_var, trend_formula,
+      family = family
     )
     trend_data <- components$trend_data
     mv_spec <- components$enhanced_mv_spec  # Already has dimensions injected
@@ -497,45 +493,32 @@ generate_stan_components_mvgam_formula <- function(...) {
 #'
 #' @param mv_spec The multivariate trend spec.
 #' @param family The observation family.
-#' @param data The modelling data.
+#' @param n_series Length of the resolved series axis.
 #' @return `TRUE` when the two scales are confounded.
 #' @noRd
-zmvn_scale_confounded <- function(mv_spec, family, data) {
+zmvn_scale_confounded <- function(mv_spec, family, n_series) {
+  checkmate::assert_int(n_series, lower = 1L)
   specs <- mv_spec$trend_specs
   if (is.null(specs)) return(FALSE)
   specs <- if (is_multivariate_trend_specs(specs)) specs else list(specs)
   has_zmvn <- any(vapply(
     specs, function(sp) identical(sp$trend, "ZMVN"), logical(1L)
   ))
-  if (!has_zmvn) return(FALSE)
-
-  # `specs` is a list of specifications by the line above, and an
-  # unnamed one of length one for a univariate trend.
-  # `trend_spec_head()` requires the multivariate predicate before
-  # taking a first element, which an unnamed list fails. The column
-  # comes from the first specification.
-  series_var <- spec_axis_vars(specs[[1L]])$series_var
-  if (!series_var %in% colnames(data)) return(FALSE)
-  if (length(unique(data[[series_var]])) > 1L) return(FALSE)
-
-  "sigma" %in% family$dpars
+  has_zmvn && n_series == 1L && "sigma" %in% family$dpars
 }
 
 
 #' Warn once when a single-series ZMVN cannot split its scales
 #' @noRd
-warn_zmvn_single_series <- function(mv_spec, family, data) {
-  if (!zmvn_scale_confounded(mv_spec, family, data)) return()
+warn_zmvn_single_series <- function(mv_spec, family, n_series) {
+  if (!zmvn_scale_confounded(mv_spec, family, n_series)) return()
   warn_once(
-    paste0(
-      "A 'ZMVN()' trend on one series shares its scale with the ",
-      "observation error. The latent state has no temporal ",
-      "structure. Only the sum of the two variances is identified: ",
-      "the priors alone set the split between 'sigma_trend' and ",
-      "'sigma'. To separate them, add series or choose a trend ",
-      "with temporal structure such as 'AR()' or 'RW()'. ",
-      "Alternatively, set a prior that says which scale you mean ",
-      "to pin."
+    c(
+      "A 'ZMVN()' trend on one series shares its scale with 'sigma'.",
+      x = "The data identify only the sum of the two variances.",
+      x = "The priors set the split between 'sigma_trend' and 'sigma'.",
+      i = "Add series, or use a trend with temporal structure such as 'AR()'.",
+      i = "Or set a prior that pins one of the two scales."
     ),
     "mvgam_zmvn_single_series"
   )

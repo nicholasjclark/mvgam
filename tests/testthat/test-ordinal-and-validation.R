@@ -439,17 +439,11 @@ test_that("a single-series ZMVN is flagged only when it is confounded", {
   # residual scale never had the problem: a Poisson has no `sigma`
   # for the trend to trade against, and a negative binomial's `shape`
   # is a dispersion rather than an additive scale.
-  mk <- function(n) {
-    data.frame(
-      y = rnorm(30 * n), time = rep(seq_len(30), n),
-      series = factor(rep(paste0("s", seq_len(n)), each = 30))
-    )
-  }
   # The build hands the check a validated family, which carries its
-  # distributional parameters.
+  # distributional parameters, and the length of the series axis.
   flagged <- function(tf, n, fam) {
     zmvn_scale_confounded(
-      parse_multivariate_trends(y ~ 1, tf), validate_family(fam), mk(n)
+      parse_multivariate_trends(y ~ 1, tf), validate_family(fam), n
     )
   }
 

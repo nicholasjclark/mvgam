@@ -61,6 +61,10 @@ methods_md.mvgam <- function(object, file = NULL,
                              notation = "default",
                              implementation = TRUE, ...) {
   checkmate::assert_class(object, "mvgam")
+  # Every section renders the model's family and link from here. A
+  # fit and a prefit both store the family `mvgam()` validated.
+  checkmate::assert_class(object$family, "family",
+                          .var.name = "object$family")
   checkmate::assert_string(file, null.ok = TRUE)
   checkmate::assert_choice(notation, c("default", "brms"))
   checkmate::assert_flag(implementation)
@@ -153,9 +157,7 @@ align_block <- function(rows) {
 #' @noRd
 render_data_section <- function(ctx) {
   obj <- ctx$object
-  fam <- obj$family
-  fam_name <- resolve_family_name(fam) %||% "gaussian"
-  link <- fam$link %||% "identity"
+  fam_name <- resolve_family_name(obj$family)
   dims <- describe_data_dimensions(obj)
 
   # Multi-response: list response columns explicitly so the
@@ -205,9 +207,10 @@ describe_predictors <- function(obj) {
   # denominator, an offset and a grouping factor each name a column
   # no reader would take to be a covariate.
   used_vars <- mvgam_term_list(obj)$conditional
-  # Skip canonical panel keys plus the response column(s); they are
-  # already covered by the dimensions line above.
-  skip <- unique(c(resp_cols, "time", "series"))
+  # The panel keys and the response columns are covered by the
+  # dimensions line above.
+  vars <- axis_vars(obj)
+  skip <- unique(c(resp_cols, vars$time_var, vars$series_var))
   predictors <- intersect(setdiff(names(data), skip), used_vars)
   if (length(predictors) == 0L) return(character(0L))
   out <- character(0L)
@@ -248,23 +251,19 @@ formula_used_vars <- function(obj) {
 
 #' @noRd
 describe_data_dimensions <- function(obj) {
-  data <- obj$data %||% data.frame()
-  n_obs <- nrow(data)
-  n_series <- if (!is.null(data$series)) {
-    length(unique(data$series))
-  } else NA_integer_
-  n_time <- if (!is.null(data$time)) {
-    length(unique(data$time))
-  } else NA_integer_
+  n_obs <- nrow(obj$data %||% data.frame())
+  # `print()` shows the same counts, taken from the axes the model
+  # resolved. A response-keyed frame has no series column to count.
+  counts <- printed_axis_counts(obj)
   parts <- character(0L)
-  if (!is.na(n_obs) && n_obs > 0L) {
+  if (n_obs > 0L) {
     parts <- c(parts, paste0("$N = ", n_obs, "$ observations"))
   }
-  if (!is.na(n_series)) {
-    parts <- c(parts, paste0("$S = ", n_series, "$ series"))
+  if (!is.null(counts$n_series)) {
+    parts <- c(parts, paste0("$S = ", counts$n_series, "$ series"))
   }
-  if (!is.na(n_time)) {
-    parts <- c(parts, paste0("$T = ", n_time, "$ time points"))
+  if (!is.null(counts$n_timepoints)) {
+    parts <- c(parts, paste0("$T = ", counts$n_timepoints, "$ time points"))
   }
   parts <- c(parts, closure_unit_data_dimensions(obj))
   parts <- c(parts, factor_loadings_data_dimensions(obj))
@@ -283,11 +282,20 @@ closure_unit_data_dimensions <- function(obj) {
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
   # The columns that key a closure unit, default included. The
-  # guard above establishes that this family has one, so the
-  # accessor answers rather than returning NULL.
-  ug <- closure_unit_key_vars(obj$family)
-  ug <- intersect(ug %||% character(0L), names(data))
-  if (!length(ug)) return(character(0L))
+  # guard above establishes that this family has one, and the
+  # accessor returns its keys. Counting units over the keys the frame
+  # holds reports fewer units than the model has. A frame missing a
+  # key is refused.
+  ug <- fit_closure_unit_keys(obj)
+  absent <- setdiff(ug, names(data))
+  if (length(absent)) {
+    stop(insight::format_error(c(
+      "The stored data lacks a column that keys the closure units.",
+      x = paste0(
+        "Missing: ", paste0("'", absent, "'", collapse = ", "), "."
+      )
+    )), call. = FALSE)
+  }
   units_df <- unique(data[, ug, drop = FALSE])
   n_unit <- nrow(units_df)
   # Visits per unit -- count rows per unit-key combination.
@@ -393,9 +401,8 @@ family_data_label <- function(fam_name) {
 render_model_section <- function(ctx) {
   obj <- ctx$object
   notation <- ctx$notation
-  fam <- obj$family
-  fam_name <- resolve_family_name(fam) %||% "gaussian"
-  link <- fam$link %||% "identity"
+  fam_name <- resolve_family_name(obj$family)
+  link <- obj$family$link
 
   rows <- list()
   for (ir in index_range_rows(obj)) {
@@ -709,9 +716,7 @@ nlpar_predictor_rhs <- function(prior, np) {
 
 #' @noRd
 model_glossary <- function(obj) {
-  fam <- obj$family
-  fam_name <- resolve_family_name(fam) %||% "gaussian"
-  link <- fam$link %||% "identity"
+  link <- obj$family$link
   defs <- c(
     paste0("- $i$ indexes observations, $t$ indexes time")
   )
@@ -739,7 +744,7 @@ model_glossary <- function(obj) {
   )
   prior <- obj$prior
   smooth_specs <- obs_smooth_specs_from_prior(prior)
-  gp_specs <- get_gp_specs(obj)
+  gp_specs <- obs_gp_specs_from_formula(obj)
   mo_specs <- obs_mo_specs_from_prior(prior)
   me_specs <- obs_me_specs_from_formula(obj)
   re_specs <- obs_re_specs_from_prior(prior)
@@ -774,7 +779,7 @@ model_glossary <- function(obj) {
     } else {
       ", exact (full covariance kernel)"
     }
-    kern_text <- gp_kernel_human_label(spec$cov %||% "exp_quad")
+    kern_text <- gp_kernel_human_label(spec$cov)
     rho_sym <- if (length(vars) > 1L) {
       paste0("$\\boldsymbol{\\rho}_{", sub, "}$")
     } else {
@@ -1126,7 +1131,7 @@ closure_unit_family_kind <- function(obj) {
   # Returns one of: "occ", "nmix_pb", "nmix_rn", "nmix_ppm",
   # or NULL when the family is not a detection family.
   if (!is_closure_unit_family(obj$family)) return(NULL)
-  fam_name <- resolve_family_name(obj$family) %||% ""
+  fam_name <- resolve_family_name(obj$family)
   switch(
     fam_name,
     occ                    = "occ",
@@ -1259,7 +1264,7 @@ closure_unit_state_link <- function(kind) {
 #' @noRd
 mv_custom_family_kind <- function(obj) {
   if (!is_multi_response_family(obj$family)) return(NULL)
-  fam_name <- resolve_family_name(obj$family) %||% ""
+  fam_name <- resolve_family_name(obj$family)
   switch(
     fam_name,
     mvn   = "mvn",
@@ -1542,7 +1547,7 @@ classify_obs_parameters <- function(obj) {
   list(
     fixed  = obs_fixed_terms_from_prior(prior),
     smooth = obs_smooth_specs_from_prior(prior),
-    gp     = get_gp_specs(obj),
+    gp     = obs_gp_specs_from_formula(obj),
     mo     = obs_mo_specs_from_prior(prior),
     me     = obs_me_specs_from_formula(obj),
     re     = obs_re_specs_from_prior(prior)
@@ -1667,8 +1672,9 @@ parse_smooth_coef <- function(coef_str) {
 
 #' @noRd
 gp_kernel_human_label <- function(cov) {
+  checkmate::assert_string(cov)
   switch(
-    cov %||% "exp_quad",
+    cov,
     "exp_quad"    = "exponentiated-quadratic",
     "matern52"    = "Matern (5/2)",
     "matern32"    = "Matern (3/2)",
@@ -1679,8 +1685,9 @@ gp_kernel_human_label <- function(cov) {
 
 #' @noRd
 gp_kernel_label <- function(cov) {
+  checkmate::assert_string(cov)
   switch(
-    cov %||% "exp_quad",
+    cov,
     "exp_quad"      = "k_{\\text{ExpQuad}}",
     "matern52"      = "k_{\\text{Matern}_{5/2}}",
     "matern32"      = "k_{\\text{Matern}_{3/2}}",
@@ -1703,8 +1710,9 @@ basis_label <- function(bs, fname) {
   if (identical(fname, "t2")) {
     return("tensor product smooth (t2)")
   }
+  checkmate::assert_string(bs)
   switch(
-    bs %||% "tp",
+    bs,
     "tp"  = "thin plate regression spline",
     "ts"  = "thin plate regression spline with shrinkage",
     "cr"  = "cubic regression spline",
@@ -1749,48 +1757,16 @@ obs_re_specs_from_prior <- function(prior) {
 }
 
 #' @noRd
-obs_gp_specs_from_prior <- function(prior) {
-  # Kept for back-compat: returns a stripped one-per-term list
-  # from the prior table. Drops 2D + by-factor detail because
-  # brms concatenates names without a separator (gpz1z2 etc).
-  # Prefer obs_gp_specs_from_formula() when the formula is
-  # available -- it recovers vars, k, by, and cov_kernel cleanly.
-  if (is.null(prior) || nrow(prior) == 0L) return(list())
-  gp_rows <- prior$class == "sdgp" & nzchar(prior$coef)
-  if (!any(gp_rows)) return(list())
-  coefs <- prior$coef[gp_rows]
-  unique_coefs <- unique(coefs)
-  lapply(unique_coefs, function(co) {
-    list(
-      vars = sub("^gp", "", co), k = NA_integer_,
-      by = NA_character_, cov = "exp_quad", coef = co
-    )
-  })
-}
-
-#' @noRd
-get_gp_specs <- function(obj) {
-  # Single entry point for everything that walks gp() terms.
-  # The formula walker recovers vars / k / by / cov; the
-  # prior-table extractor is the fallback when the formula
-  # round-trip drops the gp() call (unusual but defensive).
-  specs <- obs_gp_specs_from_formula(obj)
-  if (length(specs) == 0L) {
-    specs <- obs_gp_specs_from_prior(obj$prior)
-  }
-  specs
-}
-
-#' @noRd
 obs_gp_specs_from_formula <- function(obj) {
-  # Walk the obs formula AST for `gp(...)` calls and recover the
-  # full spec per term: variable list, k, by, cov kernel. This
-  # is the authoritative extractor; the prior-table fallback
-  # loses 2D and by-factor detail.
+  # Walk each response's formula for `gp(...)` calls and recover the
+  # spec per term: variable list, k, by and covariance kernel. A term
+  # two responses share is described once.
   if (is.null(obj$formula)) return(list())
-  f <- mvgam_obs_formula(obj)
-  if (!inherits(f, "formula") || length(f) < 3L) return(list())
-  lapply(formula_calls(f[[3L]], "gp"), gp_call_to_spec)
+  calls <- unlist(lapply(response_formulas(obj), function(form) {
+    f <- form$formula
+    if (length(f) < 3L) list() else formula_calls(f[[3L]], "gp")
+  }), recursive = FALSE, use.names = FALSE)
+  unique(lapply(calls, gp_call_to_spec))
 }
 
 #' @noRd
@@ -1952,7 +1928,7 @@ render_re_inline <- function(specs) {
 term_definition_rows <- function(obj, notation) {
   prior <- obj$prior
   smooth_specs <- obs_smooth_specs_from_prior(prior)
-  gp_specs <- get_gp_specs(obj)
+  gp_specs <- obs_gp_specs_from_formula(obj)
   mo_specs <- obs_mo_specs_from_prior(prior)
   me_specs <- obs_me_specs_from_formula(obj)
   re_specs <- obs_re_specs_from_prior(prior)
@@ -1979,7 +1955,7 @@ term_definition_rows <- function(obj, notation) {
     } else {
       paste0("\\rho_{", sub, "}")
     }
-    kernel_name <- gp_kernel_label(spec$cov %||% "exp_quad")
+    kernel_name <- gp_kernel_label(spec$cov)
     rows[[length(rows) + 1L]] <- list(
       lhs = paste0(
         "f^{(\\text{gp})}_{", sub, "}(", vars_in, ")"
@@ -2890,8 +2866,14 @@ render_implementation_section <- function(ctx) {
 
 #' @noRd
 extract_implementation_info <- function(obj) {
-  backend <- obj$backend %||% "rstan"
-  algorithm <- obj$algorithm %||% "none"
+  # A fit records what it ran under and a prefit records
+  # `algorithm = "none"`. Both come from the object's constructor.
+  backend <- obj$backend
+  algorithm <- obj$algorithm
+  checkmate::assert_choice(backend, backend_choices(),
+                           .var.name = "obj$backend")
+  checkmate::assert_choice(algorithm, c(algorithm_choices(), "none"),
+                           .var.name = "obj$algorithm")
   # Reuse the shared sampling-args extractor from how_to_cite.R.
   # `extract_sampling_info()` reads `obj$fit@stan_args` and
   # returns (chains, warmup, iter, threads, adapt_delta,
@@ -3028,12 +3010,12 @@ trend_formula_text <- function(obj) {
 
 #' @noRd
 family_call_text <- function(family) {
-  if (is.null(family)) return("gaussian()")
+  checkmate::assert_class(family, "family")
   # `family$family` collapses every brms customfamily to the
   # literal "custom"; the user-visible constructor lives on
   # `family$name`. resolve_family_name() routes through both.
-  fam <- resolve_family_name(family) %||% "gaussian"
-  link <- family$link %||% "identity"
+  fam <- resolve_family_name(family)
+  link <- family$link
   # nmix() carries the variant in its name (nmix_royle_nichols /
   # nmix_poisson_poisson / nmix_poisson_binomial). Reconstruct
   # the user-facing nmix("...") call rather than printing the

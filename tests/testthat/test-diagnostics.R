@@ -227,6 +227,14 @@ test_that("fixef.mvgam(summary = FALSE) returns the draws matrix", {
   expect_identical(colnames(out), c("Intercept", "x"))
 })
 
+test_that("fixef.mvgam refuses a 'pars' entry the model does not have", {
+  # A misspelt term is refused by name. Dropping it would leave a
+  # table with fewer rows than were asked for and no reason given.
+  stub <- make_mvgam_stub()
+  expect_error(fixef(stub, pars = c("x", "xx")), "'xx'")
+  expect_identical(rownames(fixef(stub, pars = "x")), "x")
+})
+
 test_that("rhat.mvgam returns a named numeric vector", {
   stub <- make_mvgam_stub()
   out <- rhat(stub)
@@ -651,5 +659,23 @@ test_that("hidden_par_pattern adds A_trend hide on VAR factor fits", {
   expect_true(grepl("\\^A_trend\\\\\\[", pat))
   expect_true(grepl("A_trend\\[1\\]\\[1,1\\]",
                     grep(pat, pars_var, value = TRUE)[1]))
+})
+
+test_that("the funnel advisor checks only an MCMC run", {
+  # Divergences and R-hat belong to a sampler's run. An object that
+  # records no algorithm, or an approximation, carries neither.
+  stub <- make_mvgam_stub()
+  stub$trend_metadata <- list(
+    has_by_lv = TRUE, n_lv = 2L, levels = list(series = c("a", "b"))
+  )
+  expect_false(mvgam:::flag_by_lv_full_rank_funnel(stub))
+  stub$algorithm <- "meanfield"
+  expect_false(mvgam:::flag_by_lv_full_rank_funnel(stub))
+})
+
+test_that("compiled_model() requires the backend the fit recorded", {
+  # A fit records its backend, and an object without one is refused.
+  stub <- make_mvgam_stub()
+  expect_error(mvgam:::compiled_model(stub), "x\\$backend")
 })
 

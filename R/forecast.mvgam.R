@@ -239,10 +239,7 @@ forecast.mvgam <- function(object,
   # rather than left to the propagator, which cannot tell a gap
   # from a shorter horizon and would answer for the wrong one.
   if (!is.null(fc_grid)) {
-    assert_forecast_times_steppable(
-      fc_grid$times, training, first_trend_spec(object),
-      mvgam_axes(object)$time$step
-    )
+    assert_forecast_times_steppable(fc_grid$times, object)
   }
 
   # The hindcast slot inside a forecast() result uses the same
@@ -749,7 +746,7 @@ resolve_forecast_grid <- function(object, newdata, training,
 # `mu_trend[T] - mu_trend[T-1]` and inject a spurious jump at
 # the first forecast step.
 #'@noRd
-build_training_tail_data <- function(training, max_lag) {
+build_training_tail_data <- function(object, training, max_lag) {
   if (max_lag <= 0L) return(NULL)
   series_levels <- names(training$observations)
   time_var <- training$time_var
@@ -763,9 +760,13 @@ build_training_tail_data <- function(training, max_lag) {
   # handed a tail with no rows. Asking whether the frame has a
   # series column answered the same for a grouping with none, so
   # the arms say which kind of axis they were cut from.
+  #
+  # The grid is the fit's recorded axis. On such a frame each
+  # response's training rows hold its observed occasions alone. A
+  # frame padded at the end gives a union that stops short of the
+  # grid, which placed the tail before the stored state it centres.
   if (training$response_keyed) {
-    shared <- sort(unique(unlist(training$times, use.names = FALSE)))
-    tail_ts <- tail(shared, max_lag)
+    tail_ts <- tail(mvgam_axes(object)$time$values, max_lag)
     sub <- training$data[
       training$data[[time_var]] %in% tail_ts, , drop = FALSE
     ]
@@ -1080,7 +1081,7 @@ build_forecast_arms <- function(object, trend_model, meta,
   h_max <- max(per_series_h)
 
   max_lag <- as.integer(meta$max_lag %||% 0L)
-  tail_data <- build_training_tail_data(training, max_lag)
+  tail_data <- build_training_tail_data(object, training, max_lag)
   obs_struct_fc <- get_observation_structure(object,
                                                newdata = fc_grid$data,
                                                resp = resp)
@@ -1499,8 +1500,17 @@ compute_pw_forecast_extras <- function(object, training,
   }
   if (is.null(fc_times)) fc_times <- numeric(0L)
 
-  # Training time range drives change_freq inside propagate_pw.
-  training_times <- sort(unique(unlist(training$times)))
+  # Stan fits the piecewise trend on the time index, 1 to N_time, and
+  # places its changepoints there. The forecast is evaluated on the
+  # same index. The user's own units put a fit on years 2001 to 2030
+  # at t = 2031 against changepoints near 1 to 30.
+  axis_time <- mvgam_axes(object)$time
+  to_index <- function(t) {
+    (as.numeric(t) - axis_time$values[1L]) / axis_time$step + 1
+  }
+  # The occasions carrying a response, which is the history
+  # `changepoint_range` is a proportion of at fit time
+  training_times <- to_index(sort(unique(unlist(training$times))))
 
   # Logistic PW needs a cap matrix [h, n_series] from newdata.
   # `first_trend_spec()` resolves the spec for every caller, and a
@@ -1516,15 +1526,15 @@ compute_pw_forecast_extras <- function(object, training,
     NULL
   }
 
-  list(fc_times = fc_times,
+  list(fc_times = to_index(fc_times),
        training_times = training_times,
        cap = cap)
 }
 
 
 # Internal: build the `[h, n_series]` cap matrix for PW
-# logistic from the forecast newdata. The cap column name is
-# stored on the trend spec via `spec$cap` (defaults to "cap").
+# logistic from the forecast newdata. `pw_cap_var()` names the cap
+# column.
 #
 # User-supplied cap is on the RESPONSE scale (e.g. "carrying
 # capacity of 100 individuals"); the C++ kernel expects cap on
@@ -1541,7 +1551,7 @@ compute_pw_forecast_extras <- function(object, training,
 #'@noRd
 extract_pw_cap_matrix <- function(object, fc_grid, spec, fc_times,
                                     series_levels, family) {
-  cap_var <- spec$cap %||% "cap"
+  cap_var <- pw_cap_var(spec)
   d <- fc_grid$data
   if (!(cap_var %in% names(d))) {
     stop(insight::format_error(c(

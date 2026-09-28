@@ -35,7 +35,9 @@ consider using the convention-based approach instead (see Details).
 Instead of calling this function, define these functions and let auto-discovery handle registration:
 \enumerate{
 \item \code{generate_mytrend_trend_stanvars(trend_specs, data_info)} - Stan code generator
-\item \code{mytrend_trend_properties()} - Returns list(supports_factors = TRUE/FALSE, incompatibility_reason = "...")
+\item \code{mytrend_trend_properties()} - Returns list(supports_factors =
+TRUE/FALSE, stationary_source = "none"/"lift"/"omega",
+incompatibility_reason = "...")
 }
 
 This approach requires zero manual registration calls and is automatically future-proof.

@@ -797,6 +797,52 @@ test_that("how_to_cite cites each family a model has", {
 })
 
 
+test_that("how_to_cite cites a prefit's trend", {
+  # A prefit records its trend type in its metadata alone. The
+  # citation rules take the type from there and add the references
+  # a VAR trend carries.
+  mod <- make_methods_md_prefit(y ~ 1, trend_formula = ~ VAR())
+  expect_true("heaps_var" %in% names(how_to_cite(mod)$bibtex))
+  # The backend and algorithm are what the object records. One
+  # recording neither was described as an rstan HMC run.
+  mod$backend <- NULL
+  expect_error(how_to_cite(mod), "object\\$backend")
+  expect_error(methods_md(mod), "obj\\$backend")
+})
+
+
+test_that("methods_md renders the family the model stores", {
+  # Each section spelled its own fallback family and link. The
+  # object's family is the one `mvgam()` validated, and an object
+  # without one is refused.
+  mod <- make_methods_md_prefit(y ~ x, family = poisson())
+  out <- methods_md(mod)
+  expect_match(out, "family        = poisson()", fixed = TRUE)
+  expect_false(grepl("gaussian", out, fixed = TRUE))
+  mod$family <- NULL
+  expect_error(methods_md(mod), "object\\$family")
+  expect_error(mvgam:::family_call_text(NULL), "family")
+})
+
+
+test_that("kernel and basis labels take the setting the spec records", {
+  # `gp_call_to_spec()` and `parse_smooth_coef()` record brms's and
+  # mgcv's own defaults where the user wrote none. A label given no
+  # setting has nothing to describe and refuses.
+  spec <- mvgam:::gp_call_to_spec(quote(gp(x, k = 5)))
+  expect_identical(spec$cov, "exp_quad")
+  expect_identical(mvgam:::gp_kernel_label(spec$cov), "k_{\\text{ExpQuad}}")
+  expect_error(mvgam:::gp_kernel_label(NULL))
+  expect_error(mvgam:::gp_kernel_human_label(NULL))
+  smooth <- mvgam:::parse_smooth_coef("s(x)")
+  expect_identical(
+    mvgam:::basis_label(smooth$bs, smooth$fname),
+    "thin plate regression spline"
+  )
+  expect_error(mvgam:::basis_label(NULL, "s"))
+})
+
+
 test_that("occ() emits state + obs + logit(p) rows", {
   out <- methods_md(make_occ_prefit())
   expect_true(grepl(
@@ -809,6 +855,15 @@ test_that("occ() emits state + obs + logit(p) rows", {
   # Data section calls out the closure-unit grouping dims.
   expect_true(grepl("\\$G = 8\\$ closure units", out))
   expect_true(grepl("\\\\bar J", out))
+})
+
+test_that("closure units are counted over every column that keys them", {
+  # Counted over the key columns the frame happened to hold, a frame
+  # missing one reported the units of a coarser key under the same
+  # heading.
+  mod <- make_occ_prefit()
+  mod$data$time <- NULL
+  expect_error(methods_md(mod), "'time'")
 })
 
 test_that("nmix Poisson-binomial emits N | lambda + Binomial obs row", {

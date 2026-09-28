@@ -495,16 +495,22 @@ plot.mvgam_stability = function(
   checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
   checkmate::assert_int(bins, lower = 5L)
   rlang::check_dots_empty()
-  keep <- intersect(variables, colnames(x))
-  if (!length(keep)) {
+  # A metric that is not there is refused by name. Plotting the ones
+  # that are drew fewer panels than were asked for.
+  unknown <- setdiff(variables, colnames(x))
+  if (length(unknown)) {
     stop(insight::format_error(c(
-      "None of the requested 'variables' were found in 'x'.",
+      "Some requested 'variables' are not stability metrics.",
+      x = paste0(
+        "Not found: ", paste0("'", unknown, "'", collapse = ", "), "."
+      ),
       i = paste0(
         "Available metrics: ",
         paste(colnames(x), collapse = ", "), "."
       )
-    )))
+    )), call. = FALSE)
   }
+  keep <- unique(variables)
   # Force the house red scheme for the duration of this call so
   # stability sits in the same visual family as irf() / fevd() /
   # forecast() plots.

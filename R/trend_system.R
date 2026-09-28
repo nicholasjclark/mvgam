@@ -180,7 +180,9 @@ get_default_incompatibility_reason <- function(name) {
 #'
 #' **Convention**: For trend type "FOO", you MUST define:
 #' - `generate_foo_trend_stanvars()` function for Stan code generation
-#' - `foo_trend_properties()` function returning list(supports_factors = TRUE/FALSE, incompatibility_reason = "...")
+#' - `foo_trend_properties()` function returning list(supports_factors =
+#'   TRUE/FALSE, stationary_source = "none"/"lift"/"omega",
+#'   incompatibility_reason = "...")
 #'
 #' @return Invisibly returns TRUE, or STOPS with clear error on any failure
 #' @noRd
@@ -223,7 +225,7 @@ auto_register_trend_types <- function() {
           "Missing required properties function for trend type {.field {trend_type}}."
         ),
         x = cli::format_inline(
-          "You must define {.field {properties_func_name}()} that returns list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')."
+          "You must define {.field {properties_func_name}()} that returns list(supports_factors = TRUE/FALSE, stationary_source = 'none'/'lift'/'omega', incompatibility_reason = '...')."
         ),
         i = "This ensures explicit declaration of trend capabilities."
       )))
@@ -242,7 +244,7 @@ auto_register_trend_types <- function() {
       supports_factors = trend_info$supports_factors,
       samples_innovation_scale =
         trend_info$samples_innovation_scale %||% TRUE,
-      stationary_source = trend_info$stationary_source %||% "none",
+      stationary_source = trend_info$stationary_source,
       generator_func = generator_func,
       incompatibility_reason = trend_info$incompatibility_reason
     )
@@ -287,11 +289,18 @@ validate_trend_properties <- function(trend_info, trend_type, func_name) {
       x = cli::format_inline(
         "Got {.field {class(trend_info)}} instead."
       ),
-      i = "Fix: return list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')"
+      i = paste0(
+        "Fix: return list(supports_factors = TRUE/FALSE, ",
+        "stationary_source = 'none'/'lift'/'omega', ",
+        "incompatibility_reason = '...')"
+      )
     )))
   }
 
-  required_fields <- c("supports_factors")
+  # `stationary_source` has no default here. A trend that left it out
+  # would have its marginal predictions integrate over the innovation
+  # covariance whether or not its state settles at another one.
+  required_fields <- c("supports_factors", "stationary_source")
   missing_fields <- setdiff(required_fields, names(trend_info))
 
   if (length(missing_fields) > 0) {
@@ -299,9 +308,14 @@ validate_trend_properties <- function(trend_info, trend_type, func_name) {
       cli::format_inline(
         "Function {.field {func_name}()} missing required fields: {.field {missing_fields}}."
       ),
-      x = "Required structure: list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')",
-      i = cli::format_inline(
-        "The supports_factors field is mandatory for trend type {.field {trend_type}}."
+      x = paste0(
+        "Required structure: list(supports_factors = TRUE/FALSE, ",
+        "stationary_source = 'none'/'lift'/'omega', ",
+        "incompatibility_reason = '...')."
+      ),
+      i = paste0(
+        "'stationary_source' sets the covariance a marginal ",
+        "prediction integrates over."
       )
     )))
   }
@@ -424,7 +438,9 @@ pw_trend_properties <- function() {
 #'
 #' Instead of calling this function, define these functions and let auto-discovery handle registration:
 #' 1. `generate_mytrend_trend_stanvars(trend_specs, data_info)` - Stan code generator
-#' 2. `mytrend_trend_properties()` - Returns list(supports_factors = TRUE/FALSE, incompatibility_reason = "...")
+#' 2. `mytrend_trend_properties()` - Returns list(supports_factors =
+#'   TRUE/FALSE, stationary_source = "none"/"lift"/"omega",
+#'   incompatibility_reason = "...")
 #'
 #' This approach requires zero manual registration calls and is automatically future-proof.
 #'
@@ -728,8 +744,9 @@ samples_factor_loadings <- function(trend_spec) {
 #' latent state settles at, and each kernel supplies that differently:
 #' `"lift"` raises the innovation covariance, `"omega"` takes what the
 #' Stan model already derived, `"none"` keeps the innovation
-#' covariance. A custom trend declares its own through
-#' `<name>_trend_properties()` and defaults to `"none"`. A fit with no
+#' covariance. A trend found by name declares its own in
+#' `<name>_trend_properties()`. A trend registered through
+#' `register_trend_type()` takes that function's default. A fit with no
 #' trend, which `get_trend_type()` reports as `"None"`, has no
 #' covariance to lift.
 #'
@@ -890,7 +907,7 @@ generate_ar_monitor_params <- function(trend_spec) {
   # the per-series coefficient that summary labels and the brms
   # interception set both need. The prior generator narrows the list
   # to the rows a user can edit.
-  sharing <- trend_spec$coef_sharing %||% "none"
+  sharing <- ar_coef_sharing(trend_spec)
   ar_params <- ar_monitor_coef_names(lag_vec, sharing)
 
   c(ar_params, ma_params_for(trend_spec, "AR"))
@@ -984,6 +1001,32 @@ pw_growth <- function(x) {
 #'@noRd
 pw_is_logistic <- function(x) {
   identical(pw_growth(x), "logistic")
+}
+
+
+# Internal: how an AR trend shares its coefficients across series.
+# `AR()` records the mode on every spec it builds. The other trends
+# have no coefficients to share, and their specs carry no mode.
+#'@noRd
+ar_coef_sharing <- function(spec) {
+  spec$coef_sharing %||% "none"
+}
+
+
+# Internal: the column that holds a logistic PW model's carrying
+# capacity. `create_mvgam_trend()` records it on every spec, as the
+# name the user gave or `"cap"`. The Stan data builder and the
+# forecast both take the name from here.
+#'@noRd
+pw_cap_var <- function(spec) {
+  cap_var <- spec_field(trend_spec_head(spec), "cap")
+  if (!named_var(cap_var)) {
+    stop(insight::format_error(c(
+      "The PW specification names no carrying-capacity column.",
+      i = "Build the trend with 'PW()', which records the column."
+    )), call. = FALSE)
+  }
+  cap_var
 }
 
 # -----------------------------------------------------------------------------
@@ -1286,7 +1329,7 @@ NULL
 #'   \item a `generate_<name>_trend_stanvars()` function, found by name
 #'     from the registry, that emits the Stan blocks;
 #'   \item a `<name>_trend_properties()` function returning at least
-#'     `supports_factors`, also found by name;
+#'     `supports_factors` and `stationary_source`, also found by name;
 #'   \item a `forecast_<name>_rcpp()` function if the trend is to be
 #'     forecast;
 #'   \item a branch in `get_default_validation_rules()` if the trend
@@ -1630,38 +1673,6 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
   # Since we enforce single trend type, trend_model is always the first component
   trend_model <- trend_components[[1]]
 
-  # Validate CAR restrictions early in parsing flow
-  # CAR models use irregular time intervals that vary by series,
-  # making shared trend covariates incompatible only in multivariate models
-  if (identical(trend_model$trend, "CAR") && length(regular_terms) > 0 && !is.null(data)) {
-    # Determine if this is a multivariate model by checking series count
-    axis_names <- spec_axis_vars(trend_model)
-    series_var <- axis_names$series_var
-    time_var <- axis_names$time_var
-    
-    # Try to count series - if series column exists, count unique values
-    # If series column doesn't exist, assume univariate (single series)
-    n_series <- 1  # Default assumption for missing series column
-    if (series_var %in% names(data)) {
-      n_series <- length(unique(data[[series_var]]))
-    }
-    
-    # Only restrict CAR models with covariates if multivariate (n_series > 1)
-    if (n_series > 1) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Multivariate CAR models cannot include trend covariates in {.field trend_formula}."
-        ),
-        x = "CAR models use irregular time intervals that vary by series in multivariate settings.",
-        i = "Remove covariates from the trend formula or use a different trend type.",
-        i = paste0(
-          "Univariate CAR models (single series) can include trend ",
-          "covariates."
-        )
-      )), call. = FALSE)
-    }
-  }
-
   # Calculate dimensions from data for proper parameter filtering
   if (!is.null(data)) {
     
@@ -1680,6 +1691,18 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
     # Add dimensions to trend_model for filtering if available
     if (!is.null(dimensions)) {
       trend_model$dimensions <- dimensions
+    }
+
+    # A CAR trend with covariates is refused on more than one series.
+    # The count is the resolved series axis, which also holds series
+    # that a grouping or the responses define with no series column.
+    if (identical(trend_model$trend, "CAR") && length(regular_terms) > 0 &&
+        dimensions$n_series > 1) {
+      stop(insight::format_error(c(
+        "'CAR()' takes 'trend_formula' covariates on a single series only.",
+        x = paste0("The trend has ", dimensions$n_series, " series."),
+        i = "Move the covariates to the observation formula."
+      )), call. = FALSE)
     }
   }
 
@@ -2923,10 +2946,6 @@ create_mvgam_trend <- function(trend_type, ...,
   # Handle default variable names
   if (time_var == "NA") time_var <- "time"
   if (series_var == "NA") series_var <- "series"
-
-  # Handle grouping defaults
-  if (gr_var == "NA") gr_var <- "NA"
-  if (subgr_var == "NA") subgr_var <- "NA"
 
   # Handle cap default
   if (cap_var == "NA") cap_var <- "cap"

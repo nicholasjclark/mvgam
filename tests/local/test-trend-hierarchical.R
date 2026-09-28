@@ -1129,11 +1129,8 @@ test_that("how the grouping columns are typed does not move an answer", {
   # A declared level with no rows is refused here, which is the
   # opposite of what the same shape does on a fit whose series is a
   # column: there an unused level is carried without comment. The
-  # refusal is asserted as the contract this path actually has, and
-  # it is a good refusal, naming the level and listing the ones that
-  # would have worked. Whether the two paths ought to differ is the
-  # open question recorded in FINDINGS.md, not something to settle by
-  # writing the assertion either way.
+  # refusal is asserted as the contract this path has. It names the
+  # level and lists the ones that would have worked.
   extra <- d
   extra[[vars$subgr_var]] <- factor(
     as.character(extra[[vars$subgr_var]]),

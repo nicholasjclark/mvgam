@@ -543,7 +543,8 @@ test_that("prepare_closure_unit_family() groups each family's rows by site", {
     case <- cases[[nm]]
     fam_prep <- mvgam:::prepare_closure_unit_family(
       case$fam, case$data, response_var = "y",
-      has_obs_covariates = FALSE, has_det_covariates = FALSE
+      has_obs_covariates = FALSE, has_det_covariates = FALSE,
+      series_var = "series", time_var = "time"
     )
     expect_identical(fam_prep$vars, case$vars, label = nm)
     sd <- brms::make_standata(
@@ -1433,7 +1434,8 @@ test_that("nmix('poisson_poisson') warns that intercepts alone are weak", {
     prepare_closure_unit_family(
       nmix("poisson_poisson"), data = d, response_var = "y",
       has_obs_covariates = has_obs_covariates,
-      has_det_covariates = FALSE
+      has_det_covariates = FALSE,
+      series_var = "series", time_var = "time"
     )
   }
   expect_warning(
@@ -1596,6 +1598,30 @@ test_that("closure_unit_key_vars() keys a multi-response unit on time alone", {
     closure_unit_key_vars(NULL, series_var = "sp", time_var = "yr"),
     c("sp", "yr")
   )
+})
+
+test_that("closure units are keyed by the columns the trend names", {
+  # A trend naming its series `site` and its time `yr` keys each unit
+  # on those columns. Renaming the columns changes no unit.
+  set.seed(1)
+  d <- expand.grid(visit = 1:3, series = factor(1:4), time = 1:5)
+  d$y <- pmin(rpois(nrow(d), 5), 20L)
+  d$cap <- 20L
+  renamed <- d
+  names(renamed)[match(c("series", "time"), names(renamed))] <-
+    c("site", "yr")
+  sd_default <- standata(mvgam(
+    y ~ 1, trend_formula = ~ AR(), data = d, family = nmix(),
+    run_model = FALSE, silent = 2
+  ))
+  sd_renamed <- standata(mvgam(
+    y ~ 1, trend_formula = ~ AR(time = yr, series = site),
+    data = renamed, family = nmix(), run_model = FALSE, silent = 2
+  ))
+  expect_identical(sd_renamed$N_unit, 20L)
+  for (nm in c("n_rep", "K_max", "Y_max", "visit_idx")) {
+    expect_identical(sd_renamed[[nm]], sd_default[[nm]])
+  }
 })
 
 test_that(

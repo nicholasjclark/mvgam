@@ -235,13 +235,8 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # model structure information (formula, trend type, dimensions)
   out$trend_formula <- object$trend_formula
 
-  trend_comps <- object$trend_components
-  out$trend_model <- if (!is.null(trend_comps) &&
-                         !is.null(trend_comps$types)) {
-    trend_comps$types[1]
-  } else {
-    NULL
-  }
+  trend_type <- get_trend_type(object)
+  out$trend_model <- if (!identical(trend_type, "None")) trend_type
 
   # `trend_model` is the bare constructor type, which a correlated
   # `AR()` and an independent one share. Whether this fit estimates
@@ -249,9 +244,10 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # the trend spec recorded it.
   out$trend_has_cor <- isTRUE(object$trend_metadata$has_cor)
 
-  # The `ZMVN` test in `build_next_steps()` matches the bare type. The printed line also names the order the trend
-  # was fitted at, which `printed_trend_label()` renders from the
-  # fit's own metadata. A summary object carries neither that
+  # The `ZMVN` test in `build_next_steps()` matches the bare type.
+  # The printed line also names the order the trend was fitted at,
+  # which `printed_trend_label()` renders from the fit's own
+  # metadata. A summary object carries neither that
   # metadata nor `trend_components`, and the helper's fallback then
   # reports a fitted ARMA as `None`.
   out$trend_label <- printed_trend_label(object)

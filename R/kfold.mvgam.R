@@ -304,7 +304,7 @@ kfold.mvgam <- function(x,
 # @noRd
 resolve_kfold_group <- function(object, group, data) {
   if (is.null(group)) {
-    closure_cols <- closure_unit_key_vars(object$family)
+    closure_cols <- fit_closure_unit_keys(object)
     if (!is.null(closure_cols)) {
       group <- closure_cols
     } else {
@@ -516,18 +516,21 @@ mask_heldout_response <- function(object, data, held_rows) {
   if (!length(held_rows)) {
     return(data)
   }
+  # Every response is masked or none is. A response left unmasked
+  # keeps the held-out rows in the likelihood, and the fold is then
+  # scored on data the refit was trained on.
   resp <- insight::find_response(object)
-  present <- intersect(resp, names(data))
-  if (!length(present)) {
+  absent <- setdiff(resp, names(data))
+  if (length(absent)) {
     stop(insight::format_error(c(
-      "Could not find the response column to hold a fold out on.",
-      x = paste0("The model's response is ",
-                 paste(resp, collapse = ", "), "."),
+      "Could not find a response column to hold a fold out on.",
+      x = paste0("Missing: ", paste0("'", absent, "'", collapse = ", "),
+                 "."),
       x = paste0("The training frame holds ",
                  paste(names(data), collapse = ", "), ".")
     )))
   }
-  for (r in present) {
+  for (r in resp) {
     data[[r]][held_rows] <- NA
   }
   data

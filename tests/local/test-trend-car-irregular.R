@@ -188,7 +188,7 @@ test_that("a multivariate CAR refuses every trend covariate", {
       trend_formula = ~ s(temp, k = 4) + CAR(),
       data = dat, family = poisson(), run_model = FALSE, silent = 2
     ),
-    "cannot include trend covariates"
+    "on a single series only"
   )
   expect_match(conditionMessage(plain), "trend_formula", fixed = TRUE)
 
@@ -198,7 +198,7 @@ test_that("a multivariate CAR refuses every trend covariate", {
       trend_formula = ~ s(temp, k = 4, by = lv_axis()) - 1 + CAR(),
       data = dat, family = poisson(), run_model = FALSE, silent = 2
     ),
-    "cannot include trend covariates"
+    "on a single series only"
   )
   # The two are refused by one rule, so they carry one message. A
   # separate wording for the factor case would mean a second layer

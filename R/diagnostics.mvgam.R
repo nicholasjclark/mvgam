@@ -227,11 +227,9 @@ fixef.mvgam <- function(object, summary = TRUE, robust = FALSE,
   rlang::check_dots_empty()
   # Reuse the `betas` keyword to share the b_trend[*] filter logic
   # with as.matrix.mvgam / coef.mvgam.
-  mat <- as_draws_matrix(object, variable = "betas")
-  if (!is.null(pars)) {
-    keep <- paste0("b_", pars)
-    mat <- mat[, intersect(colnames(mat), keep), drop = FALSE]
-  }
+  mat <- select_fixef_draws(
+    as_draws_matrix(object, variable = "betas"), pars
+  )
   if (ncol(mat) == 0L) {
     return(matrix(0, 0, 0))
   }
@@ -446,16 +444,49 @@ vcov.mvgam <- function(object, correlation = FALSE, pars = NULL, ...) {
   rlang::check_dots_empty()
   # Reuse the `betas` keyword so the `b_trend[*]` filter matches
   # `coef.mvgam` / `fixef.mvgam` exactly.
-  mat <- as_draws_matrix(object, variable = "betas")
-  if (!is.null(pars)) {
-    keep <- paste0("b_", pars)
-    mat <- mat[, intersect(colnames(mat), keep), drop = FALSE]
-  }
+  mat <- select_fixef_draws(
+    as_draws_matrix(object, variable = "betas"), pars
+  )
   if (ncol(mat) == 0L) {
     return(matrix(0, 0, 0))
   }
   colnames(mat) <- sub("^b_", "", colnames(mat))
   if (isTRUE(correlation)) stats::cor(mat) else stats::cov(mat)
+}
+
+
+#' The fixed-effect draws a caller named
+#'
+#' A name the fit has no coefficient for is refused. Dropping it
+#' returned a smaller matrix than the caller asked for, and a
+#' misspelt term lost its row without a message.
+#'
+#' @param mat Draws matrix of the `b_` coefficients
+#' @param pars Coefficient names without the `b_` prefix, or `NULL`
+#'   for all of them
+#' @return `mat`, restricted to `pars` in the order given
+#' @noRd
+select_fixef_draws <- function(mat, pars) {
+  if (is.null(pars)) {
+    return(mat)
+  }
+  checkmate::assert_character(pars, any.missing = FALSE, min.len = 1L)
+  keep <- paste0("b_", pars)
+  unknown <- pars[!keep %in% colnames(mat)]
+  if (length(unknown)) {
+    stop(insight::format_error(c(
+      "Some 'pars' name no fixed effect of this model.",
+      x = paste0(
+        "Not found: ", paste0("'", unknown, "'", collapse = ", "), "."
+      ),
+      i = paste0(
+        "Fixed effects: ",
+        paste0("'", sub("^b_", "", colnames(mat)), "'", collapse = ", "),
+        "."
+      )
+    )), call. = FALSE)
+  }
+  mat[, keep, drop = FALSE]
 }
 
 
@@ -503,8 +534,8 @@ flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
   # approximation carries neither, and a stub carries no draws at
   # all, so the state is tested rather than the failure caught: the
   # advisor has nothing to read and says nothing.
-  algorithm <- mvgam_fit$algorithm %||% "sampling"
-  if (is.null(mvgam_fit$fit) || !identical(algorithm, "sampling")) {
+  if (is.null(mvgam_fit$fit) ||
+      !identical(mvgam_fit$algorithm, "sampling")) {
     return(FALSE)
   }
 

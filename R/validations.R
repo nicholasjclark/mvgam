@@ -1385,7 +1385,6 @@ validate_gr_balanced_groups <- function(trend_spec, data) {
     return(invisible(NULL))
   }
   gr_var <- resolved$gr_var
-  series_var <- resolved$series_var
 
   # The series counted are the series the trend will have, which is
   # what lets an unbalanced design be caught: sized by the largest
@@ -1393,13 +1392,11 @@ validate_gr_balanced_groups <- function(trend_spec, data) {
   # they never asked for, and every index stays in range.
   series_vals <- resolved$series
 
-  # One group value per series, taken by the helper that owns that
-  # question. It reads the prepared axis when the frame carries one
-  # and the labels it is handed otherwise, which is this case: the
-  # balance is checked before any axis has been resolved.
-  series_group_table <- table(series_group_values(
-    data, series_var, gr_var, labels = series_vals
-  ))
+  # One group value per series, from the first row naming it. The
+  # balance is checked before any axis is resolved, and the count
+  # needs no order.
+  first <- !duplicated(as.character(series_vals))
+  series_group_table <- table(data[[gr_var]][first])
   # A factor column keeps levels nothing observes, and a group with
   # no series is not an unbalanced group.
   series_group_table <- series_group_table[series_group_table > 0L]
@@ -1541,8 +1538,9 @@ detect_factor_n_lv <- function(object, n_series = NULL) {
     return(NULL)
   }
   # The series count has one owner, and it is the record.
-  n_series <- n_series %||% mvgam_axes(object)$series$n %||%
-    object$standata$N_series_trend
+  # `mvgam_axes()` falls back to the Stan data for a fit that
+  # predates it.
+  n_series <- n_series %||% mvgam_axes(object)$series$n
   # A model with as many factors as series is not a factor model:
   # every series loads on its own state and there is nothing to
   # plot as a loading.
@@ -1707,24 +1705,29 @@ enforce_factor_support_against_specs <- function(trend_specs) {
 }
 
 
-#' Walk trend specs to find `n_lv` and apply the ceiling gate
+#' Apply the `n_lv` ceiling to the resolved series axis
 #'
-#' Wrapper-layer hook called once from
-#' `generate_stan_components()` after the loadings prior is
-#' attached. Reads `n_lv` from the first factor-model trend spec
-#' it finds (multivariate trend lists may be a single spec or a
-#' per-response list, but mvgam currently fits one shared trend
-#' so the first hit is the authoritative one), counts unique
-#' series from `data`, and dispatches to
-#' `validate_n_lv_ceiling()` for the capacity ceiling and to
+#' Called once, where `extract_and_validate_trend_components()` has
+#' resolved the series axis. The axis also counts series that a
+#' grouping or the responses define with no series column, which a
+#' count of the column missed. mvgam fits one shared trend, and the
+#' first factor-model spec gives its `n_lv`. The function applies
+#' `validate_n_lv_ceiling()` for the capacity ceiling and
 #' `warn_unidentified_component_scale()` for the identification
-#' bound the mv-response families carry. No-ops when no spec
-#' carries `n_lv`.
+#' bound of the mv-response families. A trend with no `n_lv` passes
+#' unchecked.
 #'
+#' @param trend_specs One trend spec or a per-response list of them.
+#' @param n_series Length of the resolved series axis.
+#' @param fit_function Name of the calling fit function, for the
+#'   refusal message.
+#' @param family The observation family, or NULL.
+#' @return `TRUE`, invisibly.
 #' @noRd
-enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
+enforce_n_lv_ceiling_against_data <- function(trend_specs, n_series,
                                               fit_function = "mvgam",
                                               family = NULL) {
+  checkmate::assert_int(n_series, lower = 1L)
   if (is.null(trend_specs)) return(invisible(TRUE))
   specs <- if (is_multivariate_trend_specs(trend_specs)) {
     trend_specs
@@ -1734,14 +1737,6 @@ enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
   for (spec in specs) {
     n_lv <- spec$n_lv
     if (is.null(n_lv) || !is.numeric(n_lv) || n_lv < 1L) next
-    # `fixed_Z` (set by `trend_map = matrix(...)` or `"identity"`)
-    # supplies Z directly; no Z prior is sampled, so the iid funnel
-    # at `n_lv = n_series` does not apply. The downstream
-    # invariant gates still reject `n_lv > n_series`.
-    if (!is.null(spec$fixed_Z)) next
-    series_var <- spec_axis_vars(spec)$series_var
-    if (!series_var %in% colnames(data)) next
-    n_series <- length(unique(data[[series_var]]))
     if (n_series < 2L) next
     validate_n_lv_ceiling(
       n_lv         = as.integer(n_lv),
@@ -1751,12 +1746,14 @@ enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
     # The ceiling above is about capacity: more factors than series
     # buys nothing. This is about identification, and it bites well
     # below that ceiling for a family carrying a residual scale per
-    # component. Both read the same `n_lv` and the same series
-    # count, so they are asked together.
-    warn_unidentified_component_scale(
-      n_lv = as.integer(n_lv), n_species = as.integer(n_series),
-      family = family
-    )
+    # component. A `trend_map` fixing the loadings samples no `Z`,
+    # which leaves no split to identify.
+    if (is.null(spec$fixed_Z)) {
+      warn_unidentified_component_scale(
+        n_lv = as.integer(n_lv), n_species = as.integer(n_series),
+        family = family
+      )
+    }
     break
   }
   invisible(TRUE)
@@ -1769,9 +1766,12 @@ enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
 #'
 #' @param gr Grouping variable name or NULL/'NA'
 #' @param subgr Subgrouping variable name or NULL/'NA'
+#' @param series_var The series column, which names the subgroups when
+#'   `gr` is given without `subgr`
 #' @return List with processed gr and subgr values
 #' @noRd
-validate_grouping_arguments <- function(gr, subgr) {
+validate_grouping_arguments <- function(gr, subgr, series_var) {
+  checkmate::assert_string(series_var, min.chars = 1)
   # Process gr argument
   if (is.null(gr) || is.na(gr) || gr == "NA") {
     gr <- NULL
@@ -1786,14 +1786,10 @@ validate_grouping_arguments <- function(gr, subgr) {
     checkmate::assert_string(subgr, min.chars = 1)
   }
 
-  # Auto-fill subgr to the default 'series' when only gr is supplied:
-  # the hierarchical codegen path derives subgroups from the existing
-  # series column (see generate_hierarchical_correlation_data() in
-  # stan_assembly.R), so a bare ZMVN(gr = X) is well-defined as long as
-  # the data carries a series variable. Users who want a different
-  # within-group identifier still pass subgr explicitly.
+  # The hierarchical Stan data derives the subgroups from the series
+  # column, and a bare `ZMVN(gr = X)` names that column as `subgr`.
   if (!is.null(gr) && is.null(subgr)) {
-    subgr <- "series"
+    subgr <- series_var
   }
 
   if (!is.null(subgr) && is.null(gr)) {
@@ -1971,36 +1967,44 @@ mvgam_links_needing_positive_eta <- c("identity", "inverse", "1/mu^2")
 #' `mvgam()` and `mvgam_multiple()` each raise it once, which keeps a
 #' list of imputations to one notice for the whole list.
 #'
-#' @param family The observation family
+#' Every response is checked under its own family: one written inside
+#' its `bf()`, or `family` otherwise. `validate_family()` turns a
+#' family given by name or as a function into the object checked here.
+#'
+#' @param formula The observation formula
+#' @param family The observation family, or `NULL` when every response
+#'   names its own
 #' @param trend_formula The trend formula, or `NULL`
 #' @return `invisible(TRUE)`
 #' @noRd
-warn_positive_mean_link_with_trend <- function(family, trend_formula) {
-  if (is.null(trend_formula) || !is.list(family)) {
+warn_positive_mean_link_with_trend <- function(formula, family,
+                                               trend_formula) {
+  if (is.null(trend_formula)) {
     return(invisible(TRUE))
   }
-  fam <- resolve_family_name(family)
-  link <- family$link %||% "identity"
-  if (!fam %in% mvgam_positive_mean_families ||
-      !link %in% mvgam_links_needing_positive_eta) {
-    return(invisible(TRUE))
+  default <- if (!is.null(family)) validate_family(family)
+  families <- Filter(Negate(is.null), formula_families(formula, default))
+  pairs <- unique(lapply(families, function(fam) {
+    c(resolve_family_name(fam), fam$link)
+  }))
+  for (pair in pairs) {
+    if (!pair[1L] %in% mvgam_positive_mean_families ||
+        !pair[2L] %in% mvgam_links_needing_positive_eta) {
+      next
+    }
+    insight::format_warning(c(
+      paste0("Family '", pair[1L], "' with 'link = \"", pair[2L],
+             "\"' needs a positive linear predictor."),
+      x = paste0("A latent trend takes negative values, where the ",
+                 "likelihood is undefined."),
+      x = paste0("An intercept-free observation formula stops every ",
+                 "chain before warmup."),
+      i = paste0("Set 'link = \"log\"' to keep the mean positive for ",
+                 "any predictor."),
+      i = paste0("Keeping this link needs an intercept well above zero ",
+                 "and a small trend scale.")
+    ))
   }
-  insight::format_warning(c(
-    paste0("Family '", fam, "' with 'link = \"", link,
-           "\"' needs a positive linear predictor."),
-    x = paste0(
-      "A latent trend is centred near zero and takes negative ",
-      "values, where the likelihood is undefined and Stan rejects ",
-      "the draw."
-    ),
-    i = paste0(
-      "Set 'link = \"log\"' to keep the mean positive for any ",
-      "predictor. Keeping this link needs an intercept held well ",
-      "above zero and a trend whose scale is small relative to it. ",
-      "An intercept-free observation formula stops every chain ",
-      "before warmup."
-    )
-  ))
   invisible(TRUE)
 }
 
@@ -2940,6 +2944,14 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   # Calculate core dimensions from data using attribute-based accessors
   time_vals <- get_time_for_grouping(data)
   series_vals <- get_series_for_grouping(data)
+  # `ensure_mvgam_variables()` records how the series were named
+  # with the series themselves. A response-keyed or hierarchical
+  # axis taken as explicit is placed on the wrong rows after the fit.
+  series_source <- attr(data, "mvgam_series_source")
+  checkmate::assert_choice(
+    series_source, c("explicit", "hierarchical", "multivariate"),
+    .var.name = "attr(data, 'mvgam_series_source')"
+  )
 
   # A response-keyed frame states its axis rather than implying it
   # through the row values, and states it in formula order, so it is
@@ -2975,7 +2987,14 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     series_var = series_var,
     unique_times = sorted_unique_times,    # Sorted unique time points
     unique_series = series_axis,           # The series axis, in order
-    series_groups = series_groups          # Their groups, same order
+    series_groups = series_groups,         # Their groups, same order
+    # Each row's cell on the two axes. A response-keyed frame gives
+    # every row every response, and the response a caller maps
+    # decides the series.
+    row_time = match(time_vals, sorted_unique_times),
+    row_series = if (is.null(response_axis)) {
+      match(series_vals, series_axis)
+    }
   )
 
   # Both axes as one record, assembled where they are decided. It is
@@ -3019,7 +3038,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   dimensions$axes <- list(
     series = list(
       levels = as.character(series_axis),
-      source = attr(data, "mvgam_series_source") %||% "explicit",
+      source = series_source,
       n = length(series_axis),
       groups = series_groups,
       last_time = series_last_time
@@ -4406,53 +4425,6 @@ get_time_for_grouping <- function(data) {
   mvgam_prepared_index(data, "time")
 }
 
-#' The group each series belongs to, one entry per series
-#'
-#' Three callers want this one answer: the balance check counts it,
-#' the subgroup dimension takes the largest count, and
-#' `group_inds_trend` is the vector itself. Only the last is sensitive
-#' to order, and that is the one that matters: Stan reads
-#' `group_inds_trend[s]` against `s`, the trend matrix's own series
-#' index, so it must be given the series order the trend was built
-#' with. Reading the data in row order answers a different question
-#' whenever the rows are not sorted by series, and the two answers are
-#' a permutation of one another, so nothing raises and the model
-#' correlates the wrong series together.
-#'
-#' The series identity is read the way the fit reads it, through the
-#' `mvgam_series` attribute when the frame carries one, so a derived
-#' series is not silently compared against the column it superseded.
-#'
-#' @param data Data frame holding one or more rows per series
-#' @param series_var Name of the series column, used when the frame
-#'   carries no prepared series attribute
-#' @param gr_var Name of the grouping column
-#' @param order_by Series identifiers in the order the answer must
-#'   follow, or NULL to keep the order the data presents
-#' @param labels Series identity per row, for a caller that has
-#'   derived it and reaches this before any axis exists. `NULL`
-#'   reads the prepared attribute, then the series column.
-#' @return Vector of group values, one per series
-#'
-#' @noRd
-series_group_values <- function(data, series_var, gr_var,
-                                order_by = NULL, labels = NULL) {
-  checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_string(gr_var)
-  labels <- labels %||% attr(data, "mvgam_series") %||% data[[series_var]]
-  if (is.null(labels)) {
-    stop(insight::format_error(
-      paste0("Series variable '", series_var, "' not found in data.")
-    ))
-  }
-  labels <- as.character(labels)
-  first <- !duplicated(labels)
-  groups <- data[[gr_var]][first]
-  if (is.null(order_by)) {
-    return(groups)
-  }
-  groups[match(as.character(order_by), labels[first])]
-}
 #' Get series variable for grouping operations
 #'
 #' @param data Data frame with mvgam series attributes
@@ -4581,7 +4553,8 @@ extract_and_validate_trend_components <- function(data, mv_spec,
                                                   response_vars,
                                                   time_var = "time",
                                                   series_var = "series",
-                                                  trend_formula = NULL) {
+                                                  trend_formula = NULL,
+                                                  family = NULL) {
   # Parameter validation per CLAUDE.md standards
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(mv_spec)
@@ -4691,7 +4664,9 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   # gr-constant-per-series check at validate_gr_constant_per_series never
   # fire from the standata path. Call them directly here so both rules
   # apply uniformly.
-  groupings <- validate_grouping_arguments(parsed_trend$gr, parsed_trend$subgr)
+  groupings <- validate_grouping_arguments(
+    parsed_trend$gr, parsed_trend$subgr, series_var
+  )
   parsed_trend$gr <- groupings$gr %||% "NA"
   parsed_trend$subgr <- groupings$subgr %||% "NA"
   if (!is.null(groupings$gr)) {
@@ -4728,27 +4703,13 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   dimensions$had_by_lv <- had_by_lv
   dimensions$n_lv_for_grain <- n_lv_for_grain
 
-  # has_by_lv requires 1 <= n_lv <= n_series.
-  if (has_by_lv) {
-    n_series_for_check <- dimensions$n_series %||%
-      length(dimensions$unique_series %||% character(0))
-    if (n_series_for_check < 1L ||
-        n_lv_for_grain > n_series_for_check) {
-      stop(insight::format_error(c(
-        paste0(
-          "'by = lv_axis()' requires a factor model ",
-          "(1 <= n_lv <= n_series)."
-        ),
-        x = paste0(
-          "Configured n_lv = ", n_lv_for_grain,
-          " but the data has n_series = ", n_series_for_check, "."
-        ),
-        i = paste0(
-          "Lower 'n_lv' to at most n_series, or remove ",
-          "'by = lv_axis()' from the trend formula."
-        )
-      )), call. = FALSE)
-    }
+  # The `n_lv` ceiling, on the series axis just resolved. It also
+  # holds `by = lv_axis()` to at most one factor per series.
+  enforce_n_lv_ceiling_against_data(
+    mv_spec$trend_specs, dimensions$n_series, family = family
+  )
+  if (!is.null(family)) {
+    warn_zmvn_single_series(mv_spec, family, dimensions$n_series)
   }
 
   # The covariate columns of the trend formula, derived where the
@@ -5998,16 +5959,15 @@ without_ess_cap_notice <- function(expr) {
 #' rule that gates the fit-time and `mvgam_data()` checks.
 #'
 #' @param fc_times Named list of forecast times per series.
-#' @param training The training arms, carrying `times` per series.
-#' @param trend_spec The fit's trend specification.
-#' @param step The spacing the fit's own time grid runs on,
-#'   from `axes$time$step`. `NA` where it is irregular.
+#' @param object The fitted `mvgam` object. Its axis record gives the
+#'   grid and the spacing, and its trend specification says whether
+#'   the trend steps.
 #' @return Invisibly `TRUE`; raises otherwise.
 #' @noRd
-assert_forecast_times_steppable <- function(fc_times, training,
-                                            trend_spec, step) {
+assert_forecast_times_steppable <- function(fc_times, object) {
   checkmate::assert_list(fc_times, null.ok = TRUE)
-  checkmate::assert_list(training)
+  checkmate::assert_class(object, "mvgam")
+  trend_spec <- first_trend_spec(object)
   if (!any_trend_requires_regular_intervals(trend_spec)) {
     return(invisible(TRUE))
   }
@@ -6020,6 +5980,13 @@ assert_forecast_times_steppable <- function(fc_times, training,
   # pad exactly that way, so it is a common shape rather than an
   # odd one.
   #
+  # The grid is the fit's recorded axis. On a frame whose responses
+  # are its series, each response's training rows hold its observed
+  # occasions alone. Gathering the grid from them made a wide frame padded at
+  # the end look shorter than its latent state. A forecast starting
+  # inside the grid then passed, and the trend stepped on from the
+  # end of the grid under times it had not reached.
+  #
   # The horizon is resolved from the last *observed* occasion, which
   # is a different question and rightly answered differently: a
   # padded series must not be forecast from an occasion it was never
@@ -6027,9 +5994,9 @@ assert_forecast_times_steppable <- function(fc_times, training,
   # occasions between the last response and the end of the grid, and
   # the message below has to name the grid rather than call its last
   # position an observation.
-  past <- sort(unique(as.numeric(unlist(
-    training$times %||% list(), use.names = FALSE
-  ))))
+  axis_time <- mvgam_axes(object)$time
+  past <- as.numeric(axis_time$values)
+  step <- axis_time$step
   if (length(past) < 2L) return(invisible(TRUE))
   # The spacing the fit recorded, not a second reading of it.
   # Deriving the step here as well gave the same fact two

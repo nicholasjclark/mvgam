@@ -2744,6 +2744,20 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
                            logistic_code, fixed = TRUE))
   expect_false(grepl("linear_trend", logistic_code, fixed = TRUE))
 
+  # Column `s` of the cap is series `s` of the trend. A factor that
+  # keeps an unused level, as `subset()` leaves one, numbered the cap
+  # columns by level and refused a frame with every cell supplied.
+  two <- data.frame(
+    y = rpois(40, 5), time = rep(1:20, 2),
+    series = factor(rep(c("a", "b"), each = 20), levels = c("z", "a", "b")),
+    cap = rep(c(30, 60), each = 20)
+  )
+  cap_sd <- standata(
+    mvgam_formula(y ~ 1, trend_formula = ~ PW(growth = "logistic")),
+    data = two, family = poisson()
+  )
+  expect_equal(exp(cap_sd$cap_trend[1, ]), c(30, 60))
+
   # GLM likelihood
   expect_true(stan_pattern("if \\(!prior_only\\)", code_with_trend))
   expect_true(stan_pattern("target \\+= poisson_log_glm_lpmf\\(Y \\| to_matrix\\(mu\\), 0\\.0, mu_ones\\);", code_with_trend))
@@ -5475,4 +5489,17 @@ test_that("the stacked design names the columns the two sides share", {
 
   # A trend carrying no design of its own gives nothing to compare.
   expect_null(shared(y ~ x, ~ AR(p = 1)))
+})
+
+
+test_that("the observed history counts every response or refuses", {
+  # PW spreads its changepoints over the occasions a response was seen
+  # at. A response the frame lacked dropped out of the count, and the
+  # history came out shorter than the model's.
+  d <- data.frame(time = 1:6, y1 = c(1, 2, NA, NA, NA, NA),
+                  y2 = c(1, 2, 3, 4, NA, NA))
+  expect_identical(count_observed_times(d, "time", c("y1", "y2")), 4L)
+  expect_error(count_observed_times(d[, c("time", "y1")], "time",
+                                    c("y1", "y2")),
+               "'y2'")
 })

@@ -53,8 +53,19 @@ test_that("Auto-discovery registry system works correctly", {
 
 test_that("Trend properties validation works correctly", {
   # Test valid properties
-  valid_props <- list(supports_factors = TRUE, incompatibility_reason = NULL)
+  valid_props <- list(supports_factors = TRUE, stationary_source = "none",
+                      incompatibility_reason = NULL)
   expect_invisible(validate_trend_properties(valid_props, "TEST", "test_properties"))
+
+  # The covariance a marginal prediction integrates over is declared
+  # by each trend. Registration spelled "none" for a trend that left
+  # it out, which skips the stationary lift without a word.
+  expect_error(
+    validate_trend_properties(
+      list(supports_factors = TRUE), "TEST", "test_properties"
+    ),
+    "missing required fields.*stationary_source"
+  )
 
   # Test invalid properties - not a list
   expect_error(
@@ -70,14 +81,15 @@ test_that("Trend properties validation works correctly", {
   )
 
   # Test invalid supports_factors type
-  invalid_props <- list(supports_factors = "not_logical")
+  invalid_props <- list(supports_factors = "not_logical",
+                        stationary_source = "none")
   expect_error(
     validate_trend_properties(invalid_props, "TEST", "test_properties"),
     "must be a single logical value"
   )
 
   # Test missing incompatibility_reason for non-factor trend
-  invalid_props <- list(supports_factors = FALSE)
+  invalid_props <- list(supports_factors = FALSE, stationary_source = "none")
   expect_error(
     validate_trend_properties(invalid_props, "TEST", "test_properties"),
     "must provide.*incompatibility_reason"
@@ -741,4 +753,29 @@ test_that("a reported prior carries the support it is sampled on", {
       expect_identical(row$ub[1], unname(d["ub"]))
     }
   }
+})
+
+
+test_that("a spec's sharing mode and cap column each have one reader", {
+  # The Stan generator, the monitor list and the prior table each
+  # spelled their own fallback sharing mode, and the Stan data builder
+  # and the forecast each spelled their own cap column.
+  expect_identical(
+    ar_coef_sharing(AR(p = 2, coef_sharing = "hierarchical")),
+    "hierarchical"
+  )
+  expect_identical(ar_coef_sharing(AR()), "none")
+  expect_identical(ar_coef_sharing(RW()), "none")
+  expect_identical(pw_cap_var(PW(growth = "logistic", cap = K)), "K")
+  expect_identical(pw_cap_var(PW(growth = "logistic")), "cap")
+  # A spec nested under `$trend_model` names the same column.
+  expect_identical(
+    pw_cap_var(list(trend_model = PW(growth = "logistic", cap = K))), "K"
+  )
+  # A spec built without `PW()` records no column, and no column is
+  # guessed for it.
+  expect_error(
+    pw_cap_var(list(trend = "PW", growth = "logistic")),
+    "names no carrying-capacity column"
+  )
 })

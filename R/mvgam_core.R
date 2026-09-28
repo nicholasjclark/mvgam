@@ -788,7 +788,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # predictor to stay positive, which a latent trend does not
   # guarantee. The imputation branch returns before this point, and
   # `mvgam_multiple()` raises the same notice once for a whole list.
-  warn_positive_mean_link_with_trend(family, trend_formula)
+  warn_positive_mean_link_with_trend(formula, family, trend_formula)
 
   # Single dataset processing. `threads` is forwarded only when the
   # user actually set it; sending `threads = NULL` explicitly down
@@ -1219,10 +1219,18 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
     )))
   }
 
+  # `mvgam_single()` records the settings the fit ran under on the
+  # stanfit. A stanfit carries no algorithm of its own: neither rstan
+  # nor brms's cmdstanr conversion writes one to `@sim`.
+  backend <- attr(combined_fit, "backend")
+  algorithm <- attr(combined_fit, "algorithm")
+  checkmate::assert_choice(backend, backend_choices(),
+                           .var.name = "attr(combined_fit, 'backend')")
+  checkmate::assert_choice(algorithm, algorithm_choices(),
+                           .var.name = "attr(combined_fit, 'algorithm')")
+
   mvgam_components <- extract_mvgam_components(combined_fit, obs_setup,
                                               trend_setup, mv_spec)
-
-  backend <- attr(combined_fit, "backend") %||% "rstan"
 
   mvgam_object <- structure(
     list(
@@ -1284,8 +1292,8 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       obs_model = obs_setup$brmsfit,
       trend_model = if (!is.null(trend_setup)) trend_setup$brmsfit else NULL,
       backend = backend,
-      init = attr(combined_fit, "init") %||% "random",
-      algorithm = combined_fit@sim$algorithm %||% "sampling",
+      init = attr(combined_fit, "init"),
+      algorithm = algorithm,
       brms_version = utils::packageVersion("brms"),
       mvgam_version = utils::packageVersion("mvgam"),
       stan_version = live_stan_version(backend),
@@ -1716,7 +1724,8 @@ mvgam_multiple <- function(formula,
   # through `mvgam()`, which is why the notice is raised here too.
   # `family` arrives through `...`. Raising it once covers the whole
   # list, where the per-imputation fit would repeat it per dataset.
-  warn_positive_mean_link_with_trend(list(...)$family, trend_formula)
+  warn_positive_mean_link_with_trend(formula, list(...)$family,
+                                     trend_formula)
 
   # Handle mids objects from mice package
   if (inherits(data_list, "mids")) {

@@ -71,6 +71,16 @@ test_that("assert_var_trend() rejects non-VAR fits with a clear pointer", {
     assert_var_trend(fake, surface = "irf()"),
     "'RW'"
   )
+  # A prefit records its trend type in its metadata alone. The gate
+  # and the message both name the type from there.
+  prefit <- structure(
+    list(trend_metadata = list(trend_type = "AR")),
+    class = c("mvgam", "mvgam_prefit")
+  )
+  expect_error(
+    assert_var_trend(prefit, surface = "irf()"),
+    "trend type is 'AR'"
+  )
 })
 
 test_that("detect_var_trend() recognises all four VAR-type spellings", {
@@ -350,4 +360,39 @@ test_that("the VAR posterior carries one label per process", {
                             A = matrix(0.1, 3L, 3L), Sigma = diag(3L),
                             p = 1L), h = 2L)
   expect_identical(names(fevd_gen), vp$labels)
+})
+
+
+test_that("the variance decomposition plot keeps the processes in order", {
+  # Sorting the labels drew the legend, the colours and the panels in
+  # alphabetical order. The object carries the fit's own order.
+  labels <- c("zeta", "alpha", "mu")
+  draws <- lapply(1:2, function(i) {
+    gen_fevd(list(K = 3L, labels = labels,
+                  A = matrix(0.1 * i, 3L, 3L), Sigma = diag(3L),
+                  p = 1L), h = 2L)
+  })
+  class(draws) <- "mvgam_fevd"
+  p <- plot(draws)
+  expect_identical(levels(p$data$Series), labels)
+  expect_identical(levels(p$data$target), labels)
+  # A subset keeps the same relative order.
+  p_sub <- plot(draws, series = c(3L, 1L), contributing = c(2L, 3L))
+  expect_identical(levels(p_sub$data$Series), c("alpha", "mu"))
+  expect_identical(levels(p_sub$data$target), c("zeta", "mu"))
+})
+
+
+test_that("a stability metric that is not there is refused by name", {
+  # A misspelt metric is refused by name. Drawing the metrics that
+  # exist would drop it from the plot without a word.
+  set.seed(5L)
+  x <- data.frame(reactivity = rnorm(20), mean_return_rate = runif(20),
+                  var_return_rate = runif(20))
+  class(x) <- c("mvgam_stability", class(x))
+  expect_error(plot(x, variables = c("reactivity", "reactvity")),
+               "'reactvity'")
+  p <- plot(x, variables = c("var_return_rate", "reactivity"))
+  expect_identical(levels(p$data$metric),
+                   c("var_return_rate", "reactivity"))
 })

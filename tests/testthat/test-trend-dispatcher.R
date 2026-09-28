@@ -26,6 +26,21 @@ test_that("CAR constructor works for continuous-time AR", {
   expect_equal(car_custom$series, "species")
 })
 
+test_that("CAR counts series on the resolved axis", {
+  # A frame whose responses are its series has no series column. The
+  # count once came from that column, which took the absent column as
+  # one series and let a trend covariate through on two.
+  set.seed(1)
+  wide <- data.frame(time = 1:30, y1 = rpois(30, 3), y2 = rpois(30, 3),
+                     x = rnorm(30))
+  expect_error(
+    mvgam(bf(mvbind(y1, y2) ~ 1) + set_rescor(FALSE),
+          trend_formula = ~ x + CAR(), data = wide, family = poisson(),
+          run_model = FALSE, silent = 2),
+    "The trend has 2 series"
+  )
+})
+
 test_that("ZMVN constructor works for zero-mean multivariate normal", {
   # Basic ZMVN creation
   # Suppress expected default warnings
@@ -191,21 +206,22 @@ test_that("trend constructors work with dispatcher integration", {
 test_that("grouping validation helper works correctly", {
 
   # Test default case
-  result1 <- mvgam:::validate_grouping_arguments("NA", "NA")
+  result1 <- mvgam:::validate_grouping_arguments("NA", "NA", "series")
   expect_null(result1$gr)
   expect_null(result1$subgr)
 
-  # gr without subgr auto-fills subgr to "series" because the
-  # hierarchical codegen derives subgroups from the existing series
-  # column when no explicit subgr variable is given.
-  result_gr_only <- mvgam:::validate_grouping_arguments("region", "NA")
+  # gr without subgr names the series column as the subgroup, since
+  # the hierarchical Stan data derives subgroups from that column.
+  result_gr_only <- mvgam:::validate_grouping_arguments(
+    "region", "NA", "site"
+  )
   expect_equal(result_gr_only$gr, "region")
-  expect_equal(result_gr_only$subgr, "series")
+  expect_equal(result_gr_only$subgr, "site")
 
   # gr with explicit subgr = "series" is allowed and matches the
   # auto-fill default.
   result_series_subgr <- mvgam:::validate_grouping_arguments(
-    "region", "series"
+    "region", "series", "series"
   )
   expect_equal(result_series_subgr$gr, "region")
   expect_equal(result_series_subgr$subgr, "series")
@@ -213,9 +229,38 @@ test_that("grouping validation helper works correctly", {
   # subgr without gr is still rejected since there is no main
   # grouping variable to nest within.
   expect_error(
-    mvgam:::validate_grouping_arguments("NA", "site"),
+    mvgam:::validate_grouping_arguments("NA", "site", "series"),
     "'subgr = site' requires a main grouping 'gr'"
   )
+})
+
+test_that("a grouped trend takes its subgroups from the series column", {
+  # `gr` without `subgr` names the series column as the subgroup. A
+  # series column called `site` gives the subgroups that column holds.
+  d <- expand.grid(t = 1:20, site = paste0("s", 1:4))
+  d$region <- factor(ifelse(d$site %in% c("s1", "s2"), "A", "B"))
+  d$site <- factor(d$site)
+  d$y <- seq_len(nrow(d)) / 10
+  m <- mvgam(y ~ 1,
+             trend_formula = ~ ZMVN(time = t, series = site, gr = region),
+             data = d, family = gaussian(), run_model = FALSE, silent = 2)
+  sd <- standata(m)
+  expect_identical(as.integer(sd$group_inds_trend), c(1L, 1L, 2L, 2L))
+  expect_identical(unname(sd$group_members_trend),
+                   matrix(1:4, 2L, byrow = TRUE))
+})
+
+test_that("the hierarchical record keeps no copy of the subgroup", {
+  # `validate_grouping_arguments()` fills a missing `subgr` with the
+  # series column, and the grouping record holds the one copy.
+  info <- mvgam:::extract_hierarchical_info(
+    list(data = data.frame(region = c("a", "b")),
+         series_groups = c("a", "a", "b", "b")),
+    ZMVN(gr = region)
+  )
+  expect_named(info, c("has_groups", "n_groups", "n_subgroups", "gr_var"))
+  expect_identical(info$gr_var, "region")
+  expect_identical(info$n_subgroups, 2L)
 })
 
 # Test formula parsing - basic functionality

@@ -138,10 +138,15 @@ test_that("vcov.mvgam(pars =) filters fixed effects", {
 })
 
 
-test_that("vcov.mvgam returns empty matrix when pars filter is empty", {
+test_that("vcov.mvgam refuses a 'pars' entry the model does not have", {
+  # An unknown name dropped out of the matrix, and a misspelt term
+  # returned it without that row and without a message.
   stub <- make_loo_extras_stub()
-  v <- vcov(stub, pars = "no_such_term")
-  expect_identical(dim(v), c(0L, 0L))
+  expect_error(vcov(stub, pars = "no_such_term"), "no_such_term")
+  expect_error(vcov(stub, pars = c("x", "no_such_term")), "no_such_term")
+  # The names that exist come back in the order they were asked for.
+  v <- vcov(stub, pars = c("x", "Intercept"))
+  expect_identical(colnames(v), c("x", "Intercept"))
 })
 
 

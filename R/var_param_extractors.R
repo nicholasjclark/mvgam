@@ -47,11 +47,7 @@ assert_var_trend <- function(object, surface) {
   if (is.null(trend_type)) {
     stop(insight::format_error(c(
       paste0("'", surface, "' requires a VAR(1) latent trend."),
-      x = paste0(
-        "This fit's trend type is '",
-        object$trend_components$types[1L] %||% "<none>",
-        "'."
-      ),
+      x = paste0("This fit's trend type is '", get_trend_type(object), "'."),
       i = paste0(
         "Refit with 'trend_formula = ~ VAR(p = 1)' to use ",
         "'", surface, "'."

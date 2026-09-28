@@ -1364,9 +1364,8 @@ test_that("pp_check carries its grouping and its x variable through", {
   # `x` at all.
   #
   # Silencing the deprecation to reach the assertion would hide a
-  # notice every user of those two types receives, so the `x`
-  # argument is left without coverage and the reason is recorded in
-  # FINDINGS.md rather than dressed up as a passing test.
+  # notice every user of those two types receives. The `x` argument
+  # is left without coverage for that reason.
 })
 
 

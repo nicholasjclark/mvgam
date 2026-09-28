@@ -400,7 +400,7 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
   # The coefficients stay in `monitor_params`, which also supplies
   # the summary labels and the set of names mvgam intercepts before
   # brms sees them.
-  sharing <- trend_obj$coef_sharing %||% "none"
+  sharing <- ar_coef_sharing(trend_obj)
   if (sharing %in% c("shared", "hierarchical")) {
     monitor_params <- monitor_params[
       !(is_ar_coefficient(monitor_params) | is_ar_partial(monitor_params))

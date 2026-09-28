@@ -1,5 +1,4 @@
-# Count the shapes tech debt takes in R/, as FINDINGS.md entry 89
-# describes them.
+# Count the shapes tech debt takes in R/.
 #
 # Each shape leaves a mark in the source that a scan can find, and a
 # count can be driven down and checked. The scan reads parse data, not

@@ -621,13 +621,13 @@ ordinate.mvgam <- function(
   svd_comp <- ordinate_factor_components(object, alpha, rotation)
   series_info <- resolve_series_info(object)
   species_names <- series_info$series_levels
-  data <- mvgam_training_data(object)
-  site_names <- if (!is.null(data) && "time" %in% names(data)) {
-    sort(unique(data$time))
-  } else {
-    # Last-resort fallback: 1..n_time bare integer labels.
+  # The score rows are the rows of `lv_trend`, one per time on the
+  # fit's own axis, and the axis labels them. A column named `time`
+  # taken from the frame numbered the sites 1 to n on any fit whose
+  # time column had another name. A fit recording no time axis
+  # labels them by position.
+  site_names <- mvgam_axes(object)$time$values %||%
     seq_len(NROW(svd_comp$scores))
-  }
   traits <- resolve_auto_traits(traits, object)
   ordinate_build_plot(
     svd_comp, which_lvs, biplot, label_sites,

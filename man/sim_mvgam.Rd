@@ -39,8 +39,8 @@ Defaults to \code{80L}.}
 \item{trend_model}{An optional \code{mvgam_trend} constructor (e.g.
 \code{AR(p = 1)}, \code{VAR(p = 2, cor = TRUE)}, \code{CAR()}, \code{ZMVN()}).
 \code{NULL} (the default) selects the type's preferred trend (see
-\emph{Details}). Sparse-lag specs like \code{AR(p = c(1, 3, 12))} are
-supported natively.}
+\emph{Details}), and \code{"None"} simulates no trend. Sparse-lag specs
+like \code{AR(p = c(1, 3, 12))} are supported natively.}
 
 \item{prop_trend}{Numeric in \verb{[0, 1]} controlling the fraction
 of total link-scale variance contributed by the latent
