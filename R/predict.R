@@ -436,11 +436,8 @@ predict_variance <- function(object, newdata, process_error,
   total_draws <- nrow(draws_mat)
 
   if (nrow(mu_full) != total_draws) {
-    stop(insight::format_error(c(
-      "Internal: posterior_epred row count does not match total draws.",
-      x = paste0("Expected ", total_draws, " rows in mu. Got ",
-                 nrow(mu_full), ".")
-    )))
+    stop_shape_fault("The expected-value draws", nrow(mu_full),
+                     total_draws)
   }
 
   # Pick the draw subsample once, use it for both mu and dpars so they
@@ -489,21 +486,17 @@ predict_variance <- function(object, newdata, process_error,
     if (is.null(x)) return(NULL)
     checkmate::assert_matrix(x)
     if (nrow(x) != n_rows) {
-      stop(insight::format_error(c(
-        "Internal: dpar row count does not match mu row count.",
-        x = paste0("dpar has ", nrow(x), " rows. mu has ", n_rows, ".")
-      )))
+      stop_shape_fault("A distributional parameter", nrow(x), n_rows)
     }
     if (ncol(x) == n_cols) return(x)
     if (ncol(x) == 1L) {
       return(matrix(x[, 1L], nrow = n_rows, ncol = n_cols,
                     byrow = FALSE))
     }
-    stop(insight::format_error(c(
-      "Internal: unexpected dpar column count.",
-      x = paste0("Got ", ncol(x), " columns. Expected 1 or ",
-                 n_cols, ".")
-    )))
+    stop_mvgam_fault(
+      "A distributional parameter must have 1 column or one per row.",
+      paste0("Got ", ncol(x), " columns for ", n_cols, " rows.")
+    )
   }
 
   sigma_mat <- broadcast(fpars$sigma, ndraws_mu, nobs_mu)

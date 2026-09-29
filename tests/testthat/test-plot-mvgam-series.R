@@ -34,14 +34,7 @@
     test_data = test_d,
     formula = stats::as.formula("y ~ 1"),
     family = stats::gaussian(),
-    series_info = list(
-      series_levels = series_levels,
-      n_series = n_series, series_names = factor(series_levels)
-    ),
-    trend_metadata = list(
-      variables = list(time_var = "time", series_var = "series"),
-      levels = list(series = series_levels)
-    )
+    trend_metadata = mock_axis_record(d)
   )
   class(obj) <- c("mvgam", "brmsfit")
   obj
@@ -72,7 +65,7 @@ test_that("resolve_series_index rejects invalid input", {
   )
   expect_error(
     mvgam:::resolve_series_index(c(1L, 2L), lv4),
-    "names one series"
+    "selects one series"
   )
   # Out of range, fractional and negative indices are all refused.
   expect_error(mvgam:::resolve_series_index(-1, lv4))

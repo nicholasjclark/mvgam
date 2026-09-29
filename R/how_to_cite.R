@@ -669,7 +669,7 @@ uses_heavy_tailed_trend <- function(object) {
 }
 
 # Predicate: was the fit produced by the jsdgam() wrapper? Keys
-# off the class hierarchy set in jsdgam() (c("mvgam", "jsdgam"))
+# off the `jsdgam` class that jsdgam() adds
 # rather than family or trend type, because jsdgam composes onto
 # the standard mvgam factor-model path and shares the family /
 # trend surface with plain mvgam fits.

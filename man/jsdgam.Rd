@@ -205,10 +205,12 @@ include \code{data2} (lookup list for string-named \code{traits} / \code{phylo}
 slots), \code{algorithm}, \code{chains}, and \code{silent}.}
 }
 \value{
-A \code{list} of class \code{c("mvgam", "jsdgam")}. The full mvgam
+A \code{list} of class \code{c("mvgam", "jsdgam", "brmsfit")}. The full mvgam
 method surface (\code{summary}, \code{predict}, \code{forecast}, \code{loo},
 \code{posterior_epred}, etc.) applies; jsdgam-specific surfaces
 (\code{ordinate}, \code{residual_cor}) recognise the additional class.
+\code{\link[=update.mvgam]{update()}} refits it through \code{jsdgam()}, with any
+argument above overridden, e.g. \code{update(fit, n_lv = 3)}.
 }
 \description{
 Sets up a Joint Species Distribution Model (JSDM) in which the

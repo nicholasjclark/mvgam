@@ -56,19 +56,6 @@ suppressMessages({
 # has to come from the environment:
 #   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(53L)
 
@@ -189,23 +176,15 @@ test_that("the Stan series and mgcv agree, once M is large enough", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_tweedie.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading tweedie fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(y ~ x, AR(p = 1), tweedie())\n")
-  fit <- mvgam(
+fit <- cached_fit("val_mvgam_tweedie.rds", function() {
+  mvgam(
     y ~ x, trend_formula = ~ AR(p = 1), data = dat,
     family = tweedie(),
     chains = 2L, iter = 1000L, warmup = 500L,
     control = list(adapt_delta = 0.95),
     silent = 2, backend = "cmdstanr"
   )
-  part <- paste0(cache, ".part")
-  saveRDS(fit, part)
-  file.rename(part, cache)
-}
+})
 
 ids <- 1:400
 
@@ -339,14 +318,9 @@ test_that("residuals and loo are built on the same fit", {
   expect_identical(nrow(res), nrow(dat))
   expect_true(all(is.finite(res[, "Estimate"])))
 
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   expect_identical(length(ic$diagnostics$pareto_k), nrow(dat))
   # loo picks its warning threshold from the number of draws (about

@@ -30,15 +30,6 @@ suppressMessages({
   library(testthat)
 })
 
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 SM <- suppressMessages
 
@@ -70,12 +61,8 @@ for (s in series_levels) {
   dat$y[rows] <- level_true[[s]] + state + stats::rnorm(n_time, 0, 0.2)
 }
 
-path <- cache_path("val_mvgam_confound_conf.rds")
-conf <- if (file.exists(path)) {
-  message("[cache] Loading confounded fit.")
-  readRDS(path)
-} else {
-  fit <- SM(mvgam(
+conf <- cached_fit("val_mvgam_confound_conf.rds", function() {
+  SM(mvgam(
     y ~ 1,
     trend_formula = ~ series + AR(p = 1),
     data = dat,
@@ -84,9 +71,7 @@ conf <- if (file.exists(path)) {
     cores = 1L,
     silent = 2L
   ))
-  saveRDS(fit, path)
-  fit
-}
+})
 
 # The user-facing projection, where the trend's series coefficients
 # carry the names the axis gives them. The raw Stan draws name them

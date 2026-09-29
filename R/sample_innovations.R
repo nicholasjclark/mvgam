@@ -17,83 +17,27 @@
 #'   \item \code{full_covariance}: Direct covariance matrix Sigma (VAR)
 #' }
 #'
-#' New trend types only need to declare their covariance pattern to
-#' integrate with this sampling infrastructure.
+#' Each trend declares its pattern in the trend registry.
 #'
 #' @name sample_innovations
 #' @keywords internal
 NULL
 
 
-#' Covariance Pattern Constants
-#'
-#' Maps trend types to their covariance parameterization pattern.
-#' New trend types should be added here with their appropriate pattern.
-#'
-#' @noRd
-trend_covariance_patterns <- list(
-  # Cholesky-scaled patterns: L_Sigma = diag(sigma_trend) %*% L_Omega_trend
-  RW = "cholesky_scaled",
-  AR = "cholesky_scaled",
-  ZMVN = "cholesky_scaled",
-
-  # Full covariance patterns: direct Sigma_trend matrix
-  VAR = "full_covariance",
-
-  # Diagonal patterns: independent innovations, sigma_trend only
-  CAR = "diagonal",
-
-  # No innovations: deterministic trends
-  PW = "none",
-  None = "none"
-)
-
-
 #' Get Covariance Pattern for Trend Type
 #'
-#' Retrieves the covariance pattern associated with a trend type.
-#' Falls back to "cholesky_scaled" for unknown types (most common).
+#' Each trend registers how its innovations are parameterised in
+#' `<name>_trend_properties()`. A fit with no trend, which
+#' `get_trend_type()` reports as `"None"`, has no innovations.
 #'
-#' @param trend_type Character string specifying the trend type
-#'   (e.g., "AR", "RW", "VAR", "ZMVN", "CAR", "PW")
+#' @param trend_type A registered trend type name, or `"None"`
 #'
 #' @return Character string: one of "none", "diagonal",
 #'   "cholesky_scaled", or "full_covariance"
 #'
 #' @noRd
 get_covariance_pattern <- function(trend_type) {
-  checkmate::assert_string(trend_type, min.chars = 1)
-
-  # Reason: match dictionary keys case-insensitively after stripping
-  # any numeric suffix ("AR1" -> "AR"). The dictionary keys keep
-  # their natural case so adding a new trend type does not require
-  # knowing the lookup convention.
-  base_type <- gsub("[0-9]+$", "", trend_type)
-  key_idx <- match(
-    tolower(base_type),
-    tolower(names(trend_covariance_patterns))
-  )
-
-  pattern <- if (!is.na(key_idx)) {
-    trend_covariance_patterns[[key_idx]]
-  } else {
-    NULL
-  }
-
-  if (is.null(pattern)) {
-    # Default to cholesky_scaled for unknown types (most common pattern)
-    warn_once(
-      c(
-        paste0("Unknown trend type '", trend_type, "' encountered."),
-        i = "Defaulting to 'cholesky_scaled' covariance pattern.",
-        i = "Register custom trends in trend_covariance_patterns."
-      ),
-      paste0("unknown_trend_cov_", trend_type)
-    )
-    pattern <- "cholesky_scaled"
-  }
-
-  pattern
+  trend_property(trend_type, "covariance_pattern")
 }
 
 
@@ -124,7 +68,7 @@ prepare_mvgam_frame <- function(object, data) {
 
 #' The series label each row of a frame carries
 #'
-#' The same identity `fitted_series_index()` is keyed on, read per
+#' The same identity `fitted_series_levels()` names, read per
 #' row rather than per level, so a caller naming its output by one
 #' and subsetting by the other cannot end up comparing a derived
 #' series against the column it superseded.
@@ -142,69 +86,21 @@ training_series_labels <- function(object, data = NULL) {
 }
 
 
-#' The index each series carries in the fitted trend matrix
+#' The series a model was fitted on
 #'
-#' `trend[t, s]` numbers its second index over the series the model
-#' was fitted on, and `standata$obs_trend_series` records the index
-#' the fit gave each training row. That record is what Stan sampled
-#' against, so it settles the mapping outright.
+#' In the order `trend[t, s]` numbers its columns, from the axis record.
+#' A hierarchical fit derives its series from `gr` and `subgr`, and
+#' sorting the column it superseded gives a permutation of that order.
+#' Every label stays valid under a permutation. Each series would then
+#' take another series' state and nothing would fail.
 #'
-#' Deriving the order instead, by sorting the levels the series
-#' column happens to hold, answers a different question: a fit whose
-#' series is rebuilt from a `gr` / `subgr` pair sorts region-major
-#' while the column it superseded sorted otherwise, and the two
-#' orders are a permutation of one another. Both carry every label,
-#' so the mismatch costs no error and no missing value, and every
-#' series simply reads another series' state.
-#'
-#' A fit predating the record, or one whose trend has no series axis,
-#' falls back to the derived order.
-#'
-#' @param object A fitted `mvgam` object
-#' @return Named integer vector mapping series label to trend column,
-#'   or NULL when neither source is available
-#'
+#' @param object A fitted `mvgam` object or prefit
+#' @return Character vector, or `NULL` for a model whose frame names no
+#'   axis
 #' @noRd
-fitted_series_index <- function(object) {
-  train <- mvgam_training_data(object)
-  if (is.null(train)) {
-    return(NULL)
-  }
-  # The axis the model was built on, which is the answer whenever the
-  # fit carries it. Everything below is a fallback for a fit that
-  # predates the record, and asking the record first spares every call
-  # on a current fit the frame preparation those fallbacks need.
-  recorded_axis <- mvgam_axes(object)$series$levels
-  if (!is.null(recorded_axis)) {
-    return(stats::setNames(seq_along(recorded_axis), recorded_axis))
-  }
-  frame <- prepare_mvgam_frame(object, train)
-  # A frame whose responses are its series states the axis outright,
-  # and the per-row values are then a single constant that no sorting
-  # can recover the axis from. The record is per response on such a
-  # fit (`obs_trend_series_<resp>`), so there is nothing below for the
-  # label route to read either. Sorting labels is a last resort that
-  # gives an alphabetical order, and a hierarchical or response-keyed
-  # fit numbers its columns in another one.
-  axis <- mvgam_response_axis(frame)
-  if (!is.null(axis)) {
-    return(stats::setNames(seq_along(axis), axis))
-  }
-
-  labels <- as.character(get_series_for_grouping(frame))
-  recorded <- object$standata$obs_trend_series
-  if (!is.null(recorded) && length(recorded) == length(labels)) {
-    per_label <- tapply(as.integer(recorded), labels, unique)
-    # A label spanning two columns would mean the preparation and the
-    # fit disagree about what a series is, which no mapping can
-    # reconcile; the derived order is then the honest answer.
-    if (all(lengths(per_label) == 1L)) {
-      out <- unlist(per_label)
-      return(sort(out))
-    }
-  }
-  levs <- sort(unique(labels))
-  stats::setNames(seq_along(levs), levs)
+fitted_series_levels <- function(object) {
+  levels <- mvgam_axes(object)$series$levels
+  if (!is.null(levels)) as.character(levels)
 }
 
 
@@ -288,25 +184,6 @@ get_observation_structure <- function(object, newdata = NULL,
   # rebuilds the multivariate series from the fit's own responses.
   data_prepared <- prepare_mvgam_frame(object, newdata)
 
-  # Validate that data preparation succeeded
-  checkmate::assert_data_frame(data_prepared, min.rows = 1)
-  if (is.null(attr(data_prepared, "mvgam_time"))) {
-    stop(insight::format_error(c(
-      "Failed to prepare data with mvgam time attributes.",
-      i = cli::format_inline(
-        "Check that {.field {time_var}} exists in data."
-      )
-    )))
-  }
-  if (is.null(attr(data_prepared, "mvgam_series"))) {
-    stop(insight::format_error(c(
-      "Failed to prepare data with mvgam series attributes.",
-      i = cli::format_inline(
-        "Check that {.field {series_var}} exists in data."
-      )
-    )))
-  }
-
   # Extract indices using existing accessor functions
   time_indices <- get_time_for_grouping(data_prepared)
   series_indices <- get_series_for_grouping(data_prepared)
@@ -321,21 +198,11 @@ get_observation_structure <- function(object, newdata = NULL,
   # its full level set through subsetting and so survives that; one
   # whose series is rebuilt from a `gr` / `subgr` pair does not,
   # because the rebuild sees only the levels present.
-  index <- fitted_series_index(object)
-  if (is.null(index)) {
-    levs <- sort(unique(as.character(series_indices)))
-    index <- stats::setNames(seq_along(levs), levs)
-  }
-  series_levels <- names(index)
-  series_int <- unname(index[as.character(series_indices)])
-  unmatched <- unique(as.character(series_indices)[is.na(series_int)])
-  if (length(unmatched)) {
-    stop(insight::format_error(c(
-      "newdata names series the model was not fitted on.",
-      x = cli::format_inline("Unknown: {.val {unmatched}}."),
-      i = cli::format_inline("Fitted series are {.val {series_levels}}.")
-    )))
-  }
+  series_levels <- fitted_series_levels(object) %||%
+    observed_levels(series_indices)
+  refuse_unseen_levels("Series", unique(as.character(series_indices)),
+                       series_levels)
+  series_int <- match(as.character(series_indices), series_levels)
 
   # Every reader of this structure indexes the trend, or the
   # innovations drawn for it, with `series_int`, so the rule for a
@@ -376,7 +243,7 @@ get_observation_structure <- function(object, newdata = NULL,
 #' @noRd
 build_single_series_observation_structure <- function(newdata, time_var,
                                                        level_label) {
-  refuse_absent_time_column(newdata, time_var)
+  assert_axis_column(newdata, time_var, "time")
   time_indices <- newdata[[time_var]]
   unique_times <- sort(unique(time_indices))
   n_obs <- nrow(newdata)
@@ -396,58 +263,12 @@ build_single_series_observation_structure <- function(newdata, time_var,
 
 #' Get Trend Type from mvgam Object
 #'
-#' Extracts the base trend type from a fitted mvgam object.
-#'
-#' @param object mvgam object with fitted trend model
-#'
-#' @return Character string with trend type (e.g., "AR", "RW", "VAR"),
-#'   or "None" if no trend model present.
-#'
-#' @details
-#' Lookup order:
-#' 1. `trend_components$types\[1\]` - primary source used by summary/print
-#' 2. `trend_metadata$trend_type` - the field a prefit records
-#' 3. `trend_formula` existence check - issues warning if type unclear
-#' 4. Returns "None" if no trend model detected
-#'
+#' @param object An `mvgam` object or prefit
+#' @return The base trend type (e.g. "AR", "RW", "VAR"), or "None"
+#'   for a model without a trend
 #' @noRd
 get_trend_type <- function(object) {
-  checkmate::assert_class(object, "mvgam")
-
-  # Primary source: trend_components$types (used by summary/print)
-  trend_comps <- object$trend_components
-  if (!is.null(trend_comps) && !is.null(trend_comps$types)) {
-    trend_type <- trend_comps$types[1]
-    if (!is.null(trend_type) && !is.na(trend_type)) {
-      return(trend_type)
-    }
-  }
-
-  # On a prefit `trend_components` is empty, and
-  # `trend_metadata$trend_type` names the type. `trend_order_label()`
-  # takes that same field for the printed label, which gave `print()`
-  # and this resolver two results for one object.
-  recorded <- object$trend_metadata$trend_type
-  if (!is.null(recorded) && !is.na(recorded[1L])) {
-    return(recorded[1L])
-  }
-
-  # Tertiary: check trend_formula existence (indicates trends present)
-  if (!is.null(object$trend_formula)) {
-    warn_once(
-      c(
-        "The trend type is absent from the object structure.",
-        i = paste0(
-          "A trend formula is present, and 'trend_components' and ",
-          "'trend_metadata' both leave the type empty."
-        )
-      ),
-      "unknown_trend_type"
-    )
-  }
-
-  # Default to None if no trend model present
-  "None"
+  object$trend_metadata$trend_type %||% "None"
 }
 
 
@@ -639,24 +460,19 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   metadata <- object$trend_metadata
   if (is.null(metadata)) {
     stop(insight::format_error(c(
-      "This 'mvgam' fit has no latent trend and hence no trend covariance.",
-      i = paste0(
-        "A trend is declared through 'trend_formula', for example ",
-        "trend_formula = ~ AR(cor = TRUE)."
-      )
-    )))
+      "A trend covariance requires a fit with a latent trend.",
+      i = paste0("Declare a trend through 'trend_formula', e.g. ",
+                 "'trend_formula = ~ AR(cor = TRUE)'.")
+    )), call. = FALSE)
   }
 
   trend_type <- get_trend_type(object)
   pattern <- get_covariance_pattern(trend_type)
-
-  specs <- object$trend_components$specifications
-  spec_one <- if (inherits(specs, "mvgam_trend")) specs else specs[[1]]
   # `create_mvgam_trend()` resolves `cor` to TRUE for a grouped trend,
   # matching the program, which declares the group correlation
-  # parameters whenever `gr` is named. The grouping clause here covers
-  # fits saved before that resolution existed.
-  has_correlations <- isTRUE(spec_one$cor) || named_var(spec_one$gr)
+  # parameters whenever `gr` is named.
+  spec <- first_trend_spec(object)
+  has_correlations <- isTRUE(spec$cor)
 
   if (pattern == "none") {
     return(list(
@@ -670,16 +486,12 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     ))
   }
 
-  # Trend topology comes from the user's trend constructor spec.
-  # `detect_factor_n_lv` returns n_lv (or NULL); a non-NA `$gr`
-  # marks a hierarchical (grouped) trend. Same checks the
-  # stan-assembly / validation layers use.
-  spec <- trend_spec_for_residcor(object)
+  # `detect_factor_n_lv` returns n_lv (or NULL). A named `gr` marks a
+  # hierarchical (grouped) trend.
   n_lv <- detect_factor_n_lv(object)
   is_lv <- !is.null(n_lv)
   hierarchical <- named_var(spec$gr)
-  n_obs_series <- mvgam_axes(object)$series$n %||%
-    object$trend_components$n_trends
+  n_obs_series <- mvgam_axes(object)$series$n
   n_series <- if (is_lv) as.integer(n_lv) else
     as.integer(n_obs_series)
 
@@ -831,9 +643,10 @@ resolve_draw_indices <- function(total_draws, ndraws, draw_ids) {
   if (!is.null(ndraws)) {
     if (ndraws > total_draws) {
       stop(insight::format_error(c(
-        "Requested more draws than the posterior holds.",
-        x = paste0("Asked for ", ndraws, ". The fit has ", total_draws, ".")
-      )))
+        "Requested more draws than the posterior has.",
+        x = paste0("Asked for ", ndraws, " from a fit with ", total_draws,
+                   ".")
+      )), call. = FALSE)
     }
     if (ndraws == total_draws) {
       return(seq_len(total_draws))
@@ -876,10 +689,7 @@ extract_posterior_param <- function(draws_mat, all_cols, param_name) {
     return(as.matrix(draws_mat[, scalar_cols[1], drop = FALSE]))
   }
 
-  stop(insight::format_error(c(
-    paste0("Parameter '", param_name, "' not found in posterior."),
-    i = "Check that model was fitted with expected covariance structure."
-  )))
+  stop_missing_draws(param_name, c(param_name, paste0(param_name, "[...]")))
 }
 
 
@@ -1092,8 +902,8 @@ group_members <- function(group_inds, n_subgroups) {
   if (any(sizes != n_subgroups)) {
     stop(insight::format_error(c(
       "Every group of a grouped trend needs the same number of series.",
-      x = paste0("Group sizes: ", paste(sizes, collapse = ", "),
-                 ". Each group needs ", n_subgroups, ".")
+      x = paste0("Group sizes are ", paste(sizes, collapse = ", "),
+                 " and each group needs ", n_subgroups, ".")
     )), call. = FALSE)
   }
   members
@@ -1402,65 +1212,13 @@ filter_hidden_pars <- function(pars) {
   pars[!is_hidden_par(pars)]
 }
 
-# Internal: return a `[ndraws, n_series, n_lv]` loading array
-# for any post-fit method that needs Z across draws. Two
-# branches:
-#   1. Free-loadings fits (default factor model, jsdgam under
-#      the Heaps identification, any trend_map = NULL or
-#      all-NA matrix) sample Z. The posterior carries
-#      `Z_tilde[s, k]` (post-hoc QR) or raw `Z[s, k]` columns
-#      that `extract_Z_loadings()` pulls per draw.
-#   2. Fully-fixed trend_map fits (any user shorthand or
-#      numeric matrix with all finite entries) never sample Z.
-#      The deterministic loading matrix lives on
-#      `object$mv_spec$trend_specs$fixed_Z` and is broadcast
-#      across draws here so callers see the same three-way
-#      array shape they would get from the sampled branch.
-# Callers: forecast.mvgam:propagate_one_draw for the LV-space
-# forecast projection, active_factors for column-norm
-# summaries. Both need per-draw Z either way.
-#'@noRd
-resolve_Z_loadings <- function(object, draws_mat, n_series, n_lv,
-                               basis = c("identified", "model")) {
-  checkmate::assert_matrix(draws_mat)
-  checkmate::assert_int(n_series, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  basis <- match.arg(basis)
-  has_free_Z <- any(grepl(
-    "^Z(_tilde)?\\[", colnames(draws_mat)
-  ))
-  if (has_free_Z) {
-    return(extract_Z_loadings(draws_mat, n_series, n_lv, basis = basis))
-  }
-  fixed_Z <- object$mv_spec$trend_specs$fixed_Z
-  if (is.null(fixed_Z)) {
-    stop(insight::format_error(c(
-      "Cannot resolve loading matrix for factor fit.",
-      x = "Neither posterior Z / Z_tilde columns nor a fixed_Z on mv_spec.",
-      i = paste0(
-        "Expected the fit to carry `mv_spec$trend_specs$fixed_Z` ",
-        "(a fully-fixed trend_map) or sampled Z columns in the ",
-        "posterior."
-      )
-    )))
-  }
-  checkmate::assert_matrix(fixed_Z, nrows = n_series, ncols = n_lv)
-  ndraws <- nrow(draws_mat)
-  # Broadcast the deterministic [n_series, n_lv] loading matrix
-  # across draws so the caller's per-draw slicing sees the same
-  # array shape it would get from `extract_Z_loadings()`.
-  array(rep(as.numeric(fixed_Z), each = ndraws),
-        dim = c(ndraws, n_series, n_lv))
-}
-
-
 # Internal: extract factor-loading draws from the posterior.
 # Returns array [ndraws, n_obs_series, n_lv] sorted by series
 # index (outer) then by lv index (inner), matching Stan's
 # column-major storage convention. Selects `Z_tilde` or `Z` via
-# `factor_loading_param_pattern()`. For a resolver that also
-# handles fully-fixed trend_map fits (Z as data), use
-# `resolve_Z_loadings()` above.
+# `factor_loading_param_pattern()`. `resolve_factor_loadings()`
+# also returns the loadings of a fully fixed trend_map fit, whose Z
+# is data.
 #'@noRd
 extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv,
                                basis = c("identified", "model")) {
@@ -1474,21 +1232,12 @@ extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv,
   cols <- grep(pattern, colnames(draws_mat), value = TRUE)
   expected_cols <- n_obs_series * n_lv
   if (length(cols) != expected_cols) {
-    stop(insight::format_error(c(
-      paste0(
-        "Expected ", expected_cols, " ", param_name,
-        " loading columns, found ", length(cols), "."
-      ),
-      i = paste0(
-        "Latent-factor model needs ", param_name,
-        "[s, lv] for s in 1..", n_obs_series,
-        ", lv in 1..", n_lv, "."
-      ),
-      i = paste0(
-        "Read draws from the stanfit itself: mvgam's 'as_draws_*' ",
-        "methods hide the unrotated loadings."
-      )
-    )))
+    stop_mvgam_fault(
+      paste0("Expected ", expected_cols, " ", param_name,
+             " loading columns, found ", length(cols), "."),
+      paste0("A factor model stores ", param_name, "[s, lv] for s in 1..",
+             n_obs_series, " and lv in 1..", n_lv, ".")
+    )
   }
   # Stan stores the loading matrix column-major:
   # [1,1], [2,1], ..., [N_series,1], [1,2], ...
@@ -1603,13 +1352,9 @@ transform_cholesky_innovations <- function(z, params, n_times, n_series,
   L_omega_arr <- params$L_Omega_trend
 
   checkmate::assert_matrix(sigma, nrows = ndraws, ncols = n_series)
-  if (!identical(dim(L_omega_arr),
-                 as.integer(c(ndraws, n_series, n_series)))) {
-    stop(insight::format_error(c(
-      "Unexpected dimensions for 'L_Omega_trend'.",
-      x = paste0("Got: ", paste(dim(L_omega_arr), collapse = "x"),
-                 ", expected: ", ndraws, "x", n_series, "x", n_series, ".")
-    )))
+  expected <- c(ndraws, n_series, n_series)
+  if (!identical(dim(L_omega_arr), as.integer(expected))) {
+    stop_shape_fault("'L_Omega_trend'", dim(L_omega_arr), expected)
   }
 
   # Pre-allocate result matrix
@@ -1661,13 +1406,9 @@ transform_full_cov_innovations <- function(z, params, n_times, n_series,
   checkmate::assert_int(ndraws, lower = 1)
 
   Sigma_arr <- params$Sigma_trend
-  if (!identical(dim(Sigma_arr),
-                 as.integer(c(ndraws, n_series, n_series)))) {
-    stop(insight::format_error(c(
-      "Unexpected dimensions for 'Sigma_trend'.",
-      x = paste0("Got: ", paste(dim(Sigma_arr), collapse = "x"),
-                 ", expected: ", ndraws, "x", n_series, "x", n_series, ".")
-    )))
+  expected <- c(ndraws, n_series, n_series)
+  if (!identical(dim(Sigma_arr), as.integer(expected))) {
+    stop_shape_fault("'Sigma_trend'", dim(Sigma_arr), expected)
   }
 
   # Pre-allocate result matrix
@@ -1724,11 +1465,11 @@ map_innovations_to_obs <- function(innovations_flat, n_times, n_series,
   time_idx <- match(obs_structure$time, obs_structure$unique_times)
   series_idx <- obs_structure$series_int
 
-  # Validate time matching succeeded
-  if (any(is.na(time_idx))) {
-    stop(insight::format_error(
-      "Failed to match observation times to unique time points."
-    ))
+  if (anyNA(time_idx)) {
+    stop_mvgam_fault(
+      "Every observation time must be one of the grid's times.",
+      paste0(sum(is.na(time_idx)), " observation times matched none.")
+    )
   }
 
   # Validate series indices are within bounds
@@ -1997,16 +1738,10 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
   sigma_arr <- params$sigma_group_trend
 
   checkmate::assert_numeric(alpha, len = ndraws, any.missing = FALSE)
-  # Local helper: dim() returns integer; build expected as integer too
-  # so identical() doesn't trip on a numeric/integer mismatch.
+  # dim() returns integers and the expected shape is compared as integers
   check_dims <- function(arr, name, expected) {
-    expected <- as.integer(expected)
-    if (!identical(dim(arr), expected)) {
-      stop(insight::format_error(c(
-        paste0("Unexpected dimensions for '", name, "'."),
-        x = paste0("Got: ", paste(dim(arr), collapse = "x"),
-                   ", expected: ", paste(expected, collapse = "x"), ".")
-      )))
+    if (!identical(dim(arr), as.integer(expected))) {
+      stop_shape_fault(paste0("'", name, "'"), dim(arr), expected)
     }
   }
 
@@ -2101,7 +1836,7 @@ draw_trend_innovations <- function(n_draws, n_series, df = Inf) {
 #'
 #' @noRd
 ar_coef_draws <- function(object, draws_mat, n_series) {
-  spec <- trend_spec_for_residcor(object)
+  spec <- first_trend_spec(object)
   lags <- as.integer(resolve_active_lags(spec$p))
   if (length(lags) == 0L) {
     return(NULL)
@@ -2379,8 +2114,7 @@ rescale_params_to_stationary <- function(params, object, draws_mat,
   # dropped before the kernel is identified.
   trend_type <- unname(as.character(get_trend_type(object)))[1L]
   # Which kernels settle, and how each one supplies the covariance, is
-  # one registry fact. A custom trend declares its own and defaults to
-  # keeping its innovation covariance.
+  # one registry fact.
   stat_source <- trend_stationary_source(trend_type)
   if (identical(stat_source, "none")) {
     return(params)

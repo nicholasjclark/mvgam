@@ -1,15 +1,3 @@
-# Internal: softmax over a vector of linear predictors. The maximum
-# is subtracted before exponentiating, which keeps `exp()` finite for
-# a predictor of any magnitude and leaves the result unchanged: the
-# transform is invariant to a shift shared by every component.
-#'@noRd
-softmax <- function(x) {
-  checkmate::assert_numeric(x, min.len = 1L, any.missing = FALSE)
-  e <- exp(x - max(x))
-  e / sum(e)
-}
-
-
 # Internal: draw one unit's worth of responses from a `K`-vector of
 # linear predictors.
 #

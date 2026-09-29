@@ -127,7 +127,7 @@ compose_linpred <- function(prep, form, resp, dpar) {
   if (is.null(dpar_form)) {
     stop_mvgam_fault(
       paste0("A linear predictor was asked for '", dpar,
-             "', which has no formula of its own."),
+             "' without a formula of its own."),
       "Only a parameter given a formula has a linear predictor."
     )
   }
@@ -405,10 +405,9 @@ group_level_pred <- function(prep, draws, resp, dpar, nlpar, n_obs) {
                "not supported."),
         x = paste0("Grouping factor '", group, "' was fitted with ",
                    n_levels, " level", if (n_levels != 1L) "s",
-                   ". 'newdata' asks for ", max(J), "."),
-        i = paste0("Use 're_formula = NA' to predict from the population ",
-                   "effects or supply 'newdata' whose levels the model ",
-                   "was fitted to.")
+                   " and 'newdata' asks for level ", max(J), "."),
+        i = paste0("Use 're_formula = NA' for the population effects or ",
+                   "supply 'newdata' with fitted levels.")
       )), call. = FALSE)
     }
     r <- draw_columns(draws, paste0("r_", id, sfx, "_", rows$cn[k], "[",
@@ -540,12 +539,11 @@ monotonic_pred <- function(draws, sdata, sfx, n_obs) {
   n_csp <- length(term_numbers(names(sdata), paste0("Csp", sfx)))
   if (n_mo != n_sp || n_csp > 0L) {
     stop(insight::format_error(c(
-      "mvgam predicts from 'mo()' terms that stand alone.",
+      "Interactions with 'mo()' terms are not supported.",
       x = paste0("This predictor has ", n_sp, " special term",
                  if (n_sp != 1L) "s", " and ", n_mo, " monotonic ",
                  "variable", if (n_mo != 1L) "s", "."),
-      i = paste0("Interactions involving 'mo()' and 'me()' or 'mi()' ",
-                 "terms are not supported.")
+      i = "Write each 'mo()' term on its own, with no 'me()' or 'mi()'."
     )), call. = FALSE)
   }
   bsp <- draw_columns(draws, paste0("bsp", sfx, "[", seq_len(n_sp), "]"))
@@ -596,8 +594,8 @@ nonlinear_linpred <- function(prep, draws, form, resp, n_obs) {
   if (!is.matrix(mu) || !identical(dim(mu), c(nrow(draws), n_obs))) {
     stop(insight::format_error(c(
       "The non-linear formula did not give one value per draw and row.",
-      x = paste0("Expected ", nrow(draws), " x ", n_obs, ". Got ",
-                 paste(dim(as.matrix(mu)), collapse = " x "), "."),
+      x = paste0("Got ", paste(dim(as.matrix(mu)), collapse = " x "),
+                 ", expected ", nrow(draws), " x ", n_obs, "."),
       i = "Write the expression with element-wise operators."
     )), call. = FALSE)
   }

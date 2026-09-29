@@ -63,19 +63,6 @@ suppressMessages({
 # has to come from the environment:
 #   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(11L)
 
@@ -114,23 +101,18 @@ sim_truth <- list(
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_hurdle_poisson.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading hurdle Poisson fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(y ~ x, AR(p = 1), hurdle_poisson())\n")
-  fit <- mvgam(
-    y ~ x, trend_formula = ~ AR(p = 1), data = dat,
-    family = brms::hurdle_poisson(),
-    chains = 2L, iter = 800L, warmup = 400L,
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_hurdle_poisson.rds",
+  function() {
+    mvgam(
+      y ~ x, trend_formula = ~ AR(p = 1), data = dat,
+      family = brms::hurdle_poisson(),
+      chains = 2L, iter = 800L, warmup = 400L,
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 draw_ids <- c(3L, 17L, 55L, 120L, 301L)
 
@@ -345,13 +327,9 @@ test_that("the prediction types this family answers, and the one it does not", {
 
 test_that("loo is built from the same density", {
   loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- c(loo_warnings, caught$warnings)
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   expect_identical(length(ic$diagnostics$pareto_k), nrow(dat))
   # loo picks its warning threshold from the number of draws (about
@@ -377,22 +355,16 @@ test_that("loo is built from the same density", {
   ll_marg <- log_lik(fit, incl_autocor = FALSE)
   # These raise the same Pareto notice, and it is collected into the
   # vector asserted on above rather than left to escape the file.
-  by_cond <- withCallingHandlers(
-    loo::loo(ll_cond,
-             r_eff = loo::relative_eff(exp(ll_cond), chain_id = chain_id)),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
-  by_marg <- withCallingHandlers(
-    loo::loo(ll_marg,
-             r_eff = loo::relative_eff(exp(ll_marg), chain_id = chain_id)),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo::loo(
+    ll_cond, r_eff = loo::relative_eff(exp(ll_cond), chain_id = chain_id)
+  ))
+  by_cond <- caught$value
+  loo_warnings <- c(loo_warnings, caught$warnings)
+  caught <- with_warnings(loo::loo(
+    ll_marg, r_eff = loo::relative_eff(exp(ll_marg), chain_id = chain_id)
+  ))
+  by_marg <- caught$value
+  loo_warnings <- c(loo_warnings, caught$warnings)
   expect_equal(unname(ic$pointwise[, "elpd_loo"]),
                unname(by_cond$pointwise[, "elpd_loo"]),
                tolerance = 1e-10)
@@ -443,20 +415,14 @@ stopifnot(
   mean(dat2$y[z2 == -1] == 0L) < mean(dat2$y[z2 == 1] == 0L) - 0.2
 )
 
-cache2 <- cache_path("val_mvgam_hurdle_poisson_dpar.rds")
-if (file.exists(cache2)) {
-  cat("[cache] Loading hurdle Poisson fit with hu sub-formula.\n")
-  fit2 <- readRDS(cache2)
-} else {
-  cat("[fit ] mvgam(bf(y ~ x, hu ~ z), AR(p = 1), hurdle_poisson())\n")
-  fit2 <- mvgam(
+fit2 <- cached_fit("val_mvgam_hurdle_poisson_dpar.rds", function() {
+  mvgam(
     brms::bf(y ~ x, hu ~ z), trend_formula = ~ AR(p = 1), data = dat2,
     family = brms::hurdle_poisson(),
     chains = 2L, iter = 800L, warmup = 400L,
     silent = 2, backend = "cmdstanr"
   )
-  saveRDS(fit2, cache2)
-}
+})
 
 
 test_that("dpar = 'hu' is the hurdle's own linear predictor", {
@@ -647,24 +613,14 @@ stopifnot(
   any(y3 > 0L)
 )
 
-cache3 <- cache_path("val_mvgam_zero_inflated_poisson.rds")
-if (file.exists(cache3)) {
-  cat("[cache] Loading zero-inflated Poisson fit.\n")
-  fit3 <- readRDS(cache3)
-} else {
-  cat("[fit ] mvgam(y ~ x, AR(p = 1), zero_inflated_poisson())\n")
-  fit3 <- mvgam(
+fit3 <- cached_fit("val_mvgam_zero_inflated_poisson.rds", function() {
+  mvgam(
     y ~ x, trend_formula = ~ AR(p = 1), data = dat3,
     family = brms::zero_inflated_poisson(),
     chains = 2L, iter = 800L, warmup = 400L,
     silent = 2, backend = "cmdstanr"
   )
-  # Written under a temporary name and moved into place, so an
-  # interrupted run cannot leave a truncated file to be read back.
-  part <- paste0(cache3, ".part")
-  saveRDS(fit3, part)
-  file.rename(part, cache3)
-}
+})
 
 
 test_that("log_lik is the zero-inflated density, on either surface", {
@@ -768,13 +724,9 @@ test_that("the two families disagree about where zeros come from", {
 
 test_that("loo is built from the zero-inflated density", {
   loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit3),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit3))
+  ic <- caught$value
+  loo_warnings <- c(loo_warnings, caught$warnings)
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   expect_identical(length(ic$diagnostics$pareto_k), nrow(dat3))
   # loo picks its warning threshold from the number of draws (about

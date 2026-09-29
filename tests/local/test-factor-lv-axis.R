@@ -34,19 +34,6 @@ suppressMessages({
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(700L)
 
@@ -162,20 +149,6 @@ sim_truth <- list(
   region_levels = region_levels, beta_region = beta_region,
   beta_depth = beta_depth
 )
-
-# The value of `expr` alongside every warning raised computing it.
-# This frame deliberately carries unobserved cells, so the notices
-# about them are part of the contract a user is owed and are counted
-# rather than discarded. Returned as a list so nothing is attached to
-# a fitted object that would then be cached.
-with_warnings <- function(expr) {
-  seen <- character(0)
-  value <- withCallingHandlers(expr, warning = function(w) {
-    seen <<- c(seen, conditionMessage(w))
-    invokeRestart("muffleWarning")
-  })
-  list(value = value, warnings = seen)
-}
 
 by_lv_formula <- ~ s(elev, k = 5, by = lv_axis()) - 1 + ZMVN(cor = TRUE)
 plain_formula <- ~ s(elev, k = 5) - 1 + ZMVN(cor = TRUE)
@@ -318,8 +291,8 @@ test_that("a prefit maps a newdata frame with no posterior at all", {
   expect_match(conditionMessage(err), "sp_ghost", fixed = TRUE)
 
   # The training arms and the forecast grid, both draw-free.
-  levs <- mvgam:::fitted_series_index(prefit_by_lv)
-  expect_identical(names(levs), species_levels)
+  expect_identical(mvgam:::fitted_series_levels(prefit_by_lv),
+                   species_levels)
   training <- mvgam:::build_training_arms(prefit_by_lv, species_levels)
   expect_identical(names(training$times), species_levels)
   for (s in species_levels) {
@@ -365,7 +338,7 @@ test_that("a prefit maps a newdata frame with no posterior at all", {
   expect_error(
     mvgam:::resolve_forecast_grid(prefit_by_lv, dat, training,
                                   species_levels),
-    "names no occasion beyond the training grid"
+    "ends at or before the last training time"
   )
   # The last observed occasion is named in the user's own numbering,
   # so a rank standing in for a value would not satisfy this.
@@ -530,16 +503,8 @@ test_that("an all-NA trend_map leaves the loadings free", {
 })
 
 
-test_that("the record and the metadata tell one story about the axis", {
-  # The series axis is written twice, on the record and on
-  # `trend_metadata`. Both are still read, so the two accounts
-  # agreeing is a live claim rather than a tautology: they are built
-  # by different routes and have disagreed before.
+test_that("the axis record names the series column as the axis", {
   ax <- mvgam:::mvgam_axes(prefit_by_lv)
-  meta <- prefit_by_lv$trend_metadata
-  expect_identical(as.character(meta$levels$series),
-                   as.character(ax$series$levels))
-  expect_identical(meta$series_source, ax$series$source)
   expect_identical(ax$series$source, "explicit")
   # No grouping is in play, so the axis is the series column itself.
   expect_null(ax$series$groups)
@@ -572,27 +537,21 @@ test_that("the by-lv program folds mu_factor into the latent states", {
 
 # -- Fits -------------------------------------------------------------
 
-cache_by_lv <- cache_path("val_mvgam_by_lv_axis.rds")
-if (file.exists(cache_by_lv)) {
-  cat("[cache] Loading by_lv_axis fit.\n")
-  fit <- readRDS(cache_by_lv)
-} else {
-  cat("[fit ] mvgam(s(elev, by = lv_axis()), ZMVN, n_lv = 2)\n")
-  # Captured, not asserted: this call runs only on a cache miss, so a
-  # count here would be a claim the file makes on some runs and not
-  # others. The identical claim is made unconditionally above, on a
-  # build of the same frame and the same formula.
-  fit <- with_warnings(mvgam(
-    formula = obs_formula, trend_formula = by_lv_formula,
-    trend_map = trend_map, data = dat, family = gaussian(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  ))$value
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache_by_lv)
-}
+# The build runs only on a cache miss and captures its warnings
+# without asserting them. The identical claim is made unconditionally
+# above, on a build of the same frame and formula.
+fit <- cached_fit(
+  "val_mvgam_by_lv_axis.rds",
+  function() {
+    with_warnings(mvgam(
+      formula = obs_formula, trend_formula = by_lv_formula,
+      trend_map = trend_map, data = dat, family = gaussian(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    ))$value
+  },
+  key = sim_truth
+)
 
 
 test_that("the fitted object keeps the factor-axis structure", {
@@ -741,7 +700,6 @@ test_that("the reference the battery compares against actually varies", {
   # what a collapsed axis would produce while keeping every shape.
   expect_gt(length(unique(round(colm, 8))), 1L)
 })
-
 
 
 test_that("a shuffled newdata answers the same, in the new order", {
@@ -919,7 +877,7 @@ test_that("a newdata naming an unknown species is refused", {
   )
   err <- expect_error(
     posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-    "Series levels in newdata not found in training data"
+    "Series in 'newdata' has levels absent from the training data"
   )
   # A refusal that does not name the offending level, or list the
   # ones that would have worked, leaves the user to find which of
@@ -1056,14 +1014,9 @@ test_that("summary and the criticism methods run on this fit", {
   # approximation breaks, and the warning that arrived, if any, is
   # the k notice those numbers already account for rather than
   # something else that slipped through.
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))
@@ -1087,7 +1040,6 @@ test_that("summary and the criticism methods run on this fit", {
 })
 
 
-
 test_that("every panel draws the occasions the frame supplied", {
   # The frame numbers its occasions from 3, so a rank and a time are
   # different vectors and a plot drawing one where it means the other
@@ -1097,15 +1049,6 @@ test_that("every panel draws the occasions the frame supplied", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
 
-  drawn_x <- function(p) {
-    b <- ggplot2::ggplot_build(p)
-    xs <- unlist(lapply(
-      b$data, function(l) if ("x" %in% names(l)) l$x else NULL
-    ))
-    xs <- xs[is.finite(xs)]
-    expect_gt(length(xs), 0L)
-    range(xs)
-  }
   want <- as.numeric(range(time_vals))
   for (ty in c("series", "trend", "factors")) {
     expect_equal(drawn_x(plot(fit, type = ty)), want)

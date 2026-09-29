@@ -305,11 +305,9 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   # `b_<resp>_<coef>` in one response of a multivariate formula.
   keep <- !endsWith(user, paste0("_", MVGAM_EMPTY_OBS_PLACEHOLDER))
   # Stan's own working arrays are held out of the parameter set this
-  # projection returns. Filtering by kind covers a fit saved before
-  # those names carried the kind `internal`, which the fit's own
-  # `exclude` list would miss. `lprior` and `lp__` carry the kind
-  # `bookkeeping` and meet the same rule: the taxonomy records that
-  # no summary claims them.
+  # projection returns. The same rule holds out `lprior` and `lp__`,
+  # of kind `bookkeeping`: the taxonomy records that no summary
+  # claims them.
   # A caller that named a parameter sets `all`, which reaches the
   # working arrays and the accumulators together with the hidden
   # block. Naming one is how a user retrieves a quantity the
@@ -334,24 +332,8 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
 # (the named list of levels per grouping factor), or NULL when the
 # fit has no group-level effects.
 #
-# Each side stores a lightweight brmsfit that already carries this
-# table, built when the model was set up, so it is read rather than
-# rebuilt. Rebuilding it meant a `brm(empty = TRUE)` call on every
-# draws extraction of any fit with group-level effects, which is
-# every `variables()`, `coef()`, `fixef()`, `vcov()`, `rhat()`,
-# `posterior_summary()`, `tidy()`, `hypothesis()` and `get_coef()`
-# call on such a fit. Passing no prior to that call also made brms
-# derive and validate its own defaults, so it warned about priors
-# the fitted program does not contain.
-#
-# A fit saved before those brmsfits were stored still has to be
-# readable, so the rebuild remains as the fallback on the
-# observation side. Its `^M_<id>$` gate short-circuits no-RE fits
-# without paying the setup cost, and trend-side blocks carry the
-# suffixed key `M_<id>_trend`, so they do not satisfy it. Such a
-# fit gets no trend-side aliasing rather than a guessed map, which
-# leaves its trend group-level parameters under positional names
-# and is the safe failure.
+# Each side stores a lightweight brmsfit holding this table, built
+# when the model was set up.
 #
 # Both `mvgam_ranef_aliases` and the user-facing `ranef.mvgam` /
 # `VarCorr.mvgam` methods read this, so the table is resolved once.
@@ -364,19 +346,6 @@ mvgam_ranef_metadata <- function(x,
     x$trend_model$ranef
   } else {
     x$obs_model$ranef
-  }
-  if (is.null(reframe) && identical(side, "observation")) {
-    # If brms ever changes the obs-side key naming, the gate falls
-    # closed (no aliasing) rather than producing an incorrect map,
-    # which is the safe failure mode.
-    if (!any(grepl("^M_\\d+$", names(x$standata)))) {
-      return(NULL)
-    }
-    empty <- brms::brm(
-      formula = x$formula, data = x$data, family = x$family,
-      empty = TRUE, silent = 2
-    )
-    reframe <- empty$ranef
   }
   if (is.null(reframe) || nrow(reframe) == 0L) {
     return(NULL)

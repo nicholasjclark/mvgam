@@ -32,11 +32,9 @@ Use ZMVN for spatial or otherwise non-temporal grouping factors
 where gaps in the \code{unit} axis are natural (e.g. dropped sites,
 stratified k-fold refits, irregular sampling grids).}
 
-\item{series}{The unquoted name of the variable that represents the series
-identifier in the supplied \code{data}. This variable should be either a
-\code{character} or \code{factor} variable. Defaults to \code{series} following mvgam
-conventions, allowing any series variable name. When using the
-default, a one-time warning will be issued.}
+\item{series}{The unquoted name of the \code{factor} variable in \code{data} that
+names each row's series. Its levels fix the order of the series. A
+trend needs this column even for a single series. Defaults to \code{series}.}
 
 \item{gr}{An optional grouping variable, which must be a \code{factor} in the
 supplied \code{data}, for setting up hierarchical residual correlation

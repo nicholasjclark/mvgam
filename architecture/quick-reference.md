@@ -39,8 +39,8 @@ mvgam(abundance ~ t2(temperature, precipitation) + s(site, bs = "re"),
       trend_formula = ~ ZMVN(n_lv = 2), data = data)
 
 # Distributional regression with trend on mu only
-mvgam(bf(count ~ s(x), sigma ~ habitat), 
-      trend_formula = ~ CAR(), family = poisson(), data = data)
+mvgam(bf(biomass ~ s(x), sigma ~ habitat),
+      trend_formula = ~ CAR(), family = gaussian(), data = data)
 ```
 
 ### Multivariate Formula Patterns (TRUE multivariate - multiple responses)
@@ -52,9 +52,9 @@ mvgam(mvbind(count, biomass, presence) ~ temperature + precipitation,
 # Pattern 2: mvbind() with no trend (pure observation model)
 mvgam(mvbind(abundance, diversity) ~ temp + precip, data = data)
 
-# Pattern 3: bf() with multiple responses and shared trend
-mvgam(bf(count ~ temp, biomass ~ precip),
-      trend_formula = ~ VAR(lags = 1), data = data)
+# Pattern 3: added bf() objects with a shared trend
+mvgam(bf(count ~ temp) + bf(biomass ~ precip) + set_rescor(FALSE),
+      trend_formula = ~ VAR(p = 1), data = data)
 
 # Pattern 4: Combined bf() objects with different families and shared trend
 mvgam(
@@ -70,19 +70,6 @@ mvgam(mvbf(
   bf(count ~ temperature, family = poisson()),
   bf(biomass ~ precipitation, family = gaussian())
 ), trend_formula = ~ AR(p = 1, cor = TRUE), data = data)
-
-# Pattern 6: Response-specific trends (different trend per response)
-mvgam(
-  bf(abundance ~ x, family = poisson()) +
-  bf(presence ~ x, family = bernoulli()) +
-  bf(diversity ~ x, family = Gamma()),
-  trend_formula = list(
-    abundance = ~ AR(p = 1),        # Population dynamics
-    presence = ~ RW(),              # Occupancy trends  
-    diversity = ~ PW(n_change = 2)  # Piecewise trends
-  ),
-  data = data
-)
 ```
 
 ### Binomial Trial Patterns (NOT multivariate - single response with trials)
@@ -101,18 +88,15 @@ mvgam(cbind(successes, failures) ~ treatment,
 
 ### Special Cases and Edge Patterns
 ```r
-# No trend formula (defaults to ZMVN for state-space, or no trend)
+# No trend formula: a brms model, which needs no series column
 mvgam(count ~ s(temperature), data = data)
 
-# Trend-only model (minimal observation effects)  
-mvgam(y ~ 1, trend_formula = ~ s(habitat) + VAR(lags = 2), data = data)
+# One series still needs its series column when a trend is used
+data$series <- factor("series_1")
+mvgam(count ~ 1, trend_formula = ~ AR(), data = data)
 
-# Complex multivariate with mixed trend types
-mvgam(mvbind(count, biomass) ~ temperature,
-      trend_formula = list(
-        count = ~ AR(p = 2),          # Different dynamics
-        biomass = ~ RW(cor = FALSE)   # Per response
-      ), data = data)
+# Trend-only model (minimal observation effects)  
+mvgam(y ~ 1, trend_formula = ~ s(habitat) + VAR(p = 2), data = data)
 
 # Hierarchical trends with grouping
 mvgam(count ~ treatment,
@@ -123,16 +107,6 @@ mvgam(mvbind(sp1, sp2, sp3, sp4) ~ habitat,
       trend_formula = ~ AR(p = 1, n_lv = 2, cor = TRUE), data = data)
 ```
 
-### Distributional Models (trends ONLY on mu)
-```r
-mvgam(
-  bf(y ~ s(x), sigma ~ s(z)),           # Distributional regression
-  trend_formula = ~ AR(p = 1),          # Applied ONLY to mu parameter
-  family = gaussian(),
-  data = data
-)
-```
-
 ### Multiple Imputation
 ```r
 mvgam(
@@ -140,31 +114,6 @@ mvgam(
   trend_formula = ~ AR(p = 1),
   data = imputed_data_list,             # List of multiply imputed datasets
   combine = TRUE                        # Pool results using Rubin's rules
-)
-```
-
-### Multivariate with Multivariate Trends
-```r
-mvgam(
-  bf(count ~ temp, biomass ~ precip) + set_rescor(FALSE),
-  trend_formula = ~ AR(p = 1, cor = TRUE),
-  family = c(poisson(), gaussian(), bernoulli()),
-  data = data
-)
-```
-
-### Multivariate with Response-Specific Trends (no factors, correlations or groupings allowed)
-```r
-mvgam(
-  bf(abund ~ x, family = poisson()) +
-  bf(presabs ~ x, family = bernoulli()) +
-  bf(divers ~ x, family = Gamma()),
-  trend_formula = list(
-    abund = ~ AR(p = 1),        # Population dynamics
-    divers = ~ RW(),            # Biomass trends
-    presabs = NULL              # No trend (static occupancy, defaults to ZMVN())
-  ),
-  data = data
 )
 ```
 
@@ -192,20 +141,28 @@ mvgam(
 
 ### Registry Architecture (R/trend_system.R)
 
+The registry holds the six built-in trends and no others. Trend `FOO`
+defines `generate_foo_trend_stanvars()` and `foo_trend_properties()`.
+`register_core_trends()` finds both by name on first use of the
+registry.
+
 **Core Functions:**
 ```r
-# Registry management
-register_trend_type(name, supports_factors, generator_func, incompatibility_reason)
-get_trend_info(name)                    # Retrieve registered trend info
-list_trend_types()                      # List all available trends
-validate_factor_compatibility(spec)     # Automatic validation
-ensure_registry_initialized()           # Auto-load core trends
+# Internal
+get_trend_info(name)                    # A trend's registered entry
+ensure_registry_initialized()           # Register the trends on first use
+trend_property(name, field)             # One entry field; "none" for "None"
 
-# User extension functions
-register_custom_trend(name, ...)        # User-facing registration
+# Exported
+list_trend_types()                      # The trends and their factor support
 ```
 
-**Auto-registered Core Trends:**
+**Registry entry:** `supports_factors`, `covariance_pattern`,
+`stationary_source`, `requires_regular_intervals`, `generator` and
+`incompatibility_reason`. Each is declared by the trend's properties
+function and none has a default.
+
+**Registered Trends:**
 - `AR`, `RW`, `VAR`, `ZMVN` (factor-compatible)
 - `PW`, `CAR` (factor-incompatible)
 
@@ -218,19 +175,21 @@ register_custom_trend(name, ...)        # User-facing registration
 - `ZMVN(n_lv = 2)` - Zero-mean multivariate normal factors
 
 **❌ Incompatible (automatic error with n_lv):**
-- `PW(n_lv = 2)` → Error: "Piecewise trends require series-specific changepoint modeling"
-- `CAR(n_lv = 2)` → Error: "Continuous-time AR requires series-specific irregular time intervals"
+- `PW(n_lv = 2)` → Error: "Piecewise trends model changepoints separately for each series."
+- `CAR(n_lv = 2)` → Error: "Continuous-time AR dynamics follow each series' own irregular time gaps."
 
 ## Two-Stage Stan Assembly System
 
 ### Stage 1: Registry-Based Stanvar Generation (R/stan_assembly.R)
 ```r
-# Registry dispatch to trend-specific generators
-trend_stanvars <- generate_trend_injection_stanvars(trend_spec, data_info)
+# Takes the trend's generator from its registry entry
+trend_stanvars <- generate_trend_specific_stanvars(
+  trend_specs, data_info, response_suffix, prior
+)
 
-# Registry automatically selects appropriate generator:
+# The registered generators:
 # - generate_rw_trend_stanvars()
-# - generate_ar_trend_stanvars() 
+# - generate_ar_trend_stanvars()
 # - generate_var_trend_stanvars()
 # - generate_zmvn_trend_stanvars()
 # - generate_car_trend_stanvars()
@@ -244,7 +203,7 @@ trend_stanvars <- generate_trend_injection_stanvars(trend_spec, data_info)
 # 2. Adding trend effects to mu parameters (linear predictors)
 # 3. Preserving all brms optimizations and structure
 
-inject_trend_into_linear_predictor(base_stancode, trend_stanvars, trend_spec)
+inject_trend_into_linear_predictors(base_stancode, resps)
 ```
 
 ## Centralized Prior Resolution (R/priors.R)
@@ -267,14 +226,10 @@ stan_code <- glue("
 2. **Common default fallback**: Use `common_trend_priors` defaults  
 3. **Empty string fallback**: Let Stan use built-in defaults
 
-## Stan Code Validation Framework (R/validations.R)
+## Stan Code Validation (R/validations.R)
 ```r
-# Unified comprehensive validation using rstan::stanc()
-validate_stan_code(stan_code, backend = "rstan", silent = FALSE)  # Primary validation function
-
-# Optional structural pre-checks for optimization
-validate_stan_code_structure(stan_code)    # Check required blocks exist
-are_braces_balanced(stan_code)             # Check brace matching
+# Parses the program with the backend's Stan compiler
+validate_stan_code(stan_code, backend = "rstan", silent = FALSE)
 ```
 
 ## Stan Assembly Integration with mvgam()
@@ -282,19 +237,17 @@ are_braces_balanced(stan_code)             # Check brace matching
 ### Key Integration Points
 
 **Trend Stanvar Generation**:
-- `extract_trend_stanvars_from_setup()` automatically calls `generate_trend_injection_stanvars()`
-- Registry system dispatches to appropriate generator (`generate_rw_trend_stanvars()`, etc.)
-- Factor model compatibility validated via `validate_factor_compatibility()`
+- `extract_trend_stanvars_from_setup()` calls `generate_trend_specific_stanvars()`
+- That function takes the generator from the trend's registry entry (`generate_rw_trend_stanvars()`, etc.)
+- `prepare_trend_specs()` refuses a factor model on a trend without a factor form, through `enforce_factor_support_against_specs()`
 
 **Stan Code Assembly**:
-- `generate_base_brms_stancode()` creates observation model with injected trend stanvars
-- `inject_trend_into_linear_predictor()` modifies Stan code to add trend effects to `mu`
-- `validate_stan_code()` provides comprehensive validation using `rstan::stanc()` directly
+- `generate_base_stancode_with_stanvars()` creates the observation model with the trend stanvars injected
+- `inject_trend_into_linear_predictors()` modifies Stan code to add trend effects to `mu`
+- `validate_stan_code()` parses the result with the backend's Stan compiler
 
 **Data Integration**:
 - Data preparation and ordering for time/series data for Stan
-- `combine_stan_data()` combines observation and trend data with conflict resolution
-- `validate_combined_standata()` ensures proper Stan data structure and types
 
 ## Validation Framework
 
@@ -370,6 +323,6 @@ mvgam(..., trend_formula = ~ AR(p = 1, n_lv = 2))
 # ❌ Wrong: Trend on auxiliary parameter
 bf(y ~ s(x), sigma ~ s(z) + AR(p = 1))
 
-# ✅ Correct: Trend only on main parameter
-bf(y ~ s(x) + AR(p = 1), sigma ~ s(z))
+# ✅ Correct: Trend in trend_formula, which joins mu only
+mvgam(bf(y ~ s(x), sigma ~ s(z)), trend_formula = ~ AR(p = 1), data = data)
 ```

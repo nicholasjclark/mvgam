@@ -135,7 +135,7 @@ shared_variation.mvgam <- function(object,
     ))
   }
 
-  series_names <- resolve_series_info(object)$series_levels
+  series_names <- fitted_series_levels(object)
   # `factor_implied_cov_draws()` owns the per-draw `Z Sigma Z'`,
   # so `residual_cor()` and this summary cannot answer
   # differently. It routes through `resolve_factor_loadings()`

@@ -4,7 +4,7 @@
 # generalised from rolling-time blocks to arbitrary groups.
 #
 # Reuses:
-#   - `lfo_log_sum_exp` / `lfo_log_mean_exp` / `lfo_sum_rows`
+#   - `log_sum_exp` / `log_mean_exp` / `lfo_sum_rows`
 #     (R/lfo_cv.mvgam.R) for numerically stable log-density math.
 #   - `clean_ll` (R/loo.mvgam.R) for sanitising log-lik draws.
 #   - `closure_unit_grouping` (R/families.R) for the default group
@@ -161,12 +161,10 @@ kfold.mvgam <- function(x,
   data <- mvgam_training_data(x)
   if (is.null(data)) {
     stop(insight::format_error(c(
-      "Could not recover training data from the fit.",
-      i = paste0(
-        "kfold needs the original training data to partition ",
-        "folds and refit. Refit with 'data = ...' and try again."
-      )
-    )))
+      "'kfold()' requires the fit's training data.",
+      x = "The fitted object's training-data slot is empty.",
+      i = "Refit with 'data = ...' and call 'kfold()' again."
+    )), call. = FALSE)
   }
 
   # Resolve group columns + per-row group key. Closure-unit fits
@@ -490,7 +488,7 @@ refit_score_one_fold <- function(object, data, fold_ids,
   )
 
   # Per-group ELPD: log_mean_exp over draws.
-  apply(held_grouped, 2L, lfo_log_mean_exp)
+  apply(held_grouped, 2L, log_mean_exp)
 }
 
 
@@ -526,7 +524,7 @@ mask_heldout_response <- function(object, data, held_rows) {
       "Could not find a response column to hold a fold out on.",
       x = paste0("Missing: ", paste0("'", absent, "'", collapse = ", "),
                  "."),
-      x = paste0("The training frame holds ",
+      x = paste0("The training frame has columns ",
                  paste(names(data), collapse = ", "), ".")
     )))
   }
@@ -609,8 +607,8 @@ print.mvgam_kfold <- function(x, digits = 2L, ...) {
   ))
   psis_k <- x$pareto_k[!is.na(x$pareto_k)]
   if (length(psis_k) > 0L) {
-    threshold_val <- pareto_k_threshold_of(x)
-    threshold_lbl <- if (pareto_k_threshold_is_adaptive(x)) {
+    threshold_val <- x$pareto_k_threshold
+    threshold_lbl <- if (isTRUE(x$pareto_k_threshold_adaptive)) {
       paste0(formatC(threshold_val, digits = digits, format = "f"),
              " (adaptive)")
     } else {
@@ -782,7 +780,7 @@ plot.mvgam_kfold <- function(x, ...) {
     threshold = as.numeric(elpd_threshold),
     facet = "ELPD"
   )
-  threshold_val <- pareto_k_threshold_of(x)
+  threshold_val <- x$pareto_k_threshold
   k_dat <- data.frame(
     group = group,
     value = as.numeric(x$pareto_k),

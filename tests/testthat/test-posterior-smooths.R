@@ -239,7 +239,7 @@ test_that("posterior_smooths.mvgam errors on unknown smooth term", {
 test_that("posterior_smooths.mvgam takes one of 'dpar' and 'nlpar'", {
   stub <- smooth_stub(brms::bf(y ~ 1 + s(z)))
   expect_error(posterior_smooths(stub, "s(z)", dpar = "mu", nlpar = "a"),
-               "not both")
+               "Supply only one of")
 })
 
 

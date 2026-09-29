@@ -316,9 +316,9 @@ trend_skeleton_lines <- function(resp, grain = "series") {
     paste0("array[N", suffixes, "] int obs_trend_time", suffixes, ";"),
     paste0("array[N", suffixes, "] int obs_trend_series", suffixes, ";"),
     # A univariate predictor takes the trend at its own row's occasion
-    # and series
+    # and series, added alone or with the intercept a GLM call held
     if (is.null(resp)) {
-      "mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];"
+      "trend[obs_trend_time[n], obs_trend_series[n]];"
     }
   )
 }
@@ -1439,22 +1439,6 @@ test_that("a block ends at the brace its header opened", {
   )
 })
 
-test_that("a mixture family's program parses once polished", {
-  data <- data.frame(
-    y = c(rnorm(30, -2), rnorm(30, 2)),
-    x = rnorm(60),
-    time = rep(1:30, 2),
-    series = factor(rep(c("a", "b"), each = 30))
-  )
-  mix <- brms::mixture(gaussian, gaussian, order = "mu")
-
-  # `validate = TRUE` parses the polished program, which is the one
-  # compiled
-  code <- stancode(mvgam_formula(y ~ x), data = data, family = mix,
-                   validate = TRUE)
-  expect_match(code, "target += log_sum_exp(ps)", fixed = TRUE)
-})
-
 test_that("trend codegen emits modern Stan array syntax across every branch", {
   # Regression guard: Stan >= 2.32 (cmdstanr default) rejects the
   # legacy `int name[N];` form, but `rstan::stanc()` still accepts
@@ -1873,7 +1857,7 @@ test_that("threads + trend + brms-native family compiles serially with one warni
       mf, data = data, family = poisson(),
       threads = 2L, validate = FALSE
     )),
-    "is ignored for brms-native families"
+    "is not supported for a brms family"
   )
   expect_equal(
     sum(grepl("reduce_sum", strsplit(code, "\n", fixed = TRUE)[[1]])),
@@ -2415,8 +2399,8 @@ test_that("stancode handles multivariate specifications with shared RW trend and
   expect_true(stan_pattern("vector\\[N_biomass\\] mu_biomass = rep_vector\\(0\\.0, N_biomass\\);", code_shared))
   expect_true(stan_pattern("mu_count \\+= Intercept_count \\+ offsets_count;", code_shared))
   expect_true(stan_pattern("mu_biomass \\+= Intercept_biomass \\+ offsets_biomass;", code_shared))
-  expect_true(stan_pattern("mu_count\\[i\\] \\+= trend\\[obs_trend_time_count\\[i\\], obs_trend_series_count\\[i\\]\\];", code_shared))
-  expect_true(stan_pattern("mu_biomass\\[i\\] \\+= trend\\[obs_trend_time_biomass\\[i\\], obs_trend_series_biomass\\[i\\]\\];", code_shared))
+  expect_true(stan_pattern("mu_count\\[n\\] \\+= trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];", code_shared))
+  expect_true(stan_pattern("mu_biomass\\[n\\] \\+= trend\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\];", code_shared))
 
   # brms passes each offset-carrying predictor as the GLM intercept,
   # and the call keeps its design matrix and coefficients. A call
@@ -2705,7 +2689,7 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_false(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(Intercept_trend, N_trend\\);", code_with_trend))
 
   # GLM-compatible mu construction and trend injection
-  expect_true(stan_pattern("mu \\+= Xc \\* b;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N\\] mu = Xc \\* b;", code_with_trend))
 
   # 6. Model Block - Priors and likelihood
   # PW-specific priors (check existence, not specific distributions)
@@ -3210,7 +3194,7 @@ test_that("trend_map conflict with explicit n_lv errors at fit time", {
   )
   expect_error(
     stancode(mf, data = data, family = poisson(), validate = FALSE),
-    "shape conflicts"
+    "give different numbers of factors"
   )
 })
 
@@ -3747,12 +3731,6 @@ test_that("standata.mvgam and default_prior.mvgam read from the fitted slot", {
   expect_identical(sd, stub$standata)
   dp <- default_prior(stub)
   expect_identical(dp, stub$prior)
-  # Errors when the slot is empty so callers learn about stale
-  # fits rather than silently getting NULL.
-  empty <- structure(list(), class = "mvgam")
-  expect_error(standata(empty), "Stan data not found")
-  expect_error(default_prior(empty),
-               "Fit was not stored with a prior table")
 })
 
 
@@ -4462,9 +4440,8 @@ test_that("trend_covariate_names() rejects a non-character selection", {
 })
 
 test_that("time works as a trend covariate on the by = lv_axis() path", {
-  # `collapse_to_time_level()` is only reached when `has_by_lv` is
-  # TRUE. It collapses twice, once to (time, series) and once to
-  # time.
+  # On this path `trend_cell_frame()` collapses twice, once to
+  # (time, series) and once to time.
   set.seed(5)
   dat <- expand.grid(time = 1:60, series = factor(paste0("s", 1:4)))
   dat$y <- rpois(nrow(dat), 5)
@@ -5090,7 +5067,7 @@ test_that("normalize = FALSE still injects the trend into the GLM call", {
     lab <- case$family$family
 
     # The trend has to reach mu, and mu has to reach the likelihood.
-    expect_true(grepl("mu\\[n\\] \\+= trend\\[", code),
+    expect_true(grepl("mu\\[n\\] \\+= (Intercept \\+ )?trend\\[", code),
                 label = paste("trend added to mu for", lab))
     expect_true(grepl("to_matrix\\(mu\\)", code),
                 label = paste("likelihood reads mu for", lab))
@@ -5121,8 +5098,8 @@ test_that("an ordinal GLM keeps its own argument layout", {
     "ordered_logistic_glm_lpmf(Y | to_matrix(mu), mu_ones, Intercept)",
     code, fixed = TRUE
   ))
-  expect_true(grepl("mu += Xc * b;", code, fixed = TRUE))
-  expect_false(grepl("mu += Intercept;", code, fixed = TRUE))
+  expect_true(grepl("vector[N] mu = Xc * b;", code, fixed = TRUE))
+  expect_false(grepl("Intercept + trend[", code, fixed = TRUE))
   expect_true(grepl("mu\\[n\\] \\+= trend\\[", code))
 })
 
@@ -5143,23 +5120,102 @@ test_that("the GLM family list is stated once", {
   expect_false(present[["normal_id_glm"]])
 })
 
-test_that("an unidentifiable GLM family is refused, not skipped", {
-  # Returning the line untouched is what let `normalize = FALSE` emit a
-  # program that computed the trend and never used it. A family added
-  # to the list without a transformation must fail loudly instead.
-  block <- list(start_idx = 1L, end_idx = 2L)
-  lines <- c("model {", "  target += mystery_glm_lpmf(Y | Xc, a, b);")
-  expect_error(
-    mvgam:::inject_trends_into_glm_calls(lines, block, "  // trend"),
-    "family could not be identified"
+# One series of forty occasions, with a Gaussian partner response.
+injection_frame <- function() {
+  set.seed(11)
+  n <- 40L
+  d <- data.frame(
+    time = seq_len(n), series = factor("s1"), x = rnorm(n),
+    e = runif(n, 1, 2), tr = rep(10L, n), yh = rnorm(n), yg = rnorm(n),
+    yB01 = runif(n, 0.1, 0.9), yp = rpois(n, 3), yk = rbinom(n, 10, 0.4)
   )
+  d$yB01[1:4] <- c(0, 1, 0, 1)
+  d
+}
 
-  # A model block with no GLM call is the ordinary case and passes
-  # through unchanged.
-  plain <- c("model {", "  target += poisson_log_lpmf(Y | mu);")
-  expect_identical(
-    mvgam:::inject_trends_into_glm_calls(plain, block, "  // trend"),
-    plain
+test_that("each response takes its trend before its inverse link", {
+  # brms applies these inverse links to the whole vector once the
+  # predictor is built. The trend joins on the link scale, before that
+  # statement and outside the likelihood loop.
+  d <- injection_frame()
+  arms <- list(
+    yB01 = bf(yB01 ~ x, family = zero_one_inflated_beta()),
+    yp = bf(yp ~ x, family = beta_nb()),
+    yk = bf(yk | trials(tr) ~ x, family = com_binomial())
+  )
+  for (resp in names(arms)) {
+    code <- stancode(
+      mvgam_formula(arms[[resp]] + bf(yh ~ 1) + set_rescor(FALSE),
+                    trend_formula = ~ AR()),
+      data = d, validate = TRUE
+    )
+    lines <- trimws(strsplit(code, "\n", fixed = TRUE)[[1]])
+    trend_at <- which(lines == paste0(
+      "mu_", resp, "[n] += trend[obs_trend_time_", resp,
+      "[n], obs_trend_series_", resp, "[n]];"
+    ))
+    link_at <- grep(paste0("^mu_", resp, " = (inv_logit|exp)\\(mu_",
+                           resp, "\\);$"), lines)
+    expect_length(trend_at, 1L)
+    expect_length(link_at, 1L)
+    expect_lt(trend_at, link_at)
+  }
+})
+
+test_that("a nonlinear response of a multivariate model takes its trend", {
+  d <- injection_frame()
+  code <- stancode(
+    mvgam_formula(
+      bf(yg ~ a + b * x, a ~ 1, b ~ 1, nl = TRUE) + bf(yh ~ 1) +
+        set_rescor(FALSE),
+      trend_formula = ~ AR()
+    ),
+    data = d, validate = TRUE
+  )
+  lines <- trimws(strsplit(code, "\n", fixed = TRUE)[[1]])
+  built_at <- grep("^mu_yg\\[n\\] = \\(nlp_yg_a", lines)
+  trend_at <- which(lines == paste0(
+    "mu_yg[n] += trend[obs_trend_time_yg[n], obs_trend_series_yg[n]];"
+  ))
+  expect_length(built_at, 1L)
+  expect_length(trend_at, 1L)
+  expect_gt(trend_at, built_at)
+})
+
+test_that("an offset-only formula keeps its offset", {
+  # The empty-formula placeholder joins the right-hand side, and the
+  # model keeps the offset as a term of its own.
+  d <- injection_frame()
+  uni <- standata(
+    mvgam_formula(yp ~ 0 + offset(log(e)), trend_formula = ~ AR()),
+    data = d, family = poisson()
+  )
+  expect_equal(as.numeric(uni$offsets), log(d$e))
+  multi <- standata(
+    mvgam_formula(
+      bf(yg ~ 0 + offset(log(e))) + bf(yh ~ 1) + set_rescor(FALSE),
+      trend_formula = ~ AR()
+    ),
+    data = d
+  )
+  expect_equal(as.numeric(multi$offsets_yg), log(d$e))
+})
+
+test_that("a mixture family is refused for every response", {
+  d <- injection_frame()
+  mix <- suppressMessages(brms::mixture(gaussian, gaussian))
+  expect_error(
+    stancode(mvgam_formula(yg ~ x, trend_formula = ~ AR()),
+             data = d, family = mix),
+    "Mixture families are not supported"
+  )
+  expect_error(
+    stancode(
+      mvgam_formula(bf(yg ~ x, family = mix) + bf(yh ~ 1) +
+                      set_rescor(FALSE)),
+      data = d
+    ),
+    "Mixture families are not supported"
   )
 })
 
@@ -5502,4 +5558,28 @@ test_that("the observed history counts every response or refuses", {
   expect_error(count_observed_times(d[, c("time", "y1")], "time",
                                     c("y1", "y2")),
                "'y2'")
+})
+
+
+test_that("a series missing a time the others have is refused", {
+  d <- data.frame(y = rpois(30, 3), time = rep(1:10, 3),
+                  series = factor(rep(c("a", "b", "c"), each = 10)))
+  ragged <- d[!(d$series == "b" & d$time == 4), ]
+  err <- expect_error(
+    stancode(mvgam_formula(y ~ 1, ~ AR()), data = ragged,
+             family = poisson()),
+    "must share one time grid"
+  )
+  msg <- conditionMessage(err)
+  expect_match(msg, "'b'", fixed = TRUE)
+  expect_match(msg, "response 'NA'", fixed = TRUE)
+  expect_false(grepl("CAR()", msg, fixed = TRUE))
+  # A CAR trend spaces its times unevenly, and the refusal says the
+  # series still share them.
+  car_err <- expect_error(
+    stancode(mvgam_formula(y ~ 1, ~ CAR()), data = ragged,
+             family = poisson()),
+    "must share one time grid"
+  )
+  expect_match(conditionMessage(car_err), "'CAR()'", fixed = TRUE)
 })

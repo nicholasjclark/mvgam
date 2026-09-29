@@ -247,9 +247,8 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # The `ZMVN` test in `build_next_steps()` matches the bare type.
   # The printed line also names the order the trend was fitted at,
   # which `printed_trend_label()` renders from the fit's own
-  # metadata. A summary object carries neither that
-  # metadata nor `trend_components`, and the helper's fallback then
-  # reports a fitted ARMA as `None`.
+  # metadata. `summary()` stores the label because the helper,
+  # handed a summary object, reports a fitted ARMA as `None`.
   out$trend_label <- printed_trend_label(object)
 
   # The same counts `print()` shows, read the same way. Reading
@@ -821,9 +820,9 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
 
 #' The trend line a summary prints
 #'
-#' A summary object carries neither the trend metadata nor the
-#' `trend_components` that `printed_trend_label()` needs. `summary()`
-#' stores the label that helper renders from the fit. The bare type
+#' A summary object carries no trend metadata, which
+#' `printed_trend_label()` needs. `summary()` stores the label that
+#' helper renders from the fit. The bare type
 #' gives `AR` for a plain AR(1), for `AR(p = 3)` and for
 #' `AR(p = 1, ma = TRUE)` alike.
 #'

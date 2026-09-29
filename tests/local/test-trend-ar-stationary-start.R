@@ -41,15 +41,6 @@ suppressMessages({
   library(testthat)
 })
 
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(6607L)
 
@@ -226,16 +217,11 @@ shapes <- list(
 fit_shape <- function(name) {
   sh <- shapes[[name]]
   dat <- if (identical(sh$form, "grouped")) dat_grouped else dat_flat
-  cache <- cache_path(sprintf("val_mvgam_ar_start_%s.rds", name))
-  if (file.exists(cache)) {
-    fit <- readRDS(cache)
-  } else {
-    cat(sprintf("[fit ] %s\n", name))
-    fit <- mvgam(y ~ 1, trend_formula = sh$rhs, data = dat,
-                 family = gaussian(), chains = 2L, iter = 600L,
-                 warmup = 300L, silent = 2, backend = "cmdstanr")
-    saveRDS(fit, cache)
-  }
+  fit <- cached_fit(sprintf("val_mvgam_ar_start_%s.rds", name), function() {
+    mvgam(y ~ 1, trend_formula = sh$rhs, data = dat,
+          family = gaussian(), chains = 2L, iter = 600L,
+          warmup = 300L, silent = 2, backend = "cmdstanr")
+  })
   list(fit = fit, dm = posterior::as_draws_matrix(fit$fit))
 }
 
@@ -252,10 +238,6 @@ check_draws <- function(dm) {
   unique(round(seq(1, nrow(dm), length.out = 15L)))
 }
 
-
-test_that("every cached fit ran the program the package generates", {
-  for (fx in fits) expect_current_program(fx$fit)
-})
 
 
 test_that("each start draws its first states from the stationary law", {

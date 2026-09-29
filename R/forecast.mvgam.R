@@ -188,18 +188,9 @@ forecast.mvgam <- function(object,
                  "or 'type = \"response\"' (the default).")
     )))
   }
-  # `trend_specs` is either a single `mvgam_trend` (univariate
-  # response) or a list of them (multivariate). For multivariate
-  # fits, pick the first trend spec when present and let the
-  # trend-type guard below reject anything unsupported.
-  trend_model <- if (is_trendless) {
-    NULL
-  } else if (is_multivariate_trend_specs(trend_specs)) {
-    trend_specs[[1L]]
-  } else {
-    trend_specs
-  }
-  meta <- if (is_trendless) NULL else get_enriched_trend_metadata(object)
+  # The trend-type guard below refuses anything unsupported
+  trend_model <- if (is_trendless) NULL else trend_spec_head(trend_specs)
+  meta <- if (is_trendless) NULL else object$trend_metadata
 
   # A forecast needs occasions to forecast at, and a fit cannot
   # invent them: the horizon is whatever the caller's frame reaches
@@ -211,19 +202,13 @@ forecast.mvgam <- function(object,
   if (is.null(newdata)) {
     stop(insight::format_error(c(
       "'newdata' is required to forecast.",
-      x = paste0(
-        "A forecast extends the training grid. The occasions to ",
-        "forecast at have to be supplied."
-      ),
-      i = paste0(
-        "Pass a frame whose times reach past the grid, with any ",
-        "covariate the model reads. For the training occasions ",
-        "themselves, use 'hindcast()'."
-      )
+      i = paste0("Pass a frame with times after the training grid and ",
+                 "every covariate the model uses."),
+      i = "For the training occasions, use 'hindcast()'."
     )), call. = FALSE)
   }
 
-  series_levels <- resolve_series_info(object)$series_levels
+  series_levels <- fitted_series_levels(object)
   reported <- reported_series(object, resp, series_levels)
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
@@ -298,22 +283,6 @@ forecast.mvgam <- function(object,
 
 
 # ----- Series / training / forecast grids -------------------------
-
-# Internal: resolve the canonical series levels from the fit.
-#'@noRd
-resolve_series_info <- function(object) {
-  # The labels a fit reports are the series identity it was built
-  # with, which for a `gr` / `subgr` trend is derived rather than
-  # read: a supplied `series` column is superseded, and reporting
-  # the superseded spelling contradicts what the supersession
-  # warning tells the user to expect. Taking them from the same
-  # place the trend index comes from also puts them in the order the
-  # trend matrix numbers its columns.
-  lv <- names(fitted_series_index(object)) %||%
-    mvgam_axes(object)$series$levels
-  list(series_levels = as.character(lv))
-}
-
 
 # Internal: the series an answer scoped to `resp` reports.
 #
@@ -529,47 +498,16 @@ refuse_empty_horizon <- function(newdata, candidate, last_times,
     "No series records an occasion it was last observed at."
   }
   stop(insight::format_error(c(
-    "'newdata' names no occasion beyond the training grid.",
+    "'newdata' ends at or before the last training time.",
     x = paste0(
       "Supplied '", time_var, "' values: ",
       paste(format(candidate, trim = TRUE), collapse = ", "), "."
     ),
     x = observed_line,
-    i = paste0(
-      "A forecast extends the grid: 'newdata' has to reach past ",
-      "it. To predict at occasions the model was fitted on, use ",
-      "'hindcast()' or 'posterior_predict()'."
-    )
+    i = "A forecast needs 'newdata' times after the training grid.",
+    i = paste0("For occasions the model was fitted on, use ",
+               "'hindcast()' or 'posterior_predict()'.")
   )), call. = FALSE)
-}
-
-
-# Internal: the last observed occasion of each series, named by the
-# axis. The record holds it in the units the user supplied, so a
-# continuous grid keeps its fractions and a padded series is dated
-# from its last observation rather than from its last row.
-#
-# An object carrying no record, or one whose record says nothing
-# about a series, falls back to the training arms, where the
-# occasions of each series were already gathered. That is the same
-# question asked of the frame instead of the fit, and it is the only
-# answer available to a model saved before the axes were recorded.
-#'@noRd
-series_last_times <- function(object, series_levels, training) {
-  recorded <- if (is.null(object)) {
-    rep(NA_real_, length(series_levels))
-  } else {
-    extract_last_observed_times(object, length(series_levels))
-  }
-  out <- stats::setNames(as.numeric(recorded), series_levels)
-  unknown <- is.na(out)
-  if (any(unknown)) {
-    out[unknown] <- vapply(series_levels[unknown], function(lv) {
-      ts <- training$times[[lv]]
-      if (!length(ts)) NA_real_ else max(as.numeric(ts))
-    }, numeric(1L))
-  }
-  out
 }
 
 
@@ -589,7 +527,7 @@ resolve_forecast_grid <- function(object, newdata, training,
   # grouping names them without any `series` column at all: asking
   # for one refused a hierarchical fit the very frame it was fitted
   # on, at a layer that had no need to ask.
-  refuse_absent_time_column(newdata, time_var)
+  assert_axis_column(newdata, time_var, "time")
   # A horizon is a comparison against the last observed occasion, and
   # `NA > last_time` is `NA`, which the subset and the sort then
   # drop. The row leaves the grid, and a later layer treats the
@@ -606,10 +544,7 @@ resolve_forecast_grid <- function(object, newdata, training,
         if (length(bad) > 5L) ", ..." else "",
         " (", length(bad), " in total)."
       ),
-      i = paste0(
-        "A forecast is placed by its occasion. Supply a time for ",
-        "every row, or keep only the rows that have one."
-      )
+      i = "Supply a time for every row or drop the rows listed."
     )), call. = FALSE)
   }
 
@@ -621,9 +556,7 @@ resolve_forecast_grid <- function(object, newdata, training,
   # `north.sp_a`, a series the model does have, spelled the way the
   # column it does not read spells it. An object carrying no record
   # has nothing to validate against, and the guard below covers it.
-  if (!is.null(object$trend_metadata)) {
-    validate_prediction_factor_levels(newdata, object$trend_metadata)
-  }
+  validate_prediction_factor_levels(newdata, object$trend_metadata)
 
   # Where the responses are the series, every row carries all of
   # them: a wide frame holds one row per time and one column per
@@ -631,7 +564,10 @@ resolve_forecast_grid <- function(object, newdata, training,
   # supplies. Asking for a per-row series here is asking a question
   # the frame cannot answer, and demanding a `series` column left
   # every `mvbf()` and `jsdgam()` fit unable to forecast at all.
-  last_times <- series_last_times(object, series_levels, training)
+  last_times <- stats::setNames(
+    extract_last_observed_times(object, length(series_levels)),
+    series_levels
+  )
 
   if (is_response_keyed(object)) {
     nt <- sort(unique(newdata[[time_var]]))
@@ -665,23 +601,9 @@ resolve_forecast_grid <- function(object, newdata, training,
   # the supplanted spelling, so factoring the raw column against the
   # trend's own levels matches nothing and reads as unknown series.
   # The rows are identified the way the fit identified them.
-  row_ids <- axis_row_series(object, newdata, required = TRUE)
-  series_fac <- factor(as.character(row_ids), levels = series_levels)
-  # Reached when the levels the grid was given and the levels the
-  # validator checks against are not the same list: an object
-  # carrying no record at all, or one whose two accounts of the axis
-  # disagree. The values named are the ones the placement was
-  # attempted on, never the column it superseded.
-  if (any(is.na(series_fac))) {
-    unresolved <- unique(as.character(row_ids)[is.na(series_fac)])
-    stop(insight::format_error(c(
-      "'newdata' contains series levels not seen at fit time.",
-      x = paste0("Unknown levels: ", paste(unresolved, collapse = ", "),
-                 "."),
-      i = paste0("The model was fitted on: ",
-                 paste(series_levels, collapse = ", "), ".")
-    )), call. = FALSE)
-  }
+  row_ids <- as.character(axis_row_series(object, newdata, required = TRUE))
+  refuse_unseen_levels("Series", unique(row_ids), series_levels)
+  series_fac <- factor(row_ids, levels = series_levels)
 
   fc_times <- lapply(series_levels, function(lv) {
     idx <- series_fac == lv
@@ -950,12 +872,7 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
       mvgam_fit = object, newdata = sub_data,
       component = "obs", resp = resp
     )
-    if (is.list(obs_linpred) && !is.matrix(obs_linpred)) {
-      stop(insight::format_error(c(
-        "Hindcast received a list-shaped obs linpred with no 'resp' scope.",
-        i = "Please report this internal mvgam bug."
-      )))
-    }
+    assert_one_response_draws(obs_linpred, "The observation predictor")
     linpred <- obs_linpred + fitted_states
     full <- switch(
       type,
@@ -975,12 +892,7 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
     )
   }
 
-  if (is.list(full) && !is.matrix(full)) {
-    stop(insight::format_error(c(
-      "Hindcast received a list-shaped posterior with no 'resp' scope.",
-      i = "Please report this internal mvgam bug."
-    )))
-  }
+  assert_one_response_draws(full, "The hindcast")
   full[draw_idx, , drop = FALSE]
 }
 
@@ -1171,10 +1083,9 @@ build_forecast_arms <- function(object, trend_model, meta,
   # Factor-model precompute: when the fit is a latent-factor model
   # the trend recursion runs in n_lv-dimensional LV space and a
   # per-draw Z projects the propagated `[h, n_lv]` LV trajectory
-  # back to `[h, n_series]`. Pull the whole Z array once via the
-  # shared `extract_Z_loadings()` helper (returns [ndraws,
-  # n_series, n_lv], preferring `Z_tilde` when present); the inner
-  # loop slices per draw. NULL for full-rank fits.
+  # back to `[h, n_series]`. `resolve_factor_loadings()` returns
+  # the whole `[ndraws, n_series, n_lv]` array once and the inner
+  # loop slices it per draw. NULL for full-rank fits.
   #
   # `detect_factor_n_lv()` is asked rather than the two Stan
   # dimensions compared, because a factor fit reaches
@@ -1187,10 +1098,9 @@ build_forecast_arms <- function(object, trend_model, meta,
     object$standata$N_lv_trend %||% n_series
   )
   is_factor_fit <- !is.null(detect_factor_n_lv(object, n_series))
-  Z_arr <- if (is_factor_fit &&
-                 meta$trend_type %in% c("RW", "AR", "VAR", "ZMVN")) {
-    resolve_Z_loadings(object, draws_mat, n_series, n_lv_trend,
-                         basis = "model")
+  Z_arr <- if (is_factor_fit) {
+    resolve_factor_loadings(object, draws_mat, n_lv = n_lv_trend,
+                            n_series = n_series, basis = "model")
   } else {
     NULL
   }
@@ -1414,50 +1324,42 @@ apply_factor_projection <- function(lv_traj, Z_slice, n_series) {
 }
 
 
-# Internal: per-step time gap vector for a CAR forecast. CAR(1)
-# is continuous-time, so the kernel needs the gap from the last
-# observed time to each forecast time. The kernel accepts a
-# single length-`h` vector (no per-series matrix), so all
-# series must share the same forecast time grid -- this is the
-# common case for mvgam CAR fits where `time` is a global
-# continuous coordinate and the test split is also shared.
-# Heterogeneous per-series forecast times error with a
-# message.
+# Internal: the one value every forecast series shares. The CAR and
+# PW kernels evaluate a single horizon for all series. Each non-empty
+# entry of `per_series` has to agree, and an empty entry is a series
+# with nothing to forecast.
+#'@noRd
+shared_across_series <- function(per_series, trend) {
+  filled <- Filter(length, per_series)
+  if (length(filled) == 0L) {
+    return(numeric(0L))
+  }
+  agree <- vapply(filled, function(v) isTRUE(all.equal(v, filled[[1L]])),
+                  logical(1L))
+  if (!all(agree)) {
+    stop(insight::format_error(c(
+      paste0(trend, " forecasts require all series to share one time grid."),
+      x = paste0("The ", trend, " kernel evaluates one horizon for all ",
+                 "series."),
+      i = "Give every series in 'newdata' the same forecast times."
+    )), call. = FALSE)
+  }
+  filled[[1L]]
+}
+
+
+# Internal: per-step time gaps for a CAR forecast. CAR(1) is
+# continuous-time, and the kernel takes the gap from each series'
+# last observed time to each forecast time.
 #'@noRd
 compute_car_forecast_time <- function(object, fc_grid,
                                         series_levels) {
-  n_series <- length(series_levels)
-  last_times <- extract_last_observed_times(object, n_series)
-  gap_per_series <- vector("list", n_series)
-  for (s in seq_len(n_series)) {
-    lv <- series_levels[s]
-    fut_t <- sort(fc_grid$times[[lv]])
-    if (length(fut_t) == 0L) {
-      gap_per_series[[s]] <- numeric(0L)
-      next
-    }
-    gap_per_series[[s]] <- diff(c(last_times[s], fut_t))
-  }
-  # Drop empty (no-forecast) series from the consistency check.
-  nonempty <- vapply(gap_per_series, length, integer(1L)) > 0L
-  if (!any(nonempty)) return(numeric(0L))
-  ref <- gap_per_series[[which(nonempty)[1L]]]
-  for (s in which(nonempty)) {
-    if (!isTRUE(all.equal(gap_per_series[[s]], ref))) {
-      stop(insight::format_error(c(
-        paste0(
-          "CAR forecasts require all series to share ",
-          "the same forecast time grid."
-        ),
-        i = paste0(
-          "The CAR kernel reads one vector of time gaps for all ",
-          "series. Give every series in 'newdata' the same forecast ",
-          "times."
-        )
-      )))
-    }
-  }
-  ref
+  last_times <- extract_last_observed_times(object, length(series_levels))
+  gaps <- lapply(seq_along(series_levels), function(s) {
+    fut_t <- sort(fc_grid$times[[series_levels[s]]])
+    if (length(fut_t) == 0L) numeric(0L) else diff(c(last_times[s], fut_t))
+  })
+  shared_across_series(gaps, "CAR")
 }
 
 
@@ -1468,37 +1370,15 @@ compute_car_forecast_time <- function(object, fc_grid,
 #     Prophet-style horizon-changepoint frequency).
 #   * `cap`: forecast-horizon carrying capacities [h, n_series]
 #     for the logistic growth path; NULL for linear.
-#
-# All series are assumed to share the same forecast time grid
-# (mirrors the CAR shared-time constraint); heterogeneous
-# per-series grids would need a per-series PW evaluation loop
-# in `propagate_pw`.
 #'@noRd
 compute_pw_forecast_extras <- function(object, training,
                                           fc_grid, series_levels) {
-  n_series <- length(series_levels)
-  # Take the first non-empty series' forecast times as the
-  # shared grid; validate the others match.
-  fc_times <- NULL
-  for (lv in series_levels) {
-    ts <- as.numeric(fc_grid$times[[lv]])
-    if (length(ts) == 0L) next
-    if (is.null(fc_times)) {
-      fc_times <- sort(unique(ts))
-    } else if (!isTRUE(all.equal(sort(unique(ts)), fc_times))) {
-      stop(insight::format_error(c(
-        paste0(
-          "PW forecasts require all series to share ",
-          "the same forecast time grid."
-        ),
-        i = paste0(
-          "The PW forecast evaluates one horizon for all series. ",
-          "Give every series in 'newdata' the same forecast times."
-        )
-      )))
-    }
-  }
-  if (is.null(fc_times)) fc_times <- numeric(0L)
+  fc_times <- shared_across_series(
+    lapply(series_levels, function(lv) {
+      sort(unique(as.numeric(fc_grid$times[[lv]])))
+    }),
+    "PW"
+  )
 
   # Stan fits the piecewise trend on the time index, 1 to N_time, and
   # places its changepoints there. The forecast is evaluated on the
@@ -1645,10 +1525,10 @@ pw_cap_link_family <- function(families) {
       "A logistic 'PW()' trend needs every response on one link.",
       x = paste0("The responses use the links ",
                  paste0("'", links, "'", collapse = ", "), "."),
-      i = paste0("The capacity is given on the response scale and ",
-                 "reaches the shared trend through the link. Give the ",
-                 "responses families with one link, or use a linear ",
-                 "'PW()' trend.")
+      x = paste0("The capacity is on the response scale and enters ",
+                 "the shared trend through the link."),
+      i = paste0("Give the responses families with one link or use a ",
+                 "linear 'PW()' trend.")
     )), call. = FALSE)
   }
   families[[1L]]
@@ -1732,17 +1612,11 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
     for (k in seq_along(ts)) {
       cell_j <- which(raw_times == ts[k] & obs_struct$series_int == col)
       if (length(cell_j) == 0L) {
-        stop(insight::format_error(c(
-          "A forecast occasion has no row in the forecast grid.",
-          x = paste0("Series '", lv, "' at ", format(ts[k],
-                                                     trim = TRUE),
-                     " matched no row."),
-          i = paste0(
-            "The horizon and the rows it was cut from are built ",
-            "from one column. They cannot disagree on a grid ",
-            "this version produced."
-          )
-        )), call. = FALSE)
+        stop_mvgam_fault(
+          "Every forecast occasion needs a row in the forecast grid.",
+          paste0("Series '", lv, "' at ", format(ts[k], trim = TRUE),
+                 " matched no row.")
+        )
       }
       sm[, k] <- mat[, cell_j[1L]]
     }
@@ -1784,4 +1658,19 @@ extract_family_pars_for_draws <- function(object, draws_mat,
     out[[nm]] <- draws_mat[draw_idx, cols, drop = FALSE]
   }
   out
+}
+
+
+# Internal: a hindcast scoped to one response holds one draws matrix.
+# A list of matrices here means the response scope was lost upstream.
+#'@noRd
+assert_one_response_draws <- function(draws, what) {
+  if (is.list(draws) && !is.matrix(draws)) {
+    stop_mvgam_fault(
+      paste0(what, " must be one draws matrix."),
+      paste0("Got a list over responses: ",
+             paste0("'", names(draws), "'", collapse = ", "), ".")
+    )
+  }
+  invisible(TRUE)
 }

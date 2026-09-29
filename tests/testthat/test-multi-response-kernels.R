@@ -123,12 +123,12 @@ test_that("log_lik_categ refuses an observation that is not one-hot", {
   expect_error(
     log_lik_categ(matrix(0, 2L, 3L), "identity", c(1L, 1L, 0L),
                   pars, NULL),
-    "single one-hot"
+    "selects exactly one species"
   )
   expect_error(
     log_lik_categ(matrix(0, 2L, 3L), "identity", c(0L, 0L, 0L),
                   pars, NULL),
-    "single one-hot"
+    "selects exactly one species"
   )
 })
 

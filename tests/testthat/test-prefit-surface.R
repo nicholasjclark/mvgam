@@ -110,11 +110,8 @@ test_that("a VAR prefit names its trend and the posterior it needs", {
   )
   expect_s3_class(pf, "mvgam_prefit")
 
-  # `trend_components` is empty until a fit runs, and the type is in
-  # `trend_metadata`. Both resolvers take the second.
-  expect_null(pf$trend_components$types)
+  # A prefit records its trend type as a fit does.
   expect_identical(get_trend_type(pf), "VAR")
-  expect_identical(detect_var_trend(pf), "VAR")
 
   # Each method states the posterior it needs, in place of the
   # trend-type refusal and in place of the internal draws error.

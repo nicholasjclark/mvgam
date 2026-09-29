@@ -190,7 +190,7 @@ test_that(
     tf <- stats::as.formula(paste0("~ ", sp, "(sex) + AR(p = 1)"))
     expect_error(
       mvgam_formula(y ~ 1, trend_formula = tf),
-      regexp = "addition-terms not allowed"
+      regexp = "addition terms are not supported"
     )
   }
 })

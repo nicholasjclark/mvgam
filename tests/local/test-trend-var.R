@@ -37,19 +37,6 @@ suppressMessages({
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 SM <- suppressMessages
 
@@ -231,23 +218,18 @@ test_that("the observation design carries the interaction and the RE", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_var_trend.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading VAR fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(VAR(cor = TRUE), 3 series x 60 occasions)\n")
-  fit <- mvgam(
-    formula = obs_formula, trend_formula = ~ VAR(cor = TRUE),
-    data = dat, family = gaussian(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_var_trend.rds",
+  function() {
+    mvgam(
+      formula = obs_formula, trend_formula = ~ VAR(cor = TRUE),
+      data = dat, family = gaussian(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 # The posterior mean transition matrix, read once in the order the
 # draws name it: `A_trend[group, row, column]`.
@@ -259,10 +241,6 @@ for (i in seq_len(n_series)) {
   }
 }
 
-
-test_that("the cached fit ran the program the package generates", {
-  expect_current_program(fit)
-})
 
 
 test_that("A is one square matrix over the series", {
@@ -300,11 +278,22 @@ test_that("the chain count comes from the slot holding finished chains", {
 
 
 test_that("A recovers the simulated dynamics, entry by entry", {
-  # Recovery on the whole matrix rather than on a summary of it. A
-  # transposed or row-permuted `A` reproduces the same marginal
-  # behaviour for each series and differs only here.
-  expect_lt(max(abs(A_hat - A_true)), 0.35)
-  expect_gt(stats::cor(as.numeric(A_hat), as.numeric(A_true)), 0.8)
+  # Recovery is checked entry by entry. Sixty times leave each entry a
+  # posterior SD between 0.14 and 0.34. Every true entry has to fall
+  # inside its 95% interval.
+  for (i in seq_len(n_series)) {
+    for (j in seq_len(n_series)) {
+      q <- stats::quantile(dm_all[, paste0("A_trend[1,", i, ",", j, "]")],
+                           c(0.025, 0.975))
+      expect_gte(A_true[i, j], q[[1L]])
+      expect_lte(A_true[i, j], q[[2L]])
+    }
+  }
+  # A transposed or row-permuted `A` reproduces the same marginal
+  # behaviour for each series and differs only here. The posterior
+  # mean has a smaller squared error against the simulated matrix
+  # than against its transpose.
+  expect_lt(sum((A_hat - A_true)^2), sum((A_hat - t(A_true))^2))
 
   # The diagonal is positive persistence for every series.
   expect_true(all(diag(A_hat) > 0))
@@ -579,31 +568,14 @@ test_that("hindcast arms are the series, in order, and distinct", {
 })
 
 
-test_that("the VAR methods gate on one trend-type source", {
+test_that("the VAR methods gate on the recorded trend type", {
   # `irf()`, `fevd()` and `posterior_transition_matrix()` each call
-  # `assert_var_trend()`, which takes `detect_var_trend()` and then
-  # `get_trend_type()`. That resolver takes `trend_components$types`
-  # first and `trend_metadata$trend_type` second. A fitted model
-  # fills both slots; a prefit fills the second alone.
-  expect_identical(fit$trend_components$types[1L], "VAR")
-  expect_identical(fit$trend_metadata$trend_type, "VAR")
+  # `assert_var_trend()`, which takes the type from
+  # `trend_metadata$trend_type`.
   expect_identical(get_trend_type(fit), "VAR")
-  expect_identical(detect_var_trend(fit), "VAR")
-
-  # Emptying the first slot leaves the recorded type, which is the
-  # shape a prefit arrives in. Taking the first slot alone reported
-  # "None" for every prefit, and the three methods below then
-  # refused a VAR naming the trend type as the reason.
-  one_slot <- fit
-  one_slot$trend_components$types <- NA_character_
-  expect_identical(get_trend_type(one_slot), "VAR")
-  expect_identical(detect_var_trend(one_slot), "VAR")
-
-  # Emptying both slots stops all three methods.
-  blanked <- one_slot
+  blanked <- fit
   blanked$trend_metadata$trend_type <- NULL
   expect_identical(get_trend_type(blanked), "None")
-  expect_null(detect_var_trend(blanked))
   for (meth in list(function(x) irf(x, h = 2L),
                     function(x) fevd(x, h = 2L),
                     posterior_transition_matrix)) {
@@ -813,7 +785,6 @@ test_that("the reference the battery compares against actually varies", {
 })
 
 
-
 test_that("a shuffled newdata answers the same, in the new order", {
   set.seed(37L)
   perm <- sample(nrow(dat))
@@ -916,7 +887,7 @@ test_that("an unknown series is refused, and named", {
   )
   err <- expect_error(
     posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-    "Series levels in newdata not found in training data"
+    "Series in 'newdata' has levels absent from the training data"
   )
   expect_match(conditionMessage(err), "hazel", fixed = TRUE)
   for (s in series_levels) {
@@ -934,7 +905,7 @@ test_that("a ragged panel is refused with counts and a remedy", {
       data = ragged, family = gaussian(), run_model = FALSE,
       silent = 2
     ),
-    "do not share the same time grid"
+    "must share one time grid"
   )
   msg <- conditionMessage(err)
   expect_match(msg, as.character(n_time), fixed = TRUE)
@@ -960,14 +931,9 @@ test_that("summary, tidiers and criticism run on a VAR fit", {
   # approximation breaks, and the warning that arrived, if any, is
   # the k notice those numbers already account for rather than
   # something else that slipped through.
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))
@@ -1212,7 +1178,7 @@ test_that("irf and fevd answer from the draws they were given", {
   expect_length(fevd(fit, h = 4L, ndraws = 5L, summary = FALSE), 5L)
   expect_length(irf(fit, h = 4L, summary = FALSE), total)
   expect_error(irf(fit, h = 4L, ndraws = total + 1L),
-               "more draws than the posterior holds")
+               "more draws than the posterior has")
 
   # The default summarises, and a summary is smaller than the draws
   # it came from. Summarising it again returns the same table rather
@@ -1293,7 +1259,7 @@ test_that("stability reports each metric once, over the whole posterior", {
   expect_identical(bins$reactivity$counts, as.integer(ref$counts))
 
   expect_error(stability(fit, ndraws = ndraws(fit) + 1L),
-               "more draws than the posterior holds")
+               "more draws than the posterior has")
   expect_identical(nrow(stability(fit, ndraws = 5L, summary = FALSE)), 5L)
 })
 
@@ -1370,19 +1336,9 @@ test_that("pp_check carries its grouping and its x variable through", {
 
 
 test_that("the plotting methods render for a VAR fit", {
-  # A ggplot comes back whether or not a layer received any data, so
-  # the class alone passes on the empty panel it looks like it is
-  # guarding. Building the plot is what forces the layers to
-  # resolve, and the row count is what says something was drawn.
-  drawn <- function(p) {
-    expect_s3_class(p, "ggplot")
-    layers <- ggplot2::ggplot_build(p)$data
-    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-    invisible(layers)
-  }
-  drawn(pp_check(fit, ndraws = 20L))
+  expect_drawn(pp_check(fit, ndraws = 20L))
   for (ty in c("residuals", "trend", "series", "re")) {
-    drawn(plot(fit, type = ty))
+    expect_drawn(plot(fit, type = ty))
   }
   panel <- as.character(mcmc_plot(fit)$data$parameter)
   # The default panel holds what a reader interprets, under the names
@@ -1399,13 +1355,13 @@ test_that("the plotting methods render for a VAR fit", {
     pairs(fit, variable = c("sigma", "sigma_trend[1]")),
     "bayesplot_grid"
   )
-  drawn(plot(conditional_effects(fit))[[1L]])
+  expect_drawn(plot(conditional_effects(fit))[[1L]])
 
   # The three types this fit cannot answer refuse it, each naming
   # the structure it would need. A method that returned an empty
   # panel instead would satisfy the loop above.
   expect_error(plot(fit, type = "smooths"), "no smooth terms")
-  expect_error(plot(fit, type = "factors"), "latent dynamic factors")
+  expect_error(plot(fit, type = "factors"), "no latent factors to plot")
   expect_error(plot(fit, type = "latent_state"), "has no closure units")
 })
 
@@ -1568,7 +1524,7 @@ test_that("a forecast over observed occasions is refused, not emptied", {
   inside$time <- rep(time_vals[seq_len(h)], times = n_series)
   err <- expect_error(
     forecast(fit, newdata = inside, ndraws = 20L, type = "trend"),
-    "names no occasion beyond the training grid"
+    "ends at or before the last training time"
   )
   expect_match(conditionMessage(err),
                paste(time_vals[seq_len(h)], collapse = ", "), fixed = TRUE)

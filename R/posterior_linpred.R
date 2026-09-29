@@ -220,34 +220,16 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #'@noRd
 compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
                                         resp_name = NULL) {
-  if (nrow(trend_mat) != nrow(obs_mat) ||
-      ncol(trend_mat) != ncol(obs_mat)) {
-    msg <- if (!is.null(resp_name)) {
-      cli::format_inline(
-        "Dimension mismatch for response {.val {resp_name}}: ",
-        "obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but ",
-        "trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
-      )
-    } else {
-      cli::format_inline(
-        "Dimension mismatch: obs_linpred is ",
-        "[{nrow(obs_mat)} x {ncol(obs_mat)}] but trend_linpred is ",
-        "[{nrow(trend_mat)} x {ncol(trend_mat)}]."
-      )
-    }
-    stop(insight::format_error(msg))
+  what <- if (is.null(resp_name)) "" else paste0(" of '", resp_name, "'")
+  if (!identical(dim(trend_mat), dim(obs_mat))) {
+    stop_shape_fault(paste0("The trend predictor", what), dim(trend_mat),
+                     dim(obs_mat))
   }
   out <- obs_mat + trend_mat
   if (!is.null(trend_noise)) {
-    if (nrow(trend_noise) != nrow(out) ||
-        ncol(trend_noise) != ncol(out)) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Trend-noise dimension mismatch: noise is ",
-          "[{nrow(trend_noise)} x {ncol(trend_noise)}] but linpred is ",
-          "[{nrow(out)} x {ncol(out)}]."
-        )
-      ))
+    if (!identical(dim(trend_noise), dim(out))) {
+      stop_shape_fault(paste0("The trend noise", what), dim(trend_noise),
+                       dim(out))
     }
     out <- out + trend_noise
   }
@@ -507,17 +489,16 @@ dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
   valid <- get_family_dpars(family_name)
   if (!dpar %in% valid) {
     stop(insight::format_error(c(
-      paste0(
-        "'", dpar, "' is not a distributional parameter of family '",
-        family_name, "'."
-      ),
+      paste0("'dpar' must be a distributional parameter of family '",
+             family_name, "'."),
+      x = paste0("Got '", dpar, "'."),
       i = if (length(valid) > 0) {
         paste0("Available: ", paste0("'", valid, "'", collapse = ", "), ".")
       } else {
         paste0("Family '", family_name,
-               "' has no distributional parameters.")
+               "' has only its mean parameter.")
       }
-    )))
+    )), call. = FALSE)
   }
   newdata <- newdata %||% mvgam_training_data(object)
   predicted <- predicted_dpar_names(object, dpar, resp = resp)

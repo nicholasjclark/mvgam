@@ -47,7 +47,7 @@ plot_mvgam_series <- function(
   checkmate::assert_class(object, "mvgam")
   resolve_resp(object, resp)
   time_var <- axis_vars(object)$time_var
-  series_levels <- resolve_series_info(object)$series_levels
+  series_levels <- fitted_series_levels(object)
   test <- newdata %||% object$test_data
   if (!is.null(test) && !is.null(object$trend_metadata)) {
     validate_prediction_factor_levels(test, object$trend_metadata)
@@ -197,7 +197,7 @@ resolve_series_index <- function(series, series_levels) {
   }
   if (length(idx) != 1L) {
     stop(insight::format_error(c(
-      "'series' names one series on this plot.",
+      "'series' selects one series on this plot.",
       x = paste0("Got ", length(idx), " of ", n_series, " series."),
       i = "Use 'all' to draw every series."
     )))

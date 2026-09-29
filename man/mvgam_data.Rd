@@ -2,7 +2,6 @@
 % Please edit documentation in R/mvgam_data.R
 \name{mvgam_data}
 \alias{mvgam_data}
-\alias{check_mvgam_data}
 \title{Inspect long-format data before fitting an \code{mvgam}}
 \usage{
 mvgam_data(
@@ -11,7 +10,6 @@ mvgam_data(
   family = gaussian(),
   formula = NULL,
   trend_formula = NULL,
-  trend_model = NULL,
   plot = TRUE,
   newdata = NULL,
   series = NULL,
@@ -19,15 +17,15 @@ mvgam_data(
   n_bins = NULL,
   log_scale = FALSE
 )
-
-check_mvgam_data(...)
 }
 \arguments{
 \item{data}{Long-format \code{data.frame} (or list) carrying at
-least the response column, a \code{time} column, and (for
-multi-series fits) a \code{series} factor column. Closure-unit
-families (\code{occ()}, \code{nmix()}) additionally require \code{visit}
-and (where the family needs it) \code{cap}.}
+least the response column and a \code{time} column. A latent trend
+also needs each row's series: a \code{series} column, the column
+the trend constructor's \code{series} argument names, or the \code{gr}
+and \code{subgr} columns of a hierarchical trend. Closure-unit
+families (\code{occ()}, \code{nmix()}) always require \code{series} and
+\code{visit}, and \code{cap} where the family needs it.}
 
 \item{y}{Character. Name of the response column. Defaults to
 \code{"y"}.}
@@ -53,14 +51,13 @@ if any are present. Response \code{NA}s are always allowed and
 are preserved by \code{mvgam()} to maintain the time grid.}
 
 \item{trend_formula}{Optional trend formula (e.g.
-\code{~ AR(time = week, series = species) + s(env)}). Subject to
-the same covariate \code{NA} check as \code{formula}. Bare names
-inside trend constructors (\code{time = week}, \code{series = species}) that point at real columns are also checked.}
-
-\item{trend_model}{Optional trend constructor (e.g. \code{AR()},
-\code{RW()}, \code{CAR()}). When supplied, regular time spacing is
-enforced for trends that require it; \code{CAR()} skips that
-check.}
+\code{~ AR(time = week, series = species) + s(env)}), as passed to
+\code{\link[=mvgam]{mvgam()}}. Its trend constructor names the time and series
+columns and decides whether times must be evenly spaced:
+\code{CAR()} and \code{ZMVN()} accept gaps, most others refuse them.
+\code{NULL} checks the data for a model without a trend, which
+needs no series column. Covariates the formula references
+get the same \code{NA} check as \code{formula}.}
 
 \item{plot}{Logical. If \code{TRUE} (default), draw the
 observed-series plot using the same panels as
@@ -73,8 +70,9 @@ list. Plotted overlaid in black with a dashed cut at the
 training/test boundary.}
 
 \item{series}{One of \code{NULL}, \code{"all"}, or a positive integer
-index into the \code{series} factor levels. \code{NULL} resolves to
-\code{"all"} for multi-series data and \code{1L} for single-series.}
+index into the series levels. \code{NULL} resolves to \code{"all"} for
+multi-series data and \code{1L} for single-series. Data without a
+series column plot as one series named after the response.}
 
 \item{lines}{Logical. Plot lines (default) or points.}
 
@@ -82,14 +80,13 @@ index into the \code{series} factor levels. \code{NULL} resolves to
 
 \item{log_scale}{Logical. Plot the response as \code{log(y + 1)}
 on the multi-series view, where different scales are common.}
-
-\item{...}{For \code{check_mvgam_data()}, arguments forwarded on to
-\code{mvgam_data()}.}
 }
 \value{
 Invisibly, an \code{mvgam_data} list with elements
 \code{data} (the validated data), \code{family} (resolved family
-object), \code{series_levels}, \code{n_series}, \code{time_range}, and
+object), \code{series_levels} (\code{NULL} when the data name no
+series), \code{n_series}, \code{time_range}, \code{n_obs}, \code{n_missing}
+(the count of missing responses), and
 \code{plot} (the \code{ggplot} / \code{patchwork} object when
 \code{plot = TRUE}, else \code{NULL}). When \code{plot = TRUE} the plot is
 also drawn to the active device.
@@ -102,7 +99,6 @@ Use this to verify data structure for a proposed observation
 family without paying for a Stan compile, and to surface the
 same friendly errors \code{mvgam()} raises at fit time. Mirrors the
 role of \code{\link[=mvgam_formula]{mvgam_formula()}} for the data side.
-\code{check_mvgam_data()} is an alias for the same function.
 }
 \examples{
 \donttest{
@@ -114,9 +110,9 @@ simdat <- sim_mvgam(family = poisson(), n_series = 3L,
 # plot.
 mvgam_data(
   simdat$data_train,
-  y           = "y",
-  family      = poisson(),
-  trend_model = AR()
+  y             = "y",
+  family        = poisson(),
+  trend_formula = ~ AR()
 )
 
 # 4-panel single-series view (time series, histogram, ACF,
@@ -140,9 +136,18 @@ try(mvgam_data(props, family = Beta(), plot = FALSE))
 # Irregular time is refused for a trend that assumes even
 # spacing, and accepted for CAR(), which models the gaps.
 gappy <- simdat$data_train[simdat$data_train$time != 5L, ]
-try(mvgam_data(gappy, family = poisson(), trend_model = AR(),
+try(mvgam_data(gappy, family = poisson(), trend_formula = ~ AR(),
                 plot = FALSE))
-mvgam_data(gappy, family = poisson(), trend_model = CAR(),
+mvgam_data(gappy, family = poisson(), trend_formula = ~ CAR(),
+            plot = FALSE)
+
+# A trend needs each row's series, even for a single series.
+one <- simdat$data_train[simdat$data_train$series == "series_1", ]
+one$series <- NULL
+try(mvgam_data(one, family = poisson(), trend_formula = ~ AR(),
+                plot = FALSE))
+one$series <- factor("series_1")
+mvgam_data(one, family = poisson(), trend_formula = ~ AR(),
             plot = FALSE)
 }
 

@@ -20,18 +20,14 @@ reshape_linpred_to_grid <- function(lp_vec, obs_struct) {
   # but flag the failure crisply if it does so callers see the
   # real cause rather than a downstream subscript error.
   if (length(lp_vec) != length(t_idx)) {
-    stop(insight::format_error(c(
-      "Linpred vector length does not match observation count.",
-      x = paste0(
-        "Got length(lp_vec) = ", length(lp_vec),
-        ", expected ", length(t_idx), "."
-      )
-    )))
+    stop_shape_fault("The linear predictor", length(lp_vec),
+                     length(t_idx))
   }
-  if (any(is.na(t_idx))) {
-    stop(insight::format_error(c(
-      "Observation times missing from the unique-time grid."
-    )))
+  if (anyNA(t_idx)) {
+    stop_mvgam_fault(
+      "Every observation time must lie on the unique-time grid.",
+      paste0(sum(is.na(t_idx)), " observation time(s) fall outside it.")
+    )
   }
   if (any(s_idx < 1L | s_idx > n_series)) {
     stop(insight::format_error(c(

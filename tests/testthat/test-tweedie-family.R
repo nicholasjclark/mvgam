@@ -91,7 +91,7 @@ test_that("standata under tweedie() carries M with the requested value", {
 
 test_that("get_family_dpars(\"tweedie\") returns mphi + mtheta", {
   # Without this, log_lik.mvgam cannot extract the posterior
-  # dpar matrices that log_lik_tweedie expects (mphi, mtheta).
+  # dpar matrices the Tweedie density takes (mphi, mtheta).
   expect_identical(
     mvgam:::get_family_dpars("tweedie"),
     c("mphi", "mtheta")
@@ -108,7 +108,7 @@ test_that("compute_family_epred returns mu directly for tweedie", {
   expect_equal(epred, exp(linpred), tolerance = 1e-12)
 })
 
-test_that("log_lik_tweedie returns finite log densities for zero + positive y", {
+test_that("the tweedie log density returns finite log densities for zero + positive y", {
   fam <- tweedie()
   ndraws <- 5L
   nobs <- 4L
@@ -116,8 +116,8 @@ test_that("log_lik_tweedie returns finite log densities for zero + positive y", 
   linpred <- matrix(log(2), nrow = ndraws, ncol = nobs)
   mphi <- matrix(0.5, nrow = ndraws, ncol = nobs)
   mtheta <- matrix(1.5, nrow = ndraws, ncol = nobs)
-  ll <- mvgam:::log_lik_tweedie(
-    linpred = linpred,
+  ll <- mvgam:::dispatch_log_lik(
+    "tweedie", linpred = linpred,
     link = "log",
     y = y,
     family_pars = list(mphi = mphi, mtheta = mtheta),
@@ -132,7 +132,7 @@ test_that("log_lik_tweedie returns finite log densities for zero + positive y", 
   expect_true(all(ll[, 3] < 0))
 })
 
-test_that("log_lik_tweedie matches mgcv::ldTweedie row-wise", {
+test_that("the tweedie log density matches mgcv::ldTweedie row-wise", {
   # Per-observation log density must equal mgcv's reference
   # implementation column by column.
   set.seed(1L)
@@ -143,8 +143,8 @@ test_that("log_lik_tweedie matches mgcv::ldTweedie row-wise", {
   linpred <- log(mu)
   mphi <- matrix(runif(ndraws * nobs, 0.3, 0.8), nrow = ndraws)
   mtheta <- matrix(runif(ndraws * nobs, 1.3, 1.7), nrow = ndraws)
-  ll <- mvgam:::log_lik_tweedie(
-    linpred = linpred,
+  ll <- mvgam:::dispatch_log_lik(
+    "tweedie", linpred = linpred,
     link = "log",
     y = y,
     family_pars = list(mphi = mphi, mtheta = mtheta),

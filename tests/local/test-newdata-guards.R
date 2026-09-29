@@ -25,15 +25,6 @@ suppressMessages({
   library(testthat)
 })
 
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(419L)
 
@@ -53,25 +44,19 @@ make_frame <- function(levels) {
 dat_multi <- make_frame(series_levels)
 dat_single <- make_frame(series_levels[1L])
 
-fit_cached <- function(name, data) {
-  path <- cache_path(name)
-  if (file.exists(path)) {
-    cat("[cache] Loading", name, "\n")
-    return(readRDS(path))
+fit_ar1 <- function(data) {
+  function() {
+    mvgam(
+      formula = y ~ x, trend_formula = ~ AR(p = 1),
+      data = data, family = poisson(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
   }
-  cat("[fit ] mvgam(AR(p = 1)) for", name, "\n")
-  f <- mvgam(
-    formula = y ~ x, trend_formula = ~ AR(p = 1),
-    data = data, family = poisson(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-  saveRDS(f, path)
-  f
 }
 
-fit <- fit_cached("val_newdata_guards_multi.rds", dat_multi)
-fit_one <- fit_cached("val_newdata_guards_single.rds", dat_single)
+fit <- cached_fit("val_newdata_guards_multi.rds", fit_ar1(dat_multi))
+fit_one <- cached_fit("val_newdata_guards_single.rds", fit_ar1(dat_single))
 
 time_var <- mvgam:::axis_vars(fit)$time_var
 series_var <- mvgam:::axis_vars(fit)$series_var

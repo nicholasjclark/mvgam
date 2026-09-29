@@ -13,12 +13,12 @@
 # ---- Build a minimal mvgam stub backed by a draws_matrix ----------
 
 # `extract_var_posterior` only needs (i) object$fit to be something
-# `posterior::as_draws_matrix` accepts and (ii) trend_components /
-# obs_data to resolve K. A draws_matrix dispatches through the
+# `posterior::as_draws_matrix` accepts and (ii) the trend type and the
+# Stan data to resolve K. A draws_matrix dispatches through the
 # posterior generic as the identity, so we can hand one in directly
 # without going through Stan.
 build_var_mock <- function(K = 3L, ndraws = 50L,
-                           trend_type = "VAR1cor", seed = 1L) {
+                           trend_type = "VAR", seed = 1L) {
   set.seed(seed)
   cols <- character(0L)
   for (i in seq_len(K)) for (j in seq_len(K)) {
@@ -41,7 +41,7 @@ build_var_mock <- function(K = 3L, ndraws = 50L,
   structure(
     list(
       fit = draws,
-      trend_components = list(types = trend_type),
+      trend_metadata = list(trend_type = trend_type),
       standata = list(N_lv_trend = K, N_series_trend = K)
     ),
     class = "mvgam"
@@ -60,7 +60,7 @@ var_kernel_input <- function(K, A, Sigma = diag(K)) {
 
 test_that("assert_var_trend() rejects non-VAR fits with a clear pointer", {
   fake <- structure(
-    list(trend_components = list(types = "RW")),
+    list(trend_metadata = list(trend_type = "RW")),
     class = "mvgam"
   )
   expect_error(
@@ -69,33 +69,10 @@ test_that("assert_var_trend() rejects non-VAR fits with a clear pointer", {
   )
   expect_error(
     assert_var_trend(fake, surface = "irf()"),
-    "'RW'"
+    "trend type is 'RW'"
   )
-  # A prefit records its trend type in its metadata alone. The gate
-  # and the message both name the type from there.
-  prefit <- structure(
-    list(trend_metadata = list(trend_type = "AR")),
-    class = c("mvgam", "mvgam_prefit")
-  )
-  expect_error(
-    assert_var_trend(prefit, surface = "irf()"),
-    "trend type is 'AR'"
-  )
-})
-
-test_that("detect_var_trend() recognises all four VAR-type spellings", {
-  for (tt in c("VAR", "VAR1", "VARcor", "VAR1cor")) {
-    fake <- structure(
-      list(trend_components = list(types = tt)),
-      class = "mvgam"
-    )
-    expect_identical(detect_var_trend(fake), tt)
-  }
-  fake_none <- structure(
-    list(trend_components = list(types = NULL)),
-    class = "mvgam"
-  )
-  expect_null(detect_var_trend(fake_none))
+  expect_true(assert_var_trend(build_var_mock(K = 2L, ndraws = 2L),
+                               surface = "irf()"))
 })
 
 # ---- Extractor -----------------------------------------------------
@@ -307,7 +284,7 @@ test_that("posterior_transition_matrix() takes one groups argument", {
 
 test_that("posterior_transition_matrix() gates on the trend type", {
   fake <- structure(
-    list(trend_components = list(types = "RW")),
+    list(trend_metadata = list(trend_type = "RW")),
     class = "mvgam"
   )
   expect_error(
@@ -329,8 +306,8 @@ test_that("var_process_labels names the series where they are the processes", {
                    c("Process_1", "Process_2", "Process_3"))
 
   named <- mock
-  named$trend_metadata <- list(
-    levels = list(series = c("willow", "ash", "rowan"))
+  named$trend_metadata$axes <- list(
+    series = list(levels = c("willow", "ash", "rowan"), n = 3L)
   )
   expect_identical(var_process_labels(named, 3L),
                    c("willow", "ash", "rowan"))
@@ -338,7 +315,7 @@ test_that("var_process_labels names the series where they are the processes", {
   # A series count disagreeing with the VAR dimension is no labelling
   # of it, and the index answers in place of a recycled name.
   short <- named
-  short$trend_metadata$levels$series <- c("willow", "ash")
+  short$trend_metadata$axes$series$levels <- c("willow", "ash")
   expect_identical(var_process_labels(short, 3L),
                    c("Process_1", "Process_2", "Process_3"))
 })

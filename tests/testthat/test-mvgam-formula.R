@@ -91,13 +91,13 @@ test_that("mvgam_formula detects incompatible autocorrelation terms", {
   # Should error with autocor() in trend_formula
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1)),
-    "brms autocorrelation terms not allowed"
+    "brms autocorrelation terms are not supported"
   )
 
   # Should provide helpful error message
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1)),
-    "conflict with mvgam State-Space dynamics"
+    "conflict with the trend dynamics"
   )
 
   # Regular terms should be fine
@@ -366,7 +366,7 @@ test_that("error handling for invalid get_prior calls", {
   # model's responses
   expect_error(
     get_prior(mvgam_formula(~ x), data = data.frame(x = 1:5)),
-    "The observation formula names no response"
+    "The observation formula needs a response"
   )
 
   # A name no family answers to is refused by brms, which lists the
@@ -460,7 +460,7 @@ test_that("all brms addition-terms detected in trend_formula", {
   # Test autocorrelation terms (different error message)
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1)),
-    "brms autocorrelation terms not allowed"
+    "brms autocorrelation terms are not supported"
   )
 
   # Test addition-terms
@@ -473,7 +473,7 @@ test_that("all brms addition-terms detected in trend_formula", {
   for (term in addition_terms) {
     expect_error(
       mvgam_formula(y ~ x, trend_formula = term),
-      "brms addition-terms not allowed",
+      "brms addition terms are not supported",
       label = paste("trend_formula", deparse(term))
     )
   }
@@ -484,21 +484,21 @@ test_that("addition-terms detection in complex trend formulas", {
   expect_error(
     mvgam_formula(y ~ x,
                   trend_formula = ~ s(time) + (1|group) + weights(w)),
-    "brms addition-terms not allowed"
+    "brms addition terms are not supported"
   )
 
   # Multiple addition-terms in one formula
   expect_error(
     mvgam_formula(y ~ x,
                   trend_formula = ~ autocor(M = ~ 1) + weights(w)),
-    "brms autocorrelation terms not allowed"
+    "brms autocorrelation terms are not supported"
   )
 
   # Nested addition-terms
   expect_error(
     mvgam_formula(y ~ x,
                   trend_formula = ~ (1|group) + I(weights(w) * 2)),
-    "brms addition-terms not allowed"
+    "brms addition terms are not supported"
   )
 })
 
@@ -534,7 +534,7 @@ test_that("edge cases and complex validation scenarios", {
   expect_error(
     mvgam_formula(y ~ x,
                   trend_formula = ~ ((time + weights(w)) * factor)),
-    "brms addition-terms not allowed"
+    "brms addition terms are not supported"
   )
 
   # Mixed valid and invalid
@@ -554,7 +554,7 @@ test_that("edge cases and complex validation scenarios", {
   # No-intercept with forbidden terms should still error
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ x - 1 + weights(w) + AR()),
-    "brms addition-terms not allowed"
+    "brms addition terms are not supported"
   )
 })
 
@@ -562,19 +562,19 @@ test_that("validation preserves helpful error context", {
   # Error should mention the problematic context
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ weights(w)),
-    "brms addition-terms not allowed"
+    "brms addition terms are not supported"
   )
 
   # Should identify the specific addition-term
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1)),
-    "brms autocorrelation terms not allowed"
+    "brms autocorrelation terms are not supported"
   )
 
   # Multiple terms - error should still be clear
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ weights(w) + subset(idx)),
-    "brms addition-terms not allowed"
+    "brms addition terms are not supported"
   )
 })
 

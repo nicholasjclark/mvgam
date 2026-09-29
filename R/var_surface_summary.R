@@ -119,7 +119,7 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
         if (is_fevd) "variance decomposition" else "impulse response",
         "."
       ),
-      i = paste0("Use '", usable, "' to name the other end of the pair.")
+      i = paste0("Use '", usable, "' to choose the other end of the pair.")
     )))
   }
   keep <- rep(TRUE, nrow(dat))

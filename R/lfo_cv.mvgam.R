@@ -191,7 +191,7 @@ lfo_cv.mvgam <- function(object,
   if (!is.null(data)) {
     if (is.null(newdata)) {
       insight::format_warning(c(
-        "'data' is deprecated. Use 'newdata' instead.",
+        "'data' is deprecated in favour of 'newdata'.",
         i = "The supplied value was passed on to 'newdata'."
       ))
       newdata <- data
@@ -220,44 +220,23 @@ lfo_cv.mvgam <- function(object,
   # same guard was reasoned out of `resolve_forecast_grid()` and its
   # comment says why; asking for the column here refused every
   # `mvbf()` fit the frame it was fitted on.
-  refuse_absent_time_column(all_data, time_var)
-  # Every series must share a time grid: a rolling origin has no
-  # single meaning when series are observed at different times, so
-  # that case is refused rather than silently misaligned.
-  # Identified the way the fit identified them, so a frame whose
-  # series column was superseded by a grouping is split into the
-  # series the model has rather than the ones the column names.
-  #
-  # The record answers `NULL` where a row belongs to no one series:
-  # a response-keyed frame carries every response on every row, so
-  # the responses cannot disagree about the grid and there is
-  # nothing here to compare. Reading a `series` column instead
-  # returned a factor of no rows and split the frame into nothing.
+  assert_axis_column(all_data, time_var, "time")
+  # A rolling origin needs every series on one time grid. The fit's
+  # axis record assigns rows to series, which covers a series a
+  # grouping defines. A response-keyed frame puts every response on
+  # every row, and the record returns `NULL` for it: its responses
+  # share the grid by construction.
   series_fac <- axis_row_series(object, all_data)
-  series_time_sets <- if (is.null(series_fac)) {
-    list(sort(unique(all_data[[time_var]])))
-  } else {
-    lapply(
-      split(all_data[[time_var]], droplevels(series_fac)),
-      function(t) sort(unique(t))
-    )
-  }
-  if (length(series_time_sets) > 1L) {
-    ref_times <- series_time_sets[[1L]]
-    mismatched <- vapply(
-      series_time_sets[-1L],
-      function(s) !identical(s, ref_times), logical(1L)
-    )
-    if (any(mismatched)) {
-      bad <- names(series_time_sets[-1L])[mismatched]
+  if (!is.null(series_fac)) {
+    short <- ragged_series(all_data[[time_var]], series_fac)
+    if (length(short) > 0L) {
       stop(insight::format_error(c(
-        "'lfo_cv()' requires all series to share the same time grid.",
-        x = paste0("Series with a different time grid: ",
-                   paste(bad, collapse = ", "), "."),
-        i = paste0("Align series to a common time grid (NA-pad ",
-                   "the response where needed) or evaluate each ",
-                   "series in a separate 'lfo_cv()' call.")
-      )))
+        "'lfo_cv()' requires all series to share one time grid.",
+        x = paste0("Series missing a time the others have: ",
+                   paste0("'", short, "'", collapse = ", "), "."),
+        i = "Give each unobserved time of a series a row with response 'NA'.",
+        i = "A series with its own times takes its own 'lfo_cv()' call."
+      )), call. = FALSE)
     }
   }
 
@@ -301,16 +280,17 @@ lfo_cv.mvgam <- function(object,
     # are shown.
     shown <- utils::head(all_unique_times, 6L)
     stop(insight::format_error(c(
-      paste0("'min_t' = ", min_t, " is not an observed time."),
+      "'min_t' must be an observed time.",
+      x = paste0("Got min_t = ", min_t, "."),
       x = paste0(
-        "The fit holds ", n_times, " occasions, beginning ",
+        "The fit has ", n_times, " occasions, beginning ",
         paste(format(shown, trim = TRUE), collapse = ", "),
         if (n_times > length(shown)) ", ..." else "",
         " and ending ", format(max(all_unique_times), trim = TRUE),
         "."
       ),
       i = "Pass one of those values."
-    )))
+    )), call. = FALSE)
   }
 
   idx_min_t <- match(min_t, all_unique_times)
@@ -552,7 +532,7 @@ lfo_collect_fold_loglik <- function(loglik, all_data, time_var,
   } else {
     n_draws <- nrow(loglik)
     probs <- exp(psis_log_weights -
-                   lfo_log_sum_exp(psis_log_weights))
+                   log_sum_exp(psis_log_weights))
     idx <- sample.int(n_draws, n_draws, replace = TRUE,
                        prob = probs)
     loglik[idx, fc_idx, drop = FALSE]
@@ -599,9 +579,9 @@ scores_at_window <- function(fit, all_data, time_var,
       loglik[, fc_idx, drop = FALSE]
     )
     if (is.null(psis_log_weights)) {
-      elpds[eval_idx] <- lfo_log_mean_exp(per_draw_loglik)
+      elpds[eval_idx] <- log_mean_exp(per_draw_loglik)
     } else {
-      elpds[eval_idx] <- lfo_log_sum_exp(
+      elpds[eval_idx] <- log_sum_exp(
         psis_log_weights + per_draw_loglik
       )
     }
@@ -624,7 +604,7 @@ scores_at_window <- function(fit, all_data, time_var,
       # draws come from the reweighted posterior the ELPD used.
       n_draws <- nrow(fc$forecasts[[1L]])
       probs <- exp(psis_log_weights -
-                     lfo_log_sum_exp(psis_log_weights))
+                     log_sum_exp(psis_log_weights))
       idx <- sample.int(n_draws, n_draws, replace = TRUE,
                           prob = probs)
       fc$forecasts <- lapply(fc$forecasts, function(m) {
@@ -731,22 +711,6 @@ lfo_training_frame <- function(object, data, last_train,
 }
 
 
-# Internal: numerically stable log-sum-exp.
-#'@noRd
-lfo_log_sum_exp <- function(x) {
-  if (length(x) == 0L) return(-Inf)
-  m <- max(x)
-  m + log(sum(exp(x - m)))
-}
-
-
-# Internal: numerically stable log-mean-exp.
-#'@noRd
-lfo_log_mean_exp <- function(x) {
-  lfo_log_sum_exp(x) - log(length(x))
-}
-
-
 # Internal: the rows of `data` observed at any of `times`.
 #
 # Written once because three places asked it and each truncated the
@@ -816,7 +780,7 @@ plot.mvgam_lfo <- function(x, ...) {
     ks[is.infinite(ks)] <- max(finite_ks)
   }
 
-  threshold_val <- pareto_k_threshold_of(obj)
+  threshold_val <- obj$pareto_k_threshold
   panels <- list()
   panels$pareto_ks <- data.frame(
     eval = obj$eval_timepoints,
@@ -977,28 +941,8 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
   checkmate::assert_character(model_names, len = length(models),
                               any.missing = FALSE)
 
-  # Align grids: every model must have the same eval_timepoints and
-  # fc_horizon so per-fold differences are meaningful.
+  assert_aligned_lfo(models)
   ref_times <- models[[1L]]$eval_timepoints
-  ref_h <- models[[1L]]$fc_horizon
-  for (i in seq_along(models)) {
-    if (!identical(models[[i]]$eval_timepoints, ref_times)) {
-      stop(insight::format_error(c(
-        "Cannot compare: eval_timepoints differ across models.",
-        x = paste0("Model ", i, " has a different evaluation grid ",
-                   "than model 1."),
-        i = paste0("Refit lfo_cv() on each model with the same ",
-                   "min_t and fc_horizon, against the same data.")
-      )))
-    }
-    if (!identical(models[[i]]$fc_horizon, ref_h)) {
-      stop(insight::format_error(c(
-        "Cannot compare: fc_horizon differs across models.",
-        x = paste0("Model ", i, " uses fc_horizon = ",
-                   models[[i]]$fc_horizon, ". Model 1 uses ", ref_h, ".")
-      )))
-    }
-  }
 
   for (i in seq_along(models)) {
     if (is.null(models[[i]]$elpds)) {
@@ -1118,21 +1062,7 @@ loo_model_weights.mvgam_lfo <- function(x, ...,
   checkmate::assert_character(model_names, len = length(models),
                               any.missing = FALSE)
 
-  # All models must share the same evaluation grid; otherwise the
-  # paired comparison underlying either method would mix
-  # observations from different rolling-origin schemes.
-  ref_times <- models[[1L]]$eval_timepoints
-  for (i in seq_along(models)) {
-    if (!identical(models[[i]]$eval_timepoints, ref_times)) {
-      stop(insight::format_error(c(
-        "Cannot weight: eval_timepoints differ across models.",
-        x = paste0("Model ", i, " has a different evaluation grid ",
-                   "than model 1."),
-        i = paste0("Refit lfo_cv() on each model with the same ",
-                   "min_t and fc_horizon against the same data.")
-      )))
-    }
-  }
+  assert_aligned_lfo(models)
 
   if (identical(method, "stacking")) {
     return(stack_mvgam_lfo(models, model_names))
@@ -1149,8 +1079,7 @@ loo_model_weights.mvgam_lfo <- function(x, ...,
     sum(m$elpds, na.rm = TRUE)
   }, numeric(1L))
 
-  shifted <- total_elpd - max(total_elpd)
-  w <- exp(shifted) / sum(exp(shifted))
+  w <- softmax(total_elpd)
   names(w) <- model_names
 
   class(w) <- "pseudobma_weights"
@@ -1185,10 +1114,10 @@ stack_mvgam_lfo <- function(models, model_names) {
       stop(insight::format_error(c(
         "Pointwise log-likelihood matrices have different widths.",
         x = paste0("Model ", i, " has ", ncol(ll_list[[i]]),
-                   " columns. Model 1 has ", ref_cols, "."),
-        i = paste0("Run lfo_cv() again on all models against the ",
-                   "same newdata and rolling-origin grid.")
-      )))
+                   " columns, model 1 has ", ref_cols, "."),
+        i = paste0("Run 'lfo_cv()' again on all models with the same ",
+                   "'newdata' and rolling-origin grid.")
+      )), call. = FALSE)
     }
   }
 
@@ -1213,7 +1142,7 @@ stack_mvgam_lfo <- function(models, model_names) {
   # are already LFO-resampled draws (not a posterior in the shape
   # PSIS-LOO expects).
   lpd_point <- vapply(ll_list, function(m) {
-    apply(m, 2L, lfo_log_mean_exp)
+    apply(m, 2L, log_mean_exp)
   }, numeric(ncol(ll_list[[1L]])))
   w <- loo::stacking_weights(lpd_point)
   names(w) <- model_names
@@ -1236,8 +1165,8 @@ stack_mvgam_lfo <- function(models, model_names) {
 #' @method print mvgam_lfo
 #' @export
 print.mvgam_lfo <- function(x, ...) {
-  threshold_val <- pareto_k_threshold_of(x)
-  adaptive_label <- if (pareto_k_threshold_is_adaptive(x)) {
+  threshold_val <- x$pareto_k_threshold
+  adaptive_label <- if (isTRUE(x$pareto_k_threshold_adaptive)) {
     " (adaptive)"
   } else {
     ""
@@ -1287,7 +1216,7 @@ print.mvgam_lfo <- function(x, ...) {
 #'   of held-out observations per series.
 #' @noRd
 window_predictive <- function(fit, fc_data) {
-  series_levels <- resolve_series_info(fit)$series_levels
+  series_levels <- fitted_series_levels(fit)
   draws_mat <- posterior::as_draws_matrix(fit$fit)
   window <- build_training_arms(fit, series_levels, data = fc_data)
   arms <- build_hindcast_arms(
@@ -1303,4 +1232,31 @@ window_predictive <- function(fit, fc_data) {
     fc_grid = list(observations = window$observations,
                    times = window$times)
   )
+}
+
+
+# Internal: LFO results compared or weighted together must share one
+# evaluation grid. A paired difference across two grids pairs ELPDs
+# from different occasions.
+#'@noRd
+assert_aligned_lfo <- function(models) {
+  ref <- models[[1L]]
+  for (i in seq_along(models)[-1L]) {
+    same <- c(
+      eval_timepoints = identical(models[[i]]$eval_timepoints,
+                                  ref$eval_timepoints),
+      fc_horizon = identical(models[[i]]$fc_horizon, ref$fc_horizon)
+    )
+    if (!all(same)) {
+      stop(insight::format_error(c(
+        "Compared LFO results must share one evaluation grid.",
+        x = paste0("Model ", i, " differs from model 1 in ",
+                   paste0("'", names(same)[!same], "'",
+                          collapse = " and "), "."),
+        i = paste0("Run 'lfo_cv()' on each model with the same ",
+                   "'min_t', 'fc_horizon' and data.")
+      )), call. = FALSE)
+    }
+  }
+  invisible(TRUE)
 }

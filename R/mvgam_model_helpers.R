@@ -157,10 +157,8 @@ mvgam_validate_weights <- function(weights, models,
     elpds <- vapply(crits, function(cc) {
       cc$estimates[elpd_col, "Estimate"]
     }, numeric(1L))
-    dic <- -2 * elpds
-    dic <- dic - min(dic)
-    w <- exp(-0.5 * dic)
-    return(w / sum(w))
+    # exp(-0.5 * dIC) normalised is the softmax of the ELPDs.
+    return(softmax(elpds))
   }
   loos <- lapply(models, loo)
   if (identical(weights, "pseudobma+")) {

@@ -43,7 +43,7 @@ shape: a `series` column that is character instead of a factor,
 gaps in the `time` index, missing values where the model cannot
 accept them, or a response that violates the chosen family's
 support. This vignette walks through the requirements and shows
-how `check_mvgam_data()` (an alias for `mvgam_data()`) raises
+how `mvgam_data()` raises
 the same friendly errors that `mvgam()` does at fit time,
 without paying for a Stan compile to find out. By the end, you
 should be able to take an arbitrary long-format data frame and
@@ -99,11 +99,12 @@ latent trajectory at those timepoints.
 
 ## The `series` factor
 
-Whatever column carries the series identifier (`series` by
-default, or any column named through `AR(series = ...)` /
-`jsdgam(species = ...)`) must be a `factor`. A column of class
-`character` looks indistinguishable in `head()` but fails the
-pre-fit check:
+A model with a latent trend places every row on one series. Its data
+needs a series column: `series` by default, or any column named
+through `AR(series = ...)` or `jsdgam(species = ...)`. That column
+must be a `factor`, and its levels fix the order of the series in
+every summary, plot and forecast. A `character` column looks the
+same in `head()` and fails the check:
 
 ```{r series-class}
 class(birdsong$series)
@@ -113,16 +114,25 @@ levels(birdsong$series)
 ```{r series-character-fail, error = TRUE}
 char_series <- birdsong
 char_series$series <- as.character(char_series$series)
-check_mvgam_data(char_series, family = poisson(), plot = FALSE)
+mvgam_data(char_series, family = poisson(),
+                 trend_formula = ~ AR(), plot = FALSE)
 ```
 
-The error is explicit about the cause and the fix: pass the
-column through `factor()` before calling `mvgam()`. Extra factor
-levels that no row references are tolerated by the validator and
-by `mvgam()` itself, but `droplevels()` is still good hygiene
-because the forecast and prediction code iterates over
-`levels(series)` and an orphan level would simply produce empty
-output for that level:
+The fix is `factor()` before calling `mvgam()`. A single time
+series needs the column too, holding one level:
+
+```{r single-series}
+one <- birdsong[birdsong$series == levels(birdsong$series)[1L], ]
+one$series <- factor("series_1")
+levels(one$series)
+```
+
+A model without a trend has no series axis and needs no series
+column.
+
+Levels that no row references are tolerated. `droplevels()` removes
+them, and the forecast and prediction methods then iterate over the
+series the data holds:
 
 ```{r dropping-levels}
 extra_level <- birdsong
@@ -131,18 +141,9 @@ extra_level$series <- factor(
   levels = c(levels(extra_level$series), "phantom_species")
 )
 setdiff(levels(extra_level$series), unique(extra_level$series))
-
-# Tidy by dropping unused levels.
 extra_level$series <- droplevels(extra_level$series)
 levels(extra_level$series)
 ```
-
-You can technically supply data with no `series` column, in
-which case `mvgam()` assumes a single time series and assigns
-the default name. For models with shared dynamics across
-non-temporal groupings, `ZMVN()` and `jsdgam()` accept the
-`series` factor as a grouping variable rather than a time index.
-See `?ZMVN` and `?jsdgam` for those entry points.
 
 ## The `time` variable
 
@@ -217,10 +218,9 @@ sampling collapse on a response the family cannot describe. The same
 check runs inside the data inspector below, which is the recommended
 pre-flight call.
 
-## `check_mvgam_data()`: pre-flight validation
+## `mvgam_data()`: pre-flight validation
 
-`check_mvgam_data()` (the same function as `mvgam_data()`,
-exposed under a more discoverable name) runs every validator
+`mvgam_data()` runs every validator
 `mvgam()` runs at fit time. It checks required columns, factor
 level alignment, regular time spacing for trends that need it,
 response-family compatibility, and any covariates the user
@@ -229,7 +229,7 @@ standard EDA view (time series, histogram, ACF, empirical CDF)
 so the shape of the data is visible at a glance.
 
 ```{r check-good, fig.asp = 0.85, out.width = "85%"}
-check_mvgam_data(
+mvgam_data(
   data    = birdsong,
   family  = poisson(),
   series  = 1L
@@ -251,7 +251,7 @@ informative error. Three common failure modes:
 ```{r check-bad-family, error = TRUE}
 bad_y <- birdsong
 bad_y$y <- bad_y$y - 0.5  # introduce negative non-integers
-check_mvgam_data(bad_y, family = poisson(), plot = FALSE)
+mvgam_data(bad_y, family = poisson(), plot = FALSE)
 ```
 
 The validator rejects the data because Poisson requires
@@ -265,18 +265,17 @@ the families mvgam adds on top of it.
 
 ```{r check-missing-times, error = TRUE}
 gap <- birdsong[birdsong$time != 5L, ]
-check_mvgam_data(gap, family = poisson(), trend_model = AR(),
+mvgam_data(gap, family = poisson(), trend_formula = ~ AR(),
                   plot = FALSE)
 ```
 
-Passing `trend_model = AR()` switches on the regular-spacing
+Passing `trend_formula = ~ AR()` switches on the regular-spacing
 check, which catches the missing timepoint that an AR fit cannot
-absorb. The error tells the user which intervals are irregular
-and suggests either `expand.grid()` for filling gaps or `CAR()`
-for accepting irregular spacing as a modelling choice. Omitting
-`trend_model = ` runs the structural checks but skips the
-regularity check, which is what `check_mvgam_data(data, family =
-...)` does by default.
+absorb. The error names the irregular intervals and suggests
+`expand.grid()` to fill the gaps or `CAR()` to model them.
+Without a `trend_formula`, `mvgam_data()` checks the data
+for a model with no trend. Such a model needs neither even
+spacing nor a series column.
 
 A note on `NA`s. mvgam preserves missing responses to maintain
 the trend's time grid: a row with `NA` in `y` is kept in the
@@ -285,20 +284,20 @@ likelihood simply skips the observation. Missing covariates are
 a different story. The trend pipeline expects every timepoint
 to carry a complete covariate row, so an `NA` in a column the
 formula references will produce dimension errors deep in Stan.
-`check_mvgam_data()` catches the problem at the validator layer
+`mvgam_data()` catches the problem at the validator layer
 when you pass the `formula` argument:
 
 ```{r check-covariate-na, error = TRUE}
 miss_cov <- birdsong
 miss_cov$temp <- rnorm(nrow(miss_cov))
 miss_cov$temp[5L] <- NA
-check_mvgam_data(miss_cov, formula = y ~ temp,
+mvgam_data(miss_cov, formula = y ~ temp,
                   family = poisson(), plot = FALSE)
 ```
 
 The same check runs inside `mvgam()` itself, so even if you
 skip the inspector the friendly error is raised before any
-Stan compile. Without the `formula` argument `check_mvgam_data()`
+Stan compile. Without the `formula` argument `mvgam_data()`
 has no way to know which columns the model will reference, so
 the `NA` in `temp` is tolerated; supply both `formula` and
 `trend_formula` to exercise the full pre-flight check.
@@ -372,11 +371,11 @@ marginalisation. The state-side and detection-side covariates
 come along as additional columns referenced by the
 `bf(y ~ ..., p ~ ...)` formula.
 
-`check_mvgam_data()` validates closure-unit shape when an `occ()`
+`mvgam_data()` validates closure-unit shape when an `occ()`
 or `nmix()` family is passed:
 
 ```{r check-closure}
-check_mvgam_data(occ_dat$data_train, family = occ(),
+mvgam_data(occ_dat$data_train, family = occ(),
                   plot = FALSE)
 ```
 
@@ -435,7 +434,7 @@ common failures is short:
 3. The response respects the chosen family's support (see the
    family's own help page).
 4. Every covariate the formula references has no `NA`s.
-5. `check_mvgam_data(data, family = ..., trend_model = ...)`
+5. `mvgam_data(data, family = ..., trend_formula = ...)`
    runs without error.
 
 The fifth item subsumes the first four; the others remain useful
@@ -444,7 +443,7 @@ inspector.
 
 ## Where to next
 
-- `?mvgam_data` / `?check_mvgam_data` for the inspector's full
+- `?mvgam_data` for the inspector's full
   argument list.
 - `?validate_newdata` for the newdata pre-check used in
   forecasting pipelines.

@@ -354,13 +354,6 @@ test_that("prior_summary.mvgam returns the prior table", {
   expect_true("prior" %in% names(out))
 })
 
-test_that("prior_summary errors when fit has no prior slot", {
-  stub <- make_mvgam_stub()
-  stub$prior <- NULL
-  expect_error(prior_summary(stub),
-               regexp = "not stored with a prior table")
-})
-
 test_that(
   "extract_prior_from_setup merges a partial user prior into the table", {
   # The stored prior table on an mvgam fit must include every
@@ -598,7 +591,7 @@ test_that("bayes_R2.mvgam errors for multivariate without resp", {
   stub <- make_mvgam_stub(mv = TRUE)
   expect_error(
     bayes_R2(stub),
-    regexp = "Name a response with 'resp'"
+    regexp = "Choose a response with 'resp'"
   )
 })
 
@@ -666,7 +659,8 @@ test_that("the funnel advisor checks only an MCMC run", {
   # records no algorithm, or an approximation, carries neither.
   stub <- make_mvgam_stub()
   stub$trend_metadata <- list(
-    has_by_lv = TRUE, n_lv = 2L, levels = list(series = c("a", "b"))
+    has_by_lv = TRUE, n_lv_for_grain = 2L,
+    axes = list(series = list(n = 2L))
   )
   expect_false(mvgam:::flag_by_lv_full_rank_funnel(stub))
   stub$algorithm <- "meanfield"

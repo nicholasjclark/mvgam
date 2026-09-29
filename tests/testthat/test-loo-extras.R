@@ -302,7 +302,7 @@ test_that("per_obs_series_labels refuses a frame naming no series", {
   stub$data$series <- NULL
   expect_error(
     mvgam:::per_obs_series_labels(stub),
-    "names no series"
+    "lack the series this model was fitted on"
   )
 })
 
@@ -320,7 +320,7 @@ test_that("per_obs_series_labels rejects mv-custom families", {
   )
   expect_error(
     mvgam:::per_obs_series_labels(stub),
-    "not meaningful for multi-response families"
+    "not supported for multi-response families"
   )
 })
 

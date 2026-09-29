@@ -328,11 +328,9 @@ test_that("CAR pulls phi, sigma, trend history, and last times", {
     trend = matrix(seq_len(n_time * n_series),
                    nrow = n_time, byrow = TRUE)
   ))
-  meta <- list(trend_type = "CAR", ar_lags = 1L,
-               ma_lags = integer(0), max_lag = 1L,
-               has_cor = FALSE,
-               variables = list(time_var = "time",
-                                  series_var = "series"))
+  meta <- c(mock_axis_record(obs_data),
+            list(trend_type = "CAR", ar_lags = 1L,
+                 ma_lags = integer(0), max_lag = 1L, has_cor = FALSE))
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta, obs_data = obs_data)
   res <- extract_last_state(fit, 1L)
@@ -435,7 +433,7 @@ test_that("Hierarchical fits (n_lv > n_series) still error", {
   fit <- make_mock_fit(draws, n_series = 2L, n_lv = 3L,
                         n_time = 5L, meta)
   expect_error(extract_last_state(fit, 1L),
-                "are not supported by")
+                "more latent states than series")
 })
 
 

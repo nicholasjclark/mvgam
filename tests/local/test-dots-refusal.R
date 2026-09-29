@@ -23,23 +23,10 @@ suppressMessages({
   library(testthat)
 })
 
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 # A smooth and a grouping, so the methods that need either reach
 # their own body rather than refusing the fit.
-fit_path <- cache_path("val_dots_refusal.rds")
-fit <- if (file.exists(fit_path)) {
-  message("[cache] Loading dots-refusal fit.")
-  readRDS(fit_path)
-} else {
+fit <- cached_fit("val_dots_refusal.rds", function() {
   set.seed(7)
   dat <- data.frame(
     time = rep(1:30, times = 2L),
@@ -48,11 +35,9 @@ fit <- if (file.exists(fit_path)) {
     x = rnorm(60)
   )
   dat$y <- rpois(60, exp(0.6 + 0.3 * dat$x))
-  f <- mvgam(y ~ s(x, k = 4) + (1 | g), data = dat,
-             family = poisson(), chains = 2, silent = 2)
-  saveRDS(f, fit_path)
-  f
-}
+  mvgam(y ~ s(x, k = 4) + (1 | g), data = dat,
+        family = poisson(), chains = 2, silent = 2)
+})
 
 # Arguments a method needs before it can be asked anything, so the
 # call reaches the guard instead of stopping on a missing argument.
@@ -162,7 +147,7 @@ test_that("a smooth view can be scoped to one response", {
     names(conditional_smooths(fit))
   )
   expect_error(conditional_smooths(fit, resp = "zzz_absent"),
-               "not a response")
+               "must be a response")
 })
 
 

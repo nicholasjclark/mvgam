@@ -1,60 +1,28 @@
-#' Detect whether a fitted mvgam carries a VAR(1) latent trend
+#' Assert that a fitted mvgam carries a VAR latent trend
 #'
-#' Inspects `object$trend_components$types` (the canonical trend-type
-#' surface populated at fit time) and returns the matching trend-type
-#' string for VAR variants, or `NULL` otherwise. Used by
-#' `irf.mvgam()`, `fevd.mvgam()`, and `stability.mvgam()` to gate
-#' VAR-only downstream calculations behind a single shared check.
-#'
-#' @param object A fitted `mvgam` object.
-#' @return The trend-type string when the fit carries a VAR, one of
-#'   `var_trend_types`; `NULL` otherwise.
-#' @noRd
-var_trend_types <- c("VAR", "VAR1", "VARcor", "VAR1cor")
-
-detect_var_trend <- function(object) {
-  # `get_trend_type()` resolves the trend type for the whole
-  # package, including the empty case it reports as "None". A
-  # direct lookup of `trend_components$types` here would make a
-  # second reader of one fact.
-  trend_type <- get_trend_type(object)
-  if (is.null(trend_type) || is.na(trend_type)) {
-    return(NULL)
-  }
-  if (!trend_type %in% var_trend_types) {
-    return(NULL)
-  }
-  trend_type
-}
-
-#' Assert that a fitted mvgam is a VAR(1) and return the trend type
-#'
-#' Thin wrapper around `detect_var_trend()` that errors with a
-#' consistent message when the gate fails. The `surface` argument
-#' lets the caller name the function the user invoked
-#' (`"irf()"`, `"fevd()"`, `"stability()"`) so the error points the
-#' right place.
+#' `irf()`, `fevd()`, `stability()` and `posterior_transition_matrix()`
+#' share this gate. `surface` names the function the user called.
 #'
 #' @param object A fitted `mvgam` object.
 #' @param surface Character; the user-facing function name to cite
 #'   in the error message.
-#' @return The trend-type string on success; stops on failure.
+#' @return `TRUE`, invisibly; stops on failure.
 #' @noRd
 assert_var_trend <- function(object, surface) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_string(surface, min.chars = 1L)
-  trend_type <- detect_var_trend(object)
-  if (is.null(trend_type)) {
+  trend_type <- get_trend_type(object)
+  if (!identical(trend_type, "VAR")) {
     stop(insight::format_error(c(
       paste0("'", surface, "' requires a VAR(1) latent trend."),
-      x = paste0("This fit's trend type is '", get_trend_type(object), "'."),
+      x = paste0("The fitted trend type is '", trend_type, "'."),
       i = paste0(
         "Refit with 'trend_formula = ~ VAR(p = 1)' to use ",
         "'", surface, "'."
       )
     )))
   }
-  trend_type
+  invisible(TRUE)
 }
 
 # Internal: walk a VAR posterior one draw at a time.
@@ -126,16 +94,7 @@ extract_var_posterior <- function(object, ndraws = NULL,
   # path: factor VARs set it to the number of factors, non-factor
   # VARs set it equal to `N_series_trend`. Reading from standata
   # guarantees the value matches what the compiled model uses.
-  K <- object$standata$N_lv_trend
-  if (is.null(K)) {
-    stop(insight::format_error(c(
-      "Cannot determine VAR dimension from fit.",
-      x = "'standata$N_lv_trend' is missing.",
-      i = "Did the fit complete fully? Try refitting."
-    )))
-  }
-  K <- as.integer(K)
-  checkmate::assert_int(K, lower = 1L)
+  K <- var_dim(object, "N_lv_trend")
 
   ndraws <- nrow(draws_mat)
 
@@ -404,12 +363,8 @@ posterior_transition_matrix <- function(object, groups = NULL,
 #' to a character vector of group names.
 #' @noRd
 resolve_transition_matrix_groups <- function(object, groups) {
-  gr_var <- first_trend_spec(object)$gr
-  all_levels <- lookup_factor_levels(
-    object$data, gr_var,
-    object$standata$N_groups_trend %||% 1L,
-    prefix = "group"
-  )
+  all_levels <- group_labels(object,
+                             object$standata$N_groups_trend %||% 1L)
   if (identical(groups, "all")) return(all_levels)
   if (is.numeric(groups)) {
     checkmate::assert_integerish(
@@ -444,9 +399,8 @@ extract_transition_matrix_draws <- function(object, group) {
   is_hier <- is_hierarchical_var(all_cols)
 
   if (is_hier && is.null(group)) {
-    K <- object$standata$N_subgroups_trend
-    checkmate::assert_int(K, lower = 1L)
-    labs <- subgroup_labels(object, K)
+    K <- var_dim(object, "N_subgroups_trend")
+    labs <- subgroup_labels(object, K, prefix = "outcome")
     # `Amu_trend[1, 1]` is the population mean of the diagonal and
     # `Amu_trend[2, 1]` of the off-diagonal entries.
     amu <- read_draws_matrix(
@@ -469,28 +423,21 @@ extract_transition_matrix_draws <- function(object, group) {
 
   if (is_hier) {
     group_int <- resolve_group_index(object, group)
-    K <- resolve_var_dim(
-      object, "N_subgroups_trend",
-      paste0("^A_group_trend\\[", group_int, ",1,"), all_cols
-    )
+    K <- var_dim(object, "N_subgroups_trend")
     out <- extract_indexed_array_2d(
       draws_mat, "A_group_trend", K, K,
       prefix_ids   = c(group_int, 1L),
-      labels       = subgroup_labels(object, K),
+      labels       = subgroup_labels(object, K, prefix = "outcome"),
       required_for = "a per-group VAR transition matrix"
     )
-    gr_var <- first_trend_spec(object)$gr
-    gr_labels <- lookup_factor_levels(object$data, gr_var,
-                                       object$standata$N_groups_trend %||%
-                                         length(unique(object$data[[gr_var]])),
-                                       prefix = "group")
-    attr(out, "group_label") <- gr_labels[group_int]
+    attr(out, "group_label") <- group_labels(
+      object, var_dim(object, "N_groups_trend")
+    )[group_int]
     return(out)
   }
 
   # Non-hierarchical VAR: single A_trend, lag pinned to one
-  K <- resolve_var_dim(object, "N_lv_trend",
-                       "^A_trend\\[1,", all_cols)
+  K <- var_dim(object, "N_lv_trend")
   labs <- var_process_labels(object, K)
   out <- extract_indexed_array_2d(
     draws_mat, "A_trend", K, K,
@@ -795,50 +742,31 @@ is_hierarchical_var <- function(all_cols) {
   ))
 }
 
-#' Resolve the K dimension for a VAR post-processing extraction:
-#' prefer the explicit `standata` slot, fall back to inferring `K`
-#' from the number of matching columns in the posterior draws
-#' matrix (assumes a `K x K` block).
+#' A dimension of the VAR, as the fitted Stan program declared it
 #' @noRd
-resolve_var_dim <- function(object, standata_slot, col_pattern,
-                            all_cols) {
-  k_slot <- object$standata[[standata_slot]]
-  if (!is.null(k_slot)) {
-    return(as.integer(k_slot))
+var_dim <- function(object, standata_slot) {
+  K <- object$standata[[standata_slot]]
+  if (is.null(K)) {
+    stop_missing_fields("The stored Stan data", standata_slot)
   }
-  n_match <- length(grep(col_pattern, all_cols))
-  if (n_match < 1L) {
-    stop(insight::format_error(c(
-      "Cannot determine VAR dimension from fit.",
-      x = paste0(
-        "Standata slot '", standata_slot, "' is missing and no ",
-        "posterior columns match '", col_pattern, "'."
-      ),
-      i = "Refit the model or update the extraction pattern."
-    )))
-  }
-  as.integer(round(sqrt(n_match)))
+  K <- as.integer(K)
+  checkmate::assert_int(K, lower = 1L, .var.name = standata_slot)
+  K
 }
 
-#' Resolve a `group` argument to an integer index against the
-#' hierarchical grouping factor stored on the fit. Reuses
-#' `first_trend_spec()` + `lookup_factor_levels()` (the label
-#' machinery `residual_cor.mvgam` uses for the same hierarchical
-#' fits) so name-to-index matching stays consistent across
-#' `residual_cor()` and `posterior_transition_matrix()`.
+#' Resolve a `group` argument to an integer index
+#'
+#' Names match against `group_labels()`, the labels `residual_cor()`
+#' reports for the same fit.
+#'
+#' @param object A hierarchical `mvgam` fit
+#' @param group A group name or index
+#' @return Integer index
 #' @noRd
 resolve_group_index <- function(object, group) {
-  n_groups <- object$standata$N_groups_trend
-  if (is.null(n_groups)) {
-    stop(insight::format_error(
-      "Fit is hierarchical but 'N_groups_trend' is missing."
-    ))
-  }
-  n_groups <- as.integer(n_groups)
+  n_groups <- var_dim(object, "N_groups_trend")
   if (is.character(group)) {
-    spec <- first_trend_spec(object)
-    gr_labels <- lookup_factor_levels(object$data, spec$gr,
-                                       n_groups, prefix = "group")
+    gr_labels <- group_labels(object, n_groups)
     idx <- match(group, gr_labels)
     if (is.na(idx)) {
       stop(insight::format_error(c(
@@ -853,13 +781,3 @@ resolve_group_index <- function(object, group) {
   as.integer(group)
 }
 
-#' Look up the innovation-outcome (subgroup) labels for a
-#' hierarchical VAR fit. Thin wrapper over `lookup_factor_levels`
-#' (`R/residual_cor.R`) so the label resolution rule is shared
-#' across `residual_cor.mvgam` and the VAR posterior helpers.
-#' @noRd
-subgroup_labels <- function(object, K) {
-  spec <- first_trend_spec(object)
-  lookup_factor_levels(object$data, spec$subgr, K,
-                       prefix = "outcome")
-}

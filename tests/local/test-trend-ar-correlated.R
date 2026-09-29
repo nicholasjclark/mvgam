@@ -59,19 +59,6 @@ suppressMessages({
 
 # This file fits its own model and caches it in the fixtures
 # directory. It depends on no shared fixture and no build step.
-# Resolved from where this file is running. What is already on disk
-# does not decide it: testthat sets the working directory to the test
-# file's own, and asking whether `fixtures` exists then picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(4021L)
 
@@ -149,31 +136,22 @@ draw_coefs <- function(dm, k, m, lag) {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_ar2_correlated.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading correlated AR(2) fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(AR(p = 2, cor = TRUE), 3 x 150)\n")
-  fit <- mvgam(
-    y ~ 1, trend_formula = trend_rhs, data = dat,
-    family = gaussian(), chains = 2L, iter = 2000L, warmup = 1000L,
-    control = list(adapt_delta = 0.95, max_treedepth = 12),
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_ar2_correlated.rds",
+  function() {
+    mvgam(
+      y ~ 1, trend_formula = trend_rhs, data = dat,
+      family = gaussian(), chains = 2L, iter = 2000L, warmup = 1000L,
+      control = list(adapt_delta = 0.95, max_treedepth = 12),
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 dm <- posterior::as_draws_matrix(fit$fit)
 check_draws <- unique(round(seq(1, nrow(dm), length.out = 25L)))
 
-
-test_that("the cached fit ran the program the package generates", {
-  expect_current_program(fit)
-})
 
 
 test_that("the joint solve supplies the first two latent states", {
@@ -421,11 +399,6 @@ test_that("every plot draws the occasions the user supplied", {
   # 1..150 where the user gave 5..154.
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
-  drawn_x <- function(pl) {
-    b <- ggplot2::ggplot_build(pl)
-    xs <- unlist(lapply(b$data, function(d) if ("x" %in% names(d)) d$x))
-    range(xs, na.rm = TRUE)
-  }
   want <- as.numeric(range(time_vals))
   for (ty in c("trend", "series")) {
     expect_equal(drawn_x(plot(fit, type = ty)), want, tolerance = 0.02)

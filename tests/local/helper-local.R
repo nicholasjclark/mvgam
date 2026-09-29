@@ -2,17 +2,124 @@
 # each local test file in this directory.
 
 
-# A cached fit tests the program it was fitted with. A change to the
-# generator leaves the cache holding the old program, and every
-# identity checked against its draws then tests a model no user can
-# obtain. The program is rebuilt from the fit's own call through the
-# path `update()` takes, which needs no formula or data restated.
+# The path of a fixture. testthat sets the working directory to the
+# test file's own and Rscript runs from the package root. The
+# directory depends on which of the two runs the file: asking whether
+# `fixtures` exists picks the wrong branch on a clean tree and writes
+# tests/local/tests/local/fixtures.
 #
-# @param fit A cached `mvgam` fit
-expect_current_program <- function(fit) {
-  rebuilt <- mvgam_dry_stancode(mvgam_update_call(fit, NULL, NULL, list()))
-  testthat::expect_identical(mvgam_normalise_stancode(rebuilt),
-                             mvgam_normalise_stancode(fit$stancode))
+# @param name File name of the fixture
+cache_path <- function(name) {
+  dir <- if (dir.exists(file.path("tests", "local"))) {
+    file.path("tests", "local", "fixtures")
+  } else {
+    "fixtures"
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  file.path(dir, name)
+}
+
+
+# Whether this run should refit a fixture. `MVGAM_REFIT` names the
+# fixtures to refit, comma-separated, with or without `.rds`, or
+# `all`. Unset, every cached fixture is loaded as it is:
+#   MVGAM_REFIT=all Rscript -e "..."
+#   MVGAM_REFIT=val_mvgam_var,val_trend_map Rscript -e "..."
+#
+# A fixture is refitted at most once per run. A file that loads one
+# fixture in several tests gets the refitted copy after the first.
+#
+# @param name File name of the fixture
+refit_requested <- function(name) {
+  if (name %in% refitted_this_run$names) return(FALSE)
+  wanted <- trimws(strsplit(Sys.getenv("MVGAM_REFIT"), ",")[[1L]])
+  "all" %in% wanted ||
+    sub("\\.rds$", "", name) %in% sub("\\.rds$", "", wanted)
+}
+refitted_this_run <- new.env()
+refitted_this_run$names <- character(0)
+
+
+# A fit loaded from the fixture cache. It is refitted when the cache is
+# absent, was built from other data, or `MVGAM_REFIT` names it. Every
+# local file loads its fits through this.
+#
+# @param name File name of the fixture
+# @param build A function of no arguments returning the fit
+# @param key Any value identifying the data the fit belongs to, such
+#   as the simulated truth. A cached fit carrying another key is stale.
+# @return The fit, carrying `key` as its `fixture_key` attribute
+cached_fit <- function(name, build, key = NULL) {
+  path <- cache_path(name)
+  if (file.exists(path) && !refit_requested(name)) {
+    fit <- readRDS(path)
+    if (identical(attr(fit, "fixture_key"), key)) {
+      message("[cache] ", name)
+      return(fit)
+    }
+  }
+  message("[fit  ] ", name)
+  fit <- build()
+  attr(fit, "fixture_key") <- key
+  part <- paste0(path, ".part")
+  saveRDS(fit, part)
+  file.rename(part, path)
+  refitted_this_run$names <- c(refitted_this_run$names, name)
+  fit
+}
+
+
+# A ggplot is returned whether or not a layer received any data.
+# Building the plot forces the layers to resolve, and the row count
+# says something was drawn.
+#
+# @param p A ggplot
+# @return The built layers, invisibly
+expect_drawn <- function(p) {
+  testthat::expect_s3_class(p, "ggplot")
+  layers <- ggplot2::ggplot_build(p)$data
+  testthat::expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+  invisible(layers)
+}
+
+
+# The range of x a plot draws over, from its built layers.
+#
+# @param p A ggplot
+# @return The finite x range
+drawn_x <- function(p) {
+  xs <- unlist(lapply(ggplot2::ggplot_build(p)$data,
+                      function(l) if ("x" %in% names(l)) l$x))
+  xs <- xs[is.finite(xs)]
+  testthat::expect_gt(length(xs), 0L)
+  range(xs)
+}
+
+
+# The facet labels of a plot, in panel order.
+#
+# @param p A ggplot
+# @return Character vector, empty for an unfaceted plot
+panel_order <- function(p) {
+  lay <- ggplot2::ggplot_build(p)$layout$layout
+  facets <- setdiff(names(lay),
+                    c("PANEL", "ROW", "COL", "SCALE_X", "SCALE_Y"))
+  if (!length(facets)) return(character(0))
+  as.character(lay[[facets[1L]]])
+}
+
+
+# Evaluate an expression and collect the warnings it raises.
+#
+# @param expr Expression to evaluate
+# @return List with `value` and the warning messages
+with_warnings <- function(expr) {
+  seen <- character(0)
+  value <- withCallingHandlers(expr, warning = function(w) {
+    seen <<- c(seen, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  list(value = value, warnings = seen)
 }
 
 

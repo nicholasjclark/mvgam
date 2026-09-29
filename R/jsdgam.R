@@ -7,11 +7,9 @@
 # forwards everything to `mvgam()` via:
 #   trend_formula = factor_formula   (`~ -1` resolves to ZMVN())
 #   trend_map     = matrix(NA_real_, n_species, n_lv)   (partial-Z full mask)
-# Class assignment is `c("mvgam", "jsdgam")`, so every mvgam method
-# serves a jsdgam fit. `mvgam` leads that vector, which means S3
-# dispatch reaches a `.jsdgam` method for no generic the package
-# defines; the methods a jsdgam fit needs are the mvgam ones, and
-# the extra slots set below are what they read.
+# A jsdgam fit is an mvgam fit with `jsdgam` inserted after `mvgam`
+# in its class. The package defines no `.jsdgam` methods: the mvgam
+# methods serve these fits and use the extra slots set below.
 #
 # The wrapper does NOT patch Stan code, does NOT rotate species across
 # factors via a modulo trend_map, and does NOT introduce new
@@ -211,10 +209,12 @@
 #'   include `data2` (lookup list for string-named `traits` / `phylo`
 #'   slots), `algorithm`, `chains`, and `silent`.
 #'
-#' @return A `list` of class `c("mvgam", "jsdgam")`. The full mvgam
+#' @return A `list` of class `c("mvgam", "jsdgam", "brmsfit")`. The full mvgam
 #'   method surface (`summary`, `predict`, `forecast`, `loo`,
 #'   `posterior_epred`, etc.) applies; jsdgam-specific surfaces
 #'   (`ordinate`, `residual_cor`) recognise the additional class.
+#'   [`update()`][update.mvgam] refits it through `jsdgam()`, with any
+#'   argument above overridden, e.g. `update(fit, n_lv = 3)`.
 #'
 #' @seealso [sim_jsdm()] to simulate data this function fits, and
 #'   [sim_closure_unit_data()] for the `occ()` / `nmix()` case;
@@ -367,11 +367,7 @@ jsdgam <- function(formula,
   if (is_mv_formula) {
     species_levels <- names(formula$forms)
   } else {
-    # Coerce species to factor if it isn't already so n_lv comparisons
-    # against nlevels() are well defined.
-    if (!is.factor(data[[species_chr]])) {
-      data[[species_chr]] <- factor(data[[species_chr]])
-    }
+    assert_axis_column(data, species_chr, "series")
     species_levels <- levels(data[[species_chr]])
   }
   n_species <- length(species_levels)
@@ -414,7 +410,7 @@ jsdgam <- function(formula,
     if ("time" %in% names(data_train)) {
       stop(insight::format_error(c(
         "'data' already contains a 'time' column.",
-        x = paste0("'unit = ", unit_chr, "' names a different column.")
+        x = paste0("'unit = ", unit_chr, "' refers to a different column.")
       )))
     }
     data_train$time <- data_train[[unit_chr]]
@@ -427,7 +423,7 @@ jsdgam <- function(formula,
         stop(insight::format_error(c(
           "'data' already contains a 'series' column.",
           x = paste0(
-            "'species = ", species_chr, "' names a different column."
+            "'species = ", species_chr, "' refers to a different column."
           )
         )))
       }
@@ -448,7 +444,27 @@ jsdgam <- function(formula,
   # -> make_loadings_prior_stanvars -> generate_factor_model) does the
   # encoding, validation and Stan emission; the helper here only
   # translates user-facing names into that spec.
-  dots <- list(...)
+  # The deprecated `samples` and `burnin` become `iter` and `warmup`
+  # here. A refit inherits `iter` and `warmup`, and the stored
+  # arguments have to name the pair it adds to.
+  dots <- translate_samples_burnin(list(...))
+  attr(dots, "translated") <- NULL
+  # The arguments as evaluated, which `update()` hands back to this
+  # function. The call records symbols, and a refit in another scope
+  # or session has to resolve them.
+  refit_args <- Filter(Negate(is.null), c(
+    list(
+      formula = formula, factor_formula = factor_formula,
+      family = if (!missing(family)) family,
+      unit = unit_chr, species = species_chr, n_lv = n_lv,
+      traits = traits, trait_slopes = trait_slopes, phylo = phylo,
+      loadings_prior = loadings_prior, backend = backend,
+      threads = threads,
+      priors = if (!missing(priors)) priors,
+      knots = if (!missing(knots)) knots
+    ),
+    dots
+  ))
   loadings_prior_resolved <- build_jsdgam_loadings_prior(
     traits = traits,
     phylo = phylo,
@@ -528,7 +544,7 @@ jsdgam <- function(formula,
     trend_map_mat <- NULL
     spec <- stats::terms(factor_formula)
     labels <- attr(spec, "term.labels")
-    if (length(find_trend_terms(factor_formula)) == 0L) {
+    if (!any(vapply(labels, is_trend_constructor_call, logical(1L)))) {
       # `term.labels` drops the intercept, so carry it across
       # explicitly: rebuilding `~ site - 1` without it would hand the
       # trend an intercept the caller removed.
@@ -544,10 +560,7 @@ jsdgam <- function(formula,
       # The caller's own constructor carries the loadings count, so
       # the ceiling has to be read from it rather than from the
       # `n_lv` argument this call ignored.
-      user_spec <- eval_trend_constructor(
-        find_trend_terms(factor_formula)[1L],
-        formula_env = environment(factor_formula)
-      )
+      user_spec <- parse_trend_formula(factor_formula)$trend_model
       if (!is.null(user_spec$n_lv)) {
         validate_n_lv_ceiling(
           n_lv         = user_spec$n_lv,
@@ -626,20 +639,16 @@ jsdgam <- function(formula,
     prepped_trend_model = list(unit = unit_chr, species = species_chr)
   )
   fit$obs_data <- data_train
+  fit$jsdgam_args <- refit_args
   # `mvgam()` stamped its own frame's call, which for a forwarded
   # fit is `do.call()`'s resolved arguments. A `jsdgam` fit was
   # built by `jsdgam()`, so that is the call it reports, and it is
   # the one holding the symbols the user wrote.
   fit$call <- call
 
-  # Preserve `mvgam_prefit` if mvgam returned a stub via
-  # `run_model = FALSE`, otherwise plain c("mvgam", "jsdgam").
-  fit_classes <- if (inherits(fit, "mvgam_prefit")) {
-    c("mvgam", "jsdgam", "mvgam_prefit")
-  } else {
-    c("mvgam", "jsdgam")
-  }
-  class(fit) <- fit_classes
+  # A fit keeps the classes `mvgam()` gave it, `brmsfit` for a fit
+  # and `mvgam_prefit` for a stub, with `jsdgam` after `mvgam`.
+  class(fit) <- append(class(fit), "jsdgam", after = 1L)
   fit
 }
 

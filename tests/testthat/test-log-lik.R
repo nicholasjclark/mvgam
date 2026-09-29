@@ -22,45 +22,45 @@
   )
 }
 
-test_that("log_lik_gaussian returns finite [ndraws x nobs]", {
+test_that("the gaussian log density returns finite [ndraws x nobs]", {
   s <- .make_synthetic()
   y <- rnorm(8, mean = 1, sd = 0.5)
-  out <- log_lik_gaussian(
-    linpred = s$linpred, link = "identity", y = y,
+  out <- dispatch_log_lik(
+    "gaussian", linpred = s$linpred, link = "identity", y = y,
     family_pars = list(sigma = s$sigma), trials = NULL
   )
   expect_equal(dim(out), c(50, 8))
   expect_true(all(is.finite(out)))
 })
 
-test_that("log_lik_poisson returns finite [ndraws x nobs]", {
+test_that("the poisson log density returns finite [ndraws x nobs]", {
   s <- .make_synthetic(mu = 1.5)
   y <- rpois(8, lambda = exp(1.5))
-  out <- log_lik_poisson(
-    linpred = s$linpred, link = "log", y = y,
+  out <- dispatch_log_lik(
+    "poisson", linpred = s$linpred, link = "log", y = y,
     family_pars = list(), trials = NULL
   )
   expect_equal(dim(out), c(50, 8))
   expect_true(all(is.finite(out)))
 })
 
-test_that("log_lik_negbinomial returns finite [ndraws x nobs]", {
+test_that("the negbinomial log density returns finite [ndraws x nobs]", {
   s <- .make_synthetic(mu = 1.5)
   y <- rnbinom(8, mu = exp(1.5), size = 2)
-  out <- log_lik_negbinomial(
-    linpred = s$linpred, link = "log", y = y,
+  out <- dispatch_log_lik(
+    "negbinomial", linpred = s$linpred, link = "log", y = y,
     family_pars = list(shape = s$shape), trials = NULL
   )
   expect_equal(dim(out), c(50, 8))
   expect_true(all(is.finite(out)))
 })
 
-test_that("log_lik_binomial uses trials per observation", {
+test_that("the binomial log density uses trials per observation", {
   s <- .make_synthetic(mu = 0)
   y  <- c(1L, 3L, 2L, 5L, 4L, 0L, 6L, 2L)
   tr <- c(6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L)
-  out <- log_lik_binomial(
-    linpred = s$linpred, link = "logit", y = y,
+  out <- dispatch_log_lik(
+    "binomial", linpred = s$linpred, link = "logit", y = y,
     family_pars = list(), trials = tr
   )
   expect_equal(dim(out), c(50, 8))
@@ -75,16 +75,16 @@ test_that("log_lik_binomial uses trials per observation", {
   expect_equal(out, want)
   expect_false(isTRUE(all.equal(
     out,
-    log_lik_binomial(linpred = s$linpred, link = "logit", y = y,
-                     family_pars = list(), trials = rep(10L, 8L))
+    dispatch_log_lik("binomial", linpred = s$linpred, link = "logit",
+                     y = y, family_pars = list(), trials = rep(10L, 8L))
   )))
 })
 
-test_that("log_lik_beta returns finite densities on (0, 1)", {
+test_that("the beta log density returns finite densities on (0, 1)", {
   s <- .make_synthetic(mu = 0)
   y <- rbeta(8, shape1 = 2, shape2 = 2)
-  out <- log_lik_beta(
-    linpred = s$linpred, link = "logit", y = y,
+  out <- dispatch_log_lik(
+    "beta", linpred = s$linpred, link = "logit", y = y,
     family_pars = list(phi = s$phi), trials = NULL
   )
   expect_equal(dim(out), c(50, 8))
@@ -134,7 +134,7 @@ test_that("dispatch_log_lik errors clearly for unknown family", {
   # mvgam's, and gives somewhere to report it.
   err <- expect_error(refuse(), regexp = "definitely_not_a_family")
   msg <- conditionMessage(err)
-  expect_match(msg, "fault in mvgam")
+  expect_match(msg, "Please report this mvgam fault")
   expect_match(msg, "mvgam/issues")
   # A reader of this message is running the package, not maintaining
   # it, so it must not hand them an edit to make in mvgam's source.
@@ -255,7 +255,8 @@ addition_fixture <- function(S = 6L, N = 5L) {
   y <- c(0.4, 1.1, 1.9, 0.2, 1.5)
   list(
     linpred = linpred, pars = pars, spec = spec, y = y,
-    ll = mvgam:::log_lik_gaussian(linpred, "identity", y, pars, NULL)
+    ll = mvgam:::dispatch_log_lik("gaussian", "identity", linpred, y,
+                                pars, NULL)
   )
 }
 
@@ -315,7 +316,7 @@ test_that("interval censoring without an upper bound errors clearly", {
   expect_error(
     mvgam:::apply_censoring(f$ll, c(0, 0, 2, 0, 0), NULL, f$spec,
                             f$linpred, f$y),
-    "no upper bound"
+    "need an upper bound"
   )
 })
 
@@ -361,7 +362,8 @@ test_that("a discrete lower bound excludes the step below it", {
   linpred <- matrix(log(rep(4, S * N)), S, N)
   spec <- mvgam:::family_dist_spec("poisson", "log", linpred, list(), NULL)
   y <- c(2, 5, 7)
-  ll <- mvgam:::log_lik_poisson(linpred, "log", y, list(), NULL)
+  ll <- mvgam:::dispatch_log_lik("poisson", "log", linpred, y, list(),
+                                NULL)
   out <- mvgam:::apply_truncation_to_loglik(
     ll, rep(2, N), rep(9, N), spec, linpred, discrete = TRUE
   )

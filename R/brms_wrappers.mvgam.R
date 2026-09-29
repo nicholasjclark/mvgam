@@ -408,13 +408,11 @@ predictive_error.mvgam <- function(object, newdata = NULL,
   ))
   y <- as.numeric(data[[resp_name]])
   if (ncol(preds) != length(y)) {
-    stop(insight::format_error(c(
-      "Internal: predictor output and response length disagree.",
-      x = paste0(
-        "Predictor columns: ", ncol(preds), ". Response observations: ",
-        length(y), "."
-      )
-    )))
+    stop_mvgam_fault(
+      "The predictions and the response differ in length.",
+      paste0("Got ", ncol(preds), " prediction columns for ", length(y),
+             " observations.")
+    )
   }
   out <- sweep(preds, 2L, y, FUN = function(p, obs) obs - p)
   if (isTRUE(sort)) {
@@ -481,9 +479,10 @@ mvgam_training_data <- function(object) {
 prediction_frame <- function(object, newdata = NULL) {
   out <- newdata %||% mvgam_training_data(object)
   if (is.null(out)) {
-    stop(insight::format_error(
-      "The fitted object holds no training data. Supply 'newdata'."
-    ))
+    stop(insight::format_error(c(
+      "'newdata' is required for this fit.",
+      x = "The fitted object's training-data slot is empty."
+    )), call. = FALSE)
   }
   out
 }
@@ -524,15 +523,6 @@ prediction_frame <- function(object, newdata = NULL) {
 standata.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
   rlang::check_dots_empty()
-  if (is.null(object$standata)) {
-    stop(insight::format_error(c(
-      "Stan data not found in mvgam object.",
-      i = paste0(
-        "The model may have been fitted with an older version ",
-        "that did not store the Stan data list."
-      )
-    )))
-  }
   object$standata
 }
 
@@ -590,15 +580,7 @@ default_prior.mvgam <- function(object, ...) {
 control_params.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
   rlang::check_dots_empty()
-  fit_obj <- x$fit
-  if (!isS4(fit_obj) ||
-        !"stan_args" %in% methods::slotNames(fit_obj)) {
-    return(list())
-  }
-  args <- fit_obj@stan_args
-  if (length(args) == 0L) return(list())
-  ctrl <- args[[1L]]$control
-  ctrl %||% list()
+  mvgam_sampler_inheritance(x)$control %||% list()
 }
 
 #' Extract initial values used in a fitted mvgam model

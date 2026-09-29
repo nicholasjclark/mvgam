@@ -216,14 +216,9 @@ mvgam_term_list <- function(x) {
   # The axis and the groupings it is built on. jsdgam aliases the
   # user's species column to `series`, and the original name is kept
   # so a grid can still be addressed in the user's own terms.
-  # Both records are read defensively: a fit saved before either was
-  # stored carries something other than a list there, and a term list
-  # is not the place to refuse one.
-  as_list <- function(v) if (is.list(v)) v else list()
-  meta <- as_list(as_list(x$trend_metadata)$variables)
-  jsdgam_meta <- as_list(attr(x$model_data, "prepped_trend_model"))
+  jsdgam_meta <- attr(x$model_data, "prepped_trend_model")
   index <- varying_meta_vars(
-    c(meta$time_var, meta$series_var, meta$gr_var, meta$subgr_var,
+    c(unlist(mvgam_axes(x)$vars, use.names = FALSE),
       unlist(jsdgam_meta[c("unit", "species")], use.names = FALSE)),
     x
   )

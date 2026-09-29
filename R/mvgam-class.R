@@ -3,34 +3,32 @@
 #' A fitted \code{mvgam} object returned by function \code{\link{mvgam}}.
 #' Run `methods(class = "mvgam")` to see an overview of available methods.
 #'
-#' @details An `mvgam` object inherits from `brmsfit` and carries the
-#'   following elements. Reach for the accessors before the slots
-#'   themselves: `variables()`, `as_draws_df()` and `as.data.frame()`
-#'   read the posterior, `stancode()` and `standata()` return the
-#'   program and its data, and `prior_summary()` returns the prior
-#'   table.
+#' @details A fit from [mvgam()] has class `c("mvgam", "brmsfit")`. The
+#'   accessors are the supported way in: `variables()`, `as_draws_df()`
+#'   and `as.data.frame()` return the posterior, `stancode()` and
+#'   `standata()` return the program and its data, and
+#'   `prior_summary()` returns the prior table. The elements are listed
+#'   below.
 #'
-#'   The fit and what it was fitted to:
+#'   The fit and its inputs:
 #'
-#'   - `fit` The `stanfit` object holding the posterior draws of the
+#'   - `fit` The `stanfit` object with the posterior draws of the
 #'     combined observation and trend model
 #'
 #'   - `formula` The observation formula, as brms validated it
 #'
-#'   - `trend_formula` The trend formula with the trend constructor
-#'     removed, which is the formula the trend submodel was built
-#'     from. `NULL` when no `trend_formula` was supplied
+#'   - `trend_formula` The trend formula without its trend constructor.
+#'     brms builds the trend submodel from this formula. `NULL` when no
+#'     `trend_formula` was supplied
 #'
-#'   - `trend_call` The trend formula as the user wrote it, with the
-#'     constructor intact, so `update()` can rebuild the model without
-#'     reconstructing the call. `NULL` when no `trend_formula` was
-#'     supplied
+#'   - `trend_call` The trend formula as the user wrote it, constructor
+#'     included. [update()] rebuilds the model from it. `NULL` when no
+#'     `trend_formula` was supplied
 #'
 #'   - `family` The observation `family` object
 #'
-#'   - `prior` A `brmsprior` table of the priors the model sampled
-#'     under, read from the compiled Stan program so it cannot
-#'     disagree with what the sampler ran
+#'   - `prior` A `brmsprior` table of the priors in the compiled Stan
+#'     program
 #'
 #'   - `data` The observation model frame
 #'
@@ -39,80 +37,75 @@
 #'   - `data.name` The deparsed name of the `data` argument
 #'
 #'   - `codegen` The `knots`, `sample_prior`, `drop_unused_levels` and
-#'     `normalize` settings the Stan program was generated under, so
-#'     that [update()] rebuilds the same program rather than the
-#'     default one
+#'     `normalize` settings the Stan program was generated under.
+#'     [update()] passes them to the refit
+#'
+#'   - `silent` The verbosity of the call. [update()] passes it to the
+#'     refit
+#'
+#'   - `save_pars` The [brms::save_pars()] object the posterior was
+#'     saved under
 #'
 #'   The Stan program:
 #'
 #'   - `stancode` The combined Stan program as a `character` string
 #'
-#'   - `standata` The `standata` list the program was fitted to
+#'   - `standata` The Stan data list the program was fitted to
 #'
 #'   The model specification, used by prediction and forecasting:
 #'
 #'   - `mv_spec` The parsed model specification, including the trend
 #'     specifications
 #'
-#'   - `trend_metadata` The resolved trend details a prediction needs,
-#'     including the time and series variables, the trend type and the
-#'     number of latent factors. Its `axes` entry is the record of
-#'     which series and which times the model was fitted on, and is
-#'     what post-processing reads rather than rebuilding either axis
-#'     from the training data:
+#'   - `trend_metadata` The trend type, its lag orders, the number of
+#'     latent factors and the record of the model's axes. Prediction,
+#'     forecasting and plotting use `axes` for the series and times the
+#'     model was fitted on:
 #'
-#'     - `axes$series$levels` The series, in the order the trend
-#'       matrix numbers its columns. Every label a summary, plot or
-#'       forecast shows comes from here
-#'     - `axes$series$source` How the axis was arrived at: `explicit`
+#'     - `axes$series$levels` The series, in the order of the trend
+#'       matrix columns. Summaries, plots and forecasts label series
+#'       with these
+#'     - `axes$series$source` How mvgam built the series: `explicit`
 #'       from a series column, `hierarchical` from `gr` and `subgr`,
 #'       or `multivariate` from the responses of a wide formula
-#'     - `axes$series$n` The number of series, matching
+#'     - `axes$series$n` The number of series, equal to
 #'       `N_series_trend` in the Stan data
-#'     - `axes$series$groups` The group each series belongs to, in the
-#'       same order, which is the order Stan subscripts
-#'       `group_inds_trend` with. `NULL` when the trend names no
-#'       grouping
-#'     - `axes$series$last_time` The last occasion each series was
-#'       observed on, in the same order, which is where a forecast
-#'       for that series begins
-#'     - `axes$time$values` The times the model was fitted on, ordered
-#'       and in their original units, from which `CAR()` and the
-#'       Gaussian processes take their gaps
-#'     - `axes$time$n` How many occasions there are. The integer
-#'       index a trend steps along is `match()` into `values`
-#'     - `axes$time$step` The spacing a forecast extends the grid by,
-#'       `NA` when the times are irregular
-#'     - `axes$factor$n_lv` The number of latent factors, which is the
-#'       column count of the loadings and of `lv_trend`
-#'     - `axes$grain` What the second dimension of `times_trend`
-#'       indexes: `series` ordinarily, or `lv` where a term written
-#'       with `by = lv_axis()` puts the trend design on the factor
-#'       axis
-#'     - `axes$vars` The columns a row is placed by: `time_var`,
-#'       `series_var`, `gr_var`, `subgr_var` and `response_vars`.
-#'       Prediction reads these to identify a frame the model has
-#'       never seen
+#'     - `axes$series$groups` The group of each series, in the same
+#'       order. `NULL` for a trend without `gr`
+#'     - `axes$series$last_time` The last time each series was
+#'       observed, in the same order. A forecast for a series starts
+#'       after this time
+#'     - `axes$time$values` The ordered times the model was fitted on,
+#'       in their original units. `CAR()` and Gaussian process terms
+#'       compute their time gaps from these
+#'     - `axes$time$n` The number of time points
+#'     - `axes$time$step` The spacing between time points, or `NA` for
+#'       irregular times. [forecast()] extends the time grid by this
+#'       step
+#'     - `axes$factor$n_lv` The number of latent factors, equal to the
+#'       number of columns of the loadings and of `lv_trend`
+#'     - `axes$grain` `lv` when a `by = lv_axis()` term puts the trend
+#'       design on the factor axis, and `series` otherwise
+#'     - `axes$vars` The column names for time, series, `gr` and
+#'       `subgr`: `time_var`, `series_var`, `gr_var` and `subgr_var`
+#'     - `axes$group_levels` The training levels of the `gr` and
+#'       `subgr` columns. Prediction refuses new data with any other
+#'       level
 #'
-#'     A model fitted before this record existed carries no `axes`,
-#'     and its series are read from `levels$series` instead.
+#'     `trend_metadata` is `NULL` for a model without a trend whose
+#'     data lack a time column or a series column.
 #'
-#'   - `trend_components` Per-component trend information derived from
-#'     the posterior. `NULL` when the model has no trend
+#'   - `series_info` The number of series in the `series` column, empty
+#'     when the data lack that column
 #'
-#'   - `series_info` The number of series. Empty when the data name
-#'     no series, in which case the count is read from `axes`
+#'   - `time_info` The number of time points in the `time` column, empty
+#'     when the data lack that column
 #'
-#'   - `time_info` The number of time points, or empty when the data
-#'     carry no time variable
+#'   - `obs_model` A `brmsfit` of the observation model. Prediction at
+#'     new data builds design matrices from it
 #'
-#'   - `obs_model` A `brmsfit` holding the observation-side model brms
-#'     generated, used as the design-matrix source for prediction at
-#'     new data
-#'
-#'   - `trend_model` A `brmsfit` holding the trend-side model, serving
-#'     the same purpose for the trend submodel. `NULL` when no
-#'     `trend_formula` was supplied
+#'   - `trend_model` A `brmsfit` of the trend submodel, used the same
+#'     way. `NULL` when no `trend_formula` was supplied
 #'
 #'   How it was fitted:
 #'
@@ -121,9 +114,9 @@
 #'   - `algorithm` `Character`, one of `sampling`, `laplace`,
 #'     `pathfinder`, `meanfield` or `fullrank`
 #'
-#'   - `init` The initial-value specification, kept as the user wrote
-#'     it (`"random"`, `"0"`, `"pathfinder"`, or a numeric value, list
-#'     or function)
+#'   - `init` The initial-value specification as supplied
+#'     (`"random"`, `"0"`, `"pathfinder"`, or a numeric value, list or
+#'     function)
 #'
 #'   - `criteria` A named `list` of model-fit criteria that
 #'     [add_criterion()] has computed, empty on a new fit
@@ -138,16 +131,20 @@
 #'
 #'   - `creation_time` A `POSIXct` timestamp
 #'
-#'   A fit from [jsdgam()] has class `c("mvgam", "jsdgam")` and carries
-#'   two further elements, which `insight::find_predictors()` reads to
-#'   address a prediction grid in the user's own column names:
+#'   A fit from [jsdgam()] has class `c("mvgam", "jsdgam", "brmsfit")`
+#'   and three
+#'   further elements:
 #'
-#'   - `obs_data` The data frame as `jsdgam()` prepared it, with the
-#'     `time` and `series` columns it derives from `unit` and `species`
+#'   - `obs_data` The data frame after `jsdgam()` prepared it, with
+#'     `time` and `series` columns derived from `unit` and `species`
 #'
-#'   - `model_data` The same frame, carrying a `prepped_trend_model`
-#'     attribute that records the `unit` and `species` column names
+#'   - `model_data` The same frame, with a `prepped_trend_model`
+#'     attribute recording the `unit` and `species` column names.
+#'     `insight::find_predictors()` uses it to address a prediction grid
+#'     by the original column names
 #'
+#'   - `jsdgam_args` The arguments of the `jsdgam()` call. [update()]
+#'     refits through `jsdgam()` with them
 #'
 #' @seealso [mvgam], [jsdgam], [mvgam_forecast-class]
 #'

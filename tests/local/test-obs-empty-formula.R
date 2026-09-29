@@ -39,19 +39,6 @@ suppressMessages({
   library(testthat)
 })
 
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(31L)
 
@@ -167,7 +154,6 @@ test_that("the frame handed back is the frame that was given", {
 })
 
 
-
 test_that("the mapping onto the trend grid is the one Stan uses", {
   # The block below is only worth anything if this index is right, so
   # it is checked against the frame on a fit where the same covariate
@@ -185,8 +171,6 @@ test_that("the mapping onto the trend grid is the one Stan uses", {
 })
 
 
-
-
 # -- Fits -------------------------------------------------------------
 #
 # Two, and the pair is what separates a cosmetic name from a
@@ -197,21 +181,13 @@ test_that("the mapping onto the trend grid is the one Stan uses", {
 # free placeholder would have cost the fit its identification.
 
 fit_cached <- function(name, trend) {
-  path <- cache_path(paste0("val_mvgam_empty_obs_", name, ".rds"))
-  if (file.exists(path)) {
-    cat("[cache] Loading empty-obs fit:", name, "\n")
-    return(readRDS(path))
-  }
-  cat("[fit  ] mvgam(y ~ -1, trend_formula =", deparse(trend), ")\n")
-  fit <- mvgam(
-    y ~ -1, trend_formula = trend, data = dat, family = gaussian(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-  part <- paste0(path, ".part")
-  saveRDS(fit, part)
-  file.rename(part, path)
-  fit
+  cached_fit(paste0("val_mvgam_empty_obs_", name, ".rds"), function() {
+    mvgam(
+      y ~ -1, trend_formula = trend, data = dat, family = gaussian(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  })
 }
 
 fit_free <- fit_cached("free", ~ elev + AR(p = 1))

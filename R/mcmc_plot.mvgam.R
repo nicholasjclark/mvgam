@@ -53,13 +53,13 @@ mcmc_plot.mvgam = function(
   valid_types <- sub("^mcmc_", "", valid_types)
   if (!type %in% valid_types) {
     stop(insight::format_error(c(
-      "'type' is not a recognised bayesplot MCMC plot.",
+      "'type' must be a bayesplot MCMC plot type.",
       x = paste0("Got: '", type, "'."),
       i = paste0(
         "Available: ",
         paste0("'", valid_types, "'", collapse = ", "), "."
       )
-    )))
+    )), call. = FALSE)
   }
 
   # The parameters a reader interprets, chosen the same way here and

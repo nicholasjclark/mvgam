@@ -31,14 +31,14 @@ recompile rather than silently paying compile cost). When
 \code{FALSE} and the stancodes match, the cache is guaranteed to
 hit.}
 
-\item{...}{Any other argument accepted by \code{\link[=mvgam]{mvgam()}} (e.g.
+\item{...}{Any other argument accepted by \code{\link[=mvgam]{mvgam()}}, or by
+\code{\link[=jsdgam]{jsdgam()}} for a \code{jsdgam} fit (e.g.
 \code{trend_formula}, \code{family}, \code{prior}, \code{chains}, \code{iter},
 \code{warmup}, \code{cores}, \code{threads}, \code{algorithm}, \code{backend},
 \code{silent}, \code{seed}, \code{init}, \code{control}). Each value overrides
-the matching slot inherited from \code{object}. Passing
-\code{prior = ...} replaces the original fit's prior table for
-this refit only; see "Prior inheritance and Stan model
-reuse" in Details.}
+the matching slot inherited from \code{object}. A \code{prior} joins
+the priors the original fit set. See "Prior inheritance and
+Stan model reuse" in Details.}
 }
 \value{
 A refit \code{mvgam} object.
@@ -58,6 +58,18 @@ via \code{...}. This means
 family, trend, prior, and backend, and only bumps the iteration
 count.
 
+Sampler settings follow \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}. \code{chains},
+\code{iter}, \code{warmup}, \code{thin} and \code{control} carry over when the refit
+keeps the original \code{algorithm}, and \code{control} also needs the
+original \code{backend}. A new \code{iter} without a \code{warmup} takes the
+default warmup of \code{iter / 2}. \code{control} merges entry by entry:
+\code{update(fit, adapt_delta = 0.99)} keeps the original
+\code{max_treedepth}.
+
+New training data passed as \code{newdata} keeps the fit's held-out
+data when that lies after the new training times. Held-out data
+overlapping them is dropped with a message.
+
 Prior inheritance and Stan model reuse. The fitted object's
 \code{prior} table is reused on every \code{update()} call by default.
 The \code{brms} adaptive priors (e.g. the response-centred Intercept
@@ -70,8 +82,9 @@ refit-heavy workflows fast: subsequent refits skip the (slow)
 compile step and only repeat sampling. To override the inherited
 priors for a single refit (e.g. swap a coefficient's prior or
 loosen a constraint) pass \code{prior = ...} directly to
-\code{\link[=update]{update()}}; the change overrides the inherited prior table
-for that call only:
+\code{\link[=update]{update()}}. As in \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}, the new rows join
+the priors the user set on the original fit, and a new row
+replaces an old one for the same parameter:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{new_priors <- c(
   prior(normal(0, 1), class = "b"),
@@ -85,12 +98,16 @@ recompile (and a \code{recompile = FALSE} call would error). Use
 \code{stancode(refit)} after the call to confirm the model surface
 you intended.
 
-Multivariate fits: formula updates are allowed and route
-through brms's own formula-update machinery via
-\code{stats::update.formula}.
+Multivariate fits take a complete new formula as \code{formula.}. A
+formula update written with \code{.} is refused, as brms refuses it.
 
-Multiple-imputation fits (produced by \code{mvgam_multiple(combine = TRUE)}): not currently supported on \code{update()}; re-fit each
-imputation separately by calling \code{\link[=mvgam]{mvgam()}} and re-pool.
+\code{jsdgam()} fits refit through \code{\link[=jsdgam]{jsdgam()}} with the arguments the
+original call evaluated, including \code{factor_formula}, \code{n_lv},
+\code{traits}, \code{trait_slopes} and \code{phylo}. Any of them can be overridden
+through \code{...}.
+
+Multiple-imputation fits (produced by \code{mvgam_multiple(combine = TRUE)}) are not supported by \code{update()}. Refit each imputation with
+\code{\link[=mvgam]{mvgam()}} and pool them again.
 }
 \examples{
 \dontrun{

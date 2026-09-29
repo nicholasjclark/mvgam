@@ -76,7 +76,7 @@ response_formulas <- function(x) {
   }, character(1L), USE.NAMES = FALSE)
   if (anyNA(keys)) {
     stop(insight::format_error(c(
-      "The observation formula names no response.",
+      "The observation formula needs a response.",
       i = "Write it as 'response ~ predictors'."
     )), call. = FALSE)
   }
@@ -139,9 +139,9 @@ resolve_resp <- function(x, resp, required = FALSE, caller = NULL) {
   if (is.null(resp)) {
     if (required && length(keys) > 1L) {
       stop(insight::format_error(c(
-        "Name a response with 'resp': this model has several.",
+        "Choose a response with 'resp': this model has several.",
         x = if (!is.null(caller)) {
-          paste0("'", caller, "' answers for one response at a time.")
+          paste0("'", caller, "' returns one response at a time.")
         },
         i = listed
       )), call. = FALSE)
@@ -154,9 +154,10 @@ resolve_resp <- function(x, resp, required = FALSE, caller = NULL) {
     # the key alone, so the refusal says which key the column became.
     as_key <- keys[match(resp, columns)]
     stop(insight::format_error(c(
-      paste0("'", resp, "' is not a response of this model."),
+      "'resp' must be a response of this model.",
+      x = paste0("Got '", resp, "'."),
       x = if (!is.na(as_key)) {
-        paste0("brms names the column '", resp, "' as '", as_key,
+        paste0("brms renames the column '", resp, "' to '", as_key,
                "', removing every '.' and '_'.")
       },
       i = listed

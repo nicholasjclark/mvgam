@@ -123,10 +123,9 @@ test_that("run_pathfinder() supplies one path per chain", {
   got <- mvgam:::run_pathfinder(
     fake_pathfinder_model(),
     args = list(data = list(N = 1), seed = 2, init = NULL),
-    chains = 4, threading_on = FALSE, threads = NULL, silent = 2
+    chains = 4, threading_on = FALSE, threads = NULL
   )
   expect_identical(got$num_paths, 4)
-  expect_false(got$show_messages)
   expect_identical(got$data, list(N = 1))
   expect_identical(got$seed, 2)
 })
@@ -139,7 +138,7 @@ test_that("run_pathfinder() lets caller-supplied arguments win", {
     fake_pathfinder_model(),
     args = list(data = list(N = 1), seed = 2, init = NULL,
                 num_paths = 10, show_messages = TRUE),
-    chains = 4, threading_on = FALSE, threads = NULL, silent = 2
+    chains = 4, threading_on = FALSE, threads = NULL
   )
   expect_identical(got$num_paths, 10)
   expect_true(got$show_messages)
@@ -155,7 +154,7 @@ test_that("run_pathfinder() starts the search in a tight ball near zero", {
   got <- mvgam:::run_pathfinder(
     fake_pathfinder_model(),
     args = list(data = list(N = 1), seed = 2, init = NULL),
-    chains = 2, threading_on = FALSE, threads = NULL, silent = 2
+    chains = 2, threading_on = FALSE, threads = NULL
   )
   expect_true(got$init > 0 && got$init < 1)
 
@@ -163,7 +162,7 @@ test_that("run_pathfinder() starts the search in a tight ball near zero", {
   explicit <- mvgam:::run_pathfinder(
     fake_pathfinder_model(),
     args = list(data = list(N = 1), seed = 2, init = 0.5),
-    chains = 2, threading_on = FALSE, threads = NULL, silent = 2
+    chains = 2, threading_on = FALSE, threads = NULL
   )
   expect_identical(explicit$init, 0.5)
 })
@@ -176,7 +175,7 @@ test_that("run_pathfinder() reports a failed approximation rather than passing i
     mvgam:::run_pathfinder(
       fake_pathfinder_model(codes = 1L),
       args = list(data = list(N = 1), seed = 2, init = NULL),
-      chains = 2, threading_on = FALSE, threads = NULL, silent = 2
+      chains = 2, threading_on = FALSE, threads = NULL
     ),
     "did not converge"
   )
@@ -184,7 +183,7 @@ test_that("run_pathfinder() reports a failed approximation rather than passing i
     mvgam:::run_pathfinder(
       fake_pathfinder_model(codes = c(0L, 1L)),
       args = list(data = list(N = 1), seed = 2, init = NULL),
-      chains = 2, threading_on = FALSE, threads = NULL, silent = 2
+      chains = 2, threading_on = FALSE, threads = NULL
     ),
     "seed"
   )
@@ -206,7 +205,7 @@ test_that("run_pathfinder() drops sampler arguments Pathfinder lacks", {
     model,
     args = list(data = list(N = 1), seed = 2, init = NULL,
                 refresh = 0, save_warmup = TRUE),
-    chains = 2, threading_on = FALSE, threads = NULL, silent = 2
+    chains = 2, threading_on = FALSE, threads = NULL
   )
   expect_identical(got$refresh, 0)
   expect_identical(got$num_paths, 2)
@@ -217,13 +216,13 @@ test_that("run_pathfinder() forwards threads only when threading is on", {
   args <- list(data = list(N = 1), seed = 2, init = NULL)
   off <- mvgam:::run_pathfinder(
     fake_pathfinder_model(), args, chains = 2,
-    threading_on = FALSE, threads = NULL, silent = 2
+    threading_on = FALSE, threads = NULL
   )
   expect_false("num_threads" %in% names(off))
 
   on <- mvgam:::run_pathfinder(
     fake_pathfinder_model(), args, chains = 2,
-    threading_on = TRUE, threads = list(threads = 3L), silent = 2
+    threading_on = TRUE, threads = list(threads = 3L)
   )
   expect_identical(on$num_threads, 3L)
 })

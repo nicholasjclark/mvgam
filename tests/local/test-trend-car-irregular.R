@@ -38,19 +38,6 @@ suppressMessages({
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(808L)
 
@@ -238,9 +225,9 @@ test_that("CAR refuses a factor decomposition, by every route", {
   # The refusal carries the reason the registry records against CAR,
   # and names trends that do decompose, so the user has somewhere to
   # go rather than only a closed door.
-  expect_match(conditionMessage(map_err), "irregular time intervals",
+  expect_match(conditionMessage(map_err), "irregular time gaps",
                fixed = TRUE)
-  expect_match(conditionMessage(map_err), "AR, RW, VAR, ZMVN",
+  expect_match(conditionMessage(map_err), "use a trend with a factor form",
                fixed = TRUE)
 
   jsd_err <- expect_error(
@@ -278,7 +265,7 @@ test_that("n_lv is the third route to a factor CAR, and refuses too", {
       formula = y ~ temp, trend_formula = ~ CAR(), n_lv = 2L,
       data = dat, family = poisson(), run_model = FALSE, silent = 2
     ),
-    "not read by 'mvgam\\(\\)'"
+    "takes 'n_lv' on the trend constructor"
   )
 })
 
@@ -376,7 +363,7 @@ test_that("the refusals carry messages a user can act on", {
       data = ragged, family = poisson(), run_model = FALSE,
       silent = 2
     ),
-    "do not share the same time grid"
+    "must share one time grid"
   )
   msg <- conditionMessage(ragged_err)
   # It counts what it got against what it wanted, so the user can
@@ -410,23 +397,18 @@ test_that("the refusals carry messages a user can act on", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_car_irregular.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading CAR irregular-time fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(CAR(), 3 series x 26 irregular occasions)\n")
-  fit <- mvgam(
-    formula = y ~ temp, trend_formula = ~ CAR(),
-    data = dat, family = poisson(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_car_irregular.rds",
+  function() {
+    mvgam(
+      formula = y ~ temp, trend_formula = ~ CAR(),
+      data = dat, family = poisson(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 
 test_that("the fitted CAR keeps the irregular grid", {
@@ -520,7 +502,7 @@ test_that("the draw-free resolvers answer on this grid", {
   # there is no horizon in it to resolve.
   expect_error(
     mvgam:::resolve_forecast_grid(fit, dat, training, series_levels),
-    "no occasion beyond the training grid"
+    "ends at or before the last training time"
   )
 })
 
@@ -650,7 +632,7 @@ test_that("an unknown series is refused, and named", {
   )
   err <- expect_error(
     posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-    "Series levels in newdata not found in training data"
+    "Series in 'newdata' has levels absent from the training data"
   )
   expect_match(conditionMessage(err), "echo", fixed = TRUE)
   for (s in series_levels) {
@@ -742,14 +724,9 @@ test_that("summary, tidiers and criticism run on a CAR fit", {
   # approximation breaks, and the warning that arrived, if any, is
   # the k notice those numbers already account for rather than
   # something else that slipped through.
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))
@@ -878,7 +855,7 @@ test_that("a frame wholly inside the grid is refused, not emptied", {
   # got wrong.
   expect_error(
     forecast(fit, newdata = mk(c(30L, 31L)), ndraws = 20L),
-    "no occasion beyond the training grid"
+    "ends at or before the last training time"
   )
   msg <- tryCatch(
     forecast(fit, newdata = mk(c(30L, 31L)), ndraws = 20L),
@@ -972,19 +949,14 @@ cont_fit <- local({
   cached <- NULL
   function() {
     if (!is.null(cached)) return(cached)
-    path <- cache_path("val_mvgam_car_continuous.rds")
-    if (file.exists(path)) {
-      cached <<- readRDS(path)
-      return(cached)
-    }
-    cat("[fit ] mvgam(CAR(), continuous time grid)\n")
-    cached <<- mvgam(
-      formula = y ~ temp, trend_formula = ~ CAR(),
-      data = cont_sim()$data, family = poisson(),
-      chains = 2L, iter = 1000L, warmup = 500L,
-      silent = 2, backend = "cmdstanr"
-    )
-    saveRDS(cached, path)
+    cached <<- cached_fit("val_mvgam_car_continuous.rds", function() {
+      mvgam(
+        formula = y ~ temp, trend_formula = ~ CAR(),
+        data = cont_sim()$data, family = poisson(),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        silent = 2, backend = "cmdstanr"
+      )
+    })
     cached
   }
 })
@@ -1064,7 +1036,7 @@ test_that("lfo_cv admits the occasions the fit was given", {
   expect_s3_class(lfo_cv(fit_c, min_t = observed), "mvgam_lfo")
   # One it does not hold is not, whatever its truncation matches.
   expect_error(lfo_cv(fit_c, min_t = fabricated),
-               "not an observed time")
+               "must be an observed time")
 })
 
 
@@ -1076,13 +1048,9 @@ test_that("lfo_cv reports the occasions it scored at", {
   sim <- cont_sim()
   fit_c <- cont_fit()
   seen <- character(0)
-  lfo <- withCallingHandlers(
-    lfo_cv(fit_c),
-    warning = function(w) {
-      seen <<- c(seen, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(lfo_cv(fit_c))
+  lfo <- caught$value
+  seen <- c(seen, caught$warnings)
   ev <- lfo$eval_timepoints
   expect_gt(length(ev), 0L)
   expect_true(all(ev %in% sim$times))
@@ -1096,15 +1064,6 @@ test_that("every panel draws the occasions the frame supplied", {
   sim <- cont_sim()
   fit_c <- cont_fit()
   want <- range(sim$times)
-  drawn_x <- function(p) {
-    xs <- unlist(lapply(
-      ggplot2::ggplot_build(p)$data,
-      function(l) if ("x" %in% names(l)) l$x else NULL
-    ))
-    xs <- xs[is.finite(xs)]
-    expect_gt(length(xs), 0L)
-    range(xs)
-  }
   for (ty in c("series", "trend")) {
     expect_equal(drawn_x(plot(fit_c, type = ty)), as.numeric(want))
   }
@@ -1119,11 +1078,6 @@ test_that("the trend panels follow the model's series order", {
   # the same series in the same position.
   sim <- cont_sim()
   fit_c <- cont_fit()
-  panel_order <- function(p) {
-    lay <- ggplot2::ggplot_build(p)$layout$layout
-    col <- intersect(c("series", "trend"), names(lay))
-    as.character(lay[[if (length(col)) col[1L] else 1L]])
-  }
   expect_identical(panel_order(plot(fit_c, type = "series")),
                    sim$series_names)
   expect_identical(panel_order(plot(fit_c, type = "trend")),
@@ -1183,18 +1137,14 @@ zmvn_fit <- local({
   cached <- NULL
   function() {
     if (!is.null(cached)) return(cached)
-    path <- cache_path("val_mvgam_zmvn_irregular.rds")
-    if (file.exists(path)) {
-      cached <<- readRDS(path)
-      return(cached)
-    }
-    cached <<- mvgam(
-      formula = y ~ 1, trend_formula = ~ ZMVN(cor = TRUE),
-      data = zmvn_sim()$data, family = gaussian(),
-      chains = 2L, burnin = 300L, samples = 300L,
-      silent = 2, refresh = 0
-    )
-    saveRDS(cached, path)
+    cached <<- cached_fit("val_mvgam_zmvn_irregular.rds", function() {
+      mvgam(
+        formula = y ~ 1, trend_formula = ~ ZMVN(cor = TRUE),
+        data = zmvn_sim()$data, family = gaussian(),
+        chains = 2L, burnin = 300L, samples = 300L,
+        silent = 2, refresh = 0
+      )
+    })
     cached
   }
 })
@@ -1279,10 +1229,9 @@ test_that("every post-fit method answers on the irregular ZMVN fit", {
   expect_true(all(is.finite(ll)))
 
   seen <- character(0)
-  ic <- withCallingHandlers(loo(fit), warning = function(w) {
-    seen <<- c(seen, conditionMessage(w))
-    invokeRestart("muffleWarning")
-  })
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  seen <- c(seen, caught$warnings)
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   expect_true(all(grepl("Pareto", seen)))
 
@@ -1324,9 +1273,7 @@ test_that("the ZMVN panels draw the occasions the frame supplied", {
   expect_error(plot(fit, type = "smooths"), "no smooth terms")
 
   pc <- pp_check(fit, ndraws = 30L)
-  expect_s3_class(pc, "ggplot")
-  expect_gt(sum(vapply(ggplot2::ggplot_build(pc)$data, nrow,
-                       integer(1L))), 0L)
+  expect_drawn(pc)
 
   # The observation formula names no predictor, so there is nothing
   # to condition on and the answer is no effects rather than an

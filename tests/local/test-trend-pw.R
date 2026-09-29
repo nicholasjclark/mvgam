@@ -45,19 +45,6 @@ suppressMessages({
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(1301L)
 
@@ -293,24 +280,19 @@ test_that("the two-dimensional smooth is one basis over two margins", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_pw_trend.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading PW fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(PW(n_changepoints = 8), offset + s(x1, x2))\n")
-  fit <- mvgam(
-    formula = obs_formula,
-    trend_formula = ~ PW(n_changepoints = n_change),
-    data = dat, family = poisson(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_pw_trend.rds",
+  function() {
+    mvgam(
+      formula = obs_formula,
+      trend_formula = ~ PW(n_changepoints = n_change),
+      data = dat, family = poisson(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 dm <- posterior::as_draws_matrix(fit$fit)
 
@@ -486,7 +468,6 @@ test_that("the reference the battery compares against actually varies", {
 })
 
 
-
 test_that("rearranged and cut newdata frames read the same cells", {
   set.seed(53L)
   perm <- sample(nrow(dat))
@@ -547,7 +528,7 @@ test_that("an unknown series is refused, and named", {
   )
   err <- expect_error(
     posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-    "Series levels in newdata not found in training data"
+    "Series in 'newdata' has levels absent from the training data"
   )
   expect_match(conditionMessage(err), "charlie", fixed = TRUE)
   for (s in series_levels) {
@@ -595,7 +576,7 @@ test_that("a factor model is refused on every route PW offers", {
   # it is misplaced whatever the trend turns out to be.
   err <- expect_error(
     build(trend_formula = ~ PW(n_changepoints = 5), n_lv = 1L),
-    "not read by 'mvgam\\(\\)'"
+    "takes 'n_lv' on the trend constructor"
   )
   expect_match(conditionMessage(err), "n_lv = 1", fixed = TRUE)
 })
@@ -756,14 +737,9 @@ test_that("summary, tidiers and criticism run on a PW fit", {
   # approximation breaks, and the warning that arrived, if any, is
   # the k notice those numbers already account for rather than
   # something else that slipped through.
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))
@@ -792,21 +768,8 @@ test_that("summary, tidiers and criticism run on a PW fit", {
 
 
 test_that("every per-series plot panels in the model's own order", {
-  # Series declared out of alphabetical order, so a panel order taken
-  # from a sort differs from the model's. `plot(type = "series")` and
-  # the hindcast arms use the model's order; `plot(type = "trend")`
-  # sorts, so the first panel of one is a different series from the
-  # first panel of the other while every label is right on its own.
-  panel_order <- function(ty) {
-    b <- ggplot2::ggplot_build(plot(fit, type = ty))
-    lay <- b$layout$layout
-    fc <- setdiff(names(lay),
-                  c("PANEL", "ROW", "COL", "SCALE_X", "SCALE_Y"))
-    if (!length(fc)) return(character(0))
-    as.character(lay[[fc[1L]]])
-  }
-  expect_identical(panel_order("series"), series_levels)
-  expect_identical(panel_order("trend"), series_levels)
+  expect_identical(panel_order(plot(fit, type = "series")), series_levels)
+  expect_identical(panel_order(plot(fit, type = "trend")), series_levels)
   expect_identical(names(hindcast(fit)$hindcasts), series_levels)
 })
 
@@ -840,18 +803,11 @@ test_that("the tidy table carries the smooth this model is built on", {
 
 
 test_that("pp_check and the plotting methods draw something for PW", {
-  # A ggplot is returned whether or not a layer received data, so the
-  # class alone passes on an empty panel.
-  drawn <- function(p) {
-    expect_s3_class(p, "ggplot")
-    layers <- ggplot2::ggplot_build(p)$data
-    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-  }
-  drawn(pp_check(fit, ndraws = 20L))
+  expect_drawn(pp_check(fit, ndraws = 20L))
   for (ty in c("residuals", "trend", "series")) {
-    drawn(plot(fit, type = ty))
+    expect_drawn(plot(fit, type = ty))
   }
-  drawn(mcmc_plot(fit))
+  expect_drawn(mcmc_plot(fit))
 })
 
 

@@ -178,13 +178,8 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
     time   = arrays$unit_grid[[unit_vars[length(unit_vars)]]]
   )
   if (ncol(state) != nrow(unit_meta)) {
-    stop(insight::format_error(c(
-      "Latent-state matrix column count does not match closure units.",
-      x = paste0(
-        "ncol(state) = ", ncol(state),
-        ", N_unit = ", nrow(unit_meta), "."
-      )
-    )))
+    stop_shape_fault("The latent-state matrix", ncol(state),
+                     nrow(unit_meta))
   }
 
   series_levels <- levels(unit_meta$series)
@@ -247,13 +242,7 @@ collect_lv_trend_column_names <- function(par_names, n_lv) {
   }
   lv_cols <- grep(pattern, par_names, value = TRUE)
   if (length(lv_cols) == 0L) {
-    stop(insight::format_error(c(
-      "Could not locate factor-path draws in posterior.",
-      i = paste0(
-        "Expected an LV-factor model with `", param_name,
-        "[t, k]` stored in the posterior."
-      )
-    )))
+    stop_missing_draws(param_name, paste0(param_name, "[t, k]"))
   }
   parts <- regmatches(
     lv_cols, regexec("\\[(\\d+),(\\d+)\\]", lv_cols)
@@ -264,13 +253,8 @@ collect_lv_trend_column_names <- function(par_names, n_lv) {
   t_pos <- idx[, 1L]
   k_pos <- idx[, 2L]
   if (max(k_pos) != n_lv) {
-    stop(insight::format_error(c(
-      "Mismatch between expected and stored factor count.",
-      x = paste0(
-        "Expected n_lv = ", n_lv,
-        ", max factor index in posterior = ", max(k_pos), "."
-      )
-    )))
+    stop_shape_fault(paste0("The '", param_name, "' factor count"),
+                     max(k_pos), n_lv)
   }
   cols_by_tk <- matrix(NA_character_, nrow = max(t_pos), ncol = n_lv)
   for (k in seq_len(n_lv)) {

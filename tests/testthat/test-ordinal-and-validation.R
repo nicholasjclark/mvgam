@@ -97,7 +97,7 @@ test_that("ordinal_log_lik reads the observed level's probability", {
   # A row whose response was not measured has no density.
   expect_true(is.na(ll[1L, 3L]))
   expect_error(ordinal_log_lik(probs, c(0, 4, 1)),
-               "none of its levels")
+               "outside its levels")
 })
 
 test_that("ordinal_pit_bounds gives the interval each level fills", {
@@ -349,8 +349,8 @@ test_that("extract_trend_latent_states: missing trend[t,s] column errors", {
         N_series_trend = 1L,
         times_trend = matrix(c(1L, 2L, 3L), ncol = 1L)
       ),
-      trend_metadata = list(
-        variables = list(time_var = "time", series_var = "series")
+      trend_metadata = mock_axis_record(
+        data.frame(time = 1:3, series = factor("s1"))
       ),
       obs_data = data.frame(time = 1:3),
       data = data.frame(time = 1:3)

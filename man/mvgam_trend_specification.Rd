@@ -2,203 +2,71 @@
 % Please edit documentation in R/trend_system.R
 \name{mvgam_trend_specification}
 \alias{mvgam_trend_specification}
-\title{mvgam_trend Object Field Specification}
+\title{Fields of an mvgam_trend object}
 \description{
-Documentation of required and optional fields for the
-mvgam_trend S3 class structure. This specification enables self-contained
-trend objects that provide all necessary information for validation,
-Stan code generation, and post-processing without external lookups.
+Every trend constructor, \code{\link[=AR]{AR()}}, \code{\link[=RW]{RW()}}, \code{\link[=VAR]{VAR()}}, \code{\link[=CAR]{CAR()}}, \code{\link[=PW]{PW()}} and
+\code{\link[=ZMVN]{ZMVN()}}, returns an object of class \code{mvgam_trend}. The object
+records the arguments of the call. Model building adds the fields
+that need the data.
 }
-\section{Core Required Fields}{
+\section{Fields every trend has}{
 
 \describe{
-\item{trend}{Character string. Normalized trend type name for stanvar
-generation dispatch. Examples: "AR", "VAR", "RW", "CAR", "PW", "ZMVN".
-Used in convention-based lookup: "AR" → generate_ar_trend_stanvars()}
-\item{time}{Character string. Name of time variable in user's data.
-Default "time" with warning when not explicitly specified.}
-\item{series}{Character string. Name of series identifier variable in data.
-Default "series" with warning when not explicitly specified.}
-\item{class}{Must include "mvgam_trend" for method dispatch.}
+\item{trend}{The trend type, such as \code{"AR"}. Stan code generation
+and the registry look the type up by this name.}
+\item{time, series}{The names of the time and series columns,
+\code{"time"} and \code{"series"} unless given.}
+\item{gr, subgr}{The names of the grouping and subgrouping
+columns of a hierarchical trend, or \code{"NA"}.}
+\item{cap}{The name of the carrying-capacity column that a
+logistic \code{\link[=PW]{PW()}} trend uses, \code{"cap"} unless given.}
+\item{ma}{\code{TRUE} for a moving-average term.}
+\item{cor}{\code{TRUE} for correlated innovations. A grouped trend
+always has them.}
+\item{validation_rules}{What the trend assumes about the data.
+\code{"requires_regular_intervals"} marks a trend that indexes its
+lags by position, and fitting then requires evenly spaced
+times. \code{\link[=CAR]{CAR()}} and \code{\link[=ZMVN]{ZMVN()}} carry no rule.}
 }
 }
 
-\section{Self-Contained Validation Fields}{
+\section{Fields a constructor adds}{
 
 \describe{
-\item{validation_rules}{Character vector of what the trend assumes
-about the data. It holds \code{"requires_regular_intervals"} or
-nothing. See \code{?validation_rules_vocabulary}.}
+\item{n_lv}{The number of latent factors, or \code{NULL} for none.}
+\item{trend_map}{The loadings as supplied to the constructor.}
+\item{p}{The autoregressive lags of \code{\link[=AR]{AR()}} and \code{\link[=VAR]{VAR()}}.}
+\item{coef_sharing}{How \code{\link[=AR]{AR()}} shares its coefficients across
+series.}
+\item{df}{The degrees of freedom of the innovations: \code{Inf} for
+Gaussian, \code{NA} to estimate them.}
+\item{growth, n_changepoints, changepoint_range,
+changepoint_scale}{The arguments of \code{\link[=PW]{PW()}}.}
 }
 }
 
-\section{Self-Contained Parameter Monitoring Fields}{
+\section{Fields model building adds}{
 
 \describe{
-\item{monitor_params}{Character vector. Stan parameters to track post-fit.
-Automatically includes response suffixes in multivariate contexts.
-Examples: c("ar1_trend", "sigma_trend", "L_Omega_trend")}
-\item{tpars}{Character vector. All trend-specific parameter names with
-"_trend" suffix for Stan compatibility. Generated from param_info.}
-\item{bounds}{Named list. Parameter bounds for prior specification.
-Format: list(ar1_trend = c(-1, 1), sigma_trend = c(0, Inf))}
+\item{fixed_Z}{The loadings matrix a \code{trend_map} gives, with \code{NA}
+marking a sampled entry. \code{NULL} when every loading is sampled.}
+\item{loadings_prior_spec}{The structured loadings prior built
+from the \code{loadings_prior} argument of \code{\link[=mvgam]{mvgam()}}.}
+\item{dimensions}{The series and time axes the data defines.}
 }
 }
 
-\section{Configuration Parameters (Trend-Specific)}{
+\section{Parameters and priors}{
 
-\describe{
-\item{p}{Integer or vector. Order parameter for AR/VAR models.
-Examples: 1 (AR1), c(1,12) (seasonal AR), 2 (VAR2)}
-\item{ma}{Logical. Whether moving average terms are included.}
-\item{cor}{Logical. Whether correlation structure is enabled.
-VAR models always set this to TRUE for optimal performance.}
-\item{gr}{Character string. Grouping variable name for hierarchical models.
-"NA" indicates no grouping.}
-\item{subgr}{Character string. Subgrouping variable name.
-Default "series" but can be customized for hierarchical models.}
-\item{n_lv}{Integer. Number of latent variables for factor models.
-Allowed for the trends the registry records \code{supports_factors}
-against: AR, RW, VAR and ZMVN.}
-\item{cap}{Character string. Carrying capacity variable for logistic growth.
-Required for PW models with growth = "logistic".}
-\item{growth}{Character string. Growth type for piecewise models:
-"linear" or "logistic".}
-\item{n_changepoints}{Integer. Number of changepoints for piecewise models.}
-\item{changepoint_range}{Numeric. Proportion of history for changepoints.}
-\item{changepoint_scale}{Numeric. Scale parameter for changepoint priors.}
-}
+Which parameters a trend samples depends on its fields at the time
+the model is built. A fully fixed \code{trend_map} samples no loadings,
+and a loadings prior with column shrinkage derives the innovation
+scale. \code{\link[=get_prior]{get_prior()}} lists the parameters for a given model.
 }
 
-\section{Display and Documentation Fields}{
-
-\describe{
-\item{label}{Character string. Human-readable description for printing.
-Auto-generated from trend type and parameters if not provided.}
-\item{summary_labels}{List. Naming patterns for parameter summaries:
-\describe{
-\item{parameter_labels}{List mapping parameter names to display labels}
-\item{factor_labels}{List for factor loading label patterns}
-\item{group_labels}{List for hierarchical parameter labels}
-}}
+\seealso{
+\code{\link[=list_trend_types]{list_trend_types()}}
 }
-}
-
-\section{Internal Processing Fields}{
-
-\describe{
-\item{param_info}{List containing:
-\describe{
-\item{parameters}{trend_param object with parameter specifications}
-\item{characteristics}{List of trend capabilities and settings}
-}}
-\item{shared_innovations}{Logical. Whether trend uses shared Gaussian
-innovation system (TRUE) or handles own innovations (FALSE).
-Most trends use shared system; exceptions: CAR, VAR, PW.}
-\item{dimensions}{List. Pre-calculated time series dimensions (populated during validation):
-\describe{
-\item{n_time}{Integer. Number of time points}
-\item{n_series}{Integer. Number of series}
-\item{n_obs}{Integer. Total observations}
-\item{time_var}{Character. Time variable name}
-\item{series_var}{Character. Series variable name}
-\item{time_range}{Numeric vector. c(min_time, max_time)}
-\item{unique_times}{Vector. All unique time values}
-}}
-\item{response_context}{Character string. Response name for multivariate models.
-NULL for univariate models, populated during multivariate parsing.}
-}
-}
-
-\section{Field Relationships and Validation Rules}{
-
-\itemize{
-\item "requires_regular_intervals": regular time validation runs
-\item n_lv and trend_map: the registry's \code{supports_factors} entry
-decides, through \code{refuse_factor_request_for_trend()}
-\item gr and subgr: the constructor defining them decides
-}
-}
-
-\section{Convention-Based Function Dispatch}{
-
-The trend field enables automatic function lookup:
-\itemize{
-\item Stan generation: "AR" → generate_ar_trend_stanvars()
-\item No manual registry entries needed
-}
-}
-
-\section{Response Suffix Handling (Multivariate)}{
-
-In multivariate contexts, certain fields are automatically modified:
-\itemize{
-\item monitor_params: "_count", "_biomass" suffixes added to parameter names
-\item summary_labels: Response-specific labels generated automatically
-\item response_context: Set to response name for tracking
-}
-}
-
-\section{Backward Compatibility}{
-
-During transition period, old fields may still be present:
-\itemize{
-\item trend_model: Legacy field, use trend instead
-\item trend_type: Legacy field, use trend instead
-}
-}
-
-\section{Class Structure Requirements}{
-
-Objects must:
-\itemize{
-\item Have class c("mvgam_trend")
-\item Pass validate_mvgam_trend() checks
-\item Include all required core fields
-\item Use approved validation_rules vocabulary
-\item Have consistent field types and relationships
-}
-}
-
-\section{Example Object}{
-
-\preformatted{
-ar_trend <- structure(list(
-  # Core required fields
-  trend = "AR",
-  time = "time",
-  series = "series",
-
-  # Self-contained validation
-  validation_rules = "requires_regular_intervals",
-
-  # Self-contained monitoring
-  monitor_params = c("ar1_trend", "sigma_trend"),
-  tpars = c("ar1_trend"),
-  bounds = list(ar1_trend = c(-1, 1)),
-
-  # Configuration
-  p = 1, ma = FALSE, cor = FALSE, n_lv = NULL,
-
-  # Auto-generated during processing
-  label = "AR1",
-  shared_innovations = TRUE,
-  param_info = list(...)
-), class = "mvgam_trend")
-}
-}
-
-\section{Design Principles}{
-
-\itemize{
-\item Self-contained: each object contains all needed metadata
-\item Convention-based: minimal configuration, maximum automation
-\item Extensible: new fields can be added without breaking existing trends
-\item Validated: structure enforced through \code{validate_mvgam_trend()}
-\item Consistent: all trends follow identical patterns
-}
-}
-
 \author{
 Nicholas J Clark
 }

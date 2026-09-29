@@ -139,7 +139,7 @@ hindcast.mvgam <- function(object,
     return(fan)
   }
 
-  series_levels <- resolve_series_info(object)$series_levels
+  series_levels <- fitted_series_levels(object)
   reported <- reported_series(object, resp, series_levels)
 
   draws_mat <- posterior::as_draws_matrix(object$fit)

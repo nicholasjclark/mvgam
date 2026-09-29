@@ -72,8 +72,8 @@ reference:
 
 - title: Formula and trend specification
   desc: >
-    Building the observation formula, choosing a latent trend
-    process, and registering your own.
+    Building the observation formula and choosing a latent trend
+    process.
   contents:
   - mvgam_formula
   - print.mvgam_formula
@@ -82,19 +82,10 @@ reference:
   - PW
   - ZMVN
   - lv_axis
-  - trend_param
-  - "+.trend_param"
-  - is.trend_param
   - is.mvgam_trend
   - print.mvgam_trend
-  - create_mvgam_trend
-  - register_custom_trend
-  - register_trend_type
-  - trend_registry
   - list_trend_types
-  - mvgam_trend_choices
   - mvgam_trend_specification
-  - validation_rules_vocabulary
 
 - title: Observation families
   desc: >

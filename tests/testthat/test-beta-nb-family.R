@@ -188,7 +188,7 @@ test_that("rbeta_nb_mvgam() draws non-negative integers with the right mean", {
   expect_equal(mean(y), 10, tolerance = 0.5)
 })
 
-test_that("log_lik_beta_nb() matches the closed-form density", {
+test_that("the beta_nb log density matches the closed-form density", {
   set.seed(3)
   ndraws <- 5L
   nobs <- 7L
@@ -197,8 +197,8 @@ test_that("log_lik_beta_nb() matches the closed-form density", {
   mtail <- matrix(runif(ndraws * nobs, 0.5, 6), ndraws, nobs)
   y <- rpois(nobs, 8)
 
-  ll <- mvgam:::log_lik_beta_nb(
-    linpred = linpred, link = "log", y = y,
+  ll <- mvgam:::dispatch_log_lik(
+    "beta_nb", linpred = linpred, link = "log", y = y,
     family_pars = list(shape = shape, mtail = mtail), trials = NULL
   )
   expect_equal(dim(ll), c(ndraws, nobs))
@@ -214,16 +214,6 @@ test_that("log_lik_beta_nb() matches the closed-form density", {
   }
   expect_equal(ll, expected, tolerance = 1e-12)
 })
-
-test_that("log_lik_beta_nb() rejects links other than log", {
-  linpred <- matrix(0, 2, 2)
-  pars <- list(shape = matrix(1, 2, 2), mtail = matrix(1, 2, 2))
-  expect_error(
-    mvgam:::log_lik_beta_nb(linpred, "identity", c(1, 2), pars, NULL),
-    "log"
-  )
-})
-
 
 # ---- simulation ----------------------------------------------------
 
@@ -247,15 +237,16 @@ test_that("pbeta_nb_mvgam() has no mass below zero", {
   # the distribution function at -1. Returning anything other than -Inf
   # there silently subtracts the zero count from the normalising
   # constant and biases every observation.
-  expect_identical(mvgam:::pbeta_nb_mvgam(-1, 5, 2, 2), -Inf)
-  expect_identical(mvgam:::pbeta_nb_mvgam(-3, 5, 2, 2), -Inf)
-  expect_equal(mvgam:::pbeta_nb_mvgam(-1, 5, 2, 2, log.p = FALSE), 0)
+  expect_identical(mvgam:::pbeta_nb_mvgam(-1, 5, 2, 2, log.p = TRUE), -Inf)
+  expect_identical(mvgam:::pbeta_nb_mvgam(-3, 5, 2, 2, log.p = TRUE), -Inf)
+  expect_equal(mvgam:::pbeta_nb_mvgam(-1, 5, 2, 2), 0)
+  expect_equal(mvgam:::dbeta_nb_mvgam(-1, 5, 2, 2), 0)
 })
 
 test_that("pbeta_nb_mvgam() equals the mass function at zero", {
   for (cfg in list(c(5, 2, 2), c(20, 1.5, 1.2), c(2, 0.7, 0.5))) {
     expect_equal(
-      mvgam:::pbeta_nb_mvgam(0, cfg[1], cfg[2], cfg[3]),
+      mvgam:::pbeta_nb_mvgam(0, cfg[1], cfg[2], cfg[3], log.p = TRUE),
       mvgam:::dbeta_nb_mvgam(0, cfg[1], cfg[2], cfg[3], log = TRUE)
     )
   }
@@ -264,18 +255,65 @@ test_that("pbeta_nb_mvgam() equals the mass function at zero", {
 test_that("pbeta_nb_mvgam() matches a direct cumulative sum of the pmf", {
   for (cfg in list(c(5, 2, 2), c(20, 1.5, 1.2), c(50, 3, 5))) {
     q <- 0:60
-    got <- mvgam:::pbeta_nb_mvgam(q, cfg[1], cfg[2], cfg[3])
-    want <- log(cumsum(
-      mvgam:::dbeta_nb_mvgam(q, cfg[1], cfg[2], cfg[3], log = FALSE)
-    ))
+    got <- mvgam:::pbeta_nb_mvgam(q, cfg[1], cfg[2], cfg[3],
+                                  log.p = TRUE)
+    want <- log(cumsum(mvgam:::dbeta_nb_mvgam(q, cfg[1], cfg[2], cfg[3])))
     expect_equal(got, want, tolerance = 1e-12)
   }
 })
 
 test_that("pbeta_nb_mvgam() is monotone and bounded by one", {
-  p <- mvgam:::pbeta_nb_mvgam(0:400, 20, 1.5, 1.2, log.p = FALSE)
+  p <- mvgam:::pbeta_nb_mvgam(0:400, 20, 1.5, 1.2)
   expect_true(all(diff(p) >= 0))
   expect_true(all(p >= 0 & p <= 1))
+})
+
+test_that("pbeta_nb_mvgam() recycles every argument elementwise", {
+  # The spec pairs one scalar quantile with a column of draws. Each
+  # parameter arrives as a vector of draws.
+  mu <- c(2, 8, 30)
+  shape <- c(0.8, 2, 4)
+  mtail <- c(1, 3, 6)
+  got <- mvgam:::pbeta_nb_mvgam(5, mu, shape, mtail)
+  want <- vapply(1:3, function(i) {
+    mvgam:::pbeta_nb_mvgam(5, mu[i], shape[i], mtail[i])
+  }, numeric(1))
+  expect_equal(got, want)
+  expect_equal(
+    mvgam:::pbeta_nb_mvgam(5, mu, shape, mtail, lower.tail = FALSE),
+    1 - want
+  )
+  expect_equal(
+    mvgam:::pbeta_nb_mvgam(5, mu, shape, mtail, lower.tail = FALSE,
+                           log.p = TRUE),
+    log1p(-want)
+  )
+})
+
+test_that("cens() and trunc() are applied post-fit through the spec", {
+  # Stan scores a censored or truncated beta_nb with `beta_nb_lcdf`.
+  # log_lik() needs the same distribution function, or `loo()` on
+  # such a fit refuses.
+  set.seed(4)
+  linpred <- matrix(log(runif(12, 3, 9)), 4, 3)
+  pars <- list(shape = matrix(1.5, 4, 3), mtail = matrix(2, 4, 3))
+  expect_true(mvgam:::family_has_dist_spec("beta_nb", "log"))
+  spec <- mvgam:::family_dist_spec("beta_nb", "log", linpred, pars, NULL)
+  y <- c(2, 5, 12)
+  got <- mvgam:::dist_cdf(spec, linpred, y)
+  want <- sapply(1:3, function(j) {
+    mvgam:::pbeta_nb_mvgam(y[j], exp(linpred[, j]), 1.5, 2)
+  })
+  expect_equal(got, want)
+  # Truncating to [2, 20] renormalises by the mass on that interval.
+  ll <- mvgam:::dispatch_log_lik("beta_nb", "log", linpred, y, pars,
+                                 NULL)
+  trunc_ll <- mvgam:::apply_truncation_to_loglik(
+    ll, rep(2, 3), rep(20, 3), spec, linpred, discrete = TRUE
+  )
+  mass <- mvgam:::dist_cdf(spec, linpred, 20) -
+    mvgam:::dist_cdf(spec, linpred, 1)
+  expect_equal(trunc_ll, ll - log(mass))
 })
 
 test_that("the Stan distribution function guards against negative counts", {

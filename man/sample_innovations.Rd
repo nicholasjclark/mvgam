@@ -20,7 +20,6 @@ diag(sigma) * L_Omega (RW, AR, ZMVN)
 \item \code{full_covariance}: Direct covariance matrix Sigma (VAR)
 }
 
-New trend types only need to declare their covariance pattern to
-integrate with this sampling infrastructure.
+Each trend declares its pattern in the trend registry.
 }
 \keyword{internal}

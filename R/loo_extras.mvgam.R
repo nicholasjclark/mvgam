@@ -272,8 +272,8 @@ loglik_col_values <- function(object, data, x, n_cols = NULL) {
   if (!is.null(n_cols) && length(out) != n_cols) {
     stop(insight::format_error(c(
       "The log-likelihood and the frame cover different observations.",
-      x = paste0("log_lik returned ", n_cols, " columns. The frame ",
-                 "gives ", length(out), " ", label, "."),
+      x = paste0("'log_lik()' returned ", n_cols, " columns for ",
+                 length(out), " ", label, "."),
       i = paste0(
         "The frame passed here differs from the one the model was ",
         "fitted on."
@@ -343,11 +343,8 @@ require_loo_pairing <- function(object, fn_name) {
     stop(insight::format_error(c(
       paste0("'", fn_name, "' is not available for family '",
              resolve_family_name(family), "'."),
-      x = paste0(
-        "This family scores one joint density per site across the ",
-        "categories measured there. A site has no single ",
-        "observation to predict and reweight."
-      ),
+      x = paste0("The family scores one joint density per site across ",
+                 "the categories measured there."),
       i = paste0(
         "Use 'loo()' to score each site or 'posterior_epred()' ",
         "for the probability of each category."
@@ -361,10 +358,8 @@ require_loo_pairing <- function(object, fn_name) {
              resolve_family_name(family), "'."),
       x = "The likelihood is scored once per closure unit.",
       x = "A linear predictor has one value per visit.",
-      i = paste0(
-        "Use 'loo_epred' or 'loo_predict'. Both aggregate a unit's ",
-        "visits the way the per-unit density does."
-      )
+      i = paste0("Use 'loo_epred()' or 'loo_predict()' to aggregate a ",
+                 "unit's visits as the per-unit density does.")
     )), call. = FALSE)
   }
   invisible(TRUE)
@@ -408,7 +403,7 @@ narrow_to_scored <- function(x, scored_from) {
       max(scored) > n_x) {
     stop(insight::format_error(c(
       "Paired quantities cover different observations.",
-      x = paste0("Supplied ", n_x, " observations. Scored ",
+      x = paste0("Supplied ", n_x, " observations and scored ",
                  n_scored, "."),
       i = paste0(
         "A 'psis_object' built from a different model or response ",
@@ -597,12 +592,10 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   y <- data_used[[y_col]]
   if (!is.numeric(y)) {
     stop(insight::format_error(c(
-      paste0(
-        "'loo_R2' requires a numeric response. Response '",
-        y_col, "' is not numeric."
-      ),
-      i = "LOO Bayesian R^2 is undefined for ordinal / categorical fits."
-    )))
+      "'loo_R2()' requires a numeric response.",
+      x = paste0("Response '", y_col, "' has class '", class(y)[1L], "'."),
+      i = "LOO Bayesian R^2 is undefined for ordinal and categorical fits."
+    )), call. = FALSE)
   }
   resp_arg <- if (is_mv) list(resp = resp) else list()
   # The expectation and the importance weights have to describe the

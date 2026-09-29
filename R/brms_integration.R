@@ -137,28 +137,21 @@ codegen_args_for <- function(codegen, accepted) {
 #' @param formula Formula or brms formula object for model specification
 #' @param data Data frame containing model variables
 #' @param family Response distribution family (default: gaussian())
-#' @param trend_formula Optional trend formula specification (default: NULL)
 #' @param stanvars Optional brms stanvars object (default: NULL)
 #' @param prior A brmsprior object or NULL. Prior specifications
 #'   for model parameters. Defaults to NULL.
-#' @param is_trend_setup Logical. If TRUE, validates trend covariates and
-#'   reduces data to one row per (time, series) combination. Default: FALSE.
-#' @param response_vars Character vector of response variable names for 
-#'   trend validation. Required when is_trend_setup = TRUE.
-#' @param time_var Character name of time variable. Default: "time".
-#' @param series_var Character name of series variable. Default: "series".
+#' @param is_trend_setup Logical. `TRUE` for the trend submodel, whose
+#'   data `extract_and_validate_trend_components()` has already reduced
+#'   to one row per trend cell. Default: FALSE.
 #' @param codegen A list from `mvgam_codegen_options()` holding the brms
 #'   code-generation options, or NULL to take brms's own defaults.
 #' @param ... Additional arguments passed to brms functions
 #' @noRd
 setup_brms_lightweight <- function(formula, data, family = gaussian(),
-                                   trend_formula = NULL, stanvars = NULL,
+                                   stanvars = NULL,
                                    prior = NULL,
                                    data2 = NULL,
                                    is_trend_setup = FALSE,
-                                   response_vars = NULL,
-                                   time_var = "time",
-                                   series_var = "series",
                                    codegen = NULL,
                                    ...) {
   # Accept both regular formulas and brms formula objects
@@ -175,49 +168,8 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     checkmate::check_class(prior, "brmsprior"),
     combine = "or"
   )
-  # Validation for new parameters
-  checkmate::assert_logical(is_trend_setup, len = 1)
+  checkmate::assert_flag(is_trend_setup)
   checkmate::assert_list(codegen, names = "named", null.ok = TRUE)
-  checkmate::assert_character(response_vars, null.ok = TRUE)
-  checkmate::assert_string(time_var)
-  checkmate::assert_string(series_var)
-  if (!is.null(trend_formula)) {
-    checkmate::assert(
-      inherits(trend_formula, "formula") ||
-      inherits(trend_formula, "brmsformula") ||
-      inherits(trend_formula, "bform") ||
-      is.list(trend_formula),
-      .var.name = "trend_formula"
-    )
-  }
-
-  # Trend context handling - validate and reduce data if this is trend setup
-  #
-  # Named before the branch, because only the trend-side call assigns
-  # it. Testing `exists()` on the observation side reached the
-  # enclosing environments and took whatever object a caller happened
-  # to hold under this name.
-  trend_metadata <- NULL
-  if (is_trend_setup && !is.null(trend_formula)) {
-    # Use consolidated validation and data extraction with metadata capture
-    result <- extract_trend_data(
-      data, trend_formula, time_var, series_var,
-      response_vars = response_vars, .return_metadata = TRUE
-    )
-    data <- result$trend_data
-    trend_metadata <- result$metadata
-
-    # brms cannot evaluate mvgam trend constructors (AR, RW, VAR,
-    # PW, CAR, ZMVN) as R functions in its model frame -- they
-    # are mvgam DSL, not formula terms. The fitting pipeline
-    # normally strips them via `extract_and_validate_trend_components()`
-    # before calling here, but the stancode() / standata() entry
-    # points reach this branch with the raw trend_formula. Run
-    # `parse_trend_formula()` in parsing-only mode (no data) to
-    # obtain the constructor-free `base_formula` and hand THAT to
-    # brms.
-    formula <- parse_trend_formula(trend_formula)$base_formula
-  }
 
   # Handle trend formulas without response variables
   # Only apply this logic to regular formula objects, not brms formula objects
@@ -231,7 +183,6 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     if (!grepl("~.*~", formula_chr) && grepl("^\\s*~", formula_chr)) {
       # This is a trend formula without response variable
       # Add fake trend_y response variable following mvgam pattern
-      data <- data
       data$trend_y <- rnorm(nrow(data))
 
       # Update formula to include trend_y response
@@ -264,18 +215,10 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     }
   }
 
-  # Validate brms formula compatibility. Skip the trend-constructor
-  # rule when we are inside the trend setup branch (formula was
-  # rewritten to `trend_formula` above and is legitimately allowed
-  # to contain AR()/VAR()/RW() etc.).
+  # The trend submodel's formula is the trend formula with its
+  # constructor removed, and the observation rules do not apply to it
   if (!is_trend_setup) {
     validate_obs_formula_brms(formula)
-  }
-
-  # Parse and validate trend formula if provided
-  trend_specs <- NULL
-  if (!is.null(trend_formula)) {
-    trend_specs <- parse_multivariate_trends(formula, trend_formula)
   }
 
   # An observation formula with no coefficient (`y ~ 0`) is given a
@@ -389,7 +332,6 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # `cov_ranef()`).
   setup_components <- list(
     formula = formula,
-    trend_formula = trend_formula,
     data = data,
     data2 = data2,
     family = family,
@@ -399,19 +341,9 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     stancode = brms::stancode(mock_setup),
     standata = brms::standata(mock_setup),
     prior = extract_prior_from_setup(mock_setup, codegen),
-    brmsterms = extract_brmsterms_from_setup(mock_setup),
-    brmsfit = mock_setup,  # Keep the mock brmsfit for prediction
-    trend_specs = trend_specs,  # Include parsed trend specifications
-    # Pass through any trend metadata captured upstream so
-    # downstream stancode generation can reuse it.
-    trend_metadata = trend_metadata,
-    setup_time = system.time({})[["elapsed"]]
+    brmsfit = mock_setup  # Keep the mock brmsfit for prediction
   )
-
-  # Validate extracted components
-  validate_setup_components(setup_components)
-
-  return(setup_components)
+  setup_components
 }
 
 
@@ -676,22 +608,18 @@ inject_obs_zero_placeholder <- function(formula, data, prior) {
 
 
 # Internal: rewrite one response's main formula from `y ~ 0` to
-# `y ~ 0 + <placeholder>`, keeping the response and environment.
+# `y ~ 0 + <placeholder>`. The placeholder is appended to the
+# right-hand side as written. An `offset()` carries no population
+# coefficient, and a formula holding one alone reaches here with its
+# offset intact. Editing the call keeps the formula's class,
+# environment and the attributes brms stores on it, such as
+# `nl = TRUE`.
 #'@noRd
 rewrite_empty_obs_arm <- function(f) {
   main <- obs_arm_main_formula(f)
-  new_main <- stats::reformulate(
-    termlabels = c("0", MVGAM_EMPTY_OBS_PLACEHOLDER),
-    response   = main[[2L]],
-    env        = environment(main)
-  )
-  if (!inherits(f, "brmsformula")) return(new_main)
-  # brms stores settings such as `nl = TRUE` as attributes of the
-  # main formula. The rewritten formula carries them over.
-  for (a in setdiff(names(attributes(main)), c("class", ".Environment"))) {
-    attr(new_main, a) <- attr(main, a)
-  }
-  f$formula <- new_main
+  main[[3L]] <- call("+", main[[3L]], as.name(MVGAM_EMPTY_OBS_PLACEHOLDER))
+  if (!inherits(f, "brmsformula")) return(main)
+  f$formula <- main
   f
 }
 
@@ -1090,28 +1018,12 @@ lift_mvgam_stanvar_priors <- function(prior, stancode) {
   out
 }
 
-#' Extract brms Terms from Setup
-#' @param setup_object brms setup object
-#' @return brmsterms object
-#' @noRd
-extract_brmsterms_from_setup <- function(setup_object) {
-  # Extract brms terms - let errors bubble up
-  if (!is.null(setup_object$formula)) {
-    terms_info <- brms::brmsterms(setup_object$formula)
-  } else {
-    terms_info <- NULL
-  }
-
-  return(terms_info)
-}
-
 # =============================================================================
 # SECTION 2: MULTIVARIATE TRENDS PARSING
 # =============================================================================
-# WHY: Multivariate models require careful formula parsing to handle
-# response-specific trends and cross-series dependencies. This system enables
-# per-response trend specifications while maintaining brms compatibility for
-# multivariate response families and distributional modeling.
+# One trend formula serves every response of a multivariate model.
+# Each response gets a copy of the same parsed specification, keyed by
+# the name brms gives that response.
 #' @noRd
 parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   # Validate inputs - accept either regular formula or brms formula objects
@@ -1122,6 +1034,8 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     checkmate::check_class(formula, "brmsformula"),
     combine = "or"
   )
+
+  checkmate::assert_formula(trend_formula, null.ok = TRUE)
 
   # Cache formula metadata so latent_params lookups in downstream
   # validators read from an attribute instead of reparsing the AST.
@@ -1144,96 +1058,34 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     ))
   }
 
-  # Refuses a malformed trend formula.
-  validate_trend_formula_brms(trend_formula)
+  validate_trend_formula(trend_formula)
 
   # Check if main formula is multivariate
   is_mv_main <- is_multivariate_formula(formula)
 
-  # The keys brms gives the responses, which are what a per-response
-  # trend specification is named by.
+  # The keys brms gives the responses, which name each copy.
   response_names <- names(response_columns(formula))
 
-
-  # Handle response-specific trend formulas
-  if (inherits(trend_formula, "brmsformula") ||
-      inherits(trend_formula, "brmsterms") ||
-      inherits(trend_formula, "mvbrmsterms")) {
-
-    # Extract response-specific trend specifications
-    trend_specs <- extract_response_trends(trend_formula, response_names)
-
-    # Create base formula for brms setup
-    base_formula <- create_trend_base_formula(trend_specs)
-
-  } else if (is.list(trend_formula) && !is.null(names(trend_formula))) {
-    # Handle response-specific trends as validated lists
-    if (!is_mv_main) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "List {.field trend_formula} requires multivariate main formula."
-        ),
-        i = "Use mvbind() or bf() for multiple responses."
-      )))
-    }
-
-    # Validate response names match
-    missing_responses <- setdiff(names(trend_formula), response_names)
-    if (length(missing_responses) > 0) {
-      stop(insight::format_error(c(
-        cli::format_inline(paste0(
-          "Unknown responses in {.field trend_formula}: ",
-          "{paste(missing_responses, collapse = ', ')}"
-        )),
-        i = paste(
-          "Available responses:",
-          paste(response_names, collapse = ", ")
-        )
-      )))
-    }
-
-    # Parse each trend formula
-    trend_specs <- lapply(names(trend_formula), function(resp) {
-      if (is.null(trend_formula[[resp]])) return(NULL)
-      parse_trend_formula(trend_formula[[resp]])$trend_model
-    })
-    names(trend_specs) <- names(trend_formula)
-
-    # Create base formula from first non-NULL trend
-    non_null_trends <- which(!sapply(trend_formula, is.null))
-    if (length(non_null_trends) > 0) {
-      base_formula <- trend_formula[[non_null_trends[1]]]
-    } else {
-      base_formula <- ~ 1  # Fallback if all trends are NULL
-    }
-
+  # The trend formula is parsed once and every response of a
+  # multivariate model takes a copy of the specification.
+  parsed_trend <- parse_trend_formula(trend_formula)
+  trend_specs <- if (is_mv_main && !is.null(response_names)) {
+    setNames(
+      replicate(
+        length(response_names), parsed_trend$trend_model,
+        simplify = FALSE
+      ),
+      response_names
+    )
   } else {
-    # Single trend formula applied to all responses. Parse it first
-    # so we store the trend objects, not the raw formula.
-    parsed_trend <- parse_trend_formula(trend_formula)
-
-    trend_specs <- if (is_mv_main && !is.null(response_names)) {
-      # Apply same parsed trend to all responses
-      setNames(
-        replicate(
-          length(response_names), parsed_trend$trend_model,
-          simplify = FALSE
-        ),
-        response_names
-      )
-    } else {
-      # Univariate case: return trend_model directly (no wrapper)
-      parsed_trend$trend_model
-    }
-
-    base_formula <- parsed_trend$base_formula
+    parsed_trend$trend_model
   }
-
   return(list(
     has_trends = TRUE,
     is_multivariate = is_mv_main,
     trend_specs = trend_specs,
-    base_formula = base_formula,
+    base_formula = parsed_trend$base_formula,
+    regular_terms = parsed_trend$regular_terms,
     cached_formulas = list(
       formula = formula
     )
@@ -1389,12 +1241,8 @@ has_mvbind_response <- function(formula) {
   # Validate mvbind has arguments (at least 2 responses for multivariate)
   if (length(response_expr) < 3) {
     stop(insight::format_error(c(
-      "Invalid mvbind() specification in formula.",
-      x = paste0(
-        "mvbind() requires at least 2 response variables for ",
-        "multivariate models."
-      ),
-      i = "Ensure syntax: mvbind(y1, y2, ...) ~ predictors"
+      "'mvbind()' needs at least two responses.",
+      i = "Write a single response as 'y ~ x'."
     )), call. = FALSE)
   }
 
@@ -1423,63 +1271,3 @@ strip_addition_terms <- function(formula) {
 }
 
 
-#' Extract Response-Specific Trend Specifications
-#' @param trend_formula brms formula object with response-specific trends
-#' @param response_names Character vector of response names
-#' @return Named list of trend specifications per response
-#' @noRd
-extract_response_trends <- function(trend_formula, response_names) {
-  checkmate::assert_character(response_names, null.ok = TRUE)
-
-  # Check if trend_formula is already processed brms terms
-  if (inherits(trend_formula, c("brmsterms", "mvbrmsterms"))) {
-    trend_terms <- trend_formula
-  } else {
-    # brms parses the structure, and a malformed formula is refused
-    # with brms's own account of what is wrong with it.
-    trend_terms <- brms::brmsterms(trend_formula)
-  }
-
-  # Extract terms for each response
-  trend_specs <- list()
-
-  if (inherits(trend_terms, "mvbrmsterms")) {
-    # Multivariate terms - extract each response
-    for (i in seq_along(trend_terms$terms)) {
-      resp_name <- names(trend_terms$terms)[i]
-      if (is.null(resp_name) && i <= length(response_names)) {
-        resp_name <- response_names[i]
-      }
-
-      if (!is.null(resp_name)) {
-        trend_specs[[resp_name]] <- trend_terms$terms[[i]]$formula
-      }
-    }
-  } else {
-    # Single response trend - apply to main or first response
-    resp_name <- if (!is.null(response_names)) response_names[1] else "main"
-    trend_specs[[resp_name]] <- trend_terms$formula
-  }
-
-  return(trend_specs)
-}
-
-#' Create Base Formula for Trend Setup
-#' @param trend_specs Named list of trend specifications
-#' @return Formula object suitable for brms setup
-#' @noRd
-create_trend_base_formula <- function(trend_specs) {
-  checkmate::assert_list(trend_specs, min.len = 1)
-
-  # Use the first trend specification as base
-  base_spec <- trend_specs[[1]]
-
-  if (inherits(base_spec, "formula")) {
-    return(base_spec)
-  } else if (inherits(base_spec, "brmsterms")) {
-    return(base_spec$formula)
-  } else {
-    # Fallback: create minimal trend formula
-    return(~ 1)
-  }
-}

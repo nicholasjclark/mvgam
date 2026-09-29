@@ -49,12 +49,6 @@ mk_chol_cov_struct <- function(sigma, L_Omega) {
 
 test_that("residual_cor projects the latent covariance through Z", {
   case <- mk_factor_obj()
-  testthat::local_mocked_bindings(
-    resolve_series_info = function(object) {
-      list(series_levels = case$series_levels)
-    },
-    .package = "mvgam"
-  )
   # Mock as_draws_matrix to bypass posterior package validation on
   # our handcrafted draws matrix.
   testthat::local_mocked_bindings(
@@ -121,7 +115,8 @@ mk_factor_stub <- function(n_lv, n_series) {
       mv_spec = list(trend_specs = structure(
         list(n_lv = n_lv), class = "mvgam_trend"
       )),
-      standata = list(N_series_trend = n_series, N_lv_trend = n_lv)
+      standata = list(N_series_trend = n_series, N_lv_trend = n_lv),
+      trend_metadata = list(axes = list(series = list(n = n_series)))
     ),
     class = "mvgam"
   )
@@ -134,8 +129,7 @@ test_that("detect_factor_n_lv holds the factor grain at the ceiling", {
 
 
 test_that("detect_factor_n_lv declines a trend wider than the series", {
-  # Hierarchical fits reach n_lv = n_groups * n_subgroups, which
-  # needs its own extraction path rather than a factor projection.
+  # More factors than series is no factor model.
   expect_null(detect_factor_n_lv(mk_factor_stub(6L, 3L)))
 })
 
@@ -432,24 +426,12 @@ test_that("residual_cor hierarchical with by_group = TRUE returns list", {
     get_trend_covariance_structure = function(object) cov_struct,
     .package = "mvgam"
   )
-  # Hierarchical group labels are now resolved from object$data via
-  # the trend spec's `gr` variable name. Provide both so the
-  # resolver finds them; otherwise it falls back to "group_<i>".
+  # The group labels come from the training levels on the axes
+  # record, sized to match cov_struct (2 groups, 3 subgroups).
   obj <- structure(
-    list(
-      mv_spec = list(trend_specs = structure(
-        list(gr = "region", subgr = "species"),
-        class = "mvgam_trend"
-      )),
-      # Stub data: mirrors what a real hierarchical mvgam fit
-      # carries on $data - a long-format data.frame with one row
-      # per series x time combination. Levels here must match
-      # cov_struct$group_info dimensions (2 groups, 3 subgroups).
-      data = data.frame(
-        region = factor(rep(c("g1", "g2"), 3L)),
-        species = factor(rep(c("s1", "s2", "s3"), each = 2L))
-      )
-    ),
+    list(trend_metadata = list(axes = list(group_levels = list(
+      gr = c("g1", "g2"), subgr = c("s1", "s2", "s3")
+    )))),
     class = "mvgam"
   )
   res <- residual_cor(obj, by_group = TRUE)

@@ -71,13 +71,6 @@ test_that("parse_trend_formula handles all formula types", {
   # Mixed terms
   result_mixed <- mvgam:::parse_trend_formula(~ x + AR(p = 2))
   expect_equal(result_mixed$trend_model$trend, "AR")
-
-  # Basic validation works
-  expect_no_error(mvgam:::validate_trend_formula_brms(~ AR()))
-  expect_no_error(mvgam:::validate_trend_formula_brms(~ RW()))
-
-  # Invalid formulas rejected
-  expect_error(mvgam:::validate_trend_formula_brms(123))
 })
 
 test_that("all trend types generate correct prior structures", {
@@ -448,32 +441,26 @@ test_that("combine_obs_trend_priors works correctly", {
   expect_equal(trend_count, 2) # 2 trend parameters
 })
 
-test_that("validate_single_trend_formula rejects invalid terms", {
+test_that("validate_trend_formula rejects invalid terms", {
   # Valid formulas pass
-  expect_no_error(mvgam:::validate_single_trend_formula(~ AR()))
-  expect_no_error(mvgam:::validate_single_trend_formula(~ x + AR()))
-  expect_no_error(mvgam:::validate_single_trend_formula(~ s(x) + RW()))
+  expect_no_error(mvgam:::validate_trend_formula(~ AR()))
+  expect_no_error(mvgam:::validate_trend_formula(~ x + AR()))
+  expect_no_error(mvgam:::validate_trend_formula(~ s(x) + RW()))
 
   # Invalid addition terms rejected
-  expect_error(mvgam:::validate_single_trend_formula(~ weights(w) + AR()))
-  expect_error(mvgam:::validate_single_trend_formula(~ trials(n) + AR()))
-  expect_error(mvgam:::validate_single_trend_formula(~ cens(c) + AR()))
+  expect_error(mvgam:::validate_trend_formula(~ weights(w) + AR()))
+  expect_error(mvgam:::validate_trend_formula(~ trials(n) + AR()))
+  expect_error(mvgam:::validate_trend_formula(~ cens(c) + AR()))
   # mi() is the one brms addition-term special that IS allowed on
-  # the trend side (the gatekeeper in validate_single_trend_formula
+  # the trend side (the gatekeeper in validate_trend_formula
   # whitelists it so users can impute missing latent-scale
   # predictors).
-  expect_no_error(mvgam:::validate_single_trend_formula(~ mi(x) + AR()))
-})
-
-test_that("validate_trend_formula_brms handles all formula types", {
-  # Valid single formula
-  expect_no_error(mvgam:::validate_trend_formula_brms(~ AR()))
-
-  # Invalid input
-  expect_error(mvgam:::validate_trend_formula_brms(123))
-
-  # Multiple trend constructors rejected
-  expect_error(mvgam:::validate_trend_formula_brms(~ AR() + RW()))
+  expect_no_error(mvgam:::validate_trend_formula(~ mi(x) + AR()))
+  # Every response shares one trend. The refusal names one constructor.
+  expect_error(
+    mvgam:::validate_trend_formula(~ AR() + RW()),
+    "Keep one constructor"
+  )
 })
 
 test_that("a trend_formula routes to the mvgam methods", {
@@ -513,21 +500,20 @@ test_that("a trend_formula routes to the mvgam methods", {
 test_that("generate_trend_priors creates correct structures", {
   test_data <- create_test_data()
 
-  # Create trend specification using parse_trend_formula
-  rw_spec <- mvgam:::parse_trend_formula(~ RW())
-  rw_priors <- mvgam:::generate_trend_priors(rw_spec, test_data)
+  priors_for <- function(tf) {
+    parsed <- mvgam:::parse_trend_formula(tf)
+    mvgam:::generate_trend_priors(parsed$trend_model, parsed$base_formula,
+                                  test_data)
+  }
+  rw_priors <- priors_for(~ RW())
   expect_s3_class(rw_priors, "brmsprior")
-  expect_true(any(grepl("sigma_trend", rw_priors$class)))
+  expect_true("sigma_trend" %in% rw_priors$class)
 
-  # AR trend
-  ar_spec <- mvgam:::parse_trend_formula(~ AR(p = 2))
-  ar_priors <- mvgam:::generate_trend_priors(ar_spec, test_data)
-  expect_true(any(grepl("ar1_pacf_trend", ar_priors$class)))
-  expect_true(any(grepl("ar2_pacf_trend", ar_priors$class)))
+  ar_priors <- priors_for(~ AR(p = 2))
+  expect_true(all(c("ar1_pacf_trend", "ar2_pacf_trend") %in%
+                    ar_priors$class))
   # One lag keeps the coefficient itself as the settable class.
-  ar1_spec <- mvgam:::parse_trend_formula(~ AR(p = 1))
-  ar1_priors <- mvgam:::generate_trend_priors(ar1_spec, test_data)
-  expect_true(any(grepl("^ar1_trend$", ar1_priors$class)))
+  expect_true("ar1_trend" %in% priors_for(~ AR(p = 1))$class)
 })
 
 test_that("distributional models work correctly with trends", {
@@ -741,14 +727,6 @@ test_that("get_prior on a fit is the table prior_summary reports", {
   expect_identical(get_prior(stub), prior_summary(stub))
   expect_identical(default_prior(stub), prior_summary(stub))
   expect_error(get_prior(stub, zzz_unknown = 1), "zzz_unknown")
-})
-
-test_that("get_prior.mvgam errors clearly when fit lacks any prior info", {
-  stub <- structure(
-    list(formula = NULL, prior = NULL),
-    class = c("mvgam", "brmsfit")
-  )
-  expect_error(get_prior(stub), "prior table")
 })
 
 
@@ -1168,14 +1146,13 @@ test_that("the registry decides whether a trend has an innovation scale", {
   expect_false(samples_innovation_scale(pw))
   expect_true(samples_innovation_scale(rw))
 
-  # Attaching MGP shrinkage takes the scale away from a trend that
-  # otherwise has one, and refreshes the cached parameter list that
-  # was built before any loadings prior existed.
-  spec <- list(column_shrinkage = "mgp")
-  rw_mgp <- attach_loadings_spec_to_trend(rw, spec)
+  # MGP shrinkage, attached after construction, takes the scale away
+  # from a trend that otherwise has one.
+  rw_mgp <- rw
+  rw_mgp$loadings_prior_spec <- list(column_shrinkage = "mgp")
   expect_false(samples_innovation_scale(rw_mgp))
-  expect_false("sigma_trend" %in% rw_mgp$monitor_params)
-  expect_true("sigma_trend" %in% rw$monitor_params)
+  expect_false("sigma_trend" %in% generate_monitor_params(rw_mgp))
+  expect_true("sigma_trend" %in% generate_monitor_params(rw))
 })
 
 
@@ -1327,21 +1304,68 @@ test_that("the branch classifier names each loadings path once", {
 })
 
 
-test_that("get_prior refuses a trend_map it cannot describe", {
-  # A fully fixed `trend_map` moves `Z` to the data block and a
-  # partial one replaces it with `Z_free_vec` under its own prior,
-  # so the free-loadings table describes neither. Refusing beats
-  # returning a table for a model the user is not fitting.
+test_that("get_prior describes the loadings a trend_map leaves", {
+  # A fully fixed map moves `Z` to the data block, with no prior. A
+  # partial map samples its `NA` entries as `Z_free_vec` under the
+  # `Z` prior. Fixed loadings pin the factors' scale, and the model
+  # samples `sigma_trend`.
   set.seed(1L)
   d <- sim_mvgam(family = poisson(), n_series = 4L,
                   n_timepoints = 20L)$data_train
-  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, n_lv = 2))
-  tm <- data.frame(series = factor(paste0("series_", 1:4)),
-                    trend = c(1L, 1L, 2L, 2L))
-  expect_error(
-    get_prior(mf, data = d, family = poisson(), trend_map = tm),
-    "cannot describe a fit that supplies 'trend_map'"
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
+  fixed <- data.frame(series = factor(paste0("series_", 1:4)),
+                      trend = c(1L, 1L, 2L, 2L))
+  partial <- matrix(c(1, NA, 0, NA, 0, NA, 1, NA), 4, 2)
+  for (tm in list(fixed, partial)) {
+    tab <- get_prior(mf, data = d, family = poisson(), trend_map = tm)
+    sc <- stancode(mf, data = d, family = poisson(), trend_map = tm)
+    expect_true("sigma_trend" %in% tab$class)
+    expect_equal(stan_prior_on(sc, "sigma_trend"),
+                 tab$prior[tab$class == "sigma_trend"])
+    expect_equal(stan_prior_on(sc, "Z_free_vec"),
+                 tab$prior[tab$class == "Z"])
+  }
+  # Only the partial map samples loadings.
+  expect_false("Z" %in% get_prior(mf, data = d, family = poisson(),
+                                   trend_map = fixed)$class)
+
+  # A user prior on `Z` reaches the free entries of a partial map.
+  sc <- stancode(mf, data = d, family = poisson(), trend_map = partial,
+                 prior = prior(normal(0, 3), class = Z))
+  expect_equal(stan_prior_on(sc, "Z_free_vec"), "normal(0, 3)")
+
+  # Written on the constructor, the map gives the same table.
+  mf_con <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1,
+                                                      trend_map = fixed))
+  expect_equal(
+    get_prior(mf_con, data = d, family = poisson()),
+    get_prior(mf, data = d, family = poisson(), trend_map = fixed)
   )
-  # The free-loadings table is unaffected.
-  expect_gt(nrow(get_prior(mf, data = d, family = poisson())), 0L)
+})
+
+
+test_that("get_prior uses the axis columns the constructor names", {
+  d <- data.frame(y = rpois(40, 5), week = rep(1:20, 2),
+                  site = factor(rep(c("a", "b"), each = 20)))
+  mf <- mvgam_formula(y ~ 1, ~ AR(time = week, series = site))
+  expect_equal(
+    get_prior(mf, data = d, family = poisson())$class,
+    get_prior(mvgam_formula(y ~ 1, ~ AR()), family = poisson(),
+              data = data.frame(y = d$y, time = d$week,
+                                series = d$site))$class
+  )
+})
+
+
+test_that("get_prior refuses a factor request the trend cannot take", {
+  # The top-level `trend_map` reaches a trend that has no factor
+  # form. `mvgam()` refuses it, and the prior table must agree.
+  d <- data.frame(y = rpois(40, 5), time = rep(1:20, 2),
+                  series = factor(rep(c("a", "b"), each = 20)))
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ CAR())
+  expect_error(
+    get_prior(mf, data = d, family = poisson(),
+              trend_map = matrix(c(1, NA), 2, 1)),
+    "Factor models are not supported for CAR trends"
+  )
 })

@@ -71,17 +71,46 @@ trend_spec_head <- function(spec) {
     return(NULL)
   }
   checkmate::assert_list(spec)
-  # A list of specifications holds specifications, one per response.
-  # `is_multivariate_trend_specs()` decides by the absence of a
-  # trend field at the top level, which also describes a single
-  # specification written without one: taking its first element
-  # then reads a column name as though it were a model, and reports
-  # a grouped trend as ungrouped without a word. Requiring the
-  # entries to be lists tells the two apart.
-  looks_multivariate <- is_multivariate_trend_specs(spec) &&
+  if (is_trend_spec_list(spec)) spec[[1L]] else spec
+}
+
+#' Apply a function to every copy of the trend specification
+#'
+#' A multivariate model holds one copy of the specification per
+#' response. A change made to one copy has to reach them all, and the
+#' result keeps the shape it arrived in.
+#'
+#' @param spec A trend specification or a list of them
+#' @param fn A function taking and returning one specification
+#' @return `spec` with `fn` applied to each specification
+#' @noRd
+map_trend_specs <- function(spec, fn) {
+  if (is.null(spec)) {
+    return(NULL)
+  }
+  checkmate::assert_list(spec)
+  checkmate::assert_function(fn)
+  if (is_trend_spec_list(spec)) lapply(spec, fn) else fn(spec)
+}
+
+#' Does this object hold one trend specification per response?
+#'
+#' A per-response list is named by response and carries no `trend`
+#' field of its own. A specification written without a `trend` field
+#' matches that description too, and taking its first element returns
+#' a column name in place of a model. Requiring every entry to be a
+#' list tells the two apart. `trend_model` marks the wrapper that
+#' `ensure_mvgam_variables()` receives.
+#'
+#' @param spec A trend specification or a list of them
+#' @return Logical scalar
+#' @noRd
+is_trend_spec_list <- function(spec) {
+  is.list(spec) &&
     length(spec) > 0L &&
+    !is.null(names(spec)) &&
+    !any(c("trend", "trend_model") %in% names(spec)) &&
     all(vapply(spec, is.list, logical(1L)))
-  if (looks_multivariate) spec[[1L]] else spec
 }
 
 #' The number of latent factors a specification names
@@ -108,15 +137,14 @@ time_axis_values <- function(times) {
 
 #' The series axis of a frame that names its series in a column
 #'
-#' A factor column declares its order and the axis keeps it, counting
-#' only the levels something is observed at. A character column
-#' declares none and is sorted.
+#' The observed levels, from `observed_levels()`: a factor keeps its
+#' declared order, and a character column is sorted.
 #'
 #' @param series_vals Per-row series identifiers
 #' @return The distinct series, in axis order
 #' @noRd
 series_axis_values <- function(series_vals) {
-  sort(unique(series_vals))
+  observed_levels(series_vals)
 }
 
 #' The group each series on the axis belongs to
@@ -141,7 +169,7 @@ axis_group_values <- function(data, spec, series_vals, series_axis) {
   rows <- match(as.character(series_axis), as.character(series_vals))
   if (anyNA(rows)) {
     stop(insight::format_error(c(
-      "The series axis names a series the data holds no rows for.",
+      "The series axis lists a series absent from the data.",
       x = cli::format_inline(
         "Unmatched: {.val {series_axis[is.na(rows)]}}."
       ),
@@ -154,51 +182,25 @@ axis_group_values <- function(data, spec, series_vals, series_axis) {
 #' The axes a fit was built on
 #'
 #' The single post-fit reading of which series and which times the
-#' model was given. Post-processing asks this rather than rebuilding
-#' the axes from the training frame, because a rebuild answers with a
-#' permutation that stays in range and so raises nothing.
-#'
-#' A fit stored before the record existed still names its series in
-#' metadata, so the series half is assembled from that here. Doing it
-#' in one place is what stops each consumer growing a fallback of its
-#' own, which is the shape the package is being brought out of. Such
-#' a fit records nothing about its times, so `$time` is absent rather
-#' than empty.
+#' model was given. Post-processing asks this in place of rebuilding
+#' the axes from the training frame. A rebuild can return a
+#' permutation that stays in range and raises nothing.
 #'
 #' @param object A fitted `mvgam` object or an `mvgam_prefit`
-#' @return The axes record, or `NULL` when the object names no
-#'   series. `$time` is `NULL` on a fit that predates the record.
+#' @return The axes record, or `NULL` for a model whose frame names no
+#'   axis
 #' @noRd
 mvgam_axes <- function(object) {
-  axes <- axes_from_metadata(object$trend_metadata)
-  if (!is.null(axes)) {
-    return(axes)
-  }
-  # An object whose metadata names no series at all: a fit saved
-  # before any of this was recorded, or one assembled by hand. The
-  # count still exists elsewhere on it, so the fallback lives here
-  # rather than at each reader, where every reader would need its
-  # own and they would drift.
-  n <- object$series_info$n_series %||%
-    object$standata$N_series_trend %||%
-    object$trend_components$n_trends
-  if (is.null(n)) {
-    return(NULL)
-  }
-  list(series = list(levels = NULL, source = NULL,
-                     n = as.integer(n), groups = NULL),
-       time = NULL)
+  object$trend_metadata$axes
 }
 
 
 #' The columns a row is placed by
 #'
-#' The axes record names them once, where the axes are resolved. A
-#' fit saved before that record existed carries the names on its
-#' trend metadata, and they are taken from there. This function holds
-#' the literal defaults for the post-fit surface: a caller spelling
-#' its own default can name a different column from the one the model
-#' was fitted on.
+#' The axes record names them where the axes are resolved. A model
+#' whose frame names no axis carries no record, and this function
+#' then returns the literal defaults. A caller spelling its own default could name a
+#' different column from the one the model was fitted on.
 #'
 #' @param object A fitted `mvgam` object
 #' @return A list naming `time_var`, `series_var`, `gr_var` and
@@ -207,12 +209,11 @@ mvgam_axes <- function(object) {
 #' @noRd
 axis_vars <- function(object) {
   rec <- mvgam_axes(object)$vars
-  meta <- object$trend_metadata$variables
   list(
-    time_var = rec$time_var %||% meta$time_var %||% "time",
-    series_var = rec$series_var %||% meta$series_var %||% "series",
-    gr_var = rec$gr_var %||% meta$gr_var,
-    subgr_var = rec$subgr_var %||% meta$subgr_var
+    time_var = rec$time_var %||% "time",
+    series_var = rec$series_var %||% "series",
+    gr_var = rec$gr_var,
+    subgr_var = rec$subgr_var
   )
 }
 
@@ -255,41 +256,6 @@ spec_axis_vars <- function(spec) {
 #' @noRd
 is_response_keyed <- function(object) {
   identical(mvgam_axes(object)$series$source, "multivariate")
-}
-
-#' The axes a stored metadata list describes
-#'
-#' The one place that knows a model saved before the record existed
-#' spelled its series as `levels$series` and `series_source`. Every
-#' reader goes through here, so the older spelling is understood in
-#' one place rather than tested for at each of them.
-#'
-#' @param meta A fit's `trend_metadata`
-#' @return The axes record, or `NULL` when it names no series
-#' @noRd
-axes_from_metadata <- function(meta) {
-  if (!is.null(meta$axes)) {
-    return(meta$axes)
-  }
-
-  levs <- as.character(meta$levels$series %||% character(0L))
-  if (!length(levs)) {
-    return(NULL)
-  }
-  # Only the series half survives in an older fit's metadata: the
-  # stored levels name the series but nothing there names the times.
-  # The time half is left absent rather than filled with an empty
-  # vector, so a reader gets nothing instead of a grid of length
-  # zero that looks like an answer.
-  list(
-    series = list(
-      levels = levs,
-      source = meta$series_source %||% "explicit",
-      n = length(levs),
-      groups = NULL
-    ),
-    time = NULL
-  )
 }
 
 #' Per-row series identity, as the fit resolved it
@@ -345,14 +311,11 @@ axis_row_series <- function(object, data, required = FALSE) {
   }
   if (required) {
     stop(insight::format_error(c(
-      "The frame names no series this model was fitted on.",
+      "The data lack the series this model was fitted on.",
       x = paste0(
         "Got columns: ", paste(names(data), collapse = ", "), "."
       ),
-      i = paste0(
-        "Supply the column the model reads or the grouping columns ",
-        "that together name a series."
-      )
+      i = "Supply the series column or the 'gr' and 'subgr' columns."
     )), call. = FALSE)
   }
   NULL

@@ -49,19 +49,6 @@ suppressMessages({
 
 SM <- suppressMessages
 
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(4242L)
 
@@ -166,23 +153,18 @@ test_that("the custom family reaches Stan with its own code and nu", {
 
 # -- Fit ---------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_com_binomial.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading com_binomial fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(com_binomial, trials aterm, s(x), AR(1))\n")
-  fit <- mvgam(
-    formula = obs_formula, trend_formula = ~ AR(p = 1),
-    data = dat, family = com_binomial(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_com_binomial.rds",
+  function() {
+    mvgam(
+      formula = obs_formula, trend_formula = ~ AR(p = 1),
+      data = dat, family = com_binomial(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 
 test_that("posterior_epred answers on the count scale for this family", {
@@ -267,19 +249,7 @@ test_that("quantile residuals are not pinned against a marginal surface", {
 
 
 test_that("plot(type = 'smooths') renders on a trials aterm model", {
-  # Drawing a smooth needs three things to reach brms together: a
-  # formula that names its family, so the aterm parses as binomial
-  # rather than gaussian; a grid builder that passes that family on;
-  # and a backfill that holds the non-focal columns at values the
-  # family accepts. A denominator held at a median is fractional, and
-  # brms refuses a fractional number of trials.
-  drawn <- function(p) {
-    expect_s3_class(p, "ggplot")
-    layers <- ggplot2::ggplot_build(p)$data
-    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-    invisible(p)
-  }
-  drawn(plot(fit, type = "smooths"))
+  expect_drawn(plot(fit, type = "smooths"))
 
   # The same grid reached through the two public smooth methods.
   sm <- smooths(fit)
@@ -508,14 +478,6 @@ test_that("no method warns about a prior this model does not use", {
   # model re-derive brms's own default set and warn about the
   # positive-only prior mvgam replaced, which reaches a reader on the
   # two calls they are most likely to make.
-  grab <- function(expr) {
-    w <- character(0)
-    withCallingHandlers(expr, warning = function(x) {
-      w <<- c(w, conditionMessage(x))
-      invokeRestart("muffleWarning")
-    })
-    w
-  }
   for (call in list(
     function() variables(fit),
     function() capture.output(summary(fit)),
@@ -523,7 +485,7 @@ test_that("no method warns about a prior this model does not use", {
     function() VarCorr(fit),
     function() ngrps(fit)
   )) {
-    w <- grab(call())
+    w <- with_warnings(call())$warnings
     expect_identical(grep("lower bounded prior", w, value = TRUE),
                      character(0))
   }

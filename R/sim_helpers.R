@@ -1,27 +1,7 @@
 # Internal helpers for sim_mvgam. Each helper builds one
 # kind of observation-side structure that the typed catalog
-# composes into a full simulation. Kept here (rather than inline in
-# sim_mvgam) so each piece can be unit-tested in isolation.
-#
-# Where the helper exists in mgcv (e.g. mgcv::gamSim's f0..f3 test
-# functions), the mvgam version uses the same well-known forms so
-# users moving between mgcv and mvgam see familiar generative
-# truth.
-
-
-# Internal: Well-known smooth test functions from mgcv::gamSim()'s
-# internals (Gu & Wahba 1991, also used by Wood's mgcv documentation).
-# Used by sim_mvgam types 1 / 2 / 3 / 5 where the user benefits from
-# a recoverable, recognisable target function. Each takes `x` on
-# [0, 1].
-#'@noRd
-gam_test_f0 <- function(x) 2 * sin(pi * x)
-gam_test_f1 <- function(x) exp(2 * x)
-gam_test_f2 <- function(x) {
-  0.2 * x^11 * (10 * (1 - x))^6 +
-    10 * (10 * x)^3 * (1 - x)^10
-}
-gam_test_f3 <- function(x) 0 * x
+# composes into a full simulation. Each lives outside sim_mvgam
+# to be unit-tested in isolation.
 
 
 # Internal: Sample a single smooth function on a fine grid by
@@ -251,22 +231,6 @@ sim_negbinom <- function(mu, size) {
 }
 
 
-# Internal: Build a covariate vector of length `n` from a chosen
-# distribution. Used by sim_mvgam to populate `x`, `z`, `w`, etc.
-#'@noRd
-sim_covariate <- function(n, type = c("uniform", "normal", "seq",
-                                       "cyclic")) {
-  type <- match.arg(type)
-  switch(
-    type,
-    "uniform" = stats::runif(n, -2, 2),
-    "normal" = stats::rnorm(n),
-    "seq" = seq(-2, 2, length.out = n),
-    "cyclic" = rep_len(1:12, n)
-  )
-}
-
-
 # Internal: Build a balanced group factor with `n_levels` groups
 # and `n` total observations.
 #'@noRd
@@ -280,67 +244,4 @@ sim_grp <- function(n, n_levels = 5L,
     }
   }
   factor(rep_len(labels, n), levels = labels)
-}
-
-
-# Internal: Stationary VAR(p) coefficient matrix via Ansley-Kohn
-# (1986). Lets sim_mvgam draw random stable VAR coefficients
-# without user input. Returns a `[n_series, n_series, p]` cube.
-#'@noRd
-stationary_VAR_phi <- function(p = 1L, n_series = 3L, ar_scale = 1) {
-  stopifnot(ar_scale > 0)
-  Id <- diag(nrow = n_series)
-  all_P <- array(dim = c(n_series, n_series, p))
-  for (i in seq_len(p)) {
-    A <- matrix(
-      stats::rnorm(n_series * n_series, sd = ar_scale),
-      nrow = n_series
-    )
-    if (i == 1L) {
-      diag(A) <- abs(diag(A))
-    }
-    B <- t(chol(Id + tcrossprod(A, A)))
-    all_P[, , i] <- solve(B, A)
-  }
-
-  all_phi <- array(dim = c(n_series, n_series, p, p))
-  all_phi_star <- array(dim = c(n_series, n_series, p, p))
-  L <- L_star <- Sigma <- Sigma_star <- Gamma <- Id
-
-  for (s in 0:(p - 1L)) {
-    all_phi[, , s + 1L, s + 1L] <-
-      L %*% all_P[, , s + 1L] %*% solve(L_star)
-    all_phi_star[, , s + 1L, s + 1L] <-
-      tcrossprod(L_star, all_P[, , s + 1L]) %*% solve(L)
-    if (s >= 1L) {
-      for (kk in 1:s) {
-        all_phi[, , s + 1L, kk] <-
-          all_phi[, , s, kk] -
-          all_phi[, , s + 1L, s + 1L] %*%
-            all_phi_star[, , s, s - kk + 1L]
-        all_phi_star[, , s + 1L, kk] <-
-          all_phi_star[, , s, kk] -
-          all_phi_star[, , s + 1L, s + 1L] %*%
-            all_phi[, , s, s - kk + 1L]
-      }
-    }
-    if (s < p - 1L) {
-      Sigma_next <- Sigma -
-        all_phi[, , s + 1L, s + 1L] %*%
-          tcrossprod(Sigma_star, all_phi[, , s + 1L, s + 1L])
-      Sigma_star_next <- Sigma_star -
-        all_phi_star[, , s + 1L, s + 1L] %*%
-          tcrossprod(Sigma, all_phi_star[, , s + 1L, s + 1L])
-      L <- t(chol(Sigma_next))
-      L_star <- t(chol(Sigma_star_next))
-      Sigma <- Sigma_next
-      Sigma_star <- Sigma_star_next
-    }
-  }
-
-  phi_out <- array(dim = c(n_series, n_series, p))
-  for (kk in seq_len(p)) {
-    phi_out[, , kk] <- all_phi[, , p, kk]
-  }
-  phi_out
 }

@@ -265,33 +265,20 @@ test_that("missing series column on data errors", {
   d <- data.frame(y = 1:3, time = 1:3)
   expect_error(
     mvgam:::normalise_trend_map("identity", d),
-    "requires a 'series'"
+    "Column 'series' is absent"
   )
 })
 
 
-# ---- Constructor surface (step 2): arg acceptance + stash ----
+# ---- Constructor surface ---------------------------------
 
-test_that("AR / VAR / RW / ZMVN accept trend_map and stash on spec", {
+test_that("AR / VAR / RW / ZMVN keep trend_map on the spec", {
   tm <- data.frame(series = c("s1", "s2"), trend = c(1, 1))
   Zmat <- matrix(c(1, 0.5, 0.5, 1), nrow = 2L, ncol = 2L)
-  for (ctor in list(
-    function() AR(trend_map = tm),
-    function() VAR(trend_map = "shared"),
-    function() RW(trend_map = Zmat),
-    function() ZMVN(trend_map = "identity")
-  )) {
-    spec <- ctor()
-    expect_true(inherits(spec, "mvgam_trend"))
-    expect_true("trend_map" %in% names(spec))
+  for (spec in list(AR(trend_map = tm), VAR(trend_map = "shared"),
+                    RW(trend_map = Zmat), ZMVN(trend_map = "identity"))) {
     expect_false(is.null(spec$trend_map))
   }
-})
-
-test_that("trend_map = NULL stashes NULL (default)", {
-  spec <- AR()
-  expect_true("trend_map" %in% names(spec))
-  expect_null(spec$trend_map)
 })
 
 test_that("PW refuses a factor request by either argument", {
@@ -306,13 +293,11 @@ test_that("PW refuses a factor request by either argument", {
     "Factor models are not supported for PW trends"
   )
   expect_identical(conditionMessage(by_map), conditionMessage(by_n_lv))
-  expect_match(conditionMessage(by_n_lv), "changepoint modeling",
+  expect_match(conditionMessage(by_n_lv), "changepoints separately",
                fixed = TRUE)
 })
 
 test_that("CAR refuses a factor request by either argument", {
-  # The other trend with no factor form, held to the same contract:
-  # one request, one refusal, carrying its own registered reason.
   by_map <- expect_error(
     CAR(trend_map = "identity"),
     "Factor models are not supported for CAR trends"
@@ -322,13 +307,11 @@ test_that("CAR refuses a factor request by either argument", {
     "Factor models are not supported for CAR trends"
   )
   expect_identical(conditionMessage(by_map), conditionMessage(by_n_lv))
-  expect_match(conditionMessage(by_n_lv), "irregular time intervals",
+  expect_match(conditionMessage(by_n_lv), "irregular time gaps",
                fixed = TRUE)
 })
 
 test_that("constructors fail-fast on malformed trend_map shapes", {
-  # Numeric scalar (not matrix / df / single string) is rejected
-  # at constructor time, not deferred to fit time.
   expect_error(AR(trend_map = 123), "trend_map")
   expect_error(RW(trend_map = list(1)), "trend_map")
   expect_error(VAR(trend_map = TRUE), "trend_map")
@@ -338,23 +321,7 @@ test_that("constructors fail-fast on malformed trend_map shapes", {
 
 # ---- Top-level alias on mvgam() ------------------------
 
-test_that("mvgam() exposes trend_map in its signature", {
-  args <- formals(mvgam)
-  expect_true("trend_map" %in% names(args))
-})
-
-test_that("apply_trend_map_alias is a no-op when alias is NULL", {
-  spec <- AR()
-  out <- mvgam:::apply_trend_map_alias(spec, NULL)
-  expect_null(out$trend_map)
-})
-
-test_that("trend_map requires a trend_formula to map onto", {
-  # `trend_map` fixes which latent factor each series loads on, and
-  # that mapping is stored on a trend spec. A model written with no
-  # `trend_formula` has no spec, and the argument was discarded in
-  # silence: `Z` never reached the Stan data and the model built was
-  # an ordinary GAM.
+test_that("mvgam(trend_map) reaches the Stan data through the trend", {
   set.seed(1L)
   d <- data.frame(
     series = factor(rep(c("a", "b", "c"), each = 10L)),
@@ -363,119 +330,28 @@ test_that("trend_map requires a trend_formula to map onto", {
   )
   tm <- data.frame(series = factor(c("a", "b", "c")),
                    trend = c(1L, 1L, 2L))
-  err <- expect_error(
+  # With no trend spec to hold it the mapping would be discarded
+  expect_error(
     mvgam(y ~ 1, trend_map = tm, data = d, family = poisson(),
           run_model = FALSE),
-    "trend_map"
+    "requires a 'trend_formula'"
   )
-  # The refusal names where the mapping belongs.
-  expect_match(conditionMessage(err), "trend_formula", fixed = TRUE)
-
-  # The same argument with a trend to carry it still builds.
-  expect_no_error(mvgam(
+  prefit <- mvgam(
     y ~ 1, trend_formula = ~ AR(p = 1), trend_map = tm, data = d,
     family = poisson(), run_model = FALSE
-  ))
-})
-
-test_that("apply_trend_map_alias grafts onto a single spec", {
-  spec <- AR()  # constructor-level NULL
-  out <- mvgam:::apply_trend_map_alias(spec, "identity")
-  expect_equal(out$trend_map, "identity")
-})
-
-test_that("apply_trend_map_alias errors on collision", {
-  spec <- AR(trend_map = "shared")  # constructor-level set
-  expect_error(
-    mvgam:::apply_trend_map_alias(spec, "identity"),
-    "both"
   )
+  expect_equal(unname(prefit$standata$Z),
+               matrix(c(1, 1, 0, 0, 0, 1), nrow = 3L))
 })
 
-test_that("apply_trend_map_alias preserves multivariate structure", {
-  specs <- list(
-    y1 = AR(),
-    y2 = RW()
-  )
+test_that("apply_trend_map_alias fills every response and refuses a clash", {
+  specs <- list(y1 = AR(), y2 = AR())
   out <- mvgam:::apply_trend_map_alias(specs, "shared")
-  expect_equal(names(out), c("y1", "y2"))
-  expect_equal(out$y1$trend_map, "shared")
-  expect_equal(out$y2$trend_map, "shared")
-  expect_s3_class(out$y1, "mvgam_trend")
-  expect_s3_class(out$y2, "mvgam_trend")
-})
-
-test_that("normalise_trend_map_on_specs rejects mismatched multivariate Zs", {
-  # mvgam uses one shared trend component, so multivariate specs
-  # must agree on trend_map. Different values across responses
-  # would otherwise be silently dropped downstream.
-  data <- data.frame(
-    y1 = 1:8, y2 = 1:8,
-    time = rep(1:4, 2L),
-    series = factor(rep(c("s1", "s2"), each = 4L))
-  )
-  specs <- list(
-    y1 = AR(trend_map = "identity"),
-    y2 = AR(trend_map = "shared")
-  )
+  expect_equal(lapply(out, `[[`, "trend_map"),
+               list(y1 = "shared", y2 = "shared"))
   expect_error(
-    mvgam:::normalise_trend_map_on_specs(specs, data),
-    "differs across multivariate"
+    mvgam:::apply_trend_map_alias(out, "identity"),
+    "given both to 'mvgam()' and to the trend constructor",
+    fixed = TRUE
   )
-})
-
-test_that("normalise_trend_map_on_specs accepts matching multivariate Zs", {
-  data <- data.frame(
-    y1 = 1:8, y2 = 1:8,
-    time = rep(1:4, 2L),
-    series = factor(rep(c("s1", "s2"), each = 4L))
-  )
-  specs <- list(
-    y1 = AR(trend_map = "shared"),
-    y2 = AR(trend_map = "shared")
-  )
-  out <- mvgam:::normalise_trend_map_on_specs(specs, data)
-  expect_false(is.null(out$y1$fixed_Z))
-  expect_false(is.null(out$y2$fixed_Z))
-  expect_equal(out$y1$fixed_Z, out$y2$fixed_Z)
-})
-
-test_that("apply_trend_map_alias multivariate collision names the spec", {
-  specs <- list(
-    y1 = AR(trend_map = "shared"),
-    y2 = RW()
-  )
-  expect_error(
-    mvgam:::apply_trend_map_alias(specs, "identity"),
-    "y1"
-  )
-})
-
-test_that("mvgam() forwards trend_map through to generate_stan_components", {
-  # Verify wiring without invoking the Stan compile path. The
-  # mock captures whatever value `mvgam_single` receives so we can
-  # confirm the alias survives the call chain.
-  data_train <- data.frame(
-    y = 1:6,
-    time = rep(1:3, 2L),
-    series = factor(rep(c("s1", "s2"), each = 3L))
-  )
-  captured <- new.env(parent = emptyenv())
-  testthat::local_mocked_bindings(
-    mvgam_single = function(formula, trend_formula, data, backend,
-                            family, data_name = NULL,
-                            newdata = NULL, trend_map = NULL,
-                            ...) {
-      captured$trend_map <- trend_map
-      structure(list(data = data),
-                 class = c("mvgam", "brmsfit"))
-    }
-  )
-  mvgam(
-    y ~ 1,
-    data = data_train,
-    trend_map = "shared",
-    family = gaussian()
-  )
-  expect_equal(captured$trend_map, "shared")
 })

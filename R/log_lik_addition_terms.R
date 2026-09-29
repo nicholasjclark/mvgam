@@ -101,6 +101,10 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
     com_binomial = spec("cmb", function(j) {
       list(mu = mu[, j], nu = nu[, j], size = trials[j])
     }),
+    beta_nb = spec("beta_nb", function(j) {
+      list(mu = mu[, j], shape = shape[, j],
+           mtail = family_pars$mtail[, j])
+    }),
     # `mvn` and `mvt` are written row-wise: conditional on the latent
     # state a row is normal or location-scale Student t, which is the
     # density `log_lik()` evaluates, so the distribution function is
@@ -158,9 +162,9 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
 
 
 # Internal: the density or distribution function a spec's
-# distribution is served by. Most are base R's; `bbinom` comes from
-# extraDistr and `cmb` from the package's own COM-binomial kernels,
-# so the lookup is written once rather than branched in both callers.
+# distribution is served by. Most are base R's. `bbinom` comes from
+# extraDistr. `cmb`, `beta_nb` and `tweedie` come from the package's
+# own kernels. Every caller obtains them through this one lookup.
 #' @noRd
 dist_fun <- function(dist, kind = c("d", "p", "q")) {
   kind <- match.arg(kind)
@@ -179,10 +183,12 @@ dist_fun <- function(dist, kind = c("d", "p", "q")) {
       switch(kind, d = extraDistr::dbbinom, p = extraDistr::pbbinom,
              q = NULL)
     },
-    # A COM-binomial and a Tweedie have no quantile function here, so
-    # a caller asking for one is told rather than handed a base R
-    # function that does not exist.
+    # A COM-binomial, a beta negative binomial and a Tweedie have no
+    # quantile function here. `NULL` tells a caller asking for one to
+    # take rejection sampling.
     cmb = switch(kind, d = dcmb, p = pcmb, q = NULL),
+    beta_nb = switch(kind, d = dbeta_nb_mvgam, p = pbeta_nb_mvgam,
+                     q = NULL),
     tweedie = switch(kind, d = dtweedie_cpg, p = ptweedie_cpg,
                      q = NULL),
     get(paste0(kind, dist), mode = "function",
@@ -364,10 +370,9 @@ addition_term_data <- function(object, resp, nobs) {
         "{length(out[[bad[1]]])} value{?s} recorded against ",
         "{nobs} likelihood contribution{?s}."
       )),
-      i = paste0(
-        "A closure-unit family scores once per unit. Weights, ",
-        "censoring or bounds recorded per visit cannot be applied."
-      )
+      x = paste0("Per-visit weights, censoring and bounds are not ",
+                 "supported for a family that scores once per unit."),
+      i = "Record weights, censoring and bounds per unit."
     )), call. = FALSE)
   }
   out
@@ -400,7 +405,7 @@ apply_censoring <- function(ll, cens, rcens, spec, linpred, y) {
   if (length(interval)) {
     if (is.null(rcens)) {
       stop(insight::format_error(c(
-        "Interval-censored rows carry no upper bound.",
+        "Interval-censored rows need an upper bound.",
         i = "Give it as the third argument: 'cens(censored, upper)'."
       )), call. = FALSE)
     }
@@ -445,13 +450,6 @@ apply_truncation_to_loglik <- function(ll, lb, ub, spec, linpred,
     matrix(-Inf, nrow(ll), ncol(ll))
   }
   ll - log_diff_exp(log_cdf_ub, log_cdf_lb)
-}
-
-
-# Internal: `log(exp(a) - exp(b))` without leaving the log scale.
-#' @noRd
-log_diff_exp <- function(a, b) {
-  a + log1p(-exp(b - a))
 }
 
 

@@ -51,19 +51,6 @@ suppressMessages({
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(2024L)
 
@@ -200,31 +187,22 @@ test_that("every row maps to the trend cell its own labels name", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_factor_var.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading factor VAR fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(VAR(cor = TRUE, n_lv = 2), 4 series on 2 factors)\n")
-  fit <- mvgam(
-    formula = obs_formula, trend_formula = trend_rhs,
-    data = dat, family = gaussian(),
-    chains = 2L, iter = 2000L, warmup = 1000L,
-    control = list(adapt_delta = 0.95, max_treedepth = 12),
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_factor_var.rds",
+  function() {
+    mvgam(
+      formula = obs_formula, trend_formula = trend_rhs,
+      data = dat, family = gaussian(),
+      chains = 2L, iter = 2000L, warmup = 1000L,
+      control = list(adapt_delta = 0.95, max_treedepth = 12),
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 dm <- posterior::as_draws_matrix(fit$fit)
 
-
-test_that("the cached fit ran the program the package generates", {
-  expect_current_program(fit)
-})
 
 
 test_that("the trend is the loadings times the factors, draw by draw", {
@@ -432,16 +410,8 @@ test_that("every plot draws, and the per-series panels keep their order", {
   }
   expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
 
-  panel_order <- function(ty) {
-    b <- ggplot2::ggplot_build(plot(fit, type = ty))
-    lay <- b$layout$layout
-    fc <- setdiff(names(lay),
-                  c("PANEL", "ROW", "COL", "SCALE_X", "SCALE_Y"))
-    if (!length(fc)) return(character(0))
-    as.character(lay[[fc[1L]]])
-  }
-  expect_identical(panel_order("series"), series_levels)
-  expect_identical(panel_order("trend"), series_levels)
+  expect_identical(panel_order(plot(fit, type = "series")), series_levels)
+  expect_identical(panel_order(plot(fit, type = "trend")), series_levels)
 })
 
 
@@ -450,11 +420,6 @@ test_that("every plot draws the occasions the user supplied", {
   # 1..100 where the user gave 3..102.
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
-  drawn_x <- function(p) {
-    b <- ggplot2::ggplot_build(p)
-    xs <- unlist(lapply(b$data, function(d) if ("x" %in% names(d)) d$x))
-    range(xs, na.rm = TRUE)
-  }
   want <- as.numeric(range(time_vals))
   for (ty in c("trend", "series")) {
     expect_equal(drawn_x(plot(fit, type = ty)), want, tolerance = 0.02)

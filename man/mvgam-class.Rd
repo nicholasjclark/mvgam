@@ -8,103 +8,95 @@ A fitted \code{mvgam} object returned by function \code{\link{mvgam}}.
 Run \code{methods(class = "mvgam")} to see an overview of available methods.
 }
 \details{
-An \code{mvgam} object inherits from \code{brmsfit} and carries the
-following elements. Reach for the accessors before the slots
-themselves: \code{variables()}, \code{as_draws_df()} and \code{as.data.frame()}
-read the posterior, \code{stancode()} and \code{standata()} return the
-program and its data, and \code{prior_summary()} returns the prior
-table.
+A fit from \code{\link[=mvgam]{mvgam()}} has class \code{c("mvgam", "brmsfit")}. The
+accessors are the supported way in: \code{variables()}, \code{as_draws_df()}
+and \code{as.data.frame()} return the posterior, \code{stancode()} and
+\code{standata()} return the program and its data, and
+\code{prior_summary()} returns the prior table. The elements are listed
+below.
 
-The fit and what it was fitted to:
+The fit and its inputs:
 \itemize{
-\item \code{fit} The \code{stanfit} object holding the posterior draws of the
+\item \code{fit} The \code{stanfit} object with the posterior draws of the
 combined observation and trend model
 \item \code{formula} The observation formula, as brms validated it
-\item \code{trend_formula} The trend formula with the trend constructor
-removed, which is the formula the trend submodel was built
-from. \code{NULL} when no \code{trend_formula} was supplied
-\item \code{trend_call} The trend formula as the user wrote it, with the
-constructor intact, so \code{update()} can rebuild the model without
-reconstructing the call. \code{NULL} when no \code{trend_formula} was
-supplied
+\item \code{trend_formula} The trend formula without its trend constructor.
+brms builds the trend submodel from this formula. \code{NULL} when no
+\code{trend_formula} was supplied
+\item \code{trend_call} The trend formula as the user wrote it, constructor
+included. \code{\link[=update]{update()}} rebuilds the model from it. \code{NULL} when no
+\code{trend_formula} was supplied
 \item \code{family} The observation \code{family} object
-\item \code{prior} A \code{brmsprior} table of the priors the model sampled
-under, read from the compiled Stan program so it cannot
-disagree with what the sampler ran
+\item \code{prior} A \code{brmsprior} table of the priors in the compiled Stan
+program
 \item \code{data} The observation model frame
 \item \code{test_data} The \code{newdata} supplied at fitting, or \code{NULL}
 \item \code{data.name} The deparsed name of the \code{data} argument
 \item \code{codegen} The \code{knots}, \code{sample_prior}, \code{drop_unused_levels} and
-\code{normalize} settings the Stan program was generated under, so
-that \code{\link[=update]{update()}} rebuilds the same program rather than the
-default one
+\code{normalize} settings the Stan program was generated under.
+\code{\link[=update]{update()}} passes them to the refit
+\item \code{silent} The verbosity of the call. \code{\link[=update]{update()}} passes it to the
+refit
+\item \code{save_pars} The \code{\link[brms:save_pars]{brms::save_pars()}} object the posterior was
+saved under
 }
 
 The Stan program:
 \itemize{
 \item \code{stancode} The combined Stan program as a \code{character} string
-\item \code{standata} The \code{standata} list the program was fitted to
+\item \code{standata} The Stan data list the program was fitted to
 }
 
 The model specification, used by prediction and forecasting:
 \itemize{
 \item \code{mv_spec} The parsed model specification, including the trend
 specifications
-\item \code{trend_metadata} The resolved trend details a prediction needs,
-including the time and series variables, the trend type and the
-number of latent factors. Its \code{axes} entry is the record of
-which series and which times the model was fitted on, and is
-what post-processing reads rather than rebuilding either axis
-from the training data:
+\item \code{trend_metadata} The trend type, its lag orders, the number of
+latent factors and the record of the model's axes. Prediction,
+forecasting and plotting use \code{axes} for the series and times the
+model was fitted on:
 \itemize{
-\item \code{axes$series$levels} The series, in the order the trend
-matrix numbers its columns. Every label a summary, plot or
-forecast shows comes from here
-\item \code{axes$series$source} How the axis was arrived at: \code{explicit}
+\item \code{axes$series$levels} The series, in the order of the trend
+matrix columns. Summaries, plots and forecasts label series
+with these
+\item \code{axes$series$source} How mvgam built the series: \code{explicit}
 from a series column, \code{hierarchical} from \code{gr} and \code{subgr},
 or \code{multivariate} from the responses of a wide formula
-\item \code{axes$series$n} The number of series, matching
+\item \code{axes$series$n} The number of series, equal to
 \code{N_series_trend} in the Stan data
-\item \code{axes$series$groups} The group each series belongs to, in the
-same order, which is the order Stan subscripts
-\code{group_inds_trend} with. \code{NULL} when the trend names no
-grouping
-\item \code{axes$series$last_time} The last occasion each series was
-observed on, in the same order, which is where a forecast
-for that series begins
-\item \code{axes$time$values} The times the model was fitted on, ordered
-and in their original units, from which \code{CAR()} and the
-Gaussian processes take their gaps
-\item \code{axes$time$n} How many occasions there are. The integer
-index a trend steps along is \code{match()} into \code{values}
-\item \code{axes$time$step} The spacing a forecast extends the grid by,
-\code{NA} when the times are irregular
-\item \code{axes$factor$n_lv} The number of latent factors, which is the
-column count of the loadings and of \code{lv_trend}
-\item \code{axes$grain} What the second dimension of \code{times_trend}
-indexes: \code{series} ordinarily, or \code{lv} where a term written
-with \code{by = lv_axis()} puts the trend design on the factor
-axis
-\item \code{axes$vars} The columns a row is placed by: \code{time_var},
-\code{series_var}, \code{gr_var}, \code{subgr_var} and \code{response_vars}.
-Prediction reads these to identify a frame the model has
-never seen
+\item \code{axes$series$groups} The group of each series, in the same
+order. \code{NULL} for a trend without \code{gr}
+\item \code{axes$series$last_time} The last time each series was
+observed, in the same order. A forecast for a series starts
+after this time
+\item \code{axes$time$values} The ordered times the model was fitted on,
+in their original units. \code{CAR()} and Gaussian process terms
+compute their time gaps from these
+\item \code{axes$time$n} The number of time points
+\item \code{axes$time$step} The spacing between time points, or \code{NA} for
+irregular times. \code{\link[=forecast]{forecast()}} extends the time grid by this
+step
+\item \code{axes$factor$n_lv} The number of latent factors, equal to the
+number of columns of the loadings and of \code{lv_trend}
+\item \code{axes$grain} \code{lv} when a \code{by = lv_axis()} term puts the trend
+design on the factor axis, and \code{series} otherwise
+\item \code{axes$vars} The column names for time, series, \code{gr} and
+\code{subgr}: \code{time_var}, \code{series_var}, \code{gr_var} and \code{subgr_var}
+\item \code{axes$group_levels} The training levels of the \code{gr} and
+\code{subgr} columns. Prediction refuses new data with any other
+level
 }
 
-A model fitted before this record existed carries no \code{axes},
-and its series are read from \code{levels$series} instead.
-\item \code{trend_components} Per-component trend information derived from
-the posterior. \code{NULL} when the model has no trend
-\item \code{series_info} The number of series. Empty when the data name
-no series, in which case the count is read from \code{axes}
-\item \code{time_info} The number of time points, or empty when the data
-carry no time variable
-\item \code{obs_model} A \code{brmsfit} holding the observation-side model brms
-generated, used as the design-matrix source for prediction at
-new data
-\item \code{trend_model} A \code{brmsfit} holding the trend-side model, serving
-the same purpose for the trend submodel. \code{NULL} when no
-\code{trend_formula} was supplied
+\code{trend_metadata} is \code{NULL} for a model without a trend whose
+data lack a time column or a series column.
+\item \code{series_info} The number of series in the \code{series} column, empty
+when the data lack that column
+\item \code{time_info} The number of time points in the \code{time} column, empty
+when the data lack that column
+\item \code{obs_model} A \code{brmsfit} of the observation model. Prediction at
+new data builds design matrices from it
+\item \code{trend_model} A \code{brmsfit} of the trend submodel, used the same
+way. \code{NULL} when no \code{trend_formula} was supplied
 }
 
 How it was fitted:
@@ -112,9 +104,9 @@ How it was fitted:
 \item \code{backend} \code{Character}, either \code{rstan} or \code{cmdstanr}
 \item \code{algorithm} \code{Character}, one of \code{sampling}, \code{laplace},
 \code{pathfinder}, \code{meanfield} or \code{fullrank}
-\item \code{init} The initial-value specification, kept as the user wrote
-it (\code{"random"}, \code{"0"}, \code{"pathfinder"}, or a numeric value, list
-or function)
+\item \code{init} The initial-value specification as supplied
+(\code{"random"}, \code{"0"}, \code{"pathfinder"}, or a numeric value, list or
+function)
 \item \code{criteria} A named \code{list} of model-fit criteria that
 \code{\link[=add_criterion]{add_criterion()}} has computed, empty on a new fit
 \item \code{call} The matched call
@@ -125,14 +117,18 @@ was fitted under
 \item \code{creation_time} A \code{POSIXct} timestamp
 }
 
-A fit from \code{\link[=jsdgam]{jsdgam()}} has class \code{c("mvgam", "jsdgam")} and carries
-two further elements, which \code{insight::find_predictors()} reads to
-address a prediction grid in the user's own column names:
+A fit from \code{\link[=jsdgam]{jsdgam()}} has class \code{c("mvgam", "jsdgam", "brmsfit")}
+and three
+further elements:
 \itemize{
-\item \code{obs_data} The data frame as \code{jsdgam()} prepared it, with the
-\code{time} and \code{series} columns it derives from \code{unit} and \code{species}
-\item \code{model_data} The same frame, carrying a \code{prepped_trend_model}
-attribute that records the \code{unit} and \code{species} column names
+\item \code{obs_data} The data frame after \code{jsdgam()} prepared it, with
+\code{time} and \code{series} columns derived from \code{unit} and \code{species}
+\item \code{model_data} The same frame, with a \code{prepped_trend_model}
+attribute recording the \code{unit} and \code{species} column names.
+\code{insight::find_predictors()} uses it to address a prediction grid
+by the original column names
+\item \code{jsdgam_args} The arguments of the \code{jsdgam()} call. \code{\link[=update]{update()}}
+refits through \code{jsdgam()} with them
 }
 }
 \seealso{

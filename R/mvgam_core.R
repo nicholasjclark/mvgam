@@ -82,7 +82,7 @@ lift_sampler_control <- function(dots, control = NULL) {
     stop(insight::format_error(c(
       "Sampler settings were given twice.",
       x = paste0(
-        "Named beside the formula and inside 'control': ",
+        "Given both as arguments and inside 'control': ",
         paste0("'", clash, "'", collapse = ", "), "."
       ),
       i = "Keep one spelling."
@@ -153,7 +153,7 @@ translate_samples_burnin <- function(dots) {
   if (any(c("iter", "warmup") %in% names(dots))) {
     stop(insight::format_error(c(
       "Do not mix 'samples'/'burnin' with 'iter'/'warmup'.",
-      x = "Both name pairs configure the same sampler budget.",
+      x = "'samples'/'burnin' and 'iter'/'warmup' set the same budget.",
       i = paste0(
         "'samples' and 'burnin' are deprecated in favour of 'iter' and ",
         "'warmup'."
@@ -868,16 +868,7 @@ validate_newdata <- function(newdata, data) {
   train_levels <- levels(data$series)
   if (is.null(train_levels)) return(invisible(newdata))
   new_chr <- as.character(newdata$series)
-  if (!all(new_chr %in% train_levels)) {
-    bad <- unique(new_chr[!new_chr %in% train_levels])
-    stop(insight::format_error(c(
-      "'newdata' contains series not present in the training data.",
-      x = paste0(
-        "Unknown levels: ",
-        paste0("'", bad, "'", collapse = ", "), "."
-      )
-    )))
-  }
+  refuse_unseen_levels("Series", unique(new_chr), train_levels)
   newdata$series <- factor(new_chr, levels = train_levels)
   invisible(newdata)
 }
@@ -1108,51 +1099,6 @@ mvgam_single <- function(formula, trend_formula, data, backend,
 }
 
 # ------------------------------------------------------------------------------
-# TREND STANVAR EXTRACTION
-# ------------------------------------------------------------------------------
-# Extracts and generates trend-specific stanvars to enable proper injection
-# into the combined Stan model while maintaining compatibility with brms.
-# `generate_trend_injection_stanvars()` in stan_assembly.R is the entry point.
-
-# ------------------------------------------------------------------------------
-# COMBINED STAN CODE GENERATION
-# ------------------------------------------------------------------------------
-# Orchestrates the combination of observation and trend models into a single
-# Stan program while maintaining separate parameterizations for ecosystem
-# compatibility.
-
-#' Generate Combined Stan Code and Data Using Modern System
-#' @param obs_setup Observation model setup
-#' @param trend_setup Trend model setup
-#' @param mv_spec Multivariate specification
-#' @return List with combined stancode and standata
-#' @noRd
-generate_combined_stancode_and_data <- function(obs_setup, trend_setup,
-                                                mv_spec, prior = NULL,
-                                                backend = "rstan") {
-
-  # Extract trend_specs from mv_spec for the Stan code generator.
-  trend_specs <- if (mv_spec$has_trends && !is.null(mv_spec$trend_specs)) {
-    # Pass the entire trend_specs (handles both univariate and multivariate)
-    mv_spec$trend_specs
-  } else {
-    NULL
-  }
-
-  # Use the two-stage assembly system
-  result <- generate_combined_stancode(
-    obs_setup = obs_setup,
-    trend_setup = trend_setup,
-    trend_specs = trend_specs,
-    prior = prior,
-    silent = 1,
-    backend = backend
-  )
-
-  return(result)
-}
-
-# ------------------------------------------------------------------------------
 # MODEL FITTING
 # ------------------------------------------------------------------------------
 # Orchestrates the actual Stan model fitting using the appropriate backend
@@ -1192,31 +1138,12 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   checkmate::assert_list(mv_spec, names = "named", null.ok = TRUE)
   checkmate::assert_list(trend_metadata, names = "named", null.ok = TRUE)
 
-  # Validate brmsfit field existence for prediction system
+  # Predictions evaluate each side through its mock brmsfit
   if (!"brmsfit" %in% names(obs_setup)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "{.field obs_setup} missing required {.field brmsfit} component."
-      ),
-      x = paste0(
-        "The observation model setup must include a brmsfit object ",
-        "for predictions."
-      ),
-      i = "Check setup_brms_lightweight() implementation."
-    )))
+    stop_missing_fields("The observation brms setup", "brmsfit")
   }
-
   if (!is.null(trend_setup) && !"brmsfit" %in% names(trend_setup)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "{.field trend_setup} missing required {.field brmsfit} component."
-      ),
-      x = paste0(
-        "The trend model setup must include a brmsfit object for ",
-        "predictions."
-      ),
-      i = "Check setup_brms_lightweight() implementation."
-    )))
+    stop_missing_fields("The trend brms setup", "brmsfit")
   }
 
   # `mvgam_single()` records the settings the fit ran under on the
@@ -1228,9 +1155,6 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                            .var.name = "attr(combined_fit, 'backend')")
   checkmate::assert_choice(algorithm, algorithm_choices(),
                            .var.name = "attr(combined_fit, 'algorithm')")
-
-  mvgam_components <- extract_mvgam_components(combined_fit, obs_setup,
-                                              trend_setup, mv_spec)
 
   mvgam_object <- structure(
     list(
@@ -1284,9 +1208,8 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       standata = combined_standata %||% obs_setup$standata,
       save_pars = save_pars,
       mv_spec = mv_spec,
-      trend_components = mvgam_components$trend_components,
-      series_info = mvgam_components$series_info,
-      time_info = mvgam_components$time_info,
+      series_info = extract_series_information(obs_setup$data),
+      time_info = extract_time_information(obs_setup$data),
       trend_metadata = trend_metadata,
       # Store lightweight brmsfit objects for prediction workflows
       obs_model = obs_setup$brmsfit,
@@ -1486,36 +1409,6 @@ create_mvgam_stub_from_stan_components <- function(
 # Extracts mvgam-specific metadata and information from the combined fit to
 # enable specialized State-Space model functionality and analysis.
 
-#' Extract mvgam-Specific Components
-#' @param combined_fit Stan fit object
-#' @param obs_setup Observation setup
-#' @param trend_setup Trend setup
-#' @param mv_spec Multivariate specification
-#' @return List of mvgam-specific components
-#' @noRd
-extract_mvgam_components <- function(combined_fit, obs_setup, trend_setup,
-                                    mv_spec) {
-  # Extract time series information
-  time_info <- extract_time_information(obs_setup$data)
-
-  # Extract series information
-  series_info <- extract_series_information(obs_setup$data, mv_spec)
-
-  # Extract trend components if available
-  trend_components <- if (!is.null(mv_spec$has_trends) &&
-                         mv_spec$has_trends) {
-    extract_trend_component_info(combined_fit, mv_spec)
-  } else {
-    NULL
-  }
-
-  return(list(
-    time_info = time_info,
-    series_info = series_info,
-    trend_components = trend_components
-  ))
-}
-
 #' Extract Time Information from Data
 #' @param data Model data frame
 #' @return List with time-related metadata
@@ -1532,10 +1425,9 @@ extract_time_information <- function(data) {
 
 #' Extract Series Information from Data
 #' @param data Model data frame
-#' @param mv_spec Multivariate specification
 #' @return List with series-related metadata
 #' @noRd
-extract_series_information <- function(data, mv_spec) {
+extract_series_information <- function(data) {
   # Only the count is read, by `print()`, `summary()` and the plot
   # and prediction helpers. The names were taken in data row order
   # rather than axis order and were never read; the response names
@@ -1546,39 +1438,6 @@ extract_series_information <- function(data, mv_spec) {
     series_info$n_series <- length(unique(data$series))
   }
   series_info
-}
-
-#' Extract Trend Component Information
-#' @param combined_fit Stan fit object
-#' @param mv_spec Multivariate specification
-#' @return List with trend component metadata
-#' @noRd
-extract_trend_component_info <- function(combined_fit, mv_spec) {
-  trend_info <- list()
-
-  if (!is.null(mv_spec$trend_specs)) {
-    trend_info$specifications <- mv_spec$trend_specs
-
-    # Handle both single spec and list of specs
-    specs_list <- if (inherits(mv_spec$trend_specs, "mvgam_trend")) {
-      list(mv_spec$trend_specs)
-    } else {
-      mv_spec$trend_specs
-    }
-
-    trend_info$n_trends <- length(specs_list)
-
-    # Extract trend types
-    trend_info$types <- sapply(specs_list, function(spec) {
-      if (inherits(spec, "mvgam_trend")) {
-        spec$trend
-      } else {
-        "custom"
-      }
-    })
-  }
-
-  return(trend_info)
 }
 
 # ==============================================================================

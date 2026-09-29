@@ -38,15 +38,13 @@ make_hindcast_mock <- function(series_levels = "s1",
     mv_spec = list(
       trend_specs = spec
     ),
-    series_info = list(series_levels = series_levels),
-    trend_metadata = list(
+    trend_metadata = c(mock_axis_record(d), list(
       trend_type = trend_type,
       ar_lags = 1L,
       ma_lags = integer(0L),
       max_lag = 1L,
-      has_cor = FALSE,
-      variables = list(time_var = "time", series_var = "series")
-    ),
+      has_cor = FALSE
+    )),
     standata = list(
       N_series_trend = length(series_levels),
       N_lv_trend = length(series_levels),
@@ -211,7 +209,7 @@ test_that("ndraws beyond available draws errors informatively", {
   )
   expect_error(
     hindcast(fit, type = "response", ndraws = 50L),
-    "more draws than the posterior holds"
+    "more draws than the posterior has"
   )
 })
 

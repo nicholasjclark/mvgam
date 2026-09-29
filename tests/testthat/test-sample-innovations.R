@@ -120,12 +120,11 @@ test_that("a hier VAR routes through the Cholesky extractor", {
   fake_object <- structure(
     list(
       fit = draws_mat,
-      trend_metadata = list(trend_type = "VAR"),
-      trend_components = list(
-        specifications = fake_spec,
-        n_trends = n_groups * n_sub
+      mv_spec = list(trend_specs = fake_spec),
+      trend_metadata = list(
+        trend_type = "VAR",
+        axes = list(series = list(n = n_groups * n_sub))
       ),
-      series_info = list(n_series = n_groups * n_sub),
       standata = list(
         N_groups_trend = n_groups,
         N_subgroups_trend = n_sub,
@@ -133,12 +132,6 @@ test_that("a hier VAR routes through the Cholesky extractor", {
       )
     ),
     class = "mvgam"
-  )
-
-  testthat::local_mocked_bindings(
-    get_trend_type = function(object) "VAR",
-    trend_spec_for_residcor = function(object) fake_spec,
-    .package = "mvgam"
   )
 
   cs <- get_trend_covariance_structure(fake_object)
@@ -586,7 +579,7 @@ test_that("sample_process_errors returns zeros for deterministic trends", {
         time = rep(1:3, 2),
         series = factor(rep(c("s1", "s2"), each = 3))
       ),
-      trend_components = list(types = "PW")
+      trend_metadata = list(trend_type = "PW")
     ),
     class = "mvgam"
   )
@@ -632,7 +625,7 @@ test_that("compose_linpred_with_noise errors on a trend dim mismatch", {
   bad_trend <- matrix(0, 3, 6)
   expect_error(
     compose_linpred_with_noise(obs, bad_trend, NULL),
-    "Dimension mismatch"
+    "has the wrong shape"
   )
   # The response is named so a multivariate fit says which one failed.
   expect_error(
@@ -648,7 +641,7 @@ test_that("compose_linpred_with_noise errors on a noise dim mismatch", {
   bad_noise <- matrix(0, 3, 6)
   expect_error(
     compose_linpred_with_noise(obs, trend, bad_noise),
-    "Trend-noise dimension mismatch"
+    "trend noise has the wrong shape"
   )
 })
 
@@ -1099,33 +1092,4 @@ test_that("a draws reader returns NULL for a parameter not carried", {
   expect_equal(dim(read_draws_vector(dm, "a", 2L)), c(4L, 2L))
   expect_null(read_draws_vector(dm, "b", 2L, required = FALSE))
   expect_error(read_draws_vector(dm, "b", 2L), "incomplete")
-})
-
-
-test_that("the trend type is resolved in one place", {
-  # `detect_var_trend()` calls `get_trend_type()`, giving `irf()`,
-  # `fevd()`, `stability()` and `posterior_transition_matrix()` the
-  # type `summary()` prints.
-  obj <- structure(
-    list(
-      trend_components = list(types = "VAR"),
-      trend_formula = ~ VAR(p = 1)
-    ),
-    class = "mvgam"
-  )
-  expect_equal(get_trend_type(obj), "VAR")
-  expect_equal(detect_var_trend(obj), "VAR")
-
-  # An empty type resolves to "None", and `detect_var_trend()`
-  # gives NULL.
-  empty <- obj
-  empty$trend_components$types <- NA_character_
-  expect_equal(get_trend_type(empty), "None")
-  expect_null(detect_var_trend(empty))
-
-  # An AR trend gives NULL from `detect_var_trend()`.
-  ar <- obj
-  ar$trend_components$types <- "AR"
-  expect_equal(get_trend_type(ar), "AR")
-  expect_null(detect_var_trend(ar))
 })

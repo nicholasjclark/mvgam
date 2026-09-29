@@ -77,7 +77,7 @@ test_that("aggregate_closure_unit_visits() errors when yrep_visit width does not
   bad <- matrix(0, nrow = 2L, ncol = nrow(d) - 1L)
   expect_error(
     aggregate_closure_unit_visits(obj, newdata = d, yrep_visit = bad),
-    "does not match 'newdata'"
+    "per-visit predictions has the wrong shape"
   )
 })
 

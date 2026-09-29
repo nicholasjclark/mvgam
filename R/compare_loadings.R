@@ -216,25 +216,22 @@ extract_median_Z <- function(object) {
       "compare_loadings() requires a latent-factor fit (n_lv > 0).",
       i = paste0(
         "Refit with `n_lv > 0` (jsdgam(...) or mvgam(..., trend_map = ...))",
-        " or compare existing fits that both carry a factor model."
+        " or compare two existing factor-model fits."
       )
     )))
   }
   n_series <- loading_series_count(object)
   draws_mat <- posterior::as_draws_matrix(object$fit)
-  # `resolve_Z_loadings()` answers for both kinds of factor fit: the
-  # sampled loadings where they are free, and the `trend_map` matrix
-  # broadcast across draws where they were supplied as data. Reading
-  # the posterior directly found no loadings at all on a fixed-Z fit,
-  # because there are none to find.
-  z_arr <- resolve_Z_loadings(
+  # A fixed-Z fit holds its loadings as data, which the resolver
+  # broadcasts across draws
+  z_arr <- resolve_factor_loadings(
     object,
     draws_mat,
     n_series = as.integer(n_series),
     n_lv = as.integer(n_lv)
   )
   med <- apply(z_arr, c(2L, 3L), stats::median)
-  rownames(med) <- resolve_series_info(object)$series_levels
+  rownames(med) <- fitted_series_levels(object)
   med
 }
 

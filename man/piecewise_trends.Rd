@@ -17,17 +17,12 @@ PW(
 )
 }
 \arguments{
-\item{time}{The unquoted name of the variable that represents time in the
-supplied \code{data}. This variable should be either a \code{numeric} or \code{integer}
-variable. Defaults to \code{time} to align with brms conventions, allowing
-any time variable name without requiring explicit "time" columns.
-When using the default, a one-time warning will be issued.}
+\item{time}{The unquoted name of the \code{numeric} or \code{integer} variable in
+\code{data} that holds each row's time. Defaults to \code{time}.}
 
-\item{series}{The unquoted name of the variable that represents the series
-identifier in the supplied \code{data}. This variable should be either a
-\code{character} or \code{factor} variable. Defaults to \code{series} following mvgam
-conventions, allowing any series variable name. When using the
-default, a one-time warning will be issued.}
+\item{series}{The unquoted name of the \code{factor} variable in \code{data} that
+names each row's series. Its levels fix the order of the series. A
+trend needs this column even for a single series. Defaults to \code{series}.}
 
 \item{cap}{The unquoted name of the variable in \code{data} that specifies the
 carrying capacity for logistic growth models. Required when \code{growth = 'logistic'}.

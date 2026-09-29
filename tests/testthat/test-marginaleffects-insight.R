@@ -42,7 +42,7 @@ test_that("model_info describes each response of a multivariate fit", {
   expect_false(info$seen$is_count)
   expect_identical(insight::model_info(pf, response = "seen"), info$seen)
   expect_error(insight::model_info(pf, response = "mass"),
-               "not a response of this model")
+               "must be a response of this model")
 })
 
 test_that(".onAttach sets marginaleffects_model_classes", {
@@ -123,10 +123,9 @@ test_that("find_predictors reads both submodels and leaves the axis out", {
     list(
       formula = y ~ x1,
       trend_formula = trend_y ~ x2 - 1,
-      trend_metadata = list(variables = list(time_var = "time",
-                                              series_var = "series",
-                                              gr_var = NA_character_,
-                                              subgr_var = NA_character_))
+      trend_metadata = list(axes = list(vars = list(
+        time_var = "time", series_var = "series"
+      )))
     ),
     class = "mvgam"
   )

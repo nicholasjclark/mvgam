@@ -488,7 +488,7 @@ ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
       "Selected latent variables exceed the model's `n_lv`.",
       x = paste0(
         "Requested which_lvs = ", paste(which_lvs, collapse = ", "),
-        ". The model has n_lv = ", svd_comp$n_lv, "."
+        " from a model with n_lv = ", svd_comp$n_lv, "."
       ),
       i = if (svd_comp$n_lv == 1L) {
         "A one-factor model plots with 'plot_factors()'."
@@ -505,12 +505,9 @@ ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
         "labels: ", length(site_names),
         ", lv_trend rows: ", NROW(svd_comp$scores), "."
       ),
-      i = paste0(
-        "Often a symptom of imputed time points in 'obs_data'. ",
-        "Either trim to the training grid or supply matching ",
-        "labels manually."
-      )
-    )))
+      x = "Imputed time points in 'obs_data' commonly cause this.",
+      i = "Trim to the training grid or supply matching labels."
+    )), call. = FALSE)
   }
   sp_dat <- data.frame(svd_comp$loadings)[, which_lvs]
   colnames(sp_dat) <- c("x", "y")
@@ -609,18 +606,15 @@ ordinate.mvgam <- function(
         "'rotation = \"", rotation, "\"' re-rotates the ",
         "structural loadings supplied via 'trend_map'."
       ),
-      i = paste0(
-        "The biplot shows ordination gradients in place of the ",
-        "declared factor structure. Pass 'rotation = \"none\"' to ",
-        "keep the declared axes, or call 'plot_factors()' for the ",
-        "fixed loadings."
-      )
+      x = paste0("The biplot shows ordination gradients in place of ",
+                 "the declared factor structure."),
+      i = paste0("Pass 'rotation = \"none\"' to keep the declared axes ",
+                 "or call 'plot_factors()' for the fixed loadings.")
     ))
   }
 
   svd_comp <- ordinate_factor_components(object, alpha, rotation)
-  series_info <- resolve_series_info(object)
-  species_names <- series_info$series_levels
+  species_names <- fitted_series_levels(object)
   # The score rows are the rows of `lv_trend`, one per time on the
   # fit's own axis, and the axis labels them. A column named `time`
   # taken from the frame numbered the sites 1 to n on any fit whose
@@ -660,10 +654,9 @@ resolve_auto_traits <- function(traits, object) {
   if (is.null(found)) {
     insight::format_warning(c(
       "Argument 'traits = \"auto\"' requires a fit built with traits.",
-      i = paste0(
-        "Pass an explicit data.frame to 'traits', or refit ",
-        "with jsdgam(traits = ...). Skipping the overlay."
-      )
+      x = "The plot omits the trait overlay.",
+      i = paste0("Pass a data.frame to 'traits' or refit with ",
+                 "'jsdgam(traits = ...)'.")
     ))
   }
   found

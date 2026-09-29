@@ -1,11 +1,7 @@
 test_that("shared_variation() errors on non-factor mvgam fits", {
   fake_fit <- structure(
     list(
-      trend_components = list(
-        types = "AR",
-        specs = list(list(n_lv = NULL))
-      ),
-      trend_metadata = list()
+      trend_metadata = list(trend_type = "AR")
     ),
     class = c("mvgam", "brmsfit")
   )
@@ -47,12 +43,6 @@ test_that("match_loadings_prior_pars rejects non-character input", {
 test_that("shared_variation returns Z Sigma Z', not Z Z'", {
   case <- mk_factor_obj()
   testthat::local_mocked_bindings(
-    resolve_series_info = function(object) {
-      list(series_levels = case$series_levels)
-    },
-    .package = "mvgam"
-  )
-  testthat::local_mocked_bindings(
     as_draws_matrix = function(x, ...) x,
     .package = "posterior"
   )
@@ -73,12 +63,6 @@ test_that("shared_variation returns Z Sigma Z', not Z Z'", {
 
 test_that("shared_variation's printed header names the returned matrix", {
   case <- mk_factor_obj()
-  testthat::local_mocked_bindings(
-    resolve_series_info = function(object) {
-      list(series_levels = case$series_levels)
-    },
-    .package = "mvgam"
-  )
   testthat::local_mocked_bindings(
     as_draws_matrix = function(x, ...) x,
     .package = "posterior"

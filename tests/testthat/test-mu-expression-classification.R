@@ -338,277 +338,116 @@ test_that("performance is acceptable for complex models", {
   expect_true(length(result$referenced_variables) > 0)
 })
 
-# GLM Pipeline Integration Tests ----
+# GLM detection and trend injection ----
 
-test_that("GLM analysis system detects patterns correctly", {
-  # Test Stan code with GLM functions
-  stan_code_glm <- "
-  model {
-    target += poisson_log_glm_lpmf(Y | X, alpha, beta);
-  }
-  "
-
-  analysis <- mvgam:::analyze_stan(stan_code_glm)
-
-  expect_s3_class(analysis, "glm_analysis")
-  expect_true(analysis$glm_patterns[["poisson_log_glm"]])
-  expect_true(analysis$mu_classification$has_glm)
-  expect_equal(analysis$mu_classification$glm_types, "poisson_log_glm")
+test_that("glm_calls_present names the GLM likelihoods a program calls", {
+  glm <- "model {\n  target += poisson_log_glm_lpmf(Y | X, alpha, beta);\n}"
+  plain <- "model {\n  target += normal_lpdf(Y | mu, sigma);\n}"
+  present <- mvgam:::glm_calls_present(glm)
+  expect_identical(names(present)[present], "poisson_log_glm")
+  expect_false(any(mvgam:::glm_calls_present(plain)))
 })
 
-test_that("GLM analysis handles non-GLM code", {
-  # Test Stan code without GLM functions
-  stan_code_normal <- "
-  model {
-    target += normal_lpdf(Y | mu, sigma);
-  }
-  "
+stan_program <- function(...) paste(c(...), collapse = "\n")
 
-  analysis <- mvgam:::analyze_stan(stan_code_normal)
-
-  expect_s3_class(analysis, "glm_analysis")
-  expect_false(any(analysis$glm_patterns))
-  expect_false(analysis$mu_classification$has_glm)
-  expect_equal(length(analysis$mu_classification$glm_types), 0)
-})
-
-test_that("processing_state constructor validates inputs", {
-  code_lines <- c("model {", "  target += normal_lpdf(Y | mu, sigma);", "}")
-
-  state <- mvgam:::processing_state(code_lines)
-
-  expect_s3_class(state, "processing_state")
-  expect_equal(state$stage, "initial")
-  expect_equal(state$code_lines, code_lines)
-  expect_equal(length(state$processed_positions), 0)
-  expect_null(state$analysis)
-  expect_null(state$mu_analysis)
-})
-
-test_that("to_analysis transition works correctly", {
-  code_lines <- c("model {", "  target += poisson_log_glm_lpmf(Y | X, alpha, beta);", "}")
-  state <- mvgam:::processing_state(code_lines)
-
-  analyzed_state <- mvgam:::to_analysis(state)
-
-  expect_s3_class(analyzed_state, "processing_state")
-  expect_equal(analyzed_state$stage, "analyzed")
-  expect_s3_class(analyzed_state$analysis, "glm_analysis")
-  expect_true("glm_analysis" %in% analyzed_state$transformations_applied)
-})
-
-test_that("to_injection integrates mu analysis correctly", {
-  # Test that to_injection calls extract_mu_construction_with_classification
-  # Use realistic Stan code with mu += pattern that the injection function expects
-  stan_code <- "model {
-    mu += X * beta;
-    target += normal_lpdf(Y | mu, sigma);
-  }"
-
-  code_lines <- strsplit(stan_code, "\n")[[1]]
-  state <- mvgam:::processing_state(code_lines)
-
-  # Move to analyzed state first
-  analyzed_state <- mvgam:::to_analysis(state)
-  expect_equal(analyzed_state$stage, "analyzed")
-
-  # Move to converted state
-  converted_state <- mvgam:::to_conversion(analyzed_state)
-  expect_equal(converted_state$stage, "converted")
-
-  # Test injection with mu analysis
-  injected_state <- mvgam:::to_injection(converted_state, "mu += trend_effects;")
-
-  expect_s3_class(injected_state, "processing_state")
-  expect_equal(injected_state$stage, "injected")
-  expect_true("mu_analyzed" %in% injected_state$transformations_applied)
-  expect_true("trend_injected" %in% injected_state$transformations_applied)
-
-  # Check that mu_analysis is stored in state and has correct structure
-  expect_type(injected_state$mu_analysis, "list")
-  expect_true("mu_construction" %in% names(injected_state$mu_analysis))
-  expect_true("supporting_declarations" %in% names(injected_state$mu_analysis))
-  expect_true("referenced_variables" %in% names(injected_state$mu_analysis))
-
-  # Verify mu analysis found the mu construction from our test code
-  expect_true(length(injected_state$mu_analysis$mu_construction) > 0)
-})
-
-test_that("transform_glm_code linear pipeline works end-to-end", {
-  # Test the linear pipeline with standard form code (not GLM)
-  standard_code <- "model {
-    mu += X * beta;
-    target += normal_lpdf(Y | mu, sigma);
-  }"
-
-  result <- mvgam:::transform_glm_code(standard_code, "mu += trend_effects;")
-
-  expect_type(result, "character")
-  expect_gt(nchar(result), 0)
-
-  # Should contain the original code and trend injection
-  expect_match(result, "trend_effects")
-})
-
-test_that("transition_with_tracking maintains operation log correctly", {
-  # Create initial state with test code
-  stan_code <- "model { mu += X * beta; }"
-  code_lines <- strsplit(stan_code, "\n")[[1]]
-  initial_state <- mvgam:::processing_state(code_lines)
-
-  # Test transition with tracking
-  analysis_details <- list(
-    glm_patterns_detected = 0,
-    optimization_plan = "no_glm_detected",
-    test_data = TRUE
+test_that("the trend joins a built predictor after its last term", {
+  code <- stan_program(
+    "model {",
+    "  if (!prior_only) {",
+    "    vector[N] mu = rep_vector(0.0, N);",
+    "    mu += Intercept + Xc * b;",
+    "    target += normal_lpdf(Y | mu, sigma);",
+    "  }",
+    "}"
   )
-
-  tracked_state <- mvgam:::transition_with_tracking(
-    initial_state,
-    new_stage = "analyzed",
-    operation = "test_analysis",
-    details = analysis_details,
-    modifications = list(analysis = list(test = TRUE))
+  expect_identical(
+    mvgam:::inject_trend_into_linear_predictors(code, ""),
+    stan_program(
+      "model {",
+      "  if (!prior_only) {",
+      "    vector[N] mu = rep_vector(0.0, N);",
+      "    mu += Intercept + Xc * b;",
+      "    for (n in 1:N) {",
+      "      mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];",
+      "    }",
+      "    target += normal_lpdf(Y | mu, sigma);",
+      "  }",
+      "}"
+    )
   )
-
-  # Verify state transition occurred correctly
-  expect_s3_class(tracked_state, "processing_state")
-  expect_equal(tracked_state$stage, "analyzed")
-  expect_true("test_analysis" %in% tracked_state$transformations_applied)
-
-  # Verify operation tracking
-  expect_type(tracked_state$operations_log, "list")
-  expect_equal(length(tracked_state$operations_log), 1)
-
-  # Check operation log entry structure
-  log_entry <- tracked_state$operations_log[[1]]
-  expect_equal(log_entry$operation, "test_analysis")
-  expect_equal(log_entry$stage, "analyzed")
-  expect_s3_class(log_entry$timestamp, "POSIXct")
-  expect_equal(log_entry$details, analysis_details)
-
-  # Verify field modifications applied correctly
-  expect_true(!is.null(tracked_state$analysis))
-  expect_equal(tracked_state$analysis$test, TRUE)
-
-  # Test chaining multiple operations
-  second_state <- mvgam:::transition_with_tracking(
-    tracked_state,
-    new_stage = "converted",
-    operation = "test_conversion",
-    details = list(converted = TRUE)
-  )
-
-  # Should have 2 operations logged
-  expect_equal(length(second_state$operations_log), 2)
-  expect_true("test_conversion" %in% second_state$transformations_applied)
 })
 
-test_that("format_pipeline_error provides detailed debugging context", {
-  # Test basic error formatting
+test_that("the trend joins before an inverse link inside a loop", {
+  # brms applies some inverse links row by row inside the likelihood
+  # loop. The trend enters on the link scale, before that loop opens.
+  code <- stan_program(
+    "model {",
+    "  vector[N_y] mu_y = rep_vector(0.0, N_y);",
+    "  mu_y += Intercept_y;",
+    "  for (n in 1 : N_y) {",
+    "    mu_y[n] = inv_logit(mu_y[n]);",
+    "    target += beta_lpdf(Y_y[n] | mu_y[n] * phi_y, phi_y);",
+    "  }",
+    "}"
+  )
+  expect_identical(
+    mvgam:::inject_trend_into_linear_predictors(code, "y"),
+    stan_program(
+      "model {",
+      "  vector[N_y] mu_y = rep_vector(0.0, N_y);",
+      "  mu_y += Intercept_y;",
+      "  for (n in 1:N_y) {",
+      "    mu_y[n] += trend[obs_trend_time_y[n], obs_trend_series_y[n]];",
+      "  }",
+      "  for (n in 1 : N_y) {",
+      "    mu_y[n] = inv_logit(mu_y[n]);",
+      "    target += beta_lpdf(Y_y[n] | mu_y[n] * phi_y, phi_y);",
+      "  }",
+      "}"
+    )
+  )
+})
+
+test_that("a GLM likelihood is rewritten to take the trend", {
+  code <- stan_program(
+    "model {",
+    "  target += poisson_log_glm_lpmf(Y | Xc, Intercept, b);",
+    "}"
+  )
+  expect_identical(
+    mvgam:::inject_trend_into_linear_predictors(code, ""),
+    stan_program(
+      "model {",
+      "  vector[N] mu = Xc * b;",
+      "  for (n in 1:N) {",
+      paste0("    mu[n] += Intercept + ",
+             "trend[obs_trend_time[n], obs_trend_series[n]];"),
+      "  }",
+      "  target += poisson_log_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones);",
+      "}"
+    )
+  )
+})
+
+test_that("an unplaceable trend is reported as an mvgam fault", {
+  # A GLM family without a layout would leave the trend computed and
+  # never added to the predictor.
+  unknown_glm <- stan_program(
+    "model {",
+    "  target += mystery_glm_lpmf(Y | Xc, Intercept, b);",
+    "}"
+  )
   expect_error(
-    mvgam:::format_pipeline_error("Test error message"),
-    "Test error message"
+    mvgam:::inject_trend_into_linear_predictors(unknown_glm, ""),
+    "family could not be identified"
   )
-
-  # Test error with context
-  context <- list(
-    operation = "test_operation",
-    expected_stage = "analyzed",
-    actual_stage = "initial"
+  no_predictor <- stan_program(
+    "model {",
+    "  target += normal_lpdf(Y | 0, sigma);",
+    "}"
   )
-
   expect_error(
-    mvgam:::format_pipeline_error("State transition failed", context),
-    "State transition failed.*operation.*test_operation.*expected_stage.*analyzed.*actual_stage.*initial"
+    mvgam:::inject_trend_into_linear_predictors(no_predictor, ""),
+    "lacks a statement building 'mu'"
   )
-
-  # Test with empty context (should not fail)
-  expect_error(
-    mvgam:::format_pipeline_error("Simple error", list()),
-    "Simple error"
-  )
-
-  # Test state transition validation with invalid stage
-  stan_code <- "model { mu += X * beta; }"
-  code_lines <- strsplit(stan_code, "\n")[[1]]
-  state <- mvgam:::processing_state(code_lines, stage = "analyzed")  # Valid stage but wrong for to_analysis
-
-  expect_error(
-    mvgam:::to_analysis(state),
-    "Invalid state for GLM analysis.*expected_stage.*initial.*actual_stage.*analyzed"
-  )
-})
-
-test_that("get_operations_summary provides correct debugging information", {
-  # Create state and perform multiple tracked operations
-  stan_code <- "model { target += normal_lpdf(Y | mu, sigma); }"
-  code_lines <- strsplit(stan_code, "\n")[[1]]
-  state <- mvgam:::processing_state(code_lines)
-
-  # Simulate analysis operation
-  state <- mvgam:::transition_with_tracking(
-    state,
-    "analyzed",
-    "glm_analysis_complete",
-    list(glm_patterns_detected = 1, optimization_plan = "preserve_glm")
-  )
-
-  # Simulate conversion operation
-  state <- mvgam:::transition_with_tracking(
-    state,
-    "converted",
-    "glm_conversion_skipped",
-    list(reason = "no_trends_require_conversion")
-  )
-
-  # Test operations summary
-  summary_df <- mvgam:::get_operations_summary(state)
-
-  # Verify summary structure
-  expect_s3_class(summary_df, "data.frame")
-  expect_equal(nrow(summary_df), 2)
-  expect_true(all(c("operation", "stage", "timestamp") %in% names(summary_df)))
-
-  # Verify summary content
-  expect_equal(summary_df$operation[1], "glm_analysis_complete")
-  expect_equal(summary_df$stage[1], "analyzed")
-  expect_equal(summary_df$operation[2], "glm_conversion_skipped")
-  expect_equal(summary_df$stage[2], "converted")
-  expect_s3_class(summary_df$timestamp, "POSIXct")
-
-  # Test empty operations log
-  empty_state <- mvgam:::processing_state(code_lines)
-  empty_summary <- mvgam:::get_operations_summary(empty_state)
-  expect_equal(nrow(empty_summary), 0)
-  expect_equal(ncol(empty_summary), 3)
-})
-
-test_that("state transitions preserve analysis data correctly", {
-  # Test that analysis data is preserved through all transitions
-  code_lines <- c("model {", "  mu += X * beta;", "}")
-
-  # Create initial state
-  initial_state <- mvgam:::processing_state(code_lines)
-  expect_null(initial_state$analysis)
-  expect_null(initial_state$mu_analysis)
-
-  # Analysis transition
-  analyzed_state <- mvgam:::to_analysis(initial_state)
-  expect_s3_class(analyzed_state$analysis, "glm_analysis")
-  expect_null(analyzed_state$mu_analysis)
-
-  # Conversion transition should preserve analysis
-  converted_state <- mvgam:::to_conversion(analyzed_state)
-  expect_s3_class(converted_state$analysis, "glm_analysis")
-  expect_null(converted_state$mu_analysis)
-
-  # Injection should preserve analysis and add mu_analysis
-  injected_state <- mvgam:::to_injection(converted_state, "mu += trend;")
-  expect_s3_class(injected_state$analysis, "glm_analysis")
-  expect_type(injected_state$mu_analysis, "list")
-
-  # Assembly should preserve both
-  final_code <- mvgam:::to_assembly(injected_state)
-  expect_type(final_code, "character")
 })

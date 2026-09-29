@@ -25,7 +25,7 @@ test_that("validate_newdata errors on series outside training levels", {
   nd <- data.frame(time = 4:5, series = "unknown")
   expect_error(
     validate_newdata(nd, data),
-    "not present"
+    "has levels absent from the training data"
   )
 })
 

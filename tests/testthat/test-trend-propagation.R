@@ -228,7 +228,7 @@ test_that("propagate_trend(CAR()) errors when time is missing", {
       CAR(), params = list(phi = 0.7, sigma = 0.5),
       h = 10L, n_series = 1L
     ),
-    "'time' is required"
+    "needs the forecast time gaps"
   )
 })
 
@@ -283,13 +283,15 @@ test_that("propagate_trend accepts a caller-supplied last_state", {
 
 # ---- Unsupported trend type ---------------------------------------
 
-test_that("propagate_trend errors on unsupported trend types", {
+test_that("an unregistered trend type reaching the propagator is a fault", {
+  # Every registered trend has a branch. Only a hand-built object
+  # reaches the fallback, which points the user at the issue tracker.
   fake_trend <- structure(
     list(trend = "UNKNOWN"), class = "mvgam_trend"
   )
   expect_error(
     propagate_trend(fake_trend, list(), h = 10L, n_series = 1L),
-    "not supported"
+    "lacks a branch for trend 'UNKNOWN'"
   )
 })
 

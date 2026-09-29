@@ -30,14 +30,66 @@ test_that("mvgam_data validates closure-unit data via the shared validator", {
 })
 
 
-test_that("mvgam_data synthesises a series factor when missing", {
+test_that("a trend requires a series column", {
   set.seed(2L)
   df <- data.frame(time = seq_len(20L),
                    y    = rpois(20L, lambda = 3))
+  # A model without a trend has no series axis to fill.
   res <- suppressMessages(
-    mvgam_data(df, y = "y", family = poisson(), plot = FALSE)
+    mvgam_data(df, y = "y", family = poisson(), plot = TRUE)
+  )
+  expect_null(res$series_levels)
+  expect_identical(res$n_series, 0L)
+  expect_s3_class(res$plot, "ggplot")
+  # A trend needs each row's series. mvgam_data() and stancode()
+  # raise the same refusal, which gives the one-line remedy for a
+  # single series.
+  err <- expect_error(
+    mvgam_data(df, y = "y", family = poisson(),
+               trend_formula = ~ AR(), plot = FALSE)
+  )
+  fit_err <- expect_error(
+    stancode(mvgam_formula(y ~ 1, trend_formula = ~ AR()),
+             data = df, family = poisson())
+  )
+  expect_identical(conditionMessage(err), conditionMessage(fit_err))
+  expect_match(conditionMessage(err), "Column 'series' is absent")
+  expect_match(conditionMessage(err),
+               'data$series <- factor("series_1")', fixed = TRUE)
+  df$series <- factor("series_1")
+  res <- suppressMessages(
+    mvgam_data(df, y = "y", family = poisson(),
+               trend_formula = ~ AR(), plot = FALSE)
   )
   expect_identical(res$n_series, 1L)
+})
+
+
+test_that("the trend constructor names the axis columns", {
+  set.seed(3L)
+  df <- data.frame(week = rep(seq_len(10L), 2L),
+                   species = factor(rep(c("a", "b"), each = 10L)),
+                   y = rpois(20L, lambda = 3))
+  res <- suppressMessages(
+    mvgam_data(df, family = poisson(),
+               trend_formula = ~ AR(time = week, series = species),
+               plot = FALSE)
+  )
+  expect_identical(res$series_levels, c("a", "b"))
+  expect_identical(res$time_range, c(1L, 10L))
+})
+
+
+test_that("mvgam_data refuses a mixture family as mvgam() does", {
+  set.seed(4L)
+  df <- data.frame(time = seq_len(10L),
+                   series = factor(rep("s1", 10L)),
+                   y = rnorm(10L))
+  mix <- suppressMessages(brms::mixture(gaussian, gaussian))
+  expect_error(
+    mvgam_data(df, family = mix, plot = FALSE),
+    "Mixture families are not supported"
+  )
 })
 
 
@@ -183,16 +235,24 @@ test_that("mvgam_data errors when 'series' is not a factor", {
 
 # ---- Time regularity / CAR dispensation --------------------------
 
-test_that("mvgam_data enforces regular time intervals by default", {
+test_that("mvgam_data enforces regular time intervals for AR()", {
   set.seed(7L)
   df <- data.frame(time   = c(1L, 2L, 4L, 7L),
                    series = factor(rep("s1", 4L)),
                    y      = rpois(4L, lambda = 3))
   expect_error(
     suppressMessages(
-      mvgam_data(df, y = "y", family = poisson(), plot = FALSE)
+      mvgam_data(df, y = "y", family = poisson(),
+                 trend_formula = ~ AR(), plot = FALSE)
     ),
     "regular|Irregular"
+  )
+  # A model without a trend has no dynamics to space evenly.
+  expect_s3_class(
+    suppressMessages(
+      mvgam_data(df, y = "y", family = poisson(), plot = FALSE)
+    ),
+    "mvgam_data"
   )
 })
 
@@ -205,53 +265,8 @@ test_that("mvgam_data skips time-regularity check under CAR()", {
   expect_no_error(
     suppressMessages(
       mvgam_data(df, y = "y", family = poisson(),
-                  trend_model = CAR(), plot = FALSE)
+                  trend_formula = ~ CAR(), plot = FALSE)
     )
-  )
-})
-
-
-# ---- check_mvgam_data() alias ------------------------------------
-
-test_that("check_mvgam_data() is exported and dispatches to mvgam_data()", {
-  expect_true(exists("check_mvgam_data", mode = "function",
-                      envir = asNamespace("mvgam")))
-  set.seed(1L)
-  simdat <- sim_mvgam(family = poisson(), n_series = 2L,
-                       n_timepoints = 16L)
-  out_check <- suppressMessages(
-    check_mvgam_data(simdat$data_train, family = poisson(),
-                      plot = FALSE)
-  )
-  out_orig <- suppressMessages(
-    mvgam_data(simdat$data_train, family = poisson(),
-                plot = FALSE)
-  )
-  # The two entry points return objects with identical structure
-  # (sans the call attribute, which we don't track).
-  expect_s3_class(out_check, "mvgam_data")
-  expect_identical(out_check$n_series, out_orig$n_series)
-  expect_identical(out_check$series_levels, out_orig$series_levels)
-  expect_identical(out_check$time_range, out_orig$time_range)
-})
-
-
-test_that("check_mvgam_data() forwards errors from mvgam_data()", {
-  # rnorm() produces non-integer floats, which trips the
-  # validate_response_for_family() non-integer branch under
-  # family = poisson(); the negative-values branch is exercised
-  # in the earlier "errors on negative y with Poisson" test.
-  bad <- data.frame(
-    y      = rnorm(10L),
-    time   = seq_len(10L),
-    series = factor("s1", levels = "s1")
-  )
-  expect_error(
-    suppressMessages(
-      check_mvgam_data(bad, y = "y", family = poisson(),
-                        plot = FALSE)
-    ),
-    regexp = "Poisson|integer|non-negative"
   )
 })
 
@@ -617,24 +632,15 @@ test_that("time regularity is gated on the trend's own rules", {
     series = factor(rep(c("a", "b"), each = 25))
   )
   expect_silent(suppressMessages(
-    mvgam_data(dat, trend_model = ZMVN(), family = poisson())
+    mvgam_data(dat, trend_formula = ~ ZMVN(), family = poisson())
   ))
   expect_silent(suppressMessages(
-    mvgam_data(dat, trend_model = CAR(), family = poisson())
+    mvgam_data(dat, trend_formula = ~ CAR(), family = poisson())
   ))
   expect_error(
     suppressMessages(
-      mvgam_data(dat, trend_model = AR(p = 1), family = poisson())
+      mvgam_data(dat, trend_formula = ~ AR(p = 1), family = poisson())
     ),
     "Gaps between times range from 1 to 3"
   )
-
-  # Both surfaces answer from the same rules.
-  for (tm in list(ZMVN(), CAR(), AR(p = 1), RW())) {
-    expect_equal(
-      any_trend_requires_regular_intervals(tm),
-      "requires_regular_intervals" %in% (tm$validation_rules %||%
-                                           character(0))
-    )
-  }
 })

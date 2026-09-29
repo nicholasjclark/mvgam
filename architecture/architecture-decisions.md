@@ -46,7 +46,7 @@ mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
 
 ### 3. Stan Integration Strategy: Two-Stage Assembly
 **Decision**: Leverage brms stanvars system with enhanced processing layer
-**Stage 1**: Generate trend stanvars and trend Stan data in `generate_trend_stanvars()`
+**Stage 1**: Generate trend stanvars and trend Stan data in `generate_trend_specific_stanvars()`
 **Stage 2**: Post-process observation model Stan code to inject trend effects and create the combined model
 
 ### 4. Parameter Extraction and Injection System
@@ -87,7 +87,6 @@ stan_code <- glue("sigma_trend ~ {sigma_prior}; ar1_trend ~ {ar1_prior};")
 **Implementation**:
 - `get_trend_parameter_prior()` in `R/priors.R` provides centralized resolution
 - `common_trend_priors` object defines shared parameters (sigma_trend, ar1_trend, LV, Z, etc.)
-- **Parameter Processing**: `process_trend_params()` called during stanvar generation, not construction
 - **Dynamic Characteristics**: Correlation requirements, factor compatibility determined with data context
 - **Environment-Dependent Logic**: Grouping variables processed with actual data structure
 
@@ -126,15 +125,11 @@ mvgam(
 ## Stan Code Design Patterns
 
 ### 1. Response-Specific Parameter Naming
-**Pattern**: Follow brms multivariate naming conventions
-```r
-// Trend effects with matching names
-vector[N_count] mu_count_trend;
-vector[N_biomass] mu_biomass_trend;
-
-// Combined effects
-mu_count += mu_count_trend;
-mu_biomass += mu_biomass_trend;
+**Pattern**: Follow brms multivariate naming conventions. Each response
+indexes the shared `trend` matrix with its own mapping arrays:
+```stan
+mu_count[n] += trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
 ```
 
 ### 2. Factor Model Architecture: Matrix Z Patterns
@@ -175,9 +170,9 @@ The key inferential property is `E(Delta) = tr(Psi^2) * Phi`, where `Delta = Z *
 
 **Closure-unit grouping cardinality**: Closure-unit families default to a 2-column `(series, time)` grouping. `occ(multi_season = TRUE)` and `nmix(multi_season = TRUE)` opt into 3-column `(series, site, time)` via `attr(family, "mvgam_unit_grouping")`; `prepare_closure_unit_family()` threads it through both the validator and the array builder. The factor model architecture is unchanged: `Z` stays `[N_species, N_lv_trend]`, `lv_trend` stays `[N_time_trend, N_lv_trend]` and the trend pipeline operates on the season axis. Per-site variation enters via the obs-formula, preserving the "trends only on `mu`" rule.
 
-### 3. Code Deduplication for User Extensibility
+### 3. Code Deduplication
 
-**Design Principle**: Eliminate redundant code to simplify custom trend development
+**Design Principle**: Each piece the trend types share is written once. A trend's registry entry and its Stan generator record how it differs from the others. The registry holds the six built-in trends. Users cannot register their own.
 
 ### 4. Hierarchical Correlation Architecture
 
@@ -211,7 +206,7 @@ The key inferential property is `E(Delta) = tr(Psi^2) * Phi`, where `Delta = Z *
 
 **Indexing contract** (`R/stan_assembly.R:create_times_trend_matrix`):
 - `times_trend[i, s] = (i - 1) * N_series_trend + s` returns the row of `trend_data` (and hence the slot of `mu_trend`) for time `i` and series `s`.
-- Relies on `extract_trend_data()` arranging trend_data by `dplyr::arrange(time, series)`. Do not break that ordering.
+- Relies on `trend_cell_frame()` (`R/validations.R`) arranging trend_data by `dplyr::arrange(time, series)`. Do not break that ordering.
 
 **Stan emit pattern** (current, after the split):
 ```stan
@@ -341,7 +336,7 @@ terms of them.
 
 ### 3. Stan Optimization Preservation
 **Principle**: Preserve all brms Stan optimizations (GLM primitives, threading, etc.)
-**Implementation**: Let brms handle observation model complexity entirely. GLM injection uses recursive preprocessing to maintain efficiency.
+**Implementation**: Let brms handle observation model complexity entirely. A GLM likelihood is rewritten to take `to_matrix(mu)`, which keeps the GLM call (see the trend injection section of `stan-data-flow-pipeline.md`).
 
 **Threading.** mvgam ships two threading code paths.
 
@@ -357,10 +352,9 @@ terms of them.
   `poisson()`, or `negbinomial()` rely on brms to emit
   `partial_log_lik_lpmf` inside `functions {}` and call
   `reduce_sum` from `model {}`. When a `trend_formula` is
-  also supplied, mvgam's trend injector for the observation
-  block (`R/stan_assembly.R:1346-1411` for `mu +=` and
-  `:1571-1602` for `mu[n] = ...`) cannot find the assignment
-  it needs to splice the trend addition into, because brms has
+  also supplied, mvgam's trend injector
+  (`inject_trend_into_linear_predictors()`) cannot find the
+  assignment it needs to splice the trend addition into, because brms has
   moved both the `mu` declaration and every linpred assignment
   into `partial_log_lik_lpmf`. The combination compiles to a
   silent serial fit or hard crashes.
@@ -424,14 +418,11 @@ AR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
 ```
 
 - **Base type dispatch**: Always use "AR", "RW", "VAR", "PW" (never "AR1", "VAR2", "PWlinear", etc.)
-- **Exported helper**: `create_mvgam_trend()` with consistent dot-prefix parameters (.time, .series, .gr, .subgr)
-- **Rule-based validation**: Validation dispatch based on `validation_rules` field automatically assigned
-- **Automatic metadata**: Dispatch function names generated via convention (generate_ar_trend_stanvars, forecast_ar_rcpp)
-- **Grouping Processing** → `apply_validation_rules()` in R/validations.R (has data context)
-- **Parameter Processing** → `generate_trend_injection_stanvars()` in R/stan_assembly.R (has full context)
-- **Correlation Requirements** → validation layer rule-based dispatch
+- **Internal helper**: `create_mvgam_trend()` with consistent dot-prefix parameters (.time, .series, .gr, .subgr)
+- **Rule-based validation**: `validation_rules` comes from the trend's registered `requires_regular_intervals`
+- **Registry discovery**: `register_core_trends()` finds `generate_<type>_trend_stanvars()` and `<type>_trend_properties()` by name
+- **Parameter Processing** → `generate_trend_specific_stanvars()` in R/stan_assembly.R (has full context)
 - **Dynamic Characteristics** → Stan assembly layer (has validated data)
-- **Dispatch Functions** → convention-based naming eliminates hardcoding
 
 **Standardized Output Pattern**:
 ```r
@@ -477,7 +468,7 @@ ZMVN()            # trend = 'ZMVN'
 - **Universal Grouping**: All trend processing uses (time, series) grouping via attribute accessors
 - **Zero Contamination**: Original data never modified - variables stored as attributes only
 - **Universal Implicit Time**: ALL models use sequential time indices (1, 2, 3, ...) with original time preserved
-- **Three Series Strategies**: Explicit, hierarchical, and multivariate series creation
+- **Three Series Strategies**: Explicit, hierarchical and multivariate series creation. Data a trend model fits must name each row's series through one of them, even for a single series. `assert_axis_column()` refuses an absent column with the one-line fix and requires the series column to be a factor. A factor's levels fix the order of the series. A model without a trend needs no series column. `mvgam_data()` resolves the axes through the same `ensure_mvgam_variables()`
 - **Dual Context**: Same logic for fitting (data + trend_formula) and prediction (mvgam_object + newdata)
 
 **Implementation Pattern**:
@@ -510,7 +501,6 @@ The axis all three strategies arrive at is recorded once on `trend_metadata$axes
 - `ensure_mvgam_variables()`: Creates time and series attributes using appropriate strategy
 - `get_time_for_grouping()`: Universal time accessor for all grouping operations
 - `get_series_for_grouping()`: Universal series accessor for all grouping operations
-- `has_mvgam_variables()`: Checks if attributes are ready for processing
 - `remove_mvgam_variables()`: Cleans up all mvgam-related attributes
 
 ### 5. Data Ordering and Validation Architecture
@@ -523,11 +513,11 @@ The axis all three strategies arrive at is recorded once on `trend_metadata$axes
 - **Single Point of Truth**: `ensure_mvgam_variables()` responsible for all variable standardization
 
 ### 6. Data Validation System for Trends
-**Entry Point**: `validate_time_series_for_trends()` uses pre-computed dimensions and attribute-based variables
+**Entry Point**: `extract_and_validate_trend_components()` (`R/validations.R`) validates the data for the trend and builds its trend data
 **Attribute Creation**: `ensure_mvgam_variables()` creates time/series attributes using appropriate strategy (explicit/hierarchical/multivariate)
-**Core Validation**: `validate_series_time()` works with attribute-based variables via accessor functions
-**Factor Management**: `validate_factor_levels()` and `validate_complete_grouping()` ensure data consistency using attributes
-**Stan Preparation**: Data preparation uses attribute-based grouping for efficient Stan computation with original data preservation
+**Dimensions**: `extract_time_series_dimensions()` resolves the series, time and factor axes once and builds the observation-to-trend mappings
+**Grid Checks**: `refuse_ragged_trend_grid()` requires every series on one time grid, and `validate_regular_time_intervals()` enforces the rule a trend's `validation_rules` names
+**Stan Preparation**: `trend_cell_frame()` arranges the trend data by time and series, leaving the user's data unmodified
 
 ### 7. Stanvars Combination Architecture
 
@@ -561,71 +551,49 @@ matrix[N_lv_trend, N_lv_trend] Sigma;            // CONFLICTS with multivariate 
 - **VAR coefficients**: `A{lag}_trend`
 - **Factor loadings**: `Z` (matrix), `z_loading` (vectors)
 
-### 9. Automatic Parameter Monitoring System
+### 9. The Parameters a Trend Samples
 
-Trend objects automatically discover their own monitoring requirements using convention-based parameter generation
+`generate_monitor_params(trend_spec)` (`R/trend_system.R`) lists the
+parameters a trend samples. It computes the list from the prepared
+specification each time and never stores it on the trend object. A
+`trend_map` and a loadings prior both join the specification after the
+constructor runs, and each changes the list:
 
-**Architecture Pattern**:
-```r
-# Simple character vector field in trend objects
-trend_obj$monitor_params <- c("sigma_trend", "ar1_trend", "ar12_trend", "L_Omega_trend", "Z")
+- a fully fixed `trend_map` samples no `Z`, and a partial one samples
+  its `NA` entries under the `Z` prior (`samples_any_loading()`);
+- with every loading sampled, the factor scale is fixed at 1 and
+  `sigma_trend` and `L_Omega_trend` leave the list
+  (`samples_factor_loadings()`);
+- multiplicative gamma process shrinkage derives `sigma_trend`
+  (`samples_innovation_scale()`).
 
-# Automatic discovery function
-monitor_params <- generate_monitor_params(trend_spec)
-```
-
-**Key Features**:
-- **Convention-Based**: Leverages existing "_trend" suffix pattern
-- **Type-Specific Generators**: Each trend type has dedicated discovery function
-- **Automatic Enhancement**: `add_monitor_params()` enriches trend objects
-- **Smart Normalization**: AR1→AR, VAR2→VAR for consistent dispatch
-- **Standalone Design**: Clean separation from brms observation parameters
-
-**Implementation (R/trend_system.R)**:
-- `generate_monitor_params(trend_spec)` - Core discovery function
-- `generate_ar_monitor_params()`, `generate_var_monitor_params()`, etc. - Type-specific generators  
-- `normalize_trend_type()` - Handles trend type variations
-- `add_monitor_params(trend_obj)` - Enhancement function
+Each trend adds its own parameters through
+`generate_<type>_monitor_params()`. The prior table and the set of
+classes mvgam withholds from brms (`get_all_mvgam_trend_parameters()`)
+both call it.
 
 
-### 10. Ultra-Efficient Forecasting System
+### 10. Forecasting
 
-Forecasting system optimized for maximum runtime speed with minimal storage overhead
+`forecast.mvgam()` (`R/forecast.mvgam.R`) propagates the fitted
+latent state forward one posterior draw at a time:
 
-**Architecture Pattern**:
-```r
-# Minimal metadata stored in final mvgam object
-mvgam_fit$forecast_dispatch <- list(
-  function_name = "forecast_ar_rcpp",               # Convention-based
-  required_params = c("ar1_trend", "sigma_trend"), # For lazy extraction
-  time_info = list(                                 # For validation/horizon calculation
-    last_time = 50,
-    time_variable = "month", 
-    regular_intervals = TRUE
-  )
-)
-```
+1. `extract_last_state()` returns the draw's trend parameters and the
+   state at the end of the training data.
+2. `trend_linpred_grid()` evaluates the trend formula's linear
+   predictor over the training tail and the horizon.
+3. `propagate_trend()` (`R/trend_propagation.R`) steps the zero-mean
+   latent state forward `h` times. It has one branch per registered
+   trend type: `propagate_arma()` for RW, AR and VAR, then
+   `propagate_car()`, `propagate_zmvn()` and `propagate_pw()`.
+4. The observation linear predictor for the same draw is added, the
+   family's inverse link applied and, for `type = "response"`,
+   observation noise drawn. These steps run once over all draws after
+   the loop.
 
-**Speed Optimizations**:
-- **Lazy Parameter Extraction**: Extract only when forecast() called using pre-stored parameter names
-- **Zero Time Overhead**: Pre-computed time structure enables fast newdata validation and horizon calculation
-- **Direct Function Dispatch**: Convention-based function names enable immediate calls without registry lookups
-- **Memory Efficient**: Store only dispatch metadata, not actual parameter values or duplicate states
-
-**Implementation (R/trend_system.R)**:
-- `generate_forecast_metadata(trend_spec)` - Creates dispatch information
-- `filter_*_forecast_params()` - Trend-specific parameter filtering for minimal extraction
-- Convention: `"AR" → forecast_ar_rcpp()` for consistent naming
-
-**Forecasting Workflow**:
-```r
-# Ultra-fast forecast execution
-forecast.mvgam <- function(object, newdata) {
-  params <- extract_parameters_fast(object$fit, object$forecast_dispatch$required_params)
-  horizon <- calculate_horizon(newdata, object$forecast_dispatch$time_info)
-  do.call(object$forecast_dispatch$function_name, list(params, object$states, horizon))
-}
-```
+`coef_uncertainty`, `trend_uncertainty` and `obs_uncertainty` each
+fix one source of variation at draw 1 or at the family mean. The
+header of `R/forecast.mvgam.R` states what each fixes.
 
 ### 11. brms Stanvar Block Naming Conventions
 
@@ -731,7 +699,7 @@ mu_trend += Intercept_trend + r_1_1_trend[J_1_trend[n]] * Z_1_1_trend[n];  // Ra
 ### Data Flow Overview
 ```
 User Input → mvgam() → parse_multivariate_trends() → setup_brms_lightweight() 
-→ validate_time_series_for_trends() → extract_time_series_dimensions(response_vars)
+→ extract_and_validate_trend_components() → extract_time_series_dimensions(response_vars)
 → {dimensions + mappings} ← comprehensive time series analysis
 → generate_combined_stancode() → extract_trend_stanvars_from_setup() 
 → fit_mvgam_model() → create_mvgam_from_combined_fit()
@@ -739,7 +707,7 @@ User Input → mvgam() → parse_multivariate_trends() → setup_brms_lightweigh
 
 **Validation Flow**:
 ```
-data + trend_specs → validate_time_series_for_trends()
+data + mv_spec → extract_and_validate_trend_components()
                   → extract_time_series_dimensions() 
                   → dimensions{n_time, n_series, n_obs, time_var, series_var}
                   → trend_specs$dimensions = dimensions
@@ -748,58 +716,39 @@ data + trend_specs → validate_time_series_for_trends()
 
 ### Key Data Structures
 ```r
-# Single trend with pre-calculated dimensions
+# One trend specification, as a constructor builds it, with the
+# dimensions `extract_and_validate_trend_components()` records
 trend_spec = list(
-  trend = "AR1", p = 1, cor = TRUE, n_lv = 2, 
+  trend = "AR", p = 1, cor = TRUE, n_lv = 2,
   time = "time", series = "series",
-  dimensions = list(
-    n_time = 50, n_series = 3, n_obs = 150,
-    time_var = "time", series_var = "series",
-    time_range = c(1, 50), unique_times = 1:50
-  )
+  dimensions = list(n_time = 50, n_series = 3, n_obs = 150, ...)
 )
 
-# Multivariate trends with dimensions per response
-mv_spec$trend_specs = list(
-  count = list(
-    trend = "AR1", p = 1,
-    dimensions = list(n_time = 50, n_series = 2, n_obs = 100, ...)
-  ),
-  biomass = list(
-    trend = "RW", 
-    dimensions = list(n_time = 50, n_series = 2, n_obs = 100, ...)
-  )
-)
+# A multivariate model holds one copy of that specification per
+# response, keyed by the response name brms gives it
+mv_spec$trend_specs = list(count = trend_spec, biomass = trend_spec)
 ```
 
-### Multivariate Trend Detection Logic
+### Reading and changing a specification
 
-**Design Pattern**: Distinguish between univariate trend specifications and multivariate collections
+Every copy in a per-response list is the same specification. A
+reader asks one copy. A change has to reach every copy. Code
+elsewhere calls three helpers in `R/axes.R` in place of testing the
+shape:
 
-**Detection Algorithm** (in `is_multivariate_trend_specs()`):
-```r
-# Univariate: Has trend field (any of these)
-trend_specs = list(trend = "RW", ...) 
-trend_specs = list(trend_type = "AR", ...)
-trend_specs = list(trend_model = "VAR", ...)
+- `trend_spec_head()` returns the one specification, whatever shape
+  arrives
+- `map_trend_specs()` applies a change to every copy and keeps the
+  shape
+- `is_trend_spec_list()` tells a per-response list from a single
+  specification: a list named by response, carrying no `trend` field
+  of its own, whose every entry is a list
 
-# Multivariate: Named list WITHOUT trend fields
-trend_specs = list(
-  count = list(trend = "RW", ...),
-  biomass = list(trend_type = "AR", ...)
-)
-```
-
-**Key Requirements**:
-1. **Field Compatibility**: Supports `trend`, `trend_type`, and `trend_model` field names, but this needs to be streamlined and simplified as we do not need to maintain backward compatibility
-2. **Multivariate Recognition**: If a named list lacks any trend-identifying field, it's treated as multivariate
-3. **Per-Response Naming**: For multivariate observation models, the
-   per-response naming (`_count`, `_biomass`) is applied only to
-   observation→trend mapping arrays (`obs_trend_time`,
-   `obs_trend_series`, `times_trend`, `mu_ones`). The trend dynamics
-   parameters themselves (`sigma_trend`, `L_Omega_trend`, `ar1_trend`,
-   etc.) are deliberately shared across responses. See "Trend
-   specification scope" below.
+Response suffixes (`_count`, `_biomass`) name only the mapping arrays
+from observations to the trend (`obs_trend_time`,
+`obs_trend_series`, `mu_ones`). The trend dynamics parameters
+(`sigma_trend`, `L_Omega_trend`, `ar1_trend`) are shared across
+responses. See "Trend specification scope" below.
 
 ### Trend specification scope
 
@@ -821,15 +770,10 @@ will not be implemented**.
   fixed effects, etc.) — not arbitrary mixing of dynamics types.
   Mixing AR and RW across responses changes the model's fundamental
   structure and is better served by fitting separate models.
-- The existing `bf(y1 ~ ...) + bf(y2 ~ ...)` and `list(y1 = ~ ...,
-  y2 = ~ ...)` syntaxes are reserved for **shared trend type with
-  per-response covariates** (e.g. each response's trend can have
-  different mean-function predictors but the same dynamics class).
-
-**Constraint enforcement**: User code that passes incompatible trend
-constructors per response (different trend constructor calls) should
-be rejected at validation time with an error referring back to this
-decision. See `validate_trend_formula_brms()`.
+**Constraint enforcement**: every entry point asserts that
+`trend_formula` is a single one-sided formula and refuses `bf()` and
+named-list trend formulas. `validate_trend_formula()` refuses more
+than one trend constructor in it.
 
 **What IS supported for multivariate models**:
 - Different observation families per response (Poisson, Gaussian,
@@ -838,8 +782,6 @@ decision. See `validate_trend_formula_brms()`.
   observation formula
 - Hierarchical / grouped trends via `gr` argument on the (single)
   trend constructor — see Hierarchical Trends section
-- Per-response trend covariates (mean-function inputs) when the
-  trend type is shared
 
 ### Time Series Dimension Management System
 
@@ -849,12 +791,13 @@ decision. See `validate_trend_formula_brms()`.
 
 1. **Early Dimension Calculation**: `extract_time_series_dimensions()` calculates all timing information directly from data during validation
 2. **No Circular Dependencies**: Eliminates previous pattern where `extract_trend_stanvars_from_setup()` tried to extract `n_obs` from `trend_specs` that didn't have it
-3. **Validation Integration**: `validate_time_series_for_trends()` now returns both validated data AND calculated dimensions
-4. **CAR Exception Handling**: CAR trends skip regular interval validation but still get basic dimensions
+3. **Validation Integration**: `extract_and_validate_trend_components()` returns the trend data, the specification carrying its dimensions and the trend metadata
+4. **Irregular Grids**: CAR and ZMVN register `requires_regular_intervals = FALSE`. They skip the regular interval check and still get dimensions
 
 **Dimension Validation Rules**:
-- **Non-CAR trends** (RW, AR, VAR, ZMVN, PW): Require regular time intervals using `validate_regular_time_intervals()`
-- **CAR trends**: Allow irregular intervals, can calculate time distances dynamically in `calculate_car_time_distances()`
+- **RW, AR, VAR, PW**: Require regular time intervals using `validate_regular_time_intervals()`
+- **CAR**: Allows irregular intervals and computes the time distances in `calculate_car_time_distances()`
+- **ZMVN**: Its likelihood is exchangeable in time, which lets it accept irregular intervals
 - **All trends**: Must have consistent series and time variable identification
 
 ### 14. Prior Specification Using Native brms Classes
@@ -875,11 +818,15 @@ decision. See `validate_trend_formula_brms()`.
 
 Replace manual prior generators with convention-based dispatch using existing trend infrastructure.
 
-**Architecture**: 
-- **Automated Prior Generation**: Uses `trend_obj$monitor_params` as authoritative source
-- **Convention-Based Dispatch**: Optional `get_[trend]_parameter_prior()` for customization
-- **Parameter Type Defaults**: Intelligent defaults based on parameter name patterns
-- **Factor Model Support**: Handles `Z` matrix and `_trend` suffixed parameters correctly
+**Architecture**:
+- `get_prior()` builds its trend rows from the specification
+  `prepare_trend_specs()` and `extract_and_validate_trend_components()`
+  produce, the one Stan generation also uses. The rows are
+  `generate_monitor_params()` of that specification.
+- A default resolves through `get_default_trend_parameter_prior()`:
+  an optional `get_<trend>_parameter_prior()` in the mvgam namespace,
+  then `common_trend_priors`, then the name patterns. The Stan
+  generators resolve defaults through the same function.
 
 
 ### 13. Registry System with Auto-Discovery
@@ -895,7 +842,7 @@ Replace manual prior generators with convention-based dispatch using existing tr
 ### 15. Ultra-Clean Stanvar Architecture
 
 - **Single Source of Truth**: Only `generate_common_trend_data()` creates dimension stanvars
-- **Injection Function Orchestration**: `generate_trend_injection_stanvars()` manages complete stanvar assembly:
+- **Orchestration**: `generate_trend_specific_stanvars()` assembles the trend stanvars:
   - Creates dimensions via `generate_common_trend_data()`
   - Creates shared innovations via `generate_shared_innovation_stanvars()`
   - Calls trend generators for trend-specific logic only
@@ -942,8 +889,8 @@ priors_obs_only <- get_prior(mvgam_formula(y ~ x), data = dat)
 ```
 
 **Integration Points**:
-- **Existing Helper Functions**: Leverages `extract_observation_priors()`, `extract_trend_priors()`, `combine_obs_trend_priors()`
-- **Response Name Extraction**: Uses `extract_response_names()` from brms integration layer
+- **Helper Functions**: `prepare_trend_specs()` and `extract_and_validate_trend_components()` build the specification Stan generation uses, `generate_trend_priors()` lists its rows and `combine_obs_trend_priors()` joins them to the observation priors
+- **Response Names**: `parse_multivariate_trends()` extracts them from the formula
 - **Validation Standards**: Full `checkmate::assert_*()` validation with `insight::format_error()` messaging
 
 ### 18. Formula Term Restrictions: Observation vs Trend Formulas
@@ -958,18 +905,17 @@ priors_obs_only <- get_prior(mvgam_formula(y ~ x), data = dat)
 
 ### 19. Observation Family Support for Prediction Functions
 
-Multi-category families are NOT supported in mvgam.
+brms's multi-category families and `mixture()` are refused.
 
-**Unsupported Families** (blocked at model specification time):
-- `categorical`, `multinomial`, `dirichlet`, `dirichlet2`, `logistic_normal`
-
-**Rationale**: These families require 3D linear predictors `[ndraws x nobs x (ncat-1)]` with one eta per category. State-Space trends are single processes that cannot be meaningfully combined with multiple category etas. Users needing these response types should use brms directly.
+**Refused Families** (blocked at model specification time):
+- `categorical`, `multinomial`, `dirichlet`, `logistic_normal`: each needs one linear predictor per category, while a trend adds to one. The refusal names mvgam's long-format equivalent: `categ()`, `multi()`, `diri()` or `mvn()`
+- `mixture()`: no post-fit method has a kernel for a mixture of families
 
 **Supported Ordinal Families** (use 2D linpred → 3D epred):
 - `cumulative`, `sratio`, `cratio`, `acat`
 - These use single eta with threshold-based transformation to category probabilities
 
-**Implementation**: `validate_supported_family()` in `R/validations.R` blocks unsupported families during `generate_stan_components_mvgam_formula()`.
+**Implementation**: `validate_supported_family()` in `R/validations.R`, called for every response by `resolve_observation_family()` (`R/families.R`), which `mvgam()`, `stancode()`, `standata()` and `mvgam_data()` all reach.
 
 ### 20. Dual-Context Function Architecture for Validation and Prediction
 
@@ -1026,12 +972,7 @@ mvgam_object$trend_metadata <- list(
 )
 ```
 
-**Implementation Examples**:
-- `extract_trend_data()`: Dual-context data extraction (R/validations.R:2671)
-- `validate_trend_setup()`: Future master validation function
-- `extract_trend_metadata()`: Future unified metadata extraction
-
-**Future Applications**: This pattern should be applied to all validation and data processing functions that will need to work during prediction, including hierarchical validation, CAR special handling and metadata-driven processing.
+**Implementation Example**: `ensure_mvgam_variables()` takes `metadata` from a fitted object and prepares a prediction frame the way it prepared the training frame (`prepare_mvgam_frame()` in `R/sample_innovations.R`).
 
 ### 21. S3 Result-Object Surface: print + summary Conventions
 

@@ -37,30 +37,13 @@ suppressMessages({
   library(testthat)
 })
 
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 fit_cached <- function(name, formula, family = gaussian(), ...) {
-  path <- cache_path(paste0("val_linpred_", name, ".rds"))
-  if (file.exists(path)) {
-    cat("[cache]", name, "\n")
-    return(readRDS(path))
-  }
-  cat("[fit  ]", name, "\n")
-  fit <- mvgam(formula, family = family, data = parity_data, chains = 2L,
-               iter = 600L, warmup = 300L, silent = 2,
-               backend = "cmdstanr", seed = 1L, ...)
-  part <- paste0(path, ".part")
-  saveRDS(fit, part)
-  file.rename(part, path)
-  fit
+  cached_fit(paste0("val_linpred_", name, ".rds"), function() {
+    mvgam(formula, family = family, data = parity_data, chains = 2L,
+          iter = 600L, warmup = 300L, silent = 2,
+          backend = "cmdstanr", seed = 1L, ...)
+  })
 }
 
 parity_data <- local({

@@ -138,7 +138,7 @@ test_that("compare_scores errors on a non-mvgam_forecast arg", {
   fc1 <- make_mock_forecast()
   bad <- list(forecasts = NULL)
   expect_error(compare_scores(fc1, bad, score = "crps"),
-               "not an mvgam_forecast")
+               "must be an 'mvgam_forecast' object")
 })
 
 

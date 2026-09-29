@@ -52,21 +52,7 @@ compare_scores <- function(..., score = "crps", model_names = NULL,
   checkmate::assert_list(score_args)
 
   forecasts <- list(...)
-  if (length(forecasts) < 2L) {
-    stop(insight::format_error(c(
-      "compare_scores() needs at least two mvgam_forecast objects.",
-      x = paste0("Received ", length(forecasts), "."),
-      i = "Pass each forecast as a separate argument."
-    )))
-  }
-  for (i in seq_along(forecasts)) {
-    if (!inherits(forecasts[[i]], "mvgam_forecast")) {
-      stop(insight::format_error(c(
-        paste0("Argument ", i, " is not an mvgam_forecast object."),
-        x = paste0("Got class '", class(forecasts[[i]])[1L], "'.")
-      )))
-    }
-  }
+  assert_compared_objects(forecasts, "mvgam_forecast", "compare_scores")
 
   if (is.null(model_names)) {
     model_names <- vapply(substitute(...()), deparse, character(1L))
@@ -155,34 +141,9 @@ compare_scores <- function(..., score = "crps", model_names = NULL,
 #' @export
 compare_elpds <- function(..., model_names = NULL) {
   lfos <- list(...)
-  if (length(lfos) < 2L) {
-    stop(insight::format_error(c(
-      "compare_elpds() needs at least two mvgam_lfo objects.",
-      x = paste0("Received ", length(lfos), "."),
-      i = "Pass each LFO result as a separate argument."
-    )))
-  }
-  for (i in seq_along(lfos)) {
-    if (!inherits(lfos[[i]], "mvgam_lfo")) {
-      stop(insight::format_error(c(
-        paste0("Argument ", i, " is not an mvgam_lfo object."),
-        x = paste0("Got class '", class(lfos[[i]])[1L], "'.")
-      )))
-    }
-  }
+  assert_compared_objects(lfos, "mvgam_lfo", "compare_elpds")
 
-  ref_times <- lfos[[1L]]$eval_timepoints
-  for (i in seq_along(lfos)) {
-    if (!identical(lfos[[i]]$eval_timepoints, ref_times)) {
-      stop(insight::format_error(c(
-        "Cannot compare: eval_timepoints differ across LFO runs.",
-        x = paste0("Run ", i, " has a different evaluation grid ",
-                   "than run 1."),
-        i = paste0("Re-run lfo_cv() with the same min_t and ",
-                   "fc_horizon against the same data.")
-      )))
-    }
-  }
+  assert_aligned_lfo(lfos)
 
   if (is.null(model_names)) {
     model_names <- vapply(substitute(...()), deparse, character(1L))
@@ -474,4 +435,26 @@ summary.mvgam_compare_scores <- function(object, ...) {
   rownames(wide) <- NULL
   class(wide) <- c("tbl_df", "tbl", "data.frame")
   wide
+}
+
+
+# Internal: the objects a comparison takes, at least two of one class.
+#'@noRd
+assert_compared_objects <- function(objects, cls, fn) {
+  if (length(objects) < 2L) {
+    stop(insight::format_error(c(
+      paste0("'", fn, "()' compares at least two '", cls, "' objects."),
+      x = paste0("Received ", length(objects), "."),
+      i = "Pass each object as a separate argument."
+    )), call. = FALSE)
+  }
+  for (i in seq_along(objects)) {
+    if (!inherits(objects[[i]], cls)) {
+      stop(insight::format_error(c(
+        paste0("Argument ", i, " must be an '", cls, "' object."),
+        x = paste0("Got class '", class(objects[[i]])[1L], "'.")
+      )), call. = FALSE)
+    }
+  }
+  invisible(TRUE)
 }

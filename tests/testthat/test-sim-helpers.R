@@ -226,24 +226,6 @@ test_that("sim_family_rng errors on unsupported family", {
 })
 
 
-# ---- sim_covariate -------------------------------------------------
-
-test_that("sim_covariate builds each type to its own shape", {
-  set.seed(11L)
-  n <- 50L
-  # Every type returns n values. The length alone identifies none of
-  # them. Each is pinned by the property defining it.
-  expect_length(sim_covariate(n, type = "normal"), n)
-  unif <- sim_covariate(n, type = "uniform")
-  expect_true(all(unif >= -2 & unif <= 2))
-  sq <- sim_covariate(n, type = "seq")
-  expect_true(all(diff(sq) > 0))
-  expect_equal(range(sq), c(-2, 2))
-  cyc <- sim_covariate(n, type = "cyclic")
-  expect_identical(cyc[1:12], cyc[13:24])
-})
-
-
 # ---- sim_grp -------------------------------------------------------
 
 test_that("sim_grp builds a balanced factor", {
@@ -255,52 +237,6 @@ test_that("sim_grp builds a balanced factor", {
   # count could not separate from a factor putting 17 rows on one
   # level and one row on each of the rest.
   expect_identical(unname(as.integer(table(out))), rep(5L, 4L))
-})
-
-
-# ---- stationary_VAR_phi --------------------------------------------
-
-test_that("stationary_VAR_phi draws stationary coefficients", {
-  set.seed(11L)
-  phi <- stationary_VAR_phi(p = 2L, n_series = 3L)
-  expect_identical(dim(phi), c(3L, 3L, 2L))
-  expect_true(all(is.finite(phi)))
-  # Stationarity is the property the helper is named for: every
-  # eigenvalue of the VAR(p) companion matrix falls inside the unit
-  # circle. Shape and finiteness pass for any draw at all.
-  companion <- rbind(
-    cbind(phi[, , 1L], phi[, , 2L]),
-    cbind(diag(3L), matrix(0, 3L, 3L))
-  )
-  expect_lt(max(Mod(eigen(companion, only.values = TRUE)$values)), 1)
-  # One lag is its own companion matrix.
-  set.seed(11L)
-  phi1 <- stationary_VAR_phi(p = 1L, n_series = 3L)
-  expect_lt(
-    max(Mod(eigen(phi1[, , 1L], only.values = TRUE)$values)), 1
-  )
-})
-
-
-# ---- gam_test_fX helpers ------------------------------------------
-
-test_that("gam_test_f0..f3 give three signals and one null", {
-  xs <- seq(0, 1, length.out = 50L)
-  fs <- lapply(
-    list(gam_test_f0, gam_test_f1, gam_test_f2, gam_test_f3),
-    function(fn) fn(xs)
-  )
-  for (f in fs) {
-    expect_length(f, 50L)
-    expect_true(all(is.finite(f)))
-  }
-  # f3 is the null function a simulation gives a covariate with no
-  # effect. The other three have to vary, or a recovery check against
-  # them would pass on a flat fit.
-  expect_identical(fs[[4L]], rep(0, 50L))
-  for (i in 1:3) {
-    expect_gt(stats::sd(fs[[i]]), 0.1)
-  }
 })
 
 

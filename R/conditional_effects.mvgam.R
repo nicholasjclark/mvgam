@@ -252,7 +252,7 @@ conditional_effects.mvgam <- function(x,
           "Faceting by series needs a series column in the data.",
           x = "The fit derives its series from the trend grouping.",
           i = paste0(
-            "Name one series with 'series = <name>', or add a '",
+            "Choose one series with 'series = <name>', or add a '",
             series_var, "' column to the data."
           )
         )), call. = FALSE)
@@ -517,9 +517,8 @@ resolve_series_arg <- function(series, x) {
     if (series < 1L || series > n_levels) {
       stop(insight::format_error(c(
         "'series' index is out of range.",
-        x = paste0(
-          "Got ", series, ". Valid indices run from 1 to ", n_levels, "."
-        ),
+        x = paste0("Got ", series, ", valid indices run from 1 to ",
+                   n_levels, "."),
         i = paste0(
           "Available levels: ",
           paste(shQuote(series_levels), collapse = ", "), "."

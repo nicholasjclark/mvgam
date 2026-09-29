@@ -277,39 +277,22 @@ test_that("assert_loadings_prior_compatible errors on fully-fixed trend_map", {
   )
 })
 
-test_that("assert_loadings_prior_spec_consistent rejects missing fields", {
+test_that("assert_loadings_prior_spec_consistent rejects a corrupt spec", {
   expect_error(
     assert_loadings_prior_spec_consistent(list(features_mat = NULL)),
-    "missing required fields"
+    "lacks required fields"
   )
-})
-
-test_that("assert_loadings_prior_spec_consistent rejects bad feature dim", {
-  bad <- list(
-    features_mat = matrix(0, 4L, 2L),
-    distance_mats = list(),
-    column_shrinkage = "iid",
-    mgp_a1 = NA, mgp_a2 = NA,
+  spec <- list(
+    features_mat = matrix(0, 4L, 2L), distance_mats = list(),
+    column_shrinkage = "iid", mgp_a1 = NA, mgp_a2 = NA,
     n_series = 4L, N_features_trend = 5L, n_distances = 0L
   )
-  expect_error(
-    assert_loadings_prior_spec_consistent(bad),
-    "inconsistent feature dimensions"
-  )
-})
-
-test_that("assert_loadings_prior_spec_consistent rejects bad distance count", {
-  bad <- list(
-    features_mat = NULL,
-    distance_mats = list(a = diag(0, 3L), b = diag(0, 3L)),
-    column_shrinkage = "iid",
-    mgp_a1 = NA, mgp_a2 = NA,
-    n_series = 3L, N_features_trend = 0L, n_distances = 5L
-  )
-  expect_error(
-    assert_loadings_prior_spec_consistent(bad),
-    "inconsistent distance counts"
-  )
+  expect_error(assert_loadings_prior_spec_consistent(spec),
+               "feature matrix has the wrong shape")
+  spec$N_features_trend <- 2L
+  spec$n_distances <- 1L
+  expect_error(assert_loadings_prior_spec_consistent(spec),
+               "distance list has the wrong shape")
 })
 
 test_that("assert_distance_names_unreserved rejects 'dist_' prefix", {
@@ -376,10 +359,8 @@ test_that("MGP shrinkage is refused on trends that cannot carry it", {
 
 test_that("loadings_prior requires a trend to carry it", {
   # The structured prior replaces the iid prior on `Z`, which exists
-  # only on a trend carrying latent factors. With no `trend_formula`
-  # the spec is normalised and its compatibility asserted, then
-  # discarded in silence. A user asking for feature-based loadings
-  # was handed an ordinary GAM.
+  # only on a trend with latent factors. Both refusals name what the
+  # prior needs.
   set.seed(1L)
   d <- sim_mvgam(family = poisson(), n_series = 6L,
                  n_timepoints = 20L)$data_train
@@ -389,8 +370,13 @@ test_that("loadings_prior requires a trend to carry it", {
           run_model = FALSE),
     "loadings_prior"
   )
-  # The refusal names where the prior belongs.
   expect_match(conditionMessage(err), "trend_formula", fixed = TRUE)
+  expect_error(
+    mvgam(y ~ 1, trend_formula = ~ AR(), data = d, family = poisson(),
+          loadings_prior = list(column_shrinkage = "mgp"),
+          run_model = FALSE),
+    "requires a factor trend"
+  )
 
   # With a trend carrying factors the same argument still builds.
   expect_no_error(mvgam(

@@ -413,7 +413,7 @@ normalise_obs_covs <- function(obs_covs, J, T_, K, multi_season) {
   if (is.data.frame(obs_covs)) {
     if (multi_season) {
       stop(insight::format_error(c(
-        "A data.frame 'obs_covs' holds single-season data only.",
+        "A data.frame 'obs_covs' supports single-season data only.",
         i = paste0(
           "Multi-season data must pass 'obs_covs' as a named list ",
           "of '[J, T, K]' arrays."

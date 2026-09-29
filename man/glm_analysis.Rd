@@ -2,8 +2,9 @@
 % Please edit documentation in R/glm_analysis.R
 \name{glm_analysis}
 \alias{glm_analysis}
-\title{GLM Analysis System}
+\title{GLM likelihood detection and trend injection}
 \description{
-Provides GLM analysis that replaces multiple detect_glm_usage() calls
-with a single analysis pass.
+brms folds the linear predictor into its GLM likelihood calls. The
+functions here find those calls and rewrite each one to take a named
+predictor that a trend can be added to.
 }

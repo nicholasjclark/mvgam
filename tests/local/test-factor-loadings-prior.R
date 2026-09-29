@@ -48,29 +48,6 @@ suppressMessages({
 # has to come from the environment:
 #   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
-
-# A ggplot is returned whether or not a layer received any data, so
-# asserting the class passes on the empty panel it looks like it is
-# guarding.
-expect_drawn <- function(p) {
-  expect_s3_class(p, "ggplot")
-  layers <- ggplot2::ggplot_build(p)$data
-  expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-  invisible(layers)
-}
 
 # The trait and phylogeny both reach `Z` through a distance, and
 # both replicas build theirs the same way: standardise the tree so
@@ -157,24 +134,20 @@ cluster_fit <- local({
   cached <- NULL
   function() {
     if (!is.null(cached)) return(cached)
-    path <- cache_path("val_mvgam_loadings_prior.rds")
-    if (file.exists(path)) {
-      cached <<- readRDS(path)
-      return(cached)
-    }
-    sim <- sim_cluster()
-    cached <<- mvgam(
-      formula = y ~ 1,
-      trend_formula = ~ AR(p = 1, n_lv = sim$n_lv),
-      data = sim$data, family = gaussian(),
-      data2 = list(features = sim$features,
-                   cluster = sim$d_cluster),
-      loadings_prior = list(features = "features",
-                            distances = "cluster"),
-      chains = 2L, iter = 1000L, warmup = 500L,
-      refresh = 0, silent = 2, backend = "cmdstanr"
-    )
-    saveRDS(cached, path)
+    cached <<- cached_fit("val_mvgam_loadings_prior.rds", function() {
+      sim <- sim_cluster()
+      mvgam(
+        formula = y ~ 1,
+        trend_formula = ~ AR(p = 1, n_lv = sim$n_lv),
+        data = sim$data, family = gaussian(),
+        data2 = list(features = sim$features,
+                     cluster = sim$d_cluster),
+        loadings_prior = list(features = "features",
+                              distances = "cluster"),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        refresh = 0, silent = 2, backend = "cmdstanr"
+      )
+    })
     cached
   }
 })
@@ -356,27 +329,25 @@ sim_birds <- local({
 birds_fit <- function(wide = FALSE) {
   nm <- if (wide) "val_mvgam_heaps_birds_wide.rds" else
     "val_mvgam_heaps_birds.rds"
-  path <- cache_path(nm)
-  if (file.exists(path)) return(readRDS(path))
-  sim <- sim_birds()
-  args <- list(
-    formula = y ~ 1, factor_formula = ~ -1,
-    data = sim$data, unit = quote(time), species = quote(series),
-    family = bernoulli(), n_lv = sim$n_lv,
-    traits = sim$trait_df, phylo = sim$tree,
-    chains = 2L, burnin = 400L, samples = 400L, silent = 2
-  )
-  if (wide) {
-    # The paper puts log(theta) ~ N(0, sqrt(10)) on the inverse
-    # length-scales where mvgam defaults to N(0, 1).
-    args$priors <- c(
-      brms::prior("normal(0, 3.162)", class = "theta_features"),
-      brms::prior("normal(0, 3.162)", class = "theta_dist_phylo")
+  cached_fit(nm, function() {
+    sim <- sim_birds()
+    args <- list(
+      formula = y ~ 1, factor_formula = ~ -1,
+      data = sim$data, unit = quote(time), species = quote(series),
+      family = bernoulli(), n_lv = sim$n_lv,
+      traits = sim$trait_df, phylo = sim$tree,
+      chains = 2L, burnin = 400L, samples = 400L, silent = 2
     )
-  }
-  fit <- do.call(jsdgam, args)
-  saveRDS(fit, path)
-  fit
+    if (wide) {
+      # The paper puts log(theta) ~ N(0, sqrt(10)) on the inverse
+      # length-scales where mvgam defaults to N(0, 1).
+      args$priors <- c(
+        brms::prior("normal(0, 3.162)", class = "theta_features"),
+        brms::prior("normal(0, 3.162)", class = "theta_dist_phylo")
+      )
+    }
+    do.call(jsdgam, args)
+  })
 }
 
 
@@ -429,11 +400,9 @@ test_that("birds: every post-fit method answers on this fit", {
   expect_true(all(is.finite(ll)))
   expect_gt(stats::sd(colMeans(ll)), 1e-8)
 
-  seen <- character(0)
-  ic <- withCallingHandlers(loo(fit), warning = function(w) {
-    seen <<- c(seen, conditionMessage(w))
-    invokeRestart("muffleWarning")
-  })
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  seen <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   expect_identical(length(ic$diagnostics$pareto_k), n_obs)
   expect_true(all(grepl("Pareto", seen)))
@@ -573,24 +542,22 @@ phylo_fit <- local({
   cached <- NULL
   function() {
     if (!is.null(cached)) return(cached)
-    path <- cache_path("val_mvgam_heaps_birds_phylo_dominant.rds")
-    if (file.exists(path)) {
-      cached <<- readRDS(path)
-      return(cached)
-    }
-    sim <- sim_phylo()
-    cached <<- jsdgam(
-      formula = y ~ 1, factor_formula = ~ -1,
-      data = sim$data, unit = time, species = series,
-      family = gaussian(), n_lv = sim$n_lv,
-      traits = sim$trait_df, phylo = sim$tree,
-      priors = c(
-        brms::prior("normal(0, 3.162)", class = "theta_features"),
-        brms::prior("normal(0, 3.162)", class = "theta_dist_phylo")
-      ),
-      chains = 2L, burnin = 500L, samples = 500L, silent = 2
+    cached <<- cached_fit(
+      "val_mvgam_heaps_birds_phylo_dominant.rds", function() {
+        sim <- sim_phylo()
+        jsdgam(
+          formula = y ~ 1, factor_formula = ~ -1,
+          data = sim$data, unit = time, species = series,
+          family = gaussian(), n_lv = sim$n_lv,
+          traits = sim$trait_df, phylo = sim$tree,
+          priors = c(
+            brms::prior("normal(0, 3.162)", class = "theta_features"),
+            brms::prior("normal(0, 3.162)", class = "theta_dist_phylo")
+          ),
+          chains = 2L, burnin = 500L, samples = 500L, silent = 2
+        )
+      }
     )
-    saveRDS(cached, path)
     cached
   }
 })
@@ -685,4 +652,19 @@ test_that("phylo: the recovered covariance follows the phylogeny", {
   expect_gt((agree - mean(null)) / stats::sd(null), 5)
   expect_lt(abs(mean(null)), 0.05)
   expect_gt(stats::sd(null), 1e-3)
+})
+
+
+test_that("birds: update() carries the traits and the phylogeny", {
+  # The fit was called with the deprecated `burnin` and `samples`, and
+  # a refit also inherits `iter` and `warmup`
+  fit <- birds_fit()
+  refit <- update(fit, chains = 1L, iter = 400L)
+  expect_s3_class(refit, "jsdgam")
+  expect_identical(mvgam_normalise_stancode(refit$stancode),
+                   mvgam_normalise_stancode(fit$stancode))
+  expect_equal(refit$standata$row_features, fit$standata$row_features)
+  expect_equal(refit$standata$dist_phylo, fit$standata$dist_phylo)
+  expect_identical(posterior::ndraws(posterior::as_draws_matrix(refit$fit)),
+                   200L)
 })

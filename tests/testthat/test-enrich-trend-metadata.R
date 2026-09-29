@@ -108,10 +108,10 @@ test_that("ZMVN() gives empty lag sets (no temporal recursion)", {
 
 test_that("enrich preserves existing fields on trend_metadata", {
   base <- list(covariates = c("x", "z"),
-                variables = list(time_var = "time"))
+               axes = list(vars = list(time_var = "time")))
   out <- enrich_trend_metadata(base, AR(p = 1L))
   expect_identical(out$covariates, c("x", "z"))
-  expect_identical(out$variables$time_var, "time")
+  expect_identical(out$axes$vars$time_var, "time")
   expect_identical(out$trend_type, "AR")
 })
 

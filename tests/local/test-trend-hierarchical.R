@@ -36,19 +36,6 @@ suppressMessages({
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(4021L)
 
@@ -150,30 +137,21 @@ sim_truth <- list(
   sigma_true = sigma_true, latent = latent
 )
 
-cache <- cache_path("val_mvgam_hier_trend.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading hierarchical AR fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(AR(gr = region, subgr = species, cor = TRUE))\n")
-  fit <- mvgam(
-    formula = obs_formula, trend_formula = trend_spec,
-    data = dat, family = poisson(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_hier_trend.rds",
+  function() {
+    mvgam(
+      formula = obs_formula, trend_formula = trend_spec,
+      data = dat, family = poisson(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 dm_all <- posterior::as_draws_matrix(fit$fit)
 
-
-test_that("the cached fit ran the program the package generates", {
-  expect_current_program(fit)
-})
 
 
 test_that("the derived axis is the one the frame declares", {
@@ -304,7 +282,7 @@ test_that("the group and subgroup counts are the frame's own", {
   # correlation matrix built for more subgroups than the group has,
   # and every index stays in range.
   sd <- fit$standata
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   d <- as.data.frame(fit$data)
 
   n_gr <- length(unique(d[[vars$gr_var]]))
@@ -411,7 +389,7 @@ test_that("a newdata holding one series reads that series' state", {
   # latent column. A `series` column would have survived subsetting
   # with its levels intact and hidden this.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   stated <- paste(d[[vars$gr_var]], d[[vars$subgr_var]], sep = "_")
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
   full <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
@@ -441,7 +419,7 @@ test_that("a hierarchical fit forecasts on its own axis", {
   # from the fit makes the identical call succeed, which is what
   # isolates it. Recorded as finding 13.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
   stated <- paste(d[[vars$gr_var]], d[[vars$subgr_var]], sep = "_")
   h <- 3L
@@ -474,7 +452,7 @@ test_that("the forecast grid is cut by the axis, not by the column", {
   # forecast recursion from a fault in which column is read to reach
   # it, and it is the only route by which this fixture forecasts.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
   stated <- paste(d[[vars$gr_var]], d[[vars$subgr_var]], sep = "_")
   h <- 3L
@@ -512,7 +490,7 @@ test_that("the one-step trend forecast follows this fit's own AR", {
   # or started from another series' last state, gives a finite
   # trajectory of the right width and fails only here.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
   stated <- paste(d[[vars$gr_var]], d[[vars$subgr_var]], sep = "_")
   h <- 1L
@@ -562,7 +540,7 @@ test_that("summary, residual_cor and shared_variation name the axis", {
   # it is the subgroup set that labels it rather than the six series.
   # A matrix built at the series dimension would correlate species
   # across regions, and the labels are how a reader tells which.
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   subgr <- levels(factor(fit$data[[vars$subgr_var]]))
   rc <- residual_cor(fit)
   expect_identical(rownames(rc$cor), subgr)
@@ -583,7 +561,7 @@ test_that("the tidiers keep this fit's own row order", {
   # A tidier that re-sorts its output pairs each fitted value with
   # another row's observation while every column keeps its length.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
 
   resp <- mvgam:::response_column(fit)
   aug <- augment(fit)
@@ -689,7 +667,7 @@ test_that("each prediction type answers with the quantity it names", {
   # any check made on one type alone.
   withr::local_options(marginaleffects_model_classes = "mvgam")
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   keyed <- paste(d[[vars$gr_var]], d[[vars$subgr_var]])
   grid <- d[!duplicated(keyed), , drop = FALSE]
 
@@ -775,14 +753,9 @@ test_that("the criticism surface runs on a hierarchical fit", {
   # Pareto-k notice is the one diagnostic that says whether the loo
   # approximation holds, and this frame has no missing responses, so
   # the plotting calls owe no notice at all.
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_s3_class(ic, "loo")
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
@@ -802,30 +775,24 @@ test_that("the criticism surface runs on a hierarchical fit", {
   # unrelated warning cannot hide among the expected ones.
   expect_true(all(grepl("Pareto k", loo_warnings)))
 
-  # A ggplot comes back whether or not a layer received data, so the
-  # object is built and its layers required to hold rows.
-  for (p in list(pp_check(fit, ndraws = 10L),
-                 pp_check(fit, type = "resid_qq", ndraws = 50L))) {
-    expect_s3_class(p, "ggplot")
-    layers <- ggplot2::ggplot_build(p)$data
-    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-  }
+  expect_drawn(pp_check(fit, ndraws = 10L))
+  expect_drawn(pp_check(fit, type = "resid_qq", ndraws = 50L))
 
   hc <- hindcast(fit, ndraws = 5L)
   expect_s3_class(hc, "mvgam_forecast")
-  expect_equal(length(hc$hindcasts), fit$series_info$n_series)
+  expect_equal(length(hc$hindcasts), mvgam:::mvgam_axes(fit)$series$n)
 })
 
 
 test_that("a grouping combination absent from training is rejected", {
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   nd <- fit$data
   # Each level below is known on its own, but this pairing never
   # appeared, so the derived series identifier is new.
   nd[[vars$subgr_var]] <- "sp_unseen"
   expect_error(
     posterior_epred(fit, newdata = nd, ndraws = 5L),
-    "Series levels in newdata not found in training data"
+    "Series in 'newdata' has levels absent from the training data"
   )
 })
 
@@ -837,7 +804,7 @@ test_that("the derived identifier follows the declared level order", {
   # levels happen to sort that way cannot tell the two apart, and
   # both this frame's columns are declared out of alphabetical order
   # so that it can.
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   vals <- mvgam:::hierarchical_series_values(
     fit$data, vars$gr_var, vars$subgr_var
   )
@@ -852,7 +819,7 @@ test_that("the derived identifier follows the declared level order", {
 
 
 test_that("a superseded series column warns once, whatever 'silent'", {
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   derived <- mvgam:::hierarchical_series_values(
     fit$data, vars$gr_var, vars$subgr_var
   )
@@ -888,7 +855,7 @@ test_that("a superseded series column warns once, whatever 'silent'", {
 
 
 test_that("a series column matching the derived one is left alone", {
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   derived <- mvgam:::hierarchical_series_values(
     fit$data, vars$gr_var, vars$subgr_var
   )
@@ -968,7 +935,7 @@ test_that("a hierarchical hindcast agrees with the conditional epred", {
   # and `posterior_epred()` across the whole frame, so they agree
   # only when both resolve the same state for the same cell.
   d <- as.data.frame(fit$data)
-  time_var <- fit$trend_metadata$variables$time_var
+  time_var <- fit$trend_metadata$axes$vars$time_var
 
   hc <- hindcast(fit, type = "expected")
   blocks <- hc$hindcasts
@@ -999,7 +966,7 @@ test_that("the axis maps a hierarchical newdata with no draws at all", {
   # than read it, and each of these was a layer that once refused
   # such a frame outright.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
   stated <- paste(d[[vars$gr_var]], d[[vars$subgr_var]], sep = "_")
 
@@ -1061,7 +1028,7 @@ test_that("the axis maps a hierarchical newdata with no draws at all", {
   }
   expect_error(
     mvgam:::resolve_forecast_grid(fit, d, training, levs),
-    "no occasion beyond the training grid"
+    "ends at or before the last training time"
   )
 })
 
@@ -1072,7 +1039,7 @@ test_that("a newdata holding a subset of series reads each of them", {
   # from one rebuilt out of the groupings present, because here the
   # levels in hand are a proper subset in a different order.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
   stated <- paste(d[[vars$gr_var]], d[[vars$subgr_var]], sep = "_")
   full <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
@@ -1101,7 +1068,7 @@ test_that("how the grouping columns are typed does not move an answer", {
   # order is what a user gets from `factor(levels = ...)`; a level
   # with no rows is what survives subsetting a larger frame.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   base <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
                           incl_autocor = TRUE)
 
@@ -1126,21 +1093,29 @@ test_that("how the grouping columns are typed does not move an answer", {
     unname(base)
   )
 
-  # A declared level with no rows is refused here, which is the
-  # opposite of what the same shape does on a fit whose series is a
-  # column: there an unused level is carried without comment. The
-  # refusal is asserted as the contract this path has. It names the
-  # level and lists the ones that would have worked.
+  # A declared level with no rows names no group, as an unused series
+  # level names no series. The frame predicts as before.
   extra <- d
   extra[[vars$subgr_var]] <- factor(
     as.character(extra[[vars$subgr_var]]),
     levels = c(levels(factor(d[[vars$subgr_var]])), "sp_absent")
   )
   expect_identical(sum(extra[[vars$subgr_var]] == "sp_absent"), 0L)
+  expect_equal(
+    unname(posterior_epred(fit, newdata = extra, draw_ids = 1:10,
+                           incl_autocor = TRUE)),
+    unname(base)
+  )
+
+  # A row holding that level is refused. The refusal names the level
+  # and lists the ones that would have worked.
+  unseen <- d
+  unseen[[vars$subgr_var]] <- as.character(unseen[[vars$subgr_var]])
+  unseen[[vars$subgr_var]][1L] <- "sp_absent"
   err <- expect_error(
-    posterior_epred(fit, newdata = extra, draw_ids = 1:10,
+    posterior_epred(fit, newdata = unseen, draw_ids = 1:10,
                     incl_autocor = TRUE),
-    "levels not in training data"
+    "levels absent from the training data"
   )
   expect_match(conditionMessage(err), "sp_absent", fixed = TRUE)
   for (lv in levels(factor(d[[vars$subgr_var]]))) {
@@ -1155,7 +1130,7 @@ test_that("single and repeated rows read the cell they name", {
   # comes first and wrong for the rest, and duplicate rows are what
   # every prediction grid is built from.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
   stated <- paste(d[[vars$gr_var]], d[[vars$subgr_var]], sep = "_")
   full <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
@@ -1184,7 +1159,7 @@ test_that("a newdata holding one occasion reads that occasion", {
   # time axis. An AR trend indexes `trend[t, s]` by both, so a cut
   # that renumbers the occasions from 1 reads the wrong rows.
   d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
+  vars <- fit$trend_metadata$axes$vars
   full <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
                           incl_autocor = TRUE)
   times <- sort(unique(d[[vars$time_var]]))

@@ -1,9 +1,8 @@
 # `trend_registry` is package state, and a testthat worker runs
-# several files in one process. The tests below clear it eleven
-# times and overwrite the core `AR` entry once. A failure between a
-# clear and its re-registration would hand every later file in that
-# worker an empty or altered registry. This restores the core set
-# when the file ends.
+# several files in one process. The tests below clear it. A failure
+# between a clear and its re-registration would hand every later file
+# in that worker an empty registry. This restores the core set when
+# the file ends.
 withr::defer(
   {
     rm(list = ls(envir = trend_registry), envir = trend_registry)
@@ -12,375 +11,80 @@ withr::defer(
   teardown_env()
 )
 
-test_that("Trend registry initializes correctly", {
-  # Clear registry for clean testing
+test_that("the registry initialises once with every core trend", {
   rm(list = ls(envir = trend_registry), envir = trend_registry)
+  expect_false(is_registry_initialized())
+  ensure_registry_initialized()
+  expect_true(is_registry_initialized())
+  n_trends <- length(ls(trend_registry))
+  ensure_registry_initialized()
+  expect_length(ls(trend_registry), n_trends)
 
-  # Registry should be empty initially
-  expect_equal(length(ls(trend_registry)), 0)
-
-  # Initialization should populate core trends
-  register_core_trends()
-
-  # Check all core trends are registered (modern trend system, no "None" trend)
-  expected_trends <- c("AR", "RW", "VAR", "ZMVN", "CAR", "PW")
-  registered_trends <- ls(trend_registry)
-  expect_true(all(expected_trends %in% registered_trends))
-})
-
-test_that("Auto-discovery registry system works correctly", {
-  # Clear registry for clean testing
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-
-  # Auto-registration should discover all core trend types
-  auto_register_trend_types()
-
-  # Check all expected trends are auto-discovered
-  expected_trends <- c("AR", "RW", "VAR", "ZMVN", "CAR", "PW")
-  registered_trends <- ls(trend_registry)
-  expect_true(all(expected_trends %in% registered_trends))
-
-  # Verify properties are correctly loaded
-  ar_info <- trend_registry[["AR"]]
-  expect_true(ar_info$supports_factors)
-  expect_null(ar_info$incompatibility_reason)
-
-  car_info <- trend_registry[["CAR"]]
-  expect_false(car_info$supports_factors)
-  expect_type(car_info$incompatibility_reason, "character")
-  expect_gt(nchar(car_info$incompatibility_reason), 10)
-})
-
-test_that("Trend properties validation works correctly", {
-  # Test valid properties
-  valid_props <- list(supports_factors = TRUE, stationary_source = "none",
-                      incompatibility_reason = NULL)
-  expect_invisible(validate_trend_properties(valid_props, "TEST", "test_properties"))
-
-  # The covariance a marginal prediction integrates over is declared
-  # by each trend. Registration spelled "none" for a trend that left
-  # it out, which skips the stationary lift without a word.
-  expect_error(
-    validate_trend_properties(
-      list(supports_factors = TRUE), "TEST", "test_properties"
-    ),
-    "missing required fields.*stationary_source"
-  )
-
-  # Test invalid properties - not a list
-  expect_error(
-    validate_trend_properties("not_a_list", "TEST", "test_properties"),
-    "must return a list"
-  )
-
-  # Test missing supports_factors field
-  invalid_props <- list(incompatibility_reason = "test")
-  expect_error(
-    validate_trend_properties(invalid_props, "TEST", "test_properties"),
-    "missing required fields.*supports_factors"
-  )
-
-  # Test invalid supports_factors type
-  invalid_props <- list(supports_factors = "not_logical",
-                        stationary_source = "none")
-  expect_error(
-    validate_trend_properties(invalid_props, "TEST", "test_properties"),
-    "must be a single logical value"
-  )
-
-  # Test missing incompatibility_reason for non-factor trend
-  invalid_props <- list(supports_factors = FALSE, stationary_source = "none")
-  expect_error(
-    validate_trend_properties(invalid_props, "TEST", "test_properties"),
-    "must provide.*incompatibility_reason"
-  )
-})
-
-test_that("Core trend properties functions return valid structures", {
-  # Test all core trend properties functions
-  trend_properties_funcs <- list(
-    AR = ar_trend_properties,
-    RW = rw_trend_properties,
-    VAR = var_trend_properties,
-    ZMVN = zmvn_trend_properties,
-    CAR = car_trend_properties,
-    PW = pw_trend_properties
-  )
-
-  for (trend_name in names(trend_properties_funcs)) {
-    props <- trend_properties_funcs[[trend_name]]()
-
-    # Should return valid structure
-    expect_type(props, "list")
-    expect_true("supports_factors" %in% names(props))
-    expect_type(props$supports_factors, "logical")
-    expect_length(props$supports_factors, 1)
-
-    # If doesn't support factors, should have reason
-    if (!props$supports_factors) {
-      expect_true("incompatibility_reason" %in% names(props))
-      expect_type(props$incompatibility_reason, "character")
-      expect_gt(nchar(props$incompatibility_reason), 5)
-    }
-  }
-})
-
-test_that("Trend type registration works correctly", {
-  # Clear registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-
-  # Mock generator function
-  mock_generator <- function(trend_specs, data_info) {
-    list(mock_stanvar = "test")
-  }
-
-  # Register a new trend type
-  result <- register_trend_type("TestTrend",
-                               supports_factors = TRUE,
-                               generator_func = mock_generator)
-
-  expect_true(result)
-  expect_true("TestTrend" %in% ls(trend_registry))
-
-  trend_info <- trend_registry[["TestTrend"]]
-  expect_true(trend_info$supports_factors)
-  expect_identical(trend_info$generator, mock_generator)
-  expect_null(trend_info$incompatibility_reason)
-})
-
-test_that("Factor incompatible trend registration works", {
-  # Clear registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-
-  mock_generator <- function(trend_specs, data_info) {
-    list(mock_stanvar = "test")
-  }
-
-  # Register factor-incompatible trend
-  register_trend_type("IncompatibleTrend",
-                     supports_factors = FALSE,
-                     generator_func = mock_generator,
-                     incompatibility_reason = "Test incompatibility reason")
-
-  trend_info <- trend_registry[["IncompatibleTrend"]]
-  expect_false(trend_info$supports_factors)
-  expect_equal(trend_info$incompatibility_reason, "Test incompatibility reason")
-})
-
-test_that("get_trend_info works correctly", {
-  # Clear and initialize registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-  register_core_trends()
-
-  # Test getting existing trend info (AR now supports factors)
-  ar_info <- get_trend_info("AR")
-  expect_true(ar_info$supports_factors)
-  expect_is(ar_info$generator, "function")
-
-  # Test getting non-existent trend
+  trends <- list_trend_types()
+  expect_setequal(trends$trend_type[trends$supports_factors],
+                  c("AR", "RW", "VAR", "ZMVN"))
+  expect_setequal(trends$trend_type[!trends$supports_factors],
+                  c("CAR", "PW"))
   expect_error(get_trend_info("NonExistentTrend"),
                "Unknown trend type.*NonExistentTrend")
 })
 
-test_that("list_trend_types works correctly", {
-  # Clear and initialize registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-  register_core_trends()
-
-  trend_list <- list_trend_types()
-
-  expect_is(trend_list, "data.frame")
-  expect_true("trend_type" %in% names(trend_list))
-  expect_true("supports_factors" %in% names(trend_list))
-  expect_true("incompatibility_reason" %in% names(trend_list))
-
-  # Check factor-compatible trends (AR now factor-compatible, plus ZMVN)
-  factor_compatible <- trend_list[trend_list$supports_factors, "trend_type"]
-  expect_true("AR" %in% factor_compatible)
-  expect_true("RW" %in% factor_compatible)
-  expect_true("VAR" %in% factor_compatible)
-  expect_true("ZMVN" %in% factor_compatible)
-
-  # Check factor-incompatible trends (CAR, PW)
-  factor_incompatible <- trend_list[!trend_list$supports_factors, "trend_type"]
-  expect_true("CAR" %in% factor_incompatible)
-  expect_true("PW" %in% factor_incompatible)
-})
-
-test_that("Registry initialization is idempotent", {
-  # Clear registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-
-  # Multiple initializations should not cause problems
-  register_core_trends()
-  first_count <- length(ls(trend_registry))
-
-  register_core_trends()
-  second_count <- length(ls(trend_registry))
-
-  expect_equal(first_count, second_count)
-})
-
-test_that("Custom trend registration works", {
-  # Clear registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-
-  # Mock generator
-  custom_generator <- function(trend_specs, data_info) {
-    list(custom_stanvar = "custom_test")
+test_that("trend properties are validated", {
+  for (props in list(ar_trend_properties(), rw_trend_properties(),
+                     var_trend_properties(), zmvn_trend_properties(),
+                     car_trend_properties(), pw_trend_properties())) {
+    expect_invisible(validate_trend_properties(props, "f"))
   }
-
-  # Registering says nothing: it is what the caller just asked for.
-  expect_silent(register_custom_trend("CustomTrend",
-                                      supports_factors = TRUE,
-                                      generator_func = custom_generator))
-
-  # Check it was registered
-  expect_true("CustomTrend" %in% ls(trend_registry))
-  custom_info <- trend_registry[["CustomTrend"]]
-  expect_true(custom_info$supports_factors)
-  expect_identical(custom_info$generator, custom_generator)
-})
-
-test_that("Overwriting existing trend types gives warning", {
-  local_verbose_warnings()
-  withr::local_envvar(TESTTHAT = "")
-  # Clear and initialize registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-  register_core_trends()
-
-  # Mock generator
-  new_generator <- function(trend_specs, data_info) {
-    list(new_stanvar = "new_test")
-  }
-
-  # Overwriting should give warning
-  expect_warning(register_custom_trend("AR",
-                                      supports_factors = FALSE,
-                                      generator_func = new_generator),
-                "Overwriting existing trend type: AR")
-})
-
-test_that("ensure_registry_initialized works", {
-  # Clear registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-
-  # Registry should be empty
-  expect_false(is_registry_initialized())
-
-  # ensure_registry_initialized should populate it
-  ensure_registry_initialized()
-  expect_true(is_registry_initialized())
-
-  # Second call should not change anything
-  trend_count_before <- length(ls(trend_registry))
-  ensure_registry_initialized()
-  trend_count_after <- length(ls(trend_registry))
-  expect_equal(trend_count_before, trend_count_after)
-})
-
-test_that("Main dispatcher uses registry correctly", {
-  # Clear and initialize registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-  register_core_trends()
-
-  # Mock data structures
-  trend_specs <- list(trend_model = "AR", n_lv = NULL, p = 1)
-  data_info <- list(n_series = 3, n_lv = 3)
-
-  # This should work without error (assuming AR generator exists)
-  # We can't test the actual output without the full generator functions
-  # but we can test that dispatch works
-  # The registry lookup and the factor-support check both pass. An
-  # error past them comes from the mock generator, which returns an
-  # incomplete stanvar list. Both assertions run whether or not the
-  # call raises, which fixes the count at two.
-  err <- caught_error(
-    generate_trend_injection_stanvars(trend_specs, data_info)
+  # Every property is declared by each trend and none has a default
+  expect_error(
+    validate_trend_properties(list(supports_factors = TRUE), "f"),
+    "covariance_pattern"
   )
-  msg <- if (is.null(err)) "" else conditionMessage(err)
-  expect_false(grepl("Unknown trend type", msg))
-  expect_false(grepl("not supported.*factor", msg))
+  expect_error(validate_trend_properties("x", "f"), "must be a list")
+
+  # The values are checked where the entry is recorded
+  generator <- function(trend_specs, data_info) list()
+  register <- function(...) {
+    args <- utils::modifyList(
+      list(name = "T", supports_factors = TRUE,
+           covariance_pattern = "diagonal", stationary_source = "none",
+           requires_regular_intervals = TRUE, generator_func = generator),
+      list(...)
+    )
+    do.call(register_trend_type, args)
+  }
+  withr::defer(rm(list = intersect("T", ls(trend_registry)),
+                  envir = trend_registry))
+  expect_error(register(supports_factors = "yes"), "supports_factors")
+  expect_error(register(covariance_pattern = "banded"), "covariance_pattern")
+  # A trend without a factor form gives the refusal its reason
+  expect_error(register(supports_factors = FALSE),
+               "incompatibility_reason")
 })
 
-# Tests for parameter processing function
-test_that("process_trend_params handles simple parameters correctly", {
-  # Test basic parameter processing with trend_param objects
-  param_specs <- trend_param("sigma", bounds = c(0, Inf)) +
-                 trend_param("theta", bounds = c(-1, 1)) +
-                 trend_param("alpha", bounds = c(0, 1))
-
-  result <- mvgam:::process_trend_params(param_specs)
-
-  # Check tpars
-  expect_equal(length(result$tpars), 3)
-  expect_true("sigma_trend" %in% result$tpars)
-  expect_true("theta_trend" %in% result$tpars)
-  expect_true("alpha_trend" %in% result$tpars)
-
-  # Check bounds
-  expect_equal(length(result$bounds), 3)
-  expect_equal(result$bounds$sigma_trend, c(0, Inf))
-  expect_equal(result$bounds$theta_trend, c(-1, 1))
-  expect_equal(result$bounds$alpha_trend, c(0, 1))
+test_that("the registry holds each trend's covariance and time facts", {
+  ensure_registry_initialized()
+  patterns <- vapply(c("AR", "RW", "ZMVN", "VAR", "CAR", "PW"),
+                     get_covariance_pattern, character(1))
+  expect_identical(
+    unname(patterns),
+    c(rep("cholesky_scaled", 3L), "full_covariance", "diagonal", "none")
+  )
+  # PW samples no innovation, which removes `sigma_trend`
+  expect_false(samples_innovation_scale(PW()))
+  expect_true(samples_innovation_scale(CAR()))
+  # CAR carries the elapsed gap and ZMVN is exchangeable in time
+  regular <- vapply(c("AR", "RW", "VAR", "PW", "CAR", "ZMVN"), function(tt) {
+    get_trend_info(tt)$requires_regular_intervals
+  }, logical(1))
+  expect_identical(unname(regular), c(rep(TRUE, 4L), FALSE, FALSE))
 })
 
-test_that("process_trend_params handles conditional parameters correctly", {
-  # Test with conditional parameters using trend_param objects
-  param_specs <- trend_param("sigma", bounds = c(0, Inf)) +
-                 trend_param("theta", bounds = c(-1, 1), condition = FALSE) +  # Excluded condition
-                 trend_param("Sigma", bounds = c(-1, 1))
-
-  result <- mvgam:::process_trend_params(param_specs)
-
-  # Check tpars (should exclude conditional FALSE entries)
-  expect_equal(length(result$tpars), 2)
-  expect_true("sigma_trend" %in% result$tpars)
-  expect_true("Sigma_trend" %in% result$tpars)
-  expect_false("theta_trend" %in% result$tpars)
-
-  # Check bounds (should exclude conditional FALSE entries)
-  expect_equal(length(result$bounds), 2)
-  expect_true("sigma_trend" %in% names(result$bounds))
-  expect_true("Sigma_trend" %in% names(result$bounds))
-  expect_false("theta_trend" %in% names(result$bounds))
-})
-
-test_that("a trend parameter condition that cannot be evaluated is an error", {
-  # It was caught and the parameter silently dropped.
-  unknown <- trend_param("theta", bounds = c(-1, 1),
-                         condition = zz_not_defined > 1)
-  expect_error(mvgam:::process_trend_params(unknown), "zz_not_defined")
-  not_a_flag <- trend_param("theta", bounds = c(-1, 1),
-                            condition = c(TRUE, FALSE))
-  expect_error(mvgam:::process_trend_params(not_a_flag), "TRUE or FALSE")
-  # A condition that evaluates keeps or drops its parameter.
-  n_lv <- 2
-  kept <- trend_param("theta", bounds = c(-1, 1), condition = n_lv > 1)
-  expect_identical(mvgam:::process_trend_params(kept)$tpars, "theta_trend")
-})
-
-test_that("process_trend_params handles empty input correctly", {
-  # Test NULL parameter specs
-  result <- mvgam:::process_trend_params(NULL)
-
-  expect_equal(length(result$tpars), 0)
-  expect_equal(length(result$bounds), 0)
-})
-
-test_that("process_trend_params preserves existing _trend suffix", {
-  # Test parameters that already have _trend suffix
-  param_specs <- trend_param("sigma_trend", bounds = c(0, Inf)) +  # Already has suffix
-                 trend_param("theta", bounds = c(-1, 1))            # Needs suffix
-
-  result <- mvgam:::process_trend_params(param_specs)
-
-  expect_equal(length(result$tpars), 2)
-  expect_true("sigma_trend" %in% result$tpars)
-  expect_true("theta_trend" %in% result$tpars)
-
-  # Should not have sigma_trend_trend
-  expect_false("sigma_trend_trend" %in% result$tpars)
+test_that("create_mvgam_trend checks the arguments every trend shares", {
+  expect_error(AR(n_lv = 0), "n_lv")
+  expect_error(RW(n_lv = 1.5), "n_lv")
+  expect_error(VAR(ma = NA), "ma")
+  expect_error(AR(cor = NA), "cor")
 })
 
 test_that("simplified RW constructor works correctly", {
@@ -455,65 +159,6 @@ test_that("helper functions work correctly", {
   expect_equal(trend_obj$series, "series")
 })
 
-test_that("trend constructors use process_trend_params correctly", {
-  # Test that actual trend constructors produce correct parameter names
-  # Test basic RW constructor (parameter processing moved to Stan assembly)
-  rw_trend <- RW()
-  expect_s3_class(rw_trend, "mvgam_trend")
-  expect_equal(rw_trend$trend, "RW")
-  expect_false(rw_trend$ma)
-
-  # Test RW with ma = TRUE
-  rw_ma_trend <- RW(ma = TRUE)
-  expect_equal(rw_ma_trend$trend, "RW")
-  expect_true(rw_ma_trend$ma)
-
-  # Test AR constructor (complex parameter processing moved to Stan assembly)
-  ar1_trend <- AR(p = 1)
-  expect_equal(ar1_trend$trend, "AR")  # Base type for all dispatch
-  expect_equal(ar1_trend$p, 1)
-
-  ar2_trend <- AR(p = 2)
-  expect_equal(ar2_trend$trend, "AR")  # Base type for all dispatch
-  expect_equal(ar2_trend$p, 2)
-
-  # Test VAR constructor
-  var_trend <- VAR(p = 1)
-  expect_equal(var_trend$trend, "VAR")  # Base type for all dispatch
-  expect_equal(var_trend$p, 1)
-  expect_true(var_trend$cor)  # VAR always has cor = TRUE
-
-  # Test CAR constructor (basic structure only - detailed tests will be added after simplification)
-  car_trend <- CAR()
-  expect_equal(car_trend$trend, "CAR")
-
-  # Test AR with MA
-  ar_ma_trend <- AR(p = 1, ma = TRUE)
-  expect_equal(ar_ma_trend$trend, "AR")  # Base type for all dispatch
-  expect_equal(ar_ma_trend$p, 1)
-  expect_true(ar_ma_trend$ma)
-})
-
-test_that("every rule constant is one a trend actually declares", {
-  # The constant and the string the fitting path tests are one value.
-  expect_equal(rule_requires_regular_intervals,
-               "requires_regular_intervals")
-})
-
-test_that("parameter suffix validation is robust", {
-  # Test validation of parameter input - should only accept trend_param objects
-  expect_error(
-    mvgam:::process_trend_params(c("sigma", "theta")),
-    "Assertion on 'param_specs' failed"
-  )
-
-  # Test that function rejects simple lists
-  expect_error(
-    mvgam:::process_trend_params(list(sigma = c(0, 1), theta = c(-1, 1))),
-    "Assertion on 'param_specs' failed"
-  )
-})
-
 test_that("simplified AR constructor works correctly", {
   # Test simplified AR constructor using create_mvgam_trend helper
   # Test basic AR constructor
@@ -569,22 +214,13 @@ test_that("create_mvgam_trend handles all parameters consistently", {
   expect_equal(trend_obj$custom_param, 42)
 })
 
-test_that("get_covariance_pattern() matches dictionary keys case-insensitively", {
-  # Reason: the dictionary stores keys in their natural case ("None",
-  # "PW", "RW", "AR", ...). Callers may pass any case. The lookup
-  # must normalise before indexing so the no-trend dispatch ("None")
-  # is not silently routed to the cholesky_scaled default, which
-  # would force prediction surfaces through sample_process_errors()
-  # and fail on missing trend_metadata for a trendless fit.
-  expect_equal(mvgam:::get_covariance_pattern("None"), "none")
-  expect_equal(mvgam:::get_covariance_pattern("none"), "none")
-  expect_equal(mvgam:::get_covariance_pattern("NONE"), "none")
-  expect_equal(mvgam:::get_covariance_pattern("AR"),   "cholesky_scaled")
-  expect_equal(mvgam:::get_covariance_pattern("ar"),   "cholesky_scaled")
-  expect_equal(mvgam:::get_covariance_pattern("AR1"),  "cholesky_scaled")
-  expect_equal(mvgam:::get_covariance_pattern("VAR2"), "full_covariance")
-  expect_equal(mvgam:::get_covariance_pattern("CAR"),  "diagonal")
-  expect_equal(mvgam:::get_covariance_pattern("PW"),   "none")
+test_that("a trendless fit takes the \"none\" pattern", {
+  # A trendless fit reports its trend type as "None". Routing it to a
+  # stochastic pattern sends every prediction surface to
+  # sample_process_errors() on metadata the fit lacks.
+  expect_identical(get_covariance_pattern("None"), "none")
+  expect_identical(trend_stationary_source("None"), "none")
+  expect_error(get_covariance_pattern("AR1"), "Unknown trend type")
 })
 
 test_that("has_stochastic_trend() returns FALSE for trendless mvgam objects", {
@@ -693,34 +329,6 @@ test_that("the ma parameter table names every trend that accepts one", {
 })
 
 
-test_that("a trend that cannot take factors refuses them", {
-  # The registry records `supports_factors` and the reason beside
-  # it, and the refusal a user meets is composed from both. These
-  # assert the live path rather than the registry field, and they
-  # use real constructor calls rather than a hand-built spec list.
-  expect_error(
-    PW(n_lv = 2),
-    "Factor models are not supported for PW trends"
-  )
-  expect_error(
-    PW(trend_map = data.frame(series = factor("a"), trend = 1L)),
-    "Factor models are not supported for PW trends"
-  )
-  # The reason travels with the refusal, so a user is told why a
-  # piecewise trend has no factor form rather than only that it has
-  # none.
-  # insight wraps the reason across lines, so the assertion takes a
-  # fragment of the registered text rather than the whole sentence.
-  expect_match(
-    conditionMessage(expect_error(PW(n_lv = 2))),
-    "series-specific changepoint modeling",
-    fixed = TRUE
-  )
-  # A factor-compatible trend takes it.
-  expect_silent(AR(n_lv = 2))
-})
-
-
 test_that("a reported prior carries the support it is sampled on", {
   # The bounds a parameter is declared with sit in the same program
   # as its prior. Reading one and not the other reported
@@ -776,6 +384,6 @@ test_that("a spec's sharing mode and cap column each have one reader", {
   # guessed for it.
   expect_error(
     pw_cap_var(list(trend = "PW", growth = "logistic")),
-    "names no carrying-capacity column"
+    "lacks a carrying-capacity column"
   )
 })

@@ -460,7 +460,10 @@ fit_model <- function(model, backend, ...) {
     init <- 0
   }
   future <- future && algorithm %in% "sampling"
-  args <- nlist(data = sdata, seed, init)
+  # Every cmdstanr method takes the two output settings, and `silent`
+  # governs them for each algorithm alike.
+  args <- nlist(data = sdata, seed, init,
+                show_messages = silent < 2, show_exceptions = silent == 0)
   if (use_opencl(opencl)) {
     args$opencl_ids <- opencl$ids
   }
@@ -489,7 +492,7 @@ fit_model <- function(model, backend, ...) {
       rlang::inform("Running Pathfinder to obtain initial values")
     }
     args$init <- run_pathfinder(model, args, chains, threading_on,
-                                threads, silent)
+                                threads)
   }
   if (algorithm %in% c("sampling", "fixed_param")) {
     c(args) <- list(
@@ -498,8 +501,6 @@ fit_model <- function(model, backend, ...) {
       chains = chains,
       thin = thin,
       parallel_chains = cores,
-      show_messages = silent < 2,
-      show_exceptions = silent == 0,
       fixed_param = algorithm == "fixed_param"
     )
     if (threading_on) {
@@ -545,8 +546,7 @@ fit_model <- function(model, backend, ...) {
     }
     out <- brms::do_call(model$variational, args)
   } else if (algorithm %in% c("pathfinder")) {
-    out <- run_pathfinder(model, args, chains, threading_on, threads,
-                          silent)
+    out <- run_pathfinder(model, args, chains, threading_on, threads)
   } else if (algorithm %in% c("laplace")) {
     if (threading_on) {
       args$threads <- threads$threads
@@ -577,11 +577,8 @@ fit_model <- function(model, backend, ...) {
         x = paste0(
           "All ", length(codes), " chains returned a non-zero code."
         ),
-        i = paste0(
-          "Refit with 'silent = 0' to see Stan's own messages. A ",
-          "different 'seed' or 'init', or a higher 'adapt_delta', ",
-          "may also help."
-        )
+        i = "Refit with 'silent = 0' to see Stan's own messages.",
+        i = "Try a different 'seed' or 'init', or a higher 'adapt_delta'."
       )), call. = FALSE)
     }
   }
@@ -1000,16 +997,10 @@ refuse_unknown_cmdstanr_args <- function(model, algorithm, arg_names) {
 #' @param chains Number of chains, used as the number of paths
 #' @param threading_on Logical; is within-chain threading active?
 #' @param threads Validated `brmsthreads` object, or `NULL`
-#' @param silent Integer from 0 to 2 controlling verbosity level
 #' @return A `CmdStanPathfinder` object
 #' @noRd
-run_pathfinder <- function(model, args, chains, threading_on, threads,
-                           silent) {
-  defaults <- list(
-    num_paths = chains,
-    show_messages = silent < 2,
-    show_exceptions = silent == 0
-  )
+run_pathfinder <- function(model, args, chains, threading_on, threads) {
+  defaults <- list(num_paths = chains)
   if (threading_on) {
     defaults$num_threads <- threads$threads
   }
@@ -1075,11 +1066,9 @@ validate_sampler_iterations <- function(iter, warmup = NULL) {
   stop(insight::format_error(c(
     "Argument 'warmup' must be smaller than 'iter'.",
     x = paste0("Got 'warmup' = ", warmup, " and 'iter' = ", iter, "."),
-    i = paste0(
-      "'iter' counts warmup and sampling together. Raise 'iter' ",
-      "above ", warmup, " or lower 'warmup'."
-    )
-  )))
+    x = "'iter' counts warmup and sampling together.",
+    i = paste0("Raise 'iter' above ", warmup, " or lower 'warmup'.")
+  )), call. = FALSE)
 }
 
 #' Validate Initial Value Specification
@@ -1203,10 +1192,9 @@ check_chains_finished <- function(fit, requested, algorithm) {
     x = paste0(
       "Asked for ", requested, " chains and ", finished, " finished."
     ),
-    i = paste0(
-      "Every summary of this model is computed from the ", finished,
-      " chains that finished. Refit to recover the full posterior."
-    )
+    x = paste0("Every summary of this model uses the ", finished,
+               " chains that finished."),
+    i = "Refit to recover the full posterior."
   ))
   invisible(TRUE)
 }

@@ -103,15 +103,10 @@ extract_truncation_bounds <- function(object, nobs) {
       lb_vals <- unique(finite_lb)
       ub_vals <- unique(finite_ub)
       if (length(lb_vals) == 1 && length(ub_vals) == 1 && lb_vals >= ub_vals) {
-        stop(insight::format_error(c(
-          cli::format_inline(
-            paste0(
-              "Invalid truncation bounds: {.field lb} (", lb_vals,
-              ") must be less than {.field ub} (", ub_vals, ")."
-            )
-          ),
-          i = "Truncation requires lb < ub to define a valid bounded region."
-        )))
+        stop(insight::format_error(paste0(
+          "Truncation bound 'lb' (", lb_vals, ") must be below 'ub' (",
+          ub_vals, ")."
+        )), call. = FALSE)
       }
     }
   }
@@ -520,12 +515,9 @@ sample_from_family <- function(family_name, ndraws, epred,
                                 ncols = ncol(epred))
       checkmate::assert_numeric(trials, lower = 0L,
                                  len = ncol(epred))
-      # `epred` is on probability scale (p); rebuild linpred via
-      # qlogis so `posterior_predict_com_binomial` (which expects
-      # linpred + link) can apply its own logit inversion. Keeps
-      # the helper-facing contract identical to
-      # `log_lik_com_binomial` rather than introducing a second
-      # p-scale entry point.
+      # `epred` is on the probability scale. `qlogis` rebuilds the
+      # link-scale predictor `posterior_predict_com_binomial()` takes,
+      # the scale every family kernel takes.
       linpred_cmb <- stats::qlogis(epred)
       posterior_predict_com_binomial(
         linpred     = linpred_cmb,
@@ -813,7 +805,7 @@ sample_from_family <- function(family_name, ndraws, epred,
       spec = family_dist_spec(
         family_name, "identity", epred,
         list(sigma = sigma, shape = shape, phi = phi, nu = nu,
-             mphi = mphi, mtheta = mtheta),
+             mphi = mphi, mtheta = mtheta, mtail = mtail),
         trials
       ),
       discrete = family_uses_integers(family_name)
@@ -1078,14 +1070,11 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
   out <- as.matrix(inv_link(linpred,
                             dpar_link(model_families(object, resp), dpar)))
   if (!is.null(ndraws) && nrow(out) != ndraws) {
-    stop(insight::format_error(c(
-      paste0(
-        "Distributional parameter '", dpar,
-        "' was predicted from a different number of draws than the ",
-        "linear predictor."
-      ),
-      x = paste0("Got ", nrow(out), " rows. Expected ", ndraws, ".")
-    )))
+    stop_mvgam_fault(
+      paste0("Distributional parameter '", dpar, "' needs one row per ",
+             "draw of the linear predictor."),
+      paste0("Got ", nrow(out), " rows, expected ", ndraws, ".")
+    )
   }
   if (!is.null(nobs) && ncol(out) != nobs) {
     stop(insight::format_error(c(
@@ -1093,12 +1082,10 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
         "Distributional parameter '", dpar, "' was predicted for a ",
         "different number of rows than the linear predictor covers."
       ),
-      x = paste0("Got ", ncol(out), " columns. Expected ", nobs, "."),
-      i = paste0(
-        "A covariate of the '", dpar, "' formula may be missing from ",
-        "'newdata'."
-      )
-    )))
+      x = paste0("Got ", ncol(out), " columns, expected ", nobs, "."),
+      i = paste0("Check 'newdata' for every covariate of the '", dpar,
+                 "' formula.")
+    )), call. = FALSE)
   }
   out
 }
@@ -1183,18 +1170,6 @@ inv_link <- function(x, link) {
       "Link '", link, "' has no inverse defined in mvgam."
     )), call. = FALSE)
   )
-}
-
-
-#' `log(1 + exp(x))`, kept finite where `exp(x)` overflows
-#'
-#' @param x Numeric vector, matrix or array
-#' @return `x` transformed, with its dimensions
-#' @noRd
-log1p_exp <- function(x) {
-  out <- log1p(exp(x))
-  out[is.infinite(out)] <- x[is.infinite(out)]
-  out
 }
 
 
@@ -1296,13 +1271,12 @@ extract_dpars_from_stanfit <- function(stanfit,
       # Sort columns by index to ensure correct ordering
       indices <- as.integer(gsub(".*\\[(\\d+)\\].*", "\\1", indexed_cols))
 
-      # Validate index extraction succeeded
-      if (any(is.na(indices))) {
-        stop(insight::format_error(
-          cli::format_inline(
-            "Failed to extract numeric indices from parameter names: {.val {indexed_cols[is.na(indices)]}}."
-          )
-        ))
+      if (anyNA(indices)) {
+        stop_mvgam_fault(
+          "A per-row parameter must carry one index per column.",
+          paste0("Got ", paste(indexed_cols[is.na(indices)],
+                              collapse = ", "), ".")
+        )
       }
 
       indexed_cols <- indexed_cols[order(indices)]
@@ -1327,12 +1301,12 @@ extract_dpars_from_stanfit <- function(stanfit,
       } else if (ncol(dpar_matrix) == nobs) {
         dpars_list[[dpar]] <- dpar_matrix
       } else {
-        stop(insight::format_error(c(
-          paste0("Parameter '", dpar, "' cannot be read one value per ",
-                 "row."),
-          x = paste0("It has ", ncol(dpar_matrix), " columns and the ",
-                     "prediction covers ", nobs, " rows.")
-        )), call. = FALSE)
+        stop_mvgam_fault(
+          paste0("Parameter '", dpar, "' must have one column per ",
+                 "prediction row."),
+          paste0("Found ", ncol(dpar_matrix), " columns for ", nobs,
+                 " rows.")
+        )
       }
     } else {
       # Parameter not found - return NULL (caller handles defaults)

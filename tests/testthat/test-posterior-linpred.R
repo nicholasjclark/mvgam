@@ -151,7 +151,7 @@ test_that("get_combined_linpred errors on dimension mismatch (univariate)", {
   expect_error(
     get_combined_linpred(stub_obj(), newdata = NULL,
                          process_error = TRUE),
-    "Dimension mismatch"
+    "has the wrong shape"
   )
 })
 
@@ -171,7 +171,7 @@ test_that("get_combined_linpred errors on dim mismatch (per-response)", {
   expect_error(
     get_combined_linpred(stub_obj(), newdata = NULL,
                          process_error = TRUE),
-    "Dimension mismatch"
+    "has the wrong shape"
   )
 })
 
@@ -423,7 +423,7 @@ test_that("a group-level term is read by its block id and prefix", {
     extract_linpred_from_prep(mk_prep(
       sdata, draws, brms::bf(y ~ (1 | g), sigma ~ (1 | g)), ranef = ranef
     ), dpar = "sigma"),
-    "fault in mvgam"
+    "Please report this mvgam fault"
   )
   # Under `re_formula = NA` brms writes no group-level data, and no
   # term is read.
@@ -525,7 +525,7 @@ test_that("a monotonic term reads each level as brms codes it", {
   sdata$Imo <- 2L
   expect_error(
     extract_linpred_from_prep(mk_prep(sdata, draws, brms::bf(y ~ mo(z)))),
-    "stand alone"
+    "on its own"
   )
 })
 
@@ -632,7 +632,7 @@ test_that("resolve_draw_indices() is the one rule for choosing draws", {
   # Asking for more than exists is refused rather than truncated.
   expect_error(
     resolve_draw_indices(10L, ndraws = 11L, draw_ids = NULL),
-    "more draws than the posterior holds"
+    "more draws than the posterior has"
   )
   # A smaller count gives that many distinct indices, in order.
   set.seed(1L)
@@ -664,7 +664,7 @@ test_that("resolve_draw_ids() materialises a count as indices", {
                seq_len(100))
   # Asking for more than exists is an error, not a silent truncation.
   expect_error(resolve_draw_ids(stub, ndraws = 150, draw_ids = NULL),
-               "more draws than the posterior holds")
+               "more draws than the posterior has")
   # A count below the total becomes that many sorted, distinct indices.
   set.seed(1L)
   ids <- resolve_draw_ids(stub, ndraws = 10, draw_ids = NULL)

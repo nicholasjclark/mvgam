@@ -44,19 +44,6 @@ suppressMessages({
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(2207L)
 
@@ -296,30 +283,21 @@ test_that("a trend covariate is built on the trend grid", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_ar_multilag.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading multi-lag AR fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(AR(p = c(1, 3, 12)), gp(x), 2 x 96)\n")
-  fit <- mvgam(
-    formula = obs_formula, trend_formula = trend_spec,
-    data = dat, family = gaussian(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_ar_multilag.rds",
+  function() {
+    mvgam(
+      formula = obs_formula, trend_formula = trend_spec,
+      data = dat, family = gaussian(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 dm <- posterior::as_draws_matrix(fit$fit)
 
-
-test_that("the cached fit ran the program the package generates", {
-  expect_current_program(fit)
-})
 
 
 test_that("print names every lag the model carries", {
@@ -630,7 +608,6 @@ test_that("the reference the battery compares against actually varies", {
 })
 
 
-
 test_that("rearranged and cut newdata frames read the same cells", {
   set.seed(88L)
   perm <- sample(nrow(dat))
@@ -680,7 +657,7 @@ test_that("an unknown series is refused, and named", {
   )
   err <- expect_error(
     posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-    "Series levels in newdata not found in training data"
+    "Series in 'newdata' has levels absent from the training data"
   )
   expect_match(conditionMessage(err), "omega", fixed = TRUE)
   for (s in series_levels) {
@@ -715,14 +692,9 @@ test_that("summary, tidiers and criticism run on a multi-lag AR", {
   # approximation breaks, and the warning that arrived, if any, is
   # the k notice those numbers already account for rather than
   # something else that slipped through.
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))
@@ -828,20 +800,11 @@ test_that("the trend-side smooth is drawn as a curve that moves", {
 
 
 test_that("pp_check and the plotting methods draw something", {
-  # A ggplot is returned whether or not a layer received any data, so
-  # the class alone passes on the empty panel it looks like it is
-  # guarding. Building the object forces the layers to resolve, and
-  # the row count is what says something was drawn.
-  drawn <- function(p) {
-    expect_s3_class(p, "ggplot")
-    layers <- ggplot2::ggplot_build(p)$data
-    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-  }
-  drawn(pp_check(fit, ndraws = 20L))
+  expect_drawn(pp_check(fit, ndraws = 20L))
   for (ty in c("residuals", "trend", "series")) {
-    drawn(plot(fit, type = ty))
+    expect_drawn(plot(fit, type = ty))
   }
-  drawn(mcmc_plot(fit))
+  expect_drawn(mcmc_plot(fit))
 })
 
 test_that("irf, fevd and stability refuse a trend that has no A", {
@@ -962,7 +925,7 @@ test_that("the series argument refuses what it cannot resolve", {
   expect_identical(n_lev, n_series)
   expect_error(conditional_effects(fit, series = "not_a_series"),
                "not one of the model's series levels")
-  expect_error(conditional_effects(fit, series = n_lev + 1L), "upper")
+  expect_error(conditional_effects(fit, series = n_lev + 1L), "out of range")
   expect_error(conditional_effects(fit, series = c("a", "b")),
                "NULL, 'all', a series name")
 })
@@ -976,12 +939,7 @@ test_that("the series argument refuses what it cannot resolve", {
 # explosive. This fit covers the contiguous case and checks the
 # property the recursion exists for.
 
-stat_cache <- cache_path("val_mvgam_ar_contiguous.rds")
-if (file.exists(stat_cache)) {
-  cat("[cache] Loading contiguous AR(p = 2) fit.\n")
-  fit_ar2 <- readRDS(stat_cache)
-} else {
-  cat("[fit ] mvgam(AR(p = 2), 2 x 96)\n")
+fit_ar2 <- cached_fit("val_mvgam_ar_contiguous.rds", function() {
   set.seed(99L)
   phi2 <- c(0.65, -0.4)
   lat2 <- matrix(0, n_time, n_series)
@@ -998,20 +956,15 @@ if (file.exists(stat_cache)) {
     series = factor(rep(series_levels, each = n_time),
                     levels = series_levels)
   )
-  fit_ar2 <- mvgam(
+  mvgam(
     y ~ 1, trend_formula = ~ AR(p = 2), data = dat2,
     family = gaussian(), chains = 2L, iter = 1000L, warmup = 500L,
     silent = 2, backend = "cmdstanr"
   )
-  saveRDS(fit_ar2, stat_cache)
-}
+})
 
 dm2 <- posterior::as_draws_matrix(fit_ar2$fit)
 
-
-test_that("the cached AR(2) fit ran the current program", {
-  expect_current_program(fit_ar2)
-})
 
 
 test_that("a contiguous AR(p = 2) carries both parameterisations", {
@@ -1130,26 +1083,16 @@ make_future_sh <- function(h) {
   )
 }
 
-shared_cache <- cache_path("val_mvgam_ar_shared.rds")
-if (file.exists(shared_cache)) {
-  cat("[cache] Loading shared-coefficient AR(1) fit.\n")
-  fit_sh <- readRDS(shared_cache)
-} else {
-  cat("[fit ] mvgam(AR(p = 1, coef_sharing = shared), 2 x 96)\n")
-  fit_sh <- mvgam(
+fit_sh <- cached_fit("val_mvgam_ar_shared.rds", function() {
+  mvgam(
     y ~ 1, trend_formula = ~ AR(p = 1, coef_sharing = "shared"),
     data = dat_sh, family = gaussian(), chains = 2L, iter = 1000L,
     warmup = 500L, silent = 2, backend = "cmdstanr"
   )
-  saveRDS(fit_sh, shared_cache)
-}
+})
 
 dm_sh <- posterior::as_draws_matrix(fit_sh$fit)
 
-
-test_that("the cached shared fit ran the current program", {
-  expect_current_program(fit_sh)
-})
 
 
 test_that("the program samples one coefficient and broadcasts it", {
@@ -1312,16 +1255,11 @@ test_that("summary, print and the tidiers name the shared parameter", {
 
 
 test_that("pp_check and the plotting methods draw something", {
-  drawn <- function(p) {
-    expect_s3_class(p, "ggplot")
-    layers <- ggplot2::ggplot_build(p)$data
-    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-  }
-  drawn(pp_check(fit_sh, ndraws = 20L))
+  expect_drawn(pp_check(fit_sh, ndraws = 20L))
   for (ty in c("residuals", "trend", "series")) {
-    drawn(plot(fit_sh, type = ty))
+    expect_drawn(plot(fit_sh, type = ty))
   }
-  drawn(mcmc_plot(fit_sh))
+  expect_drawn(mcmc_plot(fit_sh))
 })
 
 

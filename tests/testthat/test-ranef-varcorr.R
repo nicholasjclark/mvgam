@@ -7,42 +7,34 @@
 # brms.
 
 
-make_ranef_stub <- function(group = "grp",
-                            levels = c("a", "b", "c", "d", "e", "f"),
-                            include_x = TRUE) {
+# A fit-shaped stub for a gaussian model: the formula, its Stan data
+# and the brms observation model, whose `ranef` table the aliases are
+# built from.
+ranef_stub <- function(formula, data) {
+  family <- brms::brmsfamily("gaussian")
+  structure(
+    list(
+      formula = formula, data = data, family = family,
+      standata = as.list(brms::standata(formula, data = data,
+                                        family = family)),
+      obs_model = brms::brm(formula, data = data, family = family,
+                            empty = TRUE, silent = 2)
+    ),
+    class = "mvgam"
+  )
+}
+
+make_ranef_stub <- function(include_x = TRUE) {
   set.seed(7L)
   n_obs <- 40L
+  levels <- c("a", "b", "c", "d", "e", "f")
   df <- data.frame(
     y = rnorm(n_obs),
     x = rnorm(n_obs),
     grp = factor(sample(levels, n_obs, replace = TRUE), levels = levels)
   )
-  if (!identical(group, "grp")) {
-    names(df)[3L] <- group
-  }
-  form <- if (include_x) {
-    stats::as.formula(paste0("y ~ 1 + x + (x | ", group, ")"))
-  } else {
-    stats::as.formula(paste0("y ~ 1 + (1 | ", group, ")"))
-  }
-  # Build a brms-shaped formula and standata to satisfy the helper's
-  # cheap gate (`M_<id>` keys) without requiring a real fit.
-  brms_form <- brms::bf(form)
-  sd_ <- brms::standata(
-    brms_form, data = df, family = brms::brmsfamily("gaussian")
-  )
-  structure(
-    list(
-      formula = brms_form,
-      data = df,
-      family = brms::brmsfamily("gaussian"),
-      standata = as.list(sd_),
-      stancode = "// stub",
-      backend = "cmdstanr",
-      algorithm = "sampling"
-    ),
-    class = "mvgam"
-  )
+  form <- if (include_x) y ~ 1 + x + (x | grp) else y ~ 1 + (1 | grp)
+  ranef_stub(brms::bf(form), df)
 }
 
 
@@ -52,18 +44,7 @@ test_that("mvgam_ranef_aliases returns empty for fits without REs", {
   set.seed(11L)
   df <- data.frame(y = rnorm(20L), x = rnorm(20L))
   brms_form <- brms::bf(y ~ 1 + x)
-  sd_ <- brms::standata(
-    brms_form, data = df, family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(
-      formula = brms_form,
-      data = df,
-      family = brms::brmsfamily("gaussian"),
-      standata = as.list(sd_)
-    ),
-    class = "mvgam"
-  )
+  stub <- ranef_stub(brms_form, df)
   expect_identical(mvgam_ranef_aliases(stub), character(0L))
 })
 
@@ -130,15 +111,7 @@ test_that("mvgam_ranef_aliases handles uncorrelated multi-coef REs ((x||g))", {
                  levels = letters[1:4])
   )
   brms_form <- brms::bf(y ~ 1 + x + (1 + x || grp))
-  sd_ <- brms::standata(
-    brms_form, data = df, family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(formula = brms_form, data = df,
-         family = brms::brmsfamily("gaussian"),
-         standata = as.list(sd_)),
-    class = "mvgam"
-  )
+  stub <- ranef_stub(brms_form, df)
   map <- mvgam_ranef_aliases(stub)
   # No correlation parameters with `||`.
   expect_false(any(grepl("^cor_", names(map))))
@@ -160,15 +133,7 @@ test_that("mvgam_ranef_aliases handles multiple grouping factors", {
                   levels = LETTERS[1:4])
   )
   brms_form <- brms::bf(y ~ 1 + (1 | grp) + (1 | site))
-  sd_ <- brms::standata(
-    brms_form, data = df, family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(formula = brms_form, data = df,
-         family = brms::brmsfamily("gaussian"),
-         standata = as.list(sd_)),
-    class = "mvgam"
-  )
+  stub <- ranef_stub(brms_form, df)
   map <- mvgam_ranef_aliases(stub)
   # Naming them is stronger than counting. There are 3 levels of grp
   # and 4 of site, each intercept-only.
@@ -197,14 +162,7 @@ test_that("mvgam_ranef_aliases verifies cor index order for M = 3 and M = 4", {
       sprintf("y ~ %s + (%s | grp)", rhs, re_rhs)
     )
     brms_form <- brms::bf(form)
-    sd_ <- brms::standata(brms_form, data = df,
-                          family = brms::brmsfamily("gaussian"))
-    structure(
-      list(formula = brms_form, data = df,
-           family = brms::brmsfamily("gaussian"),
-           standata = as.list(sd_)),
-      class = "mvgam"
-    )
+    ranef_stub(brms_form, df)
   }
   # M = 3: brms's column-major upper-triangle order produces
   # cor_1[1] = (Intercept,x), cor_1[2] = (Intercept,z),
@@ -249,18 +207,7 @@ test_that("mvgam_ranef_aliases reads nlpar per row under shared-ID syntax", {
     b1 ~ trait1 + (1 | sp | species),
     nl = TRUE
   )
-  sd_ <- brms::standata(
-    obs_nl, data = df, family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(
-      formula  = obs_nl,
-      data     = df,
-      family   = brms::brmsfamily("gaussian"),
-      standata = as.list(sd_)
-    ),
-    class = "mvgam"
-  )
+  stub <- ranef_stub(obs_nl, df)
   alias <- mvgam_ranef_aliases(stub)
   # Both non-linear parameters carry their own species deviations,
   # so both must appear in the map rather than the first alone.
@@ -296,18 +243,7 @@ test_that(
     b  ~ trait1 + (1 | species),
     nl = TRUE
   )
-  sd_ <- brms::standata(
-    obs_nl, data = df, family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(
-      formula  = obs_nl,
-      data     = df,
-      family   = brms::brmsfamily("gaussian"),
-      standata = as.list(sd_)
-    ),
-    class = "mvgam"
-  )
+  stub <- ranef_stub(obs_nl, df)
   alias <- mvgam_ranef_aliases(stub)
   expect_true("sd_species__a_Intercept" %in% names(alias))
   expect_true("sd_species__b_Intercept" %in% names(alias))
@@ -338,18 +274,7 @@ test_that("mvgam_beta_aliases keeps the Intercept column for nl nlpars", {
     b  ~ trait1 + (1 | species),
     nl = TRUE
   )
-  sd_ <- brms::standata(
-    obs_nl, data = df, family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(
-      formula  = obs_nl,
-      data     = df,
-      family   = brms::brmsfamily("gaussian"),
-      standata = as.list(sd_)
-    ),
-    class = "mvgam"
-  )
+  stub <- ranef_stub(obs_nl, df)
   alias <- mvgam_beta_aliases(stub)
   expect_setequal(
     names(alias),
@@ -369,18 +294,7 @@ test_that("mvgam_beta_aliases still strips Intercept on linear main formulas", {
   n_obs <- 30L
   df <- data.frame(y = rnorm(n_obs), env = rnorm(n_obs))
   brms_form <- brms::bf(y ~ env)
-  sd_ <- brms::standata(
-    brms_form, data = df, family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(
-      formula  = brms_form,
-      data     = df,
-      family   = brms::brmsfamily("gaussian"),
-      standata = as.list(sd_)
-    ),
-    class = "mvgam"
-  )
+  stub <- ranef_stub(brms_form, df)
   alias <- mvgam_beta_aliases(stub)
   expect_identical(alias[["b_env"]], "b[1]")
   # The centred Intercept is exposed separately (b_Intercept), not
@@ -406,8 +320,7 @@ test_that("VarCorr.mvgam matches brms::VarCorr.brmsfit signature", {
 
 
 test_that("ranef.mvgam names what to do on a fit with no REs", {
-  # Stub carrying no `M_<id>` keys, so the cheap gate short-circuits
-  # and brm(empty = TRUE) is never reached.
+  # A stub without an observation model has no group-level table.
   stub <- structure(
     list(standata = list(N = 10L), formula = brms::bf(y ~ 1),
          data = data.frame(y = rnorm(10)),
@@ -458,25 +371,6 @@ test_that("assemble_cov_array yields D R D per draw", {
   expect_identical(cov_arr[1L, 2L, 2L], 9)
   expect_identical(cov_arr[1L, 1L, 2L], 3)
   expect_identical(cov_arr[1L, 2L, 1L], 3)
-})
-
-
-test_that("mvgam_ranef_aliases gate excludes trend-only standata blocks", {
-  # A standata that has only `M_<id>_trend` keys (no obs RE block)
-  # must skip the brm(empty=TRUE) call entirely and return char(0).
-  stub <- structure(
-    list(
-      standata = list(
-        N_trend = 30L, M_1_trend = 1L, N_1_trend = 5L,
-        Z_1_1_trend = matrix(1, 30, 1), J_1_trend = rep(1:5, 6)
-      ),
-      formula = brms::bf(y ~ 1),
-      data = data.frame(y = rnorm(5)),
-      family = brms::brmsfamily("gaussian")
-    ),
-    class = "mvgam"
-  )
-  expect_identical(mvgam_ranef_aliases(stub), character(0L))
 })
 
 

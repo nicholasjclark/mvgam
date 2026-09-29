@@ -46,7 +46,7 @@ axis_index_arms <- function(sd, resp_names) {
 
 # The time column a fit was built on.
 time_col <- function(prefit) {
-  prefit$trend_metadata$variables$time_var %||% "time"
+  prefit$trend_metadata$axes$vars$time_var %||% "time"
 }
 
 # A column named by the record and present in the frame.
@@ -76,7 +76,7 @@ frame_group_levels <- function(frame, gr_var) {
 # spelling. A frame carrying neither names one series, where any
 # labelling is trivially the right one.
 frame_row_series <- function(frame, prefit) {
-  vars <- prefit$trend_metadata$variables
+  vars <- prefit$trend_metadata$axes$vars
   if (named_col(vars$gr_var, frame) &&
         named_col(vars$subgr_var, frame)) {
     return(paste(
@@ -127,7 +127,6 @@ frame_axis_labels <- function(name) {
     long = c("a_site", "c_site", "b_site"),
     ragged = c("a_site", "c_site", "b_site"),
     unused = c("a_site", "c_site", "b_site"),
-    char_series = c("a_site", "b_site", "c_site"),
     uni = "only",
     unbal = c("a_site", "c_site", "b_site"),
     hier = hier,
@@ -150,7 +149,6 @@ frame_axis_source <- function(name) {
     name,
     long = "explicit",
     unused = "explicit",
-    char_series = "explicit",
     uni = "explicit",
     unbal = "explicit",
     ragged = "explicit",
@@ -234,7 +232,7 @@ frame_observed <- function(frame, resp_names) {
 # superseded column checks that the fit ignores what it should
 # ignore, not that it refuses what it should refuse.
 axis_naming_column <- function(frame, prefit) {
-  vars <- prefit$trend_metadata$variables
+  vars <- prefit$trend_metadata$axes$vars
   if (named_col(vars$gr_var, frame) &&
         named_col(vars$subgr_var, frame)) {
     return(vars$subgr_var)
@@ -257,7 +255,7 @@ plant_stranger <- function(frame, prefit) {
 
 # What the package says when a frame names a series it never had.
 # One condition, one message, and one place the tests spell it.
-STRANGER_REFUSAL <- "not found in training data"
+STRANGER_REFUSAL <- "has levels absent from the training data"
 
 # When each series was last observed, from the user's own frame.
 # Not the last row it has: mvgam asks a panel whose series end at
@@ -279,11 +277,8 @@ frame_last_times <- function(frame, prefit, resp_names, levels_expected) {
   }, numeric(1L), USE.NAMES = FALSE)
 }
 
-# Whether the responses are the series. Read from the record
-# rather than from `trend_metadata$series_source`, which is a
-# second account of the same fact. The record's value is checked
-# against the frame's own in `expect_axes_sound()`, so branching on
-# it here leans on something already pinned.
+# Whether the responses are the series. The record's value is checked
+# against the frame's own in `expect_axes_sound()`.
 frame_axis_source_of <- function(prefit, frame) {
   prefit$trend_metadata$axes$series$source
 }
@@ -325,7 +320,7 @@ expect_axes_sound <- function(prefit, resp_names, lab, frame,
     }
     # `group_inds_trend` is built from these groups, so the record and
     # the array Stan is handed have to name the same grouping.
-    gr_var <- meta$variables$gr_var
+    gr_var <- meta$axes$vars$gr_var
     if (!is.null(sd$group_inds_trend) && named_col(gr_var, frame)) {
       # Group `g` is the `g`th level the user's own column declares,
       # counting only the levels something is observed at. That is a
@@ -482,7 +477,7 @@ expect_axes_sound <- function(prefit, resp_names, lab, frame,
     # `1,2,1,2` from `1,1,2,2`. Entry `s` has to name the group of the
     # series that occupies column `s`, which means reading the
     # occupancy out of the record and the group out of the frame.
-    gr_var <- meta$variables$gr_var
+    gr_var <- meta$axes$vars$gr_var
     if (named_col(gr_var, frame) && !is.null(sd$obs_trend_series)) {
       row_series <- as.integer(sd$obs_trend_series)
       row_group <- as.character(frame[[gr_var]])
@@ -591,33 +586,20 @@ expect_axes_sound <- function(prefit, resp_names, lab, frame,
   # derives. This is the whole of the bug class: one fact recorded at
   # fit time, derived again elsewhere, the two disagreeing, and every
   # index still landing in range so nothing says a word.
-  index <- mvgam:::fitted_series_index(prefit)
-  expect_false(is.null(index), label = paste(lab, "index resolves"))
-  # `fitted_series_index()` returns `seq_along()` over whichever
-  # labels it settled on, so comparing its values against `1:n` says
-  # only that it produced n of them. What matters is that the label
-  # it gives a column is the label the record puts there, which the
-  # occupancy below asks directly.
-  expect_identical(length(index), n_series,
-                   label = paste(lab, "index covers the axis"))
+  levs <- as.character(meta$axes$series$levels)
+  expect_identical(length(levs), n_series,
+                   label = paste(lab, "stored levels count the axis"))
+  # Each observed row's series, looked up on the recorded axis, is the
+  # column Stan sends it to.
   if (is.null(resp_names) && !is.null(sd$obs_trend_series)) {
     labels <- frame_row_series(frame, prefit)[
       frame_observed(frame, resp_names)
     ]
     expect_identical(
-      as.integer(sd$obs_trend_series),
-      unname(as.integer(index[labels])),
-      label = paste(lab, "index reproduces the recorded mapping")
+      as.integer(sd$obs_trend_series), match(labels, levs),
+      label = paste(lab, "the axis reproduces the Stan mapping")
     )
   }
-  expect_identical(
-    length(meta$levels$series), n_series,
-    label = paste(lab, "stored levels count the axis")
-  )
-  expect_identical(
-    as.character(names(index)), as.character(meta$levels$series),
-    label = paste(lab, "labels match stored levels")
-  )
   # The labels a user would name: the responses of a wide frame, in
   # the order the formula writes them, or the levels of the column
   # they supplied. Read from the frame rather than from the fit, so
@@ -625,7 +607,7 @@ expect_axes_sound <- function(prefit, resp_names, lab, frame,
   expected <- frame_axis_labels(frame_name) %||% resp_names
   if (!is.null(expected)) {
     expect_identical(
-      as.character(names(index)), as.character(expected),
+      levs, as.character(expected),
       label = paste(lab, "labels are the user's own")
     )
   }
@@ -757,7 +739,7 @@ expect_postfit_sound <- function(prefit, resp_names, lab, frame,
 
   # The labels every summary, plot and forecast prints.
   expect_identical(
-    as.character(mvgam:::resolve_series_info(prefit)$series_levels),
+    as.character(mvgam:::fitted_series_levels(prefit)),
     as.character(expected),
     label = paste(lab, "forecast surface names the user's series")
   )
@@ -1125,7 +1107,7 @@ axis_matrix <- function() {
     # response gives nothing to build an axis from, and is turned
     # away saying so.
     list("no axis to build", "uni_bare", ~ AR(p = 1), "refuse", "uni",
-         "series variable"),
+         "Column 'series' is absent"),
 
     # Series built from a grouping, with and without a column that
     # the grouping supersedes.
@@ -1143,18 +1125,16 @@ axis_matrix <- function() {
     list("wide / gaps",      "wide_na", ~ AR(p = 1),        "sound", "wide"),
     list("wide + column",    "wide_col", ~ AR(p = 1),       "sound", "wide"),
 
-    # Columns that are awkward but legal, crossed with the trends
-    # that reach the axis by different routes. One trend per awkward
-    # frame is what let `CAR()` on a character column go unnoticed:
-    # it reads the series column itself rather than the derived axis.
+    # A factor may declare a level that no row observes. Each trend
+    # below reaches the axis by a different route.
     list("unused level / AR1",  "unused", ~ AR(p = 1),   "sound", "uni"),
     list("unused level / CAR",  "unused", ~ CAR(),       "sound", "uni"),
     list("unused level / VAR",  "unused", ~ VAR(),       "sound", "uni"),
     list("unused level / ZMVN", "unused", ~ ZMVN(n_lv = 2), "sound", "uni"),
-    list("character / AR1",  "char_series", ~ AR(p = 1), "sound", "uni"),
-    list("character / VAR",  "char_series", ~ VAR(),     "sound", "uni"),
-    list("character / ZMVN", "char_series", ~ ZMVN(n_lv = 2), "sound",
-         "uni"),
+    # A factor's levels fix the order of the series. mvgam refuses a
+    # character series column.
+    list("character series", "char_series", ~ AR(p = 1), "refuse", "uni",
+         "must be a factor"),
 
     # The latent state lives on one time grid shared by every
     # series, so a panel whose series cover different times is
@@ -1167,14 +1147,11 @@ axis_matrix <- function() {
     # both claim the series axis.
     list("hier + factor", "hier_col",
          ~ AR(p = 1, gr = region, subgr = species, n_lv = 2),
-         "refuse", "uni", "factor model"),
+         "refuse", "uni", "Factor models are not supported"),
 
-    # `CAR()` reads its gaps from the shared time grid, so it holds
-    # on a frame whose series is derived from the responses and on
-    # one whose series column is character. Both once crashed, by
-    # coercing that column with `as.numeric()`.
+    # `CAR()` takes its gaps from the shared time grid, which a frame
+    # whose series come from the responses also has.
     list("wide / CAR", "wide", ~ CAR(), "sound", "wide"),
-    list("character / CAR", "char_series", ~ CAR(), "sound", "uni"),
     # A grouping names the series, so a frame carrying `gr` and
     # `subgr` and no `series` column is a complete specification.
     # Both of these were refused, at a different layer each, by
@@ -1220,11 +1197,7 @@ axis_matrix <- function() {
     # map had the wrong number of rows.
     list("trend_map matrix / unused", "unused",
          ~ AR(p = 1, trend_map = tm_fixed), "sound", "uni"),
-    list("trend_map matrix / character", "char_series",
-         ~ AR(p = 1, trend_map = tm_fixed), "sound", "uni"),
     list("trend_map frame / long", "long",
-         ~ AR(p = 1, trend_map = tm_frame), "sound", "uni"),
-    list("trend_map frame / character", "char_series",
          ~ AR(p = 1, trend_map = tm_frame), "sound", "uni"),
     list("trend_map partial / long", "long",
          ~ AR(p = 1, trend_map = tm_part), "sound", "uni"),
@@ -1246,22 +1219,18 @@ axis_matrix <- function() {
 
     list("trend_map on wide responses", "wide",
          ~ AR(p = 1, trend_map = tm_fixed), "refuse", "wide",
-         "series' column"),
+         "Column 'series' is absent"),
     list("trend_map with no series", "uni_bare",
          ~ AR(p = 1, trend_map = tm_one), "refuse", "uni",
-         "series' column"),
+         "Column 'series' is absent"),
+    # A grouping and the loadings both define the series axis, with
+    # or without a series column in the frame.
     list("trend_map plus grouping", "hier_col",
          ~ AR(p = 1, gr = region, subgr = species,
-              trend_map = tm_hier), "refuse", "uni", "factor model"),
-    # Refused, but for the wrong reason. `hier_col` is turned away
-    # because a grouping and the loadings both claim the series axis,
-    # which is the real objection. `hier` never reaches that gate:
-    # `normalise_trend_map()` reads the series column before any axis
-    # exists and asks for a column this model does not need. The
-    # message is pinned so the day it improves is noticed.
+              trend_map = tm_hier), "refuse", "uni", "Factor models are not supported"),
     list("trend_map on a grouping", "hier",
          ~ AR(p = 1, gr = region, subgr = species,
-              trend_map = tm_hier), "refuse", "uni", "series' column"),
+              trend_map = tm_hier), "refuse", "uni", "Factor models are not supported"),
     list("trend_map fights n_lv", "long",
          ~ AR(p = 1, n_lv = 3, trend_map = tm_fixed), "refuse", "uni",
          "n_lv"),
@@ -1443,7 +1412,7 @@ test_that("a model with no trend records its axes", {
 # of this needs draws: a prefit knows its axes and that is the whole
 # of what the answer depends on.
 newdata_variants <- function(frame, prefit) {
-  vars <- prefit$trend_metadata$variables
+  vars <- prefit$trend_metadata$axes$vars
   time_var <- vars$time_var %||% "time"
   last <- max(frame[[time_var]])
 
@@ -1495,7 +1464,7 @@ test_that("newdata is placed on the fit's axes, or refused", {
   hier_tf <- ~ AR(p = 1, gr = region, subgr = species)
   # `unbal` is absent by design: an unbalanced panel is refused at
   # fitting, so there is no fit of it to hand a frame to.
-  for (nm in c("long", "hier", "hier_col", "char_series", "unused")) {
+  for (nm in c("long", "hier", "hier_col", "unused")) {
     tf <- if (nm %in% c("hier", "hier_col")) hier_tf else ~ AR(p = 1)
     frame <- frames[[nm]]
     prefit <- axis_prefit(frame, tf, "uni")
@@ -1523,11 +1492,9 @@ test_that("newdata is placed on the fit's axes, or refused", {
       )
     }
     # Placing frames does not renumber the axis. Asserted once, on
-    # the fit: `resolve_series_info()` reads only the object, so
-    # repeating it per variant would run the same expectation four
-    # times and say nothing about the frames.
+    # the fit: `fitted_series_levels()` takes only the object.
     expect_identical(
-      as.character(mvgam:::resolve_series_info(prefit)$series_levels),
+      as.character(mvgam:::fitted_series_levels(prefit)),
       axis,
       label = paste(nm, "leaves the axis where it was")
     )
@@ -1611,7 +1578,6 @@ test_that("a frame the fit has never seen lands on the right cells", {
     list(nm = "hier", spec = hier_tf, route = "uni"),
     list(nm = "hier_col", spec = hier_tf, route = "uni"),
     list(nm = "unused", spec = ~ AR(p = 1), route = "uni"),
-    list(nm = "char_series", spec = ~ AR(p = 1), route = "uni"),
     list(nm = "wide", spec = ~ AR(p = 1), route = "wide"),
     list(nm = "wide_na", spec = ~ AR(p = 1), route = "wide"),
     list(nm = "long", spec = 2L, route = "jsdgam_species"),
@@ -1670,7 +1636,7 @@ test_that("a frame the fit has never seen lands on the right cells", {
         mvgam:::resolve_forecast_grid(
           prefit, stranger, training, levels_expected
         ),
-        regexp = "not found in training data",
+        regexp = "has levels absent from the training data",
         label = paste(lab, "a stranger is refused")
       )
     }

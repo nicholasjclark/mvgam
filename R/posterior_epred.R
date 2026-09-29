@@ -108,17 +108,12 @@ compute_family_epred <- function(linpred, family, trials = NULL,
     # the dispatch directly meets.
     "nmix" = ,
     "nmix_royle_nichols" = ,
-    "nmix_poisson_poisson" = stop(insight::format_error(c(
-      paste0(
-        "Family '", family_name,
-        "' has no mean this dispatch can compute."
-      ),
-      i = paste0(
-        "A closure-unit family's mean reads the unit's other visits. ",
-        "It needs the fit's `p` draws and the arrays that the ",
-        "kernels in dispatch_closure_unit_method() supply."
-      )
-    ))),
+    "nmix_poisson_poisson" = stop_mvgam_fault(
+      paste0("Family '", family_name, "' reached the unit-free mean ",
+             "dispatch."),
+      paste0("A closure-unit family's mean needs the unit's other ",
+             "visits and the fit's 'p' draws.")
+    ),
 
     # Tweedie (compound Poisson-gamma): E[Y | mu, phi, theta] = mu
     # for all theta in [1, 2], including the boundary cases (scaled
@@ -210,25 +205,16 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 
   require_dpar <- function(value, dpar_name) {
     if (is.null(value)) {
-      stop(insight::format_error(c(
-        paste0(
-          "Family '", family_name, "' requires '", dpar_name,
-          "' for variance computation."
-        ),
-        i = "Internal: check predict_variance() extraction path."
-      )))
+      stop_mvgam_fault(
+        paste0("Family '", family_name, "' needs '", dpar_name,
+               "' for its variance."),
+        "The caller passed no draws for it."
+      )
     }
     checkmate::assert_matrix(value)
     if (nrow(value) != nrow(mu) || ncol(value) != ncol(mu)) {
-      stop(insight::format_error(c(
-        paste0(
-          "Dimension mismatch for '", dpar_name, "' in variance computation."
-        ),
-        x = paste0(
-          "Got [", nrow(value), " x ", ncol(value), "]. Expected [",
-          nrow(mu), " x ", ncol(mu), "]."
-        )
-      )))
+      stop_shape_fault(paste0("Parameter '", dpar_name, "'"),
+                       dim(value), dim(mu))
     }
     value
   }
@@ -754,24 +740,17 @@ family_mean_from_kernel <- function(family_name, mu, family_pars,
       paste0("Family '", family_name,
              "' needs more than its linear predictor for E[Y]."),
       x = paste0("Missing: ", paste(shQuote(missing), collapse = ", "), "."),
-      i = paste0(
-        "Resolve them with `resolve_family_pars()` and pass them as ",
-        "'family_pars'. Depending on the family, a mixing ",
-        "probability, a shift or a dispersion separates E[Y] from ",
-        "the base distribution's parameter."
-      )
-    )))
+      i = paste0("Pass them as 'family_pars', the mixing probability, ",
+                 "shift or dispersion that separates E[Y] from 'mu'.")
+    )), call. = FALSE)
   }
 
   for (dpar in needed) {
     value <- family_pars[[dpar]]
     checkmate::assert_matrix(value)
-    if (nrow(value) != nrow(mu) || ncol(value) != ncol(mu)) {
-      stop(insight::format_error(c(
-        paste0("Dimension mismatch for '", dpar, "' in E[Y]."),
-        x = paste0("Got [", nrow(value), " x ", ncol(value),
-                   "]. Expected [", nrow(mu), " x ", ncol(mu), "].")
-      )))
+    if (!identical(dim(value), dim(mu))) {
+      stop_shape_fault(paste0("Parameter '", dpar, "'"), dim(value),
+                       dim(mu))
     }
   }
 
@@ -925,11 +904,7 @@ data2draws <- function(x, dim) {
     # Expand to 3D array for categorical/compositional families
     # dim[1] = ndraws, dim[2:3] = observation dimensions
     if (!(length(x) == 1 || identical(dim(x), as.integer(dim[2:3])))) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Dimension of {.field x} must match dim[2:3]."
-        )
-      ))
+      stop_shape_fault("A distributional parameter", dim(x), dim[2:3])
     }
     aperm(array(x, dim = c(dim[2:3], dim[1])), perm = c(3, 1, 2))
   }
@@ -1234,36 +1209,17 @@ mean_com_poisson <- function(mu, shape, M = 10000, thres = 1e-16,
   # Direct series computation for remaining cases
   use_exact <- is.na(out)
   if (any(use_exact)) {
-    mu_e <- mu[use_exact]
-    shape_e <- shape[use_exact]
-    log_mu <- log(mu_e)
-    log_thres <- log(thres)
-
-    # First 2 terms of series
-    log_num <- shape_e * log_mu
-    log_Z <- log1p(exp(shape_e * log_mu))
-    lfac <- 0
-    k <- 2
-    converged <- FALSE
-
-    while (!converged && k <= M) {
-      log_k <- log(k)
-      lfac <- lfac + log_k
-      term <- shape_e * (k * log_mu - lfac)
-      log_num <- log(exp(log_num) + exp(log_k + term))
-      log_Z <- log(exp(log_Z) + exp(term))
-      converged <- all(term <= log_thres)
-      k <- k + 1
-    }
-
-    if (!converged) {
+    series <- com_poisson_log_series(
+      log(mu[use_exact]), shape[use_exact], M = M, thres = thres
+    )
+    if (!series$converged) {
       warn_once(
         c("Approximating the mean of com_poisson may be inaccurate.",
           "i" = "Series did not converge within M terms."),
         "mean_com_poisson_convergence"
       )
     }
-    out[use_exact] <- exp(log_num - log_Z)
+    out[use_exact] <- exp(series$log_moment - series$log_z)
   }
   out
 }
@@ -1400,7 +1356,7 @@ ordinal_thresholds <- function(object, draw_ids = NULL, resp = NULL) {
   cols <- grep(pattern, colnames(draws), value = TRUE)
   if (length(cols) == 0L) {
     stop(insight::format_error(paste0(
-      "The fit carries no ordinal thresholds named '", prefix, "[k]'."
+      "The fit lacks ordinal thresholds '", prefix, "[k]'."
     )))
   }
   cols <- cols[order(as.integer(sub(pattern, "\\1", cols)))]
@@ -1526,7 +1482,7 @@ ordinal_cells <- function(probs, y) {
   unknown <- !is.na(y) & is.na(category)
   if (any(unknown)) {
     stop(insight::format_error(c(
-      "An ordinal response holds a value that is none of its levels.",
+      "An ordinal response has a value outside its levels.",
       x = paste0("Found: ", paste(unique(y[unknown]), collapse = ", "),
                  "."),
       i = paste0("The levels are ", paste(levels, collapse = ", "), ".")

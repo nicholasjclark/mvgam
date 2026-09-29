@@ -261,7 +261,7 @@ pp_check.mvgam <- function(
     valid_types <- sub("^ppc_", "", valid_types)
     if (!type %in% valid_types) {
       stop(insight::format_error(c(
-        "Argument 'type' must name a valid ppc type.",
+        "Argument 'type' must be a valid ppc type.",
         x = paste0("Given: '", type, "'."),
         i = paste0(
           "Valid types are: ",

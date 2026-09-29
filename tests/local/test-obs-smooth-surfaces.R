@@ -121,20 +121,6 @@ assert_by_factor_variation <- function(mvgam_fit, grid_A, grid_B,
   invisible(NULL)
 }
 
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
-
 
 sm_data <- local({
   cached <- NULL
@@ -172,20 +158,16 @@ sm_fit <- local({
   cached <- NULL
   function() {
     if (!is.null(cached)) return(cached)
-    path <- cache_path("val_mvgam_smooth_surfaces.rds")
-    if (file.exists(path)) {
-      cached <<- readRDS(path)
-      return(cached)
-    }
-    cached <<- mvgam(
-      formula = y ~ s(z, by = grp, k = 5) + t2(z, w, k = c(4, 4)) +
-        gp(w, by = cat, k = 5),
-      trend_formula = ~ AR(p = 1),
-      data = sm_data(), family = poisson(),
-      chains = 2L, iter = 1000L, warmup = 500L,
-      silent = 2, backend = "cmdstanr"
-    )
-    saveRDS(cached, path)
+    cached <<- cached_fit("val_mvgam_smooth_surfaces.rds", function() {
+      mvgam(
+        formula = y ~ s(z, by = grp, k = 5) + t2(z, w, k = c(4, 4)) +
+          gp(w, by = cat, k = 5),
+        trend_formula = ~ AR(p = 1),
+        data = sm_data(), family = poisson(),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        silent = 2, backend = "cmdstanr"
+      )
+    })
     cached
   }
 })

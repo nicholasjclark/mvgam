@@ -756,38 +756,24 @@ reorder_clusters <- function(x, dis) {
 
 #' Resolve per-draw factor loadings for a fitted mvgam.
 #'
-#' Single entry point that returns a `[ndraws, n_series, n_lv]`
-#' array of Z loadings regardless of whether Z was sampled at
-#' fit time (default factor model) or fixed by the user via
-#' `trend_map` (the fixed-Z path). Everything that needs Z
-#' (sample_innovations, residual_cor, plot_factors and
-#' ordinate) calls this resolver so the fixed-vs-sampled
-#' decision lives in exactly one place.
+#' Returns a `[ndraws, n_series, n_lv]` array of Z loadings whether
+#' Z was sampled (the default factor model) or fixed by a
+#' `trend_map`. Every method that needs Z calls this resolver, which
+#' holds the choice between the fixed and sampled paths.
 #'
-#' Two callable styles:
-#' - Object-style: `resolve_factor_loadings(object = fit)`. The
-#'   resolver pulls `fixed_Z`, `n_lv`, `n_series` from the fit and
-#'   extracts draws as needed. All explicit args are optional.
-#' - Explicit-style: `resolve_factor_loadings(fixed_Z = ...,
-#'   draws_mat = ..., n_series = ..., n_lv = ...)`. `n_series`
-#'   and `n_lv` are REQUIRED in this mode (no fallback derivation
-#'   without `object`). Used by hot paths (e.g.
-#'   `draw_innovation_grid()`) that already hold pre-extracted
-#'   draws and bookkeeping scalars.
+#' Two calling styles:
+#' - Object style: `resolve_factor_loadings(object = fit)`. The
+#'   resolver takes `fixed_Z`, `n_lv` and `n_series` from the fit
+#'   and extracts draws as needed.
+#' - Explicit style: `resolve_factor_loadings(fixed_Z = ...,
+#'   draws_mat = ..., n_series = ..., n_lv = ...)`. `n_series` and
+#'   `n_lv` are required in this style. `draw_innovation_grid()`
+#'   uses it with draws it has already extracted.
 #'
-#' When `fixed_Z` is fully populated (no NAs) the matrix is
-#' broadcast across `ndraws`. Otherwise the resolver delegates
-#' @param basis `"identified"` reads the QR-rotated `Z_tilde`,
-#'   which is what reporting and plotting want. `"model"` reads
-#'   the raw `Z` the model sampled, which is what any caller
-#'   combining loadings with `sigma_trend`, `Sigma_trend` or
-#'   `Omega_trend` needs, since those live in the unrotated
-#'   basis. A fixed `trend_map` has no rotation, so both agree.
-#'
-#' to `extract_Z_loadings()`, which prefers the QR-identified
-#' `Z_tilde[i, j]` draws (free-Z factor models) and falls back
-#' to `Z[i, j]` for partial-Z fits where the user-supplied
-#' pattern is preserved without rotation.
+#' A fully populated `fixed_Z` is broadcast across draws. Otherwise
+#' `extract_Z_loadings()` extracts the draws: the QR-identified
+#' `Z_tilde[i, j]` for free loadings, or `Z[i, j]` for a partial
+#' `trend_map`, whose pattern keeps its orientation.
 #'
 #' @param object Fitted mvgam object (object-style entry).
 #'   Required when callers omit `n_series`/`n_lv`.
@@ -799,6 +785,12 @@ reorder_clusters <- function(x, dis) {
 #'   explicit-style; derived from `object` otherwise.
 #' @param n_series Integer series count. Required in
 #'   explicit-style; derived from `object` otherwise.
+#' @param basis `"identified"` returns the QR-rotated `Z_tilde`,
+#'   which reporting and plotting show. `"model"` returns the raw
+#'   `Z` the model sampled. A caller combining loadings with
+#'   `sigma_trend`, `Sigma_trend` or `Omega_trend` needs it, because
+#'   the model estimated those parameters in the unrotated basis. A fixed
+#'   `trend_map` has no rotation and both agree.
 #'
 #' @return Numeric array of dimension `[ndraws, n_series, n_lv]`.
 #' @noRd
@@ -839,11 +831,10 @@ resolve_factor_loadings <- function(object = NULL,
     } else if (!is.null(object)) {
       posterior::ndraws(posterior::as_draws_matrix(object$fit))
     } else {
-      stop(insight::format_error(c(
-        "Cannot resolve ndraws for fixed-Z broadcast.",
-        i = paste0("Supply 'object' or 'draws_mat'. The resolver ",
-                   "reads the draw count from either one.")
-      )))
+      stop_mvgam_fault(
+        "The fixed loadings need a draw count.",
+        "The caller passed 'object = NULL' and 'draws_mat = NULL'."
+      )
     }
     return(array(
       rep(as.numeric(unname(fixed_Z)), each = ndraws),
@@ -853,10 +844,10 @@ resolve_factor_loadings <- function(object = NULL,
 
   if (is.null(draws_mat)) {
     if (is.null(object)) {
-      stop(insight::format_error(c(
-        "Cannot extract sampled Z without draws.",
-        i = "Supply 'object' or 'draws_mat'."
-      )))
+      stop_mvgam_fault(
+        "The sampled loadings need draws.",
+        "The caller passed 'object = NULL' and 'draws_mat = NULL'."
+      )
     }
     draws_mat <- posterior::as_draws_matrix(object$fit)
   }

@@ -43,11 +43,9 @@ encode_loadings_features <- function(features, series_levels) {
   if (length(feature_cols) == 0L) {
     stop(insight::format_error(c(
       "'features' has no usable columns after dropping 'series'.",
-      i = paste0(
-        "Supply at least one numeric / factor / character ",
-        "column besides 'series'."
-      )
-    )))
+      i = paste0("Supply at least one numeric, factor or character ",
+                 "column other than 'series'.")
+    )), call. = FALSE)
   }
   encoded_cols <- lapply(
     feature_cols,

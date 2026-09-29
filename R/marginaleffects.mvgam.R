@@ -213,12 +213,11 @@ get_predict.mvgam <- function(model,
   if (length(dim(draws)) == 2L) {
     if (nrow(newdata) != ncol(draws)) {
       stop(insight::format_error(c(
-        "Dimension mismatch between predicted columns and newdata rows.",
-        x = cli::format_inline(
-          "Draws have {ncol(draws)} columns. newdata has {nrow(newdata)} rows."
-        ),
-        i = "Pass the same `newdata` that produced the draws."
-      )))
+        "The draws need one column per row of 'newdata'.",
+        x = paste0("The draws have ", ncol(draws), " columns and ",
+                   "'newdata' has ", nrow(newdata), " rows."),
+        i = "Pass the same 'newdata' that produced the draws."
+      )), call. = FALSE)
     }
     out <- data.table::data.table(
       rowid = rowid,
@@ -254,12 +253,10 @@ get_predict.mvgam <- function(model,
     return(out)
   }
 
-  stop(insight::format_error(c(
-    "Unexpected posterior draws shape for mvgam.",
-    x = cli::format_inline(
-      "Got dim length {length(dim(draws))}. Expected 2 or 3."
-    )
-  )))
+  stop_mvgam_fault(
+    "Posterior draws must be a matrix or a three-dimensional array.",
+    paste0("Got ", length(dim(draws)), " dimension(s).")
+  )
 }
 
 

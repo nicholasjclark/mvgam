@@ -32,18 +32,6 @@ stan_block_header <- function(block, own_line = FALSE) {
 }
 
 
-#' Pattern matching the header of any Stan block
-#'
-#' @return A regular expression alternating over `stan_block_names`.
-#' @noRd
-stan_any_block_header <- function() {
-  paste0(
-    "^(", paste(gsub(" ", "\\\\s+", stan_block_names), collapse = "|"),
-    ")\\s*\\{"
-  )
-}
-
-
 #' First line below `after` at which some other block opens
 #'
 #' Used where a block's end is taken as the start of the next one.
@@ -107,7 +95,22 @@ stan_block_body <- function(lines, block) {
 }
 
 
+#' The leading whitespace of a Stan source line
+#'
+#' @param line One line of Stan source.
+#' @return The whitespace the line starts with.
+#' @noRd
+stan_line_indent <- function(line) {
+  checkmate::assert_string(line)
+  sub("^([[:space:]]*).*$", "\\1", line)
+}
+
+
 #' Line where a brace opened on `start_line` closes
+#'
+#' The count starts at the first `{` of `start_line`. A brace that
+#' closes on the same line (`for (i in 1:N) {x += 1; }`) returns
+#' `start_line`, and a `} else {` line opens one brace.
 #'
 #' @param lines Character vector of Stan source lines.
 #' @param start_line Line number holding the opening brace.
@@ -120,7 +123,11 @@ find_matching_closing_brace <- function(lines, start_line) {
 
   # The opening brace is on `start_line`. A brace in a string or a line
   # comment opens nothing.
-  depth <- 1L
+  code <- stan_line_code(lines[start_line])
+  opens_at <- regexpr("{", code, fixed = TRUE)
+  if (opens_at < 0L) return(NA)
+  depth <- count_stan_braces(substring(code, opens_at))
+  if (depth == 0L) return(start_line)
   later <- seq.int(start_line + 1L, length.out = length(lines) - start_line)
   for (i in later) {
     depth <- depth + count_stan_braces(lines[i])

@@ -23,7 +23,7 @@ make_update_stub <- function(n_iter = 50L, n_chains = 2L) {
   structure(
     list(
       fit = drws,
-      formula = structure(y ~ x, class = c("brmsformula", "formula")),
+      formula = brms::bf(y ~ x),
       trend_formula = NULL,
       family = stats::gaussian(),
       prior = data.frame(prior = "(flat)", class = "b"),
@@ -69,7 +69,7 @@ test_that("update.mvgam rejects `data` in dots with a newdata hint", {
 
 test_that("update.mvgam rejects pooled multiple-imputation fits", {
   stub <- make_update_stub()
-  attr(stub, "is_pooled") <- TRUE
+  class(stub) <- c("mvgam_pooled", class(stub))
   expect_error(
     update(stub),
     "pooled multiple-imputation"
@@ -105,12 +105,12 @@ test_that(
 })
 
 
-test_that("mvgam_update_call applies formula. via stats::update.formula", {
+test_that("mvgam_update_call applies formula. through brms", {
   stub <- make_update_stub()
   out <- mvgam_update_call(
     stub, formula. = ~ . + z, newdata = NULL, dots = list()
   )
-  expect_identical(deparse(out$formula), "y ~ x + z")
+  expect_identical(deparse(out$formula$formula), "y ~ x + z")
 })
 
 
@@ -307,33 +307,6 @@ test_that("mvgam_normalise_stancode compares code alone", {
 })
 
 
-# ---- Legacy fit detection ------------------------------------------
-
-test_that("update.mvgam errors on legacy fits lacking trend_call", {
-  stub <- make_update_stub()
-  # Simulate a legacy fit: no trend_call slot, but trend_components
-  # present (the construct that flags trend dynamics).
-  stub$trend_components <- list(types = "AR")
-  expect_error(
-    update(stub),
-    "trend_call"
-  )
-})
-
-
-test_that("update.mvgam accepts legacy fits if trend_formula is supplied", {
-  stub <- make_update_stub()
-  stub$trend_components <- list(types = "AR")
-  # mvgam_update_call should run without error when trend_formula
-  # is in dots, even if trend_call is absent.
-  out <- mvgam_update_call(
-    stub, formula. = NULL, newdata = NULL,
-    dots = list(trend_formula = ~ AR(p = 1))
-  )
-  expect_identical(deparse(out$trend_formula), "~AR(p = 1)")
-})
-
-
 test_that("restore_trend_call_env binds what the fit already carries", {
   # A formula keeps the expression and the environment it was written
   # in, not the values it names. Written inside a function, or read
@@ -398,35 +371,37 @@ test_that("restore_trend_call_env leaves a name the fit does not carry", {
 })
 
 
-test_that("update() refuses a jsdgam rather than dropping its structure", {
-  # A jsdgam is a `c("mvgam", "jsdgam")` object, so it dispatches
-  # here. Rebuilding its call reaches `mvgam()`, which knows nothing
-  # of `factor_formula`, `n_lv`, `species`, `unit`, `traits`,
-  # `trait_slopes` or `phylo`; the refit carried none of them and said
-  # nothing. The arguments cannot be recovered either, because
-  # `$call` holds the symbols the user wrote rather than their
-  # values.
-  stub <- structure(
-    list(formula = y ~ x, trend_call = ~ -1),
-    class = c("mvgam", "jsdgam")
+test_that("update() refits a jsdgam through jsdgam()", {
+  set.seed(1)
+  dat <- expand.grid(week = 1:20, species = factor(paste0("sp", 1:4)))
+  dat$y <- rpois(nrow(dat), 2)
+  # An empty observation formula, which mvgam fills with a pinned
+  # placeholder column the refit has to rebuild.
+  prefit <- jsdgam(y ~ 0, data = dat, unit = week, species = species,
+                   family = poisson(), n_lv = 2L, run_model = FALSE,
+                   silent = 2)
+  # The refit frame is the user's own, without the 'time' and 'series'
+  # columns jsdgam() added for 'week' and 'species'.
+  args <- jsdgam_update_call(prefit, NULL, NULL, list())
+  expect_setequal(names(args$data), names(dat))
+  # An override reaches jsdgam() and changes the factor count alone.
+  refit <- update(prefit, n_lv = 1L, run_model = FALSE)
+  expect_s3_class(refit, "jsdgam")
+  expect_equal(prefit$standata$N_lv_trend, 2)
+  expect_equal(refit$standata$N_lv_trend, 1)
+  # The factor count is Stan data, and `recompile = FALSE` passes the
+  # unchanged program. A family adding a parameter changes it.
+  expect_s3_class(
+    update(prefit, n_lv = 1L, recompile = FALSE, run_model = FALSE),
+    "jsdgam"
   )
-  expect_error(update(stub), "Cannot 'update\\(\\)' a 'jsdgam' fit")
-  expect_error(update(stub), "not recoverable")
-  # The refusal comes before anything else is attempted, so a caller
-  # passing arguments still gets the real reason.
-  expect_error(update(stub, formula. = ~ . + z), "jsdgam")
-})
-
-
-test_that("an ordinary mvgam fit is not caught by that guard", {
-  stub <- structure(
-    list(formula = y ~ x, trend_call = ~ AR(p = 1)),
-    class = "mvgam"
+  expect_error(
+    update(prefit, family = brms::negbinomial(), recompile = FALSE),
+    "recompile = FALSE"
   )
-  # It gets past the jsdgam check and fails later for its own reasons,
-  # rather than being refused as a joint model.
-  err <- conditionMessage(expect_error(update(stub)))
-  expect_false(grepl("jsdgam", err))
+  # A fit without the stored arguments cannot be rebuilt.
+  prefit$jsdgam_args <- NULL
+  expect_error(update(prefit), "arguments stored on the fit")
 })
 
 
@@ -724,13 +699,11 @@ test_that("every trend constructor is told, not just the first", {
 
 
 test_that("a resolved count with nowhere to be stated is refused", {
-  # Silently rebuilding a different model is what `update()` already
-  # declines to do for a `jsdgam` fit, so the same answer is given
-  # here rather than a refit the caller cannot tell apart.
+  # A rebuild without the count would give back a different model.
   expect_error(
     state_resolved_trend_args(~ s(env, by = lv_axis()) - 1,
                               list(n_lv = 2L)),
-    "no trend constructor"
+    "lacks a trend constructor"
   )
 })
 
@@ -741,4 +714,103 @@ test_that("the arguments a refit states are ones the map knows", {
   expect_true(
     all(trend_args_stated_on_rebuild %in% names(trend_arg_metadata))
   )
+})
+
+
+test_that("a new iter drops a warmup the stored call recorded", {
+  # `jsdgam()` records `warmup` in its stored arguments. Paired with a
+  # smaller `iter`, it would leave Stan no sampling iterations.
+  stored <- list(iter = 800L, warmup = 400L)
+  refit <- inherit_sampler_args(
+    utils::modifyList(stored, list(iter = 400L)), list(fit = NULL),
+    dots = list(iter = 400L)
+  )
+  expect_null(refit$warmup)
+  expect_identical(refit$iter, 400L)
+  # A warmup the caller names stays.
+  kept <- inherit_sampler_args(
+    list(iter = 400L, warmup = 100L), list(fit = NULL),
+    dots = list(iter = 400L, warmup = 100L)
+  )
+  expect_identical(kept$warmup, 100L)
+})
+
+
+test_that("sampler settings travel only with the original algorithm", {
+  inherited <- list(chains = 2L, iter = 300L, warmup = 150L,
+                    control = list(adapt_delta = 0.95, max_treedepth = 11L))
+  local_mocked_bindings(mvgam_sampler_inheritance = function(object) {
+    inherited
+  })
+  fit <- list(algorithm = "sampling", backend = "cmdstanr")
+
+  # A variational refit takes none of them: NUTS's 300 iterations
+  # would stop the optimiser early.
+  vi <- inherit_sampler_args(list(algorithm = "meanfield"), fit,
+                             dots = list(algorithm = "meanfield"))
+  expect_null(vi$iter)
+  expect_null(vi$control)
+
+  # `control` merges entry by entry, bare settings included.
+  same <- inherit_sampler_args(
+    list(algorithm = "sampling", backend = "cmdstanr", adapt_delta = 0.9),
+    fit, dots = list(adapt_delta = 0.9)
+  )
+  expect_identical(same$control,
+                   list(adapt_delta = 0.9, max_treedepth = 11L))
+  expect_null(same$adapt_delta)
+  expect_identical(same$iter, 300L)
+
+  # Another backend has its own control defaults.
+  other <- inherit_sampler_args(
+    list(algorithm = "sampling", backend = "rstan"), fit, dots = list()
+  )
+  expect_null(other$control)
+  expect_identical(other$chains, 2L)
+})
+
+
+test_that("a new prior joins the priors the user set before", {
+  old <- rbind(
+    brms::prior_string("exponential(3)", class = "sigma_trend"),
+    brms::prior_string("normal(0, 5)", class = "b")
+  )
+  old$lb <- ""
+  new <- brms::prior(normal(0, 1), class = b)
+  merged <- merge_update_priors(new, old)
+  # The new `b` row replaces the old one. The old row spells its
+  # unbounded `lb` as "" and the new one as NA.
+  expect_equal(nrow(merged), 2L)
+  expect_identical(merged$prior[merged$class == "b"], "normal(0, 1)")
+  expect_identical(merged$prior[merged$class == "sigma_trend"],
+                   "exponential(3)")
+  expect_identical(merge_update_priors(new, NULL), new)
+})
+
+
+test_that("a multivariate formula update takes the whole formula", {
+  old <- brms::bf(mvbind(y1, y2) ~ 1)
+  expect_error(updated_formula(old, . ~ . + x), "not supported")
+  expect_identical(updated_formula(old, mvbind(y1, y2) ~ x),
+                   mvbind(y1, y2) ~ x)
+  # A univariate `bf()` updates through brms's own method.
+  up <- updated_formula(brms::bf(y ~ 1), ~ . + x)
+  expect_equal(deparse(up$formula), "y ~ x")
+})
+
+
+test_that("held-out data overlapping new training times is dropped", {
+  fit <- list(
+    test_data = data.frame(time = 11:12, y = 0),
+    trend_metadata = list(axes = list(vars = list(time_var = "time")))
+  )
+  expect_identical(
+    inherited_holdout(fit, data.frame(time = 1:10), silent = 2L),
+    fit$test_data
+  )
+  expect_message(
+    dropped <- inherited_holdout(fit, data.frame(time = 1:12), silent = 1L),
+    "drops the fit's held-out data"
+  )
+  expect_null(dropped)
 })

@@ -31,10 +31,7 @@ make_lfo_mock <- function(n_time = 40L, n_series = 1L) {
     obs_data = d,
     formula = stats::as.formula("y ~ 1"),
     family = poisson(),
-    trend_metadata = list(
-      trend_type = "AR",
-      variables = list(time_var = "time", series_var = "series")
-    ),
+    trend_metadata = list(trend_type = "AR"),
     backend = "rstan"
   )
   class(fit) <- "mvgam"
@@ -126,16 +123,16 @@ stub_lfo_primitives <- function(fit, ndraws = 5L,
     forecast = function(object, ..., newdata = NULL) {
       n_h <- if (is.null(newdata)) 1L else
         length(unique(newdata[[
-          object$trend_metadata$variables$time_var
+          object$trend_metadata$axes$vars$time_var
         ]]))
       n_series <- length(levels(object$data[[
-        object$trend_metadata$variables$series_var
+        object$trend_metadata$axes$vars$series_var
       ]]))
       fmats <- replicate(n_series,
                           matrix(0, nrow = ndraws, ncol = n_h),
                           simplify = FALSE)
       names(fmats) <- levels(object$data[[
-        object$trend_metadata$variables$series_var
+        object$trend_metadata$axes$vars$series_var
       ]])
       list(forecasts = fmats)
     },
@@ -324,10 +321,7 @@ make_lfo_mock_shifted <- function(n_time = 35L, offset = 2009L) {
     data = d, obs_data = d,
     formula = stats::as.formula("y ~ 1"),
     family = poisson(),
-    trend_metadata = list(
-      trend_type = "AR",
-      variables = list(time_var = "time", series_var = "series")
-    ),
+    trend_metadata = list(trend_type = "AR"),
     backend = "rstan"
   )
   class(fit) <- "mvgam"
@@ -392,10 +386,7 @@ test_that("lfo_cv handles irregular CAR-style time grids", {
     data = d, obs_data = d,
     formula = stats::as.formula("y ~ 1"),
     family = poisson(),
-    trend_metadata = list(
-      trend_type = "CAR",
-      variables = list(time_var = "time", series_var = "series")
-    ),
+    trend_metadata = list(trend_type = "CAR"),
     backend = "rstan"
   )
   class(fit) <- "mvgam"
@@ -429,16 +420,13 @@ test_that("Mismatched per-series time grids error", {
     data = d, obs_data = d,
     formula = stats::as.formula("y ~ 1"),
     family = poisson(),
-    trend_metadata = list(
-      trend_type = "AR",
-      variables = list(time_var = "time", series_var = "series")
-    ),
+    trend_metadata = list(trend_type = "AR"),
     backend = "rstan"
   )
   class(fit) <- "mvgam"
   expect_error(
     lfo_cv(fit, min_t = 20L, score = "elpd", silent = 2L),
-    "share the same time grid"
+    "share one time grid"
   )
 })
 
@@ -458,7 +446,7 @@ test_that("min_t not in observed times errors informatively", {
   expect_error(
     lfo_cv(fit, min_t = 25L, fc_horizon = 1L,
             score = "elpd", silent = 2L),
-    "is not an observed time"
+    "must be an observed time"
   )
 })
 

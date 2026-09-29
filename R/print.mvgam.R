@@ -101,23 +101,14 @@ print_model_formula <- function(f) {
 
 # Internal: the trend line `print()` shows.
 #
-# `trend_order_label()` already renders the order a trend was fitted
-# at: `ARMA(1, 1)` where an AR carries moving-average lags, `AR(3)`
-# where it carries three, `PW(logistic)` where a piecewise trend is
-# not the default one. Printing `trend_components$types` instead
-# dropped every one of them, so an `AR(p = 3)` and an
-# `AR(p = 1, ma = TRUE)` printed as the same bare `AR` as a plain
-# AR(1) -- the two models a whole fixture file exists to tell apart.
-#
-# The bare type is the fallback for an object carrying no trend
-# metadata, which is the only case the label cannot render.
+# `trend_order_label()` renders the order a trend was fitted at:
+# `ARMA(1, 1)` for an AR with a moving-average term, `AR(3)` for three
+# lags, `PW(logistic)` for logistic growth. A model without a trend
+# prints `None`.
 #' @noRd
 printed_trend_label <- function(x) {
   label <- trend_order_label(x)
-  if (nzchar(label %||% "")) {
-    return(label)
-  }
-  get_trend_type(x)
+  if (nzchar(label)) label else get_trend_type(x)
 }
 
 

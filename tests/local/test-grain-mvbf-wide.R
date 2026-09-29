@@ -42,31 +42,6 @@ suppressMessages({
 
 # This file fits its own models and caches them beside itself, so it
 # depends on no shared fixture and no build step.
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
-
-# The value of `expr` alongside every warning raised computing it.
-# The frame carries unobserved occasions on purpose, so the notices
-# about them are counted rather than discarded.
-with_warnings <- function(expr) {
-  seen <- character(0)
-  value <- withCallingHandlers(expr, warning = function(w) {
-    seen <<- c(seen, conditionMessage(w))
-    invokeRestart("muffleWarning")
-  })
-  list(value = value, warnings = seen)
-}
 
 set.seed(5150L)
 
@@ -283,25 +258,20 @@ test_that("only the closure-unit families are classified as such", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_mvbf_wide.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading wide mvbf fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(mvbf(count, seen, mass), AR(cor = TRUE))\n")
-  # Captured, not asserted: this runs only on a cache miss, so a
-  # count here would be a claim the file makes on some runs and not
-  # others. The same claim is made unconditionally on the prefit.
-  fit <- with_warnings(mvgam(
-    formula = obs_formula, trend_formula = ~ AR(p = 1, cor = TRUE),
-    data = dat, chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  ))$value
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+# The build runs only on a cache miss and captures its warnings
+# without asserting them. The same claim is made unconditionally on
+# the prefit.
+fit <- cached_fit(
+  "val_mvgam_mvbf_wide.rds",
+  function() {
+    with_warnings(mvgam(
+      formula = obs_formula, trend_formula = ~ AR(p = 1, cor = TRUE),
+      data = dat, chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    ))$value
+  },
+  key = sim_truth
+)
 
 
 test_that("the fitted object keeps the response axis", {
@@ -662,7 +632,7 @@ test_that("pp_check names the response it is asked for", {
   # A response the fit never had is refused, and the refusal names
   # the ones that would have worked.
   err <- expect_error(pp_check(fit, resp = "gravity", ndraws = 20L),
-                      "not a response of this model")
+                      "must be a response of this model")
   for (r in responses) {
     expect_match(conditionMessage(err), r, fixed = TRUE)
   }
@@ -791,14 +761,9 @@ test_that("a wide fit draws its observations for every response", {
 
 
 test_that("the criticism surface runs on a wide fit", {
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))

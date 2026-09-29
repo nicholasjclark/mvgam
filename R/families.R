@@ -309,8 +309,8 @@ resolve_observation_family <- function(formula, family) {
         "mvgam does not support ordinal thresholds that vary by group.",
         x = paste0("Response '", key, "' is written with ",
                    "'thres(gr = )'."),
-        i = paste0("Its predictions read one set of thresholds for ",
-                   "every observation. Drop 'gr' from 'thres()'.")
+        i = "Predictions use one set of thresholds for every observation.",
+        i = "Drop 'gr' from 'thres()'."
       )), call. = FALSE)
     }
   }
@@ -554,9 +554,7 @@ check_tweedie_truncation <- function(object, resp = NULL) {
   # `model_data` on a `jsdgam()` fit is the frame, which has no `M`.
   M <- object$standata$M
   if (is.null(M)) {
-    stop(insight::format_error(
-      "Could not locate the truncation 'M' in the fit's standata."
-    ))
+    stop_missing_fields("The stored Stan data", "M")
   }
   # The Poisson rate at the posterior mean of `mu`, `mphi` and
   # `mtheta`, per observation of each tweedie response.
@@ -1648,11 +1646,54 @@ stop_mvgam_fault <- function(headline, detail) {
   stop(insight::format_error(c(
     headline,
     x = detail,
-    i = paste0(
-      "This is a fault in mvgam itself. Please report it at ",
-      "https://github.com/nicholasjclark/mvgam/issues."
-    )
+    i = paste0("Please report this mvgam fault at ",
+               "https://github.com/nicholasjclark/mvgam/issues.")
   )), call. = FALSE)
+}
+
+
+# Internal: refuse an internal array whose shape differs from the one
+# its consumer needs. `got` and `expected` are dimension vectors.
+#'@noRd
+stop_shape_fault <- function(what, got, expected) {
+  stop_mvgam_fault(
+    paste0(what, " has the wrong shape."),
+    paste0("Got [", paste(got, collapse = " x "), "], expected [",
+           paste(expected, collapse = " x "), "].")
+  )
+}
+
+
+# Internal: refuse an internal list missing fields its consumer uses.
+#'@noRd
+stop_missing_fields <- function(what, missing) {
+  stop_mvgam_fault(
+    paste0(what, " lacks required fields."),
+    paste0("Missing: ", paste0("'", missing, "'", collapse = ", "), ".")
+  )
+}
+
+
+# Internal: refuse an internal object of the wrong class.
+#'@noRd
+stop_wrong_class <- function(what, object, expected) {
+  stop_mvgam_fault(
+    paste0(what, " must be ", expected, "."),
+    paste0("Got class '", paste(class(object), collapse = "', '"), "'.")
+  )
+}
+
+
+# Internal: refuse a posterior that lacks draws a fitted model of its
+# kind always stores.
+#'@noRd
+stop_missing_draws <- function(what, columns) {
+  stop_mvgam_fault(
+    paste0("The posterior lacks the '", what, "' draws."),
+    paste0("Missing columns: ", paste(utils::head(columns, 6L),
+                                      collapse = ", "),
+           if (length(columns) > 6L) ", ..." else "", ".")
+  )
 }
 
 
@@ -2008,7 +2049,7 @@ complete_simplex_grid <- function(object, newdata,
   take <- (match(key, settings) - 1L) * K + asked
   if (anyNA(take)) {
     stop(insight::format_error(c(
-      "A prediction grid names a category the model does not have.",
+      "The prediction grid contains a category absent from the model.",
       x = paste0(
         "Unknown: ",
         paste(unique(setdiff(as.character(newdata[[vars$series_var]]),
@@ -2097,10 +2138,8 @@ complete_closure_unit_newdata <- function(object, newdata,
   if (!is_grid) return(newdata)
   vars <- axis_vars(object)
   if (!vars$series_var %in% names(newdata)) {
-    # The levels come from the axis rather than from the training
-    # column, which carries none of its own when the user supplied a
-    # character series and orders them differently when a grouping
-    # superseded it.
+    # The levels come from the axis. A grouping that superseded the
+    # training column orders them differently from that column.
     newdata[[vars$series_var]] <- factor(
       as.character(template[[vars$series_var]]),
       levels = closure_unit_axis_levels(object)
@@ -2389,6 +2428,8 @@ build_closure_unit_arrays <- function(data,
   visit_component <- NULL
   if (!series_var %in% unit_grouping_vars &&
         series_var %in% names(data)) {
+    assert_axis_column(data, series_var, "series",
+                       require_factor = is.null(series_levels))
     series_col <- data[[series_var]]
     # The fitted levels arrive from the caller, which has the fit in
     # scope. Numbering off the frame alone shifts every later
@@ -2398,7 +2439,7 @@ build_closure_unit_arrays <- function(data,
     if (anyNA(component)) {
       unknown <- unique(as.character(series_col)[is.na(component)])
       stop(insight::format_error(c(
-        "A row names a series beyond the fitted set.",
+        "A row refers to a series outside the fitted set.",
         x = paste0("Found: ", paste(unknown, collapse = ", "), "."),
         i = paste0("Fitted series are ", paste(levs, collapse = ", "), ".")
       )), call. = FALSE)
@@ -5481,16 +5522,11 @@ prepare_closure_unit_family <- function(family, data, response_var,
   attr(family, "mvgam_stanvars") <- family_stanvars
   family_vars <- attr(family, "mvgam_vars", exact = TRUE)
   if (is.null(family_vars)) {
-    stop(insight::format_error(c(
-      paste0(
-        "Closure-unit family '", family_name,
-        "' is missing the 'mvgam_vars' attribute."
-      ),
-      i = paste0(
-        "Set `attr(fam, \"mvgam_vars\")` in the constructor to ",
-        "the integer arrays brms must thread through to the lpmf."
-      )
-    )))
+    stop_mvgam_fault(
+      paste0("Closure-unit family '", family_name,
+             "' lacks its 'mvgam_vars' attribute."),
+      "brms passes those integer arrays to the family's likelihood."
+    )
   }
   family$vars <- family_vars
   # Poisson-Poisson identifiability guard. With intercept-only mu
@@ -5587,86 +5623,6 @@ attach_family_stanvars <- function(stanvars, families) {
   stanvars
 }
 
-#' Pointwise log-likelihood for the beta negative binomial family
-#'
-#' Discovered by name from `dispatch_log_lik()`, so no registration
-#' is needed beyond defining it here. Evaluates the closed-form
-#' log-pmf rather than round-tripping through Stan, which keeps
-#' `log_lik()` usable on refits and subsets.
-#'
-#' @param linpred `[ndraws x nobs]` matrix of linear predictors
-#' @param link Link name; the family restricts this to `"log"`
-#' @param y Numeric vector of observed counts, length `nobs`
-#' @param family_pars Named list holding `shape` and `mtail`, each an
-#'   `[ndraws x nobs]` matrix
-#' @param trials Unused; present for the dispatcher's fixed signature
-#' @return `[ndraws x nobs]` matrix of log densities
-#' @noRd
-log_lik_beta_nb <- function(linpred, link, y, family_pars, trials) {
-  checkmate::assert_matrix(linpred)
-  # beta_nb() restricts the response surface to the log link, which
-  # is what keeps `mu` strictly positive.
-  checkmate::assert_choice(link, "log")
-  mu <- inv_link(linpred, link)
-  shape <- family_pars$shape
-  mtail <- family_pars$mtail
-  checkmate::assert_matrix(shape, nrows = nrow(linpred),
-                           ncols = ncol(linpred))
-  checkmate::assert_matrix(mtail, nrows = nrow(linpred),
-                           ncols = ncol(linpred))
-  # `dbeta_nb_mvgam()` recycles elementwise, so a single call over the
-  # whole matrix is enough once `y` is broadcast across draws.
-  y_mat <- matrix(y, nrow = nrow(linpred), ncol = ncol(linpred),
-                  byrow = TRUE)
-  matrix(
-    dbeta_nb_mvgam(y_mat, mu, shape, mtail, log = TRUE),
-    nrow = nrow(linpred), ncol = ncol(linpred)
-  )
-}
-
-#' R-side log-density evaluator for the Tweedie family
-#'
-#' Conforms to the `log_lik_<family>` signature expected by
-#' `dispatch_log_lik()` (see `R/log_lik.mvgam.R`). Returns a
-#' `[ndraws x nobs]` matrix of log densities. Uses
-#' `mgcv::ldTweedie()` which returns log densities directly,
-#' avoiding the `log(pmax(density, eps))` floor pattern that
-#' would silently bias LOO / WAIC scores upward for
-#' observations where the raw density underflows to zero.
-#'
-#' @noRd
-log_lik_tweedie <- function(linpred, link, y, family_pars, trials) {
-  checkmate::assert_matrix(linpred)
-  # mgcv::ldTweedie requires positive `mu`, so the link must
-  # have produced positive values. tweedie() restricts the
-  # surface to the log link.
-  checkmate::assert_choice(link, "log")
-  mu <- inv_link(linpred, link)
-  mphi <- family_pars$mphi
-  mtheta <- family_pars$mtheta
-  checkmate::assert_matrix(mphi, nrows = nrow(linpred),
-                           ncols = ncol(linpred))
-  checkmate::assert_matrix(mtheta, nrows = nrow(linpred),
-                           ncols = ncol(linpred))
-  ndraws <- nrow(linpred)
-  nobs <- ncol(linpred)
-  out <- matrix(NA_real_, nrow = ndraws, ncol = nobs)
-  for (j in seq_len(nobs)) {
-    # ldTweedie vectorises across `y`, not across `mu` / `p` /
-    # `phi`: a scalar y with vector mu only evaluates one row.
-    # Broadcast y to length ndraws so the call returns one log
-    # density per posterior draw.
-    ld <- mgcv::ldTweedie(
-      y = rep(y[j], ndraws),
-      mu = mu[, j],
-      p = mtheta[, j],
-      phi = mphi[, j]
-    )
-    out[, j] <- ld[, 1L]
-  }
-  out
-}
-
 # ============================================================
 # Conway-Maxwell-Binomial R-side post-fit kernels
 # ============================================================
@@ -5678,14 +5634,6 @@ log_lik_tweedie <- function(linpred, link, y, family_pars, trials) {
 # all (draw x observation) cells. All are vectorised: each unique
 # `T` value triggers one chunked matrix evaluation rather than
 # (ndraws * nobs) scalar lpmf calls.
-
-
-#' Numerically-stable log-sum-exp on a numeric vector
-#' @noRd
-.cmb_lse <- function(v) {
-  m <- max(v)
-  m + log(sum(exp(v - m)))
-}
 
 
 # Per-T cache of `lchoose(T, 0:T)`. The values depend only on `T`
@@ -5710,17 +5658,6 @@ log_lik_tweedie <- function(linpred, link, y, family_pars, trials) {
 }
 
 
-#' Row-wise maximum of a numeric matrix (one entry per row)
-#'
-#' Picks the max value per row via `max.col`, then reads it back
-#' via row + col indexing. Same idea as `matrixStats::rowMaxs` but
-#' without the extra dependency.
-#' @noRd
-.cmb_rowmax <- function(m) {
-  m[cbind(seq_len(nrow(m)), max.col(m, ties.method = "first"))]
-}
-
-
 #' COM-Binomial PMF on the support `0:T` for a single (mu, nu, T)
 #'
 #' Returns a `T + 1` vector of probabilities. Used by `.cmb_cdf`
@@ -5735,7 +5672,7 @@ cmb_pmf <- function(mu, nu, T) {
   lc <- .cmb_lchoose(T)
   x <- 0:T
   lw <- nu * lc + theta * x
-  exp(lw - .cmb_lse(lw))
+  exp(lw - log_sum_exp(lw))
 }
 
 
@@ -5764,10 +5701,8 @@ cmb_lpmf_vec <- function(y, mu, nu, T) {
     for (s in seq(1L, length(ia), by = chunk)) {
       idx <- ia[s:min(s + chunk - 1L, length(ia))]
       lw <- outer(nu[idx], lc) + outer(theta[idx], x)
-      mx <- .cmb_rowmax(lw)
-      lse <- mx + log(rowSums(exp(lw - mx)))
       out[idx] <- theta[idx] * y[idx] + nu[idx] * lc[y[idx] + 1L] -
-        lse
+        row_log_sum_exp(lw)
     }
   }
   out
@@ -5793,9 +5728,7 @@ cmb_mean_vec <- function(mu, nu, T) {
     for (s in seq(1L, length(ia), by = chunk)) {
       idx <- ia[s:min(s + chunk - 1L, length(ia))]
       lw <- outer(nu[idx], lc) + outer(theta[idx], x)
-      w <- exp(lw - .cmb_rowmax(lw))
-      w <- w / rowSums(w)
-      out[idx] <- as.numeric(w %*% x)
+      out[idx] <- as.numeric(row_softmax(lw) %*% x)
     }
   }
   out
@@ -5820,14 +5753,7 @@ rcmb_vec <- function(mu, nu, T) {
     for (s in seq(1L, length(ia), by = chunk)) {
       idx <- ia[s:min(s + chunk - 1L, length(ia))]
       lw <- outer(nu[idx], lc) + outer(theta[idx], x)
-      w <- exp(lw - .cmb_rowmax(lw))
-      w <- w / rowSums(w)
-      cw <- w
-      if (TT >= 1L) {
-        for (j in 2:(TT + 1L)) cw[, j] <- cw[, j - 1L] + w[, j]
-      }
-      u <- stats::runif(length(idx))
-      out[idx] <- max.col(cw >= u, ties.method = "first") - 1L
+      out[idx] <- sample_row_index(lw) - 1L
     }
   }
   out
@@ -5951,35 +5877,6 @@ dcmb <- function(x, mu, nu, size, log = FALSE) {
 
 
 # ---- Post-fit dispatchers for the v2 generic surface ----
-
-#' R-side `log_lik` for `com_binomial()`
-#'
-#' Signature matches `log_lik_tweedie()`: vector y / per-row
-#' trials, per-draw `(linpred, nu)` matrices. Returns the standard
-#' `[ndraws x nobs]` log-density matrix the loo / waic / pp_check
-#' machinery expects.
-#' @noRd
-log_lik_com_binomial <- function(linpred, link, y,
-                                  family_pars, trials) {
-  checkmate::assert_matrix(linpred)
-  checkmate::assert_choice(link, "logit")
-  checkmate::assert_numeric(trials, lower = 0L, len = ncol(linpred))
-  nu <- family_pars$nu
-  checkmate::assert_matrix(nu, nrows = nrow(linpred),
-                            ncols = ncol(linpred))
-  ndraws <- nrow(linpred)
-  nobs <- ncol(linpred)
-  # Flatten to column-major (R default): rows fastest, then cols.
-  # `outer(nu, lc) + outer(theta, x)` inside `cmb_lpmf_vec`
-  # evaluates each unique `T` as a single block.
-  mu_flat <- as.numeric(inv_link(linpred, link))
-  nu_flat <- as.numeric(nu)
-  y_flat <- rep(y, each = ndraws)
-  T_flat <- rep(trials, each = ndraws)
-  out_flat <- cmb_lpmf_vec(y_flat, mu_flat, nu_flat, T_flat)
-  matrix(out_flat, nrow = ndraws, ncol = nobs)
-}
-
 
 #' R-side `posterior_predict` for `com_binomial()`
 #'
@@ -6253,7 +6150,7 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
     unit_grouping_vars = fit_closure_unit_keys(object),
     # The series the model was fitted on. A frame missing one then
     # keeps every component on its own residual scale.
-    series_levels = names(fitted_series_index(object)),
+    series_levels = fitted_series_levels(object),
     drop_unobserved_units = FALSE
   )
 }
@@ -6471,7 +6368,7 @@ visit_to_unit_lookup <- function(arrays, n_visit) {
     stop(insight::format_error(c(
       "Closure-unit row map does not cover the prediction frame.",
       x = paste0("The map covers ", length(out), " rows."),
-      x = paste0("The prediction frame holds ", n_visit, " visits.")
+      x = paste0("The prediction frame has ", n_visit, " visits.")
     )))
   }
   out
@@ -6623,13 +6520,8 @@ aggregate_closure_unit_visits <- function(object,
   response_var <- response_column(object)
   arrays <- closure_unit_arrays_for(object, newdata)
   if (ncol(yrep_visit) != nrow(newdata)) {
-    stop(insight::format_error(c(
-      "Posterior predictive matrix column count does not match 'newdata'.",
-      x = paste0(
-        "ncol(yrep_visit) = ", ncol(yrep_visit),
-        ", nrow(newdata) = ", nrow(newdata), "."
-      )
-    )))
+    stop_shape_fault("The per-visit predictions", ncol(yrep_visit),
+                     nrow(newdata))
   }
   y_unit <- sum_within_closure_units(
     arrays, as.numeric(newdata[[response_var]])
@@ -6695,12 +6587,10 @@ multinomial_training_total <- function(object) {
     stop(insight::format_error(c(
       "A multinomial forecast needs the fit's own training data.",
       x = "The 'obs_data' and 'data' slots are empty on this fit.",
-      i = paste0(
-        "A forecast site takes its trial total from the training ",
-        "design. Supply that site's counts in 'newdata', or refit ",
-        "with the data stored on the object."
-      )
-    )))
+      x = "A forecast site takes its trial total from the training design.",
+      i = paste0("Supply that site's counts in 'newdata' or refit with ",
+                 "the data stored on the object.")
+    )), call. = FALSE)
   }
   arrays <- closure_unit_arrays_for(object, train)
   y <- as.numeric(train[[response_column(object)]])
@@ -7034,32 +6924,7 @@ posterior_latent_N_pb <- function(object, newdata = NULL,
       }
       lw[, kk] <- lp_pois + lp_binom
     }
-    # Vectorised inverse-CDF sample: subtract per-row maxima to
-    # avoid overflow, exponentiate, accumulate the running CDF
-    # column-by-column (one vectorised pass over draws per k),
-    # normalise by the row sum, and pick the first column where
-    # the running CDF exceeds a single uniform draw. Collapses
-    # the per-draw sample.int loop into n_k column updates;
-    # identical in distribution to the prob = exp(...) call to
-    # sample.int.
-    row_max <- do.call(pmax, lapply(seq_len(n_k), function(k) lw[, k]))
-    w <- exp(lw - row_max)
-    # Column-wise running CDF: each column adds the previous
-    # column's running total. n_k iterations, each touching
-    # ndraws values; far cheaper than apply(w, 1L, cumsum) when
-    # ndraws is large.
-    cdf <- w
-    if (n_k > 1L) {
-      for (k in 2:n_k) {
-        cdf[, k] <- cdf[, k - 1L] + cdf[, k]
-      }
-    }
-    cdf <- cdf / cdf[, n_k]
-    u <- stats::runif(ndraws)
-    # Number of CDF entries strictly less than u is the 0-based
-    # bin index; +1 gives the 1-based k_grid index.
-    bin_idx <- rowSums(cdf < u) + 1L
-    out[, g] <- k_grid[bin_idx]
+    out[, g] <- k_grid[sample_row_index(lw)]
   }
   out
 }
@@ -7120,8 +6985,7 @@ log_lik_nmix <- function(linpred, link, y, family_pars, trials) {
       lp_mat[, kk] <- lp_pois + lp_binom
     }
     # log_sum_exp across the truncated k grid.
-    m <- apply(lp_mat, 1L, max)
-    out[, g] <- m + log(rowSums(exp(lp_mat - m)))
+    out[, g] <- row_log_sum_exp(lp_mat)
   }
   out
 }
@@ -7135,28 +6999,9 @@ log_lik_nmix <- function(linpred, link, y, family_pars, trials) {
 # `1 - exp(-r_j * lambda_g)` (Royle and Nichols 2003), giving a
 # closed-form posterior_epred. Sampling and the conditional N
 # posterior need the truncated `1 - (1 - r_j)^k` form because they
-# condition on specific draws of N. Numerically safer via
-# log1mexp() than via
-# direct (1 - r)^k subtraction.
-
-#' Numerically stable log(1 - exp(-a)) for a > 0
-#'
-#' Maechler 2012 algorithm. Used by the Royle-Nichols log-lik /
-#' latent_N kernels where the per-(unit, k) term carries
-#' `log(1 - (1 - r_j)^k) = log1mexp(-k * log(1 - r_j))`. The
-#' branch at `log(2)` switches between `log(-expm1(-a))` (stable
-#' near `a = 0`) and `log1p(-exp(-a))` (stable for large `a`).
-#'
-#' @param a Non-negative numeric vector / matrix.
-#' @return `log(1 - exp(-a))`.
-#' @noRd
-log1mexp <- function(a) {
-  out <- a
-  small <- a <= log(2)
-  out[ small] <- log(-expm1(-a[ small]))
-  out[!small] <- log1p(-exp(-a[!small]))
-  out
-}
+# condition on specific draws of N. `log1mexp()` evaluates it
+# stably, where subtracting `(1 - r)^k` from one directly loses
+# precision.
 
 #' Extract per-row mu and per-species Psi (and nu) draws for an
 #' mv-response fit
@@ -7255,11 +7100,7 @@ extract_mv_response_components <- function(object, newdata = NULL,
   psi_cols <- paste0("Psi[", seq_len(K), "]")
   missing_cols <- setdiff(psi_cols, colnames(draws_mat))
   if (length(missing_cols) > 0L) {
-    stop(insight::format_error(c(
-      "Posterior is missing Psi columns for mv-response family.",
-      x = paste0("Expected: ", paste(psi_cols, collapse = ", "), "."),
-      x = paste0("Missing: ", paste(missing_cols, collapse = ", "), ".")
-    )))
+    stop_missing_draws("Psi", missing_cols)
   }
   # A plain numeric matrix, not the `draws_matrix` the posterior
   # arrives as. Its class survives both subsetting and `as.matrix()`,
@@ -7347,6 +7188,31 @@ posterior_predict_mvn <- function(object, newdata = NULL,
   )
 }
 
+# Internal: the shapes the 'mvn()' and 'mvt()' log-likelihoods need.
+# One response per column of `linpred`, a residual scale per draw and
+# row, and for 'mvt()' one degrees-of-freedom value per draw.
+#'@noRd
+assert_mv_loglik_shapes <- function(family, linpred, y, Psi_row,
+                                    nu = NULL) {
+  expected <- dim(linpred)
+  shapes <- c(
+    y = length(y) == expected[2L],
+    Psi_row = identical(dim(Psi_row), expected),
+    nu = is.null(nu) || length(nu) == expected[1L]
+  )
+  if (!all(shapes)) {
+    stop_mvgam_fault(
+      paste0("The '", family, "()' log-likelihood received mismatched ",
+             "inputs."),
+      paste0("Mismatched against 'linpred' [",
+             paste(expected, collapse = " x "), "]: ",
+             paste0("'", names(shapes)[!shapes], "'", collapse = ", "),
+             ".")
+    )
+  }
+  invisible(TRUE)
+}
+
 #' Per-observation log-likelihood for `mvn()`
 #'
 #' Independent normal per row at the conditional gllvm
@@ -7375,20 +7241,7 @@ log_lik_mvn <- function(linpred, link, y, family_pars, trials) {
   Psi_row <- family_pars$Psi_row
   ndraws <- nrow(linpred)
   N_obs <- ncol(linpred)
-  if (length(y) != N_obs) {
-    stop(insight::format_error(c(
-      "log_lik_mvn: y length does not match linpred columns.",
-      x = paste0("length(y) = ", length(y),
-                 ", ncol(linpred) = ", N_obs, ".")
-    )))
-  }
-  if (!identical(dim(Psi_row), c(ndraws, N_obs))) {
-    stop(insight::format_error(c(
-      "log_lik_mvn: Psi_row dimensions do not match linpred.",
-      x = paste0("Psi_row is ", paste(dim(Psi_row), collapse = "x"),
-                 ". Expected ", ndraws, "x", N_obs, ".")
-    )))
-  }
+  assert_mv_loglik_shapes("mvn", linpred, y, Psi_row)
   y_mat <- matrix(y, nrow = ndraws, ncol = N_obs, byrow = TRUE)
   matrix(
     stats::dnorm(
@@ -7466,21 +7319,7 @@ log_lik_mvt <- function(linpred, link, y, family_pars, trials) {
   nu      <- family_pars$nu
   ndraws <- nrow(linpred)
   N_obs <- ncol(linpred)
-  if (length(y) != N_obs) {
-    stop(insight::format_error(
-      "log_lik_mvt: y length does not match linpred columns."
-    ))
-  }
-  if (!identical(dim(Psi_row), c(ndraws, N_obs))) {
-    stop(insight::format_error(
-      "log_lik_mvt: Psi_row dimensions do not match linpred."
-    ))
-  }
-  if (length(nu) != ndraws) {
-    stop(insight::format_error(
-      "log_lik_mvt: nu length does not match ndraws."
-    ))
-  }
+  assert_mv_loglik_shapes("mvt", linpred, y, Psi_row, nu)
   y_mat <- matrix(y, nrow = ndraws, ncol = N_obs, byrow = TRUE)
   nu_mat <- matrix(nu, nrow = ndraws, ncol = N_obs)
   z <- (y_mat - linpred) / Psi_row
@@ -7577,13 +7416,10 @@ extract_simplex_response_components <- function(object,
   for (g in seq_len(N_unit)) {
     idx <- unit_rows[[g]]
     mu_unit <- mu[, idx, drop = FALSE]
-    # Mirror Stan's `mu_unit = mu[idx] - mu[idx[1]]` reference shift.
-    # softmax is shift-invariant so the resulting probabilities are
-    # the same as without the subtraction, but staying explicit
-    # documents the parameterisation match.
-    mu_unit_centred <- mu_unit - mu_unit[, 1L]
-    exp_mu <- exp(mu_unit_centred)
-    prob_row[, idx] <- exp_mu / rowSums(exp_mu)
+    # Stan shifts by the first row, `mu_unit = mu[idx] - mu[idx[1]]`.
+    # The softmax is invariant to a shift, which lets `row_softmax()`
+    # shift by the row maximum and keep `exp()` finite.
+    prob_row[, idx] <- row_softmax(mu_unit)
   }
 
   phi_mat <- NULL
@@ -7910,12 +7746,11 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
     cat_code <- which(y_unit == 1L)
     if (length(cat_code) != 1L) {
       stop(insight::format_error(c(
-        "categ() observation is not a single one-hot per site.",
+        "Each site of a 'categ()' response selects exactly one species.",
         x = paste0(
           "Site ", g, " has ", sum(y_unit),
           " ones across K = ", Kg, " species rows."
-        ),
-        i = "Each site must have exactly one species selected."
+        )
       )))
     }
     lp <- log(prob_row[, idx[cat_code]])
@@ -8044,22 +7879,7 @@ posterior_latent_N_royle_nichols <- function(object,
       }
       lw[, kk] <- lp_pois + lp_nondet + lp_det
     }
-    # Vectorised inverse-CDF sample identical to the Poisson-binomial
-    # path: subtract per-row maxima for numerical stability, build a
-    # running CDF column-by-column, and pick the first column whose
-    # running CDF exceeds a single uniform draw per row.
-    row_max <- do.call(pmax, lapply(seq_len(n_k), function(k) lw[, k]))
-    w <- exp(lw - row_max)
-    cdf <- w
-    if (n_k > 1L) {
-      for (k in 2:n_k) {
-        cdf[, k] <- cdf[, k - 1L] + cdf[, k]
-      }
-    }
-    cdf <- cdf / cdf[, n_k]
-    u <- stats::runif(ndraws)
-    bin_idx <- rowSums(cdf < u) + 1L
-    out[, g] <- k_grid[bin_idx]
+    out[, g] <- k_grid[sample_row_index(lw)]
   }
   out
 }
@@ -8125,8 +7945,7 @@ log_lik_nmix_royle_nichols <- function(linpred, link, y,
       }
       lp_mat[, kk] <- lp_pois + lp_nondet + lp_det
     }
-    m <- apply(lp_mat, 1L, max)
-    out[, g] <- m + log(rowSums(exp(lp_mat - m)))
+    out[, g] <- row_log_sum_exp(lp_mat)
   }
   out
 }
@@ -8256,22 +8075,7 @@ posterior_latent_N_poisson_poisson <- function(object,
           k * sum_p_g - lgamma_const
       }
     }
-    # Vectorised inverse-CDF sample identical to the PB and RN
-    # paths: subtract per-row maxima for numerical stability,
-    # build a running CDF column-by-column, pick the first
-    # column whose running CDF exceeds a single uniform draw.
-    row_max <- do.call(pmax, lapply(seq_len(n_k), function(k) lw[, k]))
-    w <- exp(lw - row_max)
-    cdf <- w
-    if (n_k > 1L) {
-      for (k in 2:n_k) {
-        cdf[, k] <- cdf[, k - 1L] + cdf[, k]
-      }
-    }
-    cdf <- cdf / cdf[, n_k]
-    u <- stats::runif(ndraws)
-    bin_idx <- rowSums(cdf < u) + 1L
-    out[, g] <- k_grid[bin_idx]
+    out[, g] <- k_grid[sample_row_index(lw)]
   }
   out
 }
@@ -8337,8 +8141,7 @@ log_lik_nmix_poisson_poisson <- function(linpred, link, y,
           k * sum_p_g - lgamma_const
       }
     }
-    m <- apply(lp_mat, 1L, max)
-    out[, g] <- m + log(rowSums(exp(lp_mat - m)))
+    out[, g] <- row_log_sum_exp(lp_mat)
   }
   out
 }

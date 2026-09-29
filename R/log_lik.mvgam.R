@@ -374,6 +374,10 @@ extract_response_for_log_lik <- function(object, newdata, resp) {
 # [ndraws x nobs] matrix of log densities. The closure-unit and ordinal
 # families are scored before it is reached, by
 # `dispatch_closure_unit_method()` and `ordinal_log_lik()`.
+#
+# A family with its own `log_lik_<family>()` kernel is scored by it.
+# Every other family is scored by the density `family_dist_spec()`
+# names, the one its censoring, truncation and residuals also use.
 dispatch_log_lik <- function(family_name, link, linpred, y,
                              family_pars, trials) {
   fn_name <- paste0("log_lik_", family_name)
@@ -381,7 +385,12 @@ dispatch_log_lik <- function(family_name, link, linpred, y,
   # caller has, where catching the error of a failed `get()` treats a
   # missing kernel and a broken one alike.
   if (!exists(fn_name, mode = "function", envir = asNamespace("mvgam"))) {
-    refuse_missing_family_dispatch(family_name, "a log-likelihood")
+    spec <- family_dist_spec(family_name, link, linpred, family_pars,
+                             trials)
+    if (is.null(spec)) {
+      refuse_missing_family_dispatch(family_name, "a log-likelihood")
+    }
+    return(dist_log_density(spec, linpred, y))
   }
   fn <- get(fn_name, mode = "function", envir = asNamespace("mvgam"))
   fn(
@@ -437,97 +446,6 @@ sum_measured_arms <- function(per_resp) {
     out[, j] <- fn(y[j], j)
   }
   out
-}
-
-log_lik_gaussian <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("gaussian", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_student <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("student", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_lognormal <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("lognormal", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_gamma <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("gamma", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_weibull <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("weibull", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_exponential <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("exponential", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_beta <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("beta", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_bernoulli <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("bernoulli", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_binomial <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("binomial", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_beta_binomial <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("beta_binomial", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_poisson <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("poisson", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_negbinomial <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("negbinomial", link, linpred, family_pars, trials),
-    linpred, y
-  )
-}
-
-log_lik_geometric <- function(linpred, link, y, family_pars, trials) {
-  dist_log_density(
-    family_dist_spec("geometric", link, linpred, family_pars, trials),
-    linpred, y
-  )
 }
 
 # Hurdle Poisson: P(Y=0) = hu; P(Y=k>0) = (1 - hu) * dpois(k|mu) /

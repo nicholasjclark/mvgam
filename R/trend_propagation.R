@@ -106,14 +106,11 @@ propagate_trend <- function(trend_model,
     "PW" = propagate_pw(trend_model, params, h, n_series,
                           fc_times, training_times, cap,
                           changepoint_range),
-    stop(insight::format_error(c(
-      "Trend type not supported by 'propagate_trend'.",
-      x = paste0("Got: '", trend_type, "'."),
-      i = paste0(
-        "Supported: 'None', 'RW', 'AR', 'VAR', 'CAR', 'ZMVN', ",
-        "'PW'."
-      )
-    )))
+    stop_mvgam_fault(
+      paste0("The trend propagator lacks a branch for trend '",
+             trend_type, "'."),
+      "Each registered trend type is forecast by its own branch."
+    )
   )
 }
 
@@ -141,13 +138,10 @@ propagate_zmvn <- function(params, h, n_series) {
 #'@noRd
 propagate_car <- function(params, h, n_series, last_state, time) {
   if (is.null(time)) {
-    stop(insight::format_error(c(
-      "'time' is required for CAR(1) propagation.",
-      i = paste0(
-        "Pass a length-h numeric vector of time gaps to ",
-        "'propagate_trend(..., time = ...)'."
-      )
-    )))
+    stop_mvgam_fault(
+      "CAR(1) propagation needs the forecast time gaps.",
+      "The caller passed 'time = NULL'."
+    )
   }
   checkmate::assert_numeric(time, len = h, lower = 0)
   phi <- params$phi %||% 0.7
@@ -183,19 +177,13 @@ propagate_pw <- function(trend_model, params, h, n_series,
                            changepoint_range = NULL) {
   growth <- pw_growth(trend_model)
   if (is.null(fc_times) || length(fc_times) != h) {
-    stop(insight::format_error(c(
-      "PW propagation requires 'fc_times' of length h.",
-      x = paste0(
-        "Got length = ",
-        if (is.null(fc_times)) 0L else length(fc_times),
-        ", expected ", h, "."
-      )
-    )))
+    stop_shape_fault("'fc_times'", length(fc_times), h)
   }
   if (is.null(training_times) || length(training_times) == 0L) {
-    stop(insight::format_error(
-      "PW propagation requires non-empty 'training_times'."
-    ))
+    stop_mvgam_fault(
+      "PW propagation needs the training times.",
+      "The caller passed an empty 'training_times'."
+    )
   }
   if (identical(growth, "logistic")) {
     if (is.null(cap) || !is.matrix(cap)) {
@@ -442,14 +430,7 @@ build_arma_A <- function(trend_type, params, ar_lags, n_series) {
     }
     checkmate::assert_array(A_cube, d = 3L)
     if (any(dim(A_cube) != c(n_series, n_series, m_a))) {
-      stop(insight::format_error(c(
-        "'A' has the wrong shape.",
-        x = paste0(
-          "Got [", paste(dim(A_cube), collapse = ", "),
-          "]. Expected [", n_series, ", ", n_series, ", ",
-          m_a, "]."
-        )
-      )))
+      stop_shape_fault("'A'", dim(A_cube), c(n_series, n_series, m_a))
     }
     return(A_cube)
   }
@@ -458,23 +439,11 @@ build_arma_A <- function(trend_type, params, ar_lags, n_series) {
   ar_coefs <- params$ar %||% rep(ar_default, m_a)
   if (is.matrix(ar_coefs)) {
     if (any(dim(ar_coefs) != c(m_a, n_series))) {
-      stop(insight::format_error(c(
-        "'ar' has the wrong shape.",
-        x = paste0(
-          "Got [", paste(dim(ar_coefs), collapse = ", "),
-          "]. Expected [", m_a, ", ", n_series, "]."
-        )
-      )))
+      stop_shape_fault("'ar'", dim(ar_coefs), c(m_a, n_series))
     }
   } else {
     if (length(ar_coefs) != m_a) {
-      stop(insight::format_error(c(
-        "'ar' has the wrong length.",
-        x = paste0(
-          "Got length ", length(ar_coefs),
-          ". Expected ", m_a, "."
-        )
-      )))
+      stop_shape_fault("'ar'", length(ar_coefs), m_a)
     }
     ar_coefs <- matrix(
       rep(ar_coefs, each = n_series), nrow = m_a, ncol = n_series,
@@ -501,14 +470,8 @@ build_arma_B <- function(has_ma, params, m_b, n_series) {
   if (!is.null(B_cube)) {
     checkmate::assert_array(B_cube, d = 3L)
     if (any(dim(B_cube) != c(n_series, n_series, m_b))) {
-      stop(insight::format_error(c(
-        "'theta_cube' has the wrong shape.",
-        x = paste0(
-          "Got [", paste(dim(B_cube), collapse = ", "),
-          "]. Expected [", n_series, ", ", n_series, ", ",
-          m_b, "]."
-        )
-      )))
+      stop_shape_fault("'theta_cube'", dim(B_cube),
+                       c(n_series, n_series, m_b))
     }
     return(B_cube)
   }
@@ -650,11 +613,7 @@ enrich_trend_metadata <- function(trend_metadata, trend_specs) {
   if (is.null(trend_metadata)) return(NULL)
   if (is.null(trend_specs)) return(trend_metadata)
 
-  spec <- if (is_multivariate_trend_specs(trend_specs)) {
-    trend_specs[[1L]]
-  } else {
-    trend_specs
-  }
+  spec <- trend_spec_head(trend_specs)
   if (is.null(spec) || is.null(spec$trend)) return(trend_metadata)
 
   trend_metadata$trend_type <- spec$trend
@@ -766,10 +725,9 @@ ar_shared_coef_names <- function(ar_lags) {
 
 
 # Internal: every AR coefficient parameter mvgam owns for this lag
-# set and sharing mode. Three consumers share the list: the prior
-# surface, the summary labels and the set of names mvgam intercepts
-# before brms sees them. Each of the three needs the per-series
-# coefficient, which stays in the list under every mode.
+# set and sharing mode. `generate_monitor_params()` returns it to the
+# prior table and to the set of names mvgam withholds from brms. The
+# withheld set needs the per-series coefficient under every mode.
 # `generate_trend_priors_from_monitor_params()` narrows the list to
 # the rows a user can edit.
 #'@noRd

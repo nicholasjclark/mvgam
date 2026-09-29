@@ -51,19 +51,6 @@ SM <- suppressMessages
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
 set.seed(3301L)
 
@@ -309,31 +296,22 @@ test_that("chains below one is refused, naming the mode that answers", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_trend_map.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading trend_map fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(AR(p = 1, trend_map = Z), 4 series on 2 factors)\n")
-  fit <- mvgam(
-    formula = obs_formula,
-    trend_formula = ~ -1 + AR(p = 1, trend_map = Z_true),
-    data = dat, family = poisson(),
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_trend_map.rds",
+  function() {
+    mvgam(
+      formula = obs_formula,
+      trend_formula = ~ -1 + AR(p = 1, trend_map = Z_true),
+      data = dat, family = poisson(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  },
+  key = sim_truth
+)
 
 dm <- posterior::as_draws_matrix(fit$fit)
 
-
-test_that("the cached fit ran the program the package generates", {
-  expect_current_program(fit)
-})
 
 
 test_that("the trend is the loadings times the factors, draw by draw", {
@@ -527,14 +505,9 @@ test_that("residual_cor is labelled by the series axis", {
 
 
 test_that("criticism and plotting run on a fixed-Z fit", {
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))
@@ -594,33 +567,15 @@ test_that("active_factors, shared_variation and ordinate answer here", {
   # fixed loadings can still be seen, since a biplot of gradients
   # presented as the declared factors is the one reading that would
   # mislead.
-  ord_warnings <- character(0)
-  ord <- withCallingHandlers(ordinate(fit), warning = function(w) {
-    ord_warnings <<- c(ord_warnings, conditionMessage(w))
-    invokeRestart("muffleWarning")
-  })
-  expect_s3_class(ord, "ggplot")
-  layers <- ggplot2::ggplot_build(ord)$data
-  expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-  expect_true(any(grepl("trend_map", ord_warnings, fixed = TRUE)))
+  ord <- with_warnings(ordinate(fit))
+  expect_drawn(ord$value)
+  expect_true(any(grepl("trend_map", ord$warnings, fixed = TRUE)))
 })
 
 
 test_that("every per-series plot panels in the model's own order", {
-  # Series declared out of alphabetical order, so a panel order taken
-  # from a sort differs from the model's. `plot(type = "series")` uses
-  # the model's; `plot(type = "trend")` sorts, so the first panel of
-  # each is a different series while every label is right on its own.
-  panel_order <- function(ty) {
-    b <- ggplot2::ggplot_build(plot(fit, type = ty))
-    lay <- b$layout$layout
-    fc <- setdiff(names(lay),
-                  c("PANEL", "ROW", "COL", "SCALE_X", "SCALE_Y"))
-    if (!length(fc)) return(character(0))
-    as.character(lay[[fc[1L]]])
-  }
-  expect_identical(panel_order("series"), series_levels)
-  expect_identical(panel_order("trend"), series_levels)
+  expect_identical(panel_order(plot(fit, type = "series")), series_levels)
+  expect_identical(panel_order(plot(fit, type = "trend")), series_levels)
   expect_identical(names(hindcast(fit)$hindcasts), series_levels)
 })
 
@@ -646,11 +601,6 @@ test_that("every plot draws the occasions the user supplied", {
   # finding 17.
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
-  drawn_x <- function(p) {
-    b <- ggplot2::ggplot_build(p)
-    xs <- unlist(lapply(b$data, function(d) if ("x" %in% names(d)) d$x))
-    range(xs, na.rm = TRUE)
-  }
   want <- as.numeric(range(time_vals))
   for (ty in c("trend", "series", "factors")) {
     expect_equal(drawn_x(plot(fit, type = ty)), want, tolerance = 0.02)
@@ -793,10 +743,41 @@ test_that("an unknown series is refused, and named", {
   )
   err <- expect_error(
     posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-    "Series levels in newdata not found in training data"
+    "Series in 'newdata' has levels absent from the training data"
   )
   expect_match(conditionMessage(err), "hazel", fixed = TRUE)
 })
 
 
 cat("\nDone.\n")
+
+
+test_that("update() refits this model and the refit forecasts", {
+  # The refit rebuilds the trend from the call the user wrote, which
+  # names `Z_true`. A shorter window keeps the program. The compiled
+  # model is reused and `recompile = FALSE` is honoured.
+  cutoff <- max(time_vals) - 10L
+  held_out <- dat[dat$time > cutoff, ]
+  short <- update(fit, newdata = dat[dat$time <= cutoff, ],
+                  recompile = FALSE, chains = 1L, iter = 400L)
+  expect_identical(nrow(mvgam:::mvgam_training_data(short)),
+                   sum(dat$time <= cutoff))
+  expect_identical(posterior::ndraws(posterior::as_draws_matrix(short$fit)),
+                   200L)
+  expect_equal(unname(short$standata$Z), unname(fit$standata$Z))
+  fc <- forecast(short, newdata = held_out, ndraws = 20L)
+  expect_identical(names(fc$forecasts), series_levels)
+  for (s in series_levels) {
+    expect_identical(dim(fc$forecasts[[s]]), c(20L, 10L))
+  }
+
+  # A new term changes the program, which `recompile = FALSE` refuses
+  expect_error(update(fit, formula. = ~ . + time, recompile = FALSE),
+               "not supported for this update")
+  grown <- update(fit, formula. = ~ . + time, chains = 1L, iter = 400L)
+  expect_false("b_time" %in% variables(fit))
+  expect_true("b_time" %in% variables(grown))
+  expect_equal(unname(grown$standata$Z), unname(fit$standata$Z))
+  expect_identical(dim(posterior_epred(grown, draw_ids = 1:5)),
+                   c(5L, nrow(dat)))
+})

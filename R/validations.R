@@ -210,13 +210,15 @@ validate_family <- function(family, link = NULL) {
 #' Validate Family is Supported by mvgam
 #'
 #' @description
-#' Checks that the family is supported by mvgam. brms's multi-category
-#' families model a matrix response through one linear predictor per
-#' category, while mvgam's trend adds to a single predictor per row,
-#' and the two cannot be composed. brms marks every such family with a
-#' special, `"categorical"`, `"multinomial"` or `"simplex"`, and each is
-#' pointed at the mvgam family that takes the same response in long
-#' format.
+#' Checks that the family is supported by mvgam. A brms `mixture()`
+#' is refused because mvgam's post-fit methods (summaries, predictions,
+#' log-likelihoods and residuals) have no kernel for a mixture of
+#' families. brms's multi-category families model a matrix response
+#' through one linear predictor per category, while mvgam's trend adds
+#' to a single predictor per row, and the two cannot be composed. brms
+#' marks every such family with a special, `"categorical"`,
+#' `"multinomial"` or `"simplex"`, and each is pointed at the mvgam
+#' family that takes the same response in long format.
 #'
 #' @param family A family or brmsfamily object
 #'
@@ -230,6 +232,15 @@ validate_supported_family <- function(family) {
     checkmate::check_class(family, "customfamily"),
     combine = "or"
   )
+  if (inherits(family, "mixfamily")) {
+    stop(insight::format_error(c(
+      "Mixture families are not supported by mvgam.",
+      x = paste0("mvgam's summaries, predictions and log-likelihoods ",
+                 "each take a single family per response."),
+      i = paste0("Request support at ",
+                 "https://github.com/nicholasjclark/mvgam/issues.")
+    )), call. = FALSE)
+  }
   # mvgam's own multi-response families (diri / multi / categ / mvn /
   # mvt) take a long-format K-row response through the closure-unit
   # pipeline.
@@ -246,12 +257,12 @@ validate_supported_family <- function(family) {
   )
   pointer <- wrappers[intersect(names(wrappers), family$specials)][1L]
   if (!is.na(pointer)) {
-    stop(insight::format_error(paste0(
-      "Family '", resolve_family_name(family),
-      "' is not supported by mvgam directly. ",
-      "Use ", pointer, ", the mvgam wrapper for a response in long ",
-      "format."
-    )))
+    stop(insight::format_error(c(
+      paste0("Family '", resolve_family_name(family),
+             "' is not supported by mvgam directly."),
+      i = paste0("Use ", pointer, ", the mvgam wrapper for a response ",
+                 "in long format.")
+    )), call. = FALSE)
   }
   invisible(TRUE)
 }
@@ -371,7 +382,9 @@ validate_closure_unit_data <- function(data,
   if (cap_required) {
     required_cols <- c(required_cols, cap_var)
   }
-  for (col in required_cols) {
+  assert_axis_column(data, series_var, "series")
+  assert_axis_column(data, time_var, "time")
+  for (col in setdiff(required_cols, c(series_var, time_var))) {
     if (!col %in% colnames(data)) {
       stop(insight::format_error(
         paste0("Closure-unit families require column '", col, "' in 'data'.")
@@ -523,10 +536,7 @@ validate_closure_unit_data <- function(data,
           ") has differing '", cap_var, "' values: ",
           paste(unique(cap_g), collapse = ", "), "."
         ),
-        i = paste0(
-          "Each closure unit has one latent abundance. Its ",
-          "upper truncation '", cap_var, "' must be a single value."
-        )
+        i = paste0("Give '", cap_var, "' one value per closure unit.")
       )))
     }
   }
@@ -580,16 +590,14 @@ validate_closure_unit_data <- function(data,
         "The closure-unit count family is not identified.",
         x = paste0(
           "Every unit has a single visit and neither the state ",
-          "nor the detection formula carries a covariate."
+          "nor the detection formula contains a covariate."
         ),
-        i = paste0(
-          "With unbounded state support, lambda and detection p ",
-          "lie on the lambda * p = observed isocurve with no data ",
-          "signal to separate them (Solymos et al. 2012). Add a ",
-          "covariate to a formula or supply additional visits per ",
-          "closure unit."
-        )
-      )))
+        x = paste0("With unbounded state support, lambda and detection ",
+                   "p lie on the isocurve lambda * p = observed ",
+                   "(Solymos et al. 2012)."),
+        i = paste0("Add a covariate to a formula or supply more visits ",
+                   "per closure unit.")
+      )), call. = FALSE)
     }
   }
   single_visit_share <- mean(rep_counts == 1L)
@@ -779,7 +787,7 @@ validate_no_covariate_nas <- function(data, formulas,
       "missing values in '", context, "'."
     ),
     stats::setNames(bad_lines, rep("x", length(bad_lines))),
-    i = "A missing response is allowed. The likelihood skips its row."
+    i = "The likelihood skips a row whose response is missing."
   )))
 }
 
@@ -866,6 +874,43 @@ validate_required_variables <- function(data, required_vars, context = "data", f
 }
 
 
+#' Shape-only assertion for `trend_map` (constructor fail-fast).
+#'
+#' Every trend constructor that accepts `trend_map` calls this, so
+#' malformed input fails when the constructor runs. The checks that
+#' need data (dimension match, series-label coverage, contiguity) run
+#' in `normalise_trend_map()`.
+#'
+#' @noRd
+assert_trend_map_input <- function(input) {
+  if (is.null(input)) return(invisible(NULL))
+  checkmate::assert(
+    checkmate::check_character(input, len = 1L),
+    checkmate::check_matrix(input, mode = "numeric"),
+    checkmate::check_data_frame(input),
+    .var.name = "trend_map"
+  )
+  invisible(NULL)
+}
+
+
+#' The series a `trend_map` or `loadings_prior` row belongs to
+#'
+#' Both arguments hold one row per series and arrive before the axis
+#' is resolved. The levels returned are those observed in the data.
+#' A declared level with no rows has no trend series and gets no row.
+#'
+#' @param data The user's data frame.
+#' @param series_var The series column the trend constructor names.
+#' @return Character vector of series levels, in axis order.
+#' @noRd
+argument_series_levels <- function(data, series_var) {
+  checkmate::assert_data_frame(data)
+  assert_axis_column(data, series_var, "series")
+  as.character(observed_levels(data[[series_var]]))
+}
+
+
 #' Normalise the user-facing `trend_map` argument
 #'
 #' Single entry point that converts any of the accepted
@@ -912,69 +957,16 @@ validate_required_variables <- function(data, required_vars, context = "data", f
 #' }
 #'
 #' @param input The user-supplied `trend_map` value.
-#' @param data Training `data.frame` carrying a `series` factor
-#'   so the normaliser can resolve dimensions and validate
-#'   labels.
+#' @param data Training `data.frame` whose series column resolves
+#'   the dimensions and labels.
+#' @param series_var The series column the trend constructor names.
 #'
 #' @return `list(Z = <num matrix>, n_lv = <int>)`.
-#'
-#' Shape-only assertion for `trend_map` (constructor fail-fast).
-#'
-#' Called from every trend constructor that accepts `trend_map`
-#' so malformed input errors immediately, not at fit time. Defers
-#' all data-dependent validation (dimension match, series-label
-#' coverage, contiguity etc.) to `normalise_trend_map()`.
-#'
 #' @noRd
-assert_trend_map_input <- function(input) {
-  if (is.null(input)) return(invisible(NULL))
-  checkmate::assert(
-    checkmate::check_character(input, len = 1L),
-    checkmate::check_matrix(input, mode = "numeric"),
-    checkmate::check_data_frame(input),
-    .var.name = "trend_map"
-  )
-  invisible(NULL)
-}
-#' The series a `trend_map` or `loadings_prior` row belongs to
-#'
-#' Both arguments are matrices with one row per series, handed in
-#' before any axis has been resolved, so both have to name the
-#' series for themselves. They asked the same question in the same
-#' ten lines and differed only in which of them the error message
-#' named.
-#'
-#' The levels are the ones something is observed at, not the ones a
-#' factor happens to declare. A column carrying a level nothing
-#' reaches gave a matrix a row for a series the trend does not
-#' have, and the argument was then refused for having the wrong
-#' number of rows.
-#'
-#' @param data The user's data frame.
-#' @param argument Name of the argument being normalised, for the
-#'   message a frame naming no series receives.
-#' @return Character vector of series levels, in axis order.
-#' @noRd
-argument_series_levels <- function(data, argument) {
-  checkmate::assert_data_frame(data)
-  checkmate::assert_string(argument)
-  if (is.null(data$series)) {
-    stop(insight::format_error(c(
-      paste0("'", argument, "' requires a 'series' column on 'data'."),
-      i = "Add a 'series' factor / character column to 'data'."
-    )))
-  }
-  as.character(observed_series_levels(data$series))
-}
-
-
-
-
-#' @noRd
-normalise_trend_map <- function(input, data) {
+normalise_trend_map <- function(input, data, series_var = "series") {
   if (is.null(input)) return(NULL)
   checkmate::assert_data_frame(data)
-  series_levels <- argument_series_levels(data, "trend_map")
+  series_levels <- argument_series_levels(data, series_var)
   n_series <- length(series_levels)
   Z <- if (is.character(input)) {
     trend_map_from_character(input, n_series)
@@ -1155,10 +1147,7 @@ refuse_unread_dots <- function(dots, allowed, fn) {
       "Unknown to ", fn, "() and to what it hands the work to: ",
       paste0("'", unread, "'", collapse = ", "), "."
     ),
-    i = paste0(
-      "Check the spelling against `?", fn, "`. A result computed ",
-      "from the default would differ from what was asked for."
-    )
+    i = paste0("Check the spelling against '?", fn, "'.")
   )), call. = FALSE)
 }
 
@@ -1282,37 +1271,19 @@ trend_map_from_dataframe <- function(input, series_levels) {
 }
 
 
-#' Does any trend in a `trend_specs` payload require regular time
-#' intervals?
+#' Does the trend require regular time intervals?
 #'
 #' @description
-#' Returns `TRUE` when at least one trend's `validation_rules`
-#' contains `"requires_regular_intervals"`. Handles three shapes:
-#' `NULL` (returns `FALSE`), a single `mvgam_trend` object, or a
-#' named list of trend specs. Used by the data validators
-#' upstream so the gate matches each trend's declared rule rather
-#' than a hardcoded trend-type predicate.
+#' The data validators ask the trend's declared `validation_rules`,
+#' so a new trend type sets the gate by its own declaration.
 #'
-#' @param trend_specs `NULL`, an `mvgam_trend`, or a list of
-#'   `mvgam_trend` objects.
+#' @param trend_specs `NULL`, an `mvgam_trend`, or a per-response
+#'   list of them.
 #' @return Logical scalar.
 #' @noRd
-any_trend_requires_regular_intervals <- function(trend_specs) {
-  if (is.null(trend_specs)) return(FALSE)
-  rule <- rule_requires_regular_intervals
-  specs <- if (inherits(trend_specs, "mvgam_trend")) {
-    list(trend_specs)
-  } else if (is_multivariate_trend_specs(trend_specs)) {
-    trend_specs
-  } else {
-    list(trend_specs)
-  }
-  for (spec in specs) {
-    if (rule %in% (spec$validation_rules %||% character(0))) {
-      return(TRUE)
-    }
-  }
-  FALSE
+trend_requires_regular_intervals <- function(trend_specs) {
+  rule_requires_regular_intervals %in%
+    trend_spec_head(trend_specs)$validation_rules
 }
 #' The series a spec will give a frame, before any axis exists
 #'
@@ -1346,7 +1317,7 @@ spec_series_values <- function(trend_spec, data) {
       x = paste0(
         "Columns present: ", paste(colnames(data), collapse = ", "), "."
       ),
-      i = "'gr' must name a column that says which group a series is in."
+      i = "Set 'gr' to the column that gives each series' group."
     )), call. = FALSE)
   }
   subgr <- groupings$subgr
@@ -1361,8 +1332,6 @@ spec_series_values <- function(trend_spec, data) {
   }
   list(gr_var = gr_var, series = series, series_var = series_var)
 }
-
-
 
 
 #' Validate Hierarchical Groups Are Balanced
@@ -1419,11 +1388,9 @@ validate_gr_balanced_groups <- function(trend_spec, data) {
       "Grouping variable '", gr_var,
       "' has unbalanced groups: ", counts_str, "."
     ),
-    i = paste0(
-      "The trend's blocks for each group share one size. Subset ",
-      "the data to a balanced design or combine small groups."
-    )
-  )))
+    i = paste0("Subset the data to a balanced design or combine small ",
+               "groups.")
+  )), call. = FALSE)
 }
 
 
@@ -1600,12 +1567,8 @@ validate_n_lv_ceiling <- function(n_lv, n_species,
 refuse_top_level_n_lv <- function(requested_n_lv) {
   if (is.null(requested_n_lv)) return(invisible(TRUE))
   stop(insight::format_error(c(
-    "Argument 'n_lv' is not read by 'mvgam()'.",
-    x = paste0(
-      "It reached the arguments forwarded to brms and Stan, where ",
-      "no factor count is read. The trend would have been given ",
-      "one latent state per series."
-    ),
+    "'mvgam()' takes 'n_lv' on the trend constructor.",
+    x = "brms and Stan ignore a top-level 'n_lv'.",
     i = paste0(
       "Write it on the trend as ",
       "'trend_formula = ~ AR(p = 1, n_lv = ", requested_n_lv,
@@ -1634,11 +1597,10 @@ refuse_factor_request_for_trend <- function(trend_name) {
   stop(insight::format_error(c(
     paste0("Factor models are not supported for ", trend_name,
            " trends."),
-    x = info$incompatibility_reason %||%
-      paste0(trend_name, " has no latent-factor form."),
+    x = info$incompatibility_reason,
     i = paste0(
-      "Drop 'n_lv' and 'trend_map', or use a trend that ",
-      "decomposes into factors: AR, RW, VAR, ZMVN."
+      "Drop 'n_lv' and 'trend_map', or use a trend with a factor form: ",
+      registered_trend_constructors(factors_only = TRUE), "."
     )
   )), call. = FALSE)
 }
@@ -1665,41 +1627,23 @@ refuse_constructor_factor_request <- function(n_lv, trend_map,
 
 #' Refuse a factor model on a trend that has no factor form
 #'
-#' Whether a trend decomposes into latent factors is recorded on the
-#' registry, as `supports_factors` alongside the reason it does not.
-#' Nothing read it: each constructor refused on its own, so the rule
-#' held only for the one route that goes through the constructor.
-#' Asked four ways of a piecewise trend, `PW(n_lv = 1)` was refused
-#' while `trend_map = matrix(NA, 2, 1)` and a `jsdgam()`
-#' `factor_formula` each built a one-factor model, and a top-level
-#' `n_lv` was dropped so silently that `N_lv_trend` came back at the
-#' series count.
+#' The registry's `supports_factors` entry records whether a trend
+#' decomposes into latent factors, and `incompatibility_reason` gives
+#' the reason for a trend that cannot. `prepare_trend_specs()` calls
+#' this once every route to a factor model has set `n_lv` on the
+#' spec: the constructor's `n_lv`, a `trend_map`, and the all-`NA`
+#' `trend_map` that `jsdgam()` builds. A top-level `n_lv` passed to
+#' `mvgam()` reaches no spec, and `refuse_top_level_n_lv()` refuses
+#' it.
 #'
-#' This is the one place a factor request meets the trend it was
-#' asked of, so it reads the registry rather than restating the
-#' rule. A request reaches a spec two ways and both are counted:
-#' `n_lv` on the spec, and a `trend_map` normalised to a fixed `Z`.
-#' The third spelling, `n_lv` passed to `mvgam()` itself, reaches no
-#' spec at all and is refused by `refuse_top_level_n_lv()` before
-#' this runs.
-#'
-#' @param trend_specs Parsed trend specifications, one spec or a
+#' @param trend_specs Normalised trend specifications, one spec or a
 #'   per-response list.
 #' @return `invisible(TRUE)`.
 #' @noRd
 enforce_factor_support_against_specs <- function(trend_specs) {
-  if (is.null(trend_specs)) return(invisible(TRUE))
-  ensure_registry_initialized()
-  specs <- if (is_multivariate_trend_specs(trend_specs)) {
-    trend_specs
-  } else {
-    list(trend_specs)
-  }
-  for (spec in specs) {
-    if (is.null(spec$n_lv) && is.null(spec$fixed_Z)) next
-    trend_name <- get_trend_name(spec)
-    if (is.null(trend_name) || !nzchar(trend_name)) next
-    refuse_factor_request_for_trend(trend_name)
+  spec <- trend_spec_head(trend_specs)
+  if (!is.null(spec$n_lv)) {
+    refuse_factor_request_for_trend(get_trend_name(spec))
   }
   invisible(TRUE)
 }
@@ -1710,8 +1654,8 @@ enforce_factor_support_against_specs <- function(trend_specs) {
 #' Called once, where `extract_and_validate_trend_components()` has
 #' resolved the series axis. The axis also counts series that a
 #' grouping or the responses define with no series column, which a
-#' count of the column missed. mvgam fits one shared trend, and the
-#' first factor-model spec gives its `n_lv`. The function applies
+#' count of the column missed. mvgam fits one shared trend, whose
+#' spec gives `n_lv`. The function applies
 #' `validate_n_lv_ceiling()` for the capacity ceiling and
 #' `warn_unidentified_component_scale()` for the identification
 #' bound of the mv-response families. A trend with no `n_lv` passes
@@ -1728,33 +1672,25 @@ enforce_n_lv_ceiling_against_data <- function(trend_specs, n_series,
                                               fit_function = "mvgam",
                                               family = NULL) {
   checkmate::assert_int(n_series, lower = 1L)
-  if (is.null(trend_specs)) return(invisible(TRUE))
-  specs <- if (is_multivariate_trend_specs(trend_specs)) {
-    trend_specs
-  } else {
-    list(trend_specs)
+  spec <- trend_spec_head(trend_specs)
+  n_lv <- spec_n_lv(spec)
+  if (is.null(n_lv) || n_lv < 1L || n_series < 2L) {
+    return(invisible(TRUE))
   }
-  for (spec in specs) {
-    n_lv <- spec$n_lv
-    if (is.null(n_lv) || !is.numeric(n_lv) || n_lv < 1L) next
-    if (n_series < 2L) next
-    validate_n_lv_ceiling(
-      n_lv         = as.integer(n_lv),
-      n_species    = as.integer(n_series),
-      fit_function = fit_function
+  validate_n_lv_ceiling(
+    n_lv         = n_lv,
+    n_species    = as.integer(n_series),
+    fit_function = fit_function
+  )
+  # The ceiling above is about capacity: more factors than series
+  # buys nothing. This is about identification, and it bites well
+  # below that ceiling for a family carrying a residual scale per
+  # component. A `trend_map` fixing the loadings samples no `Z`,
+  # which leaves no split to identify.
+  if (is.null(spec$fixed_Z)) {
+    warn_unidentified_component_scale(
+      n_lv = n_lv, n_species = as.integer(n_series), family = family
     )
-    # The ceiling above is about capacity: more factors than series
-    # buys nothing. This is about identification, and it bites well
-    # below that ceiling for a family carrying a residual scale per
-    # component. A `trend_map` fixing the loadings samples no `Z`,
-    # which leaves no split to identify.
-    if (is.null(spec$fixed_Z)) {
-      warn_unidentified_component_scale(
-        n_lv = as.integer(n_lv), n_species = as.integer(n_series),
-        family = family
-      )
-    }
-    break
   }
   invisible(TRUE)
 }
@@ -2205,91 +2141,31 @@ is_nonlinear_formula <- function(formula) {
     return(attr(formula$formula, "nl") %||% FALSE)
   }
 
-  # Check formula structure for nonlinear indicators
-  formula_str <- deparse(formula)
-
-  # Look for bf() with nl = TRUE
-  has_nl_true <- grepl("nl\\s*=\\s*TRUE", formula_str, ignore.case = TRUE)
-
-  # Look for nonlinear parameter specifications
-  has_nl_params <- grepl("\\b[a-zA-Z]+\\s*~", formula_str) &&
-                   grepl("\\bnl\\s*=", formula_str)
-
-  return(has_nl_true || has_nl_params)
+  # brms takes non-linearity from `bf(..., nl = TRUE)` alone, and a
+  # plain formula has no such flag.
+  FALSE
 }
 
-# Utility function to extract formula string using brms pattern
-formula2str_mvgam <- function(formula, space = "trim") {
-  if (is.null(formula)) {
-    return(NULL)
-  }
-
-  # Handle complex brms formula objects (bf, distributional, nonlinear)
-  if (inherits(formula, c("brmsformula", "bform"))) {
-    # Extract all formula components for a full string representation
-    formula_strings <- character(0)
-
-    # Main formula
-    if (!is.null(formula$formula)) {
-      main_str <- deparse(formula$formula)
-      formula_strings <- c(formula_strings, main_str)
-    }
-
-    # Distributional parameter formulas (sigma, nu, phi, etc.)
-    if (!is.null(formula$pforms)) {
-      pform_strings <- sapply(formula$pforms, function(pf) {
-        if (!is.null(pf$formula)) {
-          deparse(pf$formula)
-        } else {
-          deparse(pf)
-        }
-      })
-      formula_strings <- c(formula_strings, pform_strings)
-    }
-
-    # Nonlinear parameter formulas
-    if (!is.null(formula$nlpars)) {
-      nlpar_strings <- sapply(formula$nlpars, function(nlp) {
-        if (!is.null(nlp$formula)) {
-          deparse(nlp$formula)
-        } else {
-          deparse(nlp)
-        }
-      })
-      formula_strings <- c(formula_strings, nlpar_strings)
-    }
-
-    # If we couldn't extract components, use the whole object
-    if (length(formula_strings) == 0) {
-      formula_strings <- deparse(formula)
-    }
-
-    # Combine all components
-    x <- paste(formula_strings, collapse = " ")
+# Internal: the function a call names, with `pkg::fun` giving `fun`.
+# `character(0)` for a call whose head is itself computed.
+#'@noRd
+call_head_name <- function(expr) {
+  head <- expr[[1L]]
+  if (is.symbol(head)) {
+    as.character(head)
+  } else if (is.call(head) && identical(head[[1L]], as.name("::"))) {
+    as.character(head[[3L]])
   } else {
-    # Standard formula handling
-    formula <- as.formula(formula)
-    x <- Reduce(paste, deparse(formula))
+    character(0L)
   }
-
-  # Clean up whitespace
-  x <- gsub("[\t\r\n]+", " ", x, perl = TRUE)
-
-  if (space == "trim") {
-    x <- trimws(x)  # Use base R trimws for simplicity
-  }
-
-  return(x)
 }
 
 #' Collect function-call symbol names from an unevaluated R expression
 #'
 #' Recursively walks a `call`/`language` tree and returns the function
-#' names at each call site. Used by formula validators that need to
-#' detect specific function calls without false-positives from
-#' substring matches in deparsed text (e.g. distinguishing the brms
-#' `se()` addition term from a user variable named `se_x` or
-#' `defense`).
+#' names at each call site. Formula validators use it to detect
+#' specific function calls. A user variable named `se_x` or `defense`
+#' is no call, and the walk never reports it as the brms `se()` term.
 #'
 #' Handles namespace-qualified calls (`pkg::fun(x)` returns `fun`).
 #' Returns `character(0)` for symbols, literals, and `NULL`.
@@ -2303,19 +2179,25 @@ collect_call_names <- function(expr) {
   if (!is.call(expr)) {
     return(character(0L))
   }
-  head <- expr[[1L]]
-  head_name <- if (is.symbol(head)) {
-    as.character(head)
-  } else if (is.call(head) && identical(head[[1L]], as.name("::"))) {
-    as.character(head[[3L]])
-  } else {
-    character(0L)
-  }
-  arg_names <- unlist(
-    lapply(as.list(expr)[-1L], collect_call_names),
-    use.names = FALSE
+  c(
+    call_head_name(expr),
+    unlist(lapply(as.list(expr)[-1L], collect_call_names),
+           use.names = FALSE)
   )
-  c(head_name, arg_names)
+}
+
+# Internal: each call in `expr` to a function in `fns`, deparsed, in
+# the order written. A call to one of `fns` nested in another counts.
+#'@noRd
+find_calls <- function(expr, fns) {
+  if (!is.call(expr)) {
+    return(character(0L))
+  }
+  c(
+    if (any(call_head_name(expr) %in% fns)) deparse1(expr),
+    unlist(lapply(as.list(expr)[-1L], find_calls, fns = fns),
+           use.names = FALSE)
+  )
 }
 
 #' Function-call names in the right-hand side of a formula
@@ -2365,29 +2247,6 @@ formula_rhs_function_names <- function(x) {
     return(unique(collect_call_names(rhs)))
   }
   character(0L)
-}
-
-#' Trend constructor calls written in a formula
-#'
-#' @description
-#' Returns one element per constructor call, in the order written.
-#' Counting occurrences separates `~ AR(p = 1) + AR(p = 2)` from a
-#' single constructor, which one match per registered type reports
-#' identically. The pattern comes from the registry, so a newly
-#' registered trend type needs no change here.
-#'
-#' @param formula_str Deparsed formula
-#' @return Character vector of the constructor calls written
-#' @noRd
-trend_constructor_calls <- function(formula_str) {
-  checkmate::assert_string(formula_str)
-
-  matches <- regmatches(
-    formula_str,
-    gregexpr(mvgam_trend_pattern(), formula_str, perl = TRUE)
-  )[[1]]
-
-  matches[nzchar(matches)]
 }
 
 #' Tell the user once per term and session that an exact GP term
@@ -2468,25 +2327,16 @@ validate_obs_formula_brms <- function(formula) {
     .var.name = "formula"
   )
 
-  # Extract string representation for pattern matching
-  formula_str <- formula2str_mvgam(formula)
-
-  # Check for mvgam trend constructors using dynamic registry lookup
-  detected_trends <- trend_constructor_calls(formula_str)
-
+  ensure_registry_initialized()
+  detected_trends <- intersect(formula_rhs_function_names(formula),
+                               mvgam_trend_registry())
   if (length(detected_trends) > 0) {
     stop(insight::format_error(c(
-      cli::format_inline(
-        "mvgam trend constructors found in observation {.field formula}:"
-      ),
-      x = paste("Found:", paste(unique(detected_trends), collapse = ", ")),
-      i = cli::format_inline(
-        "Trend constructors belong in {.field trend_formula}, not {.field formula}."
-      ),
-      i = cli::format_inline(
-        "Use: {.code mvgam(y ~ x, trend_formula = ~ RW())}"
-      )
-    )))
+      "Trend constructors are not supported in the observation 'formula'.",
+      x = paste0("Found: ", paste0("'", detected_trends, "()'",
+                                   collapse = ", "), "."),
+      i = "Write the trend in 'trend_formula', as in 'trend_formula = ~ RW()'."
+    )), call. = FALSE)
   }
 
   # A `.` stands for every column of the frame, and an mvgam frame
@@ -2503,7 +2353,7 @@ validate_obs_formula_brms <- function(formula) {
       "A '.' is not supported in the observation 'formula'.",
       x = paste0("It would enter every column of 'data' as a predictor, ",
                  "the time and series columns among them."),
-      i = "Name the covariates the model should use."
+      i = "List the covariates the model should use."
     )))
   }
 
@@ -2514,166 +2364,10 @@ validate_obs_formula_brms <- function(formula) {
   return(formula)
 }
 
-#' Validate trend formula for State-Space compatibility
-#'
-#' Validates trend formulas supporting bf() objects, named lists, and single
-#' formulas. Ensures compatibility with mvgam State-Space dynamics.
-#'
-#' @param trend_formula Trend specification (formula, bf object, or named list)
-#' @return The validated trend formula
-#' @noRd
-validate_trend_formula_brms <- function(trend_formula) {
-  if (is.null(trend_formula)) return(NULL)
-
-  # Handle bf() objects for multivariate trend specifications
-  if (inherits(trend_formula, c("brmsformula", "bform"))) {
-    return(validate_bf_trend_formula(trend_formula))
-  }
-
-  # Handle named list for multivariate (alternative to bf())
-  if (is.list(trend_formula) && !inherits(trend_formula, "formula")) {
-    return(validate_list_trend_formula(trend_formula))
-  }
-
-  # Single trend formula validation
-  if (inherits(trend_formula, "formula")) {
-    return(validate_single_trend_formula(trend_formula))
-  }
-
-  # Invalid type
-  stop(insight::format_error(c(
-    cli::format_inline(
-      "Invalid {.field trend_formula} type: {class(trend_formula)}"
-    ),
-    i = "Must be formula, bf() object or named list."
-  )))
-}
-
-#' Validate bf() trend formula objects
-#'
-#' @param bf_obj A brmsformula or bform object
-#' @noRd
-validate_bf_trend_formula <- function(bf_obj) {
-  checkmate::assert_class(bf_obj, c("brmsformula", "bform"))
-
-  # For bf() objects in trend context, response variables are allowed
-  # because they identify which trend belongs to which response
-
-  # Extract and validate all formula components from bf() object
-  all_formulas <- extract_all_bf_formulas(bf_obj)
-
-  # Validate each formula component
-  for (i in seq_along(all_formulas)) {
-    formula_component <- all_formulas[[i]]
-    context_name <- names(all_formulas)[i] %||% paste("bf() component", i)
-
-    if (inherits(formula_component, "formula")) {
-      validate_single_trend_formula(
-        formula_component,
-        context = context_name,
-        allow_response = TRUE
-      )
-    }
-  }
-
-  return(bf_obj)
-}
-
-#' Extract all formula components from a bf() object
-#'
-#' Helper function to extract all formulas from brmsformula objects
-#' for validation purposes.
-#'
-#' @param bf_obj A brmsformula or bform object
-#' @return Named list of all formula components
-#' @noRd
-extract_all_bf_formulas <- function(bf_obj) {
-  formulas <- list()
-
-  # Main formula
-  if (!is.null(bf_obj$formula)) {
-    formulas[["main"]] <- bf_obj$formula
-  }
-
-  # Distributional parameter formulas (pforms)
-  if (!is.null(bf_obj$pforms)) {
-    for (i in seq_along(bf_obj$pforms)) {
-      pform <- bf_obj$pforms[[i]]
-      param_name <- names(bf_obj$pforms)[i] %||% paste("pform", i)
-
-      if (!is.null(pform$formula)) {
-        formulas[[paste("pform", param_name)]] <- pform$formula
-      } else if (inherits(pform, "formula")) {
-        formulas[[paste("pform", param_name)]] <- pform
-      }
-    }
-  }
-
-  # Nonlinear parameter formulas (nlpars)
-  if (!is.null(bf_obj$nlpars)) {
-    for (i in seq_along(bf_obj$nlpars)) {
-      nlpar <- bf_obj$nlpars[[i]]
-      param_name <- names(bf_obj$nlpars)[i] %||% paste("nlpar", i)
-
-      if (!is.null(nlpar$formula)) {
-        formulas[[paste("nlpar", param_name)]] <- nlpar$formula
-      } else if (inherits(nlpar, "formula")) {
-        formulas[[paste("nlpar", param_name)]] <- nlpar
-      }
-    }
-  }
-
-  # Additional formulas (if any other slots exist)
-  # This is a fallback for any other formula-containing slots
-  other_slots <- setdiff(names(bf_obj), c("formula", "pforms", "nlpars", "family", "autocor", "loop"))
-  for (slot_name in other_slots) {
-    slot_content <- bf_obj[[slot_name]]
-    if (inherits(slot_content, "formula")) {
-      formulas[[paste("other", slot_name)]] <- slot_content
-    }
-  }
-
-  return(formulas)
-}
-
-#' Validate named list trend formula
-#'
-#' @param formula_list Named list of formulas
-#' @noRd
-validate_list_trend_formula <- function(formula_list) {
-  if (is.null(names(formula_list))) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Multivariate {.field trend_formula} must be a named list."
-      ),
-      i = cli::format_inline(
-        "Use: {.code trend_formula = list(resp1 = ~ AR(), resp2 = ~ RW())}"
-      )
-    )))
-  }
-
-  # Validate each component formula
-  validated_list <- lapply(names(formula_list), function(name) {
-    if (is.null(formula_list[[name]])) {
-      return(NULL)  # Allow NULL for responses without trends
-    }
-    validate_single_trend_formula(formula_list[[name]], context = paste("response", name))
-  })
-  names(validated_list) <- names(formula_list)
-
-  return(validated_list)
-}
-
-#' Validate a single trend formula
-#'
-#' @param formula Single trend formula
-#' @param context Optional context for error messages
-#' @param allow_response Logical; whether to allow response variables (TRUE for multivariate identification)
-#' @noRd
 # Two refusals, each written once here: a trend formula naming a
 # response, and a trend formula with an offset among its terms. The
 # user's entry point raises them through
-# `validate_single_trend_formula()`, and `parse_trend_formula()` raises
+# `validate_trend_formula()`, and `parse_trend_formula()` raises
 # them for the callers that reach it directly.
 #' @noRd
 refuse_trend_formula_response <- function(formula) {
@@ -2681,7 +2375,7 @@ refuse_trend_formula_response <- function(formula) {
     return(invisible(TRUE))
   }
   stop(insight::format_error(c(
-    "A trend formula names predictors only.",
+    "A trend formula takes predictors only.",
     x = paste0("Found the response '", deparse(formula[[2L]]), "'."),
     i = "Write the response in the observation 'formula'."
   )), call. = FALSE)
@@ -2697,203 +2391,78 @@ refuse_trend_formula_offset <- function(terms_obj) {
   stop(insight::format_error(c(
     "Offsets apply to the observation model.",
     x = "Found an offset term in 'trend_formula'.",
-    i = paste0(
-      "Write it as 'formula = y ~ x + offset(log_exposure)'. The ",
-      "latent trend models the dynamics."
-    )
+    i = "Write it as 'formula = y ~ x + offset(log_exposure)'."
   )), call. = FALSE)
 }
 
-validate_single_trend_formula <- function(formula, context = NULL, allow_response = FALSE) {
+#' Validate a trend formula
+#'
+#' Refuses a response, an offset, brms autocorrelation and addition
+#' terms, more than one trend constructor, and an exact `gp()`. The
+#' checks walk the formula's calls. A variable such as `se_x` or
+#' `weights` is no call, and none of them refuses it.
+#'
+#' @param formula A one-sided trend formula, or `NULL`
+#' @return The formula, unchanged
+#' @noRd
+validate_trend_formula <- function(formula) {
   if (is.null(formula)) return(NULL)
-
   checkmate::assert_class(formula, "formula")
-
-  if (!allow_response) {
-    refuse_trend_formula_response(formula)
-  }
-
-  # Extract string for validation
-  formula_str <- formula2str_mvgam(formula)
-
+  refuse_trend_formula_response(formula)
   refuse_trend_formula_offset(stats::terms(formula))
 
-  # Validate trend formula restrictions
-  validate_trend_formula_restrictions(
-    formula_str,
-    c("brms_autocor", "addition_terms", "multiple_constructors"),
-    formula
-  )
+  rhs <- formula[[length(formula)]]
+  found <- function(calls) {
+    paste0("Found: ", paste0("'", calls, "'", collapse = ", "), ".")
+  }
 
-  # Check for exact GP usage (gp() without k parameter)
+  autocor <- find_calls(rhs, brms_autocor_terms)
+  if (length(autocor) > 0L) {
+    stop(insight::format_error(c(
+      "brms autocorrelation terms are not supported in 'trend_formula'.",
+      x = found(autocor),
+      x = "Autocorrelation terms conflict with the trend dynamics.",
+      i = "Use a trend constructor, as in 'AR(p = 1)' for 'ar(p = 1)'."
+    )), call. = FALSE)
+  }
+
+  # `mi()` is absent: missing-predictor imputation is allowed on the
+  # latent scale.
+  addition <- find_calls(rhs, brms_addition_terms)
+  if (length(addition) > 0L) {
+    stop(insight::format_error(c(
+      "brms addition terms are not supported in 'trend_formula'.",
+      x = found(addition),
+      x = "Addition terms change the observation model.",
+      i = "Write them in the observation 'formula'."
+    )), call. = FALSE)
+  }
+
+  ensure_registry_initialized()
+  constructors <- find_calls(rhs, mvgam_trend_registry())
+  if (length(constructors) > 1L) {
+    stop(insight::format_error(c(
+      "Multiple trend constructors found in 'trend_formula'.",
+      x = found(constructors),
+      x = "Every response of a model shares one latent trend.",
+      i = "Keep one constructor, as in 'trend_formula = ~ AR()'."
+    )), call. = FALSE)
+  }
+
   validate_exact_gp_usage(formula)
-
-  return(formula)
+  formula
 }
 
+# brms autocorrelation terms, which model temporal dependence the
+# trend already models
+brms_autocor_terms <- c("ar", "ma", "arma", "cosy", "unstr", "autocor")
 
-#' Validate trend formula restrictions
-#'
-#' Validates that trend formulas do not contain prohibited patterns that would
-#' conflict with State-Space dynamics or observation model behavior.
-#'
-#' @param formula_str String representation of trend formula
-#' @param restrictions Character vector of restriction types to check
-#' @param formula Original formula object (for offset checking)
-#' @noRd
-validate_trend_formula_restrictions <- function(
-  formula_str,
-  restrictions = c("brms_autocor", "addition_terms",
-                   "multiple_constructors"),
-  formula = NULL) {
-  checkmate::assert_string(formula_str)
-  restrictions <- match.arg(restrictions, several.ok = TRUE)
-
-  # Define restriction patterns and their error messages
-  restriction_configs <- list(
-    "brms_autocor" = list(
-      patterns = c(
-        "\\bar\\s*\\(" = "ar()",
-        "\\bma\\s*\\(" = "ma()",
-        "\\barma\\s*\\(" = "arma()",
-        "\\bcosy\\s*\\(" = "cosy()",
-        "\\bunstr\\s*\\(" = "unstr()",
-        "\\bautocor\\s*\\(" = "autocor()"
-      ),
-      error_header = "brms autocorrelation terms not allowed in {.field trend_formula}:",
-      error_reason = "These conflict with mvgam State-Space dynamics.",
-      error_suggestion = "Use mvgam trend types instead: {.code ar(p = 1)} \u2192 {.code AR(p = 1)}"
-    ),
-
-    "addition_terms" = list(
-      # brms `formula_ad` specials that modify the *observation model*
-      # and therefore have no defined meaning on a latent State-Space
-      # trend. `mi` is deliberately absent: missing-predictor
-      # imputation is allowed on the latent scale; the obs-side
-      # rejection of `mi()` as a predictor lives in
-      # `validate_obs_formula_brms`. Detection walks
-      # the formula AST (see `formula_rhs_function_names`) rather than
-      # grepping the deparsed string so variable names like `defense`
-      # or `se_x` cannot false-positive.
-      patterns = function(formula_str, formula = NULL) {
-        if (is.null(formula)) return(character(0L))
-        addition_terms <- c(
-          "weights", "se", "cens", "trunc", "trials", "rate",
-          "vreal", "vint", "subset", "index", "dec", "cat",
-          "thres", "cov_ranef"
-        )
-        rhs_calls <- formula_rhs_function_names(formula)
-        hit <- intersect(rhs_calls, addition_terms)
-        if (length(hit) > 0L) {
-          structure(paste0(hit, "()"), names = rep("detected", length(hit)))
-        } else character(0L)
-      },
-      error_header = "brms addition-terms not allowed in {.field trend_formula}:",
-      error_reason = "These terms modify observation model behavior, not State-Space dynamics.",
-      error_suggestion = "Include these terms in the observation {.field formula} instead."
-    ),
-
-    "multiple_constructors" = list(
-      patterns = function(formula_str) {
-        detected_trends <- trend_constructor_calls(formula_str)
-        if (length(detected_trends) > 1) {
-          structure(detected_trends,
-                    names = rep("detected", length(detected_trends)))
-        } else character(0)
-      },
-      error_header = "Multiple trend constructors found in single {.field trend_formula}:",
-      error_reason = "Each trend formula must contain exactly one trend constructor.",
-      # One string per suggestion. `c()` names a two-element `i` entry
-      # `i1` and `i2`, which `insight::format_error()` renders as one
-      # run with no separator: the reader met `formulas:` followed
-      # immediately by the code.
-      error_suggestion = paste(
-        "For multiple trends, use response-specific formulas:",
-        "{.code trend_formula = list(y1 = ~ AR(), y2 = ~ RW())}"
-      )
-    )
-  )
-
-  # Check each restriction
-  for (restriction in restrictions) {
-    config <- restriction_configs[[restriction]]
-
-    # Detect violations. `offsets` and `addition_terms` both need the
-    # original formula object: `offsets` uses `terms(formula)` to find
-    # the offset attribute, `addition_terms` walks the AST via
-    # `formula_rhs_function_names()` to avoid false-positives from
-    # variable names that share a substring with an addition-term name.
-    if (is.function(config$patterns)) {
-      if (restriction %in% c("offsets", "addition_terms")) {
-        detected <- config$patterns(formula_str, formula)
-      } else {
-        detected <- config$patterns(formula_str)
-      }
-    } else {
-      detected <- character(0)
-      for (pattern in names(config$patterns)) {
-        if (grepl(pattern, formula_str, perl = TRUE)) {
-          detected <- c(detected, config$patterns[[pattern]])
-        }
-      }
-    }
-
-    # Generate error if violations found
-    if (length(detected) > 0) {
-      if (restriction == "multiple_constructors") {
-        found_text <- paste("Found:", paste(unique(detected), collapse = " + "))
-      } else {
-        found_text <- paste("Found:", paste(unique(detected), collapse = ", "))
-      }
-
-      stop(insight::format_error(c(
-        cli::format_inline(config$error_header),
-        x = found_text,
-        x = config$error_reason,
-        i = cli::format_inline(config$error_suggestion)
-      )))
-    }
-  }
-
-  return(invisible(NULL))
-}
-
-#' Validate Setup Components
-#' @param components List of setup components
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_setup_components <- function(components) {
-  checkmate::assert_list(components, names = "named")
-
-  required_components <- c("formula", "data", "family", "stancode", "standata")
-  missing_components <- setdiff(required_components, names(components))
-
-  if (length(missing_components) > 0) {
-    stop(insight::format_error(c(
-      "Missing required setup components:",
-      x = paste(missing_components, collapse = ", ")
-    )))
-  }
-
-  # Validate Stan code is not empty
-  if (is.null(components$stancode) ||
-      (is.character(components$stancode) && nchar(components$stancode) == 0)) {
-    stop(insight::format_error(c(
-      "Stan code extraction failed.",
-      x = "Could not obtain valid Stan model code from brms setup."
-    )))
-  }
-
-  # Validate Stan data is not empty
-  if (is.null(components$standata) || length(components$standata) == 0) {
-    stop(insight::format_error(c(
-      "Stan data extraction failed.",
-      x = "Could not obtain valid Stan data from brms setup."
-    )))
-  }
-
-  invisible(TRUE)
-}
+# brms `formula_ad` specials that modify the observation model and
+# have no meaning on a latent trend
+brms_addition_terms <- c(
+  "weights", "se", "cens", "trunc", "trials", "rate", "vreal", "vint",
+  "subset", "index", "dec", "cat", "thres", "cov_ranef"
+)
 
 #' Check if object is a mvgam trend
 #'
@@ -3064,19 +2633,29 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     # except under `by = lv_axis()`, where Stan declares the map
     # `[N_time_trend, N_lv_trend]` and folds `mu_factor` into
     # `lv_trend`. Whether the trend takes that grain is not known
-    # until the trend formula has been walked, so this is left unset
-    # here and named by `extract_trend_data()`. Unset rather than
-    # defaulted to the common answer: a reader that arrives early
-    # then finds nothing instead of finding "series" and believing
-    # it.
+    # until the trend formula has been walked. It is left unset here
+    # and named by `extract_and_validate_trend_components()`. A default
+    # of "series" would give an early reader a wrong value it would
+    # believe.
     grain = NULL,
-    # The columns that identify a row, so a frame the model has never
-    # seen can be placed on these axes without a second source.
+    # The columns that identify a row. Prediction places a frame the
+    # model has never seen on these axes by them.
     vars = list(
       time_var = time_var,
       series_var = series_var,
       gr_var = groupings$gr,
       subgr_var = groupings$subgr
+    ),
+    # The levels each grouping column held in training, in the order
+    # Stan numbers the groups. Prediction refuses a frame naming a
+    # group the model never saw.
+    group_levels = lapply(
+      list(gr = groupings$gr, subgr = groupings$subgr),
+      function(column) {
+        if (named_var(column) && column %in% names(data)) {
+          observed_levels(data[[column]])
+        }
+      }
     )
   )
 
@@ -3106,7 +2685,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
 
   # Gate on the trend's own rule rather than a hardcoded
   # `!= "CAR"` predicate; see the matching call upstream.
-  if (any_trend_requires_regular_intervals(trend_specs)) {
+  if (trend_requires_regular_intervals(trend_specs)) {
     validate_regular_time_intervals(attr(data, "mvgam_original_time"), time_var)
   }
 
@@ -3176,8 +2755,7 @@ generate_obs_trend_mapping <- function(data, response_var,
   # Scalar attributes can be copied as-is
   # The response axis is one entry per series, not per row, so it is
   # carried across the subset whole rather than indexed by it.
-  scalar_attrs <- c("mvgam_time_source", "mvgam_series_source",
-                    "mvgam_series_levels")
+  scalar_attrs <- c("mvgam_series_source", "mvgam_series_levels")
   for (attr_name in scalar_attrs) {
     if (!is.null(attr(data, attr_name))) {
       attr(obs_data, attr_name) <- attr(data, attr_name)
@@ -3235,15 +2813,9 @@ validate_mvgam_trend <- function(trend_obj) {
   checkmate::assert_list(trend_obj, min.len = 1)
   checkmate::assert_string(trend_obj$trend, min.chars = 1)
 
-  # Validate required fields exist
-  required_fields <- c("trend", "time", "series")
-  missing_fields <- setdiff(required_fields, names(trend_obj))
+  missing_fields <- setdiff(c("trend", "time", "series"), names(trend_obj))
   if (length(missing_fields) > 0) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Missing required fields in mvgam_trend object: {.field {missing_fields}}"
-      )
-    ), call. = FALSE)
+    stop_missing_fields("The trend object", missing_fields)
   }
 
   invisible(TRUE)
@@ -3306,32 +2878,27 @@ eval_silent <- function(expr, type = "output", silent = TRUE, ...) {
   out
 }
 
-#' Check if trend_specs represents multivariate trends
+#' Prepare parsed trend specs for the model build
 #'
-#' @description
-#' Determines whether trend specifications represent a multivariate model
-#' (named list of trend specifications) or a univariate model (single trend).
+#' `mvgam()`, `stancode()`, `standata()` and `get_prior()` all build
+#' from specs prepared here. A top-level `trend_map` joins the spec
+#' and becomes the fixed loadings. A factor request meets the
+#' registry's record of the trend. The loadings prior attaches last.
 #'
-#' @param trend_specs Trend specifications to check
-#' @return Logical indicating if multivariate
+#' @param trend_specs Parsed trend specs, or `NULL` for no trend.
+#' @param trend_map The top-level `trend_map` argument, or `NULL`.
+#' @param loadings_prior The `loadings_prior` argument, or `NULL`.
+#' @param data,data2 The training data and `data2`.
+#' @return The prepared specs.
 #' @noRd
-is_multivariate_trend_specs <- function(trend_specs) {
-  if (is.null(trend_specs)) {
-    return(FALSE)
-  }
-
-  # Standardized structure check:
-  # Multivariate: named list without trend fields (response names as keys)
-  # Univariate: direct trend object with trend field
-  if (is.list(trend_specs) && !is.null(names(trend_specs))) {
-    # Check if this is a direct trend object (has trend field) or multivariate (response names)
-    has_trend_field <- any(c("trend", "trend_type", "trend_model") %in% names(trend_specs))
-    return(!has_trend_field)  # Multivariate if no trend field at top level
-  }
-
-  # Univariate case: direct trend specification object
-  return(FALSE)
+prepare_trend_specs <- function(trend_specs, trend_map, loadings_prior,
+                                data, data2) {
+  specs <- apply_trend_map_alias(trend_specs, trend_map)
+  specs <- normalise_trend_map_on_specs(specs, data)
+  enforce_factor_support_against_specs(specs)
+  attach_loadings_prior_spec(specs, loadings_prior, data, data2)
 }
+
 
 #' Apply the top-level `trend_map` alias to parsed trend specs
 #'
@@ -3347,9 +2914,9 @@ is_multivariate_trend_specs <- function(trend_specs) {
 #'   be NULL).
 #'
 #' @return `trend_specs` with `$trend_map` populated when the
-#'   top-level alias was supplied; unchanged otherwise. A mapping
-#'   supplied with no trend spec to hold it is refused here, which
-#'   is the layer that would otherwise discard it.
+#'   top-level alias was supplied. A mapping supplied with no trend
+#'   spec to hold it is refused here, the last point that still sees
+#'   it.
 #'
 #' @noRd
 apply_trend_map_alias <- function(trend_specs, mvgam_trend_map) {
@@ -3361,209 +2928,100 @@ apply_trend_map_alias <- function(trend_specs, mvgam_trend_map) {
       "Argument 'trend_map' requires a 'trend_formula'."
     ), call. = FALSE)
   }
-  is_multivar <- is_multivariate_trend_specs(trend_specs)
-  specs <- if (is_multivar) trend_specs else list(trend_specs)
-  for (i in seq_along(specs)) {
-    if (!is.null(specs[[i]]$trend_map)) {
-      stop(insight::format_error(paste0(
-        "'trend_map' is given both to 'mvgam()' and to the trend ",
-        "constructor for '", names(specs)[i] %||% i, "'."
-      )))
-    }
-    specs[[i]]$trend_map <- mvgam_trend_map
+  if (!is.null(trend_spec_head(trend_specs)$trend_map)) {
+    stop(insight::format_error(c(
+      "'trend_map' is given both to 'mvgam()' and to the trend constructor.",
+      i = "Supply 'trend_map' in one place."
+    )), call. = FALSE)
   }
-  if (is_multivar) specs else specs[[1L]]
+  map_trend_specs(trend_specs, function(spec) {
+    spec$trend_map <- mvgam_trend_map
+    spec
+  })
 }
 
 
-#' Normalise raw `trend_map` input on every spec to a fixed-Z
-#' matrix and reconcile with `n_lv`.
-#'
-#' Called once in the Stan-code pipeline right after
-#' `apply_trend_map_alias()`. Walks each trend spec, calls
-#' `normalise_trend_map()` for any non-NULL `trend_map`, stashes
-#' the canonical numeric Z on `spec$fixed_Z`, and updates
-#' `spec$n_lv` to match `ncol(Z)`. If the user also set `n_lv`
-#' explicitly on the constructor, the two values must agree.
-#'
-#' @param trend_specs Parsed trend specs (single spec or named
-#'   list).
-#' @param data Training `data.frame` (used to resolve series
-#'   levels for the normaliser).
-#'
-#' @return `trend_specs` with `$fixed_Z` and reconciled `$n_lv`
-#'   set on any spec whose `$trend_map` was supplied.
-#'
-#' @noRd
-# Attach a normalised loadings-prior spec onto each trend spec.
-# Mirrors `normalise_trend_map_on_specs` for the multivariate
-# unwrap/rewrap so all call sites see one consistent shape. Also
-# asserts compatibility with any fixed_Z already attached: a
-# structured prior cannot coexist with either a partial-Z or
-# fully-fixed Z (see `assert_loadings_prior_compatible()` for
-# the rationale and error messages).
+# Normalise the user's `loadings_prior` and attach it to the trend
+# spec. `mvgam()` and `get_prior()` both call this. A structured
+# prior cannot coexist with a partial or fully fixed Z (see
+# `assert_loadings_prior_compatible()`).
 #'@noRd
-attach_loadings_prior_spec <- function(trend_specs, spec) {
-  if (is.null(spec)) return(trend_specs)
+attach_loadings_prior_spec <- function(trend_specs, loadings_prior,
+                                       data, data2) {
+  if (is.null(loadings_prior)) return(trend_specs)
   if (is.null(trend_specs)) {
     stop(insight::format_error(c(
       "Argument 'loadings_prior' requires a 'trend_formula'.",
       x = "The prior applies to the loadings of a factor trend."
     )), call. = FALSE)
   }
-  is_multivar <- is_multivariate_trend_specs(trend_specs)
-  specs <- if (is_multivar) trend_specs else list(trend_specs)
-  for (i in seq_along(specs)) {
-    assert_loadings_prior_compatible(spec, specs[[i]]$fixed_Z)
-    assert_column_shrinkage_compatible(spec, specs[[i]]$trend)
-    specs[[i]]$loadings_prior_spec <- spec
+  if (is.null(trend_spec_head(trend_specs)$n_lv)) {
+    stop(insight::format_error(c(
+      "Argument 'loadings_prior' requires a factor trend.",
+      x = "The loadings belong to the latent factors that 'n_lv' sets.",
+      i = "Set 'n_lv' on the trend constructor, as in 'AR(n_lv = 2)'."
+    )), call. = FALSE)
   }
-  if (is_multivar) specs else specs[[1L]]
+  spec <- normalise_loadings_prior(
+    loadings_prior, data2 = data2, data = data,
+    series_var = spec_axis_vars(trend_specs)$series_var
+  )
+  head <- trend_spec_head(trend_specs)
+  assert_loadings_prior_compatible(spec, head$fixed_Z)
+  assert_column_shrinkage_compatible(spec, head$trend)
+  map_trend_specs(trend_specs, function(trend_spec) {
+    trend_spec$loadings_prior_spec <- spec
+    trend_spec
+  })
 }
 
 
+#' Normalise a raw `trend_map` to a fixed-Z matrix and reconcile
+#' it with `n_lv`.
+#'
+#' Called once in the Stan-code pipeline right after
+#' `apply_trend_map_alias()`. `normalise_trend_map()` converts the
+#' spec's `trend_map` to the numeric Z stored on `spec$fixed_Z`, and
+#' `spec$n_lv` takes `ncol(Z)`. An `n_lv` also set on the
+#' constructor must agree.
+#'
+#' @param trend_specs One trend spec or a per-response list of them.
+#' @param data Training `data.frame`, whose series column gives the
+#'   rows of Z.
+#'
+#' @return `trend_specs` with `$fixed_Z` and `$n_lv` set when a
+#'   `trend_map` was supplied.
+#'
+#' @noRd
 normalise_trend_map_on_specs <- function(trend_specs, data) {
-  if (is.null(trend_specs)) return(trend_specs)
-  is_multivar <- is_multivariate_trend_specs(trend_specs)
-  specs <- if (is_multivar) trend_specs else list(trend_specs)
-  for (i in seq_along(specs)) {
-    spec <- specs[[i]]
-    if (is.null(spec$trend_map)) next
-    normalised <- normalise_trend_map(spec$trend_map, data)
-    if (is.null(normalised)) next
-    if (!is.null(spec$n_lv) && spec$n_lv != normalised$n_lv) {
-      stop(insight::format_error(c(
-        paste0(
-          "'trend_map' shape conflicts with constructor ",
-          "'n_lv' on spec '", names(specs)[i] %||% i, "'."
-        ),
-        x = paste0(
-          "trend_map implies n_lv = ", normalised$n_lv,
-          " but n_lv was set to ", spec$n_lv, "."
-        ),
-        i = "Drop the redundant 'n_lv' or update trend_map shape."
-      )))
-    }
-    # An all-NA mask is just the canonical factor-model trigger
-    # (every loading free). Treat it as NULL so the downstream
-    # 'matrix-Z' code path emits a free parameter Z that
-    # loadings_prior can wire onto column-wise; keep n_lv so the
-    # factor-model gate (n_lv < n_series) still fires.
-    spec$fixed_Z <- if (all(is.na(normalised$Z))) NULL else normalised$Z
-    spec$n_lv <- normalised$n_lv
-    specs[[i]] <- spec
+  spec <- trend_spec_head(trend_specs)
+  if (is.null(spec$trend_map)) return(trend_specs)
+  if (named_var(spec_groupings(spec)$gr)) {
+    refuse_factor_hierarchical(spec$trend)
   }
-  # Multivariate fits use ONE shared trend component across all
-  # responses (see `enrich_trend_metadata()` which already keeps
-  # only the first spec's trend metadata). A fixed Z must
-  # therefore agree across responses; otherwise the downstream
-  # resolver would silently apply the first response's Z to
-  # every series.
-  if (is_multivar) {
-    fixed_Zs <- lapply(specs, function(s) s$fixed_Z)
-    populated <- which(!vapply(fixed_Zs, is.null, logical(1L)))
-    if (length(populated) >= 2L) {
-      ref <- fixed_Zs[[populated[1L]]]
-      mismatch <- populated[-1L][
-        !vapply(populated[-1L], function(j) {
-          identical(unname(fixed_Zs[[j]]), unname(ref))
-        }, logical(1L))
-      ]
-      if (length(mismatch) > 0L) {
-        offending <- names(specs)[mismatch] %||% as.character(mismatch)
-        stop(insight::format_error(c(
-          paste0(
-            "'trend_map' differs across multivariate trend specs."
-          ),
-          x = paste0(
-            "Mismatched spec(s): ",
-            paste(offending, collapse = ", "), "."
-          ),
-          i = "Set 'trend_map' once, in 'mvgam(trend_map = ...)'."
-        )))
-      }
-    }
+  normalised <- normalise_trend_map(
+    spec$trend_map, data, spec_axis_vars(spec)$series_var
+  )
+  if (!is.null(spec$n_lv) && spec$n_lv != normalised$n_lv) {
+    stop(insight::format_error(c(
+      "'trend_map' and 'n_lv' give different numbers of factors.",
+      x = paste0("'trend_map' has ", normalised$n_lv,
+                 " columns and 'n_lv' is ", spec$n_lv, "."),
+      i = "Drop 'n_lv' to let the columns of 'trend_map' set it."
+    )), call. = FALSE)
   }
-  if (is_multivar) specs else specs[[1L]]
+  # An all-NA mask frees every loading, which is the default factor
+  # model. It keeps `n_lv` and samples a free Z that a loadings prior
+  # can act on.
+  fixed_Z <- if (all(is.na(normalised$Z))) NULL else normalised$Z
+  map_trend_specs(trend_specs, function(trend_spec) {
+    trend_spec$fixed_Z <- fixed_Z
+    trend_spec$n_lv <- normalised$n_lv
+    trend_spec
+  })
 }
 
 
-#' Extract Factor Levels from Data Column
-#'
-#' Extracts unique levels from a factor or character column. Handles
-#' NULL/NA variable names, missing columns, empty columns, and both
-#' factor and character data types.
-#'
-#' @param data Data frame to extract levels from
-#' @param var_name Name of variable to extract levels from. Can be
-#'   NULL, NA, or "NA" (all return NULL).
-#'
-#' @return Character vector of unique levels (excluding NA values), or
-#'   NULL if variable is missing, NULL, NA, "NA", or column is empty.
-#'
-#' @details
-#' Level extraction behavior:
-#' - For factors: returns `levels()` (preserves level ordering)
-#' - For characters: returns `unique()` sorted alphabetically
-#' - For other types: coerces to character first
-#' - NA values are always excluded from returned levels
-#'
-#' Used by `extract_trend_data()` to store training factor levels in
-#' `trend_metadata$levels` for prediction validation.
-#'
-#' @noRd
-extract_factor_levels <- function(data, var_name) {
-  checkmate::assert_data_frame(data)
-
-  # Handle NULL/NA/missing variable name
-  if (is.null(var_name) ||
-      length(var_name) == 0 ||
-      is.na(var_name) ||
-      identical(var_name, "NA")) {
-    return(NULL)
-  }
-
-  checkmate::assert_string(var_name, min.chars = 1)
-
-  # Handle missing column
-  if (!var_name %in% names(data)) {
-    return(NULL)
-  }
-
-  col_data <- data[[var_name]]
-
-  # Handle empty or all-NA columns
-  if (length(col_data) == 0 || all(is.na(col_data))) {
-    return(NULL)
-  }
-
-  # Remove NA values before extraction
-  col_data <- col_data[!is.na(col_data)]
-
-  if (is.factor(col_data)) {
-    # Preserve all factor levels (including unused) for training metadata
-    return(levels(col_data))
-  } else {
-    # Character or other: unique sorted values
-    return(sort(unique(as.character(col_data))))
-  }
-}
-
-
-#' Validate Prediction Data Factor Levels
-#'
-#' Validates that factor levels in prediction data are a subset of training
-#' data levels. Called by `ensure_mvgam_variables()` when metadata with
-#' stored levels is provided.
-#'
-#' @param data Data frame of prediction data to validate
-#' @param metadata List containing `levels` (with series/gr/subgr) and
-#'   `variables` (with series_var/gr_var/subgr_var)
-#'
-#' @return Invisible TRUE if valid. Stops with informative error if
-#'   prediction data contains factor levels not in training data.
-#'
-#' @noRd
 # Internal: tell the user once when a `series` column they supplied is
 # superseded by the one `gr` and `subgr` imply.
 #
@@ -3605,26 +3063,10 @@ warn_series_superseded <- function(data, series_var, series_values,
   )
   invisible(NULL)
 }
-#' A grouping variable's name, or `NA` where the trend names none
-#'
-#' The metadata fields spell an absent grouping `NA_character_`
-#' rather than `NULL`, and the same ternary decided that four
-#' times over. `named_var()` owns whether a name is a name; this
-#' owns what to record when it is not.
-#'
-#' @param var A grouping variable name, or a sentinel for none.
-#' @return The name, or `NA_character_`.
-#' @noRd
-named_var_or_na <- function(var) {
-  if (named_var(var)) as.character(var) else NA_character_
-}
 
-
-
-
-# Internal: TRUE when a metadata variable name points at a usable
-# column. Trend metadata stores an absent variable as NULL, NA or the
-# literal string "NA" depending on how it was recorded.
+# Internal: TRUE when a variable name points at a column. A trend
+# constructor spells an absent grouping NA and the normalised spec
+# spells it "NA".
 #'@noRd
 named_var <- function(var) {
   !is.null(var) && length(var) == 1L && !is.na(var) &&
@@ -3632,8 +3074,7 @@ named_var <- function(var) {
 }
 
 
-# Internal: TRUE when a metadata variable names a column the data
-# actually carries.
+# Internal: TRUE when a variable names a column the data carries.
 #'@noRd
 usable_var <- function(var, data) {
   named_var(var) && var %in% names(data)
@@ -3675,36 +3116,65 @@ hierarchical_series_values <- function(data, gr_var, subgr_var) {
 }
 
 
-# Internal: refuse a prediction frame with gaps in what the model reads.
+# Internal: check the column that places a frame's rows.
 #
-# A prediction reads the columns the formulas name, the groupings, the
-# aterms, the offset and the axis. A gap in any of them reaches the
-# linear predictor untouched: a numeric column arrives as `NA` cells,
-# and a factor column takes its reference level with nothing to mark
-# it. The response is excluded, because a missing response is how a
-# forecast frame names the occasions it wants predicted.
-# One refusal for the column that places a frame's rows. It names the
-# column, the columns the frame does carry, and what to do.
+# A trend model indexes every row by one occasion and one series. mvgam
+# takes them from the `time` and `series` columns, or from the columns
+# the trend constructor names, and checks them here before using
+# either. mvgam requires the series column even for a single series,
+# which the column records by holding one level. Training data need a
+# factor series column, whose levels fix the order of the series in
+# the model and every result. Prediction data take the fitted order,
+# and a character column there is accepted.
 #' @noRd
-refuse_absent_time_column <- function(data, column) {
+assert_axis_column <- function(data, column, axis = c("time", "series"),
+                               require_factor = TRUE) {
   checkmate::assert_string(column)
+  checkmate::assert_flag(require_factor)
+  axis <- match.arg(axis)
   if (column %in% names(data)) {
+    if (axis == "series" && require_factor &&
+        !is.factor(data[[column]])) {
+      stop(insight::format_error(c(
+        paste0("Column '", column, "' must be a factor."),
+        x = paste0("Got class '", class(data[[column]])[1L], "'."),
+        i = "A factor's levels fix the order of the series.",
+        i = paste0("Convert it with data$", column, " <- factor(data$",
+                   column, ").")
+      )), call. = FALSE)
+    }
     return(invisible(TRUE))
   }
+  place <- c(time = "at one occasion", series = "on one series")[[axis]]
+  hints <- c(
+    i = paste0("A latent trend places each row ", place, "."),
+    i = paste0(
+      "Add '", column, "' to the data or name its column with the ",
+      "trend constructor's '", axis, "' argument."
+    ),
+    if (axis == "series") {
+      c(i = paste0("For a single time series: data$", column,
+                   " <- factor(\"series_1\")"))
+    }
+  )
   stop(insight::format_error(c(
     paste0("Column '", column, "' is absent from the data."),
     x = paste0(
       "Supplied: ", paste0("'", names(data), "'", collapse = ", "), "."
     ),
-    i = paste0(
-      "Every row names an occasion for the latent trend. Add '",
-      column, "' to the data, or name its column with the trend ",
-      "constructor's 'time' argument."
-    )
+    hints
   )), call. = FALSE)
 }
 
 
+# Internal: refuse a prediction frame with gaps in the model's columns.
+#
+# A prediction uses the columns the formulas name, the groupings, the
+# aterms, the offset and the axis. A gap in any of them reaches the
+# linear predictor unchanged: a numeric column contributes `NA` cells,
+# and a factor column takes its reference level with nothing to mark
+# it. The check excludes the response. A missing response marks the
+# occasions a forecast frame asks mvgam to predict.
 #' @noRd
 validate_newdata_complete <- function(newdata, object) {
   checkmate::assert_data_frame(newdata, min.rows = 1L)
@@ -3775,119 +3245,68 @@ validate_newdata_complete <- function(newdata, object) {
 }
 
 
+#' Refuse levels absent from the training data
+#'
+#' @param label What the levels belong to, e.g. "Series"
+#' @param seen The levels in the new data
+#' @param fitted The training levels
+#' @return `TRUE`, invisibly
+#' @noRd
+refuse_unseen_levels <- function(label, seen, fitted) {
+  invalid <- setdiff(seen, fitted)
+  if (length(invalid) > 0L) {
+    stop(insight::format_error(c(
+      paste0(label, " in 'newdata' has levels absent from the ",
+             "training data."),
+      x = cli::format_inline("Unseen: {.val {invalid}}."),
+      i = cli::format_inline("Fitted levels: {.val {fitted}}.")
+    )), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+
+#' Refuse a frame with a series or group the model never saw
+#'
+#' @param data Frame to predict on
+#' @param metadata A fit's `trend_metadata`, or `NULL` for a model
+#'   whose frame names no axis
+#' @return `TRUE`, invisibly
+#' @noRd
 validate_prediction_factor_levels <- function(data, metadata) {
   checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_list(metadata, names = "named")
-
-  # Each block guards its own input. The series comparison uses the
-  # axis record, and the grouping comparisons use the recorded
-  # levels. A metadata list naming neither passes through untouched.
-  if (!is.null(metadata$levels)) {
-    checkmate::assert_list(metadata$levels, names = "named")
-  }
-
-  if (is.null(metadata$variables)) {
+  checkmate::assert_list(metadata, names = "named", null.ok = TRUE)
+  axes <- metadata$axes
+  if (is.null(axes)) {
     return(invisible(TRUE))
   }
-  checkmate::assert_list(metadata$variables, names = "named")
+  vars <- axes$vars
 
-  # Validate series levels.
-  #
-  # A hierarchical trend derives its series identifier from `gr` and
-  # `subgr`, so any `series` column sitting in the data is not the one
-  # the model was fitted on and must not be compared against the stored
-  # levels. Rebuild the derived value instead: that still catches a
-  # `gr` / `subgr` combination the training data never contained, even
-  # though each level on its own is known.
-  # The axis, read through the one accessor that understands both
-  # the record and the spelling a fit saved before it used. Reading
-  # `levels$series` and `series_source` here was a second account of
-  # the axis, free to disagree with the record on the same object.
-  axes <- axes_from_metadata(metadata)
-  fitted_levels <- axes$series$levels
-  if (!is.null(fitted_levels)) {
-    gr_var <- metadata$variables$gr_var
-    subgr_var <- metadata$variables$subgr_var
-    # A pair of grouping variables says the series was derived, and
-    # so does the recorded source; either is enough, because a fit
-    # missing one still carries the other.
-    derived_hier <- identical(axes$series$source, "hierarchical") ||
-      (named_var(gr_var) && named_var(subgr_var))
-    newdata_levels <- NULL
-    if (derived_hier) {
-      assert_grouping_columns(data, gr_var, subgr_var)
-      newdata_levels <- levels(droplevels(
-        hierarchical_series_values(data, gr_var, subgr_var)
-      ))
-    } else {
-      series_var <- metadata$variables$series_var
-      if (!is.null(series_var) && series_var %in% names(data)) {
-        # The series the frame holds rows for, not the levels its
-        # factor happens to declare. Subsetting a data frame keeps
-        # every level, so reading the declaration refuses a frame
-        # that names no unknown series and merely carries a dead
-        # level. The grouping branch above already drops them.
-        newdata_levels <- observed_series_levels(data[[series_var]])
-      }
-    }
-    if (!is.null(newdata_levels)) {
-      invalid <- setdiff(newdata_levels, fitted_levels)
-      if (length(invalid) > 0) {
-        stop(insight::format_error(c(
-          "Series levels in newdata not found in training data.",
-          x = cli::format_inline("Invalid: {.val {invalid}}."),
-          i = cli::format_inline(
-            "Training data has levels: {.val {fitted_levels}}."
-          )
-        )), call. = FALSE)
-      }
+  # A hierarchical trend derives its series from `gr` and `subgr`, and
+  # the model ignored any `series` column. Deriving the value here also
+  # catches a pair the training data never held, though each level
+  # alone is known. Every check compares only the levels the frame
+  # holds rows for. Subsetting a frame keeps every declared factor
+  # level, and a level with no rows names nothing unseen.
+  hierarchical <- identical(axes$series$source, "hierarchical")
+  seen <- if (hierarchical) {
+    assert_grouping_columns(data, vars$gr_var, vars$subgr_var)
+    levels(droplevels(
+      hierarchical_series_values(data, vars$gr_var, vars$subgr_var)
+    ))
+  } else if (vars$series_var %in% names(data)) {
+    observed_levels(data[[vars$series_var]])
+  }
+  refuse_unseen_levels("Series", seen, axes$series$levels)
+
+  for (role in c("gr", "subgr")) {
+    column <- vars[[paste0(role, "_var")]]
+    fitted <- axes$group_levels[[role]]
+    if (!is.null(fitted) && column %in% names(data)) {
+      refuse_unseen_levels(paste0("Column '", column, "'"),
+                           observed_levels(data[[column]]), fitted)
     }
   }
-
-  # Validate gr levels (if hierarchical model)
-  if (!is.null(metadata$levels$gr)) {
-    gr_var <- metadata$variables$gr_var
-    if (!is.null(gr_var) && gr_var %in% names(data)) {
-      newdata_levels <- extract_factor_levels(data, gr_var)
-      if (!is.null(newdata_levels)) {
-        invalid <- setdiff(newdata_levels, metadata$levels$gr)
-        if (length(invalid) > 0) {
-          stop(insight::format_error(c(
-            cli::format_inline(
-              "Grouping variable {.field {gr_var}} has levels not in training data."
-            ),
-            x = cli::format_inline("Invalid: {.val {invalid}}."),
-            i = cli::format_inline(
-              "Training data has levels: {.val {metadata$levels$gr}}."
-            )
-          )), call. = FALSE)
-        }
-      }
-    }
-  }
-
-  # Validate subgr levels (if hierarchical model)
-  if (!is.null(metadata$levels$subgr)) {
-    subgr_var <- metadata$variables$subgr_var
-    if (!is.null(subgr_var) && subgr_var %in% names(data)) {
-      newdata_levels <- extract_factor_levels(data, subgr_var)
-      if (!is.null(newdata_levels)) {
-        invalid <- setdiff(newdata_levels, metadata$levels$subgr)
-        if (length(invalid) > 0) {
-          stop(insight::format_error(c(
-            cli::format_inline(
-              "Sub-grouping variable {.field {subgr_var}} has levels not in training data."
-            ),
-            x = cli::format_inline("Invalid: {.val {invalid}}."),
-            i = cli::format_inline(
-              "Training data has levels: {.val {metadata$levels$subgr}}."
-            )
-          )), call. = FALSE)
-        }
-      }
-    }
-  }
-
   invisible(TRUE)
 }
 
@@ -3946,19 +3365,26 @@ validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
   # Check if hierarchical grouping is requested
   use_grouping <- named_var(trend_specs$gr)
 
-  # Factor models are incompatible with hierarchical grouping
   if (use_grouping && is_factor_model) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Hierarchical {trend_name} models cannot use factor models."
-      ),
-      i = cli::format_inline(
-        "Drop {.field n_lv} (one trend per series) or remove {.field gr}/{.field subgr} to keep the factor model."
-      )
-    )))
+    refuse_factor_hierarchical(trend_name)
   }
 
   return(invisible(TRUE))
+}
+
+
+# Internal: refuse a trend that is both grouped and a factor model.
+#
+# A grouping and the loadings each define the series axis. Every site
+# that finds the pair raises this one refusal.
+#'@noRd
+refuse_factor_hierarchical <- function(trend_name) {
+  stop(insight::format_error(c(
+    paste0("Factor models are not supported for hierarchical ",
+           trend_name, " trends."),
+    x = "A grouping and the loadings both define the series axis.",
+    i = "Remove 'gr' and 'subgr', or drop 'n_lv' and 'trend_map'."
+  )), call. = FALSE)
 }
 
 # Formula Parsing Helpers
@@ -3978,7 +3404,6 @@ validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
 #' @return A formula object with trend terms removed, preserving structure
 #' @noRd
 parse_base_formula_safe <- function(trend_formula, trend_terms) {
-  # Input validation - non-negotiable per CLAUDE.md
   checkmate::assert_class(trend_formula, "formula")
   checkmate::assert_character(trend_terms, min.len = 0)
 
@@ -4024,30 +3449,16 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
   }
 
   # Handle minus operations first to check for unary case
-  if (rlang::is_call(expr, "-")) {
-    args <- rlang::call_args(expr)
-    
-    if (length(args) == 1) {
-      # Unary minus: preserve operator with processed argument
-      arg <- remove_trend_expressions(args[[1]], trend_patterns, depth + 1)
-      return(if (is.null(arg)) NULL else rlang::call2("-", arg))
-    }
-    # Binary minus continues to shared binary logic below
-  }
-  
-  # Handle binary operations (both + and binary -)
   if (rlang::is_call(expr, "+") || rlang::is_call(expr, "-")) {
     op <- rlang::call_name(expr)
     args <- rlang::call_args(expr)
-    
-    # Validate binary operation structure
-    if (length(args) != 2) {
-      stop(insight::format_error(c(
-        paste0("Invalid ", op, " operation in formula."),
-        x = "Expected binary operation with two arguments."
-      )))
+
+    # A unary operator keeps its sign on the processed operand
+    if (length(args) == 1) {
+      arg <- remove_trend_expressions(args[[1]], trend_patterns, depth + 1)
+      return(if (is.null(arg)) NULL else rlang::call2(op, arg))
     }
-    
+
     # Process both operands recursively
     lhs <- remove_trend_expressions(args[[1]], trend_patterns, depth + 1)
     rhs <- remove_trend_expressions(args[[2]], trend_patterns, depth + 1)
@@ -4122,15 +3533,9 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   if (!is.null(response_vars)) {
     checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE)
   }
-  if (!is.null(metadata)) {
-    checkmate::assert_list(metadata, names = "named")
-    if (!is.null(metadata$variables)) {
-      checkmate::assert_list(metadata$variables, names = "named")
-    }
-
-    # Validate factor levels in prediction context
-    validate_prediction_factor_levels(data, metadata)
-  }
+  # A fit's metadata marks the prediction context, where a frame
+  # naming an unseen series or group is refused.
+  validate_prediction_factor_levels(data, metadata)
 
   # Always create implicit time mapping for consistency.
   #
@@ -4143,11 +3548,10 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   # the middle. The mapping stays a bijection either way, so nothing
   # downstream can notice. Sorted input, which is the usual shape and
   # the one every fixture carries, is unaffected.
-  refuse_absent_time_column(data, time_var)
+  assert_axis_column(data, time_var, "time")
   unique_times <- time_axis_values(data[[time_var]])
   time_mapping <- setNames(seq_along(unique_times), unique_times)
   attr(data, "mvgam_time") <- time_mapping[as.character(data[[time_var]])]
-  attr(data, "mvgam_time_source") <- "implicit"
 
   # Every row has to name a cell of the trend matrix. A missing time
   # or series maps to an NA index, which stays an NA index: the
@@ -4160,13 +3564,10 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     stop(insight::format_error(c(
       paste0("Time variable '", time_var, "' has missing values."),
       x = paste0(
-        length(missing_time), " row(s) carry no time, first at row ",
-        missing_time[1L], "."
+        length(missing_time), " row(s) have a missing time, first at ",
+        "row ", missing_time[1L], "."
       ),
-      i = paste0(
-        "Every row must name an occasion for the latent trend to be ",
-        "read at. Drop these rows or supply their times."
-      )
+      i = "Drop these rows or supply their times."
     )), call. = FALSE)
   }
   attr(data, "mvgam_original_time") <- data[[time_var]]  # Store original for distance calculations
@@ -4207,31 +3608,23 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   series_source <- NULL
   series_levels <- NULL
 
-  # Strategy 1: Prediction context - use stored metadata to recreate series
-  if (!is.null(metadata)) {
-    stored <- axes_from_metadata(metadata)$series
-    stored_source <- stored$source %||% "explicit"
-
-    if (stored_source == "hierarchical" && !is.null(metadata$variables)) {
-      gr_var <- metadata$variables$gr_var
-      subgr_var <- metadata$variables$subgr_var
-
-      if (named_var(gr_var) && named_var(subgr_var)) {
-        assert_grouping_columns(data, gr_var, subgr_var)
-        series_values <- hierarchical_series_values(
-          data, gr_var, subgr_var
-        )
-        series_source <- "hierarchical"
-      }
-    } else if (stored_source == "multivariate") {
-      # The response axis the fit was built on, keyed as brms keys the
-      # responses, which is what every per-response read is asked by.
-      result <- create_multivariate_series(stored$levels, nrow(data))
-      series_values <- result$series_values
-      series_levels <- result$series_levels
-      series_source <- result$series_source
-    }
-    # If prediction context but explicit series, fall through to Strategy 3
+  # Strategy 1: in the prediction context the series are rebuilt the
+  # way the fit built them. An explicit axis falls through to the
+  # series column.
+  stored <- metadata$axes
+  if (identical(stored$series$source, "hierarchical")) {
+    gr_var <- stored$vars$gr_var
+    subgr_var <- stored$vars$subgr_var
+    assert_grouping_columns(data, gr_var, subgr_var)
+    series_values <- hierarchical_series_values(data, gr_var, subgr_var)
+    series_source <- "hierarchical"
+  } else if (identical(stored$series$source, "multivariate")) {
+    # The response axis the fit recorded, keyed as brms keys the
+    # responses.
+    result <- create_multivariate_series(stored$series$levels, nrow(data))
+    series_values <- result$series_values
+    series_levels <- result$series_levels
+    series_source <- result$series_source
   }
 
   # Strategy 2: Hierarchical series (gr + subgr present in fitting context)
@@ -4264,29 +3657,22 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     }
   }
 
-  # Strategy 3: Explicit series (column exists)
-  if (is.null(series_values) && series_var %in% names(data)) {
-    series_values <- data[[series_var]]
-    series_source <- "explicit"
+  # Strategy 3: the responses of a wide multivariate frame are its
+  # series, unless the frame names them in a series column.
+  if (is.null(series_values) && !series_var %in% names(data) &&
+        length(response_vars) > 1) {
+    result <- create_multivariate_series(names(response_vars), nrow(data))
+    series_values <- result$series_values
+    series_levels <- result$series_levels
+    series_source <- result$series_source
   }
 
-  # Strategy 4: Missing series (create from multivariate structure in fitting context)
+  # Strategy 4: the series column
   if (is.null(series_values)) {
-    if (!is.null(response_vars) && length(response_vars) > 1) {
-      result <- create_multivariate_series(names(response_vars), nrow(data))
-      series_values <- result$series_values
-      series_levels <- result$series_levels
-      series_source <- result$series_source
-    } else {
-      stop(insight::format_error(c(
-        paste0("No series variable '", series_var, "' found in data."),
-        i = paste0(
-          "Name each row's series with that column, or with the 'gr' ",
-          "and 'subgr' columns of a hierarchical trend. A multivariate ",
-          "formula whose responses are the series needs neither."
-        )
-      )), call. = FALSE)
-    }
+    assert_axis_column(data, series_var, "series",
+                       require_factor = is.null(metadata))
+    series_values <- data[[series_var]]
+    series_source <- "explicit"
   }
 
   # Store series as attribute. `mvgam_series_levels` is set only when
@@ -4304,14 +3690,11 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     stop(insight::format_error(c(
       "Series identity has missing values.",
       x = paste0(
-        length(missing_series), " row(s) name no series, first at row ",
+        length(missing_series), " row(s) have no series, first at row ",
         missing_series[1L], "."
       ),
-      i = paste0(
-        "Every row must name a series for its latent state to be ",
-        "found. Check '", series_var, "' and any grouping variables ",
-        "for missing values."
-      )
+      i = paste0("Fill the missing values in '", series_var,
+                 "' and any grouping variables.")
     )), call. = FALSE)
   }
 
@@ -4351,7 +3734,7 @@ frame_names_an_axis <- function(data, time_var, series_var,
 #' branch, and every post-fit surface then derives an axis of its own:
 #' a padded series takes the date of its last row instead of its last
 #' observation, and a wide frame loses the one field naming its
-#' responses as the series. `trend_type` stays absent, which marks a
+#' responses as the series. `trend_type` stays unset, which marks a
 #' model stepping no latent state.
 #'
 #' @param data Data frame the model was given
@@ -4369,21 +3752,37 @@ trendless_trend_metadata <- function(data, time_var, series_var,
     data = data, parsed_trend = NULL, time_var = time_var,
     series_var = series_var, response_vars = response_vars
   )
-  dimensions <- extract_time_series_dimensions(
+  axis_record(extract_time_series_dimensions(
     prepared, time_var, series_var, response_vars = response_vars
-  )
+  ))
+}
+
+
+#' The record of a model's axes that a fit stores
+#'
+#' Post-fit methods take the axes Stan was given from this record, and
+#' a second construction from the frame is the thing it exists to end.
+#' `enrich_trend_metadata()` adds the trend's own fields to it.
+#'
+#' @param dimensions The dimensions `extract_time_series_dimensions()`
+#'   built from the prepared frame.
+#' @param covariates The trend formula's covariates, which prediction
+#'   carries onto the factor grid of a `by = lv_axis()` term.
+#' @param has_by_lv,had_by_lv,n_lv_for_grain The `by = lv_axis()`
+#'   grain, which prediction rebuilds newdata on. `had_by_lv` is its
+#'   display-only twin, used by `conditional_effects.mvgam` through
+#'   `mvgam_had_by_lv()`.
+#' @return A metadata list
+#' @noRd
+axis_record <- function(dimensions, covariates = character(0),
+                        has_by_lv = FALSE, had_by_lv = FALSE,
+                        n_lv_for_grain = NULL) {
   list(
-    covariates = character(0),
-    variables = list(
-      time_var = time_var,
-      series_var = series_var,
-      gr_var = NA_character_,
-      subgr_var = NA_character_
-    ),
-    is_car = FALSE,
-    time_source = attr(prepared, "mvgam_time_source"),
-    series_source = attr(prepared, "mvgam_series_source"),
-    axes = complete_axes_grain(dimensions$axes, FALSE, FALSE)
+    covariates = covariates,
+    has_by_lv = has_by_lv,
+    had_by_lv = had_by_lv,
+    n_lv_for_grain = n_lv_for_grain,
+    axes = complete_axes_grain(dimensions$axes, has_by_lv, had_by_lv)
   )
 }
 
@@ -4404,13 +3803,10 @@ mvgam_prepared_index <- function(data, what) {
   checkmate::assert_choice(what, c("time", "series"))
   values <- attr(data, paste0("mvgam_", what))
   if (is.null(values)) {
-    stop(insight::format_error(c(
-      paste0("This data frame carries no ", what, " index."),
-      i = paste0(
-        "The ", what, " index is built when a frame is read for a ",
-        "model. This frame has not been through that reading."
-      )
-    )), call. = FALSE)
+    stop_mvgam_fault(
+      paste0("The data frame lacks its ", what, " index."),
+      "mvgam builds the index when it prepares a frame for a model."
+    )
   }
   values
 }
@@ -4434,27 +3830,26 @@ get_series_for_grouping <- function(data) {
   mvgam_prepared_index(data, "series")
 }
 
-#' The series a frame observes, in the order its axis runs
+#' The levels a column observes, in the order they are declared
 #'
-#' A factor keeps levels the data never uses, and those levels have
-#' no latent state, so they are not series. Dropping them leaves the
-#' same answer a character column gives, in the order the levels
-#' declare rather than alphabetically.
+#' A factor keeps levels the data never uses. Those levels have no
+#' rows, no latent state and no group. Dropping them leaves the labels
+#' a character column holds, in the order the factor declares. The
+#' series axis and the grouping columns both take their levels here.
 #'
-#' A frame whose responses are its series answers elsewhere, through
-#' `mvgam_response_axis()`: its per-row values are one constant and
-#' the axis is the level set, so reading the values would find a
-#' single series where the trend has one per response.
+#' A frame whose responses are its series takes its axis from
+#' `mvgam_response_axis()`. Its per-row values are one constant and
+#' the axis is the level set.
 #'
-#' @param series_vals Series values, factor or otherwise
-#' @return Character vector of observed series labels, in axis order
+#' @param values Column values, factor or otherwise
+#' @return Character vector of observed labels
 #' @noRd
-observed_series_levels <- function(series_vals) {
-  if (is.factor(series_vals)) {
-    levs <- levels(series_vals)
-    return(levs[levs %in% as.character(series_vals)])
+observed_levels <- function(values) {
+  if (is.factor(values)) {
+    levs <- levels(values)
+    return(levs[levs %in% as.character(values)])
   }
-  sort(unique(as.character(series_vals)))
+  sort(unique(as.character(values)))
 }
 
 #' The series axis of a frame whose responses are its series
@@ -4497,22 +3892,10 @@ response_series_index <- function(axis, response_key) {
       cli::format_inline(
         "Response {.field {response_key}} is not on the series axis."
       ),
-      i = cli::format_inline("Axis holds {.val {axis}}.")
+      i = cli::format_inline("The axis has {.val {axis}}.")
     )), call. = FALSE)
   }
   idx
-}
-
-#' Check if mvgam variables are ready
-#'
-#' Verifies that both time and series attributes exist on data object
-#'
-#' @param data Data frame to check for mvgam attributes
-#' @return Logical indicating if both time and series attributes exist
-#' @noRd
-has_mvgam_variables <- function(data) {
-  checkmate::assert_data_frame(data)
-  !is.null(attr(data, "mvgam_time")) && !is.null(attr(data, "mvgam_series"))
 }
 
 #' Remove mvgam variable attributes
@@ -4525,7 +3908,6 @@ has_mvgam_variables <- function(data) {
 remove_mvgam_variables <- function(data) {
   checkmate::assert_data_frame(data)
   attr(data, "mvgam_time") <- NULL
-  attr(data, "mvgam_time_source") <- NULL
   attr(data, "mvgam_original_time") <- NULL
   attr(data, "mvgam_series") <- NULL
   attr(data, "mvgam_series_source") <- NULL
@@ -4537,56 +3919,40 @@ remove_mvgam_variables <- function(data) {
 #'
 #' @description
 #' Resolves the axes once, extracts the trend data on them and
-#' injects the dimensions into the specification, so a single pass
-#' answers what three separate ones used to answer differently.
+#' records the dimensions on the specification. Stan assembly and
+#' every post-fit method take their axes from this one pass.
 #'
 #' @param data Data frame containing time series data
 #' @param mv_spec Multivariate specification object with base_formula and
 #'   trend_specs
 #' @param response_vars Character vector of response variable names
-#' @param time_var Name of time variable column (default: "time")
-#' @param series_var Name of series variable column (default: "series")
-#' @return List with trend_data, enhanced_mv_spec, metadata, and
-#'   validation_passed
+#' @param family The observation family, or NULL
+#' @return List with trend_data, enhanced_mv_spec and metadata
 #' @noRd
 extract_and_validate_trend_components <- function(data, mv_spec,
                                                   response_vars,
-                                                  time_var = "time",
-                                                  series_var = "series",
-                                                  trend_formula = NULL,
                                                   family = NULL) {
-  # Parameter validation per CLAUDE.md standards
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(mv_spec)
-  required_fields <- c("base_formula", "trend_specs", "has_trends")
-  if (!all(required_fields %in% names(mv_spec))) {
-    stop(insight::format_error(c(
-      cli::format_inline("Invalid {.field mv_spec} structure."),
-      i = cli::format_inline(paste0(
-        "Must contain {.field base_formula}, {.field trend_specs} ",
-        "and {.field has_trends} fields."
-      ))
-    )), call. = FALSE)
+  missing_fields <- setdiff(
+    c("base_formula", "trend_specs", "has_trends", "regular_terms"),
+    names(mv_spec)
+  )
+  if (length(missing_fields) > 0L) {
+    stop_missing_fields("The parsed model specification", missing_fields)
   }
   checkmate::assert_character(response_vars, min.len = 1, null.ok = TRUE)
-  checkmate::assert_string(time_var)
-  checkmate::assert_string(series_var)
-
-  if (!mv_spec$has_trends) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Cannot process trend components when {.field mv_spec$has_trends} is FALSE."
-      ),
-      i = "This function should only be called for models with trend specifications."
-    )), call. = FALSE)
+  if (!isTRUE(mv_spec$has_trends)) {
+    stop_mvgam_fault(
+      "Trend components were requested for a trendless model.",
+      "The parsed specification has 'has_trends = FALSE'."
+    )
   }
 
-  # Create attributes early to fix root cause
-  parsed_trend <- if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
-    mv_spec$trend_specs[[1]]
-  } else {
-    mv_spec$trend_specs
-  }
+  parsed_trend <- trend_spec_head(mv_spec$trend_specs)
+  axis_names <- spec_axis_vars(parsed_trend)
+  time_var <- axis_names$time_var
+  series_var <- axis_names$series_var
 
   # by = lv_axis() machinery: detect per-factor smooth markers in
   # mv_spec$base_formula, rewrite each `by` argument so the single brms
@@ -4600,8 +3966,8 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   #     basis on the trend side, exactly as `by = series` would on the
   #     obs side, but with the contribution living in the latent state.
   #
-  # has_by_lv + n_lv_for_grain are threaded through to extract_trend_data
-  # and the downstream stanvar emission only for the factor-model path.
+  # `trend_cell_frame()` and the stanvar emission use has_by_lv and
+  # n_lv_for_grain on the factor-model path alone.
   has_by_lv <- FALSE
   n_lv_for_grain <- NULL
   # Reason: `has_by_lv` selects the (time, .trend)-grain codepath and is
@@ -4630,26 +3996,6 @@ extract_and_validate_trend_components <- function(data, mv_spec,
         # Factor-model path: switch grain, emit factor-model codegen.
         has_by_lv <- TRUE
         n_lv_for_grain <- spec_n_lv(parsed_trend)
-
-        # When Z is user-pinned (fully or partially), the rotation
-        # concern that by = lv_axis() was designed to address is moot;
-        # the env constraint and the data-side constraint both pin
-        # factor identification. Emit a one-time warning so users
-        # know the rotation auto-skip is a no-op for their fit.
-        has_fixed_Z <- !is.null(parsed_trend$fixed_Z) ||
-          !is.null(parsed_trend$Z)
-        if (has_fixed_Z) {
-          warn_once(
-            paste0(
-              "'by = lv_axis()' was supplied with a user-pinned ",
-              "'trend_map' (numeric entries on Z). The per-factor ",
-              "smooths still fit, but factor identification is ",
-              "already pinned by the user-supplied loadings; the ",
-              "rotation auto-skip behaviour does not apply."
-            ),
-            class = "mvgam_by_lv_with_pinned_Z"
-          )
-        }
       }
       # Non-factor path: has_by_lv stays FALSE; the formula was already
       # rewritten to use `by = series`. The standard (time, series)
@@ -4658,12 +4004,10 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     }
   }
 
-  # Enforce gr/subgr coherence on every trend spec that carries them.
-  # validate_trend_grouping is only dispatched via a validation rule that
-  # is currently dead, so the gr-requires-subgr check and the
-  # gr-constant-per-series check at validate_gr_constant_per_series never
-  # fire from the standata path. Call them directly here so both rules
-  # apply uniformly.
+  # The grouping arguments are checked where the frame is known: `gr`
+  # needs `subgr`, and each series belongs to one group. The Stan program
+  # sizes every group's Cholesky and scale blocks by one subgroup count,
+  # and an unbalanced design gives NaN at initialisation.
   groupings <- validate_grouping_arguments(
     parsed_trend$gr, parsed_trend$subgr, series_var
   )
@@ -4671,10 +4015,6 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   parsed_trend$subgr <- groupings$subgr %||% "NA"
   if (!is.null(groupings$gr)) {
     validate_gr_constant_per_series(parsed_trend, data)
-    # Reason: current Stan template sizes per-group cholesky/sigma
-    # blocks by max(series-per-group) and produces NaN at init for
-    # unbalanced designs; fail-fast here until ragged-array support
-    # lands. Mirrors the gr-constant-per-series check above.
     validate_gr_balanced_groups(parsed_trend, data)
   }
 
@@ -4712,62 +4052,61 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     warn_zmvn_single_series(mv_spec, family, dimensions$n_series)
   }
 
-  # The covariate columns of the trend formula, derived where the
-  # lightweight path derives them.
-  all_formula_vars <- trend_formula_covariates(trend_formula, data,
-                                               dimensions)
-
-  # Add extracted variables to dimensions metadata for extract_trend_data
-  # Use all_formula_vars (including grouping variables) for data subsetting
-  if (is.null(dimensions$metadata)) {
-    dimensions$metadata <- list()
-  }
-  dimensions$metadata$covariates <- all_formula_vars
-
-  # Data extraction using precomputed dimensions and existing tested functionality
-  trend_data <- data
-  trend_metadata <- NULL
-
-  if (!is.null(response_vars) && length(response_vars) > 0) {
-    # Call existing extract_trend_data with precomputed dimensions to avoid redundant computation
-    # This reuses tested logic for proper data reduction to unique (time, series) combinations
-    result <- extract_trend_data(
-      data, trend_formula, time_var, series_var,
-      response_vars = response_vars, .return_metadata = TRUE,
-      .precomputed_dimensions = dimensions, trend_specs = mv_spec$trend_specs,
-      has_by_lv = has_by_lv, had_by_lv = had_by_lv,
-      n_lv_for_grain = n_lv_for_grain
-    )
-
-    if (!is.list(result) || !all(c("trend_data", "metadata") %in% names(result))) {
-      stop(insight::format_error(c(
-        "Invalid result from trend data extraction.",
-        i = cli::format_inline(
-          "Expected list with {.field trend_data} and {.field metadata} fields."
-        )
-      )), call. = FALSE)
-    }
-
-    trend_data <- result$trend_data
-    trend_metadata <- result$metadata
+  # A CAR trend with covariates is refused on more than one series.
+  # The count is the resolved series axis, which also holds series
+  # that a grouping or the responses define with no series column.
+  if (identical(parsed_trend$trend, "CAR") &&
+      length(mv_spec$regular_terms) > 0L && dimensions$n_series > 1L) {
+    stop(insight::format_error(c(
+      "'CAR()' takes 'trend_formula' covariates on a single series only.",
+      x = paste0("The trend has ", dimensions$n_series, " series."),
+      i = "Move the covariates to the observation formula."
+    )), call. = FALSE)
   }
 
-  # Inject dimensions into mv_spec
+  # The trend formula's covariates. A response may not be one, and
+  # each has to be constant within a trend cell. A CAR trend shares no
+  # latent state across rows, and its covariates may vary.
+  covariates <- trend_formula_covariates(mv_spec$regular_terms)
+  offending_vars <- intersect(covariates, response_vars)
+  if (length(offending_vars) > 0) {
+    stop(insight::format_error(c(
+      "Responses are not supported as trend covariates.",
+      x = paste0("Found in 'trend_formula': ",
+                 paste0("'", offending_vars, "'", collapse = ", "), "."),
+      i = "Move the term to the observation formula."
+    )), call. = FALSE)
+  }
+  time_vals <- get_time_for_grouping(data)
+  series_vals <- get_series_for_grouping(data)
+  if (length(covariates) > 0 && !identical(parsed_trend$trend, "CAR")) {
+    assert_trend_covariates_constant(data, covariates, parsed_trend,
+                                     time_vals, series_vals)
+  }
+
+  if (!has_by_lv) {
+    refuse_ragged_trend_grid(time_vals, series_vals, parsed_trend$trend)
+  }
+  trend_data <- trend_cell_frame(data, covariates, time_vals, series_vals,
+                                 has_by_lv, n_lv_for_grain)
+  trend_metadata <- axis_record(
+    dimensions, covariates = covariates, has_by_lv = has_by_lv,
+    had_by_lv = had_by_lv, n_lv_for_grain = n_lv_for_grain
+  )
+
   enhanced_mv_spec <- mv_spec
-  if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
-    for (response_name in names(mv_spec$trend_specs)) {
-      enhanced_mv_spec$trend_specs[[response_name]]$dimensions <- dimensions
+  enhanced_mv_spec$trend_specs <- map_trend_specs(
+    mv_spec$trend_specs, function(spec) {
+      spec$dimensions <- dimensions
+      spec
     }
-  } else {
-    enhanced_mv_spec$trend_specs$dimensions <- dimensions
-  }
+  )
 
-  return(list(
+  list(
     trend_data = trend_data,
     enhanced_mv_spec = enhanced_mv_spec,
-    metadata = trend_metadata,
-    validation_passed = TRUE
-  ))
+    metadata = trend_metadata
+  )
 }
 
 # Covariates to collapse, excluding the grouping columns. `time` and
@@ -4786,35 +4125,18 @@ trend_covariate_names <- function(trend_variables) {
 
 #' The covariate columns of a trend formula
 #'
-#' Walked once for the fitting pipeline and for the lighter
-#' `stancode()` path. A walk of the regular terms passes over the
-#' trend constructor, while a bare `all.vars()` of the right-hand
-#' side lists the columns named inside `AR(gr = region)` as
-#' covariates. One walk keeps the two paths agreeing on a field that
-#' decides what `newdata` must carry and what the collapse to trend
-#' grain selects.
+#' Walks the regular terms `parse_trend_formula()` separates from the
+#' trend constructor. A bare `all.vars()` of the right-hand side
+#' would list the columns named inside `AR(gr = region)` as
+#' covariates. `newdata` must hold these columns, and the collapse to
+#' trend grain selects them.
 #'
-#' @param trend_formula The trend formula, or `NULL`
-#' @param data The frame the formula is parsed against
-#' @param dimensions Precomputed dimensions for
-#'   `parse_trend_formula()`, or `NULL`
+#' @param regular_terms The term labels other than the constructor
 #' @return Character vector of column names, with the grouping
 #'   factors of any random effect included.
 #' @noRd
-trend_formula_covariates <- function(trend_formula, data,
-                                     dimensions = NULL) {
-  if (is.null(trend_formula)) {
-    return(character(0))
-  }
-  # `parse_trend_formula()` requires the dimensions whenever `data`
-  # reaches it. The lighter `stancode()` path holds neither, and the
-  # split into trend terms and regular terms needs no frame.
-  parsed <- parse_trend_formula(
-    trend_formula,
-    data = if (is.null(dimensions)) NULL else data,
-    .precomputed_dimensions = dimensions
-  )
-  regular_terms <- parsed$regular_terms %||% character(0)
+trend_formula_covariates <- function(regular_terms) {
+  checkmate::assert_character(regular_terms, any.missing = FALSE)
   out <- character(0)
   for (term in regular_terms) {
     # A dummy response, since `brmsterms()` takes a two-sided formula.
@@ -4843,508 +4165,158 @@ trend_formula_covariates <- function(trend_formula, data,
   unique(out)
 }
 
-#' Collapse a (time, series)-grained data.frame to one row per unique
-#' time for the listed time-level covariates.
+# Internal: the series observed at fewer times than the frame holds.
+# A trend matrix and a rolling origin both need every series on one
+# shared time grid.
+#'@noRd
+ragged_series <- function(time_vals, series_vals) {
+  n_time <- length(unique(time_vals))
+  per_series <- split(time_vals, series_vals, drop = TRUE)
+  short <- vapply(per_series, function(t) length(unique(t)) < n_time,
+                  logical(1L))
+  names(per_series)[short]
+}
+
+
+#' Refuse series that do not share one time grid
 #'
-#' The validator (`extract_trend_data()`) enforces that every entry in
-#' `trend_variables` is constant within each (time, series) cell, so
-#' "promoting" the values from (time, series) grain to time grain is
-#' lossless: we take `dplyr::first()` within each (time, series) and
-#' then again within each time. The result is sorted by time and
-#' carries one row per unique time value with the listed covariates
-#' attached. Used by `extract_trend_data()` when building the
-#' (time, .trend) grain for `has_by_lv = TRUE` fits, and by
-#' `compose_by_lv_trend_linpred()` when building the matching
-#' prediction grid on newdata.
+#' The trend is a matrix over every time and series, and a row of
+#' `data` locates each cell. A series missing a time the others have
+#' leaves a cell with no row. The refusal names the short series and
+#' the remedy, and for `CAR()` where uneven spacing is allowed.
 #'
-#' @param data Data frame containing the covariates.
-#' @param time_vals Time accessor values (parallel to `nrow(data)`).
-#' @param series_vals Series accessor values (parallel to `nrow(data)`).
-#' @param trend_variables Character vector of column names to collapse.
-#'   When empty the function returns a one-row-per-time frame with no
-#'   covariates attached.
-#' @return Data frame with columns `time, <trend_variables>`, sorted by
-#'   time.
+#' @param time_vals,series_vals The resolved axes, one per row.
+#' @param trend The trend type.
+#' @return `TRUE`, invisibly.
 #' @noRd
-collapse_to_time_level <- function(data, time_vals, series_vals,
-                                    trend_variables) {
-  checkmate::assert_data_frame(data, min.rows = 1L)
-  checkmate::assert_character(trend_variables)
-
-  if (length(trend_covariate_names(trend_variables)) == 0L) {
-    return(data.frame(time = sort(unique(time_vals))))
+refuse_ragged_trend_grid <- function(time_vals, series_vals, trend) {
+  short <- ragged_series(time_vals, series_vals)
+  if (length(short) == 0L) {
+    return(invisible(TRUE))
   }
+  n_time <- length(unique(time_vals))
+  n_series <- length(unique(series_vals))
+  n_cells <- nrow(unique(data.frame(time_vals, series_vals)))
+  stop(insight::format_error(c(
+    "Every series in 'data' must share one time grid.",
+    x = paste0("Series missing a time the others have: ",
+               paste0("'", short, "'", collapse = ", "), "."),
+    x = paste0(
+      "Got ", n_cells, " time and series cells over ", n_time,
+      " times and ", n_series, " series, expected ", n_time * n_series, "."
+    ),
+    i = "Give each unobserved time of a series a row with response 'NA'.",
+    if (identical(trend, "CAR")) {
+      c(i = paste0("'CAR()' allows uneven spacing between times, and ",
+                   "every series shares those times."))
+    }
+  )), call. = FALSE)
+}
 
-  data %>%
+
+#' Collapse a frame to one row per trend cell
+#'
+#' A trend cell is one occasion of one series. Under `by = lv_axis()`
+#' it is one occasion of one latent factor. The covariates there are
+#' time-level: `assert_trend_covariates_constant()` holds them constant
+#' within each (time, series) cell, and the first value at each time
+#' is joined onto every factor.
+#'
+#' @param data The training frame, carrying its axis attributes.
+#' @param covariates The trend covariates.
+#' @param time_vals,series_vals The resolved axes.
+#' @param has_by_lv,n_lv_for_grain The `by = lv_axis()` grain.
+#' @return A data frame sorted by time, then by series or factor.
+#' @noRd
+trend_cell_frame <- function(data, covariates, time_vals, series_vals,
+                             has_by_lv, n_lv_for_grain) {
+  columns <- trend_covariate_names(covariates)
+  cells <- data %>%
     dplyr::mutate(time = time_vals, series = series_vals) %>%
     dplyr::group_by(.data$time, .data$series) %>%
-    dplyr::summarise(
-      dplyr::across(
-        dplyr::all_of(trend_covariate_names(trend_variables)),
-        dplyr::first
-      ),
-      .groups = "drop"
-    ) %>%
-    dplyr::group_by(.data$time) %>%
-    dplyr::summarise(
-      dplyr::across(
-        dplyr::all_of(trend_covariate_names(trend_variables)),
-        dplyr::first
-      ),
-      .groups = "drop"
-    ) %>%
-    dplyr::arrange(.data$time)
-}
-
-extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", series_var = "series",
-                              mvgam_object = NULL, newdata = NULL, response_vars = NULL,
-                              .return_metadata = FALSE, .precomputed_dimensions = NULL, trend_specs = NULL,
-                              has_by_lv = FALSE, had_by_lv = FALSE,
-                              n_lv_for_grain = NULL) {
-
-  # Input validation for new parameters - non-negotiable per CLAUDE.md
-  if (!is.null(response_vars)) {
-    checkmate::assert_character(response_vars, min.len = 1)
-  }
-  checkmate::assert_logical(.return_metadata, len = 1)
-  if (!is.null(.precomputed_dimensions)) {
-    checkmate::assert_list(.precomputed_dimensions, names = "named")
-  }
-  checkmate::assert_flag(has_by_lv)
-  checkmate::assert_flag(had_by_lv)
-  checkmate::assert_integerish(n_lv_for_grain, lower = 1L, len = 1L,
-                                null.ok = TRUE)
-  if (has_by_lv && is.null(n_lv_for_grain)) {
-    stop(insight::format_error(c(
-      "'has_by_lv = TRUE' requires 'n_lv_for_grain' to be set."
-    )))
-  }
-
-  # In prediction context the grain mode follows the fitted object's
-  # trend_metadata, which is restored downstream from
-  # mvgam_object$trend_metadata; the caller does not pass these flags.
-  # Pull them out of metadata when present so newdata reshaping uses
-  # the same grain that was used during fitting.
-  if (!is.null(mvgam_object)) {
-    md_has_by_lv <- mvgam_object$trend_metadata$has_by_lv %||% FALSE
-    if (isTRUE(md_has_by_lv)) {
-      has_by_lv <- TRUE
-      n_lv_for_grain <- mvgam_object$trend_metadata$n_lv_for_grain
-    }
-    # had_by_lv is display-only but mirrored through prediction so
-    # downstream calls see the same metadata shape regardless of
-    # context. No effect on codegen or newdata reshaping.
-    if (isTRUE(mvgam_object$trend_metadata$had_by_lv %||% FALSE)) {
-      had_by_lv <- TRUE
-    }
-  }
-
-  # Dual-context dispatch: fitting vs prediction
-  if (!is.null(mvgam_object)) {
-    # PREDICTION CONTEXT: mvgam_object + newdata provided
-    checkmate::assert_class(mvgam_object, "mvgam")
-    checkmate::assert_data_frame(newdata, min.rows = 1)
-
-    # Get stored metadata from fitted object
-    if (is.null(mvgam_object$trend_metadata)) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "No trend metadata found in fitted {.cls mvgam} object."
-        ),
-        x = "This model may have been fitted without trend components.",
-        x = "Or it was fitted with an older version that didn't store metadata."
-      )), call. = FALSE)
-    }
-
-    metadata <- mvgam_object$trend_metadata
-    data <- newdata  # Use newdata as data for extraction
-    time_var <- axis_vars(mvgam_object)$time_var
-    series_var <- axis_vars(mvgam_object)$series_var
-
-    # Get covariates from stored metadata instead of parsing formula
-    trend_variables <- character(0)
-    if (!is.null(metadata$covariates) && length(metadata$covariates) > 0) {
-      trend_variables <- unique(metadata$covariates)
-    }
-
-    # The columns a frame needs are the time, which is read here,
-    # and the trend's own covariates. Which columns name the series
-    # is not settled at this layer: a hierarchical fit reads `gr`
-    # and `subgr`, a response-keyed one reads nothing, and only the
-    # explicit case wants the column `series_var` names. Demanding
-    # that column here refused a hierarchical fit its own prediction
-    # frame, three lines before `ensure_mvgam_variables()` would
-    # have derived the axis from the grouping it does carry. That
-    # function owns the refusal, and states which of the three
-    # things is missing.
-    required_vars <- unique(c(time_var, trend_variables))
-    missing_vars <- setdiff(required_vars, names(newdata))
-
-    if (length(missing_vars) > 0) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Missing required variables in {.arg newdata}."
-        ),
-        x = cli::format_inline(
-          "Required variables: {.field {required_vars}}"
-        ),
-        x = cli::format_inline("Missing: {.field {missing_vars}}"),
-        i = "Ensure newdata contains all variables used during model fitting."
-      )), call. = FALSE)
-    }
-
-    # Create attribute-based time and series variables for prediction context using metadata
-    data <- ensure_mvgam_variables(data, NULL, time_var, series_var, NULL, metadata)
-
-  } else {
-    # FITTING CONTEXT: data + trend_formula provided
-    checkmate::assert_data_frame(data, min.rows = 1)
-    checkmate::assert_class(trend_formula, "formula")
-    checkmate::assert_string(time_var)
-    checkmate::assert_string(series_var)
-    # Only the time column is required here. The series axis is
-    # derived from a grouping where the frame carries one.
-    refuse_absent_time_column(data, time_var)
-
-    # Pre-computed dimensions are the fast path. When a caller
-    # comes through that has not threaded them in (e.g. the
-    # `is_trend_setup = TRUE` branch in `setup_brms_lightweight()`,
-    # which receives already-reduced trend data and just needs
-    # metadata), synthesise a minimal `.precomputed_dimensions`
-    # shell carrying just the predictor names. Only
-    # `$metadata$covariates` is used downstream in this code path,
-    # and the walk that derives it is the fitting pipeline's own:
-    # the field reaches the fitted object by either route, and two
-    # derivations of it named different columns. Unblocks the
-    # brms-special surface (trials / se / cens / me / mm / cs /
-    # car) that all reach this point via `stancode()`.
-    if (is.null(.precomputed_dimensions)) {
-      .precomputed_dimensions <- list(
-        metadata = list(
-          covariates = setdiff(
-            trend_formula_covariates(trend_formula, data),
-            response_vars %||% character(0L)
-          )
-        )
-      )
-    }
-
-    # Extract everything from precomputed dimensions - skip parse_trend_formula entirely
-    trend_variables <- .precomputed_dimensions$metadata$covariates %||% character(0)
-    # Pull the trend model out of trend_specs so downstream metadata
-    # builders see gr/subgr/trend (otherwise the top-level
-    # trend_metadata$variables$gr_var falls through to NA).
-    # Safety note: ensure_mvgam_variables() only constructs the
-    # interaction-based hierarchical series when BOTH gr and subgr are
-    # present (see line ~3138). With only gr set, the hierarchical
-    # series-creation path is not triggered, so populating trend_model
-    # with a real spec here is non-invasive for non-hierarchical models.
-    single_spec <- if (!is.null(trend_specs)) {
-      if (is_multivariate_trend_specs(trend_specs)) trend_specs[[1]] else trend_specs
-    } else {
-      NULL
-    }
-    parsed_trend <- list(trend_model = single_spec)
-
-    # Create attribute-based time and series variables for fitting context
-    data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var, response_vars,
-                                   metadata = list(trend_specs = trend_specs))
-
-    # Validate trend covariates don't include response variables
-    if (!is.null(response_vars) && length(trend_variables) > 0) {
-      offending_vars <- intersect(trend_variables, response_vars)
-      if (length(offending_vars) > 0) {
-        stop(insight::format_error(c(
-          "Response variables cannot be used as trend predictors:",
-          x = cli::format_inline(
-            "Offending variables: {.field {offending_vars}}"
-          ),
-          i = "Trend models require exogenous covariates only.",
-          i = "Consider using these variables in the observation formula instead.",
-          i = "See ?mvgam_formulas for guidance on proper covariate specification."
-        )), call. = FALSE)
-      }
-    }
-
-    # Validate trend covariate invariance within grouping structure
-    if (length(trend_variables) > 0) {
-      # Skip validation for CAR models (no shared latent states)
-      skip_invariance <- !is.null(parsed_trend$trend_model) &&
-                        identical(parsed_trend$trend_model$trend, "CAR")
-
-      if (!skip_invariance) {
-        # Extract accessor values once to avoid duplication
-        time_vals <- get_time_for_grouping(data)
-        series_vals <- get_series_for_grouping(data)
-
-        # Create temporary columns with unique names to avoid collisions
-        validation_data <- data %>%
-          dplyr::mutate(
-            .validation_time_temp = time_vals,
-            .validation_series_temp = series_vals
-          )
-
-        # Determine grouping structure from trend metadata
-        validation_grouping_vars <- character(0)
-
-        if (!is.null(parsed_trend$trend_model)) {
-          has_gr <- named_var(parsed_trend$trend_model$gr)
-          has_subgr <- named_var(parsed_trend$trend_model$subgr)
-
-          if (has_gr && has_subgr) {
-            validation_grouping_vars <- c(".validation_time_temp",
-                                         parsed_trend$trend_model$gr,
-                                         parsed_trend$trend_model$subgr)
-            grouping_desc <- paste0("(time, ",
-                                   parsed_trend$trend_model$gr, ", ",
-                                   parsed_trend$trend_model$subgr, ")")
-          } else if (has_gr) {
-            validation_grouping_vars <- c(".validation_time_temp",
-                                         parsed_trend$trend_model$gr)
-            grouping_desc <- paste0("(time, ",
-                                   parsed_trend$trend_model$gr, ")")
-          } else {
-            # Always use time and series from attributes
-            validation_grouping_vars <- c(".validation_time_temp",
-                                         ".validation_series_temp")
-            grouping_desc <- "(time, series)"
-          }
-        } else {
-          # Always use time and series from attributes
-          validation_grouping_vars <- c(".validation_time_temp",
-                                       ".validation_series_temp")
-          grouping_desc <- "(time, series)"
-        }
-
-        # Validate trend variables exist (grouping vars are temporary)
-        missing_trend_vars <- setdiff(trend_variables, names(validation_data))
-        if (length(missing_trend_vars) > 0) {
-          stop(insight::format_error(c(
-            "Required trend variables not found in data:",
-            x = cli::format_inline("Missing: {.field {missing_trend_vars}}"),
-            i = paste("Available:", paste(names(data), collapse = ", "))
-          )), call. = FALSE)
-        }
-
-        # A grouping variable is trivially constant within its own
-        # groups, so exclude it from the across() to avoid a tidyselect
-        # error when gr_var also appears in trend_variables (e.g.
-        # ~ x + (x | habitat) + ZMVN(gr = habitat)).
-        trend_vars_to_check <- setdiff(trend_variables,
-                                        validation_grouping_vars)
-
-        varying_covariates <- if (length(trend_vars_to_check) > 0) {
-          validation_data %>%
-            dplyr::group_by(
-              dplyr::across(dplyr::all_of(validation_grouping_vars))
-            ) %>%
-            dplyr::summarise(
-              dplyr::across(dplyr::all_of(trend_vars_to_check),
-                           ~ length(unique(.x)) > 1),
-              .groups = "drop"
-            ) %>%
-            dplyr::select(-dplyr::all_of(validation_grouping_vars)) %>%
-            dplyr::summarise(dplyr::across(dplyr::everything(), any)) %>%
-            dplyr::select(dplyr::where(isTRUE)) %>%
-            names()
-        } else {
-          character(0)
-        }
-
-        if (length(varying_covariates) > 0) {
-          stop(insight::format_error(c(
-            paste0("Trend covariates must be constant within ",
-                   grouping_desc, " groups:"),
-            x = cli::format_inline(
-              "Varying covariates: {.field {varying_covariates}}"
-            ),
-            i = paste0("Each ", grouping_desc,
-                       " combination must have identical covariate values."),
-            i = "Consider aggregating data or using observation-level effects instead.",
-            i = "See ?mvgam_data_structure for data preparation guidance."
-          )), call. = FALSE)
-        }
-      }
-    }
-
-  }
-
-  # Universal (time, series) grouping using attribute-based accessors
-  # Following dplyr best practices: mutate first, then group_by with .data pronouns
-
-  # Extract attribute values with validation
-  time_vals <- get_time_for_grouping(data)
-  series_vals <- get_series_for_grouping(data)
-
-  # When `by = lv_axis()` is present, switch trend_data from the
-  # default (time, series) grain to a (time, .trend) grain: one row
-  # per (unique_time, latent_factor) combination, with the injected
-  # .trend factor column carrying levels 1:n_lv. The trend covariates
-  # are first reduced to one value per (time, series) cell (taking
-  # `dplyr::first()` to mirror the standard path) and then promoted to
-  # one value per time (assumed time-level: the existing covariate
-  # invariance check above enforces constant-within-(time, series),
-  # which together with the n_lv < n_series gate means time-level
-  # values are unambiguous).
+    dplyr::summarise(dplyr::across(dplyr::all_of(columns), dplyr::first),
+                     .groups = "drop") %>%
+    dplyr::arrange(.data$time, .data$series)
   if (has_by_lv) {
-    time_level <- collapse_to_time_level(
-      data, time_vals, series_vals, trend_variables
-    )
-    lv_grid <- tidyr::expand_grid(
+    time_level <- cells %>%
+      dplyr::group_by(.data$time) %>%
+      dplyr::summarise(dplyr::across(dplyr::all_of(columns), dplyr::first),
+                       .groups = "drop")
+    cells <- tidyr::expand_grid(
       time = time_level$time,
       .trend = factor(seq_len(n_lv_for_grain))
-    )
-    trend_data <- if (length(trend_variables) > 0L) {
-      dplyr::arrange(
-        dplyr::left_join(lv_grid, time_level, by = "time"),
-        .data$time, .data$.trend
-      )
-    } else {
-      lv_grid
-    }
-    trend_data <- remove_mvgam_variables(trend_data)
-  } else if (length(trend_variables) > 0) {
-    trend_data <- data %>%
-      dplyr::mutate(
-        time = time_vals,
-        series = series_vals
-      ) %>%
-      dplyr::group_by(.data$time, .data$series) %>%
-      dplyr::summarise(
-        dplyr::across(
-        dplyr::all_of(trend_covariate_names(trend_variables)),
-        dplyr::first
-      ),
-        .groups = "drop"
-      ) %>%
-      dplyr::arrange(.data$time, .data$series)
-
-    # Clean up attributes after processing
-    trend_data <- remove_mvgam_variables(trend_data)
-  } else {
-    # Handle no covariates case with same attribute approach
-    trend_data <- data %>%
-      dplyr::mutate(
-        time = time_vals,
-        series = series_vals
-      ) %>%
-      dplyr::group_by(.data$time, .data$series) %>%
-      dplyr::slice_head(n = 1) %>%
-      dplyr::ungroup() %>%
-      dplyr::arrange(.data$time, .data$series) %>%
-      dplyr::select("time", "series")
-
-    trend_data <- remove_mvgam_variables(trend_data)
+    ) %>%
+      dplyr::left_join(time_level, by = "time") %>%
+      dplyr::arrange(.data$time, .data$.trend)
   }
-
-  # Create metadata for fitted object storage
-  if (.return_metadata && !is.null(mvgam_object)) {
-    # Prediction context - metadata already available
-    metadata <- mvgam_object$trend_metadata
-  } else if (.return_metadata) {
-    # Fitting context - create metadata from parsed trend
-    metadata <- list(
-      trend_type = parsed_trend$trend_model$trend %||% NA_character_,
-      covariates = trend_variables,
-      variables = list(
-        time_var = time_var,
-        series_var = series_var,
-        gr_var = named_var_or_na(parsed_trend$trend_model$gr),
-        subgr_var = named_var_or_na(parsed_trend$trend_model$subgr)
-      ),
-      is_car = !is.null(parsed_trend$trend_model) &&
-               identical(parsed_trend$trend_model$trend, "CAR"),
-      # Context-guarded fields for prediction context
-      time_source = if (has_mvgam_variables(data)) {
-        attr(data, "mvgam_time_source")
-      } else {
-        NULL
-      },
-      series_source = if (has_mvgam_variables(data)) {
-        attr(data, "mvgam_series_source")
-      } else {
-        NULL
-      },
-      # by = lv_axis() grain switch: persist so prediction rebuilds
-      # newdata at the matching (time, .trend) grid via the same
-      # extract_trend_data code path under the prediction context.
-      # `had_by_lv` is the display-only twin (see comment near
-      # `dimensions$had_by_lv <- had_by_lv` above) consumed by
-      # `conditional_effects.mvgam` via `mvgam_had_by_lv()`.
-      has_by_lv = has_by_lv,
-      had_by_lv = had_by_lv,
-      n_lv_for_grain = n_lv_for_grain,
-      # Both axes as they were resolved when the model was built, so
-      # post-fit reads the axes Stan was given instead of rebuilding
-      # them from the frame. Read, never rebuilt here: a second
-      # construction is the thing this record exists to end.
-      # The record, completed with the one field that is not knowable
-      # where the rest of it is built. Read, never rebuilt: a second
-      # construction is the thing this record exists to end.
-      axes = complete_axes_grain(.precomputed_dimensions$axes,
-                                 has_by_lv, had_by_lv),
-      # Store factor levels for prediction validation
-      levels = list(
-        # The series the trend actually has, in axis order. Taking a
-        # factor's declared levels instead counts any the data never
-        # observes, so the stored levels outnumber the trend columns
-        # and whatever labels those columns from this list runs off
-        # the end of it. A character column was already answering the
-        # observed question, so the two spellings of this one field
-        # disagreed with each other as well.
-        series = mvgam_response_axis(data) %||%
-          observed_series_levels(series_vals),
-        gr = extract_factor_levels(
-          data, named_var_or_na(parsed_trend$trend_model$gr)
-        ),
-        subgr = extract_factor_levels(
-          data, named_var_or_na(parsed_trend$trend_model$subgr)
-        )
-      )
-    )
-  }
-
-  # Backward compatible return
-  if (.return_metadata) {
-    return(list(trend_data = trend_data, metadata = metadata))
-  } else {
-    return(trend_data)
-  }
+  remove_mvgam_variables(cells)
 }
 
-#' Format Pipeline Error with Context
+
+#' Refuse trend covariates that vary inside one trend cell
 #'
-#' @description
-#' Creates detailed error message with context information for debugging
-#' pipeline failures. Follows established validation.R error patterns.
+#' A trend cell is one occasion of one series, or of one group under a
+#' grouped trend. The trend's design matrix has one row per cell.
 #'
-#' @param message Character string with base error message
-#' @param context List with optional debugging context (default: NULL)
-#'
-#' @return Stops execution with formatted error
-#'
+#' @param data The training frame, carrying its axis attributes.
+#' @param trend_variables The trend covariates.
+#' @param trend_model The trend spec.
+#' @param time_vals,series_vals The resolved axes.
+#' @return `TRUE`, invisibly.
 #' @noRd
-format_pipeline_error <- function(message, context = NULL) {
-  checkmate::assert_character(message, len = 1, min.chars = 1)
-  checkmate::assert_list(context, null.ok = TRUE)
-  
-  # Build error message components
-  error_components <- c(message)
-  
-  # Add context information if provided
-  if (!is.null(context) && length(context) > 0) {
-    for (name in names(context)) {
-      if (!is.null(context[[name]])) {
-        context_info <- sprintf("%s: {.field %s}", name, 
-                               as.character(context[[name]])[1])
-        error_components <- c(error_components, context_info)
-      }
-    }
+assert_trend_covariates_constant <- function(data, trend_variables,
+                                             trend_model, time_vals,
+                                             series_vals) {
+  missing_vars <- setdiff(trend_variables, names(data))
+  if (length(missing_vars) > 0) {
+    stop(insight::format_error(c(
+      "A trend covariate is absent from the data.",
+      x = paste0("Missing: ",
+                 paste0("'", missing_vars, "'", collapse = ", "), "."),
+      i = paste0("Supplied: ",
+                 paste0("'", names(data), "'", collapse = ", "), ".")
+    )), call. = FALSE)
   }
-  
-  # Format and stop with error
-  full_message <- paste(error_components, collapse = ". ")
-  stop(insight::format_error(full_message), call. = FALSE)
+  groupings <- spec_groupings(trend_model)
+  cell <- if (is.null(groupings$gr)) {
+    ".cell_series"
+  } else {
+    c(groupings$gr, groupings$subgr)
+  }
+  frame <- data
+  frame$.cell_time <- time_vals
+  frame$.cell_series <- series_vals
+  cell_vars <- c(".cell_time", cell)
+  # A grouping variable is constant within its own groups, and is
+  # left out of the check
+  checked <- setdiff(trend_variables, cell_vars)
+  if (length(checked) == 0L) {
+    return(invisible(TRUE))
+  }
+  varying <- frame %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(cell_vars))) %>%
+    dplyr::summarise(
+      dplyr::across(dplyr::all_of(checked), ~ length(unique(.x)) > 1),
+      .groups = "drop"
+    ) %>%
+    dplyr::select(dplyr::all_of(checked)) %>%
+    dplyr::summarise(dplyr::across(dplyr::everything(), any)) %>%
+    dplyr::select(dplyr::where(isTRUE)) %>%
+    names()
+  if (length(varying) > 0) {
+    cell_label <- paste0(
+      "(time, ", if (identical(cell, ".cell_series")) "series" else
+        paste(cell, collapse = ", "), ")"
+    )
+    stop(insight::format_error(c(
+      paste0("A trend covariate varies within one ", cell_label, " cell."),
+      x = paste0("Varying: ",
+                 paste0("'", varying, "'", collapse = ", "), "."),
+      i = "The trend has one design row per cell.",
+      i = "Aggregate the covariate or move it to the observation formula."
+    )), call. = FALSE)
+  }
+  invisible(TRUE)
 }
 
 
@@ -5381,7 +4353,8 @@ format_pipeline_error <- function(message, context = NULL) {
 #   n_distances        int K (length of distance_mats)
 #'@noRd
 normalise_loadings_prior <- function(input, data2, data,
-                                     n_series = NULL) {
+                                     n_series = NULL,
+                                     series_var = "series") {
   if (is.null(input)) return(NULL)
   # String shorthand: `loadings_prior = "mgp"` is sugar for
   # `loadings_prior = list(column_shrinkage = "mgp")` with default
@@ -5422,7 +4395,7 @@ normalise_loadings_prior <- function(input, data2, data,
       i = "Leave 'loadings_prior' out to use the default iid prior."
     )))
   }
-  series_levels <- argument_series_levels(data, "loadings_prior")
+  series_levels <- argument_series_levels(data, series_var)
   n_series_actual <- length(series_levels)
   if (!is.null(n_series) && n_series != n_series_actual) {
     stop(insight::format_error(c(
@@ -5596,52 +4569,28 @@ resolve_distances_input <- function(distances, data2) {
 }
 
 
-# Defensive consistency check on a normalised loadings-prior
-# spec, called from `make_loadings_prior_stanvars()` before
-# stanvar emission. Validates that the required fields are
-# present and that the count fields agree with the actual
-# matrix dimensions, catching silent corruption between the
-# normaliser and the emitter.
+# Consistency check on a normalised loadings-prior spec, called
+# from `make_loadings_prior_stanvars()` before stanvar emission. The
+# count fields must agree with the matrices they count.
 #'@noRd
 assert_loadings_prior_spec_consistent <- function(spec) {
   checkmate::assert_list(spec)
-  required <- c(
-    "features_mat", "distance_mats", "column_shrinkage",
-    "mgp_a1", "mgp_a2", "n_series", "N_features_trend", "n_distances"
+  missing_fields <- setdiff(
+    c("features_mat", "distance_mats", "column_shrinkage", "mgp_a1",
+      "mgp_a2", "n_series", "N_features_trend", "n_distances"),
+    names(spec)
   )
-  missing <- setdiff(required, names(spec))
-  if (length(missing) > 0L) {
-    stop(insight::format_error(c(
-      "Loadings-prior spec is missing required fields.",
-      x = paste0(
-        "Missing: ",
-        paste0("'", missing, "'", collapse = ", "), "."
-      ),
-      i = "Build the spec via `normalise_loadings_prior()`."
-    )))
+  if (length(missing_fields) > 0L) {
+    stop_missing_fields("The loadings-prior spec", missing_fields)
   }
   if (!is.null(spec$features_mat) &&
       spec$N_features_trend != ncol(spec$features_mat)) {
-    stop(insight::format_error(c(
-      "Loadings-prior spec has inconsistent feature dimensions.",
-      x = paste0(
-        "spec$N_features_trend = ", spec$N_features_trend,
-        " but ncol(features_mat) = ",
-        ncol(spec$features_mat), "."
-      ),
-      i = "Rebuild the spec via `normalise_loadings_prior()`."
-    )))
+    stop_shape_fault("The loadings-prior feature matrix",
+                     ncol(spec$features_mat), spec$N_features_trend)
   }
   if (spec$n_distances != length(spec$distance_mats)) {
-    stop(insight::format_error(c(
-      "Loadings-prior spec has inconsistent distance counts.",
-      x = paste0(
-        "spec$n_distances = ", spec$n_distances,
-        " but length(distance_mats) = ",
-        length(spec$distance_mats), "."
-      ),
-      i = "Rebuild the spec via `normalise_loadings_prior()`."
-    )))
+    stop_shape_fault("The loadings-prior distance list",
+                     length(spec$distance_mats), spec$n_distances)
   }
   # A spec with neither a kernel nor column shrinkage carries no
   # structure to emit, and the emitter's kernel branch would then
@@ -5651,18 +4600,12 @@ assert_loadings_prior_spec_consistent <- function(spec) {
   # to build one; this is what stops a second builder from doing so.
   traits <- loadings_spec_traits(spec)
   if (!traits$kernel && !traits$mgp) {
-    stop(insight::format_error(c(
-      "Loadings-prior spec carries no structure to emit.",
-      x = paste0(
-        "It names no features, no distance matrices and ",
-        "'column_shrinkage = \"", spec$column_shrinkage %||% "iid",
-        "\"'."
-      ),
-      i = paste0(
-        "An empty spec collapses to the default iid prior. Drop ",
-        "'loadings_prior' from the call."
-      )
-    )))
+    stop_mvgam_fault(
+      "The loadings-prior spec needs features, distances or MGP shrinkage.",
+      paste0("Got column_shrinkage = '",
+             spec$column_shrinkage %||% "iid",
+             "', with the features and distances empty.")
+    )
   }
   invisible(NULL)
 }
@@ -5774,12 +4717,9 @@ assert_com_binomial_trials <- function(formula) {
   stop(insight::format_error(c(
     "'com_binomial()' needs its number of trials in a 'trials()' term.",
     x = "No 'trials()' term found in the observation formula.",
-    i = paste0(
-      "Supply the binomial denominator as an addition term, e.g. ",
-      "'bf(y | trials(n) ~ x)' for a column or 'bf(y | trials(10) ~ x)' ",
-      "for a constant."
-    )
-  )))
+    i = paste0("Write 'bf(y | trials(n) ~ x)' for a column or ",
+               "'bf(y | trials(10) ~ x)' for a constant.")
+  )), call. = FALSE)
 }
 
 
@@ -5968,7 +4908,7 @@ assert_forecast_times_steppable <- function(fc_times, object) {
   checkmate::assert_list(fc_times, null.ok = TRUE)
   checkmate::assert_class(object, "mvgam")
   trend_spec <- first_trend_spec(object)
-  if (!any_trend_requires_regular_intervals(trend_spec)) {
+  if (!trend_requires_regular_intervals(trend_spec)) {
     return(invisible(TRUE))
   }
   # The latent state lives on one time grid shared by every series,
@@ -6027,22 +4967,18 @@ assert_forecast_times_steppable <- function(fc_times, object) {
           "'newdata' must continue the training series for a '",
           get_trend_name(trend_spec), "' trend."
         ),
-        x = paste0(
-          "The training grid runs to time ", past[length(past)],
-          ". Series '",
-          lv, "' needs times ", expected[1L], " to ",
-          expected[length(expected)], ". Got ", fut[1L], " to ",
-          fut[length(fut)], "."
-        ),
+        x = paste0("The training grid runs to time ", past[length(past)],
+                   "."),
+        x = paste0("Series '", lv, "' needs times ", expected[1L], " to ",
+                   expected[length(expected)], " and got ", fut[1L],
+                   " to ", fut[length(fut)], "."),
         i = "'CAR()' models a trend over irregular times.",
         i = "'hindcast()' covers times inside the training grid."
-      )))
+      )), call. = FALSE)
     }
   }
   invisible(TRUE)
 }
-
-
 
 
 #' Map each observation row onto its row of the trend design
@@ -6079,5 +5015,3 @@ obs_rows_to_trend_rows <- function(standata, resp = "") {
   }
   as.integer(tt[cbind(ot, os)])
 }
-
-

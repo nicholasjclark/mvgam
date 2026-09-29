@@ -273,12 +273,10 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   y <- mvgam_training_data(object)[[y_col]]
   if (!is.numeric(y)) {
     stop(insight::format_error(c(
-      paste0(
-        "bayes_R2 requires a numeric response. Response '",
-        y_col, "' is not numeric."
-      ),
-      i = "Bayesian R^2 is undefined for ordinal / categorical fits."
-    )))
+      "'bayes_R2()' requires a numeric response.",
+      x = paste0("Response '", y_col, "' has class '", class(y)[1L], "'."),
+      i = "Bayesian R^2 is undefined for ordinal and categorical fits."
+    )), call. = FALSE)
   }
   resid <- sweep(epred, 2L, y, FUN = "-")
   # A row with no response has no residual, so the variances are taken
@@ -304,46 +302,7 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
 prior_summary.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
   rlang::check_dots_empty()
-  if (is.null(object$prior)) {
-    stop(insight::format_error(
-      "Fit was not stored with a prior table (object$prior is NULL)."
-    ))
-  }
-  backfill_declared_bounds(object$prior, object$stancode)
-}
-
-
-#' Fill in a stored prior table's missing bounds from the program
-#'
-#' A fit saved before the table carried bounds has them as `NA`,
-#' which reads as though a parameter were sampled unbounded when the
-#' program declares otherwise. The declaration is stored on the fit
-#' alongside the table, so the support can be recovered rather than
-#' requiring the model to be fitted again. Rows that already name a
-#' bound are left alone, so this only ever supplies what is absent.
-#'
-#' @param prior The stored prior table.
-#' @param stancode The stored Stan program, or `NULL`.
-#' @return The table, with absent bounds filled in where the program
-#'   declares one.
-#' @noRd
-backfill_declared_bounds <- function(prior, stancode) {
-  if (!is.data.frame(prior) || nrow(prior) == 0L) return(prior)
-  if (!all(c("class", "lb", "ub") %in% names(prior))) return(prior)
-  if (is.null(stancode)) return(prior)
-  # A comment can carry a declaration's shape, and the program's
-  # comments are kept.
-  sc <- strip_stan_comments(paste(as.character(stancode), collapse = "\n"))
-  if (!nzchar(sc)) return(prior)
-  declared <- stancode_declared_bounds(sc)
-  if (!length(declared)) return(prior)
-  for (i in seq_len(nrow(prior))) {
-    bound <- declared[[prior$class[i]]]
-    if (is.null(bound)) next
-    if (is.na(prior$lb[i])) prior$lb[i] <- bound$lb
-    if (is.na(prior$ub[i])) prior$ub[i] <- bound$ub
-  }
-  prior
+  object$prior
 }
 
 
@@ -416,18 +375,7 @@ posterior_summary.mvgam <- function(x, pars = NULL,
 getCall.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
   rlang::check_dots_empty()
-  call <- x$call
-  # A fit saved before the call was captured at the user-facing
-  # entry point carries the `do.call()` frame's version, whose head
-  # is the function object rather than its name. Left as it is,
-  # `deparse()` prints the whole of mvgam's source instead of the
-  # call, so the head is named here for a fit that can no longer be
-  # re-stamped. The arguments such a call inlined are not
-  # recoverable; refit to record them as written.
-  if (is.call(call) && is.function(call[[1L]])) {
-    call[[1L]] <- as.name("mvgam")
-  }
-  call
+  x$call
 }
 
 
@@ -475,7 +423,7 @@ select_fixef_draws <- function(mat, pars) {
   unknown <- pars[!keep %in% colnames(mat)]
   if (length(unknown)) {
     stop(insight::format_error(c(
-      "Some 'pars' name no fixed effect of this model.",
+      "Unknown fixed effects in 'pars'.",
       x = paste0(
         "Not found: ", paste0("'", unknown, "'", collapse = ", "), "."
       ),
@@ -518,10 +466,7 @@ select_fixef_draws <- function(mat, pars) {
 flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
   md <- mvgam_fit$trend_metadata
   if (!isTRUE(md$has_by_lv)) return(FALSE)
-  n_lv <- md$n_lv_for_grain %||% md$n_lv
-  n_series <- length(md$levels$series %||% character(0))
-  if (is.null(n_lv) || length(n_series) == 0L ||
-      n_series == 0L || as.integer(n_lv) != as.integer(n_series)) {
+  if (md$n_lv_for_grain != md$axes$series$n) {
     return(FALSE)
   }
   # Reason: `uses_loadings_prior()` returns TRUE only for the

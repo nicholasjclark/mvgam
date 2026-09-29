@@ -19,17 +19,13 @@
 #
 # `fit`     fitted mvgam object
 # `draw_id` integer draw index (1-based) into `as_draws_df(fit)`
-#
-# Defensive against legacy fits saved before the trend_metadata
-# enrichments: re-runs `enrich_trend_metadata` on the fly when
-# the cached fields are absent so loaded older fits still work.
 #'@noRd
 extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   checkmate::assert_class(fit, "mvgam")
   checkmate::assert_int(draw_id, lower = 1L)
 
-  meta <- get_enriched_trend_metadata(fit)
-  if (is.null(meta) || is.null(meta$trend_type)) return(NULL)
+  meta <- fit$trend_metadata
+  if (is.null(meta$trend_type)) return(NULL)
 
   # Callers running a per-draw loop (forecast.mvgam) build the
   # matrix once and pass it via `draws_mat` to skip the
@@ -55,13 +51,11 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
 
   # A factor model runs its recursion in n_lv-dimensional latent
   # space, and a per-draw `[n_series, n_lv]` Z projects the
-  # propagated trajectory back to observed series scale. The RW,
-  # AR, VAR and ZMVN extractors all take that grain; the whitelist
-  # below refuses the trend types whose generators emit no factor
-  # variant. `forecast.mvgam`:`propagate_one_draw` applies the
-  # projection once `propagate_trend()` returns. Hierarchical fits
-  # with `n_lv = n_groups * n_subgroups > n_series` need a
-  # dedicated extraction path and error out below.
+  # propagated trajectory back to observed series scale. Every trend
+  # the registry marks as factor-capable extracts at that grain, and
+  # model building refuses a factor model on any other.
+  # `forecast.mvgam`:`propagate_one_draw` applies the
+  # projection once `propagate_trend()` returns.
   #
   # Comparing the two Stan dimensions cannot answer this. A factor
   # fit reaches `n_lv = n_series` under an MGP loadings prior or a
@@ -71,34 +65,11 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   # latent column, to the recursion for series k.
   is_factor <- !is.null(detect_factor_n_lv(fit, n_series))
   if (n_lv > n_series) {
-    stop(insight::format_error(c(
-      paste0(
-        "Hierarchical trends (n_lv > n_series) are not ",
-        "supported by 'extract_last_state'."
-      ),
-      x = paste0(
-        "Got n_lv = ", n_lv, ", n_series = ", n_series, "."
-      ),
-      i = paste0(
-        "'extract_last_state' reads one state per series or one ",
-        "per latent factor."
-      )
-    )))
+    stop_mvgam_fault(
+      "The trend has more latent states than series.",
+      paste0("Got n_lv = ", n_lv, ", n_series = ", n_series, ".")
+    )
   }
-  if (is_factor &&
-      !meta$trend_type %in% c("RW", "AR", "VAR", "ZMVN")) {
-    stop(insight::format_error(c(
-      paste0(
-        "Factor trend variants of '", meta$trend_type,
-        "' are not supported by 'extract_last_state'."
-      ),
-      x = paste0(
-        "Got n_lv = ", n_lv, ", n_series = ", n_series, "."
-      ),
-      i = "Factor forecasts support RW, AR, VAR and ZMVN trends."
-    )))
-  }
-
   # In factor mode extraction happens at the LV grain
   # (`lv_trend[t, k]`, `sigma_trend[k]`, `ar_trend[k]`), and the
   # caller projects the propagated `[h, n_lv]` trajectory back to
@@ -144,24 +115,6 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
     out$n_lv_active <- n_lv
   }
   out
-}
-
-
-# Internal: get the enriched trend_metadata, computing the
-# kernel-relevant extras on the fly when the saved fit predates
-# the fit-time enrichment helpers.
-#'@noRd
-get_enriched_trend_metadata <- function(fit) {
-  meta <- fit$trend_metadata
-  if (is.null(meta)) return(NULL)
-  # Re-enrich only when all enrichment fields are missing.
-  # Partial enrichment is treated as missing so a regression
-  # that leaves some fields unset still gets repaired here.
-  if (!is.null(meta$ar_lags) && !is.null(meta$ma_lags) &&
-      !is.null(meta$max_lag)) {
-    return(meta)
-  }
-  enrich_trend_metadata(meta, fit$mv_spec$trend_specs)
 }
 
 
@@ -531,61 +484,20 @@ extract_car_state <- function(one_draw, meta, n_series, fit) {
 }
 
 
-# Internal: pull the last observed time per series for CAR
-# forecasting. Reads the time variable named on
-# `fit$trend_metadata$variables$time_var` from the fit's stored
-# obs/trend data. Falls back to the highest unique time in the
-# trend data when the per-series tail is unavailable.
+# Internal: the last time each series was observed at, in the order
+# the trend numbers its columns. The axes record holds it.
 #'@noRd
 extract_last_observed_times <- function(fit, n_series) {
-  # The fit recorded this when it resolved its axes, in the order the
-  # trend numbers its columns, so there is nothing to walk. Deriving
-  # it from the training frame is what had this picking series out by
-  # a column a grouping may have superseded.
   recorded <- mvgam_axes(fit)$series$last_time
-  if (!is.null(recorded)) {
-    # One entry per trend column, and the record is the thing that
-    # makes the two counts the same. Subsetting to `n_series` here
-    # would pad with `NA` or drop a series without saying which,
-    # which is the silence this record exists to end.
-    if (length(recorded) != n_series) {
-      stop(insight::format_error(c(
-        "The recorded last times do not span the trend's series.",
-        x = paste0("Recorded: ", length(recorded), ", series: ",
-                   n_series, "."),
-        i = paste0(
-          "The axis and the trend matrix are resolved together. ",
-          "The counts cannot differ on a fit built by this version."
-        )
-      )), call. = FALSE)
-    }
-    return(as.numeric(recorded))
-  }
-
-  meta <- fit$trend_metadata
-  time_var <- axis_vars(fit)$time_var
-  d <- mvgam_training_data(fit)
-  if (is.null(d) || is.null(d[[time_var]])) {
-    return(rep(NA_real_, n_series))
-  }
-  # Entry `s` of the answer is the last time trend column `s` was
-  # observed at, so the series have to be walked in the trend's own
-  # order. Sorting the raw column instead gives a permutation of that
-  # order, and truncating it to `n_series` hides the disagreement
-  # rather than raising it.
-  series_fac <- axis_row_series(fit, d)
-  if (!is.null(series_fac)) {
-    out <- vapply(
-      levels(series_fac),
-      function(lv) {
-        ts <- d[[time_var]][which(series_fac == lv)]
-        if (length(ts) == 0L) NA_real_ else max(ts, na.rm = TRUE)
-      },
-      numeric(1L)
+  # One entry per trend column. Subsetting to `n_series` would pad
+  # with `NA` or drop a series without saying which.
+  if (length(recorded) != n_series) {
+    stop_mvgam_fault(
+      "The recorded last times must span the trend's series.",
+      paste0("Recorded: ", length(recorded), ", series: ", n_series, ".")
     )
-    return(out[seq_len(n_series)])
   }
-  rep(max(d[[time_var]], na.rm = TRUE), n_series)
+  as.numeric(recorded)
 }
 
 

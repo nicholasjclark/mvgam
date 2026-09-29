@@ -42,16 +42,13 @@ mk_fake_factor_fit <- function(n_series = 4L, n_lv = 2L,
   stanfit <- new("stanfit")
   stanfit@sim <- sim
 
-  trend_metadata <- list(n_lv = n_lv, fixed_Z = fixed_Z)
-  trend_spec <- structure(
-    list(trend = "AR", n_lv = n_lv, trend_type = "AR"),
-    class = "mvgam_trend"
-  )
+  trend_spec <- structure(list(trend = "AR", n_lv = n_lv),
+                          class = "mvgam_trend")
   obj <- list(
     fit = stanfit,
     mv_spec = list(trend_specs = trend_spec),
-    series_info = list(n_series = n_series),
-    trend_metadata = trend_metadata
+    trend_metadata = list(n_lv = n_lv, fixed_Z = fixed_Z,
+                          axes = list(series = list(n = n_series)))
   )
   class(obj) <- c("mvgam", "brmsfit")
   obj

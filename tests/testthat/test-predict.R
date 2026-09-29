@@ -110,11 +110,20 @@ test_that("side_parameters() takes a fit and one of its two sides", {
 # validate_prediction_factor_levels tests
 # ==============================================================================
 
-test_that("validate_prediction_factor_levels catches invalid series levels", {
-  metadata <- list(
-    levels = list(series = c("s1", "s2", "s3")),
-    variables = list(series_var = "series")
-  )
+# An axes record as `extract_time_series_dimensions()` writes it.
+axes_metadata <- function(series, source = "explicit", gr_var = NULL,
+                          subgr_var = NULL, gr = NULL, subgr = NULL) {
+  list(axes = list(
+    series = list(levels = series, source = source,
+                  n = length(series)),
+    vars = list(time_var = "time", series_var = "series",
+                gr_var = gr_var, subgr_var = subgr_var),
+    group_levels = list(gr = gr, subgr = subgr)
+  ))
+}
+
+test_that("validate_prediction_factor_levels refuses unseen series", {
+  metadata <- axes_metadata(c("s1", "s2", "s3"))
   # A series column arrives as a factor or as character, and the
   # comparison reaches the same verdict on each.
   for (mk in list(factor, identity)) {
@@ -124,9 +133,16 @@ test_that("validate_prediction_factor_levels catches invalid series levels", {
     invalid <- data.frame(time = 1:3, series = mk(c("s1", "s4", "s1")))
     expect_error(
       validate_prediction_factor_levels(invalid, metadata),
-      "Series levels in newdata"
+      "Series in 'newdata' has levels absent"
     )
   }
+  # A dead factor level names no unseen series.
+  dead <- data.frame(time = 1:2,
+                     series = factor(c("s1", "s2"), levels = c("s1", "s2",
+                                                               "s9")))
+  expect_silent(validate_prediction_factor_levels(dead, metadata))
+  # A model whose frame names no axis carries no record to check.
+  expect_silent(validate_prediction_factor_levels(invalid, NULL))
 })
 
 test_that("a frame is held to the axis columns the fit needs", {
@@ -174,94 +190,32 @@ test_that("a frame is held to the axis columns the fit needs", {
 })
 
 
-test_that("validate_prediction_factor_levels catches invalid gr levels", {
-  # Create metadata for hierarchical model
-  metadata <- list(
-    levels = list(
-      series = c("s1"),
-      gr = c("group_a", "group_b", "group_c")
-    ),
-    variables = list(
-      series_var = "series",
-      gr_var = "group"
-    )
-  )
+test_that("validate_prediction_factor_levels refuses unseen groups", {
+  metadata <- axes_metadata(c("s1"), gr_var = "group",
+                            gr = c("group_a", "group_b", "group_c"))
+  valid <- data.frame(time = 1:3, series = factor("s1"),
+                      group = factor(c("group_a", "group_b", "group_a")))
+  expect_silent(validate_prediction_factor_levels(valid, metadata))
 
-  # Valid newdata - should pass silently
-  valid_newdata <- data.frame(
-    time = 1:3,
-    series = factor("s1"),
-    group = factor(c("group_a", "group_b", "group_a"))
-  )
-  expect_silent(validate_prediction_factor_levels(valid_newdata, metadata))
-
-  # Invalid newdata - gr level not in training
-  invalid_newdata <- data.frame(
-    time = 1:3,
-    series = factor("s1"),
-    group = factor(c("group_a", "group_d", "group_a"))
-  )
+  invalid <- valid
+  invalid$group <- factor(c("group_a", "group_d", "group_a"))
   expect_error(
-    validate_prediction_factor_levels(invalid_newdata, metadata),
-    "Grouping variable.*has levels not in"
+    validate_prediction_factor_levels(invalid, metadata),
+    "Column 'group' in 'newdata' has levels absent"
   )
 })
 
-test_that("validate_prediction_factor_levels checks what metadata records", {
-  # Every frame here names a series the metadata omits. Silence is
-  # then evidence that the check was skipped. The earlier fixture
-  # gave the frame only series the metadata listed, where silence
-  # followed from the data itself.
-  newdata <- data.frame(
-    time = 1:3,
-    series = factor(c("s1", "s9", "s1"))
+test_that("a hierarchical series is checked through its grouping", {
+  # Each level alone was seen in training. The pairs a_y and b_x were
+  # never fitted.
+  metadata <- axes_metadata(
+    c("a_x", "b_y"), source = "hierarchical",
+    gr_var = "g", subgr_var = "sg", gr = c("a", "b"), subgr = c("x", "y")
   )
-
-  # Nothing recorded to check against.
-  expect_silent(validate_prediction_factor_levels(newdata, list()))
-
-  # Other metadata, still no levels.
-  expect_silent(
-    validate_prediction_factor_levels(newdata, list(other = "stuff"))
-  )
-
-  # Levels recorded, with no variable naming the column they key.
-  expect_silent(validate_prediction_factor_levels(
-    newdata,
-    list(levels = list(series = c("s1", "s2")))
-  ))
-
-  # The same frame is refused once both halves are present. This is
-  # what makes the three silences above a statement about metadata.
-  expect_error(
-    validate_prediction_factor_levels(
-      newdata,
-      list(levels = list(series = c("s1", "s2")),
-           variables = list(series_var = "series"))
-    ),
-    "Series levels in newdata"
-  )
-})
-
-test_that("a recorded axis is checked though the levels slot is empty", {
-  # The series comparison uses the levels in the axis record. The
-  # body returns early when the `levels` slot is empty, which skips
-  # the comparison on a fit whose record already lists those levels.
-  newdata <- data.frame(
-    time = 1:3,
-    series = factor(c("s1", "s9", "s1"))
-  )
-  metadata <- list(
-    axes = list(
-      series = list(levels = c("s1", "s2"), source = "explicit",
-                    n = 2L, groups = NULL),
-      time = NULL
-    ),
-    variables = list(series_var = "series")
-  )
+  newdata <- data.frame(time = 1:2, g = c("a", "b"), sg = c("y", "x"))
   expect_error(
     validate_prediction_factor_levels(newdata, metadata),
-    "Series levels in newdata"
+    "Series in 'newdata' has levels absent"
   )
 })
 
@@ -358,7 +312,7 @@ test_that("compute_family_epred rejects unsupported families", {
   # caller can tell which one it reached this branch with.
   expect_error(
     compute_family_epred(linpred, nmix_family),
-    "no mean this dispatch can compute"
+    "reached the unit-free mean dispatch"
   )
   expect_error(compute_family_epred(linpred, nmix_family), "'nmix'")
 
@@ -393,7 +347,7 @@ test_that("compute_family_epred validates inputs", {
   expect_error(
     compute_family_epred(linpred, brms::lognormal(),
                          family_pars = list(sigma = wrong_sigma)),
-    "Dimension mismatch"
+    "has the wrong shape"
   )
 })
 
@@ -480,7 +434,7 @@ test_that("data2draws validates dimensions for 3D", {
   wrong_mat <- matrix(1:4, nrow = 2, ncol = 2)
   expect_error(
     data2draws(wrong_mat, dim = c(4, 3, 5)),
-    "Dimension of.*must match"
+    "has the wrong shape"
   )
 })
 
@@ -940,7 +894,7 @@ test_that("an indexed parameter on another axis is not read per row", {
   )
   expect_error(
     extract_dpars_from_stanfit(draws, "sigma", ndraws = 2, nobs = 3),
-    "cannot be read one value per row"
+    "must have one column per prediction row"
   )
 })
 
@@ -972,7 +926,7 @@ test_that("extract_dpars_from_stanfit validates inputs correctly", {
   # ndraws exceeds available draws
   expect_error(
     extract_dpars_from_stanfit(valid_draws, "sigma", 100, 5),
-    "more draws than the posterior holds"
+    "more draws than the posterior has"
   )
 
   # draw_ids exceeds available draws
@@ -1413,7 +1367,7 @@ test_that("compute_family_variance: errors with dim mismatch on dpar", {
     compute_family_variance(
       mu = mu, family = gaussian(), sigma = bad_sigma
     ),
-    "Dimension mismatch"
+    "has the wrong shape"
   )
 })
 

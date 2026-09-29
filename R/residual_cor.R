@@ -239,7 +239,7 @@ compute_residual_cor <- function(object, by_group, partial, summary,
   # get_trend_covariance_structure() and unifying the dispatch.
   n_lv <- detect_factor_n_lv(object)
   if (!is.null(n_lv)) {
-    series_names <- resolve_series_info(object)$series_levels
+    series_names <- fitted_series_levels(object)
     refuse_partial_on_rank_deficient(partial, n_lv,
                                      length(series_names))
     cov_draws <- factor_implied_cov_draws(object, n_lv,
@@ -368,16 +368,15 @@ refuse_partial_on_rank_deficient <- function(partial, n_lv, n_series) {
   stop(insight::format_error(c(
     "Partial correlations need a full-rank residual covariance.",
     x = paste0(
-      "This fit projects ", n_series, " series onto ", n_lv,
-      " latent factor", if (n_lv == 1L) "" else "s",
-      ". The implied covariance has rank ", n_lv, " and no inverse."
+      "The fit projects ", n_series, " series onto ", n_lv,
+      " latent factor", if (n_lv == 1L) "" else "s", "."
     ),
-    i = paste0(
-      "Use 'shared_variation()' for what the factors say the series ",
-      "share. Refitting with n_lv = ", n_series, " gives a covariance ",
-      "a partial correlation can be read off."
-    )
-  )))
+    x = paste0("The implied covariance has rank ", n_lv,
+               " and is singular."),
+    i = "Use 'shared_variation()' for the variation the factors share.",
+    i = paste0("Refit with n_lv = ", n_series,
+               " for partial correlations.")
+  )), call. = FALSE)
 }
 
 
@@ -436,13 +435,7 @@ extract_cov_draws_flat <- function(cov_struct) {
     Sigma_arr <- params$Sigma_trend
     checkmate::assert_array(Sigma_arr, d = 3L, any.missing = FALSE)
     if (!identical(dim(Sigma_arr), as.integer(c(ndraws, p, p)))) {
-      stop(insight::format_error(c(
-        "Internal: 'Sigma_trend' dimensions do not match.",
-        x = paste0(
-          "Got ", paste(dim(Sigma_arr), collapse = "x"),
-          ". Expected ", ndraws, "x", p, "x", p, "."
-        )
-      )))
+      stop_shape_fault("'Sigma_trend'", dim(Sigma_arr), c(ndraws, p, p))
     }
     return(Sigma_arr)
   }
@@ -830,65 +823,71 @@ mean_abs_offdiag_summary <- function(cor_draws, robust, probs) {
 #' Returns a list with `global` (character vector of length p for
 #' non-hierarchical or global-level) and `group_labels` (character
 #' vector of length n_groups, hierarchical only). Non-hierarchical
-#' names come from `resolve_series_info()`, the canonical
-#' series-identity resolver used by forecast / hindcast. Hierarchical
-#' labels come from the trend spec's `gr` / `subgr` variable names
-#' looked up in `object$data`; falls back to `group_<i>` /
-#' `subgroup_<i>` only when the factor levels cannot be recovered.
+#' names come from `fitted_series_levels()`. Hierarchical labels come
+#' from `group_labels()` and `subgroup_labels()`.
 #'
 #' @noRd
 get_residcor_series_names <- function(object, cov_struct) {
   fallback <- paste0("series_", seq_len(cov_struct$n_series))
 
   if (!isTRUE(cov_struct$hierarchical)) {
-    nm <- resolve_series_info(object)$series_levels %||% fallback
+    nm <- fitted_series_levels(object) %||% fallback
     if (length(nm) != cov_struct$n_series) nm <- fallback
     return(list(global = nm))
   }
 
   group_info <- cov_struct$group_info
-  spec <- trend_spec_for_residcor(object)
-  data <- object$data
-
-  group_labels <- lookup_factor_levels(data, spec$gr,
-                                       group_info$n_groups,
-                                       prefix = "group")
-  sub_labels <- lookup_factor_levels(data, spec$subgr,
-                                     group_info$n_subgroups,
-                                     prefix = "subgroup")
-
-  list(global = sub_labels, group_labels = group_labels)
+  list(
+    global = subgroup_labels(object, group_info$n_subgroups),
+    group_labels = group_labels(object, group_info$n_groups)
+  )
 }
 
 
-#' Return the active trend spec for an mvgam fit. A multivariate
-#' fit uses the first spec, since `residual_cor()` reports one
-#' correlation structure.
-#'
-#' @noRd
-trend_spec_for_residcor <- function(object) {
-  # Thin wrapper for callers that want the local name; the body
-  # lives in `first_trend_spec()` (R/multivariate_helpers.R) so
-  # methods_md and residual_cor share one implementation.
-  first_trend_spec(object)
-}
 
 
-#' Look up `levels(data[\[var_name\]])` with a fallback if the column
-#' is missing or the level count differs from the expected size.
-#' Variable name comes from `as.character()` of the trend spec slot.
+#' Labels for the groups or subgroups of a hierarchical trend
 #'
+#' The levels the fit recorded label the correlation blocks when they
+#' count one per block. Subgroups named apart in each group give more
+#' levels than a group holds series, and the function then returns
+#' positional labels.
+#'
+#' @param levels The recorded levels, or `NULL`
+#' @param expected_n How many blocks the program declares
+#' @param prefix Stem of the positional labels
+#' @return Character vector of length `expected_n`
 #' @noRd
-lookup_factor_levels <- function(data, var_name, expected_n, prefix) {
-  fallback <- paste0(prefix, "_", seq_len(expected_n))
-  if (is.null(data) || is.null(var_name)) return(fallback)
-  nm <- as.character(var_name)
-  if (length(nm) != 1L || is.na(nm) || nm == "NA" ||
-      !nm %in% names(data)) {
-    return(fallback)
+lookup_factor_levels <- function(levels, expected_n, prefix) {
+  if (length(levels) == expected_n) {
+    return(as.character(levels))
   }
-  lvls <- levels(as.factor(data[[nm]]))
-  if (length(lvls) != expected_n) fallback else lvls
+  paste0(prefix, "_", seq_len(expected_n))
+}
+
+
+#' Labels for the groups of a hierarchical trend
+#'
+#' @param object A fitted `mvgam` object
+#' @param n_groups How many groups the program declares
+#' @return Character vector of length `n_groups`
+#' @noRd
+group_labels <- function(object, n_groups) {
+  lookup_factor_levels(mvgam_axes(object)$group_levels$gr, n_groups,
+                       prefix = "group")
+}
+
+
+#' Labels for the subgroups within each group of a hierarchical trend
+#'
+#' @param object A fitted `mvgam` object
+#' @param n_subgroups How many subgroups each group holds
+#' @param prefix Stem of the positional labels
+#' @return Character vector of length `n_subgroups`
+#' @noRd
+subgroup_labels <- function(object, n_subgroups, prefix = "subgroup") {
+  lookup_factor_levels(mvgam_axes(object)$group_levels$subgr,
+                       n_subgroups, prefix = prefix)
 }
 
 

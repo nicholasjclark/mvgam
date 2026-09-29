@@ -133,11 +133,11 @@ apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
 #' Generate Combined Stan Code for Observation and Trend Models
 #'
 #' @description
-#' Generates complete Stan model code by combining observation model (from brms)
-#' with trend component specifications. Uses two-stage assembly: Stage 1 extracts
-#' trend stanvars from brms setup, Stage 2 injects trend effects into linear
-#' predictors. Supports both univariate and multivariate models with
-#' response-specific trend configurations.
+#' Combines the brms observation program with the trend. The trend
+#' stanvars are generated from the trend setup and handed to brms with
+#' the observation program, then the trend is injected into each
+#' response's linear predictor. A multivariate model shares one trend
+#' across its responses.
 #'
 #' @param obs_setup Named list containing observation model setup from
 #'   setup_brms_lightweight(), must include stancode and standata elements
@@ -151,23 +151,8 @@ apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
 #' @param silent Numeric controlling message verbosity. 0 = all messages,
 #'   1 = important only, 2 = silent. Default 1.
 #'
-#' @return Named list with elements:
-#'   \itemize{
-#'     \item stancode: Character string containing complete Stan model code
-#'     \item standata: Named list containing all data for Stan model
-#'     \item has_trends: Logical indicating if trends were included
-#'     \item is_multivariate: Logical indicating if model is multivariate
-#'   }
-#'
-#' The two-stage assembly process:
-#' \enumerate{
-#'   \item Extract trend stanvars from brms setup using trend specifications
-#'   \item Inject trend effects into observation model linear predictors
-#' }
-#'
-#' When trend_setup or trend_specs is NULL, returns observation model without
-#' trend components. For multivariate models, processes each response
-#' separately and applies response-specific parameter naming.
+#' @return A list holding `stancode`, the program, and `standata`, its
+#'   data. Without a trend setup the observation program is returned.
 #'
 #' @noRd
 generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
@@ -190,122 +175,32 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
         obs_setup$stancode,
         normalize = isTRUE(obs_setup$codegen$normalize %||% TRUE)
       ),
-      standata = obs_setup$standata,
-      has_trends = FALSE,
-      is_multivariate = FALSE
+      standata = obs_setup$standata
     ))
   }
 
-  # Determine if we have multivariate trends
-  is_multivariate <- is_multivariate_trend_specs(trend_specs)
-  
-  
-  responses_with_trends <- c()
-
-
-  # Stage 1: Extract trend stanvars from brms setup
-
-  
-  # Handle both univariate and multivariate cases
-  if (is_multivariate) {
-    # Validate multivariate trend_specs structure
-    checkmate::assert_list(trend_specs, names = "named")
-
-    # Extract response names from the trend_specs
-    response_names <- names(trend_specs)
-
-    # Helper function to detect shared trends across responses
-    # Shared trends occur when parse_multivariate_trends replicates identical
-    # trend specifications for multiple responses, causing duplicate stanvars
-    detect_shared_trends <- function(specs) {
-      # Get non-NULL trend specifications for comparison
-      non_null_specs <- specs[!sapply(specs, is.null)]
-      if (length(non_null_specs) <= 1) return(FALSE)
-
-      # Use identical() for exact deep comparison of trend objects
-      first_spec <- non_null_specs[[1]]
-      all(sapply(non_null_specs[-1], function(x) {
-        identical(x, first_spec, ignore.environment = TRUE)
-      }))
-    }
-
-    # Check if all responses share identical trend specifications
-    is_shared_trend <- detect_shared_trends(trend_specs)
-
-    if (is_shared_trend) {
-      # Shared trend case: generate stanvars only once to avoid duplicates
-      # This handles cases like trend_formula = ~ RW() applied to multiple responses
-      first_response <- names(trend_specs)[!sapply(trend_specs, is.null)][1]
-      shared_trend_spec <- trend_specs[[first_response]]
-
-      # Track all responses as having the shared trend
-      responses_with_trends <- names(trend_specs)[!sapply(trend_specs, is.null)]
-
-      # Generate shared trend stanvars without response suffix
-      trend_stanvars <- extract_trend_stanvars_from_setup(
-        trend_setup,
-        shared_trend_spec,
-        response_suffix = "",  # No suffix for shared trends
-        response_name = NULL,  # Shared across all responses
-        obs_setup = obs_setup,
-        prior = prior
-      )
-    } else {
-      # Response-specific trends: generate stanvars for each response separately
-      # This handles cases like list(count = ~ AR(), biomass = ~ RW())
-      trend_stanvars_list <- list()
-      for (resp_name in response_names) {
-        resp_trend_specs <- trend_specs[[resp_name]]
-
-        # Skip if no trend for this response
-        if (is.null(resp_trend_specs)) {
-          next
-        }
-
-        # Track this response as having a trend
-        responses_with_trends <- c(responses_with_trends, resp_name)
-
-        
-        # Extract stanvars for this response with response suffix
-        resp_stanvars <- extract_trend_stanvars_from_setup(
-          trend_setup,
-          resp_trend_specs,
-          response_suffix = paste0("_", resp_name),
-          response_name = resp_name,
-          obs_setup = obs_setup,
-          prior = prior
-        )
-
-        if (!is.null(resp_stanvars)) {
-          trend_stanvars_list[[resp_name]] <- resp_stanvars
-        }
-      }
-
-      # Combine all response-specific stanvars
-      if (length(trend_stanvars_list) > 0) {
-        trend_stanvars <- do.call(combine_stanvars, trend_stanvars_list)
-      } else {
-        trend_stanvars <- NULL
-      }
-    }
-
+  # `parse_multivariate_trends()` gives every response of a
+  # multivariate model a copy of one trend specification. The trend
+  # stanvars are generated once from that copy, and each response's
+  # predictor takes the same trend.
+  if (is_trend_spec_list(trend_specs)) {
+    response_name <- NULL
+    responses_with_trends <- names(trend_specs)
   } else {
-    # Single trend specification - backward compatible
-    # Extract actual response name from observation formula
     # The key the response's mapping is filed under, which is the name
     # `response_columns()` gives it.
     response_name <- names(response_columns(obs_setup$formula))[1L]
-
-    trend_stanvars <- extract_trend_stanvars_from_setup(
-      trend_setup = trend_setup,
-      trend_specs = trend_specs,
-      response_suffix = "",
-      response_name = response_name,
-      obs_setup = obs_setup,
-      prior = prior
-    )
-    responses_with_trends <- "main"  # Mark univariate model
+    # A univariate program names its predictor without a suffix
+    responses_with_trends <- ""
   }
+  trend_stanvars <- extract_trend_stanvars_from_setup(
+    trend_setup = trend_setup,
+    trend_specs = trend_spec_head(trend_specs),
+    response_suffix = "",
+    response_name = response_name,
+    obs_setup = obs_setup,
+    prior = prior
+  )
 
   # Reorder trend stanvars to ensure proper variable declaration order
   trend_stanvars <- sort_stanvars(trend_stanvars)
@@ -318,21 +213,11 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     silent = silent
   )
 
-  # Stage 2: Inject trends using GLM-compatible approach
-
-  # Inject trends into linear predictors
-  
-  if (is_multivariate) {
-    combined_stancode <- inject_multivariate_trends_into_linear_predictors(
-      base_stancode,
-      trend_stanvars,
-      responses_with_trends
-    )
+  # The trend joins each response's linear predictor
+  combined_stancode <- if (length(trend_stanvars)) {
+    inject_trend_into_linear_predictors(base_stancode, responses_with_trends)
   } else {
-    combined_stancode <- inject_trend_into_linear_predictor(
-      base_stancode,
-      trend_stanvars
-    )
+    base_stancode
   }
 
   # Deduplicate functions (GP models may have identical functions in both models)
@@ -352,15 +237,7 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   # tweedie() that attach a data int like M). `data2` (cached on
   # obs_setup) carries `car()` adjacency matrices and other
   # special-lookup objects.
-  standata_stanvars <- if (!is.null(obs_setup$stanvars)) {
-    if (!is.null(trend_stanvars)) {
-      combine_stanvars(obs_setup$stanvars, trend_stanvars)
-    } else {
-      obs_setup$stanvars
-    }
-  } else {
-    trend_stanvars
-  }
+  standata_stanvars <- combine_stanvars(obs_setup$stanvars, trend_stanvars)
   # `prior` and `threads` ride along for the same reason `codegen`
   # does: the sibling call to `make_stancode()` above is given both, and
   # a program and its data built under different arguments do not fit
@@ -376,15 +253,7 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     threads = obs_setup$threads
   )
 
-  return(list(
-    stancode = combined_stancode,
-    standata = combined_standata,
-    has_trends = TRUE,
-    trend_specs = trend_specs,
-    is_multivariate = is_multivariate,
-    responses_with_trends = responses_with_trends,
-    backend = backend
-  ))
+  list(stancode = combined_stancode, standata = combined_standata)
 }
 
 # Stan spells the unnormalised form of a density `_lupdf` / `_lupmf`,
@@ -477,13 +346,9 @@ stan_prior_statement <- function(lhs, dist, normalize = TRUE) {
       paste0("Cannot write a Stan prior statement for '", lhs, "'."),
       x = paste0("Expected 'distribution(arguments)', got '",
                    dist, "'."),
-      i = paste0(
-        "Give the prior as a Stan distribution call such as ",
-        "'normal(0, 1)'. Truncation, written 'T[lb, ub]', is not ",
-        "supported here: a normalised statement needs the ",
-        "truncation correction the tilde form applies for you."
-      )
-    )))
+      i = "Give the prior as a Stan distribution call such as 'normal(0, 1)'.",
+      i = "Truncation, written 'T[lb, ub]', is not supported in these priors."
+    )), call. = FALSE)
   }
 
   # The left-hand side is passed through verbatim, so it has to be
@@ -492,27 +357,18 @@ stan_prior_statement <- function(lhs, dist, normalize = TRUE) {
   # not a sampling statement, and writing it out would produce Stan
   # that either fails to compile or silently drops the real prior.
   if (grepl("[{}\"/*]|\\b(for|if|else|while)\\b", lhs)) {
-    stop(insight::format_error(c(
-      "Cannot write a Stan prior statement for this left-hand side.",
-      x = paste0("Got: '", lhs, "'."),
-      i = paste0(
-        "Expected an expression naming a parameter, such as ",
-        "'sigma_trend' or 'to_vector(Z)'. A block opener or a ",
-        "string literal here means the caller matched a statement ",
-        "that holds no prior."
-      )
-    )))
+    stop_mvgam_fault(
+      "A Stan prior statement needs a parameter on its left-hand side.",
+      paste0("Got '", lhs, "'.")
+    )
   }
 
   name <- trimws(substr(dist, 1L, open - 1L))
   if (!grepl("^[A-Za-z_][A-Za-z0-9_]*$", name)) {
     stop(insight::format_error(c(
       paste0("Cannot write a Stan prior statement for '", lhs, "'."),
-      x = paste0("'", name, "' does not name a Stan distribution."),
-      i = paste0(
-        "Stan distribution names hold letters, digits and ",
-        "underscores only."
-      )
+      x = paste0("Unknown Stan distribution: '", name, "'."),
+      i = "Stan distribution names use letters, digits and underscores."
     )))
   }
 
@@ -609,7 +465,7 @@ normalise_mvgam_sampling_statements <- function(stancode,
       ""
     }
     body <- paste(bare[first:length(bare)], collapse = " ")
-    indent <- sub("^([[:space:]]*).*$", "\\1", lines[first])
+    indent <- stan_line_indent(lines[first])
     # A generator may open a loop and write its one statement on the
     # same physical line. Anything up to the last brace before the
     # tilde opens a block rather than naming a parameter, so it
@@ -651,15 +507,10 @@ normalise_mvgam_sampling_statements <- function(stancode,
 generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
                                                 backend = "rstan", silent = 1) {
   checkmate::assert_list(obs_setup)
-  # trend_stanvars can be NULL, a stanvar, or stanvars collection
-  if (!is.null(trend_stanvars)) {
-    if (!inherits(trend_stanvars, c("stanvar", "stanvars"))) {
-      stop(insight::format_error(c(
-        "Invalid trend_stanvars class.",
-        x = paste("Got class:", paste(class(trend_stanvars), collapse = ", ")),
-        i = "Expected stanvar or stanvars object."
-      )))
-    }
+  if (!is.null(trend_stanvars) &&
+      !inherits(trend_stanvars, c("stanvar", "stanvars"))) {
+    stop_wrong_class("The trend stanvars", trend_stanvars,
+                     "a stanvar or stanvars")
   }
 
   # Combine existing stanvars with trend stanvars
@@ -760,16 +611,10 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
   # Generate trend-specific stanvars if trend spec is provided
   trend_type <- trend_specs$trend
   trend_stanvars <- if (!is.null(trend_specs) && !is.null(trend_type)) {
-    # Dimensions should be pre-calculated and included in trend_specs
-    # This eliminates circular dependency and ensures reliable dimension information
+    # `extract_and_validate_trend_components()` records the dimensions
     dimensions <- trend_specs$dimensions
-
     if (is.null(dimensions)) {
-      stop(insight::format_error(c(
-        "Missing dimension information in trend specification.",
-        x = "trend_specs must contain a 'dimensions' field with time series dimensions.",
-        i = "This should be calculated using extract_time_series_dimensions() during data validation."
-      )), call. = FALSE)
+      stop_missing_fields("The trend specification", "dimensions")
     }
 
     # Extract timing information from pre-calculated dimensions
@@ -839,16 +684,13 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
           mapping <- dimensions$mappings[[resp_name]]
           resp_suffix <- paste0("_", resp_name)
 
-          # Validate this response's mapping structure
-          if (!all(c("obs_trend_time", "obs_trend_series") %in% names(mapping))) {
-            stop(insight::format_error(c(
-              cli::format_inline(
-                "Mapping for response {.field {resp_name}} missing required fields."
-              ),
-              i = cli::format_inline(
-                "Expected fields: {.field obs_trend_time}, {.field obs_trend_series}."
-              )
-            )), call. = FALSE)
+          missing_fields <- setdiff(c("obs_trend_time", "obs_trend_series"),
+                                    names(mapping))
+          if (length(missing_fields) > 0L) {
+            stop_missing_fields(
+              paste0("The trend mapping for '", resp_name, "'"),
+              missing_fields
+            )
           }
 
           # Create stanvars for this response's mapping arrays
@@ -1063,75 +905,6 @@ parse_glm_parameters_single <- function(stan_code, glm_type) {
 
 
 
-#' Extract Mapping Arrays from Trend Stanvars
-#'
-#' @description
-#' Extracts observation-to-trend mapping arrays from trend stanvars.
-#' Common utility used by both standard and GLM trend injection.
-#'
-#' @param trend_stanvars List of stanvars containing trend components
-#' @return List with time_arrays and series_arrays vectors
-#' @noRd
-extract_mapping_arrays <- function(trend_stanvars) {
-  checkmate::assert_list(trend_stanvars, null.ok = TRUE)
-
-  mapping_arrays <- list(time_arrays = character(0), series_arrays = character(0))
-
-  for (stanvar in trend_stanvars) {
-    if (is.list(stanvar) && !is.null(stanvar$name)) {
-      if (grepl("obs_trend_time", stanvar$name)) {
-        mapping_arrays$time_arrays <- c(mapping_arrays$time_arrays, stanvar$name)
-      }
-      if (grepl("obs_trend_series", stanvar$name)) {
-        mapping_arrays$series_arrays <- c(mapping_arrays$series_arrays, stanvar$name)
-      }
-    }
-  }
-
-  return(mapping_arrays)
-}
-
-#' Validate Mapping Arrays
-#'
-#' @description
-#' Validates that mapping arrays exist and are properly paired.
-#' Common validation used by trend injection functions.
-#'
-#' @param mapping_arrays List with time_arrays and series_arrays
-#' @noRd
-validate_mapping_arrays <- function(mapping_arrays) {
-  checkmate::assert_list(mapping_arrays, names = "named")
-  checkmate::assert_names(names(mapping_arrays), must.include = c("time_arrays", "series_arrays"))
-
-  # Validate arrays exist
-  if (length(mapping_arrays$time_arrays) == 0 || length(mapping_arrays$series_arrays) == 0) {
-    stop(insight::format_error(c(
-      paste0(
-        "Missing the arrays that map observations to trends in ",
-        "trend_stanvars."
-      ),
-      x = paste0(
-        "Expected obs_trend_time and obs_trend_series arrays from ",
-        "generate_obs_trend_mapping()."
-      ),
-      i = "This indicates a problem in the stanvar generation pipeline."
-    )), call. = FALSE)
-  }
-
-  # Validate arrays are paired
-  if (length(mapping_arrays$time_arrays) != length(mapping_arrays$series_arrays)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Mismatched mapping arrays: {length(mapping_arrays$time_arrays)} time arrays but {length(mapping_arrays$series_arrays)} series arrays."
-      ),
-      x = "Each obs_trend_time array must have a corresponding obs_trend_series array.",
-      i = "Check the stanvar generation process for consistency."
-    )), call. = FALSE)
-  }
-
-  return(invisible(TRUE))
-}
-
 #' Find Stan Block Boundaries
 #'
 #' @description
@@ -1204,498 +977,233 @@ find_prior_only_insertion_point <- function(code_lines, model_block_info) {
   return(model_block_info$start_idx)
 }
 
-#' Inject Trend into Linear Predictor
+#' Add the latent trend to every response's linear predictor
 #'
-#' @description
-#' Injects trend effects into Stan linear predictor. Uses GLM-compatible approach
-#' when brms GLM optimization is detected, fallback to standard approach otherwise.
+#' brms writes each response's predictor into the observation program,
+#' and the trend is added to it as
+#' `mu[n] += trend[obs_trend_time[n], obs_trend_series[n]]`, indexed by
+#' the mapping arrays the trend stanvars declare. A univariate program
+#' names these `mu`, `N` and `Y`. A multivariate one suffixes each with
+#' the response key brms gives it.
 #'
-#' @param base_stancode Character string of base Stan code
-#' @param trend_stanvars List of trend stanvars
-#' @return Modified Stan code with trend injection
+#' @param base_stancode Character string of the observation program
+#'   with the trend stanvars already declared
+#' @param resps Response keys as brms suffixes them, or `""` for a
+#'   univariate program
+#' @return The program with the trend added to each predictor
 #' @noRd
-inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
-
-  # Input validation
+inject_trend_into_linear_predictors <- function(base_stancode, resps) {
   checkmate::assert_string(base_stancode, min.chars = 1)
-  checkmate::assert_list(trend_stanvars, null.ok = TRUE)
-
-  # Early return if no trends to inject
-  if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
-    return(base_stancode)
+  checkmate::assert_character(resps, min.len = 1, any.missing = FALSE)
+  # A GLM likelihood whose family has no layout is refused before any
+  # line is rewritten
+  glm_calls_present(base_stancode)
+  code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
+  for (resp in resps) {
+    code_lines <- inject_trend_for_response(code_lines, resp)
   }
-
-
-  # Extract and validate mapping arrays
-  mapping_arrays <- extract_mapping_arrays(trend_stanvars)
-  validate_mapping_arrays(mapping_arrays)
-
-  # Generate trend injection code
-  trend_injection_code <- generate_trend_injection_code(mapping_arrays)
-  trend_injection_string <- paste(trend_injection_code, collapse = "\n")
-
-  # Apply linear transformation pipeline for GLM handling and trend injection
-  modified_stancode <- transform_glm_code(base_stancode, trend_injection_string)
-
-
-  return(modified_stancode)
+  paste(code_lines, collapse = "\n")
 }
 
-#' Handle Trend Injection with Transformation Extraction for Any Response Type
+
+#' Add the latent trend to one response's linear predictor
 #'
-#' @description Handler for trend injection that works with both GLM
-#' and non-GLM responses. Extracts transformation lines, injects trends, then
-#' re-adds transformations in correct order.
+#' brms folds the predictor into a GLM likelihood where it can, as in
+#' `poisson_log_glm_lpmf(Y | Xc, Intercept, b)`. That call names no
+#' `mu` for a trend to reach, and it is rewritten to take one. A GLM
+#' call that already takes the `mu` brms declared, which an offset
+#' produces, is left as written. Every other predictor is a `mu` the
+#' program builds, and the trend is added once it is built.
 #'
-#' @param code_lines Character vector of Stan code lines
-#' @param resp_name String name of the response variable
-#'
-#' @return Character vector with properly ordered code
+#' @param code_lines Character vector of Stan source lines
+#' @param resp The response key, or `""` for a univariate program
+#' @return `code_lines` with the trend added to that response
 #' @noRd
-handle_response_trend_injection <- function(code_lines, resp_name) {
-  # Parameter validation
+inject_trend_for_response <- function(code_lines, resp) {
   checkmate::assert_character(code_lines, min.len = 1)
-  checkmate::assert_string(resp_name)
-  checkmate::assert_true(nchar(resp_name) > 0)
-  
-  # Find mu assignment lines (positive pattern)
-  mu_assign_pattern <- paste0("mu_", resp_name, "\\s*(\\+=|=\\s*[^=])")
-  mu_assign_lines <- which(grepl(mu_assign_pattern, code_lines, perl = TRUE))
-  
-  if (length(mu_assign_lines) == 0) {
-    # The program still compiles, and this response's linear predictor
-    # holds no trend. Saying nothing leaves that undetectable.
-    insight::format_warning(c(
-      cli::format_inline(
-        "No mu assignment found for response {.field {resp_name}}."
-      ),
-      x = cli::format_inline(
-        "The fit for {.field {resp_name}} uses its observation terms alone."
-      ),
-      i = "Report the formula and family that produced this."
-    ))
-    return(code_lines)
+  checkmate::assert_string(resp)
+  sfx <- if (nzchar(resp)) paste0("_", resp) else ""
+  model <- find_stan_block(code_lines, "model")
+  if (is.null(model)) {
+    stop_mvgam_fault(
+      "The observation program lacks a model block.",
+      "The trend is added to the predictor that block builds."
+    )
   }
-  
-  last_mu_line <- max(mu_assign_lines)
-  
-  # Get block context
-  model_block <- find_stan_block(code_lines, "model")
-  if (is.null(model_block)) {
-    model_block <- list(start_idx = 1, end_idx = length(code_lines))
+  model_range <- seq.int(model$start_idx, model$end_idx)
+  glm_pattern <- paste0(stan_density_call_pattern("_glm"),
+                        "\\(Y", sfx, " \\|")
+  glm_lines <- model_range[grepl(glm_pattern, code_lines[model_range])]
+  if (length(glm_lines) &&
+      !glm_takes_declared_mu(paste(code_lines, collapse = "\n"), resp)) {
+    return(rewrite_glm_for_trend(code_lines, model, glm_lines, resp))
   }
-  
-  # Transformation pattern matching whole statements
-  transform_pattern <- paste0("^\\s*mu_", resp_name, 
-                            "\\s*=\\s*\\w+\\s*\\(.*\\);?\\s*$")
-  
-  # Trend injection code
-  trend_injection <- c(
-    paste0("for (n in 1:N_", resp_name, ") {"),
-    paste0("  mu_", resp_name, "[n] += trend[obs_trend_time_", 
-           resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
-    "}"
+  add_trend_to_built_predictor(code_lines, model, resp)
+}
+
+
+#' The Stan loop that adds the trend to one response's predictor
+#'
+#' @param resp The response key, or `""` for a univariate program
+#' @param indent Leading whitespace for the loop
+#' @param extra A term added to the predictor with the trend, or `""`
+#' @return Character vector of three Stan lines
+#' @noRd
+trend_addition_lines <- function(resp, indent, extra = "") {
+  sfx <- if (nzchar(resp)) paste0("_", resp) else ""
+  mu_var <- glm_mu_names(resp)[["mu"]]
+  c(
+    paste0(indent, "for (n in 1:N", sfx, ") {"),
+    paste0(indent, "  ", mu_var, "[n] += ", extra,
+           "trend[obs_trend_time", sfx, "[n], obs_trend_series", sfx,
+           "[n]];"),
+    paste0(indent, "}")
   )
-  
-  # Use existing utility for transformation ordering
-  return(apply_correct_transformation_order(
-    code_lines = code_lines,
-    insert_pos = last_mu_line,
-    trend_injection_code = trend_injection,
-    transform_pattern = transform_pattern,
-    block_info = model_block
-  ))
 }
 
-#' Apply Correct Transformation Order for Stan Linear Predictors
+
+#' Rewrite a response's GLM likelihood to take a predictor with the trend
 #'
-#' @description Implements correct order: base predictor -> trend injection -> 
-#' link function transformations. Extracts transformations, injects trends, 
-#' then re-adds transformations after trend injection.
+#' The design matrix and coefficients the call carried build `mu`, the
+#' intercept and the trend are added per row, and the call is rewritten
+#' to take `to_matrix(mu)` with unit coefficients. A family whose GLM
+#' carries no intercept, the ordinal one, passes its cutpoints through
+#' unchanged.
 #'
-#' @param code_lines Character vector of Stan code lines
-#' @param insert_pos Integer position where trend injection should occur
-#' @param trend_injection_code Character vector of trend injection code lines
-#' @param transform_pattern Regex pattern to detect transformation lines
-#' @param block_info List with start_idx and end_idx for the code block
-#'
-#' @return Character vector with properly ordered code
+#' @param code_lines Character vector of Stan source lines
+#' @param model List with the model block's `start_idx` and `end_idx`
+#' @param glm_lines Line indices of the response's GLM calls
+#' @param resp The response key, or `""` for a univariate program
+#' @return `code_lines` with the call rewritten and `mu` declared
 #' @noRd
-apply_correct_transformation_order <- function(code_lines, insert_pos, 
-                                             trend_injection_code, 
-                                             transform_pattern, block_info) {
-  # Parameter validation
-  checkmate::assert_character(code_lines, min.len = 1)
-  checkmate::assert_int(insert_pos, lower = 1, upper = length(code_lines))
-  checkmate::assert_character(trend_injection_code, min.len = 1)
-  checkmate::assert_string(transform_pattern)
-  checkmate::assert_list(block_info)
-  checkmate::assert_names(names(block_info), 
-                         must.include = c("start_idx", "end_idx"))
-  
-  # Find transformation lines within the block
-  model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
-  transformation_indices <- which(grepl(transform_pattern, model_lines))
-  
-  # Convert to absolute indices
-  abs_transform_indices <- block_info$start_idx + transformation_indices - 1
-  
-  # Extract transformation lines and remove from original position
-  transformation_lines <- character(0)
-  if (length(abs_transform_indices) > 0) {
-    transformation_lines <- code_lines[abs_transform_indices]
-    code_lines <- code_lines[-abs_transform_indices]
-    
-    # Adjust insert position for removed lines
-    removed_before_insert <- sum(abs_transform_indices < insert_pos)
-    insert_pos <- insert_pos - removed_before_insert
-    
-    # Validate adjusted position
-    checkmate::assert_int(insert_pos, lower = 1, upper = length(code_lines))
+rewrite_glm_for_trend <- function(code_lines, model, glm_lines, resp) {
+  params <- NULL
+  for (i in glm_lines) {
+    glm_type <- glm_family_of_line(code_lines[i])
+    params <- parse_glm_parameters_from_line(code_lines[i], glm_type)
+    code_lines[i] <- transform_single_glm_call(code_lines[i], glm_type,
+                                               params)
   }
-  
-  # Insert trend injection with proper indentation
-  indented_injection <- paste0("    ", trend_injection_code)
-  
-  # Build result: code before + trend injection + transformations + code after
-  result_lines <- c(
-    code_lines[1:insert_pos],
-    indented_injection,
-    if (length(transformation_lines) > 0) transformation_lines else character(0),
-    if (insert_pos < length(code_lines)) {
-      code_lines[(insert_pos + 1):length(code_lines)]
+  sfx <- if (nzchar(resp)) paste0("_", resp) else ""
+  mu_var <- glm_mu_names(resp)[["mu"]]
+  intercept <- params$intercept
+  extra <- if (is.null(intercept) || identical(intercept, "0")) {
+    ""
+  } else {
+    paste0(intercept, " + ")
+  }
+  # A prior-only run carries no trend addition. The lines go inside
+  # the `if (!prior_only)` guard where brms wrote one.
+  at <- find_prior_only_insertion_point(code_lines, model)
+  indent <- stan_line_indent(code_lines[glm_lines[1L]])
+  addition <- c(
+    paste0(indent, "vector[N", sfx, "] ", mu_var, " = ",
+           params$design_matrix, " * ", params$coefficients, ";"),
+    trend_addition_lines(resp, indent, extra)
+  )
+  append(code_lines, addition, after = at)
+}
+
+
+#' Add the trend to a predictor the program builds
+#'
+#' brms builds `mu` in statements that add to it (`mu += ...`,
+#' `mu[n] += ...`) or assign it from other terms (`mu[n] = ...` in a
+#' non-linear model). Some families then transform it in place, with an
+#' assignment whose right-hand side uses `mu`: an inverse link
+#' (`mu = inv_logit(mu)`) or the skew-normal mean shift
+#' (`mu[n] = mu[n] - ...`). The trend is part of the predictor. It is
+#' added before the first transform, or after the last building
+#' statement where there is none. A statement inside a loop is placed
+#' by the loop, which keeps the trend loop from nesting in one.
+#'
+#' @param code_lines Character vector of Stan source lines
+#' @param model List with the model block's `start_idx` and `end_idx`
+#' @param resp The response key, or `""` for a univariate program
+#' @return `code_lines` with the trend loop inserted
+#' @noRd
+add_trend_to_built_predictor <- function(code_lines, model, resp) {
+  mu_var <- glm_mu_names(resp)[["mu"]]
+  model_range <- seq.int(model$start_idx, model$end_idx)
+  # A statement assigning into `mu`, possibly declaring it or indexing
+  # it, with the loop header brms sometimes writes on the same line
+  assign_re <- paste0(
+    "^\\s*(for\\s*\\([^)]*\\)\\s*\\{?\\s*)?",
+    "(vector\\[[^]]*\\]\\s+)?", mu_var, "(\\[[^]]*\\])?\\s*",
+    "(\\+=|=(?!=))(.*)$"
+  )
+  hits <- model_range[grepl(assign_re, code_lines[model_range],
+                            perl = TRUE)]
+  parts <- regmatches(code_lines[hits],
+                      regexec(assign_re, code_lines[hits], perl = TRUE))
+  reads_mu <- vapply(parts, function(p) {
+    grepl(paste0("\\b", mu_var, "\\b"), p[6L], perl = TRUE)
+  }, logical(1L))
+  declares <- vapply(parts, function(p) nzchar(p[3L]), logical(1L))
+  assigns <- vapply(parts, function(p) identical(p[5L], "="),
+                    logical(1L))
+  is_transform <- assigns & reads_mu & !declares
+  transforms <- hits[is_transform]
+  builds <- hits[!is_transform]
+  if (!length(builds)) {
+    stop_mvgam_fault(
+      paste0("The model block lacks a statement building '", mu_var, "'."),
+      "The trend joins the predictor where the model block builds it."
+    )
+  }
+  if (length(transforms)) {
+    first <- min(transforms)
+    if (any(builds > first)) {
+      stop_mvgam_fault(
+        paste0("'", mu_var, "' is transformed before it is fully built."),
+        "The trend joins after the last build and before the first transform."
+      )
+    }
+    loop <- enclosing_stan_loop(code_lines, first, model$start_idx)
+    anchor <- if (is.na(loop$start)) first else loop$start
+    after <- anchor - 1L
+  } else {
+    last <- max(builds)
+    loop <- enclosing_stan_loop(code_lines, last, model$start_idx)
+    anchor <- if (is.na(loop$start)) last else loop$start
+    after <- if (is.na(loop$end)) last else loop$end
+  }
+  indent <- stan_line_indent(code_lines[anchor])
+  append(code_lines, trend_addition_lines(resp, indent), after = after)
+}
+
+
+#' The loop enclosing a Stan statement
+#'
+#' A statement written on the loop's own line (`for (n in 1:N) mu[n]
+#' += ...;`) is its own loop. Otherwise the innermost `for` above the
+#' statement whose braces enclose it is returned.
+#'
+#' @param lines Character vector of Stan source lines
+#' @param idx Line index of the statement
+#' @param lower First line of the enclosing block
+#' @return List with the loop's `start` and `end` lines, both `NA`
+#'   outside a loop
+#' @noRd
+enclosing_stan_loop <- function(lines, idx, lower) {
+  for_re <- "^\\s*for\\s*\\("
+  if (grepl(for_re, lines[idx])) {
+    end <- if (grepl("\\{", lines[idx])) {
+      find_matching_closing_brace(lines, idx)
     } else {
-      character(0)
+      idx
     }
-  )
-  
-  return(result_lines)
-}
-
-#' Handle Nonlinear Trend Injection for Models Using mu\[n\] = ... Patterns
-#'
-#' @description
-#' Injects trend effects into nonlinear brms models that compute mu using
-#' assignment patterns like mu\[n\] = (expression) within for loops. Modifies
-#' the Stan code to add trend effects to the nonlinear predictor.
-#'
-#' @param code_lines Character vector of all model code lines
-#' @param block_info List with start_idx and end_idx for model block
-#' @param trend_injection_code Character vector of trend code to inject (unused in nonlinear case)
-#' @return Modified code_lines with trend injection added to mu assignment
-#' @noRd
-handle_nonlinear_trend_injection <- function(code_lines, block_info,
-                                           trend_injection_code) {
-  # Validate inputs
-  checkmate::assert_character(code_lines, min.len = 1)
-  checkmate::assert_list(block_info)
-  checkmate::assert_names(names(block_info),
-                         must.include = c("start_idx", "end_idx"))
-  checkmate::assert_integerish(block_info$start_idx, len = 1)
-  checkmate::assert_integerish(block_info$end_idx, len = 1)
-  checkmate::assert_character(trend_injection_code, min.len = 1)
-
-  # Validate block indices
-  if (block_info$start_idx > block_info$end_idx ||
-      block_info$end_idx > length(code_lines)) {
-    stop(insight::format_error(
-      cli::format_inline("Invalid block indices in {.field block_info}")
-    ))
+    return(list(start = idx, end = end))
   }
-
-  model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
-
-  # Find mu[n] = ... pattern within model block
-  mu_assignment_indices <- which(grepl("\\s*mu\\[n\\]\\s*=", model_lines))
-
-  if (length(mu_assignment_indices) == 0) {
-    # brms emits `vector[N] mu = rep_vector(0.0, N);` (no per-
-    # element assignment) when the observation formula has no
-    # fixed terms (e.g. `y ~ -1` or `y ~ 0`). The trend still
-    # needs to enter `mu`, so append an explicit per-element
-    # trend addition right after the declaration.
-    decl_indices <- which(grepl(
-      "\\s*vector\\[N\\]\\s*mu\\s*=\\s*rep_vector",
-      model_lines
-    ))
-    if (length(decl_indices) == 0L) {
-      stop(insight::format_error(c(
-        "No mu[n] assignment patterns found in nonlinear model block.",
-        i = "Expected pattern: mu[n] = <expression>;"
-      )))
-    }
-    abs_idx <- block_info$start_idx + max(decl_indices) - 1L
-    decl_line <- code_lines[abs_idx]
-    indent <- sub("^(\\s*).*", "\\1", decl_line)
-    insertion <- c(
-      paste0(indent, "for (n in 1:N) {"),
-      paste0(
-        indent, "  mu[n] = trend[obs_trend_time[n], ",
-        "obs_trend_series[n]];"
-      ),
-      paste0(indent, "}")
-    )
-    code_lines <- append(code_lines, insertion, after = abs_idx)
-    return(code_lines)
-  }
-
-  # Use the last mu assignment for trend injection
-  last_mu_idx <- max(mu_assignment_indices)
-  abs_idx <- block_info$start_idx + last_mu_idx - 1
-
-  # Extract and modify the mu assignment line
-  current_line <- code_lines[abs_idx]
-
-  # Validate we can extract the right-hand side
-  if (!grepl("mu\\[n\\]\\s*=\\s*(.+);", current_line)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Could not parse mu assignment in line: {.field current_line}"
-      )
-    ))
-  }
-
-  # Extract the right-hand side expression
-  rhs <- sub(".*mu\\[n\\]\\s*=\\s*(.+);.*", "\\1", current_line)
-
-  # Create new line with trend addition
-  indent <- sub("^(\\s*).*", "\\1", current_line)
-  new_line <- paste0(indent, "mu[n] = (", rhs,
-                    ") + trend[obs_trend_time[n], obs_trend_series[n]];")
-
-  # Replace the line
-  code_lines[abs_idx] <- new_line
-
-  return(code_lines)
-}
-
-#' Generate Trend Injection Code for Stan Transformed Parameters Block
-#'
-#' @description
-#' Creates Stan code lines that inject trend effects into the linear predictor
-#' mu by adding trend matrix values using observation-to-trend mapping arrays.
-#' Supports both univariate and multivariate responses with appropriate
-#' variable naming.
-#'
-#' @param mapping_arrays Named list containing mapping arrays with elements:
-#'   \itemize{
-#'     \item time_arrays: Character vector of time mapping array names
-#'     \item series_arrays: Character vector of series mapping array names
-#'   }
-#'   Arrays must be paired (same length) with corresponding time/series mappings.
-#'
-#' @return Character vector containing Stan code lines for trend injection.
-#'   Generated code follows the pattern:
-#'   \preformatted{
-#'   for (n in 1:N) {
-#'     mu\[n\] += trend[obs_trend_time\[n\], obs_trend_series\[n\]];
-#'   }
-#'   }
-#'   For multivariate responses, generates response-specific variable names
-#'   (mu_count, trend_count, N_count, etc.).
-#'
-#' @details
-#' This function is called internally by \code{inject_trend_into_linear_predictor()}
-#' to generate the actual Stan code that adds trend effects to brms linear
-#' predictors. The mapping arrays must have been created by
-#' \code{generate_obs_trend_mapping()} and included in trend stanvars.
-#'
-#' The function handles both univariate and multivariate cases by detecting
-#' response suffixes in mapping array names (e.g., "_y1", "_count") and
-#' generating appropriately named variables.
-#'
-#' @noRd
-generate_trend_injection_code <- function(mapping_arrays) {
-  checkmate::assert_list(mapping_arrays)
-  checkmate::assert_names(names(mapping_arrays), must.include = c("time_arrays", "series_arrays"))
-
-  injection_lines <- c("", "  // Add trend effects using mapping arrays")
-
-  # Generate for each response (handles both univariate and multivariate)
-  for (i in seq_along(mapping_arrays$time_arrays)) {
-    time_array <- mapping_arrays$time_arrays[i]
-    series_array <- mapping_arrays$series_arrays[i]
-
-    # Extract response suffix
-    response_suffix <- ""
-    match_result <- regexpr("_y\\d+$", time_array)
-    if (match_result != -1) {
-      response_suffix <- regmatches(time_array, match_result)
-    }
-
-    # Generate variable names based on suffix
-    mu_var <- if (response_suffix == "") "mu" else paste0("mu", response_suffix)
-    trend_var <- if (response_suffix == "") "trend" else paste0("trend", response_suffix)
-    n_var <- if (response_suffix == "") "N" else paste0("N", response_suffix)
-
-    # Generate direct mu modification loop
-    injection_lines <- c(injection_lines,
-                         paste0("  for (n in 1:", n_var, ") {"),
-                         paste0("    ", mu_var, "[n] += ", trend_var, "[", time_array, "[n], ", series_array, "[n]];"),
-                         "  }"
-    )
-  }
-
-  return(injection_lines)
-}
-
-#' Inject Multivariate Trends into Linear Predictors
-#'
-#' @description
-#' Injects response-specific trend effects into multivariate Stan model.
-#' Handles brms naming convention with _y1, _y2 suffixes.
-#'
-#' @param base_stancode Character string of base Stan code
-#' @param trend_stanvars List of trend stanvars (may be NULL)
-#' @param responses_with_trends Character vector of response names that have trends
-#' @return Modified Stan code with trend injections
-#' @noRd
-inject_multivariate_trends_into_linear_predictors <- function(
-  base_stancode,
-  trend_stanvars,
-  responses_with_trends
-) {
-  checkmate::assert_string(base_stancode)
-  checkmate::assert_character(responses_with_trends, min.len = 1)
-  checkmate::assert_list(trend_stanvars, null.ok = TRUE)
-
-  # Detect GLM usage for each response
-  detected_glm_types <- detect_glm_usage(base_stancode, responses_with_trends)
-
-  # If no trends, return unchanged
-  if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
-    return(base_stancode)
-  }
-
-  # Separate responses by GLM usage
-  glm_responses <- names(detected_glm_types[detected_glm_types])
-  non_glm_responses <- setdiff(responses_with_trends, glm_responses)
-  
-  # Handle GLM responses with response-specific transformations
-  if (length(glm_responses) > 0) {
-    code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-
-    for (resp_name in glm_responses) {
-      # brms folded this response's predictor into its GLM call. The
-      # call is read by the per-family layout, which names the design
-      # matrix, intercept and coefficients brms actually wrote. An arm
-      # with no intercept passes `0` and an uncentred `X`, and neither
-      # can be assumed.
-      glm_pattern <- paste0(stan_density_call_pattern("_glm"),
-                            "\\(Y_", resp_name, " \\|")
-      glm_lines <- which(grepl(glm_pattern, code_lines))
-      if (!length(glm_lines)) {
-        stop(insight::format_error(c(
-          paste0("No GLM likelihood was found for response '", resp_name,
-                 "'."),
-          i = "Please report this internal mvgam bug."
-        )), call. = FALSE)
-      }
-      # An offset makes brms declare `mu_<resp>` and pass it as the GLM
-      # intercept. The trend then adds to that vector, and the call
-      # keeps the design matrix and coefficients brms gave it.
-      takes_mu <- glm_takes_declared_mu(
-        paste(code_lines, collapse = "\n"), resp_name
-      )
-      glm_params <- NULL
-      for (line_idx in glm_lines) {
-        old_line <- code_lines[line_idx]
-        glm_type <- glm_family_of_line(old_line)
-        glm_params <- parse_glm_parameters_from_line(old_line, glm_type)
-        if (!takes_mu) {
-          code_lines[line_idx] <- transform_single_glm_call(
-            old_line, glm_type, glm_params
-          )
-        }
-      }
-
-      # Add mu_<resp> computation in model block using shared utility
-      model_info <- find_stan_block(code_lines, "model")
-      if (!is.null(model_info)) {
-        # Insert inside the model block's `if (!prior_only)` guard where
-        # brms wrote one. A prior-only run then carries no trend
-        # addition.
-        insert_point <- find_prior_only_insertion_point(code_lines, model_info)
-
-        if (takes_mu) {
-          # Add the trend to the declared mu_<resp>, after the loop
-          # brms wrote to modify it where there is one
-          existing_mu_pattern <- paste0(
-            "vector\\[N_", resp_name, "\\]\\s+mu_", resp_name
-          )
-          for_loop_pattern <- paste0("for \\(n in 1:N_", resp_name, "\\)")
-          for_loop_lines <- which(grepl(for_loop_pattern, code_lines))
-          
-          if (length(for_loop_lines) > 0) {
-            # Find the closing brace of the for loop
-            for_start <- max(for_loop_lines)
-            
-            # The brace matching the loop's own opening brace. The
-            # next standalone `}` closes a nested block wherever the
-            # body holds one.
-            loop_end <- find_matching_closing_brace(code_lines, for_start)
-            insert_point <- if (is.na(loop_end)) for_start else loop_end
-          } else {
-            # Fallback: insert after mu declaration
-            mu_decl_lines <- which(grepl(existing_mu_pattern, code_lines))
-            insert_point <- max(mu_decl_lines)
-          }
-          
-          # Create trend addition code with different loop variable to avoid collision
-          mu_computation <- c(
-            paste0("    // Add trend effects to existing mu_", resp_name),
-            paste0("    for (i in 1:N_", resp_name, ") {"),
-            paste0("      mu_", resp_name, "[i] += trend[obs_trend_time_", resp_name, "[i], obs_trend_series_", resp_name, "[i]];"),
-            paste0("    }")
-          )
-          
-        } else {
-          # Declare mu_<resp> from the arguments the GLM call carried
-          mu_var <- glm_mu_names(resp_name)[["mu"]]
-          intercept <- glm_params$intercept
-          offset <- if (is.null(intercept) || identical(intercept, "0")) {
-            ""
-          } else {
-            paste0(intercept, " + ")
-          }
-          mu_computation <- c(
-            paste0("    vector[N_", resp_name, "] ", mu_var, " = ",
-                   glm_params$design_matrix, " * ",
-                   glm_params$coefficients, ";"),
-            paste0("    for (n in 1:N_", resp_name, ") {"),
-            paste0("      ", mu_var, "[n] += ", offset,
-                   "trend[obs_trend_time_", resp_name,
-                   "[n], obs_trend_series_", resp_name, "[n]];"),
-            "    }"
-          )
-        }
-
-        # Insert mu computation 
-        code_lines <- c(
-          code_lines[1:insert_point],
-          mu_computation,
-          code_lines[(insert_point + 1):length(code_lines)]
-        )
+  for (j in rev(seq.int(lower, idx - 1L))) {
+    if (grepl(for_re, lines[j]) && grepl("\\{", lines[j])) {
+      end <- find_matching_closing_brace(lines, j)
+      if (!is.na(end) && end >= idx) {
+        return(list(start = j, end = end))
       }
     }
-
-    base_stancode <- paste(code_lines, collapse = "\n")
   }
-
-  checkmate::assert_string(base_stancode)
-
-  # Handle non-GLM responses using shared transformation handler
-  if (length(non_glm_responses) > 0) {
-    code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-
-    for (resp_name in non_glm_responses) {
-      code_lines <- handle_response_trend_injection(code_lines, resp_name)
-    }
-
-    base_stancode <- paste(code_lines, collapse = "\n")
-  }
-
-  return(base_stancode)
+  list(start = NA_integer_, end = NA_integer_)
 }
 
 
@@ -1882,69 +1390,33 @@ expand_per_response_standata <- function(combined_sd, formula, data,
   }, integer(1L))
   combined_sd$N <- max(resp_Ns)
 
-  # Post-hoc verification: every per-response Y_<resp> and X_<resp>
-  # row count must equal the corresponding N_<resp>. This catches
-  # any brms naming pattern the heuristic strip in
-  # `map_combined_key_to_single` missed (e.g. a future brms version
-  # introducing a new per-arm key shape we didn't anticipate).
+  # Every per-response count, response, design matrix and group index
+  # must hold one entry per observed row of that response. A brms key
+  # shape `map_combined_key_to_single()` fails to strip shows up here.
   for (resp_i in keys) {
-    n_i <- resp_Ns[[resp_i]]
     expected <- sum(observed[[resp_i]])
-    if (!identical(as.integer(n_i), as.integer(expected))) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Per-response standata expansion failed for response {.field {resp_i}}."
-        ),
-        x = cli::format_inline(
-          "N_{resp_i} = {n_i} but expected {expected} (non-NA rows)."
-        ),
-        i = paste0(
-          "This indicates `expand_per_response_standata()` could not ",
-          "map one arm's key to its equivalent in the combined standata."
-        )
-      )), call. = FALSE)
-    }
-    # Y_<resp> length check
     yk <- paste0("Y_", resp_i)
-    if (!is.null(combined_sd[[yk]]) &&
-        length(combined_sd[[yk]]) != expected) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Length mismatch for {.field {yk}}: have {length(combined_sd[[yk]])}, expected {expected}."
-        ),
-        i = "Per-arm response array was not substituted correctly."
-      )), call. = FALSE)
-    }
-    # X_<resp> nrow check (only when a fixed-effect design matrix exists)
     xk <- paste0("X_", resp_i)
-    if (!is.null(combined_sd[[xk]]) && is.matrix(combined_sd[[xk]]) &&
-        nrow(combined_sd[[xk]]) != expected) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Row count mismatch for {.field {xk}}: have {nrow(combined_sd[[xk]])}, expected {expected}."
-        ),
-        i = "Per-arm predictor matrix was not substituted correctly."
-      )), call. = FALSE)
-    }
-    # J_<grp_idx>_<resp> ranef group-index check. Each random
-    # effect Z_<grp_idx>_<resp>_* should have a matching J_<grp_idx>_<resp>
-    # array of length N_<resp>. Walk the J_*_<resp> keys present
-    # in this combined standata.
     j_keys <- grep(paste0("^J_[0-9]+_", resp_i, "$"),
-                    names(combined_sd), value = TRUE)
-    for (jk in j_keys) {
-      jv <- combined_sd[[jk]]
-      if (length(jv) != expected) {
-        stop(insight::format_error(c(
-          cli::format_inline(
-            "Length mismatch for {.field {jk}}: have {length(jv)}, expected {expected}."
-          ),
-          i = paste0(
-            "The group index array for this arm's random effects was ",
-            "not substituted correctly."
-          )
-        )), call. = FALSE)
-      }
+                   names(combined_sd), value = TRUE)
+    sizes <- c(
+      stats::setNames(resp_Ns[[resp_i]], paste0("N_", resp_i)),
+      if (!is.null(combined_sd[[yk]])) {
+        stats::setNames(length(combined_sd[[yk]]), yk)
+      },
+      if (is.matrix(combined_sd[[xk]])) {
+        stats::setNames(nrow(combined_sd[[xk]]), xk)
+      },
+      vapply(combined_sd[j_keys], length, integer(1L))
+    )
+    wrong <- sizes[sizes != expected]
+    if (length(wrong)) {
+      stop_mvgam_fault(
+        paste0("Response '", resp_i, "' has ", expected,
+               " observed rows in its Stan data."),
+        paste0("Sizes that differ: ",
+               paste0(names(wrong), " = ", wrong, collapse = ", "), ".")
+      )
     }
   }
 
@@ -1985,15 +1457,8 @@ map_combined_key_to_single <- function(combined_key, resp_name,
 # and maintains consistency across trend types.
 
 
-#' Combine Stanvars Robustly
-#'
-#' Single function to handle all stanvar combination patterns used in mvgam.
-#' Handles NULL values, individual stanvars, stanvars collections, lists, and mixed inputs.
-#' Preserves proper class structure by using brms c() method exclusively.
-#'
-#' @param ... Stanvar components to combine (can be NULL, stanvars, lists, or mixed)
-#' @return Combined stanvars collection with proper class structure, or NULL if all inputs are NULL
-#' @noRd
+# Internal: append `new_component` to `components` unless it is NULL.
+#'@noRd
 append_if_not_null <- function(components, new_component) {
   checkmate::assert_list(components)
   if (!is.null(new_component)) {
@@ -2003,74 +1468,30 @@ append_if_not_null <- function(components, new_component) {
   }
 }
 
-#' Stanvar combination for mvgam
+#' Combine stanvar components with brms's `c()` method
+#'
+#' @param ... NULL, a stanvar, a stanvars collection, or a list of
+#'   them
+#' @return A stanvars collection, or NULL when every component is NULL
 #' @noRd
 combine_stanvars <- function(...) {
-  components <- list(...)
-
-  # Flatten nested structures and filter valid components
-  valid_components <- list()
-  for (component in components) {
-    if (!is.null(component)) {
-      if (inherits(component, "stanvars")) {
-        # Direct stanvars collection
-        valid_components <- append(valid_components, list(component))
-      } else if (inherits(component, "stanvar")) {
-        # Single stanvar object
-        valid_components <- append(valid_components, list(component))
-      } else if (is.list(component)) {
-        # Handle lists that might contain stanvar/stanvars objects
-        for (item in component) {
-          if (!is.null(item)) {
-            if (inherits(item, "stanvars")) {
-              valid_components <- append(valid_components, list(item))
-            } else if (inherits(item, "stanvar")) {
-              valid_components <- append(valid_components, list(item))
-            } else {
-              stop(insight::format_error(c(
-                "Invalid item in list component.",
-                x = paste("Class:", paste(class(item), collapse = ", ")),
-                i = "Expected stanvar or stanvars object."
-              )))
-            }
-          }
-        }
-      } else {
-        stop(insight::format_error(c(
-          "Invalid component type.",
-          x = paste("Class:", paste(class(component), collapse = ", ")),
-          i = "Expected stanvar, stanvars, list or NULL."
-        )))
+  is_stanvar <- function(x) inherits(x, c("stanvar", "stanvars"))
+  flat <- list()
+  for (component in list(...)) {
+    items <- if (is_stanvar(component)) list(component) else component
+    for (item in items) {
+      if (is.null(item)) next
+      if (!is_stanvar(item)) {
+        stop_wrong_class("A stanvar component", item,
+                         "a stanvar or stanvars")
       }
+      flat <- c(flat, list(item))
     }
   }
-
-  # Return NULL if no valid components
-  if (length(valid_components) == 0) {
+  if (length(flat) == 0L) {
     return(NULL)
   }
-
-  # Combine all components using brms c() method
-  # Start with first component
-  result <- valid_components[[1]]
-
-  # Add remaining components
-  if (length(valid_components) > 1) {
-    for (i in 2:length(valid_components)) {
-      result <- c(result, valid_components[[i]])
-    }
-  }
-
-  # Validate result has proper class
-  if (!inherits(result, c("stanvar", "stanvars"))) {
-    stop(insight::format_error(c(
-      "combine_stanvars produced invalid result.",
-      x = paste("Result class:", paste(class(result), collapse = ", ")),
-      i = "Expected stanvar or stanvars object."
-    )))
-  }
-
-  return(result)
+  Reduce(c, flat)
 }
 
 # =============================================================================
@@ -2151,10 +1572,9 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     }
     if (cor) {
       # Derived covariance matrix in transformed parameters. The
-      # scaled Cholesky factor is the intermediate, not the reported
-      # quantity: `Sigma_trend` is read as a covariance wherever it
-      # appears, including by the VAR generator below and by the label
-      # `generate_parameter_label()` gives it.
+      # scaled Cholesky factor is an intermediate. The VAR generator
+      # below and the post-fit extractors take `Sigma_trend` as a
+      # covariance.
       sigma_matrix_code <- paste0(
         "cov_matrix[", effective_dim, "] Sigma_trend = ",
         "multiply_lower_tri_self_transpose(",
@@ -2446,10 +1866,10 @@ data_info_n_series <- function(data_info) {
 hierarchical_series_groups <- function(data_info) {
   series_groups <- data_info$series_groups
   if (is.null(series_groups)) {
-    stop(insight::format_error(c(
-      "A hierarchical trend reached Stan assembly with no series groups.",
-      i = "Please report this internal mvgam bug."
-    )), call. = FALSE)
+    stop_mvgam_fault(
+      "A hierarchical trend needs the group of each series.",
+      "The data information lacks 'series_groups'."
+    )
   }
   series_groups
 }
@@ -2464,7 +1884,6 @@ hierarchical_series_groups <- function(data_info) {
 #' @return List with hierarchical structure information
 #' @noRd
 extract_hierarchical_info <- function(data_info, trend_specs) {
-  # Input validation following project standards
   checkmate::assert_list(data_info, names = "named")
   checkmate::assert_list(trend_specs, names = "named")
 
@@ -2483,7 +1902,7 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
     )))
   }
 
-  unique_groups <- sort(unique(data_info$data[[gr_var]]))
+  unique_groups <- observed_levels(data_info$data[[gr_var]])
   n_groups <- length(unique_groups)
 
   if (n_groups < 1) {
@@ -2510,60 +1929,35 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
 
 #' Add Hierarchical Support to Trend Components  
 #'
-#' Adds hierarchical correlation support to trend specifications when grouping
-#' variables are present. Uses existing hierarchical infrastructure functions
-#' to maintain consistency across trend types.
+#' Adds the group correlation blocks when the trend names a grouping.
+#' The RW, AR and ZMVN generators call this. VAR builds its own
+#' blocks.
 #'
 #' @param components List of existing stanvar components
-#' @param trend_specs Trend specification list  
+#' @param trend_specs The trend specification
 #' @param data_info Data information list
-#' @return Updated components list with hierarchical support added if applicable
+#' @param prior A `brmsprior` or NULL
+#' @return `components` with the hierarchical blocks appended when the
+#'   trend is grouped
 #' @noRd
 add_hierarchical_support <- function(components, trend_specs, data_info, prior = NULL) {
-  # Input validation following project standards
   checkmate::assert_list(components)
-  checkmate::assert_list(trend_specs, names = "named") 
+  checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_list(data_info, names = "named")
-  
-  # Use existing hierarchical extraction logic instead of reimplementing
+
   hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
-  
-  
-  # Early return if no hierarchical structure needed
   if (is.null(hierarchical_info)) {
     return(components)
   }
-  
-  # Generate data structures before parameters
+
+  # Data structures precede the parameters that index them
   hierarchical_data <- generate_hierarchical_data_structures(hierarchical_info, data_info)
-  
-  # Extract parameters
   n_groups <- hierarchical_info$n_groups
   n_subgroups <- hierarchical_info$n_subgroups
-  
-  # Extract trend type for conditional innovation scaling
-  # Prefer trend_specs$trend over trend_specs$type for backward compatibility
-  trend_type <- trend_specs$trend %||% trend_specs$type
-  
-  # Validate trend type against registry if present
-  if (!is.null(trend_type)) {
-    # Ensure registry is loaded
-    ensure_registry_initialized()
-    trend_info <- list_trend_types()
-    valid_trends <- trend_info$trend_type
-    
-    if (!trend_type %in% valid_trends) {
-      stop(insight::format_error(c(
-        cli::format_inline("Unknown trend type {.field {trend_type}}."),
-        x = cli::format_inline(
-          "Valid trend types are: {.field {valid_trends}}"
-        ),
-        i = "Check spelling or register custom trend type first."
-      )))
-    }
-  }
-  
-  # Generate infrastructure components
+
+  # The trend type sets how the group innovations are scaled
+  trend_type <- get_trend_name(trend_specs)
+
   hierarchical_functions <- generate_hierarchical_functions()
   hierarchical_params <- generate_hierarchical_correlation_parameters(n_groups, n_subgroups, trend_type)
   hierarchical_priors <- generate_hierarchical_correlation_model(n_groups, prior)
@@ -2679,7 +2073,6 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL,
 #' Within each level the original order is kept.
 #' @noRd
 sort_stanvars <- function(stanvars) {
-  # Validate input per CLAUDE.md standards
   checkmate::assert_list(stanvars, null.ok = TRUE)
 
   if (is.null(stanvars) || length(stanvars) == 0) {
@@ -2944,9 +2337,10 @@ make_partial_z_stanvars <- function(fixed_Z, prior = NULL) {
   checkmate::assert_matrix(fixed_Z, mode = "numeric")
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   if (!anyNA(fixed_Z)) {
-    stop(insight::format_error(
-      "make_partial_z_stanvars() requires NA entries in fixed_Z."
-    ))
+    stop_mvgam_fault(
+      "A partial loadings matrix was requested for a fully fixed 'Z'.",
+      "'make_partial_z_stanvars()' takes a 'fixed_Z' with NA entries."
+    )
   }
   free_mask <- is.na(fixed_Z)
   template <- fixed_Z
@@ -3043,11 +2437,11 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series,
 #' Combines all matrix Z injection functions for factor/non-factor models.
 #' This provides a single interface for matrix Z generation across all Stan blocks.
 #'
-#' Three exclusive branches:
+#' Four exclusive branches:
 #' - `fixed_Z` non-NULL with NAs: partial Z. Free entries become
-#'   parameters; fixed entries are assembled into Z in
-#'   transformed parameters. No QR identification (the user's
-#'   fixed pattern is preserved on Z directly).
+#'   parameters under the `Z` prior. Fixed entries are assembled
+#'   into Z in transformed parameters. No QR identification: the
+#'   user's fixed pattern stays on Z.
 #' - `fixed_Z` non-NULL with no NAs: fully fixed Z in the data
 #'   block. No priors, no identification step.
 #' - `is_factor_model = TRUE`, `fixed_Z` NULL: emit
@@ -3071,17 +2465,14 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
                                                   fixed_Z = NULL,
                                                   family = NULL,
                                                   prior = NULL) {
-  # Validate inputs following CLAUDE.md standards
   checkmate::assert_logical(is_factor_model, len = 1)
   checkmate::assert_integerish(n_lv, len = 1, lower = 1)
   checkmate::assert_integerish(n_series, len = 1, lower = 1)
 
-  # User-supplied Z branch. Two flavours:
-  # - fully fixed (no NAs): Z lives entirely in the data block
-  # - partial (one or more NAs): free entries become a parameter
-  #   vector with a student_t prior; assembly happens in
-  #   transformed parameters using a Z_is_free mask passed via
-  #   the data block.
+  # A user-supplied Z is either fully fixed, all in the data block,
+  # or partial. The free entries of a partial Z form a parameter
+  # vector under the `Z` prior, and the `Z_is_free` data mask places
+  # them in transformed parameters.
   if (!is.null(fixed_Z)) {
     if (anyNA(fixed_Z)) {
       return(make_partial_z_stanvars(fixed_Z, prior = prior))
@@ -3698,7 +3089,7 @@ generate_trend_computation_tparameters <- function(n_lv, n_series,
   # series) values and is indexed by times_trend[i, s].
   #
   # has_by_lv == TRUE: trend_data was built at (time, .trend) grain
-  # by extract_trend_data, and times_trend has shape
+  # by trend_cell_frame(), and times_trend has shape
   # [N_time_trend, N_lv_trend]. mu_trend carries one value per
   # (time, latent factor). The per-factor smooth contributions are
   # folded into the dot product with Z so the species-specific
@@ -3787,7 +3178,6 @@ generate_hierarchical_functions <- function() {
 #' @return Combined stanvars for hierarchical data structures
 #' @noRd
 generate_hierarchical_data_structures <- function(hierarchical_info, data_info) {
-  # Input validation following project standards with field existence checks
   checkmate::assert_list(hierarchical_info, names = "named")
   checkmate::assert_list(data_info, names = "named")
   checkmate::assert_names(names(hierarchical_info), 
@@ -3823,7 +3213,7 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
   
   # Create series-to-group mapping (one entry per series, not per observation)
   series_var <- data_info$series_var
-  group_levels <- sort(unique(data_info$data[[gr_var]]))
+  group_levels <- observed_levels(data_info$data[[gr_var]])
 
   # Ordered by the trend's own series axis, which is what Stan
   # subscripts this array with. The order is resolved where the axis
@@ -4048,39 +3438,14 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
   checkmate::assert_string(response_suffix)
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
 
-  # Get trend type directly from trend object (no parsing needed!)
   trend_type <- trend_specs$trend
   if (is.null(trend_type)) {
-    stop(insight::format_error(
-      cli::format_inline("trend_specs must contain {.field trend} field")
-    ))
+    stop_missing_fields("The trend specification", "trend")
   }
 
-  # Use registry-based dispatch with clear error messages
-  generator_function_name <- paste0("generate_", tolower(trend_type), "_trend_stanvars")
-
-  # Check if the generator function exists
-  if (!exists(generator_function_name, mode = "function")) {
-    # Provide helpful guidance using registry information
-    available_trends <- ls(trend_registry)
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "No Stan generator found for trend type: {.field {trend_type}}"
-      ),
-      x = cli::format_inline(
-        "Expected function: {.field {generator_function_name}}"
-      ),
-      i = if (length(available_trends) > 0) {
-        cli::format_inline(
-          "Available trend types: {.field {available_trends}}"
-        )
-      } else {
-        "Registry appears empty. Check that register_core_trends() was called."
-      }
-    )))
-  }
-
-  generator_function <- get(generator_function_name, mode = "function")
+  # The registry records each trend type's generator
+  ensure_registry_initialized()
+  generator_function <- get_trend_info(trend_type)$generator
 
   # Extract hierarchical information for shared innovation system
   hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
@@ -4114,18 +3479,14 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     if (mgp_scale && user_sigma_prior) {
       stop(insight::format_error(c(
         paste0(
-          "A prior on 'sigma_trend' does not apply under ",
+          "A 'sigma_trend' prior is not supported under ",
           "multiplicative gamma process shrinkage."
         ),
-        x = paste0(
-          "With column_shrinkage = 'mgp' the innovation scale is ",
-          "derived as sqrt(Psi_diag). The model does not sample it."
-        ),
-        i = paste0(
-          "Shape the column scale through 'mgp_a1' and 'mgp_a2' on ",
-          "'loadings_prior' or drop the 'sigma_trend' prior."
-        )
-      )))
+        x = paste0("With column_shrinkage = 'mgp' the innovation scale ",
+                   "is derived as sqrt(Psi_diag)."),
+        i = paste0("Shape the column scale through 'mgp_a1' and 'mgp_a2' ",
+                   "on 'loadings_prior' or drop the 'sigma_trend' prior.")
+      )), call. = FALSE)
     }
     refuse_unit_factor_priors(prior, unit_factors)
     shared_stanvars <- generate_shared_innovation_stanvars(
@@ -4903,9 +4264,9 @@ refuse_unit_factor_priors <- function(prior, unit_factors) {
     stop(insight::format_error(c(
       paste0("'", given[1L], "' is fixed in a factor model with ",
              "sampled loadings."),
-      x = paste0("The factors take unit innovation scale and zero ",
-                 "correlation. The loadings 'Z' carry both."),
-      i = "Set a prior on 'Z', or fix loadings with 'trend_map'."
+      x = paste0("The loadings 'Z' set the scale and correlation of ",
+                 "unit-scale, uncorrelated factors."),
+      i = "Set a prior on 'Z' or fix loadings with 'trend_map'."
     )), call. = FALSE)
   }
   invisible(NULL)
@@ -5468,7 +4829,6 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #'
 #' @noRd
 generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
-  # Input validation following CLAUDE.md standards
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_list(data_info, names = "named")
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
@@ -5547,19 +4907,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Additional validation for logical consistency
   checkmate::assert_logical(is_varma, len = 1)
-  if (is_varma && ma_lags <= 0) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Internal error: VARMA indicator set but {.field ma_lags} <= 0"
-      )
-    ))
-  }
-  if (!is_varma && ma_lags > 0) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Internal error: VARMA indicator not set but {.field ma_lags} > 0"
-      )
-    ))
+  if (!identical(is_varma, ma_lags > 0)) {
+    stop_mvgam_fault(
+      "A VAR trend's moving-average indicator must match its MA lags.",
+      paste0("Got is_varma = ", is_varma, " with ", ma_lags,
+             " MA lag(s).")
+    )
   }
 
   # VAR/VARMA mathematical functions block with modern Stan syntax and numerical stability
@@ -6155,15 +5508,9 @@ calculate_car_time_distances <- function(data_info) {
   # the gap between two steps belongs to the grid rather than to a
   # series and each column of the answer is the same.
   #
-  # Reading the series column to find that out was the source of
-  # three faults. It gave `as.numeric()` a column that may hold
-  # characters, or on a frame whose series is derived may not exist;
-  # it numbered the series by factor level where the observation
-  # mapping numbers them by position on the axis; and it filled the
-  # matrix by counting rows, so row `k` held the `k`th observed gap
-  # where the gap at time `k` belonged. The grid removes all three.
-  # The seam that builds the time index supplies it, which keeps the
-  # gaps in the order of the index they attach to.
+  # The gaps come from the time grid alone, in the order of the time
+  # index they attach to. A frame whose series come from the responses
+  # has no series column, and the grid needs none.
   times <- time_axis_values(data[[time_var]])
   n_series <- data_info_n_series(data_info)
 
@@ -7225,16 +6572,10 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
         # Only error if there are still truly missing variables after full search
         if (length(missing_vars) > 0) {
-          missing_str <- paste(missing_vars, collapse = ", ")
-          stop(insight::format_error(c(
-            "The variable mapping is missing required variables.",
-            x = paste0("Missing: ", missing_str, "."),
-            i = paste0(
-              "Every variable used in mu construction has to be declared ",
-              "in a Stan block: data, parameters, transformed data, ",
-              "transformed parameters or computed variables."
-            )
-          )))
+          stop_mvgam_fault(
+            "The trend's mu construction uses undeclared variables.",
+            paste0("Missing: ", paste(missing_vars, collapse = ", "), ".")
+          )
         }
       }
 
@@ -7252,70 +6593,27 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       create_mu_stanvar <- FALSE  # Stanvar already created above
 
     } else {
+      # No brms statement builds mu: rebuild it from the intercept and
+      # design matrix the trend program declares
       create_mu_stanvar <- TRUE
-      has_coefficients <- grepl("vector\\[.*\\]\\s+b[^_]", stancode) &&
-                          (grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode) ||
-                           grepl("matrix\\[.*\\]\\s+X[^_]", stancode))
-
-      if (has_coefficients) {
-        has_xc <- grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode) ||
-                  grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
-
-        if (!has_xc) {
-          stop(insight::format_error(
-            cli::format_inline(
-              "Expected design matrix {.field Xc{suffix}} not found in Stan code."
-            )
-          ))
-        }
-
-        # Validate inputs following project standards
-        checkmate::assert_string(stancode, min.chars = 1)
-        checkmate::assert_string(suffix, min.chars = 1)
-        checkmate::assert_string(time_param, min.chars = 1)
-
-        # Check parameter existence using consistent patterns
-        intercept_param <- paste0("Intercept", suffix)
-        intercept_present <- grepl("real.*Intercept[^_]", stancode)
-        
-        # Determine which covariate parameter is present
-        xc_present <- grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode)
-        x_present <- grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
-        covariates_present <- xc_present || x_present
-        covariate_param <- if (xc_present) paste0("Xc", suffix) else paste0("X", suffix)
-
-        # Build mu construction efficiently  
-        base_declaration <- paste0("vector[", time_param, "] mu", suffix, " = ")
-        zero_vector <- paste0("rep_vector(0.0, ", time_param, ")")
-        intercept_vector <- paste0("rep_vector(", intercept_param, ", ", time_param, ")")
-
-        # Handle the 4 cases systematically
-        if (!intercept_present && !covariates_present) {
-          # Case 1: No terms
-          mu_trend_code <- paste0(base_declaration, zero_vector, ";")
-        } else if (intercept_present && !covariates_present) {
-          # Case 2: Intercept only - use rep_vector for speed
-          mu_trend_code <- paste0(base_declaration, intercept_vector, ";")
-        } else if (!intercept_present && covariates_present) {
-          # Case 3: Covariates only
-          mu_trend_code <- paste0(base_declaration, zero_vector, ";\n  mu", suffix,
-                                  " += ", covariate_param, " * b", suffix, ";")
-        } else {
-          # Case 4: Both intercept and covariates
-          mu_trend_code <- paste0(base_declaration, zero_vector, ";\n  mu", suffix,
-                                  " += ", intercept_param, " + ", covariate_param,
-                                  " * b", suffix, ";")
-        }
+      mu_decl <- paste0("vector[", time_param, "] mu", suffix)
+      intercept <- if (grepl("real.*Intercept[^_]", stancode)) {
+        paste0("Intercept", suffix)
+      }
+      design <- if (grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode)) {
+        "Xc"
+      } else if (grepl("matrix\\[.*\\]\\s+X[^_]", stancode)) {
+        "X"
+      }
+      has_coefficients <- !is.null(design) &&
+        grepl("vector\\[.*\\]\\s+b[^_]", stancode)
+      mu_trend_code <- if (has_coefficients) {
+        paste0(mu_decl, " = rep_vector(0.0, ", time_param, ");\n  mu",
+               suffix, " += ", if (!is.null(intercept)) paste0(intercept, " + "),
+               design, suffix, " * b", suffix, ";")
       } else {
-        intercept_present <- grepl("real.*Intercept[^_]", stancode)
-        if (intercept_present) {
-          mu_trend_code <- paste0("vector[", time_param, "] mu", suffix,
-                                 " = rep_vector(Intercept", suffix, ", ",
-                                 time_param, ");")
-        } else {
-          mu_trend_code <- paste0("vector[", time_param, "] mu", suffix,
-                                 " = rep_vector(0.0, ", time_param, ");")
-        }
+        paste0(mu_decl, " = rep_vector(", intercept %||% "0.0", ", ",
+               time_param, ");")
       }
 
       # Create fallback stanvar
@@ -7605,7 +6903,6 @@ find_variable_declarations <- function(stancode, referenced_vars,
 #' @return Character vector of Stan code lines for mu_trend construction
 #' @noRd
 reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_declarations, variable_mapping, time_param = "N_time_trend") {
-  # Validation following project standards
   checkmate::assert_character(mu_construction)
   checkmate::assert_character(supporting_declarations)
   checkmate::assert_list(variable_mapping, types = "character", names = "named", min.len = 1)
@@ -8001,11 +7298,11 @@ extract_stan_block_content <- function(stancode, block_name) {
   checkmate::assert_string(stancode, min.chars = 1)
   checkmate::assert_string(block_name, min.chars = 1)
 
-  # Validate basic Stan code structure
   if (!grepl("\\{", stancode)) {
-    stop(insight::format_error(
-      "Invalid Stan code: no block structure found in provided code."
-    ), call. = FALSE)
+    stop_mvgam_fault(
+      "The Stan code to search lacks any block.",
+      paste0("mvgam searched it for the '", block_name, "' block.")
+    )
   }
 
   if (block_name == "functions") {
@@ -8686,14 +7983,14 @@ create_times_trend_matrix <- function(n_time,
                                       n_lv = NULL) {
   # times_trend[i, ?] is the row of trend_data (and the slot in
   # mu_trend / X_trend) at time i for the second-axis index. trend_data
-  # is arranged by extract_trend_data() via dplyr::arrange(time, ...).
+  # is arranged by trend_cell_frame() via dplyr::arrange(time, ...).
   # The trend assembly emits `... + mu_trend[times_trend[i, ?]]`, so
   # this mapping is what lets the trend formula's fixed and random
   # effects vary along that axis.
   #
   # Three cases, distinguished by the second-axis size:
   #   * Shared trend (multivariate shared, or any case where
-  #     extract_trend_data collapses to a single "shared" level):
+  #     trend_cell_frame() collapses to a single "shared" level):
   #     trend_data has n_time rows. All observed series share one
   #     mu_trend value per time, so times_trend[i, s] = i. Second axis
   #     is N_series_trend (series).
@@ -8706,10 +8003,10 @@ create_times_trend_matrix <- function(n_time,
   checkmate::assert_flag(has_by_lv)
   checkmate::assert_integerish(n_lv, lower = 1L, len = 1L, null.ok = TRUE)
   if (has_by_lv && is.null(n_lv)) {
-    stop(insight::format_error(paste0(
-      "'has_by_lv = TRUE' requires 'n_lv' to be set in",
-      " create_times_trend_matrix()."
-    )))
+    stop_mvgam_fault(
+      "A factor-grain time index was requested without 'n_lv'.",
+      "'create_times_trend_matrix()' takes 'n_lv' with 'has_by_lv = TRUE'."
+    )
   }
 
   second_axis_size <- if (has_by_lv) as.integer(n_lv) else as.integer(n_series)
@@ -8717,18 +8014,12 @@ create_times_trend_matrix <- function(n_time,
 
   n_trend_rows <- as.integer(n_trend_rows %||% (n_time * second_axis_size))
   n_unique_trend_second <- as.integer(n_trend_rows / n_time)
+  # `refuse_ragged_trend_grid()` has refused a ragged frame already
   if (n_unique_trend_second * n_time != n_trend_rows) {
-    stop(insight::format_error(c(
-      paste0(
-        "Series in 'data' do not share the same time grid."
-      ),
-      x = paste0(
-        "Got ", n_trend_rows, " rows over ", n_time, " times. Expected ",
-        n_time * second_axis_size, ", one per time and ",
-        if (has_by_lv) "latent factor" else "series", "."
-      ),
-      i = "Give an unobserved cell a row with a missing response."
-    )), call. = FALSE)
+    stop_mvgam_fault(
+      "The trend data does not fill its time grid.",
+      paste0("Got ", n_trend_rows, " rows over ", n_time, " times.")
+    )
   }
 
   if (n_unique_trend_second == 1L) {

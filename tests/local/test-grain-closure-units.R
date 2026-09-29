@@ -52,38 +52,6 @@ suppressMessages({
 # has to come from the environment:
 #   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
-
-# A ggplot is returned whether or not a layer received any data, so
-# asserting the class passes on the empty panel it looks like it is
-# guarding. Building the plot is what forces the layers to resolve.
-expect_drawn <- function(p) {
-  expect_s3_class(p, "ggplot")
-  layers <- ggplot2::ggplot_build(p)$data
-  expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-  invisible(layers)
-}
-
-with_warnings <- function(expr) {
-  seen <- character(0)
-  value <- withCallingHandlers(expr, warning = function(w) {
-    seen <<- c(seen, conditionMessage(w))
-    invokeRestart("muffleWarning")
-  })
-  list(value = value, warnings = seen)
-}
 
 set.seed(808L)
 
@@ -141,22 +109,17 @@ obs_formula <- bf(y ~ elev, p ~ tod_c)
 
 # -- Fit --------------------------------------------------------------
 
-cache <- cache_path("val_mvgam_occ_units.rds")
-if (file.exists(cache)) {
-  cat("[cache] Loading occupancy fit.\n")
-  fit <- readRDS(cache)
-} else {
-  cat("[fit ] mvgam(bf(y ~ elev, p ~ tod_c), occ(), 75 closure units)\n")
-  fit <- with_warnings(mvgam(
-    formula = obs_formula, family = occ(), data = dat,
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  ))$value
-}
-if (!identical(attr(fit, "sim_truth"), sim_truth)) {
-  attr(fit, "sim_truth") <- sim_truth
-  saveRDS(fit, cache)
-}
+fit <- cached_fit(
+  "val_mvgam_occ_units.rds",
+  function() {
+    with_warnings(mvgam(
+      formula = obs_formula, family = occ(), data = dat,
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    ))$value
+  },
+  key = sim_truth
+)
 
 
 test_that("the program counts units, not rows and not series", {
@@ -542,14 +505,9 @@ test_that("a frame carrying no responses can still be predicted at", {
 
 
 test_that("the criticism surface runs on a closure-unit fit", {
-  loo_warnings <- character(0)
-  ic <- withCallingHandlers(
-    loo(fit),
-    warning = function(w) {
-      loo_warnings <<- c(loo_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  )
+  caught <- with_warnings(loo(fit))
+  ic <- caught$value
+  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   # One likelihood term per closure unit, so the diagnostic is
   # counted on units rather than on visits.
@@ -636,17 +594,13 @@ nmix_sim <- local({
   }
 })
 
-nmix_cache <- cache_path("val_mvgam_closure_nmix_units.rds")
-if (file.exists(nmix_cache)) {
-  nmix_fit <- readRDS(nmix_cache)
-} else {
-  nmix_fit <- with_warnings(mvgam(
+nmix_fit <- cached_fit("val_mvgam_closure_nmix_units.rds", function() {
+  with_warnings(mvgam(
     formula = y ~ elev, family = nmix(), data = nmix_sim()$data,
     chains = 2L, iter = 1000L, warmup = 500L,
     silent = 2, backend = "cmdstanr"
   ))$value
-  saveRDS(nmix_fit, nmix_cache)
-}
+})
 
 
 test_that("the two sample-size accessors agree", {
@@ -774,12 +728,9 @@ gappy_fits <- local({
     # Every sixth visit goes unmade, spread across sites rather than
     # clustered, so no unit loses all of its visits.
     gappy$y[seq(2L, nrow(gappy), by = 6L)] <- NA_integer_
-    path <- cache_path("val_mvgam_occ_visits_gappy.rds")
-    fit <- if (file.exists(path)) {
-      readRDS(path)
-    } else {
+    fit <- cached_fit("val_mvgam_occ_visits_gappy.rds", function() {
       # brms reports the rows it dropped, once per internal pass.
-      out <- withCallingHandlers(
+      withCallingHandlers(
         mvgam(y ~ 1, data = gappy, family = occ(), chains = 2L,
               iter = 800L, warmup = 400L, silent = 2, seed = 11L,
               backend = "cmdstanr"),
@@ -789,9 +740,7 @@ gappy_fits <- local({
           }
         }
       )
-      saveRDS(out, path)
-      out
-    }
+    })
     cached <<- list(gappy = fit, data_gappy = gappy)
     cached
   }
@@ -1024,18 +973,16 @@ sim_jsdm_occ <- function() {
 
 
 fit_jsdm_closure <- function(nm, sim, family) {
-  cache <- cache_path(paste0("val_mvgam_jsdgam_mv_", nm, ".rds"))
-  if (file.exists(cache)) return(readRDS(cache))
-  fit <- jsdgam(
-    formula = y ~ species,
-    factor_formula = ~ s(env, by = lv_axis(), k = 5) - 1,
-    data = sim$data, unit = site, species = species,
-    family = family, n_lv = sim$N_lv,
-    chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-  saveRDS(fit, cache)
-  fit
+  cached_fit(paste0("val_mvgam_jsdgam_mv_", nm, ".rds"), function() {
+    jsdgam(
+      formula = y ~ species,
+      factor_formula = ~ s(env, by = lv_axis(), k = 5) - 1,
+      data = sim$data, unit = site, species = species,
+      family = family, n_lv = sim$N_lv,
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+  })
 }
 
 
@@ -1231,7 +1178,7 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
     )
     err <- expect_error(
       posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-      "Series levels in newdata not found in training data"
+      "Series in 'newdata' has levels absent from the training data"
     )
     expect_match(conditionMessage(err), "sp_unseen", fixed = TRUE)
     for (s in lev) {
@@ -1357,11 +1304,9 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
   test_that(says("summary and the criticism methods run on this fit"), {
     txt <- capture.output(summary(fit))
     expect_true(any(grepl(paste0("Series:\\s*", K), txt)))
-    seen <- character(0)
-    ic <- withCallingHandlers(loo(fit), warning = function(w) {
-      seen <<- c(seen, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    })
+    caught <- with_warnings(loo(fit))
+    ic <- caught$value
+    seen <- caught$warnings
     expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
     # One likelihood term per closure unit, so the diagnostic is
     # counted on units rather than on visits.
@@ -1511,22 +1456,18 @@ fit_multi_season <- local({
   cached <- NULL
   function() {
     if (!is.null(cached)) return(cached)
-    path <- cache_path("val_mvgam_occ_multi_season.rds")
-    if (file.exists(path)) {
-      cached <<- readRDS(path)
-      return(cached)
-    }
-    sim <- sim_multi_season()
-    cached <<- jsdgam(
-      formula = y ~ s(env, k = 6) + s(site, bs = "re"),
-      factor_formula = ~ AR(time = time) - 1,
-      data = sim$data, unit = time, species = series,
-      family = occ(multi_season = TRUE), n_lv = sim$N_lv,
-      prior = prior(normal(0, 0.5), class = "sds"),
-      chains = 2L, iter = 1000L, warmup = 500L,
-      silent = 2, backend = "cmdstanr"
-    )
-    saveRDS(cached, path)
+    cached <<- cached_fit("val_mvgam_occ_multi_season.rds", function() {
+      sim <- sim_multi_season()
+      jsdgam(
+        formula = y ~ s(env, k = 6) + s(site, bs = "re"),
+        factor_formula = ~ AR(time = time) - 1,
+        data = sim$data, unit = time, species = series,
+        family = occ(multi_season = TRUE), n_lv = sim$N_lv,
+        prior = prior(normal(0, 0.5), class = "sds"),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        silent = 2, backend = "cmdstanr"
+      )
+    })
     cached
   }
 })

@@ -61,14 +61,14 @@ test_that("times outside the grid are refused", {
   obs <- make_obs_struct(time = c(1, 2), series_int = c(1, 1))
   obs$unique_times <- c(5, 6)
   expect_error(reshape_linpred_to_grid(c(0.1, 0.2), obs),
-                 "missing from the unique-time grid")
+                 "must lie on the unique-time grid")
 })
 
 
 test_that("a mismatched vector length is refused", {
   obs <- make_obs_struct(time = c(1, 2, 3), series_int = c(1, 1, 1))
   expect_error(reshape_linpred_to_grid(c(0.1, 0.2), obs),
-                 "does not match observation count")
+                 "linear predictor has the wrong shape")
 })
 
 

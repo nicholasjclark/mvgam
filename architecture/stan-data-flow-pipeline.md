@@ -2,7 +2,7 @@
 
 ## Overview
 
-The mvgam package uses a two-stage assembly system that combines brms for observation modeling with custom trend extensions. The pipeline processes user input (formulas and data) through multiple stages before generating a unified Stan model.
+The mvgam package uses a two-stage assembly system that combines brms for observation modeling with mvgam's own trend extensions. The pipeline processes user input (formulas and data) through multiple stages before generating a unified Stan model.
 
 ## Pipeline Stages
 
@@ -28,7 +28,7 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 - **Available data structures**: Formula objects, response names, trend type information
 
 ### Stage 3: Data Validation and Comprehensive Time Series Analysis
-- **Entry point**: `validate_time_series_for_trends()` in `R/validations.R`
+- **Entry point**: `extract_and_validate_trend_components()` in `R/validations.R`
 - **Input**: Raw data, parsed trend specifications, and response variable names
 - **Processing**: 
   - Calls `extract_time_series_dimensions(response_vars)`, which resolves the series, time and factor axes once and records them
@@ -59,6 +59,7 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 - **Entry point**: `extract_trend_stanvars_from_setup()` in `R/stan_assembly.R`
 - **Input**: trend_setup, trend specifications with embedded dimensions and mappings, and obs_setup for GLM detection
 - **Processing**:
+  - **Trend predictor**: `extract_and_rename_stan_blocks()` builds `mu_trend` from the brms trend program, using `extract_mu_construction_with_classification()` (`R/mu_expression_analysis.R`) to find the statements that construct its `mu`
   - **GLM Detection and Optimization**: Analyzes observation model stancode for GLM function usage
     - **Detection Method**: Uses `detect_glm_usage()` to identify GLM functions (poisson_log_glm, normal_id_glm, etc.)
     - **Automatic Enhancement**: If GLM detected, adds `mu_ones` data stanvar for GLM compatibility
@@ -103,9 +104,6 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
   - Merges Stan data from both models
   - **Deduplication System**: Applied after initial combination to prevent compilation errors:
     - **Function deduplication**: `deduplicate_stan_functions()` removes duplicate function definitions
-    - **Variable deduplication**: `deduplicate_stan_variables()` removes duplicate variable declarations
-    - **Precedence rules**: data > transformed data > parameters > transformed parameters
-    - **Implementation**: Token-based variable extraction handles Stan constraint syntax correctly
   - Validates combined code structure
 - **Output**: Base Stan code with properly ordered and deduplicated trend variables ready for injection
 - **Available data structures**: Combined Stan code with both observation and trend components in correct declaration order and no duplicates
@@ -120,34 +118,12 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 - **Output**: Polished Stan code ready for compilation or inspection
 - **Available data structures**: Final polished Stan code with consistent formatting
 
-### Stage 7: GLM-Compatible Trend Injection with Enhanced Mu Analysis
-- **Entry point**: `inject_trend_into_linear_predictor()` in `R/stan_assembly.R`
-- **Input**: Base Stan code and trend stanvars (including mapping arrays and GLM compatibility stanvars)
-- **Processing**: 
-  - **Enhanced Mu Analysis System**: Uses comprehensive mu pattern recognition from `R/mu_expression_analysis.R`:
-    - **Function**: `extract_mu_construction_with_classification()` provides structural analysis of brms mu expressions
-    - **Classification**: Handles 11+ different brms patterns (GP, splines, monotonic, random effects, etc.)
-    - **Execution Planning**: Analyzes variable dependencies and generates proper execution ordering
-    - **Replaces**: Legacy regex-based pattern matching with robust structural analysis
-  - **Adaptive Approach**: Automatically selects optimal trend injection method based on GLM detection
-  - **GLM-Optimized Path**: When GLM functions detected (e.g., `poisson_log_glm_lpmf`):
-    - **Parameter Parsing**: Uses `parse_glm_parameters()` with regex patterns to extract Y variable, design matrix, intercept, and coefficients
-    - **Efficient Computation**: Creates `vector[N] mu = Xc * b` using matrix multiplication for base linear predictor
-    - **Trend Integration**: Adds intercept and trend in loop: `mu[n] += Intercept + trend[obs_trend_time[n], obs_trend_series[n]]`
-    - **GLM Preservation**: Transforms GLM call to `glm_function(Y | to_matrix(mu), 0.0, mu_ones, ...)` preserving optimization
-    - **Type Safety**: Uses correct lpdf/lpmf suffix based on distribution (continuous vs discrete)
-  - **Standard Path**: When no GLM optimization detected:
-    - **Traditional Injection**: Direct insertion into transformed parameters block
-    - **Compatibility**: Works with all non-GLM likelihood specifications
-  - **Key Innovation**: Replaces missing `obs_ind` references with explicit mapping arrays
-  - **Validation**: Ensures mapping arrays exist in stanvars before attempting injection
-  - **Missing Data Handling**: Works correctly even with missing observations since brms and mapping arrays are aligned
-  - **Universal Pattern**: All models use `trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[times_trend[i,s]]` for trend computation
-- **Output**: Complete Stan code ready for compilation with optimal computation strategy:
-  1. **Trend Computation**: `trend` matrix values using universal state-space formula
-  2. **GLM Path**: Efficient matrix-based `mu` construction with GLM-compatible function calls
-  3. **Standard Path**: Direct trend injection into linear predictor
-- **Available data structures**: All previous structures including observation-to-trend mappings and GLM compatibility variables
+### Stage 7: Trend Injection
+- **Entry point**: `inject_trend_into_linear_predictors(base_stancode, resps)` in `R/stan_assembly.R`. `resps` is `""` for a univariate model and the brms response keys for a multivariate one; `<sfx>` below is `""` or `_<resp>`
+- **Per response**, `inject_trend_for_response()` adds `mu<sfx>[n] += trend[obs_trend_time<sfx>[n], obs_trend_series<sfx>[n]]` in a loop:
+  - **GLM likelihood on `Y<sfx>`**: `rewrite_glm_for_trend()` declares `mu<sfx> = design * coefs`, adds the intercept and trend and rewrites the call to take `to_matrix(mu<sfx>)` and `mu_ones<sfx>`. brms writes an offset model's GLM call with the declared `mu<sfx>` as its intercept, and that call takes the next path unchanged
+  - **Built predictor**: `add_trend_to_built_predictor()` places the loop before the first statement that transforms `mu<sfx>` (an inverse link, or the skew-normal mean shift), outside any loop enclosing it. Without a transform, the loop follows the last statement that builds `mu<sfx>`
+- **Faults**: an unknown GLM family, or a model block with no single correct place for the trend, raises `stop_mvgam_fault()`. `resolve_observation_family()` has already refused the families mvgam does not support, `mixture()` among them
 
 ## Critical Data Structures
 
@@ -182,14 +158,8 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 ### GLM Optimization System
 - **Purpose**: Preserves brms GLM optimization while enabling trend injection into linear predictors
 - **Detection**: Automatic identification of GLM functions in observation model during stanvar generation
-- **Supported GLM Types**: All brms GLM functions including:
-  - `poisson_log_glm_lpmf`: Poisson regression with log link
-  - `normal_id_glm_lpdf`: Normal regression with identity link  
-  - `neg_binomial_2_log_glm_lpmf`: Negative binomial regression with log link
-  - `bernoulli_logit_glm_lpmf`: Bernoulli regression with logit link
-  - `ordered_logistic_glm_lpmf`: Ordered logistic regression
-  - `categorical_logit_glm_lpmf`: Categorical regression with logit link
-- **Parameter Parsing**: Regex-based extraction of GLM function parameters:
+- **Supported GLM Types**: the entries of `glm_call_layout` (`R/glm_analysis.R`): `normal_id_glm`, `poisson_log_glm`, `neg_binomial_2_log_glm`, `bernoulli_logit_glm` and `ordered_logistic_glm`. `categorical_logit_glm` has no entry because mvgam refuses `brms::categorical()`
+- **Parameter Parsing**: `parse_glm_parameters_from_line()` maps each argument to its role in the family's `glm_call_layout` entry:
   - **Y variable**: Response variable name from GLM call
   - **Design matrix**: Matrix or vector containing predictors (e.g., `Xc`)
   - **Intercept**: Scalar intercept parameter (e.g., `Intercept`)
@@ -223,7 +193,7 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 └─ generate_stan_components_mvgam_formula() →           [SHARED INFRASTRUCTURE - SINGLE SOURCE OF TRUTH]
     ├─ parse_multivariate_trends() →                   [EXTRACTS response_names FROM FORMULA]
     │   └─ returns mv_spec with response_names →
-    ├─ validate_time_series_for_trends(data, trend_specs, response_vars) →
+    ├─ extract_and_validate_trend_components(data, mv_spec, response_vars) →
     │   └─ extract_time_series_dimensions(data, time_var, series_var, trend_type, response_vars) →
     │       ├─ calculate dimensions (n_time, n_series, n_obs) →
     │       ├─ create ordering mappings →
@@ -245,13 +215,12 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
     │   │   ├─ create stanvar for obs_trend_series →
     │   │   └─ generate_trend_specific_stanvars() →
     │   ├─ sort_stanvars() →                            [DEPENDENCY-BASED REORDERING]
-    │   └─ inject_trend_into_linear_predictor() →       [GLM-COMPATIBLE TREND INJECTION]
-    │       ├─ detect_glm_usage() →                     [DETERMINES INJECTION APPROACH]
-    │       ├─ inject_trend_into_glm_predictor() →      [GLM-OPTIMIZED PATH]
-    │       │   ├─ parse_glm_parameters() →             [EXTRACTS GLM FUNCTION PARAMETERS]
-    │       │   ├─ generate efficient mu construction → [MATRIX MULTIPLICATION + LOOP]
-    │       │   └─ transform_glm_call() →               [GLM FUNCTION TRANSFORMATION]
-    │       └─ standard trend injection →               [TRADITIONAL PATH FOR NON-GLM]
+    │   └─ inject_trend_into_linear_predictors() →      [ONE PASS PER RESPONSE]
+    │       └─ inject_trend_for_response() →
+    │           ├─ rewrite_glm_for_trend() →            [GLM LIKELIHOOD ON Y<sfx>]
+    │           │   ├─ parse_glm_parameters_from_line()
+    │           │   └─ build_glm_call_on_mu()
+    │           └─ add_trend_to_built_predictor() →     [EVERY OTHER LIKELIHOOD]
     ├─ polish_generated_stan_code() →                   [SINGLE POLISHING POINT]
     └─ returns {combined_components, obs_setup, trend_setup, mv_spec} →
         ├─ mvgam() path: extract stancode/standata + create mvgam object

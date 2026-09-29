@@ -157,11 +157,7 @@ active_factors.mvgam <- function(object,
   }
   n_series <- loading_series_count(object)
   draws_mat <- posterior::as_draws_matrix(object$fit)
-  # `resolve_Z_loadings()` returns the sampled Z / Z_tilde
-  # array when the fit has free loadings, or the fully-fixed
-  # trend_map matrix broadcast across draws when Z is data.
-  # Fixed-Z fits get column-norm summaries that are constant
-  # across draws (posterior mass on the deterministic value).
+  # A fixed-Z fit gets column norms constant across draws.
   # The model basis, not the QR-identified one: `sigma_trend[k]`
   # belongs to the column `Z[, k]` the model sampled, while
   # `Z_tilde[, k]` is a mixture of every column, so pairing the two
@@ -169,7 +165,7 @@ active_factors.mvgam <- function(object,
   # shrinkage fit the rotated norms carry a QR gradient of 51 down
   # to 28 while the sampled ones sit flat around 41, which is what
   # the unit-scale prior puts there.
-  Z_arr <- resolve_Z_loadings(
+  Z_arr <- resolve_factor_loadings(
     object,
     draws_mat,
     n_series = as.integer(n_series),
@@ -330,5 +326,5 @@ loading_series_count <- function(object) {
   if (!is.null(n)) {
     return(as.integer(n))
   }
-  as.integer(length(resolve_series_info(object)$series_levels))
+  as.integer(length(fitted_series_levels(object)))
 }

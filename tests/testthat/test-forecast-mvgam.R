@@ -45,15 +45,13 @@ make_mock_mvgam <- function(series_levels = "s1", n_time = 10L,
     mv_spec = list(
       trend_specs = spec
     ),
-    series_info = list(series_levels = series_levels),
-    trend_metadata = list(
+    trend_metadata = c(mock_axis_record(d), list(
       trend_type = trend_type,
       ar_lags = ar_lags,
       ma_lags = ma_lags,
       max_lag = max_lag,
-      has_cor = FALSE,
-      variables = list(time_var = "time", series_var = "series")
-    ),
+      has_cor = FALSE
+    )),
     standata = list(
       N_series_trend = length(series_levels),
       N_lv_trend = n_lv %||% length(series_levels),
@@ -292,7 +290,7 @@ test_that("ndraws beyond available draws errors informatively", {
   expect_error(
     forecast(fit, newdata = mock_future_data(fit), type = "response",
               ndraws = 50L),
-    "more draws than the posterior holds"
+    "more draws than the posterior has"
   )
 })
 
@@ -365,7 +363,7 @@ test_that("compute_car_forecast_time errors on per-series time mismatch", {
   expect_error(
     compute_car_forecast_time(fit, fc_grid,
                                 series_levels = c("a", "b")),
-    "share the same forecast"
+    "share one time grid"
   )
 })
 
@@ -426,7 +424,7 @@ test_that("Newdata with unseen series levels errors crisply", {
   )
   expect_error(
     forecast(fit, newdata = newdata, type = "response"),
-    "series levels not seen"
+    "has levels absent from the training data"
   )
 })
 
@@ -461,7 +459,7 @@ test_that("Newdata that names no time or no series errors", {
       newdata = data.frame(time = 11:12, y = NA_integer_),
       type = "response"
     ),
-    "names no series"
+    "lack the series this model was fitted on"
   )
 })
 
@@ -789,7 +787,11 @@ test_that("the forecast grid does not depend on newdata row order", {
     observations = list(a = training$y[1:10], b = training$y[11:20]),
     data = training, series_var = "series", time_var = "time"
   )
-  model <- structure(list(formula = brms::bf(y ~ 1)), class = "mvgam")
+  model <- structure(
+    list(formula = brms::bf(y ~ 1),
+         trend_metadata = mock_axis_record(training)),
+    class = "mvgam"
+  )
   ordered_grid <- resolve_forecast_grid(
     object = model, newdata = future, training = train_info,
     series_levels = c("a", "b")
@@ -888,7 +890,7 @@ test_that("a wide frame padded at the end is stepped from its grid", {
     ),
     "Rows containing NAs were excluded"
   )
-  series_levels <- mvgam:::resolve_series_info(prefit)$series_levels
+  series_levels <- mvgam:::fitted_series_levels(prefit)
   training <- mvgam:::build_training_arms(prefit, series_levels)
   expect_identical(max(unlist(training$times)), 10L)
   fc <- mvgam:::resolve_forecast_grid(

@@ -275,18 +275,12 @@ walk_by_lv <- function(expr, state, depth = 0L) {
       if (is_series_symbol(by_arg)) {
         stop(insight::format_error(c(
           "'by = series' is not allowed inside 'trend_formula'.",
-          x = paste0(
-            "The trend side models shared dynamics or effects that ",
-            "vary by latent factor. Observation effects that vary by ",
-            "series belong in 'formula'."
-          ),
-          i = paste0(
-            "Use 'by = lv_axis()' for a smooth that varies by factor. ",
-            "This requires a factor model with 'n_lv < n_series'. ",
-            "For an effect that varies by series, move the smooth to ",
-            "'formula'."
-          )
-        )))
+          x = paste0("The trend side models shared dynamics or effects ",
+                     "that vary by latent factor."),
+          i = "Move an effect that varies by series to 'formula'.",
+          i = paste0("Use 'by = lv_axis()' for a smooth that varies by ",
+                     "factor, in a factor model with 'n_lv < n_series'.")
+        )), call. = FALSE)
       }
     }
     return(expr)

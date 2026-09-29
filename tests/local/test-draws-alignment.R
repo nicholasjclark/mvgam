@@ -44,52 +44,15 @@ suppressMessages({
 # has to come from the environment:
 #   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
-# Resolved from where this file is running rather than from what is
-# already on disk. testthat sets the working directory to the test
-# file's own, so asking whether `fixtures` exists picks the wrong
-# branch on a clean tree and writes tests/local/tests/local/fixtures.
-cache_path <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, name)
-}
 
-# The value of `expr` and every warning raised computing it. Several
-# blocks here exercise calls that warn by contract, and each one
-# names the notice instead of discarding it.
-with_warnings <- function(expr) {
-  seen <- character(0)
-  value <- withCallingHandlers(expr, warning = function(w) {
-    seen <<- c(seen, conditionMessage(w))
-    invokeRestart("muffleWarning")
-  })
-  list(value = value, warnings = seen)
-}
-
-# Fits are cached because every assertion here is about which draws
-# came back, not about what the sampler found, so refitting changes
-# nothing a check reads. Written under a temporary name and moved into
-# place, so an interrupted run cannot leave a truncated file behind.
+# Every assertion here concerns which draws came back. The cache is
+# named for this file, and the models asserted on are the ones built
+# here.
 fit_cached <- function(name, ...) {
-  # The cache is named for this file rather than shared, so the models
-  # asserted on are the ones built here. A shared name would let a
-  # differently specified fit of the same name answer instead.
-  path <- cache_path(paste0("val_align_", name, ".rds"))
-  if (file.exists(path)) {
-    return(readRDS(path))
-  }
-  fit <- mvgam(
-    ..., chains = 2L, iter = 1000L, warmup = 500L,
-    silent = 2, backend = "cmdstanr"
-  )
-  part <- paste0(path, ".part")
-  saveRDS(fit, part)
-  file.rename(part, path)
-  fit
+  cached_fit(paste0("val_align_", name, ".rds"), function() {
+    mvgam(..., chains = 2L, iter = 1000L, warmup = 500L,
+          silent = 2, backend = "cmdstanr")
+  })
 }
 
 sim_ar1 <- function(n, ar, sd) {
@@ -259,7 +222,7 @@ test_that("a count and the indices it stands for agree", {
   }
   # And refuses one it cannot honour, rather than quietly using all.
   expect_error(posterior_epred(fit, ndraws = ndraws(fit) + 1L),
-               "more draws than the posterior holds")
+               "more draws than the posterior has")
 })
 
 

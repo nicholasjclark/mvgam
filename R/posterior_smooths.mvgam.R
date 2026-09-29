@@ -86,7 +86,7 @@ posterior_smooths.mvgam <- function(object, smooth, newdata = NULL,
   rlang::check_dots_empty()
   if (!is.null(dpar) && !is.null(nlpar)) {
     stop(insight::format_error(
-      "Name a distributional parameter or a non-linear parameter, not both."
+      "Supply only one of 'dpar' and 'nlpar'."
     ), call. = FALSE)
   }
   resolve_resp(object, resp, required = TRUE, caller = "posterior_smooths()")
@@ -223,12 +223,10 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
                    logical(1L))
     terms_list <- terms_list[keep]
     if (length(terms_list) == 0L) {
-      stop(insight::format_error(
-        paste0(
-          "None of the requested smooth terms were found. ",
-          "Use 'smooths(x)' to list the available terms."
-        )
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        "'smooth' must be a smooth term of the model.",
+        i = "Use 'smooths(x)' to list the available terms."
+      )), call. = FALSE)
     }
   }
   probs <- c((1 - prob) / 2, 1 - (1 - prob) / 2)
@@ -502,8 +500,8 @@ mvgam_smooth_terms <- function(x) {
           sum(counts) != length(attr(Xs, "smcols"))) {
         stop_mvgam_fault(
           "A predictor's smooth terms do not match its smooth objects.",
-          paste0("Terms: ", paste(labels, collapse = ", "), "; objects: ",
-                 length(attr(Xs, "smcols")), ".")
+          paste0("Got terms ", paste(labels, collapse = ", "), " for ",
+                 length(attr(Xs, "smcols")), " smooth objects.")
         )
       }
       specs <- mgcv::interpret.gam(

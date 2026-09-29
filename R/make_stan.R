@@ -134,14 +134,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
 
   # Parse multivariate trends and validate. The trend names the time
   # and series columns, which key a closure unit below.
-  if (is.null(mv_spec <- parse_multivariate_trends(obs_formula, trend_formula))) {
-    stop(insight::format_error(c(
-      "Failed to parse trend formula specification.",
-      i = cli::format_inline(
-        "Check your {.arg trend_formula} syntax and constructor arguments."
-      )
-    )))
-  }
+  mv_spec <- parse_multivariate_trends(obs_formula, trend_formula)
   axis_names <- spec_axis_vars(mv_spec$trend_specs)
 
   # Closure-unit families (`nmix()` and its variants, `occ()`, and the
@@ -191,35 +184,9 @@ build_stan_components <- function(formula, data, family = gaussian(),
   obs_stanvars <- attach_family_stanvars(stanvars, families)
   trend_stanvars_in <- stanvars
 
-  # Apply the top-level `trend_map` alias to the parsed trend
-  # specs. Collision detection: error if the user supplied
-  # `trend_map` both at `mvgam(..., trend_map = ...)` AND on the
-  # trend constructor (e.g. `AR(trend_map = ...)`).
-  mv_spec$trend_specs <- apply_trend_map_alias(
-    mv_spec$trend_specs, trend_map
+  mv_spec$trend_specs <- prepare_trend_specs(
+    mv_spec$trend_specs, trend_map, loadings_prior, data, data2
   )
-
-  # Normalise each spec's raw `trend_map` (matrix / data.frame /
-  # character code) to a canonical numeric Z. Stashed on
-  # `spec$fixed_Z`; `spec$n_lv` is reconciled to `ncol(Z)`. Stan
-  # emission downstream reads `fixed_Z` and skips the sampled-Z
-  # path when it is non-NULL.
-  mv_spec$trend_specs <- normalise_trend_map_on_specs(
-    mv_spec$trend_specs, data
-  )
-
-  # Normalise the structured-loadings prior once at the top
-  # level and attach to each trend spec. The same spec is shared
-  # across multivariate trends because mvgam fits one shared
-  # trend component across responses.
-  loadings_prior_spec <- normalise_loadings_prior(
-    loadings_prior, data2 = data2, data = data
-  )
-  if (!is.null(loadings_prior_spec)) {
-    mv_spec$trend_specs <- attach_loadings_prior_spec(
-      mv_spec$trend_specs, loadings_prior_spec
-    )
-  }
 
   # `n_lv` belongs to the trend that carries the factors, so it is
   # written on the constructor inside `trend_formula`. Passed to
@@ -227,13 +194,6 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # brms and Stan, and nothing there reads it: asked for one factor
   # on two series, the fit came back with two and said nothing.
   refuse_top_level_n_lv(list(...)$n_lv)
-
-  # Whether this trend has a factor form at all, read from the
-  # registry that records it. Asked here because every route a
-  # factor can be requested by has landed by now: the constructor's
-  # `n_lv` and a `trend_map` normalised to a fixed `Z`.
-  enforce_factor_support_against_specs(mv_spec$trend_specs)
-
 
   # Two cases need brms threading suppressed at the stancode level.
   # Both rewrite the local `threads` so brms's downstream
@@ -296,7 +256,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
     silent = silent
   )
 
-  if (is.null(obs_setup <- do.call(setup_brms_lightweight, c(
+  obs_setup <- do.call(setup_brms_lightweight, c(
     list(
       formula = obs_formula,
       data = data,
@@ -306,46 +266,28 @@ build_stan_components <- function(formula, data, family = gaussian(),
     ),
     shared_setup,
     list(...)
-  )))) {
-    stop(insight::format_error(c(
-      "Failed to setup observation model with brms.",
-      i = cli::format_inline(
-        "Check your {.arg formula} and {.arg data} compatibility."
-      )
-    )))
-  }
+  ))
 
-  # Initialize trend_priors outside conditional block
   trend_priors <- NULL
-  
-  # Setup trend model if trends are specified
   trend_setup <- if (mv_spec$has_trends) {
-    # Validate trend model prerequisites
     checkmate::assert_class(mv_spec$base_formula, "formula")
-    
-    # Filter priors: only pass trend-related priors to trend setup
     trend_priors <- filter_priors_by_side(prior, "trend")
-    
-    # `trend_spec_head()` takes the first of a multivariate set and
-    # the spec itself for a univariate one.
-    time_var <- axis_names$time_var
-    series_var <- axis_names$series_var
-    
+
     # Each response's column, named by the key brms suffixes its data
     # and parameters with: the frame is read by the one and the
     # program is written with the other.
     response_vars <- response_columns(obs_formula)
-    
-    # Consolidated trend processing - replaces dual path architecture
+
+    # The axes are resolved here once, and the dimensions they give
+    # travel on the spec
     components <- extract_and_validate_trend_components(
-      data, mv_spec, response_vars, time_var, series_var, trend_formula,
-      family = family
+      data, mv_spec, response_vars, family = family
     )
     trend_data <- components$trend_data
-    mv_spec <- components$enhanced_mv_spec  # Already has dimensions injected
+    mv_spec <- components$enhanced_mv_spec
     trend_metadata <- components$metadata
-    
-    if (is.null(trend_result <- do.call(setup_brms_lightweight, c(
+
+    do.call(setup_brms_lightweight, c(
       list(
         formula = mv_spec$base_formula,
         data = trend_data,  # Use reduced trend data
@@ -364,15 +306,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
       ),
       shared_setup,
       list(...)
-    )))) {
-      stop(insight::format_error(c(
-        "Failed to setup trend model with brms.",
-        i = cli::format_inline(
-          "Check your {.arg trend_formula} and {.arg data} compatibility."
-        )
-      )))
-    }
-    trend_result
+    ))
   } else {
     NULL
   }
@@ -388,35 +322,13 @@ build_stan_components <- function(formula, data, family = gaussian(),
     )
   }
 
-  # Generate combined Stan code and data using existing infrastructure
-  combined_components <- generate_combined_stancode_and_data(
+  combined_components <- generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    mv_spec = mv_spec,
-    prior = trend_priors,  # Pass unfiltered trend priors to mvgam functions
+    trend_specs = mv_spec$trend_specs,
+    prior = trend_priors,
     backend = backend
   )
-
-  # Validate result structure with specific error locations
-  if (is.null(combined_components)) {
-    stop(insight::format_error(c(
-      "Stan component generation returned NULL result.",
-      i = cli::format_inline(
-        "This indicates a failure in {.fn generate_combined_stancode_and_data}."
-      )
-    )))
-  }
-
-  if (!is.list(combined_components)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Stan component generation returned invalid type: {.cls {class(combined_components)}}."
-      ),
-      i = cli::format_inline(
-        "Expected list from {.fn generate_combined_stancode_and_data}."
-      )
-    )))
-  }
 
   # Polish Stan code for consistent formatting and spacing
   combined_components$stancode <- paste(
@@ -498,13 +410,8 @@ generate_stan_components_mvgam_formula <- function(...) {
 #' @noRd
 zmvn_scale_confounded <- function(mv_spec, family, n_series) {
   checkmate::assert_int(n_series, lower = 1L)
-  specs <- mv_spec$trend_specs
-  if (is.null(specs)) return(FALSE)
-  specs <- if (is_multivariate_trend_specs(specs)) specs else list(specs)
-  has_zmvn <- any(vapply(
-    specs, function(sp) identical(sp$trend, "ZMVN"), logical(1L)
-  ))
-  has_zmvn && n_series == 1L && "sigma" %in% family$dpars
+  identical(trend_spec_head(mv_spec$trend_specs)$trend, "ZMVN") &&
+    n_series == 1L && "sigma" %in% family$dpars
 }
 
 
@@ -547,14 +454,12 @@ warn_zmvn_single_series <- function(mv_spec, family, n_series) {
 stacked_design_matrix <- function(sdata) {
   n <- sdata$N
   n_trend <- sdata$N_trend
-  tt <- sdata$times_trend
-  oi <- sdata$obs_trend_time
-  os <- sdata$obs_trend_series
-  if (is.null(n) || is.null(n_trend) || is.null(tt) ||
-        is.null(oi) || is.null(os)) {
+  idx <- obs_rows_to_trend_rows(sdata)
+  if (is.null(n) || is.null(n_trend) || is.null(idx) || anyNA(idx)) {
     return(NULL)
   }
-  if (!identical(ncol(tt), as.integer(sdata$N_series_trend))) {
+  if (!identical(ncol(sdata$times_trend),
+                 as.integer(sdata$N_series_trend))) {
     return(NULL)
   }
   is_design <- function(nm) {
@@ -573,10 +478,6 @@ stacked_design_matrix <- function(sdata) {
   # One observation design named `X`. A multivariate formula keys its
   # designs by response, and those belong to separate likelihoods.
   if (!("X" %in% obs_nms) || !length(trend_nms)) {
-    return(NULL)
-  }
-  idx <- tt[cbind(as.integer(oi), as.integer(os))]
-  if (anyNA(idx)) {
     return(NULL)
   }
   # A block carries its own column names where brms wrote them, and
@@ -698,18 +599,12 @@ warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
   # This warning is raised on every fit. A batch script that re-fits
   # after a config change keeps seeing it each time its threads
   # request is dropped.
-  insight::format_warning(
-    paste0(
-      "`threads_per_chain > 1` is ignored for brms-native ",
-      "families combined with a `trend_formula`. mvgam's trend ",
-      "injector cannot reach the linear predictor that brms places ",
-      "inside `partial_log_lik_lpmf`. The model compiles and ",
-      "samples serially. Closure-unit families (`occ()`, `nmix()`) ",
-      "are unaffected and continue to thread. Multi-response ",
-      "families (`diri()`, `mvn()`, `mvt()`, `multi()`, `categ()`) ",
-      "also continue to thread."
-    )
-  )
+  insight::format_warning(c(
+    "'threads' is not supported for a brms family with a 'trend_formula'.",
+    x = "brms threads a likelihood that the latent trend has to join.",
+    i = "The model samples serially.",
+    i = "Closure-unit and multi-response families thread as requested."
+  ))
 }
 
 
@@ -818,18 +713,7 @@ mvgam_formula_component <- function(component, object, data, family,
     validate = validate,
     ...
   )
-  out <- generated$combined_components[[component]]
-  if (is.null(out)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Stan generation missing {.field {component}} component."
-      ),
-      i = cli::format_inline(
-        "The {.fn generate_combined_stancode_and_data} result is incomplete."
-      )
-    )))
-  }
-  out
+  generated$combined_components[[component]]
 }
 
 #' Stan program and data from a formula carrying a `trend_formula`
@@ -960,20 +844,12 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
   )
 
   # Validate Stan data structure follows brms conventions
-  if (!is.list(standata)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Generated Stan data is not a list: {.cls {class(standata)}}."
-      ),
-      i = "Stan requires named list structure for data."
-    )))
-  }
-
-  if (length(standata) == 0) {
-    stop(insight::format_error(c(
-      "Generated Stan data list is empty.",
-      i = "No data components were successfully generated."
-    )))
+  if (!is.list(standata) || length(standata) == 0L) {
+    stop_mvgam_fault(
+      "The generated Stan data must be a non-empty list.",
+      paste0("Got class '", class(standata)[1L], "' of length ",
+             length(standata), ".")
+    )
   }
 
   return(standata)

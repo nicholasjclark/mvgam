@@ -44,19 +44,10 @@ approx_gp_pred <- function(Xgp, slambda, zgp, sdgp, lscale, kernel) {
   
   # Validate dimension consistency
   if (ncol(zgp) != n_basis) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Basis function mismatch: {.field Xgp} has {n_basis} basis functions but {.field zgp} has {ncol(zgp)} coefficients."
-      )
-    ))
+    stop_shape_fault("The GP coefficients 'zgp'", ncol(zgp), n_basis)
   }
-
   if (length(sdgp) != n_draws) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Draw count mismatch: {.field zgp} has {n_draws} draws but {.field sdgp} has {length(sdgp)} elements."
-      )
-    ))
+    stop_shape_fault("The GP scale 'sdgp'", length(sdgp), n_draws)
   }
   
   # Compute spectral power density (returns sqrt for direct use)
@@ -117,11 +108,7 @@ prepare_spd_inputs <- function(slambda, sdgp, lscale) {
 
   # Validate row count matches draws
   if (nrow(lscale) != n_draws) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Dimension mismatch: {.field lscale} has {nrow(lscale)} rows but {.field sdgp} has {n_draws} elements."
-      )
-    ))
+    stop_shape_fault("The GP length scale", nrow(lscale), n_draws)
   }
 
   # brms uses isotropic GPs by default (single shared length scale)
@@ -135,11 +122,11 @@ prepare_spd_inputs <- function(slambda, sdgp, lscale) {
     lscale_iso <- NULL
     lscale2 <- lscale^2
   } else {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Dimension mismatch: {.field lscale} has {n_lscale_dims} columns but expected 1 (isotropic) or {n_dims} (anisotropic)."
-      )
-    ))
+    stop_mvgam_fault(
+      "A GP length scale needs 1 column or one per dimension.",
+      paste0("Got ", n_lscale_dims, " columns for ", n_dims,
+             " dimensions.")
+    )
   }
 
   list(
@@ -385,8 +372,8 @@ validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
     stop_mvgam_fault(
       paste0("Monotonic variable '", xmo_name, "' holds a level ",
              "outside its coding."),
-      paste0("Levels run 0 to ", k_levels, "; found ", min(Xmo),
-             " to ", max(Xmo), ".")
+      paste0("Levels run 0 to ", k_levels, " and the data hold ",
+             min(Xmo), " to ", max(Xmo), ".")
     )
   }
   Xmo
@@ -787,19 +774,8 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   s_idx <- obs_struct$series_int
   time_var <- axis_vars(mvgam_fit)$time_var
   # The grid the trend was fitted on, from the record that owns it.
-  # A fit saved before that record existed rebuilds the grid from the
-  # stored frame, which gives the same vector wherever both are
-  # present.
-  train_data <- mvgam_training_data(mvgam_fit)
-  fitted_times <- mvgam_axes(mvgam_fit)$time$values
-  if (is.null(fitted_times) && time_var %in% names(train_data)) {
-    fitted_times <- sort(unique(train_data[[time_var]]))
-  }
-  raw_t_idx <- if (time_var %in% names(newdata) &&
-                     !is.null(fitted_times)) {
-    match(newdata[[time_var]], fitted_times)
-  } else {
-    NULL
+  raw_t_idx <- if (time_var %in% names(newdata)) {
+    match(newdata[[time_var]], mvgam_axes(mvgam_fit)$time$values)
   }
   # A closure-unit family predicts at the unit grain rather than per
   # newdata row, so the raw lookup only applies when it covers the

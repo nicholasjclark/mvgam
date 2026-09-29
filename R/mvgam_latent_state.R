@@ -49,11 +49,7 @@ new_mvgam_latent_state <- function(draws, unit, family,
   checkmate::assert_string(state_short)
   checkmate::assert_flag(has_time)
   if (ncol(draws) != nrow(unit)) {
-    stop(insight::format_error(c(
-      "Draws / unit grid size mismatch.",
-      x = paste0("ncol(draws) = ", ncol(draws),
-                  ", nrow(unit) = ", nrow(unit), ".")
-    )))
+    stop_shape_fault("The latent-state draws", ncol(draws), nrow(unit))
   }
   structure(
     list(

@@ -133,6 +133,13 @@ stan_prior_on <- function(code, param) {
 }
 
 
+# The axes record `mvgam()` stores for a frame with `time` and
+# `series` columns, built by the package's own code. A mock fit takes
+# its `trend_metadata` from here and adds the trend's fields.
+mock_axis_record <- function(data) {
+  mvgam:::trendless_trend_metadata(data, "time", "series")
+}
+
 # One factor-fit mock, shared by every test that reads the loadings.
 # `residual_cor()` and `shared_variation()` are two views of the same
 # `Z Sigma Z'`, so a mock defined in one file and copied into the
@@ -140,8 +147,8 @@ stan_prior_on <- function(code, param) {
 # Helper to build a fake mvgam fit carrying just enough state for the
 # factor-loadings branch: an n_lv on the trend spec, plus a fit slot
 # that returns the requested Z[i,j] columns when handed to
-# posterior::as_draws_matrix(). resolve_series_info() is consulted
-# via local_mocked_bindings so the helper doesn't need a real fit.
+# posterior::as_draws_matrix(), and the series levels on the axes
+# record.
 mk_factor_obj <- function(n_series = 3L, n_lv = 2L, ndraws = 50L,
                           Z_target = NULL, sigma_target = NULL) {
   if (is.null(Z_target)) {
@@ -179,9 +186,12 @@ mk_factor_obj <- function(n_series = 3L, n_lv = 2L, ndraws = 50L,
           list(n_lv = n_lv), class = "mvgam_trend"
         )),
         trend_metadata = list(
-          n_lv = n_lv
+          trend_type = "ZMVN",
+          n_lv = n_lv,
+          axes = list(series = list(
+            levels = paste0("s", seq_len(n_series)), n = n_series
+          ))
         ),
-        trend_components = list(types = "ZMVN"),
         fit = draws_mat
       ),
       class = "mvgam"

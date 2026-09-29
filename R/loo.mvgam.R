@@ -164,12 +164,10 @@ loo.mvgam <- function(x, ...,
         "{.field moment_match} and {.field reloo} are not ",
         "supported on mvgam."
       )),
-      i = paste0(
-        "These options require model refits. Inspect the Pareto k ",
-        "diagnostics from 'loo()' and refit without problematic ",
-        "observations if needed."
-      )
-    )))
+      x = "Each option refits the model once per high-k observation.",
+      i = paste0("Inspect the Pareto k diagnostics from 'loo()' and ",
+                 "refit on the remaining observations if needed.")
+    )), call. = FALSE)
   }
 
   # The remaining brms-parity arguments describe machinery this
@@ -446,25 +444,21 @@ per_series_ic <- function(x, logliks,
 per_obs_series_labels <- function(x) {
   if (is_multi_response_family(x$family)) {
     stop(insight::format_error(c(
-      "by_series = TRUE is not meaningful for multi-response families.",
-      x = paste0(
-        "Family '", resolve_family_name(x$family) %||% "?",
-        "' places species on the K-vector axis within each closure ",
-        "unit. A species has no rows of its own."
-      ),
-      i = "Use loo()/waic() without by_series to score per closure unit."
-    )))
+      "'by_series = TRUE' is not supported for multi-response families.",
+      x = paste0("Family '", resolve_family_name(x$family) %||% "?",
+                 "' places species on the K-vector axis of each closure ",
+                 "unit."),
+      i = "Call 'loo()' or 'waic()' with 'by_series = FALSE' to score per unit."
+    )), call. = FALSE)
   }
   data <- mvgam_training_data(x) %||% data.frame()
   series <- axis_row_series(x, data, required = TRUE)
   if (is.null(series)) {
     stop(insight::format_error(c(
-      "by_series = TRUE is not meaningful for a response-keyed fit.",
-      x = paste0(
-        "The series of this model are its responses. Every row ",
-        "carries all of them."
-      )
-    )))
+      "'by_series = TRUE' is not supported for a response-keyed fit.",
+      x = "The series of this model are its responses.",
+      x = "Each row contains every response."
+    )), call. = FALSE)
   }
   # `loglik_col_values()` settles the closure-unit grain for every
   # caller, and `kfold()` puts its fold keys through the same call.

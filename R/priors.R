@@ -29,11 +29,10 @@
 #' Common Prior Specifications for Trend Parameters
 #'
 #' @description
-#' Shared prior specifications for trend parameters that are used across
-#' multiple trend types. This ensures consistent defaults and reduces
-#' duplication in trend registrations. Each specification contains default
-#' Stan distribution strings, parameter bounds, descriptions, and dimension
-#' information.
+#' Default priors for the trend parameters several trend types share,
+#' written once for all of them. Each specification holds a Stan
+#' distribution string, parameter bounds, a description and a
+#' dimension.
 #'
 #' @format Named list with parameter specifications. Each element is a list with:
 #' \describe{
@@ -51,7 +50,6 @@
 #'   \item{Z}{Factor loadings matrix for factor models}
 #' }
 #'
-#' @seealso \code{\link{register_trend_type}} for using prior specifications
 #' @noRd
 common_trend_priors <- list(
   sigma_trend = list(
@@ -178,173 +176,49 @@ common_trend_priors <- list(
   )
 )
 
-#' Extract Trend Model Priors
+#' The trend half of the prior table
 #'
-#' @param trend_formula Trend formula specification
-#' @param data Data frame
-#' @return A brmsprior object with trend model priors
-#' @noRd
-extract_trend_priors <- function(trend_formula, data,
-                                 .precomputed_dimensions = NULL,
-                                 codegen = NULL,
-                                 loadings_prior_spec = NULL) {
-  if (!is.null(trend_formula)) {
-    checkmate::assert_formula(trend_formula)
-  }
-  checkmate::assert_data_frame(data, min.rows = 1)
-  if (!is.null(.precomputed_dimensions)) {
-    checkmate::assert_list(.precomputed_dimensions, names = "named")
-  }
-
-  if (is.null(trend_formula)) {
-    # No trend model - return empty brmsprior with canonical schema
-    empty_prior <- create_empty_brmsprior()
-    return(empty_prior)
-  }
-
-  # Parse trend formula to determine trend type
-  trend_spec <- parse_trend_formula(trend_formula, data,
-                                   .precomputed_dimensions = .precomputed_dimensions)
-
-  # Generate priors based on trend type using convention-based dispatch
-  # Pass data through for base formula prior extraction
-  trend_priors <- generate_trend_priors(trend_spec, data,
-                                        loadings_prior_spec = loadings_prior_spec,
-                                        codegen = codegen)
-
-  return(trend_priors)
-}
-
-# NOTE: parse_trend_formula() has been moved to R/trend_system.R as part of the
-# mvgam trend parsing system. The function provides ZMVN defaults and
-# fully-populated mvgam_trend objects with monitor_params metadata.
-
-#' Generate Trend Priors from Monitor Parameters
+#' Built from the prepared specification, the one Stan generation
+#' also uses. Its `trend_map`, loadings prior and dimensions decide
+#' the rows.
 #'
+#' @param trend_model The prepared `mvgam_trend` object
+#' @param base_formula The trend formula without its constructor, or
+#'   `NULL`
+#' @param data The trend-grain data frame
 #' @param codegen A list from `mvgam_codegen_options()`, or NULL
-#' @param trend_spec Trend specification from parse_trend_formula
 #' @return A brmsprior object with trend priors
 #' @noRd
-generate_trend_priors <- function(trend_spec, data,
-                                  loadings_prior_spec = NULL,
+generate_trend_priors <- function(trend_model, base_formula, data,
                                   codegen = NULL) {
-  # Validate parameters before generating trend priors
-  checkmate::assert_list(trend_spec, names = "named")
+  checkmate::assert_class(trend_model, "mvgam_trend")
+  checkmate::assert_class(base_formula, "formula", null.ok = TRUE)
   checkmate::assert_data_frame(data, min.rows = 1)
 
-  # Validate trend_spec structure before accessing components
-  if (!"trend_model" %in% names(trend_spec)) {
-    stop(insight::format_error(c(
-      cli::format_inline("Invalid {.field trend_spec} structure."),
-      x = cli::format_inline(
-        "Expected component {.field trend_model} not found."
-      )
-    )))
-  }
+  prior_list <- list(
+    constructor = generate_trend_priors_from_monitor_params(trend_model)
+  )
 
-  if (!"base_formula" %in% names(trend_spec)) {
-    stop(insight::format_error(c(
-      cli::format_inline("Invalid {.field trend_spec} structure."),
-      x = cli::format_inline(
-        "Expected component {.field base_formula} not found."
-      )
-    )))
-  }
-
-  # Validate component types
-  if (!is.null(trend_spec$trend_model)) {
-    checkmate::assert_class(trend_spec$trend_model, "mvgam_trend")
-  }
-  if (!is.null(trend_spec$base_formula)) {
-    checkmate::assert_class(trend_spec$base_formula, "formula")
-  }
-
-  # Initialize list to collect different prior sources
-  prior_list <- list()
-
-  # Extract components from validated trend_spec
-  trend_model <- trend_spec$trend_model
-  base_formula <- trend_spec$base_formula
-
-  # 1. Get trend constructor priors (AR, RW, etc.). The loadings
-  # prior decides which branch `Z` is drawn from, so the object
-  # reported on carries the same spec the code generator reads.
-  if (inherits(trend_model, "mvgam_trend")) {
-    trend_model <- attach_loadings_spec_to_trend(
-      trend_model, loadings_prior_spec
-    )
-    prior_list$constructor <-
-      generate_trend_priors_from_monitor_params(trend_model)
-  }
-
-  # 2. Get base formula priors using existing mvgam infrastructure
-  # Use setup_brms_lightweight which handles fake response variables automatically
-  if (!is.null(base_formula) && inherits(base_formula, "formula")) {
-    # Ask brms only when the trend formula has something for it to
-    # answer about. An intercept counts, so `~ 1` still produces
-    # `Intercept_trend`, while `~ 0` and `~ -1` produce nothing:
-    # comparing against `~ 0` alone reported a `b_trend` for `~ -1`
-    # that the emitted program has no parameter for.
+  if (!is.null(base_formula)) {
+    # brms has coefficients to report only for a formula with a
+    # population term. An intercept counts: `~ 1` gives
+    # `Intercept_trend`, and `~ 0` and `~ -1` give no rows.
     if (formula_has_population_terms(base_formula)) {
-
-      # Call verified setup_brms_lightweight function
-      # The same options the observation side is given, so a prior
-      # table reports the coefficients the fit will actually estimate.
-      trend_setup <- setup_brms_lightweight(
+      # The codegen options the observation side takes, which fix the
+      # coefficients the fit estimates
+      base_priors <- setup_brms_lightweight(
         formula = base_formula,
         data = data,
         family = gaussian(),
         codegen = codegen
-      )
-
-      # Validate that setup returned expected structure
-      if (!is.list(trend_setup)) {
-        stop(insight::format_error(c(
-          "setup_brms_lightweight returned unexpected structure.",
-          x = "Expected list object with prior component."
-        )))
-      }
-
-      if (!"prior" %in% names(trend_setup)) {
-        stop(insight::format_error(c(
-          cli::format_inline(
-            "setup_brms_lightweight missing expected {.field prior} component."
-          ),
-          x = "Cannot extract base formula priors."
-        )))
-      }
-
-      # Extract and validate prior structure
-      base_priors <- trend_setup$prior
-      if (!inherits(base_priors, c("brmsprior", "data.frame"))) {
-        stop(insight::format_error(c(
-          "Invalid prior structure from setup_brms_lightweight.",
-          x = "Expected brmsprior data frame."
-        )))
-      }
-
-      # Add _trend suffix to distinguish from observation priors
+      )$prior
       if (nrow(base_priors) > 0) {
-        # Validate expected columns exist
-        if (!"class" %in% names(base_priors)) {
-          stop(insight::format_error(c(
-            "Invalid base_priors structure.",
-            x = cli::format_inline(
-              "Missing required {.field class} column."
-            )
-          )))
-        }
-
         prior_list$base <- suffix_trend_prior_classes(base_priors)
       }
     }
   }
 
-  # Combine all priors
-  if (length(prior_list) == 0) {
-    return(create_empty_brmsprior())
-  }
-  return(bind_brmsprior_rows(prior_list))
+  bind_brmsprior_rows(prior_list)
 }
 
 #' Row-bind brmsprior data frames with column-schema union
@@ -366,21 +240,15 @@ bind_brmsprior_rows <- function(prior_list) {
   combined
 }
 
-#' Generate Trend Priors from Monitor Parameters
+#' Prior rows for the parameters a trend samples
 #'
-#' @description
-#' Generate priors for trend parameters using the monitor_params metadata
-#' from the trend object. This integrates with the existing trend dispatcher
-#' system and automatically works for all trend types.
-#'
-#' @param trend_obj A mvgam_trend object with monitor_params metadata
+#' @param trend_obj A prepared `mvgam_trend` object
 #' @return A brmsprior object with trend priors
 #' @noRd
 generate_trend_priors_from_monitor_params <- function(trend_obj) {
   checkmate::assert_class(trend_obj, "mvgam_trend")
 
-  # Get monitor parameters that need priors
-  monitor_params <- trend_obj$monitor_params
+  monitor_params <- generate_monitor_params(trend_obj)
 
   # Filter out correlation parameters for single-series trends
   # L_Omega_trend only makes sense with multiple series (n_series > 1)
@@ -395,11 +263,8 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
   # `"shared"`, and a population mean and scale under
   # `"hierarchical"`. A prior row for the derived vector promises an
   # override the program would discard. The editable rows are the
-  # parameters each mode samples.
-  #
-  # The coefficients stay in `monitor_params`, which also supplies
-  # the summary labels and the set of names mvgam intercepts before
-  # brms sees them.
+  # parameters each mode samples. `generate_monitor_params()` keeps
+  # the coefficients, because mvgam withholds them from brms.
   sharing <- ar_coef_sharing(trend_obj)
   if (sharing %in% c("shared", "hierarchical")) {
     monitor_params <- monitor_params[
@@ -481,33 +346,27 @@ get_default_trend_parameter_prior <- function(param_name,
   checkmate::assert_string(param_name)
   checkmate::assert_class(trend_obj, "mvgam_trend", null.ok = TRUE)
 
-  # A trend-specific resolver may exist only to tighten a bound, as
-  # AR's does for stationarity. Where it names no distribution the
-  # shared default still supplies one, so the bound is honoured
-  # without the summary going silent on the prior itself. Without a
-  # trend object there is no such resolver to consult.
+  # A trend-specific resolver may only tighten a bound, as CAR's does
+  # for its damping coefficient. The shared default then supplies the
+  # distribution. A call without a trend object has no resolver.
   custom_result <- NULL
   if (!is.null(trend_obj)) {
-    custom_function <- paste0(
-      "get_", tolower(trend_obj$trend), "_parameter_prior"
+    resolver <- get0(
+      paste0("get_", tolower(trend_obj$trend), "_parameter_prior"),
+      envir = asNamespace("mvgam"), mode = "function", inherits = FALSE
     )
-    if (exists(custom_function, mode = "function")) {
-      custom_prior <- get(custom_function, mode = "function")
-      custom_result <- custom_prior(param_name, trend_obj)
+    if (!is.null(resolver)) {
+      custom_result <- resolver(param_name, trend_obj)
       if (!is.null(custom_result) && nzchar(custom_result$prior)) {
         return(custom_result)
       }
     }
   }
 
-  # The shared defaults, read in the order the Stan generator reads
-  # them. Skipping this step let the summary report a prior the model
-  # never sampled under: `sigma_trend` came back empty here, so brms
-  # filled in its own `student_t(3, 0, 2.5)`, while the Stan code
-  # carried `exponential(2)`. Passing that summary back through
-  # `update()` then changed the model.
-  if (param_name %in% names(common_trend_priors)) {
-    spec <- common_trend_priors[[param_name]]
+  # The shared table covers the parameters every trend can have. The
+  # Stan generator resolves its defaults through this same function.
+  spec <- common_trend_priors[[param_name]]
+  if (!is.null(spec)) {
     bounds <- spec$bounds
     return(list(
       prior = spec$default,
@@ -517,10 +376,9 @@ get_default_trend_parameter_prior <- function(param_name,
         (if (!is.na(bounds[2L])) as.character(bounds[2L]) else "")
     ))
   }
-  # A resolver that named only bounds still needs a distribution, and
-  # for a lag above one the shared table has no entry to supply it.
-  # Returning the bounds alone left `ar2_trend` and its siblings
-  # reporting nothing while Stan sampled them.
+  # A resolver that gives only bounds still needs a distribution. The
+  # shared table has no entry for `ar2_trend` and the higher lags,
+  # and the name patterns supply one.
   pattern <- get_parameter_type_default_prior(param_name)
   if (!is.null(custom_result)) {
     pattern$lb <- custom_result$lb %||% pattern$lb
@@ -826,43 +684,29 @@ filter_priors_by_side <- function(combined_priors, side) {
 #' @return Character vector of all mvgam-generated parameter names
 #' @noRd
 get_all_mvgam_trend_parameters <- function(trend_specs) {
-  if (is.null(trend_specs)) {
+  spec <- trend_spec_head(trend_specs)
+  if (is.null(spec)) {
     return(character(0))
   }
-  
-  # Ensure trend registry is initialized
   ensure_registry_initialized()
-  
-  all_mvgam_params <- character(0)
-  
-  # Handle both single trend specs and multivariate trend specs
-  if (is_multivariate_trend_specs(trend_specs)) {
-    # Multivariate: extract trend models from each response
-    for (response_name in names(trend_specs)) {
-      trend_spec <- trend_specs[[response_name]]
-      if (inherits(trend_spec, "mvgam_trend")) {
-        monitor_params <- generate_monitor_params(trend_spec)
-        all_mvgam_params <- c(all_mvgam_params, monitor_params)
-      }
-    }
-  } else {
-    # Single trend spec
-    if (inherits(trend_specs, "mvgam_trend")) {
-      monitor_params <- generate_monitor_params(trend_specs)
-      all_mvgam_params <- c(all_mvgam_params, monitor_params)
-    }
+  all_mvgam_params <- if (inherits(spec, "mvgam_trend")) {
+    generate_monitor_params(spec)
   }
-  
+
   # These two are mvgam's whenever they appear, which is a different
   # question from whether a given model samples them. This list only
   # decides what must never be handed to brms, so naming them
   # unconditionally is the safe direction: dropping one lets it reach
   # brms as `sigma`, an observation-side prior on the wrong scale.
   # What a model actually samples is `samples_innovation_scale()`.
-  all_mvgam_params <- c(all_mvgam_params, "sigma_trend", "nu_trend")
-  
-  unique(all_mvgam_params)
+  unique(c(all_mvgam_params, "sigma_trend", "nu_trend"))
 }
+
+# The columns that identify a prior row. Two rows agreeing on all of
+# them set the same prior.
+brmsprior_key_cols <- c("class", "coef", "group", "resp", "dpar",
+                        "nlpar", "lb", "ub")
+
 
 #' Merge user-supplied prior overrides onto a default prior table
 #'
@@ -896,7 +740,7 @@ merge_user_priors <- function(default_priors, user_priors,
     return(list(priors = default_priors, unmatched = character(0L)))
   }
   key_cols <- intersect(
-    c("class", "coef", "group", "resp", "dpar", "nlpar", "lb", "ub"),
+    brmsprior_key_cols,
     intersect(names(default_priors), names(user_priors))
   )
   is_wildcard <- function(x) is.na(x) | !nzchar(as.character(x))
@@ -1227,9 +1071,11 @@ map_prior_to_stan_string <- function(prior_row) {
   # Validate prior string exists and is not empty
   if (is.null(extracted_prior) || is.na(extracted_prior) ||
       nchar(trimws(extracted_prior)) == 0) {
-    stop(insight::format_error(
-      "Prior string cannot be empty or missing. All brms priors must specify a distribution."
-    ))
+    stop(insight::format_error(c(
+      "Every prior needs a distribution.",
+      x = paste0("The prior for class '", prior_row$class,
+                 "' is empty.")
+    )), call. = FALSE)
   }
 
   # Clean prior string
@@ -1443,16 +1289,10 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
         stop(insight::format_error(c(
           paste0("A 'constant()' prior is not supported for '",
                  param_name, "'."),
-          x = paste0(
-            "mvgam emits its own priors as sampling statements. ",
-            "'constant()' names no distribution Stan can evaluate."
-          ),
-          i = paste0(
-            "Give '", param_name, "' a narrow proper prior. Where the ",
-            "trend constructor takes the quantity as an argument, fix ",
-            "it there."
-          )
-        )))
+          x = "Stan samples this parameter from a distribution.",
+          i = paste0("Give '", param_name, "' a narrow proper prior or ",
+                     "fix it through its trend constructor argument.")
+        )), call. = FALSE)
       }
 
       # Convert to clean Stan string
@@ -1643,7 +1483,7 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
     checkmate::assert_formula(trend_formula, .var.name = "trend_formula")
 
     # Use trend formula validation from validations.R
-    validate_single_trend_formula(trend_formula, context = "trend_formula")
+    validate_trend_formula(trend_formula)
   }
 
   # Determine and store formula type for later use
@@ -1912,8 +1752,6 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
                                     loadings_prior = NULL,
                                     data2 = NULL,
                                     trend_map = NULL, ...) {
-
-  # Input validation (required by CLAUDE.md standards)
   checkmate::assert_class(object, "mvgam_formula")
   checkmate::assert_data_frame(data, min.rows = 1)
 
@@ -1954,82 +1792,23 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   # Parse multivariate trends and validate
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
 
-  # A fixed or partial `trend_map` changes which loadings are
-  # sampled at all: a fully fixed matrix moves `Z` to the data
-  # block, and a partial one replaces it with `Z_free_vec` under a
-  # prior of its own. The table describes neither, so it is refused
-  # rather than answered for the free-loadings model the user is
-  # not fitting.
-  if (!is.null(trend_map)) {
-    stop(insight::format_error(c(
-      "'get_prior()' cannot describe a fit that supplies 'trend_map'.",
-      i = "Call 'stancode()' with the same 'trend_map' to see the priors."
-    )))
-  }
-
-  # Attach the loadings-prior spec exactly as the fitting path does
-  # in `make_stan.R`. Without it the table cannot know which `Z`
-  # branch will fire and reports the unstructured default for all
-  # three, which is the model only one of them fits.
-  loadings_prior_spec <- normalise_loadings_prior(
-    loadings_prior, data2 = data2, data = data
+  mv_spec$trend_specs <- prepare_trend_specs(
+    mv_spec$trend_specs, trend_map, loadings_prior, data, data2
   )
-  if (!is.null(loadings_prior_spec)) {
-    mv_spec$trend_specs <- attach_loadings_prior_spec(
-      mv_spec$trend_specs, loadings_prior_spec
-    )
-  }
-  
-  # Extract and validate trend components. This call also runs the
-  # `by = lv_axis()` AST rewrite (factor-active rewrites to
-  # `by = .trend`; non-factor rewrites to `by = series`), so the
-  # rewritten formula must be threaded into the downstream prior
-  # extraction; passing the raw `trend_formula` here would surface
-  # `lv_axis()` as an unresolved variable inside brms's
-  # `validate_data()`.
+
+  # The spec and trend data Stan generation builds from. The base
+  # formula has its `by = lv_axis()` terms rewritten to the columns
+  # the trend data holds.
   components <- extract_and_validate_trend_components(
-    data, mv_spec, response_vars, "time", "series", trend_formula
+    data, mv_spec, response_vars
   )
-
-  # Extract dimensions from the validated spec
-  dimensions <- if (is_multivariate_trend_specs(components$enhanced_mv_spec$trend_specs)) {
-    first_spec <- components$enhanced_mv_spec$trend_specs[[1]]
-    first_spec$dimensions
-  } else {
-    components$enhanced_mv_spec$trend_specs$dimensions
-  }
-
-  # The validator rewrites `by = lv_axis()` markers in the trend
-  # formula to either `by = series` (non-factor path) or
-  # `by = .trend` (factor path); without this rewrite,
-  # `extract_trend_priors()` would surface the literal `lv_axis()`
-  # call as an unresolved variable inside brms's `validate_data()`.
-  # For all other trend formulas, the validator's `base_formula`
-  # carries only the trend-predictor side (the constructor stripped),
-  # so we must keep the original `trend_formula` and only swap in
-  # the rewritten form when the marker was actually present.
-  uses_lv_axis_marker <- inherits(trend_formula, "formula") &&
-    any(grepl("lv_axis\\(\\)|by = trend\\b",
-               deparse(trend_formula)))
-  trend_formula_for_priors <- if (uses_lv_axis_marker &&
-      inherits(components$enhanced_mv_spec$base_formula, "formula")) {
-    components$enhanced_mv_spec$base_formula
-  } else {
-    trend_formula
-  }
-
-  # Extract trend model priors using validated components
-  trend_priors <- extract_trend_priors(
-    trend_formula = trend_formula_for_priors,
+  trend_priors <- generate_trend_priors(
+    trend_model = trend_spec_head(components$enhanced_mv_spec$trend_specs),
+    base_formula = components$enhanced_mv_spec$base_formula,
     data = components$trend_data,
-    .precomputed_dimensions = dimensions,
-    codegen = codegen_from_dots(list(...)),
-    loadings_prior_spec = loadings_prior_spec
+    codegen = codegen_from_dots(list(...))
   )
 
-  # Combine observation and trend priors using existing helper function
-  combined_priors <- combine_obs_trend_priors(obs_priors, trend_priors)
-
-  return(combined_priors)
+  combine_obs_trend_priors(obs_priors, trend_priors)
 }
 

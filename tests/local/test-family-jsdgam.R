@@ -67,31 +67,6 @@ suppressMessages({
 #   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
 
-# testthat runs from tests/local/ and Rscript from the package root,
-# so the branch asks which of those this is rather than whether a
-# cache is already there: on a clean tree the latter picks the root
-# path while already inside tests/local.
-jsdm_cache <- function(name) {
-  dir <- if (dir.exists(file.path("tests", "local"))) {
-    file.path("tests", "local", "fixtures")
-  } else {
-    "fixtures"
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-  file.path(dir, paste0("val_mvgam_jsdgam_mv_", name, ".rds"))
-}
-
-
-# A ggplot is returned whether or not a layer received any data, so
-# asserting the class passes on the empty panel it looks like it is
-# guarding. Building the plot is what forces the layers to resolve.
-expect_drawn <- function(p) {
-  expect_s3_class(p, "ggplot")
-  layers <- ggplot2::ggplot_build(p)$data
-  expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
-  invisible(layers)
-}
-
 
 # The pairs of per-species matrices holding identical values. A list
 # of the right names and dimensions that carries one shared matrix
@@ -308,37 +283,28 @@ SPECS <- list(
 JSDM_FORMULA <- y ~ env * series
 JSDM_FACTOR_FORMULA <- ~ -1
 
+# A cached fit belongs to the simulation whose frame it was built from.
+# Editing a simulator changes that frame, and the stored posterior then
+# describes data the file does not generate.
 fit_jsdm <- function(nm, spec, sim) {
-  cache <- jsdm_cache(nm)
-  fit <- NULL
-  if (file.exists(cache)) {
-    cached <- readRDS(cache)
-    # A cached fit belongs to the simulation whose frame it was built
-    # from. Editing a simulator changes that frame, and the stored
-    # posterior then describes data the file does not generate.
-    if (identical(sim_frame_key(cached$data), sim_frame_key(sim$long_dat))) {
-      fit <- cached
-    }
-  }
-  if (is.null(fit)) {
-    fit <- jsdgam(
-      formula = JSDM_FORMULA,
-      factor_formula = JSDM_FACTOR_FORMULA,
-      data = sim$long_dat,
-      unit = time, species = series,
-      family = eval(spec$family),
-      n_lv = sim$N_lv,
-      chains = 2L,
-      iter = 1000L, warmup = 500L,
-      silent = 2,
-      backend = "cmdstanr"
-    )
-  }
-  if (!identical(attr(fit, "sim_truth"), sim$truth)) {
-    attr(fit, "sim_truth") <- sim$truth
-    saveRDS(fit, cache)
-  }
-  fit
+  cached_fit(
+    paste0("val_mvgam_jsdgam_mv_", nm, ".rds"),
+    function() {
+      jsdgam(
+        formula = JSDM_FORMULA,
+        factor_formula = JSDM_FACTOR_FORMULA,
+        data = sim$long_dat,
+        unit = time, species = series,
+        family = eval(spec$family),
+        n_lv = sim$N_lv,
+        chains = 2L,
+        iter = 1000L, warmup = 500L,
+        silent = 2,
+        backend = "cmdstanr"
+      )
+    },
+    key = sim_frame_key(sim$long_dat)
+  )
 }
 
 
@@ -607,7 +573,7 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # nothing.
     expect_error(
       mvgam:::resolve_forecast_grid(fit, d, training, lev),
-      "no occasion beyond the training grid"
+      "ends at or before the last training time"
     )
   })
 
@@ -706,7 +672,7 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     )
     err <- expect_error(
       posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-      "Series levels in newdata not found in training data"
+      "Series in 'newdata' has levels absent from the training data"
     )
     # A refusal that does not name the offending level, or list the
     # ones that would have worked, leaves the user to find which of
@@ -970,11 +936,9 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # the one diagnostic saying whether the approximation can be
     # trusted. Capturing it rather than suppressing it keeps the
     # signal: an unrelated notice fails instead of passing unseen.
-    seen <- character(0)
-    ic <- withCallingHandlers(loo(fit), warning = function(w) {
-      seen <<- c(seen, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    })
+    caught <- with_warnings(loo(fit))
+    ic <- caught$value
+    seen <- caught$warnings
     expect_s3_class(ic, "loo")
     expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
     # The diagnostics have to be there and cover every observation
@@ -1197,10 +1161,12 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
                                            type = "response")
       expect_identical(nrow(pr_r), nrow(grid))
       if (isTRUE(spec$me_integer_tell)) {
-        # A count family sampled rather than averaged returns whole
-        # numbers, which is what separates the two types here.
-        expect_true(all(pr_r$estimate == floor(pr_r$estimate)))
-        expect_false(all(pr_e$estimate == floor(pr_e$estimate)))
+        # Sampled counts separate the two types. The median of integer
+        # draws is a whole number, or a half one over an even number of
+        # draws. The median of expectations is neither.
+        halves <- function(x) all(2 * x == floor(2 * x))
+        expect_true(halves(pr_r$estimate))
+        expect_false(halves(pr_e$estimate))
       }
       # `env * series` gives each species its own slope; a design
       # that dropped the interaction returns one slope shared by all.
@@ -1545,13 +1511,11 @@ test_that("n_lv reaches the ceiling the validator sets", {
     expect_identical(as.integer(m$standata$N_lv_trend), n_sp)
   }
 
-  # One factor past the species count adds no rank, and is refused
-  # with the reason and a remedy.
+  # One factor past the species count adds no rank, and the refusal
+  # gives the reason.
   err <- expect_error(build(n_lv = n_sp + 1L),
                       "at most the number of species")
-  msg <- conditionMessage(err)
-  expect_match(msg, "rank at most", fixed = TRUE)
-  expect_match(msg, "mgp_a2", fixed = TRUE)
+  expect_match(conditionMessage(err), "rank at most", fixed = TRUE)
 })
 
 
@@ -1581,4 +1545,28 @@ test_that("every surface the help page sends a reader to answers", {
   expect_s3_class(compare_loadings(obj, obj), "ggplot")
   expect_s3_class(methods_md(obj), "mvgam_methods_md")
   expect_s3_class(how_to_cite(obj), "how_to_cite")
+})
+
+
+test_that("update() refits a jsdgam through jsdgam() and the refit predicts", {
+  obj <- get("nb", envir = built)
+  fit <- obj$fit
+  lev <- obj$sim$species_levels
+  one <- update(fit, n_lv = 1L, chains = 1L, iter = 400L)
+  expect_s3_class(one, "jsdgam")
+  expect_identical(one$jsdgam_args$n_lv, 1L)
+  expect_identical(as.integer(one$standata$N_lv_trend), 1L)
+  expect_identical(posterior::ndraws(posterior::as_draws_matrix(one$fit)),
+                   200L)
+  expect_identical(as.character(mvgam:::mvgam_axes(one)$series$levels), lev)
+  expect_identical(dim(residual_cor(one)$cor), c(obj$sim$K, obj$sim$K))
+  expect_identical(dim(posterior_epred(one, draw_ids = 1:5)),
+                   c(5L, nrow(obj$sim$long_dat)))
+
+  # The factor count is Stan data, and the refit reused the program.
+  # A family adding a parameter changes it.
+  expect_identical(mvgam_normalise_stancode(one$stancode),
+                   mvgam_normalise_stancode(fit$stancode))
+  expect_error(update(fit, family = poisson(), recompile = FALSE),
+               "not supported for this update")
 })

@@ -1015,10 +1015,10 @@ test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
     "\\\\text\\{diag\\}\\(\\\\boldsymbol\\{\\\\Psi\\}\\^2\\)", out
   ))
   expect_false(grepl("L_\\\\Omega L_\\\\Omega\\^\\\\top", out))
-  # The trend's own correlation is a different matter: this fit
-  # samples `L_Omega_trend ~ lkj_corr_cholesky(2)`, so the prior
-  # table reports it and the write-up renders it.
-  expect_true(grepl("LKJCholesky", out))
+  # Every loading is sampled, which fixes the factor correlation at
+  # the identity. The program has no LKJ prior and the write-up
+  # renders none.
+  expect_false(grepl("LKJCholesky", out))
 })
 
 

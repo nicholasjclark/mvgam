@@ -594,7 +594,7 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
     algorithm = glance_algorithm(x),
     pss = posterior::ndraws(posterior::as_draws(x$fit)),
     nobs = sum(!is.na(d[[response_column(x, resp)]])),
-    nseries = length(resolve_series_info(x)$series_levels),
+    nseries = length(fitted_series_levels(x)),
     family = fam_name,
     link = link_name
   )
