@@ -1292,7 +1292,7 @@ test_that("the summary prints every coefficient the model estimated", {
   # carries an intercept, a slope, two region contrasts and two
   # interaction columns, so an omission has somewhere to hide.
   smry <- summary(fit)
-  blocks <- grep("^(fixed|dpar_.*_fixed|trend_fixed)$", names(smry),
+  blocks <- grep("^(fixed|trend_fixed)$", names(smry),
                  value = TRUE)
   expect_gt(length(blocks), 0L)
   shown <- unlist(lapply(blocks, function(k) rownames(smry[[k]])))
@@ -1494,20 +1494,13 @@ test_that("partial residual correlations are available on a full-rank trend", {
 
 
 test_that("hypothesis reaches every parameter the fit reports", {
-  # Finding 50. `hypothesis()` reads raw Stan names, so it answers for
-  # any parameter whose reported name happens to survive unaliased and
-  # refuses the rest. brms writes the population block as an indexed
-  # array, so `b_elev` is `b[1]` inside the program and
-  # `sd_block__Intercept` is `sd_1[1]`, while `b_Intercept`, `sigma`
-  # and the whole trend block are written out in full.
-  #
-  # The split is invisible from the output: the refusal names a
-  # parameter `variables()` had just listed.
   vars <- variables(fit)
+  # With `class = NULL`, `hypothesis()` takes a parameter by the name
+  # `variables()` lists
   for (nm in c("b_Intercept", "sigma", "A_trend[1,1,2]",
                "b_elev", "sd_block__Intercept")) {
     expect_true(nm %in% vars)
-    expect_no_error(hypothesis(fit, paste0("`", nm, "` = 0")))
+    expect_no_error(hypothesis(fit, paste0("`", nm, "` = 0"), class = NULL))
   }
 })
 

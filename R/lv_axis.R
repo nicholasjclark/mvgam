@@ -82,7 +82,7 @@
 #'   warmup        = 500,
 #'   silent        = 2
 #' )
-#' summary(mod_nonfac, include_betas = FALSE)
+#' summary(mod_nonfac)
 #' conditional_effects(mod_nonfac)
 #'
 #' # ---- Factor mode (`n_lv` set on the trend constructor) ----
@@ -113,12 +113,14 @@ lv_axis <- function() {
 # pattern in R/validations.R so the formula walk reuses the same rlang
 # idioms (`rlang::is_call`, `rlang::call_args`, `rlang::call_name`,
 # `rlang::call2`). The walk is structural: it tracks whether the
-# current node is in a smooth or GP call (`s`, `te`, `ti`, `t2`, `gp`)
-# and, if so, inspects only the `by` argument of that call.
+# current node is in one of `MVGAM_SMOOTH_CALLS` and, if so, inspects
+# only the `by` argument of that call.
 
-# Smooth/GP constructor names that accept a `by` argument and whose
-# `by` position is where `lv_axis()` may appear.
-.smooth_with_by_calls <- c("s", "te", "ti", "t2", "gp")
+# The smooth and Gaussian-process constructors brms fits. Each takes
+# its covariates as unnamed arguments and a grouping as `by`, where
+# `lv_axis()` may appear.
+#'@noRd
+MVGAM_SMOOTH_CALLS <- c("s", "t2", "gp")
 
 #' Check if an expression is a literal call to `lv_axis()`.
 #'
@@ -257,7 +259,7 @@ walk_by_lv <- function(expr, state, depth = 0L) {
 
   fn_name <- rlang::call_name(expr)
 
-  if (!is.null(fn_name) && fn_name %in% .smooth_with_by_calls) {
+  if (!is.null(fn_name) && fn_name %in% MVGAM_SMOOTH_CALLS) {
     args <- rlang::call_args(expr)
     by_arg <- args[["by"]]
     if (!is.null(by_arg)) {

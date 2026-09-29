@@ -422,21 +422,20 @@ lfo_cv.mvgam <- function(object,
     # elements, so a window with nothing between the last refit and
     # the evaluation point would have indexed observations in
     # reverse instead of skipping them.
-    if (k - 1L < idx_refit + 1L) {
-      last_obs_positions <- integer(0)
-    } else {
-      last_obs_positions <- seq.int(idx_refit + 1L, k - 1L)
+    logratio <- if (k - 1L >= idx_refit + 1L) {
+      last_obs_times <- all_unique_times[seq.int(idx_refit + 1L, k - 1L)]
+      lfo_sum_rows(loglik_past[
+        , rows_at_times(all_data, time_var, last_obs_times), drop = FALSE
+      ])
     }
-    if (length(last_obs_positions) == 0L) {
+    # With no response observed since the last refit, the posterior
+    # is the refit's own and there is nothing to reweight. A gap in
+    # sampling does this: every series is missing at those times and
+    # `lfo_sum_rows()` returns `NA` for every draw.
+    if (is.null(logratio) || all(is.na(logratio))) {
       psis_lw <- NULL
       pareto_ks[k_eval] <- NA_real_
     } else {
-      last_obs_times <- all_unique_times[last_obs_positions]
-      last_obs_idx <- rows_at_times(all_data, time_var,
-                                    last_obs_times)
-      logratio <- lfo_sum_rows(
-        loglik_past[, last_obs_idx, drop = FALSE]
-      )
       psis_obj <- suppressWarnings(loo::psis(logratio))
       pareto_ks[k_eval] <- loo::pareto_k_values(psis_obj)[1L]
       psis_lw <- loo::weights.importance_sampling(
@@ -813,6 +812,10 @@ plot.mvgam_lfo <- function(x, ...) {
     }
   }
   long <- do.call(rbind, panels)
+  # A fold scored on a fresh refit has no importance ratio and no
+  # Pareto k, and a score can be missing where a window held no
+  # observation. Neither has a point to draw.
+  long <- long[!is.na(long$value), , drop = FALSE]
   long$colour <- ifelse(
     (long$facet == "Pareto K" & long$value > long$threshold) |
       (long$facet == "ELPD" & long$value < long$threshold) |
@@ -1229,8 +1232,10 @@ window_predictive <- function(fit, fc_data) {
   new_mvgam_forecast(
     fit, "response", resp = NULL, reported = series_levels,
     training = NULL, hindcasts = NULL, forecasts = arms,
-    fc_grid = list(observations = window$observations,
-                   times = window$times)
+    fc_grid = list(
+      observations = window$observations,
+      times = hindcast_column_times(fit, "response", NULL, window)
+    )
   )
 }
 

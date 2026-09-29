@@ -148,7 +148,7 @@ test_that("response_column returns the LHS variable", {
 
 test_that("hypothesis.mvgam returns a brmshypothesis on a single test", {
   stub <- make_wrapper_stub()
-  h <- hypothesis(stub, "b_x > 0")
+  h <- hypothesis(stub, "x > 0")
   expect_s3_class(h, "brmshypothesis")
   expect_named(
     h$hypothesis,
@@ -168,9 +168,16 @@ test_that("hypothesis.mvgam returns a brmshypothesis on a single test", {
 
 test_that("hypothesis.mvgam accepts multiple hypotheses", {
   stub <- make_wrapper_stub()
-  h <- hypothesis(stub, c("b_x > 0", "b_Intercept < 1"))
+  h <- hypothesis(stub, c("x > 0", "Intercept < 1"))
   expect_s3_class(h, "brmshypothesis")
   expect_identical(nrow(h$hypothesis), 2L)
+  # As brms does, the default class tests `b_Intercept`, and
+  # `class = NULL` takes any parameter by its full name
+  draws_df <- as.data.frame(posterior::as_draws_df(stub$fit))
+  expect_equal(h$hypothesis$Estimate[2L] + 1, mean(draws_df$b_Intercept),
+               tolerance = 1e-8)
+  expect_s3_class(hypothesis(stub, "b_x > 0", class = NULL),
+                  "brmshypothesis")
 })
 
 

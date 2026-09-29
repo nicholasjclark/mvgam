@@ -33,7 +33,7 @@
 #'
 #' @param formula A `formula` object specifying the GAM observation
 #'   model formula. These behave exactly like the formula for a GLM
-#'   except that smooth terms (`s()`, `te()`, `ti()`, `t2()`),
+#'   except that smooth terms (`s()`, `t2()`),
 #'   nonparametric `gp()` terms and `offset()` can be added to the
 #'   right-hand side. Time-varying effects are expressed as
 #'   `s(time, by = X)` or `gp(time, by = X)`. `gp()` accepts
@@ -44,8 +44,8 @@
 #'   warning to that effect.
 #'
 #' @param factor_formula A `formula` for the latent factors' linear
-#'   predictor. Use `by = lv_axis()` inside `s()`, `te()`, `ti()`,
-#'   `t2()`, or `gp()` terms to fit a separate smooth per latent
+#'   predictor. Use `by = lv_axis()` inside `s()`, `t2()` or `gp()`
+#'   terms to fit a separate smooth per latent
 #'   factor. The legacy spelling `by = trend` is still accepted and
 #'   emits a one-time deprecation warning before being rewritten to
 #'   `by = lv_axis()` internally. The companion sentinel `lv_axis()`
@@ -281,9 +281,7 @@
 #'   silent         = 2
 #' )
 #'
-#' # `include_betas = FALSE` keeps the printed summary readable
-#' # when the model carries many smooth coefficients.
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #'
 #' # Marginal env effect on the response (occupancy * detection)
 #' # scale. Pass `type = "link"` for the logit-occupancy scale,

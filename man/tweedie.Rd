@@ -127,7 +127,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-summary(mod, include_betas = FALSE)
+summary(mod)
 
 # Posterior intervals for the AR dynamics. The observation-side
 # dpars (`mphi`, `mtheta`) are picked up under "obs_params".

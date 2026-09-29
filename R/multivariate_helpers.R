@@ -1,10 +1,9 @@
-# Shared utilities for multivariate (mvbind / mvbrmsformula) fits.
-# Centralises three patterns shared across
-# residuals.mvgam / pp_check.mvgam / plot.mvgam /
+# Shared utilities for multivariate (mvbind / mvbrmsformula) fits,
+# used by residuals.mvgam / pp_check.mvgam / plot.mvgam /
 # conditional_effects.mvgam / hindcast.mvgam / methods_md:
 #
 #   1. which responses a model has, keyed as brms keys them, and
-#      the column each is read from
+#      the data column of each
 #   2. detection of `set_rescor(TRUE)`
 #   3. per-response fan-out: when a method receives no `resp`
 #      arg on an mv fit, re-enter the method once per response
@@ -13,9 +12,9 @@
 
 #' Return the first mvgam_trend spec on a fitted (or prefit)
 #' mvgam object. `mv_spec$trend_specs` is either a single
-#' `mvgam_trend` (univariate) or a list of them (multivariate);
-#' callers that only need to read one slot (loadings prior,
-#' gr / subgr, trend type) take the first.
+#' `mvgam_trend` (univariate) or a list of them (multivariate).
+#' Callers that need one slot (loadings prior, gr / subgr, trend
+#' type) take the first.
 #'
 #' Used by `methods_md()` model-section renderers and
 #' `residual_cor()` extractors; both want a single per-fit spec.
@@ -29,25 +28,26 @@ first_trend_spec <- function(object) {
   trend_spec_head(object$mv_spec$trend_specs)
 }
 
-#' The responses a model reads, keyed as brms keys them
+#' The responses of a model, keyed as brms keys them
 #'
-#' brms keys a response by its column with every `.` and `_` taken
-#' out, so the column `my_count` is the response `mycount`. The key is
-#' what `resp` takes, what `forms` is indexed by and what every
-#' per-response parameter and data array is suffixed with. Reading the
-#' frame takes the column. Code that took one spelling for the other
-#' looked for a column that was not there, which refused every trend
-#' model whose response carried an underscore or a dot.
+#' brms keys a response by its column with every `.` and `_` removed:
+#' the column `my_count` is the response `mycount`. `resp` takes the
+#' key, `forms` is indexed by it, and every per-response parameter and
+#' data array takes it as a suffix. A lookup in the data frame takes
+#' the column. Code that used one spelling for the other looked for a
+#' column that did not exist, and refused every trend model whose
+#' response name contained an underscore or a dot.
 #'
-#' This is the one reader of which responses a model has. A fit, a
-#' prefit and a bare observation formula are all answered from the
-#' formula, so no stored copy can drift from the model it describes.
+#' Every lookup of a model's responses goes through this function. It
+#' derives them from the formula for a fit, a prefit and a bare
+#' observation formula alike, and no stored copy can drift from the
+#' model.
 #'
 #' @param x A fitted `mvgam`, a prefit, its summary, or an observation
 #'   formula in any spelling `mvgam()` accepts
 #' @return Character vector of response columns named by key, in
 #'   formula order. An addition term such as `trials()` qualifies a
-#'   response rather than being one, so it is left out.
+#'   response and is left out.
 #' @noRd
 response_columns <- function(x) {
   vapply(response_formulas(x), function(form) {
@@ -86,11 +86,11 @@ response_formulas <- function(x) {
 #' The family of each response
 #'
 #' A family written inside a response's `bf()` belongs to that
-#' response. The family given beside the formula applies to every
-#' response that names none, which is how brms reads the pair.
+#' response. The family passed with the formula applies to every
+#' response that names none, as brms applies it.
 #'
 #' @inheritParams response_columns
-#' @param family The family given beside the formula
+#' @param family The family passed with the formula
 #' @return A list of family objects named by response key
 #' @noRd
 formula_families <- function(x, family) {
@@ -100,10 +100,9 @@ formula_families <- function(x, family) {
 #' The family of one response of a model, or of each
 #'
 #' A model written with `brms::mvbf()` gives each response its own
-#' family, and no single family describes it. Asked without `resp`,
-#' a model with several responses answers with one family per
-#' response, named by brms's key for it; otherwise it answers with
-#' one family.
+#' family, and no single family describes it. Without `resp`, a model
+#' with several responses returns one family per response, named by
+#' brms's key for it. Otherwise the function returns one family.
 #'
 #' @param object A fitted `mvgam`, a prefit or its summary.
 #' @param resp One response's key, or `NULL`.
@@ -118,16 +117,15 @@ model_families <- function(object, resp = NULL) {
 
 #' Check the response a caller named against the model's own
 #'
-#' Every method taking `resp` asks the same two questions of it: is it
-#' one of the model's responses, and can the method answer without
-#' one. They are answered here so the refusal reads the same wherever
-#' it is met.
+#' Every method taking `resp` checks two things: that it names one of
+#' the model's responses, and whether the method needs one. This
+#' function checks both, and every method raises the same refusal.
 #'
 #' @param x A fitted `mvgam`, or anything else `response_columns()`
-#'   reads
+#'   accepts
 #' @param resp The response a caller named, or `NULL`
-#' @param required Whether the caller answers for one response at a
-#'   time, so a model with several needs to be told which
+#' @param required Whether the caller returns one response at a time.
+#'   A model with several then needs `resp`.
 #' @param caller Name of the method asking, used in the refusal
 #' @return `resp`, unchanged, invisibly
 #' @noRd
@@ -150,8 +148,8 @@ resolve_resp <- function(x, resp, required = FALSE, caller = NULL) {
   }
   checkmate::assert_string(resp)
   if (!resp %in% keys) {
-    # A column name is the natural thing to type, and brms answers to
-    # the key alone, so the refusal says which key the column became.
+    # Users type a column name, and brms accepts the key alone. The
+    # refusal names the key the column became.
     as_key <- keys[match(resp, columns)]
     stop(insight::format_error(c(
       "'resp' must be a response of this model.",
@@ -166,7 +164,7 @@ resolve_resp <- function(x, resp, required = FALSE, caller = NULL) {
   invisible(resp)
 }
 
-#' The column one response is read from
+#' The data column of one response
 #'
 #' @param object A fitted `mvgam` object
 #' @param resp The response's key, or `NULL` on a model with one
@@ -198,12 +196,12 @@ response_suffix <- function(object, resp = NULL) {
 #' @noRd
 subset_obj_to_response <- function(obj, r) {
   # Per-response slice of a multi-response fit. Filters the prior
-  # table to rows scoped to response `r` (including rows with no
-  # `resp` set, which are shared across responses), and narrows the
-  # formula and the family to that response's own. Downstream
-  # extractors and renderers reading any of them then see the
-  # single-response view without per-helper threading.
+  # table to rows scoped to response `r` and to rows with no `resp`,
+  # which all responses share. Narrows the formula and the family to
+  # that response's own. Downstream extractors and renderers then work
+  # on the single-response view with no argument of their own for it.
   out <- obj
+  out$methods_md_resp <- r
   out$family <- model_families(obj, r)
   out$formula <- obj$formula$forms[[r]]
   prior <- obj$prior
@@ -234,24 +232,27 @@ has_rescor <- function(obj) {
 }
 
 
+#' The prefix brms gives each row of a group-level table
+#'
+#' brms names a group-level parameter by the predictor it enters, as
+#' `brms:::combine_prefix()` joins the distributional parameter, the
+#' response and the non-linear parameter: `sd_g__sigma_y1_Intercept`
+#' and `r_g__sigma_y1[a,Intercept]` for `sigma` of the response `y1`.
+#' That is the suffix `predictor_suffix()` gives, without its leading
+#' underscore. `mvgam_ranef_aliases()`, `ranef.mvgam()` and
+#' `VarCorr.mvgam()` all name their rows with it.
+#'
+#' @param nlpar,dpar,resp The table's columns of the same names
+#' @return Character vector, one prefix per row, `""` for the mean of a
+#'   model with one response
 #' @noRd
 make_row_prefix <- function(nlpar, dpar, resp) {
-  # Per-row routing prefix for brms parameter aliasing. brms's
-  # stancode writes per-row aliases using whichever of these is
-  # set, in priority order: nlpar > dpar > resp. Returns "" when
-  # none is set (the univariate, no-dpar, no-nlpar case).
-  # Centralised so the ifelse ladder lives in one place, shared by
-  # mvgam_ranef_aliases / ranef.mvgam / VarCorr.mvgam.
-  ifelse(
-    !is.na(nlpar) & nzchar(nlpar), nlpar,
-    ifelse(
-      !is.na(dpar) & nzchar(dpar), dpar,
-      ifelse(
-        !is.na(resp) & nzchar(resp), resp,
-        ""
-      )
-    )
-  )
+  vapply(seq_along(dpar), function(i) {
+    sub("^_", "", predictor_suffix(
+      resp = null_if_blank(resp[i]), dpar = null_if_blank(dpar[i]),
+      nlpar = null_if_blank(nlpar[i])
+    ))
+  }, character(1L))
 }
 
 
@@ -265,30 +266,27 @@ mv_resp_fan_out <- function(object, resp, class = NULL, combine = NULL) {
   # residuals.mvgam, pp_check.mvgam, conditional_effects.mvgam,
   # mvgam_resid_panel, and hindcast.mvgam.
   #
-  # `class` is the class the caller's single-response answer has.
-  # Given it, the list takes that class too, so a method dispatches
-  # on the wrapper as it would on one answer, and records two facts a
-  # reader would otherwise have to infer from its shape: that it is a
-  # wrapper, and whether its responses are the fit's series. On a
-  # wide frame they are, so the elements together are one answer over
-  # the whole axis; on a long frame each element spans every series.
+  # `class` is the class of the caller's single-response result.
+  # Given it, the list takes that class too, and a method dispatches
+  # on the wrapper as it would on one result. Two attributes record
+  # what the shape alone does not show: that the object is a wrapper,
+  # and whether its responses are the fit's series. On a wide frame
+  # they are, and the elements together cover the whole series axis.
+  # On a long frame each element spans every series.
   #
   # `combine`, where given, turns the named list into the one object
-  # the caller returns, which is how a plotting method hands back one
-  # figure rather than a list that prints as a listing.
+  # the caller returns. A plotting method uses it to return one
+  # figure.
   #
   # Implementation: capture the caller's matched call via
   # `match.call(sys.function(-1L), sys.call(-1L))`, swap `resp`
   # per iteration, and eval in the caller's parent frame so any
   # symbolic arguments resolve in the user's environment.
   #
-  # Assumes direct S3 method invocation (`residuals(fit)` etc.).
-  # Does not support `do.call(method.mvgam, ...)` or S4 dispatch,
-  # which insert intermediate frames and shift the -1L / -2L
-  # offsets. Every caller in mvgam today uses direct dispatch, so
-  # this is safe; revisit if a future caller wraps the method via
-  # do.call or a magrittr pipe and the response loop ends up
-  # iterating against an unexpected frame.
+  # Requires direct S3 method invocation (`residuals(fit)` etc.).
+  # `do.call(method.mvgam, ...)` and S4 dispatch insert intermediate
+  # frames and shift the -1L / -2L offsets. Every caller in mvgam
+  # dispatches directly.
   if (!is.null(resp) ||
         !inherits(object$formula, "mvbrmsformula")) {
     return(NULL)
@@ -332,8 +330,8 @@ mv_resp_fan_out <- function(object, resp, class = NULL, combine = NULL) {
 #' Drop the posterior draws classes from a matrix
 #'
 #' `posterior::as_draws_matrix()` returns an object that keeps its
-#' class through subsetting and arithmetic, so anything computed from
-#' it carries the class too. A prediction whose class depends on
+#' class through subsetting and arithmetic, and anything computed from
+#' it inherits the class. A prediction whose class depends on
 #' whether the model had random effects is a surprise on its own, and
 #' S4 slots that accept a plain matrix reject it outright. Values,
 #' dimensions and dimnames are untouched.
@@ -349,71 +347,4 @@ as_plain_matrix <- function(x) {
   attr(x, "nchains") <- NULL
   class(x) <- setdiff(class(x), c("draws_matrix", "draws"))
   x
-}
-
-
-#' Is this parameter from the trend model?
-#'
-#' The trend side of a model names its parameters with a `_trend`
-#' suffix, either at the end or before the index, so `sigma_trend[1]`
-#' and `b_x_trend` are trend parameters. Asking whether the name merely
-#' contains `_trend` reads a covariate as structure: a user with a
-#' column called `pre_trend_score` gets `b_pre_trend_score`, which is
-#' an observation-side coefficient and belongs in the observation
-#' block. Every trend parameter the package emits ends the suffix, so
-#' the suffix is what is tested.
-#'
-#' The `_trend\\[` alternative is why this differs from a bare
-#' `grepl("_trend$", ...)`. A posterior draw carries an index, so
-#' `sigma_trend[1]` has to match; a prior class never does, which is
-#' why the prior tables test the suffix on its own and do not call
-#' here.
-#'
-#' A rotated companion carries `_trend_tilde`, as `A_trend_tilde` does
-#' for `A_trend`. Testing the bare suffix filed those on the
-#' observation side, where `mvgam_par_kind()` has no branch for them
-#' and they reach a summary under the kind `other`.
-#'
-#' @param pars Character vector of parameter names
-#' @return Logical vector
-#'
-#' @noRd
-is_trend_parameter <- function(pars) {
-  grepl("_trend(_tilde)?($|\\[)", pars)
-}
-
-
-#' Is this parameter an autoregressive coefficient?
-#'
-#' An `AR(p)` trend emits one coefficient per lag, `ar1_trend` through
-#' `ar<p>_trend`. The test was written in two spellings across five
-#' places, which is one fact and five chances to disagree about it.
-#' Note the hierarchical mean and standard deviation of a coefficient,
-#' `mu_ar1_trend` and `sigma_ar1_trend`, are different parameters and
-#' are deliberately excluded by the anchor.
-#'
-#' @param pars Character vector of parameter names
-#' @return Logical vector
-#'
-#' @noRd
-is_ar_coefficient <- function(pars) {
-  grepl("^ar[0-9]+_trend$", pars)
-}
-
-
-#' Is this parameter an autoregressive partial autocorrelation?
-#'
-#' A contiguous `AR(p >= 2)` trend samples `ar<k>_pacf_trend` and
-#' derives `ar<k>_trend` from it, which keeps every draw stationary.
-#' The two names hold different quantities. This pattern matches the
-#' partial autocorrelation. `is_ar_coefficient()` matches the
-#' coefficient. Each caller collects the one parameter set its own
-#' question asks about.
-#'
-#' @param pars Character vector of parameter names
-#' @return Logical vector
-#'
-#' @noRd
-is_ar_partial <- function(pars) {
-  grepl("^ar[0-9]+_pacf_trend$", pars)
 }

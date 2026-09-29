@@ -98,7 +98,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-summary(mod, include_betas = FALSE)
+summary(mod)
 
 # `mtail` is what separates this family from a negative binomial.
 # A posterior that drifts toward the upper prior range is a sign

@@ -118,7 +118,7 @@ fit <- mvgam(
 
 # The `nu` posterior should concentrate around the simulated
 # 1.5 and stay well above the binomial null at nu = 1.
-summary(fit, include_betas = FALSE)
+summary(fit)
 mcmc_plot(fit, variable = "nu", type = "areas")
 
 # Posterior predictive check of the marginal count distribution.

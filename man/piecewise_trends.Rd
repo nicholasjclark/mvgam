@@ -56,10 +56,10 @@ the latent processes are modelled as \code{n_lv} factors with estimated
 loadings onto the series. Defaults to \code{NULL}, in which case one
 latent process is used per series.}
 
-\item{trend_map}{Optional \code{data.frame} specifying which latent
-process each series maps onto, giving fixed (rather than estimated)
-loadings for dynamic factor models. See \code{\link{mvgam}} for the
-required format. Defaults to \code{NULL}.}
+\item{trend_map}{Optional specification of which latent process each
+series maps onto. It fixes the loadings of a dynamic factor model.
+See \code{\link{mvgam}} for the accepted formats. Defaults to
+\code{NULL}.}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of
@@ -84,17 +84,11 @@ omits its intercept (\code{y ~ -1} or \code{y ~ 0 + ...}). An intercept
 there raises the ceiling above \code{cap}.
 
 \emph{Logistic growth and the cap variable}:
-When forecasting growth, there is often some maximum achievable point that a
-time series can reach. For example, total market size, total population size
-or carrying capacity in population dynamics. It can be advantageous for the
-forecast to saturate at or near this point so that predictions are more
-sensible.
-
-This function allows you to make forecasts using a logistic growth trend
-model, with a specified carrying capacity. Note that this capacity does not
-need to be static over time; it can vary with each series × timepoint
-combination if necessary. But you must supply a \code{cap} value for each
-observation in the data when using \code{growth = 'logistic'}.
+Many growing series approach a ceiling, such as a total market size,
+a population size or an ecological carrying capacity.
+\code{growth = 'logistic'} saturates the trend at a capacity that \code{data}
+supplies in its \code{cap} column. The capacity can vary by series and by
+time, and every observation needs a \code{cap} value.
 
 For observation families that use a non-identity link function, the
 \code{cap} value is transformed to the link scale internally: it is
@@ -119,7 +113,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-summary(mod, include_betas = FALSE)
+summary(mod)
 
 # A linear PW exposes the base growth rate (k_trend) and the
 # changepoint rate deltas (delta_trend[changepoint, series]).

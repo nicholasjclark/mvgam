@@ -138,13 +138,10 @@ conditional_effects.mvgam <- function(x,
   series_mode <- resolve_series_arg(series, x)
 
   # Observation rugs and overlaid points apply where the drawn
-  # quantity shares the observations' scale. `response` and
-  # `expected` both do. `link`, `variance`, `latent_state` and
-  # `detection` each name a different scale. Both overlays stay off
-  # there. The fan-out above leaves one response in scope on a
-  # multivariate fit, which supplies the column the points come
-  # from.
-  obs_scale <- type %in% c("response", "expected")
+  # quantity shares the observations' scale. The fan-out above leaves
+  # one response in scope on a multivariate fit, which supplies the
+  # column the points come from.
+  obs_scale <- on_observation_scale(type)
   points_alpha <- 0
   if (obs_scale) {
     if (isTRUE(points)) {
@@ -320,27 +317,38 @@ conditional_effects.mvgam <- function(x,
 #'   otherwise returns the list invisibly so callers can post-process.
 #' @param ask Logical. If `TRUE`, prompts before each new plot.
 #' @param ... Ignored.
-#' @return Invisibly returns the list of ggplot objects.
+#' @return Invisibly, a flat named list of ggplot objects, as
+#'   `brms::conditional_effects()` plots return one. A multivariate
+#'   fit's panels are named `<response>.<effect>`, response by
+#'   response.
 #' @rdname conditional_effects.mvgam
 #' @export
 plot.mvgam_conditional_effects <- function(x, plot = TRUE, ask = FALSE,
                                            ...) {
-  if (length(x) == 0L) return(invisible(x))
-  if (isTRUE(plot)) {
+  plots <- conditional_effects_panels(x)
+  if (isTRUE(plot) && length(plots) > 0L) {
     default_ask <- grDevices::devAskNewPage()
     on.exit(grDevices::devAskNewPage(default_ask))
     grDevices::devAskNewPage(ask = isTRUE(ask))
-    if (isTRUE(attr(x, "mv_wrapper"))) {
-      # Multivariate wrapper: `x` is a named list of per-response
-      # `mvgam_conditional_effects` objects. Recurse in per-arm
-      # order so the display sequence matches user expectation
-      # (arm-by-arm, effect-by-effect within each arm).
-      for (r in names(x)) plot(x[[r]], plot = TRUE, ask = FALSE, ...)
-    } else {
-      for (p in x) graphics::plot(p)
-    }
+    for (p in plots) graphics::plot(p)
   }
-  invisible(x)
+  invisible(plots)
+}
+
+
+# Internal: the panels of a conditional-effects object as one list.
+# A multivariate fit holds one set of panels per response, and each
+# panel's name takes its response as a prefix.
+#'@noRd
+conditional_effects_panels <- function(x) {
+  if (!isTRUE(attr(x, "mv_wrapper"))) {
+    return(unclass(x))
+  }
+  panels <- lapply(names(x), function(r) {
+    p <- conditional_effects_panels(x[[r]])
+    stats::setNames(p, paste0(r, ".", names(p)))
+  })
+  do.call(c, panels)
 }
 
 
@@ -458,9 +466,8 @@ split_term_labels <- function(lab) {
   if (is.call(expr) && identical(expr[[1L]], as.name("*"))) {
     return(list(vapply(as.list(expr)[-1L], deparse, character(1L))))
   }
-  smooth_heads <- c("s", "te", "t2", "ti", "gp", "mo")
   if (!is.call(expr) || !is.name(expr[[1L]]) ||
-        !as.character(expr[[1L]]) %in% smooth_heads) {
+        !as.character(expr[[1L]]) %in% c(MVGAM_SMOOTH_CALLS, "mo")) {
     return(list(all.vars(expr)))
   }
   # A smooth names its covariates as unnamed arguments and its

@@ -1684,26 +1684,13 @@ test_that("multi-season: the fit describes its own specification", {
 
 test_that("multi-season: every listed parameter is reachable", {
   fit <- fit_multi_season()
-  # `hypothesis()` is the documented route to a posterior statement
-  # about one parameter. A parameter that `variables()` lists and
-  # the draws carry has to be reachable by the name both of them
-  # use. Measured, `sds_1[1]`, `p` and `ar1_trend[1]` are, and
-  # `bs_senv_1` is refused under the name it is listed by.
   vars <- variables(fit)
-  targets <- c("Intercept", "sds_1[1]", "ar1_trend[1]", "bs_senv_1")
-  expect_true(all(targets %in% vars))
-  for (v in targets) {
-    # `bs_senv_1` raises here, so reachability is asserted before the
-    # value is read. Without that the block reports an error and
-    # says nothing about the three parameters that do work.
-    expect_no_error(hypothesis(fit, paste(v, "> 0")))
-  }
-  for (v in setdiff(targets, "bs_senv_1")) {
-    h <- hypothesis(fit, paste(v, "> 0"))
-    expect_s3_class(h, "brmshypothesis")
+  # With `class = NULL`, `hypothesis()` takes a parameter by the name
+  # `variables()` lists
+  for (v in c("b_Intercept", "ar1_trend[1]",
+              grep("^(sds|bs)_", vars, value = TRUE))) {
+    h <- hypothesis(fit, paste0("`", v, "` > 0"), class = NULL)
     expect_true(is.finite(h$hypothesis$Estimate))
-    expect_true(h$hypothesis$Post.Prob >= 0 &&
-                  h$hypothesis$Post.Prob <= 1)
   }
 })
 

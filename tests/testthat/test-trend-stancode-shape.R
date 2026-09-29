@@ -126,13 +126,10 @@ test_that("VAR(p = 2) declares array[2] A_raw_trend", {
 # ----- VAR sparse-lag p (currently rejected) --------------------
 
 test_that("VAR(p = c(2, 4)) errors with an informative message", {
-  # Sparse-lag VAR is not yet supported: the Heaps-2022
-  # stationary joint-distribution initialisation assumes a
-  # consecutive companion-form structure, and deriving the
-  # sparse-companion stationary covariance is a separate piece
-  # of work. The constructor rejects vector 'p' with a clear
-  # message that points users at AR(p = c(...)) for the
-  # univariate sparse-lag case.
+  # The Heaps (2023) stationary initialisation is defined on the
+  # companion form of consecutive lags, and a sparse lag set has no
+  # companion form with the same stationary covariance. The
+  # constructor refuses a vector 'p' and points to AR(p = c(...)).
   expect_error(
     VAR(p = c(2, 4)),
     "Sparse-lag VAR"

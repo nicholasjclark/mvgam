@@ -87,7 +87,10 @@ An object of class \code{mvgam_conditional_effects}: a named
 list with one \code{ggplot} per effect, drawn by the \code{plot} and
 \code{print} methods.
 
-Invisibly returns the list of ggplot objects.
+Invisibly, a flat named list of ggplot objects, as
+\code{brms::conditional_effects()} plots return one. A multivariate
+fit's panels are named \verb{<response>.<effect>}, response by
+response.
 }
 \description{
 Plot the conditional effects of one or more numeric / categorical

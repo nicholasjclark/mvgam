@@ -134,10 +134,15 @@ plot.mvgam_forecast <- function(
     NA_real_
   }
 
-  y_label <- if (length(plotted_series) == 1L) {
-    paste0("Predictions for ", plotted_series)
-  } else {
+  # The axis names the scale the draws are on
+  y_label <- switch(x$type %||% "response",
+    link = "Linear predictor",
+    expected = "Expected value",
+    trend = "Latent trend",
     "Predictions"
+  )
+  if (length(plotted_series) == 1L) {
+    y_label <- paste0(y_label, " for ", plotted_series)
   }
 
   # Build the plot under the mvgam palette so the ribbon and
@@ -256,13 +261,9 @@ build_forecast_layers <- function(
       )
     }
 
-    # Observations: train + (optionally) test.
-    # Skipped for trend hindcasts / forecasts because the
-    # ribbon is on the latent-process scale, but the stored
-    # `train_observations` / `test_observations` are on the
-    # response scale; overlaying them produces a scale
-    # mismatch that squashes the ribbon flat against the axis.
-    show_obs <- !is_trend_forecast(x)
+    # Observations: train + (optionally) test, on the scales they
+    # share with the ribbon.
+    show_obs <- on_observation_scale(x$type)
     obs_times <- c()
     obs_y <- c()
     if (!is.null(hc_mat) && show_obs) {

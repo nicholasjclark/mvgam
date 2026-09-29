@@ -836,14 +836,22 @@ overlay_family_default_priors <- function(obs_priors, formula, family) {
 #' @param combined_stancode The assembled Stan code, used by
 #'   `lift_mvgam_stanvar_priors()` to detect mvgam-injected stanvar
 #'   rows.
+#' @param trend_stancode The trend-side brms program, or NULL.
 #' @return A `brmsprior` data frame ready to land on `mvgam_object$prior`.
 #' @noRd
 assemble_stored_prior_table <- function(obs_priors, trend_priors,
-                                          user_prior, combined_stancode) {
+                                          user_prior, combined_stancode,
+                                          trend_stancode = NULL) {
   combined <- combine_obs_trend_priors(
     obs_priors, add_trend_suffix_to_priors(trend_priors)
   )
-  lifted <- lift_mvgam_stanvar_priors(combined, combined_stancode)
+  brms_trend <- setdiff(
+    brms_declared_params(trend_stancode), brms_trend_dropped_params
+  )
+  lifted <- lift_mvgam_stanvar_priors(
+    combined, combined_stancode,
+    brms_owned = paste0(brms_trend, "_trend")
+  )
   if (!is.null(user_prior) && nrow(user_prior) > 0L) {
     lifted <- merge_user_priors(lifted, user_prior)$priors
   }
@@ -943,7 +951,8 @@ add_trend_suffix_to_priors <- function(trend_priors) {
 suffix_trend_prior_classes <- function(priors) {
   if (is.null(priors) || nrow(priors) == 0L) return(priors)
   coefs <- priors$coef %||% rep("", nrow(priors))
-  bookkeeping_sigma <- priors$class == "sigma" & !nzchar(coefs)
+  bookkeeping_sigma <- priors$class %in% brms_trend_dropped_params &
+    !nzchar(coefs)
   priors <- priors[!bookkeeping_sigma, , drop = FALSE]
   if (nrow(priors) == 0L) return(priors)
   priors$class <- apply_trend_class_suffix(priors$class)
@@ -1368,7 +1377,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #'   \item Trend constructors: \code{RW()}, \code{AR()}, \code{CAR()},
 #'     \code{ZMVN()}, \code{VAR()}, \code{PW()}
 #'   \item Covariates that affect trend dynamics
-#'   \item Smooth terms using mgcv syntax: \code{s()}, \code{te()}, \code{ti()}, \code{t2()}
+#'   \item Smooth terms using mgcv syntax: \code{s()}, \code{t2()}
 #'   \item Random effects: \code{(1|group)}, \code{(slope|group)}
 #'   \item Gaussian processes: \code{gp()}
 #' }
@@ -1742,7 +1751,7 @@ get_prior.mvgam <- function(object, ...) {
 #' # Inspect the posterior to confirm the overrides took effect. The
 #' # `ar1_trend` and `sigma_trend` rows should sit on the scale set
 #' # by their custom priors rather than the flat defaults.
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #' }
 #'
 #' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}},

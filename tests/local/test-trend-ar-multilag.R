@@ -749,22 +749,14 @@ test_that("summary, tidiers and criticism run on a multi-lag AR", {
 
 
 test_that("hypothesis reaches the smooth's own coefficient", {
-  # Every other parameter on this fit is reachable by the name
-  # `variables()` gives it, including the lag coefficients, the
-  # Gaussian process scale and length-scale and the smooth's variance
-  # component. The basis coefficient is refused under that same name.
   vars <- variables(fit)
-  reachable <- c(grep("^ar1_trend", vars, value = TRUE)[1],
-                 grep("^sdgp", vars, value = TRUE)[1],
-                 grep("^lscale", vars, value = TRUE)[1],
-                 grep("^sds_", vars, value = TRUE)[1])
-  for (nm in reachable) {
-    expect_no_error(hypothesis(fit, paste0(nm, " = 0")))
-  }
-  bs <- grep("^bs_", vars, value = TRUE)
-  expect_gt(length(bs), 0L)
-  for (nm in bs) {
-    expect_no_error(hypothesis(fit, paste0(nm, " = 0")))
+  # With `class = NULL`, `hypothesis()` takes a parameter by the name
+  # `variables()` lists
+  targets <- grep("^(ar1_trend\\[|(sdgp|lscale|sds|bs)_)", vars,
+                  value = TRUE)
+  expect_gt(length(targets), 4L)
+  for (nm in targets) {
+    expect_no_error(hypothesis(fit, paste0("`", nm, "` = 0"), class = NULL))
   }
 })
 
@@ -882,12 +874,12 @@ test_that("conditional_effects honours a user-supplied effects list", {
 })
 
 
-test_that("plot returns the effects list invisibly and draws it", {
+test_that("plot returns the panels as brms does and draws them", {
   ce <- conditional_effects(fit)
   out <- plot(ce, plot = FALSE)
-  expect_identical(out, ce)
-  # Returning its input unchanged is half the contract; the panels
-  # it would have drawn have to hold data.
+  # One ggplot per effect, named as the effects are
+  expect_identical(names(out), names(ce))
+  expect_true(all(vapply(out, inherits, logical(1L), "ggplot")))
   p <- plot(ce)[[1L]]
   layers <- ggplot2::ggplot_build(p)$data
   expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)

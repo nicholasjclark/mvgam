@@ -306,6 +306,7 @@ test_that("print.mvgam_forecast handles hindcast-only fits", {
   # Give it a hindcast so the print isn't completely empty.
   fc$hindcasts <- list(s1 = matrix(0, nrow = 10L, ncol = 8L),
                         s2 = matrix(0, nrow = 10L, ncol = 8L))
+  fc$train_times <- list(s1 = 1:8, s2 = 1:8)
   blob <- paste(capture.output(print(fc)), collapse = "\n")
   expect_match(blob, "hindcast:  8 timepoints")
   expect_match(blob, "forecast:  0 \\(hindcast only\\)")

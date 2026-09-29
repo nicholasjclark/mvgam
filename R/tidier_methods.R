@@ -179,7 +179,8 @@ tidy_spec <- function(obj_vars, user_map) {
   # is back-transformed into, and the table reports the coefficient
   # once, under the name on the data's own scale.
   visible <- function(pars) {
-    pars <- intersect(pars, user_map)
+    # In the order `mvgam_user_pars()` gives, which is brms's
+    pars <- unname(user_map[user_map %in% pars])
     pars[mvgam_par_kind(pars) != "intercept"]
   }
   # The penalty of a smooth, the scales of a Gaussian process and the

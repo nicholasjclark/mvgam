@@ -4,63 +4,19 @@
 # or a vector of parameter names.
 
 
-test_that("get_dpar_names() reads the formula rather than the names", {
-  # A parameter given its own formula is recorded in `pforms`.
+test_that("a block's rows print under brms's names", {
+  pars <- c("bs_sigma_sz_1", "sds_sigma_sz_1_trend", "sd_g__Intercept",
+            "cor_g__Intercept__x")
+  tab <- data.frame(Estimate = seq_along(pars), row.names = pars)
+  block <- function(key) Filter(function(b) b$key == key, summary_blocks())[[1L]]
   expect_equal(
-    get_dpar_names(brms::bf(y ~ x, sigma ~ x)),
-    "sigma"
+    c(rownames(summary_block_rows(tab[1, , drop = FALSE], block("fixed"))),
+      rownames(summary_block_rows(tab[2, , drop = FALSE], block("smooth")))),
+    c("sigma_sz_1", "sds(sigma_sz_1)")
   )
   expect_equal(
-    sort(get_dpar_names(brms::bf(y ~ x, sigma ~ x, nu ~ z))),
-    c("nu", "sigma")
-  )
-  # A plain formula names none.
-  expect_equal(get_dpar_names(brms::bf(y ~ x)), character())
-  # Reading the parameter names instead would see `b_body_mass` and
-  # invent a parameter called `body`, which is why the formula is the
-  # source of truth.
-  expect_equal(get_dpar_names(brms::bf(y ~ body_mass)), character())
-  # Multivariate formulas union over their arms.
-  mv <- brms::bf(y1 ~ x, sigma ~ x) + brms::bf(y2 ~ x, nu ~ x)
-  expect_equal(sort(get_dpar_names(mv)), c("nu", "sigma"))
-})
-
-
-test_that("dpar_alternation() builds one group, or none", {
-  expect_null(dpar_alternation(character()))
-  expect_equal(dpar_alternation("sigma"), "(sigma)")
-  expect_equal(dpar_alternation(c("sigma", "nu")), "(sigma|nu)")
-})
-
-
-test_that("a parameter's own block is the only one it appears in", {
-  pars <- c("b_Intercept", "b_x", "b_sigma_Intercept", "b_sigma_x",
-            "s_z_1[1]", "sds_z_1", "s_sigma_z_1[1]", "sds_sigma_z_1")
-  dpars <- "sigma"
-
-  # Population-level effects hold the mean's coefficients only.
-  expect_equal(
-    pars[match_fixed_pars(pars, dpars)],
-    c("b_Intercept", "b_x")
-  )
-  # The dpar's coefficients go to the dpar block instead.
-  expect_equal(
-    pars[match_dpar_fixed_pars(pars, dpars)],
-    c("b_sigma_Intercept", "b_sigma_x")
-  )
-  # Smooths split the same way.
-  expect_equal(
-    pars[match_smooth_pars(pars, dpars)],
-    c("s_z_1[1]", "sds_z_1")
-  )
-  expect_equal(
-    pars[match_dpar_smooth_pars(pars, dpars)],
-    c("s_sigma_z_1[1]", "sds_sigma_z_1")
-  )
-  # With no distributional parameters nothing is held back.
-  expect_equal(
-    pars[match_fixed_pars(pars, character())],
-    c("b_Intercept", "b_x", "b_sigma_Intercept", "b_sigma_x")
+    rownames(summary_block_rows(tab[3:4, , drop = FALSE], block("random"), "g")$g),
+    c("sd(Intercept)", "cor(Intercept,x)")
   )
 })
 
@@ -144,31 +100,6 @@ test_that("is_trend_state_param() names the states and nothing else", {
 })
 
 
-test_that("no summary block claims a trend state", {
-  # Every block is built by a `match_*` predicate. If none of them
-  # admits `trend[i, s]`, then carrying those rows further only to
-  # discard them is wasted work, which is what the removed
-  # `include_states` argument did: it kept them and changed nothing.
-  states <- c("trend[1,1]", "lv_trend[2,1]", "innovations_trend[1,1]",
-              "mu_trend[3]", "scaled_innovations_trend[1,1]")
-  matchers <- list(
-    fixed = function(p) match_fixed_pars(p, character()),
-    smooth = function(p) match_smooth_pars(p, character()),
-    random = match_random_pars,
-    family = function(p) match_family_pars(p, character()),
-    trend_fixed = function(p) match_fixed_pars(p, side = "trend"),
-    trend_smooth = function(p) match_smooth_pars(p, side = "trend"),
-    trend_random = function(p) match_random_pars(p, side = "trend"),
-    trend_specific = match_trend_specific_pars,
-    loadings = match_z_loadings,
-    loadings_prior = match_loadings_prior_pars
-  )
-  for (nm in names(matchers)) {
-    expect_false(any(matchers[[nm]](states)))
-  }
-})
-
-
 test_that("summary() offers no argument for the trend states", {
   # Removed rather than fixed: 1.1.x never had one, and the states
   # are reachable through hindcast(type = "trend"),
@@ -179,3 +110,4 @@ test_that("summary() offers no argument for the trend states", {
     "include_trend_states" %in% names(formals(summary.mvgam_pooled))
   )
 })
+

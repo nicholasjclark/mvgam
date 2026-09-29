@@ -13,8 +13,9 @@
 probabilities for credible intervals. Default is \code{c(0.025,
   0.975)} for 95\% intervals.}
 
-\item{robust}{Logical; if \code{TRUE}, use median and MAD instead of
-mean and SD. Default is \code{FALSE}.}
+\item{robust}{Logical; if \code{TRUE}, the median and MAD measure
+central tendency and spread. The default \code{FALSE} uses the
+mean and SD.}
 
 \item{...}{Additional arguments passed to \code{\link{summary.mvgam}}.}
 }

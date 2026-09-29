@@ -167,8 +167,8 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
       colour = mvgam_colour("dark_highlight"), linewidth = 0.7
     ) +
     ggplot2::facet_wrap(~ shock, scales = "free_y") +
+    scale_x_horizon() +
     ggplot2::labs(
-      x = "Horizon",
       y = if (inherits(x, "mvgam_fevd_summary")) {
         "Proportion of forecast error variance"
       } else {

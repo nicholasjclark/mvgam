@@ -316,7 +316,9 @@ new_mvgam_forecast <- function(object, type, resp, reported, training,
       type = type,
       series_names = factor(reported, levels = reported),
       train_observations = pick(training$observations),
-      train_times = pick(training$times),
+      train_times = if (!is.null(training)) {
+        pick(hindcast_column_times(object, type, resp, training))
+      },
       test_observations = pick(fc_grid$observations),
       test_times = pick(fc_grid$times),
       hindcasts = hindcasts,
@@ -412,12 +414,15 @@ build_training_arms <- function(object, series_levels, resp = NULL,
     response_column(object, if (response_keyed) lv else resp)
   }
 
+  # Each series' rows are held in time order. The observations, the
+  # row times and the hindcast columns all take that order from here.
   series_rows <- lapply(series_levels, function(lv) {
-    if (response_keyed) {
+    rows <- if (response_keyed) {
       which(!is.na(d[[column_of(lv)]]))
     } else {
       which(series_labels == lv)
     }
+    rows[order(d[[time_var]][rows])]
   })
   names(series_rows) <- series_levels
 
@@ -433,12 +438,12 @@ build_training_arms <- function(object, series_levels, resp = NULL,
   # frame beside it matched nothing and the horizon came back empty,
   # while the panels drew one axis to 91 and its neighbour to 91.953
   # under the same label.
-  times <- lapply(series_levels, function(lv) {
-    rows <- series_rows[[lv]]
-    if (!length(rows)) return(d[[time_var]][0L])
-    sort(unique(d[[time_var]][rows]))
-  })
-  names(times) <- series_levels
+  # A closure-unit family has several rows per occasion, one per
+  # visit, and its `expected` and `response` hindcasts have one column
+  # per row. `row_times` labels those columns; `times` holds each
+  # occasion once, which every other surface has one column for.
+  row_times <- lapply(series_rows, function(rows) d[[time_var]][rows])
+  times <- lapply(row_times, function(t) sort(unique(t)))
 
   list(
     data = d,
@@ -448,8 +453,39 @@ build_training_arms <- function(object, series_levels, resp = NULL,
     series_labels = series_labels,
     series_rows = series_rows,
     observations = observations,
-    times = times
+    times = times,
+    row_times = row_times
   )
+}
+
+
+# Internal: the time of each column of a hindcast matrix.
+#
+# `build_hindcast_arms()` predicts a closure-unit family's `expected`
+# and `response` surfaces per visit row, and every other surface per
+# occasion. An `mvgam_forecast` labels each column with its time, and
+# `plot()` and `summary()` pair the two by position.
+#'@noRd
+hindcast_column_times <- function(object, type, resp, training) {
+  if (hindcast_per_row(object, type, resp)) {
+    training$row_times
+  } else {
+    training$times
+  }
+}
+
+
+# Internal: whether a hindcast has one column per row of the frame.
+#
+# A closure-unit family ships one row per visit, and its detection-
+# marginalised `expected` and `response` surfaces vary by visit.
+# `trend` and `link` belong to the occasion. The family consulted is
+# the response's own: a multivariate fit's top-level family is a
+# placeholder shared by every response.
+#'@noRd
+hindcast_per_row <- function(object, type, resp) {
+  type %in% c("expected", "response") &&
+    uses_closure_unit_layout(model_families(object, resp))
 }
 
 
@@ -744,14 +780,9 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
   keyed <- is_response_keyed(object)
   arm_resp <- function(lv) if (keyed) lv else resp
 
-  # Which rows an arm covers, and in what order, said once and read
-  # by both paths below. Membership is settled where the arms were
-  # built; the ordering is by the occasion the user supplied.
-  arm_rows <- lapply(series_levels, function(lv) {
-    rows <- training$series_rows[[lv]]
-    rows[order(training$data[[time_var]][rows])]
-  })
-  names(arm_rows) <- series_levels
+  # `build_training_arms()` settles which rows each series covers and
+  # holds them in time order, and both paths below take them as given.
+  arm_rows <- training$series_rows[series_levels]
 
   # A simplex family's expectation is a softmax across the K rows of
   # a closure unit, and its unit is a site whose rows are the series
@@ -785,15 +816,10 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
       next
     }
     sub <- training$data[arm_rows[[lv]], , drop = FALSE]
-    # Closure-unit families ship multiple rows per (series, time)
-    # for the per-visit detection grain. The `"trend"` and `"link"`
-    # surfaces live at the (time, series) grain of the trend matrix,
-    # so collapse `sub` to one row per unique time before the
-    # linpred call. The detection-marginalised `"expected"` and
-    # `"response"` surfaces keep the per-row sub-data because the
-    # latent state varies per closure unit.
-    if (type %in% c("trend", "link") &&
-          uses_closure_unit_layout(object$family)) {
+    # One row per occasion unless the surface varies by visit. Every
+    # family but a closure-unit one already has a single row per
+    # occasion, and the cut leaves it unchanged.
+    if (!hindcast_per_row(object, type, arm_resp(lv))) {
       sub <- sub[!duplicated(sub[[time_var]]), , drop = FALSE]
     }
     out[[s]] <- hindcast_one_series(
@@ -806,59 +832,34 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 
 
 # Internal: dispatch on `type` for a single series's hindcast.
-# Standard families pull the per-draw conditional `trend[t, s]`
-# directly from the stanfit (the same per-cell value Stan would
-# emit as `ypred` in generated quantities), compose with the
-# per-draw deterministic obs-side linpred, and dispatch the
-# family RNG via `draw_observations`. Closure-unit
-# families keep their joint-over-unit marginalisation entries
-# through `posterior_epred` / `posterior_predict`.
-# `process_error` is carried on the signature for the
-# closure-unit branch, which forwards it to `posterior_epred()`
-# and `posterior_predict()`. It is a no-op on the standard-family
-# branch, where the per-draw conditional state already supplies
-# the trajectory.
+#
+# For every family, `extract_trend_latent_states()` takes the
+# per-draw conditional `trend[t, s]` that Stan composes in
+# transformed parameters, and the observation predictor is added to
+# it. That gives the `trend` and `link` hindcast of any fit. A fit
+# without a trend contributes a zero matrix. A closure-unit family's `expected` and `response`
+# marginalise over the latent state of each closure unit, which
+# `posterior_epred()` and `posterior_predict()` do per visit row.
+# `process_error` reaches only that branch; elsewhere the fitted
+# state supplies the trajectory.
 #'@noRd
 hindcast_one_series <- function(object, sub_data, type, draw_idx,
                                   obs_uncertainty,
                                   process_error = FALSE,
                                   resp = NULL) {
-  family <- model_families(object, resp)
-  is_closure <- uses_closure_unit_layout(family)
-
-  if (is_closure) {
-    full <- switch(
-      type,
-      "trend" = extract_component_linpred(
-        mvgam_fit = object, newdata = sub_data, component = "trend"
-      ),
-      "link" = extract_component_linpred(
-        mvgam_fit = object, newdata = sub_data,
-        component = "obs", resp = resp
-      ) + extract_component_linpred(
-        mvgam_fit = object, newdata = sub_data, component = "trend"
-      ),
-      "expected" = posterior_epred(
+  if (hindcast_per_row(object, type, resp)) {
+    full <- if (type == "response" && isTRUE(obs_uncertainty)) {
+      posterior_predict(
         object, newdata = sub_data, ndraws = NULL,
         process_error = process_error, resp = resp
-      ),
-      "response" = if (isTRUE(obs_uncertainty)) {
-        posterior_predict(
-          object, newdata = sub_data, ndraws = NULL,
-          process_error = process_error, resp = resp
-        )
-      } else {
-        posterior_epred(
-          object, newdata = sub_data, ndraws = NULL,
-          process_error = process_error, resp = resp
-        )
-      }
-    )
+      )
+    } else {
+      posterior_epred(
+        object, newdata = sub_data, ndraws = NULL,
+        process_error = process_error, resp = resp
+      )
+    }
   } else {
-    # Per-draw conditional `trend[t, s]` from the stanfit (`Z @
-    # lv_trend + mu_trend` per draw, exactly as Stan composes in
-    # transformed parameters). Returns NULL for trendless fits, in
-    # which case the trend contribution is the zero matrix.
     draws_mat <- posterior::as_draws_matrix(object$fit)
     fitted_states <- extract_trend_latent_states(
       mvgam_fit = object, newdata = sub_data, full_draws = draws_mat,

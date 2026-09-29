@@ -11,16 +11,16 @@
 #'   parameter names, or (when `regex = TRUE`) a vector of regular
 #'   expressions. Recognised keywords:
 #'   \itemize{
-#'     \item `"betas"`: population-level fixed effects (brms `b_*`).
+#'     \item `"betas"`: population-level coefficients, the set
+#'       [brms::fixef()] reports (`b_*`, `bs_*` and `bsp_*`).
 #'     \item `"obs_params"`: observation-family distributional
 #'       parameters (`sigma`, `phi`, `shape`, ...).
 #'     \item `"smooth_params"`: smooth-term standard deviations
 #'       (`sds_*`).
-#'     \item `"trend_betas"`: trend-side fixed effects (`b_trend[*]`).
-#'     \item `"trend_params"`: trend-dynamics parameters (AR, GP,
-#'       innovation SD, ...). With a `trend_formula` this resolves to
-#'       the `_trend`-suffixed parameter block; without it, the
-#'       top-level trend dynamics.
+#'     \item `"trend_betas"`: the trend formula's population-level
+#'       coefficients (`b_*_trend`, `bs_*_trend` and `bsp_*_trend`).
+#'     \item `"trend_params"`: trend-dynamics parameters
+#'       (autoregressive coefficients, innovation SDs, ...).
 #'     \item `"trend_smooth_params"`: trend-side smooth SDs.
 #'   }
 #'   `NULL` (the default) returns every parameter.
@@ -74,51 +74,30 @@
 NULL
 
 
-# The keyword shortcuts, defined once. Each entry maps
-# a keyword to a function that returns the matching parameter names
-# given the current stanfit's variables and the parent fit object
-# (the latter is needed to disambiguate trend-formula vs obs-only
-# fits when the same parameter name can mean different things).
+# The keyword shortcuts `variable =` accepts, defined once.
 mvgam_keyword_shortcuts <- c(
   "betas", "obs_params", "smooth_params",
   "trend_betas", "trend_params", "trend_smooth_params"
 )
 
 
-# Resolve a single keyword to a character vector of parameter names
-# present in `all_vars`. Patterns are brms-native: keywords map
-# directly to the parameter names brms emits. The trend-dynamics
-# block (`trend_params`) is the one place context matters, since with
-# a `trend_formula` those parameters carry the `_trend` suffix,
-# otherwise they sit at the top level.
+# Resolve a single keyword to the names in `all_vars` it selects.
+# Each keyword is a (side, kind) pair from the one taxonomy.
+# `?mvgam_draws` documents `smooth_params` as the smoothing standard
+# deviations alone. The smooth bucket `tidy()` reports from also holds
+# the basis coefficients and the Gaussian-process hyperparameters.
 #'@noRd
-resolve_mvgam_keyword <- function(keyword, x, all_vars) {
-  # The keywords are (side, kind) pairs from the one taxonomy rather
-  # than a private set of regexes. `smooth_params` is deliberately
-  # narrower than the smooth bucket `tidy()` reads: `?mvgam_draws`
-  # documents it as the smoothing standard deviations, so the
-  # taxonomy separates those from the basis coefficients and the
-  # Gaussian-process hyperparameters instead of forcing one answer.
+resolve_mvgam_keyword <- function(keyword, all_vars) {
   kind <- mvgam_par_kind(all_vars)
   side <- mvgam_par_side(all_vars)
   pick <- function(k, sd) all_vars[kind %in% k & side == sd]
   switch(keyword,
-    "betas" = pick("beta", "observation"),
-    "trend_betas" = pick("beta", "trend"),
+    "betas" = pick(c("beta", "basis"), "observation"),
+    "trend_betas" = pick(c("beta", "basis"), "trend"),
     "obs_params" = pick("family", "observation"),
     "smooth_params" = pick("smooth_sd", "observation"),
     "trend_smooth_params" = pick("smooth_sd", "trend"),
-    # An observation-only fit keeps its trend dynamics at the top
-    # level rather than under the suffix, so the side is where the
-    # two spellings part company; the kind is the same either way.
-    "trend_params" = if (!is.null(x$trend_formula)) {
-      pick("dynamics", "trend")
-    } else {
-      all_vars[grepl(
-        "^(ar\\d|alpha_gp|rho_gp|sdgp|lscale|sigma|tau)(\\[|$|_)",
-        all_vars
-      ) & kind != "state"]
-    }
+    "trend_params" = pick("dynamics", "trend")
   )
 }
 
@@ -143,13 +122,11 @@ mvgam_beta_aliases <- function(x) {
   #   `X_<dpar>`      dpar formula      -> b_<dpar>[k]     -> b_<dpar>_<term>
   #   `X_<nlpar>`     nl sub-formula    -> b_<nlpar>[k]    -> b_<nlpar>_<term>
   #   `X_trend`       mvgam-only        -> b_trend[k]      -> b_<term>_trend
-  # The trend block is the only one with a name suffix (rather than
-  # prefix); all others reduce to the same template, so we drive the
-  # whole map from a single sweep over `names(x$standata)`.
-  # Reason: nl sub-formulas do NOT get the Intercept-centring
-  # transform, so the column count of `X_<nlpar>` matches the
-  # length of `b_<nlpar>` directly (Intercept stays at position 1).
-  # `strip_intercept = FALSE` opts out of the centring assumption.
+  # The trend block takes a name suffix and every other block a
+  # prefix. One sweep over `names(x$standata)` builds the whole map.
+  # brms does not centre a non-linear sub-formula's design: the
+  # columns of `X_<nlpar>` match `b_<nlpar>` one to one, with the
+  # Intercept at position 1. `strip_intercept = FALSE` states that.
   build <- function(X, pos_prefix, alias_prefix, alias_suffix,
                     strip_intercept = TRUE) {
     if (is.null(X) || !is.matrix(X) || ncol(X) == 0L) {
@@ -169,10 +146,10 @@ mvgam_beta_aliases <- function(x) {
     old <- paste0(pos_prefix, "[", seq_along(cn), "]")
     stats::setNames(old, new)
   }
-  # A non-linear sub-formula sits in brmsformula$pforms under its
-  # nlpar name, but only counts as one when the top-level formula
-  # carries attr(., "nl") = TRUE. Read once at the top of the sweep
-  # so the per-block branch can decide whether to strip.
+  # brms stores a non-linear sub-formula in `pforms` under its nlpar
+  # name, and treats it as one only when the top-level formula has
+  # `attr(., "nl") = TRUE`. The per-block branch below tests the
+  # names found here.
   obs_form <- x$formula
   is_nl <- isTRUE(attr(
     if (inherits(obs_form, "brmsformula")) obs_form$formula else obs_form,
@@ -201,65 +178,239 @@ mvgam_beta_aliases <- function(x) {
       )
     }
   })
-  # Smooth-term fixed-effect basis: `bs[k]` / `bs_trend[k]` map to
-  # `bs_<colname>` / `bs_<colname>_trend` where colname comes from
-  # the corresponding standata block (`Xs` / `Xs_trend`). The
-  # `bs` vector is NOT intercept-centred (no leading "Intercept"
-  # column to strip), so the index is direct.
-  build_bs <- function(Xs, pos_name, alias_suffix) {
-    if (is.null(Xs) || !is.matrix(Xs) || ncol(Xs) == 0L) {
-      return(character(0L))
+  # The unpenalised part of each smooth: `bs<p>[k]` maps to
+  # `bs<p>_<colname>`, the column named in the matching `Xs<p>`
+  # block, for every predictor `<p>` as the `X` sweep above names
+  # them. brms keeps no intercept column in `Xs`, and the index is
+  # direct.
+  Xs_blocks <- grep("^Xs(_.+)?$", names(x$standata), value = TRUE)
+  bs_parts <- lapply(Xs_blocks, function(blk) {
+    suffix <- sub("^Xs", "", blk)
+    if (identical(suffix, "_trend")) {
+      build(x$standata[[blk]], "bs_trend", "bs_", "_trend",
+            strip_intercept = FALSE)
+    } else {
+      build(x$standata[[blk]], paste0("bs", suffix),
+            paste0("bs", suffix, "_"), "", strip_intercept = FALSE)
     }
-    cn <- colnames(Xs)
-    if (length(cn) == 0L) {
-      return(character(0L))
-    }
-    new <- paste0("bs_", cn, alias_suffix)
-    old <- paste0(pos_name, "[", seq_along(cn), "]")
-    stats::setNames(old, new)
+  })
+  c(unlist(parts), unlist(bs_parts))
+}
+
+
+# Internal: the alias map for the smoothing standard deviations and
+# basis coefficients. brms's stancode numbers each smooth object:
+# `sds<p>_<i>[k]` is the standard deviation of its k-th penalty and
+# `s<p>_<i>_<k>[m]` the m-th coefficient under that penalty.
+# `brms:::rename_sm()` then names the object by its label:
+# `sds<p>_<label>_<k>` and `s<p>_<label>_<k>[m]`. A trend-side name
+# takes `_trend` before its index, as the other aliases do.
+#
+# @param x A fitted `mvgam` object.
+# @param raw The raw Stan names the posterior carries.
+#'@noRd
+mvgam_smooth_aliases <- function(x, raw) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_character(raw)
+  # `mvgam_smooth_terms()` rebuilds each side's Stan data. A fit
+  # without a smoothing standard deviation has no smooth to name.
+  if (!any(startsWith(raw, "sds_"))) {
+    return(character(0L))
   }
-  bs_parts <- c(
-    build_bs(x$standata$Xs, "bs", ""),
-    build_bs(x$standata$Xs_trend, "bs_trend", "_trend")
-  )
-  # Special terms (`mo()`, `me()`, `mi()`, `cs()`) come back as the
-  # indexed array `bsp[k]`, in the order they appear in the formula,
-  # which is the order `Ksp` counts. brms spells the same
-  # coefficient `bsp_<term>` with the punctuation removed, and that
-  # is the name its prior table and `summary()` already use, so
-  # without this a monotonic effect was the one population
-  # coefficient reachable only by its position.
-  build_sp <- function(form, pos_name, alias_suffix) {
-    ff <- if (inherits(form, "brmsformula")) form$formula else form
-    if (!inherits(ff, "formula") || length(ff) < 2L) {
-      return(character(0L))
-    }
-    labs <- attr(stats::terms(ff), "term.labels")
-    sp <- grep("^(mo|me|mi|cs)\\(", labs, value = TRUE)
-    if (length(sp) == 0L) {
-      return(character(0L))
-    }
-    new <- paste0("bsp_", gsub("[[:space:](),]", "", sp), alias_suffix)
-    old <- paste0(pos_name, "[", seq_along(sp), "]")
-    stats::setNames(old, new)
+  parts <- lapply(mvgam_smooth_terms(x), function(t) {
+    p <- predictor_suffix(t$resp, t$dpar, t$nlpar)
+    sfx <- if (identical(t$side, "trend")) "_trend" else ""
+    labels <- brms_smooth_labels(t)
+    unlist(Map(function(i, label) {
+      sds_old <- raw[startsWith(raw, paste0("sds", p, "_", i, sfx, "["))]
+      sds_new <- paste0("sds", p, "_", label, "_", stan_index(sds_old), sfx)
+      s_old <- raw[grepl(
+        paste0("^s", p, "_", i, "_[0-9]+", sfx, "\\["), raw
+      )]
+      k <- sub(paste0("^s", p, "_", i, "_([0-9]+).*$"), "\\1", s_old)
+      s_new <- paste0("s", p, "_", label, "_", k, sfx,
+                      "[", stan_index(s_old), "]")
+      stats::setNames(c(sds_old, s_old), c(sds_new, s_new))
+    }, t$objects, labels))
+  })
+  unlist(parts)
+}
+
+
+# Internal: the alias map for Gaussian-process and special terms.
+#
+# brms numbers these by position within each predictor `<p>`, and
+# `brms:::rename_gp()` and `brms:::rename_sp()` name them by term:
+#   `sdgp<p>_<i>[k]`       -> `sdgp<p>_<label k>`
+#   `lscale<p>_<i>[k, d]`  -> `lscale<p>_<label k><covariate d>`, or
+#                             `lscale<p>_<label k>` when isotropic
+#   `zgp<p>_<i>[_j][m]`    -> `zgp<p>_<label j>[m]`
+#   `bsp<p>[k]`            -> `bsp<p>_<term k>`
+#   `simo<p>_<i>[m]`       -> `simo<p>_<term><n>[m]`, one per `mo()`
+# A GP's label is `gp` and its covariates, then its `by` variable and
+# each level of a `by` factor. A trend-side name takes `_trend` before
+# its index, as the other aliases do.
+#
+# @param x A fitted `mvgam` object.
+# @param raw The raw Stan names the posterior carries.
+#'@noRd
+mvgam_special_aliases <- function(x, raw) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_character(raw)
+  if (!any(grepl("^(sdgp|lscale|zgp|bsp|simo)(_|\\[)", raw))) {
+    return(character(0L))
   }
-  sp_parts <- c(
-    build_sp(x$formula, "bsp", ""),
-    build_sp(x$trend_formula, "bsp_trend", "_trend")
+  rename_block <- function(old_prefix, new_names, sfx) {
+    old <- raw[startsWith(raw, paste0(old_prefix, sfx, "["))]
+    if (length(old) != length(new_names)) {
+      return(character(0L))
+    }
+    stats::setNames(old, paste0(new_names, sfx))
+  }
+  rename_vector <- function(old_prefix, new_prefix, sfx) {
+    old <- raw[startsWith(raw, paste0(old_prefix, sfx, "["))]
+    stats::setNames(old, paste0(new_prefix, sfx, "[", stan_index(old), "]"))
+  }
+  out <- character(0L)
+  for (side in c("obs", "trend")) {
+    model <- side_model(x, side)
+    if (is.null(model)) next
+    sfx <- if (identical(side, "trend")) "_trend" else ""
+    for (lp in model_predictors(model$formula)) {
+      p <- lp$suffix
+      gp_terms <- formula_term_labels(lp$pred[["gp"]])
+      for (i in seq_along(gp_terms)) {
+        g <- eval(str2lang(gp_terms[i]), list(gp = brms::gp))
+        labels <- brms_gp_labels(g, model$data)
+        cells <- if (isTRUE(g$iso)) labels else {
+          as.vector(outer(labels, g$term, paste0))
+        }
+        out <- c(
+          out,
+          rename_block(paste0("sdgp", p, "_", i),
+                       paste0("sdgp", p, "_", labels), sfx),
+          rename_block(paste0("lscale", p, "_", i),
+                       paste0("lscale", p, "_", cells), sfx)
+        )
+        zgp <- if (length(labels) > 1L) {
+          Map(function(j, lab) {
+            rename_vector(paste0("zgp", p, "_", i, "_", j),
+                          paste0("zgp", p, "_", lab), sfx)
+          }, seq_along(labels), labels)
+        } else {
+          list(rename_vector(paste0("zgp", p, "_", i),
+                             paste0("zgp", p, "_", labels), sfx))
+        }
+        out <- c(out, unlist(zgp))
+      }
+      sp_terms <- formula_term_labels(lp$pred[["sp"]])
+      if (length(sp_terms)) {
+        coefs <- brms_rename(sp_terms)
+        out <- c(out, rename_block(paste0("bsp", p),
+                                   paste0("bsp", p, "_", coefs), sfx))
+        n_mo <- lengths(regmatches(sp_terms,
+                                   gregexpr("\\bmo\\(", sp_terms)))
+        simo <- unlist(Map(function(coef, n) {
+          if (n > 0L) paste0(coef, seq_len(n))
+        }, coefs, n_mo), use.names = FALSE)
+        for (i in seq_along(simo)) {
+          out <- c(out, rename_vector(paste0("simo", p, "_", i),
+                                      paste0("simo", p, "_", simo[i]), sfx))
+        }
+      }
+    }
+  }
+  out
+}
+
+
+# Internal: the label of each Gaussian process a `gp()` term fits.
+# `brms:::frame_gp()` writes `gp` and the covariates, appends the `by`
+# variable, and for a `by` factor fits one process per column of the
+# factor's cell-means design, labelled by its level.
+#
+# @param g The object `brms::gp()` returns for the term.
+# @param data The frame the model was fitted to.
+# @return Character vector, one label per process.
+#'@noRd
+brms_gp_labels <- function(g, data) {
+  label <- paste0("gp", brms_rename(paste(g$term, collapse = "")))
+  if (identical(g$by, "NA")) {
+    return(label)
+  }
+  label <- paste0(label, brms_rename(g$by))
+  byval <- data[[g$by]]
+  if (!is.factor(byval) && !is.character(byval) && !is.logical(byval)) {
+    return(label)
+  }
+  byval <- unique(as.factor(byval))
+  design <- stats::model.matrix(
+    if (isTRUE(g$cmc)) ~ 0 + byval else ~ 1 + byval
   )
-  c(unlist(parts), bs_parts, sp_parts)
+  levels <- gsub("[ \t\r\n]+", "", sub("^byval", "",
+                                          brms_rename(colnames(design))))
+  paste0(label, levels)
+}
+
+
+# Internal: the term labels of a component formula, or none.
+#'@noRd
+formula_term_labels <- function(form) {
+  if (!inherits(form, "formula")) {
+    return(character(0L))
+  }
+  attr(stats::terms(form), "term.labels")
+}
+
+
+# Internal: the index a Stan element name carries, `3` for `x[3]`.
+#'@noRd
+stan_index <- function(v) {
+  sub("^.*\\[([0-9]+)\\]$", "\\1", v)
+}
+
+
+# Internal: the label brms gives each smooth object of one term.
+# `brms:::frame_sm()` joins the covariates and the `by` variable,
+# strips the punctuation `brms:::rename()` strips, prefixes the
+# smooth function and appends the object's `by` level: `s(time, by =
+# series)` labels its objects `stimeseriesDM`, `stimeseriesDO`.
+#
+# @param term One entry of `mvgam_smooth_terms()`.
+# @return Character vector, one label per smooth object of the term.
+#'@noRd
+brms_smooth_labels <- function(term) {
+  sfun <- sub("\\(.*$", "", term$term)
+  vars <- c(term$covars, stats::na.omit(term$by_var))
+  base <- paste0(sfun, brms_rename(paste(vars, collapse = "")))
+  if (is.null(term$bylevels)) {
+    return(base)
+  }
+  paste0(base, brms_rename(gsub("[ \t\r\n]+", "", term$bylevels)))
+}
+
+
+# Internal: the substitutions `brms:::rename()` applies by default
+# when it turns a term into part of a parameter name.
+#'@noRd
+brms_rename <- function(x) {
+  from <- c(" ", "(", ")", "[", "]", ",", "\"", "'", "?",
+            "+", "-", "*", "/", "^", "=", "$")
+  to <- c(rep("", 9L), "P", "M", "MU", "D", "E", "EQ", "USD")
+  for (i in seq_along(from)) {
+    x <- gsub(from[i], to[i], x, fixed = TRUE)
+  }
+  x
 }
 
 
 # Internal: replace positional Stan parameter names in `vars` with
-# their brms-native aliases. The map is named character vector
-# where each element's name is the alias and the value is the
-# positional Stan name (the same shape produced by
-# `mvgam_beta_aliases` and `mvgam_ranef_aliases`). Names not in
-# the map pass through unchanged. Used by `variables.mvgam` to
-# expose aliases at the character-vector layer.
+# their brms-native aliases. Each element of `alias_map` names the
+# alias and holds the positional Stan name, the shape every
+# `mvgam_*_aliases()` builder returns. Names not in the map pass
+# through unchanged.
 #'@noRd
-apply_mvgam_beta_aliases <- function(vars, alias_map) {
+apply_mvgam_aliases <- function(vars, alias_map) {
   if (length(alias_map) == 0L) {
     return(vars)
   }
@@ -273,15 +424,16 @@ apply_mvgam_beta_aliases <- function(vars, alias_map) {
 
 
 # Internal: the user-facing projection of a fit's parameter names.
-# Returns a named character vector whose names are the names a user
-# sees and whose values are the raw Stan names behind them, after
-# dropping excluded parameters, the empty-observation placeholder
-# and (unless `hidden`) the rotation-indeterminate factor block.
+# Returns a named character vector: each name is the name a user
+# sees and each value the raw Stan name it aliases. The
+# empty-observation placeholder is dropped, and unless `all` is set
+# so are the working arrays, the accumulators and the hidden forms.
 #
-# `variables.mvgam()`, `extract_mvgam_draws()` and `tidy.mvgam()`
-# all read this, and the three agree about which parameters exist and
-# what they are called: `b_x` and not `b[1]`, the identified loadings
-# and not `L_Omega_trend`.
+# `variables.mvgam()`, `extract_mvgam_draws()`, `summary()` and
+# `tidy.mvgam()` all take their names from here. They agree about
+# which parameters exist and what they are called: `b_x` for the
+# positional `b[1]`, and the identified loadings in place of
+# `L_Omega_trend`.
 #
 # @param x A fitted `mvgam` object.
 # @param pars Optional raw Stan names to project. Defaults to every
@@ -296,12 +448,13 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_flag(all)
   raw <- pars %||% posterior::variables(posterior::as_draws(x$fit))
-  user <- apply_mvgam_beta_aliases(
-    raw, c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
+  user <- apply_mvgam_aliases(
+    raw, c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x),
+           mvgam_smooth_aliases(x, raw), mvgam_special_aliases(x, raw))
   )
-  # The empty-observation placeholder is a structural column that
-  # stands in for a design brms cannot build, never a parameter the
-  # user asked for. brms names its coefficient `b_<coef>`, or
+  # The empty-observation placeholder is a structural column mvgam
+  # adds for a design brms cannot build. The user wrote no such
+  # parameter. brms names its coefficient `b_<coef>`, or
   # `b_<resp>_<coef>` in one response of a multivariate formula.
   keep <- !endsWith(user, paste0("_", MVGAM_EMPTY_OBS_PLACEHOLDER))
   # Stan's own working arrays are held out of the parameter set this
@@ -321,7 +474,7 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   user <- user[keep]
   # brms orders a fitted object's parameters by class, and every
   # reader of this projection inherits that order
-  ord <- mvgam_par_order(user, get_dpar_names(x$formula))
+  ord <- mvgam_par_order(user)
   stats::setNames(raw[ord], user[ord])
 }
 
@@ -335,8 +488,14 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
 # Each side stores a lightweight brmsfit holding this table, built
 # when the model was set up.
 #
-# Both `mvgam_ranef_aliases` and the user-facing `ranef.mvgam` /
-# `VarCorr.mvgam` methods read this, so the table is resolved once.
+# `mvgam_ranef_aliases()`, `ranef.mvgam()` and `VarCorr.mvgam()` all
+# take the names they look up from here. Each row gains the three
+# name parts brms builds: `row_prefix`, the predictor it enters, as
+# `make_row_prefix()` gives it; `alias_key`, the group with that
+# prefix, as in `r_g__sigma_y1[a,Intercept]`; and `coef_alias`, the
+# coefficient with that prefix, as in `sd_g__sigma_y1_Intercept`.
+# `brms:::rename_re_levels()` writes each whitespace character of a
+# level as `.`, and so do the levels here.
 #'@noRd
 mvgam_ranef_metadata <- function(x,
                                  side = c("observation", "trend")) {
@@ -350,7 +509,19 @@ mvgam_ranef_metadata <- function(x,
   if (is.null(reframe) || nrow(reframe) == 0L) {
     return(NULL)
   }
-  list(reframe = reframe, group_levels = attr(reframe, "levels"))
+  group_levels <- lapply(attr(reframe, "levels"), function(lv) {
+    gsub("[ \t\r\n]", ".", lv)
+  })
+  prefix <- make_row_prefix(reframe$nlpar, reframe$dpar, reframe$resp)
+  has_prefix <- nzchar(prefix)
+  reframe$row_prefix <- prefix
+  reframe$alias_key <- ifelse(
+    has_prefix, paste0(reframe$group, "__", prefix), reframe$group
+  )
+  reframe$coef_alias <- ifelse(
+    has_prefix, paste0(prefix, "_", reframe$coef), reframe$coef
+  )
+  list(reframe = reframe, group_levels = group_levels)
 }
 
 
@@ -361,27 +532,18 @@ mvgam_ranef_metadata <- function(x,
 # these to user-facing aliases keyed on the grouping factor name
 # and the coefficient name (`r_<group>[<level>,<coef>]`,
 # `sd_<group>__<coef>`, `cor_<group>__<coef1>__<coef2>`). mvgam
-# delegates Stan-code generation to brms but does not run
-# `rename_pars`, so this helper rebuilds the same map.
+# delegates Stan-code generation to brms and does not run
+# `rename_pars`. This helper rebuilds the same map.
 #
 # Returns a named character vector in the same shape as
 # `mvgam_beta_aliases`: names are the brms-native aliases, values
 # are the positional Stan names. An empty character vector is
 # returned when the fit has no group-level effects.
 #
-# Multi-coef correlated groups: brms stores the correlation matrix
-# off-diagonals in a vector `cor_<id>[1:NC]` where
-# `NC = M*(M-1)/2`. brms's stancode packs them via
-# `cor_<id>[choose(k - 1, 2) + j] = Cor_<id>[j, k]` for j < k, i.e.
-# column-major upper-triangle order: for M = 4 the pairs are
-# (1,2), (1,3), (2,3), (1,4), (2,4), (3,4). The helper below
-# walks pairs in the same order so the alias index matches brms
-# byte-for-byte at any M.
-#
 # Both sides are aliased. The observation and trend blocks reach
-# Stan under the same positional names, the trend's carrying
-# `_trend` after the id, and each side's table is read off the
-# lightweight brmsfit stored for it.
+# Stan under the same positional names, the trend's with `_trend`
+# after the id. `mvgam_ranef_metadata()` takes each side's table from
+# the lightweight brmsfit stored for it.
 #
 # The other brms group-level patterns come through the same
 # `$ranef` table and so need no special case here: multivariate
@@ -402,8 +564,7 @@ mvgam_ranef_aliases <- function(x) {
 # same positional names the observation side uses, with `_trend`
 # after the id: `sd_1_trend[1]` where the observation side has
 # `sd_1[1]`. Its alias takes the `_trend` suffix the beta aliaser
-# already applies to `b_trend[k]`, so `sd_grp__Intercept_trend`
-# rather than a positional name no reader can act on.
+# applies to `b_trend[k]`: `sd_grp__Intercept_trend`.
 #'@noRd
 mvgam_ranef_aliases_side <- function(x,
                                      side = c("observation", "trend")) {
@@ -428,45 +589,29 @@ mvgam_ranef_aliases_side <- function(x,
     n_lvl <- length(levels)
     n_coef <- length(coefs)
     has_cor <- isTRUE(rows$cor[1L]) && n_coef > 1L
-    # Reason: when the RE attaches to an nlpar / dpar / response
-    # block, brms prefixes the user-facing names with that key
-    # (sd_<group>__<nlpar>_<coef>, r_<group>__<nlpar>[lvl, coef]).
-    # The shared-ID syntax `(1 | sp | series)` puts two nlpars
-    # under one id, so the prefix must be read per-row (not just
-    # the first row) or the second nlpar's parameters collide
-    # with the first's aliases.
-    row_pfx <- make_row_prefix(rows$nlpar, rows$dpar, rows$resp)
-    coef_alias <- ifelse(
-      nzchar(row_pfx), paste0(row_pfx, "_", coefs), coefs
-    )
-    group_token_per_coef <- ifelse(
-      nzchar(row_pfx), paste0(group, "__", row_pfx), group
-    )
+    # The shared-ID syntax `(1 | sp | series)` puts two nlpars under
+    # one id. The names are built per row. Built from the first row
+    # alone, the second nlpar's names collided with the first's.
+    coef_alias <- rows$coef_alias
+    group_token_per_coef <- rows$alias_key
     # brms writes the per-level deviations twice: as the matrix
     # `r_<id>[<level_idx>, <coef_idx>]` a correlated block is scaled
     # into, and as the per-coefficient vectors
     # `r_<id>_<coef_idx>[<level_idx>]` its own comment calls faster to
-    # index. The matrix is one of the working variables a fit leaves
-    # out, so the vectors are what a posterior carries and what the
-    # alias is built from, which is the spelling brms renames too.
+    # index. A fit leaves the matrix out with the other working
+    # variables. The posterior holds the vectors, and brms renames
+    # the vectors too.
     grid <- expand.grid(
       level_idx = seq_len(n_lvl),
       coef_idx = seq_len(n_coef),
       KEEP.OUT.ATTRS = FALSE
     )
-    # brms's stancode pattern for the positional names depends on
-    # whether the RE attaches to a nlpar / dpar / response block.
-    # When it does (row_pfx non-empty), the stancode infixes that
-    # token between the id and the coef index:
-    #   univariate:    r_<id>_<coef_idx>[<lev>], sd_<id>[<coef_idx>]
-    #   mv / nlpar:    r_<id>_<pfx>_<coef_idx>[<lev>],
-    #                  sd_<id>_<pfx>[<coef_idx>]
-    # row_pfx is per-row to handle the shared-id case
-    # `(x | sp | series)` where the two coefs may live under
-    # different nlpars; pick the per-coef token.
-    pfx_per_coef <- row_pfx
-    coef_infix <- ifelse(nzchar(pfx_per_coef),
-                          paste0("_", pfx_per_coef), "")
+    # brms's stancode infixes the row prefix between the id and the
+    # coefficient index, the spelling `brms:::rename_re_levels()` matches:
+    #   univariate:          r_<id>_<coef_idx>[<lev>]
+    #   dpar / resp / nlpar: r_<id>_<prefix>_<coef_idx>[<lev>]
+    coef_infix <- ifelse(nzchar(rows$row_prefix),
+                         paste0("_", rows$row_prefix), "")
     r_old <- sprintf("r_%d%s_%d%s[%d]", id,
                      coef_infix[grid$coef_idx],
                      grid$coef_idx, pos_sfx, grid$level_idx)
@@ -480,27 +625,35 @@ mvgam_ranef_aliases_side <- function(x,
       alias_sfx, levels[grid$level_idx], coefs[grid$coef_idx]
     )
     r_map <- stats::setNames(r_old, r_new)
-    # sd_<id>[<coef_idx>] -> sd_<group>__[<nlpar>_]<coef>
-    # Unlike `r_`, brms's stancode emits `sd_` without the
-    # nlpar / dpar / response infix because `id` already
-    # distinguishes per-response (mv) and per-nlpar/dpar
-    # grouping blocks (each gets its own id).
-    sd_old <- sprintf("sd_%d%s[%d]", id, pos_sfx, seq_len(n_coef))
-    sd_new <- sprintf("sd_%s__%s%s", group, coef_alias, alias_sfx)
-    sd_map <- stats::setNames(sd_old, sd_new)
-    # cor_<id>[<k>] -> cor_<group>__[<nlpar>_]<coef_j>__[<nlpar>_]<coef_k>
-    # Pair order follows brms's column-major upper-triangle packing
-    # (`choose(k - 1, 2) + j` for j < k); see comment block above.
+    # sd_<id>[<coef_idx>] -> sd_<group>__<coef>. A `by` factor makes
+    # `sd_<id>` a matrix with one column per level, which Stan saves
+    # column by column, in the order `ranef_rnames()` names the cells.
+    rnames <- ranef_rnames(rows)
+    by_levels <- length(rnames) %/% n_coef
+    sd_old <- if (by_levels > 1L) {
+      sprintf("sd_%d%s[%d,%d]", id, pos_sfx, rep(seq_len(n_coef), by_levels),
+              rep(seq_len(by_levels), each = n_coef))
+    } else {
+      sprintf("sd_%d%s[%d]", id, pos_sfx, seq_len(n_coef))
+    }
+    sd_map <- stats::setNames(
+      sd_old, paste0("sd_", group, "__", rnames, alias_sfx)
+    )
+    # cor_<id>[<k>] -> cor_<group>__<coef_j>__<coef_k>, in the order
+    # `ranef_cor_names()` gives. Each level of a `by` factor has its
+    # own vector `cor_<id>_<level>`.
     cor_map <- character(0L)
     if (has_cor) {
-      ks <- rep(2:n_coef, times = seq_len(n_coef - 1L))
-      js <- unlist(lapply(2:n_coef, function(k) seq_len(k - 1L)))
-      cor_old <- sprintf("cor_%d%s[%d]", id, pos_sfx, seq_along(js))
-      cor_new <- sprintf(
-        "cor_%s__%s__%s%s", group,
-        coef_alias[js], coef_alias[ks], alias_sfx
-      )
-      cor_map <- stats::setNames(cor_old, cor_new)
+      cells <- matrix(rnames, nrow = n_coef)
+      cor_map <- unlist(lapply(seq_len(ncol(cells)), function(j) {
+        new <- paste0(ranef_cor_names(group, cells[, j]), alias_sfx)
+        vec <- if (by_levels > 1L) paste0("cor_", id, "_", j) else {
+          paste0("cor_", id)
+        }
+        stats::setNames(
+          sprintf("%s%s[%d]", vec, pos_sfx, seq_along(new)), new
+        )
+      }))
     }
     c(r_map, sd_map, cor_map)
   })
@@ -517,10 +670,11 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_logical(regex, len = 1L)
   checkmate::assert_logical(inc_warmup, len = 1L)
-  # Every draws method in the package arrives here, so one guard
-  # covers them all. A prefit has an empty `fit` slot, and the line
-  # below met it with "Don't know how to transform an object of class
-  # 'NULL'", naming neither the state nor the argument that made it.
+  # Every draws method in the package calls this function, and the
+  # one guard serves them all. A prefit has an empty `fit` slot, and
+  # the line below met it with "Don't know how to transform an object
+  # of class 'NULL'", naming neither the state nor the argument that
+  # made it.
   require_fitted_model(x)
   drws <- posterior::as_draws_array(x$fit, inc_warmup = inc_warmup)
   # One projection decides which parameters exist and what they are
@@ -552,7 +706,7 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   matched <- character(0L)
   if (any(is_keyword)) {
     matched <- unlist(lapply(variable[is_keyword], function(k) {
-      resolve_mvgam_keyword(k, x, all_vars)
+      resolve_mvgam_keyword(k, all_vars)
     }))
   }
   free <- variable[!is_keyword]

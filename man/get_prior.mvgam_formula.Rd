@@ -123,7 +123,7 @@ mod <- mvgam(
 # Inspect the posterior to confirm the overrides took effect. The
 # `ar1_trend` and `sigma_trend` rows should sit on the scale set
 # by their custom priors rather than the flat defaults.
-summary(mod, include_betas = FALSE)
+summary(mod)
 }
 
 }

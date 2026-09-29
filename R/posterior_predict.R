@@ -853,69 +853,7 @@ sample_from_family <- function(family_name, ndraws, epred,
 get_family_dpars <- function(family_name) {
   checkmate::assert_string(family_name)
 
-  # Map families to required distributional parameters
-  # Covers all brms families for future-proofing
-  dpar_map <- list(
-    # Continuous families
-    gaussian = c("sigma"),
-    student = c("sigma", "nu"),
-    skew_normal = c("sigma", "alpha"),
-    lognormal = c("sigma"),
-    shifted_lognormal = c("sigma", "ndt"),
-    gamma = c("shape"),
-    weibull = c("shape"),
-    frechet = c("shape"),
-    inverse.gaussian = c("shape"),
-    exgaussian = c("sigma", "beta"),
-    beta = c("phi"),
-    gen_extreme_value = c("sigma", "xi"),
-    asym_laplace = c("sigma", "quantile"),
-    wiener = c("bs", "ndt", "bias"),
-    von_mises = c("kappa"),
-    exponential = character(0),
-
-    # Count families
-    poisson = character(0),
-    negbinomial = c("shape"),
-    negbinomial2 = c("sigma"),
-    geometric = character(0),
-    discrete_weibull = c("shape"),
-    com_poisson = c("shape"),
-
-    # Binomial families (trials from data, not posterior)
-    binomial = character(0),
-    beta_binomial = c("phi"),
-    bernoulli = character(0),
-
-    # Zero-inflated families
-    zero_inflated_poisson = c("zi"),
-    zero_inflated_negbinomial = c("zi", "shape"),
-    zero_inflated_binomial = c("zi"),
-    zero_inflated_beta_binomial = c("zi", "phi"),
-    zero_inflated_beta = c("zi", "phi"),
-    zero_one_inflated_beta = c("zoi", "coi", "phi"),
-    zero_inflated_asym_laplace = c("zi", "sigma", "quantile"),
-
-    # Hurdle families
-    hurdle_poisson = c("hu"),
-    hurdle_negbinomial = c("hu", "shape"),
-    hurdle_gamma = c("hu", "shape"),
-    hurdle_lognormal = c("hu", "sigma"),
-
-    # Custom mvgam families
-    tweedie      = c("mphi", "mtheta"),
-    beta_nb      = c("shape", "mtail"),
-    com_binomial = c("nu"),
-    nmix         = c("p"),
-    occ          = c("p"),
-    diri         = c("phi"),
-    multi        = character(0),
-    categ        = character(0),
-    mvn          = c("Psi"),
-    mvt          = c("Psi", "nu")
-  )
-
-  dpar_map[[family_name]] %||% character(0)
+  MVGAM_FAMILY_DPARS[[family_name]] %||% character(0)
 }
 
 

@@ -216,8 +216,8 @@ plot.mvgam_irf = function(x, series = 1, responses = NULL, ...) {
     ggplot2::facet_wrap(
       ~series, scales = "free_y", labeller = ggplot2::label_parsed
     ) +
+    scale_x_horizon() +
     ggplot2::labs(
-      x = "Horizon",
       y = paste0(attr(x, "irf_type"), " impulse response")
     ) +
     mvgam_theme()

@@ -475,8 +475,9 @@ smooths <- function(x) {
 #'   side first: `term`, the label as the formula writes it; `side`;
 #'   `resp`, `dpar` and `nlpar`, naming the predictor as
 #'   `predictor_suffix()` takes them; `objects`, the numbers of its
-#'   smooth objects; `covars`, the variables it is a smooth of; and
-#'   `by_var`, its `by` variable or `NA`
+#'   smooth objects; `covars`, the variables it is a smooth of;
+#'   `by_var`, its `by` variable or `NA`; and `bylevels`, the `by`
+#'   level of each object in turn, `NULL` without a `by` factor
 #' @noRd
 mvgam_smooth_terms <- function(x) {
   checkmate::assert_class(x, "mvgam")
@@ -488,7 +489,7 @@ mvgam_smooth_terms <- function(x) {
     }
     sdata <- brms::standata(model, internal = TRUE)
     for (predictor in model_predictors(model$formula)) {
-      Xs <- sdata[[paste0("Xs", do.call(predictor_suffix, predictor))]]
+      Xs <- sdata[[paste0("Xs", predictor$suffix)]]
       if (is.null(Xs)) {
         next
       }
@@ -513,11 +514,12 @@ mvgam_smooth_terms <- function(x) {
         by_var <- specs[[i]]$by
         out[[length(out) + 1L]] <- c(
           list(term = labels[i], side = side),
-          predictor,
+          predictor[c("resp", "dpar", "nlpar")],
           list(
             objects = seq.int(last[i] - counts[i] + 1L, last[i]),
             covars = specs[[i]]$term,
-            by_var = if (identical(by_var, "NA")) NA_character_ else by_var
+            by_var = if (identical(by_var, "NA")) NA_character_ else by_var,
+            bylevels = if (length(bylevels[[i]])) bylevels[[i]]
           )
         )
       }

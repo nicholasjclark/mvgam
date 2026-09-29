@@ -17,12 +17,16 @@ print.mvgam <- function(x, ...) {
   # estimates and takes one.
   rlang::check_dots_empty()
 
-  # Section 1: Formulas (distinguish observation vs process)
+  # Section 1: Formulas (distinguish observation vs process). The
+  # trend line below names the constructor, and a process formula
+  # with no predictor is left out.
   if (!is.null(x$trend_formula)) {
     cat("GAM observation formula:\n")
     print_model_formula(formula(x))
-    cat("\nGAM process formula:\n")
-    print_model_formula(x$trend_formula)
+    predictors <- trend_predictors(x$trend_formula)
+    if (!is.null(predictors)) {
+      cat("\nGAM process formula:\n", predictors, "\n", sep = "")
+    }
   } else {
     cat("GAM formula:\n")
     print_model_formula(formula(x))
@@ -57,10 +61,7 @@ print.mvgam <- function(x, ...) {
   if (is.null(x$fit)) {
     cat("Not fitted", "\n")
   } else {
-    draws <- posterior::as_draws(x$fit)
-    cat(realised_chain_count(x$fit), 'chains, each with iter =',
-        posterior::niterations(draws), '\n')
-    cat('  Total post-warmup draws =', posterior::ndraws(draws), '\n')
+    cat(format_draws_line(draw_counts(x)), "\n")
   }
 
   invisible(x)
@@ -85,16 +86,13 @@ print.mvgam_formula <- function(x, ...) {
   invisible(x)
 }
 
-# Internal: print a model formula without its environment.
-#
-# `print.formula()` appends `<environment: 0x...>` for any formula
-# not built in the global environment, which is every formula that
-# reaches a fit. The address changes between sessions and says
-# nothing about the model, so no formula this package prints carries
-# one.
+# Internal: print a model formula as `summary()` shows it, one line
+# per response and per distributional parameter, without the
+# placeholder `format_model_formula()` strips or the environment
+# `print.formula()` appends.
 #' @noRd
 print_model_formula <- function(f) {
-  print(f, showEnv = FALSE)
+  cat(format_model_formula(f), sep = "\n")
   invisible(f)
 }
 

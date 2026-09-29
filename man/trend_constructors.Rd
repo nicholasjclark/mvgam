@@ -102,35 +102,29 @@ Two constraints currently apply to hierarchical trend models:
 \item \code{gr} must be constant within each series (each series belongs to
 a single group). Models with \code{gr} varying within a series are
 rejected at validation time.
-\item Groups must be balanced (the same number of series in each
-group). Unbalanced designs are not yet supported by the underlying
-Stan template; if you supply unbalanced data without an explicit
-\code{subgr} argument, the model will fail at Stan initialisation.
+\item Every group must hold the same number of series. The Stan
+program sizes each group's correlation block from one shared
+count, and validation refuses unbalanced groups before
+fitting.
 }}
 
-\item{subgr}{A subgrouping \code{factor} variable specifying which element in
-\code{data} represents the different time series. Defaults to \code{series}, but
-note that models that use the hierarchical correlations, where the
-\code{subgr} time series are measured in each level of \code{gr}, \emph{should not}
-include a \code{series} element in \code{data}. Rather, this element will be created
-internally based on the supplied variables for \code{gr} and \code{subgr}.
+\item{subgr}{A subgrouping \code{factor} variable naming the time series
+within each level of \code{gr}. Defaults to \code{series}. A model with
+hierarchical correlations builds its series from \code{gr} and \code{subgr},
+and \code{data} then needs no \code{series} column.
 
-For example, if you are modelling temporal counts for a group of species
-(labelled as \code{species} in \code{data}) across three different geographical
-regions (labelled as \code{region}), and you would like the residuals to be
-correlated within regions, then you should specify \code{gr = region} and
-\code{subgr = species}. Internally, \code{mvgam()} will create the \code{series} element
-for the data using:
+For example, to model counts of several species (\code{species} in
+\code{data}) across three regions (\code{region}) with residuals correlated
+within regions, specify \code{gr = region} and \code{subgr = species}.
+\code{mvgam()} then builds the series as
 
 \verb{series = interaction(gr, subgr, drop = TRUE, sep = "_",}
 \verb{lex.order = TRUE)}
 
-so a region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}, and
-the levels sort lexically. Post-fit output labels each series that
-way, so \code{summary()}, \code{plot()} and \code{forecast()} all report \code{"r1_sp1"}
-rather than any \code{series} column the data happened to carry. A
-\code{series} column supplied alongside \code{gr} and \code{subgr} is replaced by
-the derived one, with a warning.}
+A region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}, and
+the levels sort lexically. \code{summary()}, \code{plot()} and \code{forecast()}
+all label that series \code{"r1_sp1"}. A \code{series} column that disagrees
+with the derived series is replaced by it, with a warning.}
 
 \item{n_lv}{The number of latent factors to estimate for dynamic
 factor models. When \code{n_lv} is smaller than the number of series,
@@ -138,36 +132,35 @@ the latent processes are modelled as \code{n_lv} factors with estimated
 loadings onto the series. Defaults to \code{NULL}, in which case one
 latent process is used per series.}
 
-\item{trend_map}{Optional \code{data.frame} specifying which latent
-process each series maps onto, giving fixed (rather than estimated)
-loadings for dynamic factor models. See \code{\link{mvgam}} for the
-required format. Defaults to \code{NULL}.}
+\item{trend_map}{Optional specification of which latent process each
+series maps onto. It fixes the loadings of a dynamic factor model.
+See \code{\link{mvgam}} for the accepted formats. Defaults to
+\code{NULL}.}
 
 \item{df}{Degrees of freedom for the latent process innovations.
-Defaults to \code{Inf}, which gives the Gaussian innovations mvgam
-has always used, since a t with infinite degrees of freedom is a
-normal. Set \code{df = NA} to estimate them, or supply a number
-above \code{2} to fix them.
+Defaults to \code{Inf}, which gives Gaussian innovations: a t with
+infinite degrees of freedom is a normal. Set \code{df = NA} to
+estimate them, or supply a number above \code{2} to fix them.
 
 Finite degrees of freedom let the latent process absorb an
-occasional large shock without inflating \code{sigma_trend}
-everywhere, which suits boom-and-bust population series and
-outbreak dynamics. The innovations follow a multivariate t, which
-shares the innovation \emph{scale} across series at each time
-point. Large innovations therefore tend to occur together, but
-each series keeps its own direction and magnitude: a shock in one
-series says nothing about the sign of the others, and a series can
-sit out an event that moves its neighbours. Correlation between
-series is governed by \code{cor} exactly as it is for Gaussian
-innovations; the tail behaviour is layered on top of it.
+occasional large shock while \code{sigma_trend} stays at the scale
+of ordinary variation. That suits boom-and-bust population series
+and outbreak dynamics. The innovations follow a multivariate t,
+which shares one innovation \emph{scale} across the series at each
+time point, and large innovations tend to occur together as a
+result. Each series keeps its own direction and magnitude. A shock
+in one series says nothing about the sign of the others, and one
+series can stay unmoved by an event that moves its neighbours.
+\code{cor} sets the correlation between series exactly as it does
+for Gaussian innovations, and the degrees of freedom control how
+heavy the tails of the innovations are.
 
 When \code{df = NA} the degrees of freedom are estimated as
-\code{nu_trend}, with a default \code{gamma(4, 0.3)} prior that
-can be replaced through the \code{prior} argument, for example
-\code{prior(gamma(2, 0.1), class = "nu_trend")}. Note that
-\code{nu_trend} is listed in the \code{\link{get_prior}} table
-alongside \code{sigma_trend}, so the class name can be read from
-there.
+\code{nu_trend}, with a default \code{gamma(4, 0.3)} prior. The
+\code{prior} argument replaces it, for example
+\code{prior(gamma(2, 0.1), class = "nu_trend")}.
+\code{\link{get_prior}} lists \code{nu_trend} with the other trend
+classes.
 
 Three caveats. The bound of \code{2} is required: below it the
 innovations have no finite variance, and an autoregressive trend
@@ -178,35 +171,31 @@ under Gaussian innovations alone. A finite mix of t variates has
 heavier tails than the infinite sum that defines that law. The
 degrees of freedom are informed only through the tail of the
 latent process and are weakly identified in short series: below
-roughly 200 time points, the posterior stays close to its prior. Not available for \code{VAR()}, which samples its states
-directly, or \code{PW()}, which has no innovations.}
+roughly 200 time points, the posterior stays close to its prior.
+Not available for \code{VAR()}, which samples its states directly,
+or \code{PW()}, which has no innovations.}
 
-\item{p}{Specification of the autoregressive lag set. The
-semantics differ slightly across trend types:
+\item{p}{The autoregressive lags. The accepted form depends on the
+trend type:
 \itemize{
-\item For \code{AR()} models: a positive integer or a positive
-integer vector. A scalar \code{p = k} is the textbook
-AR(k) interpretation and is expanded to consecutive
-lags \code{1:k}, so the fit estimates \code{ar1_trend},
-\code{ar2_trend}, ..., \code{ark_trend}. A vector
-\code{p = c(...)} selects a sparse lag set:
-\code{p = c(1, 12)} declares only \code{ar1_trend} and
-\code{ar12_trend} (seasonal AR with no intermediate
-lags), and \code{p = c(2, 4)} declares only
-\code{ar2_trend} and \code{ar4_trend} (no \code{ar1}
-or \code{ar3}).
-\item For \code{VAR()} models: a positive integer. A scalar
-\code{p = k} is the VAR(k) interpretation with
-consecutive coefficient matrices for lags \code{1:k}.
-Sparse-lag vector \code{p} is not supported and will
-not be added: the Heaps-2023 stationary joint-
-distribution initialisation assumes consecutive
-companion-form structure, so the sparse case has no
-companion-form analogue with the same identified
-stationary covariance. Use \code{AR(p = c(...))} for
-sparse-lag autoregression on a single series.
-\item For \code{CAR()} models: must be \code{1} (continuous-time
-AR(1) process).
+\item For \code{AR()} models: a positive integer or a positive integer
+vector. A scalar \code{p = k} is the textbook AR(k) and expands
+to the consecutive lags \code{1:k}. The fit then estimates
+\code{ar1_trend} through \code{ark_trend}. A vector
+\code{p = c(...)} selects a sparse lag set. \code{p = c(1, 12)}
+declares only \code{ar1_trend} and \code{ar12_trend}, a seasonal
+AR with no intermediate lags. \code{p = c(2, 4)} declares only
+\code{ar2_trend} and \code{ar4_trend}.
+\item For \code{VAR()} models: a positive integer. \code{p = k} is the
+VAR(k), with one coefficient matrix for each of the lags
+\code{1:k}. A sparse lag vector is not supported. The stationary
+initialisation of Heaps (2023) is defined on the companion form
+of consecutive lags. A sparse lag set has no companion form with
+the same identified stationary covariance. Use
+\code{AR(p = c(...))} for sparse-lag autoregression on a single
+series.
+\item For \code{CAR()} models: must be \code{1}, a continuous-time AR(1)
+process.
 }}
 
 \item{coef_sharing}{Character string, one of \code{"none"},
@@ -236,7 +225,8 @@ and piecewise trends (PW). These functions do not evaluate their arguments
 \strong{Important}: Only ONE trend constructor is allowed per \code{trend_formula}.
 For complex temporal dynamics, use the parameter options of a single trend type:
 \itemize{
-\item For seasonal patterns: \code{AR(p = c(1, 12))} instead of \code{RW() + AR(p = 12)}
+\item For seasonal patterns: \code{AR(p = c(1, 12))}. A sum such as
+\code{RW() + AR(p = 12)} is refused
 \item For multiple time scales: \code{AR(p = c(1, 7, 30))} for daily, weekly, monthly
 \item For multivariate dynamics: \code{VAR(p = 2)} captures cross-series relationships
 }
@@ -309,67 +299,55 @@ lags, where the sampled quantity is a partial autocorrelation,
 and empty for \code{p = 1} and for a sparse lag set such as
 \code{p = c(1, 3)}. \code{AR(p = 2)} samples \code{ar1_pacf_trend} and
 \code{AR(p = 1)} samples \code{ar1_trend}.
-All variants synthesise the same \verb{ar\{lag\}_trend[j]} symbol
-in \verb{transformed parameters}, so downstream code
-(forecasting, IRF, FEVD, summary printing) is unchanged.
-Custom priors can be set on any sampled parameter via the
-standard \code{brms::set_prior(class = "<name>")} route; call
-\code{get_prior(mvgam_formula(...))} to see the exact parameter
-set surfaced by the current \code{coef_sharing} value.
+Every setting defines the same \verb{ar\{lag\}_trend[j]} in
+\verb{transformed parameters}, and forecasting, IRF, FEVD and summaries
+use that quantity whatever the setting. A prior on any sampled
+parameter is set with \code{brms::set_prior(class = "<name>")}.
+\code{get_prior(mvgam_formula(...))} lists the parameters the chosen
+\code{coef_sharing} samples.
 }
 
 \section{Parameter Naming Convention}{
 
-All trend model parameters automatically receive a "_trend" suffix to prevent
-naming conflicts with observation model parameters. For example:
-\itemize{
-\item \code{sigma} becomes \code{sigma_trend}
-\item \code{theta} becomes \code{theta_trend} (when \code{ma = TRUE})
-\item \code{Sigma} becomes \code{Sigma_trend} (when \code{cor = TRUE})
-\item \code{ar[p]} becomes \code{ar_trend[p]} (for AR trends)
-\item \code{A[p]} becomes \code{A_trend[p]} (for VAR trends)
-}
-
-This naming convention is applied consistently across all trend types and must
-be considered when:
-\itemize{
-\item Specifying priors (use \code{prior(normal(0, 1), class = sigma_trend)})
-\item Extracting parameters from fitted models
-}
+Every trend parameter carries a \verb{_trend} suffix, which keeps it
+distinct from an observation model parameter of the same name. The
+innovation scale is \code{sigma_trend}, the moving-average
+coefficient \code{theta1_trend}, the autoregressive coefficients
+\code{ar1_trend} to \code{ark_trend} and the VAR coefficient
+matrices \code{A_trend}. Priors take these class names, as in
+\code{prior(normal(0, 1), class = sigma_trend)}, and parameter
+extraction takes the same names.
 }
 
 \section{Identification}{
 
 Factor-model fits (\code{n_lv < n_series}) sample the loadings
-matrix \code{Z} unconstrained and identify it post-hoc via thin QR
-decomposition in generated quantities, following Heaps & Jermyn
-(2024). The identified loadings \code{Z_tilde} and rotated factor
-paths \code{lv_trend_tilde} (for AR / RW / VAR) are saved alongside
-the unrotated \code{Z} and \code{lv_trend}; downstream resolvers prefer
-the identified versions when present. \code{qr_thin_R()}
-guarantees a non-negative diagonal on \code{Z_tilde}, removing the
-\eqn{2^k} sign-mode equivalence by construction. Per-factor
-scalar parameters (\code{ar1_trend}, \code{sigma_trend}, \code{theta1_trend},
-\code{L_Omega_trend}) remain in the unrotated latent basis; for
-VAR-trend factor models the lag-coefficient array also rotates
-(\verb{A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'}).
+matrix \code{Z} unconstrained. Following Heaps & Jermyn (2024), generated
+quantities identify it by a thin QR decomposition. The fit saves the
+identified loadings \code{Z_tilde} with the unrotated \code{Z}, and the rotated
+factor paths \code{lv_trend_tilde} with \code{lv_trend}. Post-fit methods use
+the identified versions where they exist. \code{qr_thin_R()} gives \code{Z_tilde} a non-negative diagonal,
+which removes the \eqn{2^k} equivalent sign modes. The per-factor
+coefficients \code{ar1_trend} and \code{theta1_trend} stay in the unrotated
+basis. A VAR factor model also rotates its lag coefficients as
+\verb{A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'}.
 
-Supplying \code{trend_map} bypasses the QR identification step
-entirely so the user-encoded fixed entries are preserved exactly
-on \code{Z}. Combine a free factor model with the optional
-\code{loadings_prior} argument on \code{mvgam()} to swap the
-default iid Student-t prior on \code{Z} for a structured matrix-normal
-prior built from per-series features and / or pairwise distance
-matrices; see \code{\link{mvgam}} for the full surface.
+A \code{trend_map} skips the QR step and keeps its fixed entries on
+\code{Z} exactly. A \code{by = lv_axis()} smooth ties each factor to its own
+covariate effect. Because a rotation would mix those effects, that
+model skips the QR step as well. For a free factor model, the \code{loadings_prior}
+argument of \code{mvgam()} replaces the default iid Student-t prior
+on \code{Z} with a structured matrix-normal prior. That prior is built
+from per-series features, pairwise distance matrices or both. See
+\code{\link{mvgam}} for its arguments.
 
 Setting \code{loadings_prior = "mgp"} (or
 \code{loadings_prior = list(column_shrinkage = "mgp")}) switches
 the column scaling to the multiplicative gamma process prior of
 Bhattacharya & Dunson (2011), which shrinks later columns of \code{Z}
-toward zero with increasing strength. Under this prior \code{n_lv}
-acts as a truncation ceiling rather than the exact factor count;
-\code{\link{active_factors}} reports the posterior distribution of
-the active column count.
+toward zero with increasing strength. \code{n_lv} is then a truncation
+ceiling on the factor count. \code{\link{active_factors}} reports
+the posterior distribution of the number of active columns.
 }
 
 \examples{
@@ -454,15 +432,14 @@ mcmc_plot(mod_car, variable = "trend_params", type = "intervals")
 # series correlations:
 #   trend_formula = ~ ZMVN()
 
-# Hierarchical VAR. Two regions, two outcomes per region. The
-# `gr` factor identifies the grouping unit (region) and `subgr`
-# identifies the within-group dimension (outcome). The fit
-# estimates a population innovation correlation across outcomes
-# plus per-region deviations; `alpha_cor_trend` (beta(3, 2) by
-# default) controls the partial-pooling blend between them.
-# Simulate data with a genuine cross-outcome correlation (~0.6)
-# so the population estimate is recoverable, not floating on
-# noise.
+# Hierarchical VAR with two regions and two outcomes per region.
+# `gr` names the grouping unit (region) and `subgr` the series
+# within it (outcome). The fit estimates a population innovation
+# correlation across outcomes and per-region deviations from it.
+# `alpha_cor_trend`, with a beta(3, 2) prior by default, sets how
+# strongly the two are pooled. The simulated outcomes share a
+# correlation of about 0.6, which gives the population estimate a
+# signal to recover.
 set.seed(3)
 n_t <- 30L; rho <- 0.6
 Sigma <- matrix(c(1, rho, rho, 1), 2L, 2L)
@@ -478,7 +455,6 @@ hdat <- do.call(rbind, lapply(regions, function(r) {
     y       = c(eps[, 1L], eps[, 2L])
   )
 }))
-hdat$series <- factor(paste(hdat$region, hdat$outcome, sep = "_"))
 
 mod_hv <- mvgam(
   y ~ 1,
@@ -498,10 +474,9 @@ mod_hv <- mvgam(
 # mass near 0 lets the regions diverge.
 mcmc_plot(mod_hv, variable = "alpha_cor_trend", type = "hist")
 
-# `residual_cor()` defaults to the population (across-outcome)
-# correlation. Passing `by_group = TRUE` returns a list of
-# per-region correlations alongside the population entry, so
-# the across-region heterogeneity can be inspected directly.
+# `residual_cor()` returns the population (across-outcome)
+# correlation by default. `by_group = TRUE` also returns the
+# per-region correlations, for comparing the regions.
 residual_cor(mod_hv)
 residual_cor(mod_hv, by_group = TRUE)
 }

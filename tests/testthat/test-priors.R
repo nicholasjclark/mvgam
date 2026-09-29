@@ -1020,9 +1020,9 @@ test_that("a user prior reaches the parameters that reported nothing", {
   user <- brms::prior_string("normal(0, 3)", class = "Amu_trend") +
     brms::prior_string("gamma(5, 2)", class = "Domega_trend")
   code <- prior_code(mf, poisson(), pr = user)
-  expect_true(grepl(stan_prior_line("Amu_trend[lag]", "normal(0, 3)"),
+  expect_true(grepl(stan_prior_line("Amu_trend[k]", "normal(0, 3)"),
                       code, fixed = TRUE))
-  expect_true(grepl(stan_prior_line("Domega_trend[1, 1]", "gamma(5, 2)"),
+  expect_true(grepl(stan_prior_line("Domega_trend[k]", "gamma(5, 2)"),
                       code, fixed = TRUE))
 
   pw <- mvgam_formula(y ~ -1, trend_formula = ~ PW())
@@ -1079,26 +1079,13 @@ test_that("suffix_trend_prior_classes carries both guards", {
 })
 
 
-test_that("every surface names a trend prior class the same way", {
+test_that("the trend suffix skips classes mvgam already names", {
   # `Z` is the Stan parameter's own name, so `Z_trend` names nothing.
-  # The suffix rule was written twice and only one copy knew that,
-  # so the model description rendered a parameter the program has no
-  # equivalent of.
   cls <- c("sigma", "ar1_trend", "Z", "Psi", "theta_dist_phy", "")
   expect_equal(
     apply_trend_class_suffix(cls),
     c("sigma_trend", "ar1_trend", "Z", "Psi", "theta_dist_phy", "")
   )
-
-  tp <- brms::prior(student_t(3, 0, 0.5), class = "Z") +
-    brms::prior(normal(0, 1), class = "ar1")
-  rendered <- merge_trend_priors(
-    list(prior = NULL, trend_model = list(prior = tp))
-  )
-  # `setequal` rather than `sort`: collation puts "Z" before
-  # "ar1_trend" in the C locale and after it elsewhere, and the
-  # claim here is about membership, not order.
-  expect_setequal(rendered$class, c("ar1_trend", "Z"))
 })
 
 

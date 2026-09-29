@@ -434,3 +434,14 @@ test_that("the by-factor GP carries one length-scale per level", {
 
 
 cat("\nDone.\n")
+
+
+test_that("each smooth object is named as brms names it", {
+  # `brms:::rename_sm()` labels an object by its term and `by` level
+  # and numbers its penalties; summary() reports those alone.
+  expect_equal(
+    rownames(summary(sm_fit())$smooth),
+    c("sds(szgrpa_1)", "sds(szgrpb_1)", "sds(szgrpc_1)",
+      "sds(t2zw_1)", "sds(t2zw_2)", "sds(t2zw_3)")
+  )
+})

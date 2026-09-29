@@ -210,10 +210,8 @@ plot.mvgam_fevd = function(x, series = NULL, contributing = NULL, ...) {
     ggplot2::scale_fill_manual(values = fill_values) +
     ggplot2::facet_wrap(~target) +
     mvgam_theme() +
-    ggplot2::labs(
-      x = "Forecast horizon",
-      y = "Median contribution to forecast variance"
-    )
+    scale_x_horizon("Forecast horizon") +
+    ggplot2::labs(y = "Median contribution to forecast variance")
 }
 
 #'@noRd

@@ -492,7 +492,7 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
 test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with tensor product smooths and presence covariate", {
   code_with_trend <- trend_shape_code("varma")
 
-  # Advanced mathematical functions for VARMA stationarity (Heaps 2022)
+  # Advanced mathematical functions for VARMA stationarity (Heaps 2023)
   expect_true(stan_pattern("matrix sqrtm\\(matrix A\\)", code_with_trend))
   expect_true(stan_pattern("matrix AtoP\\(matrix P_real\\)", code_with_trend))
   expect_true(stan_pattern("matrix initial_joint_var\\(", code_with_trend))
@@ -531,7 +531,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   # MA coefficient matrices
   expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;", code_with_trend))
 
-  # Hierarchical hyperparameters (Heaps 2022 methodology)
+  # Hierarchical hyperparameters (Heaps 2023 methodology)
   expect_true(stan_pattern("array\\[2\\] vector\\[2\\] Amu_trend;", code_with_trend))
   expect_true(stan_pattern("array\\[2\\] vector<lower=0>\\[2\\] Aomega_trend;", code_with_trend))
   expect_true(stan_pattern("array\\[2\\] vector\\[1\\] Dmu_trend;", code_with_trend))
@@ -553,7 +553,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
   expect_true(stan_pattern("cov_matrix\\[N_lv_trend\\] Sigma_trend = multiply_lower_tri_self_transpose\\(L_Sigma_trend\\);", code_with_trend))
 
-  # Stationarity transformations (Heaps 2022)
+  # Stationarity transformations (Heaps 2023)
   expect_true(stan_pattern("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_trend;", code_with_trend))
   expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
   expect_true(stan_pattern("P_var\\[i\\] = AtoP\\(A_raw_trend\\[i\\]\\);", code_with_trend))
@@ -1514,13 +1514,13 @@ test_that("user priors on array-shaped VAR hyperparameters emit per-lag", {
   lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
   code_only <- lines[!grepl("^\\s*//", lines)]
 
-  amu_lines <- grep("Amu_trend\\[lag\\]\\s*[~|]", code_only, value = TRUE)
+  amu_lines <- grep("Amu_trend\\[k\\]\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(amu_lines), 1L)
-  expect_match(amu_lines, "Amu_trend\\[lag\\]\\s*[~|]\\s*(normal\\()?0,\\s*0.3")
+  expect_match(amu_lines, "Amu_trend\\[k\\]\\s*[~|]\\s*(normal\\()?0,\\s*0.3")
 
-  aomega_lines <- grep("Aomega_trend\\[lag\\]\\s*[~|]", code_only, value = TRUE)
+  aomega_lines <- grep("Aomega_trend\\[k\\]\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(aomega_lines), 1L)
-  expect_match(aomega_lines, "Aomega_trend\\[lag\\]\\s*[~|]\\s*(gamma\\()?2,\\s*0.5")
+  expect_match(aomega_lines, "Aomega_trend\\[k\\]\\s*[~|]\\s*(gamma\\()?2,\\s*0.5")
 
   l_global_lines <- grep("L_Omega_global_trend\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(l_global_lines), 1L)
@@ -1536,13 +1536,9 @@ test_that("user priors on array-shaped VAR hyperparameters emit per-lag", {
 
 
 test_that("user priors on array-shaped VARMA MA hyperparameters emit", {
-  # Regression guard for user-supplied `Dmu_trend` / `Domega_trend`
-  # priors on VARMA(p, q) fits. `Dmu_trend` / `Domega_trend` are
-  # declared `array[2] vector[ma_lags]`; the user override must reach
-  # the emitter and end up on the two scalar target rows
-  # (`Dmu_trend[1, 1] ~ ...`, `Dmu_trend[2, 1] ~ ...`) so higher-order
-  # ma_lags stay ready to plug in once the current ma_lags = 1 cap
-  # lifts. Compile is verified via stancode `validate = TRUE`.
+  # `Dmu_trend` / `Domega_trend` are declared `array[2]
+  # vector[ma_lags]`; the user override has to reach the statement on
+  # each array element. Compile is verified via `validate = TRUE`.
   data <- setup_stan_test_data()$multivariate
   mf <- mvgam_formula(
     count ~ 1 + x,
@@ -1559,23 +1555,14 @@ test_that("user priors on array-shaped VARMA MA hyperparameters emit", {
   lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
   code_only <- lines[!grepl("^\\s*//", lines)]
 
-  # Either spelling: `Dmu_trend[1, 1] ~ dist(...)` or the density
-  # call `dist_lpdf(Dmu_trend[1, 1] | ...)`.
-  dmu_lines <- grep("Dmu_trend\\[[12], ?1\\]\\s*[~|]",
-                     code_only, value = TRUE)
-  expect_equal(length(dmu_lines), 2L)
-  expect_true(all(grepl("normal(\\(|_lpdf\\(.*\\| ?)0,\\s*0.4",
-                          dmu_lines)))
-
-  dom_lines <- grep("Domega_trend\\[[12], ?1\\]\\s*[~|]",
-                     code_only, value = TRUE)
-  expect_equal(length(dom_lines), 2L)
-  expect_true(all(grepl("gamma(\\(|_lpdf\\(.*\\| ?)3,\\s*0.75",
-                          dom_lines)))
+  # Either spelling: `Dmu_trend[k] ~ dist(...)` or the density call
+  # `dist_lpdf(Dmu_trend[k] | ...)`.
+  expect_match(code_only, "Dmu_trend\\[k\\].*0, ?0.4", all = FALSE)
+  expect_match(code_only, "Domega_trend\\[k\\].*3, ?0.75", all = FALSE)
 })
 
 
-test_that("default priors on array-shaped VAR hyperparameters still emit per-lag", {
+test_that("default priors on array-shaped VAR hyperparameters still emit", {
   data <- setup_stan_test_data()$multivariate
   mf <- mvgam_formula(
     count ~ 1 + x,
@@ -1587,19 +1574,18 @@ test_that("default priors on array-shaped VAR hyperparameters still emit per-lag
   lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
   code_only <- lines[!grepl("^\\s*//", lines)]
 
-  # Without overrides the package defaults must still surface, under the
-  # same per-lag indexing, and only once.
-  amu_lines <- grep("Amu_trend\\[lag\\]\\s*[~|]", code_only, value = TRUE)
+  # Without overrides the package defaults still surface, once each.
+  amu_lines <- grep("Amu_trend\\[k\\]\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(amu_lines), 1L)
   expect_match(amu_lines, paste0(
-    "Amu_trend\\[lag\\]\\s*[~|]\\s*(normal\\()?0,",
+    "Amu_trend\\[k\\]\\s*[~|]\\s*(normal\\()?0,",
     "\\s*sqrt\\(0.455\\)"
   ))
 
-  aomega_lines <- grep("Aomega_trend\\[lag\\]\\s*[~|]", code_only, value = TRUE)
+  aomega_lines <- grep("Aomega_trend\\[k\\]\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(aomega_lines), 1L)
   expect_match(aomega_lines, paste0(
-    "Aomega_trend\\[lag\\]\\s*[~|]\\s*(gamma\\()?1.365,",
+    "Aomega_trend\\[k\\]\\s*[~|]\\s*(gamma\\()?1.365,",
     "\\s*0.071175"
   ))
 
@@ -5505,43 +5491,28 @@ test_that("the stacked design names the columns the two sides share", {
     pf <- mvgam(obs, trend_formula = tr, data = d, family = poisson(),
                 run_model = FALSE)
     m <- stacked_design_matrix(standata(pf))
-    if (is.null(m)) {
-      return(NULL)
-    }
-    norms <- sqrt(colSums(m^2))
-    norms[norms == 0] <- 1
-    q <- qr(sweep(m, 2L, norms, "/"))
-    list(
-      ncol = ncol(m),
-      rank = q$rank,
-      dependent = if (q$rank < ncol(m)) {
-        colnames(m)[q$pivot[seq.int(q$rank + 1L, ncol(m))]]
-      } else {
-        character(0)
-      }
-    )
+    if (is.null(m)) NULL else confounded_columns(m)
   }
 
   # A per-series latent level against an observation intercept.
-  s1 <- shared(y ~ 1, ~ series + AR(p = 1))
-  expect_lt(s1$rank, s1$ncol)
-  expect_match(s1$dependent, "^X_trend:series")
+  expect_match(shared(y ~ 1, ~ series + AR(p = 1)), "^X_trend:series")
 
   # The same covariate on both sides.
-  s2 <- shared(y ~ x, ~ x + AR(p = 1))
-  expect_identical(s2$dependent, "X_trend:x")
+  expect_identical(shared(y ~ x, ~ x + AR(p = 1)), "X_trend:x")
 
   # Different covariates are separately identified.
-  s3 <- shared(y ~ x, ~ env + AR(p = 1))
-  expect_identical(s3$rank, s3$ncol)
-  expect_length(s3$dependent, 0L)
+  expect_length(shared(y ~ x, ~ env + AR(p = 1)), 0L)
+
+  # The placeholder for an empty observation formula is a column of
+  # zeros pinned at zero, and shares a direction with nothing.
+  expect_length(shared(y ~ 0, ~ series + AR(p = 1)), 0L)
 
   # A smooth repeated across the two formulas shares its whole basis.
   # A check over the parametric designs alone reports this pairing at
   # full rank.
-  s4 <- shared(y ~ s(env, k = 5), ~ s(env, k = 5) + AR(p = 1))
-  expect_lt(s4$rank, s4$ncol)
-  expect_true(any(grepl("^Zs_1_1_trend", s4$dependent)))
+  expect_true(any(grepl(
+    "^Zs_1_1_trend", shared(y ~ s(env, k = 5), ~ s(env, k = 5) + AR(p = 1))
+  )))
 
   # A trend carrying no design of its own gives nothing to compare.
   expect_null(shared(y ~ x, ~ AR(p = 1)))

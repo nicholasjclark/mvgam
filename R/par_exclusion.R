@@ -1,25 +1,26 @@
 # Which parameters a fit does not keep
 #
-# brms computes this list before sampling and passes it to Stan, so a
-# model's working variables never reach the posterior: the standardised
-# deviates a group-level block is scaled from, the unscaled coefficients
-# a shrinkage prior scales, the ordered intercepts a mixture is
-# identified by. Each is a quantity the model also reports under another
-# name, and a reader offered both meets one parameter twice.
+# brms computes this list before sampling and passes it to Stan, and a
+# model's working variables never reach the posterior: the
+# standardised deviates a group-level block is scaled from, the
+# unscaled coefficients a shrinkage prior scales, the ordered
+# intercepts a mixture is identified by. The model reports each of
+# these under another name, and a reader offered both would meet one
+# parameter twice.
 #
-# mvgam assembles its program out of two brms models, so it applies the
-# same rules to each. The rules are `brms:::exclude_pars()`, which brms
-# does not export; what this file takes from brms is exported.
-# `brmsterms()` gives the response, distributional and non-linear
-# parameters whose names a working variable carries, and the stored
-# brmsfit carries the group-level table. Every trend-side name takes
-# mvgam's `_trend` suffix.
+# mvgam assembles its program from two brms models and applies the
+# same rules to each. The rules are `brms:::exclude_pars()`, which
+# brms does not export, and this file uses only brms's exported
+# functions. `brmsterms()` gives the response, distributional and
+# non-linear parameters whose names a working variable takes, and the
+# stored brmsfit holds the group-level table. Every trend-side name
+# takes mvgam's `_trend` suffix.
 #
-# mvgam's own working arrays are a separate question and stay in the
-# posterior: `sample_innovations.R` takes `Q_tilde` per draw to rebuild
-# the identified loadings, so excluding it would drop a quantity the
-# package itself needs. Those are hidden when a reader is shown
-# parameter names, which `mvgam_par_kind()` decides.
+# mvgam's own working arrays stay in the posterior.
+# `sample_innovations.R` takes `Q_tilde` per draw to rebuild the
+# identified loadings, and excluding it would drop a quantity the
+# package needs. `mvgam_par_kind()` hides them when a reader is shown
+# parameter names.
 
 
 #' The parameters a fit excludes
@@ -132,26 +133,17 @@ brms_working_pars <- function(bfit, standata, save_pars, suffix = "") {
     if (!(isTRUE(save_pars$group) || ".err" %in% save_pars$group)) {
       out <- c(out, paste0("err", resp))
     }
-    # Every distributional and non-linear parameter has a predictor of
-    # its own, and each names its working variables by that predictor.
-    # A non-linear predictor is an expression over the parameters
-    # below it and declares none of these itself.
-    linear <- Filter(
-      function(pred) !inherits(pred, "btnl"), c(frame$dpars, frame$nlpars)
-    )
-    for (pred in linear) {
-      sfx <- predictor_suffix(
-        resp = null_if_blank(frame$resp), dpar = null_if_blank(pred$dpar),
-        nlpar = null_if_blank(pred$nlpar)
-      )
-      out <- c(out, paste0("chol_cor", sfx))
-      if (!save_pars$all) {
-        out <- c(out, paste0(
-          c("bQ", "zb", "zbsp", "zbs", "zar", "zma", "hs_local", "R2D2_phi",
-            "scales", "merged_Intercept", "zcar", "nszcar", "zerr"),
-          sfx
-        ))
-      }
+  }
+  # Every linear predictor names its working variables by its own
+  # suffix.
+  for (lp in model_predictors(bfit$formula)) {
+    out <- c(out, paste0("chol_cor", lp$suffix))
+    if (!save_pars$all) {
+      out <- c(out, paste0(
+        c("bQ", "zb", "zbsp", "zbs", "zar", "zma", "hs_local", "R2D2_phi",
+          "scales", "merged_Intercept", "zcar", "nszcar", "zerr"),
+        lp$suffix
+      ))
     }
   }
   if (!save_pars$all) {
@@ -166,28 +158,12 @@ brms_working_pars <- function(bfit, standata, save_pars, suffix = "") {
 }
 
 
-#' A brms name part, or NULL when the model has none
-#'
-#' `predictor_suffix()` takes `NULL` for a part a model does not have,
-#' while a `brmsterms` frame spells the same absence as `""`.
-#'
-#' @param x A character scalar, or NULL.
-#' @return `x`, or NULL when it is absent or empty.
-#' @noRd
-null_if_blank <- function(x) {
-  if (length(x) == 0L || is.na(x[1L]) || !nzchar(x[1L])) {
-    return(NULL)
-  }
-  as.character(x[1L])
-}
-
-
 #' The standardised smooth coefficients a program declares
 #'
 #' brms gives each penalised part of a smooth a standardised
 #' coefficient `zs<sfx>_<i>_<j>`, scales it into `s<sfx>_<i>_<j>` and
-#' keeps the scaled one. The data block carries the matching `Zs` basis
-#' for each part, so the program's own data name which parts exist.
+#' keeps the scaled one. The data block holds the matching `Zs` basis
+#' for each part, and the program's own data name the parts.
 #'
 #' @param standata The combined Stan data.
 #' @param suffix `"_trend"` on the trend side, `""` otherwise.

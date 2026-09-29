@@ -59,8 +59,8 @@ variables.mvgam <- function(x, ...) {
 default_plot_variables <- function(x) {
   checkmate::assert_class(x, "mvgam")
   pars <- names(mvgam_user_pars(x))
-  shown <- c("beta", "basis", "family", "dynamics", "loading",
-             "smooth_sd", "gp", "ranef_sd")
+  shown <- c("beta", "basis", "simplex", "family", "dynamics", "loading",
+             "loadings_prior", "smooth_sd", "gp", "ranef_sd")
   pars[mvgam_par_kind(pars) %in% shown]
 }
 
@@ -94,7 +94,7 @@ categorize_mvgam_parameters <- function(x) {
   pick <- function(kinds, on_side) {
     all_pars[kind %in% kinds & side == on_side]
   }
-  betas <- c("beta", "basis", "intercept")
+  betas <- c("beta", "basis", "simplex", "intercept")
   smooths <- c("smooth_sd", "smooth_coef", "gp", "gp_coef")
   ranef <- c("ranef_sd", "ranef_coef")
 
@@ -106,7 +106,8 @@ categorize_mvgam_parameters <- function(x) {
     # The raw loadings and the broadcast coefficient copies are
     # left out, as `variables()` leaves them out: what reports each
     # quantity is in the same posterior under another name.
-    trend_pars = all_pars[kind %in% c("dynamics", "loading") &
+    trend_pars = all_pars[kind %in% c("dynamics", "loading",
+                                      "loadings_prior") &
                             !is_hidden_par(all_pars)],
     trend_betas = pick(betas, "trend"),
     trend_smoothpars = pick(smooths, "trend"),

@@ -205,11 +205,68 @@ mvgam_band_fills <- function(n, palette = mvgam_palette()) {
   palette[seq_len(n)]
 }
 
+#' An x axis of whole forecast horizons
+#'
+#' A horizon counts steps, and the default breaks labelled a
+#' twelve-step axis at 2.5, 5.0 and 7.5.
+#'
+#' @param name Axis title
+#' @return A ggplot2 scale
+#' @noRd
+scale_x_horizon <- function(name = "Horizon") {
+  ggplot2::scale_x_continuous(
+    name = name,
+    breaks = function(limits) {
+      b <- pretty(limits)
+      b[b == round(b)]
+    }
+  )
+}
+
+#' Whether a prediction type shares the observations' scale
+#'
+#' `response` and `expected` do. `link`, `trend`, `variance`,
+#' `latent_state` and `detection` each name another scale, and
+#' observations drawn over one of those flatten the band against an
+#' axis. Every observation overlay in the package calls this.
+#'
+#' @param type A prediction type
+#' @return A single logical
+#' @noRd
+on_observation_scale <- function(type) {
+  isTRUE(type %in% c("response", "expected"))
+}
+
+#' A posterior quantile at each occasion
+#'
+#' A closure-unit hindcast has one column per visit, and several
+#' visits share an occasion. Their draws are pooled, which gives the
+#' predictive for a visit chosen at random on that occasion. Every
+#' other matrix has one column per occasion and is summarised column
+#' by column.
+#'
+#' @param draws_mat A `(ndraws x n_col)` matrix
+#' @param times The time of each column
+#' @param prob The quantile to take
+#' @return Numeric vector with one value for each of
+#'   `sort(unique(times))`
+#' @noRd
+quantile_by_time <- function(draws_mat, times, prob) {
+  checkmate::assert_matrix(draws_mat, mode = "numeric")
+  checkmate::assert_numeric(
+    times, len = ncol(draws_mat), any.missing = FALSE
+  )
+  vapply(sort(unique(times)), function(t) {
+    stats::quantile(draws_mat[, times == t], probs = prob, na.rm = TRUE,
+                    names = FALSE)
+  }, numeric(1L))
+}
+
 #' Multi-quantile ribbon stack for a `(ndraws x n_time)` matrix.
 #'
 #' Returns a list of `geom_ribbon` layers (outer first, inner
 #' last) suitable for `+`-composition. Quantile bounds are
-#' computed per column; NAs are dropped per-column. Inner bands
+#' computed per occasion by `quantile_by_time()`. Inner bands
 #' plot on top of outer bands.
 #'
 #' @noRd
@@ -221,10 +278,6 @@ mvgam_band_layer <- function(
   group = NULL,
   fill = NULL
 ) {
-  checkmate::assert_matrix(draws_mat, mode = "numeric")
-  checkmate::assert_numeric(
-    times, len = ncol(draws_mat), any.missing = FALSE
-  )
   checkmate::assert_numeric(
     probs, lower = 0, upper = 1, min.len = 1L, any.missing = FALSE
   )
@@ -247,14 +300,11 @@ mvgam_band_layer <- function(
   }
   alpha <- (1 - probs) / 2
   lapply(seq_along(probs), function(i) {
-    lo <- apply(
-      draws_mat, 2L, stats::quantile, probs = alpha[i], na.rm = TRUE
+    df <- data.frame(
+      time = sort(unique(times)),
+      lower = quantile_by_time(draws_mat, times, alpha[i]),
+      upper = quantile_by_time(draws_mat, times, 1 - alpha[i])
     )
-    hi <- apply(
-      draws_mat, 2L, stats::quantile,
-      probs = 1 - alpha[i], na.rm = TRUE
-    )
-    df <- data.frame(time = times, lower = lo, upper = hi)
     if (!is.null(group)) {
       df$series <- group
     }
@@ -278,15 +328,11 @@ mvgam_median_layer <- function(
   linewidth = 1,
   group = NULL
 ) {
-  checkmate::assert_matrix(draws_mat, mode = "numeric")
-  checkmate::assert_numeric(
-    times, len = ncol(draws_mat), any.missing = FALSE
-  )
   if (is.null(colour)) {
     colour <- mvgam_palette()[5L]
   }
-  med <- apply(draws_mat, 2L, stats::median, na.rm = TRUE)
-  df <- data.frame(time = times, med = med)
+  df <- data.frame(time = sort(unique(times)),
+                   med = quantile_by_time(draws_mat, times, 0.5))
   if (!is.null(group)) {
     df$series <- group
   }

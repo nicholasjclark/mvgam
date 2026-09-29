@@ -17,10 +17,10 @@
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}
 
-\item{sigma}{Retained for brms-parity; currently unused on
-\code{mvgam} fits because the observation-family scale is exposed
-via \code{\link[=posterior_predict]{posterior_predict()}} rather than the residual-sigma
-pathway brms uses. Must be a single positive number.}
+\item{sigma}{Accepted for compatibility with
+\code{\link[brms:VarCorr.brmsfit]{brms::VarCorr.brmsfit()}} and unused. \code{\link[=summary.mvgam]{summary.mvgam()}} reports
+the observation family's scale. Must be a single non-negative
+number.}
 
 \item{summary}{Logical. If \code{TRUE} (the default), collapse each
 group's posterior draws to summary statistics; if \code{FALSE},
@@ -59,9 +59,9 @@ fitted \code{mvgam} object, returned in the same shape as
 the same workflow.
 }
 \details{
-Observation-side group-level effects only. Trend-side
-covariance components carry their positional Stan names rather
-than the brms-style labels.
+Observation-side group-level effects only. A trend-side
+component is named with the \verb{_trend} suffix, as
+\code{sd_g__Intercept_trend}, and \code{as_draws()} returns its draws.
 }
 \examples{
 \dontrun{

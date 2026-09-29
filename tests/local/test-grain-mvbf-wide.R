@@ -718,6 +718,10 @@ test_that("conditional_effects answers per response, on its own scale", {
   # warn about.
   expect_no_warning(ce <- conditional_effects(fit))
   expect_identical(names(ce), responses)
+  # Drawn, the panels come back as one flat list of ggplots, as brms
+  # returns them.
+  expect_identical(names(plot(ce, plot = FALSE)),
+                   paste0(responses, ".x"))
 
   for (r in responses) {
     expect_s3_class(ce[[r]], "mvgam_conditional_effects")

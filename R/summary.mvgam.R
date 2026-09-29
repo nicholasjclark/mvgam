@@ -14,8 +14,9 @@
 #' @param object An object of class \code{mvgam}.
 #' @param probs Numeric vector of length 2 specifying quantile probabilities
 #'   for credible intervals. Default is \code{c(0.025, 0.975)} for 95% intervals.
-#' @param robust Logical; if \code{TRUE}, use median and MAD instead of mean
-#'   and SD as measures of central tendency and spread. Default is \code{FALSE}.
+#' @param robust Logical; if \code{TRUE}, the median and MAD measure
+#'   central tendency and spread. The default \code{FALSE} uses the mean
+#'   and SD.
 #' @param include_betas Logical; if \code{TRUE} (the default), print every
 #'   per-cell expansion of the trend-side dynamic parameters
 #'   (per-country and per-cell \code{A_group_trend},
@@ -31,15 +32,33 @@
 #'   \code{as_draws_df()}, or \code{mcmc_plot()}.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return An object of class \code{summary.mvgam} containing:
+#' @return An object of class \code{mvgam_summary}. Each block is a
+#'   data frame of the columns below, one row per parameter, named as
+#'   \pkg{brms} prints it, and is absent when the model has none. The
+#'   observation model's blocks are:
 #' \describe{
-#'   \item{\code{fixed}}{Fixed effect parameter summaries}
-#'   \item{\code{smooth}}{Smooth (GAM) parameter summaries}
-#'   \item{\code{spec}}{Family-specific parameter summaries (sigma, shape, etc.)}
-#'   \item{\code{trend}}{Trend model parameter summaries}
-#'   \item{\code{loadings}}{Factor loading (Z matrix) summaries}
-#'   \item{Metadata}{Formula, family, sampling information}
+#'   \item{\code{smooth}}{Smoothing standard deviations, one row per
+#'     penalty of each smooth. The basis coefficients are available by
+#'     name from \code{as_draws(object, variable = "^s_", regex =
+#'     TRUE)}.}
+#'   \item{\code{gp}}{Gaussian-process marginal standard deviations
+#'     and length-scales.}
+#'   \item{\code{random}}{Group-level standard deviations and
+#'     correlations, as a list of tables named by grouping factor.
+#'     \code{ngrps} gives each factor's number of levels, and
+#'     \code{ranef()} the per-level effects.}
+#'   \item{\code{fixed}}{Regression coefficients, those of every
+#'     distributional parameter given a formula among them.}
+#'   \item{\code{mo}}{The simplex of each monotonic effect.}
+#'   \item{\code{spec}}{Family parameters without a formula of their
+#'     own, such as \code{sigma} or \code{shape}.}
 #' }
+#' The trend model's blocks take the same names with the prefix
+#' \code{trend_}, joined by \code{trend_spec} for the trend's
+#' dynamics, \code{loadings} for the factor loadings and
+#' \code{loadings_prior} for the hyperparameters of their prior. The
+#' formula, family, draw counts and data dimensions are stored with
+#' them.
 #'
 #' @details
 #' The summary includes the following columns:
@@ -62,9 +81,7 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # `include_betas = FALSE` keeps the printed summary readable when
-#' # the model carries many smooth coefficients.
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #' }
 #'
 #' @export
@@ -91,10 +108,9 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # Get all parameter names from rownames
   pars <- rownames(all_summaries)
 
-  # Drop the trend's own time-indexed states. There is one row per
-  # (time, series) and no summary slot claims them, so they would be
-  # discarded downstream regardless; pruning here keeps the work off
-  # the categorisers. `hindcast(type = "trend")` returns them as a
+  # Drop the trend's own time-indexed states: one row per time point
+  # and series, which no summary block claims. Dropping them here
+  # spares the classifiers below that work. `hindcast(type = "trend")` returns them as a
   # trajectory, and `as.data.frame(variable = "^trend\\[", regex =
   # TRUE)` as draws.
   pars_to_keep <- !is_trend_state_param(pars)
@@ -128,90 +144,34 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     pars <- rownames(all_summaries)
   }
 
-  # Build output structure with metadata. The sampler's own arguments
-  # are the only record of what was asked for:
-  # `posterior::niterations()` counts the draws that were kept, which
-  # is the post-warmup half, so reporting it as `iter` understates the
-  # run and leaves the warmup unknowable.
-  draws_obj <- posterior::as_draws(object$fit)
-  sampler <- mvgam_sampler_inheritance(object)
-  out <- list(
-    formula = object$formula,
-    family = object$family,
-    nchains = sampler$chains %||% posterior::nchains(draws_obj),
-    niter = sampler$iter %||% posterior::niterations(draws_obj),
-    nwarmup = sampler$warmup,
-    nthin = sampler$thin %||% 1L,
-    ndraws = posterior::ndraws(draws_obj)
+  out <- c(
+    list(formula = object$formula, family = object$family),
+    draw_counts(object)
   )
 
-  # Detect distributional parameters (those with formulas like sigma ~ x)
-  dpars_with_formulas <- get_dpar_names(object$formula)
-
-  # Observation model parameters (no _trend suffix, no dpar prefix)
-  obs_fixed_idx <- match_fixed_pars(pars, dpars_with_formulas)
-  if (any(obs_fixed_idx)) {
-    out$fixed <- all_summaries[obs_fixed_idx, , drop = FALSE]
-    # Clean names: b_Intercept → Intercept, b_x → x
-    rownames(out$fixed) <- gsub("^b_", "", rownames(out$fixed))
-  }
-
-  obs_smooth_idx <- match_smooth_pars(pars, dpars_with_formulas)
-  if (any(obs_smooth_idx)) {
-    out$smooth <- all_summaries[obs_smooth_idx, , drop = FALSE]
-  }
-
-  obs_random_idx <- match_random_pars(pars)
-  if (any(obs_random_idx)) {
-    out$random <- all_summaries[obs_random_idx, , drop = FALSE]
-  }
-
-  # Distributional parameters (b_{dpar}_* pattern, following brms)
-  if (length(dpars_with_formulas) > 0) {
-    for (dpar in dpars_with_formulas) {
-      # Fixed effects for this dpar
-      dpar_fixed_idx <- match_dpar_fixed_pars(pars, dpar)
-      if (any(dpar_fixed_idx)) {
-        out[[paste0("dpar_", dpar, "_fixed")]] <-
-          all_summaries[dpar_fixed_idx, , drop = FALSE]
-        # Clean names: b_sigma_Intercept → Intercept, b_sigma_x → x
-        rownames(out[[paste0("dpar_", dpar, "_fixed")]]) <-
-          gsub(paste0("^b_", dpar, "_"), "",
-               rownames(out[[paste0("dpar_", dpar, "_fixed")]]))
+  # The blocks brms reports, for each side of the model. A trend-side
+  # block takes the `trend_` prefix on its key.
+  kind <- mvgam_par_kind(pars)
+  for (side in c("observation", "trend")) {
+    prefix <- if (identical(side, "trend")) "trend_" else ""
+    on_side <- mvgam_par_side(pars) == side
+    ngrps <- lengths(mvgam_ranef_metadata(object, side)$group_levels)
+    for (block in summary_blocks()) {
+      idx <- kind %in% block$kinds & on_side
+      if (any(idx)) {
+        out[[paste0(prefix, block$key)]] <- summary_block_rows(
+          all_summaries[idx, , drop = FALSE], block, names(ngrps)
+        )
       }
-
-      # Smooths for this dpar
-      dpar_smooth_idx <- match_dpar_smooth_pars(pars, dpar)
-      if (any(dpar_smooth_idx)) {
-        out[[paste0("dpar_", dpar, "_smooth")]] <-
-          all_summaries[dpar_smooth_idx, , drop = FALSE]
-      }
+    }
+    if (length(ngrps)) {
+      out[[paste0(prefix, "ngrps")]] <- ngrps
     }
   }
 
-  # Family-specific parameters WITHOUT formulas (pass dpars to exclude them)
-  family_idx <- match_family_pars(pars, has_dpar_formulas = dpars_with_formulas)
+  family_idx <- match_family_pars(pars)
   if (any(family_idx)) {
     out$spec <- all_summaries[family_idx, , drop = FALSE]
-  }
-
-  # Trend model parameters (subdivided by type)
-  trend_fixed_idx <- match_fixed_pars(pars, side = "trend")
-  if (any(trend_fixed_idx)) {
-    out$trend_fixed <- all_summaries[trend_fixed_idx, , drop = FALSE]
-    # `b_Intercept_trend` reads as `b_Intercept` under its heading.
-    rownames(out$trend_fixed) <- gsub("_trend$", "",
-                                       rownames(out$trend_fixed))
-  }
-
-  trend_smooth_idx <- match_smooth_pars(pars, side = "trend")
-  if (any(trend_smooth_idx)) {
-    out$trend_smooth <- all_summaries[trend_smooth_idx, , drop = FALSE]
-  }
-
-  trend_random_idx <- match_random_pars(pars, side = "trend")
-  if (any(trend_random_idx)) {
-    out$trend_random <- all_summaries[trend_random_idx, , drop = FALSE]
   }
 
   trend_spec_idx <- match_trend_specific_pars(pars)
@@ -224,7 +184,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     out$loadings <- all_summaries[z_idx, , drop = FALSE]
   }
 
-  loadings_prior_idx <- match_loadings_prior_pars(pars)
+  loadings_prior_idx <- kind == "loadings_prior"
   if (any(loadings_prior_idx)) {
     out$loadings_prior <- all_summaries[
       loadings_prior_idx, , drop = FALSE
@@ -251,20 +211,19 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # handed a summary object, reports a fitted ARMA as `None`.
   out$trend_label <- printed_trend_label(object)
 
-  # The same counts `print()` shows, read the same way. Reading
-  # `series_info` here instead left a hierarchical fit printing four
-  # series and summarising none, because the axis it counts is
-  # derived from a grouping and `series_info` only counts a column.
+  # The counts `print()` shows, from the same helper. A hierarchical
+  # fit derives its series axis from a grouping. `series_info` counts
+  # a column, and taking the count from it printed four series for
+  # such a fit and summarised none.
   counts <- printed_axis_counts(object)
   out$n_series <- counts$n_series
   out$n_timepoints <- counts$n_timepoints
 
-  # How many rows the model was given, which is what `nobs()` counts
-  # and what a reader takes "Number of observations" to mean. The
-  # product of the two axes above is neither: on a ragged design it
-  # exceeds the frame, and on a closure-unit family it printed the
-  # unit count, so the two standard accessors gave a reader 75 and
-  # 300 for one model with nothing to say why.
+  # How many rows the model was given. `nobs()` counts these, and a
+  # reader takes "Number of observations" to mean them. The product of
+  # the two axes above exceeds the frame on a ragged design and
+  # counted units on a closure-unit family. The two standard
+  # accessors then gave 75 and 300 for one model.
   out$nobs <- nobs(object)
 
   # Store data name (captured at top-level mvgam() call)
@@ -293,11 +252,10 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 #'
 #' @noRd
 compute_all_summaries <- function(object, probs, robust) {
-  # Draws are taken from the fitted object rather than `object$fit`
-  # so brms's parameter renaming is applied: the raw Stan model
-  # carries population-level coefficients as an unnamed vector `b`,
-  # and only the brmsfit method resolves `b[k]` to `b_<coef>`. The
-  # trend-side parameters mvgam adds pass through unchanged.
+  # The draws come from the fitted object, whose method gives every
+  # parameter the name `mvgam_user_pars()` assigns: `b_x` for the
+  # positional `b[1]` of the raw Stan model, and brms's names for the
+  # smooth, Gaussian-process and group-level blocks.
   draws <- posterior::as_draws_df(object)
 
   # Each element is named, which gives the column its name, and holds
@@ -385,67 +343,97 @@ rename_summary_cols <- function(col_names, probs, robust) {
 # PARAMETER MATCHING FUNCTIONS (Pattern-Based)
 # ==============================================================================
 
-#' Population coefficients of one side of the model
+#' The parameter blocks a summary reports for each side, in print order
 #'
-#' The intercept is the one on the data's scale, `b_Intercept` or
-#' `b_Intercept_trend`; brms's centred intercept is left out.
+#' `brms:::summary.brmsfit()` reports these blocks and
+#' `brms:::print.brmssummary()` prints them in this order under these
+#' headings. Each block names its key in the summary object and the
+#' taxonomy kinds it holds. A distributional parameter's coefficients
+#' join the mean's, as brms reports `b_sigma_x` as `sigma_x`. The basis
+#' coefficients of a smooth or a Gaussian process and the per-level
+#' group-level effects have no meaning one at a time and no block
+#' holds them. `as_draws()` returns them by name, and
+#' `conditional_smooths()` and `ranef()` summarise them.
 #'
-#' @param pars Character vector of all parameter names
-#' @param dpars Distributional parameters carrying their own formula;
-#'   their coefficients form their own block
-#' @param side `"observation"` or `"trend"`
-#' @return Logical vector
+#' `wrap` names a hyperparameter inside its class, as brms prints
+#' `sds(sx_1)`, `sdgp(gpx)` and `lscale(gpx)`. The group-level block
+#' splits by grouping factor, as brms prints `sd(Intercept)` under
+#' `~g`.
 #'
+#' @return A list of blocks
 #' @noRd
-match_fixed_pars <- function(pars, dpars = character(),
-                             side = "observation") {
-  mvgam_par_kind(pars, dpars) == "beta" & mvgam_par_side(pars) == side
+summary_blocks <- function() {
+  list(
+    list(key = "smooth", heading = "Smoothing Spline Hyperparameters",
+         kinds = "smooth_sd", wrap = TRUE),
+    list(key = "gp", heading = "Gaussian Process Hyperparameters",
+         kinds = "gp", wrap = TRUE),
+    list(key = "random", heading = "Multilevel Hyperparameters",
+         kinds = "ranef_sd", wrap = TRUE),
+    list(key = "fixed", heading = "Regression Coefficients",
+         kinds = c("beta", "basis"), wrap = FALSE),
+    list(key = "mo", heading = "Monotonic Simplex Parameters",
+         kinds = "simplex", wrap = FALSE)
+  )
 }
 
-#' Smooth parameters of one side of the model
+
+#' A block's rows under the names brms prints
 #'
-#' @inheritParams match_fixed_pars
-#' @return Logical vector
+#' The block's heading and side name the class and the side, and the
+#' class prefix and the trend suffix are dropped: `b_x`, `bs_sigma_sx_1`, `simo_moord1[1]` and
+#' `b_elev_trend` print as `x`, `sigma_sx_1`, `moord1[1]` and `elev`.
+#' A hyperparameter keeps its class around the rest, as `sds(sx_1)`.
+#' A group-level block becomes one table per grouping factor, as
+#' `brms:::summary.brmsfit()` builds it: the rows of each factor are
+#' those named `sd_<g>__` or `cor_<g>__`, with that prefix dropped and
+#' the coefficient pair of a correlation joined by a comma.
+#' `sd_g__Intercept` and `cor_g__Intercept__x` print as `sd(Intercept)`
+#' and `cor(Intercept,x)` under `g`.
 #'
+#' @param tab Rows of the summary table, named by parameter
+#' @param block One entry of `summary_blocks()`
+#' @param groups The side's grouping factors, as
+#'   `mvgam_ranef_metadata()` names them
+#' @return `tab` with its row names replaced, or for the group-level
+#'   block a list of such tables named by grouping factor
 #' @noRd
-match_smooth_pars <- function(pars, dpars = character(),
-                              side = "observation") {
-  mvgam_par_kind(pars, dpars) %in% c("smooth_sd", "smooth_coef") &
-    mvgam_par_side(pars) == side
+summary_block_rows <- function(tab, block, groups = character()) {
+  pars <- sub("_trend(\\[|$)", "\\1", rownames(tab))
+  class <- sub("_.*$", "", pars)
+  if (identical(block$key, "random")) {
+    out <- lapply(stats::setNames(nm = groups), function(g) {
+      lead <- paste0(class, "_", g, "__")
+      hit <- class %in% c("sd", "cor") & startsWith(pars, lead)
+      rows <- tab[hit, , drop = FALSE]
+      core <- sub("__", ",", substring(pars[hit], nchar(lead[hit]) + 1L))
+      rownames(rows) <- paste0(class[hit], "(", core, ")")
+      rows
+    })
+    return(Filter(nrow, out))
+  }
+  core <- sub("^[a-z]+_", "", pars)
+  rownames(tab) <- if (isTRUE(block$wrap)) {
+    paste0(class, "(", core, ")")
+  } else {
+    core
+  }
+  tab
 }
 
-#' Group-level parameters of one side of the model
-#'
-#' @inheritParams match_fixed_pars
-#' @return Logical vector
-#'
-#' @noRd
-match_random_pars <- function(pars, side = "observation") {
-  mvgam_par_kind(pars) %in% c("ranef_sd", "ranef_coef") &
-    mvgam_par_side(pars) == side
-}
 
 #' Observation-family parameters
 #'
-#' Excludes any distributional parameter that carries its own
-#' formula: its coefficients are reported as a block of their own.
+#' A distributional parameter given a formula of its own has no scalar
+#' of this kind: brms reports its coefficients with the regression
+#' coefficients.
 #'
 #' @param pars Character vector of all parameter names
-#' @param has_dpar_formulas Distributional parameters with formulas
 #' @return Logical vector
 #'
 #' @noRd
-match_family_pars <- function(pars, has_dpar_formulas = character()) {
-  checkmate::assert_character(has_dpar_formulas)
-  keep <- mvgam_par_kind(pars) == "family"
-  if (length(has_dpar_formulas) > 0L) {
-    modelled <- grepl(
-      paste0("^(", paste(has_dpar_formulas, collapse = "|"), ")(\\[|$)"),
-      pars
-    )
-    keep <- keep & !modelled
-  }
-  keep
+match_family_pars <- function(pars) {
+  mvgam_par_kind(pars) == "family"
 }
 
 
@@ -483,112 +471,12 @@ match_z_loadings <- function(pars) {
   grepl(factor_loading_param_pattern(pars), pars)
 }
 
-#' Match interpretable loadings-prior parameters
-#'
-#' @description
-#' Identifies the structured-prior parameters worth showing in
-#' `summary.mvgam()`: length-scales for the feature ARD kernel
-#' (`theta_features\[k\]`), length-scales for each supplied pairwise
-#' distance matrix (`theta_dist_<name>`), and the per-factor
-#' multiplicative-gamma-process column scale `Psi_diag\[k\]` when
-#' MGP shrinkage is enabled. The underlying `varrho_inv\[k\]`
-#' draws are intentionally hidden: they parameterise `Psi_diag`
-#' via a cumulative product and carry no direct interpretation
-#' on their own.
-#'
-#' @param pars Character vector of all parameter names
-#' @return Logical vector indicating which parameters belong to
-#'   the loadings-prior summary block
-#'
-#' @noRd
-match_loadings_prior_pars <- function(pars) {
-  checkmate::assert_character(pars)
-  if (length(pars) == 0) return(logical(0))
-  grepl("^theta_features\\[|^theta_dist_|^Psi_diag\\[", pars)
-}
-
-#' Get distributional parameter names
-#'
-#' @description
-#' Names the distributional parameters the user gave a formula of their
-#' own, read from `pforms` on the model formula. Reading the formula
-#' rather than the parameter names keeps a covariate whose own name
-#' contains an underscore, such as `b_body_mass`, from being mistaken
-#' for a coefficient of a distributional parameter called `body`.
-#'
-#' @param formula An `brmsformula` or `mvbrmsformula`
-#' @return Character vector of unique distributional parameter names
-#'
-#' @noRd
-get_dpar_names <- function(formula) {
-  forms <- if (brms::is.mvbrmsformula(formula)) {
-    formula$forms
-  } else {
-    list(formula)
-  }
-  unique(unlist(lapply(forms, function(f) names(f$pforms)))) %||% character()
-}
-
-
-#' Regex alternation over distributional parameter names
-#'
-#' @param dpars Character vector of distributional parameter names
-#' @return A single regex group, or `NULL` when there are none
-#'
-#' @noRd
-dpar_alternation <- function(dpars) {
-  checkmate::assert_character(dpars, any.missing = FALSE)
-  if (length(dpars) == 0) {
-    return(NULL)
-  }
-  paste0("(", paste(dpars, collapse = "|"), ")")
-}
-
-#' Match distributional parameter fixed effects
-#'
-#' @description
-#' Identifies fixed effects for a specific distributional parameter
-#' (e.g., b_sigma_Intercept, b_sigma_x for sigma).
-#'
-#' @param pars Character vector of parameter names
-#' @param dpars One or more distributional parameter names
-#' @return Logical vector indicating matching parameters
-#'
-#' @noRd
-match_dpar_fixed_pars <- function(pars, dpars) {
-  checkmate::assert_character(pars, min.len = 0)
-  alt <- dpar_alternation(dpars)
-  if (length(pars) == 0 || is.null(alt)) return(rep(FALSE, length(pars)))
-
-  # Match b_{dpar}_* pattern
-  grepl(paste0("^b_", alt, "_"), pars)
-}
-
-#' Match distributional parameter smooth terms
-#'
-#' @description
-#' Identifies smooth terms for distributional parameters
-#' (e.g., s_sigma_x_1\[1\] for sigma ~ s(x)).
-#'
-#' @param pars Character vector of parameter names
-#' @param dpars One or more distributional parameter names
-#' @return Logical vector indicating matching parameters
-#'
-#' @noRd
-match_dpar_smooth_pars <- function(pars, dpars) {
-  checkmate::assert_character(pars, min.len = 0)
-  alt <- dpar_alternation(dpars)
-  if (length(pars) == 0 || is.null(alt)) return(rep(FALSE, length(pars)))
-
-  # Match s_{dpar}_* or sds_{dpar}_* patterns
-  grepl(paste0("^s(ds)?_", alt, "_"), pars)
-}
-
 #' The trend's own time-indexed states
 #'
-#' Numerous by construction and excluded from summary output by
-#' default. `latent_state` names the closure-unit quantity elsewhere
-#' in the package, so the trend's own states take `trend_state` here.
+#' A fit has one per time point and series, and summary output leaves
+#' them out. Elsewhere in the package `latent_state` names the
+#' closure-unit quantity, and the trend's own states take
+#' `trend_state`.
 #'
 #' @param pars Character vector of parameter names
 #' @return Logical vector
@@ -619,25 +507,25 @@ is_trend_matrix_param <- function(pars) {
 # HELPER FUNCTIONS FOR PRINT METHOD
 # ==============================================================================
 
-#' Round numeric columns in a data frame
+#' Format a parameter table as brms prints one
 #'
-#' @description
-#' Rounds only numeric columns while preserving non-numeric columns and rownames.
+#' `brms:::print_format()` prints every column to `digits` places and
+#' the effective sample sizes as whole draws. Rounding instead printed
+#' an Rhat of 1.00 as `1` and an ESS as `1390.86`.
 #'
-#' @param x Data frame or numeric object to round
+#' @param x Data frame of numeric columns, named by parameter
 #' @param digits Number of decimal places
-#'
-#' @return Object with numeric columns rounded
-#'
+#' @return Character matrix with the row and column names of `x`
 #' @noRd
-round_numeric <- function(x, digits = 2) {
-  if (is.data.frame(x)) {
-    num_cols <- sapply(x, is.numeric)
-    x[num_cols] <- lapply(x[num_cols], round, digits = digits)
-  } else if (is.numeric(x)) {
-    x <- round(x, digits = digits)
+format_param_table <- function(x, digits = 2) {
+  out <- as.matrix(x)
+  for (col in colnames(x)) {
+    fmt <- if (col %in% c("Bulk_ESS", "Tail_ESS")) "%.0f" else {
+      paste0("%.", digits, "f")
+    }
+    out[, col] <- sprintf(fmt, x[[col]])
   }
-  x
+  out
 }
 
 #' Print a parameter table section if present
@@ -655,7 +543,7 @@ print_param_section <- function(table, header, digits = 2) {
     if (!is.null(header)) {
       cat(header, ":\n", sep = "")
     }
-    print(round_numeric(table, digits = digits), quote = FALSE)
+    print(format_param_table(table, digits), quote = FALSE, right = TRUE)
     cat("\n")
   }
 }
@@ -668,7 +556,7 @@ print_param_section <- function(table, header, digits = 2) {
 #'
 #' brms's layout: a model with several responses prefixes each family
 #' and link with the response's key, aligned under the first. The
-#' family is named by `resolve_family_name()`, which answers "tweedie"
+#' family is named by `resolve_family_name()`, which returns "tweedie"
 #' where a customfamily stores "custom".
 #'
 #' @param x A fitted `mvgam`, a prefit or its summary.
@@ -704,20 +592,11 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   checkmate::assert_class(x, "mvgam_summary")
   checkmate::assert_int(digits, lower = 0)
 
-  # Header formatting (brms style with fixed padding)
-
   # Section 1: Family and Links (aligned with fixed spacing)
-  fams <- print_family_links(x)
-  is_multivariate <- !inherits(fams, "family")
+  print_family_links(x)
 
   # Section 2: Formula
-  formulas <- if (is_multivariate) {
-    # For multivariate, format each response formula separately
-    # Extract formula from each form (not the entire form object)
-    unlist(lapply(x$formula$forms, format_model_formula), use.names = FALSE)
-  } else {
-    format_model_formula(x$formula)
-  }
+  formulas <- format_model_formula(x$formula)
   # Join with newline + 9 spaces to align with "Formula: "
   cat("Formula: ", paste0(formulas, collapse = " \n         "), " \n",
       sep = "")
@@ -742,65 +621,47 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     cat(trend_line, "\n", sep = "")
   }
 
-  # Section 5: Sampling information (brms style with continuation line).
-  # A fit that recorded its own arguments reports them; one that did
-  # not says so rather than inventing a number.
-  warmup <- x$nwarmup
-  cat("  Draws: ", x$nchains, " chains, each with iter = ", x$niter,
-      "; warmup = ", warmup %||% "unrecorded",
-      "; thin = ", x$nthin %||% 1L, "; \n", sep = "")
-  cat("         total post-warmup draws = ", x$ndraws, "\n\n", sep = "")
+  cat(format_draws_line(x), "\n\n", sep = "")
 
   # Section 6: Observation Model Parameters
-  has_obs_params <- !is.null(x$fixed) || !is.null(x$smooth) ||
-                     !is.null(x$random)
-
-  if (has_obs_params) {
-    cat("== Observation Model ==\n")
-    print_param_section(x$fixed, "Population-Level Effects", digits)
-    print_param_section(x$smooth, "Smooth Terms", digits)
-    print_param_section(x$random, "Group-Level Effects", digits)
+  blocks <- summary_blocks()
+  side_blocks <- function(prefix) {
+    Filter(Negate(is.null), stats::setNames(
+      lapply(blocks, function(b) x[[paste0(prefix, b$key)]]),
+      vapply(blocks, `[[`, character(1L), "heading")
+    ))
   }
-
-  # Section 7: Distributional Parameters (brms style)
-  # Find all dpar sections (dpar_{name}_fixed, dpar_{name}_smooth)
-  dpar_sections <- names(x)[grepl("^dpar_", names(x))]
-  if (length(dpar_sections) > 0) {
-    # Extract unique dpar names
-    dpar_names <- unique(gsub("^dpar_([^_]+)_.*", "\\1", dpar_sections))
-
-    for (dpar_name in dpar_names) {
-      fixed_key <- paste0("dpar_", dpar_name, "_fixed")
-      smooth_key <- paste0("dpar_", dpar_name, "_smooth")
-
-      if (!is.null(x[[fixed_key]]) || !is.null(x[[smooth_key]])) {
-        cat(paste0("Coefficients for '", dpar_name, "':\n"))
-        if (!is.null(x[[fixed_key]])) {
-          print(round_numeric(x[[fixed_key]], digits), quote = FALSE)
-          cat("\n")
-        }
-        if (!is.null(x[[smooth_key]])) {
-          print(round_numeric(x[[smooth_key]], digits), quote = FALSE)
-          cat("\n")
-        }
+  # The group-level block is one table per grouping factor, each under
+  # its factor and level count, as brms prints it
+  print_side <- function(tabs, ngrps) {
+    for (heading in names(tabs)) {
+      tab <- tabs[[heading]]
+      if (is.data.frame(tab)) {
+        print_param_section(tab, heading, digits)
+        next
+      }
+      cat(heading, ":\n", sep = "")
+      for (g in names(tab)) {
+        cat("~", g, " (Number of levels: ", ngrps[[g]], ")\n", sep = "")
+        print_param_section(tab[[g]], NULL, digits)
       }
     }
   }
+  obs_tabs <- side_blocks("")
+  if (length(obs_tabs) || !is.null(x$spec)) {
+    cat("== Observation Model ==\n")
+    print_side(obs_tabs, x$ngrps)
+    print_param_section(x$spec, "Further Distributional Parameters", digits)
+  }
 
-  # Section 8: Further Distributional Parameters (brms convention)
-  # These are family-specific parameters WITHOUT formulas
-  print_param_section(x$spec, "Further Distributional Parameters", digits)
-
-  # Section 9: Trend Model Parameters
-  has_trend_params <- !is.null(x$trend_fixed) || !is.null(x$trend_smooth) ||
-                      !is.null(x$trend_random) || !is.null(x$trend_spec) ||
+  # Section 7: Trend Model Parameters
+  trend_tabs <- side_blocks("trend_")
+  has_trend_params <- length(trend_tabs) > 0L || !is.null(x$trend_spec) ||
                       !is.null(x$loadings) || !is.null(x$loadings_prior)
 
   if (has_trend_params) {
     cat("== Trend Model ==\n")
-    print_param_section(x$trend_fixed, "Population-Level Effects", digits)
-    print_param_section(x$trend_smooth, "Smooth Terms", digits)
-    print_param_section(x$trend_random, "Group-Level Effects", digits)
+    print_side(trend_tabs, x$trend_ngrps)
     print_param_section(x$trend_spec, "Trend Specific Parameters", digits)
     print_param_section(x$loadings, "Factor Loadings", digits)
     print_param_section(x$loadings_prior, "Loadings Prior", digits)
@@ -815,6 +676,48 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   cat("Use `how_to_cite(fit)` for a citation-ready model description.\n")
 
   invisible(x)
+}
+
+
+#' How many draws a fit holds and how the sampler was run
+#'
+#' The sampler's own arguments are the record of what was asked for.
+#' `posterior::niterations()` counts the draws kept after warmup, and
+#' reporting it as `iter` understated the run: `print()` said 1000
+#' where `summary()` said 2000 for one fit. It is used only when the
+#' fit recorded no arguments.
+#'
+#' @param object A fitted `mvgam` object
+#' @return List with `nchains`, `niter`, `nwarmup` (`NULL` when
+#'   unrecorded), `nthin` and `ndraws`
+#' @noRd
+draw_counts <- function(object) {
+  draws <- posterior::as_draws(object$fit)
+  sampler <- mvgam_sampler_inheritance(object)
+  list(
+    nchains = sampler$chains %||% posterior::nchains(draws),
+    niter = sampler$iter %||% posterior::niterations(draws),
+    nwarmup = sampler$warmup,
+    nthin = sampler$thin %||% 1L,
+    ndraws = posterior::ndraws(draws)
+  )
+}
+
+
+#' The draws line `print()` and `summary()` show
+#'
+#' brms's two-line layout. A fit that recorded no warmup says so.
+#'
+#' @param x The list `draw_counts()` returns, or a summary holding it
+#' @return A single string spanning two lines
+#' @noRd
+format_draws_line <- function(x) {
+  paste0(
+    "  Draws: ", x$nchains, " chains, each with iter = ", x$niter,
+    "; warmup = ", x$nwarmup %||% "unrecorded",
+    "; thin = ", x$nthin %||% 1L, "; \n",
+    "         total post-warmup draws = ", x$ndraws
+  )
 }
 
 
@@ -838,18 +741,36 @@ format_trend_line <- function(x) {
     return("")
   }
   out <- paste0(" Trends: ", x$trend_label %||% x$trend_model)
-  if (!is.null(x$trend_formula)) {
-    trend_rhs <- if (length(x$trend_formula) == 3L) {
-      stats::formula(stats::delete.response(stats::terms(x$trend_formula)))
-    } else {
-      x$trend_formula
-    }
-    trend_str <- format(trend_rhs)
-    if (!grepl("^~\\s*[01]\\s*$", trend_str)) {
-      out <- paste0(out, "; formula: ", trend_str)
-    }
+  predictors <- trend_predictors(x$trend_formula)
+  if (!is.null(predictors)) {
+    out <- paste0(out, "; formula: ", predictors)
   }
   paste0(out, " ")
+}
+
+
+#' The predictors of a trend formula, as `print()` and `summary()` show
+#' them
+#'
+#' mvgam stores the trend formula with the placeholder response
+#' `trend_y` and without the trend constructor, which the trend line
+#' names. A formula reduced to `~0` or `~1` names no predictor a
+#' reader acts on.
+#'
+#' @param trend_formula The fit's `trend_formula`, or `NULL`
+#' @return A one-sided formula as a single string, or `NULL`
+#' @noRd
+trend_predictors <- function(trend_formula) {
+  if (is.null(trend_formula)) {
+    return(NULL)
+  }
+  rhs <- if (length(trend_formula) == 3L) {
+    stats::formula(stats::delete.response(stats::terms(trend_formula)))
+  } else {
+    trend_formula
+  }
+  out <- paste(trimws(format(rhs)), collapse = " ")
+  if (grepl("^~\\s*[01]\\s*$", out)) NULL else out
 }
 
 
@@ -867,11 +788,10 @@ build_next_steps <- function(x) {
   has_covariates <- !is.null(x$fixed) &&
     nrow(x$fixed) > 1L
   forecastable <- !grepl("^ZMVN", trend_model)
-  # Sharing the closure-unit layout is not the same as modelling a
-  # detection process. `mvn()`, `mvt()` and `diri()` share the
-  # layout and model none, and asking the layout question here sent
-  # readers of those summaries to `pp_check(type = "fit_stat")`,
-  # which refuses them.
+  # A detection process decides the closure-unit suggestions. `mvn()`,
+  # `mvt()` and `diri()` share the closure-unit layout and model no
+  # detection. Testing the layout sent readers of their summaries to
+  # `pp_check(type = "fit_stat")`, which refuses them.
   is_cu <- !is.null(x$family) && is_closure_unit_family(x$family)
   has_latent_state <- "latent_state" %in% family_predict_types(x$family)
   # Candidates in priority order; first five matching entries
@@ -902,8 +822,15 @@ build_next_steps <- function(x) {
          text = "`residual_cor(fit)`: implied cross-series correlations"),
     list(when = forecastable,
          text = "`forecast(fit, newdata = ...)`: out-of-sample forecasts"),
+    # PSIS-LOO leaves out an observation the latent state was fitted
+    # to, and a fit with temporal dynamics is compared by refitting on
+    # shorter series.
     list(when = TRUE,
-         text = "`loo(fit)` / `loo_compare(...)`: model fit + comparison"),
+         text = if (nzchar(trend_model) && forecastable) {
+           "`lfo_cv(fit)`: leave-future-out model comparison"
+         } else {
+           "`loo(fit)` / `loo_compare(...)`: model fit + comparison"
+         }),
     list(when = has_covariates,
          text = "`conditional_effects(fit)`: covariate effects"),
     # The drawn form of the same call, offered on the same terms.
@@ -933,8 +860,9 @@ build_next_steps <- function(x) {
 #' @param probs Numeric vector of length 2 specifying quantile
 #'   probabilities for credible intervals. Default is \code{c(0.025,
 #'   0.975)} for 95% intervals.
-#' @param robust Logical; if \code{TRUE}, use median and MAD instead of
-#'   mean and SD. Default is \code{FALSE}.
+#' @param robust Logical; if \code{TRUE}, the median and MAD measure
+#'   central tendency and spread. The default \code{FALSE} uses the
+#'   mean and SD.
 #' @param ... Additional arguments passed to \code{\link{summary.mvgam}}.
 #'
 #' @return An object of class \code{c("mvgam_pooled_summary",

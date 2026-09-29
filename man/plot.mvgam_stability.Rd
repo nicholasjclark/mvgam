@@ -20,7 +20,7 @@ metrics (\code{"reactivity"}, \code{"mean_return_rate"},
 \code{"var_return_rate"}); pass any subset of \code{x}'s column names
 to widen or narrow the panel set.}
 
-\item{bins}{Number of histogram bins passed to \code{geom_histogram}.}
+\item{bins}{Number of histogram bins.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
@@ -30,9 +30,9 @@ A \code{ggplot} object.
 \description{
 Renders a faceted histogram of the reactivity, mean return rate
 and variance return rate posterior draws returned by
-\code{stability.mvgam()}. A dashed reference line at zero marks the
-reactivity threshold above which shocks are amplified rather
-than absorbed.
+\code{stability.mvgam()}. A dashed reference line at zero on the
+reactivity panel marks the threshold above which the system
+amplifies a shock before it decays.
 }
 \seealso{
 \code{\link[=stability]{stability()}}, \code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}},

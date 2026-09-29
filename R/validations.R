@@ -578,9 +578,12 @@ validate_closure_unit_data <- function(data,
         c(
           "Every closure unit has a single visit and zero covariates.",
           i = paste0(
-            "Only the product of state and detection probability ",
-            "is identified by data; the individual parameters ",
-            "are prior-dominated (Royle and Dorazio 2008, ch. 3.5)."
+            "The data identify only the product of state and ",
+            "detection probability."
+          ),
+          i = paste0(
+            "The priors set each probability on its own ",
+            "(Royle and Dorazio 2008, ch. 3.5)."
           )
         ),
         "closure_unit_all_single_visit"
@@ -610,10 +613,8 @@ validate_closure_unit_data <- function(data,
           "% single-visit units)."
         ),
         i = paste0(
-          "State and detection probability share information ",
-          "only via the formulae; with this proportion of ",
-          "single-visit units, posterior identifiability ",
-          "depends largely on the covariate structure."
+          "A single-visit unit separates state from detection only ",
+          "through the covariates in the two formulas."
         )
       ),
       "closure_unit_single_visit"
@@ -2014,13 +2015,11 @@ response_support_hint <- function(fam) {
                   "levels."))
   }
   if (fam %in% c("beta", "betar")) {
-    return(paste0("Beta excludes both endpoints; use ",
-                  "zero_inflated_beta() for exact zeros or ",
-                  "zero_one_inflated_beta() for both."))
+    return(paste0("Use zero_inflated_beta() for exact zeros or ",
+                  "zero_one_inflated_beta() for zeros and ones."))
   }
   if (fam == "zero_inflated_beta") {
-    return(paste0("This family admits exact zeros but not ones; ",
-                  "use zero_one_inflated_beta() for both."))
+    return("Use zero_one_inflated_beta() for exact ones.")
   }
   if (fam == "tweedie") {
     return("Tweedie models a zero-inflated continuous response.")
@@ -2031,11 +2030,11 @@ response_support_hint <- function(fam) {
   if (fam %in% c("gamma", "lognormal", "weibull", "exponential",
                  "frechet", "inverse.gaussian",
                  "shifted_lognormal")) {
-    return(paste0("This family excludes zero; use its hurdle ",
-                  "counterpart if exact zeros are real observations."))
+    return(paste0("Use the family's hurdle counterpart if exact zeros ",
+                  "are real observations."))
   }
   if (isTRUE(mvgam_response_support[[fam]]$integer)) {
-    return(paste0("Counts cannot be negative; check the column for ",
+    return(paste0("Check the column for ",
                   "missing-data sentinels such as -1 or -999."))
   }
   "Check the response column, or choose a family whose support covers it."
@@ -4067,7 +4066,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   # The trend formula's covariates. A response may not be one, and
   # each has to be constant within a trend cell. A CAR trend shares no
   # latent state across rows, and its covariates may vary.
-  covariates <- trend_formula_covariates(mv_spec$regular_terms)
+  covariates <- trend_formula_covariates(mv_spec$base_formula)
   offending_vars <- intersect(covariates, response_vars)
   if (length(offending_vars) > 0) {
     stop(insight::format_error(c(
@@ -4125,44 +4124,28 @@ trend_covariate_names <- function(trend_variables) {
 
 #' The covariate columns of a trend formula
 #'
-#' Walks the regular terms `parse_trend_formula()` separates from the
-#' trend constructor. A bare `all.vars()` of the right-hand side
-#' would list the columns named inside `AR(gr = region)` as
+#' Parses the formula `parse_trend_formula()` leaves once the trend
+#' constructor is removed. A bare `all.vars()` of the full right-hand
+#' side would list the columns named inside `AR(gr = region)` as
 #' covariates. `newdata` must hold these columns, and the collapse to
 #' trend grain selects them.
 #'
-#' @param regular_terms The term labels other than the constructor
-#' @return Character vector of column names, with the grouping
-#'   factors of any random effect included.
+#' @param base_formula The one-sided trend formula without its
+#'   constructor
+#' @return Character vector of column names, with the slopes and
+#'   grouping factors of any random effect included.
 #' @noRd
-trend_formula_covariates <- function(regular_terms) {
-  checkmate::assert_character(regular_terms, any.missing = FALSE)
-  out <- character(0)
-  for (term in regular_terms) {
-    # A dummy response, since `brmsterms()` takes a two-sided formula.
-    bterms <- brms::brmsterms(stats::as.formula(paste("y ~", term)))
-    mu <- bterms$dpars$mu
-    term_vars <- character(0)
-    if (!is.null(mu$fe) && !identical(mu$fe, ~ 1)) {
-      term_vars <- c(term_vars, all.vars(mu$fe))
-    }
-    for (part in c("sm", "gp", "sp")) {
-      allvars <- attr(mu[[part]], "allvars")
-      if (!is.null(allvars)) {
-        term_vars <- c(term_vars, setdiff(all.vars(allvars), "1"))
-      }
-    }
-    # The grouping factors select the rows, and the axis columns are
-    # carried separately.
-    grouping <- character(0)
-    if (!is.null(mu$re) && nrow(mu$re) > 0) {
-      parts <- unlist(strsplit(as.character(mu$re$group), ":",
-                               fixed = TRUE))
-      grouping <- setdiff(parts, c("series", "time"))
-    }
-    out <- c(out, term_vars, grouping)
-  }
-  unique(out)
+trend_formula_covariates <- function(base_formula) {
+  checkmate::assert_formula(base_formula)
+  # `allvars` names every column a term uses: a slope inside a random
+  # effect, a grouping factor, a smooth's `by` and an offset alike.
+  # The axis columns and the `by = lv_axis()` rewrite are carried
+  # separately.
+  bterms <- brms::brmsterms(rlang::new_formula(
+    quote(.mvgam_lhs), rlang::f_rhs(base_formula)
+  ))
+  setdiff(trend_covariate_names(all.vars(bterms$allvars)),
+          c(".mvgam_lhs", by_lv_rewrite_tokens()))
 }
 
 # Internal: the series observed at fewer times than the frame holds.

@@ -163,6 +163,8 @@ mvgam_side_terms <- function(f, family = NULL) {
       })
     } else if (inherits(f, "brmsformula")) {
       f$family <- family
+    } else if (inherits(f, "formula") && length(f) == 3L) {
+      f <- brms::bf(f, family = family)
     }
   }
   # A trend submodel is written without a response. brms parses a
@@ -498,7 +500,7 @@ model_info.mvgam <- function(x, response = NULL, ...) {
     is_logit = identical(link, "logit"),
     is_probit = identical(link, "probit"),
     is_log = identical(link, "log"),
-    is_mixed = any(grepl("^sd_|^r_", pars)),
+    is_mixed = any(mvgam_par_kind(pars) %in% c("ranef_sd", "ranef_coef")),
     is_multivariate = isTRUE(brms::is.mvbrmsformula(x$formula)),
     is_bayesian = TRUE,
     family = fam_name,

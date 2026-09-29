@@ -25,9 +25,9 @@ array of summary statistics
 defined by \code{probs}). If \code{FALSE}, return the raw draws as a
 \verb{[n_draws x n_levels x n_coefs]} array per group.}
 
-\item{robust}{Logical. When \code{summary = TRUE}, use the median /
-MAD as the centre / spread instead of the mean / SD. Defaults
-to \code{FALSE}.}
+\item{robust}{Logical. When \code{summary = TRUE} and \code{robust = TRUE},
+the median and MAD give the centre and spread. The default
+\code{FALSE} uses the mean and SD.}
 
 \item{probs}{Numeric vector of length 2 with the quantiles to
 report when \code{summary = TRUE}. Defaults to
@@ -69,10 +69,9 @@ convention; the underlying positional Stan parameters are
 aliased transparently.
 }
 \details{
-Observation-side random effects only. Trend-side group-level
-effects (i.e. \code{(1 | g)} inside \code{trend_formula}) carry their
-positional Stan names rather than the brms-style labels, and
-address the same draws under either.
+Observation-side group-level effects only. A \code{(1 | g)} inside
+\code{trend_formula} is named with the \verb{_trend} suffix, as
+\code{r_g_trend[a,Intercept]}, and \code{as_draws()} returns its draws.
 }
 \examples{
 \dontrun{

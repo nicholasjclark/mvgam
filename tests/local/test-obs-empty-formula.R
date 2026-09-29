@@ -196,7 +196,7 @@ fit_conf <- fit_cached("conf", ~ series + AR(p = 1))
 
 test_that("the summary shows no name the user cannot look up", {
   # `summary()` used to print the placeholder as the sole
-  # Population-Level Effect, with an estimate and an interval, while
+  # regression coefficient, with an estimate and an interval, while
   # neither `variables()` nor `tidy()` listed it. The pin is what
   # settles it: a coefficient held at a constant has no draws to
   # summarise.
@@ -209,7 +209,7 @@ test_that("what the summary names, the accessors carry", {
   # The weaker half of the claim above, stated so that a fix which
   # merely renames the placeholder still has to make it reachable.
   printed <- capture.output(summary(fit_free))
-  start <- grep("Population-Level Effects", printed)
+  start <- grep("Regression Coefficients", printed)
   expect_length(start, 1L)
   rest <- printed[seq(start + 2L, length(printed))]
   block <- rest[seq_len(which(!nzchar(trimws(rest)))[1L] - 1L)]

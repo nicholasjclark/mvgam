@@ -225,16 +225,15 @@ fixef.mvgam <- function(object, summary = TRUE, robust = FALSE,
   checkmate::assert_logical(robust, len = 1L)
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L)
   rlang::check_dots_empty()
-  # Reuse the `betas` keyword to share the b_trend[*] filter logic
-  # with as.matrix.mvgam / coef.mvgam.
+  # The `betas` keyword is the set `brms::fixef()` reports, and
+  # `coef()`, `vcov()` and `get_coef()` take the same one.
   mat <- select_fixef_draws(
     as_draws_matrix(object, variable = "betas"), pars
   )
   if (ncol(mat) == 0L) {
     return(matrix(0, 0, 0))
   }
-  # Strip the `b_` prefix so column / row names match brms output.
-  colnames(mat) <- sub("^b_", "", colnames(mat))
+  colnames(mat) <- fixef_name(colnames(mat))
   if (!isTRUE(summary)) {
     return(mat)
   }
@@ -398,7 +397,7 @@ vcov.mvgam <- function(object, correlation = FALSE, pars = NULL, ...) {
   if (ncol(mat) == 0L) {
     return(matrix(0, 0, 0))
   }
-  colnames(mat) <- sub("^b_", "", colnames(mat))
+  colnames(mat) <- fixef_name(colnames(mat))
   if (isTRUE(correlation)) stats::cor(mat) else stats::cov(mat)
 }
 
@@ -409,9 +408,9 @@ vcov.mvgam <- function(object, correlation = FALSE, pars = NULL, ...) {
 #' returned a smaller matrix than the caller asked for, and a
 #' misspelt term lost its row without a message.
 #'
-#' @param mat Draws matrix of the `b_` coefficients
-#' @param pars Coefficient names without the `b_` prefix, or `NULL`
-#'   for all of them
+#' @param mat Draws matrix of the population-level coefficients
+#' @param pars Coefficient names as `fixef_name()` gives them, or
+#'   `NULL` for all of them
 #' @return `mat`, restricted to `pars` in the order given
 #' @noRd
 select_fixef_draws <- function(mat, pars) {
@@ -419,8 +418,9 @@ select_fixef_draws <- function(mat, pars) {
     return(mat)
   }
   checkmate::assert_character(pars, any.missing = FALSE, min.len = 1L)
-  keep <- paste0("b_", pars)
-  unknown <- pars[!keep %in% colnames(mat)]
+  names <- fixef_name(colnames(mat))
+  keep <- match(pars, names)
+  unknown <- pars[is.na(keep)]
   if (length(unknown)) {
     stop(insight::format_error(c(
       "Unknown fixed effects in 'pars'.",
@@ -429,8 +429,7 @@ select_fixef_draws <- function(mat, pars) {
       ),
       i = paste0(
         "Fixed effects: ",
-        paste0("'", sub("^b_", "", colnames(mat)), "'", collapse = ", "),
-        "."
+        paste0("'", names, "'", collapse = ", "), "."
       )
     )), call. = FALSE)
   }

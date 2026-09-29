@@ -487,16 +487,21 @@ strip_empty_obs_placeholder <- function(formula_str) {
 # placeholder from the first response.
 #' @noRd
 format_model_formula <- function(formula) {
-  # A distributional model carries one extra formula per parameter in
-  # `pforms`. brms prints each on its own line under the response
-  # formula, and a reader who wrote `sigma ~ x` needs to see it in the
-  # summary, so they are collected here before `formula` is narrowed
-  # to the response formula alone.
-  dpar_lines <- unlist(lapply(formula$pforms, format), use.names = FALSE)
-  if (!is.null(formula$formula)) {
-    formula <- formula$formula
+  # A multivariate formula gives each response its own lines, in the
+  # order brms prints them.
+  if (brms::is.mvbrmsformula(formula)) {
+    return(unlist(lapply(formula$forms, format_model_formula),
+                  use.names = FALSE))
   }
-  c(strip_empty_obs_placeholder(format(formula)), dpar_lines)
+  if (!brms::is.brmsformula(formula)) {
+    return(strip_empty_obs_placeholder(format(formula)))
+  }
+  # brms stores one formula per distributional parameter in `pforms`
+  # and prints each on its own line under the response formula. A
+  # reader who wrote `sigma ~ x` needs to see it, and the lines are
+  # collected before `formula` is narrowed to the response formula.
+  dpar_lines <- unlist(lapply(formula$pforms, format), use.names = FALSE)
+  c(strip_empty_obs_placeholder(format(formula$formula)), dpar_lines)
 }
 
 
@@ -668,6 +673,12 @@ mvgam_unsuffixed_params <- c(
 )
 
 
+# The trend reaches brms as a gaussian model. The assembled program
+# drops that model's residual `sigma`: the process noise is the
+# `sigma_trend` mvgam declares, one per latent series.
+brms_trend_dropped_params <- "sigma"
+
+
 #' Does this prior class name a parameter mvgam manages?
 #'
 #' @description
@@ -718,10 +729,12 @@ apply_trend_class_suffix <- function(class) {
 # before the first observed time, drawn from the stationary
 # distribution the autoregression implies, so its statement is a
 # function of `A_trend` and `Sigma_trend` rather than a prior of its
-# own.
+# own. `init_innovations_trend` holds the standard variates an ARMA
+# start scales to its stationary law.
 mvgam_state_params <- c(
   "trend", "lv_trend", "lv_trend_tilde",
-  "innovations_trend", "scaled_innovations_trend", "init_trend"
+  "innovations_trend", "scaled_innovations_trend", "init_trend",
+  "init_innovations_trend"
 )
 
 
@@ -742,7 +755,8 @@ stancode_declared_bounds <- function(sc) {
     "positive_ordered|unit_vector|cholesky_factor_corr|",
     "cholesky_factor_cov|corr_matrix|cov_matrix)",
     "[[:space:]]*(<[^>]*>)?",
-    "[[:space:]]*(?:\\[[^]]*\\])?",
+    # A size may nest one index, as `[knots_1[1]]` does.
+    "[[:space:]]*(?:\\[(?:[^][]|\\[[^]]*\\])*\\])?",
     "[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*;"
   )
   out <- list()
@@ -815,6 +829,14 @@ mvgam_stancode_prior_rows <- function(sc) {
     invisible(NULL)
   }
 
+  # An index names a coefficient. A bare identifier there is a loop
+  # variable, as in `Amu_trend[k]`, and the statement covers the
+  # whole parameter.
+  statement_coef <- function(index) {
+    coef <- gsub("^\\[|\\]$", "", index)
+    if (grepl("^[A-Za-z_][A-Za-z0-9_]*$", coef)) "" else coef
+  }
+
   # `x ~ dist(args);`, with an optional index becoming the coef.
   tilde_re <- paste0(
     "(?:^|[[:space:];{}])",
@@ -826,7 +848,7 @@ mvgam_stancode_prior_rows <- function(sc) {
   for (hit in regmatches(sc, gregexpr(tilde_re, sc))[[1L]]) {
     m <- regmatches(hit, regexec(tilde_re, hit))[[1L]]
     if (length(m) < 4L || !is_mvgam_param(m[2L])) next
-    coef <- gsub("^\\[|\\]$", "", m[3L])
+    coef <- statement_coef(m[3L])
     # A multi-dimensional slice is a loop body rather than a prior on
     # a named coefficient: `Z[ : , i_z] ~ ...` sits inside a `for` and
     # names a Stan local. `varrho_inv[1]` and `varrho_inv[2:N]` carry
@@ -856,7 +878,7 @@ mvgam_stancode_prior_rows <- function(sc) {
   for (hit in regmatches(sc, gregexpr(lpdf_re, sc))[[1L]]) {
     m <- regmatches(hit, regexec(lpdf_re, hit))[[1L]]
     if (length(m) < 5L || !is_mvgam_param(m[3L])) next
-    coef <- gsub("^\\[|\\]$", "", m[4L])
+    coef <- statement_coef(m[4L])
     # A multi-index names a cell rather than a coefficient, which the
     # prior table has no row shape for.
     if (grepl(",", coef, fixed = TRUE)) next
@@ -954,6 +976,19 @@ formula_has_population_terms <- function(formula) {
 }
 
 
+#' The parameters a brms program declares
+#'
+#' @param stancode A brms program, as one string or its lines.
+#' @return Character vector of parameter names, empty for NULL.
+#' @noRd
+brms_declared_params <- function(stancode) {
+  if (is.null(stancode)) return(character(0L))
+  lines <- strsplit(paste(stancode, collapse = "\n"), "\n", fixed = TRUE)[[1L]]
+  body <- stan_block_body(lines, "parameters")
+  names(stancode_declared_bounds(paste(body, collapse = "\n")))
+}
+
+
 #' Lift mvgam-emitted Stan priors into the brmsprior table
 #'
 #' brms's `validate_prior()` only sees priors that flow through its
@@ -976,10 +1011,15 @@ formula_has_population_terms <- function(formula) {
 #' @param prior A `brmsprior` returned by `validate_prior()`.
 #' @param stancode Character string (or vector of lines) holding the
 #'   full assembled Stan model. NULL / empty returns `prior` as-is.
+#' @param brms_owned Names the trend's brms program declares, as the
+#'   assembled model spells them. brms files their priors under its
+#'   classes (`sds_1_trend` under `sds_trend`). A statement on one of
+#'   them adds no row.
 #'
 #' @return The merged `brmsprior` with mvgam-side rows appended.
 #' @noRd
-lift_mvgam_stanvar_priors <- function(prior, stancode) {
+lift_mvgam_stanvar_priors <- function(prior, stancode,
+                                      brms_owned = character(0L)) {
   checkmate::assert_class(prior, "brmsprior")
   checkmate::assert(
     checkmate::check_null(stancode),
@@ -994,6 +1034,22 @@ lift_mvgam_stanvar_priors <- function(prior, stancode) {
   if (!nzchar(sc)) return(prior)
 
   rows <- mvgam_stancode_prior_rows(sc)
+  # A row brms already validated is in the table. The trend's brms
+  # model writes its own priors into the program under the `_trend`
+  # suffix, and the scan above finds `b_trend` there a second time.
+  # The scanned prior fills a row brms left flat, and is otherwise
+  # already stated.
+  held <- paste0(prior$class, "|", prior$coef)
+  for (r in rows) {
+    at <- match(paste0(r$class, "|", r$coef), held)
+    if (!is.na(at) && !nzchar(prior$prior[at])) {
+      prior$prior[at] <- r$prior
+      if ("source" %in% names(prior)) prior$source[at] <- "mvgam"
+    }
+  }
+  rows <- Filter(function(r) {
+    !paste0(r$class, "|", r$coef) %in% held && !r$class %in% brms_owned
+  }, rows)
 
   if (length(rows) == 0L) return(prior)
 

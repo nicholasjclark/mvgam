@@ -79,7 +79,7 @@ mod_nonfac <- mvgam(
   warmup        = 500,
   silent        = 2
 )
-summary(mod_nonfac, include_betas = FALSE)
+summary(mod_nonfac)
 conditional_effects(mod_nonfac)
 
 # ---- Factor mode (`n_lv` set on the trend constructor) ----

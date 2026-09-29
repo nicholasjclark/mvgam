@@ -36,51 +36,38 @@ stratified k-fold refits, irregular sampling grids).}
 names each row's series. Its levels fix the order of the series. A
 trend needs this column even for a single series. Defaults to \code{series}.}
 
-\item{gr}{An optional grouping variable, which must be a \code{factor} in the
-supplied \code{data}, for setting up hierarchical residual correlation
-structures. If specified, this will automatically set up a model where the
-residual correlations for a specific level of \code{gr} are modelled
-hierarchically:
+\item{gr}{An optional grouping \code{factor} in \code{data} that sets up
+hierarchical residual correlations. The correlation matrix of each
+level of \code{gr} is
 
-\eqn{\Omega_{group} = p\Omega_{global} + (1 - p)\Omega_{group, local}},
+\eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} +
+  (1 - \alpha_{cor})\Omega_{group, local}},
 
 where \eqn{\Omega_{global}} is a \emph{global} correlation matrix,
-\eqn{\Omega_{group, local}} is a \emph{local deviation} correlation matrix, and
-\eqn{p} is a weighting parameter controlling how strongly the local
-correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
-correlation matrix \eqn{\Omega_{global}}. If \code{gr} is supplied then \code{subgr}
-\emph{must} also be supplied
+\eqn{\Omega_{group, local}} a \emph{local deviation} correlation matrix
+and \eqn{\alpha_{cor}} (\code{alpha_cor_trend}) the weight that shrinks
+each group's matrix toward the global one. Supplying \code{gr} requires
+\code{subgr}. \code{cor} defaults to \code{TRUE} for a grouped trend, and an
+explicit \code{cor = FALSE} is refused.}
 
-A grouped trend estimates correlations among the \code{subgr} units
-within each level of \code{gr}. \code{cor} defaults to \code{TRUE} for such a
-trend, and an explicit \code{cor = FALSE} is refused.}
+\item{subgr}{A subgrouping \code{factor} in \code{data} naming the
+observational units within each level of \code{gr}. Defaults to
+\code{series}, and the data need not be time series. A model with
+hierarchical correlations builds its series from \code{gr} and \code{subgr},
+and \code{data} then needs no \code{series} column.
 
-\item{subgr}{A subgrouping \code{factor} variable specifying which element in
-\code{data} represents the different observational units. Defaults to \code{series}
-to be consistent with other functionalities in \pkg{mvgam}, though note
-that the data need not be time series in this case
-
-Models that use the hierarchical correlations (by supplying a value for
-\code{gr}) \emph{should not} include a \code{series} element in \code{data}. Rather, this
-element will be created internally based on the supplied variables for \code{gr}
-and \code{subgr}
-
-For example, if you are modelling counts for a group of species (labelled
-as \code{species} in the data) across sampling sites (labelled as \code{site} in the
-data) in three different geographical regions (labelled as \code{region}), and
-you would like the residuals to be correlated within regions, then you
-should specify \code{unit = site}, \code{gr = region}, and \code{subgr = species}
-
-Internally, \code{mvgam()} will appropriately order the data by \code{unit} (in this
-case, by \code{site}) and create the \code{series} element for the data using
-something like:
+For example, to model counts of several species (\code{species} in
+\code{data}) at sampling sites (\code{site}) in three regions (\code{region})
+with residuals correlated within regions, specify \code{unit = site},
+\code{gr = region} and \code{subgr = species}. \code{mvgam()} orders the data by
+\code{unit} and builds the series as
 
 \verb{series = interaction(gr, subgr, drop = TRUE, sep = "_",}
 \verb{lex.order = TRUE)}
 
-so a region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}. A
-\code{series} column supplied alongside \code{gr} and \code{subgr} is replaced by
-the derived one, with a warning.}
+A region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}. A
+\code{series} column that disagrees with the derived series is replaced
+by it, with a warning.}
 
 \item{n_lv}{The number of latent factors to estimate for dynamic
 factor models. When \code{n_lv} is smaller than the number of series,
@@ -101,36 +88,35 @@ the model \code{gr} exists to specify. \code{VAR()} and
 \code{cor = FALSE}, as do \code{AR(gr = ...)} and
 \code{RW(gr = ...)}.}
 
-\item{trend_map}{Optional \code{data.frame} specifying which latent
-process each series maps onto, giving fixed (rather than estimated)
-loadings for dynamic factor models. See \code{\link{mvgam}} for the
-required format. Defaults to \code{NULL}.}
+\item{trend_map}{Optional specification of which latent process each
+series maps onto. It fixes the loadings of a dynamic factor model.
+See \code{\link{mvgam}} for the accepted formats. Defaults to
+\code{NULL}.}
 
 \item{df}{Degrees of freedom for the latent process innovations.
-Defaults to \code{Inf}, which gives the Gaussian innovations mvgam
-has always used, since a t with infinite degrees of freedom is a
-normal. Set \code{df = NA} to estimate them, or supply a number
-above \code{2} to fix them.
+Defaults to \code{Inf}, which gives Gaussian innovations: a t with
+infinite degrees of freedom is a normal. Set \code{df = NA} to
+estimate them, or supply a number above \code{2} to fix them.
 
 Finite degrees of freedom let the latent process absorb an
-occasional large shock without inflating \code{sigma_trend}
-everywhere, which suits boom-and-bust population series and
-outbreak dynamics. The innovations follow a multivariate t, which
-shares the innovation \emph{scale} across series at each time
-point. Large innovations therefore tend to occur together, but
-each series keeps its own direction and magnitude: a shock in one
-series says nothing about the sign of the others, and a series can
-sit out an event that moves its neighbours. Correlation between
-series is governed by \code{cor} exactly as it is for Gaussian
-innovations; the tail behaviour is layered on top of it.
+occasional large shock while \code{sigma_trend} stays at the scale
+of ordinary variation. That suits boom-and-bust population series
+and outbreak dynamics. The innovations follow a multivariate t,
+which shares one innovation \emph{scale} across the series at each
+time point, and large innovations tend to occur together as a
+result. Each series keeps its own direction and magnitude. A shock
+in one series says nothing about the sign of the others, and one
+series can stay unmoved by an event that moves its neighbours.
+\code{cor} sets the correlation between series exactly as it does
+for Gaussian innovations, and the degrees of freedom control how
+heavy the tails of the innovations are.
 
 When \code{df = NA} the degrees of freedom are estimated as
-\code{nu_trend}, with a default \code{gamma(4, 0.3)} prior that
-can be replaced through the \code{prior} argument, for example
-\code{prior(gamma(2, 0.1), class = "nu_trend")}. Note that
-\code{nu_trend} is listed in the \code{\link{get_prior}} table
-alongside \code{sigma_trend}, so the class name can be read from
-there.
+\code{nu_trend}, with a default \code{gamma(4, 0.3)} prior. The
+\code{prior} argument replaces it, for example
+\code{prior(gamma(2, 0.1), class = "nu_trend")}.
+\code{\link{get_prior}} lists \code{nu_trend} with the other trend
+classes.
 
 Three caveats. The bound of \code{2} is required: below it the
 innovations have no finite variance, and an autoregressive trend
@@ -141,8 +127,9 @@ under Gaussian innovations alone. A finite mix of t variates has
 heavier tails than the infinite sum that defines that law. The
 degrees of freedom are informed only through the tail of the
 latent process and are weakly identified in short series: below
-roughly 200 time points, the posterior stays close to its prior. Not available for \code{VAR()}, which samples its states
-directly, or \code{PW()}, which has no innovations.}
+roughly 200 time points, the posterior stays close to its prior.
+Not available for \code{VAR()}, which samples its states directly,
+or \code{PW()}, which has no innovations.}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of
@@ -156,39 +143,39 @@ purely to help set up a model with particular error processes
 \section{Identification}{
 
 Factor-model fits (\code{n_lv < n_series}) sample the loadings
-matrix \code{Z} unconstrained and identify it post-hoc via thin QR
-decomposition in generated quantities, following Heaps & Jermyn
-(2024). The identified loadings \code{Z_tilde} and rotated factor
-paths \code{lv_trend_tilde} are saved alongside \code{Z} and \code{lv_trend};
-downstream resolvers prefer the identified versions when
-present. \code{qr_thin_R()} guarantees a non-negative diagonal
-on \code{Z_tilde}, removing the \eqn{2^k} sign-mode equivalence by
-construction. The per-block scale matrices \code{L_Omega_trend} /
-\code{Sigma_trend} remain in the unrotated latent basis.
+matrix \code{Z} unconstrained. Following Heaps & Jermyn (2024), generated
+quantities identify it by a thin QR decomposition. The fit saves the
+identified loadings \code{Z_tilde} with the unrotated \code{Z}, and the rotated
+factor paths \code{lv_trend_tilde} with \code{lv_trend}. Post-fit methods use
+the identified versions where they exist. \code{qr_thin_R()} gives \code{Z_tilde} a non-negative diagonal,
+which removes the \eqn{2^k} equivalent sign modes. The per-factor
+coefficients \code{ar1_trend} and \code{theta1_trend} stay in the unrotated
+basis. A VAR factor model also rotates its lag coefficients as
+\verb{A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'}.
 
-Supplying \code{trend_map} bypasses the QR identification step
-entirely so the user-encoded fixed entries are preserved exactly
-on \code{Z}. Combine a free factor model with the optional
-\code{loadings_prior} argument on \code{mvgam()} to swap the
-default iid Student-t prior on \code{Z} for a structured matrix-normal
-prior built from per-series features and / or pairwise distance
-matrices; see \code{\link{mvgam}} for the full surface.
+A \code{trend_map} skips the QR step and keeps its fixed entries on
+\code{Z} exactly. A \code{by = lv_axis()} smooth ties each factor to its own
+covariate effect. Because a rotation would mix those effects, that
+model skips the QR step as well. For a free factor model, the \code{loadings_prior}
+argument of \code{mvgam()} replaces the default iid Student-t prior
+on \code{Z} with a structured matrix-normal prior. That prior is built
+from per-series features, pairwise distance matrices or both. See
+\code{\link{mvgam}} for its arguments.
 
 Setting \code{loadings_prior = "mgp"} (or
 \code{loadings_prior = list(column_shrinkage = "mgp")}) switches
 the column scaling to the multiplicative gamma process prior of
 Bhattacharya & Dunson (2011), which shrinks later columns of \code{Z}
-toward zero with increasing strength. Under this prior \code{n_lv}
-acts as a truncation ceiling rather than the exact factor count;
-\code{\link{active_factors}} reports the posterior distribution of
-the active column count.
+toward zero with increasing strength. \code{n_lv} is then a truncation
+ceiling on the factor count. \code{\link{active_factors}} reports
+the posterior distribution of the number of active columns.
 }
 
 \examples{
 \dontrun{
-# Simulate four correlated Gaussian series. ZMVN is a single-
-# snapshot residual prior, so the recoverable structure is the
-# cross-series covariance.
+# Simulate four correlated Gaussian series. ZMVN treats each time
+# point as an independent multivariate normal draw, which leaves
+# the cross-series covariance as the structure it recovers.
 set.seed(2)
 simdat <- sim_mvgam(
   family       = gaussian(),

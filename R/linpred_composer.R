@@ -15,9 +15,9 @@
 #' brms names each piece of a predictor with the distributional
 #' parameter unless it is the mean, then the response of a model with
 #' several, then the non-linear parameter, each after an underscore.
-#' `sigma` of the response `y1` reads its design from `X_sigma_y1` and
-#' its coefficients from `b_sigma_y1`; the mean of a model with one
-#' response reads `X` and `b`. A grouping index is named by the response
+#' `sigma` of the response `y1` takes its design from `X_sigma_y1` and
+#' its coefficients from `b_sigma_y1`. The mean of a model with one
+#' response takes `X` and `b`. A grouping index is named by the response
 #' alone, as `J_1_y1`.
 #'
 #' @param resp The response's key on a model with several, or `NULL`
@@ -37,31 +37,62 @@ predictor_suffix <- function(resp = NULL, dpar = NULL, nlpar = NULL) {
 }
 
 
+#' A brms name part, or NULL when the model has none
+#'
+#' `predictor_suffix()` takes `NULL` for a part a model does not have,
+#' while a `brmsterms` frame spells the same absence as `""`.
+#'
+#' @param x A character scalar, or NULL.
+#' @return `x`, or NULL when it is absent or empty.
+#' @noRd
+null_if_blank <- function(x) {
+  if (length(x) == 0L || is.na(x[1L]) || !nzchar(x[1L])) {
+    return(NULL)
+  }
+  as.character(x[1L])
+}
+
+
 #' Every linear predictor a brms model writes
 #'
 #' One for each response's mean unless the mean is non-linear, one for
-#' each distributional parameter given a formula, and one for each
-#' non-linear parameter.
+#' each further distributional parameter it predicts, including each
+#' mixture component's mean, and one for each non-linear parameter. A
+#' non-linear predictor is an expression over the parameters below it
+#' and declares no parameters itself.
 #'
-#' @param formula A `brmsformula` or `mvbrmsformula`
-#' @return A list of `list(resp, dpar, nlpar)` as `predictor_suffix()`
-#'   takes them, each `NULL` where it does not apply
+#' @param formula A `brmsformula` or `mvbrmsformula`, or `NULL`
+#' @return A list with one entry per predictor: `resp`, `dpar` and
+#'   `nlpar` as `predictor_suffix()` takes them, each `NULL` where it
+#'   does not apply and `dpar` `NULL` for the mean; `suffix`, the name
+#'   suffix `predictor_suffix()` gives them; and `pred`, the predictor's
+#'   `brmsterms` entry
 #' @noRd
 model_predictors <- function(formula) {
-  forms <- response_formulas(formula)
-  several <- length(forms) > 1L
+  if (is.null(formula)) {
+    return(list())
+  }
+  bterms <- brms::brmsterms(formula)
+  frames <- if (inherits(bterms, "mvbrmsterms")) bterms$terms else {
+    list(bterms)
+  }
   out <- list()
-  for (key in names(forms)) {
-    resp <- if (several) key
-    nlpars <- nonlinear_parameters(forms[[key]])
-    dpars <- setdiff(names(forms[[key]]$pforms), nlpars)
-    out <- c(
-      out,
-      if (length(nlpars) == 0L) list(list(resp = resp, dpar = NULL,
-                                          nlpar = NULL)),
-      lapply(dpars, function(d) list(resp = resp, dpar = d, nlpar = NULL)),
-      lapply(nlpars, function(p) list(resp = resp, dpar = NULL, nlpar = p))
-    )
+  for (frame in frames) {
+    linear <- Filter(function(pred) !inherits(pred, "btnl"),
+                     c(frame$dpars, frame$nlpars))
+    for (pred in unname(linear)) {
+      dpar <- null_if_blank(pred$dpar)
+      part <- list(
+        resp = null_if_blank(frame$resp),
+        dpar = if (!identical(dpar, "mu")) dpar,
+        nlpar = null_if_blank(pred$nlpar)
+      )
+      out[[length(out) + 1L]] <- c(
+        part,
+        list(suffix = predictor_suffix(part$resp, part$dpar, part$nlpar),
+             pred = pred)
+      )
+    }
   }
   out
 }
@@ -70,8 +101,8 @@ model_predictors <- function(formula) {
 #' Linear predictor of a prepared model, on the link scale
 #'
 #' @param prep A `mvgam_prep` from `prepare_linpred_data()`
-#' @param resp One response of a model with several, or `NULL`, which
-#'   answers for each
+#' @param resp One response of a model with several, or `NULL` for
+#'   each
 #' @param dpar The distributional parameter, or `NULL` for the mean
 #' @return A `[ndraws x nobs]` matrix, or a list of them named by
 #'   response when a model with several is asked for none
@@ -180,8 +211,8 @@ nonlinear_parameters <- function(form) {
 #'
 #' @param prep A `mvgam_prep`
 #' @param draws Plain `[ndraws x npar]` matrix of the posterior
-#' @param rhs The formula this predictor was written as, read for the
-#'   kernel of each `gp()` term
+#' @param rhs The formula this predictor was written as, which gives
+#'   the kernel of each `gp()` term
 #' @param resp,dpar,nlpar The predictor, as `predictor_suffix()` takes it
 #' @param n_obs Number of rows the predictor covers
 #' @return A `[ndraws x n_obs]` matrix
@@ -211,13 +242,13 @@ linear_terms_pred <- function(prep, draws, rhs, resp, dpar, nlpar, n_obs) {
 }
 
 
-#' Posterior columns a term reads
+#' Posterior columns a term uses
 #'
 #' The design and the draws both come from the fitted model. A name the
 #' design implies and the draws lack is a fault in mvgam.
 #'
 #' @param draws Plain `[ndraws x npar]` matrix of the posterior
-#' @param cols The column names to read, in order
+#' @param cols The column names to take, in order
 #' @return `draws[, cols]` as a matrix
 #' @noRd
 draw_columns <- function(draws, cols) {
@@ -233,7 +264,7 @@ draw_columns <- function(draws, cols) {
 }
 
 
-#' A data entry a term reads
+#' A data entry a term uses
 #'
 #' @param sdata The prediction's Stan data
 #' @param name The entry brms writes
@@ -300,13 +331,13 @@ fixed_pred <- function(draws, sdata, sfx, n_obs) {
 #'
 #' brms numbers the smooth objects of a predictor in order, one per
 #' level of a `by` factor, and splits each into an unpenalised part and
-#' one or more penalised parts. The unpenalised parts share `Xs`, read
-#' against `bs`, and `attr(Xs, "smcols")` gives each object's columns
-#' of it. Object `i` has `nb_<i>` penalised parts, the `Zs_<i>_<j>`
-#' bases read against `s_<i>_<j>`.
+#' one or more penalised parts. The unpenalised parts share `Xs`,
+#' multiplied by `bs`, and `attr(Xs, "smcols")` gives each object's
+#' columns of it. Object `i` has `nb_<i>` penalised parts, the
+#' `Zs_<i>_<j>` bases multiplied by `s_<i>_<j>`.
 #'
 #' @inheritParams fixed_pred
-#' @param objects The numbers of the smooth objects to read, or `NULL`
+#' @param objects The numbers of the smooth objects to evaluate, or `NULL`
 #'   for every one
 #' @return A `[ndraws x n_obs]` matrix
 #' @noRd
@@ -436,12 +467,12 @@ gp_kernels <- function(rhs) {
 
 #' Approximate Gaussian process terms
 #'
-#' Each term reads its basis `Xgp`, its eigenvalues `slambda`, its
+#' Each term uses its basis `Xgp`, its eigenvalues `slambda`, its
 #' marginal standard deviation `sdgp`, its length scales `lscale` and
 #' its basis coefficients `zgp`, all under `<sfx>_<i>`. A term with a
 #' factor `by` holds one of each per level, suffixed by the level, and
 #' places that level's rows with `Igp`. `Jgp` maps rows onto the unique
-#' covariate values the basis was built on, and `Cgp` scales a term by a
+#' covariate values brms computed the basis from, and `Cgp` scales a term by a
 #' continuous `by`.
 #'
 #' @inheritParams fixed_pred

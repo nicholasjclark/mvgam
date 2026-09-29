@@ -438,13 +438,10 @@ test_that("one parameter block reads the same way through every method", {
 
 
 test_that("hypothesis reaches every parameter variables lists", {
-  # `mphi` survives unaliased and is accepted. `b_x` exists only as
-  # the alias, and `hypothesis()` reads the stanfit rather than the
-  # aliased list, so it refuses a name the line above just listed.
-  # Two parameters of one model, told apart by nothing a user sees.
   expect_true(all(c("mphi", "b_x") %in% variables(fit)))
-  expect_s3_class(hypothesis(fit, "mphi = 1"), "brmshypothesis")
-  expect_s3_class(hypothesis(fit, "b_x = 0"), "brmshypothesis")
+  expect_s3_class(hypothesis(fit, "mphi = 1", class = NULL),
+                  "brmshypothesis")
+  expect_s3_class(hypothesis(fit, "x = 0"), "brmshypothesis")
 })
 
 

@@ -4,21 +4,40 @@
 \alias{hypothesis.mvgam}
 \title{Test posterior hypotheses on a fitted \pkg{mvgam} model}
 \usage{
-\method{hypothesis}{mvgam}(x, hypothesis, alpha = 0.05, robust = FALSE, ...)
+\method{hypothesis}{mvgam}(
+  x,
+  hypothesis,
+  class = "b",
+  group = "",
+  alpha = 0.05,
+  robust = FALSE,
+  seed = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}
 
-\item{hypothesis}{Character vector of hypothesis strings.
-Each string uses the standard \code{brms::hypothesis} grammar
-(e.g. \code{"ar1_trend[1] > 0"}, \code{"sigma_trend[1] < 1"},
-\code{"(b_x - b_z) = 0"}).}
+\item{hypothesis}{Character vector of hypothesis strings in the
+\code{\link[brms:hypothesis.brmsfit]{brms::hypothesis()}} grammar, such as \code{"x > 0"} or
+\code{"(x - z) = 0"}.}
+
+\item{class}{The class prefix the names in \code{hypothesis} omit.
+Defaults to \code{"b"}. \code{NULL} or \code{""} takes every parameter by its
+full name.}
+
+\item{group}{The grouping factor of a group-level class, as
+\verb{class = "sd", group = "site"} tests \code{sd_site__Intercept} as
+\code{Intercept}.}
 
 \item{alpha}{One minus the credible-interval mass. Defaults
 to \code{0.05} (90\%-CI for one-sided, 95\%-CI for two-sided).}
 
-\item{robust}{Logical. Use median / MAD instead of mean / SD
+\item{robust}{Logical. Use median / MAD in place of mean / SD
 when summarising. Defaults to \code{FALSE}.}
+
+\item{seed}{Seed for the random draws of an evidence ratio, or
+\code{NULL}.}
 
 \item{...}{Forwarded to \code{brms::hypothesis}.}
 }
@@ -26,15 +45,12 @@ when summarising. Defaults to \code{FALSE}.}
 A \code{brmshypothesis} object. See \code{\link[brms:hypothesis.brmsfit]{brms::hypothesis()}}.
 }
 \description{
-Wraps \code{\link[brms:hypothesis.brmsfit]{brms::hypothesis()}} so it works on \code{mvgam} fits.
-\code{brms::hypothesis.brmsfit} is the default dispatch (mvgam is
-a \code{brmsfit} subclass), but its internal helpers expect a
-brmsfit-shaped Stan stancode / data layout that mvgam does
-not store, so the brms-fit method raises an \code{rbind} error on
-an mvgam object. This wrapper bypasses that path: it pulls
-posterior draws via \code{\link[posterior:draws_df]{posterior::as_draws_df()}} and forwards
-them to \code{brms::hypothesis.default}, which evaluates the
-hypothesis string against the draws data frame directly.
+The \code{mvgam} method of \code{\link[brms:hypothesis.brmsfit]{brms::hypothesis()}}, with the arguments and
+parameter names of \code{brms::hypothesis.brmsfit()}. By default a
+hypothesis names population-level coefficients without their \code{b_}
+prefix, as \code{"x > 0"} tests \code{b_x}. \code{class = NULL} names any
+parameter by the full name \code{\link[=variables.mvgam]{variables.mvgam()}} lists, such as
+\code{ar1_trend[1]} or \code{sigma}.
 }
 \examples{
 \dontrun{
@@ -42,24 +58,23 @@ set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
 
-mod <- mvgam(y ~ s(x),
+mod <- mvgam(y ~ x,
               trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Single hypothesis.
-hypothesis(mod, "ar1_trend[1] > 0")
+# A population-level coefficient, named as fixef() names it.
+hypothesis(mod, "x > 0")
 
-# Multiple hypotheses in one call.
-hypothesis(mod, c("ar1_trend[1] > 0",
-                   "sigma_trend[1] < 1"))
+# Any parameter by its full name.
+hypothesis(mod, c("ar1_trend[1] > 0", "sigma_trend[1] < 1"),
+           class = NULL)
 }
 
 }
 \seealso{
-\code{\link[brms:hypothesis.brmsfit]{brms::hypothesis()}}, \code{\link[posterior:draws_df]{posterior::as_draws_df()}},
-\code{\link[=variables.mvgam]{variables.mvgam()}}.
+\code{\link[brms:hypothesis.brmsfit]{brms::hypothesis()}}, \code{\link[=variables.mvgam]{variables.mvgam()}}.
 }
 \author{
 Nicholas J Clark

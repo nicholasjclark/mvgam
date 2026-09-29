@@ -26,7 +26,9 @@ parameters (e.g. shape, scale, overdispersion). Only returned when
 \code{levels(data$series)} in the original model fit.
 
 \item \code{train_observations}, \code{train_times} Lists of length \code{n_series}
-holding the training response vectors and their unique time grids.
+holding the training responses and the time of each hindcast
+column. A closure-unit family's \code{"expected"} and \code{"response"}
+hindcasts have one column per visit, and their times repeat.
 
 \item \code{test_observations}, \code{test_times} If \code{forecast()} produced the
 object, the corresponding test response vectors and time grids.

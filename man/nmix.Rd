@@ -358,7 +358,7 @@ mod <- mvgam(
   chains  = 2,
   silent  = 2
 )
-summary(mod, include_betas = FALSE)
+summary(mod)
 
 # Marginal env effect on the response scale (expected count
 # = lambda * p).

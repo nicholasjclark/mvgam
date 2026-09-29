@@ -503,6 +503,35 @@ stacked_design_matrix <- function(sdata) {
 }
 
 
+# Internal: the columns of a stacked design that repeat a direction
+# the others already span, or none.
+#
+# A column of zeros moves no fitted value and shares a direction with
+# nothing. The empty-observation placeholder is one, pinned at zero
+# by its prior. A rank taken on raw columns follows their scales, and
+# the observation design is centred where the trend design is not,
+# so each column is scaled to unit length first.
+#
+# @param m The matrix `stacked_design_matrix()` returns, or `NULL`
+# @return Character vector of column names
+#'@noRd
+confounded_columns <- function(m) {
+  if (is.null(m)) {
+    return(character(0L))
+  }
+  norms <- sqrt(colSums(m^2))
+  m <- m[, norms > 0, drop = FALSE]
+  if (ncol(m) < 2L) {
+    return(character(0L))
+  }
+  q <- qr(sweep(m, 2L, norms[norms > 0], "/"))
+  if (q$rank >= ncol(m)) {
+    return(character(0L))
+  }
+  colnames(m)[q$pivot[seq.int(q$rank + 1L, ncol(m))]]
+}
+
+
 # Internal: warn once when the two designs share a direction.
 #
 # A term written into both formulas moves the same fitted values from
@@ -512,31 +541,17 @@ stacked_design_matrix <- function(sdata) {
 # to write. This names the columns involved and continues.
 #'@noRd
 warn_confounded_design <- function(sdata) {
-  m <- stacked_design_matrix(sdata)
-  if (is.null(m) || ncol(m) < 2L) {
+  dependent <- confounded_columns(stacked_design_matrix(sdata))
+  if (!length(dependent)) {
     return(invisible(NULL))
   }
-  # A rank taken on raw columns follows their scales: the
-  # observation design is centred and the trend design is not.
-  norms <- sqrt(colSums(m^2))
-  norms[norms == 0] <- 1
-  q <- qr(sweep(m, 2L, norms, "/"))
-  if (q$rank >= ncol(m)) {
-    return(invisible(NULL))
-  }
-  dependent <- colnames(m)[q$pivot[seq.int(q$rank + 1L, ncol(m))]]
   warn_once(
-    paste0(
-      "The observation and trend designs share ",
-      ncol(m) - q$rank, " direction",
-      if (ncol(m) - q$rank > 1L) "s" else "", ". Stacked, they hold ",
-      ncol(m), " columns of rank ", q$rank,
-      ". The remaining columns carry ",
-      paste(dependent, collapse = ", "),
-      ". A coefficient on one side and its partner on the other move ",
-      "the same fitted values, and the priors alone set the split ",
-      "between them. Drop the repeated term from one formula, or set ",
-      "a prior pinning the side that carries it."
+    c(
+      "The observation and trend designs are collinear.",
+      x = paste0("Columns that repeat a direction of the other side: ",
+                 paste(dependent, collapse = ", "), "."),
+      i = "The priors alone set how the effect splits between the sides.",
+      i = "Drop the term from one formula or pin one side with a prior."
     ),
     "mvgam_confounded_design"
   )

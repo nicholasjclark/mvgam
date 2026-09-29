@@ -89,33 +89,36 @@ rstantools::predictive_interval
 
 #' Test posterior hypotheses on a fitted \pkg{mvgam} model
 #'
-#' Wraps [brms::hypothesis()] so it works on `mvgam` fits.
-#' `brms::hypothesis.brmsfit` is the default dispatch (mvgam is
-#' a `brmsfit` subclass), but its internal helpers expect a
-#' brmsfit-shaped Stan stancode / data layout that mvgam does
-#' not store, so the brms-fit method raises an `rbind` error on
-#' an mvgam object. This wrapper bypasses that path: it pulls
-#' posterior draws via [posterior::as_draws_df()] and forwards
-#' them to `brms::hypothesis.default`, which evaluates the
-#' hypothesis string against the draws data frame directly.
+#' The `mvgam` method of [brms::hypothesis()], with the arguments and
+#' parameter names of `brms::hypothesis.brmsfit()`. By default a
+#' hypothesis names population-level coefficients without their `b_`
+#' prefix, as `"x > 0"` tests `b_x`. `class = NULL` names any
+#' parameter by the full name [variables.mvgam()] lists, such as
+#' `ar1_trend[1]` or `sigma`.
 #'
 #' @param x A fitted `mvgam` object.
-#' @param hypothesis Character vector of hypothesis strings.
-#'   Each string uses the standard `brms::hypothesis` grammar
-#'   (e.g. `"ar1_trend[1] > 0"`, `"sigma_trend[1] < 1"`,
-#'   `"(b_x - b_z) = 0"`).
+#' @param hypothesis Character vector of hypothesis strings in the
+#'   [brms::hypothesis()] grammar, such as `"x > 0"` or
+#'   `"(x - z) = 0"`.
+#' @param class The class prefix the names in `hypothesis` omit.
+#'   Defaults to `"b"`. `NULL` or `""` takes every parameter by its
+#'   full name.
+#' @param group The grouping factor of a group-level class, as
+#'   `class = "sd", group = "site"` tests `sd_site__Intercept` as
+#'   `Intercept`.
 #' @param alpha One minus the credible-interval mass. Defaults
 #'   to `0.05` (90%-CI for one-sided, 95%-CI for two-sided).
-#' @param robust Logical. Use median / MAD instead of mean / SD
+#' @param robust Logical. Use median / MAD in place of mean / SD
 #'   when summarising. Defaults to `FALSE`.
+#' @param seed Seed for the random draws of an evidence ratio, or
+#'   `NULL`.
 #' @param ... Forwarded to `brms::hypothesis`.
 #'
 #' @return A `brmshypothesis` object. See [brms::hypothesis()].
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [brms::hypothesis()], [posterior::as_draws_df()],
-#'   [variables.mvgam()].
+#' @seealso [brms::hypothesis()], [variables.mvgam()].
 #'
 #' @examples
 #' \dontrun{
@@ -123,39 +126,58 @@ rstantools::predictive_interval
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
 #'
-#' mod <- mvgam(y ~ s(x),
+#' mod <- mvgam(y ~ x,
 #'               trend_formula = ~ AR(p = 1),
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Single hypothesis.
-#' hypothesis(mod, "ar1_trend[1] > 0")
+#' # A population-level coefficient, named as fixef() names it.
+#' hypothesis(mod, "x > 0")
 #'
-#' # Multiple hypotheses in one call.
-#' hypothesis(mod, c("ar1_trend[1] > 0",
-#'                    "sigma_trend[1] < 1"))
+#' # Any parameter by its full name.
+#' hypothesis(mod, c("ar1_trend[1] > 0", "sigma_trend[1] < 1"),
+#'            class = NULL)
 #' }
 #'
 #' @importFrom brms hypothesis
 #' @method hypothesis mvgam
 #' @export
-hypothesis.mvgam <- function(x, hypothesis, alpha = 0.05,
-                              robust = FALSE, ...) {
+hypothesis.mvgam <- function(x, hypothesis, class = "b", group = "",
+                             alpha = 0.05, robust = FALSE, seed = NULL,
+                             ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(hypothesis, min.len = 1L,
-                                any.missing = FALSE)
+                              any.missing = FALSE)
+  checkmate::assert_string(class, null.ok = TRUE)
+  checkmate::assert_string(group)
   checkmate::assert_number(alpha, lower = 0, upper = 1)
   checkmate::assert_flag(robust)
-  # Under the raw stanfit names every parameter mvgam aliases is
-  # unreachable: `b_elev` is `b[1]` there, `sd_block__Intercept` is
-  # `sd_1[1]`, and a hypothesis naming either was refused as a
-  # parameter the model does not have.
+  checkmate::assert_count(seed, null.ok = TRUE)
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+  # `brms::hypothesis.brmsfit()` needs the brmsfit internals mvgam
+  # does not store. Its draws come from the projection every draws
+  # method shares, which names `b[1]` as `b_x`.
   draws <- as.data.frame(
     posterior::as_draws_df(extract_mvgam_draws(x))
   )
+  # The prefix `brms::hypothesis.brmsfit()` builds from `class` and
+  # `group`, which a hypothesis leaves off its names
+  prefix <- if (length(class) && nzchar(class)) {
+    paste0(class, if (nzchar(group)) paste0("_", group, "__") else "_")
+  } else {
+    ""
+  }
+  if (nzchar(prefix)) {
+    keep <- startsWith(names(draws), prefix)
+    draws <- stats::setNames(draws[keep],
+                             substring(names(draws)[keep],
+                                       nchar(prefix) + 1L))
+  }
   brms::hypothesis(draws, hypothesis = hypothesis,
-                    alpha = alpha, robust = robust, ...)
+                   alpha = alpha, robust = robust, ...)
 }
 
 

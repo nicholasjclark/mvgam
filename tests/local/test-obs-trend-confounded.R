@@ -81,13 +81,9 @@ series_betas <- grep("^b_series.*_trend$", names(draws), value = TRUE)
 
 
 test_that("the rank check names the pairing this file fits", {
-  m <- mvgam:::stacked_design_matrix(standata(conf))
-  expect_false(is.null(m))
-  norms <- sqrt(colSums(m^2))
-  norms[norms == 0] <- 1
-  q <- qr(sweep(m, 2L, norms, "/"))
-  expect_lt(q$rank, ncol(m))
-  dependent <- colnames(m)[q$pivot[seq.int(q$rank + 1L, ncol(m))]]
+  dependent <- mvgam:::confounded_columns(
+    mvgam:::stacked_design_matrix(standata(conf))
+  )
   expect_match(dependent, "series")
 })
 

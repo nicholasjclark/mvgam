@@ -15,9 +15,9 @@
 #'   (`Estimate`, `Est.Error`, and the lower / upper quantiles
 #'   defined by `probs`). If `FALSE`, return the raw draws as a
 #'   `[n_draws x n_levels x n_coefs]` array per group.
-#' @param robust Logical. When `summary = TRUE`, use the median /
-#'   MAD as the centre / spread instead of the mean / SD. Defaults
-#'   to `FALSE`.
+#' @param robust Logical. When `summary = TRUE` and `robust = TRUE`,
+#'   the median and MAD give the centre and spread. The default
+#'   `FALSE` uses the mean and SD.
 #' @param probs Numeric vector of length 2 with the quantiles to
 #'   report when `summary = TRUE`. Defaults to
 #'   `c(0.025, 0.975)`.
@@ -44,10 +44,9 @@
 #'   factors are of interest.
 #'
 #' @details
-#' Observation-side random effects only. Trend-side group-level
-#' effects (i.e. `(1 | g)` inside `trend_formula`) carry their
-#' positional Stan names rather than the brms-style labels, and
-#' address the same draws under either.
+#' Observation-side group-level effects only. A `(1 | g)` inside
+#' `trend_formula` is named with the `_trend` suffix, as
+#' `r_g_trend[a,Intercept]`, and `as_draws()` returns its draws.
 #'
 #' @author Nicholas J Clark
 #'
@@ -115,22 +114,9 @@ ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
   }
   drws <- extract_mvgam_draws(object)
   n_chains <- posterior::nchains(drws)
-  # Multi-response, nlpar, and dpar grouping rows live under
-  # `<group>__<resp|nlpar|dpar>` in the aliased draws (see
-  # `mvgam_ranef_aliases`). Reuse the same per-row prefix logic
-  # here so the lookup matches the alias output exactly. Each
-  # (group, prefix) pair becomes its own entry in the returned
-  # list, keeping the brms-parity shape on univariate fits
-  # (`prefix == ""`, key = bare group name).
-  reframe$row_prefix <- make_row_prefix(
-    reframe$nlpar, reframe$dpar, reframe$resp
-  )
-  alias_keys <- ifelse(
-    nzchar(reframe$row_prefix),
-    paste0(reframe$group, "__", reframe$row_prefix),
-    reframe$group
-  )
-  reframe$alias_key <- alias_keys
+  # Each (group, predictor) pair is its own entry, keyed as the
+  # aliased draws name it: the bare group on a univariate fit and
+  # `<group>__<prefix>` otherwise.
   keys <- unique(reframe$alias_key)
   if (!is.null(groups)) {
     keys <- intersect(keys, as.character(groups))
@@ -188,10 +174,10 @@ brms::ranef
 #' the same workflow.
 #'
 #' @param x A fitted `mvgam` object.
-#' @param sigma Retained for brms-parity; currently unused on
-#'   `mvgam` fits because the observation-family scale is exposed
-#'   via [posterior_predict()] rather than the residual-sigma
-#'   pathway brms uses. Must be a single positive number.
+#' @param sigma Accepted for compatibility with
+#'   [brms::VarCorr.brmsfit()] and unused. [summary.mvgam()] reports
+#'   the observation family's scale. Must be a single non-negative
+#'   number.
 #' @param summary Logical. If `TRUE` (the default), collapse each
 #'   group's posterior draws to summary statistics; if `FALSE`,
 #'   return the raw draws.
@@ -216,9 +202,9 @@ brms::ranef
 #'     same dimensions as `cor`.
 #'
 #' @details
-#' Observation-side group-level effects only. Trend-side
-#' covariance components carry their positional Stan names rather
-#' than the brms-style labels.
+#' Observation-side group-level effects only. A trend-side
+#' component is named with the `_trend` suffix, as
+#' `sd_g__Intercept_trend`, and `as_draws()` returns its draws.
 #'
 #' @author Nicholas J Clark
 #'
@@ -274,52 +260,35 @@ VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,
   }
   reframe <- meta$reframe
   drws <- extract_mvgam_draws(x)
-  # Mirror ranef.mvgam's per-row prefix logic so the lookup keys
-  # match the alias map for multi-response, nlpar and dpar fits.
-  # Univariate rows have an empty prefix and the key is the bare
-  # group name, preserving the brms-parity list shape.
-  reframe$row_prefix <- make_row_prefix(
-    reframe$nlpar, reframe$dpar, reframe$resp
-  )
-  reframe$alias_key <- ifelse(
-    nzchar(reframe$row_prefix),
-    paste0(reframe$group, "__", reframe$row_prefix),
-    reframe$group
-  )
-  # For sd the alias map writes `sd_<group>__<prefix>_<coef>`
-  # (e.g. `sd_grp__y1_Intercept`) -- see `mvgam_ranef_aliases`.
-  # cor uses the same prefixed coef token.
-  reframe$coef_alias <- ifelse(
-    nzchar(reframe$row_prefix),
-    paste0(reframe$row_prefix, "_", reframe$coef),
-    as.character(reframe$coef)
-  )
   keys <- unique(reframe$alias_key)
   out <- vector("list", length(keys))
   names(out) <- keys
   for (k in keys) {
     rows <- reframe[reframe$alias_key == k, , drop = FALSE]
-    coefs <- as.character(rows$coef)
-    coef_aliases <- as.character(rows$coef_alias)
     g_bare <- rows$group[1L]
+    ids <- split(rows, factor(rows$id, levels = unique(rows$id)))
+    coefs <- unlist(lapply(ids, ranef_rnames, col = "coef"),
+                    use.names = FALSE)
+    coef_aliases <- unlist(lapply(ids, ranef_rnames), use.names = FALSE)
     n_coef <- length(coefs)
-    sd_names <- sprintf("sd_%s__%s", g_bare, coef_aliases)
-    sd_mat <- posterior::as_draws_matrix(
-      posterior::subset_draws(drws, variable = sd_names)
-    )
+    sd_mat <- posterior::as_draws_matrix(posterior::subset_draws(
+      drws, variable = paste0("sd_", g_bare, "__", coef_aliases)
+    ))
     colnames(sd_mat) <- coefs
-    has_cor <- isTRUE(rows$cor[1L]) && n_coef > 1L
+    has_cor <- any(rows$cor) && n_coef > 1L
     group_out <- list(sd = unclass(sd_mat))
     if (has_cor) {
-      # Walk pairs in brms's column-major upper-triangle order
-      # (`cor[choose(k - 1, 2) + j] = Cor[j, k]`).
-      ks <- rep(2:n_coef, times = seq_len(n_coef - 1L))
-      js <- unlist(lapply(2:n_coef, function(k) seq_len(k - 1L)))
-      cor_names <- sprintf("cor_%s__%s__%s", g_bare,
-                            coef_aliases[js], coef_aliases[ks])
-      cor_mat <- posterior::as_draws_matrix(
-        posterior::subset_draws(drws, variable = cor_names)
-      )
+      # A pair brms estimates no correlation for, across two ids or two
+      # levels of a `by` factor, is zero, as `brms::VarCorr()` fills it
+      cor_names <- ranef_cor_names(g_bare, coef_aliases)
+      cor_mat <- matrix(0, nrow = nrow(sd_mat), ncol = length(cor_names),
+                        dimnames = list(NULL, cor_names))
+      found <- intersect(cor_names, posterior::variables(drws))
+      if (length(found)) {
+        cor_mat[, found] <- as.matrix(posterior::as_draws_matrix(
+          posterior::subset_draws(drws, variable = found)
+        ))
+      }
       cor_arr <- assemble_cor_array(cor_mat, n_coef, coefs)
       cov_arr <- assemble_cov_array(group_out$sd, cor_arr, coefs)
       group_out$cor <- cor_arr
@@ -347,6 +316,42 @@ VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,
 #' @importFrom brms VarCorr
 #' @export
 brms::VarCorr
+
+
+# Internal: the names brms gives the coefficients of one group-level
+# id, as `brms:::get_rnames()` builds them. A grouping with a `by`
+# factor, `gr(g, by = f)`, estimates each coefficient once per level
+# of `f`, and each cell is named `<coef>:<f><level>`, the coefficient
+# varying fastest.
+#
+# @param rows The rows of `mvgam_ranef_metadata()`'s table for one id.
+# @param col The column that names the coefficients: `coef_alias`
+#   for a parameter name, `coef` for a label.
+# @return Character vector, one name per cell.
+#'@noRd
+ranef_rnames <- function(rows, col = "coef_alias") {
+  by <- rows$by[1L]
+  coefs <- rows[[col]]
+  if (length(by) == 0L || is.na(by) || !nzchar(by)) {
+    return(coefs)
+  }
+  as.vector(outer(coefs, paste0(by, rows$bylevels[[1L]]), paste,
+                  sep = ":"))
+}
+
+
+# Internal: the names of a group's correlations, in the order brms
+# packs them. brms's stancode writes `cor[choose(k - 1, 2) + j] =
+# Cor[j, k]` for j < k, the upper triangle column by column: for four
+# coefficients the pairs run (1,2), (1,3), (2,3), (1,4), (2,4), (3,4).
+# `assemble_cor_array()` unpacks them in the same order.
+#'@noRd
+ranef_cor_names <- function(group, coef_alias) {
+  n <- length(coef_alias)
+  ks <- rep(2:n, times = seq_len(n - 1L))
+  js <- unlist(lapply(2:n, function(k) seq_len(k - 1L)))
+  sprintf("cor_%s__%s__%s", group, coef_alias[js], coef_alias[ks])
+}
 
 
 # Internal: build [n_draws x size x size] symmetric correlation

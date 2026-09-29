@@ -18,8 +18,9 @@
 \item{probs}{Numeric vector of length 2 specifying quantile probabilities
 for credible intervals. Default is \code{c(0.025, 0.975)} for 95\% intervals.}
 
-\item{robust}{Logical; if \code{TRUE}, use median and MAD instead of mean
-and SD as measures of central tendency and spread. Default is \code{FALSE}.}
+\item{robust}{Logical; if \code{TRUE}, the median and MAD measure
+central tendency and spread. The default \code{FALSE} uses the mean
+and SD.}
 
 \item{include_betas}{Logical; if \code{TRUE} (the default), print every
 per-cell expansion of the trend-side dynamic parameters
@@ -38,15 +39,33 @@ still be pulled via \code{as.matrix()},
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-An object of class \code{summary.mvgam} containing:
+An object of class \code{mvgam_summary}. Each block is a
+data frame of the columns below, one row per parameter, named as
+\pkg{brms} prints it, and is absent when the model has none. The
+observation model's blocks are:
 \describe{
-\item{\code{fixed}}{Fixed effect parameter summaries}
-\item{\code{smooth}}{Smooth (GAM) parameter summaries}
-\item{\code{spec}}{Family-specific parameter summaries (sigma, shape, etc.)}
-\item{\code{trend}}{Trend model parameter summaries}
-\item{\code{loadings}}{Factor loading (Z matrix) summaries}
-\item{Metadata}{Formula, family, sampling information}
+\item{\code{smooth}}{Smoothing standard deviations, one row per
+penalty of each smooth. The basis coefficients are available by
+name from \code{as_draws(object, variable = "^s_", regex =
+    TRUE)}.}
+\item{\code{gp}}{Gaussian-process marginal standard deviations
+and length-scales.}
+\item{\code{random}}{Group-level standard deviations and
+correlations, as a list of tables named by grouping factor.
+\code{ngrps} gives each factor's number of levels, and
+\code{ranef()} the per-level effects.}
+\item{\code{fixed}}{Regression coefficients, those of every
+distributional parameter given a formula among them.}
+\item{\code{mo}}{The simplex of each monotonic effect.}
+\item{\code{spec}}{Family parameters without a formula of their
+own, such as \code{sigma} or \code{shape}.}
 }
+The trend model's blocks take the same names with the prefix
+\code{trend_}, joined by \code{trend_spec} for the trend's
+dynamics, \code{loadings} for the factor loadings and
+\code{loadings_prior} for the hyperparameters of their prior. The
+formula, family, draw counts and data dimensions are stored with
+them.
 }
 \description{
 Provides posterior summary statistics for mvgam model parameters, organized
@@ -74,9 +93,7 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# `include_betas = FALSE` keeps the printed summary readable when
-# the model carries many smooth coefficients.
-summary(mod, include_betas = FALSE)
+summary(mod)
 }
 
 }

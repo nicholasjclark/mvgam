@@ -393,24 +393,16 @@ plot.mvgam_stability_summary <- function(
   ...
 ) {
   checkmate::assert_class(x, "mvgam_stability_summary")
-  checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
   checkmate::assert_flag(intervals)
   rlang::check_dots_empty()
-  keep <- intersect(variables, x$metric)
-  if (!length(keep)) {
-    stop(insight::format_error(c(
-      "None of the requested 'variables' were found in 'x'.",
-      i = paste0("Available metrics: ",
-                 paste(x$metric, collapse = ", "), ".")
-    )))
-  }
-  dat <- x[x$metric %in% keep, , drop = FALSE]
-  dat$metric <- factor(dat$metric, levels = keep)
-  bounds <- grep("^Q", colnames(dat), value = TRUE)
+  keep <- resolve_stability_metrics(variables, x$metric)
   set_color_scheme_local("red")
 
   counts <- attr(x, "bin_counts")
   if (intervals || is.null(counts)) {
+    dat <- x[x$metric %in% keep, , drop = FALSE]
+    dat$metric <- factor(dat$metric, levels = keep)
+    bounds <- grep("^Q", colnames(dat), value = TRUE)
     return(
       ggplot2::ggplot(
         dat, ggplot2::aes(x = .data$metric, y = .data$Estimate)
@@ -426,37 +418,7 @@ plot.mvgam_stability_summary <- function(
         mvgam_theme()
     )
   }
-
-  # Rebuild the bars from the stored edges and counts. Each bar is
-  # drawn at its own midpoint and width so an uneven final bin is not
-  # silently widened to match the rest.
-  long <- do.call(rbind, lapply(keep, function(v) {
-    b <- counts[[v]]
-    if (is.null(b) || !length(b$counts)) {
-      return(NULL)
-    }
-    lower <- utils::head(b$breaks, -1L)
-    upper <- utils::tail(b$breaks, -1L)
-    data.frame(
-      metric = v,
-      mid = (lower + upper) / 2,
-      width = upper - lower,
-      count = b$counts,
-      stringsAsFactors = FALSE
-    )
-  }))
-  long$metric <- factor(long$metric, levels = keep)
-  ggplot2::ggplot(long, ggplot2::aes(x = .data$mid, y = .data$count)) +
-    ggplot2::geom_col(
-      ggplot2::aes(width = .data$width),
-      fill = mvgam_palette()[4L],
-      colour = "white"
-    ) +
-    ggplot2::geom_vline(xintercept = 0, linetype = "dashed",
-                        colour = "grey30") +
-    ggplot2::facet_wrap(~ metric, scales = "free", nrow = 1L) +
-    ggplot2::labs(x = "Posterior draw", y = "Frequency") +
-    mvgam_theme()
+  stability_histogram(counts[keep])
 }
 
 
@@ -464,9 +426,9 @@ plot.mvgam_stability_summary <- function(
 #'
 #' Renders a faceted histogram of the reactivity, mean return rate
 #' and variance return rate posterior draws returned by
-#' `stability.mvgam()`. A dashed reference line at zero marks the
-#' reactivity threshold above which shocks are amplified rather
-#' than absorbed.
+#' `stability.mvgam()`. A dashed reference line at zero on the
+#' reactivity panel marks the threshold above which the system
+#' amplifies a shock before it decays.
 #'
 #' @param x A `mvgam_stability` object returned by [stability()].
 #' @param variables Character vector picking which columns of `x`
@@ -474,7 +436,7 @@ plot.mvgam_stability_summary <- function(
 #'   metrics (`"reactivity"`, `"mean_return_rate"`,
 #'   `"var_return_rate"`); pass any subset of `x`'s column names
 #'   to widen or narrow the panel set.
-#' @param bins Number of histogram bins passed to `geom_histogram`.
+#' @param bins Number of histogram bins.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
@@ -482,8 +444,6 @@ plot.mvgam_stability_summary <- function(
 #'   [plot.mvgam_irf()], [plot.mvgam_fevd()],
 #'   [plot.mvgam_forecast()]
 #' @method plot mvgam_stability
-#' @importFrom ggplot2 ggplot aes geom_histogram geom_vline
-#'   facet_wrap labs
 #' @export
 plot.mvgam_stability = function(
   x,
@@ -492,12 +452,30 @@ plot.mvgam_stability = function(
   ...
 ) {
   checkmate::assert_class(x, "mvgam_stability")
-  checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
   checkmate::assert_int(bins, lower = 5L)
   rlang::check_dots_empty()
-  # A metric that is not there is refused by name. Plotting the ones
-  # that are drew fewer panels than were asked for.
-  unknown <- setdiff(variables, colnames(x))
+  keep <- resolve_stability_metrics(variables, colnames(x))
+  # The red scheme `irf()`, `fevd()` and `forecast()` plots use,
+  # restored when the call returns.
+  set_color_scheme_local("red")
+  stability_histogram(lapply(stats::setNames(keep, keep), function(v) {
+    bin_draws(x[[v]], bins)
+  }))
+}
+
+
+#' The stability metrics a plot was asked for
+#'
+#' A metric that is not there is refused by name. Plotting the ones
+#' that are drew fewer panels than were asked for.
+#'
+#' @param variables The metrics requested
+#' @param available The metrics the object holds
+#' @return `variables`, deduplicated
+#' @noRd
+resolve_stability_metrics <- function(variables, available) {
+  checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
+  unknown <- setdiff(variables, available)
   if (length(unknown)) {
     stop(insight::format_error(c(
       "Some requested 'variables' are not stability metrics.",
@@ -505,31 +483,51 @@ plot.mvgam_stability = function(
         "Not found: ", paste0("'", unknown, "'", collapse = ", "), "."
       ),
       i = paste0(
-        "Available metrics: ",
-        paste(colnames(x), collapse = ", "), "."
+        "Available metrics: ", paste(available, collapse = ", "), "."
       )
     )), call. = FALSE)
   }
-  keep <- unique(variables)
-  # Force the house red scheme for the duration of this call so
-  # stability sits in the same visual family as irf() / fevd() /
-  # forecast() plots.
-  set_color_scheme_local("red")
-  long <- do.call(rbind, lapply(keep, function(v) {
-    data.frame(metric = v, value = x[[v]])
+  unique(variables)
+}
+
+
+#' Faceted histogram of binned stability metrics
+#'
+#' Each bar is drawn at its own midpoint and width, which keeps an
+#' uneven final bin its true width. Zero is a threshold for reactivity
+#' alone, and the reference line is drawn on that panel only. Drawn on
+#' a return rate, it squeezed the posterior into the edge of its panel.
+#'
+#' @param counts Named list of `bin_draws()` results, one per metric
+#' @return A `ggplot` object
+#' @noRd
+stability_histogram <- function(counts) {
+  long <- do.call(rbind, lapply(names(counts), function(v) {
+    b <- counts[[v]]
+    if (is.null(b) || !length(b$counts)) {
+      return(NULL)
+    }
+    lower <- utils::head(b$breaks, -1L)
+    upper <- utils::tail(b$breaks, -1L)
+    data.frame(metric = v, mid = (lower + upper) / 2,
+               width = upper - lower, count = b$counts,
+               stringsAsFactors = FALSE)
   }))
-  long$metric <- factor(long$metric, levels = keep)
-  ggplot2::ggplot(long, ggplot2::aes(x = value)) +
-    ggplot2::geom_histogram(
-      bins = bins,
+  long$metric <- factor(long$metric, levels = names(counts))
+  threshold <- data.frame(
+    metric = factor(intersect("reactivity", names(counts)),
+                    levels = names(counts)),
+    x = 0
+  )
+  ggplot2::ggplot(long, ggplot2::aes(x = .data$mid, y = .data$count)) +
+    ggplot2::geom_col(
+      ggplot2::aes(width = .data$width),
       fill = mvgam_palette()[4L],
       colour = "white"
     ) +
-    ggplot2::geom_vline(
-      xintercept = 0,
-      linetype = "dashed",
-      colour = "grey30"
-    ) +
+    ggplot2::geom_vline(data = threshold,
+                        ggplot2::aes(xintercept = .data$x),
+                        linetype = "dashed", colour = "grey30") +
     ggplot2::facet_wrap(~ metric, scales = "free", nrow = 1L) +
     ggplot2::labs(x = "Posterior draw", y = "Frequency") +
     mvgam_theme()

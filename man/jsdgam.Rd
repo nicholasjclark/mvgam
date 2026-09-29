@@ -28,7 +28,7 @@ jsdgam(
 \arguments{
 \item{formula}{A \code{formula} object specifying the GAM observation
 model formula. These behave exactly like the formula for a GLM
-except that smooth terms (\code{s()}, \code{te()}, \code{ti()}, \code{t2()}),
+except that smooth terms (\code{s()}, \code{t2()}),
 nonparametric \code{gp()} terms and \code{offset()} can be added to the
 right-hand side. Time-varying effects are expressed as
 \code{s(time, by = X)} or \code{gp(time, by = X)}. \code{gp()} accepts
@@ -39,8 +39,8 @@ prediction at newdata; exact \code{gp()} terms emit a one-shot
 warning to that effect.}
 
 \item{factor_formula}{A \code{formula} for the latent factors' linear
-predictor. Use \code{by = lv_axis()} inside \code{s()}, \code{te()}, \code{ti()},
-\code{t2()}, or \code{gp()} terms to fit a separate smooth per latent
+predictor. Use \code{by = lv_axis()} inside \code{s()}, \code{t2()} or \code{gp()}
+terms to fit a separate smooth per latent
 factor. The legacy spelling \code{by = trend} is still accepted and
 emits a one-time deprecation warning before being rewritten to
 \code{by = lv_axis()} internally. The companion sentinel \code{lv_axis()}
@@ -251,9 +251,7 @@ mod <- jsdgam(
   silent         = 2
 )
 
-# `include_betas = FALSE` keeps the printed summary readable
-# when the model carries many smooth coefficients.
-summary(mod, include_betas = FALSE)
+summary(mod)
 
 # Marginal env effect on the response (occupancy * detection)
 # scale. Pass `type = "link"` for the logit-occupancy scale,

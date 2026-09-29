@@ -17,9 +17,8 @@
 # model that comes back is not the model that was asked for.
 mvgam_removed_args <- c(
   share_obs_params = paste0(
-    "the observation family's parameters are shared across series by ",
-    "default; for one set per series, write a distributional formula ",
-    "such as 'bf(y ~ x, sigma ~ series)'"
+    "a distributional formula such as 'bf(y ~ x, sigma ~ series)' ",
+    "gives each series its own family parameters"
   ),
   trend_model = paste0(
     "trend constructors are written inside 'trend_formula', as in ",
@@ -108,12 +107,9 @@ reject_removed_args <- function(dots, fn = "mvgam") {
       "{cli::qty(found)}{?This argument was/These arguments were} ",
       "removed in mvgam 2.0."
     ),
-    i = paste0(
-      paste0(
-        "For '", found, "', ", mvgam_removed_args[found],
-        collapse = ". "
-      ),
-      "."
+    stats::setNames(
+      paste0("For '", found, "', ", mvgam_removed_args[found], "."),
+      rep("i", length(found))
     )
   )))
 }
@@ -1185,7 +1181,8 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
         obs_priors      = obs_setup$prior,
         trend_priors    = trend_setup$prior,
         user_prior      = user_prior,
-        combined_stancode = combined_stancode %||% obs_setup$stancode
+        combined_stancode = combined_stancode %||% obs_setup$stancode,
+        trend_stancode  = trend_setup$stancode
       ),
       # The frame the user supplied. `mvgam()` adds a placeholder
       # column when the observation formula has no terms, and brms
@@ -1376,7 +1373,8 @@ create_mvgam_stub_from_stan_components <- function(
         obs_priors      = obs_setup$prior,
         trend_priors    = trend_setup$prior,
         user_prior      = user_prior,
-        combined_stancode = stan_components$combined_components$stancode
+        combined_stancode = stan_components$combined_components$stancode,
+        trend_stancode  = trend_setup$stancode
       ),
       data = drop_obs_placeholder(obs_setup$data %||% data),
       test_data = newdata,

@@ -117,7 +117,7 @@ test_that("Smooth term renders f_{x}(x) inline + basis decomposition", {
   expect_true(grepl("f_\\{x\\}\\(x_\\{i,t\\}\\)", out))
   expect_true(grepl("\\\\beta\\^\\{\\(x\\)\\}_k", out))
   expect_true(grepl("B_k\\(x\\)", out))
-  expect_true(grepl("\\\\lambda_\\{x\\}", out))
+  expect_true(grepl("\\\\sigma\\^\\{\\(s\\)\\}_\\{x\\}", out))
 })
 
 test_that("Approximate 1D GP renders with kernel + length scale + marginal SD", {
@@ -463,11 +463,11 @@ test_that("family_distribution_text covers core brms families", {
   expect_equal(ft("lognormal", mu, NULL),
                "\\text{LogNormal}(\\mu, \\sigma)")
   expect_equal(ft("gamma", mu, NULL),
-               "\\text{Gamma}(\\alpha, \\mu)")
+               "\\text{Gamma}(\\varphi, \\mu)")
   expect_equal(ft("beta", mu, NULL),
                "\\text{Beta}(\\mu, \\phi)")
   expect_equal(ft("negbinomial", mu, NULL),
-               "\\text{NegBin}(\\mu, \\phi)")
+               "\\text{NegBin}(\\mu, \\varphi)")
 })
 
 test_that("family_distribution_text covers tweedie + hurdle + ZI", {
@@ -476,20 +476,20 @@ test_that("family_distribution_text covers tweedie + hurdle + ZI", {
   expect_equal(ft("tweedie", mu, NULL),
                "\\text{Tweedie}(\\mu, \\phi, \\xi)")
   expect_equal(ft("hurdle_poisson", mu, NULL),
-               "\\text{Hurdle-Poisson}(\\mu, \\pi_{\\text{hu}})")
+               "\\text{Hurdle-Poisson}(\\mu, \\pi^{(\\text{hu})})")
   expect_equal(
     ft("hurdle_negbinomial", mu, NULL),
-    "\\text{Hurdle-NegBin}(\\mu, \\phi, \\pi_{\\text{hu}})"
+    "\\text{Hurdle-NegBin}(\\mu, \\varphi, \\pi^{(\\text{hu})})"
   )
   expect_equal(ft("zero_inflated_poisson", mu, NULL),
-               "\\text{ZIPoisson}(\\mu, \\pi_{\\text{zi}})")
+               "\\text{ZIPoisson}(\\mu, \\pi^{(\\text{zi})})")
   expect_equal(
     ft("zero_inflated_negbinomial", mu, NULL),
-    "\\text{ZINegBin}(\\mu, \\phi, \\pi_{\\text{zi}})"
+    "\\text{ZINegBin}(\\mu, \\varphi, \\pi^{(\\text{zi})})"
   )
   expect_equal(
     ft("zero_inflated_binomial", mu, NULL),
-    "\\text{ZIBinomial}(n_{i,t}, \\mu, \\pi_{\\text{zi}})"
+    "\\text{ZIBinomial}(n_{i,t}, \\mu, \\pi^{(\\text{zi})})"
   )
 })
 
@@ -547,7 +547,7 @@ test_that("format_prior_distribution maps every common brms family", {
   expect_equal(fmt("cauchy(0, 5)"), "\\text{Cauchy}(0, 5)")
   expect_equal(fmt("beta(1, 1)"), "\\text{Beta}(1, 1)")
   expect_equal(fmt("uniform(-1, 1)"), "\\text{Uniform}(-1, 1)")
-  expect_equal(fmt("lkj_corr_cholesky(1)"), "\\text{LKJCholesky}(1)")
+  expect_equal(fmt("lkj_corr_cholesky(1)"), "\\text{LKJCorr}(1)")
   expect_equal(fmt("(flat)"), "\\text{flat}")
   expect_equal(fmt(""), "\\text{flat}")
 })
@@ -610,9 +610,9 @@ test_that("Factor model (n_lv > 0) emits decomposition + iid Z + QR", {
     "\\\\sum_\\{k=1\\}\\^\\{2\\} Z_\\{i,k\\} \\\\tilde\\\\eta_\\{k,t\\}",
     out
   ))
-  # iid default Z prior.
+  # The priors section states the stored iid prior on the loadings.
   expect_true(grepl(
-    "Z_\\{i,k\\} &\\\\sim \\\\text\\{Student-t\\}\\(3, 0, 0\\.5\\)",
+    "Z_\\{i,k\\} &\\\\sim \\\\text\\{StudentT\\}\\(3, 0, 0\\.5\\)",
     out
   ))
   # In factor mode the latent dynamics are on tilde-eta_{k,t}.
@@ -626,32 +626,21 @@ test_that("Factor model (n_lv > 0) emits decomposition + iid Z + QR", {
   expect_false(grepl("\\\\tilde Z", out))
 })
 
-test_that("MGP loadings_prior emits varrho + Psi rows + Normal(0, sqrt(Psi))", {
-  # n_lv = 2 forces a non-trivial column shrinkage.
-  mod <- make_methods_md_prefit(
-    y ~ x, trend_formula = ~ AR(p = 1, n_lv = 2)
+test_that("MGP loadings scale the factor innovations by sqrt(Psi_k)", {
+  set.seed(1L)
+  d <- data.frame(
+    time = rep(1:30, 4), series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = rnorm(120), y = rpois(120, 3)
   )
-  # Inject the MGP loadings spec on the prefit's trend spec (the
-  # canonical pre-fit location) so the renderer dispatches to the
-  # MGP branch without needing a full Stan run.
-  mod$mv_spec$trend_specs$loadings_prior_spec <- list(
-    features_mat   = NULL,
-    distance_mats  = list(),
-    column_shrinkage = "mgp",
-    mgp_a1 = 2, mgp_a2 = 3,
-    n_series = 4L, N_features_trend = 0L, n_distances = 0L
-  )
+  mod <- mvgam(y ~ x, trend_formula = ~ AR(p = 1, n_lv = 2), data = d,
+               family = poisson(), run_model = FALSE, silent = 2,
+               loadings_prior = list(column_shrinkage = "mgp"))
   out <- methods_md(mod)
-  expect_true(grepl(
-    "\\\\varrho_1 &\\\\sim \\\\text\\{InvGamma\\}\\(a_1, 1\\)", out
-  ))
-  expect_true(grepl(
-    "\\\\Psi_k &= \\\\prod_\\{l \\\\le k\\} \\\\varrho_l", out
-  ))
-  expect_true(grepl(
-    "Z_\\{i,k\\} &\\\\sim \\\\text\\{Normal\\}\\(0, \\\\sqrt\\{\\\\Psi_k\\}\\)",
-    out
-  ))
+  # Stan draws Z at unit scale and scales the factor innovations by
+  # sqrt(Psi_k), with Psi_k the cumulative product of `varrho_inv`.
+  expect_true(grepl("\\\\Psi_k &= \\\\prod_\\{l \\\\le k\\} \\\\varrho_l", out))
+  expect_true(grepl("Normal\\}\\(0, \\\\sqrt\\{\\\\Psi_k\\}\\)", out))
+  expect_true(grepl("\\\\varrho_\\{1\\} &\\\\sim \\\\text\\{InvGamma\\}\\(a_1, 1\\)", out))
 })
 
 test_that("loadings_prior features + distances kernel emits kernel rows", {
@@ -983,11 +972,13 @@ test_that("mvbind rescor priors carry response superscripts", {
   out <- methods_md(mod)
   expect_true(grepl("\\\\sigma\\^\\{\\(yA\\)\\}", out))
   expect_true(grepl("\\\\sigma\\^\\{\\(yB\\)\\}", out))
-  expect_true(grepl("\\\\mathbf\\{L\\}_\\{\\\\text\\{rescor\\}\\}", out))
-  expect_true(grepl("\\\\text\\{LKJCholesky\\}", out))
+  # The prior on the Cholesky factor is stated on the matrix it builds.
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\Omega\\} &\\\\sim \\\\text\\{LKJCorr\\}", out
+  ))
 })
 
-test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
+test_that("mvn() emits MVNormal with a diagonal Sigma", {
   set.seed(1L)
   K <- 3L; n_sites <- 6L
   d <- expand.grid(
@@ -1018,7 +1009,7 @@ test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
   # Every loading is sampled, which fixes the factor correlation at
   # the identity. The program has no LKJ prior and the write-up
   # renders none.
-  expect_false(grepl("LKJCholesky", out))
+  expect_false(grepl("LKJ", out, fixed = TRUE))
 })
 
 

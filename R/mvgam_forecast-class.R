@@ -21,7 +21,9 @@
 #'     `levels(data$series)` in the original model fit.
 #'
 #'   \item `train_observations`, `train_times` Lists of length `n_series`
-#'     holding the training response vectors and their unique time grids.
+#'     holding the training responses and the time of each hindcast
+#'     column. A closure-unit family's `"expected"` and `"response"`
+#'     hindcasts have one column per visit, and their times repeat.
 #'
 #'   \item `test_observations`, `test_times` If `forecast()` produced the
 #'     object, the corresponding test response vectors and time grids.
@@ -187,16 +189,14 @@ summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
 #' @export
 print.mvgam_forecast <- function(x, ...) {
   n_series <- length(x$series_names)
-  n_train <- if (!is.null(x$hindcasts) && length(x$hindcasts) > 0L) {
-    ncol(x$hindcasts[[1L]])
-  } else {
-    0L
+  # The count is of occasions. A closure-unit hindcast has one column
+  # per visit and several visits on each occasion.
+  n_occasions <- function(draws, times) {
+    if (length(draws) == 0L) return(0L)
+    if (is.null(times)) ncol(draws[[1L]]) else length(unique(times[[1L]]))
   }
-  n_test <- if (!is.null(x$forecasts) && length(x$forecasts) > 0L) {
-    ncol(x$forecasts[[1L]])
-  } else {
-    0L
-  }
+  n_train <- n_occasions(x$hindcasts, x$train_times)
+  n_test <- n_occasions(x$forecasts, x$test_times)
   n_draws <- if (!is.null(x$hindcasts) && length(x$hindcasts) > 0L) {
     nrow(x$hindcasts[[1L]])
   } else if (!is.null(x$forecasts) && length(x$forecasts) > 0L) {

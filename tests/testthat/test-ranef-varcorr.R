@@ -1,5 +1,5 @@
 # CI-safe tests for the random-effect alias helpers
-# (mvgam_ranef_aliases / apply_mvgam_beta_aliases path) and the
+# (mvgam_ranef_aliases / apply_mvgam_aliases path) and the
 # ranef.mvgam / VarCorr.mvgam S3 surface. Numerical concordance
 # against brms lives in tests/local/. Here we lock in the gate
 # (no-RE fits return empty maps cheaply), the map shape on a
@@ -146,6 +146,33 @@ test_that("mvgam_ranef_aliases handles multiple grouping factors", {
   expect_true("sd_site__Intercept" %in% names(map))
   # No cor blocks (intercept-only).
   expect_false(any(grepl("^cor_", names(map))))
+})
+
+
+test_that("by-factor and multivariate dpar groupings take brms's names", {
+  set.seed(23L)
+  n_obs <- 40L
+  df <- data.frame(
+    y = rnorm(n_obs), y2 = rnorm(n_obs), x = rnorm(n_obs),
+    g = factor(sample(letters[1:4], n_obs, replace = TRUE))
+  )
+  # `gr(by = )` nests each level of `g` in one level of `f`
+  df$f <- factor(ifelse(df$g %in% c("a", "b"), "A", "B"))
+  # `gr(g, by = f)` fits one sd matrix column and one correlation
+  # vector per level of `f`
+  by_map <- mvgam_ranef_aliases(
+    ranef_stub(brms::bf(y ~ x + (1 + x | gr(g, by = f))), df)
+  )
+  expect_identical(by_map[["sd_g__x:fB"]], "sd_1[2,2]")
+  expect_identical(by_map[["cor_g__Intercept:fB__x:fB"]], "cor_1_2[1]")
+  # brms joins the dpar and the response: `sigma_y`, not `sigma`
+  mv_map <- mvgam_ranef_aliases(ranef_stub(
+    brms::bf(y ~ x, sigma ~ (1 | g)) + brms::bf(y2 ~ x) +
+      brms::set_rescor(FALSE),
+    df
+  ))
+  expect_identical(mv_map[["sd_g__sigma_y_Intercept"]], "sd_1[1]")
+  expect_identical(mv_map[["r_g__sigma_y[a,Intercept]"]], "r_1_sigma_y_1[1]")
 })
 
 
@@ -417,9 +444,9 @@ test_that("a trend-side random effect is named, not numbered", {
 })
 
 
-# ---- apply_mvgam_beta_aliases composition --------------------------
+# ---- apply_mvgam_aliases composition --------------------------
 
-test_that("apply_mvgam_beta_aliases handles a combined beta + ranef map", {
+test_that("apply_mvgam_aliases handles a combined beta + ranef map", {
   vars <- c("b[1]", "r_1[1,1]", "sd_1[1]", "cor_1[1]", "lp__")
   alias_map <- c(
     "b_x"                   = "b[1]",
@@ -427,7 +454,7 @@ test_that("apply_mvgam_beta_aliases handles a combined beta + ranef map", {
     "sd_grp__Intercept"     = "sd_1[1]",
     "cor_grp__Intercept__x" = "cor_1[1]"
   )
-  out <- apply_mvgam_beta_aliases(vars, alias_map)
+  out <- apply_mvgam_aliases(vars, alias_map)
   expect_identical(
     out,
     c(

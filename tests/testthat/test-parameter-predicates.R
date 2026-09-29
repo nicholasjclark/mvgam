@@ -121,7 +121,8 @@ test_that("the trend suffix decides which block a parameter prints in", {
             "sigma_trend[1]", "ar1_trend[1]", "b_x_trend")
   # Observation-side effects keep the coefficients the user asked for.
   expect_identical(
-    pars[match_fixed_pars(pars, character())],
+    pars[mvgam_par_kind(pars) == "beta" &
+           mvgam_par_side(pars) == "observation"],
     c("b_Intercept", "b_x", "b_pre_trend_score", "b_trending")
   )
   # The trend block holds only what the trend model emitted.
@@ -327,4 +328,25 @@ test_that("an autoregressive coefficient is told from its hyperparameters", {
   # As are the indexed draws and anything merely starting the same way.
   expect_false(any(is_ar_coefficient(c("ar1_trend[1]", "ar_trend",
                                        "artefact_trend"))))
+})
+
+
+test_that("a smooth object takes the label brms gives it", {
+  # `brms:::frame_sm()` joins the covariates and the `by` variable,
+  # strips punctuation and appends each object's `by` level.
+  by <- list(term = "s(time, by = series)", covars = "time",
+             by_var = "series", bylevels = c("DM", "a-b"))
+  expect_equal(brms_smooth_labels(by),
+               c("stimeseriesDM", "stimeseriesaMb"))
+})
+
+
+test_that("every family and loadings-prior parameter has a kind", {
+  # A name of no kind reached no summary block and printed nowhere
+  family <- c("p", "Psi[2]", "quantile", "disc", "sigma_y2", "theta1")
+  expect_true(all(mvgam_par_kind(family) == "family"))
+  prior <- c("theta_features[1]", "theta_dist_phylo", "Psi_diag[1]")
+  expect_true(all(mvgam_par_kind(prior) == "loadings_prior"))
+  working <- c("varrho_inv[1]", "Z_cols[1,1]", "L_Phi_loadings[1,1]")
+  expect_true(all(mvgam_par_kind(working) == "internal"))
 })

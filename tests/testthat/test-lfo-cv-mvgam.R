@@ -87,15 +87,6 @@ test_that("deprecated data arg forwards to newdata with warning", {
     log_lik = function(object, ...) {
       matrix(stats::rnorm(5L * nrow(newdat)),
              nrow = 5L, ncol = nrow(newdat))
-    },
-    forecast = function(object, ...) {
-      list(forecasts = setNames(
-        list(matrix(0, nrow = 5L, ncol = 1L)),
-        levels(newdat$series)
-      ))
-    },
-    score = function(object, score, ...) {
-      list(all_series = data.frame(score = 0))
     }
   )
   expect_warning(
@@ -107,44 +98,6 @@ test_that("deprecated data arg forwards to newdata with warning", {
 
 
 # ----- Return-shape contract --------------------------------------
-
-# Helper: stub the primitives so a small mock fit can roll through
-# lfo_cv end-to-end without any real Stan calls.
-stub_lfo_primitives <- function(fit, ndraws = 5L,
-                                 pareto_k = 0.2,
-                                 loglik_fill = -1.0) {
-  newdat <- fit$data
-  n_obs <- nrow(newdat)
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      matrix(loglik_fill, nrow = ndraws, ncol = n_obs)
-    },
-    forecast = function(object, ..., newdata = NULL) {
-      n_h <- if (is.null(newdata)) 1L else
-        length(unique(newdata[[
-          object$trend_metadata$axes$vars$time_var
-        ]]))
-      n_series <- length(levels(object$data[[
-        object$trend_metadata$axes$vars$series_var
-      ]]))
-      fmats <- replicate(n_series,
-                          matrix(0, nrow = ndraws, ncol = n_h),
-                          simplify = FALSE)
-      names(fmats) <- levels(object$data[[
-        object$trend_metadata$axes$vars$series_var
-      ]])
-      list(forecasts = fmats)
-    },
-    score = function(object, score, ...) {
-      list(all_series = data.frame(score = 1.0))
-    },
-    .package = c("mvgam", "mvgam", "mvgam", "mvgam"),
-    .env = parent.frame()
-  )
-  invisible(NULL)
-}
-
 
 test_that("Return object has all documented mvgam_lfo slots", {
   fit <- make_lfo_mock(n_time = 35L)
@@ -287,21 +240,27 @@ test_that("print.mvgam_lfo runs without error and returns invisibly", {
 
 # ----- Multi-series ----------------------------------------------
 
-test_that("lfo_cv runs on a 2-series fit", {
+test_that("lfo_cv runs on a 2-series fit with a gap in sampling", {
   fit <- make_lfo_mock(n_time = 35L, n_series = 2L)
   ndraws <- 5L
   newdat <- fit$data
+  # Neither series was sampled at time 31. `log_lik()` returns a
+  # missing density in every draw for an `NA` response.
   testthat::local_mocked_bindings(
     update.mvgam = function(object, ...) object,
     log_lik = function(object, ...) {
-      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
+      ll <- matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
+      ll[, newdat$time == 31L] <- NA_real_
+      ll
     }
   )
   out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
                  score = "elpd", silent = 2L)
-  expect_s3_class(out, "mvgam_lfo")
-  expect_identical(length(out$eval_timepoints), 5L)
   expect_identical(length(out$elpds), 5L)
+  # Nothing was observed between the refit and time 32. That fold
+  # has no importance ratio and no Pareto k, where `loo::psis()`
+  # refused the all-missing ratio.
+  expect_identical(is.na(out$pareto_ks), c(TRUE, TRUE, FALSE, FALSE, FALSE))
 })
 
 
@@ -521,8 +480,11 @@ test_that("plot.mvgam_lfo draws a panel per score without notices", {
   # this suite, which is what holds the fix.
   scored <- mk_mvgam_lfo(c(-2, -2.5, -3))
   scored$scores <- list(crps = c(1.1, 1.4, 0.9), sis = c(2, 3, 4))
+  # The first fold is scored on a fresh refit and has no Pareto k.
+  # ggplot warned on rendering it until the method dropped it.
+  scored$pareto_ks[1L] <- NA_real_
   g <- plot(scored)
-  expect_s3_class(g, "ggplot")
+  expect_no_warning(ggplot2::ggplot_build(g))
   expect_identical(
     unique(g$data$facet), c("Pareto K", "ELPD", "CRPS", "SIS")
   )

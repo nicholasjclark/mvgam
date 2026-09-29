@@ -82,6 +82,10 @@ test_that("as.matrix.mvgam(variable = 'betas') extracts b_* only", {
   # order the selection declared. Comparing the sets alone passed on
   # a permutation.
   expect_identical(colnames(out), c("b_Intercept", "b_x"))
+  # The set `brms::fixef()` reports: the unpenalised smooth part is
+  # in, the monotonic simplex is not
+  smooth_stub <- make_mvgam_stub(c("b_Intercept", "bs_sx_1", "simo_mox1[1]"))
+  expect_identical(rownames(fixef(smooth_stub)), c("Intercept", "sx_1"))
 })
 
 test_that("as.matrix.mvgam(variable = 'trend_betas') extracts b_trend[", {
@@ -110,15 +114,6 @@ test_that("as.matrix.mvgam(variable = 'trend_smooth_params') matches _trend", {
   expect_equal(colnames(out), "sds_sz_1_trend")
 })
 
-test_that("trend_params on obs-only fit picks top-level dynamics", {
-  stub <- make_mvgam_stub()
-  stub$trend_formula <- NULL
-  out <- as.matrix(stub, variable = "trend_params")
-  expect_true("sigma" %in% colnames(out))
-  expect_false("trend[1,1]" %in% colnames(out))
-  expect_false("innovations_trend[1,1]" %in% colnames(out))
-})
-
 test_that("trend_params on trend-formula fit picks _trend block", {
   stub <- make_mvgam_stub()
   stub$trend_formula <- ~AR(p = 1)
@@ -132,6 +127,8 @@ test_that("trend_params on trend-formula fit picks _trend block", {
   expect_false("b_x_trend" %in% colnames(out))
   expect_false("Intercept_trend" %in% colnames(out))
   expect_false("innovations_trend[1,1]" %in% colnames(out))
+  # The observation family's scale belongs to the other side
+  expect_false("sigma" %in% colnames(out))
   expect_false("sds_sz_1_trend" %in% colnames(out))
 })
 
@@ -534,6 +531,21 @@ test_that("lift keeps every latent state out of the prior table", {
   )
   out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
   expect_equal(nrow(out), 0L)
+})
+
+
+test_that("lift keeps one row per parameter the table holds", {
+  # The trend's brms model writes a user's `b_trend` prior into the
+  # program, and the stored table already has the row brms validated.
+  base <- brms::prior_string("std_normal()", class = "b_trend")
+  base$source <- "user"
+  sc <- "lprior += std_normal_lpdf(b_trend);"
+  expect_identical(nrow(mvgam:::lift_mvgam_stanvar_priors(base, sc)), 1L)
+  # A row brms left flat takes the prior the program applies.
+  base$prior <- ""
+  expect_identical(
+    mvgam:::lift_mvgam_stanvar_priors(base, sc)$prior, "std_normal()"
+  )
 })
 
 

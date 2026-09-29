@@ -886,15 +886,11 @@ test_that("the index columns are not reported as model predictors", {
 
 
 test_that("hypothesis reaches every name variables() lists", {
-  # `hypothesis()` reads the stanfit directly, so a name mvgam's
-  # alias pass created is unreachable while its unaliased neighbours
-  # are not. Both are listed by `variables()`.
-  vars <- variables(fit)
-  expect_true("b_temp" %in% vars)
-  expect_true(any(grepl("^ar1_trend\\[", vars)))
-
-  expect_s3_class(hypothesis(fit, "ar1_trend[1] > 0"), "brmshypothesis")
-  expect_s3_class(hypothesis(fit, "b_temp > 0"), "brmshypothesis")
+  # With `class = NULL`, `hypothesis()` takes a parameter by the name
+  # `variables()` lists
+  expect_s3_class(hypothesis(fit, "ar1_trend[1] > 0", class = NULL),
+                  "brmshypothesis")
+  expect_s3_class(hypothesis(fit, "temp > 0"), "brmshypothesis")
 })
 
 

@@ -48,16 +48,16 @@
 parameter names, or (when \code{regex = TRUE}) a vector of regular
 expressions. Recognised keywords:
 \itemize{
-\item \code{"betas"}: population-level fixed effects (brms \verb{b_*}).
+\item \code{"betas"}: population-level coefficients, the set
+\code{\link[brms:fixef.brmsfit]{brms::fixef()}} reports (\verb{b_*}, \verb{bs_*} and \verb{bsp_*}).
 \item \code{"obs_params"}: observation-family distributional
 parameters (\code{sigma}, \code{phi}, \code{shape}, ...).
 \item \code{"smooth_params"}: smooth-term standard deviations
 (\verb{sds_*}).
-\item \code{"trend_betas"}: trend-side fixed effects (\verb{b_trend[*]}).
-\item \code{"trend_params"}: trend-dynamics parameters (AR, GP,
-innovation SD, ...). With a \code{trend_formula} this resolves to
-the \verb{_trend}-suffixed parameter block; without it, the
-top-level trend dynamics.
+\item \code{"trend_betas"}: the trend formula's population-level
+coefficients (\verb{b_*_trend}, \verb{bs_*_trend} and \verb{bsp_*_trend}).
+\item \code{"trend_params"}: trend-dynamics parameters
+(autoregressive coefficients, innovation SDs, ...).
 \item \code{"trend_smooth_params"}: trend-side smooth SDs.
 }
 \code{NULL} (the default) returns every parameter.}

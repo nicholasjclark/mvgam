@@ -4001,7 +4001,7 @@ stationary_joint_functions_stanvar <- function(kernel = "var") {
 ",
       if (identical(kernel, "var")) "      /**
        * Compute joint stationary covariance for VARMA(p,q) initialization
-       * Heaps 2022 companion matrix approach for stationary distribution
+       * Heaps 2023 companion matrix approach for stationary distribution
        * @param Sigma Innovation covariance matrix (m x m)
        * @param phi Array of stationary VAR coefficient matrices
        * @param theta Array of stationary MA coefficient matrices
@@ -4016,7 +4016,7 @@ stationary_joint_functions_stanvar <- function(kernel = "var") {
         matrix[(p + q) * m * (p + q) * m, (p + q) * m * (p + q) * m] tmp;
         matrix[(p + q) * m, (p + q) * m] Omega;
 
-        // Construct companion matrix (phi_tilde) following Heaps 2022.
+        // Construct companion matrix (phi_tilde) following Heaps 2023.
         // The VAR component fills the leading m rows with phi.
         for (i in 1:p) {
           companion_mat[1:m, ((i - 1) * m + 1):(i * m)] = phi[i];
@@ -4785,6 +4785,26 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   return(do.call(combine_stanvars, components))
 }
 
+#' Hyperpriors on a VAR or VARMA coefficient prior
+#'
+#' The means and precisions are declared `array[2] vector[lags]`:
+#' element `[1]` for the diagonal and `[2]` for the off-diagonal. A statement
+#' on each array element covers every lag, and a scalar statement on
+#' the whole array fails Stan's dimension check.
+#'
+#' @param prior The prior table, for user overrides.
+#' @param mu,omega Names of the mean and precision parameters.
+#' @return Stan model-block code.
+#' @noRd
+var_hyperprior_statements <- function(prior, mu, omega) {
+  paste0(
+    "for (k in 1:2) {\n",
+    "        ", mu, "[k] ~ ", get_trend_parameter_prior(prior, mu), ";\n",
+    "        ", omega, "[k] ~ ", get_trend_parameter_prior(prior, omega),
+    ";\n      }"
+  )
+}
+
 #' VAR/VARMA Trend Generator
 #'
 #' @description
@@ -4921,7 +4941,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     scode = "
       /**
        * Compute matrix square root using eigendecomposition
-       * Following Heaps 2022 methodology for stationary VAR/VARMA
+       * Following Heaps 2023 methodology for stationary VAR/VARMA
        * @param A Symmetric positive definite matrix (m x m)
        * @return Matrix square root of A
        */
@@ -4942,7 +4962,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
       /**
        * Transform P_real to P matrix using partial autocorrelation approach
-       * Heaps 2022 transformation for stationarity constraints
+       * Heaps 2023 transformation for stationarity constraints
        * @param P_real Real-valued unconstrained matrix
        * @return Constrained P matrix for stationary VAR coefficients
        */
@@ -4957,7 +4977,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
       /**
        * Perform reverse mapping from partial autocorrelations to stationary coefficients
-       * Heaps 2022 Algorithm for computing phi coefficients from P matrices
+       * Heaps 2023 Algorithm for computing phi coefficients from P matrices
        * @param P Array of partial autocorrelation matrices
        * @param Sigma Innovation covariance matrix
        * @return Array containing phi coefficients and Gamma matrices [2, p]
@@ -5190,7 +5210,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       // Apply reverse mapping to get stationary MA coefficients
       result_ma = rev_mapping(P_ma, Sigma_trend);
 
-      // Extract stationary MA coefficients (negative sign per Heaps 2022)
+      // Extract stationary MA coefficients (negative sign per Heaps 2023)
       for (i in 1:{ma_lags}) {{
         D_trend[i] = -result_ma[1, i];
       }}
@@ -5263,8 +5283,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # top-level generator would emit `Dmu_trend ~ ...;` and fail Stan's
   # dimensionality check.
   varma_ma_priors <- if (is_varma) {
-    dmu_user_prior <- get_trend_parameter_prior(prior, "Dmu_trend")
-    domega_user_prior <- get_trend_parameter_prior(prior, "Domega_trend")
     paste0(
       "      // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)\n",
       "      for (ma_lag in 1:", ma_lags, ") {\n",
@@ -5279,11 +5297,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "          }\n",
       "        }\n",
       "      }\n\n",
-      "      // Hyperpriors for hierarchical MA coefficient means and precisions\n",
-      "      Dmu_trend[1, 1] ~ ", dmu_user_prior, ";\n",
-      "      Domega_trend[1, 1] ~ ", domega_user_prior, ";\n",
-      "      Dmu_trend[2, 1] ~ ", dmu_user_prior, ";\n",
-      "      Domega_trend[2, 1] ~ ", domega_user_prior, ";"
+      var_hyperprior_statements(prior, "Dmu_trend", "Domega_trend")
     )
   } else ""
 
@@ -5302,18 +5316,14 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     ""
   }
 
-  # Resolve user overrides for the array-shaped hyperpriors. They
-  # MUST be emitted with per-lag indexing inside the for-loop below;
-  # routing through `generate_trend_priors_stanvar` would emit
-  # `Amu_trend ~ ...;` and trip Stan's dimensionality check (the
-  # parameter is declared array[2] vector[lags]).
-  amu_user_prior <- get_trend_parameter_prior(prior, "Amu_trend")
-  aomega_user_prior <- get_trend_parameter_prior(prior, "Aomega_trend")
+  var_hyperpriors <- var_hyperprior_statements(
+    prior, "Amu_trend", "Aomega_trend"
+  )
   
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
     scode = glue::glue("
-      // VARMA likelihood implementation following Heaps 2022 methodology
+      // VARMA likelihood implementation following Heaps 2023 methodology
 
       // Initial joint distribution for stationary VARMA initialization
       vector[{init_dim_expr}] mu_init_trend = rep_vector(0.0, {init_dim_expr});
@@ -5366,13 +5376,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
       {omega_prior}
 
-      // Hyperpriors on the coefficient means and precisions: [1] for the
-      // diagonal and [2] for the off-diagonal elements, each a vector
-      // over lags.
-      for (lag in 1:2) {{
-        Amu_trend[lag] ~ {amu_user_prior};
-        Aomega_trend[lag] ~ {aomega_user_prior};
-      }}
+      {var_hyperpriors}
     "),
     block = "model"
   )
@@ -5585,14 +5589,6 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # `build_stan_components()`, which reads `supports_factors` and so
   # answers every route a user can ask by. Assembly is downstream of
   # it and takes the spec as settled.
-
-  # CAR does not support hierarchical correlations
-  if (named_var(trend_specs$gr)) {
-    warn_once(
-      "CAR trends do not support hierarchical correlations; ignoring 'gr' parameter",
-      "CAR_group_error"
-    )
-  }
 
   # Build components list following the 3-stanvar pattern
   components <- list()
@@ -7688,8 +7684,7 @@ filter_renameable_identifiers <- function(identifiers,
     # Global flags that should not be renamed
     "prior_only",
 
-    # Innovation parameters handled by shared innovation system (avoid duplication)
-    "sigma",  # Shared innovation system provides vector sigma_trend
+    brms_trend_dropped_params,
 
     # Comment words and obvious non-parameters based on testing
     "total", "number", "observations", "response", "variable",

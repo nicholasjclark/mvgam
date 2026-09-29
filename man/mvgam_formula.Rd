@@ -40,7 +40,7 @@ observation model. When specified, the trend_formula can include:
 \item Trend constructors: \code{RW()}, \code{AR()}, \code{CAR()},
 \code{ZMVN()}, \code{VAR()}, \code{PW()}
 \item Covariates that affect trend dynamics
-\item Smooth terms using mgcv syntax: \code{s()}, \code{te()}, \code{ti()}, \code{t2()}
+\item Smooth terms using mgcv syntax: \code{s()}, \code{t2()}
 \item Random effects: \code{(1|group)}, \code{(slope|group)}
 \item Gaussian processes: \code{gp()}
 }

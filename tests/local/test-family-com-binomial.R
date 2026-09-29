@@ -506,10 +506,9 @@ test_that("the marginaleffects coefficient hook reads every term", {
   expect_true(length(gc) > 1L)
   # The named coefficients the other accessors report.
   expect_true("b_serieslower" %in% names(gc))
-  # And the accessors that read through the alias pass agree with it.
-  fx <- rownames(fixef(fit))
-  expect_true(all(paste0("b_", fx) %in% names(gc)) ||
-                all(fx %in% names(gc)))
+  # `fixef()` reports the same coefficients, the smooth and monotonic
+  # ones among them, without their class prefix
+  expect_identical(mvgam:::fixef_name(names(gc)), rownames(fixef(fit)))
 })
 
 

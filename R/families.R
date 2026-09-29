@@ -183,7 +183,7 @@
 #'   chains        = 2,
 #'   silent        = 2
 #' )
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #'
 #' # Posterior intervals for the AR dynamics. The observation-side
 #' # dpars (`mphi`, `mtheta`) are picked up under "obs_params".
@@ -736,7 +736,7 @@ check_tweedie_truncation <- function(object, resp = NULL) {
 #'   chains        = 2,
 #'   silent        = 2
 #' )
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #'
 #' # `mtail` is what separates this family from a negative binomial.
 #' # A posterior that drifts toward the upper prior range is a sign
@@ -1011,7 +1011,7 @@ beta_nb_stan_funs <- function() {
 #'
 #' # The `nu` posterior should concentrate around the simulated
 #' # 1.5 and stay well above the binomial null at nu = 1.
-#' summary(fit, include_betas = FALSE)
+#' summary(fit)
 #' mcmc_plot(fit, variable = "nu", type = "areas")
 #'
 #' # Posterior predictive check of the marginal count distribution.
@@ -2936,7 +2936,7 @@ build_closure_unit_arrays <- function(data,
 #'   chains  = 2,
 #'   silent  = 2
 #' )
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #'
 #' # Marginal env effect on the response scale (expected count
 #' # = lambda * p).
