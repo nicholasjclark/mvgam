@@ -36,7 +36,7 @@
 #' }
 #'
 #' @export
-mcmc_plot.mvgam = function(
+mcmc_plot.mvgam <- function(
   object,
   type = 'intervals',
   variable = NULL,

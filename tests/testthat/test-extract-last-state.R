@@ -236,20 +236,20 @@ test_that("ARMA pulls theta and the last raw innovation row", {
 
 # ----- VAR -------------------------------------------------------
 
-test_that("VAR pulls Heaps-transformed A_trend with lag-first indexing", {
+test_that("VAR pulls Heaps-transformed Phi_trend with lag-first indexing", {
   n_series <- 2L; n_time <- 4L
   A1 <- matrix(c(0.5, 0.1, -0.2, 0.6),
                 nrow = 2L, byrow = TRUE)
   L <- matrix(c(1, 0, 0.3, sqrt(1 - 0.09)),
                nrow = 2L, byrow = TRUE)
-  # Stan declares A_trend as array[N_lags] matrix[N_lv, N_lv];
-  # the draws-matrix names are A_trend[lag, i, j].
+  # Stan declares Phi_trend as array[N_lags] matrix[N_lv, N_lv];
+  # the draws-matrix names are Phi_trend[lag, i, j].
   A_arr <- array(0, dim = c(1L, n_series, n_series))
   A_arr[1L, , ] <- A1
   draws <- make_draws(list(
     sigma_trend = c(1, 1),
     L_Omega_trend = L,
-    A_trend = A_arr,
+    Phi_trend = A_arr,
     trend = matrix(0, nrow = n_time, ncol = n_series)
   ))
   meta <- list(trend_type = "VAR", ar_lags = 1L,
@@ -265,13 +265,13 @@ test_that("VAR pulls Heaps-transformed A_trend with lag-first indexing", {
 
 
 test_that("VARMA seeds the forecast with the last innovation it fitted", {
-  # The program applies `D_trend`, the transform of `D_raw_trend`, and
+  # The program applies `Theta_trend`, the transform of `D_trend`, and
   # never stores its innovations. It centres `lv_t` on
   # `A_1 lv_{t-1} + A_2 lv_{t-2} + D e_{t-1}`. The path below runs on
   # one time axis from t = -1, and `init_trend` is then packed in the
   # companion order `Omega_trend` gives it, most recent first:
   # `(lv_0, lv_{-1}, e_0)`. The extractor has to recover the last
-  # innovation. `D_raw_trend` carries values the program never applies.
+  # innovation. `D_trend` carries values the program never applies.
   n <- 2L
   n_time <- 6L
   A <- list(matrix(c(0.5, 0.1, -0.2, 0.3), n, n),
@@ -295,9 +295,9 @@ test_that("VARMA seeds the forecast with the last innovation it fitted", {
   draws <- make_draws(list(
     sigma_trend = c(1, 1),
     L_Omega_trend = diag(n),
-    A_trend = A_arr,
-    D_trend = array(D, dim = c(1L, n, n)),
-    D_raw_trend = array(-D, dim = c(1L, n, n)),
+    Phi_trend = A_arr,
+    Theta_trend = array(D, dim = c(1L, n, n)),
+    D_trend = array(-D, dim = c(1L, n, n)),
     init_trend = init,
     lv_trend = lv,
     trend = lv

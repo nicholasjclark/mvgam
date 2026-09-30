@@ -271,9 +271,9 @@ test_that("mvgam_data skips time-regularity check under CAR()", {
 })
 
 
-# ---- Covariate-NA guard (validate_no_covariate_nas) --------------
+# ---- Model columns (validate_model_columns) ---------------------
 
-test_that("validate_no_covariate_nas() catches NAs in obs-formula covariates", {
+test_that("NAs in observation covariates are refused", {
   set.seed(1L)
   simdat <- sim_mvgam(family = poisson(), n_series = 2L,
                        n_timepoints = 16L)
@@ -291,12 +291,12 @@ test_that("validate_no_covariate_nas() catches NAs in obs-formula covariates", {
       mvgam_data(dat, formula = y ~ temp, family = poisson(),
                   plot = FALSE)
     ),
-    regexp = "Columns referenced.*missing values.*'temp': 1 NA"
+    regexp = "hold missing values.*'temp': 1 NA, first at row 3"
   )
 })
 
 
-test_that("validate_no_covariate_nas() checks trend-formula covariates", {
+test_that("NAs in trend covariates are refused", {
   set.seed(1L)
   simdat <- sim_mvgam(family = poisson(), n_series = 2L,
                        n_timepoints = 16L)
@@ -308,12 +308,12 @@ test_that("validate_no_covariate_nas() checks trend-formula covariates", {
       mvgam_data(dat, trend_formula = ~ s(env) + AR(),
                   family = poisson(), plot = FALSE)
     ),
-    regexp = "Columns referenced.*'env': 2 NAs"
+    regexp = "'env': 2 NAs"
   )
 })
 
 
-test_that("validate_no_covariate_nas() ignores response + unreferenced cols", {
+test_that("NAs in the response and unused columns pass", {
   set.seed(1L)
   simdat <- sim_mvgam(family = poisson(), n_series = 2L,
                        n_timepoints = 16L,
@@ -334,22 +334,20 @@ test_that("validate_no_covariate_nas() ignores response + unreferenced cols", {
 
 
 test_that("an addition term is complete on the rows its response was seen", {
-  # brms drops a row whose addition term is missing, while the trend
-  # mapping keeps any row whose response was observed, so a missing
-  # weight left the likelihood and the trend describing different rows.
+  # brms drops a row whose addition term is missing. The trend mapping
+  # keeps every row with an observed response, and a missing weight
+  # would leave the likelihood and the trend on different rows.
   dat <- data.frame(y = rpois(12L, 3), x = rnorm(12L),
                     w = runif(12L, 0.2, 1.5))
   dat$w[4L] <- NA
   expect_error(
-    validate_no_covariate_nas(dat, formulas = list(y | weights(w) ~ x)),
+    validate_model_columns(dat, y | weights(w) ~ x, poisson()),
     regexp = "'w': 1 NA"
   )
-  # Where the response is missing too, the row leaves the likelihood
-  # whatever the addition term holds, so nothing is refused.
+  # A row whose response is also missing leaves the likelihood, and
+  # its addition term is not checked.
   dat$y[4L] <- NA
-  expect_null(
-    validate_no_covariate_nas(dat, formulas = list(y | weights(w) ~ x))
-  )
+  expect_silent(validate_model_columns(dat, y | weights(w) ~ x, poisson()))
 })
 
 
@@ -383,11 +381,9 @@ test_that("gp() and RE group columns are checked for NAs", {
 
 
 test_that("NAs in matrix-column predictors are counted", {
-  # Matrix-column predictors (distributed-lag style) are
-  # carried as list entries rather than data.frame columns
-  # because as.data.frame() would flatten them. Exercise the
-  # validator helper directly to confirm it counts every NA
-  # cell in a 16 x 3 matrix predictor.
+  # A matrix predictor (distributed-lag style) is carried as a list
+  # entry, since as.data.frame() would flatten it. A row counts once
+  # however many of its cells are missing.
   dat <- list(
     y      = rpois(16L, 1),
     time   = 1:16,
@@ -395,10 +391,50 @@ test_that("NAs in matrix-column predictors are counted", {
     Z      = matrix(rnorm(48L), ncol = 3L)
   )
   dat$Z[c(2L, 7L), 2L] <- NA
+  dat$Z[2L, 3L] <- NA
   expect_error(
-    validate_no_covariate_nas(dat, formulas = list(y ~ Z),
-                                response_vars = "y"),
+    validate_model_columns(dat, y ~ Z, gaussian()),
     regexp = "'Z': 2 NAs"
+  )
+})
+
+
+test_that("columns the formulas use must be in the data", {
+  set.seed(1L)
+  dat <- sim_mvgam(family = poisson(), n_series = 2L,
+                   n_timepoints = 16L)$data_train
+  dat$n <- dat$y + 2L
+  dat$x <- rnorm(nrow(dat))
+  # Addition terms, offsets and random-effect groups are all columns,
+  # and brms would report them only after the trend was parsed.
+  expect_error(
+    suppressMessages(mvgam_data(
+      dat, formula = y | trials(n) ~ x + offset(log(area)) + (1 | site),
+      family = binomial(), trend_formula = ~ s(env) + AR(), plot = FALSE
+    )),
+    "Absent: 'site', 'area', 'env'"
+  )
+  # A name in 'data2' counts as present, as brms counts it.
+  expect_silent(validate_model_columns(
+    dat, y ~ s(lagm, k = 4), poisson(),
+    data2 = list(lagm = matrix(0, nrow(dat), 2L))
+  ))
+  # A prediction frame may omit its response but not its trials.
+  expect_silent(validate_model_columns(
+    dat[, c("time", "series", "n", "x")], y | trials(n) ~ x, binomial(),
+    optional = "y", context = "newdata"
+  ))
+  expect_error(
+    validate_model_columns(dat[, c("time", "series", "x")],
+                           y | trials(n) ~ x, binomial(),
+                           optional = "y", context = "newdata"),
+    "missing from 'newdata'"
+  )
+  # A count may not exceed its denominator.
+  dat$n[5L] <- dat$y[5L] - 1L
+  expect_error(
+    validate_response_shapes(dat, y | trials(n) ~ x, binomial()),
+    "first at row 5"
   )
 })
 
@@ -411,30 +447,9 @@ test_that("lhs_columns() handles formula / brmsformula / mvbrmsformula", {
                    c("y", "trials"))
   # brmsformula: response on $formula slot.
   expect_identical(lhs_columns(brms::bf(y ~ x)), "y")
-  # Two-arm bf(): still only the top response, not the dpar arm.
+  # A bf() with a detection formula: the main response alone.
   expect_identical(lhs_columns(brms::bf(y ~ env, p ~ tod)),
                    "y")
-})
-
-
-test_that("extract_predictor_vars() handles formula / brmsformula / bf arms", {
-  expect_identical(extract_predictor_vars(NULL),     character(0L))
-  expect_identical(extract_predictor_vars(y ~ 1),    character(0L))
-  expect_identical(extract_predictor_vars(y ~ x + z), c("x", "z"))
-  expect_identical(extract_predictor_vars(y ~ s(x, by = grp)),
-                   c("x", "grp"))
-  # Trend constructor bare names should be picked up.
-  expect_identical(extract_predictor_vars(~ AR(time = week, series = sp)),
-                   c("week", "sp"))
-  # A two-part bf() (closure-unit detection sub-formula).
-  bf_two <- brms::bf(y ~ env, p ~ tod)
-  expect_identical(extract_predictor_vars(bf_two), c("env", "tod"))
-  # List of formulas: the union of the predictors, in the order they
-  # first appear, with duplicates dropped.
-  expect_identical(
-    extract_predictor_vars(list(y ~ x, ~ s(z, by = grp))),
-    c("x", "z", "grp")
-  )
 })
 
 

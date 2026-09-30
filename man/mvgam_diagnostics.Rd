@@ -57,7 +57,14 @@
 
 \method{nvariables}{mvgam}(x, ...)
 
-\method{posterior_summary}{mvgam}(x, pars = NULL, probs = c(0.025, 0.975), robust = FALSE, ...)
+\method{posterior_summary}{mvgam}(
+  x,
+  pars = NULL,
+  variable = NULL,
+  probs = c(0.025, 0.975),
+  robust = FALSE,
+  ...
+)
 
 \method{getCall}{mvgam}(x, ...)
 
@@ -88,6 +95,9 @@ quantile probabilities for credible intervals. Defaults to
 
 \item{resp}{Character. Response name for multivariate models.
 Ignored for univariate fits.}
+
+\item{variable}{Model-parameter names for \code{posterior_summary()},
+as \pkg{brms} names the argument. Takes precedence over \code{pars}.}
 
 \item{correlation}{Logical. If \code{TRUE}, return the correlation
 matrix of fixed-effect coefficients; otherwise the covariance

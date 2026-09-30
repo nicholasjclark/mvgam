@@ -296,6 +296,10 @@ test_that("posterior_summary.mvgam returns a brms-shaped matrix", {
   expect_true(is.matrix(out))
   expect_identical(colnames(out), c("Estimate", "Est.Error",
                                     "Q2.5", "Q97.5"))
+  # brms names the selection argument 'variable'.
+  expect_identical(
+    posterior_summary(stub, variable = c("b_Intercept", "sigma")), out
+  )
 })
 
 test_that("a lost chain is named against the count that was asked for", {
@@ -641,7 +645,7 @@ test_that(
 
 test_that(
   "hidden_par_pattern returns NULL for a non-factor fit", {
-  # Non-factor fit: no Z_tilde, no lv_trend_tilde, no A_trend_tilde.
+  # Non-factor fit: no Z_tilde, no lv_trend_tilde, no Phi_trend_tilde.
   # The variance block must survive because it is properly identified
   # in non-factor trend fits.
   pars_nonfactor <- c(
@@ -656,13 +660,13 @@ test_that(
   )
 })
 
-test_that("hidden_par_pattern adds A_trend hide on VAR factor fits", {
+test_that("hidden_par_pattern adds Phi_trend hide on VAR factor fits", {
   pars_var <- c(
-    "Z_tilde[1,1]", "A_trend[1][1,1]", "A_trend_tilde[1][1,1]"
+    "Z_tilde[1,1]", "Phi_trend[1][1,1]", "Phi_trend_tilde[1][1,1]"
   )
   pat <- mvgam:::hidden_par_pattern(pars_var)
-  expect_true(grepl("\\^A_trend\\\\\\[", pat))
-  expect_true(grepl("A_trend\\[1\\]\\[1,1\\]",
+  expect_true(grepl("\\^Phi_trend\\\\\\[", pat))
+  expect_true(grepl("Phi_trend\\[1\\]\\[1,1\\]",
                     grep(pat, pars_var, value = TRUE)[1]))
 })
 

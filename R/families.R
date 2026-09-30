@@ -1705,8 +1705,8 @@ refuse_missing_family_dispatch <- function(family_name, what) {
   stop_mvgam_fault(
     paste0("mvgam cannot compute ", what, " for family '",
            family_name, "'."),
-    paste0("This family is registered without the internal kernel ",
-           "that step requires.")
+    paste0("Family '", family_name, "' registers no kernel for ", what,
+           ".")
   )
 }
 
@@ -2197,6 +2197,29 @@ closure_unit_index <- function(data, unit_grouping_vars,
 }
 
 
+# Internal: refuse closure-unit data missing a column the layout needs.
+# The response and the unit's key columns place every visit, and a
+# `cap` column bounds each unit's latent count where the family sets
+# no default. The fit and prediction paths share the message.
+#'@noRd
+assert_closure_unit_columns <- function(data, columns) {
+  missing <- setdiff(columns, names(data))
+  if (!length(missing)) {
+    return(invisible(TRUE))
+  }
+  roles <- c(
+    cap = "'cap' is the upper bound on the latent count of each unit.",
+    visit = "'visit' numbers the repeat surveys within each unit."
+  )
+  roles <- roles[intersect(missing, names(roles))]
+  stop(insight::format_error(c(
+    "Closure-unit data are missing required columns.",
+    x = paste0("Absent: ", paste0("'", missing, "'", collapse = ", "), "."),
+    stats::setNames(unname(roles), rep("i", length(roles)))
+  )), call. = FALSE)
+}
+
+
 #' Build per-closure-unit indexing arrays from long-format data
 #'
 #' Walks the user's long-format observation data and groups rows
@@ -2317,20 +2340,7 @@ build_closure_unit_arrays <- function(data,
         is.null(default_cap_buffer)) {
     required_cols <- c(required_cols, cap_var)
   }
-  for (col in required_cols) {
-    if (!col %in% colnames(data)) {
-      stop(insight::format_error(c(
-        paste0(
-          "Closure-unit families require column '", col,
-          "' to be present in 'data'."
-        ),
-        i = paste0(
-          "Add '", col, "' to the data frame, or rename the ",
-          "existing variable via the relevant `*_var` argument."
-        )
-      )))
-    }
-  }
+  assert_closure_unit_columns(data, required_cols)
   # Assemble the closure-unit key from the requested grouping
   # columns. For count-based families this is "(series, time)" so
   # each (species, site) pair is its own closure unit; for
@@ -3273,7 +3283,7 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #'   chains  = 2,
 #'   silent  = 2
 #' )
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #'
 #' # Marginal env effect on the response scale (occupancy *
 #' # detection). For the logit-occupancy view pass
@@ -5600,7 +5610,8 @@ attach_family_stanvars <- function(stanvars, families) {
     if (any(!vapply(own[-1L], identical, logical(1L), own[[1L]]))) {
       stop(insight::format_error(c(
         paste0("Two responses give '", name, "()' different arguments."),
-        x = "Its Stan data are declared once and shared between them.",
+        x = paste0("'", name, "()' declares its Stan data once for all ",
+                   "responses."),
         i = paste0("Give '", name, "()' the same arguments in every ",
                    "response.")
       )), call. = FALSE)
@@ -6824,8 +6835,7 @@ latent_N_saturation <- function(object, newdata = NULL,
       x = paste0(
         "Family '", resolve_family_name(object$family),
         "' marginalises no latent state over repeat visits."
-      ),
-      i = "It applies to occ() and nmix() fits."
+      )
     )))
   }
   # K_max comes from the per-unit array assembled at fit / predict

@@ -445,6 +445,13 @@ fit_model <- function(model, backend, ...) {
                                 seed, control, silent, future, ...) {
 
   require_package("cmdstanr")
+  # mvgam's own starting values set only the parameters that need one.
+  # cmdstanr reports every partial init list, which here says nothing
+  # the user asked about.
+  if (isTRUE(attr(init, "mvgam_partial"))) {
+    old_warn <- options(cmdstanr_warn_inits = FALSE)
+    on.exit(options(old_warn), add = TRUE)
+  }
   # some input checks and housekeeping
   class(sdata) <- "list"
   if (is_NA(seed)) {
@@ -1069,6 +1076,46 @@ validate_sampler_iterations <- function(iter, warmup = NULL) {
     x = "'iter' counts warmup and sampling together.",
     i = paste0("Raise 'iter' above ", warmup, " or lower 'warmup'.")
   )), call. = FALSE)
+}
+
+#' Starting values for the coefficients of a sparse-lag AR trend
+#'
+#' A contiguous lag set is sampled as partial autocorrelations, which
+#' keeps every draw stationary. A sparse set such as `p = c(1, 12)` is
+#' bounded one coefficient at a time, and a random start can place a
+#' chain on an explosive recursion. Its latent path then grows
+#' without limit, and the chain stays at that start. The coefficients
+#' and their hierarchical means start near zero here, and Stan draws
+#' every other parameter as it would.
+#'
+#' @param stancode The assembled Stan program
+#' @param standata The Stan data, which sizes the coefficient vectors
+#' @param chains Number of chains
+#' @param seed Seed the starting values are drawn under
+#' @return A list of per-chain init lists marked `mvgam_partial`, or
+#'   `NULL` when the model has no sparse lag set
+#' @noRd
+sparse_ar_inits <- function(stancode, standata, chains, seed) {
+  pars <- grep("^(shared_|mu_)?ar[0-9]+_trend$",
+               brms_declared_params(stancode), value = TRUE)
+  lags <- sort(unique(as.integer(sub("^\\D*ar([0-9]+)_trend$", "\\1",
+                                     pars))))
+  if (length(lags) < 2L || ar_lags_contiguous(lags)) return(NULL)
+  # A hierarchical mean is one value, a shared coefficient a length-one
+  # vector, and every other coefficient one value per process.
+  sizes <- ifelse(startsWith(pars, "mu_"), NA_integer_,
+                  ifelse(startsWith(pars, "shared_"), 1L,
+                         as.integer(standata$N_lv_trend)))
+  local_seed(seed)
+  out <- lapply(seq_len(chains), function(chain) {
+    stats::setNames(lapply(sizes, function(n) {
+      # `array()` keeps a length-one vector a vector in Stan's JSON.
+      if (is.na(n)) stats::runif(1L, -0.1, 0.1) else
+        array(stats::runif(n, -0.1, 0.1))
+    }), pars)
+  })
+  attr(out, "mvgam_partial") <- TRUE
+  out
 }
 
 #' Validate Initial Value Specification

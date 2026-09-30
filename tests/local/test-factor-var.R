@@ -139,7 +139,7 @@ test_that("the transition matrix is sized by the factor axis", {
 
   code <- paste(as.character(stancode(prefit)), collapse = "\n")
   expect_true(grepl(
-    "array[1] matrix[N_lv_trend, N_lv_trend] A_trend;",
+    "array[1] matrix[N_lv_trend, N_lv_trend] Phi_trend;",
     code, fixed = TRUE
   ))
   expect_true(grepl(
@@ -237,7 +237,7 @@ test_that("the posterior holds one coefficient per factor pair", {
   # Four transition coefficients and not sixteen, two innovation
   # scales and not four. A model that gave every series its own process
   # differs from this one here and nowhere a shape check would look.
-  expect_length(grep("^A_trend\\[", colnames(dm)), N_lv * N_lv)
+  expect_length(grep("^Phi_trend\\[", colnames(dm)), N_lv * N_lv)
   expect_length(grep("^sigma_trend", colnames(dm)), N_lv)
   expect_length(grep("^Z\\[", colnames(dm)), n_series * N_lv)
   expect_length(grep("^lv_trend\\[", colnames(dm)), n_time * N_lv)

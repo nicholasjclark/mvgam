@@ -15,6 +15,8 @@
 #' @param pars Optional character vector of parameter names. For
 #'   `nuts_params` these are sampler-parameter names; otherwise they
 #'   are model-parameter names. `NULL` returns all parameters.
+#' @param variable Model-parameter names for `posterior_summary()`,
+#'   as \pkg{brms} names the argument. Takes precedence over `pars`.
 #' @param summary Logical. If `TRUE` (the default), summary statistics
 #'   are returned; if `FALSE`, the raw posterior draws are returned.
 #'   `coef` summarises to posterior means rather than to the
@@ -113,6 +115,23 @@ mvgam_post_summary <- function(draws, robust = FALSE,
   out <- cbind(Estimate = centre, Est.Error = spread, q)
   colnames(out) <- c("Estimate", "Est.Error",
                      paste0("Q", probs * 100))
+  out
+}
+
+
+# Internal: the posterior median and two quantiles of each column of a
+# draws matrix, named `<prefix>Q50`, `<prefix>Q<lower>` and
+# `<prefix>Q<upper>`. The forecast, impulse-response and
+# variance-decomposition summaries report these columns.
+median_interval_cols <- function(draws, probs, prefix) {
+  checkmate::assert_matrix(draws, mode = "numeric")
+  checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L,
+                            any.missing = FALSE)
+  probs <- sort(probs)
+  q <- apply(draws, 2L, stats::quantile, probs = c(0.5, probs),
+             na.rm = TRUE, names = FALSE)
+  out <- as.data.frame(t(matrix(q, nrow = 3L)))
+  names(out) <- paste0(prefix, "Q", c(50, 100 * probs))
   out
 }
 
@@ -355,14 +374,15 @@ nvariables.mvgam <- function(x, ...) {
 #' @importFrom brms posterior_summary
 #' @method posterior_summary mvgam
 #' @export
-posterior_summary.mvgam <- function(x, pars = NULL,
+posterior_summary.mvgam <- function(x, pars = NULL, variable = NULL,
                                      probs = c(0.025, 0.975),
                                      robust = FALSE, ...) {
   object <- x
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_character(pars, null.ok = TRUE)
+  checkmate::assert_character(variable, null.ok = TRUE)
   rlang::check_dots_empty()
-  drws <- as_draws_array(object, variable = pars)
+  drws <- as_draws_array(object, variable = variable %||% pars)
   mat <- posterior::as_draws_matrix(drws)
   mvgam_post_summary(mat, robust = robust, probs = probs)
 }
@@ -451,7 +471,7 @@ select_fixef_draws <- function(mat, pars) {
 # transitions are a faster early signal than Rhat for the rotational
 # funnel; the structural pre-checks already constrain the call to a
 # narrow high-risk class, so divergence inside that class is nearly
-# pathology-specific. The watch-list covers the declared (`A_trend`,
+# pathology-specific. The watch-list covers the declared (`Phi_trend`,
 # `L_Omega_trend`) and transformed (`Sigma_trend`, `L_Sigma_trend`)
 # variance-block parameters plus the latent state and process
 # noise. A single parameter exceeding threshold is sufficient: the
@@ -497,7 +517,7 @@ flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
   watched <- grep(
     paste0(
       "^(init_trend|lv_trend|sigma_trend|Sigma_trend|",
-      "L_Sigma_trend|L_Omega_trend|A_trend)\\["
+      "L_Sigma_trend|L_Omega_trend|Phi_trend)\\["
     ),
     names(rh)
   )

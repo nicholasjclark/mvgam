@@ -68,7 +68,7 @@
 #'     per draw.
 #'   \item Full-covariance trends (`VAR`, `VARMA`) read `Omega_trend`,
 #'     the stationary covariance the Stan model derives from
-#'     `A_trend` and `Sigma_trend`.
+#'     `Phi_trend` and `Sigma_trend`.
 #' }
 #'
 #' The covariance summarised is the one the latent states settle at,

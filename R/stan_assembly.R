@@ -320,7 +320,7 @@ stan_density_suffix <- function(stan_code, stem) {
 #' @param lhs Left-hand side, passed through verbatim. Every shape
 #'   the emitters use is legal as a density's first argument: a bare
 #'   parameter (`sigma_trend`), a container call (`to_vector(Z)`,
-#'   `diagonal(A_raw_trend[lag])`), an index or slice
+#'   `diagonal(A_trend[lag])`), an index or slice
 #'   (`varrho_inv[2:N_lv_trend]`) and a transpose (`lv_trend[t, :]'`).
 #' @param dist Distribution call as the prior table spells it, for
 #'   example `"student_t(3, 0, 2.5)"` or `"std_normal()"`. Arguments
@@ -1895,12 +1895,7 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
 
   gr_var <- trend_specs$gr
 
-  if (is.null(data_info$data[[gr_var]])) {
-    stop(insight::format_error(c(
-      paste0("Grouping variable '", gr_var, "' not found in data."),
-      i = "Check that 'gr' refers to an existing column."
-    )))
-  }
+  assert_grouping_columns(data_info$data, gr_var, trend_specs$subgr)
 
   unique_groups <- observed_levels(data_info$data[[gr_var]])
   n_groups <- length(unique_groups)
@@ -2526,9 +2521,9 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 #' diagonal by construction, removing the 2^n_lv sign-mode
 #' equivalence without an inline sign-fix.
 #'
-#' For VAR factor models the coefficient array `A_trend` lives
+#' For VAR factor models the coefficient array `Phi_trend` lives
 #' in the same latent basis as `lv_trend`. The rotation
-#' `A_trend_tilde\[lag\] = Q_tilde A_trend\[lag\] Q_tilde'` brings
+#' `Phi_trend_tilde\[lag\] = Q_tilde Phi_trend\[lag\] Q_tilde'` brings
 #' the saved coefficients into the identified `Z_tilde` /
 #' `lv_trend_tilde` basis so downstream summaries (impulse
 #' responses, stationarity checks) are coherent.
@@ -2537,7 +2532,7 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 #' parameters that index over the latent factor dimension `K`
 #' and whose interpretation only makes sense in the identified
 #' basis: `Z_tilde`, `lv_trend_tilde`, and (VAR only)
-#' `A_trend_tilde`. The factor innovations have identity
+#' `Phi_trend_tilde`. The factor innovations have identity
 #' covariance, which the rotation leaves unchanged. Per-factor
 #' scalar parameters (`ar1_trend`, `ar{p}_trend`, `theta1_trend`)
 #' stay unrotated. They remain in the unrotated `Z` basis, where
@@ -2663,15 +2658,15 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
       qr_lines,
       # `size()` is not a data expression, so Stan refuses it as a
       # top-level array size. `N_lags_trend` is the data integer the
-      # rest of the VAR code sizes `A_trend` by.
+      # rest of the VAR code sizes `Phi_trend` by.
       paste0(
         "array[N_lags_trend] matrix[N_lv_trend, N_lv_trend]",
-        " A_trend_tilde;"
+        " Phi_trend_tilde;"
       ),
       "for (lag in 1:N_lags_trend) {",
       paste0(
-        "  A_trend_tilde[lag]",
-        " = Q_tilde * A_trend[lag] * Q_tilde';"
+        "  Phi_trend_tilde[lag]",
+        " = Q_tilde * Phi_trend[lag] * Q_tilde';"
       ),
       "}"
     )
@@ -4822,7 +4817,7 @@ var_hyperprior_statements <- function(prior, mu, omega) {
 #' @param data_info Data information including dimensions (n_obs, n_series, n_time)
 #'   and other model structure details
 #' @param prior A brmsprior object containing custom prior specifications for
-#'   VAR trend parameters (A_trend matrices, sigma_trend, etc.). If NULL,
+#'   VAR trend parameters (Phi_trend matrices, sigma_trend, etc.). If NULL,
 #'   uses defaults from trend registry. Default NULL.
 #'
 #' @return Combined stanvars object containing Stan code for:
@@ -5064,12 +5059,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   var_specific_params <- if(is_hierarchical) {
     paste0(
       "      // Hierarchical VAR: group-specific raw matrices with shared hyperpriors\n",
-      "      array[N_groups_trend, ", lags, "] matrix[N_subgroups_trend, N_subgroups_trend] A_raw_group_trend;"
+      "      array[N_groups_trend, ", lags, "] matrix[N_subgroups_trend, N_subgroups_trend] A_group_trend;"
     )
   } else {
     paste0(
       "      // Standard VAR: single raw matrix\n",
-      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] A_raw_trend;",
+      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] A_trend;",
       if (!unit_factors) {
         paste0(
           "\n\n      // Standard variance and correlation parameters\n",
@@ -5085,7 +5080,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     scode = glue::glue("
       {var_specific_params}
 
-      // Means and precisions of the A_raw_trend coefficient priors,
+      // Means and precisions of the A_trend coefficient priors,
       // [1] for the diagonal and [2] for the off-diagonal elements
       array[2] vector[{lags}] Amu_trend;
       array[2] vector<lower=0>[{lags}] Aomega_trend;
@@ -5098,19 +5093,19 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Conditional MA parameters block for VARMA(p,q) when ma_lags > 0
   # This creates a 4th stanvar component only for VARMA models
-  # D_trend naming follows Heaps 2023 convention for MA coefficients
+  # Theta_trend naming follows Heaps 2023 convention for MA coefficients
   if (is_varma) {
     var_ma_parameters_stanvar <- brms::stanvar(
       name = "var_ma_parameters",
       scode = glue::glue("
       // Raw MA partial autocorrelation matrices (unconstrained for stationarity)
-      // D_raw_trend gets transformed to D_trend (stationary MA coefficients)
-      array[{ma_lags}] matrix[N_lv_trend, N_lv_trend] D_raw_trend;
+      // D_trend gets transformed to Theta_trend (stationary MA coefficients)
+      array[{ma_lags}] matrix[N_lv_trend, N_lv_trend] D_trend;
 
-      // Hierarchical hyperparameters for D_raw_trend (MA) coefficients
+      // Hierarchical hyperparameters for D_trend (MA) coefficients
       // [1] = diagonal elements, [2] = off-diagonal elements
-      array[2] vector[{ma_lags}] Dmu_trend;           // Means for D_raw_trend elements
-      array[2] vector<lower=0>[{ma_lags}] Domega_trend;  // Precisions for D_raw_trend elements
+      array[2] vector[{ma_lags}] Dmu_trend;           // Means for D_trend elements
+      array[2] vector<lower=0>[{ma_lags}] Domega_trend;  // Precisions for D_trend elements
       "),
       block = "parameters"
     )
@@ -5123,7 +5118,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "      // Hierarchical VAR: group-specific computations then block assembly\n\n",
       "      // Group-specific hierarchical correlations and covariances\n",
       "      array[N_groups_trend] cov_matrix[N_subgroups_trend] Sigma_group_trend;\n",
-      "      array[N_groups_trend, ", lags, "] matrix[N_subgroups_trend, N_subgroups_trend] A_group_trend;\n\n",
+      "      array[N_groups_trend, ", lags, "] matrix[N_subgroups_trend, N_subgroups_trend] Phi_group_trend;\n\n",
       "      // Compute group-specific covariances using hierarchical correlation structure\n",
       "      for (g_idx in 1:N_groups_trend) {\n",
       "        // The global correlation mixed with the group's own deviation\n",
@@ -5134,23 +5129,23 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "        // Apply Heaps transformation per group\n",
       "        for (lag in 1:N_lags_trend) {\n",
       "          array[1] matrix[N_subgroups_trend, N_subgroups_trend] P_group;\n",
-      "          P_group[1] = AtoP(A_raw_group_trend[g_idx, lag]);\n",
+      "          P_group[1] = AtoP(A_group_trend[g_idx, lag]);\n",
       "          array[2, 1] matrix[N_subgroups_trend, N_subgroups_trend] result_group =\n",
       "            rev_mapping(P_group, Sigma_group_trend[g_idx]);\n",
-      "          A_group_trend[g_idx, lag] = result_group[1, 1];\n",
+      "          Phi_group_trend[g_idx, lag] = result_group[1, 1];\n",
       "        }\n",
       "      }\n\n",
       "      // Build block-structured full matrices (groups do not interact)\n",
       "      cov_matrix[N_lv_trend] Sigma_trend = rep_matrix(0, N_lv_trend, N_lv_trend);\n",
-      "      array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] A_trend;\n",
+      "      array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] Phi_trend;\n",
       "      for (lag in 1:N_lags_trend) {\n",
-      "        A_trend[lag] = rep_matrix(0, N_lv_trend, N_lv_trend);\n",
+      "        Phi_trend[lag] = rep_matrix(0, N_lv_trend, N_lv_trend);\n",
       "      }\n\n",
       "      // Each group's blocks, placed at its member series\n",
       group_members_stanblock(),
       "        Sigma_trend[members, members] = Sigma_group_trend[g_idx];\n",
       "        for (lag in 1:N_lags_trend) {\n",
-      "          A_trend[lag][members, members] = A_group_trend[g_idx, lag];\n",
+      "          Phi_trend[lag][members, members] = Phi_group_trend[g_idx, lag];\n",
       "        }\n",
       "      }"
     )
@@ -5167,22 +5162,22 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "      matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);\n",
       "      cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);\n\n",
       "      // Transform raw parameters to stationary coefficients\n",
-      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] A_trend;\n\n",
+      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] Phi_trend;\n\n",
       "      // Working arrays for stationarity transformation\n",
       "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] P_var;\n",
       "      array[2, ", lags, "] matrix[N_lv_trend, N_lv_trend] result_var;\n\n",
       "      for (i in 1:", lags, ") {\n",
-      "        P_var[i] = AtoP(A_raw_trend[i]);\n",
+      "        P_var[i] = AtoP(A_trend[i]);\n",
       "      }\n\n",
       "      result_var = rev_mapping(P_var, Sigma_trend);\n\n",
       "      for (i in 1:", lags, ") {\n",
-      "        A_trend[i] = result_var[1, i];\n",
+      "        Phi_trend[i] = result_var[1, i];\n",
       "      }"
     )
   }
 
   # Pre-compute VARMA-specific additions
-  varma_d_trend <- if(is_varma) paste0("array[", ma_lags, "] matrix[N_lv_trend, N_lv_trend] D_trend;") else ""
+  varma_d_trend <- if(is_varma) paste0("array[", ma_lags, "] matrix[N_lv_trend, N_lv_trend] Theta_trend;") else ""
   varma_ma_init <- if(is_varma) "vector[N_lv_trend] ma_init_trend;" else ""
 
   var_tparameters_stanvar <- brms::stanvar(
@@ -5198,13 +5193,13 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       {varma_ma_init}
 
       {if(is_varma) glue::glue('
-      // Transform D_raw_trend to stationary D_trend (VARMA only)
+      // Transform D_trend to stationary Theta_trend (VARMA only)
       array[{ma_lags}] matrix[N_lv_trend, N_lv_trend] P_ma;
       array[2, {ma_lags}] matrix[N_lv_trend, N_lv_trend] result_ma;
 
-      // Transform D_raw_trend matrices using AtoP transformation
+      // Transform D_trend matrices using AtoP transformation
       for (i in 1:{ma_lags}) {{
-        P_ma[i] = AtoP(D_raw_trend[i]);
+        P_ma[i] = AtoP(D_trend[i]);
       }}
 
       // Apply reverse mapping to get stationary MA coefficients
@@ -5212,12 +5207,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
       // Extract stationary MA coefficients (negative sign per Heaps 2023)
       for (i in 1:{ma_lags}) {{
-        D_trend[i] = -result_ma[1, i];
+        Theta_trend[i] = -result_ma[1, i];
       }}
       ') else ''}
 
       // Compute initial joint covariance matrix using companion matrix approach
-      {if(is_varma) 'Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);' else 'array[1] matrix[N_lv_trend, N_lv_trend] empty_theta; empty_theta[1] = rep_matrix(0.0, N_lv_trend, N_lv_trend); Omega_trend = initial_joint_var(Sigma_trend, A_trend, empty_theta[1:0]);'}
+      {if(is_varma) 'Omega_trend = initial_joint_var(Sigma_trend, Phi_trend, Theta_trend);' else 'array[1] matrix[N_lv_trend, N_lv_trend] empty_theta; empty_theta[1] = rep_matrix(0.0, N_lv_trend, N_lv_trend); Omega_trend = initial_joint_var(Sigma_trend, Phi_trend, empty_theta[1:0]);'}
 
       {if(is_varma) glue::glue('
       // The MA error before the first occasion, from init_trend
@@ -5246,12 +5241,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "      for (g_idx in 1:N_groups_trend) {\n",
       "        for (lag in 1:N_lags_trend) {\n",
       "          // Diagonal elements prior (shared across all groups)\n",
-      "          diagonal(A_raw_group_trend[g_idx, lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));\n\n",
+      "          diagonal(A_group_trend[g_idx, lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));\n\n",
       "          // Off-diagonal elements prior (shared across all groups)\n",
       "          for (i in 1:N_subgroups_trend) {\n",
       "            for (j in 1:N_subgroups_trend) {\n",
       "              if (i != j) {\n",
-      "                A_raw_group_trend[g_idx, lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));\n",
+      "                A_group_trend[g_idx, lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));\n",
       "              }\n",
       "            }\n",
       "          }\n",
@@ -5263,12 +5258,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "      // Standard VAR: single matrix priors\n",
       "      for (lag in 1:N_lags_trend) {\n",
       "        // Diagonal elements prior\n",
-      "        diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));\n\n",
+      "        diagonal(A_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));\n\n",
       "        // Off-diagonal elements prior\n",
       "        for (i in 1:N_lv_trend) {\n",
       "          for (j in 1:N_lv_trend) {\n",
       "            if (i != j) {\n",
-      "              A_raw_trend[lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));\n",
+      "              A_trend[lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));\n",
       "            }\n",
       "          }\n",
       "        }\n",
@@ -5284,15 +5279,15 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # dimensionality check.
   varma_ma_priors <- if (is_varma) {
     paste0(
-      "      // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)\n",
+      "      // Hierarchical priors for VARMA MA coefficient matrices (D_trend)\n",
       "      for (ma_lag in 1:", ma_lags, ") {\n",
       "        // Diagonal elements prior for MA coefficients\n",
-      "        diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));\n\n",
+      "        diagonal(D_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));\n\n",
       "        // Off-diagonal elements prior for MA coefficients\n",
       "        for (i in 1:N_lv_trend) {\n",
       "          for (j in 1:N_lv_trend) {\n",
       "            if (i != j) {\n",
-      "              D_raw_trend[ma_lag, i, j] ~ normal(Dmu_trend[2, ma_lag], 1 / sqrt(Domega_trend[2, ma_lag]));\n",
+      "              D_trend[ma_lag, i, j] ~ normal(Dmu_trend[2, ma_lag], 1 / sqrt(Domega_trend[2, ma_lag]));\n",
       "            }\n",
       "          }\n",
       "        }\n",
@@ -5344,12 +5339,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
             // block k holds lv_{{1 - k}}, which puts lv_{{t - i}} at
             // block i - t + 1.
             int init_idx = i - t + 1;
-            mu_t_trend[t] += A_trend[i]
+            mu_t_trend[t] += Phi_trend[i]
               * init_trend[((init_idx - 1) * N_lv_trend + 1):
                            (init_idx * N_lv_trend)];
           }} else {{
             // A lag inside the series
-            mu_t_trend[t] += A_trend[i] * {lv_transpose_lag};
+            mu_t_trend[t] += Phi_trend[i] * {lv_transpose_lag};
           }}
         }}
 
@@ -5357,10 +5352,10 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         // MA component: Add moving average term for VARMA
         if (t - 1 <= 0) {{
           // The MA error before the first occasion
-          mu_t_trend[t] += D_trend[1] * ma_init_trend;
+          mu_t_trend[t] += Theta_trend[1] * ma_init_trend;
         }} else {{
           // The MA error at t - 1: the state less its conditional mean
-          mu_t_trend[t] += D_trend[1] * ({lv_transpose_prev} - mu_t_trend[t - 1]);
+          mu_t_trend[t] += Theta_trend[1] * ({lv_transpose_prev} - mu_t_trend[t - 1]);
         }}
         ') else ''}
       }}
@@ -5469,7 +5464,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   }
 
   # Add factor model support if applicable. Pass trend_type = "VAR"
-  # so generate_factor_model() emits the rotated A_trend_tilde in
+  # so generate_factor_model() emits the rotated Phi_trend_tilde in
   # generated quantities (the VAR coefficient array lives in the
   # latent basis and must be rotated to match Z_tilde/lv_trend_tilde).
   if (is_factor_model) {
@@ -8285,11 +8280,12 @@ remove_duplicate_functions <- function(functions_list) {
         unique_functions[[length(unique_functions) + 1]] <- first_func
       } else {
         # Different implementations - error
-        stop(insight::format_error(c(
-          "Functions with identical signatures but different implementations detected.",
-          x = cli::format_inline("Name: {.field {first_func$name}}"),
-          i = "This suggests a serious error in code generation."
-        )))
+        stop_mvgam_fault(
+          "Two generated Stan functions share a signature.",
+          cli::format_inline(
+            "Function {.field {first_func$name}} has two different bodies."
+          )
+        )
       }
     }
   }

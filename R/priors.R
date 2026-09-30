@@ -162,14 +162,14 @@ common_trend_priors <- list(
   ),
 
   Dmu_trend = list(
-    default = "normal(0.0, 1.0)",
+    default = "normal(0, 1)",
     bounds = c(NA, NA),
     description = "Mean of the VARMA moving-average coefficients",
     dimension = "vector"
   ),
 
   Domega_trend = list(
-    default = "gamma(2.0, 1.0)",
+    default = "gamma(2, 1)",
     bounds = c(0, NA),
     description = "Precision of the VARMA moving-average coefficients",
     dimension = "vector"
@@ -1466,27 +1466,22 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 
   # Validate trend_formula if provided
   if (!is.null(trend_formula)) {
-    # Detect bf() / brmsformula with distributional-parameter formulas
-    # (pforms) before the assert_formula guard fires. The downstream
-    # validator returns a generic "Must be a formula, not brmsformula"
-    # message; trap the dpar case here so users get a targeted hint.
-    if (inherits(trend_formula, c("brmsformula", "bform")) &&
-        !is.null(trend_formula$pforms) &&
-        length(trend_formula$pforms) > 0L) {
-      dpar_names <- paste(
-        paste0("'", names(trend_formula$pforms), "'"),
-        collapse = ", "
-      )
+    # A `bf()` trend formula carries distributional or non-linear
+    # sub-formulas, which the latent state cannot take. Named here
+    # before the generic "Must be a formula" assertion runs.
+    if (inherits(trend_formula, c("brmsformula", "bform"))) {
+      subs <- names(trend_formula$pforms)
       stop(insight::format_error(c(
-        paste0(
-          "Distributional-parameter formulas such as 'sigma ~ z' ",
-          "are not supported inside 'trend_formula'."
-        ),
-        x = paste0(
-          "Found dpar formula(s): ", dpar_names, "."
-        ),
-        i = "Write them with bf(...) in the observation 'formula'."
-      )))
+        "'trend_formula' must be a one-sided formula such as '~ x + AR()'.",
+        x = if (length(subs)) {
+          paste0("Found 'bf()' sub-formulas for: ",
+                 paste0("'", subs, "'", collapse = ", "), ".")
+        } else {
+          "Found a 'bf()' formula."
+        },
+        i = paste0("Write distributional and non-linear formulas with ",
+                   "'bf()' in the observation 'formula'.")
+      )), call. = FALSE)
     }
 
     checkmate::assert_formula(trend_formula, .var.name = "trend_formula")

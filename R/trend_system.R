@@ -232,7 +232,7 @@ var_trend_properties <- function() {
   list(
     supports_factors = TRUE,
     covariance_pattern = "full_covariance",
-    # The Stan model already derives `Omega_trend` from `A_trend` and
+    # The Stan model already derives `Omega_trend` from `Phi_trend` and
     # `Sigma_trend`. Nothing is recomputed here.
     stationary_source = "omega",
     requires_regular_intervals = TRUE,
@@ -1147,7 +1147,7 @@ print.mvgam_trend <- function(x, ...) {
 #' innovation scale is \code{sigma_trend}, the moving-average
 #' coefficient \code{theta1_trend}, the autoregressive coefficients
 #' \code{ar1_trend} to \code{ark_trend} and the VAR coefficient
-#' matrices \code{A_trend}. Priors take these class names, as in
+#' matrices \code{Phi_trend}. Priors take these class names, as in
 #' \code{prior(normal(0, 1), class = sigma_trend)}, and parameter
 #' extraction takes the same names.
 #'
@@ -1161,7 +1161,7 @@ print.mvgam_trend <- function(x, ...) {
 #' which removes the \eqn{2^k} equivalent sign modes. The per-factor
 #' coefficients `ar1_trend` and `theta1_trend` stay in the unrotated
 #' basis. A VAR factor model also rotates its lag coefficients as
-#' `A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'`.
+#' `Phi_trend_tilde[lag] = Q_tilde * Phi_trend[lag] * Q_tilde'`.
 #'
 #' A \code{trend_map} skips the QR step and keeps its fixed entries on
 #' `Z` exactly. A `by = lv_axis()` smooth ties each factor to its own
@@ -1222,10 +1222,10 @@ print.mvgam_trend <- function(x, ...) {
 #'   chains        = 2,
 #'   silent        = 2
 #' )
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #'
 #' # `variable = "trend_params"` is a keyword shortcut that pulls
-#' # every trend-dynamics parameter (A_trend, sigma_trend, the
+#' # every trend-dynamics parameter (Phi_trend, sigma_trend, the
 #' # Sigma_trend covariance, etc.) in one call. See ?mvgam_draws
 #' # for the full keyword set ("betas", "obs_params",
 #' # "smooth_params", "trend_betas", "trend_params",
@@ -1330,7 +1330,7 @@ print.mvgam_trend <- function(x, ...) {
 #' }
 #'
 #' @export
-RW = function(
+RW <- function(
     time = NA,
     series = NA,
     ma = FALSE,
@@ -1359,7 +1359,7 @@ RW = function(
 
 #' @rdname trend_constructors
 #' @export
-AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = NULL,
+AR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = NULL,
               gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL,
               coef_sharing = c("none", "shared", "hierarchical"),
               df = Inf) {
@@ -1393,7 +1393,7 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = NULL,
 
 #' @rdname trend_constructors
 #' @export
-CAR = function(time = NA, series = NA, n_lv = NULL, trend_map = NULL,
+CAR <- function(time = NA, series = NA, n_lv = NULL, trend_map = NULL,
                df = Inf) {
   # A continuous-time process evolves per series and has no factor
   # form. The two arguments exist here to refuse a factor request
@@ -1414,7 +1414,7 @@ CAR = function(time = NA, series = NA, n_lv = NULL, trend_map = NULL,
 
 #' @rdname trend_constructors
 #' @export
-VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
+VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
                gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL) {
   # A VAR has correlated innovations by definition. `cor` is accepted
   # for symmetry with AR(), RW() and ZMVN(), and only TRUE is valid.
@@ -1550,7 +1550,7 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' }
 #'
 #' @export
-PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
+PW <- function(time = NA, series = NA, cap = NA, n_changepoints = 10,
               changepoint_range = 0.8, changepoint_scale = 0.05,
               growth = 'linear', n_lv = NULL, trend_map = NULL) {
   # Validate arguments
@@ -1678,7 +1678,7 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'   chains        = 2,
 #'   silent        = 2
 #' )
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #'
 #' # All trend-side latent dynamics in one summary view. For ZMVN
 #' # the meaningful entries are sigma_trend (per-series SDs),
@@ -1688,7 +1688,7 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' }
 #'
 #' @export
-ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA,
+ZMVN <- function(time = NA, series = NA, gr = NA, subgr = NA,
                  n_lv = NULL, cor = TRUE, trend_map = NULL,
                  df = Inf) {
   # `cor` is accepted for symmetry with `AR()` and `VAR()`. ZMVN is a

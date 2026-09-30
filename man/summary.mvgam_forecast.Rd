@@ -7,27 +7,25 @@
 \method{summary}{mvgam_forecast}(object, probs = c(0.025, 0.975), ...)
 }
 \arguments{
-\item{object}{an object of class \code{mvgam_forecast} obtained using either the
-\code{hindcast()} or \code{function()} function. This object will contain
-draws from the posterior distribution of hindcasts and forecasts.}
+\item{object}{An \code{mvgam_forecast} object from \code{\link[=hindcast]{hindcast()}} or
+\code{\link[=forecast]{forecast()}}.}
 
-\item{probs}{The upper and lower percentiles to be computed by the
-\code{quantile} function, in addition to the median}
+\item{probs}{The lower and upper quantiles to report in addition to
+the median.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A long-format \code{tibble} / \code{data.frame} reporting the posterior median,
-upper and lower percentiles of the predictions for each series at each of
-the timepoints that were originally supplied in \code{data} and, optionally,
-in \code{newdata}.
+A long-format \code{tibble} with one row per series and time,
+holding the posterior median and the two quantiles of the
+predictions, the observed value for \code{type = 'response'}, and the
+prediction type.
 }
 \description{
-This function takes an \code{mvgam_forecast} object and
-calculates a posterior summary of the hindcast and forecast distributions
-of each series, along with any true values that were included in \code{data}
-and \code{newdata} if \code{type = 'response'} was used in the call to
-\code{hindcast()} or \code{function()}
+Posterior medians and quantiles of the hindcast and
+forecast distributions of each series, with the observed values
+in \code{data} and \code{newdata} when the object holds \code{type = 'response'}
+predictions.
 }
 \seealso{
 \code{\link{forecast.mvgam}}, \code{\link{plot.mvgam_forecast}}

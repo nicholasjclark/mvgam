@@ -33,21 +33,12 @@ mvgam_split_models <- function(x, ..., model_names = NULL,
     )))
   }
   models <- c(list(x), dots[is_model_dot])
-  if (!is.null(model_names)) {
-    checkmate::assert_character(
-      model_names, len = length(models), any.missing = FALSE,
-      min.chars = 1L
-    )
-    names(models) <- model_names
-  } else {
-    dot_call <- substitute(list(x, ...), env = parent.frame())[-1L]
-    deparsed <- vapply(dot_call, deparse1, character(1L))
-    model_pos <- c(TRUE, is_model_dot)
-    candidate <- deparsed[model_pos]
-    names(models) <- candidate
-    if (any(duplicated(names(models))) || !all(nzchar(names(models)))) {
-      names(models) <- paste0("model", seq_along(models))
-    }
+  dot_call <- as.list(substitute(list(x, ...), env = parent.frame()))[-1L]
+  names(models) <- compared_object_names(
+    models, dot_call[c(TRUE, is_model_dot)], model_names
+  )
+  if (is.null(model_names) && anyDuplicated(names(models))) {
+    names(models) <- paste0("model", seq_along(models))
   }
   list(models = models, other = other)
 }

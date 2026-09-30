@@ -113,24 +113,15 @@ build_stan_components <- function(formula, data, family = gaussian(),
   obs_formula <- formula$formula
   trend_formula <- formula$trend_formula
 
-  # The family a univariate `bf()` names becomes the model's, and
-  # every response's family is checked, before anything below reads
-  # `family`.
+  # The family a univariate `bf()` names becomes the model's. Every
+  # response's family is checked before any step below uses `family`.
   resolved <- resolve_observation_family(obs_formula, family)
   obs_formula <- resolved$formula
   family <- resolved$family
 
-  # The likelihood skips a missing response and the trend grid keeps
-  # its occasion. A missing covariate leaves a row the program cannot
-  # build. Refusing it here covers
-  # every route to a program, `stancode()` and `standata()` as well
-  # as `mvgam()`.
-  validate_no_covariate_nas(
-    data          = data,
-    formulas      = list(obs_formula, trend_formula),
-    response_vars = lhs_columns(obs_formula),
-    context       = "data"
-  )
+  # Refusing an absent or incomplete column here covers every route to
+  # a program, `stancode()` and `standata()` as well as `mvgam()`.
+  validate_model_columns(data, obs_formula, family, trend_formula, data2)
 
   # Parse multivariate trends and validate. The trend names the time
   # and series columns, which key a closure unit below.

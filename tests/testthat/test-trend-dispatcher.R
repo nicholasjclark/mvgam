@@ -777,11 +777,26 @@ test_that("validate_gr_balanced_groups passes balanced groups silently", {
     )
   )
   expect_null(result)
+  # A grouping column the frame lacks, or one holding a gap, leaves
+  # rows on no series.
+  expect_error(
+    mvgam:::validate_gr_balanced_groups(
+      list(gr = "biome", subgr = "NA", series = "series"), balanced
+    ),
+    "Absent: 'biome'"
+  )
+  balanced$habitat[2L] <- NA
+  expect_error(
+    mvgam:::validate_gr_balanced_groups(
+      list(gr = "habitat", subgr = "NA", series = "series"), balanced
+    ),
+    "'habitat': 1 NA, first at row 2"
+  )
 })
 
-test_that("a user-supplied subgr is counted, not waved through", {
-  # `gr` and `subgr` together name the series, so the balance of a
-  # design written that way is exactly the balance of its groups.
+test_that("a user-supplied subgr counts toward the group balance", {
+  # `gr` and `subgr` together name the series. The balance of a design
+  # written that way is the balance of its groups.
   # Returning early whenever `subgr` was supplied skipped every
   # model written the way the documentation shows: the design
   # reached Stan, `N_subgroups_trend` took the largest group, and

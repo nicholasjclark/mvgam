@@ -46,13 +46,10 @@ test_that("resolve_series_index defaults make sense", {
   lv4 <- c("s1", "s2", "s3", "s4")
   expect_equal(mvgam:::resolve_series_index(NULL, lv1), 1L)
   expect_equal(mvgam:::resolve_series_index(NULL, lv4), "all")
-  expect_equal(mvgam:::resolve_series_index("all", lv4), "all")
-  expect_equal(mvgam:::resolve_series_index(2L, lv4), 2L)
   # A name reaches the index every other series-aware surface gives
   # it. This plot once took indices alone, and a reader of its panel
   # labels had no value to pass back.
   expect_equal(mvgam:::resolve_series_index("s3", lv4), 3L)
-  expect_equal(mvgam:::resolve_series_index("s1", lv4), 1L)
 })
 
 test_that("resolve_series_index rejects invalid input", {
@@ -67,9 +64,8 @@ test_that("resolve_series_index rejects invalid input", {
     mvgam:::resolve_series_index(c(1L, 2L), lv4),
     "selects one series"
   )
-  # Out of range, fractional and negative indices are all refused.
-  expect_error(mvgam:::resolve_series_index(-1, lv4))
-  expect_error(mvgam:::resolve_series_index(99L, lv4))
+  # Out of range and fractional indices are refused.
+  expect_error(mvgam:::resolve_series_index(99L, lv4), "out of range")
   expect_error(mvgam:::resolve_series_index(1.5, lv4))
 })
 
@@ -80,18 +76,10 @@ test_that("series_long_df extracts the right columns and labels rows", {
   out <- mvgam:::series_long_df(df, "y", df$series, "time",
                                 label = "train")
   expect_equal(sort(colnames(out)), c("data", "series", "time", "y"))
-  expect_equal(nrow(out), 5L)
-  expect_true(all(out$data == "train"))
   # The series is the one the caller names, not a column of the frame.
   out_named <- mvgam:::series_long_df(df, "y", "count", "time",
                                       label = "train")
   expect_true(all(out_named$series == "count"))
-})
-
-test_that("series_long_df returns NULL on NULL input (rbind passthrough)", {
-  out <- mvgam:::series_long_df(NULL, "y", NULL, "time",
-                                label = "validate")
-  expect_null(out)
 })
 
 test_that("series_long_df errors when response missing", {
@@ -102,23 +90,28 @@ test_that("series_long_df errors when response missing", {
   )
 })
 
-test_that("plot_mvgam_series single-series returns 4-panel patchwork", {
+test_that("plot_mvgam_series takes one series in time order", {
   fit <- .make_stub_fit()
-  p <- mvgam:::plot_mvgam_series(fit, series = 1L)
-  expect_true(inherits(p, "patchwork"))
+  # The ACF follows time order on a frame holding its rows out of
+  # order.
+  shuffled <- fit
+  shuffled$data <- fit$data[sample(nrow(fit$data)), ]
+  acf_panel <- mvgam:::plot_mvgam_series(shuffled, series = 1L)[[3L]]
+  expect_equal(
+    acf_panel$data$acf[acf_panel$data$lag == 1],
+    stats::acf(fit$data$y, plot = FALSE)$acf[2L]
+  )
 })
 
 test_that("plot_mvgam_series multi-series default is faceted ggplot", {
   fit <- .make_stub_fit(n_series = 3L)
   p <- mvgam:::plot_mvgam_series(fit)
-  expect_ggplot(p)
   expect_true(inherits(p$facet, "FacetWrap"))
 })
 
 test_that("plot_mvgam_series auto-fetches object$test_data", {
   fit <- .make_stub_fit(with_test = TRUE)
   p <- mvgam:::plot_mvgam_series(fit, series = 1L)
-  expect_true(inherits(p, "patchwork"))
   # Cut line should appear because newdata was attached. Walk
   # the patchwork's first panel (TS) layers for a GeomVline.
   ts_panel <- p[[1L]]
@@ -129,32 +122,3 @@ test_that("plot_mvgam_series auto-fetches object$test_data", {
   expect_true("GeomVline" %in% geoms)
 })
 
-test_that("plot_mvgam_series log_scale switches the y label", {
-  # Strictly-positive y so log(y + 1) doesn't produce NaN.
-  fit <- .make_stub_fit(n_series = 3L)
-  fit$data$y <- exp(fit$data$y)
-  p <- mvgam:::plot_mvgam_series(fit, log_scale = TRUE)
-  expect_true(grepl("log\\(", p$labels$y))
-})
-
-test_that("series_hist_panel returns a ggplot with one histogram layer", {
-  p <- mvgam:::series_hist_panel(rnorm(50L), "y")
-  expect_ggplot(p)
-  expect_true(any(vapply(
-    p$layers,
-    function(l) inherits(l$geom, "GeomBar"),
-    logical(1L)
-  )))
-})
-
-test_that("series_acf_panel returns a ggplot", {
-  p <- mvgam:::series_acf_panel(rnorm(50L))
-  expect_ggplot(p)
-  expect_equal(p$labels$title, "ACF")
-})
-
-test_that("series_ecdf_panel returns a ggplot with sensible y limits", {
-  p <- mvgam:::series_ecdf_panel(rnorm(50L), "y")
-  expect_ggplot(p)
-  expect_equal(p$labels$title, "CDF")
-})

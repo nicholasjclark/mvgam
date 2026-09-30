@@ -526,10 +526,10 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_true(stan_pattern("vector\\[K_trend\\] b_trend;", code_with_trend))
 
   # VAR coefficient matrices (raw/unconstrained for stationarity)
-  expect_true(stan_pattern("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_raw_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_trend;", code_with_trend))
 
   # MA coefficient matrices
-  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
 
   # Hierarchical hyperparameters (Heaps 2023 methodology)
   expect_true(stan_pattern("array\\[2\\] vector\\[2\\] Amu_trend;", code_with_trend))
@@ -554,13 +554,13 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_true(stan_pattern("cov_matrix\\[N_lv_trend\\] Sigma_trend = multiply_lower_tri_self_transpose\\(L_Sigma_trend\\);", code_with_trend))
 
   # Stationarity transformations (Heaps 2023)
-  expect_true(stan_pattern("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_trend;", code_with_trend))
-  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
-  expect_true(stan_pattern("P_var\\[i\\] = AtoP\\(A_raw_trend\\[i\\]\\);", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] Phi_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] Theta_trend;", code_with_trend))
+  expect_true(stan_pattern("P_var\\[i\\] = \\w+\\(A_trend\\[i\\]\\);", code_with_trend))
   expect_true(stan_pattern("result_var = rev_mapping\\(P_var, Sigma_trend\\);", code_with_trend))
 
   # Initial joint covariance matrix
-  expect_true(stan_pattern("Omega_trend = initial_joint_var\\(Sigma_trend, A_trend, D_trend\\);", code_with_trend))
+  expect_true(stan_pattern("Omega_trend = initial_joint_var\\(Sigma_trend, Phi_trend, Theta_trend\\);", code_with_trend))
 
   # Multivariate linear predictors with splines
   expect_true(stan_pattern("vector\\[N_count\\] mu_count = rep_vector\\(0\\.0, N_count\\);", code_with_trend))
@@ -616,7 +616,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   # VAR component with initialization handling
   expect_true(stan_pattern("for \\(i in 1:2\\)", code_with_trend))
   expect_true(stan_pattern("if \\(t - i <= 0\\)", code_with_trend))
-  expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= A_trend\\[i\\] \\* lv_trend\\[t - i, :\\]';", code_with_trend))
+  expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= Phi_trend\\[i\\] \\* lv_trend\\[t - i, :\\]';", code_with_trend))
 
   # `mu_t_trend` must be declared with Stan >= 2.32 array syntax.
   # Pre-2.32 form `vector[N_lv_trend] mu_t_trend[N_time_trend];`
@@ -633,7 +633,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
 
   # MA component
   expect_true(stan_pattern("if \\(t - 1 <= 0\\)", code_with_trend))
-  expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_init_trend;", code_with_trend))
+  expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= Theta_trend\\[1\\] \\* ma_init_trend;", code_with_trend))
   expect_true(stan_pattern("} else \\{", code_with_trend))
 
   # Latent variable likelihood
@@ -647,8 +647,8 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_true(stan_pattern("Domega_trend\\[", code_with_trend))
 
   # Structured priors for raw coefficients should exist
-  expect_true(stan_pattern("A_raw_trend\\[.*\\] ~ ", code_with_trend))
-  expect_true(stan_pattern("D_raw_trend\\[.*\\] ~ ", code_with_trend))
+  expect_true(stan_pattern("A_trend\\[.*\\] ~ ", code_with_trend))
+  expect_true(stan_pattern("D_trend\\[.*\\] ~ ", code_with_trend))
 
   # Basic parameter priors should exist
   expect_true(stan_pattern("sigma_trend ~", code_with_trend))
@@ -688,7 +688,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
 
   # Should NOT have incorrect VARMA structure
   expect_false(grepl("for \\(i in 1:1\\)", code_with_trend)) # Should be 1:2 for VAR(2)
-  expect_false(grepl("ar_dynamics", code_with_trend)) # Should use A_trend matrices
+  expect_false(grepl("ar_dynamics", code_with_trend)) # Should use Phi_trend matrices
 
   # Tensor product smooth structure (t2(x, time))
   # brms decomposes tensor products into multiple indexed marginal components
@@ -1101,7 +1101,7 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
   expect_true(stan_pattern("real<lower=0, upper=1> alpha_cor_trend;", code_with_trend))
 
   # VAR-specific hierarchical coefficient parameters
-  expect_true(stan_pattern("array\\[N_groups_trend, 1\\] matrix\\[N_subgroups_trend, N_subgroups_trend\\] A_raw_group_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_groups_trend, 1\\] matrix\\[N_subgroups_trend, N_subgroups_trend\\] A_group_trend;", code_with_trend))
 
   # Group-specific sigma parameters for VAR
   expect_true(stan_pattern("array\\[N_groups_trend\\] vector<lower=0>\\[N_subgroups_trend\\] sigma_group_trend;", code_with_trend))
@@ -1110,7 +1110,7 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
   expect_true(stan_pattern("matrix combine_cholesky\\(", code_with_trend))
 
   # Group-specific coefficient matrices in transformed parameters
-  expect_true(stan_pattern("array\\[N_groups_trend, 1\\] matrix\\[N_subgroups_trend, N_subgroups_trend\\] A_group_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_groups_trend, 1\\] matrix\\[N_subgroups_trend, N_subgroups_trend\\] Phi_group_trend;", code_with_trend))
   expect_true(stan_pattern("array\\[N_groups_trend\\] cov_matrix\\[N_subgroups_trend\\] Sigma_group_trend;", code_with_trend))
 
   # Hierarchical correlation computation with g_idx loop indices
@@ -1120,26 +1120,26 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
 
   # Block-diagonal assembly of full system matrices
   expect_true(stan_pattern("cov_matrix\\[N_lv_trend\\] Sigma_trend = rep_matrix\\(0, N_lv_trend, N_lv_trend\\);", code_with_trend))
-  expect_true(stan_pattern("array\\[N_lags_trend\\] matrix\\[N_lv_trend, N_lv_trend\\] A_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_lags_trend\\] matrix\\[N_lv_trend, N_lv_trend\\] Phi_trend;", code_with_trend))
   # Each group's blocks land at its member series, the ascending order
   # the innovations and the stationary start take them in.
   expect_true(stan_pattern(
     "Sigma_trend[members, members] = Sigma_group_trend[g_idx];",
     code_with_trend, fixed = TRUE))
   expect_true(stan_pattern(
-    "A_trend[lag][members, members] = A_group_trend[g_idx, lag];",
+    "Phi_trend[lag][members, members] = Phi_group_trend[g_idx, lag];",
     code_with_trend, fixed = TRUE))
 
   # Heaps transformation for stationarity (VAR-specific)
   expect_true(stan_pattern("array\\[1\\] matrix\\[N_subgroups_trend, N_subgroups_trend\\] P_group;", code_with_trend))
-  expect_true(stan_pattern("P_group\\[1\\] = AtoP\\(A_raw_group_trend\\[g_idx, lag\\]\\);", code_with_trend))
+  expect_true(stan_pattern("P_group\\[1\\] = \\w+\\(A_group_trend\\[g_idx, lag\\]\\);", code_with_trend))
 
   # Default prior application (VAR should use default beta(3, 2))
   expect_true(stan_pattern("alpha_cor_trend ~ beta\\(3, 2\\);", code_with_trend))
 
   # VAR coefficient and sigma priors (uses g_idx consistently)
   expect_true(stan_pattern(paste0(
-    "normal_lpdf\\(diagonal\\(A_raw_group_trend",
+    "normal_lpdf\\(diagonal\\(A_group_trend",
     "\\[g_idx, lag\\]\\) \\|"
   ), code_with_trend))
   expect_true(stan_pattern(paste0(

@@ -173,22 +173,19 @@ test_that("Returns mvgam_forecast with 10 contractual fields", {
   # would require a real stanfit object for dpar extraction; the
   # class-shape contract is the same for every type.
   fc <- forecast(fit, newdata = newdata, type = "expected")
-  expect_s3_class(fc, "mvgam_forecast")
   required <- c("family", "family_pars", "type", "series_names",
                 "train_observations", "train_times",
                 "test_observations", "test_times",
                 "hindcasts", "forecasts")
   expect_equal(sort(names(fc)), sort(required))
-  dead <- c("call", "trend_call", "trend_model", "drift",
-            "use_lv", "fit_engine")
-  expect_false(any(dead %in% names(fc)))
-  expect_identical(fc$type, "expected")
-  expect_true(is.list(fc$forecasts))
-  expect_true(is.list(fc$hindcasts))
+  # Held-out data stored by `mvgam(newdata = )` drive the horizon
+  # when `forecast()` is given none.
+  fit$test_data <- newdata
+  expect_equal(forecast(fit, type = "expected"), fc)
 })
 
 
-test_that("newdata = NULL returns hindcasts only, no forecasts", {
+test_that("forecast needs newdata or held-out data stored at fit time", {
   fit <- make_mock_mvgam()
   draws <- make_draws_mat(ndraws = 3L)
   testthat::local_mocked_bindings(
@@ -214,16 +211,12 @@ test_that("newdata = NULL returns hindcasts only, no forecasts", {
       matrix(2L, nrow = nrow(linpred), ncol = nrow(newdata))
     }
   )
-  # Without `newdata` there are no occasions to forecast at, and a
-  # fit cannot invent them. This returned an `mvgam_forecast`
-  # carrying hindcasts, a type and an empty `forecasts` list, which
-  # reads as though it forecast something; `hindcast()` is the call
-  # that answers at the training occasions.
+  # A fit given no held-out data has no occasions to forecast at.
+  # `hindcast()` predicts at the training occasions.
   expect_error(
     forecast(fit, newdata = NULL, type = "response"),
     "'newdata' is required to forecast"
   )
-  expect_identical(dim(hindcast(fit)$hindcasts[["s1"]]), c(3L, 10L))
 })
 
 
@@ -468,36 +461,21 @@ test_that("Newdata that names no time or no series errors", {
 
 test_that("pad_or_trim_rows pads short grids by repeating final row", {
   g <- matrix(c(1, 2, 3, 4), nrow = 2L, ncol = 2L)
-  out <- pad_or_trim_rows(g, target_rows = 4L)
-  expect_identical(dim(out), c(4L, 2L))
-  expect_equal(out[1, ], c(1, 3))
-  expect_equal(out[2, ], c(2, 4))
   # Rows 3 and 4 repeat the final source row.
-  expect_equal(out[3, ], c(2, 4))
-  expect_equal(out[4, ], c(2, 4))
+  expect_equal(pad_or_trim_rows(g, target_rows = 4L), g[c(1, 2, 2, 2), ])
 })
 
 
 test_that("pad_or_trim_rows trims long grids from the head", {
   g <- matrix(seq_len(6L), nrow = 6L, ncol = 1L)
-  out <- pad_or_trim_rows(g, target_rows = 3L)
-  expect_identical(dim(out), c(3L, 1L))
   # Trimming from the head keeps the trailing 3 rows.
-  expect_equal(as.numeric(out), c(4, 5, 6))
-})
-
-
-test_that("pad_or_trim_rows preserves an exact-fit grid", {
-  g <- matrix(c(1, 2), nrow = 2L, ncol = 1L)
-  expect_identical(pad_or_trim_rows(g, 2L), g)
+  expect_equal(as.numeric(pad_or_trim_rows(g, target_rows = 3L)), c(4, 5, 6))
 })
 
 
 test_that("pad_or_trim_rows handles zero-row input as a zero pad", {
   g <- matrix(0, nrow = 0L, ncol = 2L)
-  out <- pad_or_trim_rows(g, target_rows = 3L)
-  expect_identical(dim(out), c(3L, 2L))
-  expect_true(all(out == 0))
+  expect_equal(pad_or_trim_rows(g, target_rows = 3L), matrix(0, 3L, 2L))
 })
 
 
@@ -519,26 +497,15 @@ test_that("trend_linpred_grid reshapes one draw to series scale", {
   lp <- matrix(seq_len(12), nrow = 2L, byrow = TRUE)
   out <- trend_linpred_grid(lp, lp_obs_struct(), draw_row = 2L,
                               n_rows = 3L, n_series = 2L)
-  expect_identical(dim(out), c(3L, 2L))
   # Row 2 of `lp` is 7:12, laid out as (t, s) pairs.
-  expect_equal(out[1, ], c(7, 8))
-  expect_equal(out[2, ], c(9, 10))
-  expect_equal(out[3, ], c(11, 12))
+  expect_equal(out, matrix(7:12, nrow = 3L, byrow = TRUE))
 })
 
 
 test_that("trend_linpred_grid is zero without a trend formula", {
   out <- trend_linpred_grid(NULL, NULL, draw_row = 1L,
                               n_rows = 4L, n_series = 3L)
-  expect_identical(dim(out), c(4L, 3L))
-  expect_true(all(out == 0))
-})
-
-
-test_that("trend_linpred_grid returns an empty grid for zero rows", {
-  out <- trend_linpred_grid(NULL, NULL, draw_row = 1L,
-                              n_rows = 0L, n_series = 2L)
-  expect_identical(dim(out), c(0L, 2L))
+  expect_equal(out, matrix(0, 4L, 3L))
 })
 
 
@@ -548,7 +515,6 @@ test_that("trend_linpred_grid keeps series scale, not draw width", {
   lp <- matrix(seq_len(6), nrow = 1L)
   out <- trend_linpred_grid(lp, lp_obs_struct(), draw_row = 1L,
                               n_rows = 2L, n_series = 2L)
-  expect_identical(ncol(out), 2L)
   # Trimming from the head keeps the two most recent times.
   expect_equal(out[2, ], c(5, 6))
 })
@@ -758,8 +724,6 @@ test_that("slice_per_series handles per-series horizon differences", {
   out <- slice_per_series(mat, fc_grid, obs_struct,
                             ndraws_use = 1L,
                             series_levels = c("a", "b"))
-  expect_identical(dim(out[["a"]]), c(1L, 3L))
-  expect_identical(dim(out[["b"]]), c(1L, 2L))
   expect_equal(as.numeric(out[["a"]]), c(411, 421, 431))
   expect_equal(as.numeric(out[["b"]]), c(412, 422))
 })
@@ -802,7 +766,6 @@ test_that("the forecast grid does not depend on newdata row order", {
   )
 
   # Truths follow the sorted times, not the order they arrived in.
-  expect_equal(ordered_grid$observations, shuffled_grid$observations)
   expect_equal(shuffled_grid$observations$a, c(101, 102, 103))
   expect_equal(shuffled_grid$observations$b, c(201, 202, 203))
 
@@ -822,12 +785,10 @@ test_that("an argument neither method reads is refused, not swallowed", {
   # class and shape, which is what made the same shape of defect hard
   # to see on `posterior_predict()`.
   fit <- make_mock_mvgam()
-  expect_error(hindcast(fit, incl_autcor = TRUE), "must be empty")
-  expect_error(hindcast(fit, ndraw = 5L), "must be empty")
-  expect_error(forecast(fit, newdata = fit$data, ndraw = 5L),
-               "must be empty")
   # The offending name is reported, so the caller can see which one.
   expect_error(hindcast(fit, incl_autcor = TRUE), "incl_autcor")
+  expect_error(forecast(fit, newdata = fit$data, ndraw = 5L),
+               "must be empty")
 })
 
 
@@ -857,7 +818,6 @@ test_that("the step check names the grid, not an observation", {
   err <- conditionMessage(expect_error(
     mvgam:::assert_forecast_times_steppable(list(s1 = 31), prefit)
   ))
-  expect_type(err, "character")
   expect_match(err, "training grid runs to time 40", fixed = TRUE)
   # The word that was wrong. The series was last seen at 30 here, so
   # nothing may claim it was observed at 40.

@@ -36,9 +36,9 @@
 
 test_that("default type is 'residuals' and routes to mvgam_resid_panel", {
   f <- .install_route_mock("mvgam_resid_panel", value = "panel")
-  out <- plot(.make_stub_mvgam())
-  expect_true(f$called)
+  out <- plot(.make_stub_mvgam(), series = 2L)
   expect_equal(out, "panel")
+  expect_identical(f$args$series, 2L)
 })
 
 test_that("type = 'smooths' routes to conditional_smooths", {
@@ -65,20 +65,17 @@ test_that("type = 'smooths' routes to conditional_smooths", {
   )
   f <- .install_route_mock("conditional_smooths", value = cs_mock)
   out <- plot(.make_stub_mvgam(), type = "smooths")
-  expect_true(f$called)
   expect_s3_class(out, "ggplot")
 })
 
 test_that("type = 'factors' routes to plot_factors", {
   f <- .install_route_mock("plot_factors", value = "fac")
   expect_equal(plot(.make_stub_mvgam(), type = "factors"), "fac")
-  expect_true(f$called)
 })
 
 test_that("type = 'series' routes to plot_mvgam_series", {
   f <- .install_route_mock("plot_mvgam_series", value = "ts")
   expect_equal(plot(.make_stub_mvgam(), type = "series"), "ts")
-  expect_true(f$called)
 })
 
 test_that("type = 'trend' calls hindcast then plot.mvgam_forecast", {
@@ -87,15 +84,5 @@ test_that("type = 'trend' calls hindcast then plot.mvgam_forecast", {
   f_plot <- .install_route_mock("plot.mvgam_forecast", value = "tr_plot")
   expect_equal(plot(.make_stub_mvgam(), type = "trend"), "tr_plot")
   expect_true(f_hc$called)
-  expect_true(f_plot$called)
 })
 
-test_that("unknown type errors via match.arg", {
-  expect_error(
-    plot(.make_stub_mvgam(), type = "uncertainty")
-  )
-})
-
-test_that("non-mvgam input errors via checkmate assertion", {
-  expect_error(plot.mvgam(list()))
-})

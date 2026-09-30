@@ -7,7 +7,7 @@
 
 > **M**ulti**V**ariate (Dynamic) **G**eneralized **A**dditive **M**odels
 
-[![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
+[![R-CMD-check](https://github.com/nicholasjclark/mvgam/workflows/R-CMD-check/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
 [![Coverage
 status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
 [![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=brightgreen)](https://nicholasjclark.github.io/mvgam/)
@@ -76,8 +76,8 @@ data(portal_data)
 mvgam_data(portal_data, y = "captures", family = poisson())
 #> ✔ Data check passed for family 'poisson (link = log)'.
 #> • series: 4 level(s)
-#> • time: 1 to 80
-#> • n obs: 320 (68 NA)
+#> • time:   1 to 80
+#> • n obs:  320 (68 NA)
 ```
 
 <img src="man/figures/README-unnamed-chunk-4-1.png" alt="Visualizing multivariate time series in R using mvgam" width="100%" />
@@ -86,8 +86,8 @@ mvgam_data(portal_data, y = "captures", family = poisson())
 mvgam_data(portal_data, y = "captures", family = poisson(), series = 1L)
 #> ✔ Data check passed for family 'poisson (link = log)'.
 #> • series: 4 level(s)
-#> • time: 1 to 80
-#> • n obs: 320 (68 NA)
+#> • time:   1 to 80
+#> • n obs:  320 (68 NA)
 ```
 
 <img src="man/figures/README-unnamed-chunk-5-1.png" alt="Single-series exploratory panel for a Portal Project rodent species" width="100%" />
@@ -146,23 +146,17 @@ Using `print()` returns a quick summary of the object:
 ``` r
 mod
 #> GAM observation formula:
-#> captures ~ 0 + .mvgam_empty_obs
-#> <environment: 0x55d605720658>
+#> captures ~ 0
 #> 
 #> GAM process formula:
-#> trend_y ~ s(ndvi_ma12, bs = "re", by = series) + s(mintemp, bs = "bs", 
-#>     by = series) - 1
+#> ~s(ndvi_ma12, bs = "re", by = series) + s(mintemp, bs = "bs", by = series) - 1
 #> 
-#> 
-#> Family:
-#> poisson 
-#> 
-#> Link function:
-#> log 
+#>  Family: poisson 
+#>   Links: mu = log 
 #> 
 #> 
 #> Trend model:
-#> VAR 
+#> VAR(1) 
 #> 
 #> 
 #> N series:
@@ -175,8 +169,8 @@ mod
 #> 
 #> Status:
 #> Loading required namespace: rstan
-#> 4 chains, each with iter = 1000 
-#>   Total post-warmup draws = 4000
+#>   Draws: 4 chains, each with iter = 2500; warmup = 1500; thin = 1; 
+#>          total post-warmup draws = 4000
 ```
 
 Split Rhat and Effective Sample Size diagnostics show good convergence
@@ -346,7 +340,7 @@ description
     #>   Heaps (2023) and Clark et al. (2025). The mvgam-constructed model and
     #>   data were passed to Stan (Carpenter et al. 2017) via the cmdstanr
     #>   interface (Gabry et al. 2024). We ran 4 Hamiltonian Monte Carlo chains
-    #>   for 1000 warmup iterations and 1000 sampling iterations. Rank-normalised
+    #>   for 1500 warmup iterations and 1000 sampling iterations. Rank-normalised
     #>   split Rhat and effective sample sizes (Vehtari et al. 2021) were used to
     #>   monitor convergence.
 
@@ -399,29 +393,55 @@ type `methods(class = "mvgam")`.
 
 ## Extended observation families
 
-`mvgam` was originally designed to analyse and forecast non-negative
-integer-valued data. But further development of `mvgam` has resulted in
-support for a growing number of observation families. Currently, the
-package can handle data for the following:
+`mvgam` began as a tool for forecasting ecological counts, and counts
+are still where its most specialised machinery sits. Successive releases
+have widened what the observation model will accept, so the choice of
+`family` now spans most of the response types met in ecological and
+environmental monitoring.
+
+For continuous responses:
 
 - `gaussian()` for real-valued data
-- `student_t()` for heavy-tailed real-valued data
-- `lognormal()` for non-negative real-valued data
-- `Gamma()` for non-negative real-valued data
-- `Beta()` for proportional data on `(0,1)`
-- `bernoulli()` for binary data
-- `poisson()` for count data
-- `nb()` for overdispersed count data
-- `binomial()` for count data with known number of trials
-- `beta_binomial()` for overdispersed count data with known number of
-  trials
-- `nmix()` for count data with imperfect detection (unknown number of
-  trials)
+- `student()` for real-valued data with heavy tails
+- `lognormal()` and `Gamma()` for strictly positive data
+- `exponential()` for waiting times
+- `Beta()` for proportions on `(0, 1)`
+- `tweedie()` for positive continuous data carrying an exact mass at
+  zero, such as catch per unit effort or rainfall
 
-See `??mvgam_families` for more information. Below is a simple example
-for simulating and modelling proportional data with `Beta` observations
-over a set of series with a smoothed covariate effect and independent
-autoregressive dynamic trends:
+For counts and binary outcomes:
+
+- `poisson()` for equidispersed counts
+- `negbinomial()` for overdispersed counts
+- `beta_nb()` for counts whose tails run heavier than a negative
+  binomial can reach
+- `bernoulli()` for binary data
+- `binomial()` and `beta_binomial()` for counts with a known number of
+  trials
+- `com_binomial()` for bounded counts that are under-, over- or
+  super-dispersed relative to a binomial
+
+A further group of families operates on *closure units*, where several
+rows of the data share a single latent state. Rows belonging to a unit
+are recognised from their `series` and `time` values, so replicate
+visits to a site, or the species that together make up one assemblage,
+need no reshaping:
+
+- `nmix()` for repeat counts of an unknown abundance seen with imperfect
+  detection
+- `occ()` for repeat detection and non-detection visits to a site of
+  unknown occupancy
+- `multi()` and `diri()` for compositional counts and proportions that
+  sum within a unit
+- `categ()` for a single categorical outcome per unit
+- `mvn()` and `mvt()` for continuous multi-species responses with a
+  low-rank residual covariance, the latter permitting heavier tails
+
+See `?mvgam_families` for the full set, grouped by the kind of response
+each one suits, with a link to the page documenting its
+parameterisation. Below is a simple example for simulating and modelling
+proportional data with `Beta` observations over a set of series with a
+smoothed covariate effect and independent autoregressive dynamic trends:
 
 ``` r
 set.seed(100)
@@ -452,53 +472,47 @@ Inspect the summary to see that the posterior now also contains
 estimates for the `Beta` precision parameters $\phi$.
 
 ``` r
-summary(mod, 
-        include_betas = FALSE)
+summary(mod)
 #>  Family: beta 
-#>   Links: mu = logit 
+#>   Links: mu = logit; phi = log 
 #> Formula: y ~ s(x, by = series, k = 6) 
 #>    Data: data$data_train (Number of observations: 180) 
 #>  Series: 3 
-#>  Trends: AR(); formula: ~0 
-#>   Draws: 4 chains, each with iter = 1000; warmup = 500; thin = 1; 
+#>  Trends: AR(1) 
+#>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1; 
 #>          total post-warmup draws = 4000
 #> 
 #> == Observation Model ==
-#> Population-Level Effects:
-#>           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> Intercept     0.19      0.17    -0.13     0.55    1   831.47  1656.26
+#> Smoothing Spline Hyperparameters:
+#>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+#> sds(sxseriesseries_1_1)     4.61      2.24     1.71    10.13 1.00     1167
+#> sds(sxseriesseries_2_1)     6.07      2.58     2.74    12.62 1.00      962
+#> sds(sxseriesseries_3_1)     9.01      3.74     3.81    18.35 1.00     1022
+#>                         Tail_ESS
+#> sds(sxseriesseries_1_1)     2117
+#> sds(sxseriesseries_2_1)     1346
+#> sds(sxseriesseries_3_1)     1462
 #> 
-#> Smooth Terms:
-#>          Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sds_1[1]     4.69      2.33     1.72    10.32 1.00  1697.25  1984.08
-#> sds_2[1]     5.98      2.57     2.49    12.28 1.00  1097.27  1378.18
-#> sds_3[1]     8.96      3.65     3.79    18.36 1.00  1164.42  1622.96
-#> s_1_1[1]     2.31      4.53    -4.92    13.30 1.00  1729.45  1888.80
-#> s_1_1[2]     1.78      2.71    -4.05     7.04 1.00  1891.68  2430.50
-#> s_1_1[3]    -6.58      3.21   -13.86    -1.28 1.00  1434.53  1631.25
-#> s_1_1[4]     2.29      2.15    -2.00     6.73 1.00  2414.93  2712.05
-#> s_2_1[1]     4.01      5.12    -4.76    15.54 1.00  1621.80  1557.77
-#> s_2_1[2]     0.38      2.64    -5.25     5.27 1.00  2037.57  2223.11
-#> s_2_1[3]    -8.83      2.65   -14.07    -3.56 1.01   838.28  1907.40
-#> s_2_1[4]     5.37      2.78     0.29    11.26 1.00  1479.55  2130.82
-#> s_3_1[1]    14.08      6.06     2.22    26.18 1.00  1586.80  1835.02
-#> s_3_1[2]     5.78      2.68     0.80    11.13 1.00   865.43  2135.11
-#> s_3_1[3]   -11.30      2.70   -16.53    -5.98 1.00  1526.84  2167.88
-#> s_3_1[4]    -0.48      2.49    -5.51     4.23 1.00  1299.91  2197.23
+#> Regression Coefficients:
+#>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> Intercept               0.20      0.18    -0.12     0.57 1.00      881     1412
+#> sx:seriesseries_1_1     9.64      7.00    -1.57    25.66 1.00     1220     1931
+#> sx:seriesseries_2_1    14.25      5.53     4.08    25.95 1.01      698     1382
+#> sx:seriesseries_3_1    22.79      6.63     9.41    35.42 1.00     1424     1841
 #> 
 #> Further Distributional Parameters:
 #>     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> phi    12.08      6.94     5.18    31.52 1.04   108.91   155.27
+#> phi    13.15      9.33     5.36    40.10 1.03       79       95
 #> 
 #> == Trend Model ==
 #> Trend Specific Parameters:
 #>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> sigma_trend[1]     0.79      0.22     0.37     1.22 1.02   162.14   359.13
-#> sigma_trend[2]     0.86      0.22     0.45     1.30 1.02   194.55   420.79
-#> sigma_trend[3]     0.50      0.21     0.06     0.90 1.03   143.82   208.69
-#> ar1_trend[1]       0.56      0.20     0.15     0.91 1.01   536.65  1127.34
-#> ar1_trend[2]       0.71      0.13     0.45     0.93 1.00   562.30  1420.17
-#> ar1_trend[3]       0.54      0.28    -0.21     0.92 1.01   728.42   588.66
+#> sigma_trend[1]     0.81      0.23     0.35     1.25 1.03      113      281
+#> sigma_trend[2]     0.89      0.23     0.49     1.39 1.02      126      153
+#> sigma_trend[3]     0.51      0.21     0.09     0.95 1.03       99      149
+#> ar1_trend[1]       0.54      0.20     0.14     0.90 1.01      405      717
+#> ar1_trend[2]       0.69      0.12     0.43     0.91 1.01      311      912
+#> ar1_trend[3]       0.55      0.25    -0.08     0.92 1.01      540      626
 #> 
 #> Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
 #> and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -507,7 +521,8 @@ summary(mod,
 #> Next steps:
 #>   - `pp_check(fit)`: posterior predictive checks
 #>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
-#>   - `loo(fit)` / `loo_compare(...)`: model fit + comparison
+#>   - `lfo_cv(fit)`: leave-future-out model comparison
+#>   - `conditional_effects(fit)`: covariate effects
 #> Use `how_to_cite(fit)` for a citation-ready model description.
 ```
 
@@ -541,10 +556,10 @@ troubleshoot.
 
 ## Citing `mvgam` and related software
 
-When using any software please make sure to appropriately acknowledge
-the hard work that developers and maintainers put into making these
-packages available. Citations are currently the best way to formally
-acknowledge this work (but feel free to ⭐ this repo as well).
+Research software is written and maintained by people whose only
+currency is citation. If `mvgam` contributed to an analysis, please cite
+it, and cite the packages it builds on as well. A ⭐ on the repository
+is welcome too.
 
 When using `mvgam`, please cite the following:
 
@@ -565,15 +580,14 @@ appropriate citations for your software setup.
 
 ## Getting help
 
-If you encounter a clear bug, please file an issue with a minimal
-reproducible example on
-[GitHub](https://github.com/nicholasjclark/mvgam/issues). Please also
-feel free to use the [`mvgam` Discussion
-Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for
-or post other discussion topics related to the package, and do check out
-the [`mvgam`
-Changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for
-any updates about recent upgrades that the package has incorporated.
+Bug reports belong on the [issue
+tracker](https://github.com/nicholasjclark/mvgam/issues), and a minimal
+reproducible example is what makes them fixable. Questions about model
+syntax, priors or interpretation are better suited to the [`mvgam`
+Discussion Board](https://github.com/nicholasjclark/mvgam/discussions),
+where an earlier thread has often covered the same ground already. The
+[Changelog](https://nicholasjclark.github.io/mvgam/news/index.html)
+records what changed in each release.
 
 ## Other resources
 

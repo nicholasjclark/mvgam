@@ -156,7 +156,7 @@ a species intercept, since detection was simulated as constant within
 a species.
 
 ```{r summary}
-summary(mod, include_betas = FALSE)
+summary(mod)
 ```
 
 ```{r diagnostics, echo = FALSE}

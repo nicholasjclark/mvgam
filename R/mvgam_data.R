@@ -1,7 +1,8 @@
 # Pre-fit data inspection. Composes the same validators mvgam()
 # runs at fit time (`ensure_mvgam_variables()` for the trend axes,
 # `validate_regular_time_intervals()`, `validate_closure_unit_data()`,
-# `validate_response_for_family()`) so users can verify their
+# `validate_response_shapes()`, `validate_model_columns()`) so users
+# can verify their
 # long-format data has the columns / levels / response shape a
 # proposed model requires, without paying for a Stan compile.
 # Optionally returns the same observed-series plot that
@@ -42,18 +43,24 @@
 #'   [jsdgam()].
 #' @param formula Optional observation formula (a `formula`,
 #'   `brmsformula`, or `bf()` two-arm specification for
-#'   closure-unit fits). When supplied, every covariate the
-#'   formula references is checked for `NA` and the call errors
-#'   if any are present. Response `NA`s are always allowed and
-#'   are preserved by `mvgam()` to maintain the time grid.
+#'   closure-unit fits). Every column the formula uses must be in
+#'   `data`: covariates, offsets, random-effect grouping factors
+#'   and the columns of addition terms such as `trials()` and
+#'   `weights()`. Those columns may not hold `NA`, and a
+#'   `trials()` count may not fall below its response. Response
+#'   `NA`s are allowed, and `mvgam()` keeps their rows on the
+#'   time grid.
 #' @param trend_formula Optional trend formula (e.g.
 #'   `~ AR(time = week, series = species) + s(env)`), as passed to
 #'   [mvgam()]. Its trend constructor names the time and series
 #'   columns and decides whether times must be evenly spaced:
 #'   `CAR()` and `ZMVN()` accept gaps, most others refuse them.
 #'   `NULL` checks the data for a model without a trend, which
-#'   needs no series column. Covariates the formula references
-#'   get the same `NA` check as `formula`.
+#'   needs no series column. Its covariates, offsets and grouping
+#'   factors get the same checks as those of `formula`.
+#' @param data2 Optional named list of further model data, as passed
+#'   to [mvgam()]. A formula variable found here, such as a matrix
+#'   covariate, need not be a column of `data`.
 #' @param plot Logical. If `TRUE` (default), draw the
 #'   observed-series plot using the same panels as
 #'   `plot(fit, type = "series")`. Multi-series data render as a
@@ -143,6 +150,7 @@ mvgam_data <- function(data,
                        family = gaussian(),
                        formula = NULL,
                        trend_formula = NULL,
+                       data2 = NULL,
                        plot = TRUE,
                        newdata = NULL,
                        series = NULL,
@@ -152,6 +160,7 @@ mvgam_data <- function(data,
   checkmate::assert_string(y)
   checkmate::assert_flag(plot)
   checkmate::assert_formula(trend_formula, null.ok = TRUE)
+  checkmate::assert_list(data2, names = "named", null.ok = TRUE)
   if (is.list(data) && !is.data.frame(data)) {
     data <- as.data.frame(data)
   }
@@ -159,7 +168,9 @@ mvgam_data <- function(data,
   # The family and the trend are resolved as mvgam() resolves them, so
   # a model this check passes is one mvgam() accepts.
   obs_formula <- formula %||% stats::reformulate("1", response = y)
-  family <- resolve_observation_family(obs_formula, family)$family
+  resolved <- resolve_observation_family(obs_formula, family)
+  obs_formula <- resolved$formula
+  family <- resolved$family
 
   if (is_multi_response_family(family)) {
     stop(insight::format_error(c(
@@ -182,6 +193,9 @@ mvgam_data <- function(data,
   axis <- spec_axis_vars(trend_spec)
   time_var <- axis$time_var
   series_var <- axis$series_var
+  if (!is.null(trend_spec)) {
+    trend_spec <- resolve_trend_groupings(trend_spec, data, series_var)
+  }
 
   if (uses_closure_unit_layout(family)) {
     # validate_closure_unit_data() already enforces required
@@ -197,10 +211,9 @@ mvgam_data <- function(data,
       cap_required   = is.null(closure_unit_default_cap(family))
     )
   } else {
-    validate_required_variables(
-      data, required_vars = c(y, time_var), context = "mvgam_data"
-    )
-    validate_response_for_family(data[[y]], family, y_name = y)
+    validate_required_variables(data, y)
+    assert_axis_column(data, time_var, "time")
+    validate_response_shapes(data, obs_formula, family)
   }
 
   # Each row's series, resolved the way mvgam() resolves it: from the
@@ -216,22 +229,19 @@ mvgam_data <- function(data,
          "mvgam_series")
   }
   train_series <- row_series(data)
-  series_levels <- if (has_series) levels(as.factor(train_series))
+  # `mvgam()` drops a level no row holds, and the check reports the
+  # series the model will fit.
+  series_levels <- if (has_series) {
+    levels(droplevels(as.factor(train_series)))
+  }
 
   if (trend_requires_regular_intervals(trend_spec)) {
     validate_regular_time_intervals(data[[time_var]], time_var)
   }
 
-  # Covariate NA check. Runs only when at least one formula was
-  # supplied; mirrors the pre-fit guard wired into mvgam_core().
-  if (!is.null(formula) || !is.null(trend_formula)) {
-    validate_no_covariate_nas(
-      data           = data,
-      formulas       = list(formula, trend_formula),
-      response_vars  = y,
-      context        = "data"
-    )
-  }
+  # The column checks `build_stan_components()` runs before any
+  # program is built.
+  validate_model_columns(data, obs_formula, family, trend_formula, data2)
 
   out <- list(
     data          = data,

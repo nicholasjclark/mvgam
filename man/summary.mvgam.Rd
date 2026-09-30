@@ -4,13 +4,7 @@
 \alias{summary.mvgam}
 \title{Summary of mvgam model fits}
 \usage{
-\method{summary}{mvgam}(
-  object,
-  probs = c(0.025, 0.975),
-  robust = FALSE,
-  include_betas = TRUE,
-  ...
-)
+\method{summary}{mvgam}(object, probs = c(0.025, 0.975), robust = FALSE, matrices = FALSE, ...)
 }
 \arguments{
 \item{object}{An object of class \code{mvgam}.}
@@ -22,19 +16,15 @@ for credible intervals. Default is \code{c(0.025, 0.975)} for 95\% intervals.}
 central tendency and spread. The default \code{FALSE} uses the mean
 and SD.}
 
-\item{include_betas}{Logical; if \code{TRUE} (the default), print every
-per-cell expansion of the trend-side dynamic parameters
-(per-country and per-cell \code{A_group_trend},
-\code{Sigma_group_trend}, the full block-diagonal
-\code{A_trend} / \code{Sigma_trend} / \code{Omega_trend} etc.).
-Setting \code{FALSE} keeps the global hyperparameters
-(\code{Amu_trend}, \code{Aomega_trend},
-\code{L_Omega_global_trend}, \code{alpha_cor_trend},
-\code{sigma}) and drops the per-cell arrays; useful for
-hierarchical VAR fits where the expansion runs to hundreds
-or thousands of rows. Individual per-country blocks can
-still be pulled via \code{as.matrix()},
-\code{as_draws_df()}, or \code{mcmc_plot()}.}
+\item{matrices}{Logical; if \code{TRUE}, also print every cell of
+the matrices a correlated, VAR or hierarchical trend derives
+from its sampled parameters (\code{Phi_trend}, \code{Sigma_trend},
+\code{Omega_trend}, \code{Phi_group_trend},
+\code{Sigma_group_trend}). The default \code{FALSE} prints the
+sampled parameters alone, among them \code{sigma_trend},
+\code{Amu_trend}, \code{Aomega_trend} and
+\code{alpha_cor_trend}. \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}} and
+\code{\link[=residual_cor]{residual_cor()}} summarise the matrices a cell at a time.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

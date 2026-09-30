@@ -727,9 +727,9 @@ apply_trend_class_suffix <- function(class) {
 # and the non-centred reparameterisation it is written under, not
 # priors a user set or could change. `init_trend` holds the states
 # before the first observed time, drawn from the stationary
-# distribution the autoregression implies, so its statement is a
-# function of `A_trend` and `Sigma_trend` rather than a prior of its
-# own. `init_innovations_trend` holds the standard variates an ARMA
+# distribution the autoregression implies. Its statement is a
+# density built from `Phi_trend` and `Sigma_trend`, with no prior of
+# its own. `init_innovations_trend` holds the standard variates an ARMA
 # start scales to its stationary law.
 mvgam_state_params <- c(
   "trend", "lv_trend", "lv_trend_tilde",
@@ -895,7 +895,7 @@ mvgam_stancode_prior_rows <- function(sc) {
 #' each one offsets a program's `lp__` by a constant. Reading whole
 #' left-hand sides rather than one spelling of them resolves a
 #' container call, a slice, a transpose and a loop body alike:
-#' `diagonal(A_raw_trend[lag])` and `lv_trend[t, : ]'` are statements
+#' `diagonal(A_trend[lag])` and `lv_trend[t, : ]'` are statements
 #' a parameter-shaped pattern does not see.
 #'
 #' Ownership comes from `is_mvgam_managed_class()`, the predicate the
@@ -1093,24 +1093,13 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
 
   checkmate::assert_formula(trend_formula, null.ok = TRUE)
 
-  # Cache formula metadata so latent_params lookups in downstream
-  # validators read from an attribute instead of reparsing the AST.
-  formula <- cache_formula_latent_params(formula)
-  if (!is.null(trend_formula)) {
-    trend_formula <- cache_formula_latent_params(trend_formula)
-  }
-
   # Handle missing trend formula
   if (is.null(trend_formula)) {
     return(list(
       has_trends = FALSE,
       is_multivariate = FALSE,
       trend_specs = NULL,
-      base_formula = NULL,
-      cached_formulas = list(
-        formula = formula,
-        trend_formula = NULL
-      )
+      base_formula = NULL
     ))
   }
 
@@ -1141,10 +1130,7 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     is_multivariate = is_mv_main,
     trend_specs = trend_specs,
     base_formula = parsed_trend$base_formula,
-    regular_terms = parsed_trend$regular_terms,
-    cached_formulas = list(
-      formula = formula
-    )
+    regular_terms = parsed_trend$regular_terms
   ))
 }
 

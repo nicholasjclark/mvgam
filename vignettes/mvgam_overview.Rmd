@@ -37,827 +37,325 @@ library(ggplot2)
 theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 ```
 
-When we fit a regression to a time series, any structure the
-covariates do not explain ends up in the residuals, where it
-inflates the observation noise. `mvgam` fits state-space models
-instead, which give that structure its own place in the model. We
-write the observation model as a `brms` formula, which is compiled
-through the `brms` Stan code generator, and `mvgam` adds a latent
-state layer on top. The observation process maps the latent state
-to the response through a chosen likelihood, and a trend process
-governs how the latent state evolves over time.
+`mvgam` fits Bayesian state-space models to time series, extending
+the dynamic generalised additive models of Clark and Wells (2023).
+The observation model is a `brms` formula (Bürkner 2017), and a
+second formula, `trend_formula`, adds a latent state that evolves
+through time. Temporal structure that the covariates do not explain
+is estimated as part of the latent state, and forecasts carry that
+structure forward. Stan fits the model, and the fitted object works
+with the `brms`, `marginaleffects`, `loo` and `bayesplot` tooling.
 
-Because the observation side is compiled by `brms`, the full
-`brms` modelling vocabulary carries through into state-space fits.
-Linear terms, smooths (`s()`, `t2()`, `te()`), Gaussian process
-smooths (`gp()`), monotonic effects (`mo()`), random effects
-through `(... | ...)`, smooths split by a factor (`by = `), and
-nonlinear formulas through `bf(..., nl = TRUE)` all work on
-either side of the model. Joint responses compose through `bf()`
-arms with distributional regression on auxiliary parameters
-(e.g. `bf(y ~ ..., sigma ~ ...)`).
-
-`mvgam` then adds the latent state layer. Inside `trend_formula`
-sit random walks, autoregressions with arbitrary sparse lag sets,
-vector autoregressions, piecewise growth and hierarchical
-residual correlations, alongside a continuous time AR for
-irregular sampling and a low-rank factor structure for joint
-species distribution models. Smooths and covariate effects can
-run on the latent state alongside the response, so the same
-modelling vocabulary applies in both layers.
-
-Once fitted, the resulting object plugs into the wider Bayesian
-tooling: `marginaleffects::predictions()`, `comparisons()`,
-`hypotheses()` and `slopes()` dispatch on `mvgam` objects through
-the standard `posterior_epred()`, `posterior_predict()` and
-`posterior_linpred()` methods. `bayesplot` and `loo` plug in
-directly. `as_draws()` from the `posterior` package returns the
-draws as an array. `tidy()` and `glance()` return broom-format
-data frames, with `augment()` for adding posterior summaries back
-to the original data.
-
-This vignette works through the package on data simulated by
-`sim_mvgam()`. The simulator returns the true smooth functions and
-the latent trajectory it drew from, so we can check what the model
-recovers. The data carry a covariate effect and a dynamic process,
-which lets us ask what a smooth misses on its own and what the
-latent state adds.
-
-## State-space formulation
-
-For an observation $y_{i, t}$ on series $i$ at time $t$ with link
-function $g$ and observation family $\mathcal{F}$:
+For an observation $y_{i,t}$ on series $i$ at time $t$, with link
+function $g$ and a response distribution $\mathcal{F}$:
 
 \begin{align*}
-y_{i, t} & \sim \mathcal{F}(\tilde{y}_{i, t}, \phi) \\
-g(\tilde{y}_{i, t}) & = \alpha_i +
-  \sum_{j=1}^{J} s_{i, j}(x_{j, t}) +
-  Z_{i, \cdot} \, z_{\cdot, t} \, .
+y_{i,t} & \sim \mathcal{F}(\mu_{i,t}, \theta) \\
+g(\mu_{i,t}) & = \alpha_i + \textstyle\sum_j f_j(x_{j,i,t})
+  + Z_{i,\cdot} \, \eta_{\cdot,t} \\
+\eta_{\cdot,t} & \sim \text{trend process}(\eta_{\cdot,t-1}, \dots)
 \end{align*}
 
-The intercept $\alpha_i$ and smooths $s_{i, j}$ form the
-observation-side linear predictor. The latent state $z_{k, t}$
-evolves through a trend process (AR(1), VAR, RW, CAR and so on);
-$Z$ is a loadings matrix mapping the $K$-dimensional latent state
-onto the $N$ series. With $K = N$ and $Z = I$ each series gets
-its own latent state; with $K < N$ the latent states are shared
-factors. Smooths and covariate effects passed through
-`trend_formula` sit on the latent state; everything in the
-top-level `formula` sits on the response.
-
-## Modelling APIs
-
-Two fitters give access to the same state-space models. They
-differ in how the data are laid out and in what the response
-represents.
-
-`mvgam()` takes a long-format data frame indexed by a time
-column and (optionally) by a series column. The defaults are
-`time` and `series`, but every trend constructor accepts
-`time = ` / `series = ` arguments that point at any column in
-the data, so existing column names need not be renamed. The
-series dimension drives the multivariate trend constructors:
-`VAR()`, the `cor = TRUE` switches and hierarchical
-correlations through `gr`. The response is a single column on
-the `brms` side. Use this fitter to forecast one or more time
-series, including the closure-unit families when each unit
-produces a scalar response.
-
-`jsdgam()` is the entry point for joint species distribution and
-closure-unit fits where the grouping is biological rather than
-temporal. Data arrive as one row per `(unit, species)` cell.
-Joint multivariate response families work on sites by species;
-occupancy and N-mixture models work on sites by visit by
-species, with the detection process attached as a second `bf()`
-arm. `jsdgam()` composes the same trend pipeline as `mvgam()`,
-with factor structure via `n_lv` and `loadings_prior`, and adds
-phylogenetic distance matrices through `phylo`, trait-informed
-loading priors through `traits`, and trait by environment
-interactions through `trait_slopes`.
-
-The family table below applies to both fitters. The closure-unit
-and joint multivariate response families work in either, and the
-choice between `mvgam()` and `jsdgam()` is driven by what the
-rows of the data represent rather than by the likelihood itself.
-
-## Supported observation families
-
-The complete `brms` family list is available through the
-integration layer. `mvgam` adds a small library of families for
-time-series and ecological use cases that `brms` does not ship
-natively:
-
-| Family | Use case | Distributional parameters |
-|:------:|:---------|:-----------------:|
-| `tweedie()` | Compound Poisson-Gamma counts that include many zeros | `mphi`, `mtheta` |
-| `beta_nb()` | Heavy-tailed counts whose largest values a negative binomial keeps under-predicting | `shape`, `mtail` |
-| `com_binomial()` | Conway-Maxwell-Binomial for over-, under-, super-dispersed bounded counts | `nu` |
-| `nmix()` | N-mixture detection-error models (Poisson-Binomial, Royle-Nichols, Poisson-Poisson variants) | `mu`, `p` |
-| `occ()` | Single-season occupancy with imperfect detection | `mu`, `p` |
-| `diri()` | Dirichlet compositional responses | `phi` |
-| `multi()`, `categ()` | Multinomial and categorical responses on the closure-unit grain | -- |
-| `mvn()`, `mvt()` | Multivariate normal / Student-t responses with low-rank residual covariance | -- |
-
-The parameter column names what a `bf()` arm or a `prior()` call
-can address. For the closure-unit families `mu` carries the state
-(abundance or occupancy) and `p` the detection side; for `mvn()`
-and `mvt()` the residual covariance is built from the loadings
-and the species scales `Psi` rather than from a distributional
-parameter. Each family is documented on its own help page with a
-worked recovery example. The two groups that need extra
-explanation are the closure-unit families and the joint
-multivariate response families, both summarised below.
-
-A family whose mean has to stay positive needs a link that keeps it
-there once a trend enters the linear predictor. `stats::Gamma()`
-supplies the `inverse` link. Under it the mean is positive only where
-the predictor is, and a latent trend is centred near zero and reaches
-negative values, leaving the likelihood undefined. Pair `Gamma()`,
-`weibull()`, `exponential()`, `frechet()` and `inverse.gaussian()`
-with `link = "log"` for a trend model. `mvgam()` warns before
-fitting. `lognormal()` is the exception, since its `mu` is a
-log-scale location that takes any sign.
-
-### Closure-unit families: `occ()` and `nmix()`
-
-Closure-unit data hold repeated observations of the same sampling
-unit (a site, a visit, a season) under a process that may detect
-the underlying state imperfectly. `occ()` and `nmix()` marginalise
-the latent occupancy or abundance state inside the Stan
-likelihood, so the chain samples only the detection model and
-the linear predictor for the state. Both enter through a second
-`bf()` arm.
-
-`occ()` implements the single-season occupancy model of
-[MacKenzie et al. (2002)](<https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2>),
-which separates occupancy probability $\psi$ from per-visit
-detection probability. `nmix()` supports three observation
-processes chosen at the constructor: `"poisson_binomial"`
-follows [Royle (2004)](https://doi.org/10.1111/j.0006-341X.2004.00142.x),
-`"royle_nichols"` follows
-[Royle and Nichols (2003)](<https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2>),
-and `"poisson_poisson"` treats each observed count as a noisy
-Poisson realisation of an underlying Poisson abundance.
-
-### Joint multivariate response families
-
-These families model a multivariate response on the closure-unit
-grain. The likelihood is evaluated at the unit level (one row
-per `(unit, species)` cell with `K` species), and the trend
-pipeline composes through the latent state as for any other
-family. Two complementary identification mechanisms are needed
-because both compositional and continuous multivariate
-likelihoods are non-identified without them.
-
-`diri()`, `multi()` and `categ()` model compositional or
-categorical responses on the simplex. The likelihood subtracts
-the reference category's linear predictor from every entry of
-the length-$K$ `mu` vector (a softmax shift equivalent to the
-$K - 1$ reference parameterisation), and a `sum_to_zero_vector[K]`
-constraint is applied to each column of $Z$. Together these
-identify the joint model without user-supplied constraints.
-`posterior_epred()` returns one probability per
-`(unit, species)` row summing to 1 within each unit.
-
-`mvn()` and `mvt()` model continuous multivariate responses.
-The residual covariance is the sum of a loadings outer product
-and a diagonal of species-specific variances $\Psi^2$:
-
-\begin{align*}
-\Sigma & = Z Z^\top + \mathrm{diag}(\Psi^2)
-\end{align*}
-
-`residual_cor()` converts this $\Sigma$ to a correlation matrix
-between species on the response scale. The loadings are
-identified by the same rotation described in the trend factor
-model section below.
-
-See `?jsdgam` for the full surface, including the phylogenetic
-and trait-environment hooks, and `?ordinate` for biplot
-helpers built on the rotated loadings. The online article
-[Joint species distribution GAMs with informed loadings](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
-walks through a complete `jsdgam()` workflow on count data
-with a negative binomial observation model, trait-informed
-loadings, ordination rotations and MGP shrinkage.
-
-## Latent trend processes
-
-Six families of trend constructor live inside `trend_formula`.
-Each is documented on its own help page; the formulas below give
-the per-step transition that the constructor compiles into Stan.
-The presentation starts with the simplest case (random walks),
-then covers stationary autoregressions, an analogue for irregular
-sampling, and a deterministic piecewise kernel.
-
-### Random walks: `RW()`
-
-The simplest dynamic process. Each series carries a
-non-stationary state that drifts by a Normal innovation at every
-step. Setting `ma = TRUE` adds a moving-average error term
-$\theta_i$ that lets the chain absorb brief shocks without
-forcing them into the next state:
-
-\begin{align*}
-z_{i, t} & = z_{i, t - 1} + \theta_i \, \epsilon_{i, t - 1}
-                + \epsilon_{i, t} \\
-\epsilon_{i, t} & \sim \text{Normal}(0, \sigma_i)
-\end{align*}
-
-### Autoregressions: `AR(p = ...)`
-
-`AR()` scales the previous state by lag coefficients $\rho_l$.
-When `p` is a scalar, the lag set is
-$\mathcal{L} = \{1, \dots, p\}$; when `p` is a vector, the lag
-set is $\mathcal{L} = p$ and the user can skip intermediate
-lags. `AR(p = c(1, 12))` evaluates only the lag 1 and lag 12
-coefficients, with no $\rho_2$ through $\rho_{11}$ in the model.
-Sparse lag sets are the right shape for periodic seasonal
-recurrence (lag 1 momentum and lag 12 annual cycle for monthly
-data; lag 1 and lag 7 for weekly data) without paying for the
-intermediate coefficients. Default priors bound each $\rho_l$
-in $(-1, 1)$. For AR(1), the initial state is rescaled to the
-stationary marginal variance, so the prior at $t = 1$ matches
-the stationary distribution implied by $\rho_1$ and $\sigma_i$:
-
-\begin{align*}
-z_{i, t} & \sim \text{Normal}\!\Bigl(
-  \textstyle \sum_{l \in \mathcal{L}} \rho_{i, l} \, z_{i, t - l}
-  + \theta_i \, \epsilon_{i, t - 1},\;
-  \sigma_i \Bigr)
-\end{align*}
-
-### Vector autoregressions: `VAR(p = ...)`
-
-`VAR()` generalises `AR()` to multiple correlated series. Each
-$A_l$ is an $N_{\text{series}} \times N_{\text{series}}$
-transition matrix. Entries off the diagonal carry the lagged
-effect of one series on another. Unlike `AR()`, `VAR()` requires
-`p` to be a scalar (`VAR(p = 2)` includes lags 1 and 2): the
-Heaps (2023) joint stationary prior used here needs consecutive
-companion-form structure, so sparse lag vectors are not
-supported. Innovations
-are correlated through $\Sigma$, with an LKJ prior on the
-Cholesky factor:
-
-\begin{align*}
-z_t & \sim \text{Normal}\!\Bigl(
-  \textstyle \sum_{l=1}^{p} A_l \, z_{t - l},\; \Sigma \Bigr)
-\end{align*}
-
-### Zero-mean multivariate normal: `ZMVN()`
-
-`ZMVN()` is `VAR()` stripped of its temporal recursion. It is the
-right kernel when the data are organised by a non-temporal
-grouping (sites or regions, for example) and the question is
-residual covariance rather than dynamics, which is the typical setup for
-joint species distribution models that have no time dimension:
-
-\begin{align*}
-z_t & \sim \text{Normal}(0, \Sigma)
-\end{align*}
-
-### Continuous-time AR(1): `CAR()`
-
-For data sampled at irregular intervals, where the discrete AR
-recursion no longer makes sense, `CAR()` runs an AR(1) recursion
-whose lag coefficient decays geometrically with the time gap
-$\Delta_t = t - t_{-}$ between the current observation and the
-most recent one. This is the Ornstein-Uhlenbeck process
-specialised to discrete observations:
-
-\begin{align*}
-z_{i, t} & \sim \text{Normal}\!\bigl(
-  \rho_i^{\Delta_t} \, z_{i, t_{-}},\;
-  \sigma_i \bigr)
-\end{align*}
-
-### Heavy-tailed innovations: `df`
-
-Every stochastic trend above draws its innovations from a Normal
-distribution, which spreads an occasional large shock across the
-whole series by inflating $\sigma$. Setting `df` on `AR()`, `RW()`,
-`CAR()` or `ZMVN()` replaces that with a multivariate Student-t, so
-the shock is absorbed by the tail and the process variance stays
-where the bulk of the data put it. This suits boom-and-bust
-population series and outbreak dynamics, where a single
-environmental event moves the whole system and then the usual
-dynamics resume.
-
-\begin{align*}
-\boldsymbol{\epsilon}_t & \sim
-  \text{MVStudentT}(\nu, \mathbf{0}, \Sigma)
-\end{align*}
-
-The default `df = Inf` gives the Normal innovations above, since a
-Student-t with infinite degrees of freedom is a Normal. `df = NA`
-estimates $\nu$, and a number above 2 fixes it.
-
-What the multivariate form shares between series is the innovation
-*scale* at each time point, not the shock itself. Large innovations
-therefore tend to occur together: at the 1% of time points where one
-series shocks hardest, another series is also large about half the
-time, against a baseline of roughly one time in ten. But each series
-still draws its own standard Normal, so the signs are independent and
-a series can sit out an event that moves its neighbours. Correlation
-between series is governed by `cor` exactly as it is for Normal
-innovations; the tail behaviour is layered on top of that rather than
-replacing it.
-
-Where `df = NA`, the degrees of freedom are estimated as `nu_trend`
-under a default `gamma(4, 0.3)` prior, which can be replaced through
-`prior`, for example `prior(gamma(2, 0.1), class = "nu_trend")`.
-
-Two things are worth knowing before reaching for it. The lower bound
-of 2 is required rather than conventional: below it the innovations
-have no finite variance and the stationary initialisation of an
-autoregressive trend is undefined. And $\nu$ is informed only
-through the tail of a latent process that is itself observed through
-the observation model, so it is weakly identified in short series;
-below roughly 200 time points expect the posterior to lean on its
-prior. `VAR()` and `PW()` do not take `df`, the first because it
-samples its states directly and the second because it is
-deterministic.
-
-### Piecewise growth: `PW()`
-
-Where the trends above are stochastic, `PW()` is deterministic.
-The constructor compiles the Prophet kernel of
-[Taylor and Letham (2018)](https://doi.org/10.1080/00031305.2017.1380080).
-It fits a piecewise linear or piecewise logistic trajectory with
-growth rate changes at a set of changepoints
-$\{s_1, \dots, s_S\}$. The lag-zero rate is $k$ and the magnitude
-shift at changepoint $s_j$ is $\delta_j$. Let $a(t)$ be the
-$\mathbb{R}^S$ indicator with $a_j(t) = \mathbb{1}\{t \geq s_j\}$
-and $\gamma$ the offset-correction vector that keeps the
-trajectory continuous. Linear growth passes through the origin,
-and the observation formula supplies the level:
-
-\begin{align*}
-z_t & = \bigl(k + a(t)^\top \delta\bigr) t
-       + a(t)^\top \gamma
-\end{align*}
-
-Logistic growth adds an offset $m$ to $(k, \delta)$ and maps the
-trajectory through a sigmoid with a (possibly time-varying)
-carrying capacity $C(t)$:
-
-\begin{align*}
-z_t & = \frac{C(t)}{1 + \exp\!\bigl(
-  -(k + a(t)^\top \delta)\,(t - (m + a(t)^\top \gamma))
-\bigr)}
-\end{align*}
-
-### Composing options
-
-Three switches apply to any per-series trend, so the six
-constructors above cover many configurations without needing new
-ones.
-
-The first is `cor = TRUE`, which switches independent innovations
-to correlated innovations through an LKJ prior on the Cholesky
-factor of $\Sigma$.
-
-The second is `gr = ` / `subgr = `, which sets up hierarchical
-residual correlation matrices. The per-group covariance is
-shrunk toward a population matrix through a weight
-$\alpha_{\text{cor}} \in (0, 1)$ on the population draw:
-
-\begin{align*}
-\Omega_g & = \alpha_{\text{cor}} \, \Omega_{\text{global}}
-           + (1 - \alpha_{\text{cor}}) \, \Omega_{g, \text{local}}
-\end{align*}
-
-The third is `n_lv < n_series`, which moves the trend into a
-factor model. A $K$-dimensional latent process $\tilde{z}_t$
-drives the $N_{\text{series}}$-dimensional state through a
-loadings matrix
-$Z \in \mathbb{R}^{N_{\text{series}} \times K}$:
-
-\begin{align*}
-z_t & = Z \, \tilde{z}_t, \qquad
-\tilde{z}_t \in \mathbb{R}^K
-\end{align*}
-
-Factor structure has three advantages over running
-$N_{\text{series}}$ independent latent processes. It reduces
-dimension, so that dozens of correlated outcomes (species,
-financial assets, regions) share dynamics through a few latent
-axes, which cuts the parameter count and picks up joint structure
-that independent fits miss.
-
-It is also rotation invariant. The marginal covariance
-$Z Z^\top$ identifies what the data can resolve about $Z$, and
-mvgam follows the
-[Heaps and Jermyn (2024)](https://doi.org/10.1007/s11222-024-10454-0)
-prior: sample $Z$ unconstrained, then apply a thin QR rotation
-in generated quantities to identify $Z$ post hoc. The diagonal
-of the rotated loadings is non-negative by construction. This
-removes the $2^K$ sign equivalence that constrained factor
-models suffer from. For VAR factor models the lag-coefficient
-cube rotates the same way:
-$\tilde{A}_l = Q \, A_l \, Q^\top$ for the orthogonal $Q$
-delivered by the QR factorisation. Per-factor scalar parameters
-($\rho_l$, $\sigma$, MA coefficients, $L_{\Omega}$) stay in the
-unrotated latent basis.
-
-And it takes structured priors. `loadings_prior` accepts either
-a Matrix Normal prior built from per-series features and
-distance matrices, or the multiplicative gamma process (MGP)
-prior of
-[Bhattacharya and Dunson (2011)](https://doi.org/10.1093/biomet/asr013).
-MGP shrinks later columns of $Z$ toward zero, so `n_lv` becomes a
-truncation ceiling on the factor count. Under MGP,
-`active_factors()` reports the posterior distribution of the
-number of active columns.
-
-See `?AR`, `?VAR`, `?RW`, `?ZMVN`, `?CAR` and `?PW` for the
-per-constructor arguments, `list_trend_types()` for what is
-registered in the current session, the `loadings_prior` argument
-on `?mvgam` for the structured priors, and `?ordinate.mvgam` for
-biplot helpers on the rotated loadings.
-Smooth Gaussian process effects on covariates remain available
-through `gp()` inside either `formula` or `trend_formula`.
-
-The example below uses `AR(p = c(1, 12))` to fit lag-1 momentum
-together with annual recurrence at lag 12 from monthly data,
-which is the dynamic structure the simulator was set up to
-generate.
-
-## A simulated example
-
-`sim_mvgam(type = 7)` generates a single Gaussian series with a
-smooth covariate effect on the observation side and a sparse-lag
-`AR(p = c(1, 12))` latent state. The covariate is not periodic and
-the latent state is, so the two are separately identifiable. `proportional_train` splits the 240 monthly observations into a
-training window and a held-out tail, so we can score forecasts the
-model has never seen.
-
-```{r sim-data}
-set.seed(7)
-sim <- sim_mvgam(
-  type               = 7L,
-  family             = gaussian(),
-  n_series           = 1L,
-  n_timepoints       = 240L,
-  proportional_train = 12 / 13
-)
-train <- sim$data_train
-test  <- sim$data_test
-nrow(train)
-nrow(test)
-head(train)
+The $f_j$ are any terms a `brms` formula accepts: linear effects,
+smooths (Wood 2017), Gaussian processes, monotonic effects and random
+effects. The latent state $\eta$ follows one of the trend processes
+below, and the loadings $Z$ map it onto the series. Each series has
+its own state when $Z$ is the identity, and a few shared factors
+drive many series when $Z$ has fewer columns than there are series.
+
+## What mvgam can model
+
+Every `brms` family works as the observation model, and `mvgam` adds
+families for ecological and count data:
+
+| Family | Use case |
+|:-------|:---------|
+| `tweedie()` | Non-negative data with many exact zeros |
+| `beta_nb()` | Counts with heavier tails than a negative binomial |
+| `com_binomial()` | Bounded counts that are over- or under-dispersed |
+| `occ()` | Occupancy from repeated detection surveys |
+| `nmix()` | Abundance from repeated counts with imperfect detection |
+| `diri()`, `multi()`, `categ()` | Compositions and categorical outcomes |
+| `mvn()`, `mvt()` | Correlated continuous responses |
+
+`trend_formula` names the latent state with one constructor, and it
+can hold covariates and smooths that act on the state:
+
+| Constructor | Latent state | Typical use |
+|:------------|:-------------|:------------|
+| `RW()` | Random walk | Series with no fixed mean |
+| `AR(p = )` | Autoregression, including sparse lags such as `p = c(1, 12)` | Momentum and seasonal recurrence |
+| `VAR(p = )` | Vector autoregression | Series that drive one another |
+| `CAR()` | Continuous-time AR(1) | Irregularly spaced observations |
+| `ZMVN()` | Correlated residuals with no time recursion | Sites, regions or species |
+| `PW()` | Piecewise linear or logistic growth | Trends with changepoints |
+
+The constructors share a set of options. `cor = TRUE` correlates the
+innovations across series, and `gr` with `subgr` pools correlation
+matrices across groups. `n_lv` sets a number of shared latent factors
+below the number of series, and `df` gives the innovations
+Student-t tails. `ma = TRUE` adds a moving-average term to `RW()`,
+`AR()` and `VAR()`. The help page of each constructor lists the
+options it takes.
+
+`mvgam()` fits data in long format, one row per series and time.
+`jsdgam()` fits joint species distribution models to one row per site
+and species, with phylogenetic and trait-informed loadings.
+
+## Portal rodent captures
+
+`portal_data` holds monthly captures of four desert rodent species
+from the Portal Project, a long-term field study in Arizona (Ernest
+et al. 2018). Trapping follows the lunar cycle, and some months
+went unsampled, which leaves missing counts. Two covariates come
+with the counts: minimum temperature (`mintemp`) and a 12-month
+moving average of vegetation greenness (`ndvi_ma12`). We held out
+the last 12 months of each series to score forecasts.
+
+```{r data}
+data(portal_data)
+train <- subset(portal_data, time <= 68)
+test  <- subset(portal_data, time >  68)
 ```
 
-`sim$true_smooths[["s(x)"]]` holds the generative smooth on a fine
-grid; `sim$true_trend` is the realised AR(1, 12) trajectory on the
-link scale. `mvgam_data()` runs the
-same validators `mvgam()` would run at fit time and draws the
-package's standard EDA view of the response (time series,
-histogram, ACF, empirical CDF) with the held-out window overlaid
-in black:
+Fitting any model below needs a working Stan installation, through
+either `cmdstanr` or `rstan`; the
+[cmdstanr guide](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)
+covers the setup.
 
-```{r sim-plot, fig.asp = 0.85, out.width = "85%"}
-mvgam_data(train, family = gaussian(), newdata = test)
+### One species
+
+The Desert Pocket Mouse (PP) is dormant through the colder months,
+and its captures run from long stretches of zeros to peaks above
+20. `mvgam_data()` checks the counts against the family and plots
+the series, its distribution and its autocorrelation, with the
+held-out months in black:
+
+```{r pp-data, fig.asp = 0.85, out.width = "85%"}
+pp_train <- droplevels(subset(train, series == "PP"))
+pp_test  <- droplevels(subset(test, series == "PP"))
+mvgam_data(pp_train, family = poisson(), y = "captures",
+           newdata = pp_test)
 ```
 
-The ACF panel shows the lag 1 and lag 12 spikes the latent state
-puts there, and they are why a model of the covariate alone will
-not do: it has nowhere to put them. The next two sections fit that
-model and then add the latent state, so what separates the two is
-the state itself.
+The first model relates captures to smooth functions of the two
+covariates, with no latent state:
 
-## Model 1: smooth only, no latent state
-
-The first model fits the covariate smooth and treats everything
-else as observation noise:
-
-\begin{align*}
-y_t & \sim \text{Normal}(\mu_t, \sigma) \\
-\mu_t & = \alpha + s(x_t) \\
-\beta_{\text{smooth}} & \sim \text{Normal}\!\bigl(0, (S \lambda)^{-1}\bigr) \\
-\sigma & \sim \text{half-}t_3(0, 2.5)
-\end{align*}
-
-```{r model-step1, results = "hide"}
-step1 <- mvgam(
-  y ~ s(x),
-  family  = gaussian(),
-  data    = train,
-  newdata = test,
-  chains  = 4,
-  iter    = 2000,
-  warmup  = 1000,
+```{r fit-gam, results = "hide"}
+fit_gam <- mvgam(
+  captures ~ s(mintemp, k = 6) + s(ndvi_ma12, k = 6),
+  family  = poisson(),
+  data    = pp_train,
+  newdata = pp_test,
   silent  = 2
 )
 ```
 
-```{r}
-summary(step1, include_betas = FALSE)
+Captures in one month carry over into the next beyond anything
+the covariates explain, and the randomised quantile residuals of
+this model remain strongly autocorrelated at lag 1:
+
+```{r gam-resid, fig.asp = 0.5, out.width = "80%"}
+plot(fit_gam, type = "residuals", series = "PP")
 ```
 
-`sigma` is large. A fit that ignores time has no way to describe
-the dynamic part of this response, so the observation noise takes
-it.
+The second model moves both smooths into `trend_formula`, where
+they act on a latent state that follows an AR(1) process. The
+observation formula keeps the intercept:
 
-```{r step1-cond-effects, fig.asp = 0.5, out.width = "70%"}
-conditional_effects(step1)
-```
-
-The marginal smooth is essentially flat. The Dunn-Smyth residuals
-show why this fit is misspecified:
-
-```{r step1-resid, fig.asp = 0.5, out.width = "80%"}
-plot(step1, type = "residuals")
-```
-
-Lag-1 and lag-12 autocorrelation are both visible in the residual
-ACF. The dynamic structure that the simulator built into the data
-has nowhere to go in this fit, so it leaks into the residuals
-and pushes `sigma` up. A state-space model would absorb that
-signal into a latent state and leave the residuals clean.
-
-## Model 2: add an AR(1, 12) latent state
-
-The second model keeps the smooth and lets the latent state carry
-the structure model 1 missed:
-
-\begin{align*}
-y_t & \sim \text{Normal}(\mu_t + z_t, \sigma) \\
-\mu_t & = \alpha + s(x_t) \\
-z_t & \sim \text{Normal}\!\bigl(\rho_1 \, z_{t - 1} + \rho_{12} \, z_{t - 12},
-                               \sigma_{\text{trend}}\bigr) \\
-\rho_1, \rho_{12} & \sim \text{Normal}(0, 0.5)[-1, 1] \\
-\sigma_{\text{trend}} & \sim \text{Exponential}(2)
-\end{align*}
-
-The obs-side formula is unchanged; the latent state enters
-through `trend_formula`:
-
-```{r model-step2, results = "hide"}
-step2 <- mvgam(
-  y ~ s(x),
-  trend_formula = ~ AR(p = c(1, 12)),
-  family        = gaussian(),
-  data          = train,
-  newdata       = test,
-  chains        = 4,
-  iter          = 2000,
-  warmup        = 1000,
+```{r fit-ar, results = "hide"}
+fit_ar <- mvgam(
+  captures ~ 1,
+  trend_formula = ~ s(mintemp, k = 6) + s(ndvi_ma12, k = 6) + AR(),
+  family        = poisson(),
+  data          = pp_train,
+  newdata       = pp_test,
   silent        = 2
 )
 ```
 
-```{r}
-summary(step2, include_betas = FALSE)
+```{r ar-summary}
+summary(fit_ar)
 ```
 
-`sigma` falls against model 1, because the dynamic signal has moved
-out of the observation noise and into the latent state. The trend
-block reports `ar1_trend` and `ar12_trend`, which we can check
-against the values the simulator used:
+The latent state absorbs the persistence from one month to the
+next, and the residuals of this fit show no autocorrelation left:
 
-```{r step2-ar-recovery}
-ar1  <- as.numeric(as.array(step2, variable = "ar1_trend[1]"))
-ar12 <- as.numeric(as.array(step2, variable = "ar12_trend[1]"))
-data.frame(
-  parameter = c("ar1_trend", "ar12_trend"),
-  truth     = c(0.55, 0.40),
-  median    = c(median(ar1),  median(ar12)),
-  lower_90  = c(quantile(ar1,  0.05), quantile(ar12, 0.05)),
-  upper_90  = c(quantile(ar1,  0.95), quantile(ar12, 0.95)),
-  prob_gt_0 = c(mean(ar1 > 0), mean(ar12 > 0))
+```{r ar-resid, fig.asp = 0.5, out.width = "80%"}
+plot(fit_ar, type = "residuals", series = "PP")
+```
+
+`pp_check()` compares the observed counts with counts drawn from
+the fitted model. The rootogram shows the model reproducing the
+distribution of captures, zeros included:
+
+```{r ar-ppc, fig.asp = 0.5, out.width = "70%"}
+pp_check(fit_ar, type = "rootogram")
+```
+
+`conditional_effects()` plots each covariate's effect on the
+expected count, and the `marginaleffects` functions
+`predictions()`, `comparisons()` and `slopes()` work on the fit
+directly:
+
+```{r ar-effects, fig.asp = 0.5, out.width = "70%"}
+plot(conditional_effects(fit_ar, type = "expected"), ask = FALSE)
+```
+
+`forecast()` continues the latent state from its last estimated
+values into the held-out months. Without a latent state, the
+first model forecasts from the covariates alone, and its
+intervals miss most of the high counts:
+
+```{r forecasts, fig.asp = 0.5, out.width = "80%"}
+fc_gam <- forecast(fit_gam)
+fc_ar  <- forecast(fit_ar)
+plot(fc_gam)
+plot(fc_ar)
+```
+
+`compare_scores()` scores both forecasts with the continuous
+ranked probability score (CRPS), where lower is better, and
+`summary()` sets the scores out by forecast horizon:
+
+```{r scores, fig.asp = 0.5, out.width = "70%"}
+scores <- compare_scores(fc_gam, fc_ar, score = "crps")
+summary(scores)
+plot(scores, relative = "fc_gam")
+```
+
+```{r score-numbers, include = FALSE}
+by_horizon <- summary(scores)
+totals <- round(colSums(by_horizon[c("fc_gam", "fc_ar")], na.rm = TRUE), 1)
+n_scored <- sum(!is.na(by_horizon$fc_ar))
+ar_wins <- sum(by_horizon$fc_ar < by_horizon$fc_gam, na.rm = TRUE)
+pp_rows <- subset(scores, series != "all_series")
+covered <- tapply(pp_rows$in_interval, pp_rows$model, sum, na.rm = TRUE)
+```
+
+The latent state improves the forecasts. The AR model has the lower
+CRPS in `r ar_wins` of the `r n_scored` scored months, and its CRPS
+sums to `r totals[["fc_ar"]]` against `r totals[["fc_gam"]]` for the
+smooth-only model. Its 90% intervals contain `r covered[["fc_ar"]]`
+of the `r n_scored` held-out counts. Those of the model without a
+latent state contain `r covered[["fc_gam"]]`.
+
+`score()` also returns the log score, interval scores and, for
+several series, energy and variogram scores. `lfo_cv()` repeats
+the comparison over many forecast origins by refitting on
+successively longer windows.
+
+### Four species
+
+The four species share the covariates but respond to them
+differently. The observation formula gives each species its own
+mean through `series`. In `trend_formula`, `by = lv_axis()` gives
+each species its own smooths of temperature and vegetation, and
+`AR(cor = TRUE)` gives each species its own latent AR(1) state,
+with innovations correlated across species:
+
+```{r fit-cor, results = "hide"}
+fit_cor <- mvgam(
+  captures ~ series,
+  trend_formula = ~ s(mintemp, by = lv_axis(), k = 6) +
+    s(ndvi_ma12, by = lv_axis(), k = 6) + AR(cor = TRUE),
+  family        = poisson(),
+  data          = train,
+  newdata       = test,
+  silent        = 2
 )
 ```
 
-Both lag coefficients are clearly positive and both 90% intervals
-cover the simulated values. `mcmc_plot()` shows the same
-posteriors as densities:
+`conditional_effects()` with `series = "all"` draws each species'
+response to temperature in a panel of its own. The responses differ
+clearly among species. Captures of PP rise with minimum temperature
+and those of PB rise at the warmest temperatures, while captures of
+the two kangaroo rats, DM and DO, fall slightly:
 
-```{r step2-mcmc, fig.asp = 0.45, out.width = "70%"}
-mcmc_plot(step2, variable = "ar[0-9]+_trend",
-          regex = TRUE, type = "areas")
+```{r cor-effects, fig.asp = 0.8, out.width = "85%"}
+plot(
+  conditional_effects(fit_cor, effects = "mintemp", series = "all",
+                      type = "expected"),
+  ask = FALSE
+)
 ```
 
-With the dynamic structure now carried by the latent state, the
-Dunn-Smyth residuals no longer show the lag-1 and lag-12
-autocorrelation that model 1's residuals carried:
+The forecasts come from one joint posterior, and each species
+keeps its own scale and persistence:
 
-```{r step2-resid, fig.asp = 0.5, out.width = "80%"}
-plot(step2, type = "residuals")
+```{r cor-forecast, fig.asp = 0.75, out.width = "90%"}
+fc_cor <- forecast(fit_cor)
+plot(fc_cor)
 ```
 
-And the smooth, no longer asked to explain the dynamics as well,
-recovers the covariate effect:
-
-```{r step2-cond-effects, fig.asp = 0.5, out.width = "70%"}
-conditional_effects(step2)
+```{r cor-numbers, include = FALSE}
+cor_scores <- score(fc_cor, score = "crps")
+in_interval <- unlist(lapply(
+  cor_scores[names(cor_scores) != "all_series"], `[[`, "in_interval"
+))
 ```
 
-## Hindcast versus forecast
+The forecasts track the held-out counts of all four species. Their
+90% intervals contain `r sum(in_interval, na.rm = TRUE)` of the
+`r sum(!is.na(in_interval))` held-out counts.
 
-The fit produces two posterior trajectories that get separate
-names. `hindcast()` returns the trajectory at the training times,
-read directly from the Stan-fitted latent state and therefore
-deterministic at every draw. `forecast()` propagates the AR(1, 12)
-recursion forward from the last fitted state to held-out times,
-accumulating uncertainty from `sigma_trend` and the obs noise.
-Both return a single `mvgam_forecast` object with the same
-structure; the forecast arm is populated only when `newdata`
-covers times beyond the training window:
+`residual_cor()` returns the correlations among the species'
+innovations, which measure how strongly the species rise and fall
+together once temperature and vegetation are accounted for:
 
-```{r hindcast-forecast}
-fc <- forecast(step2, newdata = test)
-dim(fc$hindcasts[[1]])
-dim(fc$forecasts[[1]])
+```{r cor-resid, fig.asp = 0.8, out.width = "60%"}
+rc <- residual_cor(fit_cor)
+plot(rc)
 ```
 
-```{r forecast-plot, fig.asp = 0.55, out.width = "80%"}
-plot(fc, series = 1)
+```{r cor-resid-numbers, include = FALSE}
+pb_pp <- sprintf("%.2f (95%% interval %.2f to %.2f)",
+                 rc$cor["PB", "PP"], rc$cor_lower["PB", "PP"],
+                 rc$cor_upper["PB", "PP"])
 ```
 
-The forecast arm covers the held-out year, which the next two
-sections score.
+The two pocket mouse species, PB and PP, share the strongest
+correlation, `r pb_pp`. `n_lv` would instead estimate a few shared
+latent factors for many species, and `VAR()` would estimate how
+each species' state affects the others at the next time step.
 
-## Forecast scoring across rules
+### Reporting
 
-Proper scoring rules grade probabilistic forecasts on calibration
-and sharpness in one number. `score()` returns one score per
-timepoint from an `mvgam_forecast` object. Summing across the
-held-out window gives a single number per model that can be
-compared across fits. The Continuous Ranked Probability Score (CRPS) is
-the default, but the same call supports the log score (`logs`),
-the Dawid-Sebastiani score (`dss`), and the Discrete Ranked
-Probability Score (`drps`):
+`methods_md()` writes the fitted model as Markdown equations with
+its priors, and `how_to_cite()` returns a methods paragraph and the
+references for the model's components:
 
-```{r forecast-score}
-fc1 <- forecast(step1, newdata = test)
-fc2 <- forecast(step2, newdata = test)
-score_rules <- c("crps", "logs", "dss", "drps")
-scores <- vapply(score_rules, function(rule) {
-  s1 <- score(fc1, score = rule)
-  s2 <- score(fc2, score = rule)
-  c(no_trend = sum(s1[[1]]$score, na.rm = TRUE),
-    ar_1_12  = sum(s2[[1]]$score, na.rm = TRUE))
-}, numeric(2))
-round(scores, 2)
+```{r methods, results = "asis"}
+methods_md(fit_ar, heading_level = 4)
 ```
-
-A lower score is better, and the state-space fit wins on every
-rule. The margin is widest on the Dawid-Sebastiani score, which
-penalises badly calibrated forecast variance harder than the
-others: the trendless fit stays overconfident around its flat
-cycle.
-
-`score()` covers additional rules through the `score` argument:
-the interval score (`sis`) and the quantile score (`qs`) for
-calibration tasks; `twcrps` weights CRPS toward tail behaviour. For
-multivariate forecasts from VAR fits or factor models, `score()`
-also supports `energy` (energy score) and `variogram` (variogram
-score); both penalise dependence patterns that per-series rules
-miss. The `interval_width` argument sets the nominal coverage
-band used by the interval-based rules.
-
-### Leave-future-out cross-validation
-
-A single train/test split rewards models that happen to win on
-one specific horizon. `lfo_cv.mvgam()` automates the alternative:
-it scores forecasts at every refit point along the series, then
-aggregates the per-step scores across many forecast origins.
-
-```{r lfo-example, fig.asp = 0.55, out.width = "80%", results = "hide"}
-lfo_step2 <- lfo_cv(step2, min_t = 200, fc_horizon = 12,
-                    silent = 2)
-plot(lfo_step2)
-```
-
-`min_t` sets the first refit point, `fc_horizon` sets the
-prediction window per fold, and the chain is reseated through
-`update()` between folds so the Stan program does not recompile.
-The default score is the expected log predictive density (ELPD),
-returned per fold and per step ahead. The companion
-`kfold.mvgam()` runs block CV for grouped designs through
-cluster-level holdout. It supports user-defined fold maps
-through the `folds` argument.
-
-`loo()` and `loo_compare()` also dispatch on `mvgam` objects,
-but both inherit the same pathology when applied to state-space
-fits. PSIS-LOO approximates leaving $y_t$ out of the likelihood,
-but the chain still conditioned on $y_t$ when it estimated the
-latent state $z_t$. The approximate density is therefore
-evaluated against a posterior that has already seen the
-observation through the latent path; Pareto-$k$ diagnostics
-warn about exactly this, and differencing two contaminated
-ELPDs in `loo_compare()` does not remove the contamination. The
-honest comparison uses either the forecast score above on the
-held-out window or `lfo_cv()` below. `lfo_cv()` refits the chain
-on shorter prefixes, so the latent state at the scoring time was
-never conditioned on its own observation.
-
-## Take-aways
-
-The two fits differ in one argument, and that argument decides
-where the temporal structure goes. Without `trend_formula` it
-lands in the residuals and inflates `sigma`; with it, the latent
-state carries the autocorrelation, the smooth is free to describe
-the covariate effect, and the held-out forecasts score better on
-every rule we tried. If a residual ACF from an mvgam fit still
-shows structure, that is the argument to reach for.
-
-`how_to_cite()` returns a methods-section paragraph adapted to
-the model's actual structure (likelihood, link, trend type,
-sampler configuration, backend). For a model statement rendered
-as Markdown plus LaTeX, use `methods_md(step2)`.
 
 ```{r how-to-cite}
-how_to_cite(step2)
+how_to_cite(fit_ar)
 ```
 
-## Further reading
-
-The natural next functions to explore on the same fit are:
-
-- `?mvgam` for the full fitter signature, including
-  `loadings_prior` and `trend_map`.
-- `?jsdgam` for joint species distribution and closure-unit
-  family fits.
-- `?forecast.mvgam` and `?hindcast.mvgam` for the prediction
-  surface, including `type = "link" / "expected" / "trend"`.
-- `?conditional_effects.mvgam` for the effect-summary path
-  that wraps marginaleffects. `predictions()`, `comparisons()`
-  and `hypotheses()` from the marginaleffects package also
-  dispatch on `mvgam` objects.
-- `?kfold.mvgam` for k-fold model evaluation.
-- `?lfo_cv.mvgam` for evaluation that holds out future
-  timepoints.
-- `?irf` and `?fevd` for impulse responses and forecast error
-  variance decomposition; `?stability` for eigenvalue checks on
-  VAR trends.
-
-Getting data into the shape this vignette assumes is covered in
-the
-[data formatting vignette](https://nicholasjclark.github.io/mvgam/articles/data.html),
-which is the right place to start if a fit refuses to compile.
-From here, each trend process has an article of its own:
+## Where to go next
 
 - The
-  [VAR article](https://nicholasjclark.github.io/mvgam/articles/var.html)
-  fits `VAR(cor = TRUE)` to three regional bird counts and reads
-  impulse responses, variance decompositions and stability
-  metrics off the posterior; the
-  [hierarchical VAR article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
-  scales that to a panel of eight economies.
+  [data formatting vignette](https://nicholasjclark.github.io/mvgam/articles/data.html)
+  prepares data for `mvgam()`, including missing values and
+  irregular times.
 - The
   [dynamic factor vignette](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
-  works through `trend_map`, the argument that decides which
-  series share a latent path.
+  shares latent states across many series.
 - The
-  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
-  shares a single latent state across several outcomes with
-  different observation families, and the
-  [integrated distribution article](https://nicholasjclark.github.io/mvgam/articles/idm.html)
-  applies that pattern to survey protocols that each see the same
-  species differently.
+  [VAR article](https://nicholasjclark.github.io/mvgam/articles/var.html)
+  estimates how series drive one another, with impulse responses and
+  variance decompositions.
 - The
   [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
-  applies the latent factor variant to multispecies count data
-  with informed loadings via `jsdgam()`, and the
+  fits multispecies data with `jsdgam()`, and the
   [N-mixture article](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
-  covers the closure-unit families that marginalise imperfect
-  detection.
+  covers detection-error families.
 - The
   [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
-  walks through `forecast()`, `score()`, `lfo_cv()` and
-  `ensemble()` on a worked count-data example.
-
-## Acknowledgements
-
-mvgam composes mgcv smooths (Wood
-[2017](https://doi.org/10.1201/9781315370279)) with brms's
-multilevel and multi-response models (Bürkner
-[2017](https://doi.org/10.18637/jss.v080.i01)) and adds a latent
-process layer in the dynamic generalised additive model tradition
-(Clark & Wells [2023](https://doi.org/10.1111/2041-210X.13974)).
-Stationary VAR priors follow Heaps
-([2023](https://doi.org/10.1080/10618600.2022.2079648)); the
-latent factor architecture follows Heaps & Jermyn
-([2024](https://doi.org/10.1007/s11222-024-10454-0)) with the
-MGP prior of Bhattacharya & Dunson
-([2011](https://doi.org/10.1093/biomet/asr013)). The piecewise
-trend implementation follows the Prophet specification of Taylor
-& Letham ([2018](https://doi.org/10.1080/00031305.2017.1380080)).
-Closure-unit families wrap the occupancy framework of MacKenzie
-et al. ([2002](<https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2>))
-and the N-mixture approaches of Royle
-([2004](https://doi.org/10.1111/j.0006-341X.2004.00142.x)) and
-Royle & Nichols ([2003](<https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2>)).
-The multispecies forecasting framing follows Clark et al.
-([2025](https://doi.org/10.7717/peerj.18929)).
+  compares models with `score()`, `lfo_cv()` and `ensemble()`.
 
 ## References
-
-Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
-infinite factor models. *Biometrika* 98, 291-306.
-[doi:10.1093/biomet/asr013](https://doi.org/10.1093/biomet/asr013)
 
 Bürkner, P.-C. (2017). brms: An R package for Bayesian
 multilevel models using Stan. *Journal of Statistical Software*
@@ -869,41 +367,9 @@ Models (DGAMs) for forecasting discrete ecological time series.
 *Methods in Ecology and Evolution* 14, 771-784.
 [doi:10.1111/2041-210X.13974](https://doi.org/10.1111/2041-210X.13974)
 
-Clark, N. J., Ernest, S. K. M., Senyondo, H., Simonis, J.,
-White, E. P., Yenni, G. M. and Karunarathna, K. A. N. K. (2025).
-Beyond single-species models: leveraging multispecies forecasts <!-- prose-lint-disable-line -->
-to navigate the dynamics of ecological predictability.
-*PeerJ* 13, e18929.
-[doi:10.7717/peerj.18929](https://doi.org/10.7717/peerj.18929)
-
-Heaps, S. E. (2023). Enforcing stationarity through the prior in
-vector autoregressions. *Journal of Computational and Graphical
-Statistics* 32, 74-83.
-[doi:10.1080/10618600.2022.2079648](https://doi.org/10.1080/10618600.2022.2079648)
-
-Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
-distributions for the covariance matrix in latent factor models.
-*Statistics and Computing* 34, 143.
-[doi:10.1007/s11222-024-10454-0](https://doi.org/10.1007/s11222-024-10454-0)
-
-MacKenzie, D. I., Nichols, J. D., Lachman, G. B., Droege, S.,
-Royle, J. A. and Langtimm, C. A. (2002). Estimating site
-occupancy rates when detection probabilities are less than one.
-*Ecology* 83(8), 2248-2255.
-[doi:10.1890/0012-9658(2002)083\[2248:ESORWD\]2.0.CO;2](<https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2>)
-
-Royle, J. A. (2004). N-mixture models for estimating population
-size from spatially replicated counts. *Biometrics* 60, 108-115.
-[doi:10.1111/j.0006-341X.2004.00142.x](https://doi.org/10.1111/j.0006-341X.2004.00142.x)
-
-Royle, J. A. and Nichols, J. D. (2003). Estimating abundance
-from repeated presence-absence data or point counts. *Ecology*
-84(3), 777-790.
-[doi:10.1890/0012-9658(2003)084\[0777:EAFRPA\]2.0.CO;2](<https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2>)
-
-Taylor, S. and Letham, B. (2018). Forecasting at scale. *The
-American Statistician* 72(1), 37-45.
-[doi:10.1080/00031305.2017.1380080](https://doi.org/10.1080/00031305.2017.1380080)
+Ernest, S. K. M. et al. (2018). The Portal Project: a long-term
+study of a Chihuahuan desert ecosystem. *bioRxiv* 332783.
+[doi:10.1101/332783](https://doi.org/10.1101/332783)
 
 Wood, S. N. (2017). *Generalized Additive Models: An Introduction
 with R* (2nd edition). Chapman and Hall/CRC.

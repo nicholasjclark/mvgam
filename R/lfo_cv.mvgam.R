@@ -89,9 +89,10 @@
 #'   * `scores`: named list of vectors, one per requested non-ELPD
 #'     score (`NULL` if no non-ELPD score requested).
 #'   * `pareto_ks`: Pareto-k diagnostic at each evaluation step.
-#'   * `eval_timepoints`: integer vector of the times evaluated.
-#'   * `refits_at`: integer vector of time points where the model
-#'     was refit.
+#'   * `eval_timepoints`: the times evaluated, as the data record
+#'     them.
+#'   * `refits_at`: the times at which the model was refit, as the
+#'     data record them.
 #'   * `pareto_k_threshold`: the numeric threshold the refit gate
 #'     applied, whether it came from the argument or from the
 #'     adaptive rule.
@@ -336,7 +337,7 @@ lfo_cv.mvgam <- function(object,
     NULL
   }
   pareto_ks <- rep(NA_real_, n_evals)
-  refits_at <- integer(0)
+  refits_at <- all_unique_times[0L]
   # Parallel to eval_timepoints: TRUE at each eval where a fresh
   # refit was performed (initial fit at min_t plus any
   # Pareto-k-threshold-triggered refits). Read by
@@ -844,7 +845,9 @@ plot.mvgam_lfo <- function(x, ...) {
     ggplot2::scale_colour_manual(
       values = c(inlier = "grey30", outlier = mvgam_colour("dark"))
     ) +
-    ggplot2::labs(x = "Evaluation time", y = NULL) +
+    scale_x_steps("Evaluation time",
+                  whole = all(long$eval == round(long$eval))) +
+    ggplot2::labs(y = NULL) +
     mvgam_theme()
 }
 
@@ -929,20 +932,11 @@ summary.mvgam_lfo <- function(object, ...) {
 #' @method loo_compare mvgam_lfo
 #' @export
 loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
-  checkmate::assert_class(x, "mvgam_lfo")
-  extras <- list(...)
-  for (m in extras) {
-    checkmate::assert_class(m, "mvgam_lfo")
-  }
-  models <- c(list(x), extras)
-
-  if (is.null(model_names)) {
-    nms <- c(deparse(substitute(x)),
-             vapply(substitute(...()), deparse, character(1L)))
-    model_names <- nms
-  }
-  checkmate::assert_character(model_names, len = length(models),
-                              any.missing = FALSE)
+  models <- list(x, ...)
+  assert_compared_objects(models, "mvgam_lfo", "loo_compare")
+  model_names <- compared_object_names(
+    models, as.list(substitute(list(x, ...)))[-1L], model_names
+  )
 
   assert_aligned_lfo(models)
   ref_times <- models[[1L]]$eval_timepoints
@@ -1049,21 +1043,14 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
 loo_model_weights.mvgam_lfo <- function(x, ...,
                                           method = "pseudo-BMA",
                                           model_names = NULL) {
-  checkmate::assert_class(x, "mvgam_lfo")
   checkmate::assert_choice(method,
                             c("pseudo-BMA", "stacking"))
-  extras <- list(...)
-  for (m in extras) {
-    checkmate::assert_class(m, "mvgam_lfo")
-  }
-  models <- c(list(x), extras)
-  if (is.null(model_names)) {
-    nms <- c(deparse(substitute(x)),
-             vapply(substitute(...()), deparse, character(1L)))
-    model_names <- nms
-  }
-  checkmate::assert_character(model_names, len = length(models),
-                              any.missing = FALSE)
+  models <- list(x, ...)
+  assert_compared_objects(models, "mvgam_lfo", "loo_model_weights",
+                          min_n = 1L)
+  model_names <- compared_object_names(
+    models, as.list(substitute(list(x, ...)))[-1L], model_names
+  )
 
   assert_aligned_lfo(models)
 

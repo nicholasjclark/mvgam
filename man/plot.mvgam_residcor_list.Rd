@@ -32,8 +32,8 @@ A \link[ggplot2:ggplot]{ggplot2::ggplot} object.
 Faceted heatmap panel across the per-group correlation
 matrices returned by \code{residual_cor(mod, by_group = TRUE)} on a
 hierarchical VAR or factor fit. Reads exactly as
-\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} does, one panel per group: fill carries
-the posterior median and opacity carries \code{Pr(sign)}. Colour
+\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} does, one panel per group, with fill
+showing the posterior median. Colour
 limits are shared across facets so the eye can compare panels
 directly. The \verb{_global} reference matrix is included by default;
 drop it with \code{include_global = FALSE}.

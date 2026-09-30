@@ -360,7 +360,7 @@ jsdgam <- function(formula,
     names(data),
     must.include = if (is_mv_formula) unit_chr else c(unit_chr, species_chr)
   )
-  validate_pos_integer(n_lv)
+  checkmate::assert_int(n_lv, lower = 1)
 
   if (is_mv_formula) {
     species_levels <- names(formula$forms)
@@ -388,16 +388,8 @@ jsdgam <- function(formula,
     fit_function = "jsdgam"
   )
 
-  # Unit must be numeric / integer because mvgam's time axis is.
-  if (!is.numeric(data[[unit_chr]]) && !is.integer(data[[unit_chr]])) {
-    stop(insight::format_error(c(
-      paste0("'", unit_chr, "' must be numeric or integer."),
-      i = paste0(
-        "Convert via 'data$", unit_chr, " <- as.integer(...)' before",
-        " calling jsdgam()."
-      )
-    )))
-  }
+  # The unit becomes the time axis.
+  assert_axis_column(data, unit_chr, "time")
 
   # Promote (unit, species) to the canonical (time, series) columns
   # mvgam expects. The original columns stay attached so a prediction

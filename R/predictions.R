@@ -365,7 +365,8 @@ validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
     stop_mvgam_fault(
       paste0("Monotonic variable '", xmo_name, "' does not cover the ",
              "prediction's rows."),
-      paste0("It has ", length(Xmo), " values for ", n_obs, " rows.")
+      paste0("'", xmo_name, "' has ", length(Xmo), " values for ", n_obs,
+             " rows.")
     )
   }
   if (any(Xmo < 0L | Xmo > k_levels)) {
@@ -581,7 +582,7 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, full_draws,
   if (length(n_lv) != 1L || length(n_series) != 1L) {
     stop_mvgam_fault(
       "A 'by = lv_axis()' fit does not record its factor and series counts.",
-      "Both are needed to compose its trend prediction."
+      "The trend prediction needs both counts."
     )
   }
 
@@ -755,10 +756,10 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   N_time_trend <- mvgam_fit$standata$N_time_trend
   N_series_trend <- mvgam_fit$standata$N_series_trend
   if (is.null(N_time_trend) || is.null(N_series_trend)) {
-    stop(insight::format_error(c(
-      "Cannot align latent trend state without N_time_trend / N_series_trend.",
-      i = "This indicates a malformed mvgam fit."
-    )))
+    stop_mvgam_fault(
+      "The fit's Stan data lack 'N_time_trend' or 'N_series_trend'.",
+      "Aligning the latent trend states needs both."
+    )
   }
 
   # Map newdata rows to columns of the fitted trend matrix. The lookup

@@ -151,7 +151,7 @@ the identified versions where they exist. \code{qr_thin_R()} gives \code{Z_tilde
 which removes the \eqn{2^k} equivalent sign modes. The per-factor
 coefficients \code{ar1_trend} and \code{theta1_trend} stay in the unrotated
 basis. A VAR factor model also rotates its lag coefficients as
-\verb{A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'}.
+\verb{Phi_trend_tilde[lag] = Q_tilde * Phi_trend[lag] * Q_tilde'}.
 
 A \code{trend_map} skips the QR step and keeps its fixed entries on
 \code{Z} exactly. A \code{by = lv_axis()} smooth ties each factor to its own
@@ -193,7 +193,7 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-summary(mod, include_betas = FALSE)
+summary(mod)
 
 # All trend-side latent dynamics in one summary view. For ZMVN
 # the meaningful entries are sigma_trend (per-series SDs),

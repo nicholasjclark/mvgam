@@ -1,139 +1,3 @@
-#' Cache Formula Latent Parameters
-#'
-#' @description
-#' Extract and cache latent parameters from brmsformula objects to avoid
-#' repetitive parsing during validation. Caches parameters from pforms
-#' (distributional parameters) and nlpars (nonlinear parameters).
-#'
-#' @param formula A formula object, potentially with brmsformula structure
-#' @return Same formula object with cached latent parameters as attributes
-#' @noRd
-#'
-cache_formula_latent_params <- function(formula) {
-  # Input validation
-  if (is.null(formula)) {
-    return(formula)
-  }
-
-  checkmate::assert(
-    checkmate::check_formula(formula),
-    checkmate::check_class(formula, "brmsformula"),
-    checkmate::check_class(formula, "mvbrmsformula"),
-    combine = "or"
-  )
-
-  # Skip if already cached (avoid redundant processing)
-  existing_cache <- attr(formula, "mvgam_latent_params")
-  if (!is.null(existing_cache) && !is.null(attr(formula, "mvgam_cache_version"))) {
-    return(formula)
-  }
-
-  # Initialize latent parameter collection
-  latent_params <- character()
-
-  # Extract latent parameters based on formula type
-  if (inherits(formula, "brmsformula")) {
-    # Extract distributional parameters (pforms: sigma, nu, etc.)
-    if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
-      pform_params <- names(formula$pforms)
-      if (!is.null(pform_params)) {
-        latent_params <- c(latent_params, pform_params)
-      }
-    }
-
-    # Extract nonlinear parameters (nlpars) if present
-    if (!is.null(formula$nlpars) && length(formula$nlpars) > 0) {
-      nlpar_params <- names(formula$nlpars)
-      if (!is.null(nlpar_params)) {
-        latent_params <- c(latent_params, nlpar_params)
-      }
-    }
-  }
-
-  # Clean and deduplicate parameters
-  latent_params <- unique(latent_params[nzchar(latent_params)])
-
-  # Cache results as attributes
-  attr(formula, "mvgam_latent_params") <- latent_params
-  attr(formula, "mvgam_cache_version") <- "1.0"
-  attr(formula, "mvgam_cache_timestamp") <- Sys.time()
-
-  return(formula)
-}
-
-#' Filter Required Variables Using Formula Metadata
-#'
-#' @description
-#' Remove latent parameters from variable requirements using cached formula
-#' metadata. Prevents validation errors for model-defined parameters that
-#' don't exist in user data.
-#'
-#' @param required_vars Character vector of required variable names
-#' @param formula Formula object with potential cached metadata
-#' @return Character vector with latent parameters filtered out
-#' @noRd
-#'
-filter_required_variables <- function(required_vars, formula = NULL) {
-  # Input validation
-  checkmate::assert_character(required_vars, any.missing = FALSE)
-
-  # Early return for edge cases
-  if (length(required_vars) == 0) {
-    return(character())
-  }
-
-  if (is.null(formula)) {
-    return(required_vars)
-  }
-
-  checkmate::assert(
-    checkmate::check_formula(formula),
-    checkmate::check_class(formula, "brmsformula"),
-    checkmate::check_class(formula, "mvbrmsformula"),
-    combine = "or"
-  )
-
-  # Extract latent parameters for filtering
-  latent_params <- character()
-
-  # Primary: Use cached metadata if available
-  cached_latent <- attr(formula, "mvgam_latent_params")
-  cache_version <- attr(formula, "mvgam_cache_version")
-
-  if (!is.null(cached_latent) && !is.null(cache_version)) {
-    latent_params <- cached_latent
-  } else {
-    # Fallback: Direct extraction for uncached formulas
-    if (inherits(formula, "brmsformula")) {
-      fallback_params <- character()
-
-      if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
-        pform_names <- names(formula$pforms)
-        if (!is.null(pform_names)) {
-          fallback_params <- c(fallback_params, pform_names)
-        }
-      }
-
-      if (!is.null(formula$nlpars) && length(formula$nlpars) > 0) {
-        nlpar_names <- names(formula$nlpars)
-        if (!is.null(nlpar_names)) {
-          fallback_params <- c(fallback_params, nlpar_names)
-        }
-      }
-
-      latent_params <- unique(fallback_params[nzchar(fallback_params)])
-    }
-  }
-
-  # Filter out latent parameters from requirements
-  if (length(latent_params) > 0) {
-    filtered_vars <- setdiff(required_vars, latent_params)
-    return(filtered_vars)
-  }
-
-  return(required_vars)
-}
-
 #' Validate and Standardize Family Argument
 #'
 #' @description
@@ -384,13 +248,9 @@ validate_closure_unit_data <- function(data,
   }
   assert_axis_column(data, series_var, "series")
   assert_axis_column(data, time_var, "time")
-  for (col in setdiff(required_cols, c(series_var, time_var))) {
-    if (!col %in% colnames(data)) {
-      stop(insight::format_error(
-        paste0("Closure-unit families require column '", col, "' in 'data'.")
-      ))
-    }
-  }
+  assert_closure_unit_columns(
+    data, setdiff(required_cols, c(series_var, time_var))
+  )
 
   y_vals   <- data[[response_var]]
   # A `cap` column the user supplied is checked below whatever the
@@ -666,212 +526,177 @@ lhs_columns <- function(formula) {
 }
 
 
-#' Extract predictor variable names from one or more formulas
+#' The data columns each formula of a model uses
 #'
-#' Returns the unique names of variables that appear on the
-#' right-hand side of the supplied formula(s), suitable for use
-#' with `data[[var]]` lookups. Handles plain `formula`,
-#' `brmsformula` (including multi-arm fits via `pforms`), and
-#' `mvbrmsformula` (multivariate response via `forms`). Skips
-#' `NULL` entries silently so callers can pass a list of optional
-#' formulas without prior filtering.
+#' Each side is parsed with `brms::brmsterms()`, as brms parses it
+#' when it builds the model frame. The parse lists the responses, the
+#' covariates, the columns of addition terms such as `trials()` and
+#' `weights()`, offsets, and the slopes and grouping factors of random
+#' effects. The trend side leaves out its constructor, whose axis and
+#' grouping columns are checked where the axis is resolved.
 #'
-#' The brmsterms-based predictor walk inside
-#' `extract_and_validate_trend_components()` (also in this file)
-#' is a more elaborate variant that yields metadata for the
-#' dimension-computation pipeline. This helper is intentionally a
-#' thinner pure-R wrapper aimed at the pre-fit NA check, which
-#' only needs the column names. Keeping the two parallel avoids
-#' reaching into the dimensions pipeline for a much simpler use
-#' case.
-#'
-#' @param formulas A single formula, brmsformula, mvbrmsformula,
-#'   or a list mixing any of those.
-#' @return Character vector of unique variable names (RHS only,
-#'   response variables excluded). Empty when nothing useful is
-#'   found.
+#' @param obs_formula The observation formula
+#' @param family The observation family
+#' @param trend_formula The trend formula, or `NULL`
+#' @return A list with the `formula` and `trend_formula` columns
 #' @noRd
-extract_predictor_vars <- function(formulas) {
-  if (is.null(formulas)) return(character(0L))
-  # brmsformula / mvbrmsformula are lists internally; treat them
-  # as single inputs (not iterables) at the entry point so the
-  # collector recurses into $formula / $pforms / $forms correctly.
-  if (inherits(formulas, c("formula", "brmsformula", "mvbrmsformula")) ||
-      !is.list(formulas)) {
-    formulas <- list(formulas)
-  }
-
-  collect <- function(f) {
-    if (is.null(f)) return(character(0L))
-    if (inherits(f, c("brmsformula", "mvbrmsformula"))) {
-      forms <- list()
-      if (!is.null(f$formula)) forms <- c(forms, list(f$formula))
-      if (!is.null(f$pforms))  forms <- c(forms, unname(f$pforms))
-      if (!is.null(f$forms))   forms <- c(forms, unname(lapply(
-        f$forms, function(x) x$formula %||% x
-      )))
-      unlist(lapply(forms, collect))
-    } else if (inherits(f, "formula")) {
-      # RHS only when response is on LHS; full formula otherwise.
-      rhs <- if (length(f) == 3L) f[[3L]] else f
-      setdiff(all.vars(rhs), lhs_columns(f))
-    } else {
-      character(0L)
+model_columns <- function(obs_formula, family, trend_formula = NULL) {
+  list(
+    formula = mvgam_side_terms(obs_formula, family)$all,
+    trend_formula = if (!is.null(trend_formula)) {
+      trend_formula_covariates(
+        parse_base_formula_safe(trend_formula, mvgam_trend_registry())
+      )
     }
-  }
-
-  unique(unlist(lapply(formulas, collect)))
+  )
 }
 
 
-#' Validate that no formula-referenced covariate contains NAs
+#' Refuse absent or incomplete model columns
 #'
-#' brms's default `na_action = na_omit` silently drops rows with
-#' `NA` in any model-frame column. That is harmless for the
-#' response (mvgam preserves the trend time grid separately and
-#' only skips the dropped rows in the likelihood) but it is
-#' fatal for covariates: the trend pipeline expects a row at
-#' every timepoint, and a missing-covariate row breaks the
-#' dimension alignment downstream in Stan with an opaque
-#' chain-failure error. This pre-fit check raises an error at
-#' the validator layer naming the offending columns.
+#' brms reports an absent column only when it builds the model frame,
+#' after the trend is parsed, and its message names neither the formula
+#' that uses the column nor the argument that lacks it. As in
+#' `brms:::validate_data()`, a name `data2` holds counts as present.
 #'
-#' @param data A data frame or list of vectors / matrices.
-#' @param formulas A single formula, brmsformula, mvbrmsformula,
-#'   or list of any of those. NULL elements are skipped.
-#' @param response_vars Character vector of response column
-#'   names to exclude from the check (NAs in the response are
-#'   allowed and preserved by mvgam).
-#' @param context String used in the error message to identify
-#'   the offending data object (e.g. `"data"` or `"newdata"`).
-#' @return Invisible NULL on success; an informative error on
-#'   failure listing which columns carry how many NAs.
+#' brms also drops a row with `NA` in any model-frame column. mvgam
+#' keeps the rows of a missing response on the trend's time grid and
+#' skips them in the likelihood. A missing covariate leaves a row that
+#' the trend expects and the linear predictor cannot fill. An addition
+#' term is checked only on the rows whose response was observed,
+#' because a row with a missing response leaves the likelihood.
+#'
+#' @param data A data frame, or a list of vectors and matrices
+#' @param obs_formula The observation formula, with its family resolved
+#' @param family The observation family
+#' @param trend_formula The trend formula, or `NULL`
+#' @param data2 The list of further model data, or `NULL`
+#' @param optional Columns `data` may omit, such as the responses of a
+#'   prediction frame
+#' @param context The argument that supplied `data`
+#' @return `TRUE`, invisibly
 #' @noRd
-validate_no_covariate_nas <- function(data, formulas,
-                                        response_vars = character(0L),
-                                        context = "data") {
-  if (is.null(data) || is.null(formulas)) {
-    return(invisible(NULL))
+validate_model_columns <- function(data, obs_formula, family,
+                                   trend_formula = NULL, data2 = NULL,
+                                   optional = character(0L),
+                                   context = "data") {
+  columns <- model_columns(obs_formula, family, trend_formula)
+  used <- unique(unlist(columns, use.names = FALSE))
+  absent <- setdiff(used, c(names(data), names(data2), optional))
+  covariates <- intersect(setdiff(used, lhs_columns(obs_formula)),
+                          names(data))
+  refuse_column_gaps(
+    absent,
+    c(na_rows(data, covariates), addition_term_na_rows(data, obs_formula)),
+    context
+  )
+}
+
+
+# Internal: the rows of each column that hold a missing value. A
+# matrix column, such as a distributed-lag predictor, counts a row
+# once however many of its cells are missing.
+#'@noRd
+na_rows <- function(data, columns) {
+  rows <- lapply(columns, function(v) {
+    x <- data[[v]]
+    which(if (is.matrix(x)) rowSums(is.na(x)) > 0L else is.na(x))
+  })
+  stats::setNames(rows, columns)
+}
+
+
+# Internal: refuse model columns a frame omits or leaves incomplete.
+# The fit and prediction paths share this message, and a frame meets
+# the same wording wherever it enters.
+#'@noRd
+refuse_column_gaps <- function(absent, gaps, context) {
+  gaps <- Filter(length, gaps)
+  if (!length(absent) && !length(gaps)) {
+    return(invisible(TRUE))
   }
-  predictor_vars <- extract_predictor_vars(formulas)
-  predictor_vars <- setdiff(predictor_vars, response_vars)
-
-  # Drop names that aren't data columns. These are typically NSE
-  # bare names from trend constructors (e.g. AR(time = week)) or
-  # bs / k literals brms has already absorbed -- not covariates.
-  # `data` may be a data frame or a list (for matrix predictors).
-  available <- names(data)
-  predictor_vars <- intersect(predictor_vars, available)
-
-  na_counts <- vapply(predictor_vars, function(v) {
-    col <- data[[v]]
-    # `is.na()` handles vectors AND matrices uniformly; a matrix
-    # column (e.g. distributed-lag predictor) returns a logical
-    # matrix and `sum()` counts every NA cell.
-    if (is.null(col)) 0L else as.integer(sum(is.na(col)))
-  }, integer(1L))
-  na_counts <- c(na_counts, addition_term_na_counts(data, formulas))
-
-  bad <- na_counts[na_counts > 0L]
-  if (length(bad) == 0L) {
-    return(invisible(NULL))
+  headline <- if (length(absent)) {
+    paste0("Columns the model uses are missing from '", context, "'.")
+  } else {
+    paste0("Columns the model uses hold missing values in '", context,
+           "'.")
   }
-
-  bad_lines <- vapply(seq_along(bad), function(i) {
-    paste0("'", names(bad)[i], "': ", bad[i], " NA",
-           if (bad[i] > 1L) "s" else "")
-  }, character(1L))
-
+  lines <- c(
+    if (length(absent)) {
+      paste0("Absent: ", paste0("'", absent, "'", collapse = ", "), ".")
+    },
+    vapply(names(gaps), function(v) {
+      n <- length(gaps[[v]])
+      paste0("'", v, "': ", n, if (n > 1L) " NAs" else " NA",
+             ", first at row ", gaps[[v]][1L], ".")
+    }, character(1L))
+  )
+  hint <- if (identical(context, "newdata")) {
+    "A missing response is allowed and marks a row to predict."
+  } else {
+    "Impute the missing values before fitting."
+  }
   stop(insight::format_error(c(
-    paste0(
-      "Columns referenced by the formula contain ",
-      "missing values in '", context, "'."
-    ),
-    stats::setNames(bad_lines, rep("x", length(bad_lines))),
-    i = "The likelihood skips a row whose response is missing."
-  )))
+    headline,
+    stats::setNames(lines, rep("x", length(lines))),
+    if (length(gaps)) c(i = hint)
+  )), call. = FALSE)
 }
 
 
 #' Missing values in the addition terms of observed rows
 #'
-#' An addition term such as `weights(w)` or `trials(n)` is read on
-#' every row its response was observed at, and brms drops a row whose
-#' addition term is missing just as it drops one whose covariate is.
-#' The trend mapping keeps that row, since its response was seen, so
-#' the two then describe different rows. Where the response is missing
-#' the row leaves the likelihood anyway, so only observed rows count.
+#' brms evaluates an addition term such as `weights(w)` or `trials(n)`
+#' on every row whose response was observed, and drops a row whose
+#' addition term is missing as it drops one with a missing covariate.
+#' The trend mapping keeps every row with an observed response, and
+#' the two would then describe different rows. A row with a missing
+#' response leaves the likelihood whatever its addition terms hold.
 #'
 #' @param data A data frame
-#' @param formulas The formulas `validate_no_covariate_nas()` was given
-#' @return Named integer counts, one per addition-term column
+#' @param obs_formula The observation formula
+#' @return Named list of row indices, one per addition-term column
 #' @noRd
-addition_term_na_counts <- function(data, formulas) {
-  if (inherits(formulas, c("formula", "bform")) || !is.list(formulas)) {
-    formulas <- list(formulas)
+addition_term_na_rows <- function(data, obs_formula) {
+  if (is.null(obs_formula) || !length(lhs_columns(obs_formula))) {
+    return(list())
   }
-  counts <- lapply(formulas, function(f) {
-    if (is.null(f) || !length(lhs_columns(f))) {
-      return(integer(0L))
+  rows <- lapply(unname(response_formulas(obs_formula)), function(form) {
+    y <- response_columns(form)[[1L]]
+    extra <- intersect(setdiff(lhs_columns(form), y), names(data))
+    if (!length(extra) || is.null(data[[y]])) {
+      return(list())
     }
-    unlist(lapply(unname(response_formulas(f)), function(form) {
-      y <- response_columns(form)[[1L]]
-      extra <- intersect(setdiff(lhs_columns(form), y), names(data))
-      if (!length(extra) || is.null(data[[y]])) {
-        return(integer(0L))
-      }
-      seen <- !is.na(data[[y]])
-      vapply(extra, function(v) {
-        as.integer(sum(is.na(data[[v]][seen])))
-      }, integer(1L))
-    }))
+    seen <- !is.na(data[[y]])
+    lapply(na_rows(data, extra), function(r) r[seen[r]])
   })
-  unlist(counts)
+  do.call(c, rows)
 }
 
 
+#' Refuse a frame missing named columns
+#'
 #' @param data Data frame to check
-#' @param required_vars Character vector of required variable names
-#' @param context Context description for error messages
-#' @param formula Optional formula object for nonlinear parameter filtering
-#' @return Invisible TRUE if validation passes, throws error otherwise
+#' @param required_vars Character vector of required column names
+#' @param context The argument that supplied `data`
+#' @return `TRUE`, invisibly
 #' @noRd
-validate_required_variables <- function(data, required_vars, context = "data", formula = NULL) {
+validate_required_variables <- function(data, required_vars,
+                                        context = "data") {
   checkmate::assert_data_frame(data)
   checkmate::assert_character(required_vars, min.len = 1)
-  checkmate::assert_character(context, len = 1)
-  checkmate::assert(
-    is.null(formula) || inherits(formula, "brmsformula"),
-    .var.name = "formula"
-  )
-
-  # Remove latent parameters from nonlinear formulas as they are model-defined, not data variables
-  if (!is.null(formula) && inherits(formula, "brmsformula") && !is.null(formula$pforms)) {
-    latent_params <- names(formula$pforms)
-    required_vars <- setdiff(required_vars, latent_params)
-
-    # If no variables remain after filtering, validation passes
-    if (length(required_vars) == 0) {
-      return(invisible(TRUE))
-    }
-  }
-
+  checkmate::assert_string(context)
   missing_vars <- setdiff(required_vars, names(data))
-  if (length(missing_vars) > 0) {
-    # Pre-compute strings for proper interpolation
-    missing_str <- paste(missing_vars, collapse = ", ")
-    available_str <- paste(names(data), collapse = ", ")
-
-    stop(insight::format_error(
-      c(
-        paste0("Required variables not found in ", context, ":"),
-        "x" = paste0("Missing: ", missing_str),
-        "i" = paste0("Available: ", available_str)
-      )
-    ), call. = FALSE)
+  if (!length(missing_vars)) {
+    return(invisible(TRUE))
   }
-
-  invisible(TRUE)
+  stop(insight::format_error(c(
+    paste0("Required columns are missing from '", context, "'."),
+    x = paste0("Absent: ", paste0("'", missing_vars, "'", collapse = ", "),
+               "."),
+    i = paste0("Columns present: ",
+               paste0("'", names(data), "'", collapse = ", "), ".")
+  )), call. = FALSE)
 }
 
 
@@ -1041,7 +866,7 @@ assert_series_coverage <- function(supplied, series_levels, subject) {
       paste0("Unknown to the training data: ", quoted(unknown), ".")
     },
     x = if (length(dups)) {
-      paste0("These are duplicated: ", quoted(dups), ".")
+      paste0("Duplicated: ", quoted(dups), ".")
     },
     i = paste0("The training series are: ", quoted(series_levels), ".")
   )), call. = FALSE)
@@ -1288,18 +1113,15 @@ trend_requires_regular_intervals <- function(trend_specs) {
 }
 #' The series a spec will give a frame, before any axis exists
 #'
-#' The two grouping validators run before the axis is resolved and
-#' both need the same answer: which series each row belongs to under
-#' this specification. They asked for it differently, and each way
-#' was wrong in its own direction. One read the specification flat
-#' and vanished silently on the nested spelling; both returned
-#' without checking whenever the frame carried no `series` column,
-#' which is exactly the frame a grouping names its series for.
+#' The two grouping validators run before the axis is resolved, and
+#' both need the series each row belongs to under this specification.
+#' The grouping is taken through `spec_groupings()`, which accepts the
+#' flat and the nested spelling of a spec. A frame with no `series`
+#' column still has series here, because `gr` and `subgr` name them.
 #'
-#' A `gr` that names no column of the frame is refused here rather
-#' than passed on. Left alone it reached Stan assembly, after brms
-#' setup, and was reported there against a variable the user never
-#' wrote.
+#' `assert_grouping_columns()` refuses a grouping column the frame
+#' lacks or leaves incomplete. Stan assembly would otherwise report it
+#' after brms setup, against a variable the user never wrote.
 #'
 #' @param trend_spec A trend specification, in either spelling.
 #' @param data The frame being validated.
@@ -1312,19 +1134,12 @@ spec_series_values <- function(trend_spec, data) {
   if (!named_var(gr_var)) {
     return(NULL)
   }
-  if (!gr_var %in% colnames(data)) {
-    stop(insight::format_error(c(
-      paste0("Grouping variable '", gr_var, "' is not in the data."),
-      x = paste0(
-        "Columns present: ", paste(colnames(data), collapse = ", "), "."
-      ),
-      i = "Set 'gr' to the column that gives each series' group."
-    )), call. = FALSE)
-  }
   subgr <- groupings$subgr
   series_var <- spec_axis_vars(trend_spec)$series_var
-  series <- if (named_var(subgr) && !identical(subgr, series_var) &&
-                  subgr %in% colnames(data)) {
+  # A `subgr` naming the series column is checked with the axis.
+  own_subgr <- named_var(subgr) && !identical(subgr, series_var)
+  assert_grouping_columns(data, gr_var, if (own_subgr) subgr)
+  series <- if (own_subgr) {
     hierarchical_series_values(data, gr_var, subgr)
   } else if (series_var %in% colnames(data)) {
     data[[series_var]]
@@ -1332,6 +1147,26 @@ spec_series_values <- function(trend_spec, data) {
     return(NULL)
   }
   list(gr_var = gr_var, series = series, series_var = series_var)
+}
+
+
+# Internal: the trend's grouping arguments, checked against the frame.
+# `gr` needs `subgr`, and each series belongs to one group. The Stan
+# program sizes every group's Cholesky and scale blocks by one subgroup
+# count, and an unbalanced design gives NaN at initialisation. The
+# returned spec holds "NA" for a grouping it does not use.
+#'@noRd
+resolve_trend_groupings <- function(parsed_trend, data, series_var) {
+  groupings <- validate_grouping_arguments(
+    parsed_trend$gr, parsed_trend$subgr, series_var
+  )
+  parsed_trend$gr <- groupings$gr %||% "NA"
+  parsed_trend$subgr <- groupings$subgr %||% "NA"
+  if (!is.null(groupings$gr)) {
+    validate_gr_constant_per_series(parsed_trend, data)
+    validate_gr_balanced_groups(parsed_trend, data)
+  }
+  parsed_trend
 }
 
 
@@ -1768,6 +1603,7 @@ validate_regular_time_intervals <- function(time_values, time_var = "time") {
         "Gaps between times range from ", min(intervals), " to ",
         max(intervals), "."
       ),
+      i = "Add the missing times as rows with an NA response.",
       i = "'CAR()' models a trend over irregular times."
     )))
   }
@@ -1997,8 +1833,8 @@ validate_response_for_family <- function(y, family, y_name = "y") {
       x = paste0(sum(frac), " of ", sum(present),
                  " values are not integers, the first at row ",
                  which(frac)[1L], "."),
-      i = paste0("Round the column if the fractions are a storage ",
-                 "artefact or model it with a continuous family.")
+      i = paste0("Round the column if the fractions come from storage, ",
+                 "or model it with a continuous family.")
     )))
   }
 
@@ -2080,12 +1916,61 @@ validate_response_shapes <- function(data, formula, family) {
       next
     }
     column <- columns[[key]]
+    trials <- trials_expression(response_formulas(formula)[[key]], fam)
     for (frame in frames) {
       if (!column %in% names(frame)) next
       validate_response_for_family(frame[[column]], fam, y_name = column)
+      refuse_counts_above_trials(frame, column, trials)
     }
   }
   invisible(TRUE)
+}
+
+
+# Internal: the expression inside a response's `trials()` term, as a
+# quosure in the formula's environment, or `NULL` when the response
+# has none.
+#'@noRd
+trials_expression <- function(form, family) {
+  form$family <- family
+  ad <- brms::brmsterms(form)$adforms$trials
+  if (is.null(ad)) {
+    return(NULL)
+  }
+  # brms stores the term as `~ resp_trials(<expr>)`.
+  rlang::new_quosure(rlang::f_rhs(ad)[[2L]],
+                     environment(form$formula) %||% globalenv())
+}
+
+
+# Internal: refuse an observed count above its `trials()` denominator.
+# brms reports this from its data preparation without naming the
+# column or the row. A frame without the denominator's columns is left
+# to `validate_model_columns()`.
+#'@noRd
+refuse_counts_above_trials <- function(frame, column, trials) {
+  if (is.null(trials)) {
+    return(invisible(TRUE))
+  }
+  # A name the frame lacks may be a constant the formula environment holds.
+  unbound <- setdiff(all.vars(rlang::quo_get_expr(trials)), names(frame))
+  env <- rlang::quo_get_env(trials)
+  if (!all(vapply(unbound, exists, logical(1L), envir = env))) {
+    return(invisible(TRUE))
+  }
+  y <- frame[[column]]
+  n <- rep_len(rlang::eval_tidy(trials, frame), length(y))
+  over <- !is.na(y) & !is.na(n) & y > n
+  if (!any(over)) {
+    return(invisible(TRUE))
+  }
+  first <- which(over)[1L]
+  stop(insight::format_error(c(
+    paste0("'", column, "' has counts above its 'trials()' denominator."),
+    x = paste0(sum(over), " of ", sum(!is.na(y)),
+               " values exceed it, the first at row ", first, " (",
+               column, " = ", y[first], ", trials = ", n[first], ").")
+  )), call. = FALSE)
 }
 
 
@@ -2350,7 +2235,7 @@ validate_obs_formula_brms <- function(formula) {
   if (any(has_dot)) {
     stop(insight::format_error(c(
       "A '.' is not supported in the observation 'formula'.",
-      x = paste0("It would enter every column of 'data' as a predictor, ",
+      x = paste0("'.' enters every column of 'data' as a predictor, ",
                  "the time and series columns among them."),
       i = "List the covariates the model should use."
     )))
@@ -2490,7 +2375,11 @@ is.mvgam_trend <- function(x) {
 #'   `response_columns()`
 #' @return List with time series dimensions and optional added metadata
 #' @noRd
-extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL, trend_specs = NULL, response_vars = NULL, cached_formulas = NULL) {
+extract_time_series_dimensions <- function(data, time_var = "time",
+                                           series_var = "series",
+                                           trend_type = NULL,
+                                           trend_specs = NULL,
+                                           response_vars = NULL) {
 
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
@@ -2503,11 +2392,6 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE)
   }
 
-
-  # Validate required variables exist - only require time_var since series can be created via attributes
-  formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
-  filtered_vars <- filter_required_variables(time_var, formula_to_use)  # Only require time_var
-  validate_required_variables(data, filtered_vars, "time series data")
 
   # Calculate core dimensions from data using attribute-based accessors
   time_vals <- get_time_for_grouping(data)
@@ -2667,10 +2551,6 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     # read from the response's own column.
     for (key in names(response_vars)) {
       column <- response_vars[[key]]
-      formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
-      filtered_vars <- filter_required_variables(column, formula_to_use)
-      validate_required_variables(data, filtered_vars, "response mapping data")
-
       dimensions$mappings[[key]] <- generate_obs_trend_mapping(
         data = data,
         response_var = column,
@@ -2817,26 +2697,6 @@ validate_mvgam_trend <- function(trend_obj) {
     stop_missing_fields("The trend object", missing_fields)
   }
 
-  invisible(TRUE)
-}
-
-#' Validate proportional values (0-1 range)
-#' @param x Numeric value to validate
-#' @param name Parameter name for error messages
-#' @return Logical TRUE if valid, stops with error if not
-#' @noRd
-validate_proportional <- function(x, name = deparse(substitute(x))) {
-  checkmate::assert_number(x, lower = 0, upper = 1, .var.name = name)
-  invisible(TRUE)
-}
-
-#' Validate positive integers
-#' @param x Integer value to validate
-#' @param name Parameter name for error messages
-#' @return Logical TRUE if valid, stops with error if not
-#' @noRd
-validate_pos_integer <- function(x, name = deparse(substitute(x))) {
-  checkmate::assert_int(x, lower = 1, .var.name = name)
   invisible(TRUE)
 }
 
@@ -3024,11 +2884,10 @@ normalise_trend_map_on_specs <- function(trend_specs, data) {
 # Internal: tell the user once when a `series` column they supplied is
 # superseded by the one `gr` and `subgr` imply.
 #
-# `gr` and `subgr` together identify a series, so mvgam builds the
-# column itself and ignores whatever `series` the data carried. Staying
-# silent leaves a user whose own column disagreed believing the model
-# was grouped their way, and every post-fit label then reads back in
-# mvgam's spelling rather than theirs.
+# `gr` and `subgr` together identify a series. mvgam builds the series
+# from them and ignores the `series` column the data carried. A user
+# whose column disagreed would believe the model grouped their way, and
+# every post-fit label uses mvgam's names for the series.
 #'@noRd
 warn_series_superseded <- function(data, series_var, series_values,
                                    gr_var, subgr_var) {
@@ -3049,10 +2908,7 @@ warn_series_superseded <- function(data, series_var, series_values,
       x = paste0(
         "Supplied: '", supplied[1L], "'. Used: '", derived[1L], "'."
       ),
-      i = paste0(
-        "Hierarchical trends name a series by its grouping variables, ",
-        "and '", series_var, "' is redundant here."
-      ),
+      i = "A hierarchical trend names each series by its grouping columns.",
       i = paste0(
         "Every post-fit summary, plot and forecast labels this series ",
         "'", derived[1L], "'."
@@ -3062,6 +2918,31 @@ warn_series_superseded <- function(data, series_var, series_values,
   )
   invisible(NULL)
 }
+
+# Internal: refuse a time column with missing values. A row without a
+# time maps to no occasion of the trend, and its trend index stays
+# `NA` through to the linear predictor.
+#'@noRd
+refuse_missing_times <- function(values, time_var) {
+  rows <- which(is.na(values))
+  if (!length(rows)) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    paste0("Time variable '", time_var, "' has missing values."),
+    x = paste0("'", time_var, "' is NA on ", count_rows(rows),
+               ", first at row ", rows[1L], "."),
+    i = "Drop these rows or supply their times."
+  )), call. = FALSE)
+}
+
+
+# Internal: "1 row" or "n rows".
+#'@noRd
+count_rows <- function(rows) {
+  paste0(length(rows), if (length(rows) == 1L) " row" else " rows")
+}
+
 
 # Internal: TRUE when a variable name points at a column. A trend
 # constructor spells an absent grouping NA and the normalised spec
@@ -3082,20 +2963,35 @@ usable_var <- function(var, data) {
 
 # Internal: require the grouping columns a hierarchical trend needs.
 #
-# Reason: a bare `checkmate::assert_names()` reports the missing names
-# without saying why they are wanted, which reads as an internal
-# assertion to someone who simply passed a newdata built from the
-# covariates they model over.
+# Reason: `checkmate::assert_names()` reports the missing names as an
+# internal assertion and gives no reason for them. This message names
+# the role of the columns. Training and prediction frames share it.
 #'@noRd
-assert_grouping_columns <- function(data, gr_var, subgr_var) {
-  wanted <- c(gr_var, subgr_var)
-  missing <- wanted[!vapply(wanted, usable_var, logical(1L), data = data)]
-  if (!length(missing)) {
+assert_grouping_columns <- function(data, gr_var, subgr_var = NULL) {
+  wanted <- unlist(Filter(named_var, list(gr_var, subgr_var)))
+  missing <- setdiff(wanted, names(data))
+  if (length(missing)) {
+    stop(insight::format_error(c(
+      "Grouping columns of the trend are missing from the data.",
+      x = paste0("Absent: ", paste0("'", missing, "'", collapse = ", "),
+                 "."),
+      i = paste0("A hierarchical trend identifies each series by its ",
+                 "'gr' and 'subgr' columns.")
+    )), call. = FALSE)
+  }
+  # A row without its group belongs to no series.
+  gaps <- wanted[vapply(wanted, function(v) anyNA(data[[v]]), logical(1L))]
+  if (!length(gaps)) {
     return(invisible(TRUE))
   }
+  lines <- vapply(gaps, function(v) {
+    paste0("'", v, "': ", sum(is.na(data[[v]])), " NA, first at row ",
+           which(is.na(data[[v]]))[1L], ".")
+  }, character(1L))
   stop(insight::format_error(c(
-    "Columns needed to identify each series are missing from 'newdata'.",
-    x = cli::format_inline("Missing: {.field {missing}}.")
+    "Grouping columns of the trend hold missing values.",
+    stats::setNames(lines, rep("x", length(lines))),
+    i = "Drop these rows or supply their groups."
   )), call. = FALSE)
 }
 
@@ -3124,7 +3020,8 @@ hierarchical_series_values <- function(data, gr_var, subgr_var) {
 # which the column records by holding one level. Training data need a
 # factor series column, whose levels fix the order of the series in
 # the model and every result. Prediction data take the fitted order,
-# and a character column there is accepted.
+# and a character column there is accepted. Time must be numeric. The
+# trend orders and spaces its steps by the value of each time.
 #' @noRd
 assert_axis_column <- function(data, column, axis = c("time", "series"),
                                require_factor = TRUE) {
@@ -3142,9 +3039,24 @@ assert_axis_column <- function(data, column, axis = c("time", "series"),
                    column, ").")
       )), call. = FALSE)
     }
+    if (axis == "time" && !is.numeric(data[[column]])) {
+      stop(insight::format_error(c(
+        paste0("Column '", column, "' must be numeric."),
+        x = paste0("Got class '", class(data[[column]])[1L], "'."),
+        i = "mvgam orders and spaces the times by their values.",
+        i = paste0(
+          "Convert it with data$", column, " <- ",
+          if (is.factor(data[[column]])) {
+            paste0("as.numeric(as.character(data$", column, ")).")
+          } else {
+            paste0("as.numeric(data$", column, ").")
+          }
+        )
+      )), call. = FALSE)
+    }
     return(invisible(TRUE))
   }
-  place <- c(time = "at one occasion", series = "on one series")[[axis]]
+  place <-c(time = "at one occasion", series = "on one series")[[axis]]
   hints <- c(
     i = paste0("A latent trend places each row ", place, "."),
     i = paste0(
@@ -3215,32 +3127,7 @@ validate_newdata_complete <- function(newdata, object) {
   }
   absent <- setdiff(setdiff(read, exempt), names(newdata))
   present <- intersect(read, names(newdata))
-  gaps <- present[vapply(present, function(col) anyNA(newdata[[col]]),
-                         logical(1L))]
-  if (!length(absent) && !length(gaps)) {
-    return(invisible(TRUE))
-  }
-  detail <- character(0L)
-  if (length(absent)) {
-    detail <- c(detail, paste0(
-      "Absent: ", paste0("'", absent, "'", collapse = ", "), "."
-    ))
-  }
-  if (length(gaps)) {
-    first <- vapply(gaps, function(col) which(is.na(newdata[[col]]))[1L],
-                    integer(1L))
-    detail <- c(detail, paste0(
-      "Missing values in: ",
-      paste0("'", gaps, "' (first at row ", first, ")",
-             collapse = ", "),
-      "."
-    ))
-  }
-  stop(insight::format_error(c(
-    "'newdata' is missing values the model needs to predict.",
-    stats::setNames(detail, rep("x", length(detail))),
-    i = "A missing response is allowed and marks a row to predict."
-  )), call. = FALSE)
+  refuse_column_gaps(absent, na_rows(newdata, present), "newdata")
 }
 
 
@@ -3330,7 +3217,7 @@ validate_stan_code <- function(stan_code, backend = "rstan", silent = TRUE,
 
 
 #'@noRd
-as_one_logical = function(x, allow_na = FALSE) {
+as_one_logical <- function(x, allow_na = FALSE) {
   s <- substitute(x)
   x <- as.logical(x)
   if (length(x) != 1L || anyNA(x) && !allow_na) {
@@ -3558,17 +3445,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   # linear predictor, and nothing between here and the answer says
   # so. Refusing here is the one layer that owns the question,
   # because this is where the two indices are built.
-  missing_time <- which(is.na(attr(data, "mvgam_time")))
-  if (length(missing_time) > 0L) {
-    stop(insight::format_error(c(
-      paste0("Time variable '", time_var, "' has missing values."),
-      x = paste0(
-        length(missing_time), " row(s) have a missing time, first at ",
-        "row ", missing_time[1L], "."
-      ),
-      i = "Drop these rows or supply their times."
-    )), call. = FALSE)
-  }
+  refuse_missing_times(data[[time_var]], time_var)
   attr(data, "mvgam_original_time") <- data[[time_var]]  # Store original for distance calculations
 
   # The series axis of a frame whose responses are its series
@@ -3689,8 +3566,8 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     stop(insight::format_error(c(
       "Series identity has missing values.",
       x = paste0(
-        length(missing_series), " row(s) have no series, first at row ",
-        missing_series[1L], "."
+        "The series is NA on ", count_rows(missing_series),
+        ", first at row ", missing_series[1L], "."
       ),
       i = paste0("Fill the missing values in '", series_var,
                  "' and any grouping variables.")
@@ -4003,19 +3880,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     }
   }
 
-  # The grouping arguments are checked where the frame is known: `gr`
-  # needs `subgr`, and each series belongs to one group. The Stan program
-  # sizes every group's Cholesky and scale blocks by one subgroup count,
-  # and an unbalanced design gives NaN at initialisation.
-  groupings <- validate_grouping_arguments(
-    parsed_trend$gr, parsed_trend$subgr, series_var
-  )
-  parsed_trend$gr <- groupings$gr %||% "NA"
-  parsed_trend$subgr <- groupings$subgr %||% "NA"
-  if (!is.null(groupings$gr)) {
-    validate_gr_constant_per_series(parsed_trend, data)
-    validate_gr_balanced_groups(parsed_trend, data)
-  }
+  parsed_trend <- resolve_trend_groupings(parsed_trend, data, series_var)
 
   data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var,
                                 response_vars)
@@ -4026,8 +3891,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     time_var,
     series_var,
     trend_specs = mv_spec$trend_specs,
-    response_vars = response_vars,
-    cached_formulas = mv_spec$cached_formulas
+    response_vars = response_vars
   )
 
   # Persist the by_lv grain markers on dimensions so downstream stanvar

@@ -313,8 +313,7 @@ mod <- mvgam(
 
 Inspect the summary to see that the posterior now also contains estimates for the `Beta` precision parameters $\phi$.
 ```{r}
-summary(mod, 
-        include_betas = FALSE)
+summary(mod)
 ```
 
 Plot the hindcast and forecast distributions for each series

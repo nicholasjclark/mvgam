@@ -292,8 +292,8 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
           n_clamped, " of ", total_samples, ") were clamped."
         ),
         "i" = paste(
-          "This may indicate the truncation region is too narrow",
-          "relative to the posterior predictive distribution."
+          "The model places this share of its predictive draws",
+          "outside the truncation bounds."
         )
       ),
       "mvgam_truncation_clamp"

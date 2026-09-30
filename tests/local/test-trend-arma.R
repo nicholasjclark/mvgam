@@ -608,11 +608,8 @@ test_that("every per-series plot panels in the model's own order", {
 
 
 test_that("forecast with no newdata says what it needs", {
-  # The default call. It used to return an `mvgam_forecast` carrying
-  # hindcast arms, a type and an empty `forecasts` list, so an object
-  # that looks complete held no forecast at all. A fit cannot invent
-  # the occasions to forecast at, nor the covariates the model reads
-  # there, so the requirement is named.
+  # A fit given no held-out data has no occasions to forecast at,
+  # and the refusal names what `forecast()` needs.
   expect_error(forecast(fit), "'newdata' is required to forecast")
   msg <- tryCatch(forecast(fit), error = conditionMessage)
   expect_true(grepl("hindcast", msg, fixed = TRUE))

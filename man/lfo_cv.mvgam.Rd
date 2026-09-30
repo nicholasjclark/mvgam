@@ -86,9 +86,10 @@ time point (if \code{"elpd"} is in \code{score}).
 \item \code{scores}: named list of vectors, one per requested non-ELPD
 score (\code{NULL} if no non-ELPD score requested).
 \item \code{pareto_ks}: Pareto-k diagnostic at each evaluation step.
-\item \code{eval_timepoints}: integer vector of the times evaluated.
-\item \code{refits_at}: integer vector of time points where the model
-was refit.
+\item \code{eval_timepoints}: the times evaluated, as the data record
+them.
+\item \code{refits_at}: the times at which the model was refit, as the
+data record them.
 \item \code{pareto_k_threshold}: the numeric threshold the refit gate
 applied, whether it came from the argument or from the
 adaptive rule.

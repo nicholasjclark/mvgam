@@ -26,10 +26,8 @@ a fresh refit (Pareto-k above threshold or initial fit).
 }
 \description{
 Stacks the per-step ELPDs from several \code{mvgam_lfo}
-objects into one long-format \code{tibble}. The returned frame is
-the natural input for ggplot trajectories that show how each
-model's predictive density evolves across the rolling-origin
-evaluation grid.
+objects into one long-format \code{tibble}, with one row per model
+and evaluation time.
 }
 \seealso{
 \code{\link[=lfo_cv]{lfo_cv()}}, \code{\link[=loo_compare.mvgam_lfo]{loo_compare.mvgam_lfo()}},

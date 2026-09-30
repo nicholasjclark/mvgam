@@ -44,32 +44,34 @@
 #' @param seed Optional integer seed for reproducibility.
 #'
 #' @details
-#' The six recipes:
+#' The seven recipes:
 #'
 #' \describe{
 #'   \item{`type = 1`}{`y ~ s(x)` with `RW()` trend.
 #'     Single smooth covariate + random-walk trend; the simplest
 #'     mvgam recipe.}
-#'   \item{`type = 2`}{`y ~ s(x) + s(z)` with `AR(p = 1, phi = 0.7)`
-#'     trend. Two additive smooths.}
-#'   \item{`type = 3`}{`y ~ s(x) + (1 | grp)` with
-#'     `AR(p = 1, phi = 0.7)`. Hierarchical: random intercept per
-#'     group level (5 groups by default).}
-#'   \item{`type = 4`}{`y ~ gp(x)` with `AR(p = 1, phi = 0.7)`.
-#'     Gaussian-process covariate (mvgam-specific).}
+#'   \item{`type = 2`}{`y ~ s(x) + s(z)` with an `AR(p = 1)` trend
+#'     whose coefficient is 0.7. Two additive smooths.}
+#'   \item{`type = 3`}{`y ~ s(x) + (1 | grp)` with an `AR(p = 1)`
+#'     trend whose coefficient is 0.7. Hierarchical: random
+#'     intercept per group level (5 groups by default).}
+#'   \item{`type = 4`}{`y ~ gp(x)` with an `AR(p = 1)` trend whose
+#'     coefficient is 0.7. Gaussian-process covariate.}
 #'   \item{`type = 5`}{State-space: obs `y ~ x`, trend formula
-#'     `~ s(z)`, `AR(p = 1, phi = 0.6)`. The smooth lives on the
-#'     trend, not on `y`'s linear predictor. `prop_trend` defaults
-#'     to `0.2` for this type to keep the AR component small
-#'     relative to the smooth so the two are identifiable.}
+#'     `~ s(z)`, and an `AR(p = 1)` trend whose coefficient is 0.6.
+#'     The smooth enters the latent state. `prop_trend` defaults
+#'     to `0.2` for this type, which keeps the AR component small
+#'     relative to the smooth and makes the two identifiable.}
 #'   \item{`type = 6`}{`y ~ s(season, bs = "cc")` with `CAR(time,
 #'     series)`. Cyclic seasonal + continuous-time AR(1) on
-#'     irregular time gaps (`Δt ~ Uniform(1, 6)`).}
+#'     irregular time gaps (`Δt ~ Uniform(1, 6)`), with
+#'     autocorrelation 0.7 over one time unit.}
 #'   \item{`type = 7`}{`y ~ s(x)` with sparse
 #'     `AR(p = c(1, 12))`. The latent state carries lag-1 momentum
-#'     and lag-12 recurrence; the observation side carries a smooth
-#'     of a covariate that is not periodic, so the two are
-#'     separately identifiable. `prop_trend` defaults to `0.6`.}
+#'     and lag-12 recurrence, with coefficients 0.55 and 0.40. The
+#'     observation side holds a smooth of a covariate that is not
+#'     periodic, which makes it identifiable from the latent state.
+#'     `prop_trend` defaults to `0.6`.}
 #' }
 #'
 #' For multi-series simulations (`n_series > 1`), the observation
@@ -94,6 +96,7 @@
 #'       f_true)` ground-truth smooth functions.}
 #'     \item{`true_trend`}{Matrix `[n_timepoints, n_series]` of
 #'       latent trend realisations.}
+#'     \item{`true_trend_sigma`}{Empirical SD of `true_trend`.}
 #'     \item{`true_sigma_obs`}{Observation noise SD (or
 #'       family-specific dispersion).}
 #'   }

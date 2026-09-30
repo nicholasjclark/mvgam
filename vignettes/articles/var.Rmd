@@ -157,19 +157,18 @@ n_reg <- length(region_order)
 
 `summary()` on a VAR fit splits the parameter table between the
 observation model (here a single shared shape) and the trend
-model (the region intercepts, the VAR coefficient array
-`A_raw_trend`, and the innovation Cholesky `L_Omega_trend`). We
-suppress the spline coefficient table with `include_betas =
-FALSE` because there are no smooth terms on the observation
-side.
+model (the region intercepts, the innovation SDs and the
+hyperparameters of the Heaps prior on the transition matrix).
+`matrices = TRUE` adds a row for every cell of the transition
+matrix `Phi_trend` and the innovation covariance `Sigma_trend`.
 
 ```{r summary}
-summary(varmod, include_betas = FALSE)
+summary(varmod)
 ```
 
 The three region intercepts sit close to zero on the
 inverse link scale, and the VAR self-coefficients on the diagonal
-of $A$ (rows `A_raw_trend[1,i,i]`) are all positive and bounded
+of $A$ (`Phi_trend[1,i,i]`, plotted below) are all positive and bounded
 well below one, so the Heaps
 ([2023](https://doi.org/10.1080/10618600.2022.2079648)) prior
 that guarantees stationarity is not pushing against the data.
@@ -177,7 +176,7 @@ that guarantees stationarity is not pushing against the data.
 ## Inspecting the transition matrix
 
 The lagged dependence structure lives in the $3 \times 3$
-matrix $A$. `mcmc_plot()` with `variable = "A_trend"` and
+matrix $A$. `mcmc_plot()` with `variable = "Phi_trend"` and
 `type = "hist"` shows the posterior for every cell. Passing
 `facet_args = list(dir = "v")` walks the facets column-first, so
 row $i$, column $j$ (the effect of process $j$'s state at time
@@ -187,7 +186,7 @@ by hand.
 ```{r plot-A, fig.cap = "Posterior histograms for each cell of the VAR transition matrix A. Diagonals capture self-lag; off-diagonals capture lagged cross-region effects."}
 mcmc_plot(
   varmod,
-  variable    = "A_trend",
+  variable    = "Phi_trend",
   regex       = TRUE,
   type        = "hist",
   facet_args  = list(dir = "v")
@@ -195,8 +194,8 @@ mcmc_plot(
 ```
 
 ```{r a-numbers, include = FALSE}
-A_post <- as.matrix(varmod, variable = "^A_trend\\[", regex = TRUE)
-a_cell <- function(i, j) A_post[, sprintf("A_trend[1,%d,%d]", i, j)]
+A_post <- as.matrix(varmod, variable = "^Phi_trend\\[", regex = TRUE)
+a_cell <- function(i, j) A_post[, sprintf("Phi_trend[1,%d,%d]", i, j)]
 a_diag_min <- min(vapply(seq_len(n_reg),
                          function(i) mean(a_cell(i, i) > 0), numeric(1)))
 off <- expand.grid(i = seq_len(n_reg), j = seq_len(n_reg))
@@ -215,7 +214,7 @@ good year tends to be followed by another. The off-diagonals are
 weaker and none of them separates from zero. The strongest is the
 effect of `r fe_a_best`, at `r fe_a_best_p` of the posterior
 above zero, which is suggestive and no more. Note the index
-order: `A_trend[1,i,j]` is the effect of process $j$ on process
+order: `Phi_trend[1,i,j]` is the effect of process $j$ on process
 $i$, and the processes follow the levels of the series factor, so
 `region_order` above is what names them.
 
@@ -482,7 +481,7 @@ Once a VAR is fitted in mvgam, the same handful of accessors
 work end to end for any observation family and any correlated
 innovation structure:
 
-- `mcmc_plot(mod, variable = "A_trend", ...)` shows the lagged
+- `mcmc_plot(mod, variable = "Phi_trend", ...)` shows the lagged
   dependence structure per cell of the transition matrix.
 - `residual_cor(mod)` turns the innovation covariance into
   correlations with intervals and evidence, telling you which

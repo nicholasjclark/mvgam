@@ -18,13 +18,22 @@
 #' @param newdata Optional \code{dataframe} or \code{list} of test data
 #'   containing the variables included in the linear predictor of
 #'   \code{formula}. If not supplied, predictions are generated for the
-#'   original observations used for the model fit. Ignored if using one
-#'   of the residual plots (i.e. 'resid_hist')
+#'   original observations used for the model fit. The residual types
+#'   describe the training data and refuse it.
 #'
 #' @param per_obs Logical. For `type = 'resid_vs_fitted'`, whether each
 #'   observation collapses to its posterior median on both axes, giving
 #'   one point per observation. `FALSE` keeps the draw by observation
 #'   scatter, which shows the posterior spread. Read only by that type.
+#'
+#' @param series For the residual types `resid_hist`, `resid_ribbon`,
+#'   `resid_qq`, `resid_vs_fitted`, `resid_acf` and `resid_pacf`, the
+#'   one series whose residuals are drawn, as a name or an index. The
+#'   default is the first series. Its residuals are taken in time order.
+#'   `resid_acf` keeps missing responses in place, and its lags count
+#'   time steps. `resid_pacf` drops them, and its lags count
+#'   observations. A plot from a fit with several series names its
+#'   series in the subtitle.
 #'
 #' @param ... Further arguments passed to \code{\link{predict.mvgam}}
 #'   as well as to the PPC function specified in \code{type}. A name
@@ -170,6 +179,7 @@ pp_check.mvgam <- function(
   resp = NULL,
   draw_ids = NULL,
   per_obs = TRUE,
+  series = NULL,
   ...
 ) {
   require_fitted_model(object, "pp_check")
@@ -185,6 +195,37 @@ pp_check.mvgam <- function(
   validate_draw_selectors(ndraws, draw_ids)
   ndraws_given <- "ndraws" %in% names(match.call())
 
+  # Residuals are computed on the rows the model was fitted to. The
+  # observed values of a frame the caller supplies belong to other
+  # rows.
+  if (grepl("resid", type) && !is.null(newdata)) {
+    stop(insight::format_error(c(
+      "The residual types describe the training data.",
+      i = "Drop 'newdata' from this call."
+    )))
+  }
+  resid_by_series <- c(
+    "resid_hist", "resid_ribbon", "resid_acf", "resid_pacf",
+    "resid_qq", "resid_vs_fitted"
+  )
+  if (!is.null(series)) {
+    if (!type %in% resid_by_series) {
+      stop(insight::format_error(c(
+        "'series' selects the series of a residual plot.",
+        x = paste0("Got type = '", type, "'."),
+        i = paste0(
+          "Use it with ", paste0("'", resid_by_series, "'", collapse = ", "),
+          ", or subset 'newdata' for the other checks."
+        )
+      )))
+    }
+    if (is_closure_unit_family(object$family)) {
+      stop(insight::format_error(c(
+        "'series' is not supported for closure-unit residuals.",
+        x = "A closure-unit family has one residual per closure unit."
+      )))
+    }
+  }
   # Whether the fit saw these rows decides which surface every panel
   # reads, and it has to be settled before the training frame is
   # substituted below: afterwards a test on `newdata` answers as
@@ -539,6 +580,7 @@ pp_check.mvgam <- function(
     ndraws <- NULL
   }
 
+  series_sel <- NULL
   if (grepl("resid", type)) {
     y[!is.na(y)] <- 0
     # residuals(summary = FALSE) returns [ndraws x nobs] (brms
@@ -553,6 +595,15 @@ pp_check.mvgam <- function(
       ndraws = if (!is.null(draw_ids)) NULL else ndraws,
       draw_ids = draw_ids, resp = resp
     )
+    # Residual columns follow the rows of the training frame, whose
+    # series may be interleaved or shuffled. One series in time order
+    # is what an autocorrelation or a residual ribbon can describe.
+    if (type %in% resid_by_series &&
+          !is_closure_unit_family(object$family)) {
+      series_sel <- resid_series_rows(object, newdata, series)
+      y <- y[series_sel$rows]
+      yrep <- yrep[, series_sel$rows, drop = FALSE]
+    }
   } else {
     pred_args <- c(
       list(
@@ -611,7 +662,10 @@ pp_check.mvgam <- function(
   # aggregation left it a matrix one width and a frame another. For
   # every other family the grain is still the row and this is the
   # same narrowing it always was.
-  if (anyNA(y)) {
+  # The lag panels take the missing responses as they need them:
+  # `build_resid_lag_panel()` keeps them in place for the ACF and drops
+  # them for the pACF.
+  if (anyNA(y) && !type %in% c("resid_acf", "resid_pacf")) {
     insight::format_warning(
       "Observations with a missing response are omitted from the plot."
     )
@@ -631,12 +685,14 @@ pp_check.mvgam <- function(
     # convention); restore the natural-sign DS residual draws.
     resid_draws <- -1 * yrep
     if (type %in% c("resid_acf", "resid_pacf")) {
-      return(build_resid_lag_panel(
+      return(label_resid_series(build_resid_lag_panel(
         resid_draws, lag_type = sub("resid_", "", type)
-      ))
+      ), series_sel))
     }
     if (type == "resid_qq") {
-      return(build_resid_qq_panel(resid_draws))
+      return(label_resid_series(
+        build_resid_qq_panel(resid_draws), series_sel
+      ))
     }
     if (type == "resid_vs_fitted") {
       # The fitted values name their surface through the same
@@ -650,6 +706,9 @@ pp_check.mvgam <- function(
         ),
         in_sample
       ))
+      if (!is.null(series_sel)) {
+        fitted_draws <- fitted_draws[, series_sel$rows, drop = FALSE]
+      }
       if (!is.null(take)) {
         fitted_draws <- fitted_draws[, take, drop = FALSE]
       }
@@ -659,9 +718,9 @@ pp_check.mvgam <- function(
       # Pass `per_obs = FALSE` to retain the pooled draw x obs
       # scatter that exposes posterior uncertainty.
       per_obs <- isTRUE(per_obs)
-      return(build_resid_vs_fitted_panel(
+      return(label_resid_series(build_resid_vs_fitted_panel(
         resid_draws, fitted_draws, per_obs = per_obs
-      ))
+      ), series_sel))
     }
   }
 
@@ -756,7 +815,63 @@ pp_check.mvgam <- function(
       ggplot2::theme(legend.position = "none") +
       ggplot2::labs(y = "DS residuals")
   }
-  out_plot
+  label_resid_series(out_plot, series_sel)
+}
+
+
+# Internal: the rows of one series in the frame residuals are
+# computed on, in time order.
+#
+# Returns a list of `rows` (indices into `data`), `label` (the series
+# name, or NULL for a fit that records no series axis) and `n_series`.
+# A fit that records no series axis, a response-keyed frame among
+# them, keeps every row.
+#'@noRd
+resid_series_rows <- function(object, data, series = NULL) {
+  row_series <- axis_row_series(object, data)
+  levs <- if (is.null(row_series)) character(0L) else levels(row_series)
+  if (length(levs) == 0L) {
+    if (!is.null(series)) {
+      stop(insight::format_error(c(
+        "'series' selects among the series a model records.",
+        x = "The fit records no series axis."
+      )))
+    }
+    rows <- seq_len(nrow(data))
+    label <- NULL
+  } else {
+    idx <- resolve_series(series %||% 1L, levs)
+    if (length(idx) != 1L) {
+      stop(insight::format_error(c(
+        "A residual plot shows one series.",
+        x = paste0("Got ", length(idx), " of ", length(levs), " series."),
+        i = "Pass one series name or index to 'series'."
+      )))
+    }
+    label <- levs[idx]
+    rows <- which(row_series == label)
+    if (length(rows) == 0L) {
+      stop(insight::format_error(
+        paste0("Series '", label, "' has no rows in the training data.")
+      ))
+    }
+  }
+  time_var <- axis_vars(object)$time_var
+  if (time_var %in% names(data)) {
+    rows <- rows[order(data[[time_var]][rows])]
+  }
+  list(rows = rows, label = label, n_series = length(levs))
+}
+
+
+# Internal: name the series a residual plot shows, where the fit has
+# more than one to choose from.
+#'@noRd
+label_resid_series <- function(p, series_sel) {
+  if (is.null(series_sel$label) || series_sel$n_series < 2L) {
+    return(p)
+  }
+  p + ggplot2::labs(subtitle = paste0("Series: ", series_sel$label))
 }
 
 
@@ -880,14 +995,21 @@ build_resid_lag_panel <- function(
   lag_type <- match.arg(lag_type)
   acf_fn <- if (lag_type == "acf") stats::acf else stats::pacf
   ndraws <- nrow(resid_draws)
+  # The ACF estimates each lag from the pairs both observed. A
+  # missing value stays in place, and the lags count time steps. The
+  # pACF recursion needs an ACF from a complete series, and a gappy
+  # one gives partial correlations outside [-1, 1]. It drops the
+  # missing values, and its lags count observations.
   per_draw <- lapply(seq_len(ndraws), function(d) {
-    out <- acf_fn(
-      resid_draws[d, ], plot = FALSE, na.action = stats::na.pass
-    )
+    x <- resid_draws[d, ]
+    if (lag_type == "pacf") {
+      x <- x[!is.na(x)]
+    }
+    out <- acf_fn(x, plot = FALSE, na.action = stats::na.pass)
     data.frame(
       value = out$acf[, , 1L],
       lag = out$lag[, 1L, 1L],
-      n_used = out$n.used
+      n_used = sum(!is.na(x))
     )
   })
   lag_df <- do.call(rbind, per_draw)
@@ -1186,36 +1308,52 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
 }
 
 
-# Internal: 4-panel residual diagnostic patchwork. Called by
-# `plot.mvgam(x, type = "residuals")` in the dispatcher. Bundles
-# the four diagnostic pp_check types into a single ggplot via
-# `patchwork::wrap_plots`.
+# Internal: residual diagnostic patchwork for one series, called by
+# `plot.mvgam(x, type = "residuals")`. Residuals against fitted
+# values, the Q-Q plot, the ACF and the pACF, all from one set of
+# posterior draws. A closure-unit family has one residual per closure
+# unit, and its residuals are shown in the Q-Q panel alone.
 #'@noRd
 mvgam_resid_panel <- function(
-  object, newdata = NULL, ndraws = 100L, resp = NULL, ...
+  object, series = NULL, newdata = NULL, ndraws = 100L, resp = NULL, ...
 ) {
-  # The four panels are built from this function's own arguments, so
+  # The panels are built from this function's own arguments, so
   # nothing here reads `...`. It is refused instead of being handed
   # on, since `plot.mvgam(type = "residuals")` reaches this and an
   # argument accepted here would reach no one.
   rlang::check_dots_empty()
-  # Multivariate fan-out via the shared helper: one 4-panel grid per
-  # response, stacked into one figure. Without this each inner
-  # `pp_check` call would itself answer for every response, and
-  # `patchwork::wrap_plots` refuses nested lists.
+  # Multivariate fan-out via the shared helper: one grid per response,
+  # stacked into one figure. Without it each inner `pp_check()` call
+  # would return a figure per response, and `patchwork::wrap_plots()`
+  # refuses nested lists.
   fan <- mv_resp_fan_out(object, resp, combine = stack_response_plots)
   if (!is.null(fan)) return(fan)
-  # The four panels each run the same residual extraction over the
-  # same rows, so anything it reports about the data holds for the
-  # whole grid and is worth saying once rather than four times.
-  panels <- warn_once_per_call(lapply(
-    c("resid_vs_fitted", "resid_qq", "resid_acf", "resid_pacf"),
-    function(type) {
-      pp_check(
-        object, type = type, newdata = newdata,
-        ndraws = ndraws, resp = resp
-      )
-    }
-  ))
-  patchwork::wrap_plots(panels, ncol = 2L, nrow = 2L)
+  # Every panel uses the same posterior draws. Drawn separately, the
+  # Q-Q panel and the ACF described different subsets of the posterior.
+  draw_ids <- resolve_draw_ids(object, ndraws, NULL)
+  closure_unit <- is_closure_unit_family(object$family)
+  types <- if (closure_unit) {
+    "resid_qq"
+  } else {
+    c("resid_vs_fitted", "resid_qq", "resid_acf", "resid_pacf")
+  }
+  # The panels run the same residual extraction over the same rows.
+  # A condition it raises about the data applies to the whole grid,
+  # and it is raised once.
+  panels <- warn_once_per_call(lapply(types, function(type) {
+    pp_check(
+      object, type = type, newdata = newdata, draw_ids = draw_ids,
+      resp = resp, series = series
+    ) + ggplot2::labs(subtitle = NULL)
+  }))
+  out <- patchwork::wrap_plots(panels, ncol = min(2L, length(panels)))
+  label <- if (closure_unit) {
+    NULL
+  } else {
+    resid_series_rows(object, mvgam_training_data(object), series)$label
+  }
+  if (is.null(label)) {
+    return(out)
+  }
+  out + patchwork::plot_annotation(title = paste0("Residuals for ", label))
 }

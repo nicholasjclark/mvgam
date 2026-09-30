@@ -130,7 +130,7 @@ test_that("compare_scores carries multivariate scores in all_series", {
 test_that("compare_scores errors on a single forecast", {
   fc1 <- make_mock_forecast()
   expect_error(compare_scores(fc1, score = "crps"),
-               "at least two")
+               "at least 2")
 })
 
 
@@ -165,7 +165,7 @@ test_that("compare_elpds errors on grid mismatch", {
 
 test_that("compare_elpds errors on a single LFO arg", {
   m1 <- make_mock_lfo(c(-1, -2, -3))
-  expect_error(compare_elpds(m1), "at least two")
+  expect_error(compare_elpds(m1), "at least 2")
 })
 
 

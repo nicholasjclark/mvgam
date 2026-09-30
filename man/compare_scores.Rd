@@ -39,17 +39,11 @@ from \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}.
 }
 \description{
 Bundles per-series-per-horizon scores from several
-\code{mvgam_forecast} objects into one long-format \code{tibble}. The
-returned frame has one row per model x series x horizon
-combination and is the natural input for \code{ggplot2} facets,
-side-by-side score plots, and per-horizon score-difference
-summaries. For joint scores (\code{"energy"}, \code{"variogram"},
-\code{"twenergy"}) the per-series rows are NA-valued and the joint
-score lives in \code{series == "all_series"}.
-
-Replaces the manual \code{data.frame} stitching that would
-otherwise be needed when comparing many forecasts against each
-other.
+\code{mvgam_forecast} objects into one long-format \code{tibble}, with
+one row per model x series x horizon combination. For joint
+scores (\code{"energy"}, \code{"variogram"}, \code{"twenergy"}) the per-series
+scores are \code{NA} and the joint score is the row with
+\code{series == "all_series"}.
 }
 \seealso{
 \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}},

@@ -164,6 +164,9 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
       x = paste0("Series: '", s_name, "'.")
     )))
   }
+  # The ACF panel takes its values in row order, and a frame may hold
+  # a series out of time order.
+  dat_s <- dat_s[order(dat_s$time), , drop = FALSE]
   patchwork::wrap_plots(
     series_time_plot(dat_s, ylab, lines, facet = FALSE),
     series_hist_panel(dat_s$y, ylab, n_bins),

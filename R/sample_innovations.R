@@ -717,7 +717,7 @@ NULL
 #' @param draws_mat A posterior draws matrix
 #'   (`posterior::as_draws_matrix()`).
 #' @param name Character. Base parameter name (e.g. `"Sigma_trend"`,
-#'   `"A_group_trend"`).
+#'   `"Phi_group_trend"`).
 #' @param nrow,ncol Positive integers. Matrix dimensions.
 #' @param prefix_ids Integer vector of leading (fixed) indices.
 #'   Empty for a bare `name[i, j]` matrix; `c(group)` for
@@ -1130,8 +1130,8 @@ factor_state_param_pattern <- function(pars) {
 #   * Raw factor paths `lv_trend[t, k]` and the upstream
 #     `innovations_trend[t, k]` / `scaled_innovations_trend[t, k]`
 #     when `lv_trend_tilde[t, k]` is present (same condition).
-#   * Unrotated VAR dynamics `A_trend[lag][i, j]` when
-#     `A_trend_tilde[lag][i, j]` is present.
+#   * Unrotated VAR dynamics `Phi_trend[lag][i, j]` when
+#     `Phi_trend_tilde[lag][i, j]` is present.
 #   * Per-series copies of a shared AR coefficient when the
 #     sampled `shared_ar{k}_trend[.]` scalar is present.
 # The rotation- and sign-indeterminate families show poor Rhat /
@@ -1144,8 +1144,8 @@ factor_state_param_pattern <- function(pars) {
 #'@noRd
 hidden_par_pattern <- function(pars) {
   patterns <- character(0L)
-  if (any(grepl("^A_trend_tilde\\[", pars))) {
-    patterns <- c(patterns, "^A_trend\\[")
+  if (any(grepl("^Phi_trend_tilde\\[", pars))) {
+    patterns <- c(patterns, "^Phi_trend\\[")
   }
   if (has_identified_loadings(pars)) {
     # Free-Z factor fit detected. The raw loadings `Z[i, j]`,

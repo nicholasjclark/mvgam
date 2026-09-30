@@ -42,22 +42,14 @@ A \code{ggplot} object.
 \description{
 Heatmap of the residual correlations or partial correlations
 from a Joint Species Distribution (\code{jsdgam}) or dynamic
-factor (\code{mvgam}) model, with the weight of evidence behind
-each entry shown alongside its estimate.
+factor (\code{mvgam}) model.
 }
 \details{
 Only the lower triangle of off-diagonal entries is
 drawn; a symmetric matrix says everything once and the
-diagonal is \code{1} for any correlation.
-
-Fill carries the posterior median. Opacity carries \code{Pr(sign)},
-the larger of \code{Pr(r > 0)} and \code{Pr(r < 0)}, binned at 0.75 and
-0.95 into three ordered levels. Reading the two together is
-the point: a large correlation the data barely resolve is
-drawn faintly rather than erased, and a small one the data
-resolve well is drawn firmly. \code{x$sig_cor} applies a hard cut
-at \code{Pr(sign) > 0.95} instead, and is still on the object for
-anyone who wants it.
+diagonal is \code{1} for any correlation. Fill shows the posterior
+median. \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} reports each pair's
+interval and \code{prob_nonzero}.
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}}

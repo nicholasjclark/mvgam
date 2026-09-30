@@ -160,7 +160,7 @@ from an observation parameter of the same name. The innovation scale
 is `sigma_trend`, the correlation factor `L_Omega_trend`, a sampled
 covariance `Sigma_trend`, the autoregressive coefficients `ar1_trend`
 to `ark_trend`, the moving-average coefficient `theta1_trend` and the
-VAR coefficients `A_trend[lag]`. The loadings matrix is `Z`.
+VAR coefficients `Phi_trend[lag]`. The loadings matrix is `Z`.
 
 `generate_monitor_params()` lists the parameters a trend samples. A
 `trend_map` and a loadings prior both join the specification after
@@ -391,7 +391,7 @@ Generated quantities compute `Z_tilde = qr_thin_R(Z')'` and
 `Q_tilde = qr_thin_Q(Z')'` and rotate the factor paths to match with
 `lv_trend_tilde = lv_trend * Q_tilde'`. A VAR factor model also
 rotates its coefficients as
-`A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'`.
+`Phi_trend_tilde[lag] = Q_tilde * Phi_trend[lag] * Q_tilde'`.
 `qr_thin_R()` returns an upper triangle with a non-negative diagonal,
 which gives `Z_tilde` a lower triangular form with a positive
 diagonal and removes the `2^k` sign modes. The factorisation is

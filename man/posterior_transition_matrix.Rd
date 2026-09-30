@@ -9,12 +9,12 @@ posterior_transition_matrix(
   groups = NULL,
   summary = TRUE,
   robust = FALSE,
-  probs = c(0.025, 0.975)
+  probs = c(0.025, 0.975),
+  lag = 1L
 )
 }
 \arguments{
-\item{object}{A fitted \code{mvgam} object whose trend is a
-VAR(1).}
+\item{object}{A fitted \code{mvgam} object whose trend is a VAR.}
 
 \item{groups}{Which panels of a hierarchical VAR fit to
 return. \code{NULL} (the default) gives the global shrinkage
@@ -44,6 +44,9 @@ mean when \code{FALSE}.}
 \item{probs}{Length-2 numeric vector of quantile probabilities
 for the per-cell credible interval when \code{summary = TRUE}.
 Defaults to \code{c(0.025, 0.975)}.}
+
+\item{lag}{The lag whose transition matrix is returned, at most
+the order \code{p} of the fitted \code{VAR(p)}. Defaults to \code{1}.}
 }
 \value{
 One matrix, or a list of them when \code{groups} names more
@@ -51,33 +54,32 @@ than one panel. With \code{summary = TRUE}, an object of class
 \code{mvgam_var_matrix} with slots \code{A}, \code{A_se}, \code{A_lower},
 \code{A_upper}, \code{A_ess}, \code{prob_positive}, \code{prob_negative},
 \code{prob_nonzero}, \code{n_series}, \code{series_names}, \code{group_label},
-\code{probs}. Has \code{print()} and \code{plot()} methods. With
+\code{probs}, \code{lag}. Has \code{print()} and \code{plot()} methods. With
 \code{summary = FALSE}, a \verb{[ndraws, K, K]} numeric array with
 dims 2-3 labelled by the outcome names.
 }
 \description{
-Extract the VAR(1) transition matrix $A$ from a fitted
-\code{mvgam} object, either as a per-cell posterior summary
-(default) or as raw per-draw values. Row $i$ of $A$ gives the
-linear dependence of latent process $i$ at time $t$ on the
-vector of processes at time $t - 1$; the diagonal is
-self-persistence, off-diagonals encode cross-outcome dependence
-at lag one.
+Extract a VAR transition matrix $A_l$ from a fitted \code{mvgam}
+object, either as a per-cell posterior summary (default) or as
+raw per-draw values. Row $i$ of $A_l$ gives the linear dependence
+of latent process $i$ at time $t$ on the vector of processes at
+time $t - l$; the diagonal is self-persistence, off-diagonals
+encode cross-outcome dependence at lag $l$.
 }
 \details{
 The extractor dispatches on whether the fit is hierarchical
 (\verb{VAR(gr = <var>, ...)}) or single-panel.
 \itemize{
 \item On a \strong{single-panel VAR} the routine reads the fitted
-\code{A_trend} array.
+\code{Phi_trend} array.
 \item On a \strong{hierarchical VAR} with \verb{group = <int>} or
 \verb{group = <name>} it reads the panel-specific matrix
-\code{A_group_trend[c, 1, , ]}, i.e. the transition matrix for
+\code{Phi_group_trend[c, l, , ]}, i.e. the transition matrix for
 the requested country / patch / hospital.
 \item On a \strong{hierarchical VAR} with \code{group = NULL} it synthesises
 the shrinkage target from the hyperparameters:
-diagonal cells take \code{Amu_trend[1, 1]}, off-diagonal cells
-take \code{Amu_trend[2, 1]}. This is the mean the sampler pulls
+diagonal cells take \code{Amu_trend[1, l]}, off-diagonal cells
+take \code{Amu_trend[2, l]}. This is the mean the sampler pulls
 every panel's $A_c$ toward, so it summarises the pool
 without reading any single country
 (Savage \href{https://rpubs.com/jimsavage/hierarchical_var}{2016}).
@@ -92,10 +94,6 @@ point estimates default to the posterior mean; intervals use
 \code{prob_positive} / \code{prob_negative} / \code{prob_nonzero} count the
 fraction of draws with each entry above or below zero. See
 the argument documentation for the median switch.
-
-Only VAR(1) fits are supported; the \code{A_trend} slot has a
-single lag dimension pinned to one for compatibility with
-mvgam's \code{irf()}, \code{fevd()} and \code{stability()} methods.
 }
 \references{
 Savage J (2016). Hierarchical Vector

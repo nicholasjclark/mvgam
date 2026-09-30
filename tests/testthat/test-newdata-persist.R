@@ -1,52 +1,39 @@
-# Unit tests for the `newdata` interface on mvgam() (N2).
-# Exercises the lightweight validator and the test_data
-# persistence path without spinning up a Stan fit.
+# The `newdata` interface of mvgam(): the structural check and the
+# persistence of held-out data, without a Stan fit.
 
-test_that("validate_newdata accepts NULL", {
-  data <- data.frame(time = 1:3, series = factor("s1"))
-  expect_null(validate_newdata(NULL, data))
-})
-
-test_that("validate_newdata coerces newdata$series to training levels", {
+test_that("check_newdata requires the axis columns and training levels", {
+  expect_null(check_newdata(NULL, data.frame(time = 1)))
   data <- data.frame(
     time = 1:3,
     series = factor(rep("s1", 3L), levels = c("s1", "s2"))
   )
-  nd <- data.frame(time = 4:5, series = "s2")
-  out <- validate_newdata(nd, data)
   # The rows still name s2. Checking the level set alone passed on a
   # coercion putting every row on s1.
+  out <- check_newdata(data.frame(time = 4:5, series = "s2"), data)
   expect_identical(out$series,
                    factor(c("s2", "s2"), levels = c("s1", "s2")))
-})
-
-test_that("validate_newdata errors on series outside training levels", {
-  data <- data.frame(time = 1:3, series = factor("s1"))
-  nd <- data.frame(time = 4:5, series = "unknown")
   expect_error(
-    validate_newdata(nd, data),
+    check_newdata(data.frame(time = 4:5, series = "unknown"), data),
     "has levels absent from the training data"
   )
+  expect_error(check_newdata(data.frame(series = "s1"), data),
+               "Absent: 'time'")
 })
 
-test_that("validate_newdata errors on missing required columns", {
-  data <- data.frame(time = 1:3, series = factor("s1"), y = 0)
-  nd <- data.frame(series = "s1")
-  expect_error(validate_newdata(nd, data))
-})
-
-test_that("validate_newdata errors on non-data.frame input", {
-  data <- data.frame(time = 1, series = factor("s1"))
-  expect_error(
-    validate_newdata(list(time = 1), data)
-  )
-})
-
-test_that("validate_newdata is a no-op when data has no series factor", {
-  data <- data.frame(time = 1:3, series = c("s1", "s1", "s1"))
-  nd <- data.frame(time = 4:5, series = c("s1", "s1"))
-  out <- validate_newdata(nd, data)
-  expect_identical(out$series, c("s1", "s1"))
+test_that("check_newdata takes its columns from the trend constructor", {
+  data <- data.frame(week = rep(1:3, 2L),
+                     sp = factor(rep(c("a", "b"), each = 3L)),
+                     region = factor(rep(c("n", "s"), each = 3L)))
+  # Axis names the trend gives were refused with an assertion on an
+  # empty column list, on every mvgam() call passing 'newdata'.
+  axes <- ~ AR(time = week, series = sp)
+  expect_silent(check_newdata(data[4:6, ], data, axes))
+  expect_error(check_newdata(data[, c("week", "region")], data, axes),
+               "Absent: 'sp'")
+  # A grouping names the series, and its columns are required instead.
+  grouped <- ~ ZMVN(time = week, gr = region, subgr = sp)
+  expect_error(check_newdata(data[, c("week", "sp")], data, grouped),
+               "Absent: 'region'")
 })
 
 test_that("mvgam() forwards newdata through to test_data persistence", {

@@ -23,7 +23,7 @@ print.mvgam <- function(x, ...) {
   if (!is.null(x$trend_formula)) {
     cat("GAM observation formula:\n")
     print_model_formula(formula(x))
-    predictors <- trend_predictors(x$trend_formula)
+    predictors <- trend_predictors(x)
     if (!is.null(predictors)) {
       cat("\nGAM process formula:\n", predictors, "\n", sep = "")
     }

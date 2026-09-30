@@ -19,10 +19,12 @@
 \item{type}{Character. The kind of plot to produce. One of:
 \describe{
 \item{\code{"residuals"} (default)}{Four-panel Dunn-Smyth
-residual diagnostic: residuals vs fitted, Q-Q, ACF,
-pACF. See \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for the underlying types
-(\code{resid_vs_fitted}, \code{resid_qq}, \code{resid_acf},
-\code{resid_pacf}).}
+residual diagnostic for one series: residuals vs fitted,
+Q-Q, ACF, pACF, titled by the series. See \code{\link[=pp_check.mvgam]{pp_check.mvgam()}}
+for the underlying types (\code{resid_vs_fitted}, \code{resid_qq},
+\code{resid_acf}, \code{resid_pacf}). A closure-unit family (\code{occ()},
+\code{nmix()}) has one residual per closure unit and draws the
+Q-Q panel alone.}
 \item{\code{"smooths"}}{Conditional smooth posteriors via
 \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, combined into a single
 \code{patchwork} when more than one smooth is present.}
@@ -64,12 +66,11 @@ dedicated surfaces directly:
 \code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}}.
 }}
 
-\item{series}{Optional series subset. Passed through to the
-series-aware branches (\code{"residuals"}, \code{"trend"},
-\code{"series"}). Accepts \code{NULL} (all series, default), \code{"all"},
-an integer index, or a character series name. Ignored by
-branches that summarise across series (\code{"smooths"},
-\code{"factors"}).}
+\item{series}{Optional series subset, as an integer index or a
+series name. \code{"trend"} and \code{"series"} also take \code{"all"}, and
+draw every series by default. \code{"residuals"} draws one series,
+the first by default. Ignored by branches that summarise across
+series (\code{"smooths"}, \code{"factors"}).}
 
 \item{resp}{For multivariate (multiple-response) models, the
 name of a single response variable to return results for.
@@ -101,7 +102,7 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# 4-panel default dispatch (PPC + residuals + trend + smooths).
+# Residual diagnostics, the default type.
 plot(mod)
 }
 

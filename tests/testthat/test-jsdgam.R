@@ -148,7 +148,7 @@ test_that("jsdgam rejects non-numeric unit column", {
       family = poisson(), n_lv = 2L,
       run_model = FALSE, silent = 2
     ),
-    "numeric or integer"
+    "must be numeric"
   )
 })
 

@@ -314,7 +314,7 @@ distinct from an observation model parameter of the same name. The
 innovation scale is \code{sigma_trend}, the moving-average
 coefficient \code{theta1_trend}, the autoregressive coefficients
 \code{ar1_trend} to \code{ark_trend} and the VAR coefficient
-matrices \code{A_trend}. Priors take these class names, as in
+matrices \code{Phi_trend}. Priors take these class names, as in
 \code{prior(normal(0, 1), class = sigma_trend)}, and parameter
 extraction takes the same names.
 }
@@ -330,7 +330,7 @@ the identified versions where they exist. \code{qr_thin_R()} gives \code{Z_tilde
 which removes the \eqn{2^k} equivalent sign modes. The per-factor
 coefficients \code{ar1_trend} and \code{theta1_trend} stay in the unrotated
 basis. A VAR factor model also rotates its lag coefficients as
-\verb{A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'}.
+\verb{Phi_trend_tilde[lag] = Q_tilde * Phi_trend[lag] * Q_tilde'}.
 
 A \code{trend_map} skips the QR step and keeps its fixed entries on
 \code{Z} exactly. A \code{by = lv_axis()} smooth ties each factor to its own
@@ -374,10 +374,10 @@ mod <- mvgam(
   chains        = 2,
   silent        = 2
 )
-summary(mod, include_betas = FALSE)
+summary(mod)
 
 # `variable = "trend_params"` is a keyword shortcut that pulls
-# every trend-dynamics parameter (A_trend, sigma_trend, the
+# every trend-dynamics parameter (Phi_trend, sigma_trend, the
 # Sigma_trend covariance, etc.) in one call. See ?mvgam_draws
 # for the full keyword set ("betas", "obs_params",
 # "smooth_params", "trend_betas", "trend_params",

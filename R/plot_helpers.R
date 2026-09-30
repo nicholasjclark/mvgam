@@ -178,18 +178,25 @@ mvgam_categorical_palette <- function(n) {
 
 
 #' Shared `scale_colour_manual` for plots that overlay several
-#' coloured categorical groups (compare_scores models,
-#' compare_elpds models). Uses the Okabe-Ito palette instead of
-#' the bayesplot single-hue schemes, which are designed for
-#' sequential posterior bands and make distinct categories hard
-#' to tell apart at small palette indices.
+#' groups (compare_scores and compare_elpds models, the levels of a
+#' conditional effect's second variable). Up to three models take
+#' the dark, mid and light shades of the active bayesplot scheme,
+#' matching the forecast and residual figures. A single-hue scheme
+#' holds three distinguishable line shades, and more models than
+#' that take the Okabe-Ito hues.
 #'
 #' @noRd
-mvgam_model_colour_scale <- function(n, name = NULL) {
-  ggplot2::scale_colour_manual(
-    name   = name,
-    values = mvgam_categorical_palette(n)
-  )
+mvgam_model_colour_scale <- function(n, name = NULL,
+                                     aesthetics = "colour", ...) {
+  checkmate::assert_count(n, positive = TRUE)
+  values <- if (n <= 3L) {
+    vapply(c("dark", "mid", "light_highlight")[seq_len(n)],
+           mvgam_colour, character(1L), USE.NAMES = FALSE)
+  } else {
+    mvgam_categorical_palette(n)
+  }
+  ggplot2::scale_colour_manual(name = name, values = values,
+                               aesthetics = aesthetics, ...)
 }
 
 #' Light-to-dark fills for `n` symmetric quantile bands. Picks
@@ -205,15 +212,19 @@ mvgam_band_fills <- function(n, palette = mvgam_palette()) {
   palette[seq_len(n)]
 }
 
-#' An x axis of whole forecast horizons
+#' An x axis of whole steps
 #'
-#' A horizon counts steps, and the default breaks labelled a
-#' twelve-step axis at 2.5, 5.0 and 7.5.
+#' A horizon counts steps, and so does an evaluation time on a
+#' regular grid. The default breaks labelled a twelve-step axis at
+#' 2.5, 5.0 and 7.5. An irregular `CAR()` grid keeps its fractional
+#' times, and `whole = FALSE` leaves those breaks alone.
 #'
 #' @param name Axis title
+#' @param whole Whether every value on the axis is a whole number
 #' @return A ggplot2 scale
 #' @noRd
-scale_x_horizon <- function(name = "Horizon") {
+scale_x_steps <- function(name = "Horizon", whole = TRUE) {
+  if (!isTRUE(whole)) return(ggplot2::scale_x_continuous(name = name))
   ggplot2::scale_x_continuous(
     name = name,
     breaks = function(limits) {
@@ -262,6 +273,36 @@ quantile_by_time <- function(draws_mat, times, prob) {
   }, numeric(1L))
 }
 
+#' Per-occasion quantiles of a draws matrix, one block per group
+#'
+#' @param draws_mat A `(ndraws x n_col)` matrix
+#' @param times The time of each column
+#' @param probs The quantiles to take, one column `q1`, `q2`, ... each
+#' @param group `NULL`, one panel label, or one label per column.
+#'   Each label is its own panel over the same times, and its columns
+#'   are summarised apart from the others.
+#' @return Data frame with `time`, the quantile columns and, when
+#'   `group` is given, `series`
+#' @noRd
+occasion_quantiles <- function(draws_mat, times, probs, group = NULL) {
+  per_col <- length(group) > 1L
+  if (per_col) checkmate::assert_true(length(group) == ncol(draws_mat))
+  blocks <- if (per_col) {
+    split(seq_along(times), factor(group, levels = unique(group)))
+  } else {
+    list(seq_along(times))
+  }
+  do.call(rbind, lapply(blocks, function(idx) {
+    sub <- draws_mat[, idx, drop = FALSE]
+    df <- data.frame(time = sort(unique(times[idx])))
+    for (j in seq_along(probs)) {
+      df[[paste0("q", j)]] <- quantile_by_time(sub, times[idx], probs[j])
+    }
+    if (!is.null(group)) df$series <- group[idx[1L]]
+    df
+  }))
+}
+
 #' Multi-quantile ribbon stack for a `(ndraws x n_time)` matrix.
 #'
 #' Returns a list of `geom_ribbon` layers (outer first, inner
@@ -300,14 +341,10 @@ mvgam_band_layer <- function(
   }
   alpha <- (1 - probs) / 2
   lapply(seq_along(probs), function(i) {
-    df <- data.frame(
-      time = sort(unique(times)),
-      lower = quantile_by_time(draws_mat, times, alpha[i]),
-      upper = quantile_by_time(draws_mat, times, 1 - alpha[i])
+    df <- occasion_quantiles(
+      draws_mat, times, c(alpha[i], 1 - alpha[i]), group
     )
-    if (!is.null(group)) {
-      df$series <- group
-    }
+    names(df)[2:3] <- c("lower", "upper")
     ggplot2::geom_ribbon(
       data = df,
       mapping = ggplot2::aes(x = time, ymin = lower, ymax = upper),
@@ -331,11 +368,8 @@ mvgam_median_layer <- function(
   if (is.null(colour)) {
     colour <- mvgam_palette()[5L]
   }
-  df <- data.frame(time = sort(unique(times)),
-                   med = quantile_by_time(draws_mat, times, 0.5))
-  if (!is.null(group)) {
-    df$series <- group
-  }
+  df <- occasion_quantiles(draws_mat, times, 0.5, group)
+  names(df)[2L] <- "med"
   ggplot2::geom_line(
     data = df,
     mapping = ggplot2::aes(x = time, y = med),
@@ -513,125 +547,33 @@ pretty_symmetric_breaks <- function(limits) {
 }
 
 
-#' Ordered evidence levels for a correlation heatmap.
-#'
-#' `Pr(sign)` is the larger of `Pr(r > 0)` and `Pr(r < 0)`, so it
-#' runs from 0.5 (the sign is a coin flip) to 1. Cutting it into a
-#' few ordered bins follows `bayesplot::mcmc_rhat()`, which cuts a
-#' continuous diagnostic at fixed breaks and shows the bins with the
-#' colour scheme's graded steps. The point is that the bins are
-#' ordered rather than binary: a correlation the data barely resolve
-#' is drawn faintly, not erased.
-#'
-#' @param p Numeric vector of `Pr(sign)` values.
-#' @return Ordered factor with three levels.
-#'
-#' @noRd
-residcor_evidence_bin <- function(p) {
-  cut(
-    p,
-    breaks = c(-Inf, 0.75, 0.95, Inf),
-    labels = c("< 0.75", "0.75 - 0.95", "> 0.95"),
-    ordered_result = TRUE
-  )
-}
-
-
-#' Evidence levels, named so a legend key is drawn for each.
-#' @noRd
-residcor_evidence_levels <- function() {
-  levels(residcor_evidence_bin(0.5))
-}
-
-
-#' Long-format lower triangle of an estimate matrix and its
-#' matching evidence matrix, ready for a heatmap.
+#' Long-format lower triangle of an estimate matrix, ready for a
+#' heatmap.
 #'
 #' The upper triangle and the diagonal are not returned at all: a
 #' symmetric matrix says everything once, and the diagonal is 1 for
 #' any correlation.
 #'
 #' @param estimate Symmetric matrix of posterior point estimates.
-#' @param evidence Matrix of `Pr(sign)`, same dimensions.
-#' @param cluster Reorder both by `cluster_cormat()`.
-#' @return Data frame with `Var1`, `Var2`, `value` and `ev`.
+#' @param cluster Reorder by `cluster_cormat()`.
+#' @return Data frame with `Var1`, `Var2` and `value`.
 #'
 #' @noRd
-residcor_panel_data <- function(estimate, evidence, cluster = FALSE) {
+residcor_panel_data <- function(estimate, cluster = FALSE) {
   # A single series has no off-diagonal entry, so the lower triangle
   # is empty and there is no panel to draw. Refusing here names the
   # reason, where the empty frame would fail further downstream.
   checkmate::assert_matrix(estimate, mode = "numeric", min.rows = 2L)
-  checkmate::assert_matrix(
-    evidence, mode = "numeric", nrows = nrow(estimate),
-    ncols = ncol(estimate)
-  )
   checkmate::assert_flag(cluster)
   if (isTRUE(cluster)) {
     idx <- cluster_cormat(estimate)
     estimate <- estimate[idx, idx]
-    evidence <- evidence[idx, idx]
   }
   keep <- lower.tri(estimate)
   out <- expand.grid(dimnames(estimate))
   colnames(out) <- c("Var1", "Var2")
   out$value <- as.vector(estimate)
-  out$ev <- residcor_evidence_bin(as.vector(evidence))
   out[as.vector(keep), , drop = FALSE]
-}
-
-
-#' One invisible row per evidence level, so every level has a
-#' legend key.
-#'
-#' ggplot builds a key from the rows a layer holds, so a level the
-#' data never reach draws its label with no swatch beside it. On a
-#' fit where nothing clears `Pr(sign) > 0.75` that emptied two
-#' thirds of the legend. These rows render nothing: no fill, no
-#' border.
-#'
-#' @param panel Output of `residcor_panel_data()`.
-#' @return `panel` with one row per evidence level.
-#'
-#' @noRd
-residcor_legend_filler <- function(panel) {
-  lv <- residcor_evidence_levels()
-  filler <- panel[rep(1L, length(lv)), , drop = FALSE]
-  filler$ev <- factor(lv, levels = lv, ordered = TRUE)
-  filler
-}
-
-
-#' Opacity scale for the evidence bins.
-#'
-#' Reads on its own greyscale rather than borrowing the diverging
-#' hue, since it grades confidence rather than correlation. The
-#' floor sits well above zero so the least certain bin is still
-#' legible.
-#'
-#' @noRd
-residcor_evidence_scale <- function() {
-  ggplot2::scale_alpha_ordinal(
-    name = "Pr(sign)",
-    range = c(0.55, 1),
-    limits = residcor_evidence_levels(),
-    drop = FALSE,
-    na.translate = FALSE
-  )
-}
-
-
-#' Guide order for a residual-correlation heatmap: the estimate's
-#' colour bar first, the evidence legend under it.
-#' @noRd
-residcor_guides <- function() {
-  ggplot2::guides(
-    fill = ggplot2::guide_colourbar(order = 1),
-    alpha = ggplot2::guide_legend(
-      order = 2,
-      override.aes = list(fill = "grey45")
-    )
-  )
 }
 
 

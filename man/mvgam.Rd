@@ -27,39 +27,25 @@ slopes, monotonic \code{mo()}, measurement-error \code{me()}, distributional
 \code{dpar} sub-formulas, and \code{offset()} are all available. \code{gp()}
 accepts both the approximate Hilbert-space form
 (\code{gp(x, k = 20)}) and the exact full-covariance form
-(\code{gp(x)}, no \code{k}). The two forms differ on what mvgam can do
-after the fit: the approximate form supports prediction at
-newdata; the exact form fits + scores in-sample fine but
-\code{predict()} / \code{posterior_epred()} at new covariate values is
-not wired up. Picking up an exact \code{gp()} term emits a
-one-shot warning saying as much.}
+(\code{gp(x)}, no \code{k}). Prediction at \code{newdata} requires the
+approximate form. An exact \code{gp()} term fits and scores
+in-sample, and \code{mvgam()} says so once per session.}
 
-\item{trend_formula}{Trend formula specification (may be response-specific).
-Same \code{gp()} caveat applies on the trend side: exact GPs fit
-but do not support forecasts / new-time-point prediction yet.}
+\item{trend_formula}{Trend formula specification (may be
+response-specific). An exact \code{gp()} term here also predicts
+in-sample alone, and forecasting a model that holds one
+requires the approximate form.}
 
 \item{data}{Data frame or list of multiply imputed datasets}
 
-\item{newdata}{Optional test-set \code{data.frame} persisted on the
-fit as \code{object$test_data}. Used by \code{plot(fit, type = "series")}
-to overlay the test arm without re-passing the data. Passing
-\code{newdata} to \code{mvgam()} does not emit Stan generated-quantities
-forecasts at fit time. Keeping forecasting out of Stan keeps
-the fit object small and the sampler fast, and means downstream
-methods can choose their own newdata. To use the persisted
-data downstream, re-pass it through the relevant method.
-\code{forecast()} and \code{posterior_predict()} answer different
-questions:
-\itemize{
-\item \code{forecast(mod, newdata = mod$test_data)} propagates the
-fitted latent state forward in time per posterior draw, so
-future predictions extrapolate the actual trajectory.
-\item \code{posterior_predict(mod, newdata = mod$test_data)}
-marginalises over the trend's stochastic dynamics by Monte
-Carlo at the supplied design points and ignores the fitted
-trajectory's position relative to training time.
-}
-Use \code{forecast()} for time-series forecasting and
+\item{newdata}{Optional held-out \code{data.frame}, stored on the fit
+as \code{object$test_data}. \code{forecast()} forecasts to it when called
+without \code{newdata}, and \code{plot(fit, type = "series")} overlays it.
+The fit itself draws no forecasts. \code{forecast()} propagates the
+fitted latent state forward in time per posterior draw, and
+\code{posterior_predict(mod, newdata = mod$test_data)} marginalises
+over the trend's stochastic dynamics at the supplied design
+points. Use \code{forecast()} for time-series forecasting and
 \code{posterior_predict()} for marginal predictive checks.}
 
 \item{trend_map}{Optional fixed factor-loading specification.
@@ -324,7 +310,7 @@ mod <- mvgam(
   chains = 2,
   silent = 2
 )
-summary(mod, include_betas = FALSE)
+summary(mod)
 conditional_effects(mod)
 mcmc_plot(mod, variable = "^ar1", regex = TRUE, type = "hist")
 
@@ -343,7 +329,7 @@ gmod <- mvgam(
   chains = 2,
   silent = 2
 )
-summary(gmod, include_betas = FALSE)
+summary(gmod)
 
 # ---- Multivariate VAR(1) with intercept suppression + custom priors ----
 # Three correlated series, no observation intercept (`y ~ 0`),
@@ -384,7 +370,7 @@ var_mod <- mvgam(
   warmup        = 500,
   silent        = 2
 )
-summary(var_mod, include_betas = FALSE)
+summary(var_mod)
 
 # Hindcasts (training cells) and forecasts (held-out cells)
 # share a single object; plot one series to inspect the

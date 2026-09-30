@@ -27,6 +27,12 @@ score <- function(object, ...) UseMethod("score")
 scores_honouring_log <- c("crps", "drps", "sis")
 
 
+# The scores that grade every series jointly. `score()` returns each
+# as one `all_series` row and leaves the per-series scores `NA`.
+#' @noRd
+joint_forecast_scores <- c("energy", "variogram", "twenergy")
+
+
 #' Proper scoring rules for `mvgam_forecast` objects
 #'
 #' Compute one of eleven proper scoring rules on the held-out
@@ -124,7 +130,7 @@ scores_honouring_log <- c("crps", "drps", "sis")
 #' )
 #'
 #' # Score requires a forecast object with held-out test draws.
-#' fc <- forecast(mod, newdata = mod$test_data)
+#' fc <- forecast(mod)
 #' sc <- score(fc, score = "crps")
 #' head(sc[[1L]])
 #' }
@@ -161,8 +167,7 @@ score.mvgam_forecast <- function(object,
   }
   univariate <- c("crps", "drps", "sis", "brier",
                    "logs", "dss", "qs", "twcrps")
-  multivariate <- c("energy", "variogram", "twenergy")
-  score <- match.arg(score, c(univariate, multivariate))
+  score <- match.arg(score, c(univariate, joint_forecast_scores))
   checkmate::assert_number(interval_width,
                              lower = 0.05, upper = 0.95)
   checkmate::assert_number(quantile_level, lower = 0, upper = 1)

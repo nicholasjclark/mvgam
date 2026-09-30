@@ -15,16 +15,13 @@
 \value{
 A \code{tibble} with one row per series x horizon cell
 (univariate scores) or per horizon (joint scores), one
-column per model carrying that model's score at the cell.
+column of scores per model.
 }
 \description{
 Pivots the long-format \code{mvgam_compare_scores}
 tibble to one row per evaluation cell (per series x horizon
 for univariate scores, per horizon for joint scores) and one
-column per model. The result is what you would write by hand
-when reading a model-vs-model score table off a page.
-Replaces ad-hoc \code{reshape()} or \code{pivot_wider()} calls when
-you want a side-by-side comparison rather than a plot.
+column per model.
 }
 \seealso{
 \code{\link[=compare_scores]{compare_scores()}}, \code{\link[=plot.mvgam_compare_scores]{plot.mvgam_compare_scores()}}

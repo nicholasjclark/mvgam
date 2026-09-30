@@ -571,7 +571,7 @@ monotonic_pred <- function(draws, sdata, sfx, n_obs) {
   if (n_mo != n_sp || n_csp > 0L) {
     stop(insight::format_error(c(
       "Interactions with 'mo()' terms are not supported.",
-      x = paste0("This predictor has ", n_sp, " special term",
+      x = paste0("The predictor has ", n_sp, " special term",
                  if (n_sp != 1L) "s", " and ", n_mo, " monotonic ",
                  "variable", if (n_mo != 1L) "s", "."),
       i = "Write each 'mo()' term on its own, with no 'me()' or 'mi()'."

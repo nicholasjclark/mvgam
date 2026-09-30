@@ -126,7 +126,7 @@ reference:
     response shape a proposed family expects.
   contents:
   - mvgam_data
-  - validate_newdata
+  - check_newdata
   - series_to_mvgam
   - pivot_detection_array
   - pivot_species_matrix

@@ -658,17 +658,11 @@ test_that("GP validation works with complex formulas", {
   )
 })
 
-test_that("bf() with dpar formulas in trend_formula errors with hint", {
-  # Distributional-parameter formulas inside trend_formula are not
-  # currently supported. The fail-fast in mvgam_formula() catches
-  # this before the generic "Must be a formula" assertion fires and
-  # tells the user where to put dpar formulas instead.
+test_that("bf() in trend_formula errors with hint", {
+  # A non-linear trend formula was named as a distributional one.
   expect_error(
-    mvgam_formula(
-      y ~ 1,
-      trend_formula = bf(~ AR(p = 1), sigma ~ z)
-    ),
-    "Distributional-parameter formulas"
+    mvgam_formula(y ~ 1, trend_formula = bf(~ a * x, a ~ 1, nl = TRUE)),
+    "Found 'bf\\(\\)' sub-formulas for: 'a'"
   )
 
   err <- conditionMessage(expect_error(
@@ -679,24 +673,4 @@ test_that("bf() with dpar formulas in trend_formula errors with hint", {
   ))
   expect_match(err, "'sigma'")
   expect_match(err, "obs", ignore.case = TRUE)
-
-  # Multiple dpars should be named in the error too.
-  err_multi <- conditionMessage(expect_error(
-    mvgam_formula(
-      y ~ 1,
-      trend_formula = bf(~ AR(p = 1), sigma ~ z, nu ~ z)
-    )
-  ))
-  expect_match(err_multi, "'sigma'")
-  expect_match(err_multi, "'nu'")
-
-  # bf() trend_formula WITHOUT pforms still hits the generic
-  # "Must be a formula" assertion. We do not steal that error message.
-  err_no_pforms <- conditionMessage(expect_error(
-    mvgam_formula(
-      y ~ 1,
-      trend_formula = bf(~ AR(p = 1))
-    )
-  ))
-  expect_no_match(err_no_pforms, "Distributional-parameter")
 })

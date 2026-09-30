@@ -173,6 +173,12 @@ mvgam_side_terms <- function(f, family = NULL) {
   if (inherits(f, "formula") && length(f) == 2L) {
     f <- stats::reformulate(deparse(f[[2L]]), response = ".mvgam_lhs")
   }
+  # brms announces its default for an unset `rescor` on every parse,
+  # which `silent = 2` cannot reach here. The residual correlation adds
+  # no column, and fixing it on this copy leaves the terms unchanged.
+  if (inherits(f, "mvbrmsformula") && is.null(f$rescor)) {
+    f$rescor <- FALSE
+  }
   bt <- brms::brmsterms(f)
   if (is.null(bt$terms)) {
     return(mvgam_brmsterms_parts(bt))

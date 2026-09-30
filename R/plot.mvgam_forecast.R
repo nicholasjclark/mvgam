@@ -189,11 +189,18 @@ resolve_series <- function(series, series_levels) {
     return(seq_along(series_levels))
   }
   if (is.numeric(series)) {
-    checkmate::assert_integerish(
-      series,
-      lower = 1L, upper = length(series_levels),
-      any.missing = FALSE, min.len = 1L
-    )
+    checkmate::assert_integerish(series, any.missing = FALSE, min.len = 1L)
+    bad <- series[series < 1L | series > length(series_levels)]
+    if (length(bad) > 0L) {
+      stop(insight::format_error(c(
+        "Series index out of range.",
+        x = paste0("Got: ", paste(bad, collapse = ", "), "."),
+        i = paste0(
+          "The fit has ", length(series_levels), " series: ",
+          paste0("'", series_levels, "'", collapse = ", "), "."
+        )
+      )))
+    }
     return(as.integer(series))
   }
   if (is.character(series)) {

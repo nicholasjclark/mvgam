@@ -94,7 +94,7 @@ matrix is reconstructed from the trend's posterior covariance:
 per draw.
 \item Full-covariance trends (\code{VAR}, \code{VARMA}) read \code{Omega_trend},
 the stationary covariance the Stan model derives from
-\code{A_trend} and \code{Sigma_trend}.
+\code{Phi_trend} and \code{Sigma_trend}.
 }
 
 The covariance summarised is the one the latent states settle at,

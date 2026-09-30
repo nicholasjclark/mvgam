@@ -167,15 +167,15 @@ The VAR fit's `summary()` shows the joint parameters that
 distinguish it from the simpler models:
 
 ```{r mod_var_summary}
-summary(mod_var, include_betas = FALSE)
+summary(mod_var)
 ```
 
-The `A_trend` matrix carries the lag-1 cross-effects between
+The `Phi_trend` matrix carries the lag-1 cross-effects between
 species, and `Sigma_trend` (with `cor = TRUE`) is unstructured
 rather than diagonal.
 
 Read the `Rhat` and `Bulk_ESS` columns before anything else. The
-entries of `A_trend` sample poorly here, and raising the
+entries of `Phi_trend` sample poorly here, and raising the
 iterations does not rescue them: sixteen transition coefficients
 are a great deal to ask of four series over 68 months with a
 fifth of the cells missing. Carry that into every comparison

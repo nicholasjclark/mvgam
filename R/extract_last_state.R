@@ -81,7 +81,7 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   # the matching pair reconstructs the trend, so the whole
   # forecast reads one basis. It is the model basis, because every
   # other quantity the recursion consumes -- `ar<k>_trend`,
-  # `A_trend`, `sigma_trend`, `L_Omega_trend` -- is stated for the
+  # `Phi_trend`, `sigma_trend`, `L_Omega_trend` -- is stated for the
   # `Z` the model sampled, and rotating the state alone would
   # leave those behind.
   state_dim <- if (is_factor) n_lv else n_series
@@ -372,24 +372,24 @@ extract_arma_state <- function(one_draw, meta, n_series, n_lv, fit,
 }
 
 
-# VAR(p) and VARMA(p, 1). Pulls the Heaps-transformed
-# `A_trend[i, j, lag]` array per active lag (the kernel reads
-# this directly), the standard sigma + Sigma pair, and the
-# MA coefficient cube from `D_raw_trend[i, j, 1]` when present.
+# VAR(p) and VARMA(p, 1). Pulls the stationary coefficient matrix
+# `Phi_trend[lag, i, j]` of each lag, which the kernel uses as it is,
+# the sigma and Sigma pair, and the moving-average matrix
+# `Theta_trend[1, i, j]` when present.
 # VAR fits always have `cor = TRUE` (multivariate innovations).
 #'@noRd
 extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
                                 state_var = "trend") {
   n_time <- as.integer(fit$standata$N_time_trend)
   m_a <- length(meta$ar_lags)
-  # Stan declares A_trend as `array[N_lags_trend] matrix[N_lv,
-  # N_lv]`, so the index order is `A_trend[lag, i, j]` (array
-  # slot first, then matrix row/col). We pack into an
+  # Stan declares Phi_trend as `array[N_lags_trend] matrix[N_lv,
+  # N_lv]`, and its draws are indexed `Phi_trend[lag, i, j]`: the
+  # array slot first, then the matrix row and column. We pack into an
   # [n_series, n_series, n_lags] R cube matching the contract
   # of `propagate_trend(..., params = list(A = ...))`.
   A_cube <- array(0, dim = c(n_series, n_series, m_a))
   for (k in seq_len(m_a)) {
-    A_cube[, , k] <- draw_block(one_draw, "A_trend", n_series, n_series,
+    A_cube[, , k] <- draw_block(one_draw, "Phi_trend", n_series, n_series,
                                 lead = meta$ar_lags[k])
   }
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
@@ -399,13 +399,13 @@ extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
                   Sigma = scov$Sigma)
   errors <- NULL
   if (length(meta$ma_lags) > 0L) {
-    # The program applies `D_trend`, the stationary transform of
-    # `D_raw_trend`, and indexes it `D_trend[lag, i, j]` like
-    # `A_trend`.
+    # The program applies `Theta_trend`, the stationary transform of
+    # `D_trend`, and indexes it `Theta_trend[lag, i, j]` like
+    # `Phi_trend`.
     m_b <- length(meta$ma_lags)
     B_cube <- array(0, dim = c(n_series, n_series, m_b))
     for (j_lag in seq_len(m_b)) {
-      B_cube[, , j_lag] <- draw_block(one_draw, "D_trend", n_series,
+      B_cube[, , j_lag] <- draw_block(one_draw, "Theta_trend", n_series,
                                       n_series, lead = meta$ma_lags[j_lag])
     }
     params$theta_cube <- B_cube

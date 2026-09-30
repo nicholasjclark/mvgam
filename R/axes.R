@@ -168,13 +168,10 @@ axis_group_values <- function(data, spec, series_vals, series_axis) {
   }
   rows <- match(as.character(series_axis), as.character(series_vals))
   if (anyNA(rows)) {
-    stop(insight::format_error(c(
+    stop_mvgam_fault(
       "The series axis lists a series absent from the data.",
-      x = cli::format_inline(
-        "Unmatched: {.val {series_axis[is.na(rows)]}}."
-      ),
-      i = "This means two parts of the fit disagree about the axis."
-    )), call. = FALSE)
+      cli::format_inline("Unmatched: {.val {series_axis[is.na(rows)]}}.")
+    )
   }
   as.character(data[[gr_var]])[rows]
 }

@@ -16,6 +16,7 @@
   resp = NULL,
   draw_ids = NULL,
   per_obs = TRUE,
+  series = NULL,
   ...
 )
 }
@@ -50,8 +51,8 @@ and ignored otherwise.}
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data
 containing the variables included in the linear predictor of
 \code{formula}. If not supplied, predictions are generated for the
-original observations used for the model fit. Ignored if using one
-of the residual plots (i.e. 'resid_hist')}
+original observations used for the model fit. The residual types
+describe the training data and refuse it.}
 
 \item{resp}{Optional names of response variables. If specified, predictions
 are performed only for the specified response variables.}
@@ -63,6 +64,15 @@ If \code{NULL} (the default), all draws are used.}
 observation collapses to its posterior median on both axes, giving
 one point per observation. \code{FALSE} keeps the draw by observation
 scatter, which shows the posterior spread. Read only by that type.}
+
+\item{series}{For the residual types \code{resid_hist}, \code{resid_ribbon},
+\code{resid_qq}, \code{resid_vs_fitted}, \code{resid_acf} and \code{resid_pacf}, the
+one series whose residuals are drawn, as a name or an index. The
+default is the first series. Its residuals are taken in time order.
+\code{resid_acf} keeps missing responses in place, and its lags count
+time steps. \code{resid_pacf} drops them, and its lags count
+observations. A plot from a fit with several series names its
+series in the subtitle.}
 
 \item{...}{Further arguments passed to \code{\link{predict.mvgam}}
 as well as to the PPC function specified in \code{type}. A name

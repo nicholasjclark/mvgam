@@ -488,6 +488,17 @@ test_that("plot.mvgam_lfo draws a panel per score without notices", {
   expect_identical(
     unique(g$data$facet), c("Pareto K", "ELPD", "CRPS", "SIS")
   )
+
+  # A regular grid is labelled in whole steps. An irregular CAR grid
+  # keeps its own fractional times.
+  x_breaks <- function(times) {
+    built <- ggplot2::ggplot_build(
+      plot(mk_mvgam_lfo(c(-2, -2.5, -3), eval_timepoints = times))
+    )
+    stats::na.omit(built$layout$panel_params[[1L]]$x$breaks)
+  }
+  expect_true(all(x_breaks(31:33) %% 1 == 0))
+  expect_true(any(x_breaks(c(0.4, 0.9, 1.3)) %% 1 != 0))
 })
 
 

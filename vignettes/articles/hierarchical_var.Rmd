@@ -308,19 +308,18 @@ concentrate near zero.
 ## Model summary
 
 `summary()` on a hierarchical VAR fit reports the shared
-observation parameters (a single residual SD here), the trend
-metadata, and the global trend hyperparameters. Each country
-carries its own $A_c$ and $\Sigma_c$, and those arrays run to
-hundreds of cells on this panel, so `include_betas = FALSE`
-keeps the printout focused on the shrinkage targets `Amu_trend`,
-`Aomega_trend`, `L_Omega_global_trend`, the pooling weight
-`alpha_cor_trend`, and the innovation SDs `sigma_group_trend`
-for each country and outcome. Individual $A_c$ and $\Sigma_c$
-blocks are pulled out with `posterior_transition_matrix()`,
-`residual_cor()`, and `mcmc_plot()` in the sections below.
+observation parameters (a single residual SD here) and the global
+trend hyperparameters: the shrinkage targets `Amu_trend` and
+`Aomega_trend`, the pooling weight `alpha_cor_trend` and the
+innovation SDs `sigma_group_trend` for each country and outcome.
+Each country carries its own $A_c$ and $\Sigma_c$. Those arrays
+run to hundreds of cells on this panel, and `summary()` prints
+them only with `matrices = TRUE`. The sections below pull out
+individual blocks with `posterior_transition_matrix()`,
+`residual_cor()` and `mcmc_plot()`.
 
 ```{r summary}
-summary(mod_hier, include_betas = FALSE)
+summary(mod_hier)
 ```
 
 ## Diagnostics: convergence and identification
@@ -426,13 +425,12 @@ plot(
 
 `irf()` traces how a unit shock to one outcome propagates
 through the VAR over the next $h$ years. On the hierarchical
-fit the routine operates on the full block-diagonal
-`A_trend` (dimension $24 \times 24$), so the default plot
-would fan out to 24 response panels per shock; `responses`
-narrows the display to the panels of interest. The three
-Australian processes are packed contiguously in slots 1-3, so
-selecting `series = 2` (Australian GDP) with
-`responses = 1:3` shows Australia's within-country IRF.
+fit it uses the full $24 \times 24$ block-diagonal
+`Phi_trend`, and the default plot draws 24 response panels per
+shock. `responses` narrows the plot to the panels of
+interest. The three Australian processes occupy slots 1-3, and
+`series = 2` (Australian GDP) with `responses = 1:3` shows
+Australia's within-country IRF.
 
 ```{r irf, fig.cap = "Generalized impulse response functions for Australia over an eight-year horizon. Each panel shows how one Australian outcome responds to a positive shock in Australian GDP."}
 irfs <- irf(mod_hier, h = 8)
@@ -506,8 +504,8 @@ amplification of a shock before decay sets in; others do not.
 Once fitted, a small set of helpers exposes the hierarchical
 VAR at any level:
 
-- `summary(mod, include_betas = FALSE)` keeps the printout
-  focused on the hyperparameters.
+- `summary(mod)` prints the hyperparameters, and
+  `matrices = TRUE` adds every cell of each country's matrices.
 - `posterior_transition_matrix(mod, groups = <name>)` returns
   each country's $A_c$ as a `[ndraws, K, K]` array. Leave
   `groups` at its default for the shrinkage target built from

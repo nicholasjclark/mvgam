@@ -10,6 +10,7 @@ mvgam_data(
   family = gaussian(),
   formula = NULL,
   trend_formula = NULL,
+  data2 = NULL,
   plot = TRUE,
   newdata = NULL,
   series = NULL,
@@ -45,10 +46,13 @@ supported here; pass the data directly to \code{\link[=mvgam]{mvgam()}} /
 
 \item{formula}{Optional observation formula (a \code{formula},
 \code{brmsformula}, or \code{bf()} two-arm specification for
-closure-unit fits). When supplied, every covariate the
-formula references is checked for \code{NA} and the call errors
-if any are present. Response \code{NA}s are always allowed and
-are preserved by \code{mvgam()} to maintain the time grid.}
+closure-unit fits). Every column the formula uses must be in
+\code{data}: covariates, offsets, random-effect grouping factors
+and the columns of addition terms such as \code{trials()} and
+\code{weights()}. Those columns may not hold \code{NA}, and a
+\code{trials()} count may not fall below its response. Response
+\code{NA}s are allowed, and \code{mvgam()} keeps their rows on the
+time grid.}
 
 \item{trend_formula}{Optional trend formula (e.g.
 \code{~ AR(time = week, series = species) + s(env)}), as passed to
@@ -56,8 +60,12 @@ are preserved by \code{mvgam()} to maintain the time grid.}
 columns and decides whether times must be evenly spaced:
 \code{CAR()} and \code{ZMVN()} accept gaps, most others refuse them.
 \code{NULL} checks the data for a model without a trend, which
-needs no series column. Covariates the formula references
-get the same \code{NA} check as \code{formula}.}
+needs no series column. Its covariates, offsets and grouping
+factors get the same checks as those of \code{formula}.}
+
+\item{data2}{Optional named list of further model data, as passed
+to \code{\link[=mvgam]{mvgam()}}. A formula variable found here, such as a matrix
+covariate, need not be a column of \code{data}.}
 
 \item{plot}{Logical. If \code{TRUE} (default), draw the
 observed-series plot using the same panels as

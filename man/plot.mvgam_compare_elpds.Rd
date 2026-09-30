@@ -20,8 +20,7 @@ itself is dropped from the plot.}
 \item{cumulative}{Logical. When \code{TRUE} (default \code{FALSE}) the
 y-axis becomes the cumulative ELPD up to each evaluation
 timepoint, which is the quantity \code{loo_compare()} sums
-across folds. Useful for spotting when one model pulls
-ahead of another over the rolling-origin window.}
+across folds.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

@@ -93,9 +93,11 @@ lift_sampler_control <- function(dots, control = NULL) {
 # Reason: called on the dots of every entry point that reaches the
 # code generator, so an argument mvgam no longer takes is named
 # wherever it is written rather than disappearing into `...`.
-reject_removed_args <- function(dots, fn = "mvgam") {
+reject_removed_args <- function(dots, fn = "mvgam",
+                                removed = mvgam_removed_args) {
   checkmate::assert_string(fn, min.chars = 1)
-  found <- intersect(names(mvgam_removed_args), names(dots))
+  checkmate::assert_character(removed, names = "named")
+  found <- intersect(names(removed), names(dots))
   if (!length(found)) {
     return(invisible(NULL))
   }
@@ -108,7 +110,7 @@ reject_removed_args <- function(dots, fn = "mvgam") {
       "removed in mvgam 2.0."
     ),
     stats::setNames(
-      paste0("For '", found, "', ", mvgam_removed_args[found], "."),
+      paste0("For '", found, "', ", removed[found], "."),
       rep("i", length(found))
     )
   )))
@@ -200,36 +202,22 @@ mvgam_imputation_forwarded <- c(
 #'   `dpar` sub-formulas, and `offset()` are all available. `gp()`
 #'   accepts both the approximate Hilbert-space form
 #'   (`gp(x, k = 20)`) and the exact full-covariance form
-#'   (`gp(x)`, no `k`). The two forms differ on what mvgam can do
-#'   after the fit: the approximate form supports prediction at
-#'   newdata; the exact form fits + scores in-sample fine but
-#'   `predict()` / `posterior_epred()` at new covariate values is
-#'   not wired up. Picking up an exact `gp()` term emits a
-#'   one-shot warning saying as much.
-#' @param trend_formula Trend formula specification (may be response-specific).
-#'   Same `gp()` caveat applies on the trend side: exact GPs fit
-#'   but do not support forecasts / new-time-point prediction yet.
+#'   (`gp(x)`, no `k`). Prediction at `newdata` requires the
+#'   approximate form. An exact `gp()` term fits and scores
+#'   in-sample, and `mvgam()` says so once per session.
+#' @param trend_formula Trend formula specification (may be
+#'   response-specific). An exact `gp()` term here also predicts
+#'   in-sample alone, and forecasting a model that holds one
+#'   requires the approximate form.
 #' @param data Data frame or list of multiply imputed datasets
-#' @param newdata Optional test-set `data.frame` persisted on the
-#'   fit as `object$test_data`. Used by `plot(fit, type = "series")`
-#'   to overlay the test arm without re-passing the data. Passing
-#'   `newdata` to `mvgam()` does not emit Stan generated-quantities
-#'   forecasts at fit time. Keeping forecasting out of Stan keeps
-#'   the fit object small and the sampler fast, and means downstream
-#'   methods can choose their own newdata. To use the persisted
-#'   data downstream, re-pass it through the relevant method.
-#'   `forecast()` and `posterior_predict()` answer different
-#'   questions:
-#'   \itemize{
-#'     \item `forecast(mod, newdata = mod$test_data)` propagates the
-#'       fitted latent state forward in time per posterior draw, so
-#'       future predictions extrapolate the actual trajectory.
-#'     \item `posterior_predict(mod, newdata = mod$test_data)`
-#'       marginalises over the trend's stochastic dynamics by Monte
-#'       Carlo at the supplied design points and ignores the fitted
-#'       trajectory's position relative to training time.
-#'   }
-#'   Use `forecast()` for time-series forecasting and
+#' @param newdata Optional held-out `data.frame`, stored on the fit
+#'   as `object$test_data`. `forecast()` forecasts to it when called
+#'   without `newdata`, and `plot(fit, type = "series")` overlays it.
+#'   The fit itself draws no forecasts. `forecast()` propagates the
+#'   fitted latent state forward in time per posterior draw, and
+#'   `posterior_predict(mod, newdata = mod$test_data)` marginalises
+#'   over the trend's stochastic dynamics at the supplied design
+#'   points. Use `forecast()` for time-series forecasting and
 #'   `posterior_predict()` for marginal predictive checks.
 #' @param trend_map Optional fixed factor-loading specification.
 #'   Accepts one of three shapes, a numeric `n_series x n_lv`
@@ -480,7 +468,7 @@ mvgam_imputation_forwarded <- c(
 #'   chains = 2,
 #'   silent = 2
 #' )
-#' summary(mod, include_betas = FALSE)
+#' summary(mod)
 #' conditional_effects(mod)
 #' mcmc_plot(mod, variable = "^ar1", regex = TRUE, type = "hist")
 #'
@@ -499,7 +487,7 @@ mvgam_imputation_forwarded <- c(
 #'   chains = 2,
 #'   silent = 2
 #' )
-#' summary(gmod, include_betas = FALSE)
+#' summary(gmod)
 #'
 #' # ---- Multivariate VAR(1) with intercept suppression + custom priors ----
 #' # Three correlated series, no observation intercept (`y ~ 0`),
@@ -540,7 +528,7 @@ mvgam_imputation_forwarded <- c(
 #'   warmup        = 500,
 #'   silent        = 2
 #' )
-#' summary(var_mod, include_betas = FALSE)
+#' summary(var_mod)
 #'
 #' # Hindcasts (training cells) and forecasts (held-out cells)
 #' # share a single object; plot one series to inspect the
@@ -698,16 +686,18 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     checkmate::check_list(data, types = "data.frame"),
     .var.name = "data"
   )
-  newdata <- validate_newdata(newdata, data)
+  newdata <- check_newdata(newdata, data, trend_formula)
 
-  # `build_stan_components()` refuses a missing covariate in `data`.
-  # `newdata` does not reach it and is checked here.
+  # `build_stan_components()` refuses an absent or missing covariate
+  # in `data`. `newdata` does not reach it and is checked here. Its
+  # responses may be absent, which marks the occasions to forecast.
   if (!is.null(newdata)) {
-    validate_no_covariate_nas(
-      data           = newdata,
-      formulas       = list(formula, trend_formula),
-      response_vars  = lhs_columns(formula),
-      context        = "newdata"
+    resolved <- resolve_observation_family(formula, family)
+    validate_model_columns(
+      newdata, resolved$formula, resolved$family, trend_formula,
+      data2 = list(...)$data2,
+      optional = response_columns(resolved$formula),
+      context = "newdata"
     )
   }
 
@@ -830,42 +820,66 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 #' Validate `newdata` against the training data of an \pkg{mvgam} model
 #'
 #' Runs the structural checks that [predict.mvgam()] and
-#' [forecast.mvgam()] apply to a `newdata` frame, so a misaligned frame is
-#' caught up front rather than at the back of an expensive prediction
-#' pipeline. It confirms that any `time` and `series` columns present in the
-#' training `data` also appear in `newdata`, rejects `series` levels that
-#' were not in the training data, and coerces `newdata$series` to the
-#' training factor levels. Predictor and response columns are not enforced
-#' here; the prediction functions resolve those from the model formula.
+#' [forecast.mvgam()] apply to a `newdata` frame, and refuses a
+#' misaligned frame before an expensive prediction. The trend constructor in
+#' `trend_formula` names the time and series columns, `time` and
+#' `series` by default. Each of them the training `data` holds must
+#' also be in `newdata`. A hierarchical trend identifies its series by
+#' its `gr` and `subgr` columns, and those are required in their
+#' place. Series levels absent from the training data are refused, and
+#' the series column of `newdata` is coerced to the training levels.
+#' The prediction functions check the columns the formulas use.
 #'
-#' @param newdata A `data.frame` of prediction covariates in the same shape
-#'   as the training data (same factor levels and covariate columns).
-#' @param data The `data.frame` (or `list`) used to fit the model, whose
-#'   `series` levels define the valid set.
-#' @return `newdata` with `series` coerced to the training factor levels,
-#'   returned invisibly, or `NULL` (invisibly) when `newdata` is `NULL`.
+#' @param newdata A `data.frame` of prediction covariates in the same
+#'   shape as the training data.
+#' @param data The training `data.frame` of the model, whose series
+#'   levels define the valid set.
+#' @param trend_formula The trend formula passed to [mvgam()], or
+#'   `NULL` for a model without a trend.
+#' @return `newdata` with its series column coerced to the training
+#'   factor levels, returned invisibly, or `NULL` (invisibly) when
+#'   `newdata` is `NULL`.
 #' @seealso [predict.mvgam()], [forecast.mvgam()]
 #' @examples
 #' train <- data.frame(
-#'   series = factor(rep(c("a", "b"), each = 3L)),
-#'   time = rep(1:3, times = 2L),
+#'   species = factor(rep(c("a", "b"), each = 3L)),
+#'   week = rep(1:3, times = 2L),
 #'   y = rnorm(6L)
 #' )
 #' future <- data.frame(
-#'   series = factor(rep(c("a", "b"), each = 2L), levels = c("a", "b")),
-#'   time = rep(4:5, times = 2L)
+#'   species = factor(rep(c("a", "b"), each = 2L)),
+#'   week = rep(4:5, times = 2L)
 #' )
-#' validate_newdata(future, train)
+#' check_newdata(future, train, ~ AR(time = week, series = species))
+#'
+#' # A species the model never saw is refused.
+#' future$species <- factor(rep(c("a", "c"), each = 2L))
+#' try(check_newdata(future, train, ~ AR(time = week, series = species)))
 #' @export
-validate_newdata <- function(newdata, data) {
+check_newdata <- function(newdata, data, trend_formula = NULL) {
   if (is.null(newdata)) return(invisible(NULL))
-  required <- intersect(c("time", "series"), names(data))
-  validate_required_variables(newdata, required, "newdata")
-  train_levels <- levels(data$series)
-  if (is.null(train_levels)) return(invisible(newdata))
-  new_chr <- as.character(newdata$series)
+  checkmate::assert_data_frame(newdata)
+  checkmate::assert_formula(trend_formula, null.ok = TRUE)
+  spec <- if (!is.null(trend_formula)) {
+    parse_trend_formula(trend_formula)$trend_model
+  }
+  axis <- spec_axis_vars(spec)
+  series_var <- axis$series_var
+  gr <- spec_groupings(spec)
+  # `gr` alone takes the series column as its subgroup.
+  subgr <- gr$subgr %||% series_var
+  series_cols <- if (is.null(gr$gr)) series_var else c(gr$gr, subgr)
+  required <- intersect(c(axis$time_var, series_cols), names(data))
+  if (length(required)) {
+    validate_required_variables(newdata, required, "newdata")
+  }
+  train_levels <- levels(data[[series_var]])
+  if (!series_var %in% required || is.null(train_levels)) {
+    return(invisible(newdata))
+  }
+  new_chr <- as.character(newdata[[series_var]])
   refuse_unseen_levels("Series", unique(new_chr), train_levels)
-  newdata$series <- factor(new_chr, levels = train_levels)
+  newdata[[series_var]] <- factor(new_chr, levels = train_levels)
   invisible(newdata)
 }
 
@@ -1038,7 +1052,14 @@ mvgam_single <- function(formula, trend_formula, data, backend,
       cores = cores,
       threads = threads,
       opencl = opencl,
-      init = init,
+      init = if (is_equal(init, "random")) {
+        sparse_ar_inits(
+          stan_components$combined_components$stancode,
+          stan_components$combined_components$standata, chains, seed
+        ) %||% init
+      } else {
+        init
+      },
       exclude = exclude,
       seed = seed,
       control = control,
@@ -1772,7 +1793,11 @@ pool_mvgam_fits <- function(fits) {
     if (!identical(ref_vars, current_vars)) {
       stop(insight::format_error(c(
         sprintf("Model 1 and %d have different parameters.", i),
-        x = "This may indicate fitting failures or model changes."
+        x = paste0("Parameters in one fit alone: ",
+                   paste(utils::head(c(setdiff(ref_vars, current_vars),
+                                       setdiff(current_vars, ref_vars)),
+                                     5L), collapse = ", "), "."),
+        i = "Fit the same model to every imputed dataset."
       )))
     }
   }

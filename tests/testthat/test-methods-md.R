@@ -93,13 +93,25 @@ test_that("RW trend emits eta_{t-1} dynamics + Normal innovation", {
   out <- methods_md(mod)
   expect_true(grepl("\\\\eta_\\{i,t\\} &= \\\\eta_\\{i,t-1\\}", out))
   expect_true(grepl("\\\\epsilon\\^\\{\\(\\\\eta\\)\\}_\\{i,t\\}", out))
-  expect_true(grepl("\\\\sigma_\\\\eta", out))
+  # Four series each sample their own innovation SD.
+  expect_true(grepl("\\\\sigma_\\{\\\\eta,i\\}", out))
+  ma <- methods_md(make_methods_md_prefit(
+    y ~ 1, trend_formula = ~ RW(ma = TRUE)
+  ))
+  expect_match(ma, "\\eta_{i,t-1} + \\epsilon^{(\\eta)}_{i,t} + \\theta_{i,1}",
+               fixed = TRUE)
 })
 
 test_that("AR(p = 1) trend emits phi_1 eta_{t-1} dynamics", {
   mod <- make_methods_md_prefit(y ~ 1, trend_formula = ~ AR(p = 1))
   out <- methods_md(mod)
-  expect_true(grepl("\\\\phi_\\{1\\} \\\\eta_\\{i,t-1\\}", out))
+  expect_true(grepl("\\\\phi_\\{i,1\\} \\\\eta_\\{i,t-1\\}", out))
+  # A shared coefficient is one value for every series.
+  shared <- methods_md(make_methods_md_prefit(
+    y ~ 1, trend_formula = ~ AR(p = 1, coef_sharing = "shared")
+  ))
+  expect_match(shared, "\\phi_{1} \\eta_{i,t-1}", fixed = TRUE)
+  expect_match(shared, "\\phi_{1} &\\sim", fixed = TRUE)
 })
 
 test_that("AR(p = c(1, 2)) emits both lag terms in the dynamics row", {
@@ -107,8 +119,14 @@ test_that("AR(p = c(1, 2)) emits both lag terms in the dynamics row", {
     y ~ 1, trend_formula = ~ AR(p = c(1L, 2L))
   )
   out <- methods_md(mod)
-  expect_true(grepl("\\\\phi_\\{1\\} \\\\eta_\\{i,t-1\\}", out))
-  expect_true(grepl("\\\\phi_\\{2\\} \\\\eta_\\{i,t-2\\}", out))
+  expect_true(grepl("\\\\phi_\\{i,1\\} \\\\eta_\\{i,t-1\\}", out))
+  expect_true(grepl("\\\\phi_\\{i,2\\} \\\\eta_\\{i,t-2\\}", out))
+  # A hierarchical fit's coefficient prior names its hyperparameters.
+  hier <- methods_md(make_methods_md_prefit(
+    y ~ 1, trend_formula = ~ AR(p = c(1L, 3L), coef_sharing = "hierarchical")
+  ))
+  expect_match(hier, "\\phi_{i,3} &\\sim \\text{Normal}(\\mu^{(\\phi)}_{3}, ",
+               fixed = TRUE)
 })
 
 test_that("Smooth term renders f_{x}(x) inline + basis decomposition", {
@@ -727,15 +745,15 @@ test_that("each response of a multivariate model is described by its family", {
     data = d, run_model = FALSE
   )
   out <- methods_md(mv)
-  expect_match(out, "$\\text{n\\_seen}$ non-negative integer counts",
+  expect_match(out, "$\\mathrm{n\\_seen}$ non-negative integer counts",
                fixed = TRUE)
-  expect_match(out, "$\\text{size\\_g}$ positive real observations",
+  expect_match(out, "$\\mathrm{size\\_g}$ positive real observations",
                fixed = TRUE)
   expect_match(out, "nseen_{i,t} &\\sim \\text{Poisson}", fixed = TRUE)
   expect_match(out, "sizeg_{i,t} &\\sim \\text{LogNormal}", fixed = TRUE)
   expect_match(out, "\\log \\mu^{(nseen)}_{i,t} &=", fixed = TRUE)
   expect_match(out, "\\log \\sigma^{(sizeg)}_{i,t} &=", fixed = TRUE)
-  expect_match(out, "$\\mu^{(sizeg)}_{i,t}$: conditional mean of $sizeg_{i,t}$ on the identity-link scale",
+  expect_match(out, "$\\mu^{(sizeg)}_{i,t}$: conditional mean of $sizeg_{i,t}$",
                fixed = TRUE)
   expect_match(
     out,

@@ -24,12 +24,9 @@
 the training data, containing the time / series cells at
 which forecasts are wanted. Rows with time values beyond
 the training grid drive the forecast horizon. When \code{NULL},
-the returned object contains hindcasts only and the
-\verb{$forecasts} / \verb{$test_observations} / \verb{$test_times} slots
-are \code{NULL}. The fallback is deliberately strict: if you
-want forecasts using the held-out data that was passed to
-\code{mvgam(..., newdata = X)} at fit time, pass it explicitly
-here as \code{forecast(mod, newdata = mod$test_data)}.
+the held-out data given to \code{mvgam(..., newdata = )} at fit
+time is used. A fit given no held-out data has no occasions
+to forecast at, and \code{forecast()} then refuses.
 
 For \code{AR()}, \code{RW()}, \code{VAR()} and \code{PW()} the forecast times
 must continue the training series without a gap and at its
@@ -111,13 +108,13 @@ mod <- mvgam(
   y ~ s(x),
   trend_formula = ~ AR(p = 1),
   data    = simdat$data_train,
-  newdata = simdat$data_test,  # persisted on mod$test_data
+  newdata = simdat$data_test,
   family  = poisson(),
   chains  = 2, silent = 2
 )
 
-# Pass the held-out data explicitly to drive the forecast horizon.
-fc <- forecast(mod, newdata = mod$test_data)
+# The held-out data given to mvgam() drive the forecast horizon.
+fc <- forecast(mod)
 plot(fc)
 }
 

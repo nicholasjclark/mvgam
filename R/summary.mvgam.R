@@ -17,19 +17,15 @@
 #' @param robust Logical; if \code{TRUE}, the median and MAD measure
 #'   central tendency and spread. The default \code{FALSE} uses the mean
 #'   and SD.
-#' @param include_betas Logical; if \code{TRUE} (the default), print every
-#'   per-cell expansion of the trend-side dynamic parameters
-#'   (per-country and per-cell \code{A_group_trend},
-#'   \code{Sigma_group_trend}, the full block-diagonal
-#'   \code{A_trend} / \code{Sigma_trend} / \code{Omega_trend} etc.).
-#'   Setting \code{FALSE} keeps the global hyperparameters
-#'   (\code{Amu_trend}, \code{Aomega_trend},
-#'   \code{L_Omega_global_trend}, \code{alpha_cor_trend},
-#'   \code{sigma}) and drops the per-cell arrays; useful for
-#'   hierarchical VAR fits where the expansion runs to hundreds
-#'   or thousands of rows. Individual per-country blocks can
-#'   still be pulled via \code{as.matrix()},
-#'   \code{as_draws_df()}, or \code{mcmc_plot()}.
+#' @param matrices Logical; if \code{TRUE}, also print every cell of
+#'   the matrices a correlated, VAR or hierarchical trend derives
+#'   from its sampled parameters (\code{Phi_trend}, \code{Sigma_trend},
+#'   \code{Omega_trend}, \code{Phi_group_trend},
+#'   \code{Sigma_group_trend}). The default \code{FALSE} prints the
+#'   sampled parameters alone, among them \code{sigma_trend},
+#'   \code{Amu_trend}, \code{Aomega_trend} and
+#'   \code{alpha_cor_trend}. [posterior_transition_matrix()] and
+#'   [residual_cor()] summarise the matrices a cell at a time.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An object of class \code{mvgam_summary}. Each block is a
@@ -87,13 +83,19 @@
 #' @export
 summary.mvgam <- function(object, probs = c(0.025, 0.975),
                           robust = FALSE,
-                          include_betas = TRUE, ...) {
+                          matrices = FALSE, ...) {
   # Input validation
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_numeric(probs, len = 2, lower = 0, upper = 1)
   checkmate::assert_true(probs[1] < probs[2])
   checkmate::assert_logical(robust, len = 1)
-  checkmate::assert_logical(include_betas, len = 1)
+  checkmate::assert_flag(matrices)
+  reject_removed_args(
+    list(...), fn = "summary",
+    removed = c(
+      include_betas = "use 'matrices = TRUE' to print the trend matrices"
+    )
+  )
   rlang::check_dots_empty()
 
   require_fitted_model(object, "summary")
@@ -117,14 +119,11 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
   pars <- rownames(all_summaries)
 
-  # `include_betas = FALSE` drops the trend-side per-cell arrays that
-  # dominate the printed summary on a hierarchical or
-  # high-dimensional VAR fit. The Cholesky factors those matrices are
-  # built from carry the kind `internal` and never reach a printed
-  # summary. The hyperparameters a reader inspects directly stay,
-  # among them `Amu_trend`, `Aomega_trend`, `alpha_cor_trend` and the
-  # `sigma_group_trend` scalars.
-  if (!isTRUE(include_betas)) {
+  # The matrices a trend derives from its sampled parameters print
+  # only on request: a 3-series VAR(2) derives 63 cells of them. The
+  # sampled parameters stay, among them `Amu_trend`, `Aomega_trend`,
+  # `alpha_cor_trend` and the `sigma_group_trend` scalars.
+  if (!matrices) {
     pars_to_keep <- !is_trend_matrix_param(pars)
     if (any(!pars_to_keep)) {
       all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
@@ -179,9 +178,10 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     out$trend_spec <- all_summaries[trend_spec_idx, , drop = FALSE]
   }
 
-  z_idx <- match_z_loadings(pars)
-  if (any(z_idx)) {
-    out$loadings <- all_summaries[z_idx, , drop = FALSE]
+  z_pars <- pars[match_z_loadings(pars)]
+  if (length(z_pars)) {
+    z_pars <- varying_pars(as_draws_array(object, variable = z_pars), z_pars)
+    out$loadings <- all_summaries[z_pars, , drop = FALSE]
   }
 
   loadings_prior_idx <- kind == "loadings_prior"
@@ -194,6 +194,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # Store mvgam-specific metadata for print.summary.mvgam() to display
   # model structure information (formula, trend type, dimensions)
   out$trend_formula <- object$trend_formula
+  out$trend_predictors <- trend_predictors(object)
 
   trend_type <- get_trend_type(object)
   out$trend_model <- if (!identical(trend_type, "None")) trend_type
@@ -471,6 +472,23 @@ match_z_loadings <- function(pars) {
   grepl(factor_loading_param_pattern(pars), pars)
 }
 
+#' The parameters whose draws are not all equal
+#'
+#' The identified loadings are lower triangular. Every draw holds the
+#' entries above the diagonal at zero, and a summary of them reports
+#' a constant with no convergence diagnostics.
+#'
+#' @param draws A `draws` object holding `pars`.
+#' @param pars Character vector of parameter names.
+#' @return The subset of `pars` that varies across draws.
+#' @noRd
+varying_pars <- function(draws, pars) {
+  pars[vapply(pars, function(p) {
+    v <- as.numeric(posterior::extract_variable(draws, p))
+    any(v != v[1L])
+  }, logical(1L))]
+}
+
 #' The trend's own time-indexed states
 #'
 #' A fit has one per time point and series, and summary output leaves
@@ -491,7 +509,7 @@ is_trend_state_param <- function(pars) {
 #'
 #' A correlated or hierarchical trend estimates one entry per cell of
 #' a matrix, and a high-dimensional fit prints hundreds of those
-#' rows. `include_betas = FALSE` drops them. `par_taxonomy.R`
+#' rows. `summary()` prints them with `matrices = TRUE`. `par_taxonomy.R`
 #' declares the names, which keeps one account of what each name
 #' means.
 #'
@@ -741,7 +759,7 @@ format_trend_line <- function(x) {
     return("")
   }
   out <- paste0(" Trends: ", x$trend_label %||% x$trend_model)
-  predictors <- trend_predictors(x$trend_formula)
+  predictors <- x$trend_predictors
   if (!is.null(predictors)) {
     out <- paste0(out, "; formula: ", predictors)
   }
@@ -752,15 +770,22 @@ format_trend_line <- function(x) {
 #' The predictors of a trend formula, as `print()` and `summary()` show
 #' them
 #'
-#' mvgam stores the trend formula with the placeholder response
-#' `trend_y` and without the trend constructor, which the trend line
-#' names. A formula reduced to `~0` or `~1` names no predictor a
-#' reader acts on.
+#' The trend formula as the user wrote it, less its trend constructor,
+#' which the trend line names. mvgam stores a rewritten copy for
+#' fitting, where `by = lv_axis()` becomes `by = series` and a `- 1` is
+#' added, and that copy is the fallback for a fit that records no
+#' user formula. A formula reduced to `~0` or `~1` names no predictor
+#' a reader acts on.
 #'
-#' @param trend_formula The fit's `trend_formula`, or `NULL`
+#' @param object An `mvgam` object
 #' @return A one-sided formula as a single string, or `NULL`
 #' @noRd
-trend_predictors <- function(trend_formula) {
+trend_predictors <- function(object) {
+  trend_formula <- if (inherits(object$trend_call, "formula")) {
+    parse_base_formula_safe(object$trend_call, mvgam_trend_registry())
+  } else {
+    object$trend_formula
+  }
   if (is.null(trend_formula)) {
     return(NULL)
   }
@@ -785,8 +810,13 @@ build_next_steps <- function(x) {
   has_factors <- !is.null(x$loadings) || !is.null(x$loadings_prior)
   trend_model <- x$trend_model %||% ""
   has_cor_trend <- has_factors || isTRUE(x$trend_has_cor)
-  has_covariates <- !is.null(x$fixed) &&
-    nrow(x$fixed) > 1L
+  # A covariate may enter either predictor. The observation side
+  # always holds an intercept row among its fixed effects, and the
+  # trend side holds none.
+  covariate_blocks <- c("smooth", "gp", "mo", "trend_fixed",
+                        "trend_smooth", "trend_gp", "trend_mo")
+  has_covariates <- (!is.null(x$fixed) && nrow(x$fixed) > 1L) ||
+    any(covariate_blocks %in% names(x))
   forecastable <- !grepl("^ZMVN", trend_model)
   # A detection process decides the closure-unit suggestions. `mvn()`,
   # `mvt()` and `diri()` share the closure-unit layout and model no
@@ -812,6 +842,11 @@ build_next_steps <- function(x) {
          text = paste0(
            "`hindcast(fit, type = \"latent_state\")`: ",
            "psi (occ) or N (nmix)"
+         )),
+    list(when = grepl("^VAR", trend_model),
+         text = paste0(
+           "`posterior_transition_matrix(fit)` / `irf(fit)`: ",
+           "lagged effects between series"
          )),
     list(when = has_factors,
          text = paste0(

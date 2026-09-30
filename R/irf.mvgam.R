@@ -77,7 +77,7 @@ irf.mvgam <- function(
   future = FALSE,
   ...
 ) {
-  validate_pos_integer(h)
+  checkmate::assert_int(h, lower = 1)
   checkmate::assert_logical(cumulative, len = 1L)
   checkmate::assert_logical(orthogonal, len = 1L)
   validate_draw_selectors(ndraws, draw_ids)
@@ -184,37 +184,32 @@ gen_irf <- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {
   irs
 }
 
-#' Convert a VAR A matrix to its moving average representation
+#' The moving-average weights of a VAR or VARMA
+#'
+#' \eqn{\Phi_0 = I} and
+#' \eqn{\Phi_n = D_n + \sum_{j = 1}^{\min(n, p)} A_j \Phi_{n - j}},
+#' with \eqn{D_n = 0} beyond the moving-average order.
+#'
+#' @param x One draw: `A` a `[K, K, p]` array, `D` a `[K, K, q]` array
+#'   (`q` may be 0), and `K`
+#' @param h Horizon
+#' @return A `[K, K, h + 1]` array holding \eqn{\Phi_0, \ldots, \Phi_h}
 #' @noRd
 var_phi <- function(x, h = 10) {
   h <- abs(as.integer(h))
   K <- x$K
-  p <- x$p
-  A <- as.array(x$A)
-  if (h >= p) {
-    As <- array(0, dim = c(K, K, h + 1))
-    for (i in (p + 1):(h + 1)) {
-      As[,, i] <- matrix(0, nrow = K, ncol = K)
+  p <- dim(x$A)[3L]
+  q <- dim(x$D)[3L] %||% 0L
+  Phi <- array(0, dim = c(K, K, h + 1L))
+  Phi[,, 1L] <- diag(K)
+  for (n in seq_len(h)) {
+    acc <- if (n <= q) x$D[,, n] else matrix(0, K, K)
+    for (j in seq_len(min(n, p))) {
+      acc <- acc + x$A[,, j] %*% Phi[,, n - j + 1L]
     }
-  } else {
-    As <- array(0, dim = c(K, K, p))
+    Phi[,, n + 1L] <- acc
   }
-  As[,, 1] <- A
-  Phi <- array(0, dim = c(K, K, h + 1))
-  Phi[,, 1] <- diag(K)
-  Phi[,, 2] <- Phi[,, 1] %*% As[,, 1]
-  if (h > 1) {
-    for (i in 3:(h + 1)) {
-      tmp1 <- Phi[,, 1] %*% As[,, i - 1]
-      tmp2 <- matrix(0, nrow = K, ncol = K)
-      idx <- (i - 2):1
-      for (j in 1:(i - 2)) {
-        tmp2 <- tmp2 + Phi[,, j + 1] %*% As[,, idx[j]]
-      }
-      Phi[,, i] <- tmp1 + tmp2
-    }
-  }
-  return(Phi)
+  Phi
 }
 
 #' Convert a VAR A matrix to its orthogonalised moving average representation

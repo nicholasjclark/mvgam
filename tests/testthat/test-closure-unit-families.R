@@ -819,7 +819,7 @@ test_that("build_closure_unit_arrays() errors on missing columns", {
   d$cap <- NULL
   expect_error(
     build_closure_unit_arrays(d, response_var = "y"),
-    "Closure-unit families require column 'cap'"
+    "Absent: 'cap'"
   )
 })
 

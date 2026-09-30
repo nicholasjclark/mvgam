@@ -47,8 +47,8 @@ mvgam_par_side <- function(pars) {
 #' prior class has none, and the prior tables test the bare suffix
 #' themselves.
 #'
-#' A rotated companion ends in `_trend_tilde`, as `A_trend_tilde` does
-#' for `A_trend`. Testing the bare suffix filed those on the
+#' A rotated companion ends in `_trend_tilde`, as `Phi_trend_tilde` does
+#' for `Phi_trend`. Testing the bare suffix filed those on the
 #' observation side, where `mvgam_par_kind()` classified them as
 #' `other`.
 #'
@@ -255,8 +255,8 @@ MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "sd", "cor", "sdgp", "lscale")
 # VAR, VARMA or ARMA fit without naming a quantity a reader
 # interprets. A Cholesky factor carries a unit diagonal and a
 # structurally zero upper triangle, both of which print as a row
-# with no posterior width. `A_raw_trend` is the unconstrained matrix
-# the stationarity transform turns into `A_trend`, and `Z_cols` the
+# with no posterior width. `A_trend` is the unconstrained matrix
+# the stationarity transform turns into `Phi_trend`, and `Z_cols` the
 # sum-to-zero columns `Z` is assembled from. A structured loadings
 # prior builds its correlation `Phi_loadings` and that matrix's
 # Cholesky factor from the length-scales `summary()` reports, and its
@@ -279,7 +279,7 @@ MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "sd", "cor", "sdgp", "lscale")
 #'@noRd
 MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "^(P_var|result_var|P_ma|result_ma|empty_theta|Q_tilde|",
-  "ma_innovations_trend|A_raw_trend|A_raw_group_trend|",
+  "ma_innovations_trend|A_trend|A_group_trend|D_trend|",
   "L_Omega_trend|L_Sigma_trend|L_Omega_global_trend|",
   "L_Omega_group_trend|L_deviation_group_trend|L_group_trend|",
   "Z_cols|varrho_inv|Phi_loadings|L_Phi_loadings)\\[",
@@ -293,14 +293,14 @@ MVGAM_PAR_STATE_PATTERN <- paste0(
 )
 
 # The per-cell matrix arrays a correlated or hierarchical trend
-# estimates. A reader interprets these directly, and a
-# high-dimensional fit prints hundreds of rows of them, which
-# `include_betas = FALSE` drops. The Cholesky factors they are built
-# from carry the kind `internal` and never reach a printed summary.
+# derives. A high-dimensional fit has hundreds of cells of them, and
+# `summary()` prints them only with `matrices = TRUE`. The Cholesky
+# factors they are built from carry the kind `internal` and never
+# reach a printed summary.
 #'@noRd
 MVGAM_PAR_MATRIX_PATTERN <- paste0(
-  "^(A_group_trend|Sigma_group_trend|A_trend|Sigma_trend|",
-  "Omega_trend)\\["
+  "^(Phi_group_trend|Sigma_group_trend|Phi_trend|Sigma_trend|",
+  "Omega_trend|Theta_trend)\\["
 )
 
 # The name `brms::fixef()` gives a population-level coefficient: its

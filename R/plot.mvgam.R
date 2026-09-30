@@ -9,10 +9,12 @@
 #' @param type Character. The kind of plot to produce. One of:
 #'   \describe{
 #'     \item{`"residuals"` (default)}{Four-panel Dunn-Smyth
-#'       residual diagnostic: residuals vs fitted, Q-Q, ACF,
-#'       pACF. See [pp_check.mvgam()] for the underlying types
-#'       (`resid_vs_fitted`, `resid_qq`, `resid_acf`,
-#'       `resid_pacf`).}
+#'       residual diagnostic for one series: residuals vs fitted,
+#'       Q-Q, ACF, pACF, titled by the series. See [pp_check.mvgam()]
+#'       for the underlying types (`resid_vs_fitted`, `resid_qq`,
+#'       `resid_acf`, `resid_pacf`). A closure-unit family (`occ()`,
+#'       `nmix()`) has one residual per closure unit and draws the
+#'       Q-Q panel alone.}
 #'     \item{`"smooths"`}{Conditional smooth posteriors via
 #'       [conditional_smooths.mvgam()], combined into a single
 #'       `patchwork` when more than one smooth is present.}
@@ -53,12 +55,11 @@
 #'     \item Arbitrary conditional plots:
 #'       [marginaleffects::plot_predictions()].
 #'   }
-#' @param series Optional series subset. Passed through to the
-#'   series-aware branches (`"residuals"`, `"trend"`,
-#'   `"series"`). Accepts `NULL` (all series, default), `"all"`,
-#'   an integer index, or a character series name. Ignored by
-#'   branches that summarise across series (`"smooths"`,
-#'   `"factors"`).
+#' @param series Optional series subset, as an integer index or a
+#'   series name. `"trend"` and `"series"` also take `"all"`, and
+#'   draw every series by default. `"residuals"` draws one series,
+#'   the first by default. Ignored by branches that summarise across
+#'   series (`"smooths"`, `"factors"`).
 #' @inheritParams forecast.mvgam
 #' @param ndraws Optional cap on posterior draws used by branches
 #'   that subsample. Passed through to the relevant surface.
@@ -83,7 +84,7 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # 4-panel default dispatch (PPC + residuals + trend + smooths).
+#' # Residual diagnostics, the default type.
 #' plot(mod)
 #' }
 #'
@@ -111,7 +112,7 @@ plot.mvgam <- function(
   switch(
     type,
     residuals = mvgam_resid_panel(
-      x, ndraws = ndraws %||% 100L, resp = resp, ...
+      x, series = series, ndraws = ndraws %||% 100L, resp = resp, ...
     ),
     smooths = wrap_effects_list(
       conditional_smooths(x, ndraws = ndraws, resp = resp, ...)

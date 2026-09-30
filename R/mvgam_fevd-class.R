@@ -81,44 +81,15 @@ NULL
 #' @author Nicholas J Clark
 #'
 #' @export
-summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
+summary.mvgam_fevd <- function(object, probs = c(0.025, 0.975), ...) {
   checkmate::assert_class(object, "mvgam_fevd")
-  checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
-                            any.missing = FALSE, sorted = TRUE)
-  validate_proportional(min(probs))
-  validate_proportional(max(probs))
   rlang::check_dots_empty()
-
-  # Calculate posterior quantiles of error variance contributions
-  ynames <- names(object[[1]])
-  out <- do.call(
-    rbind,
-    lapply(seq_len(length(object)), function(draw) {
-      fevd_df(object[[draw]], ynames = ynames) %>%
-        dplyr::mutate(draw = draw)
-    })
-  ) %>%
-    dplyr::group_by(horizon, target, Series) %>%
-    dplyr::mutate(
-      fevdQ50 = median(evd),
-      fevd_Qlower = quantile(evd, min(probs)),
-      fevd_Qupper = quantile(evd, max(probs))
-    ) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(
-      shock = paste0(Series, ' -> ', target)
-    ) %>%
-    dplyr::select(shock, horizon, fevdQ50, fevd_Qlower, fevd_Qupper) %>%
-    dplyr::distinct()
-  colnames(out) <- c(
-    'shock',
-    'horizon',
-    'fevdQ50',
-    paste0('fevdQ', 100 * min(probs)),
-    paste0('fevdQ', 100 * max(probs))
+  surface <- fevd_draws(object)
+  tibble::tibble(
+    shock = paste0(surface$keys$Series, " -> ", surface$keys$target),
+    horizon = surface$keys$horizon,
+    median_interval_cols(surface$draws, probs, "fevd")
   )
-
-  return(out)
 }
 
 #'Plot forecast error variance decompositions from an `mvgam_fevd` object
@@ -154,7 +125,7 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
 #'@author Nicholas J Clark
 #'
 #'@export
-plot.mvgam_fevd = function(x, series = NULL, contributing = NULL, ...) {
+plot.mvgam_fevd <- function(x, series = NULL, contributing = NULL, ...) {
   checkmate::assert_class(x, "mvgam_fevd")
   rlang::check_dots_empty()
   # Calculate posterior median error variance contributions
@@ -167,18 +138,13 @@ plot.mvgam_fevd = function(x, series = NULL, contributing = NULL, ...) {
   target_names <- ynames[target_keep]
   source_names <- ynames[source_keep]
 
-  do.call(
-    rbind,
-    lapply(seq_len(length(x)), function(draw) {
-      fevd_df(x[[draw]], ynames = ynames)
-    })
-  ) %>%
+  surface <- fevd_draws(x)
+  surface$keys$mean_evd <- apply(surface$draws, 2L, stats::median)
+  surface$keys %>%
     dplyr::filter(
       target %in% target_names,
       Series %in% source_names
     ) %>%
-    dplyr::group_by(horizon, target, Series) %>%
-    dplyr::summarise(mean_evd = median(evd), .groups = "drop") %>%
     # When `contributing` drops sources, the retained shares no
     # longer sum to 1; re-normalise per (target, horizon) so the
     # stacked bars still read as a proper variance decomposition.
@@ -210,24 +176,30 @@ plot.mvgam_fevd = function(x, series = NULL, contributing = NULL, ...) {
     ggplot2::scale_fill_manual(values = fill_values) +
     ggplot2::facet_wrap(~target) +
     mvgam_theme() +
-    scale_x_horizon("Forecast horizon") +
+    scale_x_steps("Forecast horizon") +
     ggplot2::labs(y = "Median contribution to forecast variance")
 }
 
-#'@noRd
-fevd_df = function(x, ynames) {
-  do.call(
-    rbind,
-    lapply(seq_len(length(x)), function(process) {
-      data.frame(
-        horizon = 1:NROW(x[[process]]),
-        evd = as.vector(x[[process]]),
-        Series = ynames[sort(rep(
-          seq_along(ynames),
-          NROW(x[[process]])
-        ))],
-        target = ynames[process]
-      )
-    })
+#' The draws of every variance share, one column per cell
+#'
+#' @param x An `mvgam_fevd` object
+#' @return List with `keys`, a frame naming each cell's `horizon`,
+#'   source `Series` and `target`, and `draws`, an
+#'   `(ndraws x n_cells)` matrix of shares in the same order
+#' @noRd
+fevd_draws <- function(x) {
+  # Each target's shares are an `(h x K)` matrix, horizons down the
+  # rows and source processes across the columns.
+  ynames <- names(x[[1L]])
+  h <- NROW(x[[1L]][[1L]])
+  n <- length(ynames)
+  keys <- data.frame(
+    horizon = rep(seq_len(h), times = n * n),
+    Series = rep(rep(ynames, each = h), times = n),
+    target = rep(ynames, each = h * n)
   )
+  draws <- t(vapply(x, function(draw) {
+    unlist(lapply(draw, as.vector), use.names = FALSE)
+  }, numeric(nrow(keys))))
+  list(keys = keys, draws = draws)
 }

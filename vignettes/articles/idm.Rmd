@@ -230,7 +230,7 @@ Convergence, per-measurement intercepts and the parameters on
 the trend side all arrive together from `summary()`:
 
 ```{r joint-summary}
-summary(mod_joint, include_betas = FALSE)
+summary(mod_joint)
 ```
 
 The `ar1_trend[1]`, `ar12_trend[1]` and `sigma_trend[1]`

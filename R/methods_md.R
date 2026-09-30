@@ -21,6 +21,9 @@
 #' @param implementation Logical; append an Implementation
 #'   section that reconstructs the `mvgam` / `jsdgam` call used
 #'   to fit the model. Defaults to `TRUE`.
+#' @param heading_level Integer; the Markdown level of the section
+#'   headings. The default `2` writes `## Model`. Raise it to nest the
+#'   sections under a heading of the document they are placed in.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An object of class `mvgam_methods_md` carrying the
@@ -59,7 +62,8 @@ methods_md <- function(object, file = NULL, notation = "default",
 #' @export
 methods_md.mvgam <- function(object, file = NULL,
                              notation = "default",
-                             implementation = TRUE, ...) {
+                             implementation = TRUE,
+                             heading_level = 2L, ...) {
   checkmate::assert_class(object, "mvgam")
   # Every section renders the model's family and link from here. A
   # fit and a prefit both store the family `mvgam()` validated.
@@ -68,6 +72,7 @@ methods_md.mvgam <- function(object, file = NULL,
   checkmate::assert_string(file, null.ok = TRUE)
   checkmate::assert_choice(notation, c("default", "brms"))
   checkmate::assert_flag(implementation)
+  checkmate::assert_int(heading_level, lower = 1L, upper = 6L)
   rlang::check_dots_empty()
 
   sections <- methods_md_section_registry(
@@ -80,6 +85,9 @@ methods_md.mvgam <- function(object, file = NULL,
     character(1L)
   )
   body <- paste(parts, collapse = "\n\n")
+  # Each section writes its heading at level two.
+  body <- gsub("(^|\n)## ", paste0("\\1", strrep("#", heading_level), " "),
+               body)
 
   out <- structure(
     body,
@@ -188,7 +196,7 @@ render_data_section <- function(ctx) {
     resp_line
   )
   if (length(dims) > 0L) {
-    lines <- c(lines, paste0(dims, collapse = ", "))
+    lines <- c(lines, "", paste0(dims, collapse = ", "))
   }
   pred_lines <- describe_predictors(obj)
   if (length(pred_lines) > 0L) {
@@ -234,7 +242,7 @@ describe_predictors <- function(obj) {
     } else {
       paste0(class(col)[[1L]], " covariate")
     }
-    out <- c(out, paste0("- $", nm, "$: ", desc))
+    out <- c(out, paste0("- $", escape_math_text(nm), "$: ", desc))
   }
   out
 }
@@ -632,7 +640,8 @@ sub_predictor_rhs <- function(prior, value, col,
   }
   for (co in coefs) {
     parts <- c(parts, paste0(
-      "\\beta_{", value, ",", co, "} \\, ", co, "_{i,t}"
+      "\\beta_{", escape_math_text(value), ",", escape_math_text(co),
+      "} \\, ", escape_math_text(co), "_{i,t}"
     ))
   }
   if (length(parts) == 0L) return("0")
@@ -658,11 +667,17 @@ nl_top_linpred_rhs <- function(obj) {
   }
   rhs_src <- paste(deparse(f$formula[[3L]], width.cutoff = 80L),
                     collapse = " ")
+  # The indexed, escaped name a token becomes. A backslash in a
+  # replacement string is an escape, and the escaped name carries one.
+  subscripted <- function(name) {
+    gsub("\\", "\\\\", paste0(escape_math_text(name), "_{i,t}"),
+         fixed = TRUE)
+  }
   # Decorate each nlpar token. Use word boundaries so `b` in `bx`
   # is not rewritten when only `b` is the nlpar.
   for (np in nlpars) {
     pat <- paste0("\\b", np, "\\b")
-    rhs_src <- gsub(pat, paste0(np, "_{i,t}"), rhs_src)
+    rhs_src <- gsub(pat, subscripted(np), rhs_src)
   }
   # Subscript bare data covariates `x` -> `x_{i,t}` so they look
   # like the rest of the math block. Skip already-subscripted
@@ -671,8 +686,7 @@ nl_top_linpred_rhs <- function(obj) {
   # rewrite only those (avoids touching constants / numbers).
   for (v in setdiff(formula_used_vars(obj), nlpars)) {
     pat <- paste0("\\b", v, "\\b(?!_\\{)")
-    rhs_src <- gsub(pat, paste0(v, "_{i,t}"),
-                     rhs_src, perl = TRUE)
+    rhs_src <- gsub(pat, subscripted(v), rhs_src, perl = TRUE)
   }
   # `*` is the multiplication marker; render as a thin space so
   # `a + b * env` becomes `a_{i,t} + b_{i,t} env_{i,t}` rather
@@ -701,7 +715,7 @@ nlpar_linear_predictor_rows <- function(obj, notation) {
   for (i in seq_along(nlpars)) {
     np <- nlpars[i]
     out[[i]] <- list(
-      lhs = paste0(np, "_{i,t}"),
+      lhs = paste0(escape_math_text(np), "_{i,t}"),
       op  = "=",
       rhs = nlpar_predictor_rhs(prior, np)
     )
@@ -777,7 +791,7 @@ term_glossary <- function(obj) {
       "- $", response_symbol(obj, "\\alpha"), "$: population intercept"
     ))
   }
-  covariates <- setdiff(classes$fixed, "Intercept")
+  covariates <- escape_math_text(setdiff(classes$fixed, "Intercept"))
   if (length(covariates) > 0L) {
     defs <- c(defs, paste0(
       "- $", response_symbol(obj, paste0("\\beta_{", covariates, "}")),
@@ -794,7 +808,8 @@ term_glossary <- function(obj) {
     }
     defs <- c(defs, paste0(
       "- $", sym[["f"]], "$: ", basis_label(spec$bs, spec$fname),
-      " in $", paste(spec$vars, collapse = "$, $"), "$, basis size ",
+      " in $", paste(escape_math_text(spec$vars), collapse = "$, $"),
+      "$, basis size ",
       k_label, ", smoothing SD $", sym[["sd"]], "$"
     ))
   }
@@ -802,7 +817,7 @@ term_glossary <- function(obj) {
     sym <- term_symbols("gp", spec, obj)
     by_text <- if (!is.null(spec$by) && !is.na(spec$by) &&
                     nzchar(spec$by)) {
-      paste0(", stratified by $", spec$by, "$")
+      paste0(", stratified by $", escape_math_text(spec$by), "$")
     } else ""
     k_text <- if (!is.null(spec$k) && !is.na(spec$k)) {
       paste0(", approximated with ", spec$k, " basis functions")
@@ -811,13 +826,13 @@ term_glossary <- function(obj) {
     }
     defs <- c(defs, paste0(
       "- $", sym[["f"]], "$: Gaussian process in $",
-      paste(spec$vars, collapse = ", "), "$", by_text, " with ",
+      spec_subscript(spec), "$", by_text, " with ",
       gp_kernel_human_label(spec$cov), " kernel, length scale $",
       sym[["rho"]], "$ and marginal SD $", sym[["sd"]], "$", k_text
     ))
   }
   for (s in classes$mo) {
-    v <- s$var
+    v <- escape_math_text(s$var)
     sym <- term_symbols("mo", s, obj)
     defs <- c(defs, paste0(
       "- $", sym[["m"]], "(", v, ")$: monotonic step transform of ",
@@ -827,8 +842,8 @@ term_glossary <- function(obj) {
     ))
   }
   for (s in classes$me) {
-    v <- s$var
-    sdv <- if (!is.na(s$sdvar)) s$sdvar else "se"
+    v <- escape_math_text(s$var)
+    sdv <- escape_math_text(if (!is.na(s$sdvar)) s$sdvar else "se")
     sym <- term_symbols("me", s, obj)
     defs <- c(defs, paste0(
       "- $\\tilde{", v, "}_{i,t}$: latent true covariate underlying ",
@@ -839,7 +854,7 @@ term_glossary <- function(obj) {
     ))
   }
   for (s in classes$re) {
-    grp <- s$group
+    grp <- escape_math_text(s$group)
     sym <- term_symbols("re", s, obj)
     if (!s$has_slope) {
       defs <- c(defs, paste0(
@@ -862,25 +877,22 @@ term_glossary <- function(obj) {
 
 #' @noRd
 model_glossary <- function(obj) {
-  link <- obj$family$link
   defs <- c(
-    paste0("- $i$ indexes observations, $t$ indexes time")
+    paste0("- $i$ indexes series, $t$ indexes time")
   )
   defs <- c(defs, closure_unit_glossary(obj))
   defs <- c(defs, mv_custom_glossary(obj))
   keys <- names(response_columns(obj))
   if (length(keys) > 1L) {
-    # Each response's mean is on its own family's link scale.
     defs <- c(defs, vapply(keys, function(r) {
       paste0("- $\\mu^{(", r, ")}_{i,t}$: conditional mean of $", r,
-             "_{i,t}$ on the ", model_families(obj, r)$link,
-             "-link scale")
+             "_{i,t}$")
     }, character(1L), USE.NAMES = FALSE))
   } else if (is.null(closure_unit_family_kind(obj)) &&
                is.null(mv_custom_family_kind(obj))) {
     defs <- c(defs, paste0(
       "- $\\mu_{i,t}$: conditional mean of $",
-      response_letter(obj), "_{i,t}$ on the ", link, "-link scale"
+      response_letter(obj), "_{i,t}$"
     ))
   }
   defs <- c(defs, unlist(lapply(response_views(obj), function(v) {
@@ -922,13 +934,7 @@ model_glossary <- function(obj) {
     }
     defs <- c(defs, innovation_glossary(obj, is_factor))
     if (identical(tt, "AR")) {
-      defs <- c(defs, "- $\\phi_l$: autoregressive coefficient at lag $l$")
-      if (any(grepl("^ar[0-9]+_pacf_trend$", obj$prior$class))) {
-        defs <- c(defs, paste0(
-          "- $\\psi_l$: partial autocorrelation at lag $l$, which fixes ",
-          "the coefficients $\\phi_l$ inside the stationary region"
-        ))
-      }
+      defs <- c(defs, ar_glossary(obj))
     }
     if (identical(tt, "VAR")) {
       defs <- c(defs, paste0(
@@ -953,12 +959,15 @@ model_glossary <- function(obj) {
       ))
     } else if (trend_has_ma(obj)) {
       defs <- c(defs, paste0(
-        "- $\\theta_l$: moving-average coefficient at lag $l$"
+        "- $", lag_symbol("\\theta", "l", trend_process_index(obj)),
+        "$: moving-average coefficient at lag $l$"
       ))
     }
     if (identical(tt, "CAR")) {
       defs <- c(defs, paste0(
-        "- $\\rho$: continuous-time AR decay rate"
+        "- $", trend_symbols(obj)[["ar1_trend"]],
+        "$: autocorrelation over one time unit, and ",
+        "$\\Delta t_{i,t}$ the time since series $i$ was last observed"
       ))
     }
     if (identical(tt, "PW")) defs <- c(defs, pw_glossary(obj))
@@ -989,13 +998,14 @@ innovation_glossary <- function(obj, is_factor) {
   tt <- obj$trend_metadata$trend_type
   if (identical(tt, "PW")) return(character(0L))
   sd <- innovation_sd(obj)
+  sd_vec <- innovation_sd(obj, vector = TRUE)
   what <- if (is_factor) "factor innovation" else "process innovation"
   form <- innovation_form(obj, identical(tt, "VAR"))
   gr <- trend_grouping_var(obj)
   out <- switch(form,
     scalar = paste0("- $", trend_eps(obj), "$: ", what, ", SD $", sd, "$"),
     diag = paste0("- $", trend_eps_vec(obj), "$: ", what,
-                  "s at time $t$, independent with SD $", sd, "$"),
+                  "s at time $t$, independent with SDs $", sd_vec, "$"),
     cor = paste0("- $", trend_eps_vec(obj), "$: ", what,
                  "s at time $t$, covariance $", sigma_symbol(gr), "$")
   )
@@ -1023,6 +1033,34 @@ innovation_glossary <- function(obj, is_factor) {
 #' @noRd
 trend_has_ma <- function(obj) {
   length(obj$trend_metadata$ma_lags %||% integer(0L)) > 0L
+}
+
+
+# Internal: the glossary entries for an AR trend's coefficients.
+#' @noRd
+ar_glossary <- function(obj) {
+  classes <- obj$prior$class
+  shared <- any(startsWith(classes, "shared_ar"))
+  idx <- if (!shared) trend_process_index(obj)
+  phi <- lag_symbol("\\phi", "l", idx)
+  of <- if (shared) " shared by every series" else ""
+  out <- paste0("- $", phi, "$: autoregressive coefficient at lag $l$", of)
+  pacf <- any(grepl("_pacf_trend$", classes))
+  if (pacf) {
+    out <- c(out, paste0(
+      "- $", lag_symbol("\\psi", "l", idx), "$: partial autocorrelation ",
+      "at lag $l$, which fixes the coefficients $", phi, "$ inside the ",
+      "stationary region"
+    ))
+  }
+  if (any(startsWith(classes, "mu_ar"))) {
+    base <- if (pacf) "\\psi" else "\\phi"
+    out <- c(out, paste0(
+      "- $\\mu^{(", base, ")}_{l}$, $\\sigma^{(", base, ")}_{l}$: mean ",
+      "and SD of the lag-$l$ coefficients across series"
+    ))
+  }
+  out
 }
 
 
@@ -1064,22 +1102,20 @@ trend_order_label <- function(obj) {
 
 #' @noRd
 index_range_rows <- function(obj) {
-  data <- obj$data %||% data.frame()
-  if (nrow(data) == 0L) return(list())
-  rows <- list()
-  if (!is.null(data$series)) {
-    rows[[length(rows) + 1L]] <- list(
-      lhs = "i",
-      op  = "\\in",
-      rhs = paste0("\\{1, \\ldots, ", length(unique(data$series)), "\\}")
-    )
+  # The data section's axis counts. They count a renamed or derived
+  # series or time axis as the model resolved it.
+  counts <- printed_axis_counts(obj)
+  index_row <- function(lhs, n) {
+    list(lhs = lhs, op = "\\in",
+         rhs = paste0("\\{1, \\ldots, ", n, "\\}"))
   }
-  if (!is.null(data$time)) {
-    rows[[length(rows) + 1L]] <- list(
-      lhs = "t",
-      op  = "\\in",
-      rhs = paste0("\\{1, \\ldots, ", length(unique(data$time)), "\\}")
-    )
+  rows <- list()
+  # A single series needs no range for `i`.
+  if (isTRUE(counts$n_series > 1L)) {
+    rows[[length(rows) + 1L]] <- index_row("i", counts$n_series)
+  }
+  if (!is.null(counts$n_timepoints)) {
+    rows[[length(rows) + 1L]] <- index_row("t", counts$n_timepoints)
   }
   rows
 }
@@ -1096,19 +1132,24 @@ response_letter <- function(obj) {
 
 #' @noRd
 escape_math_text <- function(s) {
-  # Inside `$...$` pandoc / LaTeX treats `_` as a subscript
-  # marker, so a multi-character name like `y_diri` would
-  # render as `y` with subscript `diri`. A bare `\_` is still
-  # rendered awkwardly by xelatex in math mode (visible gaps
-  # around the literal). Wrap any identifier that contains a
-  # `_` in `\text{...}` so it renders as upright text, with
-  # the `_` itself escaped to keep LaTeX happy.
+  # Inside `$...$` a `_` is a subscript marker. Left bare, `y_diri`
+  # renders as `y` with subscript `diri`. A name carrying one is set
+  # upright.
   if (is.null(s) || !is.character(s)) return(s)
   out <- vapply(s, function(x) {
     if (!grepl("_", x, fixed = TRUE)) return(x)
-    paste0("\\text{", gsub("_", "\\\\_", x, fixed = FALSE), "}")
+    math_upright(x)
   }, character(1L))
   if (length(out) == 1L) unname(out) else out
+}
+
+#' @noRd
+math_upright <- function(x) {
+  # An identifier set upright in math mode, its underscores escaped.
+  # `\mathrm{}` keeps the escape a math macro, which LaTeX and
+  # MathJax both render. MathJax prints `\_` inside `\text{}`
+  # literally, backslash and all.
+  paste0("\\mathrm{", gsub("_", "\\\\_", x), "}")
 }
 
 #' @noRd
@@ -1939,7 +1980,7 @@ gp_call_to_spec <- function(call) {
 
 #' @noRd
 render_fixed_inline <- function(terms, obj) {
-  covariates <- setdiff(terms, "Intercept")
+  covariates <- escape_math_text(setdiff(terms, "Intercept"))
   bits <- c(
     if ("Intercept" %in% terms) response_symbol(obj, "\\alpha"),
     if (length(covariates)) paste0(
@@ -1990,21 +2031,24 @@ term_symbols <- function(kind, spec, obj = NULL) {
         sd = paste0("\\sigma^{(\\text{gp})}_{", sub, "}"))
     },
     mo = {
-      v <- spec$var
+      v <- escape_math_text(spec$var)
       c(beta = paste0("\\beta^{(\\text{mo})}_{", v, "}"),
         m = paste0("m_{", v, "}"),
         zeta = paste0("\\boldsymbol{\\zeta}_{", v, "}"),
         zeta_j = paste0("\\zeta_{", v, ",j}"))
     },
     me = {
-      v <- spec$var
+      v <- escape_math_text(spec$var)
       c(beta = paste0("\\beta^{(\\text{me})}_{", v, "}"),
         mu = paste0("\\mu^{(\\text{me})}_{", v, "}"),
         sd = paste0("\\sigma^{(\\text{me})}_{", v, "}"))
     },
     re = {
-      g <- spec$group
-      sl <- spec$slopes %||% character(0L)
+      # The slope names key the symbols as brms spells them, and the
+      # symbols print them escaped.
+      g <- escape_math_text(spec$group)
+      sl_key <- spec$slopes %||% character(0L)
+      sl <- escape_math_text(sl_key)
       c(alpha = paste0("\\alpha_{", g, "}"),
         alpha_i = paste0("\\alpha_{", g, "[i]}"),
         sd = paste0("\\sigma_{", g, "}"),
@@ -2012,11 +2056,11 @@ term_symbols <- function(kind, spec, obj = NULL) {
         Sigma = paste0("\\boldsymbol{\\Sigma}_{", g, "}"),
         Omega = paste0("\\boldsymbol{\\Omega}_{", g, "}"),
         stats::setNames(paste0("\\beta^{(", g, ")}_{", sl, ", ", g, "}"),
-                        paste0("slope:", sl)),
+                        paste0("slope:", sl_key)),
         stats::setNames(paste0("\\beta^{(", g, ")}_{", sl, ", ", g, "[i]}"),
-                        paste0("slope_i:", sl)),
+                        paste0("slope_i:", sl_key)),
         stats::setNames(paste0("\\sigma^{(\\beta_{", sl, "})}_{", g, "}"),
-                        paste0("sd_slope:", sl)))
+                        paste0("sd_slope:", sl_key)))
     }
   )
   if (is.null(obj)) return(out)
@@ -2052,7 +2096,7 @@ render_me_inline <- function(specs, obj) {
   # rather than the noisy observation `x_{i,t}`.
   compose_inline_terms(specs, function(s) {
     paste0(term_symbols("me", s, obj)[["beta"]], " \\, \\tilde{",
-           s$var, "}_{i,t}")
+           escape_math_text(s$var), "}_{i,t}")
   })
 }
 
@@ -2063,7 +2107,8 @@ render_mo_inline <- function(specs, obj) {
   # cumulative step transform built from a Dirichlet simplex.
   compose_inline_terms(specs, function(s) {
     sym <- term_symbols("mo", s, obj)
-    paste0(sym[["beta"]], " \\, ", sym[["m"]], "(", s$var, "_{i,t})")
+    paste0(sym[["beta"]], " \\, ", sym[["m"]], "(",
+           escape_math_text(s$var), "_{i,t})")
   })
 }
 
@@ -2080,7 +2125,7 @@ spec_subscript <- function(spec) {
   # Math-subscript form of the variable list: "x" for univariate
   # smooths/GPs, "x, z" for tensor / multi-dim. Shared by every
   # renderer that needs a per-term subscript label.
-  paste(spec$vars, collapse = ", ")
+  paste(escape_math_text(spec$vars), collapse = ", ")
 }
 
 #' @noRd
@@ -2089,7 +2134,7 @@ spec_key <- function(spec) {
   # subscript that already nests inside `_{...}` (no commas).
   # Used as the per-term key in basis-size $K_{key}$ and basis
   # coefficient $\beta^{(key)}$ tags.
-  paste(spec$vars, collapse = ":")
+  paste(escape_math_text(spec$vars), collapse = ":")
 }
 
 #' @noRd
@@ -2097,14 +2142,14 @@ spec_vars_indexed <- function(spec, suffix = "_{i,t}") {
   # "x_{i,t}, z_{i,t}" -- the indexed argument list used inside
   # a function call f_{sub}(x_{i,t}, z_{i,t}). suffix is a hook
   # for callers that want a different index pattern.
-  paste(paste0(spec$vars, suffix), collapse = ", ")
+  paste(paste0(escape_math_text(spec$vars), suffix), collapse = ", ")
 }
 
 #' @noRd
 gp_subscript <- function(spec) {
   base <- spec_subscript(spec)
   if (!is.null(spec$by) && !is.na(spec$by) && nzchar(spec$by)) {
-    paste0(base, " \\mid ", spec$by)
+    paste0(base, " \\mid ", escape_math_text(spec$by))
   } else {
     base
   }
@@ -2118,7 +2163,8 @@ render_re_inline <- function(specs, obj) {
   compose_inline_terms(specs, function(s) {
     sym <- term_symbols("re", s, obj)
     slopes <- if (length(s$slopes)) {
-      paste0(sym[paste0("slope_i:", s$slopes)], " ", s$slopes, "_{i,t}")
+      paste0(sym[paste0("slope_i:", s$slopes)], " ",
+             escape_math_text(s$slopes), "_{i,t}")
     }
     paste(c(sym[["alpha_i"]], slopes), collapse = " + ")
   })
@@ -2147,7 +2193,7 @@ term_definition_rows <- function(obj, notation) {
     )
   }
   for (s in classes$mo) {
-    v <- s$var
+    v <- escape_math_text(s$var)
     sym <- term_symbols("mo", s, obj)
     # Cumulative step transform from a Dirichlet simplex over the D-1
     # step increments (Burkner & Charpentier 2020). The priors
@@ -2158,8 +2204,8 @@ term_definition_rows <- function(obj, notation) {
     )
   }
   for (s in classes$me) {
-    v <- s$var
-    sdv <- if (!is.na(s$sdvar)) s$sdvar else "se"
+    v <- escape_math_text(s$var)
+    sdv <- escape_math_text(if (!is.na(s$sdvar)) s$sdvar else "se")
     sym <- term_symbols("me", s, obj)
     # Observation layer: noisy x_i is centred on the latent tilde{x}_i
     # with known SD sdvar_i (data). Latent layer: tilde{x}_i drawn
@@ -2361,6 +2407,7 @@ trend_eps_vec <- function(obj) {
 #' @noRd
 innovation_rows <- function(obj, is_vector) {
   sd <- innovation_sd(obj)
+  sd_vec <- innovation_sd(obj, vector = TRUE)
   gr <- trend_grouping_var(obj)
   form <- innovation_form(obj, is_vector)
   eps_vec <- trend_eps_vec(obj)
@@ -2386,7 +2433,7 @@ innovation_rows <- function(obj, is_vector) {
     )),
     diag = list(list(
       lhs = eps_vec, op = "\\sim",
-      rhs = paste0(mvn, diag_cov_text(sd), ")")
+      rhs = paste0(mvn, diag_cov_text(sd_vec), ")")
     )),
     list(list(
       lhs = trend_eps(obj), op = "\\sim",
@@ -2403,7 +2450,7 @@ innovation_rows <- function(obj, is_vector) {
 #' The rows that build a correlated trend covariance from its parts
 #' @noRd
 covariance_rows <- function(obj) {
-  sd <- innovation_sd(obj)
+  sd <- innovation_sd(obj, vector = TRUE)
   gr <- trend_grouping_var(obj)
   if (!is.null(gr)) return(hierarchical_cor_rows(obj, sd))
   if (!trend_samples_cor(obj)) return(list())
@@ -2440,8 +2487,22 @@ trend_samples_cor <- function(obj) {
 #' at 1.
 #'
 #' @noRd
-innovation_sd <- function(obj) {
-  if ("sigma_trend" %in% obj$prior$class) return("\\sigma_\\eta")
+innovation_sd <- function(obj, vector = FALSE) {
+  if ("sigma_trend" %in% obj$prior$class) {
+    sym <- trend_symbols(obj)
+    # A vector of innovations has one SD per process.
+    if (vector && !is.null(trend_process_index(obj))) {
+      return("\\boldsymbol{\\sigma}_\\eta")
+    }
+    # A continuous-time AR scales each innovation to its gap, which
+    # holds the stationary variance fixed at any spacing.
+    if (identical(obj$trend_metadata$trend_type, "CAR")) {
+      rho <- sym[["ar1_trend"]]
+      return(paste0(sym[["sigma_trend"]], " \\sqrt{(1 - ", rho,
+                    "^{2 \\Delta t_{i,t}}) / (1 - ", rho, "^2)}"))
+    }
+    return(sym[["sigma_trend"]])
+  }
   if ("sigma_group_trend" %in% obj$prior$class) {
     return(trend_symbols(obj)[["sigma_group_trend"]])
   }
@@ -2503,6 +2564,22 @@ trend_symbols <- function(obj) {
   gr <- trend_grouping_var(obj) %||% "g"
   tt <- obj$trend_metadata$trend_type %||% ""
   lags <- obj$trend_metadata$ar_lags %||% 1L
+  ma_lags <- obj$trend_metadata$ma_lags %||% integer(0L)
+  idx <- trend_process_index(obj)
+  # Each lag's coefficient takes the process index, its shared form
+  # drops it, and a hierarchical fit adds a mean and an SD per lag.
+  lag_family <- function(base, suffix) {
+    if (length(lags) == 0L) return(character(0L))
+    nm <- paste0("ar", lags, suffix, "_trend")
+    c(
+      stats::setNames(lag_symbol(base, lags, idx), nm),
+      stats::setNames(lag_symbol(base, lags), paste0("shared_", nm)),
+      stats::setNames(paste0("\\mu^{(", base, ")}_{", lags, "}"),
+                      paste0("mu_", nm)),
+      stats::setNames(paste0("\\sigma^{(", base, ")}_{", lags, "}"),
+                      paste0("sigma_", nm))
+    )
+  }
   c(
     sigma_group_trend = paste0("\\boldsymbol{\\sigma}_{\\eta,", gr, "}"),
     alpha_cor_trend = "\\alpha_{cor}",
@@ -2510,12 +2587,68 @@ trend_symbols <- function(obj) {
     L_deviation_group_trend = paste0(
       "\\boldsymbol{\\Omega}_{", gr, ", \\text{local}}"
     ),
-    # A continuous-time AR has one decay rate.
-    if (identical(tt, "CAR")) c(ar1_trend = "\\rho"),
+    sigma_trend = if (is.null(idx)) "\\sigma_\\eta" else {
+      paste0("\\sigma_{\\eta,", idx, "}")
+    },
+    # A continuous-time AR has one decay rate per series.
+    if (identical(tt, "CAR")) {
+      c(ar1_trend = if (is.null(idx)) "\\rho" else paste0("\\rho_{", idx, "}"))
+    } else {
+      lag_family("\\phi", "")
+    },
     # A contiguous AR(p) samples its partial autocorrelations and
     # maps them to stationary coefficients.
-    stats::setNames(paste0("\\psi_{", lags, "}"),
-                    paste0("ar", lags, "_pacf_trend"))
+    lag_family("\\psi", "_pacf"),
+    if (length(ma_lags) > 0L) {
+      stats::setNames(lag_symbol("\\theta", ma_lags, idx),
+                      paste0("theta", ma_lags, "_trend"))
+    }
+  )
+}
+
+#' The index a trend's per-process parameters carry
+#'
+#' @return `NULL` for a trend with one process, `"k"` for a factor
+#'   model's factors and `"i"` for the series.
+#' @noRd
+trend_process_index <- function(obj) {
+  is_factor <- methods_md_has_factor_model(obj)
+  n <- if (is_factor) {
+    obj$trend_metadata$n_lv
+  } else {
+    printed_axis_counts(obj)$n_series
+  }
+  if (is.null(n) || n <= 1L) return(NULL)
+  if (is_factor) "k" else "i"
+}
+
+#' A lag coefficient's symbol, such as `\\phi_{i,12}`
+#' @noRd
+lag_symbol <- function(base, lag, idx = NULL) {
+  if (length(lag) == 0L) return(character(0L))
+  paste0(base, "_{", if (!is.null(idx)) paste0(idx, ","), lag, "}")
+}
+
+#' The autoregressive coefficient symbols the dynamics are written with
+#'
+#' A shared coefficient is one value for every process and carries no
+#' process index.
+#' @noRd
+ar_coef_symbols <- function(obj) {
+  lags <- obj$trend_metadata$ar_lags %||% 1L
+  shared <- any(startsWith(obj$prior$class, "shared_ar"))
+  lag_symbol("\\phi", lags, if (!shared) trend_process_index(obj))
+}
+
+#' The moving-average terms of a trend's dynamics
+#' @noRd
+ma_terms <- function(obj) {
+  if (!trend_has_ma(obj)) return(character(0L))
+  ma_lags <- obj$trend_metadata$ma_lags
+  paste(
+    paste0(trend_symbols(obj)[paste0("theta", ma_lags, "_trend")], " ",
+           trend_eps_lag(obj, ma_lags)),
+    collapse = " + "
   )
 }
 
@@ -2564,7 +2697,8 @@ render_latent_rw <- function(obj, notation) {
     list(list(
       lhs = trend_eta(obj),
       op  = "=",
-      rhs = paste0(trend_eta(obj, lag = 1L), " + ", trend_eps(obj))
+      rhs = paste(c(trend_eta(obj, lag = 1L), trend_eps(obj), ma_terms(obj)),
+                  collapse = " + ")
     )),
     innovation_rows(obj, is_vector = FALSE)
   )
@@ -2573,18 +2707,10 @@ render_latent_rw <- function(obj, notation) {
 #' @noRd
 render_latent_ar <- function(obj, notation) {
   lags <- obj$trend_metadata$ar_lags %||% 1L
-  rhs <- paste(
-    paste0("\\phi_{", lags, "} ", trend_eta(obj, lag = lags)),
-    collapse = " + "
-  )
-  rhs <- paste0(rhs, " + ", trend_eps(obj))
-  if (trend_has_ma(obj)) {
-    ma_lags <- obj$trend_metadata$ma_lags
-    rhs <- paste0(rhs, " + ", paste(
-      paste0("\\theta_{", ma_lags, "} ", trend_eps_lag(obj, ma_lags)),
-      collapse = " + "
-    ))
-  }
+  rhs <- paste(c(
+    paste0(ar_coef_symbols(obj), " ", trend_eta(obj, lag = lags)),
+    trend_eps(obj), ma_terms(obj)
+  ), collapse = " + ")
   c(
     list(list(lhs = trend_eta(obj), op = "=", rhs = rhs)),
     innovation_rows(obj, is_vector = FALSE)
@@ -2621,7 +2747,8 @@ render_latent_car <- function(obj, notation) {
       lhs = trend_eta(obj),
       op  = "=",
       rhs = paste0(
-        "\\rho^{\\Delta t_{i,t}} ", trend_eta(obj, lag = 1L),
+        trend_symbols(obj)[["ar1_trend"]], "^{\\Delta t_{i,t}} ",
+        trend_eta(obj, lag = 1L),
         " + ", trend_eps(obj)
       )
     )),
@@ -2635,7 +2762,7 @@ render_latent_zmvn <- function(obj, notation) {
   cov <- if (trend_samples_cor(obj)) {
     sigma_symbol(gr)
   } else {
-    diag_cov_text(innovation_sd(obj))
+    diag_cov_text(innovation_sd(obj, vector = TRUE))
   }
   rows <- list(list(
     lhs = trend_eta_vec(obj),
@@ -2997,10 +3124,11 @@ prior_align_rows <- function(obj, prior, symbols) {
       format_parameter_symbol(row)
     }
     if (is.null(sym)) next
-    dist <- format_prior_distribution(row$prior)
+    # The MGP shapes are Stan data, and the glossary gives their values.
+    dist <- format_prior_distribution(
+      row$prior, c(symbols, mgp_a1 = "a_1", mgp_a2 = "a_2")
+    )
     if (is.null(dist)) next
-    # The MGP shapes are Stan data; the glossary gives their values.
-    dist <- gsub("\\\\text\\{mgp\\\\_a([12])\\}", "a_\\1", dist)
     rows[[length(rows) + 1L]] <- list(
       lhs = sym, op = "\\sim", rhs = dist
     )
@@ -3161,11 +3289,8 @@ implementation_prose <- function(fn, info) {
     "none"      = NULL,
     info$algorithm
   )
-  stan_lib <- if (identical(info$backend, "cmdstanr")) {
-    paste0("Stan ", info$stan_v, " (via cmdstanr)")
-  } else {
-    paste0("Stan ", info$stan_v, " (via rstan)")
-  }
+  interface <- if (identical(info$backend, "cmdstanr")) "cmdstanr" else "rstan"
+  stan_lib <- paste0("Stan ", info$stan_v, " via ", interface)
   base <- paste0(
     "Fitted with mvgam ", info$mvgam_v,
     " (brms ", info$brms_v, "; ", stan_lib, ")."
@@ -3385,7 +3510,7 @@ format_parameter_symbol_base <- function(row) {
   if (identical(cls, "b")) {
     if (nzchar(dpar)) {
       lbl <- if (nzchar(coef)) paste0(dpar, ",", coef) else dpar
-      return(paste0("\\beta_{", lbl, "}"))
+      return(paste0("\\beta_{", escape_math_text(lbl), "}"))
     }
     # nl sub-formula coefficients: brms emits b_<nlpar>_<term>
     # priors with nzchar(nlpar). Carry the nlpar through as a
@@ -3394,7 +3519,7 @@ format_parameter_symbol_base <- function(row) {
     if (nzchar(nlpar)) {
       base <- paste0("\\beta^{(", nlpar, ")}")
       if (nzchar(coef)) {
-        return(paste0(base, "_{", coef, "}"))
+        return(paste0(base, "_{", escape_math_text(coef), "}"))
       }
       return(base)
     }
@@ -3406,7 +3531,7 @@ format_parameter_symbol_base <- function(row) {
         spec <- list(var = sub("^m[oe]", "", coef))
         return(term_symbols(kind, spec)[["beta"]])
       }
-      return(paste0("\\beta_{", coef, "}"))
+      return(paste0("\\beta_{", escape_math_text(coef), "}"))
     }
     return("\\boldsymbol{\\beta}")
   }
@@ -3473,19 +3598,10 @@ format_parameter_symbol_base <- function(row) {
   if (identical(cls, "Psi")) {
     return("\\boldsymbol{\\Psi}")
   }
-  # AR / VAR / RW / CAR scales emitted by brms with class names
-  # like ar1_trend / sigma_trend / Intercept_trend / phi_trend.
+  # Trend classes `trend_symbols()` does not name, such as
+  # Intercept_trend and phi_trend.
   if (grepl("_trend$", cls)) {
     if (identical(cls, "Intercept_trend")) return("\\alpha^{(\\eta)}")
-    if (grepl("^ar[0-9]+_trend", cls)) {
-      lag <- sub("^ar([0-9]+)_trend.*", "\\1", cls)
-      return(paste0("\\phi_{", lag, "}"))
-    }
-    if (grepl("^theta[0-9]+_trend", cls)) {
-      lag <- sub("^theta([0-9]+)_trend.*", "\\1", cls)
-      return(paste0("\\theta_{", lag, "}"))
-    }
-    if (identical(cls, "sigma_trend")) return("\\sigma_\\eta")
     if (identical(cls, "phi_trend"))   return("\\phi_\\eta")
     if (identical(cls, "L_Omega_trend")) return("\\boldsymbol{\\Omega}")
     pw <- c(k_trend = "k_i", m_trend = "m_i",
@@ -3497,15 +3613,15 @@ format_parameter_symbol_base <- function(row) {
                Dmu_trend = "\\mu^{(D)}", Domega_trend = "\\omega^{(D)}")
     if (cls %in% names(hyper)) return(hyper[[cls]])
     bare <- sub("_trend$", "", cls)
-    return(paste0("\\text{", bare, "}_\\eta"))
+    return(paste0(math_upright(bare), "_\\eta"))
   }
   # Unrecognised class: render verbatim so the row still appears
   # (math-only spec, no silent drops).
-  paste0("\\text{", cls, "}")
+  math_upright(cls)
 }
 
 #' @noRd
-format_prior_distribution <- function(prior_str) {
+format_prior_distribution <- function(prior_str, symbols = NULL) {
   if (is.null(prior_str)) return(NULL)
   s <- trimws(prior_str)
   if (!nzchar(s)) return("\\text{flat}")
@@ -3526,9 +3642,12 @@ format_prior_distribution <- function(prior_str) {
   if (length(m) == 3L && m[[2L]] %in% names(labels)) {
     args <- trimws(strsplit(m[[3L]], "\\s*,\\s*")[[1L]])
     if (identical(m[[2L]], "std_normal")) args <- c("0", "1")
-    # Literal `_` in a hyper-parameter name is escaped, as a bare
-    # `mgp_a1` would render `mgp` subscript `a1`.
-    args <- vapply(args, escape_math_text, character(1L))
+    # An argument naming a sampled hyperparameter takes its symbol.
+    # Any other literal `_` is escaped, as a bare `mgp_a1` would
+    # render `mgp` subscript `a1`.
+    args <- vapply(args, function(a) {
+      if (a %in% names(symbols)) symbols[[a]] else escape_math_text(a)
+    }, character(1L))
     args <- gsub("sqrt\\(([^()]*)\\)", "\\\\sqrt{\\1}", args)
     return(paste0(
       "\\text{", labels[[m[[2L]]]], "}(", paste(args, collapse = ", "), ")"

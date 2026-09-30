@@ -151,7 +151,7 @@ solve_dlyap <- function(B, Sigma, tol = 1e-12, max_iter = 100L) {
 #'@rdname stability.mvgam
 #'@method stability mvgam
 #'@export
-stability.mvgam = function(object, ndraws = NULL, draw_ids = NULL,
+stability.mvgam <- function(object, ndraws = NULL, draw_ids = NULL,
                            summary = TRUE, probs = c(0.025, 0.975),
                            future = FALSE, ...) {
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
@@ -163,6 +163,17 @@ stability.mvgam = function(object, ndraws = NULL, draw_ids = NULL,
   checkmate::assert_flag(future)
   rlang::check_dots_empty()
   assert_var_trend(object, surface = "stability()")
+  # The Ives et al. (2003) metrics and reactivity describe first-order
+  # dynamics. A higher-order or moving-average VAR has no single
+  # transition matrix they apply to.
+  meta <- object$trend_metadata
+  if (length(meta$ar_lags %||% 1L) > 1L || length(meta$ma_lags) > 0L) {
+    stop(insight::format_error(c(
+      "'stability()' is not supported for VAR(p > 1) or VARMA trends.",
+      i = "The stability metrics are defined for one VAR(1) transition matrix.",
+      i = "'irf()' and 'fevd()' describe the dynamics of this fit."
+    )), call. = FALSE)
+  }
   # Each draw costs a Lyapunov solve at O(K^3 log(1/tol)), so a wide
   # panel is worth answering from a subset. The coefficients and the
   # innovation covariance are read from the same draws, since a
@@ -173,7 +184,7 @@ stability.mvgam = function(object, ndraws = NULL, draw_ids = NULL,
   metrics <- do.call(
     rbind,
     mvgam_maybe_future_lapply(var_post$ndraws, function(i) {
-      B <- var_post$A[i, , , drop = TRUE]
+      B <- var_post$A[i, , , 1L]
       p <- var_post$K
       Sigma <- var_post$Sigma[i, , , drop = TRUE]
 
@@ -445,7 +456,7 @@ plot.mvgam_stability_summary <- function(
 #'   [plot.mvgam_forecast()]
 #' @method plot mvgam_stability
 #' @export
-plot.mvgam_stability = function(
+plot.mvgam_stability <- function(
   x,
   variables = c("reactivity", "mean_return_rate", "var_return_rate"),
   bins = 30L,

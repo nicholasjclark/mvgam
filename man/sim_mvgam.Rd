@@ -78,6 +78,7 @@ level coefficients.}
 \item{\code{true_smooths}}{Named list of \code{data.frame(grid, f_true)} ground-truth smooth functions.}
 \item{\code{true_trend}}{Matrix \verb{[n_timepoints, n_series]} of
 latent trend realisations.}
+\item{\code{true_trend_sigma}}{Empirical SD of \code{true_trend}.}
 \item{\code{true_sigma_obs}}{Observation noise SD (or
 family-specific dispersion).}
 }
@@ -92,31 +93,33 @@ grammar (smooths + GPs + random effects + AR/RW/CAR/VAR
 dynamics).
 }
 \details{
-The six recipes:
+The seven recipes:
 
 \describe{
 \item{\code{type = 1}}{\code{y ~ s(x)} with \code{RW()} trend.
 Single smooth covariate + random-walk trend; the simplest
 mvgam recipe.}
-\item{\code{type = 2}}{\code{y ~ s(x) + s(z)} with \code{AR(p = 1, phi = 0.7)}
-trend. Two additive smooths.}
-\item{\code{type = 3}}{\code{y ~ s(x) + (1 | grp)} with
-\code{AR(p = 1, phi = 0.7)}. Hierarchical: random intercept per
-group level (5 groups by default).}
-\item{\code{type = 4}}{\code{y ~ gp(x)} with \code{AR(p = 1, phi = 0.7)}.
-Gaussian-process covariate (mvgam-specific).}
+\item{\code{type = 2}}{\code{y ~ s(x) + s(z)} with an \code{AR(p = 1)} trend
+whose coefficient is 0.7. Two additive smooths.}
+\item{\code{type = 3}}{\code{y ~ s(x) + (1 | grp)} with an \code{AR(p = 1)}
+trend whose coefficient is 0.7. Hierarchical: random
+intercept per group level (5 groups by default).}
+\item{\code{type = 4}}{\code{y ~ gp(x)} with an \code{AR(p = 1)} trend whose
+coefficient is 0.7. Gaussian-process covariate.}
 \item{\code{type = 5}}{State-space: obs \code{y ~ x}, trend formula
-\code{~ s(z)}, \code{AR(p = 1, phi = 0.6)}. The smooth lives on the
-trend, not on \code{y}'s linear predictor. \code{prop_trend} defaults
-to \code{0.2} for this type to keep the AR component small
-relative to the smooth so the two are identifiable.}
+\code{~ s(z)}, and an \code{AR(p = 1)} trend whose coefficient is 0.6.
+The smooth enters the latent state. \code{prop_trend} defaults
+to \code{0.2} for this type, which keeps the AR component small
+relative to the smooth and makes the two identifiable.}
 \item{\code{type = 6}}{\code{y ~ s(season, bs = "cc")} with \code{CAR(time, series)}. Cyclic seasonal + continuous-time AR(1) on
-irregular time gaps (\code{Δt ~ Uniform(1, 6)}).}
+irregular time gaps (\code{Δt ~ Uniform(1, 6)}), with
+autocorrelation 0.7 over one time unit.}
 \item{\code{type = 7}}{\code{y ~ s(x)} with sparse
 \code{AR(p = c(1, 12))}. The latent state carries lag-1 momentum
-and lag-12 recurrence; the observation side carries a smooth
-of a covariate that is not periodic, so the two are
-separately identifiable. \code{prop_trend} defaults to \code{0.6}.}
+and lag-12 recurrence, with coefficients 0.55 and 0.40. The
+observation side holds a smooth of a covariate that is not
+periodic, which makes it identifiable from the latent state.
+\code{prop_trend} defaults to \code{0.6}.}
 }
 
 For multi-series simulations (\code{n_series > 1}), the observation

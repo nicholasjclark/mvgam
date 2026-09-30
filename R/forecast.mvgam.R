@@ -46,12 +46,9 @@
 #'   the training data, containing the time / series cells at
 #'   which forecasts are wanted. Rows with time values beyond
 #'   the training grid drive the forecast horizon. When `NULL`,
-#'   the returned object contains hindcasts only and the
-#'   `$forecasts` / `$test_observations` / `$test_times` slots
-#'   are `NULL`. The fallback is deliberately strict: if you
-#'   want forecasts using the held-out data that was passed to
-#'   `mvgam(..., newdata = X)` at fit time, pass it explicitly
-#'   here as `forecast(mod, newdata = mod$test_data)`.
+#'   the held-out data given to `mvgam(..., newdata = )` at fit
+#'   time is used. A fit given no held-out data has no occasions
+#'   to forecast at, and `forecast()` then refuses.
 #'
 #'   For `AR()`, `RW()`, `VAR()` and `PW()` the forecast times
 #'   must continue the training series without a gap and at its
@@ -125,13 +122,13 @@
 #'   y ~ s(x),
 #'   trend_formula = ~ AR(p = 1),
 #'   data    = simdat$data_train,
-#'   newdata = simdat$data_test,  # persisted on mod$test_data
+#'   newdata = simdat$data_test,
 #'   family  = poisson(),
 #'   chains  = 2, silent = 2
 #' )
 #'
-#' # Pass the held-out data explicitly to drive the forecast horizon.
-#' fc <- forecast(mod, newdata = mod$test_data)
+#' # The held-out data given to mvgam() drive the forecast horizon.
+#' fc <- forecast(mod)
 #' plot(fc)
 #' }
 #'
@@ -167,7 +164,7 @@ forecast.mvgam <- function(object,
   if (!is.null(fan)) {
     return(fan)
   }
-  newdata <- ensure_obs_placeholder(newdata, object)
+  newdata <- ensure_obs_placeholder(newdata %||% object$test_data, object)
 
   trend_specs <- object$mv_spec$trend_specs
   # Trendless fits forecast by projecting the obs-side linear
@@ -193,15 +190,14 @@ forecast.mvgam <- function(object,
   meta <- if (is_trendless) NULL else object$trend_metadata
 
   # A forecast needs occasions to forecast at, and a fit cannot
-  # invent them: the horizon is whatever the caller's frame reaches
-  # past the training grid, and any covariate the model reads has
-  # to be supplied there too. Without `newdata` the method used to
-  # return an `mvgam_forecast` carrying hindcasts, a type and an
-  # empty `forecasts` list, which reads as though it forecast
-  # something.
+  # invent them. The horizon is whatever the caller's frame, or the
+  # held-out data stored at fit time, reaches past the training
+  # grid, and any covariate the model uses has to be supplied there
+  # too.
   if (is.null(newdata)) {
     stop(insight::format_error(c(
       "'newdata' is required to forecast.",
+      x = "The fit stores no held-out data from 'mvgam(newdata = )'.",
       i = paste0("Pass a frame with times after the training grid and ",
                  "every covariate the model uses."),
       i = "For the training occasions, use 'hindcast()'."
@@ -569,20 +565,7 @@ resolve_forecast_grid <- function(object, newdata, training,
   # drop. The row leaves the grid, and a later layer treats the
   # remaining occasions as discontinuous, naming an internal vector
   # in its message.
-  if (anyNA(newdata[[time_var]])) {
-    bad <- which(is.na(newdata[[time_var]]))
-    stop(insight::format_error(c(
-      paste0("Every row of 'newdata' needs a value in '", time_var,
-             "'."),
-      x = paste0(
-        "Missing at row", if (length(bad) > 1L) "s " else " ",
-        paste(utils::head(bad, 5L), collapse = ", "),
-        if (length(bad) > 5L) ", ..." else "",
-        " (", length(bad), " in total)."
-      ),
-      i = "Supply a time for every row or drop the rows listed."
-    )), call. = FALSE)
-  }
+  refuse_missing_times(newdata[[time_var]], time_var)
 
   # A series the fit never had is refused by the validator that owns
   # that fact, so a user meets one message wherever the frame

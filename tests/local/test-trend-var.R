@@ -169,11 +169,11 @@ test_that("the prefit records the series axis and the VAR grain", {
 
 
 test_that("the program declares a full transition matrix", {
-  # `A_trend` is an array of one square matrix per group, and this
+  # `Phi_trend` is an array of one square matrix per group, and this
   # model has one group. Declared at any other size it could not
   # express a cross-series effect at all.
   sc <- as.character(stancode(prefit))
-  expect_true(grepl("array[1] matrix[N_lv_trend, N_lv_trend] A_trend",
+  expect_true(grepl("array[1] matrix[N_lv_trend, N_lv_trend] Phi_trend",
                     sc, fixed = TRUE))
   # The innovations are drawn jointly, which is what `cor = TRUE`
   # buys: a diagonal covariance would make the series independent
@@ -182,7 +182,7 @@ test_that("the program declares a full transition matrix", {
                     fixed = TRUE))
   expect_true(grepl("multi_normal_lpdf", sc, fixed = TRUE))
   # The recursion multiplies the lagged state by `A`.
-  expect_match(sc, "A_trend\\[i\\]\\s*\\*\\s*lv_trend")
+  expect_match(sc, "Phi_trend\\[i\\]\\s*\\*\\s*lv_trend")
 })
 
 
@@ -232,24 +232,24 @@ fit <- cached_fit(
 )
 
 # The posterior mean transition matrix, read once in the order the
-# draws name it: `A_trend[group, row, column]`.
+# draws name it: `Phi_trend[group, row, column]`.
 dm_all <- posterior::as_draws_matrix(fit$fit)
 A_hat <- matrix(NA_real_, n_series, n_series)
 for (i in seq_len(n_series)) {
   for (j in seq_len(n_series)) {
-    A_hat[i, j] <- mean(dm_all[, paste0("A_trend[1,", i, ",", j, "]")])
+    A_hat[i, j] <- mean(dm_all[, paste0("Phi_trend[1,", i, ",", j, "]")])
   }
 }
 
 
 
 test_that("A is one square matrix over the series", {
-  cols <- grep("^A_trend\\[", colnames(dm_all), value = TRUE)
+  cols <- grep("^Phi_trend\\[", colnames(dm_all), value = TRUE)
   expect_length(cols, n_series * n_series)
   # Three indices, the first being the group. Read as a plain matrix
   # the entries would be misplaced, which is why the reader above
   # names all three.
-  expect_true(all(grepl("^A_trend\\[1,[0-9]+,[0-9]+\\]$", cols)))
+  expect_true(all(grepl("^Phi_trend\\[1,[0-9]+,[0-9]+\\]$", cols)))
 })
 
 
@@ -283,7 +283,7 @@ test_that("A recovers the simulated dynamics, entry by entry", {
   # inside its 95% interval.
   for (i in seq_len(n_series)) {
     for (j in seq_len(n_series)) {
-      q <- stats::quantile(dm_all[, paste0("A_trend[1,", i, ",", j, "]")],
+      q <- stats::quantile(dm_all[, paste0("Phi_trend[1,", i, ",", j, "]")],
                            c(0.025, 0.975))
       expect_gte(A_true[i, j], q[[1L]])
       expect_lte(A_true[i, j], q[[2L]])
@@ -321,7 +321,7 @@ radii_of_A <- function(ks = NULL) {
     out <- matrix(NA_real_, n_series, n_series)
     for (i in seq_len(n_series)) {
       for (j in seq_len(n_series)) {
-        out[i, j] <- dm_all[k, paste0("A_trend[1,", i, ",", j, "]")]
+        out[i, j] <- dm_all[k, paste0("Phi_trend[1,", i, ",", j, "]")]
       }
     }
     out
@@ -354,7 +354,7 @@ test_that("residual_cor reports the process covariance, not the innovations", {
   #
   # Both sides come from this one fit, so this is one quantity
   # reached two ways: mvgam's own reported covariance against the
-  # closed form built from mvgam's own `A_trend` and `Sigma_trend`.
+  # closed form built from mvgam's own `Phi_trend` and `Sigma_trend`.
   # Returning `Sigma` itself is the plausible mistake here, and it is
   # what the second expectation rules out. Measured, the closed form
   # agrees to 0.006 while `Sigma` sits 0.108 away.
@@ -375,7 +375,7 @@ test_that("residual_cor reports the process covariance, not the innovations", {
   }
   ks <- round(seq(1, nrow(dm_all), length.out = 200L))
   G <- Reduce(`+`, lapply(ks, function(k) {
-    stat_cov(read_sq(k, "A_trend", grouped = TRUE),
+    stat_cov(read_sq(k, "Phi_trend", grouped = TRUE),
              read_sq(k, "Sigma_trend"))
   })) / length(ks)
   S <- Reduce(`+`, lapply(ks, function(k) read_sq(k, "Sigma_trend"))) /
@@ -655,13 +655,13 @@ test_that("irf and fevd describe this fit's own matrix", {
 })
 
 
-test_that("posterior_transition_matrix answers for this fit's own A", {
-  # The exported accessor for `A`, and the one `?posterior_transition
-  # _matrix` presents alongside `irf()`, `fevd()` and `stability()`.
-  # Everything else in this file reads `A_trend` out of the draws by
-  # hand, so the two are one quantity reached two ways: an accessor
-  # that transposed the matrix or read the group index as a row
-  # returns the same numbers in the wrong cells.
+test_that("posterior_transition_matrix returns this fit's own Phi", {
+  # The exported accessor for `Phi`, which `?posterior_transition_matrix`
+  # presents with `irf()`, `fevd()` and `stability()`. The other tests
+  # in this file take `Phi_trend` from the draws by hand, and the two
+  # routes must agree cell for cell: an accessor that transposed the
+  # matrix, or took the group index as a row, returns the right numbers
+  # in the wrong cells.
   ptm <- posterior_transition_matrix(fit)
   expect_s3_class(ptm, "mvgam_var_matrix")
   expect_identical(dim(ptm$A), c(n_series, n_series))
@@ -918,7 +918,7 @@ test_that("summary, tidiers and criticism run on a VAR fit", {
   txt <- capture.output(summary(fit))
   expect_gt(length(txt), 10L)
   expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
-  expect_true(any(grepl("A_trend|VAR", txt)))
+  expect_true(any(grepl("Phi_trend|VAR", txt)))
 
   ll <- log_lik(fit, ndraws = 20L)
   expect_identical(dim(ll), c(20L, nrow(dat)))
@@ -958,17 +958,17 @@ test_that("summary, tidiers and criticism run on a VAR fit", {
   expect_equal(as.numeric(aug$.observed), as.numeric(dat$y))
   expect_identical(as.character(aug$series), as.character(dat$series))
   # A VAR is its transition matrix, so a tidy table of this fit that
-  # omits `A_trend` describes some other model. `is.data.frame()` is
+  # omits `Phi_trend` describes some other model. `is.data.frame()` is
   # no guard on that: a frame of no rows satisfies it, and so does a
   # frame of the wrong rows. `variables()` and `posterior_summary()`
   # agree on what the fit holds, and that is the standard here.
-  expect_true(any(grepl("^A_trend\\[", variables(fit))))
-  n_A_vars <- sum(grepl("^A_trend\\[", variables(fit)))
-  n_A_summ <- sum(grepl("^A_trend\\[", rownames(posterior_summary(fit))))
+  expect_true(any(grepl("^Phi_trend\\[", variables(fit))))
+  n_A_vars <- sum(grepl("^Phi_trend\\[", variables(fit)))
+  n_A_summ <- sum(grepl("^Phi_trend\\[", rownames(posterior_summary(fit))))
   expect_identical(n_A_summ, n_A_vars)
   td <- tidy(fit, effects = "all")
   expect_true(is.data.frame(td))
-  expect_identical(sum(grepl("^A_trend\\[", td$term)), n_A_vars)
+  expect_identical(sum(grepl("^Phi_trend\\[", td$term)), n_A_vars)
   expect_identical(sum(grepl("^sigma_trend\\[", td$term)),
                    sum(grepl("^sigma_trend\\[", variables(fit))))
 
@@ -1226,7 +1226,7 @@ test_that("stability reports each metric once, over the whole posterior", {
   # The return rate is not merely near the spectral radius, it is
   # the spectral radius, draw for draw: measured, the two agree to
   # zero across every draw. So this is one fact reached twice, once
-  # by `stability()` and once from the `A_trend` columns, and the
+  # by `stability()` and once from the `Phi_trend` columns, and the
   # two have to be reading the same matrix in the same shape. A
   # comparison of the two maxima under a tolerance passes under any
   # permutation of the draws and under a systematic offset; the
@@ -1497,7 +1497,7 @@ test_that("hypothesis reaches every parameter the fit reports", {
   vars <- variables(fit)
   # With `class = NULL`, `hypothesis()` takes a parameter by the name
   # `variables()` lists
-  for (nm in c("b_Intercept", "sigma", "A_trend[1,1,2]",
+  for (nm in c("b_Intercept", "sigma", "Phi_trend[1,1,2]",
                "b_elev", "sd_block__Intercept")) {
     expect_true(nm %in% vars)
     expect_no_error(hypothesis(fit, paste0("`", nm, "` = 0"), class = NULL))

@@ -18,6 +18,7 @@ methods_md(
   file = NULL,
   notation = "default",
   implementation = TRUE,
+  heading_level = 2L,
   ...
 )
 }
@@ -39,6 +40,10 @@ section that reconstructs the \code{mvgam} / \code{jsdgam} call used
 to fit the model. Defaults to \code{TRUE}.}
 
 \item{...}{Unused. Anything passed here is refused.}
+
+\item{heading_level}{Integer; the Markdown level of the section
+headings. The default \code{2} writes \verb{## Model}. Raise it to nest the
+sections under a heading of the document they are placed in.}
 }
 \value{
 An object of class \code{mvgam_methods_md} carrying the

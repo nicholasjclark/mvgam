@@ -98,8 +98,7 @@ NULL
 #'
 #' Heatmap of the residual correlations or partial correlations
 #' from a Joint Species Distribution (\code{jsdgam}) or dynamic
-#' factor (\code{mvgam}) model, with the weight of evidence behind
-#' each entry shown alongside its estimate.
+#' factor (\code{mvgam}) model.
 #'
 #' @param x A `mvgam_residcor` object returned by
 #'   `residual_cor(..., summary = TRUE)`.
@@ -122,16 +121,9 @@ NULL
 #'
 #' @details Only the lower triangle of off-diagonal entries is
 #'   drawn; a symmetric matrix says everything once and the
-#'   diagonal is `1` for any correlation.
-#'
-#'   Fill carries the posterior median. Opacity carries `Pr(sign)`,
-#'   the larger of `Pr(r > 0)` and `Pr(r < 0)`, binned at 0.75 and
-#'   0.95 into three ordered levels. Reading the two together is
-#'   the point: a large correlation the data barely resolve is
-#'   drawn faintly rather than erased, and a small one the data
-#'   resolve well is drawn firmly. `x$sig_cor` applies a hard cut
-#'   at `Pr(sign) > 0.95` instead, and is still on the object for
-#'   anyone who wants it.
+#'   diagonal is `1` for any correlation. Fill shows the posterior
+#'   median. [summary.mvgam_residcor()] reports each pair's
+#'   interval and `prob_nonzero`.
 #'
 #' @return A `ggplot` object.
 #'
@@ -156,7 +148,6 @@ plot.mvgam_residcor <- function(
 
   if (type == "correlation") {
     estimate <- x$cor
-    evidence <- x$prob_nonzero
     scale_name <- "Posterior\ncorrelation"
   } else {
     estimate <- x$prec %||% stop(insight::format_error(c(
@@ -166,11 +157,10 @@ plot.mvgam_residcor <- function(
         "the partial correlation surface."
       )
     )))
-    evidence <- x$prec_prob_nonzero
     scale_name <- "Posterior\nprecision"
   }
 
-  panel <- residcor_panel_data(estimate, evidence, cluster = cluster)
+  panel <- residcor_panel_data(estimate, cluster = cluster)
   lim <- if (rescale) {
     max(abs(panel$value), na.rm = TRUE)
   } else {
@@ -179,17 +169,9 @@ plot.mvgam_residcor <- function(
 
   ggplot2::ggplot(panel, ggplot2::aes(x = Var1, y = Var2)) +
     ggplot2::geom_tile(
-      mapping = ggplot2::aes(fill = value, alpha = ev),
-      colour = "grey50"
-    ) +
-    ggplot2::geom_tile(
-      data = residcor_legend_filler(panel),
-      mapping = ggplot2::aes(alpha = ev),
-      fill = NA, colour = NA, show.legend = TRUE
+      mapping = ggplot2::aes(fill = value), colour = "grey50"
     ) +
     mvgam_diverging_scale(name = scale_name, limits = c(-lim, lim)) +
-    residcor_evidence_scale() +
-    residcor_guides() +
     ggplot2::labs(x = "", y = "") +
     # Dropping the upper triangle takes one level off each axis, so
     # both are held open to keep the panel square.
@@ -206,8 +188,8 @@ plot.mvgam_residcor <- function(
 #' Faceted heatmap panel across the per-group correlation
 #' matrices returned by `residual_cor(mod, by_group = TRUE)` on a
 #' hierarchical VAR or factor fit. Reads exactly as
-#' [plot.mvgam_residcor()] does, one panel per group: fill carries
-#' the posterior median and opacity carries `Pr(sign)`. Colour
+#' [plot.mvgam_residcor()] does, one panel per group, with fill
+#' showing the posterior median. Colour
 #' limits are shared across facets so the eye can compare panels
 #' directly. The `_global` reference matrix is included by default;
 #' drop it with `include_global = FALSE`.
@@ -237,27 +219,18 @@ plot.mvgam_residcor_list <- function(x, include_global = TRUE,
   keep <- if (isTRUE(include_global)) names(x) else
     setdiff(names(x), "_global")
   panel <- do.call(rbind, lapply(keep, function(g) {
-    df <- residcor_panel_data(x[[g]]$cor, x[[g]]$prob_nonzero)
+    df <- residcor_panel_data(x[[g]]$cor)
     df$group <- g
     df
   }))
-  # One filler set is enough: the legend is shared across facets.
-  filler <- residcor_legend_filler(panel)
   lim <- if (rescale) max(abs(panel$value), na.rm = TRUE) else 1
   ncol <- ncol %||% ceiling(sqrt(length(keep)))
   ggplot2::ggplot(panel, ggplot2::aes(x = Var1, y = Var2)) +
     ggplot2::geom_tile(
-      mapping = ggplot2::aes(fill = value, alpha = ev),
-      colour = "grey60"
-    ) +
-    ggplot2::geom_tile(
-      data = filler, mapping = ggplot2::aes(alpha = ev),
-      fill = NA, colour = NA, show.legend = TRUE
+      mapping = ggplot2::aes(fill = value), colour = "grey60"
     ) +
     mvgam_diverging_scale(name = "Posterior\ncorrelation",
                           limits = c(-lim, lim)) +
-    residcor_evidence_scale() +
-    residcor_guides() +
     ggplot2::facet_wrap(~ group, ncol = ncol) +
     ggplot2::scale_x_discrete(
       guide = ggplot2::guide_axis(angle = 45), drop = FALSE

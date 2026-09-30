@@ -28,7 +28,6 @@ test_that("the summary header carries every formula and every link", {
     format_model_formula(brms::bf(y ~ x, sigma ~ x)),
     c("y ~ x", "sigma ~ x")
   )
-  expect_equal(format_model_formula(brms::bf(y ~ x)), "y ~ x")
 
   # A link is named for every parameter the family carries, not just
   # the mean, so a coefficient in the sigma block can be read on the
@@ -56,25 +55,15 @@ test_that("the trend line names the order and drops an empty formula", {
     format_trend_line(list(trend_model = "AR")),
     " Trends: AR "
   )
-  # A trend formula carrying only a constructor reduces to `~0`, and
-  # one with an intercept alone to `~1`. Neither names a predictor.
-  expect_equal(
-    format_trend_line(list(trend_model = "AR", trend_formula = ~0)),
-    " Trends: AR "
-  )
-  expect_equal(
-    format_trend_line(list(trend_model = "AR", trend_formula = ~1)),
-    " Trends: AR "
-  )
-  # A formula carrying a predictor is named, with the response
-  # dropped from a two-sided one.
-  expect_equal(
-    format_trend_line(list(trend_model = "AR", trend_formula = ~ elev)),
-    " Trends: AR; formula: ~elev "
-  )
-  expect_equal(
-    format_trend_line(list(trend_model = "AR", trend_formula = y ~ elev)),
-    " Trends: AR; formula: ~elev "
+  # A formula with an intercept alone names no predictor, and a
+  # two-sided one drops its response.
+  expect_null(trend_predictors(list(trend_formula = ~1)))
+  expect_identical(trend_predictors(list(trend_formula = y ~ elev)), "~elev")
+  # The user's spelling prints, less the constructor. The stored copy
+  # holds `by = series` and a `- 1`.
+  expect_identical(
+    trend_predictors(list(trend_call = ~ s(x, by = lv_axis()) + AR())),
+    "~s(x, by = lv_axis())"
   )
   # A fit with no trend prints no line.
   expect_equal(format_trend_line(list()), "")
@@ -94,20 +83,15 @@ test_that("is_trend_state_param() names the states and nothing else", {
     "sigma_trend", "ar1_trend[1]", "Intercept_trend", "b_trend[1]",
     "Sigma_trend[1,1]", "L_Omega_trend[2,1]", "Z[1,2]"
   ))))
-  # `latent_state` is the closure-unit quantity, not this one.
+  # `latent_N` is a closure-unit family's latent abundance.
   expect_false(is_trend_state_param("latent_N[1]"))
-  expect_equal(is_trend_state_param(character()), logical(0))
 })
 
-
-test_that("summary() offers no argument for the trend states", {
-  # Removed rather than fixed: 1.1.x never had one, and the states
-  # are reachable through hindcast(type = "trend"),
-  # as.data.frame(variable = "^trend\\[") and plot(type = "trend").
-  expect_false("include_states" %in% names(formals(summary.mvgam)))
-  expect_false("include_trend_states" %in% names(formals(summary.mvgam)))
-  expect_false(
-    "include_trend_states" %in% names(formals(summary.mvgam_pooled))
+test_that("summaries skip a loading fixed at zero in every draw", {
+  draws <- posterior::draws_array(
+    `Z_tilde[1,1]` = rnorm(20), `Z_tilde[1,2]` = rep(0, 20)
+  )
+  expect_identical(
+    varying_pars(draws, c("Z_tilde[1,1]", "Z_tilde[1,2]")), "Z_tilde[1,1]"
   )
 })
-

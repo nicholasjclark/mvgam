@@ -583,7 +583,7 @@ ordinate.mvgam <- function(
   checkmate::assert_integerish(
     which_lvs, len = 2L, lower = 1L, any.missing = FALSE
   )
-  validate_proportional(alpha)
+  checkmate::assert_number(alpha, lower = 0, upper = 1)
   checkmate::assert_flag(biplot)
   checkmate::assert_flag(label_sites)
   checkmate::assert_number(trait_arrow_scale, lower = 0)

@@ -75,65 +75,38 @@ NULL
 #' @author Nicholas J Clark
 #'
 #' @export
-summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
+summary.mvgam_irf <- function(object, probs = c(0.025, 0.975), ...) {
   checkmate::assert_class(object, "mvgam_irf")
-  checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
-                            any.missing = FALSE, sorted = TRUE)
-  validate_proportional(min(probs))
-  validate_proportional(max(probs))
   rlang::check_dots_empty()
-
-  n_processes <- dim(object[[1]][[1]])[2]
-  h <- dim(object[[1]][[1]])[1]
-  n_draws <- length(object)
-  # `irf()` names each shocked process when it builds the draws, so
-  # the label is read back here instead of being spelled a second way.
-  labels <- names(object[[1]])
-
-  out <- do.call(
-    rbind,
-    lapply(1:n_processes, function(series) {
-      # Extract IRFs for the specific series
-      impulse_responses <- lapply(seq_along(object), function(j) {
-        object[[j]][series]
-      })
-
-      responses <- do.call(
-        rbind,
-        lapply(seq_along(impulse_responses), function(j) {
-          data.frame(
-            horizon = 1:h,
-            imp_resp = as.vector(impulse_responses[[j]][[1]]),
-            resp_var = labels[sort(rep(
-              seq_len(n_processes),
-              NROW(impulse_responses[[j]][[1]])
-            ))]
-          )
-        })
-      ) %>%
-        dplyr::mutate(shock = paste0(labels[series], ' -> ', resp_var)) %>%
-
-        # Calculate posterior empirical quantiles of impulse responses
-        dplyr::group_by(shock, horizon) %>%
-        dplyr::summarise(
-          irfQ50 = median(imp_resp),
-          irfQlower = quantile(imp_resp, min(probs)),
-          irfQupper = quantile(imp_resp, max(probs)),
-          .groups = 'keep'
-        ) %>%
-        dplyr::ungroup()
-      colnames(responses) <- c(
-        'shock',
-        'horizon',
-        'irfQ50',
-        paste0('irfQ', 100 * min(probs)),
-        paste0('irfQ', 100 * max(probs))
+  labels <- names(object[[1L]])
+  n_processes <- length(labels)
+  h <- NROW(object[[1L]][[1L]])
+  do.call(rbind, lapply(seq_len(n_processes), function(series) {
+    out <- tibble::tibble(
+      shock = paste0(labels[series], " -> ",
+                     rep(labels, each = h)),
+      horizon = rep(seq_len(h), times = n_processes),
+      median_interval_cols(
+        irf_draws(object, series, seq_len(n_processes)), probs, "irf"
       )
-      responses
-    })
-  )
+    )
+    out[order(out$shock, out$horizon, method = "radix"), ]
+  }))
+}
 
-  return(out)
+#' The draws of the responses to one shock
+#'
+#' @param x An `mvgam_irf` object
+#' @param series The process the shock originates in
+#' @param resp_ids The responding processes
+#' @return An `(ndraws x (h * length(resp_ids)))` matrix, with the
+#'   horizons of each response in consecutive columns
+#' @noRd
+irf_draws <- function(x, series, resp_ids) {
+  h <- NROW(x[[1L]][[1L]])
+  do.call(cbind, lapply(resp_ids, function(resp) {
+    t(vapply(x, function(draw) draw[[series]][, resp], numeric(h)))
+  }))
 }
 
 #' Plot impulse responses from an `mvgam_irf` object
@@ -162,9 +135,9 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
 #' @author Nicholas J Clark
 #'
 #' @export
-plot.mvgam_irf = function(x, series = 1, responses = NULL, ...) {
+plot.mvgam_irf <- function(x, series = 1, responses = NULL, ...) {
   checkmate::assert_class(x, "mvgam_irf")
-  validate_pos_integer(series)
+  checkmate::assert_int(series, lower = 1)
   rlang::check_dots_empty()
   # Lock the bayesplot scheme to the house red for the duration
   # of this call so IRFs share the visual identity of forecast(),
@@ -198,9 +171,7 @@ plot.mvgam_irf = function(x, series = 1, responses = NULL, ...) {
   resp_keys <- paste0(
     as_literal(labels[series]), " %->% ", as_literal(labels[resp_ids])
   )
-  draws_mat <- do.call(cbind, lapply(resp_ids, function(resp) {
-    t(vapply(x, function(draw) draw[[series]][, resp], numeric(h)))
-  }))
+  draws_mat <- irf_draws(x, series, resp_ids)
   times <- rep(seq_len(h), times = length(resp_ids))
   group <- rep(resp_keys, each = h)
 
@@ -216,7 +187,7 @@ plot.mvgam_irf = function(x, series = 1, responses = NULL, ...) {
     ggplot2::facet_wrap(
       ~series, scales = "free_y", labeller = ggplot2::label_parsed
     ) +
-    scale_x_horizon() +
+    scale_x_steps() +
     ggplot2::labs(
       y = paste0(attr(x, "irf_type"), " impulse response")
     ) +

@@ -7,9 +7,9 @@
 #   AR(p = c(2, 4))  -> SPARSE: only lags 2 and 4
 #                       (declares ar2_trend, ar4_trend; no ar1)
 #   VAR(p = 3)       -> CONSECUTIVE lags 1, 2, 3
-#                       (declares array[3] A_raw_trend matrices)
+#                       (declares array[3] A_trend matrices)
 #   VAR(p = c(2, 4)) -> SPARSE: only lags 2 and 4
-#                       (declares array[2] A_raw_trend matrices
+#                       (declares array[2] A_trend matrices
 #                        plus an `active_lags_trend` data array)
 #
 # Tests build an `mvgam_formula` and call `stancode()` with
@@ -107,18 +107,18 @@ test_that("initial_joint_var guards the q=0 (pure VAR) case", {
 
 # ----- VAR scalar p (intended: CONSECUTIVE lags 1..p) ------------
 
-test_that("VAR(p = 1) declares array[1] A_raw_trend", {
+test_that("VAR(p = 1) declares array[1] A_trend", {
   code <- get_trend_stancode(~ VAR(p = 1))
   expect_true(stan_has(
-    code, "array[1] matrix[N_lv_trend, N_lv_trend] A_raw_trend"
+    code, "array[1] matrix[N_lv_trend, N_lv_trend] A_trend"
   ))
   expect_true(stan_has(code, "[N_lv_trend] sigma_trend;"))
 })
 
-test_that("VAR(p = 2) declares array[2] A_raw_trend", {
+test_that("VAR(p = 2) declares array[2] A_trend", {
   code <- get_trend_stancode(~ VAR(p = 2))
   expect_true(stan_has(
-    code, "array[2] matrix[N_lv_trend, N_lv_trend] A_raw_trend"
+    code, "array[2] matrix[N_lv_trend, N_lv_trend] A_trend"
   ))
 })
 
@@ -419,7 +419,7 @@ test_that("a wrapped statement inside a loop is rewritten in place", {
   prog <- paste(
     "model {",
     "  for (lag in 1 : 2) {",
-    "    diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag],",
+    "    diagonal(A_trend[lag]) ~ normal(Amu_trend[1, lag],",
     "                                        1 / sqrt(Ao[1, lag]));",
     "  }",
     "}", sep = "\n"

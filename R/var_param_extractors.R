@@ -14,11 +14,10 @@ assert_var_trend <- function(object, surface) {
   trend_type <- get_trend_type(object)
   if (!identical(trend_type, "VAR")) {
     stop(insight::format_error(c(
-      paste0("'", surface, "' requires a VAR(1) latent trend."),
+      paste0("'", surface, "' requires a VAR latent trend."),
       x = paste0("The fitted trend type is '", trend_type, "'."),
       i = paste0(
-        "Refit with 'trend_formula = ~ VAR(p = 1)' to use ",
-        "'", surface, "'."
+        "Refit with 'trend_formula = ~ VAR()' to use '", surface, "'."
       )
     )))
   }
@@ -40,9 +39,9 @@ var_draw_surfaces <- function(var_post, kernel, future) {
       kernel(list(
         K = var_post$K,
         labels = var_post$labels,
-        A = var_post$A[draw, , , drop = TRUE],
-        Sigma = var_post$Sigma[draw, , , drop = TRUE],
-        p = 1L
+        A = draw_slice(var_post$A, draw),
+        D = draw_slice(var_post$D, draw),
+        Sigma = var_post$Sigma[draw, , , drop = TRUE]
       ))
     },
     future = future
@@ -50,13 +49,17 @@ var_draw_surfaces <- function(var_post, kernel, future) {
 }
 
 
-#' Extract VAR(1) posterior draws of (A, Sigma) from a fitted mvgam
+#' One draw of a `[ndraws, K, K, lags]` coefficient array
+#' @noRd
+draw_slice <- function(arr, draw) {
+  array(arr[draw, , , , drop = FALSE], dim = dim(arr)[-1L])
+}
+
+#' Extract VAR posterior draws of (A, D, Sigma) from a fitted mvgam
 #'
-#' Pulls the per-draw coefficient matrix `A_trend[1, , ]` and
-#' innovation covariance `Sigma_trend` from `object$fit` and returns
-#' them as 3-D arrays sized `[ndraws, K, K]`. The `[1]` index on
-#' `A_trend` selects the (currently only) supported VAR lag (`p = 1`);
-#' higher-lag VAR is rejected at the constructor.
+#' Pulls the per-draw coefficient matrices `Phi_trend[l, , ]` of every
+#' lag, the moving-average matrices `Theta_trend[j, , ]` of a VARMA, and
+#' the innovation covariance `Sigma_trend` from `object$fit`.
 #'
 #' `K` is the number of latent series in the VAR. For both factor
 #' and non-factor VARs the Stan-side dimension is `N_lv_trend` (for
@@ -65,9 +68,11 @@ var_draw_surfaces <- function(var_post, kernel, future) {
 #' standata cached on the fit so the value is always what the Stan
 #' model actually compiled with.
 #'
-#' @param object A fitted `mvgam` object whose trend is a VAR(1).
+#' @param object A fitted `mvgam` object whose trend is a VAR.
 #' @return A list with elements:
-#'   * `A`: `[ndraws, K, K]` array of VAR coefficient draws.
+#'   * `A`: `[ndraws, K, K, p]` array of VAR coefficient draws.
+#'   * `D`: `[ndraws, K, K, q]` array of moving-average draws, with
+#'     `q = 0` for a VAR.
 #'   * `Sigma`: `[ndraws, K, K]` array of innovation-covariance
 #'     draws.
 #'   * `K`: integer, the VAR dimension.
@@ -85,10 +90,10 @@ extract_var_posterior <- function(object, ndraws = NULL,
   # innovation covariance or a response would be built from a matrix
   # pair no single draw produced.
   draws_mat <- subset_draws_rows(draws_mat, ndraws, draw_ids)
-  # Reads the raw `A_trend`. For factor VAR with Heaps QR
+  # The unrotated `Phi_trend`. For a factor VAR with Heaps QR
   # identification the generated-quantities block also emits
-  # `A_trend_tilde = Q A_trend Q'`; callers that want the
-  # QR-identified surface should read `A_trend_tilde` and rotate
+  # `Phi_trend_tilde = Q Phi_trend Q'`, and a caller wanting the
+  # QR-identified surface takes `Phi_trend_tilde` and rotates
   # `Sigma_trend` by the same Q.
   # `N_lv_trend` is the Stan-side VAR dimension for every code
   # path: factor VARs set it to the number of factors, non-factor
@@ -98,20 +103,26 @@ extract_var_posterior <- function(object, ndraws = NULL,
 
   ndraws <- nrow(draws_mat)
 
-  # `A_trend` is declared as `array[size(A_trend)] matrix[K, K]` in
-  # Stan, so posterior column names take the form `A_trend[lag,i,j]`.
-  # Restrict to the single supported lag (lag = 1) up front.
-  A <- extract_indexed_array_2d(
-    draws_mat, "A_trend", K, K,
-    prefix_ids   = 1L,
-    required_for = "A_trend (VAR(1) coefficient extraction)"
-  )
+  # Stan declares `Phi_trend` and `Theta_trend` as arrays of `K x K`
+  # matrices, one per lag. Their draws are named `Phi_trend[lag,i,j]`.
+  by_lag <- function(name, n_lags) {
+    out <- array(0, dim = c(ndraws, K, K, n_lags))
+    for (l in seq_len(n_lags)) {
+      out[, , , l] <- extract_indexed_array_2d(
+        draws_mat, name, K, K, prefix_ids = l,
+        required_for = paste0(name, " (VAR coefficient extraction)")
+      )
+    }
+    out
+  }
+  A <- by_lag("Phi_trend", length(object$trend_metadata$ar_lags %||% 1L))
+  D <- by_lag("Theta_trend", length(object$trend_metadata$ma_lags))
   Sigma <- extract_indexed_array_2d(
     draws_mat, "Sigma_trend", K, K,
     required_for = "Sigma_trend (VAR innovation covariance)"
   )
 
-  list(A = A, Sigma = Sigma, K = K, ndraws = ndraws,
+  list(A = A, D = D, Sigma = Sigma, K = K, ndraws = ndraws,
        labels = var_process_labels(object, K))
 }
 
@@ -215,28 +226,27 @@ var_process_labels <- function(object, K) {
 #' Posterior transition matrix for a VAR trend
 #'
 #' @description
-#' Extract the VAR(1) transition matrix $A$ from a fitted
-#' `mvgam` object, either as a per-cell posterior summary
-#' (default) or as raw per-draw values. Row $i$ of $A$ gives the
-#' linear dependence of latent process $i$ at time $t$ on the
-#' vector of processes at time $t - 1$; the diagonal is
-#' self-persistence, off-diagonals encode cross-outcome dependence
-#' at lag one.
+#' Extract a VAR transition matrix $A_l$ from a fitted `mvgam`
+#' object, either as a per-cell posterior summary (default) or as
+#' raw per-draw values. Row $i$ of $A_l$ gives the linear dependence
+#' of latent process $i$ at time $t$ on the vector of processes at
+#' time $t - l$; the diagonal is self-persistence, off-diagonals
+#' encode cross-outcome dependence at lag $l$.
 #'
 #' @details
 #' The extractor dispatches on whether the fit is hierarchical
 #' (`VAR(gr = <var>, ...)`) or single-panel.
 #'
 #' * On a **single-panel VAR** the routine reads the fitted
-#'   `A_trend` array.
+#'   `Phi_trend` array.
 #' * On a **hierarchical VAR** with `group = <int>` or
 #'   `group = <name>` it reads the panel-specific matrix
-#'   `A_group_trend[c, 1, , ]`, i.e. the transition matrix for
+#'   `Phi_group_trend[c, l, , ]`, i.e. the transition matrix for
 #'   the requested country / patch / hospital.
 #' * On a **hierarchical VAR** with `group = NULL` it synthesises
 #'   the shrinkage target from the hyperparameters:
-#'   diagonal cells take `Amu_trend[1, 1]`, off-diagonal cells
-#'   take `Amu_trend[2, 1]`. This is the mean the sampler pulls
+#'   diagonal cells take `Amu_trend[1, l]`, off-diagonal cells
+#'   take `Amu_trend[2, l]`. This is the mean the sampler pulls
 #'   every panel's $A_c$ toward, so it summarises the pool
 #'   without reading any single country
 #'   (Savage [2016](https://rpubs.com/jimsavage/hierarchical_var)).
@@ -251,12 +261,9 @@ var_process_labels <- function(object, K) {
 #' fraction of draws with each entry above or below zero. See
 #' the argument documentation for the median switch.
 #'
-#' Only VAR(1) fits are supported; the `A_trend` slot has a
-#' single lag dimension pinned to one for compatibility with
-#' mvgam's `irf()`, `fevd()` and `stability()` methods.
-#'
-#' @param object A fitted `mvgam` object whose trend is a
-#'   VAR(1).
+#' @param object A fitted `mvgam` object whose trend is a VAR.
+#' @param lag The lag whose transition matrix is returned, at most
+#'   the order `p` of the fitted `VAR(p)`. Defaults to `1`.
 #' @param groups Which panels of a hierarchical VAR fit to
 #'   return. `NULL` (the default) gives the global shrinkage
 #'   target built from `Amu_trend`, and is the only setting a
@@ -288,7 +295,7 @@ var_process_labels <- function(object, K) {
 #'   `mvgam_var_matrix` with slots `A`, `A_se`, `A_lower`,
 #'   `A_upper`, `A_ess`, `prob_positive`, `prob_negative`,
 #'   `prob_nonzero`, `n_series`, `series_names`, `group_label`,
-#'   `probs`. Has `print()` and `plot()` methods. With
+#'   `probs`, `lag`. Has `print()` and `plot()` methods. With
 #'   `summary = FALSE`, a `[ndraws, K, K]` numeric array with
 #'   dims 2-3 labelled by the outcome names.
 #'
@@ -310,22 +317,33 @@ var_process_labels <- function(object, K) {
 posterior_transition_matrix <- function(object, groups = NULL,
                                          summary = TRUE,
                                          robust = FALSE,
-                                         probs = c(0.025, 0.975)) {
+                                         probs = c(0.025, 0.975),
+                                         lag = 1L) {
   checkmate::assert_flag(summary)
   checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
                             any.missing = FALSE, unique = TRUE)
   require_fitted_model(object, "posterior_transition_matrix")
+  assert_var_trend(object, surface = "posterior_transition_matrix()")
+  checkmate::assert_int(lag, lower = 1L)
+  order <- length(object$trend_metadata$ar_lags %||% 1L)
+  if (lag > order) {
+    stop(insight::format_error(c(
+      paste0("'lag' must be at most ", order, ", the order of the VAR."),
+      x = paste0("Got 'lag' = ", lag, ".")
+    )), call. = FALSE)
+  }
   probs <- sort(probs)
 
   one_matrix <- function(group) {
-    arr <- extract_transition_matrix_draws(object, group)
+    arr <- extract_transition_matrix_draws(object, group, lag)
     if (!summary) return(arr)
     finalise_transition_matrix(
       arr,
       group_label = attr(arr, "group_label"),
       robust      = robust,
-      probs       = probs
+      probs       = probs,
+      lag         = lag
     )
   }
 
@@ -386,14 +404,13 @@ resolve_transition_matrix_groups <- function(object, groups) {
   groups
 }
 
-#' Extract raw `[ndraws, K, K]` posterior draws of the VAR(1)
+#' Extract raw `[ndraws, K, K]` posterior draws of the lag-`lag` VAR
 #' transition matrix from a fitted mvgam. Returned array carries
 #' `attr(., "group_label")` (`"global"`, a country name, or
 #' `"single-panel"`) so downstream summarisers can label the
 #' object.
 #' @noRd
-extract_transition_matrix_draws <- function(object, group) {
-  assert_var_trend(object, surface = "posterior_transition_matrix()")
+extract_transition_matrix_draws <- function(object, group, lag) {
   draws_mat <- posterior::as_draws_matrix(object$fit)
   all_cols <- colnames(draws_mat)
   is_hier <- is_hierarchical_var(all_cols)
@@ -401,15 +418,15 @@ extract_transition_matrix_draws <- function(object, group) {
   if (is_hier && is.null(group)) {
     K <- var_dim(object, "N_subgroups_trend")
     labs <- subgroup_labels(object, K, prefix = "outcome")
-    # `Amu_trend[1, 1]` is the population mean of the diagonal and
-    # `Amu_trend[2, 1]` of the off-diagonal entries.
+    # `Amu_trend[1, lag]` is the population mean of the diagonal and
+    # `Amu_trend[2, lag]` of the off-diagonal entries.
     amu <- read_draws_matrix(
-      draws_mat, "Amu_trend", 2L, 1L,
+      draws_mat, "Amu_trend", 2L, length(object$trend_metadata$ar_lags),
       needed_for = "the global 'Amu_trend' A matrix"
     )
     ndraws <- nrow(draws_mat)
-    diag_draws <- amu[, 1L, 1L]
-    off_draws <- amu[, 2L, 1L]
+    diag_draws <- amu[, 1L, lag]
+    off_draws <- amu[, 2L, lag]
     out <- vapply(seq_len(ndraws), function(d) {
       m <- matrix(off_draws[d], K, K)
       diag(m) <- diag_draws[d]
@@ -425,8 +442,8 @@ extract_transition_matrix_draws <- function(object, group) {
     group_int <- resolve_group_index(object, group)
     K <- var_dim(object, "N_subgroups_trend")
     out <- extract_indexed_array_2d(
-      draws_mat, "A_group_trend", K, K,
-      prefix_ids   = c(group_int, 1L),
+      draws_mat, "Phi_group_trend", K, K,
+      prefix_ids   = c(group_int, lag),
       labels       = subgroup_labels(object, K, prefix = "outcome"),
       required_for = "a per-group VAR transition matrix"
     )
@@ -436,12 +453,12 @@ extract_transition_matrix_draws <- function(object, group) {
     return(out)
   }
 
-  # Non-hierarchical VAR: single A_trend, lag pinned to one
+  # Non-hierarchical VAR: one Phi_trend matrix per lag
   K <- var_dim(object, "N_lv_trend")
   labs <- var_process_labels(object, K)
   out <- extract_indexed_array_2d(
-    draws_mat, "A_trend", K, K,
-    prefix_ids   = 1L,
+    draws_mat, "Phi_trend", K, K,
+    prefix_ids   = lag,
     labels       = labs[seq_len(K)],
     required_for = "the VAR transition matrix"
   )
@@ -458,7 +475,7 @@ extract_transition_matrix_draws <- function(object, group) {
 #' with the same semantic as their `mvgam_residcor` counterparts.
 #' @noRd
 finalise_transition_matrix <- function(arr, group_label,
-                                        robust, probs) {
+                                        robust, probs, lag = 1L) {
   series_names <- dimnames(arr)[[2L]]
   stats <- summarise_unconstrained_array(
     arr, robust = robust, probs = probs, series_names = series_names
@@ -490,7 +507,8 @@ finalise_transition_matrix <- function(arr, group_label,
       n_series      = p,
       series_names  = series_names,
       group_label   = group_label,
-      probs         = probs
+      probs         = probs,
+      lag           = lag
     ),
     class = "mvgam_var_matrix"
   )
@@ -521,7 +539,8 @@ finalise_transition_matrix <- function(arr, group_label,
 #' @method print mvgam_var_matrix
 #' @export
 print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
-  cat("VAR(1) transition matrix from an mvgam fit\n")
+  cat("Lag-", x$lag %||% 1L, " VAR transition matrix from an mvgam fit\n",
+      sep = "")
   cat("  Group      : ", x$group_label %||% "(unlabelled)", "\n",
       sep = "")
   cat("  Dimension  : ", x$n_series, " x ", x$n_series, "\n",
@@ -612,7 +631,8 @@ plot.mvgam_var_matrix <- function(x, cluster = FALSE, ...) {
 #' @method print mvgam_var_matrix_list
 #' @export
 print.mvgam_var_matrix_list <- function(x, ...) {
-  cat("VAR(1) transition matrices from an mvgam fit\n")
+  cat("Lag-", x[[1L]]$lag %||% 1L,
+      " VAR transition matrices from an mvgam fit\n", sep = "")
   cat("  Groups     : ", length(x), "\n", sep = "")
   cat("  Dimension  : ", x[[1L]]$n_series, " x ",
       x[[1L]]$n_series, "\n", sep = "")
@@ -737,7 +757,7 @@ plot_var_matrix_list_diagonal <- function(x) {
 #' @noRd
 is_hierarchical_var <- function(all_cols) {
   any(grepl(
-    "^(L_Omega_global_trend|A_group_trend|Sigma_group_trend)\\[",
+    "^(L_Omega_global_trend|Phi_group_trend|Sigma_group_trend)\\[",
     all_cols
   ))
 }

@@ -42,9 +42,8 @@ panel.
 \code{"variogram"}, \code{"twenergy"}) plot a single panel from
 the \code{all_series} rows.
 }
-Ensembles included in the \code{compare_scores()} call appear
-alongside the component models, so the same plot compares
-individuals and ensembles in one go.
+An ensemble passed to \code{compare_scores()} is plotted as one
+more model and compared with its components.
 }
 \seealso{
 \code{\link[=compare_scores]{compare_scores()}}, \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}},

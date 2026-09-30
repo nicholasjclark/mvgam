@@ -22,7 +22,7 @@ build_var_mock <- function(K = 3L, ndraws = 50L,
   set.seed(seed)
   cols <- character(0L)
   for (i in seq_len(K)) for (j in seq_len(K)) {
-    cols <- c(cols, sprintf("A_trend[1,%d,%d]", i, j))
+    cols <- c(cols, sprintf("Phi_trend[1,%d,%d]", i, j))
   }
   for (i in seq_len(K)) for (j in seq_len(K)) {
     cols <- c(cols, sprintf("Sigma_trend[%d,%d]", i, j))
@@ -51,9 +51,11 @@ build_var_mock <- function(K = 3L, ndraws = 50L,
 # The math kernels are reached only through `var_draw_surfaces()`,
 # which hands them the process labels beside the matrices. A stub
 # omitting those describes an object no caller builds.
-var_kernel_input <- function(K, A, Sigma = diag(K)) {
-  list(K = K, A = A, Sigma = Sigma, p = 1L,
-       labels = paste0("s", seq_len(K)))
+var_kernel_input <- function(K, A, Sigma = diag(K),
+                             D = array(0, c(K, K, 0L)),
+                             labels = paste0("s", seq_len(K))) {
+  list(K = K, A = array(A, c(K, K, length(A) / K^2)), D = D,
+       Sigma = Sigma, labels = labels)
 }
 
 # ---- Gate ----------------------------------------------------------
@@ -65,7 +67,7 @@ test_that("assert_var_trend() rejects non-VAR fits with a clear pointer", {
   )
   expect_error(
     assert_var_trend(fake, surface = "irf()"),
-    "requires a VAR\\(1\\) latent trend"
+    "requires a VAR latent trend"
   )
   expect_error(
     assert_var_trend(fake, surface = "irf()"),
@@ -83,30 +85,30 @@ test_that(
   vp <- extract_var_posterior(mock)
   expect_identical(vp$K, 3L)
   expect_identical(vp$ndraws, 25L)
-  expect_identical(dim(vp$A), c(25L, 3L, 3L))
+  expect_identical(dim(vp$A), c(25L, 3L, 3L, 1L))
   expect_identical(dim(vp$Sigma), c(25L, 3L, 3L))
 })
 
 test_that("extract_var_posterior() reads the correct column for each (i, j)", {
-  # Stamp known values into A_trend[1,2,3] and Sigma_trend[1,1] so we
+  # Stamp known values into Phi_trend[1,2,3] and Sigma_trend[1,1] so we
   # can verify the indexing convention round-trips correctly.
   mock <- build_var_mock(K = 3L, ndraws = 4L)
-  mock$fit[1L, "A_trend[1,2,3]"] <- 0.7
+  mock$fit[1L, "Phi_trend[1,2,3]"] <- 0.7
   mock$fit[2L, "Sigma_trend[1,1]"] <- 1.25
   vp <- extract_var_posterior(mock)
-  expect_equal(vp$A[1L, 2L, 3L], 0.7)
+  expect_equal(vp$A[1L, 2L, 3L, 1L], 0.7)
   expect_equal(vp$Sigma[2L, 1L, 1L], 1.25)
 })
 
 test_that(
   "extract_var_posterior() errors on a missing column", {
   mock <- build_var_mock(K = 2L, ndraws = 3L)
-  drop_col <- "A_trend[1,1,1]"
+  drop_col <- "Phi_trend[1,1,1]"
   mock$fit <- mock$fit[, setdiff(colnames(mock$fit), drop_col), drop = FALSE]
   # The refusal names the cell the posterior lacks.
   expect_error(
     extract_var_posterior(mock),
-    "Missing: A_trend\\[1,1,1\\]"
+    "Missing: Phi_trend\\[1,1,1\\]"
   )
 })
 
@@ -132,6 +134,22 @@ test_that("var_phi() recovers A^k for diagonal A", {
   expect_equal(Phi[, , 2L], A)
   expect_equal(Phi[, , 3L], A %*% A)
   expect_equal(Phi[, , 4L], A %*% A %*% A)
+})
+
+test_that("var_phi() matches a VAR(2) companion and a VARMA impulse", {
+  K <- 2L
+  set.seed(2L)
+  A <- array(stats::rnorm(K * K * 2L, sd = 0.25), c(K, K, 2L))
+  D <- array(stats::rnorm(K * K, sd = 0.3), c(K, K, 1L))
+  # A VAR(2)'s weights are the top-left block of the companion powers.
+  comp <- rbind(cbind(A[, , 1L], A[, , 2L]), cbind(diag(K), 0 * diag(K)))
+  Phi <- var_phi(var_kernel_input(K, A), h = 3L)
+  expect_equal(Phi[, , 4L], (comp %*% comp %*% comp)[1:K, 1:K])
+  # A VARMA(2, 1)'s first weight adds the moving-average matrix.
+  Phi_ma <- var_phi(var_kernel_input(K, A, D = D), h = 2L)
+  expect_equal(Phi_ma[, , 2L], A[, , 1L] + D[, , 1L])
+  expect_equal(Phi_ma[, , 3L],
+               A[, , 1L] %*% Phi_ma[, , 2L] + A[, , 2L])
 })
 
 test_that("gen_fevd() rows sum to 1 across the columns for each horizon", {
@@ -289,7 +307,7 @@ test_that("posterior_transition_matrix() gates on the trend type", {
   )
   expect_error(
     posterior_transition_matrix(fake),
-    "requires a VAR\\(1\\) latent trend"
+    "requires a VAR latent trend"
   )
 })
 
@@ -329,13 +347,13 @@ test_that("the VAR posterior carries one label per process", {
   expect_identical(vp$labels, c("Process_1", "Process_2", "Process_3"))
   # Both kernels read the labels off the posterior, so a surface
   # cannot spell them a second way.
-  irf_gen <- gen_irf(list(K = 3L, labels = vp$labels,
-                          A = matrix(0.1, 3L, 3L), Sigma = diag(3L),
-                          p = 1L), h = 2L)
+  irf_gen <- gen_irf(
+    var_kernel_input(3L, matrix(0.1, 3L, 3L), labels = vp$labels), h = 2L
+  )
   expect_identical(names(irf_gen), vp$labels)
-  fevd_gen <- gen_fevd(list(K = 3L, labels = vp$labels,
-                            A = matrix(0.1, 3L, 3L), Sigma = diag(3L),
-                            p = 1L), h = 2L)
+  fevd_gen <- gen_fevd(
+    var_kernel_input(3L, matrix(0.1, 3L, 3L), labels = vp$labels), h = 2L
+  )
   expect_identical(names(fevd_gen), vp$labels)
 })
 
@@ -345,9 +363,8 @@ test_that("the variance decomposition plot keeps the processes in order", {
   # alphabetical order. The object carries the fit's own order.
   labels <- c("zeta", "alpha", "mu")
   draws <- lapply(1:2, function(i) {
-    gen_fevd(list(K = 3L, labels = labels,
-                  A = matrix(0.1 * i, 3L, 3L), Sigma = diag(3L),
-                  p = 1L), h = 2L)
+    gen_fevd(var_kernel_input(3L, matrix(0.1 * i, 3L, 3L),
+                              labels = labels), h = 2L)
   })
   class(draws) <- "mvgam_fevd"
   p <- plot(draws)

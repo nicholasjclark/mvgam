@@ -986,13 +986,16 @@ axis_frames <- function() {
   # Series named by character rather than by factor.
   char_series <- long
   char_series$series <- as.character(char_series$series)
+  factor_time <- long
+  factor_time$time <- factor(factor_time$time)
 
   list(
     uni = uni, uni_bare = uni_bare,
     long = long, hier = hier, hier_col = hier_col,
     hier3 = hier3, hier_unbal = hier_unbal, ragged = ragged,
     wide = wide, wide_col = wide_col, wide_na = wide_na,
-    unbal = unbal, unused = unused, char_series = char_series
+    unbal = unbal, unused = unused, char_series = char_series,
+    factor_time = factor_time
   )
 }
 
@@ -1135,6 +1138,9 @@ axis_matrix <- function() {
     # character series column.
     list("character series", "char_series", ~ AR(p = 1), "refuse", "uni",
          "must be a factor"),
+    # The trend orders and spaces its steps by the value of each time.
+    list("factor time", "factor_time", ~ AR(p = 1), "refuse", "uni",
+         "as.numeric\\(as.character"),
 
     # The latent state lives on one time grid shared by every
     # series, so a panel whose series cover different times is

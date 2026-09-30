@@ -132,6 +132,8 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
     out
   }
 
+  # The lower-triangular zeros of identified loadings are constant.
+  obj_vars$trend_pars <- varying_pars(draws, obj_vars$trend_pars)
   spec <- tidy_spec(obj_vars, user_map)
   spec <- dplyr::filter(spec, .effects_filter(effect, effects))
 

@@ -273,15 +273,15 @@ loo_compare.mvgam <- function(
     autocor_supplied = !missing(incl_autocor)
   )
   criterion <- match.arg(criterion)
-  models <- split_mod_dots(x, ..., model_names = model_names)
-  estimates <- named_list(names(models))
-  for (i in seq_along(models)) {
-    estimates[[i]] <- if (criterion == "loo") {
-      loo(models[[i]], incl_autocor = incl_autocor)
-    } else {
-      waic(models[[i]], incl_autocor = incl_autocor)
-    }
-  }
+  models <- list(x, ...)
+  assert_compared_objects(models, "mvgam", "loo_compare")
+  score <- if (criterion == "loo") loo else waic
+  estimates <- stats::setNames(
+    lapply(models, score, incl_autocor = incl_autocor),
+    compared_object_names(
+      models, as.list(substitute(list(x, ...)))[-1L], model_names
+    )
+  )
   cmp <- loo_compare(estimates)
   # Row order in `cmp` differs from `estimates`. Pareto-k
   # diagnostics only apply on the loo path (WAIC has no PSIS).
@@ -323,50 +323,6 @@ loo::loo
 #' @export
 #' @importFrom loo loo_compare
 loo::loo_compare
-
-#'@noRd
-split_mod_dots = function(x, ..., model_names = NULL, other = TRUE) {
-  dots <- list(x, ...)
-  names <- substitute(list(x, ...), env = parent.frame())[-1]
-  names <- ulapply(names, deparse)
-
-  if (!is.null(model_names)) {
-    names <- model_names
-  }
-
-  if (length(names)) {
-    if (!length(names(dots))) {
-      names(dots) <- names
-    } else {
-      has_no_name <- !nzchar(names(dots))
-      names(dots)[has_no_name] <- names[has_no_name]
-    }
-  }
-  is_mvgam <- unlist(lapply(dots, function(y) inherits(y, 'mvgam')))
-  models <- dots[is_mvgam]
-  out <- dots[!is_mvgam]
-
-  if (length(out)) {
-    stop(insight::format_error(
-      "Only model objects can be passed to '...' for this method."
-    ))
-  }
-  models
-}
-
-#'@noRd
-named_list = function(names, values = NULL) {
-  if (!is.null(values)) {
-    if (length(values) <= 1L) {
-      values <- replicate(length(names), values)
-    }
-    values <- as.list(values)
-    stopifnot(length(values) == length(names))
-  } else {
-    values <- vector("list", length(names))
-  }
-  setNames(values, names)
-}
 
 # Compute per-series information criterion estimates from a
 # pointwise log-likelihood matrix. Used by both loo.mvgam(by_series
@@ -475,7 +431,7 @@ per_obs_series_labels <- function(x) {
 #' different observations.
 #'
 #'@noRd
-clean_ll = function(x, logliks) {
+clean_ll <- function(x, logliks) {
   # First remove any columns that are all NA (these had missing observations)
   scored <- which(!apply(logliks, 2, function(x) all(!is.finite(x))))
   logliks <- logliks[, scored, drop = FALSE]

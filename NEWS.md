@@ -21,7 +21,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 ## New features
 * Families: `tweedie()`, `beta_nb()`, `com_binomial()`, `occ()`, `diri()`, `multi()`, `categ()`, `mvn()` and `mvt()`. `nmix()` gained Royle-Nichols, Poisson-Poisson and multi-season variants
 * Multivariate responses through `mvbind()` and `mvbf()`
-* `mvgam_formula()`, `mvgam_data()` and `validate_newdata()` check a model and its data before fitting or prediction
+* `mvgam_formula()`, `mvgam_data()` and `check_newdata()` check a model and its data before fitting or prediction
 * Moving average terms in `AR()` and `VAR()`, coefficient pooling in `AR()` and partially fixed `trend_map`
 * `loadings_prior` for structured factor loadings, with `active_factors()`, `shared_variation()`, `compare_loadings()` and `ordinate()`
 * `jsdgam()` gained `traits`, `trait_slopes` and `phylo`. `by = lv_axis()` gives each latent factor its own smooth

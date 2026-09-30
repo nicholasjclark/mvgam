@@ -112,7 +112,7 @@ mod <- mvgam(
 )
 
 # Score requires a forecast object with held-out test draws.
-fc <- forecast(mod, newdata = mod$test_data)
+fc <- forecast(mod)
 sc <- score(fc, score = "crps")
 head(sc[[1L]])
 }

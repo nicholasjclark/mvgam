@@ -262,11 +262,11 @@ conditional_effects.mvgam <- function(x,
         !is.na(rows) & rows == series_mode$level, , drop = FALSE
       ]
     }
-    p <- do.call(marginaleffects::plot_predictions,
-                  c(list(model), pp_args, list(...))) +
-      ggplot2::scale_fill_discrete(label = round_legend_labels) +
-      ggplot2::scale_colour_discrete(label = round_legend_labels) +
-      mvgam_theme()
+    p <- style_effect_panel(
+      do.call(marginaleffects::plot_predictions,
+              c(list(model), pp_args, list(...))),
+      pp_args$condition, axis_vars(x)$series_var
+    )
     # marginaleffects defaults the y-axis label to the model's
     # first response name. For multi-response fits we know which
     # arm we are plotting (`resp`); overwrite so the user sees
@@ -550,6 +550,57 @@ resolve_series_arg <- function(series, x) {
   stop(insight::format_error(
     "'series' must be NULL, 'all', a series name or a 1-based index."
   ))
+}
+
+
+# Draw a `plot_predictions()` panel as the other mvgam effect plots
+# are drawn. marginaleffects colours a second conditioning variable's
+# levels on one panel. Where that variable is the series, each series
+# is a panel of its own with its own y scale, since series counts can
+# differ by an order of magnitude. Any other second variable keeps its
+# colours, taken from the active scheme.
+#'@noRd
+style_effect_panel <- function(p, condition, series_var) {
+  set_color_scheme_local("red")
+  group_var <- if (length(condition) >= 2L) condition[[2L]] else NULL
+  by_series <- identical(group_var, series_var)
+  for (layer in p$layers) {
+    if (by_series) {
+      layer$mapping[c("colour", "fill")] <- NULL
+    }
+    # An occasion with a missing response has no point to draw.
+    if (inherits(layer$geom, "GeomPoint")) {
+      layer$geom_params$na.rm <- TRUE
+    }
+    if (any(c("colour", "fill") %in% names(layer$mapping))) {
+      next
+    }
+    if (inherits(layer$geom, "GeomRibbon")) {
+      layer$aes_params$fill <- mvgam_colour("mid")
+      layer$aes_params$alpha <- 0.5
+    } else if (inherits(layer$geom, "GeomPoint") &&
+                 !inherits(layer$geom, "GeomPointrange")) {
+      layer$aes_params$colour <- "black"
+    } else {
+      layer$aes_params$colour <- mvgam_colour("dark")
+    }
+  }
+  if (by_series) {
+    # marginaleffects labels the colour and fill it mapped. The facet
+    # strips name the series now, and a label with no mapping left to
+    # carry it draws a notice.
+    p$labels[c("colour", "fill")] <- NULL
+    return(p + ggplot2::facet_wrap(ggplot2::vars(.data[[series_var]]),
+                                   scales = "free_y") +
+             mvgam_theme())
+  }
+  if (!is.null(group_var)) {
+    p <- p + mvgam_model_colour_scale(
+      length(unique(p$data[[group_var]])), name = group_var,
+      aesthetics = c("colour", "fill"), labels = round_legend_labels
+    )
+  }
+  p + mvgam_theme()
 }
 
 
