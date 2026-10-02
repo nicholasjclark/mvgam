@@ -638,6 +638,10 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       time_var = dimensions$time_var,
       series_var = dimensions$series_var,
       unique_times = dimensions$unique_times,
+      # The occasions in the user's own units, from the axis record.
+      # The gaps a continuous-time trend steps over are `diff()` of
+      # them.
+      time_axis = dimensions$axes$time,
       unique_series = dimensions$unique_series,
       series_groups = dimensions$series_groups,
       row_time = dimensions$row_time,
@@ -1557,36 +1561,14 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
       stanvar_components <- append(stanvar_components, list(sigma_stanvar))
     }
 
-    # Correlation parameters. A Cholesky factor is emitted whenever
-    # correlation is asked for, including at one latent dimension
-    # where it is a 1x1 identity, because the post-fit extractors
-    # read `L_Omega_trend` without first checking the dimension.
-    if (cor && !unit_factors) {
-      # Cholesky factor for correlation matrix
-      l_omega_stanvar <- brms::stanvar(
-        name = "L_Omega_trend",
-        scode = paste0("cholesky_factor_corr[", effective_dim, "] L_Omega_trend;"),
-        block = "parameters"
-      )
-      stanvar_components <- append(stanvar_components, list(l_omega_stanvar))
-    }
+    # Unit-scale factors fix the correlation factor at the identity
+    # further down, and declare no parameter for it.
     if (cor) {
-      # Derived covariance matrix in transformed parameters. The
-      # scaled Cholesky factor is an intermediate. The VAR generator
-      # below and the post-fit extractors take `Sigma_trend` as a
-      # covariance.
-      sigma_matrix_code <- paste0(
-        "cov_matrix[", effective_dim, "] Sigma_trend = ",
-        "multiply_lower_tri_self_transpose(",
-        "diag_pre_multiply(sigma_trend, L_Omega_trend));"
+      stanvar_components <- append(
+        stanvar_components,
+        innovation_correlation_stanvars(effective_dim,
+                                        sampled = !unit_factors)
       )
-
-      sigma_matrix_stanvar <- brms::stanvar(
-        name = "Sigma_trend",
-        scode = sigma_matrix_code,
-        block = "tparameters"
-      )
-      stanvar_components <- append(stanvar_components, list(sigma_matrix_stanvar))
     }
   }
 
@@ -1654,6 +1636,56 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
   # Combine all components using do.call to handle the list properly
   return(do.call(combine_stanvars, stanvar_components))
 }
+
+#' Stanvars declaring a trend's innovation correlation
+#'
+#' `L_Omega_trend` is the Cholesky factor of the correlation among the
+#' innovations, and `Sigma_trend` the covariance it gives with
+#' `sigma_trend`. The shared innovation system and `CAR()`, which
+#' scales its own innovations, both declare the pair through this
+#' function, and the post-fit extractors find one spelling.
+#'
+#' The factor is declared at one latent dimension too, where it is a
+#' 1x1 identity. The post-fit extractors take `L_Omega_trend` without
+#' first checking the dimension.
+#'
+#' @param effective_dim Stan name of the innovations' dimension
+#' @param sampled Whether to declare `L_Omega_trend` as a parameter.
+#'   `FALSE` leaves its declaration to the caller.
+#' @param scale Stan expression for a matrix that multiplies the
+#'   covariance element by element, or `NULL` for none. `CAR()` passes
+#'   the ratio of its unit-gap innovation covariance to its diffusion
+#'   correlation.
+#' @return List of stanvar objects
+#' @noRd
+innovation_correlation_stanvars <- function(effective_dim = "N_lv_trend",
+                                            sampled = TRUE,
+                                            scale = NULL) {
+  checkmate::assert_string(effective_dim, min.chars = 1L)
+  checkmate::assert_flag(sampled)
+  checkmate::assert_string(scale, min.chars = 1L, null.ok = TRUE)
+  l_omega <- brms::stanvar(
+    name = "L_Omega_trend",
+    scode = paste0("cholesky_factor_corr[", effective_dim,
+                   "] L_Omega_trend;"),
+    block = "parameters"
+  )
+  # The VAR generator and the post-fit extractors take `Sigma_trend`
+  # as a covariance. The scaled Cholesky factor is an intermediate.
+  sigma_matrix <- brms::stanvar(
+    name = "Sigma_trend",
+    scode = paste0(
+      "cov_matrix[", effective_dim, "] Sigma_trend = ",
+      "multiply_lower_tri_self_transpose(",
+      "diag_pre_multiply(sigma_trend, L_Omega_trend))",
+      if (!is.null(scale)) paste0("\n    .* ", scale),
+      ";"
+    ),
+    block = "tparameters"
+  )
+  c(if (sampled) list(l_omega), list(sigma_matrix))
+}
+
 
 #' Are the trend innovations Gaussian?
 #'
@@ -5449,79 +5481,268 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   return(result_stanvars)
 }
 
-#' Calculate Time Distances for CAR Models
+#' The time unit a CAR trend measures its gaps in
 #'
-#' Calculate temporal distances between observations for continuous-time AR.
-#' Uses pmax(1e-3, dis_time) to prevent zero distances.
+#' The typical gap between two observations of one series, which the
+#' axis record holds as `observation_gap`. `ar1_trend` and
+#' `sigma_trend` are then the damping and the innovation scale over a
+#' typical step, whatever unit the time column is recorded in, and a
+#' regular grid has gaps of one. The unit stays the same when another
+#' series adds times to the grid. The fit and `forecast()` both take
+#' it from the axis record through this function.
 #'
-#' @param data_info Data information containing data, time variable, and series
-#' @return Matrix of time distances \[n, n_series\]
+#' @param time_axis The `time` entry of the axis record, or a list
+#'   holding the occasions of one series as `values`
+#' @return A positive number, 1 for a grid of one occasion
+#' @noRd
+car_time_scale <- function(time_axis) {
+  checkmate::assert_list(time_axis)
+  if (!is.null(time_axis$observation_gap)) {
+    return(time_axis$observation_gap)
+  }
+  axis_observation_gap(list(as.numeric(time_axis$values)))
+}
+
+# Smallest gap a CAR trend steps over, in units of `car_time_scale()`
+car_min_gap <- 1e-6
+
+#' Gaps of a CAR trend in units of its time scale
+#'
+#' @param gaps Differences between consecutive times
+#' @param scale The value `car_time_scale()` returns for the fitted grid
+#' @return `gaps / scale`, no smaller than `car_min_gap`
+#' @noRd
+car_scaled_gaps <- function(gaps, scale) {
+  checkmate::assert_numeric(gaps, any.missing = FALSE)
+  checkmate::assert_number(scale, lower = 0, finite = TRUE)
+  pmax(car_min_gap, gaps / scale)
+}
+
+#' Time gaps a CAR trend steps over
+#'
+#' Every series is observed on one shared grid, and the gap between
+#' two steps belongs to the grid. Each column of `time_dis` is the
+#' same.
+#'
+#' Step `t` holds the distance from `t - 1` in units of
+#' `car_time_scale()`. The first has no predecessor and takes 1. The
+#' floor `car_min_gap` keeps a repeated timestamp from collapsing the
+#' autocorrelation to zero distance.
+#'
+#' A correlated CAR factorises one innovation covariance per distinct
+#' gap, and `gap_values` and `gap_index` name them: step `t` spans
+#' `gap_values[gap_index[t]]`.
+#'
+#' @param data_info Data information holding `time_axis`, the time
+#'   entry of the axis record, and `n_series`
+#' @return List of `time_dis`, a matrix of gaps \[n_time, n_series\],
+#'   `gap_values`, the distinct gaps, and `gap_index`, the position of
+#'   each step's gap among them
 #' @noRd
 calculate_car_time_distances <- function(data_info) {
-  data <- data_info$data
-  time_var <- data_info$time_var
-  series_var <- data_info$series_var
-
-  # Every series is observed on one shared grid, since a panel whose
-  # series cover different times is refused before reaching here, so
-  # the gap between two steps belongs to the grid rather than to a
-  # series and each column of the answer is the same.
-  #
-  # The gaps come from the time grid alone, in the order of the time
-  # index they attach to. A frame whose series come from the responses
-  # has no series column, and the grid needs none.
-  times <- time_axis_values(data[[time_var]])
+  # The axis record holds the occasions once and the time index is
+  # `match()` into them. The gaps are the differences in that order.
+  times <- data_info$time_axis$values
+  checkmate::assert_numeric(times, min.len = 1L, any.missing = FALSE,
+                            .var.name = "data_info$time_axis$values")
   n_series <- data_info_n_series(data_info)
+  dis_time <- c(1, car_scaled_gaps(diff(times),
+                                   car_time_scale(data_info$time_axis)))
 
-  # Step `t` carries the distance from `t - 1`. The first has no
-  # predecessor, and Stan raises it to a power, so it takes 1 rather
-  # than a gap. The floor keeps a repeated timestamp from collapsing
-  # the autocorrelation to zero distance.
-  dis_time <- c(1, pmax(1e-3, diff(times)))
+  # Gaps that differ by rounding alone share one factorisation
+  gap_key <- signif(dis_time, 10)
 
-  matrix(
-    rep(dis_time, times = n_series),
-    nrow = length(times), ncol = n_series
+  list(
+    time_dis = matrix(
+      rep(dis_time, times = n_series),
+      nrow = length(times), ncol = n_series
+    ),
+    gap_values = dis_time[!duplicated(gap_key)],
+    gap_index = match(gap_key, unique(gap_key))
   )
+}
+
+#' Stan dynamics of a CAR trend with independent innovations
+#'
+#' @return A stanvars object for the transformed parameters block
+#' @noRd
+car_independent_dynamics_stanvars <- function() {
+  combine_stanvars(
+    brms::stanvar(
+      name = "car_innovation_computation",
+      scode = paste0(
+        "matrix[N_time_trend, N_lv_trend] scaled_innovations_trend;\n  ",
+        independent_scaling_stancode()
+      ),
+      block = "tparameters"
+    ),
+    brms::stanvar(
+      name = "car_tparameters",
+      scode = glue::glue("
+      // Start at the stationary marginal of the continuous-time AR(1)
+      for (j in 1:N_lv_trend) {{
+        lv_trend[1, j] = scaled_innovations_trend[1, j]
+                         / sqrt(1 - square(ar1_trend[j]));
+      }}
+
+      // Apply continuous-time AR evolution for subsequent time points.
+      // The gap scales the decay and the innovation together. The
+      // marginal variance stays put across an irregular grid.
+      for (j in 1:N_lv_trend) {{
+        for (i in 2:N_time_trend) {{
+          lv_trend[i, j] = pow(ar1_trend[j], time_dis[i, j]) * lv_trend[i - 1, j]
+                         + scaled_innovations_trend[i, j]
+                           * sqrt((1 - pow(ar1_trend[j], 2 * time_dis[i, j]))
+                                  / (1 - square(ar1_trend[j])));
+        }}
+      }}
+    "),
+      block = "tparameters"
+    )
+  )
+}
+
+#' Stan dynamics of a CAR trend with correlated innovations
+#'
+#' The exact transition of the continuous-time process. Series `a`
+#' and `b` hold covariance `Sigma_trend[a, b] / (1 - ar_a * ar_b)` at
+#' every occasion, and the innovations across a gap `d` take that
+#' covariance times `1 - (ar_a * ar_b)^d`. The diagonal is the scaling
+#' the independent form applies. A scaling of each series by its own
+#' gap factor would hold the innovation correlation fixed at every
+#' gap, and the model would then change when a time point is added
+#' between two others.
+#'
+#' `L_Omega_trend` is the correlation of the diffusion, the shocks
+#' over an instant. `Sigma_trend` is the innovation covariance over a
+#' unit gap, which `car_unit_coherence()` derives from it, and
+#' `sigma_trend` stays the unit-gap innovation scale of each series. A
+#' correlation placed on the unit-gap innovations directly admits
+#' values no continuous-time process produces when the series damp at
+#' different rates, and the innovation covariance over a gap below one
+#' is then not positive definite.
+#'
+#' @param gaps The list `calculate_car_time_distances()` returns
+#' @return A stanvars object: the gap data, `L_Omega_trend`,
+#'   `Sigma_trend` and the dynamics
+#' @noRd
+car_correlated_dynamics_stanvars <- function(gaps) {
+  checkmate::assert_list(gaps, names = "named")
+  gap_stanvars <- list(
+    brms::stanvar(
+      x = length(gaps$gap_values),
+      name = "N_gaps_trend",
+      scode = "int<lower=1> N_gaps_trend;",
+      block = "data"
+    ),
+    brms::stanvar(
+      x = as.array(gaps$gap_values),
+      name = "gap_trend",
+      scode = "vector<lower=0>[N_gaps_trend] gap_trend;",
+      block = "data"
+    ),
+    brms::stanvar(
+      x = as.array(as.integer(gaps$gap_index)),
+      name = "gap_index_trend",
+      scode = paste0("array[N_time_trend] int<lower=1, upper=N_gaps_trend>",
+                     " gap_index_trend;"),
+      block = "data"
+    )
+  )
+  coherence <- brms::stanvar(
+    name = "car_unit_coherence",
+    scode = "
+      /**
+       * Ratio of the unit-gap innovation covariance of a continuous-time
+       * AR(1) to the product of the series' unit-gap scales and their
+       * diffusion correlation. One on the diagonal.
+       * @param ar Damping of each series over a unit gap, in (0, 1)
+       * @return Symmetric matrix with entries in (0, 1]
+       */
+      matrix car_unit_coherence(vector ar) {
+        int K = rows(ar);
+        vector[K] rate = -log(ar);
+        vector[K] gain = sqrt(2 * rate ./ (1 - square(ar)));
+        matrix[K, K] out;
+        for (a in 1:K) {
+          out[a, a] = 1;
+          for (b in (a + 1):K) {
+            out[a, b] = gain[a] * gain[b] * (1 - ar[a] * ar[b])
+                        / (rate[a] + rate[b]);
+            out[b, a] = out[a, b];
+          }
+        }
+        return out;
+      }
+    ",
+    block = "functions"
+  )
+  dynamics <- brms::stanvar(
+    name = "car_tparameters",
+    scode = "
+      {
+        matrix[N_lv_trend, N_lv_trend] log_ar_cross_trend
+          = log(ar1_trend * ar1_trend');
+        // Covariance the states hold at every occasion
+        matrix[N_lv_trend, N_lv_trend] Gamma_trend
+          = Sigma_trend ./ -expm1(log_ar_cross_trend);
+        // Cholesky factor of the innovation covariance, one per
+        // distinct gap
+        array[N_gaps_trend] matrix[N_lv_trend, N_lv_trend] L_gap_trend;
+        for (g in 1:N_gaps_trend) {
+          L_gap_trend[g] = cholesky_decompose(
+            Gamma_trend .* -expm1(gap_trend[g] * log_ar_cross_trend));
+        }
+
+        // Start at the stationary law of the continuous-time AR(1)
+        lv_trend[1] = (cholesky_decompose(Gamma_trend)
+                       * innovations_trend[1]')';
+
+        // The gap scales the decay and the innovation together
+        for (i in 2:N_time_trend) {
+          lv_trend[i] = (pow(ar1_trend, gap_trend[gap_index_trend[i]])
+                           .* lv_trend[i - 1]'
+                         + L_gap_trend[gap_index_trend[i]]
+                           * innovations_trend[i]')';
+        }
+      }
+    ",
+    block = "tparameters"
+  )
+  do.call(combine_stanvars, c(
+    gap_stanvars, list(coherence),
+    innovation_correlation_stanvars(
+      scale = "car_unit_coherence(ar1_trend)"
+    ),
+    list(dynamics)
+  ))
 }
 
 #' CAR Trend Generator
 #'
 #' @description
-#' Generates Stan code components for continuous-time autoregressive (CAR) trends
-#' which model temporal dynamics using continuous-time damped oscillator formulation.
-#' CAR trends are useful for irregularly spaced time series and automatic
-#' handling of missing observations. Does NOT support factor models or
-#' hierarchical correlations due to continuous-time constraints.
+#' Generates the Stan components of a continuous-time AR(1) trend,
+#' which decays by `ar1_trend^gap` over the time gaps the data
+#' records. `cor = TRUE` correlates the innovations of the series.
+#' Factor models and grouped correlations are refused upstream.
 #'
-#' @param trend_specs Trend specification for CAR model containing parameters
-#'   like n_lv (must equal n_series), but NOT supporting factor models or grouping
-#' @param data_info Data information including dimensions (n_obs, n_series, n_time)
-#'   and time spacing details for continuous-time modeling
+#' @param trend_specs Trend specification for CAR model
+#' @param data_info Data information including dimensions (n_obs,
+#'   n_series, n_time) and the time values the gaps come from
 #' @param prior A brmsprior object containing custom prior specifications for
-#'   CAR trend parameters (ar1_trend, sigma_trend). If NULL, uses defaults
-#'   from trend registry. Default NULL.
+#'   CAR trend parameters (ar1_trend, sigma_trend, L_Omega_trend). If
+#'   NULL, uses defaults from trend registry. Default NULL.
 #'
 #' @return Combined stanvars object containing Stan code for:
 #'   \itemize{
-#'     \item Common trend data (dimensions and indices)
-#'     \item CAR coefficient parameters (ar1_trend for damping)
-#'     \item Innovation variance parameters (sigma_trend)
-#'     \item Continuous-time dynamics formulation
+#'     \item The time gaps
+#'     \item The damping `ar1_trend`, declared strictly inside (0, 1)
+#'       because Stan raises it to a real power
+#'     \item The innovation scale `sigma_trend` and, under
+#'       `cor = TRUE`, the correlation factor `L_Omega_trend`
+#'     \item The continuous-time dynamics
 #'     \item Trend computation in transformed parameters
 #'   }
-#'
-#' CAR trends use continuous-time formulation with specific constraints:
-#' \enumerate{
-#'   \item No factor models: n_lv must equal n_series (series-specific evolution)
-#'   \item No hierarchical correlations: gr parameter not supported
-#'   \item Continuous-time: handles irregular time spacing automatically
-#'   \item Damped oscillator: ar1_trend controls damping rate
-#'   \item Missing data: natural handling of gaps in continuous formulation
-#' }
-#'
-#' The ar1_trend parameter in CAR models represents the damping coefficient
-#' in continuous time, distinct from discrete-time AR(1) coefficients.
 #'
 #' @noRd
 generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
@@ -5534,16 +5755,16 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   n_lv <- trend_specs$n_lv %||% data_info_n_series(data_info)
   n_series <- data_info_n_series(data_info)
   n_obs <- data_info$n_obs
+  has_cor <- isTRUE(trend_specs$cor)
 
   # Validate dimensions
   checkmate::assert_int(n_lv, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(n_obs, lower = 1)
 
-  # A factor request against CAR is refused by the registry check in
-  # `build_stan_components()`, which reads `supports_factors` and so
-  # answers every route a user can ask by. Assembly is downstream of
-  # it and takes the spec as settled.
+  # `build_stan_components()` refuses a factor request against CAR
+  # from the registered `supports_factors`, by every route a user can
+  # ask. Assembly runs after it and takes the spec as settled.
 
   # Build components list following the 3-stanvar pattern
   components <- list()
@@ -5561,11 +5782,11 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   components <- append_if_not_null(components, matrix_z)
 
   # Calculate time distances for continuous-time AR evolution
-  time_dis <- calculate_car_time_distances(data_info)
+  gaps <- calculate_car_time_distances(data_info)
 
   # Time distance data for continuous-time AR
   time_dis_data_stanvar <- brms::stanvar(
-    x = time_dis,
+    x = gaps$time_dis,
     name = "time_dis",
     scode = glue::glue("array[N_time_trend, N_series_trend] real<lower=0> time_dis;"),
     block = "data"
@@ -5588,56 +5809,24 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   )
   components <- append(components, list(car_innovation_parameters_stanvar))
 
-  # CAR innovation computation in transformed parameters
-  car_innovation_computation_stanvar <- brms::stanvar(
-    name = "car_innovation_computation",
-    scode = paste0(
-      "matrix[N_time_trend, N_lv_trend] scaled_innovations_trend;\n  ",
-      independent_scaling_stancode()
-    ),
-    block = "tparameters"
-  )
-  components <- append(components, list(car_innovation_computation_stanvar))
-
   # 2. TPARAMETERS block - CAR dynamics computation (always needed)
-  car_tparameters_stanvar <- brms::stanvar(
-    name = "car_tparameters",
-    scode = glue::glue("
-      // Start at the stationary marginal of the continuous-time AR(1)
-      for (j in 1:N_lv_trend) {{
-        lv_trend[1, j] = scaled_innovations_trend[1, j]
-                         / sqrt(1 - square(ar1_trend[j]));
-      }}
+  components <- append(components, list(
+    if (has_cor) {
+      car_correlated_dynamics_stanvars(gaps)
+    } else {
+      car_independent_dynamics_stanvars()
+    }
+  ))
 
-      // Apply continuous-time AR evolution for subsequent time points.
-      // The gap scales the decay and the innovation together. The
-      // marginal variance stays put across an irregular grid.
-      for (j in 1:N_lv_trend) {{
-        for (i in 2:N_time_trend) {{
-          lv_trend[i, j] = pow(ar1_trend[j], time_dis[i, j]) * lv_trend[i - 1, j]
-                         + scaled_innovations_trend[i, j]
-                           * sqrt((1 - pow(ar1_trend[j], 2 * time_dis[i, j]))
-                                  / (1 - square(ar1_trend[j])));
-        }}
-      }}
-    "),
-    block = "tparameters"
+  # 3. MODEL block - CAR priors. CAR scales its own innovations, and
+  # the shared innovation system emits none of these for it.
+  car_model_stanvar <- generate_trend_priors_stanvar(
+    param_names = c("ar1_trend", "sigma_trend",
+                    if (has_cor) "L_Omega_trend"),
+    prior = prior,
+    stanvar_name = "car_model"
   )
-  components <- append(components, list(car_tparameters_stanvar))
-
-  # 3. MODEL block - CAR priors (ar1_trend, but not sigma_trend)
-  # Build list of parameters that need priors
-  car_params_to_prior <- c("ar1_trend", "sigma_trend")
-  # CAR trends use their own innovation system with sigma_trend priors
-
-  if (length(car_params_to_prior) > 0) {
-    car_model_stanvar <- generate_trend_priors_stanvar(
-      param_names = car_params_to_prior,
-      prior = prior,
-      stanvar_name = "car_model"
-    )
-    components <- append_if_not_null(components, car_model_stanvar)
-  }
+  components <- append_if_not_null(components, car_model_stanvar)
 
   # 3.5. Add sampling statement for CAR innovations_trend parameter.
   # Routed through the shared generator so continuous-time trends get

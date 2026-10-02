@@ -119,9 +119,8 @@ of the registry. Each entry records:
 
 - `supports_factors`, and the `incompatibility_reason` a factor
   request is refused with;
-- `covariance_pattern`: `"none"` for PW, `"diagonal"` for CAR,
-  `"cholesky_scaled"` for RW, AR and ZMVN, `"full_covariance"` for
-  VAR;
+- `covariance_pattern`: `"none"` for PW, `"cholesky_scaled"` for RW,
+  AR, ZMVN and CAR, `"full_covariance"` for VAR;
 - `stationary_source`: how a marginal prediction obtains the
   covariance it integrates over (section 10);
 - `requires_regular_intervals`: `TRUE` for a trend that indexes its
@@ -542,16 +541,50 @@ contiguous and sparse lag sets with or without a moving-average term.
 A draw close to a unit root takes an exact companion solve. `VAR()`
 takes `Omega_trend`, the stationary joint variance its Stan model
 computes. The registry's `stationary_source` records which of these
-applies: `"lift"` for AR, `"omega"` for VAR and `"none"` for the rest.
+applies: `"lift"` for AR and CAR, `"omega"` for VAR and `"none"` for
+the rest.
 
 The Stan program starts every contiguous `AR()` at the same law: the
 scalar closed forms at one lag, `ar_stationary_init()` for
 independent series above one lag and `joint_init_stanblock()` for
 correlated or grouped innovations at any order and for a
 moving-average term above one lag. A random walk has no stationary
-distribution and `ZMVN()` has no dynamics to settle into. `CAR()`
-decays by `ar^gap`, and irregular gaps admit no single variance. All
-three keep their innovation covariance. A sparse lag set bounds its
+distribution and `ZMVN()` has no dynamics to settle into. Both keep
+their innovation covariance.
+
+`CAR()` is the exact discretisation of a continuous-time AR(1). Across
+a gap `d` the state decays by `ar^d` and the innovations have
+covariance `Gamma[a, b] (1 - (ar_a ar_b)^d)`, where
+`Gamma[a, b] = Sigma_trend[a, b] / (1 - ar_a ar_b)` is the covariance
+the states hold at every occasion and the first state is drawn from.
+Adding an occasion between two others leaves the law of the remaining
+states unchanged. Gaps are measured in units of the median gap between
+two consecutive observations of one series, which the axis record
+holds as `time$observation_gap`. The Stan data and `forecast()` both
+take it through `car_time_scale()`. The model is then the same in any
+time unit, and the unit stays put when another series adds times to
+the grid. Under `cor = TRUE`, `L_Omega_trend` is the correlation of
+the shocks over an instant and `Sigma_trend`, the innovation
+covariance over a gap of one, follows from it through
+`car_unit_coherence()`. A correlation placed on the unit-gap
+innovations directly gives a covariance that is not positive definite
+at gaps below one when the series damp at different rates. Every
+post-fit path takes the innovation correlation from the stored
+`Sigma_trend` (`stores_innovation_cov()`). A CAR forecast steps every
+series from the last occasion of the fitted grid, where each has a
+state, including a series whose last responses are missing.
+
+The registry's `completes_time_grid` is `TRUE` for CAR alone. Such a
+trend takes series observed at their own times:
+`trend_cell_frame()` adds a cell for each time a series has no row
+at, and the frame is the model its `NA`-padded form gives, with
+identical Stan data. Every other trend is refused by
+`refuse_ragged_trend_grid()`. `forecast()` steps all series over the
+union of the forecast times and reports each at its own.
+`score()` sums series at each forecast time, and a joint score needs
+shared times. `lfo_cv()` scores the series observed in each fold and
+records the count as `n_obs`. `df` is refused on such a frame
+(`refuse_heavy_tails_on_ragged_grid()`). A sparse lag set bounds its
 coefficients one at a time, and a draw can be explosive. It keeps the
 raw start in Stan, keeps its innovation covariance on the R side, and
 `warn_explosive_draws()` counts such draws.

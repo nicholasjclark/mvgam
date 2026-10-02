@@ -108,6 +108,10 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
       )
     )))
   )
+  # The degrees of freedom this draw's innovations take, absent for a
+  # Gaussian trend. Forecast innovations then follow the law the model
+  # was fitted with.
+  out$params$df <- extract_nu_trend_draws(one_draw, fit)
   # Tag the state with the LV dimensionality when non-trivial
   # so the caller knows to apply Z projection after
   # propagation.
@@ -231,7 +235,9 @@ extract_sigma_and_cov <- function(one_draw, n_series, n_lv,
   sigma_vec <- broadcast_to_series(
     draw_vector(one_draw, "sigma_trend", n_lv), n_series
   )
-  Sigma <- if (has_cor) {
+  Sigma <- if (has_cor && stores_innovation_cov(one_draw)) {
+    draw_block(one_draw, "Sigma_trend", n_series, n_series)
+  } else if (has_cor) {
     L <- draw_block(one_draw, "L_Omega_trend", n_series, n_series)
     # `diag(x)` for a length-one x builds an x-by-x identity rather
     # than a 1x1 matrix holding x, so the scaling is applied by row
@@ -458,23 +464,26 @@ varma_last_innovation <- function(one_draw, A_cube, D, ar_lags, n,
 
 # CAR(1): continuous-time AR(1). Pulls phi per series from
 # `ar1_trend[s]`, sigma per series from `sigma_trend[s]`, the
-# last latent state from the trailing row of `trend[t, s]`, and
-# the last observed time per series so the caller can build the
-# forecast gap vector via diff(c(last_time, newdata_times)).
+# last latent state from the trailing row of `trend[t, s]`, and the
+# time of that state, the last occasion of the fitted grid. A fit
+# with correlated innovations adds `Sigma`, their covariance over a
+# gap of one.
 #'@noRd
 extract_car_state <- function(one_draw, meta, n_series, fit) {
   n_lv <- as.integer(fit$standata$N_lv_trend %||% n_series)
   n_time <- as.integer(fit$standata$N_time_trend)
   phi <- broadcast_to_series(draw_vector(one_draw, "ar1_trend", n_lv),
                              n_series)
-  sigma <- broadcast_to_series(draw_vector(one_draw, "sigma_trend", n_lv),
-                               n_series)
+  has_cor <- isTRUE(meta$has_cor)
+  scov <- extract_sigma_and_cov(one_draw, n_series, n_lv, has_cor,
+                                fit$standata)
   trends_hist <- extract_trend_history(
     one_draw, n_series, n_lv, max_lag = 1L, n_time = n_time
   )
-  last_time <- extract_last_observed_times(fit, n_series)
+  last_time <- rep(max(mvgam_axes(fit)$time$values), n_series)
   list(
-    params = list(phi = phi, sigma = sigma),
+    params = c(list(phi = phi, sigma = scov$sigma),
+               if (has_cor) list(Sigma = scov$Sigma)),
     last_state = list(
       trends = trends_hist,
       errors = NULL,

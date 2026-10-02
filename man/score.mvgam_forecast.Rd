@@ -58,9 +58,13 @@ last echoes the requested \code{score}; the \code{score} column is
 \code{NA} for the multivariate scorers' per-series rows -- they
 carry coverage diagnostics only, with the joint score
 sitting in \code{all_series}). The \code{all_series} entry holds the
-per-horizon aggregate: row-summed scores for univariate
-scorers (with \code{score_type} prefixed \code{"sum_"}) or the
-multivariate per-horizon score itself.
+per-horizon aggregate: scores summed over the series at each
+forecast time for univariate scorers (with \code{score_type}
+prefixed \code{"sum_"}) or the multivariate per-horizon score
+itself. Series forecast at their own times, as \code{CAR()} allows,
+are summed at the times they share, and \code{eval_horizon} then
+counts the times any series is forecast at. A multivariate
+score needs every series at the same forecast times.
 }
 \description{
 Compute one of eleven proper scoring rules on the held-out

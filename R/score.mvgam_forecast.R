@@ -98,9 +98,13 @@ joint_forecast_scores <- c("energy", "variogram", "twenergy")
 #'   `NA` for the multivariate scorers' per-series rows -- they
 #'   carry coverage diagnostics only, with the joint score
 #'   sitting in `all_series`). The `all_series` entry holds the
-#'   per-horizon aggregate: row-summed scores for univariate
-#'   scorers (with `score_type` prefixed `"sum_"`) or the
-#'   multivariate per-horizon score itself.
+#'   per-horizon aggregate: scores summed over the series at each
+#'   forecast time for univariate scorers (with `score_type`
+#'   prefixed `"sum_"`) or the multivariate per-horizon score
+#'   itself. Series forecast at their own times, as `CAR()` allows,
+#'   are summed at the times they share, and `eval_horizon` then
+#'   counts the times any series is forecast at. A multivariate
+#'   score needs every series at the same forecast times.
 #'
 #' @seealso [forecast.mvgam], [hindcast.mvgam],
 #'   [mvgam_forecast-class][mvgam]. The CRPS / DRPS / ELPD /
@@ -292,7 +296,7 @@ score_univariate <- function(object, series_names, score,
   names(series_score) <- series_names
 
   series_score$all_series <- sum_univariate_horizon(
-    series_score, score
+    series_score, score, object$test_times[series_names]
   )
   series_score
 }
@@ -317,34 +321,57 @@ empty_score_df <- function() {
 }
 
 
-# Internal: aggregate per-series score columns into a single
-# per-horizon row-summed `all_series` data.frame. Handles
-# ragged per-series horizons by NA-padding to the longest.
+# Internal: sum the per-series scores at each forecast time into the
+# `all_series` data.frame. Horizon `k` is the `k`th time any series
+# is forecast at, and a series contributes at the times it holds.
+# Series forecast at their own times are summed at the times they
+# share.
 #'@noRd
-sum_univariate_horizon <- function(series_score, score) {
-  cols <- lapply(series_score, function(df) df$score)
-  cols <- cols[lengths(cols) > 0L]
-  if (length(cols) == 0L) {
+sum_univariate_horizon <- function(series_score, score, test_times) {
+  scored <- names(series_score)[
+    vapply(series_score, nrow, integer(1L)) > 0L
+  ]
+  if (length(scored) == 0L) {
     return(data.frame(
       score = numeric(0L), eval_horizon = integer(0L),
       score_type = character(0L), stringsAsFactors = FALSE
     ))
   }
-  h_max <- max(lengths(cols))
-  padded <- vapply(cols, function(v) {
-    c(v, rep(NA_real_, h_max - length(v)))
-  }, numeric(h_max))
-  # vapply collapses to a vector when h_max == 1; force matrix
-  # shape so rowSums sees the column dimension.
-  if (!is.matrix(padded)) {
-    padded <- matrix(padded, nrow = h_max)
+  # An object that records no forecast times is summed by position
+  times <- lapply(scored, function(lv) {
+    n <- nrow(series_score[[lv]])
+    if (is.null(test_times[[lv]])) {
+      return(as.numeric(seq_len(n)))
+    }
+    as.numeric(test_times[[lv]])[seq_len(n)]
+  })
+  horizon <- sort(unique(unlist(times, use.names = FALSE)))
+  total <- numeric(length(horizon))
+  for (i in seq_along(scored)) {
+    at <- match(times[[i]], horizon)
+    value <- series_score[[scored[i]]]$score
+    held <- !is.na(value)
+    total[at[held]] <- total[at[held]] + value[held]
   }
   data.frame(
-    score = rowSums(padded, na.rm = TRUE),
-    eval_horizon = seq_len(h_max),
+    score = total,
+    eval_horizon = seq_along(horizon),
     score_type = paste0("sum_", score),
     stringsAsFactors = FALSE
   )
+}
+
+
+# Internal: whether the scored series are forecast at the same times.
+#'@noRd
+shares_forecast_times <- function(test_times) {
+  if (length(test_times) == 0L) {
+    return(TRUE)
+  }
+  first <- as.numeric(test_times[[1L]])
+  all(vapply(test_times, function(t) {
+    isTRUE(all.equal(as.numeric(t), first))
+  }, logical(1L)))
 }
 
 
@@ -373,10 +400,14 @@ score_multivariate <- function(object, series_names, score,
       "No held-out series available for multivariate scoring."
     ))
   }
-  if (length(unique(vapply(fcs[ok], ncol, integer(1L)))) > 1L) {
+  # A joint score is of one vector per time, with every series in it
+  if (length(unique(vapply(fcs[ok], ncol, integer(1L)))) > 1L ||
+      !shares_forecast_times(object$test_times[series_names[ok]])) {
     stop(insight::format_error(c(
       "Multivariate scoring requires a shared forecast horizon.",
-      i = "Per-series horizon lengths must match."
+      i = "Give every series in 'newdata' the same forecast times.",
+      i = paste0("'crps' and the other univariate scores take series ",
+                 "at their own times.")
     )))
   }
 

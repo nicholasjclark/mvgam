@@ -1855,10 +1855,11 @@ test_that("irregular time distances agree with the time index", {
   )
   # Every series shares one time grid, so the columns are equal by
   # construction and one of them carries the claim. Step `t` holds
-  # the gap from `t - 1`; the first step has no predecessor and
-  # holds a placeholder rather than a distance.
+  # the gap from `t - 1` in units of the median gap. The first step
+  # has no predecessor and holds a placeholder.
   expect_equal(
-    as.numeric(sd$time_dis[-1L, 1L]), diff(sorted_times),
+    as.numeric(sd$time_dis[-1L, 1L]),
+    diff(sorted_times) / median(diff(sorted_times)),
     tolerance = 1e-8
   )
   expect_false(anyNA(sd$time_dis))
@@ -1886,7 +1887,7 @@ test_that("CAR gaps and the PW cap are placed by the axis seams", {
   index_time[sd$obs_trend_time] <- d$time
   expect_equal(
     as.numeric(sd$time_dis[-1L, 1L]),
-    pmax(1e-3, diff(index_time)),
+    pmax(1e-6, diff(index_time) / median(diff(times))),
     tolerance = 1e-8
   )
 

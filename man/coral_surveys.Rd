@@ -36,8 +36,10 @@ Naive AR(1) treats every consecutive observation as a unit gap
 and biases \code{phi} downward toward \code{phi^mean(dt)} (roughly 0.29
 for this dataset), leaving the SST smooth to absorb persistence
 that belongs to the latent state. \code{trend_formula = ~ CAR()}
-with the supplied \code{time} column recovers \code{phi} near \code{0.7} in
-continuous time and renders the SST smooth identifiable.
+with the supplied \code{time} column measures the damping over the
+median gap between surveys, three months here. Its \code{ar1_trend}
+is then near \code{0.7^3 = 0.34}, the monthly \code{phi} of \code{0.7}, and the
+SST smooth is identifiable.
 
 True generative components:
 \itemize{

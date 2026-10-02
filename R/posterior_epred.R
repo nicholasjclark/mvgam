@@ -310,24 +310,23 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if `TRUE`, the trend contributes a
-#'   sampled innovation on top of its deterministic submodel, drawn per
-#'   posterior draw from the distribution the trend settles into. For an
-#'   autoregressive trend that is the stationary distribution, so an
-#'   AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
-#'   innovation variance, and the resulting Jensen correction on a log
-#'   link is \eqn{\sigma^2/(2(1-\rho^2))}. A random walk has no
-#'   stationary distribution and a `ZMVN()` trend has no dynamics to
-#'   settle into, so both draw their innovations directly; `CAR()` does
-#'   the same, its decay depending on the gap between observations. If
-#'   `FALSE`, the default, the trend contributes its deterministic
-#'   submodel alone, still at its own per-draw values, so `FALSE` is
-#'   not a collapse to a posterior mean. Read only under
-#'   `incl_autocor = FALSE`, since conditioning on the fitted state
-#'   leaves no innovation to sample.
+#' @param process_error Logical; if `TRUE`, the trend adds a sampled
+#'   innovation to its deterministic submodel. Each posterior draw
+#'   takes one innovation from the distribution the trend settles
+#'   into. An autoregressive trend settles into its stationary
+#'   distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}, and
+#'   the Jensen correction on a log link is
+#'   \eqn{\sigma^2/(2(1-\rho^2))}. A random walk lacks a stationary
+#'   distribution and a `ZMVN()` trend lacks dynamics. Both draw their
+#'   innovations directly. `CAR()` holds one stationary covariance at
+#'   every time of an irregular grid and draws from it. If `FALSE`,
+#'   the default, the trend contributes its deterministic submodel
+#'   alone, at its own per-draw values. The argument applies under
+#'   `incl_autocor = FALSE`. Conditioning on the fitted state already
+#'   fixes every innovation.
 #'
-#'   The innovations are drawn afresh on each call, so two calls on one
-#'   fit give different answers. Set a seed for a reproducible one.
+#'   Each call draws new innovations, and two calls on one fit give
+#'   different results. Set a seed to reproduce a result.
 #' @param incl_autocor Logical; which prediction surface the trend
 #'   contribution comes from. `FALSE`, the default, keeps the fitted
 #'   `trend[t, s]` out and answers from the two submodels' covariate

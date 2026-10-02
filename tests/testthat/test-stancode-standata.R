@@ -2107,7 +2107,7 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
   expect_false(grepl("Z_raw", code_with_trend, fixed = TRUE))
   expect_false(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z;", code_with_trend))
 
-  # Should NOT have correlation parameters (CAR doesn't support correlated trends)
+  # No correlation parameters without `cor = TRUE`
   expect_false(grepl("L_Omega_trend", code_with_trend, fixed = TRUE))
   expect_false(grepl("Sigma_trend", code_with_trend, fixed = TRUE))
 
@@ -2122,6 +2122,49 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
 
   # Should NOT have VAR parameters
   expect_false(grepl("A[0-9]+_trend", code_with_trend))
+})
+
+test_that("CAR(cor = TRUE) correlates the diffusion and scales its gaps", {
+  times <- c(10, 14, 16, 26, 28, 30)
+  d <- expand.grid(time = times, series = c("a", "b", "c"),
+                   stringsAsFactors = FALSE)
+  d$series <- factor(d$series)
+  d$y <- seq_len(nrow(d)) %% 5
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ CAR(cor = TRUE))
+  code <- stancode(mf, data = d, family = poisson())
+
+  # The correlation is that of the shocks over an instant, and the
+  # unit-gap covariance follows from it
+  expect_true(stan_pattern("matrix car_unit_coherence\\(vector ar\\)", code))
+  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;",
+                           code))
+  expect_true(stan_pattern(
+    paste0("cov_matrix\\[N_lv_trend\\] Sigma_trend = ",
+           "multiply_lower_tri_self_transpose\\(diag_pre_multiply\\(",
+           "sigma_trend, L_Omega_trend\\)\\) \\.\\* ",
+           "car_unit_coherence\\(ar1_trend\\);"),
+    code
+  ))
+  expect_true(stan_pattern(
+    "Gamma_trend \\.\\* -expm1\\(gap_trend\\[g\\] \\* log_ar_cross_trend\\)",
+    code
+  ))
+  expect_true(stan_pattern(
+    "lkj_corr_cholesky_lpdf\\(L_Omega_trend \\| 2\\)", code
+  ))
+
+  # Gaps are in units of the median gap, one entry per distinct gap
+  sdata <- standata(mf, data = d, family = poisson())
+  expect_equal(as.numeric(sdata$gap_trend[sdata$gap_index_trend][-1L]),
+               diff(times) / 2)
+  expect_identical(as.integer(sdata$N_gaps_trend), 3L)
+  # The same series in another time unit gives the same data
+  d_scaled <- transform(d, time = time * 7.3)
+  expect_equal(standata(mf, data = d_scaled, family = poisson())$gap_trend,
+               sdata$gap_trend)
+
+  prior_classes <- get_prior(mf, data = d, family = poisson())$class
+  expect_true("L_Omega_trend" %in% prior_classes)
 })
 
 test_that("stancode handles different observation families", {
@@ -5532,7 +5575,7 @@ test_that("the observed history counts every response or refuses", {
 })
 
 
-test_that("a series missing a time the others have is refused", {
+test_that("a series missing a time is refused, and CAR completes it", {
   d <- data.frame(y = rpois(30, 3), time = rep(1:10, 3),
                   series = factor(rep(c("a", "b", "c"), each = 10)))
   ragged <- d[!(d$series == "b" & d$time == 4), ]
@@ -5544,13 +5587,47 @@ test_that("a series missing a time the others have is refused", {
   msg <- conditionMessage(err)
   expect_match(msg, "'b'", fixed = TRUE)
   expect_match(msg, "response 'NA'", fixed = TRUE)
-  expect_false(grepl("CAR()", msg, fixed = TRUE))
-  # A CAR trend spaces its times unevenly, and the refusal says the
-  # series still share them.
-  car_err <- expect_error(
-    stancode(mvgam_formula(y ~ 1, ~ CAR()), data = ragged,
-             family = poisson()),
-    "must share one time grid"
+  expect_match(msg, "'CAR()' takes series observed at their own times",
+               fixed = TRUE)
+
+  # A CAR trend holds a state for every series at every time. The
+  # frame with the row absent and the frame with the row present and
+  # its response missing are one model.
+  car <- mvgam_formula(y ~ 1, ~ CAR(cor = TRUE))
+  padded <- d
+  padded$y[padded$series == "b" & padded$time == 4] <- NA
+  sd_ragged <- standata(car, data = ragged, family = poisson())
+  sd_padded <- suppressWarnings(
+    standata(car, data = padded, family = poisson())
   )
-  expect_match(conditionMessage(car_err), "'CAR()'", fixed = TRUE)
+  expect_identical(sd_ragged, sd_padded)
+  expect_identical(as.integer(sd_ragged$N_trend), 30L)
+  expect_identical(as.integer(sd_ragged$N), 29L)
+
+  # A multivariate t draws one mixing scale per time, and the times of
+  # one series would then change the trend of another
+  expect_error(
+    stancode(mvgam_formula(y ~ 1, ~ CAR(df = 5)), data = ragged,
+             family = poisson()),
+    "'df' is not supported for series observed at their own times"
+  )
+  expect_no_error(suppressWarnings(
+    stancode(mvgam_formula(y ~ 1, ~ CAR(df = 5)), data = padded,
+             family = poisson())
+  ))
+})
+
+test_that("CAR measures time in gaps between a series' observations", {
+  # Three series observed every two units, each offset from the
+  # others. The union of their times has gaps of 0.01, and the unit
+  # stays the gap one series is observed at.
+  base <- seq(2, 20, by = 2)
+  d <- data.frame(
+    time = c(base, base + 0.01, base + 0.02),
+    series = factor(rep(c("a", "b", "c"), each = length(base))),
+    y = rep(1:5, 6)
+  )
+  sdata <- standata(mvgam_formula(y ~ 1, ~ CAR(cor = TRUE)), data = d,
+                    family = poisson())
+  expect_equal(sort(as.numeric(sdata$gap_trend)), c(0.005, 0.99, 1))
 })

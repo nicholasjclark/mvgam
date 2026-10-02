@@ -164,9 +164,9 @@ arma::mat trend_arma_recursC(
 //     catches misuse.
 //   - sigma must be strictly positive.
 //
-// Zero-gap guard: time_dis[t] is floored at 1e-3 to avoid the noise
+// Zero-gap guard: time_dis[t] is floored at 1e-6 to avoid the noise
 // term collapsing when two observations land at the same rounded
-// time. Matches the reference threshold in R/trend_system.R:2271.
+// time. Matches `car_min_gap` in R/stan_assembly.R.
 //
 // Inputs:
 //   phi          length-n_series per-series autocorrelation in (0, 1).
@@ -190,7 +190,7 @@ arma::mat car1_recursC(
     int h) {
 
   const int n_series = phi.n_elem;
-  const double min_dt = 1e-3;
+  const double min_dt = 1e-6;
 
   // Stationarity + positivity guards. CAR(1)'s stationary formula
   // is undefined outside the (0, 1) phi range; sigma <= 0 produces

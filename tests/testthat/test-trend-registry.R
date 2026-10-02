@@ -49,7 +49,8 @@ test_that("trend properties are validated", {
       list(name = "T", supports_factors = TRUE,
            covariance_pattern = "diagonal", stationary_source = "none",
            requires_regular_intervals = TRUE,
-           per_factor_coefficients = FALSE, generator_func = generator),
+           per_factor_coefficients = FALSE, completes_time_grid = FALSE,
+           generator_func = generator),
       list(...)
     )
     do.call(register_trend_type, args)
@@ -69,8 +70,18 @@ test_that("the registry holds each trend's covariance and time facts", {
                      get_covariance_pattern, character(1))
   expect_identical(
     unname(patterns),
-    c(rep("cholesky_scaled", 3L), "full_covariance", "diagonal", "none")
+    c(rep("cholesky_scaled", 3L), "full_covariance", "cholesky_scaled",
+      "none")
   )
+  # A CAR state holds one covariance at every occasion of its grid
+  expect_identical(trend_stationary_source("CAR"), "lift")
+  # CAR alone holds a state at a time a series has no row for
+  completes <- vapply(
+    c("RW", "AR", "VAR", "ZMVN", "PW", "CAR"),
+    function(tt) get_trend_info(tt)$completes_time_grid,
+    logical(1L)
+  )
+  expect_identical(names(completes)[completes], "CAR")
   # PW samples no innovation, which removes `sigma_trend`
   expect_false(samples_innovation_scale(PW()))
   expect_true(samples_innovation_scale(CAR()))

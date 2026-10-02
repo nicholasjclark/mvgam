@@ -106,7 +106,10 @@ where \code{Omega_trend} solves \verb{Omega = A Omega A' + Sigma}, and for
 \code{AR(cor = TRUE)}, which takes the leading block of the same solve
 over the companion form of its lag set, a moving-average term
 included. At one lag that block is
-\code{Sigma[a, b] / (1 - ar_a * ar_b)}. The correlation moves with the
+\code{Sigma[a, b] / (1 - ar_a * ar_b)}, which is also the covariance a
+\code{CAR(cor = TRUE)} trend holds at every time of an irregular grid.
+That covariance is the same whatever unit the times are recorded
+in. The correlation moves with the
 scales at every order and for every lag set. A sparse lag set such
 as \code{p = c(1, 12)} bounds its coefficients one at a time and admits
 a jointly explosive draw, which has no stationary covariance. Such a

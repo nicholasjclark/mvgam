@@ -12,8 +12,10 @@
 #' and biases `phi` downward toward `phi^mean(dt)` (roughly 0.29
 #' for this dataset), leaving the SST smooth to absorb persistence
 #' that belongs to the latent state. `trend_formula = ~ CAR()`
-#' with the supplied `time` column recovers `phi` near `0.7` in
-#' continuous time and renders the SST smooth identifiable.
+#' with the supplied `time` column measures the damping over the
+#' median gap between surveys, three months here. Its `ar1_trend`
+#' is then near `0.7^3 = 0.34`, the monthly `phi` of `0.7`, and the
+#' SST smooth is identifiable.
 #'
 #' @format A `data.frame` with 150 rows and the following fields:
 #' \describe{

@@ -60,16 +60,23 @@ stopifnot(
   !any(time_vals == seq_along(time_vals))
 )
 
-# A continuous-time AR: the damping over a gap of `d` is `phi^d`, so
-# the simulation has to use the gap and not the step count.
+# A continuous-time AR in the unit the model measures gaps in, the
+# median gap. The damping over a gap of `d` is `phi^d`, the innovation
+# scales with it, and the first state comes from the stationary law.
+time_scale <- stats::median(gaps)
+model_gaps <- gaps / time_scale
 phi_true <- 0.75
 sigma_true <- 0.35
+car_step_sd <- function(phi, sigma, d) {
+  sigma * sqrt((1 - phi^(2 * d)) / (1 - phi^2))
+}
 latent <- matrix(0, nrow = n_time, ncol = n_series)
 for (s in seq_len(n_series)) {
+  latent[1L, s] <- rnorm(1L, 0, sigma_true / sqrt(1 - phi_true^2))
   for (t in 2:n_time) {
-    d <- gaps[t - 1L]
+    d <- model_gaps[t - 1L]
     latent[t, s] <- phi_true^d * latent[t - 1L, s] +
-      rnorm(1L, 0, sigma_true * sqrt(d))
+      rnorm(1L, 0, car_step_sd(phi_true, sigma_true, d))
   }
 }
 
@@ -85,8 +92,8 @@ dat$y <- rpois(nrow(dat), exp(1.2 + 0.3 * dat$temp +
 sim_truth <- list(
   n_series = n_series, n_time = n_time,
   series_levels = series_levels, time_vals = time_vals,
-  gaps = gaps, phi_true = phi_true, sigma_true = sigma_true,
-  latent = latent
+  gaps = gaps, time_scale = time_scale, phi_true = phi_true,
+  sigma_true = sigma_true, latent = latent
 )
 
 
@@ -111,7 +118,7 @@ test_that("the record keeps the irregular grid the user supplied", {
 })
 
 
-test_that("time_dis is the measured gap, not the step count", {
+test_that("time_dis is the measured gap in units of the median gap", {
   # The array the CAR recursion raises its damping to the power of.
   # A derivation that counted occasions returns a column of ones and
   # keeps every dimension, every index and every prior intact, so a
@@ -120,10 +127,10 @@ test_that("time_dis is the measured gap, not the step count", {
   td <- sd$time_dis
   expect_identical(dim(td), c(n_time, n_series))
 
-  # Step `t` carries the distance from `t - 1`; the first has no
-  # predecessor and takes 1 rather than a gap, because Stan raises
-  # the damping to this power.
-  expected <- c(1, gaps)
+  # Step `t` holds the distance from `t - 1`. The first has no
+  # predecessor and takes 1, because Stan raises the damping to this
+  # power.
+  expected <- c(1, model_gaps)
   expect_equal(as.numeric(td[, 1L]), as.numeric(expected))
   expect_identical(as.numeric(td[1L, 1L]), 1)
 
@@ -136,10 +143,16 @@ test_that("time_dis is the measured gap, not the step count", {
   for (s in seq_len(n_series)) {
     expect_equal(as.numeric(td[, s]), as.numeric(expected))
   }
-  # And the gaps are the user's own, so rescaling the time column
-  # would be visible.
-  expect_equal(sum(as.numeric(td[-1L, 1L])),
+  # The gaps span the user's own grid
+  expect_equal(sum(as.numeric(td[-1L, 1L])) * time_scale,
                as.numeric(max(time_vals) - min(time_vals)))
+  # The same grid in another time unit gives the same gaps
+  dat_scaled <- transform(dat, time = time * 7.3)
+  scaled <- mvgam(
+    formula = y ~ temp, trend_formula = ~ CAR(),
+    data = dat_scaled, family = poisson(), run_model = FALSE, silent = 2
+  )
+  expect_equal(scaled$standata$time_dis, td)
 })
 
 
@@ -204,7 +217,7 @@ test_that("a multivariate CAR refuses every trend covariate", {
   )
   expect_identical(as.integer(uni$standata$N_series_trend), 1L)
   expect_equal(as.numeric(uni$standata$time_dis[, 1L]),
-               as.numeric(c(1, gaps)))
+               as.numeric(c(1, model_gaps)))
 })
 
 
@@ -330,13 +343,9 @@ test_that("a repeated timestamp cannot collapse the damping", {
   # identity.
   dup_times <- time_vals
   dup_times[5L] <- dup_times[4L]
-  dup <- dat
-  dup$time <- rep(dup_times, times = n_series)
-  info <- list(
-    data = dup, time_var = "time", series_var = "series",
-    n_series = n_series
-  )
-  td <- mvgam:::calculate_car_time_distances(info)
+  info <- list(time_axis = list(values = as.numeric(dup_times)),
+               n_series = n_series)
+  td <- mvgam:::calculate_car_time_distances(info)$time_dis
   expect_true(all(as.numeric(td) > 0))
   expect_true(all(is.finite(as.numeric(td))))
 })
@@ -349,33 +358,37 @@ test_that("the refusals carry messages a user can act on", {
   # several patterns passes on whichever one happens to match and
   # stops telling apart the conditions it was written to separate.
 
-  # A series missing an occasion the others have. This is the
-  # refusal most particular to CAR, and its wording says so: gaps
-  # within a series are the whole point of the trend, but the
-  # series still have to align on one shared grid, since `time_dis`
-  # is one column per series over a common set of occasions.
+  # A series missing an occasion the others have. `CAR()` holds a
+  # state for that series there, and the frame is the model its
+  # NA-padded form gives. A trend that steps by position refuses it
+  # and names the trend that takes it.
   ragged <- dat[!(as.character(dat$series) == series_levels[2L] &
                     dat$time == time_vals[5L]), , drop = FALSE]
   expect_identical(nrow(ragged), nrow(dat) - 1L)
-  ragged_err <- expect_error(
+  completed <- mvgam(
+    formula = y ~ temp, trend_formula = ~ CAR(),
+    data = ragged, family = poisson(), run_model = FALSE, silent = 2
+  )
+  expect_identical(as.integer(completed$standata$N_trend),
+                   n_time * n_series)
+  expect_identical(as.integer(completed$standata$N), nrow(ragged))
+  expect_equal(completed$standata$time_dis, prefit$standata$time_dis)
+  zmvn_err <- expect_error(
     mvgam(
-      formula = y ~ temp, trend_formula = ~ CAR(),
+      formula = y ~ temp, trend_formula = ~ ZMVN(),
       data = ragged, family = poisson(), run_model = FALSE,
       silent = 2
     ),
     "must share one time grid"
   )
-  msg <- conditionMessage(ragged_err)
-  # It counts what it got against what it wanted, so the user can
-  # see which side is short.
+  msg <- conditionMessage(zmvn_err)
+  # The message gives the cells supplied and the cells a full grid has
   expect_match(msg, as.character(nrow(ragged)), fixed = TRUE)
-  expect_match(msg, as.character(n_time), fixed = TRUE)
-  expect_match(msg, as.character(n_series), fixed = TRUE)
-  # It names the remedy, and it names this trend, because a reader
-  # who chose CAR for irregular sampling needs telling that within
-  # a series is where the irregularity is allowed to live.
+  expect_match(msg, as.character(n_time * n_series), fixed = TRUE)
+  # It names the remedy and the trend that needs none
   expect_match(msg, "NA", fixed = TRUE)
-  expect_match(msg, "CAR()", fixed = TRUE)
+  expect_match(msg, "'CAR()' takes series observed at their own times",
+               fixed = TRUE)
 
   # A prediction frame with no time column. The time is the one
   # thing a forecast grid cannot do without, and the message names
@@ -415,7 +428,7 @@ test_that("the fitted CAR keeps the irregular grid", {
   expect_identical(as.integer(mvgam:::mvgam_axes(fit)$time$values),
                    time_vals)
   expect_equal(as.numeric(fit$standata$time_dis[, 1L]),
-               as.numeric(c(1, gaps)))
+               as.numeric(c(1, model_gaps)))
 })
 
 
@@ -426,10 +439,13 @@ test_that("the damping recovers the simulated one", {
   dm <- posterior::as_draws_matrix(fit$fit)
   ar_cols <- grep("^ar1_trend\\[", colnames(dm), value = TRUE)
   expect_length(ar_cols, n_series)
-  ar_mean <- mean(colMeans(dm[, ar_cols, drop = FALSE]))
-  expect_gt(ar_mean, 0)
-  expect_lt(ar_mean, 1)
-  expect_lt(abs(ar_mean - phi_true), 0.3)
+  # Twenty-six occasions leave the prior much of its weight, and the
+  # claim is that each interval holds the simulated value.
+  for (col in ar_cols) {
+    bounds <- stats::quantile(as.numeric(dm[, col]), c(0.025, 0.975))
+    expect_lt(bounds[[1L]], phi_true)
+    expect_gt(bounds[[2L]], phi_true)
+  }
 })
 
 
@@ -670,7 +686,7 @@ test_that("a CAR forecast continues the grid it was given", {
   # ignoring the gap lands on the much larger `ar1 * last`.
   dm <- posterior::as_draws_matrix(fit$fit)
   fc <- forecast(fit, newdata = future, ndraws = 600L, type = "trend")
-  first_gap <- future_times[1L] - max(time_vals)
+  first_gap <- (future_times[1L] - max(time_vals)) / time_scale
   for (k in seq_along(series_levels)) {
     ar1 <- as.numeric(dm[, paste0("ar1_trend[", k, "]")])
     last <- as.numeric(dm[, paste0("trend[", n_time, ",", k, "]")])
@@ -936,7 +952,8 @@ cont_sim <- local({
     d$y <- stats::rpois(nrow(d), exp(1.1 + 0.4 * d$temp +
                                        as.vector(lat)))
     cached <<- list(data = d, times = tv, series_names = series_names,
-                    n_series = n_s, phi = phi)
+                    n_series = n_s, phi = phi,
+                    time_scale = stats::median(diff(tv)))
     cached
   }
 })
@@ -952,7 +969,7 @@ cont_fit <- local({
         chains = 2L, iter = 1000L, warmup = 500L,
         silent = 2, backend = "cmdstanr"
       )
-    })
+    }, key = cont_sim()$time_scale)
     cached
   }
 })
@@ -968,9 +985,9 @@ test_that("the continuous grid reaches the record as the user gave it", {
   fit_c <- cont_fit()
   expect_equal(as.numeric(mvgam_axes(fit_c)$time$values),
                as.numeric(sim$times))
-  # The damping is raised to these, so they are the measured gaps.
+  # The damping is raised to the measured gaps, in median-gap units
   expect_equal(as.numeric(fit_c$standata$time_dis[, 1L]),
-               as.numeric(c(1, diff(sim$times))))
+               as.numeric(c(1, diff(sim$times) / sim$time_scale)))
 })
 
 
@@ -1078,6 +1095,394 @@ test_that("the trend panels follow the model's series order", {
                    sim$series_names)
   expect_identical(panel_order(plot(fit_c, type = "trend")),
                    sim$series_names)
+})
+
+
+# ----------------------------------------------------------------------
+# Correlated series on the continuous grid
+# ----------------------------------------------------------------------
+#
+# `CAR(cor = TRUE)` correlates the shocks of the series. The series
+# here damp at different rates under a strong correlation, and some
+# gaps are below one, where a correlation placed on the unit-gap
+# innovations fails to give a positive definite covariance. One series
+# has no response at the last two occasions, and its forecast starts
+# at the end of the grid with the others.
+
+cor_sim <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    set.seed(4242L)
+    series_names <- c("west", "north", "east")
+    k <- length(series_names)
+    tv <- cumsum(c(0.5, round(stats::runif(79L, 0.3, 4.8), 3L)))
+    n_t <- length(tv)
+    scale <- stats::median(diff(tv))
+    gaps <- diff(tv) / scale
+    phi <- c(0.9, 0.3, 0.6)
+    sigma <- c(0.5, 0.6, 0.4)
+    rate <- -log(phi)
+    cor_instant <- matrix(c(1, 0.8, -0.5, 0.8, 1, -0.3, -0.5, -0.3, 1), k)
+    gain <- sqrt(2 * rate / (1 - phi^2))
+    Sigma <- cor_instant * tcrossprod(sigma * gain) *
+      (1 - tcrossprod(phi)) / outer(rate, rate, "+")
+    gamma <- Sigma / (1 - tcrossprod(phi))
+    lat <- matrix(0, n_t, k)
+    lat[1L, ] <- t(chol(gamma)) %*% stats::rnorm(k)
+    for (t in 2:n_t) {
+      step_cov <- gamma * (1 - tcrossprod(phi)^gaps[t - 1L])
+      lat[t, ] <- phi^gaps[t - 1L] * lat[t - 1L, ] +
+        t(chol(step_cov)) %*% stats::rnorm(k)
+    }
+    d <- data.frame(
+      time = rep(tv, times = k),
+      series = factor(rep(series_names, each = n_t), levels = series_names)
+    )
+    d$y <- stats::rpois(nrow(d), exp(1.5 + as.vector(lat)))
+    d$y[d$series == "north" & d$time >= tv[n_t - 1L]] <- NA
+    cached <<- list(
+      data = d, times = tv, series_names = series_names, n_series = k,
+      time_scale = scale, gaps = gaps, phi = phi, sigma = sigma,
+      cor_instant = cor_instant
+    )
+    cached
+  }
+})
+
+cor_fit <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    cached <<- cached_fit("val_mvgam_car_correlated.rds", function() {
+      # The frame holds two missing responses, and the fit says so
+      caught <- with_warnings(mvgam(
+        formula = y ~ 1, trend_formula = ~ CAR(cor = TRUE),
+        data = cor_sim()$data, family = poisson(),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        silent = 2, backend = "cmdstanr"
+      ))
+      stopifnot(all(grepl("Rows containing NAs", caught$warnings)))
+      caught$value
+    }, key = cor_sim()[c("times", "phi", "sigma", "cor_instant")])
+    cached
+  }
+})
+
+
+test_that("the correlated CAR program is the exact continuous-time law", {
+  sim <- cor_sim()
+  fit_k <- cor_fit()
+  k <- sim$n_series
+  n_t <- length(sim$times)
+  sd <- fit_k$standata
+  # One gap entry per distinct gap, in median-gap units, some below one
+  expect_equal(as.numeric(sd$gap_trend[sd$gap_index_trend][-1L]),
+               sim$gaps, tolerance = 1e-8)
+  expect_lt(min(sim$gaps), 1)
+
+  # Ground truth is the process itself: the stored states are rebuilt
+  # from the sampled damping, scales, instantaneous correlation and
+  # innovations. Stored draws keep about six significant digits.
+  dm <- posterior::as_draws_matrix(fit_k$fit)
+  cells <- function(name, nr, nc) {
+    paste0(name, "[", rep(seq_len(nr), nc), ",",
+           rep(seq_len(nc), each = nr), "]")
+  }
+  worst <- c(Sigma = 0, state = 0)
+  for (r in c(1L, 250L, 500L, 750L, 1000L)) {
+    phi <- as.numeric(dm[r, paste0("ar1_trend[", seq_len(k), "]")])
+    sig <- as.numeric(dm[r, paste0("sigma_trend[", seq_len(k), "]")])
+    L <- matrix(as.numeric(dm[r, cells("L_Omega_trend", k, k)]), k, k)
+    z <- matrix(as.numeric(dm[r, cells("innovations_trend", n_t, k)]),
+                n_t, k)
+    rate <- -log(phi)
+    gain <- sqrt(2 * rate / (1 - phi^2))
+    Sigma <- tcrossprod(L) * tcrossprod(sig * gain) *
+      (1 - tcrossprod(phi)) / outer(rate, rate, "+")
+    diag(Sigma) <- sig^2
+    worst["Sigma"] <- max(worst["Sigma"], max(abs(
+      Sigma - matrix(as.numeric(dm[r, cells("Sigma_trend", k, k)]), k, k)
+    )))
+    gamma <- Sigma / (1 - tcrossprod(phi))
+    x <- matrix(NA_real_, n_t, k)
+    x[1L, ] <- t(chol(gamma)) %*% z[1L, ]
+    for (i in 2:n_t) {
+      d <- sim$gaps[i - 1L]
+      x[i, ] <- phi^d * x[i - 1L, ] +
+        t(chol(gamma * (1 - tcrossprod(phi)^d))) %*% z[i, ]
+    }
+    worst["state"] <- max(worst["state"], max(abs(
+      x - matrix(as.numeric(dm[r, cells("trend", n_t, k)]), n_t, k)
+    )))
+  }
+  expect_lt(worst[["Sigma"]], 1e-6)
+  expect_lt(worst[["state"]], 1e-5)
+})
+
+
+test_that("a correlated CAR forecast is the exact conditional law", {
+  sim <- cor_sim()
+  fit_k <- cor_fit()
+  k <- sim$n_series
+  n_t <- length(sim$times)
+  # The series without responses at the end of the grid is recorded as
+  # last observed earlier, and every series is stepped from the grid end
+  expect_lt(mvgam:::mvgam_axes(fit_k)$series$last_time[2L], max(sim$times))
+  leads <- c(0.05, 0.7, 2.5, 40) * sim$time_scale
+  future <- data.frame(
+    time = rep(max(sim$times) + leads, times = k),
+    series = factor(rep(sim$series_names, each = length(leads)),
+                    levels = sim$series_names),
+    y = NA_integer_
+  )
+  fc <- forecast(fit_k, newdata = future, type = "trend")
+  draws <- simplify2array(fc$forecasts)
+  dm <- posterior::as_draws_matrix(fit_k$fit)
+  phi <- unclass(dm[, paste0("ar1_trend[", seq_len(k), "]")])
+  last <- unclass(dm[, paste0("trend[", n_t, ",", seq_len(k), "]")])
+  dim(phi) <- dim(last) <- c(nrow(dm), k)
+  for (h in seq_along(leads)) {
+    gap <- leads[h] / sim$time_scale
+    cond_mean <- phi^gap * last
+    cond_cov <- stats::cov(cond_mean)
+    for (r in seq_len(nrow(dm))) {
+      p <- as.numeric(phi[r, ])
+      Sigma <- matrix(as.numeric(dm[r, paste0(
+        "Sigma_trend[", rep(seq_len(k), k), ",",
+        rep(seq_len(k), each = k), "]"
+      )]), k, k)
+      cond_cov <- cond_cov + Sigma * (1 - tcrossprod(p)^gap) /
+        (1 - tcrossprod(p)) / nrow(dm)
+    }
+    got <- stats::cov(draws[, h, ])
+    # Spread within 10 percent and correlation within 0.1 at every
+    # lead, the shortest a twentieth of the median gap
+    expect_lt(max(abs(sqrt(diag(got) / diag(cond_cov)) - 1)), 0.1)
+    expect_lt(max(abs(stats::cov2cor(got) - stats::cov2cor(cond_cov))), 0.1)
+    expect_lt(max(abs(colMeans(draws[, h, ]) - colMeans(cond_mean))), 0.1)
+  }
+
+  # A time the model was fitted on is a hindcast
+  inside <- future
+  inside$time <- rep(c(sim$times[n_t], max(sim$times) + leads[-1L]), k)
+  expect_error(forecast(fit_k, newdata = inside),
+               "begin after the last fitted time")
+})
+
+
+test_that("the correlated CAR reports the correlation of its trends", {
+  sim <- cor_sim()
+  fit_k <- cor_fit()
+  rc <- residual_cor(fit_k)
+  expect_identical(rownames(rc$cor), sim$series_names)
+  # The stationary correlation, from the stored covariance and damping
+  dm <- posterior::as_draws_matrix(fit_k$fit)
+  k <- sim$n_series
+  want <- matrix(0, k, k)
+  for (r in seq_len(nrow(dm))) {
+    p <- as.numeric(dm[r, paste0("ar1_trend[", seq_len(k), "]")])
+    Sigma <- matrix(as.numeric(dm[r, paste0(
+      "Sigma_trend[", rep(seq_len(k), k), ",", rep(seq_len(k), each = k), "]"
+    )]), k, k)
+    want <- want + stats::cov2cor(Sigma / (1 - tcrossprod(p))) / nrow(dm)
+  }
+  expect_equal(unname(rc$cor), want, tolerance = 0.02)
+  # The simulated signs: west and north together, east against both
+  off <- upper.tri(rc$cor)
+  expect_identical(sign(rc$cor[off]), sign(sim$cor_instant[off]))
+
+  expect_s3_class(lfo_cv(fit_k, min_t = sim$times[length(sim$times) - 3L]),
+                  "mvgam_lfo")
+  for (ty in c("trend", "series")) {
+    expect_equal(drawn_x(plot(fit_k, type = ty)), range(sim$times))
+  }
+})
+
+
+
+# ----------------------------------------------------------------------
+# Series observed at their own times
+# ----------------------------------------------------------------------
+#
+# The correlated frame above with each series keeping its own share of
+# the times. The trend holds a state for every series at each time any
+# series was observed, and a series enters the likelihood where it has
+# a row.
+
+own_sim <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    sim <- cor_sim()
+    set.seed(5150L)
+    d <- sim$data[!is.na(sim$data$y), ]
+    d <- d[stats::runif(nrow(d)) < 0.6, ]
+    d <- d[sample(nrow(d)), ]
+    union_times <- sort(unique(d$time))
+    padded <- merge(
+      expand.grid(time = union_times,
+                  series = factor(sim$series_names,
+                                  levels = sim$series_names)),
+      d, all.x = TRUE
+    )
+    cached <<- list(data = d, padded = padded, union_times = union_times,
+                    series_names = sim$series_names, n_series = sim$n_series)
+    cached
+  }
+})
+
+own_fit <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    cached <<- cached_fit("val_mvgam_car_own_times.rds", function() {
+      mvgam(
+        formula = y ~ 1, trend_formula = ~ CAR(cor = TRUE),
+        data = own_sim()$data, family = poisson(),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        silent = 2, backend = "cmdstanr"
+      )
+    }, key = own_sim()$data)
+    cached
+  }
+})
+
+
+test_that("series at their own times are the NA-padded model", {
+  sim <- own_sim()
+  # The premise: the series miss different times
+  per_series <- table(sim$data$series)
+  expect_true(all(per_series < length(sim$union_times)))
+
+  car <- mvgam_formula(y ~ 1, trend_formula = ~ CAR(cor = TRUE))
+  sd_own <- standata(car, data = sim$data, family = poisson())
+  caught <- with_warnings(standata(car, data = sim$padded,
+                                   family = poisson()))
+  expect_true(all(grepl("Rows containing NAs", caught$warnings)))
+  sd_pad <- caught$value
+  # One program, one trend grid and one time unit. The observations
+  # are the same cells in the order each frame lists them, and the
+  # observation design names its rows by that order.
+  shared <- setdiff(names(sd_own),
+                    c("Y", "X", "obs_trend_time", "obs_trend_series"))
+  expect_identical(sd_own[shared], sd_pad[shared])
+  cell <- function(s) paste(s$obs_trend_time, s$obs_trend_series)
+  expect_identical(
+    as.numeric(sd_own$Y)[order(cell(sd_own))],
+    as.numeric(sd_pad$Y)[order(cell(sd_pad))]
+  )
+  expect_identical(
+    as.integer(sd_own$N_trend),
+    length(sim$union_times) * sim$n_series
+  )
+  # The unit is the gap between one series' observations, which
+  # exceeds the gap between the times of the union
+  axis_time <- mvgam:::mvgam_axes(own_fit())$time
+  expect_gt(axis_time$observation_gap,
+            stats::median(diff(sim$union_times)))
+})
+
+
+test_that("each surface reports a series at its own times", {
+  sim <- own_sim()
+  fit_o <- own_fit()
+  dm <- posterior::as_draws_matrix(fit_o$fit)
+  cell_state <- function(time, series) {
+    as.numeric(dm[, paste0(
+      "trend[", match(time, sim$union_times), ",",
+      match(series, sim$series_names), "]"
+    )])
+  }
+  intercept <- as.numeric(dm[, "b_Intercept"])
+
+  hc <- hindcast(fit_o, type = "expected")
+  for (s in sim$series_names) {
+    own <- sort(sim$data$time[sim$data$series == s])
+    expect_equal(as.numeric(hc$train_times[[s]]), own)
+    expect_identical(ncol(hc$hindcasts[[s]]), length(own))
+    expect_equal(hc$hindcasts[[s]][, 3L],
+                 exp(intercept + cell_state(own[3L], s)))
+  }
+  ep <- posterior_epred(fit_o, incl_autocor = TRUE)
+  for (i in c(1L, 40L, nrow(sim$data))) {
+    expect_equal(
+      ep[, i],
+      exp(intercept + cell_state(sim$data$time[i],
+                                 as.character(sim$data$series[i])))
+    )
+  }
+  # A time inside the grid at which a series has no row takes the
+  # state the model holds there
+  first <- sim$series_names[1L]
+  absent <- setdiff(sim$union_times,
+                    sim$data$time[sim$data$series == first])[2L]
+  at_gap <- posterior_linpred(
+    fit_o, incl_autocor = TRUE,
+    newdata = data.frame(time = absent,
+                         series = factor(first, levels = sim$series_names),
+                         y = NA_integer_)
+  )
+  expect_equal(at_gap[, 1L], intercept + cell_state(absent, first))
+
+  for (ty in c("trend", "series")) {
+    expect_equal(drawn_x(plot(fit_o, type = ty)), range(sim$union_times))
+  }
+})
+
+
+test_that("forecast and its scores take each series at its own times", {
+  sim <- own_sim()
+  fit_o <- own_fit()
+  end <- max(sim$union_times)
+  future <- data.frame(
+    time = end + c(1, 4, 9, 2, 4, 30),
+    series = factor(rep(sim$series_names[1:2], each = 3L),
+                    levels = sim$series_names),
+    y = c(3L, 5L, 4L, 6L, 2L, 7L)
+  )
+  fc <- forecast(fit_o, newdata = future, type = "trend")
+  expect_equal(as.numeric(fc$test_times[[1L]]), end + c(1, 4, 9))
+  expect_equal(as.numeric(fc$test_times[[2L]]), end + c(2, 4, 30))
+  expect_identical(ncol(fc$forecasts[[3L]]), 0L)
+
+  # Every series steps from its state at the end of the grid, over
+  # the gap to its own forecast time in the fit's unit
+  dm <- posterior::as_draws_matrix(fit_o$fit)
+  unit <- mvgam:::mvgam_axes(fit_o)$time$observation_gap
+  n_t <- length(sim$union_times)
+  for (s in 1:2) {
+    phi <- as.numeric(dm[, paste0("ar1_trend[", s, "]")])
+    last <- as.numeric(dm[, paste0("trend[", n_t, ",", s, "]")])
+    scale2 <- as.numeric(dm[, paste0("Sigma_trend[", s, ",", s, "]")])
+    leads <- (as.numeric(fc$test_times[[s]]) - end) / unit
+    for (h in seq_along(leads)) {
+      draws <- fc$forecasts[[s]][, h]
+      cond_var <- mean(scale2 * (1 - phi^(2 * leads[h])) / (1 - phi^2)) +
+        stats::var(phi^leads[h] * last)
+      expect_lt(abs(mean(draws) - mean(phi^leads[h] * last)), 0.15)
+      expect_lt(abs(stats::sd(draws) / sqrt(cond_var) - 1), 0.1)
+    }
+  }
+
+  # The scores of the two series are summed at the one time they share
+  sc <- score(forecast(fit_o, newdata = future), "crps")
+  expect_identical(nrow(sc$all_series), 5L)
+  expect_equal(
+    sc$all_series$score[3L],
+    sc[[sim$series_names[1L]]]$score[2L] +
+      sc[[sim$series_names[2L]]]$score[2L]
+  )
+  expect_error(score(forecast(fit_o, newdata = future), "energy"),
+               "shared forecast horizon")
+
+  lfo <- lfo_cv(fit_o,
+                min_t = sim$union_times[length(sim$union_times) - 3L])
+  rows_at <- vapply(lfo$eval_timepoints, function(t) {
+    sum(sim$data$time == t)
+  }, integer(1L))
+  expect_identical(lfo$n_obs, rows_at)
+  expect_true(all(is.finite(lfo$elpds)))
 })
 
 

@@ -966,9 +966,16 @@ model_glossary <- function(obj) {
     if (identical(tt, "CAR")) {
       defs <- c(defs, paste0(
         "- $", trend_symbols(obj)[["ar1_trend"]],
-        "$: autocorrelation over one time unit, and ",
-        "$\\Delta t_{i,t}$ the time since series $i$ was last observed"
+        "$: autocorrelation over a gap of one, and $", car_gap_symbol,
+        "$ the time between occasions $t - 1$ and $t$ in units of the ",
+        "median gap between a series' observations"
       ))
+      if (trend_samples_cor(obj)) {
+        defs <- c(defs, paste0(
+          "- $", sigma_symbol(), "$: innovation covariance over a gap ",
+          "of one, and $\\lambda_i = -\\log \\rho_i$"
+        ))
+      }
     }
     if (identical(tt, "PW")) defs <- c(defs, pw_glossary(obj))
     gr <- trend_grouping_var(obj)
@@ -1007,13 +1014,17 @@ innovation_glossary <- function(obj, is_factor) {
     diag = paste0("- $", trend_eps_vec(obj), "$: ", what,
                   "s at time $t$, independent with SDs $", sd_vec, "$"),
     cor = paste0("- $", trend_eps_vec(obj), "$: ", what,
-                 "s at time $t$, covariance $", sigma_symbol(gr), "$")
+                 "s at time $t$, covariance $", innovation_cov_symbol(obj),
+                 "$")
   )
   # ZMVN draws the states themselves and has no innovations.
   of <- "innovations"
   if (identical(tt, "ZMVN")) {
     out <- character(0L)
     of <- "latent states"
+  }
+  if (identical(tt, "CAR")) {
+    of <- "shocks over an instant"
   }
   if (identical(form, "cor") && is.null(gr)) {
     out <- c(out, paste0(
@@ -2429,7 +2440,7 @@ innovation_rows <- function(obj, is_vector) {
   rows <- switch(form,
     cor = list(list(
       lhs = eps_vec, op = "\\sim",
-      rhs = paste0(mvn, sigma_symbol(gr), ")")
+      rhs = paste0(mvn, innovation_cov_symbol(obj), ")")
     )),
     diag = list(list(
       lhs = eps_vec, op = "\\sim",
@@ -2454,7 +2465,59 @@ covariance_rows <- function(obj) {
   gr <- trend_grouping_var(obj)
   if (!is.null(gr)) return(hierarchical_cor_rows(obj, sd))
   if (!trend_samples_cor(obj)) return(list())
-  list(cov_decomposition_row(sigma_symbol(), sd, ""))
+  is_car <- identical(obj$trend_metadata$trend_type, "CAR")
+  c(car_gap_covariance_rows(obj),
+    list(cov_decomposition_row(sigma_symbol(), sd, "",
+                               scale = if (is_car) car_coherence_symbol)),
+    if (is_car) list(car_coherence_row()))
+}
+
+# The matrix taking a continuous-time AR's instantaneous correlation
+# to its innovation correlation over a gap of one
+car_coherence_symbol <- "\\mathbf{C}"
+
+#' The row defining `car_coherence_symbol`
+#' @noRd
+car_coherence_row <- function() {
+  gain <- function(i) {
+    paste0("\\sqrt{2 \\lambda_{", i, "} / (1 - \\rho_{", i, "}^2)}")
+  }
+  list(
+    lhs = "C_{ij}", op = "=",
+    rhs = paste0(
+      gain("i"), " \\, ", gain("j"),
+      " \\, (1 - \\rho_{i} \\rho_{j}) / (\\lambda_{i} + \\lambda_{j})"
+    )
+  )
+}
+
+# The time between two successive occasions of a continuous-time AR
+car_gap_symbol <- "\\Delta_t"
+
+#' The covariance the innovation vector is written with
+#'
+#' A correlated continuous-time AR draws its innovations from a
+#' covariance that depends on the gap they span. Every other
+#' correlated trend draws them from one covariance.
+#' @noRd
+innovation_cov_symbol <- function(obj) {
+  if (identical(obj$trend_metadata$trend_type, "CAR")) {
+    return("\\mathbf{Q}_t")
+  }
+  sigma_symbol(trend_grouping_var(obj))
+}
+
+#' The row giving a correlated continuous-time AR its gap covariance
+#' @noRd
+car_gap_covariance_rows <- function(obj) {
+  if (!identical(obj$trend_metadata$trend_type, "CAR")) return(list())
+  rho <- function(i) paste0("\\rho_{", i, "}")
+  cross <- paste0(rho("i"), " ", rho("j"))
+  list(list(
+    lhs = "Q_{t,ij}", op = "=",
+    rhs = paste0("\\Sigma_{ij} \\, (1 - (", cross, ")^{", car_gap_symbol,
+                 "}) / (1 - ", cross, ")")
+  ))
 }
 
 #' How the trend's innovations are written
@@ -2499,7 +2562,7 @@ innovation_sd <- function(obj, vector = FALSE) {
     if (identical(obj$trend_metadata$trend_type, "CAR")) {
       rho <- sym[["ar1_trend"]]
       return(paste0(sym[["sigma_trend"]], " \\sqrt{(1 - ", rho,
-                    "^{2 \\Delta t_{i,t}}) / (1 - ", rho, "^2)}"))
+                    "^{2 ", car_gap_symbol, "}) / (1 - ", rho, "^2)}"))
     }
     return(sym[["sigma_trend"]])
   }
@@ -2522,8 +2585,10 @@ diag_cov_text <- function(sd) {
 }
 
 #' @noRd
-cov_decomposition_row <- function(lhs, sd, omega_sub) {
+cov_decomposition_row <- function(lhs, sd, omega_sub, scale = NULL) {
   omega <- paste0("\\boldsymbol{\\Omega}", omega_sub)
+  # A matrix multiplying the correlation element by element
+  if (!is.null(scale)) omega <- paste0("(", omega, " \\circ ", scale, ")")
   list(
     lhs = lhs, op = "=",
     rhs = if (identical(sd, "1")) omega else paste0(
@@ -2747,7 +2812,7 @@ render_latent_car <- function(obj, notation) {
       lhs = trend_eta(obj),
       op  = "=",
       rhs = paste0(
-        trend_symbols(obj)[["ar1_trend"]], "^{\\Delta t_{i,t}} ",
+        trend_symbols(obj)[["ar1_trend"]], "^{", car_gap_symbol, "} ",
         trend_eta(obj, lag = 1L),
         " + ", trend_eps(obj)
       )

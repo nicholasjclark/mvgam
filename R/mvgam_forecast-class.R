@@ -123,9 +123,22 @@ print.mvgam_forecast <- function(x, ...) {
   n_series <- length(x$series_names)
   # The count is of occasions. A closure-unit hindcast has one column
   # per visit and several visits on each occasion.
+  # One count per series. Series observed or forecast at their own
+  # times hold different numbers, and the range is printed.
   n_occasions <- function(draws, times) {
     if (length(draws) == 0L) return(0L)
-    if (is.null(times)) ncol(draws[[1L]]) else length(unique(times[[1L]]))
+    counts <- if (is.null(times)) {
+      vapply(draws, ncol, integer(1L))
+    } else {
+      vapply(times, function(t) length(unique(t)), integer(1L))
+    }
+    range(counts)
+  }
+  count_label <- function(n) {
+    if (length(unique(n)) == 1L) {
+      return(paste0(n[1L], " timepoints"))
+    }
+    paste0(n[1L], " to ", n[2L], " timepoints per series")
   }
   n_train <- n_occasions(x$hindcasts, x$train_times)
   n_test <- n_occasions(x$forecasts, x$test_times)
@@ -141,9 +154,10 @@ print.mvgam_forecast <- function(x, ...) {
     paste0("mvgam_forecast (type '", x$type %||% "response", "')"),
     paste0("  family:    ", x$family %||% "unknown"),
     paste0("  series:    ", n_series),
-    paste0("  hindcast:  ", n_train, " timepoints"),
-    paste0("  forecast:  ", n_test,
-           if (n_test == 0L) " (hindcast only)" else " timepoints"),
+    paste0("  hindcast:  ", count_label(n_train)),
+    paste0("  forecast:  ",
+           if (all(n_test == 0L)) "0 (hindcast only)" else
+             count_label(n_test)),
     paste0("  draws:     ", n_draws)
   )
   if (!is.null(ensemble_w)) {

@@ -314,7 +314,7 @@ test_that("VARMA seeds the forecast with the last innovation it fitted", {
 
 # ----- CAR -------------------------------------------------------
 
-test_that("CAR pulls phi, sigma, trend history, and last times", {
+test_that("CAR pulls phi, sigma, trend history, and the grid end", {
   n_series <- 2L; n_time <- 6L
   obs_data <- data.frame(
     time = c(1, 4, 7, 10, 12, 15,
@@ -337,7 +337,45 @@ test_that("CAR pulls phi, sigma, trend history, and last times", {
   expect_named(res$params, c("phi", "sigma"))
   expect_equal(res$params$phi, c(0.6, 0.8))
   expect_equal(res$params$sigma, c(0.3, 0.4))
-  expect_equal(unname(res$last_state$time), c(15, 16))
+  # Every series has a state at the last occasion of the grid
+  expect_equal(unname(res$last_state$time), c(16, 16))
+
+  # Correlated innovations add their unit-time covariance, and
+  # estimated degrees of freedom reach the forecast with the draw.
+  L <- matrix(c(1, 0.5, 0, sqrt(0.75)), 2L, 2L)
+  draws_cor <- make_draws(list(
+    ar1_trend = c(0.6, 0.8),
+    sigma_trend = c(0.3, 0.4),
+    L_Omega_trend = L,
+    nu_trend = 5,
+    trend = matrix(0, nrow = n_time, ncol = n_series)
+  ))
+  meta$has_cor <- TRUE
+  res_cor <- extract_last_state(
+    make_mock_fit(draws_cor, n_series, n_lv = 2L, n_time, meta,
+                  data = obs_data),
+    1L
+  )
+  expect_equal(unname(res_cor$params$Sigma),
+               tcrossprod(L * c(0.3, 0.4)), tolerance = 1e-12)
+  expect_identical(res_cor$params$df, 5)
+
+  # A forecast steps with the stored covariance. On a CAR fit it
+  # differs from the scales and correlation factor multiplied out.
+  stored <- matrix(c(0.09, 0.04, 0.04, 0.16), 2L, 2L)
+  draws_stored <- make_draws(list(
+    ar1_trend = c(0.6, 0.8),
+    sigma_trend = c(0.3, 0.4),
+    L_Omega_trend = L,
+    Sigma_trend = stored,
+    trend = matrix(0, nrow = n_time, ncol = n_series)
+  ))
+  res_stored <- extract_last_state(
+    make_mock_fit(draws_stored, n_series, n_lv = 2L, n_time, meta,
+                  data = obs_data),
+    1L
+  )
+  expect_equal(unname(res_stored$params$Sigma), stored)
 })
 
 

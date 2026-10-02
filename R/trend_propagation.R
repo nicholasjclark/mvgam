@@ -58,8 +58,13 @@
 #'     `trend_model$ma`, optional `drift`.
 #'   * **CAR(1)**: `phi` (length `n_series` or scalar, must lie
 #'     in (0, 1) for stationary CAR), `sigma` (length
-#'     `n_series` or scalar, must be positive). `time` argument
-#'     is required.
+#'     `n_series` or scalar, must be positive), optional `Sigma`
+#'     (innovation covariance over one unit of time) when
+#'     `trend_model$cor`. `time` argument is required.
+#'
+#' Every stochastic trend also takes an optional `df`, the degrees of
+#' freedom of multivariate t innovations. `Inf` or absent gives
+#' Gaussian innovations.
 #'
 #' Defaults that apply if a field is missing: `sigma = 1`,
 #' `ar = 0.7` (AR/RW), `drift = 0`, `theta = 0`,
@@ -90,6 +95,14 @@ propagate_trend <- function(trend_model,
   checkmate::assert_int(h, lower = 0L)
   checkmate::assert_int(n_series, lower = 1L)
   checkmate::assert_list(last_state, null.ok = TRUE)
+
+  # A forecast supplies each draw's degrees of freedom. A simulation
+  # takes the value fixed on the constructor, and Gaussian innovations
+  # where the constructor asks for an estimate.
+  if (is.null(params$df)) {
+    df <- trend_model$df %||% Inf
+    params$df <- if (is.na(df)) Inf else df
+  }
 
   trend_type <- trend_model$trend
 
@@ -128,7 +141,7 @@ propagate_zmvn <- function(params, h, n_series) {
     }
     Sigma <- diag(sigma_vec^2, nrow = n_series)
   }
-  rmvn(h, mu = rep(0, n_series), Sigma = Sigma)
+  rmvn(h, mu = rep(0, n_series), Sigma = Sigma, df = params$df %||% Inf)
 }
 
 
@@ -148,17 +161,67 @@ propagate_car <- function(params, h, n_series, last_state, time) {
   sigma <- params$sigma %||% 1
   if (length(phi) == 1L) phi <- rep(phi, n_series)
   if (length(sigma) == 1L) sigma <- rep(sigma, n_series)
+  if (any(phi <= 0 | phi >= 1)) {
+    stop(insight::format_error(c(
+      "CAR 'phi' must lie strictly between 0 and 1.",
+      x = paste0("Got ", paste(signif(phi, 3), collapse = ", "), "."),
+      x = "The damping across a gap is 'phi' raised to the gap."
+    )), call. = FALSE)
+  }
+  df <- params$df %||% Inf
+  Sigma <- params$Sigma
   last_trend <- if (!is.null(last_state) &&
                      !is.null(last_state$trends)) {
     as.numeric(last_state$trends[nrow(last_state$trends), ])
   } else {
-    rep(0, n_series)
+    # With no fitted state to continue, the path starts at the law the
+    # Stan program gives its first state.
+    start_cov <- car_stationary_cov(
+      phi, Sigma %||% diag(sigma^2, nrow = n_series)
+    )
+    as.numeric(rmvn(1L, mu = rep(0, n_series), Sigma = start_cov, df = df))
   }
-  innovations <- draw_trend_innovations(h, n_series, params$df %||% Inf)
-  car1_recursC(
-    phi = phi, sigma = sigma, time_dis = as.numeric(time),
-    innovations = innovations, last_trend = last_trend, h = h
-  )
+  innovations <- draw_trend_innovations(h, n_series, df)
+  if (is.null(Sigma)) {
+    return(car1_recursC(
+      phi = phi, sigma = sigma, time_dis = as.numeric(time),
+      innovations = innovations, last_trend = last_trend, h = h
+    ))
+  }
+  checkmate::assert_matrix(Sigma, nrows = n_series, ncols = n_series,
+                           any.missing = FALSE)
+  # Correlated innovations take one covariance per gap, the exact
+  # transition of the continuous-time process.
+  gamma <- car_stationary_cov(phi, Sigma)
+  states <- matrix(NA_real_, nrow = h, ncol = n_series)
+  for (step in seq_len(h)) {
+    # The floor the Stan data applies
+    gap <- max(time[step], car_min_gap)
+    gap_factor <- t(chol(car_gap_cov(phi, gamma, gap)))
+    last_trend <- phi^gap * last_trend +
+      as.numeric(gap_factor %*% innovations[step, ])
+    states[step, ] <- last_trend
+  }
+  states
+}
+
+
+# Internal: the covariance a CAR state holds at every occasion.
+# `Sigma` is the innovation covariance over one unit of time, and
+# series `a` and `b` settle at `Sigma[a, b] / (1 - phi_a * phi_b)`.
+#'@noRd
+car_stationary_cov <- function(phi, Sigma) {
+  Sigma / (1 - tcrossprod(phi))
+}
+
+
+# Internal: the innovation covariance of a CAR state across one gap,
+# from the stationary covariance `gamma`. A gap of one returns the
+# unit-time covariance `Sigma`.
+#'@noRd
+car_gap_cov <- function(phi, gamma, gap) {
+  # `expm1()` keeps the digits a small gap would lose to `1 - x^gap`
+  gamma * -expm1(gap * log(tcrossprod(phi)))
 }
 
 
@@ -365,6 +428,7 @@ propagate_arma <- function(trend_model, params, h, n_series,
     }
     Sigma <- diag(sigma_vec^2, nrow = n_series)
   }
+  df <- params$df %||% Inf
 
   # `trend_arma_recursC()` carries a general time-varying-mean
   # offset, but mvgam's programs put the trend linear predictor
@@ -381,14 +445,14 @@ propagate_arma <- function(trend_model, params, h, n_series,
     burn_in <- 200L
     last_state <- run_burnin(
       ar_lags, ma_lags, drift, A_cube, B_cube, Sigma,
-      n_series, burn_in, max_lag
+      n_series, burn_in, max_lag, df = df
     )
   } else {
     validate_last_state(last_state, max_ar, max_ma, n_series)
   }
 
   innovations <- assemble_innovations(
-    last_state$errors, h, n_series, Sigma, max_lag
+    last_state$errors, h, n_series, Sigma, max_lag, df = df
   )
 
   last_trends <- if (max_ar > 0L) {
@@ -493,9 +557,10 @@ build_arma_B <- function(has_ma, params, m_b, n_series) {
 # contract (trends, errors, time).
 #'@noRd
 run_burnin <- function(ar_lags, ma_lags, drift, A_cube, B_cube,
-                        Sigma, n_series, burn_in, max_lag) {
+                        Sigma, n_series, burn_in, max_lag, df = Inf) {
   total <- burn_in + max_lag
-  innovations <- rmvn(total, mu = rep(0, n_series), Sigma = Sigma)
+  innovations <- rmvn(total, mu = rep(0, n_series), Sigma = Sigma,
+                      df = df)
   bi_last_trends <- if (length(ar_lags) > 0L) {
     matrix(0, nrow = max(ar_lags), ncol = n_series)
   } else {
@@ -539,7 +604,8 @@ validate_last_state <- function(last_state, max_ar, max_ma,
 
 # Build the full innovations matrix used by trend_arma_recursC.
 # The first `max_lag` rows hold the innovation history and the rest
-# hold the forecast-step innovations drawn from MVN(0, Sigma).
+# hold the forecast-step innovations, drawn with covariance `Sigma`
+# from the innovation law `df` names.
 #
 # At its first step the kernel takes the lag-j innovation from
 # history row `max_lag - j + 1`, which makes the last history row
@@ -549,7 +615,7 @@ validate_last_state <- function(last_state, max_ar, max_ma,
 # the second of two.
 #'@noRd
 assemble_innovations <- function(last_errors, h, n_series, Sigma,
-                                   max_lag) {
+                                   max_lag, df = Inf) {
   total <- h + max_lag
   out <- matrix(0, nrow = total, ncol = n_series)
   n_hist <- if (is.null(last_errors)) 0L else nrow(last_errors)
@@ -559,20 +625,27 @@ assemble_innovations <- function(last_errors, h, n_series, Sigma,
   }
   if (h > 0L) {
     out[(max_lag + 1L):total, ] <- rmvn(
-      h, mu = rep(0, n_series), Sigma = Sigma
+      h, mu = rep(0, n_series), Sigma = Sigma, df = df
     )
   }
   out
 }
 
 
-# Internal: mgcv-based multivariate-normal sampler. Factor the
-# covariance via mgcv::mroot and apply to IID normals.
+# Internal: mgcv-based multivariate sampler. Factor the scale matrix
+# via mgcv::mroot and apply it to standard variates. `df = Inf` gives
+# a multivariate normal. A finite `df` gives the multivariate t of
+# `draw_trend_innovations()`, whose scale matrix is `Sigma`.
 #'@noRd
-rmvn <- function(n, mu, Sigma) {
+rmvn <- function(n, mu, Sigma, df = Inf) {
   L <- mgcv::mroot(Sigma)
   m <- ncol(L)
-  t(mu + L %*% matrix(stats::rnorm(m * n), m, n))
+  z <- if (is_gaussian_df(df)) {
+    matrix(stats::rnorm(m * n), m, n)
+  } else {
+    t(draw_trend_innovations(n, m, df))
+  }
+  t(mu + L %*% z)
 }
 
 

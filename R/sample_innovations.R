@@ -11,9 +11,10 @@
 #'
 #' \itemize{
 #'   \item \code{none}: Deterministic trends (PW) - no innovations
-#'   \item \code{diagonal}: Independent innovations per series (CAR)
+#'   \item \code{diagonal}: Independent innovations per series, which
+#'     a \code{cholesky_scaled} trend takes without \code{cor}
 #'   \item \code{cholesky_scaled}: Correlated via L_Sigma =
-#'     diag(sigma) * L_Omega (RW, AR, ZMVN)
+#'     diag(sigma) * L_Omega (RW, AR, ZMVN, CAR)
 #'   \item \code{full_covariance}: Direct covariance matrix Sigma (VAR)
 #' }
 #'
@@ -759,9 +760,40 @@ extract_simple_cholesky_params <- function(draws_mat, n_series) {
   checkmate::assert_int(n_series, lower = 1)
   list(
     sigma_trend = read_draws_vector(draws_mat, "sigma_trend", n_series),
-    L_Omega_trend = read_draws_matrix(draws_mat, "L_Omega_trend",
-                                       n_series, n_series)
+    L_Omega_trend = if (stores_innovation_cov(draws_mat)) {
+      extract_indexed_array_2d(
+        draws_mat, "Sigma_trend", n_series, n_series,
+        required_for = "Sigma_trend (innovation covariance)",
+        transform = innovation_cor_factor
+      )
+    } else {
+      read_draws_matrix(draws_mat, "L_Omega_trend", n_series, n_series)
+    }
   )
+}
+
+
+#' Whether the draws hold the innovation covariance `Sigma_trend`
+#'
+#' `Sigma_trend` is the covariance of the innovations over one step.
+#' `CAR()` places `L_Omega_trend` on the correlation of the shocks over
+#' an instant, and its `Sigma_trend` is then a different matrix from
+#' `sigma_trend` and `L_Omega_trend` multiplied out. Every post-fit
+#' path takes the innovation correlation from `Sigma_trend` where the
+#' fit stores it.
+#'
+#' @param draws Draws with one named column per parameter element
+#' @return `TRUE` or `FALSE`
+#' @noRd
+stores_innovation_cov <- function(draws) {
+  "Sigma_trend[1,1]" %in% colnames(draws)
+}
+
+
+#' Lower Cholesky factor of a covariance matrix's correlation
+#' @noRd
+innovation_cor_factor <- function(Sigma) {
+  t(chol(stats::cov2cor(Sigma)))
 }
 
 
@@ -1260,8 +1292,8 @@ map_lv_to_series_innovations <- function(lv_innov, Z, n_times,
 
 #' Transform Innovations: Diagonal Pattern
 #'
-#' For models with independent innovations per series (CAR, or RW/AR/ZMVN
-#' with cor=FALSE). Vectorized implementation without per-draw loops.
+#' For models with independent innovations per series (RW, AR, ZMVN
+#' or CAR with cor = FALSE). Vectorized implementation without per-draw loops.
 #'
 #' @param z Matrix `[ndraws x (n_times * n_series)]` of standard normals
 #' @param params List with `sigma_trend` matrix \[ndraws x n_series\]

@@ -2476,10 +2476,11 @@ extract_time_series_dimensions <- function(data, time_var = "time",
   # here spares the forecast surface a walk of the training frame,
   # which is where it was picking series out by a column the grouping
   # may have superseded.
-  series_last_time <- axis_last_times(
+  observed_times <- axis_observed_times(
     data, series_vals, series_axis, original_time %||% time_vals,
     response_axis, response_vars
   )
+  series_last_time <- axis_last_times(observed_times)
 
   dimensions$axes <- list(
     series = list(
@@ -2497,7 +2498,10 @@ extract_time_series_dimensions <- function(data, time_var = "time",
     time = list(
       values = time_values,
       n = length(sorted_unique_times),
-      step = time_step
+      step = time_step,
+      # The typical gap between two observations of one series, the
+      # unit `CAR()` measures its gaps in
+      observation_gap = axis_observation_gap(observed_times)
     ),
     # The columns of `Z` and of `lv_trend`. A model with no factor
     # constructor loads each series on its own state, so the factor
@@ -3947,11 +3951,18 @@ extract_and_validate_trend_components <- function(data, mv_spec,
                                      by_time = has_by_lv)
   }
 
-  if (!has_by_lv) {
-    refuse_ragged_trend_grid(time_vals, series_vals, parsed_trend$trend)
+  # A trend that completes its grid holds a state for a series at a
+  # time the frame has no row for. Every other trend takes one row per
+  # time and series.
+  completes_grid <- trend_completes_time_grid(parsed_trend)
+  if (completes_grid) {
+    refuse_heavy_tails_on_ragged_grid(time_vals, series_vals, parsed_trend)
+  } else if (!has_by_lv) {
+    refuse_ragged_trend_grid(time_vals, series_vals)
   }
   trend_data <- trend_cell_frame(data, covariates, time_vals, series_vals,
-                                 has_by_lv, n_lv_for_grain)
+                                 has_by_lv, n_lv_for_grain,
+                                 complete = completes_grid)
   trend_metadata <- axis_record(
     dimensions, covariates = covariates, has_by_lv = has_by_lv,
     had_by_lv = had_by_lv, n_lv_for_grain = n_lv_for_grain
@@ -4032,13 +4043,12 @@ ragged_series <- function(time_vals, series_vals) {
 #' The trend is a matrix over every time and series, and a row of
 #' `data` locates each cell. A series missing a time the others have
 #' leaves a cell with no row. The refusal names the short series and
-#' the remedy, and for `CAR()` where uneven spacing is allowed.
+#' the remedy, and the trend that takes series at their own times.
 #'
 #' @param time_vals,series_vals The resolved axes, one per row.
-#' @param trend The trend type.
 #' @return `TRUE`, invisibly.
 #' @noRd
-refuse_ragged_trend_grid <- function(time_vals, series_vals, trend) {
+refuse_ragged_trend_grid <- function(time_vals, series_vals) {
   short <- ragged_series(time_vals, series_vals)
   if (length(short) == 0L) {
     return(invisible(TRUE))
@@ -4055,10 +4065,53 @@ refuse_ragged_trend_grid <- function(time_vals, series_vals, trend) {
       " times and ", n_series, " series, expected ", n_time * n_series, "."
     ),
     i = "Give each unobserved time of a series a row with response 'NA'.",
-    if (identical(trend, "CAR")) {
-      c(i = paste0("'CAR()' allows uneven spacing between times, and ",
-                   "every series shares those times."))
-    }
+    i = "'CAR()' takes series observed at their own times."
+  )), call. = FALSE)
+}
+
+
+#' Does the trend hold a state at a time a series has no row for?
+#'
+#' @param trend_spec An `mvgam_trend`
+#' @return The trend type's registered `completes_time_grid`
+#' @noRd
+trend_completes_time_grid <- function(trend_spec) {
+  # A model with no trend has no grid to complete
+  if (is.null(trend_spec$trend)) {
+    return(FALSE)
+  }
+  isTRUE(get_trend_info(trend_spec$trend)$completes_time_grid)
+}
+
+
+#' Refuse t innovations for series observed at their own times
+#'
+#' A multivariate t draws one mixing scale per occasion. On the union
+#' of the series' times, the occasions one series is observed at then
+#' change the law of another series' trend. Gaussian innovations give
+#' the same law on any grid.
+#'
+#' @param time_vals,series_vals The resolved axes, one per row.
+#' @param trend_spec The trend spec.
+#' @return `TRUE`, invisibly.
+#' @noRd
+refuse_heavy_tails_on_ragged_grid <- function(time_vals, series_vals,
+                                              trend_spec) {
+  df <- trend_spec$df %||% Inf
+  if (!is.na(df) && is_gaussian_df(df)) {
+    return(invisible(TRUE))
+  }
+  short <- ragged_series(time_vals, series_vals)
+  if (length(short) == 0L) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    "'df' is not supported for series observed at their own times.",
+    x = paste0("Series missing a time the others have: ",
+               paste0("'", short, "'", collapse = ", "), "."),
+    x = "The times of one series would change the trend of another.",
+    i = "Give each unobserved time of a series a row with response 'NA'.",
+    i = "Gaussian innovations take the series as they are."
   )), call. = FALSE)
 }
 
@@ -4075,17 +4128,28 @@ refuse_ragged_trend_grid <- function(time_vals, series_vals, trend) {
 #' @param covariates The trend covariates.
 #' @param time_vals,series_vals The resolved axes.
 #' @param has_by_lv,n_lv_for_grain The `by = lv_axis()` grain.
+#' @param complete Whether to add a cell for each time a series has no
+#'   row at. A trend that completes its grid on several series takes
+#'   no covariates, and the added cells need none.
 #' @return A data frame sorted by time, then by series or factor.
 #' @noRd
 trend_cell_frame <- function(data, covariates, time_vals, series_vals,
-                             has_by_lv, n_lv_for_grain) {
+                             has_by_lv, n_lv_for_grain, complete = FALSE) {
+  checkmate::assert_flag(complete)
   columns <- trend_covariate_names(covariates)
   cells <- data %>%
     dplyr::mutate(time = time_vals, series = series_vals) %>%
     dplyr::group_by(.data$time, .data$series) %>%
     dplyr::summarise(dplyr::across(dplyr::all_of(columns), dplyr::first),
-                     .groups = "drop") %>%
-    dplyr::arrange(.data$time, .data$series)
+                     .groups = "drop")
+  if (complete) {
+    cells <- dplyr::full_join(
+      tidyr::expand_grid(time = unique(cells$time),
+                         series = unique(cells$series)),
+      cells, by = c("time", "series")
+    )
+  }
+  cells <- dplyr::arrange(cells, .data$time, .data$series)
   if (has_by_lv) {
     time_level <- cells %>%
       dplyr::group_by(.data$time) %>%

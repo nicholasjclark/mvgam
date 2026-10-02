@@ -86,7 +86,7 @@ the \code{subgr} units within each level of \code{gr}, which is
 the model \code{gr} exists to specify. \code{VAR()} and
 \code{ZMVN()} always estimate correlations and refuse
 \code{cor = FALSE}, as do \code{AR(gr = ...)} and
-\code{RW(gr = ...)}.}
+\code{RW(gr = ...)}. \code{CAR()} defaults to \code{FALSE}.}
 
 \item{trend_map}{Optional specification of which latent process each
 series maps onto. It fixes the loadings of a dynamic factor model.
