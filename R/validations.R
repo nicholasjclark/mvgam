@@ -2948,13 +2948,6 @@ named_var <- function(var) {
 }
 
 
-# Internal: TRUE when a variable names a column the data carries.
-#'@noRd
-usable_var <- function(var, data) {
-  named_var(var) && var %in% names(data)
-}
-
-
 # Internal: require the grouping columns a hierarchical trend needs.
 #
 # Reason: `checkmate::assert_names()` reports the missing names as an
@@ -3120,8 +3113,11 @@ validate_newdata_complete <- function(newdata, object) {
     exempt <- setdiff(exempt, vars$series_var)
   }
   absent <- setdiff(setdiff(read, exempt), names(newdata))
-  present <- intersect(read, names(newdata))
-  refuse_column_gaps(absent, na_rows(newdata, present), "newdata")
+  present <- user_axis_names(object, intersect(read, names(newdata)))
+  refuse_column_gaps(
+    user_axis_names(object, absent),
+    na_rows(newdata, intersect(present, names(newdata))), "newdata"
+  )
 }
 
 
@@ -3151,11 +3147,14 @@ refuse_unseen_levels <- function(label, seen, fitted) {
 #' @param data Frame to predict on
 #' @param metadata A fit's `trend_metadata`, or `NULL` for a model
 #'   whose frame names no axis
+#' @param series_label What the message calls the series
 #' @return `TRUE`, invisibly
 #' @noRd
-validate_prediction_factor_levels <- function(data, metadata) {
+validate_prediction_factor_levels <- function(data, metadata,
+                                              series_label = "Series") {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(metadata, names = "named", null.ok = TRUE)
+  checkmate::assert_string(series_label)
   axes <- metadata$axes
   if (is.null(axes)) {
     return(invisible(TRUE))
@@ -3177,7 +3176,7 @@ validate_prediction_factor_levels <- function(data, metadata) {
   } else if (vars$series_var %in% names(data)) {
     observed_levels(data[[vars$series_var]])
   }
-  refuse_unseen_levels("Series", seen, axes$series$levels)
+  refuse_unseen_levels(series_label, seen, axes$series$levels)
 
   for (role in c("gr", "subgr")) {
     column <- vars[[paste0(role, "_var")]]
@@ -4265,8 +4264,8 @@ normalise_loadings_prior <- function(input, data2, data,
     stop(insight::format_error(c(
       "Mismatch between supplied n_series and series levels.",
       x = paste0(
-        "Got n_series = ", n_series, ", levels(data$series) = ",
-        n_series_actual, "."
+        "Got n_series = ", n_series, ", levels of '", series_var,
+        "' = ", n_series_actual, "."
       )
     )))
   }

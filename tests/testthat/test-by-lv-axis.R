@@ -82,10 +82,9 @@ test_that("by = lv_axis() without n_lv is accepted (non-factor path)", {
   dat$series <- factor(dat$series)
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
-  # Reason: when no n_lv is set, `by = lv_axis()` is rewritten
-  # internally to `by = series` and the standard (time, series)
-  # codepath handles the rest. has_by_lv stays FALSE on the
-  # trend metadata.
+  # With no `n_lv`, `lv_axis()` becomes the series column and the
+  # trend design keeps its (time, series) grain. `has_by_lv` stays
+  # FALSE on the trend metadata.
   mod <- mvgam(
     formula = y ~ -1,
     trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,

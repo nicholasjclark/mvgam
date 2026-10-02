@@ -619,15 +619,9 @@ jsdgam <- function(formula,
 
   fit <- do.call(mvgam, forward_args)
 
-  # The frame as jsdgam prepared it, and the record of which columns
-  # the user named. `insight::find_predictors()` reads that record so
-  # a grid can be addressed by `unit` and `species` rather than by the
-  # `time` and `series` aliases mvgam fits on.
-  fit$model_data <- structure(
-    data_train,
-    prepped_trend_model = list(unit = unit_chr, species = species_chr)
-  )
-  fit$obs_data <- data_train
+  # The arguments record the unit and species columns the user
+  # named. Messages and prediction frames name those columns in
+  # place of the `time` and `series` copies mvgam fits on.
   fit$jsdgam_args <- refit_args
   # `mvgam()` stamped its own frame's call, which for a forwarded
   # fit is `do.call()`'s resolved arguments. A `jsdgam` fit was
@@ -676,6 +670,112 @@ warn_simplex_obs_formula_lacks_species <- function(formula, species_chr) {
     "jsdgam_simplex_no_species_interaction"
   )
   invisible(NULL)
+}
+
+
+#' The unit and species columns a `jsdgam()` fit was given
+#'
+#' @param object A fitted `mvgam` object
+#' @return A list naming `unit` and `species`, or `NULL` for a fit
+#'   `jsdgam()` did not build
+#' @noRd
+jsdgam_axis_names <- function(object) {
+  args <- object$jsdgam_args
+  if (is.null(args)) NULL else args[c("unit", "species")]
+}
+
+
+#' Name axis columns as the user of a `jsdgam()` fit named them
+#'
+#' A message about a frame names the unit and species columns the user
+#' supplied. The `time` and `series` copies are mvgam's own.
+#'
+#' @param object A fitted `mvgam` object
+#' @param columns Column names, some of them `time` or `series`
+#' @return `columns`, with each copy replaced by the user's column and
+#'   repeats dropped
+#' @noRd
+user_axis_names <- function(object, columns) {
+  named <- jsdgam_axis_names(object)
+  if (is.null(named)) {
+    return(columns)
+  }
+  vars <- axis_vars(object)
+  columns[columns == vars$time_var] <- named$unit
+  columns[columns == vars$series_var] <- named$species
+  unique(columns)
+}
+
+
+#' Name the series of a fit as a message about a frame calls them
+#'
+#' @param object A fitted `mvgam` object
+#' @return `"Series"`, or the user's species column for a `jsdgam()`
+#'   fit
+#' @noRd
+series_column_label <- function(object) {
+  species <- jsdgam_axis_names(object)$species
+  if (is.null(species)) "Series" else paste0("Column '", species, "'")
+}
+
+
+#' Give a frame the `time` and `series` columns a `jsdgam()` fit uses
+#'
+#' `jsdgam()` fits on `time` and `series` columns that repeat the
+#' user's unit and species columns. A frame naming only the user's
+#' columns takes the two copies here.
+#'
+#' The observation formula may use either name of the species. A
+#' prediction grid varies the column the caller conditions on and
+#' holds the other at its most frequent level, which pairs each
+#' species with the trend of another. In each row where the two
+#' differ, the column away from that level was varied, and both
+#' columns take its value.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data Frame to predict for
+#' @return `data`. A fit `jsdgam()` did not build returns it unchanged.
+#' @noRd
+jsdgam_axis_columns <- function(object, data) {
+  named <- jsdgam_axis_names(object)
+  if (is.null(named) || !is.data.frame(data)) {
+    return(data)
+  }
+  vars <- axis_vars(object)
+  # A value the training data never held keeps its own label, and the
+  # check of unseen levels names it.
+  as_fitted <- function(values, column) {
+    fitted <- object$data[[column]]
+    if (is.factor(fitted) && all(values %in% levels(fitted))) {
+      factor(as.character(values), levels = levels(fitted))
+    } else {
+      values
+    }
+  }
+  unit <- named$unit
+  if (!identical(unit, vars$time_var) && unit %in% names(data) &&
+        !vars$time_var %in% names(data)) {
+    data[[vars$time_var]] <- data[[unit]]
+  }
+  species <- named$species
+  series_var <- vars$series_var
+  if (identical(species, series_var) || !species %in% names(data)) {
+    return(data)
+  }
+  if (!series_var %in% names(data)) {
+    data[[series_var]] <- as_fitted(data[[species]], series_var)
+    return(data)
+  }
+  by_species <- as.character(data[[species]])
+  by_series <- as.character(data[[series_var]])
+  if (identical(by_species, by_series)) {
+    return(data)
+  }
+  held <- names(which.max(table(object$data[[species]])))
+  varied <- ifelse(by_species == held, by_series, by_species)
+  data[[species]] <- as_fitted(varied, species)
+  data[[series_var]] <- as_fitted(varied, series_var)
+  data
 }
 
 

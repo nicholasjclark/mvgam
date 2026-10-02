@@ -9,8 +9,6 @@
 #   - `clean_ll` (R/loo.mvgam.R) for sanitising log-lik draws.
 #   - `closure_unit_grouping` (R/families.R) for the default group
 #     key on closure-unit families (occ / nmix variants).
-#   - `mvgam_training_data` (R/brms_wrappers.mvgam.R) for the
-#     parent fit's training frame.
 #   - `update.mvgam` for per-fold refits: passing the prior arg
 #     OMITTED inherits the parent fit's pinned prior table so the
 #     compiled Stan binary is reused across all refits.
@@ -158,7 +156,7 @@ kfold.mvgam <- function(x,
     set.seed(seed)
   }
 
-  data <- mvgam_training_data(x)
+  data <- x$data
   if (is.null(data)) {
     stop(insight::format_error(c(
       "'kfold()' requires the fit's training data.",

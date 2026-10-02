@@ -1067,7 +1067,7 @@ test_that("a narrowed likelihood is paired with the rows it kept", {
   # `clean_ll()` sets `scored_columns` for exactly that, and its own
   # roxygen says a matrix paired with the frame afterwards has to be
   # narrowed with it.
-  d <- mvgam:::mvgam_training_data(fit)
+  d <- fit$data
   y <- insight::find_response(fit)
   n_missing <- sum(is.na(d[[y]]))
   expect_gt(n_missing, 0L)
@@ -1124,7 +1124,7 @@ test_that("a refit rebuilds the model that was fitted", {
   # this file asserts wherever it arises.
   expect_warning(
     refit <- update(
-      fit, newdata = mvgam:::mvgam_training_data(fit), run_model = FALSE
+      fit, newdata = fit$data, run_model = FALSE
     ),
     "Rows containing NAs"
   )

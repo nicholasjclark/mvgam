@@ -51,7 +51,7 @@ make_draws <- function(values) {
 # represent either kind faithfully.
 make_mock_fit <- function(draws, n_series, n_lv, n_time,
                             trend_metadata,
-                            obs_data = NULL,
+                            data = NULL,
                             spec_n_lv = NULL) {
   fit <- list(
     fit = draws,
@@ -64,7 +64,7 @@ make_mock_fit <- function(draws, n_series, n_lv, n_time,
       list(n_lv = spec_n_lv), class = "mvgam_trend"
     )),
     trend_metadata = trend_metadata,
-    obs_data = obs_data
+    data = data
   )
   class(fit) <- "mvgam"
   fit
@@ -332,7 +332,7 @@ test_that("CAR pulls phi, sigma, trend history, and last times", {
             list(trend_type = "CAR", ar_lags = 1L,
                  ma_lags = integer(0), max_lag = 1L, has_cor = FALSE))
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
-                        n_time, meta, obs_data = obs_data)
+                        n_time, meta, data = obs_data)
   res <- extract_last_state(fit, 1L)
   expect_named(res$params, c("phi", "sigma"))
   expect_equal(res$params$phi, c(0.6, 0.8))

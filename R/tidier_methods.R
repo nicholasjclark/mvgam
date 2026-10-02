@@ -345,7 +345,7 @@ broom_summary_fns <- function(robust = FALSE,
 #' @inheritParams forecast.mvgam
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A tibble (or `list`, when `class(x$obs_data) == "list"`)
+#' @return A tibble (or `list`, when `class(x$data) == "list"`)
 #'   with the original training data plus:
 #'
 #'   * `.observed` -- the response value.
@@ -429,7 +429,7 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
     return(dplyr::bind_rows(stacked))
   }
 
-  obs_data <- mvgam_training_data(x)
+  obs_data <- x$data
   obs_data$.observed <- obs_data[[response_column(x, resp)]]
   obs_data <- purrr::discard_at(
     obs_data,
@@ -501,7 +501,7 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   } else {
     c(obs_data, fit_summ, resid_summ, list(.unit = unit_id))
   }
-  if (!identical(class(x$obs_data), "list")) {
+  if (!identical(class(x$data), "list")) {
     augmented <- tibble::as_tibble(augmented)
   }
   augmented
@@ -592,7 +592,7 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
   link_name <- if (inherits(fam, "family")) fam$link else
     NA_character_
 
-  d <- mvgam_training_data(x)
+  d <- x$data
   out <- tibble::tibble(
     algorithm = glance_algorithm(x),
     pss = posterior::ndraws(posterior::as_draws(x$fit)),

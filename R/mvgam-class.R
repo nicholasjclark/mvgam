@@ -95,12 +95,6 @@
 #'     `trend_metadata` is `NULL` for a model without a trend whose
 #'     data lack a time column or a series column.
 #'
-#'   - `series_info` The number of series in the `series` column, empty
-#'     when the data lack that column
-#'
-#'   - `time_info` The number of time points in the `time` column, empty
-#'     when the data lack that column
-#'
 #'   - `obs_model` A `brmsfit` of the observation model. Prediction at
 #'     new data builds design matrices from it
 #'
@@ -132,19 +126,13 @@
 #'   - `creation_time` A `POSIXct` timestamp
 #'
 #'   A fit from [jsdgam()] has class `c("mvgam", "jsdgam", "brmsfit")`
-#'   and three
-#'   further elements:
+#'   and one further element. Its `data` carries `time` and `series`
+#'   columns copied from the `unit` and `species` columns:
 #'
-#'   - `obs_data` The data frame after `jsdgam()` prepared it, with
-#'     `time` and `series` columns derived from `unit` and `species`
-#'
-#'   - `model_data` The same frame, with a `prepped_trend_model`
-#'     attribute recording the `unit` and `species` column names.
-#'     `insight::find_predictors()` uses it to address a prediction grid
-#'     by the original column names
-#'
-#'   - `jsdgam_args` The arguments of the `jsdgam()` call. [update()]
-#'     refits through `jsdgam()` with them
+#'   - `jsdgam_args` The arguments of the `jsdgam()` call, with `unit`
+#'     and `species` as column names. [update()] refits through
+#'     `jsdgam()` with them, and prediction accepts a frame naming the
+#'     `unit` and `species` columns alone
 #'
 #' @seealso [mvgam], [jsdgam], [mvgam_forecast-class]
 #'

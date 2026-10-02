@@ -760,7 +760,7 @@ test_that("update() refits this model and the refit forecasts", {
   held_out <- dat[dat$time > cutoff, ]
   short <- update(fit, newdata = dat[dat$time <= cutoff, ],
                   recompile = FALSE, chains = 1L, iter = 400L)
-  expect_identical(nrow(mvgam:::mvgam_training_data(short)),
+  expect_identical(nrow(short$data),
                    sum(dat$time <= cutoff))
   expect_identical(posterior::ndraws(posterior::as_draws_matrix(short$fit)),
                    200L)

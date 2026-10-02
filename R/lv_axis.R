@@ -57,8 +57,8 @@
 #' factor. The coefficient of one factor has no scale of its own: the
 #' loadings and the factor effects trade scale, and their product is
 #' what the data identify. [conditional_effects()] and [predict()]
-#' report that product, the effect of the covariate on a series. Pass
-#' `series = "all"` to [conditional_effects()] for a panel per series.
+#' report that product, the effect of the covariate on each series,
+#' and [conditional_effects()] draws a panel per series.
 #'
 #' @seealso [mvgam()], [jsdgam()], [conditional_effects.mvgam()]
 #'
@@ -115,9 +115,8 @@
 #'   chains        = 2,
 #'   silent        = 2
 #' )
-#' # The seasonal effect on each series. With no `series` argument
-#' # the panel shows the first series alone.
-#' conditional_effects(mod_factors, series = "all")
+#' # The seasonal effect on each series
+#' conditional_effects(mod_factors)
 #'
 #' # The series column is refused in a trend term
 #' try(mvgam(

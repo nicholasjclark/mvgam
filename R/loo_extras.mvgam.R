@@ -487,7 +487,7 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
   # The weights are one per observation the likelihood scored, which
   # is a closure unit for the detection families and a row for
   # everything else, so the prediction reaches that grain first.
-  preds <- at_loglik_grain(object, mvgam_training_data(object), preds)
+  preds <- at_loglik_grain(object, object$data, preds)
   # A prediction covers every observation; the weights cover only
   # those the likelihood could score. Narrow the prediction to those
   # before pairing the two, or a fit with any missing response asks
@@ -587,7 +587,7 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   resolve_resp(object, resp, required = TRUE, caller = "loo_R2()")
   require_loo_pairing(object, "loo_R2")
   local_seed(seed)
-  data_used <- mvgam_training_data(object)
+  data_used <- object$data
   y_col <- response_column(object, resp)
   y <- data_used[[y_col]]
   if (!is.numeric(y)) {

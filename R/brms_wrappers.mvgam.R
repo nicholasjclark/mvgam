@@ -408,7 +408,7 @@ predictive_error.mvgam <- function(object, newdata = NULL,
   }
   resolve_resp(object, resp, required = TRUE,
                caller = "predictive_error()")
-  data <- if (is.null(newdata)) object$data else newdata
+  data <- prediction_frame(object, newdata)
   resp_name <- response_column(object, resp)
   if (!resp_name %in% names(data)) {
     stop(insight::format_error(c(
@@ -482,24 +482,26 @@ nsamples.mvgam <- function(object, ...) {
 }
 
 
-# Internal: training data for a fitted `mvgam`. Prefers
-# `obs_data` (the post-fit canonical slot) and falls back to
-# `data` (raw input). Returns NULL when neither slot is set.
-# Defined once so every caller reads the training data the same
-# way. Assertion is intentionally
-# omitted: called in low-overhead inner loops where the caller
-# has already validated.
-#'@noRd
-mvgam_training_data <- function(object) {
-  object$obs_data %||% object$data
-}
-
-
-# Internal: the frame a prediction method works on, `newdata` or else
-# the training data.
-#'@noRd
+#' The frame a prediction is made for
+#'
+#' `newdata` where the caller gave one, with the `time` and `series`
+#' columns of a `jsdgam()` fit filled in, and the training data
+#' otherwise.
+#'
+#' @param object A fitted `mvgam` object
+#' @param newdata The caller's frame, or `NULL`
+#' @return A data frame
+#' @noRd
 prediction_frame <- function(object, newdata = NULL) {
-  out <- newdata %||% mvgam_training_data(object)
+  if (!is.null(newdata)) {
+    if (NROW(newdata) == 0L) {
+      stop(insight::format_error(
+        "'newdata' requires at least one row."
+      ), call. = FALSE)
+    }
+    return(jsdgam_axis_columns(object, newdata))
+  }
+  out <- object$data
   if (is.null(out)) {
     stop(insight::format_error(c(
       "'newdata' is required for this fit.",

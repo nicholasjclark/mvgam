@@ -60,7 +60,7 @@ test_that("the trend line names the order and drops an empty formula", {
   expect_null(trend_predictors(list(trend_formula = ~1)))
   expect_identical(trend_predictors(list(trend_formula = y ~ elev)), "~elev")
   # The user's spelling prints, less the constructor. The stored copy
-  # holds `by = series` and a `- 1`.
+  # holds the series column in place of `lv_axis()`, and a `- 1`.
   expect_identical(
     trend_predictors(list(trend_call = ~ s(x, by = lv_axis()) + AR())),
     "~s(x, by = lv_axis())"

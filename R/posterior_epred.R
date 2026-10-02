@@ -445,17 +445,7 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   validate_draw_selectors(ndraws, draw_ids)
   rlang::check_dots_empty()
 
-  # Handle newdata = NULL (use training data)
-  if (is.null(newdata)) {
-    if (is.null(object$data)) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "No training data found in model object. Please provide {.field newdata} explicitly."
-        )
-      ))
-    }
-    newdata <- object$data
-  }
+  newdata <- prediction_frame(object, newdata)
 
   # The linear predictor and the distributional parameters are drawn
   # by separate extractions, so a requested count is materialised as
@@ -802,7 +792,7 @@ extract_trials_for_family <- function(object, family, newdata) {
   # whose response was missing, so the denominator is resolved
   # against that data rather than reused from `standata`, which is
   # sized to the likelihood's observed rows.
-  pred_data <- if (is.null(newdata)) object$data else newdata
+  pred_data <- prediction_frame(object, newdata)
   trials <- resolve_trials_denominator(object$formula, pred_data) %||%
     pred_data$trials
 

@@ -112,10 +112,8 @@ printed_trend_label <- function(x) {
 
 #' How many series and time points a model was built on
 #'
-#' Read from the axes the fit records, which a prefit carries as well
-#' as a fitted model, so the two print alike. `series_info` and
-#' `time_info` answer for a model built before the record existed and
-#' for one with no trend, where no axes are resolved.
+#' Counted on the axes the fit records. A prefit carries the same
+#' record, and the two print alike.
 #'
 #' @param x An `mvgam` or `mvgam_prefit` object
 #' @return List with `n_series` and `n_timepoints`, either possibly
@@ -124,8 +122,8 @@ printed_trend_label <- function(x) {
 printed_axis_counts <- function(x) {
   axes <- mvgam_axes(x)
   list(
-    n_series = axes$series$n %||% x$series_info$n_series,
-    n_timepoints = axes$time$n %||% x$time_info$n_timepoints
+    n_series = axes$series$n,
+    n_timepoints = axes$time$n
   )
 }
 

@@ -60,12 +60,13 @@ covariate effect with the latent process held out. Set \code{TRUE} to
 integrate over the trend's dynamics, which widens the band by the
 latent state's own spread.}
 
-\item{series}{Optional control over the \code{series} factor in
-multi-series fits. \code{NULL} (the default) marginalises over series,
-matching brms's behaviour for a grouping factor. \code{"all"} adds
-\code{series} to each condition tuple so the plot facets by series.
-A single integer or character value picks one series and filters
-the prediction grid to that series's observations.}
+\item{series}{Which series the panels show. \code{NULL} (the default)
+draws one panel per effect at the reference series, as brms does
+for a grouping factor. A factor model whose \code{trend_formula} uses
+\code{\link[=lv_axis]{lv_axis()}} gives each series its own effect, and \code{NULL} then
+draws a panel per series. \code{"all"} draws a panel per series for
+any model. A single integer or character value picks one series
+and filters the prediction grid to its observations.}
 
 \item{resp}{For multivariate (multiple-response) models, the
 name of a single response variable to return results for.

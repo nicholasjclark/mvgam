@@ -204,15 +204,8 @@ test_that("the mean is the linear predictor, with no correction", {
 })
 
 
-test_that("the truncation diagnostic reads M from the Stan data", {
-  # `M` is Stan data. It was read from `model_data` first, which a
-  # `jsdgam()` fit sets to its frame: a frame has no `M`, and the
-  # diagnostic refused every jsdgam tweedie fit.
+test_that("the truncation diagnostic reports M of the Stan data", {
   expect_message(check_tweedie_truncation(fit),
-                 paste0("M = ", fit$standata$M, ","), fixed = TRUE)
-  framed <- fit
-  framed$model_data <- mvgam:::mvgam_training_data(fit)
-  expect_message(check_tweedie_truncation(framed),
                  paste0("M = ", fit$standata$M, ","), fixed = TRUE)
 })
 

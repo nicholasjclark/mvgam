@@ -35,12 +35,13 @@
 #'   covariate effect with the latent process held out. Set `TRUE` to
 #'   integrate over the trend's dynamics, which widens the band by the
 #'   latent state's own spread.
-#' @param series Optional control over the `series` factor in
-#'   multi-series fits. `NULL` (the default) marginalises over series,
-#'   matching brms's behaviour for a grouping factor. `"all"` adds
-#'   `series` to each condition tuple so the plot facets by series.
-#'   A single integer or character value picks one series and filters
-#'   the prediction grid to that series's observations.
+#' @param series Which series the panels show. `NULL` (the default)
+#'   draws one panel per effect at the reference series, as brms does
+#'   for a grouping factor. A factor model whose `trend_formula` uses
+#'   [lv_axis()] gives each series its own effect, and `NULL` then
+#'   draws a panel per series. `"all"` draws a panel per series for
+#'   any model. A single integer or character value picks one series
+#'   and filters the prediction grid to its observations.
 #' @inheritParams forecast.mvgam
 #' @param ... Additional arguments forwarded to
 #'   [marginaleffects::plot_predictions()].
@@ -230,6 +231,18 @@ conditional_effects.mvgam <- function(x,
   attr(model, "mvgam_predict_args") <- list(
     resp = resp, process_error = process_error
   )
+  # With `lv_axis()` in a factor model the loadings give each series
+  # its own effect of every trend term. The panels facet by series
+  # unless the caller chose otherwise, wherever the data names the
+  # series and the effect leaves room for one more variable.
+  series_var <- axis_vars(x)$series_var
+  facet_by_default <- identical(series_mode$kind, "none") &&
+    isTRUE(x$trend_metadata$has_by_lv) && series_var %in% names(x$data)
+  # `jsdgam()` keeps the user's species column as a second name for
+  # the series. An effect of either name already shows every series.
+  series_names <- c(
+    series_var, jsdgam_axis_names(x)$species
+  )
   out <- lapply(cond_labs, function(cond) {
     pp_args <- list(
       condition = cond,
@@ -243,7 +256,6 @@ conditional_effects.mvgam <- function(x,
       # variables. A column added to the frame here never reaches it.
       # A fit deriving its series from `gr` and `subgr` has no such
       # variable, and the refusal names that.
-      series_var <- axis_vars(x)$series_var
       if (!series_var %in% names(x$data)) {
         stop(insight::format_error(c(
           "Faceting by series needs a series column in the data.",
@@ -255,9 +267,12 @@ conditional_effects.mvgam <- function(x,
         )), call. = FALSE)
       }
       pp_args$condition <- c(cond, series_var)
+    } else if (facet_by_default && length(cond) < 3L &&
+                 !any(series_names %in% cond)) {
+      pp_args$condition <- c(cond, series_var)
     } else if (identical(series_mode$kind, "one")) {
       # Restrict the prediction grid to one series's observations.
-      rows <- axis_row_series(x, x$data) %||% x$data$series
+      rows <- axis_row_series(x, x$data) %||% x$data[[series_var]]
       pp_args$newdata <- x$data[
         !is.na(rows) & rows == series_mode$level, , drop = FALSE
       ]
@@ -265,7 +280,7 @@ conditional_effects.mvgam <- function(x,
     p <- style_effect_panel(
       do.call(marginaleffects::plot_predictions,
               c(list(model), pp_args, list(...))),
-      pp_args$condition, axis_vars(x)$series_var
+      pp_args$condition, series_var
     )
     # marginaleffects defaults the y-axis label to the model's
     # first response name. For multi-response fits we know which

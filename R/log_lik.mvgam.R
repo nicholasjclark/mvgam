@@ -113,7 +113,7 @@ log_lik.mvgam <- function(object,
     autocor_supplied = !missing(incl_autocor)
   )
 
-  newdata <- newdata %||% mvgam_training_data(object)
+  newdata <- prediction_frame(object, newdata)
 
   # The linear predictor and the distributional parameters are drawn
   # by separate extractions, so `ndraws` is materialised as concrete

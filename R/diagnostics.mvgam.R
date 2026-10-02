@@ -288,7 +288,7 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
     posterior_epred(object, incl_autocor = TRUE, ...)
   }
   y_col <- response_column(object, resp)
-  y <- mvgam_training_data(object)[[y_col]]
+  y <- object$data[[y_col]]
   if (!is.numeric(y)) {
     stop(insight::format_error(c(
       "'bayes_R2()' requires a numeric response.",

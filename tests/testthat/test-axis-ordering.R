@@ -711,11 +711,8 @@ expect_postfit_sound <- function(prefit, resp_names, lab, frame,
   n_time <- as.integer(sd$N_time_trend)
   expected <- frame_axis_labels(frame_name) %||% resp_names
 
-  # The accessor, not the field. Every post-fit reader asks through
-  # `mvgam_axes()`, which also understands the older spelling a fit
-  # saved before the record carries, so reading
-  # `trend_metadata$axes` directly would leave the one function they
-  # all share untested.
+  # Every post-fit function takes the axes from `mvgam_axes()`, and
+  # the test calls that accessor too.
   acc <- mvgam:::mvgam_axes(prefit)
   expect_identical(
     as.character(acc$series$levels), as.character(expected),
@@ -1266,8 +1263,8 @@ axis_matrix <- function() {
     # one per series. The cell exists to pin that second grain,
     # which no other cell exercises.
     list("by lv / AR factor", "long",
-         ~ s(env, by = lv_axis()) + AR(p = 1, n_lv = 2), "sound",
-         "uni"),
+         ~ s(time, by = lv_axis(), k = 4) + AR(p = 1, n_lv = 2),
+         "sound", "uni"),
     # `CAR()` never reaches that second grain, and the two cells
     # below say why rather than leaving the combination untried.
     # `time_dis` is declared `[N_time_trend, N_series_trend]` and

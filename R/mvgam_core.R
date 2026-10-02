@@ -832,12 +832,16 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 #' @param newdata A `data.frame` of prediction covariates in the same
 #'   shape as the training data.
 #' @param data The training `data.frame` of the model, whose series
-#'   levels define the valid set.
+#'   levels define the valid set. A fitted model from [mvgam()] or
+#'   [jsdgam()] is also accepted. `newdata` is then checked against
+#'   every column the fitted formulas use, and `trend_formula` is
+#'   ignored.
 #' @param trend_formula The trend formula passed to [mvgam()], or
 #'   `NULL` for a model without a trend.
 #' @return `newdata` with its series column coerced to the training
 #'   factor levels, returned invisibly, or `NULL` (invisibly) when
-#'   `newdata` is `NULL`.
+#'   `newdata` is `NULL`. Checked against a fitted model, `newdata`
+#'   is returned with the columns that model predicts from.
 #' @seealso [predict.mvgam()], [forecast.mvgam()]
 #' @examples
 #' train <- data.frame(
@@ -858,6 +862,15 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 check_newdata <- function(newdata, data, trend_formula = NULL) {
   if (is.null(newdata)) return(invisible(NULL))
   checkmate::assert_data_frame(newdata)
+  if (inherits(data, "mvgam")) {
+    newdata <- prediction_frame(data, newdata)
+    validate_newdata_complete(newdata, data)
+    validate_prediction_factor_levels(
+      newdata, data$trend_metadata,
+      series_label = series_column_label(data)
+    )
+    return(invisible(newdata))
+  }
   checkmate::assert_formula(trend_formula, null.ok = TRUE)
   spec <- if (!is.null(trend_formula)) {
     parse_trend_formula(trend_formula)$trend_model
@@ -1225,8 +1238,6 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       standata = combined_standata %||% obs_setup$standata,
       save_pars = save_pars,
       mv_spec = mv_spec,
-      series_info = extract_series_information(obs_setup$data),
-      time_info = extract_time_information(obs_setup$data),
       trend_metadata = trend_metadata,
       # Store lightweight brmsfit objects for prediction workflows
       obs_model = obs_setup$brmsfit,
@@ -1346,7 +1357,7 @@ prune_stored_formula_envs <- function(x, depth = 0L) {
 
 # Build a no-fit mvgam stub from generated stan_components. Used by
 # the `run_model = FALSE` path: callers get an mvgam-shaped
-# list with `stancode`, `standata`, `obs_data`, `trend_metadata` and
+# list with `stancode`, `standata`, `data`, `trend_metadata` and
 # friends populated, but `fit` is left NULL because no sampling
 # happened. The stub is an `mvgam` first, and every method dispatches
 # to the `mvgam` one; `print()`, `stancode()`, `standata()` and
@@ -1414,43 +1425,6 @@ create_mvgam_stub_from_stan_components <- function(
 }
 
 
-
-# ------------------------------------------------------------------------------
-# COMPONENT EXTRACTION
-# ------------------------------------------------------------------------------
-# Extracts mvgam-specific metadata and information from the combined fit to
-# enable specialized State-Space model functionality and analysis.
-
-#' Extract Time Information from Data
-#' @param data Model data frame
-#' @return List with time-related metadata
-#' @noRd
-extract_time_information <- function(data) {
-  # Only the count is read, by `print()` and `summary()`. The range,
-  # the spacing and the presence marker were written and never read.
-  if ("time" %in% names(data)) {
-    list(n_timepoints = length(unique(data$time)))
-  } else {
-    list()
-  }
-}
-
-#' Extract Series Information from Data
-#' @param data Model data frame
-#' @return List with series-related metadata
-#' @noRd
-extract_series_information <- function(data) {
-  # Only the count is read, by `print()`, `summary()` and the plot
-  # and prediction helpers. The names were taken in data row order
-  # rather than axis order and were never read; the response names
-  # are read from `mv_spec` wherever they are wanted; and the two
-  # presence markers had no readers at all.
-  series_info <- list()
-  if ("series" %in% names(data)) {
-    series_info$n_series <- length(unique(data$series))
-  }
-  series_info
-}
 
 # ==============================================================================
 # MULTIPLE IMPUTATION SUPPORT: RUBIN'S RULES POOLING

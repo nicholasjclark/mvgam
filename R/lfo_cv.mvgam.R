@@ -39,7 +39,7 @@
 #' @param newdata Optional `data.frame` containing the response,
 #'   `time`, `series` and any covariates required by the model
 #'   formula. When `NULL`, the original training data
-#'   (`object$obs_data` or `object$data`) is used. All series must
+#'   (`object$data`) is used. All series must
 #'   share the same set of observed time values.
 #' @param data Deprecated. Use `newdata` instead.
 #' @param min_t Numeric; the time *value* at which the initial
@@ -205,13 +205,7 @@ lfo_cv.mvgam <- function(object,
     }
   }
 
-  all_data <- newdata %||% mvgam_training_data(object)
-  if (is.null(all_data)) {
-    stop(insight::format_error(c(
-      "No data available to roll the LFO window over.",
-      i = "Pass the full data frame via 'newdata'."
-    )))
-  }
+  all_data <- prediction_frame(object, newdata)
 
   time_var <- axis_vars(object)$time_var
   # Only the time is demanded. Which rows belong to which series is

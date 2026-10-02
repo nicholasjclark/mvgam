@@ -316,12 +316,10 @@ print.mvgam_active_factors <- function(x, ...) {
 #'
 #' @noRd
 loading_series_count <- function(object) {
-  # The rows of `Z` are the series axis, so this is the axis's own
-  # count. It used to try three sources in turn, the middle one
-  # being `levels(object$obs_data$series)`: a column's declared
-  # levels, which count a level nothing observes and so size every
-  # loadings surface one series too wide on a frame carrying a
-  # spare level.
+  # The rows of `Z` are the series axis, and the axis record counts
+  # them. A column's declared levels can include a level with zero
+  # rows, which would size every loadings surface one series too
+  # wide.
   n <- mvgam_axes(object)$series$n
   if (!is.null(n)) {
     return(as.integer(n))

@@ -613,7 +613,7 @@ test_that("the two sample-size accessors agree", {
   # compared anything; the occupancy fit here is `fit`, and it runs
   # below the nmix fit because that is where both exist.
   for (f in list(fit, nmix_fit)) {
-    d <- mvgam:::mvgam_training_data(f)
+    d <- f$data
     n_unit <- as.integer(f$standata$N_unit)
     expect_gt(nrow(d), n_unit)
     printed <- capture.output(summary(f))
@@ -840,7 +840,7 @@ test_that("a fold holds out whole closure units", {
   # `occ()` fit it answered NULL, every visit became its own fold,
   # and all 75 units were split.
   obj <- gappy_fits()
-  d <- obj$gappy$obs_data %||% obj$gappy$data
+  d <- obj$gappy$data
   arrays <- mvgam:::closure_unit_arrays_for(obj$gappy, d)
   keys <- mvgam:::resolve_kfold_group(obj$gappy, NULL, d)
 
@@ -998,7 +998,7 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
   # the fit kept rather than the one the simulation built. The
   # simulation frame has no `time`, and passing it raises there
   # instead of reaching the claim.
-  d <- as.data.frame(fit$obs_data)
+  d <- as.data.frame(fit$data)
   raw <- sim$data
   n_unit_jsdm <- K * n_sites
   says <- function(claim) paste0(nm, ": ", claim)
@@ -1178,7 +1178,7 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
     )
     err <- expect_error(
       posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-      "Series in 'newdata' has levels absent from the training data"
+      "'species' in 'newdata' has levels absent from the training data"
     )
     expect_match(conditionMessage(err), "sp_unseen", fixed = TRUE)
     for (s in lev) {

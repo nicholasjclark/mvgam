@@ -718,7 +718,7 @@ test_that("a variance reads a scale written with its own formula", {
   # `sigma` the model has. Asserting only that the answer is finite
   # would not have caught it, and asserting only that it runs would
   # not catch a scale read from the wrong observation.
-  d <- mvgam:::mvgam_training_data(fit_dpar)
+  d <- fit_dpar$data
   ids <- 1:100
   sigma <- mvgam:::resolve_family_pars(
     fit_dpar, dpar_names = "sigma", ndraws = length(ids),
@@ -810,7 +810,7 @@ test_that("a truncated prediction follows the truncated law", {
   # and rejecting-then-clamping piled mass exactly on the bound.
   # Both are invisible to `all(y >= lb)`, which is why the check is
   # made against the truncated distribution itself.
-  d <- mvgam:::mvgam_training_data(fit_trunc)
+  d <- fit_trunc$data
   yrep <- posterior_predict(fit_trunc, incl_autocor = TRUE)
   expect_true(all(yrep >= 0))
 
@@ -933,7 +933,7 @@ test_that("a fold splits the simplest frame there is", {
   #
   # This frame is the control that says so, because there is nothing
   # about it a guard could legitimately object to.
-  d <- mvgam:::mvgam_training_data(fit_plain)
+  d <- fit_plain$data
   expect_identical(length(unique(d$series)), 1L)
   expect_false(any(diff(sort(unique(d$time))) != 1L))
 

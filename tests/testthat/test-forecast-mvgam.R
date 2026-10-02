@@ -36,7 +36,6 @@ make_mock_mvgam <- function(series_levels = "s1", n_time = 10L,
   fit <- list(
     fit = structure(list(), class = "fake_stanfit"),
     data = d,
-    obs_data = d,
     formula = stats::as.formula("y ~ 1"),
     call = match.call(),
     trend_call = stats::as.formula("~ AR(p = 1)"),

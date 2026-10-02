@@ -2,7 +2,7 @@
 # port, class and slot plumbing. Three layers:
 #   1. Argument validation: 'unit' / 'species' / 'n_lv' / 'data'.
 #   2. Class + slot plumbing: the `jsdgam` class and the
-#      prepped_trend_model attribute populated correctly.
+#      recorded unit and species column names.
 #   3. Forward-compat smoke test: a minimal jsdgam call composes
 #      cleanly with the brms-integration mvgam() pipeline.
 
@@ -206,16 +206,11 @@ test_that("jsdgam returns c('mvgam', 'jsdgam') and the metadata slots", {
   )
   expect_identical(class(mod), c("mvgam", "jsdgam", "mvgam_prefit"))
 
-  prepped <- attr(mod$model_data, "prepped_trend_model")
-  expect_type(prepped, "list")
-  expect_identical(prepped$unit, "time")
-  expect_identical(prepped$species, "species")
-
-  expect_true(!is.null(mod$obs_data))
-  expect_true(!is.null(mod$model_data))
+  expect_identical(mvgam:::jsdgam_axis_names(mod),
+                   list(unit = "time", species = "species"))
 })
 
-test_that("jsdgam preserves the unit column name on prepped_trend_model", {
+test_that("jsdgam records the unit column name the user gave", {
   dat <- build_jsdgam_toy()
   dat$site <- dat$time
   dat$time <- NULL
@@ -225,11 +220,8 @@ test_that("jsdgam preserves the unit column name on prepped_trend_model", {
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
   )
-  expect_identical(
-    attr(mod$model_data, "prepped_trend_model")$unit,
-    "site"
-  )
-  expect_true("time" %in% names(mod$model_data))
+  expect_identical(mvgam:::jsdgam_axis_names(mod)$unit, "site")
+  expect_true("time" %in% names(mod$data))
 })
 
 # 3. Forward-compat composition --------------------------------------------
@@ -598,4 +590,32 @@ test_that("a species column is required only when the formula needs one", {
               family = poisson(), run_model = FALSE)),
     "species"
   )
+})
+
+
+test_that("a frame takes the series and time a jsdgam fit uses", {
+  lev <- c("ant", "bee", "cod")
+  train <- data.frame(
+    site = rep(1:2, times = 3L),
+    sp = factor(rep(lev, each = 2L), levels = lev)
+  )
+  train$time <- train$site
+  train$series <- train$sp
+  fit <- list(data = train,
+              jsdgam_args = list(unit = "site", species = "sp"))
+  # A frame naming only the user's columns takes both copies.
+  filled <- jsdgam_axis_columns(fit, train[c("site", "sp")])
+  expect_identical(filled$time, train$site)
+  expect_identical(filled$series, train$sp)
+  # A grid varies one name of the species and holds the other at one
+  # level. Both then take the varied value.
+  held <- factor("ant", levels = lev)
+  for (grid in list(
+    data.frame(sp = factor(lev, levels = lev), series = held, time = 1L),
+    data.frame(sp = held, series = factor(lev, levels = lev), time = 1L)
+  )) {
+    aligned <- jsdgam_axis_columns(fit, grid)
+    expect_identical(as.character(aligned$sp), lev)
+    expect_identical(aligned$series, aligned$sp)
+  }
 })

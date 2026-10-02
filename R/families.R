@@ -550,8 +550,7 @@ check_tweedie_truncation <- function(object, resp = NULL) {
       "'check_tweedie_truncation()' needs a response with family tweedie()."
     ))
   }
-  # `M` is Stan data and is read from the stored Stan data.
-  # `model_data` on a `jsdgam()` fit is the frame, which has no `M`.
+  # `M` is Stan data, taken from the stored Stan data.
   M <- object$standata$M
   if (is.null(M)) {
     stop_missing_fields("The stored Stan data", "M")
@@ -1929,7 +1928,7 @@ closure_unit_default_cap_buffer <- function(family) {
 # belongs to.
 #'@noRd
 closure_unit_axis_levels <- function(object) {
-  levels(axis_row_series(object, mvgam_training_data(object)))
+  levels(axis_row_series(object, object$data))
 }
 
 
@@ -1974,6 +1973,52 @@ closure_units_are_intact <- function(object, newdata) {
   idx <- closure_unit_index(newdata, key)
   nrow(newdata) == length(idx$levels) * length(levs) &&
     !anyDuplicated(paste(idx$unit, component))
+}
+
+
+#' Refuse a compositional frame whose units lack some categories
+#'
+#' A composition is shared among every category of a unit. Shares
+#' computed over a subset sum to one over that subset, and differ from
+#' the shares of the whole unit.
+#'
+#' @param object A fitted `mvgam` object
+#' @param newdata Frame to predict for
+#' @return `TRUE`, invisibly
+#' @noRd
+refuse_partial_compositions <- function(object, newdata) {
+  if (!is_simplex_response_family(object$family) ||
+        closure_units_are_intact(object, newdata)) {
+    return(invisible(TRUE))
+  }
+  levs <- closure_unit_axis_levels(object)
+  stop(insight::format_error(c(
+    "A composition is predicted for whole units.",
+    x = paste0("Some units of 'newdata' lack one of the ", length(levs),
+               " categories, or repeat one."),
+    i = paste0("Give each unit one row for each of: ",
+               paste0("'", levs, "'", collapse = ", "), ".")
+  )), call. = FALSE)
+}
+
+
+#' Resolve the frame a closure-unit prediction is made for
+#'
+#' A frame to predict for may leave the response out. Its rows are
+#' then unobserved visits, as rows with a missing response are.
+#'
+#' @param object A fitted `mvgam` object
+#' @param newdata Frame to predict for, or `NULL` for the training data
+#' @return A data frame carrying the response column
+#' @noRd
+closure_unit_frame <- function(object, newdata = NULL) {
+  newdata <- prediction_frame(object, newdata)
+  response_var <- response_column(object)
+  if (!response_var %in% names(newdata)) {
+    newdata[[response_var]] <- NA_real_
+  }
+  refuse_partial_compositions(object, newdata)
+  newdata
 }
 
 
@@ -2111,7 +2156,7 @@ complete_closure_unit_newdata <- function(object, newdata,
                                           )) {
   if (is.null(newdata)) return(newdata)
   if (!uses_closure_unit_layout(object$family)) return(newdata)
-  data <- mvgam_training_data(object) %||% data.frame()
+  data <- object$data %||% data.frame()
   if (nrow(data) == 0L) return(newdata)
   template <- data[1L, , drop = FALSE]
   # The response is resolved unguarded, as it is at every other
@@ -2213,7 +2258,7 @@ assert_closure_unit_columns <- function(data, columns) {
   )
   roles <- roles[intersect(missing, names(roles))]
   stop(insight::format_error(c(
-    "Closure-unit data are missing required columns.",
+    "Columns the model uses are missing from the data.",
     x = paste0("Absent: ", paste0("'", missing, "'", collapse = ", "), "."),
     stats::setNames(unname(roles), rep("i", length(roles)))
   )), call. = FALSE)
@@ -6147,7 +6192,7 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
   checkmate::assert_class(object, "mvgam")
   # The frame the model was fitted on, through the accessor that
   # owns that question rather than one of its two spellings.
-  newdata <- newdata %||% mvgam_training_data(object)
+  newdata <- prediction_frame(object, newdata)
   fam <- object$family
   vars <- axis_vars(object)
   build_closure_unit_arrays(
@@ -6211,7 +6256,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
       i = "Use family = nmix() or family = occ()."
     )))
   }
-  newdata <- prediction_frame(object, newdata)
+  newdata <- closure_unit_frame(object, newdata)
   response_var <- response_column(object)
   binary_y_check <- is_binary_response_family(object$family)
   default_cap <- closure_unit_default_cap(object$family)
@@ -6527,7 +6572,7 @@ aggregate_closure_unit_visits <- function(object,
                                            yrep_visit) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_matrix(yrep_visit)
-  newdata <- newdata %||% mvgam_training_data(object)
+  newdata <- prediction_frame(object, newdata)
   response_var <- response_column(object)
   arrays <- closure_unit_arrays_for(object, newdata)
   if (ncol(yrep_visit) != nrow(newdata)) {
@@ -6559,7 +6604,7 @@ aggregate_closure_unit_visits <- function(object,
 #' @return Numeric vector, one trial total per row of `newdata`.
 #' @noRd
 multinomial_unit_totals <- function(object, newdata, arrays) {
-  newdata <- newdata %||% mvgam_training_data(object)
+  newdata <- prediction_frame(object, newdata)
   y <- as.numeric(newdata[[response_column(object)]])
   # `N_site` is the multinomial's sample size, and it is data rather
   # than a parameter: a site's counts sum to it. A site with no counts
@@ -6593,11 +6638,11 @@ multinomial_unit_totals <- function(object, newdata, arrays) {
 #' @return A single numeric trial total.
 #' @noRd
 multinomial_training_total <- function(object) {
-  train <- mvgam_training_data(object)
+  train <- object$data
   if (is.null(train)) {
     stop(insight::format_error(c(
       "A multinomial forecast needs the fit's own training data.",
-      x = "The 'obs_data' and 'data' slots are empty on this fit.",
+      x = "The training data are absent from the fitted object.",
       x = "A forecast site takes its trial total from the training design.",
       i = paste0("Supply that site's counts in 'newdata' or refit with ",
                  "the data stored on the object.")
@@ -6900,7 +6945,7 @@ posterior_latent_N_pb <- function(object, newdata = NULL,
   arrays <- comp$arrays
   ndraws <- comp$ndraws
   N_unit <- arrays$N_unit
-  if (is.null(newdata)) newdata <- object$data
+  newdata <- prediction_frame(object, newdata)
   response_var <- response_column(object)
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)
@@ -7392,7 +7437,7 @@ extract_simplex_response_components <- function(object,
       "extract_simplex_response_components() requires a simplex-response fit."
     ))
   }
-  newdata <- prediction_frame(object, newdata)
+  newdata <- closure_unit_frame(object, newdata)
   arrays <- closure_unit_arrays_for(object, newdata)
 
   # Resolve draw_ids up front so the mu linpred and the per-row phi
@@ -7606,7 +7651,7 @@ log_lik_diri <- function(linpred, link, y, family_pars, trials) {
 #'
 #' Each row's expected count is `softmax(mu_unit)[k] * N_site` where
 #' `N_site = sum(Y_unit)` is the per-site trial total. The per-site
-#' total is read from `object$obs_data` (or `newdata`) so the
+#' total is taken from `object$data` (or `newdata`) so the
 #' epred matches the data-generating multinomial sample size.
 #'
 #' @inheritParams posterior_epred_diri
@@ -7851,7 +7896,7 @@ posterior_latent_N_royle_nichols <- function(object,
   arrays <- comp$arrays
   ndraws <- comp$ndraws
   N_unit <- arrays$N_unit
-  if (is.null(newdata)) newdata <- object$data
+  newdata <- prediction_frame(object, newdata)
   response_var <- response_column(object)
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)
@@ -8042,7 +8087,7 @@ posterior_latent_N_poisson_poisson <- function(object,
   arrays <- comp$arrays
   ndraws <- comp$ndraws
   N_unit <- arrays$N_unit
-  if (is.null(newdata)) newdata <- object$data
+  newdata <- prediction_frame(object, newdata)
   response_var <- response_column(object)
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)

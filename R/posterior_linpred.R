@@ -383,18 +383,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
     ))
   }
 
-  # Handle newdata = NULL (use training data)
-  if (is.null(newdata)) {
-    if (is.null(object$data)) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "No training data found in model object. ",
-          "Please provide {.field newdata} explicitly."
-        )
-      ))
-    }
-    newdata <- object$data
-  }
+  newdata <- prediction_frame(object, newdata)
 
   # Delegate to get_combined_linpred (all other validation handled there)
   linpred <- get_combined_linpred(
@@ -500,7 +489,7 @@ dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
       }
     )), call. = FALSE)
   }
-  newdata <- newdata %||% mvgam_training_data(object)
+  newdata <- prediction_frame(object, newdata)
   predicted <- predicted_dpar_names(object, dpar, resp = resp)
   if (length(predicted) == 0) {
     # Sampled as a scalar, so there is nothing to transform.

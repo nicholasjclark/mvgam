@@ -575,7 +575,7 @@ test_that("sample_process_errors returns zeros for deterministic trends", {
   # without touching any posterior matrix.
   obj <- structure(
     list(
-      obs_data = data.frame(
+      data = data.frame(
         time = rep(1:3, 2),
         series = factor(rep(c("s1", "s2"), each = 3))
       ),

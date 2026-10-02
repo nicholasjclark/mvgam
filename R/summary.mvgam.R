@@ -212,10 +212,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # handed a summary object, reports a fitted ARMA as `None`.
   out$trend_label <- printed_trend_label(object)
 
-  # The counts `print()` shows, from the same helper. A hierarchical
-  # fit derives its series axis from a grouping. `series_info` counts
-  # a column, and taking the count from it printed four series for
-  # such a fit and summarised none.
+  # The counts `print()` shows, from the same helper.
   counts <- printed_axis_counts(object)
   out$n_series <- counts$n_series
   out$n_timepoints <- counts$n_timepoints
@@ -769,7 +766,7 @@ format_trend_line <- function(x) {
 #'
 #' The trend formula as the user wrote it, less its trend constructor,
 #' which the trend line names. mvgam stores a rewritten copy for
-#' fitting, where `by = lv_axis()` becomes `by = series` and a `- 1` is
+#' fitting, where `lv_axis()` becomes a data column and a `- 1` is
 #' added, and that copy is the fallback for a fit that records no
 #' user formula. A formula reduced to `~0` or `~1` names no predictor
 #' a reader acts on.

@@ -987,7 +987,7 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
                                  sample_new_levels = "uncertainty") {
   linpred <- extract_component_linpred(
     mvgam_fit = object,
-    newdata = newdata %||% mvgam_training_data(object),
+    newdata = prediction_frame(object, newdata),
     component = dpar,
     draw_ids = draw_ids,
     resp = resp,
@@ -1378,17 +1378,7 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   checkmate::assert_string(resp, null.ok = TRUE)
   rlang::check_dots_empty()
 
-  # Handle newdata = NULL (use training data)
-  if (is.null(newdata)) {
-    if (is.null(object$data)) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "No training data found in model object. Please provide {.field newdata} explicitly."
-        )
-      ))
-    }
-    newdata <- object$data
-  }
+  newdata <- prediction_frame(object, newdata)
 
   # The linear predictor and the distributional parameters are drawn
   # by separate extractions, so a requested count is materialised as

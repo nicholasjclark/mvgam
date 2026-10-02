@@ -468,7 +468,10 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # instead of reaching the level comparison as an unknown series.
   validate_newdata_complete(newdata, mvgam_fit)
   if (!is.null(mvgam_fit$trend_metadata)) {
-    validate_prediction_factor_levels(newdata, mvgam_fit$trend_metadata)
+    validate_prediction_factor_levels(
+      newdata, mvgam_fit$trend_metadata,
+      series_label = series_column_label(mvgam_fit)
+    )
   }
 
   is_trend <- identical(component, "trend")

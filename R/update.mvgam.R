@@ -836,7 +836,7 @@ jsdgam_update_call <- function(object, formula., newdata, dots) {
   columns <- c(time = args$unit, series = args$species)
   added <- names(columns)[columns != names(columns)]
   args$data <- newdata %||%
-    object$obs_data[setdiff(names(object$obs_data), added)]
+    object$data[setdiff(names(object$data), added)]
   # The held-out frame is the fit's own, as on the 'mvgam()' path.
   args$newdata <- if (is.null(newdata)) {
     object$test_data

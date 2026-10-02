@@ -460,9 +460,6 @@ test_that("the forecast grid is cut by the axis, not by the column", {
 
   bare <- fit
   bare$data[[vars$series_var]] <- NULL
-  if (!is.null(bare$obs_data)) {
-    bare$obs_data[[vars$series_var]] <- NULL
-  }
   future <- do.call(rbind, lapply(levs, function(s) {
     proto <- d[which(stated == s)[1L], , drop = FALSE]
     out <- proto[rep(1L, h), , drop = FALSE]
@@ -499,9 +496,6 @@ test_that("the one-step trend forecast follows this fit's own AR", {
 
   bare <- fit
   bare$data[[vars$series_var]] <- NULL
-  if (!is.null(bare$obs_data)) {
-    bare$obs_data[[vars$series_var]] <- NULL
-  }
   future <- do.call(rbind, lapply(levs, function(s) {
     proto <- d[which(stated == s)[1L], , drop = FALSE]
     out <- proto[rep(1L, h), , drop = FALSE]
@@ -684,7 +678,8 @@ test_that("each prediction type answers with the quantity it names", {
   expect_length(ask("expected"), nrow(grid))
   expect_equal(ask("expected"), as.numeric(ep), tolerance = 0.05)
   expect_equal(ask("link"), as.numeric(lp), tolerance = 0.05)
-  expect_equal(ask("response"), as.numeric(med), tolerance = 0.05)
+  # Two sets of predictive draws give medians one count apart at most.
+  expect_lte(max(abs(ask("response") - as.numeric(med))), 1)
 
   # A count drawn from the observation family is a whole number, and
   # its expectation is not, so the two types cannot be confused.

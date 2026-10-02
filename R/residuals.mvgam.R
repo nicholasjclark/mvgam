@@ -326,7 +326,7 @@ residuals.mvgam <- function(object,
                                 robust = robust, probs = probs))
   }
 
-  d <- newdata %||% mvgam_training_data(object)
+  d <- prediction_frame(object, newdata)
   # `resp` is populated when the mv fan-out scoped this call (or
   # the user supplied it explicitly via `...`); otherwise fall
   # back to the single response on a univariate fit.
@@ -374,7 +374,7 @@ compute_closure_unit_residuals <- function(object, newdata, type,
   # frame is substituted for them, since afterwards every test on
   # `newdata` answers as though the user had supplied new data.
   in_sample <- is.null(newdata)
-  newdata <- newdata %||% mvgam_training_data(object)
+  newdata <- prediction_frame(object, newdata)
   pp_args <- c(
     list(object = object, newdata = newdata,
          draw_ids = draw_ids, ndraws = ndraws),

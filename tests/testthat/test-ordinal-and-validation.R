@@ -339,7 +339,7 @@ test_that("extract_trend_latent_states: missing trend[t,s] column errors", {
                             "sigma_trend[1]", "ar1_trend[1]"))
   )
   # Build a minimal mock mvgam object with the structure the helper
-  # depends on: standata + trend_metadata + obs_data with a `time`
+  # depends on: standata + trend_metadata + data with a `time`
   # column. Mock get_observation_structure by passing newdata that
   # maps to t = 3 (which is missing from full_draws above).
   mock_fit <- structure(
@@ -352,12 +352,11 @@ test_that("extract_trend_latent_states: missing trend[t,s] column errors", {
       trend_metadata = mock_axis_record(
         data.frame(time = 1:3, series = factor("s1"))
       ),
-      obs_data = data.frame(time = 1:3),
       data = data.frame(time = 1:3)
     ),
     class = "mvgam"
   )
-  attr(mock_fit$obs_data, "mvgam_series") <- factor("s1", levels = "s1")
+  attr(mock_fit$data, "mvgam_series") <- factor("s1", levels = "s1")
   # newdata spans t = 1, 2, 3 so `obs_struct$unique_times` sees all
   # three positions and the last row resolves to `trend[3, 1]`,
   # which is deliberately absent from full_draws above so the

@@ -493,7 +493,7 @@ ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
         "labels: ", length(site_names),
         ", lv_trend rows: ", NROW(svd_comp$scores), "."
       ),
-      x = "Imputed time points in 'obs_data' commonly cause this.",
+      x = "Imputed time points in the training data commonly cause this.",
       i = "Trim to the training grid or supply matching labels."
     )), call. = FALSE)
   }

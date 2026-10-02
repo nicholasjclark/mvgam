@@ -35,7 +35,7 @@ name of a single response variable to return results for.
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A tibble (or \code{list}, when \code{class(x$obs_data) == "list"})
+A tibble (or \code{list}, when \code{class(x$data) == "list"})
 with the original training data plus:
 \itemize{
 \item \code{.observed} -- the response value.

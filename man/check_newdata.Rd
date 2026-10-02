@@ -11,7 +11,10 @@ check_newdata(newdata, data, trend_formula = NULL)
 shape as the training data.}
 
 \item{data}{The training \code{data.frame} of the model, whose series
-levels define the valid set.}
+levels define the valid set. A fitted model from \code{\link[=mvgam]{mvgam()}} or
+\code{\link[=jsdgam]{jsdgam()}} is also accepted. \code{newdata} is then checked against
+every column the fitted formulas use, and \code{trend_formula} is
+ignored.}
 
 \item{trend_formula}{The trend formula passed to \code{\link[=mvgam]{mvgam()}}, or
 \code{NULL} for a model without a trend.}
@@ -19,7 +22,8 @@ levels define the valid set.}
 \value{
 \code{newdata} with its series column coerced to the training
 factor levels, returned invisibly, or \code{NULL} (invisibly) when
-\code{newdata} is \code{NULL}.
+\code{newdata} is \code{NULL}. Checked against a fitted model, \code{newdata}
+is returned with the columns that model predicts from.
 }
 \description{
 Runs the structural checks that \code{\link[=predict.mvgam]{predict.mvgam()}} and

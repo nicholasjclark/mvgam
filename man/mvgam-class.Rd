@@ -89,10 +89,6 @@ level
 
 \code{trend_metadata} is \code{NULL} for a model without a trend whose
 data lack a time column or a series column.
-\item \code{series_info} The number of series in the \code{series} column, empty
-when the data lack that column
-\item \code{time_info} The number of time points in the \code{time} column, empty
-when the data lack that column
 \item \code{obs_model} A \code{brmsfit} of the observation model. Prediction at
 new data builds design matrices from it
 \item \code{trend_model} A \code{brmsfit} of the trend submodel, used the same
@@ -118,17 +114,13 @@ was fitted under
 }
 
 A fit from \code{\link[=jsdgam]{jsdgam()}} has class \code{c("mvgam", "jsdgam", "brmsfit")}
-and three
-further elements:
+and one further element. Its \code{data} carries \code{time} and \code{series}
+columns copied from the \code{unit} and \code{species} columns:
 \itemize{
-\item \code{obs_data} The data frame after \code{jsdgam()} prepared it, with
-\code{time} and \code{series} columns derived from \code{unit} and \code{species}
-\item \code{model_data} The same frame, with a \code{prepped_trend_model}
-attribute recording the \code{unit} and \code{species} column names.
-\code{insight::find_predictors()} uses it to address a prediction grid
-by the original column names
-\item \code{jsdgam_args} The arguments of the \code{jsdgam()} call. \code{\link[=update]{update()}}
-refits through \code{jsdgam()} with them
+\item \code{jsdgam_args} The arguments of the \code{jsdgam()} call, with \code{unit}
+and \code{species} as column names. \code{\link[=update]{update()}} refits through
+\code{jsdgam()} with them, and prediction accepts a frame naming the
+\code{unit} and \code{species} columns alone
 }
 }
 \seealso{

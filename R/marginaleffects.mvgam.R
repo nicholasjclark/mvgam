@@ -90,6 +90,7 @@ get_predict.mvgam <- function(model,
   # question is asked of, so asking again afterwards would answer
   # about mvgam's own stamping rather than about the caller.
   is_grid <- !closure_units_are_intact(model, newdata)
+  newdata <- jsdgam_axis_columns(model, newdata)
   newdata <- complete_closure_unit_newdata(model, newdata, is_grid)
   # A composition is a property of a whole site, so its grid is
   # completed to whole sites, predicted, and the asked-for rows
@@ -331,18 +332,14 @@ get_group_names.mvgam <- function(model, ...) {
   if (!is_ordinal_family(model$family)) {
     return("main_marginaleffect")
   }
-  # Both facts through the accessors that own them: the response
-  # column off the formula, the frame off the fit. Reading `$data`
-  # alone answers `NULL` for a fit that stores its frame as
-  # `obs_data`, and the categories then come back as integers with
-  # nothing saying the labels were lost. A model with several
-  # responses has no one set of categories, and marginaleffects asks
-  # this once per model rather than per response.
+  # The formula names the response column. A model with several
+  # responses has several sets of categories, and marginaleffects
+  # asks once per model.
   columns <- response_columns(model)
   if (length(columns) != 1L) {
     return("main_marginaleffect")
   }
-  y <- mvgam_training_data(model)[[columns[[1L]]]]
+  y <- model$data[[columns[[1L]]]]
   if (is.factor(y)) {
     return(levels(y))
   }

@@ -233,9 +233,7 @@ pp_check.mvgam <- function(
   # residual axis conditional and the fitted axis marginal.
   in_sample <- is.null(newdata)
   if (in_sample) {
-    # Fitting data lives on $data; some objects also expose $obs_data
-    # as an alias and may have it empty.
-    newdata <- mvgam_training_data(object)
+    newdata <- object$data
   }
 
   # Multi-response custom families (diri / multi / categ / mvn /
@@ -1151,7 +1149,7 @@ build_resid_vs_fitted_panel <- function(
 closure_unit_fit_stat_ppc <- function(object, newdata, stat,
                                         group, ndraws, draw_ids) {
   stat <- match.arg(stat, c("chi_squared", "freeman_tukey"))
-  if (is.null(newdata)) newdata <- mvgam_training_data(object)
+  newdata <- prediction_frame(object, newdata)
 
   # Per-visit yrep + epred. Both arrive as [ndraws x N_visit] so they
   # share the closure-unit aggregator below.
@@ -1350,7 +1348,7 @@ mvgam_resid_panel <- function(
   label <- if (closure_unit) {
     NULL
   } else {
-    resid_series_rows(object, mvgam_training_data(object), series)$label
+    resid_series_rows(object, object$data, series)$label
   }
   if (is.null(label)) {
     return(out)

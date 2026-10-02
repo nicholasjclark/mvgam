@@ -29,7 +29,6 @@ make_hindcast_mock <- function(series_levels = "s1",
   fit <- list(
     fit = structure(list(), class = "fake_stanfit"),
     data = d,
-    obs_data = d,
     formula = stats::as.formula("y ~ 1"),
     call = match.call(),
     trend_call = stats::as.formula("~ AR(p = 1)"),

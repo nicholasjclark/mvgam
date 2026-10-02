@@ -329,7 +329,7 @@ test_that("a refit runs on a design mvgam wrote a column for", {
   for (fit in list(fit_free, fit_conf)) {
     # `run_model = FALSE` builds the program without sampling it.
     refit <- update(
-      fit, newdata = mvgam:::mvgam_training_data(fit), run_model = FALSE
+      fit, newdata = fit$data, run_model = FALSE
     )
     expect_s3_class(refit, "mvgam")
     # The refit is the same program, not merely a program.

@@ -29,7 +29,7 @@ lfo_cv(object, ...)
 \item{newdata}{Optional \code{data.frame} containing the response,
 \code{time}, \code{series} and any covariates required by the model
 formula. When \code{NULL}, the original training data
-(\code{object$obs_data} or \code{object$data}) is used. All series must
+(\code{object$data}) is used. All series must
 share the same set of observed time values.}
 
 \item{min_t}{Numeric; the time \emph{value} at which the initial

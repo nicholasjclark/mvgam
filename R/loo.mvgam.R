@@ -407,7 +407,7 @@ per_obs_series_labels <- function(x) {
       i = "Call 'loo()' or 'waic()' with 'by_series = FALSE' to score per unit."
     )), call. = FALSE)
   }
-  data <- mvgam_training_data(x) %||% data.frame()
+  data <- x$data %||% data.frame()
   series <- axis_row_series(x, data, required = TRUE)
   if (is.null(series)) {
     stop(insight::format_error(c(

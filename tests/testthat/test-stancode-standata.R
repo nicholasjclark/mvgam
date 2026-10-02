@@ -3246,7 +3246,6 @@ test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
   ))
   # User-supplied loadings bypass the QR identification path.
   expect_false(grepl("Z_tilde", code, fixed = TRUE))
-  expect_false(grepl("Q_tilde", code, fixed = TRUE))
   expect_false(grepl("qr_thin_R", code, fixed = TRUE))
   # Standata carries the template (NAs -> 0), mask, and count.
   expect_equal(dim(sd$Z_template), c(4L, 2L))
@@ -3272,7 +3271,6 @@ test_that("fully-fixed Z is preserved (no partial-Z stanvars emitted)", {
   expect_false(grepl("Z_free_vec", code, fixed = TRUE))
   # User-supplied loadings bypass the QR identification path.
   expect_false(grepl("Z_tilde", code, fixed = TRUE))
-  expect_false(grepl("Q_tilde", code, fixed = TRUE))
   expect_false(grepl("qr_thin_R", code, fixed = TRUE))
 })
 

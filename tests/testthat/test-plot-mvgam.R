@@ -7,7 +7,6 @@
     formula = stats::as.formula("y ~ 1"),
     family = stats::gaussian(),
     data = data.frame(y = rnorm(20L)),
-    obs_data = data.frame(y = rnorm(20L)),
     fit = list()
   )
   class(obj) <- c("mvgam", "brmsfit")

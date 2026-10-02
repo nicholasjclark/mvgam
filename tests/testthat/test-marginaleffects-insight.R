@@ -145,7 +145,7 @@ test_that("find_predictors.mvgam walks nl sub-formulas and jsdgam aliases", {
   stub_nl <- structure(
     list(
       formula = obs_nl, trend_formula = NULL,
-      trend_metadata = NULL, model_data = NULL
+      trend_metadata = NULL
     ),
     class = "mvgam"
   )
@@ -160,19 +160,15 @@ test_that("find_predictors.mvgam walks nl sub-formulas and jsdgam aliases", {
   expect_false("species" %in% preds)
   expect_identical(insight::find_random(stub_nl)$random, "species")
 
-  # jsdgam: the user's species / unit column names persist via
-  # attr(model_data, "prepped_trend_model"). find_predictors must
-  # surface them so downstream tools building newdata grids do
-  # not have to know the aliasing.
+  # jsdgam: the fit records the user's unit and species column
+  # names, and find_predictors() lists them for grid builders.
   stub_jsdgam <- structure(
     list(
       formula = y ~ env, trend_formula = NULL,
       trend_metadata = NULL,
-      model_data = structure(
-        data.frame(y = 1:3, env = 1:3, species = letters[1:3],
-                    site = 1:3),
-        prepped_trend_model = list(unit = "site", species = "species")
-      )
+      data = data.frame(y = 1:3, env = 1:3, species = letters[1:3],
+                        site = 1:3),
+      jsdgam_args = list(unit = "site", species = "species")
     ),
     class = "mvgam"
   )

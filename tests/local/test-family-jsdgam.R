@@ -672,8 +672,11 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     )
     err <- expect_error(
       posterior_epred(fit, newdata = nd, draw_ids = 1:5),
-      "Series in 'newdata' has levels absent from the training data"
+      "'series' in 'newdata' has levels absent from the training data"
     )
+    # check_newdata() runs the same check on a fitted model.
+    expect_error(check_newdata(nd, fit), "y_unseen", fixed = TRUE)
+    expect_identical(names(check_newdata(d, fit)), names(d))
     # A refusal that does not name the offending level, or list the
     # ones that would have worked, leaves the user to find which of
     # their species the model has never seen.

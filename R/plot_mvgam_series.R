@@ -48,9 +48,12 @@ plot_mvgam_series <- function(
   resolve_resp(object, resp)
   time_var <- axis_vars(object)$time_var
   series_levels <- fitted_series_levels(object)
-  test <- newdata %||% object$test_data
+  test <- jsdgam_axis_columns(object, newdata %||% object$test_data)
   if (!is.null(test) && !is.null(object$trend_metadata)) {
-    validate_prediction_factor_levels(test, object$trend_metadata)
+    validate_prediction_factor_levels(
+      test, object$trend_metadata,
+      series_label = series_column_label(object)
+    )
   }
 
   # Where the responses are the series, a row is one occasion carrying
@@ -84,7 +87,7 @@ plot_mvgam_series <- function(
   }
 
   series_obs_plot(
-    dat           = rbind(long_of(mvgam_training_data(object), "train"),
+    dat           = rbind(long_of(object$data, "train"),
                           long_of(test, "validate")),
     labels        = labels,
     series_levels = series_levels,

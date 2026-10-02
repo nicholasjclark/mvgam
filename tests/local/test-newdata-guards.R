@@ -60,7 +60,7 @@ fit_one <- cached_fit("val_newdata_guards_single.rds", fit_ar1(dat_single))
 
 time_var <- mvgam:::axis_vars(fit)$time_var
 series_var <- mvgam:::axis_vars(fit)$series_var
-train <- mvgam:::mvgam_training_data(fit)
+train <- fit$data
 
 
 test_that("a complete frame predicts", {
@@ -113,7 +113,7 @@ test_that("a single-series frame predicts when the column is dropped", {
   # The case where the axis has a substitute. One series means every
   # row belongs to it, and the record places rows the frame never
   # keyed.
-  train_one <- mvgam:::mvgam_training_data(fit_one)
+  train_one <- fit_one$data
   nd <- train_one
   nd[[mvgam:::axis_vars(fit_one)$series_var]] <- NULL
   ep <- posterior_epred(fit_one, newdata = nd)

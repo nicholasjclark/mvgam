@@ -164,7 +164,9 @@ forecast.mvgam <- function(object,
   if (!is.null(fan)) {
     return(fan)
   }
-  newdata <- ensure_obs_placeholder(newdata %||% object$test_data, object)
+  newdata <- ensure_obs_placeholder(
+    jsdgam_axis_columns(object, newdata %||% object$test_data), object
+  )
 
   trend_specs <- object$mv_spec$trend_specs
   # Trendless fits forecast by projecting the obs-side linear
@@ -377,7 +379,7 @@ build_training_arms <- function(object, series_levels, resp = NULL,
   # The fit's own frame by default. `lfo_cv()` passes a window of it
   # instead, so the arms it scores are cut by the same rule the
   # hindcast arms are, rather than by a second one written beside it.
-  d <- data %||% mvgam_training_data(object)
+  d <- data %||% object$data
   meta_vars <- axis_vars(object)
   time_var <- meta_vars$time_var
   series_var <- meta_vars$series_var
@@ -575,7 +577,10 @@ resolve_forecast_grid <- function(object, newdata, training,
   # `north.sp_a`, a series the model does have, spelled the way the
   # column it does not read spells it. An object carrying no record
   # has nothing to validate against, and the guard below covers it.
-  validate_prediction_factor_levels(newdata, object$trend_metadata)
+  validate_prediction_factor_levels(
+    newdata, object$trend_metadata,
+    series_label = series_column_label(object)
+  )
 
   # Where the responses are the series, every row carries all of
   # them: a wide frame holds one row per time and one column per
@@ -1284,11 +1289,8 @@ trend_linpred_grid <- function(lp_mat, obs_struct, draw_row,
         "Got ", ncol(grid), " series in the linear predictor, ",
         "expected ", n_series, "."
       ),
-      i = paste0(
-        "Keep every fitted series level on the 'newdata' series ",
-        "column, for example with factor(series, levels = ",
-        "levels(fit$data$series))."
-      )
+      i = paste0("Give the series column of 'newdata' every series ",
+                 "level of the training data.")
     )))
   }
   pad_or_trim_rows(grid, n_rows)

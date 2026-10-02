@@ -79,7 +79,7 @@ prepare_mvgam_frame <- function(object, data) {
 #'
 #' @noRd
 training_series_labels <- function(object, data = NULL) {
-  data <- data %||% mvgam_training_data(object)
+  data <- data %||% object$data
   as.character(get_series_for_grouping(
     prepare_mvgam_frame(object, data)
   ))
@@ -135,15 +135,8 @@ get_observation_structure <- function(object, newdata = NULL,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_string(resp, null.ok = TRUE)
 
-  # Use training data if newdata not provided
-  if (is.null(newdata)) {
-    newdata <- object$obs_data
-    if (is.null(newdata)) {
-      newdata <- object$data
-    }
-  }
-
-  checkmate::assert_data_frame(newdata, min.rows = 1)
+  newdata <- prediction_frame(object, newdata)
+  checkmate::assert_data_frame(newdata)
 
   vars <- axis_vars(object)
   time_var <- vars$time_var
@@ -158,7 +151,7 @@ get_observation_structure <- function(object, newdata = NULL,
   # invoking ensure_mvgam_variables.
   n_series_trained <- object$standata$N_series_trend %||%
     length(levels(as.factor(
-      attr(mvgam_training_data(object), "mvgam_series")
+      attr(object$data, "mvgam_series")
     )))
 
   is_single_series <- !is.null(n_series_trained) && n_series_trained == 1L
@@ -167,7 +160,7 @@ get_observation_structure <- function(object, newdata = NULL,
   if (is_single_series && !has_explicit_series) {
     # Pull the trained level so series indices line up with the
     # fitted model's encoding.
-    train_series <- attr(mvgam_training_data(object), "mvgam_series")
+    train_series <- attr(object$data, "mvgam_series")
     level_label <- if (!is.null(train_series)) {
       as.character(train_series[1L])
     } else {
@@ -238,7 +231,7 @@ get_observation_structure <- function(object, newdata = NULL,
 #' @param time_var Character; name of the time column.
 #' @param level_label Character; the single trained series level used
 #'   for the integer/factor mapping. Pulled from
-#'   `attr(object$obs_data, "mvgam_series")\[1\]`.
+#'   `attr(object$data, "mvgam_series")\[1\]`.
 #'
 #' @noRd
 build_single_series_observation_structure <- function(newdata, time_var,
@@ -330,7 +323,7 @@ sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
     } else {
       1L
     }
-    n_obs <- NROW(newdata %||% mvgam_training_data(object))
+    n_obs <- NROW(prediction_frame(object, newdata))
     return(matrix(0, n_rows, n_obs))
   }
 

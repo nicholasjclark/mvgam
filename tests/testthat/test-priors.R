@@ -131,7 +131,7 @@ test_that("all trend types generate correct prior structures", {
         brms_equivalent = y ~ s(x)
       ),
       random_VAR = list(
-        mvgam_trend = ~ x + (1|series) + VAR(p = 1),
+        mvgam_trend = ~ x + (1 | lv_axis()) + VAR(p = 1),
         brms_equivalent = y ~ x + (1|series)
       ),
       interaction_CAR = list(
@@ -139,7 +139,7 @@ test_that("all trend types generate correct prior structures", {
         brms_equivalent = y ~ x1 * x2
       ),
       mixed_ZMVN = list(
-        mvgam_trend = ~ (1|series) + s(x) + x1 * x2 + ZMVN(),
+        mvgam_trend = ~ (1 | lv_axis()) + s(x) + x1 * x2 + ZMVN(),
         brms_equivalent = y ~ (1|series) + s(x) + x1 * x2
       ),
       tensor_PW = list(

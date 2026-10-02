@@ -28,7 +28,6 @@ make_lfo_mock <- function(n_time = 40L, n_series = 1L) {
   fit <- list(
     fit = structure(list(), class = "fake_stanfit"),
     data = d,
-    obs_data = d,
     formula = stats::as.formula("y ~ 1"),
     family = poisson(),
     trend_metadata = list(trend_type = "AR"),
@@ -277,7 +276,7 @@ make_lfo_mock_shifted <- function(n_time = 35L, offset = 2009L) {
   )
   fit <- list(
     fit = structure(list(), class = "fake_stanfit"),
-    data = d, obs_data = d,
+    data = d,
     formula = stats::as.formula("y ~ 1"),
     family = poisson(),
     trend_metadata = list(trend_type = "AR"),
@@ -342,7 +341,7 @@ test_that("lfo_cv handles irregular CAR-style time grids", {
   )
   fit <- list(
     fit = structure(list(), class = "fake_stanfit"),
-    data = d, obs_data = d,
+    data = d,
     formula = stats::as.formula("y ~ 1"),
     family = poisson(),
     trend_metadata = list(trend_type = "CAR"),
@@ -376,7 +375,7 @@ test_that("Mismatched per-series time grids error", {
   )
   fit <- list(
     fit = structure(list(), class = "fake_stanfit"),
-    data = d, obs_data = d,
+    data = d,
     formula = stats::as.formula("y ~ 1"),
     family = poisson(),
     trend_metadata = list(trend_type = "AR"),

@@ -219,7 +219,7 @@ hindcast_latent_state <- function(object, ndraws = NULL,
     # A fit built before `unit_grid` was recorded. Fall back to the
     # first-appearance order of the training data, which is what the
     # arrays used, and do not sort it.
-    td <- mvgam_training_data(object)
+    td <- object$data
     unit_df <- unique(td[, c(meta$series_var, meta$time_var),
                          drop = FALSE])
   }

@@ -64,7 +64,7 @@
           class = "mvgam_trend"
         )
       ),
-      obs_data = list(
+      data = list(
         series = factor(rep(
           paste0("s", seq_len(n_series)), length.out = n_time
         ))
