@@ -579,7 +579,7 @@ test_that("the VAR methods gate on the recorded trend type", {
   for (meth in list(function(x) irf(x, h = 2L),
                     function(x) fevd(x, h = 2L),
                     posterior_transition_matrix)) {
-    expect_error(meth(blanked), "requires a VAR\\(1\\) latent trend")
+    expect_error(meth(blanked), "requires a VAR latent trend")
   }
 })
 
