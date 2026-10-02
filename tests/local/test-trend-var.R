@@ -520,8 +520,8 @@ test_that("fitted summarises the same draws epred returns", {
   # they agree only when both put the same cell in the same place. A
   # method that re-sorted its output keeps every dimension and every
   # value while pairing them with the wrong rows.
-  ep <- posterior_epred(fit, ndraws = NULL, process_error = FALSE)
-  ft <- fitted(fit, process_error = FALSE)
+  ep <- posterior_epred(fit, ndraws = NULL, incl_autocor = TRUE)
+  ft <- fitted(fit)
   expect_identical(nrow(ft), nrow(dat))
   expect_identical(colnames(ft),
                    c("Estimate", "Est.Error", "Q2.5", "Q97.5"))

@@ -381,8 +381,8 @@ test_that("each row reads the latent cell the sampler drew for it", {
 
 
 test_that("fitted summarises the same draws epred returns", {
-  ep <- posterior_epred(fit, ndraws = NULL, process_error = FALSE)
-  ft <- fitted(fit, process_error = FALSE)
+  ep <- posterior_epred(fit, ndraws = NULL, incl_autocor = TRUE)
+  ft <- fitted(fit)
   expect_identical(nrow(ft), nrow(dat))
   expect_identical(colnames(ft),
                    c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
@@ -806,9 +806,9 @@ test_that("irf, fevd and stability refuse a trend that has no A", {
   # another. Answering anyway would mean inventing the cross terms,
   # and the tables give a reader no way to tell an invented one from
   # an estimated one.
-  expect_error(irf(fit), "VAR\\(1\\) latent trend")
-  expect_error(fevd(fit), "VAR\\(1\\) latent trend")
-  expect_error(stability(fit), "VAR\\(1\\) latent trend")
+  expect_error(irf(fit), "requires a VAR latent trend")
+  expect_error(fevd(fit), "requires a VAR latent trend")
+  expect_error(stability(fit), "requires a VAR latent trend")
 })
 
 

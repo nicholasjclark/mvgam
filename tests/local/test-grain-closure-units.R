@@ -1079,11 +1079,13 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
     expect_identical(dim(pp), c(20L, nrow(d)))
     expect_true(all(is.finite(ep)))
     expect_true(all(is.finite(pp)))
-    # `fitted()` summarises the draws `posterior_epred()` returns, so
-    # its Estimate column is their column mean exactly.
+    # `fitted()` summarises the draws `posterior_epred()` returns at
+    # the fitted state. Its Estimate column is their column mean.
     ft <- fitted(fit, draw_ids = 1:20)
+    ep_state <- posterior_epred(fit, draw_ids = 1:20,
+                                incl_autocor = TRUE)
     expect_identical(nrow(ft), nrow(d))
-    expect_equal(unname(ft[, "Estimate"]), unname(colMeans(ep)),
+    expect_equal(unname(ft[, "Estimate"]), unname(colMeans(ep_state)),
                  tolerance = 1e-8)
     # The density belongs to the unit, not the row: one term per
     # closure unit is what the marginalisation produces.

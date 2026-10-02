@@ -418,13 +418,12 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     if (!is.null(spec$epred_ok)) expect_true(spec$epred_ok(ep))
     if (!is.null(spec$predict_ok)) expect_true(spec$predict_ok(pp))
 
-    # `fitted()` summarises the draws `posterior_epred()` returns, so
-    # its Estimate column is their column mean exactly. Asserting
-    # only its row count passes a method that reached a different
-    # surface and came back with the right rectangle of wrong
-    # numbers.
+    # `fitted()` summarises the draws `posterior_epred()` returns at
+    # the fitted state. Its Estimate column is their column mean.
     ft <- fitted(fit, draw_ids = 1:20)
-    expect_equal(unname(ft[, "Estimate"]), unname(colMeans(ep)),
+    ep_state <- posterior_epred(fit, draw_ids = 1:20,
+                                incl_autocor = TRUE)
+    expect_equal(unname(ft[, "Estimate"]), unname(colMeans(ep_state)),
                  tolerance = 1e-8)
     expect_true(all(ft[, "Q2.5"] <= ft[, "Estimate"]))
     expect_true(all(ft[, "Estimate"] <= ft[, "Q97.5"]))

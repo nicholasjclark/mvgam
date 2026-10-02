@@ -390,8 +390,8 @@ test_that("each row reads the latent cell the sampler drew for it", {
 
 
 test_that("fitted summarises the same draws epred returns", {
-  ep <- posterior_epred(fit, ndraws = NULL, process_error = FALSE)
-  ft <- fitted(fit, process_error = FALSE)
+  ep <- posterior_epred(fit, ndraws = NULL, incl_autocor = TRUE)
+  ft <- fitted(fit)
   expect_identical(nrow(ft), nrow(dat))
   expect_identical(colnames(ft),
                    c("Estimate", "Est.Error", "Q2.5", "Q97.5"))

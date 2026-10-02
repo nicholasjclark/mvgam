@@ -61,6 +61,12 @@
 #'   computation. Default is `c(0.025, 0.975)` for 95% credible
 #'   intervals.
 #' @inheritParams posterior_epred.mvgam
+#' @param incl_autocor Logical; whether the fitted values include the
+#'   latent trend state the model inferred at each time. Defaults to
+#'   `TRUE` for the training data, as in
+#'   [`brms::fitted.brmsfit()`][brms::fitted.brmsfit], and to `FALSE`
+#'   with `newdata`. Under `TRUE` the observed response minus the
+#'   fitted value is the ordinary residual of [residuals.mvgam()].
 #' @param allow_new_levels Logical; accepted for brms compatibility.
 #'   A grouping level the model never saw is refused whatever this is
 #'   set to, because a new level has no fitted random effect and, for
@@ -95,14 +101,13 @@
 #' [posterior_predict.mvgam()] draws on top. Use `predict()` for
 #' predictive samples that carry it.
 #'
-#' The latent process is a separate question from that noise, and
-#' `process_error` decides it on both methods alike: under the default
-#' `FALSE` the trend contributes its deterministic submodel and the
-#' fitted values describe the covariate structure alone, while `TRUE`
-#' integrates over the trend's dynamics by sampling a state per draw.
-#' Neither setting fixes the trend at a posterior mean. For the state
-#' the model actually inferred at each time, pass `incl_autocor = TRUE`
-#' or read it directly from [hindcast.mvgam()].
+#' For the training data the fitted values include the trend state
+#' the model inferred at each time, which [hindcast.mvgam()] also
+#' returns. With `newdata`, or under `incl_autocor = FALSE`, the
+#' fitted values describe the covariate structure. `process_error`
+#' then decides the trend's part: `FALSE` keeps its deterministic
+#' submodel, and `TRUE` samples a state per draw from the trend's
+#' dynamics.
 #'
 #' Two brms `fitted()` arguments have no counterpart here and are
 #' refused rather than dropped. `dpar` and `nlpar` name a
@@ -152,7 +157,7 @@ fitted.mvgam <- function(object,
                          robust = FALSE,
                          probs = c(0.025, 0.975),
                          process_error = FALSE,
-                         incl_autocor = FALSE,
+                         incl_autocor = is.null(newdata),
                          allow_new_levels = FALSE,
                          sample_new_levels = "uncertainty",
                          ...) {

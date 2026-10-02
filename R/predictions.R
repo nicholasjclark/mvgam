@@ -774,9 +774,8 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   # on, because the observation structure renumbers time from one
   # within whatever frame it is handed: a frame holding only the later
   # half of a series would otherwise read the state of the earlier
-  # half, silently and with the right shape. Working from the raw
-  # values also makes a time the fit never saw fall out as `NA`, which
-  # is what the marginal substitution below keys on.
+  # half, silently and with the right shape. A time the fit never
+  # saw matches nothing in the raw values and is refused below.
   obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata,
                                           resp = resp)
   s_idx <- obs_struct$series_int
@@ -802,31 +801,20 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
     ))
   }
 
-  # Unseen times: substitute the per-series posterior mean of the
-  # latent state (averaged across the training time grid) for any
-  # newdata row whose time is outside the fitted grid. This is the
-  # documented marginal-MC semantic of the posterior_*.mvgam
-  # surfaces (see architecture-decisions.md): the prediction
-  # primitives integrate over the trend dynamics and treat the
-  # latent state as stationary at any prediction time, matching
-  # the marginaleffects / brms::predict convention for models with
-  # correlated residuals. For state-aware out-of-sample prediction
-  # (latent state extrapolated forward via the trend kernel) use
-  # `forecast.mvgam()` instead.
-  has_unseen <- any(is.na(t_idx))
-
-  series_marginal <- if (has_unseen) {
-    out <- matrix(NA_real_, nrow = nrow(full_draws), ncol = N_series_trend)
-    for (s in seq_len(N_series_trend)) {
-      cols_s <- paste0("trend[", seq_len(N_time_trend), ",", s, "]")
-      cols_s <- intersect(cols_s, par_names)
-      if (length(cols_s) > 0L) {
-        out[, s] <- rowMeans(full_draws[, cols_s, drop = FALSE])
-      }
-    }
-    out
-  } else {
-    NULL
+  # A time outside the fitted grid has no fitted state. `forecast()`
+  # propagates the state to later times with its variance.
+  if (anyNA(t_idx)) {
+    time_label <- user_axis_names(mvgam_fit, time_var)
+    stop(insight::format_error(c(
+      "The fitted trend state covers the fitted times only.",
+      x = paste0(
+        sum(is.na(t_idx)), " row(s) of 'newdata' hold a value of '",
+        time_label, "' outside the fitted times."
+      ),
+      i = "Use forecast() to predict new times.",
+      i = "Use score() on a forecast or lfo_cv() to score new times.",
+      i = "Set 'incl_autocor = FALSE' to predict from the covariates."
+    )), call. = FALSE)
   }
 
   ndraws <- nrow(full_draws)
@@ -835,10 +823,9 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   # them one row at a time scanned the whole parameter vector per
   # observation, so the work grew with the product of the two rather
   # than with their sum.
-  seen <- !is.na(t_idx)
   wanted <- paste0("trend[", t_idx, ",", s_idx, "]")
   col <- match(wanted, par_names)
-  absent <- seen & is.na(col)
+  absent <- is.na(col)
   if (any(absent)) {
     stop(insight::format_error(c(
       "Latent trend state column missing from posterior draws.",
@@ -853,11 +840,6 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   }
 
   latent_mat <- matrix(NA_real_, nrow = ndraws, ncol = nobs)
-  if (any(seen)) {
-    latent_mat[, seen] <- full_draws[, col[seen], drop = FALSE]
-  }
-  if (any(!seen)) {
-    latent_mat[, !seen] <- series_marginal[, s_idx[!seen], drop = FALSE]
-  }
+  latent_mat[] <- full_draws[, col, drop = FALSE]
   latent_mat
 }

@@ -592,9 +592,11 @@ raw start in Stan, keeps its innovation covariance on the R side, and
 The conditional surface (`forecast()`, `hindcast()`, `residuals()`,
 `pp_check()`) uses the fitted latent state from the posterior.
 `hindcast()` returns it at the training grid and `forecast()`
-extrapolates it. A time outside the grid has no fitted state and
-takes the per-series marginal. The result is exact and reproducible
-across calls.
+extrapolates it. A time outside the grid has no fitted state, and the
+conditional surface refuses it. `forecast()` predicts it. `fitted()`
+uses this surface for the training data, as `residuals()` does, and
+the marginal surface for `newdata`. The result is exact and
+reproducible across calls.
 
 Counterfactuals and covariate-level reasoning go through the marginal
 surface. Forecasting, hindcasting and model comparison by ELPD or

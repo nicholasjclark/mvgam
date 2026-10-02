@@ -358,8 +358,8 @@ lfo_cv.mvgam <- function(object,
   # log_lik on the FULL data so we can index into it at any
   # future window. It scores each observation under the latent state
   # the model inferred at that time, which is the density an ELPD is
-  # built from; the times beyond the training window this fit was
-  # refitted on have no such state and take the per-series marginal.
+  # built from. The refit kept the held-out rows with their responses
+  # masked, and it inferred a state at each of their times.
   loglik_past <- log_lik(fit_past, newdata = all_data)
   idx_refit <- idx_min_t
 

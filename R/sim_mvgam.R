@@ -701,9 +701,7 @@ spec_type_6 <- function() {
       # gaps set the recorded time column, the season covariate
       # derived from it, and the spacing the CAR kernel
       # propagates over, so the three cannot disagree. All series
-      # share the gap sequence, because forecast.mvgam's CAR
-      # helper takes a single length-h time vector across series
-      # and rejects per-series gap patterns that differ.
+      # share the gap sequence.
       shared_gaps <- c(0, stats::runif(n_timepoints - 1L, 1, 6))
       shared_times <- cumsum(shared_gaps)
       time_long <- rep(shared_times, n_series)

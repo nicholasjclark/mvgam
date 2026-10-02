@@ -18,7 +18,7 @@
   robust = FALSE,
   probs = c(0.025, 0.975),
   process_error = FALSE,
-  incl_autocor = FALSE,
+  incl_autocor = is.null(newdata),
   allow_new_levels = FALSE,
   sample_new_levels = "uncertainty",
   ...
@@ -110,23 +110,12 @@ fixes every innovation.
 Each call draws new innovations, and two calls on one fit give
 different results. Set a seed to reproduce a result.}
 
-\item{incl_autocor}{Logical; which prediction surface the trend
-contribution comes from. \code{FALSE}, the default, keeps the fitted
-\code{trend[t, s]} out and answers from the two submodels' covariate
-structure, so an effect reads the same whether it is asked at the
-first time point or the fiftieth. \code{TRUE} reads the latent state
-the model inferred at each time, which is the quantity
-\code{\link[=hindcast]{hindcast()}} returns and the one an ELPD is built from;
-\code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} ask for it, because an
-R^2 describes the series that was observed rather than a
-counterfactual one. A row whose time falls outside the fitted grid
-has no such state and takes the per-series marginal.
-
-The default suits a model whose covariates carry the signal. When
-most of the series-level variation sits in the trend instead, as
-in a fit with few covariates and a strong autoregressive process,
-this surface has little left to say; \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
-\code{\link[=forecast.mvgam]{forecast.mvgam()}} are the better reading there.}
+\item{incl_autocor}{Logical; whether the fitted values include the
+latent trend state the model inferred at each time. Defaults to
+\code{TRUE} for the training data, as in
+\code{\link[brms:fitted.brmsfit]{brms::fitted.brmsfit()}}, and to \code{FALSE}
+with \code{newdata}. Under \code{TRUE} the observed response minus the
+fitted value is the ordinary residual of \code{\link[=residuals.mvgam]{residuals.mvgam()}}.}
 
 \item{allow_new_levels}{Logical; accepted for brms compatibility.
 A grouping level the model never saw is refused whatever this is
@@ -171,14 +160,13 @@ expected value E[Y | X], or the linear predictor with \code{scale = "linear"}, a
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws on top. Use \code{predict()} for
 predictive samples that carry it.
 
-The latent process is a separate question from that noise, and
-\code{process_error} decides it on both methods alike: under the default
-\code{FALSE} the trend contributes its deterministic submodel and the
-fitted values describe the covariate structure alone, while \code{TRUE}
-integrates over the trend's dynamics by sampling a state per draw.
-Neither setting fixes the trend at a posterior mean. For the state
-the model actually inferred at each time, pass \code{incl_autocor = TRUE}
-or read it directly from \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}.
+For the training data the fitted values include the trend state
+the model inferred at each time, which \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} also
+returns. With \code{newdata}, or under \code{incl_autocor = FALSE}, the
+fitted values describe the covariate structure. \code{process_error}
+then decides the trend's part: \code{FALSE} keeps its deterministic
+submodel, and \code{TRUE} samples a state per draw from the trend's
+dynamics.
 
 Two brms \code{fitted()} arguments have no counterpart here and are
 refused rather than dropped. \code{dpar} and \code{nlpar} name a

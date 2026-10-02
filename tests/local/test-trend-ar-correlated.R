@@ -226,7 +226,9 @@ test_that("the marginal covariance is the solve's leading block", {
     s_k <- cs$params$sigma_trend[k, ]
     L_k <- matrix(cs$params$L_Omega_trend[k, , ], n_series, n_series)
     got <- diag(s_k) %*% tcrossprod(L_k) %*% diag(s_k)
-    expect_equal(unname(got), unname(want), tolerance = 1e-8)
+    # The correlation factor comes from the stored `Sigma_trend`,
+    # whose two triangles agree to about seven digits.
+    expect_equal(unname(got), unname(want), tolerance = 1e-6)
   }
 })
 
@@ -267,7 +269,7 @@ test_that("residual_cor reports the correlation the states settle at", {
                                        seq_len(n_series)]
     got <- matrix(cors[k, , ], n_series, n_series)
     expect_equal(unname(got), unname(stats::cov2cor(G0)),
-                 tolerance = 1e-8)
+                 tolerance = 1e-6)
   }
   # The summarised matrix keeps the series the sampler was given.
   rc <- residual_cor(fit)

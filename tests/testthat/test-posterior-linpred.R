@@ -854,13 +854,16 @@ test_that("the prediction entry points share one set of defaults", {
   # given.
   entry_points <- list(
     posterior_epred.mvgam, posterior_predict.mvgam,
-    posterior_linpred.mvgam, predict.mvgam, fitted.mvgam
+    posterior_linpred.mvgam, predict.mvgam
   )
   for (fn in entry_points) {
     args <- formals(fn)
     expect_identical(eval(args$process_error), FALSE)
     expect_identical(eval(args$incl_autocor), FALSE)
   }
+  # `fitted()` includes the fitted state for the training data.
+  expect_identical(formals(fitted.mvgam)$incl_autocor,
+                   quote(is.null(newdata)))
 })
 
 

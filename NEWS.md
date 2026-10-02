@@ -34,6 +34,8 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 
 ## Changed defaults
 * `posterior_epred()`, `posterior_predict()`, `posterior_linpred()` and `fitted()` default to `process_error = FALSE`, as `predict()` does
+* `fitted()` includes the fitted trend state for the training data, as `residuals()` does
+* Predictions with `incl_autocor = TRUE` and `log_lik()` refuse times outside the fitted times. Use `forecast()`
 * `conditional_effects()` defaults to `type = "expected"`
 * `CAR()` keeps its autoregressive parameter inside `(0, 1)` and measures time in median observation gaps
 * The `com_binomial()` prior on `nu` is now `normal(1, 1)`

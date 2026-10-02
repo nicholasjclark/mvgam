@@ -86,7 +86,7 @@ can hold covariates and smooths that act on the state:
 | `RW()` | Random walk | Series with no fixed mean |
 | `AR(p = )` | Autoregression, including sparse lags such as `p = c(1, 12)` | Momentum and seasonal recurrence |
 | `VAR(p = )` | Vector autoregression | Series that drive one another |
-| `CAR()` | Continuous-time AR(1) | Irregularly spaced observations |
+| `CAR()` | Continuous-time AR(1) | Irregular times, and series observed at their own times |
 | `ZMVN()` | Correlated residuals with no time recursion | Sites, regions or species |
 | `PW()` | Piecewise linear or logistic growth | Trends with changepoints |
 

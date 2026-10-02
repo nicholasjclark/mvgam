@@ -337,7 +337,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   [loo_R2.mvgam()] and [bayes_R2.mvgam()] ask for it, because an
 #'   R^2 describes the series that was observed rather than a
 #'   counterfactual one. A row whose time falls outside the fitted grid
-#'   has no such state and takes the per-series marginal.
+#'   is refused under `TRUE`. [forecast.mvgam()] predicts those times.
 #'
 #'   The default suits a model whose covariates carry the signal. When
 #'   most of the series-level variation sits in the trend instead, as

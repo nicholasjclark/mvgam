@@ -108,8 +108,7 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   # already carry the trend formula's contribution, because the trend
   # kernel is written on the centred convention `(trend - mu_trend)`,
   # and adding the deterministic submodel on top would count it twice.
-  # A row whose time falls outside the fitted grid has no such state
-  # and receives the per-series marginal instead.
+  # A row whose time falls outside the fitted grid is refused.
   #
   # On a response-keyed fit the state is read once per response, since
   # each response is its own series and holds its own `trend[t, s]`

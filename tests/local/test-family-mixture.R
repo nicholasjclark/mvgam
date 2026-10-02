@@ -798,7 +798,7 @@ test_that("fitted is the expectation, averaged", {
   # composed differently by each.
   for (f in list(fit, fit2, fit3)) {
     expect_equal(unname(fitted(f)[, "Estimate"]),
-                 unname(colMeans(posterior_epred(f))),
+                 unname(colMeans(posterior_epred(f, incl_autocor = TRUE))),
                  tolerance = 1e-12)
   }
 })

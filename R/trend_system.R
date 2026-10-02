@@ -997,8 +997,6 @@ print.mvgam_trend <- function(x, ...) {
 #'     the same identified stationary covariance. Use
 #'     \code{AR(p = c(...))} for sparse-lag autoregression on a single
 #'     series.
-#'   * For `CAR()` models: must be \code{1}, a continuous-time AR(1)
-#'     process.
 #'
 #' @param time The unquoted name of the `numeric` or `integer` variable in
 #'   `data` that holds each row's time. Defaults to `time`.
@@ -1346,6 +1344,38 @@ print.mvgam_trend <- function(x, ...) {
 #'   silent        = 2
 #' )
 #' mcmc_plot(mod_car, variable = "trend_params", type = "intervals")
+#'
+#' # Correlated CAR(1) for three series observed at their own times.
+#' # Each series keeps a random 60 percent of the survey times.
+#' set.seed(11)
+#' simdat_cor <- sim_mvgam(
+#'   type         = 6L,
+#'   family       = poisson(),
+#'   n_series     = 3L,
+#'   n_timepoints = 80L
+#' )
+#' own_times <- simdat_cor$data_train
+#' own_times <- own_times[runif(nrow(own_times)) < 0.6, ]
+#' table(own_times$series)
+#'
+#' mod_car_cor <- mvgam(
+#'   y ~ s(season, bs = "cc", k = 6),
+#'   trend_formula = ~ CAR(cor = TRUE),
+#'   data          = own_times,
+#'   family        = poisson(),
+#'   chains        = 2,
+#'   silent        = 2
+#' )
+#' summary(mod_car_cor)
+#'
+#' # Correlations among the series' innovations
+#' residual_cor(mod_car_cor)
+#'
+#' # The trend has a state for every series at every survey time,
+#' # and forecast() takes each series at its own future times.
+#' plot(hindcast(mod_car_cor), series = 1)
+#' fc_car <- forecast(mod_car_cor, newdata = simdat_cor$data_test)
+#' plot(fc_car, series = 2)
 #'
 #' # Other trend constructors swap in the same place. For example
 #' # an AR(1) on a single series:
