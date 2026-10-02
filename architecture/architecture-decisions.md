@@ -540,10 +540,12 @@ covariance `Gamma[a, b] (1 - (ar_a ar_b)^d)`, where
 `Gamma[a, b] = Sigma_trend[a, b] / (1 - ar_a ar_b)` is the covariance
 the states hold at every occasion and the first state is drawn from.
 Adding an occasion between two others leaves the law of the remaining
-states unchanged. Gaps are measured in units of the median gap of the
-fitted grid (`car_time_scale()`), which the Stan data and `forecast()`
-both take from the axis record, and the model is then the same in any
-time unit. Under `cor = TRUE`, `L_Omega_trend` is the correlation of
+states unchanged. Gaps are measured in units of the median gap between
+two consecutive observations of one series, which the axis record
+holds as `time$observation_gap`. The Stan data and `forecast()` both
+take it through `car_time_scale()`. The model is then the same in any
+time unit, and the unit stays put when another series adds times to
+the grid. Under `cor = TRUE`, `L_Omega_trend` is the correlation of
 the shocks over an instant and `Sigma_trend`, the innovation
 covariance over a gap of one, follows from it through
 `car_unit_coherence()`. A correlation placed on the unit-gap
@@ -552,7 +554,19 @@ at gaps below one when the series damp at different rates. Every
 post-fit path takes the innovation correlation from the stored
 `Sigma_trend` (`stores_innovation_cov()`). A CAR forecast steps every
 series from the last occasion of the fitted grid, where each has a
-state, including a series whose last responses are missing. A sparse lag set bounds its
+state, including a series whose last responses are missing.
+
+The registry's `completes_time_grid` is `TRUE` for CAR alone. Such a
+trend takes series observed at their own times:
+`trend_cell_frame()` adds a cell for each time a series has no row
+at, and the frame is the model its `NA`-padded form gives, with
+identical Stan data. Every other trend is refused by
+`refuse_ragged_trend_grid()`. `forecast()` steps all series over the
+union of the forecast times and reports each at its own.
+`score()` sums series at each forecast time, and a joint score needs
+shared times. `lfo_cv()` scores the series observed in each fold and
+records the count as `n_obs`. `df` is refused on such a frame
+(`refuse_heavy_tails_on_ragged_grid()`). A sparse lag set bounds its
 coefficients one at a time, and a draw can be explosive. It keeps the
 raw start in Stan, keeps its innovation covariance on the R side, and
 `warn_explosive_draws()` counts such draws.

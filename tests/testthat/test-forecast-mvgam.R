@@ -351,19 +351,18 @@ test_that("compute_car_forecast_time builds the right gap vector", {
 })
 
 
-test_that("compute_car_forecast_time errors on per-series time mismatch", {
+test_that("compute_car_forecast_time steps over the union of times", {
   fit <- make_mock_mvgam(series_levels = c("a", "b"))
   testthat::local_mocked_bindings(
     mvgam_axes = function(object) list(time = list(values = c(2, 4, 6, 10)))
   )
-  # Series 'a' has gaps c(1, 1); series 'b' has gaps c(1, 2).
+  # Each series at its own forecast times: one step per time of the
+  # union 11, 12, 13.
   fc_grid <- list(times = list(a = c(11, 12),
                                   b = c(11, 13)))
-  expect_error(
-    compute_car_forecast_time(fit, fc_grid,
-                                series_levels = c("a", "b")),
-    "share one time grid"
-  )
+  out <- compute_car_forecast_time(fit, fc_grid,
+                                     series_levels = c("a", "b"))
+  expect_equal(out, c(1, 1, 1) / 2)
 })
 
 

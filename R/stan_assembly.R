@@ -641,7 +641,7 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       # The occasions in the user's own units, from the axis record.
       # The gaps a continuous-time trend steps over are `diff()` of
       # them.
-      time_values = dimensions$axes$time$values,
+      time_axis = dimensions$axes$time,
       unique_series = dimensions$unique_series,
       series_groups = dimensions$series_groups,
       row_time = dimensions$row_time,
@@ -5522,23 +5522,24 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
 #' The time unit a CAR trend measures its gaps in
 #'
-#' The median gap between the distinct occasions of the fitted grid.
-#' `ar1_trend` and `sigma_trend` are then the damping and the
-#' innovation scale over a typical step, whatever unit the time column
-#' is recorded in, and a regular grid has gaps of one. The fit and
-#' `forecast()` both take the unit from the axis record through this
-#' function.
+#' The typical gap between two observations of one series, which the
+#' axis record holds as `observation_gap`. `ar1_trend` and
+#' `sigma_trend` are then the damping and the innovation scale over a
+#' typical step, whatever unit the time column is recorded in, and a
+#' regular grid has gaps of one. The unit stays the same when another
+#' series adds times to the grid. The fit and `forecast()` both take
+#' it from the axis record through this function.
 #'
-#' @param time_values The occasions of the fitted grid
+#' @param time_axis The `time` entry of the axis record, or a list
+#'   holding the occasions of one series as `values`
 #' @return A positive number, 1 for a grid of one occasion
 #' @noRd
-car_time_scale <- function(time_values) {
-  checkmate::assert_numeric(time_values, min.len = 1L, any.missing = FALSE)
-  gaps <- diff(sort(unique(as.numeric(time_values))))
-  if (length(gaps) == 0L) {
-    return(1)
+car_time_scale <- function(time_axis) {
+  checkmate::assert_list(time_axis)
+  if (!is.null(time_axis$observation_gap)) {
+    return(time_axis$observation_gap)
   }
-  stats::median(gaps)
+  axis_observation_gap(list(as.numeric(time_axis$values)))
 }
 
 # Smallest gap a CAR trend steps over, in units of `car_time_scale()`
@@ -5571,8 +5572,8 @@ car_scaled_gaps <- function(gaps, scale) {
 #' gap, and `gap_values` and `gap_index` name them: step `t` spans
 #' `gap_values[gap_index[t]]`.
 #'
-#' @param data_info Data information holding `time_values`, the
-#'   occasions of the axis record in the user's units, and `n_series`
+#' @param data_info Data information holding `time_axis`, the time
+#'   entry of the axis record, and `n_series`
 #' @return List of `time_dis`, a matrix of gaps \[n_time, n_series\],
 #'   `gap_values`, the distinct gaps, and `gap_index`, the position of
 #'   each step's gap among them
@@ -5580,11 +5581,12 @@ car_scaled_gaps <- function(gaps, scale) {
 calculate_car_time_distances <- function(data_info) {
   # The axis record holds the occasions once and the time index is
   # `match()` into them. The gaps are the differences in that order.
-  times <- data_info$time_values
+  times <- data_info$time_axis$values
   checkmate::assert_numeric(times, min.len = 1L, any.missing = FALSE,
-                            .var.name = "data_info$time_values")
+                            .var.name = "data_info$time_axis$values")
   n_series <- data_info_n_series(data_info)
-  dis_time <- c(1, car_scaled_gaps(diff(times), car_time_scale(times)))
+  dis_time <- c(1, car_scaled_gaps(diff(times),
+                                   car_time_scale(data_info$time_axis)))
 
   # Gaps that differ by rounding alone share one factorisation
   gap_key <- signif(dis_time, 10)

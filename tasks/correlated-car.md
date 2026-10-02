@@ -147,7 +147,25 @@ Times closer than `1e-6` median gaps merge into one occasion. This
 replaces the absolute `1e-3` floor, which changed the process and broke
 the composition identity.
 
-## Stage 2: series on their own times
+## Stage 2 as built (2026-10-02)
+
+- Registry property `completes_time_grid`, `TRUE` for CAR. The ragged
+  refusal is skipped and `trend_cell_frame(complete = TRUE)` adds the
+  absent cells. The Stan data equal those of the `NA`-padded frame.
+- Time unit: the median gap between consecutive observations of one
+  series (`axes$time$observation_gap`, from `axis_observed_times()`).
+  The union-grid median shrinks as series interleave and would change
+  what `ar1_trend` and its prior mean.
+- `forecast()` steps all series over the union of forecast times from
+  the grid end. `score()` sums series at each forecast time, and joint
+  scores need shared times. `lfo_cv()` admits the frame and records
+  `n_obs` per fold.
+- `df` is refused on a ragged frame.
+- Not done: residual ACF panels use row lags, which carry no meaning
+  on irregular times. The trend panel draws a series at its observed
+  times only. Near-duplicate times are floored, not merged.
+
+## Stage 2: series on their own times (plan)
 
 CAR builds the union of all series' times. A cell with no data row is a
 latent state with no likelihood term.

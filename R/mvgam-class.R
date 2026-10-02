@@ -74,7 +74,8 @@
 #'       order. `NULL` for a trend without `gr`
 #'     - `axes$series$last_time` The last time each series was
 #'       observed, in the same order. A forecast for a series starts
-#'       after this time
+#'       after this time. A `CAR()` forecast starts after the last
+#'       fitted time for every series
 #'     - `axes$time$values` The ordered times the model was fitted on,
 #'       in their original units. `CAR()` and Gaussian process terms
 #'       compute their time gaps from these
@@ -82,6 +83,9 @@
 #'     - `axes$time$step` The spacing between time points, or `NA` for
 #'       irregular times. [forecast()] extends the time grid by this
 #'       step
+#'     - `axes$time$observation_gap` The median gap between two
+#'       consecutive observations of one series. `CAR()` measures its
+#'       time gaps in this unit
 #'     - `axes$factor$n_lv` The number of latent factors, equal to the
 #'       number of columns of the loadings and of `lv_trend`
 #'     - `axes$grain` `lv` when a `by = lv_axis()` term puts the trend

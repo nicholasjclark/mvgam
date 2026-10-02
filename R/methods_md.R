@@ -968,7 +968,7 @@ model_glossary <- function(obj) {
         "- $", trend_symbols(obj)[["ar1_trend"]],
         "$: autocorrelation over a gap of one, and $", car_gap_symbol,
         "$ the time between occasions $t - 1$ and $t$ in units of the ",
-        "median gap"
+        "median gap between a series' observations"
       ))
       if (trend_samples_cor(obj)) {
         defs <- c(defs, paste0(

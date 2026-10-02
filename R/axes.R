@@ -344,51 +344,39 @@ complete_axes_grain <- function(axes, has_by_lv, had_by_lv) {
   axes
 }
 
-#' The last time each series on the axis was observed at
+#' The times each series on the axis was observed at
 #'
-#' Answers in the axis's own order. `CAR()` forecasts forward from
-#' these, so an answer in any other order starts each series from
-#' another's last observation.
+#' One vector per axis entry, in the axis's own order, holding the
+#' times at which that series has a response.
 #'
 #' @param data The frame the axis was built from
 #' @param series_vals Per-row series identifiers
 #' @param series_axis The series axis, in order
-#' @param times Per-row times, in the units the record carries
+#' @param times Per-row times, in the units the record holds
 #' @param response_axis The response axis where the responses are the
 #'   series, from `mvgam_response_axis()`, and `NULL` otherwise
 #' @param response_vars The response columns named by response key, from
-#'   `response_columns()`. They say which column a response-keyed series
-#'   is read from, and tell an observation from a padding row on a
-#'   stacked frame.
-#' @return One time per axis entry, `NA` where a series has no rows
+#'   `response_columns()`. They name the column a response-keyed series
+#'   takes its values from, and tell an observation from a padding row
+#'   on a stacked frame.
+#' @return A list of numeric vectors, empty where a series has no
+#'   response
 #' @noRd
-axis_last_times <- function(data, series_vals, series_axis, times,
-                            response_axis = NULL,
-                            response_vars = NULL) {
-  # A response-keyed frame carries every response on every row, so a
-  # row's series is not in its values: they are one constant. Each
-  # response's last occasion is the last row at which that response
-  # was observed, which is what its own column says.
-  #
-  # The test is whether the axis *is* the responses, not whether the
-  # model has several. A wide frame naming its own series column has
-  # one series that every response is measured on, and there the
-  # levels are not column names at all.
+axis_observed_times <- function(data, series_vals, series_axis, times,
+                                response_axis = NULL,
+                                response_vars = NULL) {
+  # A response-keyed frame has every response on every row, and a
+  # response is observed where its own column holds a value. The test
+  # is whether the axis is the responses. A wide frame naming its own
+  # series column has one series that every response is measured on.
   if (!is.null(response_axis)) {
-    return(vapply(as.character(series_axis), function(key) {
-      seen <- times[!is.na(data[[response_vars[[key]]]])]
-      if (!length(seen)) NA_real_ else max(as.numeric(seen))
-    }, numeric(1L), USE.NAMES = FALSE))
+    return(lapply(as.character(series_axis), function(key) {
+      as.numeric(times[!is.na(data[[response_vars[[key]]]])])
+    }))
   }
 
-  # When a series was last *observed*, which is not the same as the
-  # last row it has. mvgam asks a panel whose series end at
-  # different times to be padded with `NA`, so a padded series has
-  # rows to the end of the grid and observations only to its own
-  # end. Reading the rows dated it from the padding, and a `CAR()`
-  # forecast then started from an occasion the series was never
-  # seen at. The response branch above has always asked the right
-  # question; this asks the same one of a stacked frame.
+  # A series padded with `NA` responses has rows to the end of the
+  # grid and observations to its own end.
   labels <- as.character(series_vals)
   observed <- rep(TRUE, length(labels))
   for (resp in response_vars) {
@@ -396,8 +384,39 @@ axis_last_times <- function(data, series_vals, series_axis, times,
       observed <- observed & !is.na(data[[resp]])
     }
   }
-  vapply(as.character(series_axis), function(lv) {
-    seen <- times[labels == lv & observed]
-    if (!length(seen)) NA_real_ else max(as.numeric(seen), na.rm = TRUE)
-  }, numeric(1L), USE.NAMES = FALSE)
+  lapply(as.character(series_axis), function(lv) {
+    seen <- as.numeric(times[labels == lv & observed])
+    seen[!is.na(seen)]
+  })
+}
+
+#' The last time each series on the axis was observed at
+#'
+#' @param observed_times The list `axis_observed_times()` returns
+#' @return One time per axis entry, `NA` where a series has no response
+#' @noRd
+axis_last_times <- function(observed_times) {
+  vapply(observed_times, function(seen) {
+    if (!length(seen)) NA_real_ else max(seen)
+  }, numeric(1L))
+}
+
+#' The typical gap between two observations of one series
+#'
+#' The median, over every series, of the gaps between consecutive
+#' times a series was observed at. `CAR()` measures its gaps in this
+#' unit. A time that another series adds to the grid, or a row with a
+#' missing response, leaves it unchanged.
+#'
+#' @param observed_times The list `axis_observed_times()` returns
+#' @return A positive number, 1 where no series has two observed times
+#' @noRd
+axis_observation_gap <- function(observed_times) {
+  gaps <- unlist(lapply(observed_times, function(seen) {
+    diff(sort(unique(seen)))
+  }), use.names = FALSE)
+  if (length(gaps) == 0L) {
+    return(1)
+  }
+  stats::median(gaps)
 }

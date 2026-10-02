@@ -213,6 +213,25 @@ test_that("Multivariate scoring on inconsistent horizons errors", {
 })
 
 
+test_that("series forecast at their own times are summed by time", {
+  fc <- make_mock_forecast(n_series = 2L, h = 3L)
+  # Both series hold three forecasts, and share the time 12 alone
+  fc$test_times <- list(s1 = c(11, 12, 15), s2 = c(12, 13, 14))
+  out <- score(fc, "crps")
+  # One row per time any series is forecast at: 11, 12, 13, 14, 15
+  expect_equal(
+    out$all_series$score,
+    c(out$s1$score[1L], out$s1$score[2L] + out$s2$score[1L],
+      out$s2$score[2L], out$s2$score[3L], out$s1$score[3L])
+  )
+  # Equal counts at different times are no shared horizon
+  expect_error(
+    score(fc, "energy"),
+    "Multivariate scoring requires a shared forecast horizon"
+  )
+})
+
+
 # ----- Routing parity vs direct kernel calls ----------------------
 
 test_that("score(fc, 'crps') score column equals crps_mcmc_object", {

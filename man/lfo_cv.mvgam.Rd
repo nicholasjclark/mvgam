@@ -30,7 +30,8 @@ lfo_cv(object, ...)
 \code{time}, \code{series} and any covariates required by the model
 formula. When \code{NULL}, the original training data
 (\code{object$obs_data} or \code{object$data}) is used. All series must
-share the same set of observed time values.}
+share the same set of observed time values, except under
+\code{CAR()}, which takes series observed at their own times.}
 
 \item{min_t}{Numeric; the time \emph{value} at which the initial
 training window ends. Must be one of the times present in the
@@ -88,6 +89,8 @@ score (\code{NULL} if no non-ELPD score requested).
 \item \code{pareto_ks}: Pareto-k diagnostic at each evaluation step.
 \item \code{eval_timepoints}: the times evaluated, as the data record
 them.
+\item \code{n_obs}: the number of responses each fold scores. Folds of
+series observed at their own times hold different numbers.
 \item \code{refits_at}: the times at which the model was refit, as the
 data record them.
 \item \code{pareto_k_threshold}: the numeric threshold the refit gate

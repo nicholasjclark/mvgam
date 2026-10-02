@@ -68,7 +68,8 @@ or \code{multivariate} from the responses of a wide formula
 order. \code{NULL} for a trend without \code{gr}
 \item \code{axes$series$last_time} The last time each series was
 observed, in the same order. A forecast for a series starts
-after this time
+after this time. A \code{CAR()} forecast starts after the last
+fitted time for every series
 \item \code{axes$time$values} The ordered times the model was fitted on,
 in their original units. \code{CAR()} and Gaussian process terms
 compute their time gaps from these
@@ -76,6 +77,9 @@ compute their time gaps from these
 \item \code{axes$time$step} The spacing between time points, or \code{NA} for
 irregular times. \code{\link[=forecast]{forecast()}} extends the time grid by this
 step
+\item \code{axes$time$observation_gap} The median gap between two
+consecutive observations of one series. \code{CAR()} measures its
+time gaps in this unit
 \item \code{axes$factor$n_lv} The number of latent factors, equal to the
 number of columns of the loadings and of \code{lv_trend}
 \item \code{axes$grain} \code{lv} when a \code{by = lv_axis()} term puts the trend

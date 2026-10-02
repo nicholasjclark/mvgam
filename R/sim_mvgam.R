@@ -723,8 +723,9 @@ spec_type_6 <- function() {
         ),
         time_long = time_long,
         # In units of the median gap, as a fit measures them
-        trend_time = car_scaled_gaps(shared_gaps,
-                                     car_time_scale(shared_times))
+        trend_time = car_scaled_gaps(
+          shared_gaps, car_time_scale(list(values = shared_times))
+        )
       )
     },
     trend_params = function(n_series, n_timepoints, prop_trend) {

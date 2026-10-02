@@ -343,7 +343,8 @@ test_that("a repeated timestamp cannot collapse the damping", {
   # identity.
   dup_times <- time_vals
   dup_times[5L] <- dup_times[4L]
-  info <- list(time_values = as.numeric(dup_times), n_series = n_series)
+  info <- list(time_axis = list(values = as.numeric(dup_times)),
+               n_series = n_series)
   td <- mvgam:::calculate_car_time_distances(info)$time_dis
   expect_true(all(as.numeric(td) > 0))
   expect_true(all(is.finite(as.numeric(td))))
@@ -357,33 +358,37 @@ test_that("the refusals carry messages a user can act on", {
   # several patterns passes on whichever one happens to match and
   # stops telling apart the conditions it was written to separate.
 
-  # A series missing an occasion the others have. This is the
-  # refusal most particular to CAR, and its wording says so: gaps
-  # within a series are the whole point of the trend, but the
-  # series still have to align on one shared grid, since `time_dis`
-  # is one column per series over a common set of occasions.
+  # A series missing an occasion the others have. `CAR()` holds a
+  # state for that series there, and the frame is the model its
+  # NA-padded form gives. A trend that steps by position refuses it
+  # and names the trend that takes it.
   ragged <- dat[!(as.character(dat$series) == series_levels[2L] &
                     dat$time == time_vals[5L]), , drop = FALSE]
   expect_identical(nrow(ragged), nrow(dat) - 1L)
-  ragged_err <- expect_error(
+  completed <- mvgam(
+    formula = y ~ temp, trend_formula = ~ CAR(),
+    data = ragged, family = poisson(), run_model = FALSE, silent = 2
+  )
+  expect_identical(as.integer(completed$standata$N_trend),
+                   n_time * n_series)
+  expect_identical(as.integer(completed$standata$N), nrow(ragged))
+  expect_equal(completed$standata$time_dis, prefit$standata$time_dis)
+  zmvn_err <- expect_error(
     mvgam(
-      formula = y ~ temp, trend_formula = ~ CAR(),
+      formula = y ~ temp, trend_formula = ~ ZMVN(),
       data = ragged, family = poisson(), run_model = FALSE,
       silent = 2
     ),
     "must share one time grid"
   )
-  msg <- conditionMessage(ragged_err)
-  # It counts what it got against what it wanted, so the user can
-  # see which side is short.
+  msg <- conditionMessage(zmvn_err)
+  # The message gives the cells supplied and the cells a full grid has
   expect_match(msg, as.character(nrow(ragged)), fixed = TRUE)
-  expect_match(msg, as.character(n_time), fixed = TRUE)
-  expect_match(msg, as.character(n_series), fixed = TRUE)
-  # It names the remedy, and it names this trend, because a reader
-  # who chose CAR for irregular sampling needs telling that within
-  # a series is where the irregularity is allowed to live.
+  expect_match(msg, as.character(n_time * n_series), fixed = TRUE)
+  # It names the remedy and the trend that needs none
   expect_match(msg, "NA", fixed = TRUE)
-  expect_match(msg, "CAR()", fixed = TRUE)
+  expect_match(msg, "'CAR()' takes series observed at their own times",
+               fixed = TRUE)
 
   # A prediction frame with no time column. The time is the one
   # thing a forecast grid cannot do without, and the message names
@@ -1294,6 +1299,191 @@ test_that("the correlated CAR reports the correlation of its trends", {
   }
 })
 
+
+
+# ----------------------------------------------------------------------
+# Series observed at their own times
+# ----------------------------------------------------------------------
+#
+# The correlated frame above with each series keeping its own share of
+# the times. The trend holds a state for every series at each time any
+# series was observed, and a series enters the likelihood where it has
+# a row.
+
+own_sim <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    sim <- cor_sim()
+    set.seed(5150L)
+    d <- sim$data[!is.na(sim$data$y), ]
+    d <- d[stats::runif(nrow(d)) < 0.6, ]
+    d <- d[sample(nrow(d)), ]
+    union_times <- sort(unique(d$time))
+    padded <- merge(
+      expand.grid(time = union_times,
+                  series = factor(sim$series_names,
+                                  levels = sim$series_names)),
+      d, all.x = TRUE
+    )
+    cached <<- list(data = d, padded = padded, union_times = union_times,
+                    series_names = sim$series_names, n_series = sim$n_series)
+    cached
+  }
+})
+
+own_fit <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    cached <<- cached_fit("val_mvgam_car_own_times.rds", function() {
+      mvgam(
+        formula = y ~ 1, trend_formula = ~ CAR(cor = TRUE),
+        data = own_sim()$data, family = poisson(),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        silent = 2, backend = "cmdstanr"
+      )
+    }, key = own_sim()$data)
+    cached
+  }
+})
+
+
+test_that("series at their own times are the NA-padded model", {
+  sim <- own_sim()
+  # The premise: the series miss different times
+  per_series <- table(sim$data$series)
+  expect_true(all(per_series < length(sim$union_times)))
+
+  car <- mvgam_formula(y ~ 1, trend_formula = ~ CAR(cor = TRUE))
+  sd_own <- standata(car, data = sim$data, family = poisson())
+  caught <- with_warnings(standata(car, data = sim$padded,
+                                   family = poisson()))
+  expect_true(all(grepl("Rows containing NAs", caught$warnings)))
+  sd_pad <- caught$value
+  # One program, one trend grid and one time unit. The observations
+  # are the same cells in the order each frame lists them, and the
+  # observation design names its rows by that order.
+  shared <- setdiff(names(sd_own),
+                    c("Y", "X", "obs_trend_time", "obs_trend_series"))
+  expect_identical(sd_own[shared], sd_pad[shared])
+  cell <- function(s) paste(s$obs_trend_time, s$obs_trend_series)
+  expect_identical(
+    as.numeric(sd_own$Y)[order(cell(sd_own))],
+    as.numeric(sd_pad$Y)[order(cell(sd_pad))]
+  )
+  expect_identical(
+    as.integer(sd_own$N_trend),
+    length(sim$union_times) * sim$n_series
+  )
+  # The unit is the gap between one series' observations, which
+  # exceeds the gap between the times of the union
+  axis_time <- mvgam:::mvgam_axes(own_fit())$time
+  expect_gt(axis_time$observation_gap,
+            stats::median(diff(sim$union_times)))
+})
+
+
+test_that("each surface reports a series at its own times", {
+  sim <- own_sim()
+  fit_o <- own_fit()
+  dm <- posterior::as_draws_matrix(fit_o$fit)
+  cell_state <- function(time, series) {
+    as.numeric(dm[, paste0(
+      "trend[", match(time, sim$union_times), ",",
+      match(series, sim$series_names), "]"
+    )])
+  }
+  intercept <- as.numeric(dm[, "b_Intercept"])
+
+  hc <- hindcast(fit_o, type = "expected")
+  for (s in sim$series_names) {
+    own <- sort(sim$data$time[sim$data$series == s])
+    expect_equal(as.numeric(hc$train_times[[s]]), own)
+    expect_identical(ncol(hc$hindcasts[[s]]), length(own))
+    expect_equal(hc$hindcasts[[s]][, 3L],
+                 exp(intercept + cell_state(own[3L], s)))
+  }
+  ep <- posterior_epred(fit_o, incl_autocor = TRUE)
+  for (i in c(1L, 40L, nrow(sim$data))) {
+    expect_equal(
+      ep[, i],
+      exp(intercept + cell_state(sim$data$time[i],
+                                 as.character(sim$data$series[i])))
+    )
+  }
+  # A time inside the grid at which a series has no row takes the
+  # state the model holds there
+  first <- sim$series_names[1L]
+  absent <- setdiff(sim$union_times,
+                    sim$data$time[sim$data$series == first])[2L]
+  at_gap <- posterior_linpred(
+    fit_o, incl_autocor = TRUE,
+    newdata = data.frame(time = absent,
+                         series = factor(first, levels = sim$series_names),
+                         y = NA_integer_)
+  )
+  expect_equal(at_gap[, 1L], intercept + cell_state(absent, first))
+
+  for (ty in c("trend", "series")) {
+    expect_equal(drawn_x(plot(fit_o, type = ty)), range(sim$union_times))
+  }
+})
+
+
+test_that("forecast and its scores take each series at its own times", {
+  sim <- own_sim()
+  fit_o <- own_fit()
+  end <- max(sim$union_times)
+  future <- data.frame(
+    time = end + c(1, 4, 9, 2, 4, 30),
+    series = factor(rep(sim$series_names[1:2], each = 3L),
+                    levels = sim$series_names),
+    y = c(3L, 5L, 4L, 6L, 2L, 7L)
+  )
+  fc <- forecast(fit_o, newdata = future, type = "trend")
+  expect_equal(as.numeric(fc$test_times[[1L]]), end + c(1, 4, 9))
+  expect_equal(as.numeric(fc$test_times[[2L]]), end + c(2, 4, 30))
+  expect_identical(ncol(fc$forecasts[[3L]]), 0L)
+
+  # Every series steps from its state at the end of the grid, over
+  # the gap to its own forecast time in the fit's unit
+  dm <- posterior::as_draws_matrix(fit_o$fit)
+  unit <- mvgam:::mvgam_axes(fit_o)$time$observation_gap
+  n_t <- length(sim$union_times)
+  for (s in 1:2) {
+    phi <- as.numeric(dm[, paste0("ar1_trend[", s, "]")])
+    last <- as.numeric(dm[, paste0("trend[", n_t, ",", s, "]")])
+    scale2 <- as.numeric(dm[, paste0("Sigma_trend[", s, ",", s, "]")])
+    leads <- (as.numeric(fc$test_times[[s]]) - end) / unit
+    for (h in seq_along(leads)) {
+      draws <- fc$forecasts[[s]][, h]
+      cond_var <- mean(scale2 * (1 - phi^(2 * leads[h])) / (1 - phi^2)) +
+        stats::var(phi^leads[h] * last)
+      expect_lt(abs(mean(draws) - mean(phi^leads[h] * last)), 0.15)
+      expect_lt(abs(stats::sd(draws) / sqrt(cond_var) - 1), 0.1)
+    }
+  }
+
+  # The scores of the two series are summed at the one time they share
+  sc <- score(forecast(fit_o, newdata = future), "crps")
+  expect_identical(nrow(sc$all_series), 5L)
+  expect_equal(
+    sc$all_series$score[3L],
+    sc[[sim$series_names[1L]]]$score[2L] +
+      sc[[sim$series_names[2L]]]$score[2L]
+  )
+  expect_error(score(forecast(fit_o, newdata = future), "energy"),
+               "shared forecast horizon")
+
+  lfo <- lfo_cv(fit_o,
+                min_t = sim$union_times[length(sim$union_times) - 3L])
+  rows_at <- vapply(lfo$eval_timepoints, function(t) {
+    sum(sim$data$time == t)
+  }, integer(1L))
+  expect_identical(lfo$n_obs, rows_at)
+  expect_true(all(is.finite(lfo$elpds)))
+})
 
 
 # ----------------------------------------------------------------------

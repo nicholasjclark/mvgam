@@ -11,9 +11,10 @@
 #'
 #' \itemize{
 #'   \item \code{none}: Deterministic trends (PW) - no innovations
-#'   \item \code{diagonal}: Independent innovations per series (CAR)
+#'   \item \code{diagonal}: Independent innovations per series, which
+#'     a \code{cholesky_scaled} trend takes without \code{cor}
 #'   \item \code{cholesky_scaled}: Correlated via L_Sigma =
-#'     diag(sigma) * L_Omega (RW, AR, ZMVN)
+#'     diag(sigma) * L_Omega (RW, AR, ZMVN, CAR)
 #'   \item \code{full_covariance}: Direct covariance matrix Sigma (VAR)
 #' }
 #'
@@ -1312,8 +1313,8 @@ map_lv_to_series_innovations <- function(lv_innov, Z, n_times,
 
 #' Transform Innovations: Diagonal Pattern
 #'
-#' For models with independent innovations per series (CAR, or RW/AR/ZMVN
-#' with cor=FALSE). Vectorized implementation without per-draw loops.
+#' For models with independent innovations per series (RW, AR, ZMVN
+#' or CAR with cor = FALSE). Vectorized implementation without per-draw loops.
 #'
 #' @param z Matrix `[ndraws x (n_times * n_series)]` of standard normals
 #' @param params List with `sigma_trend` matrix \[ndraws x n_series\]

@@ -40,7 +40,8 @@
 #'   `time`, `series` and any covariates required by the model
 #'   formula. When `NULL`, the original training data
 #'   (`object$obs_data` or `object$data`) is used. All series must
-#'   share the same set of observed time values.
+#'   share the same set of observed time values, except under
+#'   `CAR()`, which takes series observed at their own times.
 #' @param data Deprecated. Use `newdata` instead.
 #' @param min_t Numeric; the time *value* at which the initial
 #'   training window ends. Must be one of the times present in the
@@ -91,6 +92,8 @@
 #'   * `pareto_ks`: Pareto-k diagnostic at each evaluation step.
 #'   * `eval_timepoints`: the times evaluated, as the data record
 #'     them.
+#'   * `n_obs`: the number of responses each fold scores. Folds of
+#'     series observed at their own times hold different numbers.
 #'   * `refits_at`: the times at which the model was refit, as the
 #'     data record them.
 #'   * `pareto_k_threshold`: the numeric threshold the refit gate
@@ -228,7 +231,10 @@ lfo_cv.mvgam <- function(object,
   # every row, and the record returns `NULL` for it: its responses
   # share the grid by construction.
   series_fac <- axis_row_series(object, all_data)
-  if (!is.null(series_fac)) {
+  # A trend that completes its grid holds a state for every series at
+  # every time, and each fold then scores the series observed in it.
+  if (!is.null(series_fac) &&
+      !trend_completes_time_grid(first_trend_spec(object))) {
     short <- ragged_series(all_data[[time_var]], series_fac)
     if (length(short) > 0L) {
       stop(insight::format_error(c(
@@ -363,6 +369,16 @@ lfo_cv.mvgam <- function(object,
   loglik_past <- log_lik(fit_past, newdata = all_data)
   idx_refit <- idx_min_t
 
+  # The responses each fold scores. Folds of series observed at their
+  # own times hold different numbers, and a fold's score is a sum over
+  # them.
+  eval_n_obs <- vapply(eval_positions, function(k) {
+    rows <- rows_at_times(
+      all_data, time_var, all_unique_times[k:(k + fc_horizon - 1L)]
+    )
+    sum(!is.na(loglik_past[1L, rows]))
+  }, integer(1L))
+
   # The number the refit gate below compares against, and the one
   # the result reports. The adaptive rule from Vehtari et al. (2024)
   # tightens it when the posterior draw count is small and clamps at
@@ -496,6 +512,7 @@ lfo_cv.mvgam <- function(object,
       scores = score_arrays,
       pareto_ks = pareto_ks,
       eval_timepoints = eval_timepoints,
+      n_obs = eval_n_obs,
       refits_at = refits_at,
       refit_triggered = refit_triggered,
       pareto_k_threshold = pareto_k_threshold_used,
@@ -878,7 +895,9 @@ summary.mvgam_lfo <- function(object, ...) {
     # logical vector during the lfo loop so the flag is robust to
     # irregular time grids.
     refit_here = object$refit_triggered,
-    pareto_k = object$pareto_ks
+    pareto_k = object$pareto_ks,
+    # The number of responses the fold scores
+    n_obs = object$n_obs
   )
   if (!is.null(object$elpds)) {
     out$elpd <- object$elpds

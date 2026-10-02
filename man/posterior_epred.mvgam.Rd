@@ -32,8 +32,9 @@ AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
 innovation variance, and the resulting Jensen correction on a log
 link is \eqn{\sigma^2/(2(1-\rho^2))}. A random walk has no
 stationary distribution and a \code{ZMVN()} trend has no dynamics to
-settle into, so both draw their innovations directly; \code{CAR()} does
-the same, its decay depending on the gap between observations. If
+settle into, so both draw their innovations directly. \code{CAR()}
+holds one stationary covariance at every time of an irregular
+grid and draws from it. If
 \code{FALSE}, the default, the trend contributes its deterministic
 submodel alone, still at its own per-draw values, so \code{FALSE} is
 not a collapse to a posterior mean. Read only under

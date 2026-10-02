@@ -61,7 +61,8 @@
 #'   time, whether or not the response is observed there.
 #'   `CAR()` and `ZMVN()` are exempt: `CAR()` carries the elapsed
 #'   gap into its kernel, and `ZMVN()` has no temporal structure
-#'   to step through.
+#'   to step through. Under `CAR()` each series may have its own
+#'   forecast times, all after the last fitted time.
 #' @param ... Currently unused.
 #' @param type One of `"response"`, `"link"`, `"expected"`,
 #'   `"trend"`. `"response"` samples from the observation family
@@ -1051,6 +1052,11 @@ build_forecast_arms <- function(object, trend_model, meta,
   } else {
     NULL
   }
+  # One step per time of the union, which exceeds a single series'
+  # count when the series are forecast at their own times
+  if (!is.null(fc_time)) {
+    h_max <- length(fc_time)
+  }
 
   # PW forecasts evaluate a piecewise function at user-
   # supplied forecast times. Pre-compute the shared
@@ -1333,34 +1339,33 @@ shared_across_series <- function(per_series, trend) {
 
 
 # Internal: per-step time gaps for a CAR forecast, in the unit the fit
-# measured its own gaps in. The state every series is stepped from is
-# the one at the last occasion of the fitted grid, and the first gap
-# is measured from that occasion. A series whose last responses are
-# missing has a state there too.
+# measured its own gaps in. Every series is stepped together over the
+# union of the forecast times, from its state at the last occasion of
+# the fitted grid, and each series is then reported at its own times.
+# A series whose last responses are missing has a state at the last
+# occasion too.
 #'@noRd
 compute_car_forecast_time <- function(object, fc_grid,
                                         series_levels) {
-  grid_times <- mvgam_axes(object)$time$values
-  origin <- max(grid_times)
-  scale <- car_time_scale(grid_times)
-  gaps <- lapply(series_levels, function(lv) {
-    fut_t <- sort(fc_grid$times[[lv]])
-    if (length(fut_t) == 0L) {
-      return(numeric(0L))
-    }
-    if (fut_t[1L] <= origin) {
+  time_axis <- mvgam_axes(object)$time
+  origin <- max(time_axis$values)
+  for (lv in series_levels) {
+    fut_t <- fc_grid$times[[lv]]
+    if (length(fut_t) > 0L && min(fut_t) <= origin) {
       stop(insight::format_error(c(
         paste0("CAR forecasts begin after the last fitted time, ",
                format(origin, trim = TRUE), "."),
         x = paste0("Series '", lv, "' has 'newdata' times from ",
-                   format(fut_t[1L], trim = TRUE), "."),
+                   format(min(fut_t), trim = TRUE), "."),
         i = paste0("Use 'hindcast()' or 'posterior_predict()' for times ",
                    "the model was fitted on.")
       )), call. = FALSE)
     }
-    car_scaled_gaps(diff(c(origin, fut_t)), scale)
-  })
-  shared_across_series(gaps, "CAR")
+  }
+  horizon <- sort(unique(as.numeric(
+    unlist(fc_grid$times[series_levels], use.names = FALSE)
+  )))
+  car_scaled_gaps(diff(c(origin, horizon)), car_time_scale(time_axis))
 }
 
 

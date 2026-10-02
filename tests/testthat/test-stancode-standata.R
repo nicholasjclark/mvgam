@@ -5575,7 +5575,7 @@ test_that("the observed history counts every response or refuses", {
 })
 
 
-test_that("a series missing a time the others have is refused", {
+test_that("a series missing a time is refused, and CAR completes it", {
   d <- data.frame(y = rpois(30, 3), time = rep(1:10, 3),
                   series = factor(rep(c("a", "b", "c"), each = 10)))
   ragged <- d[!(d$series == "b" & d$time == 4), ]
@@ -5587,13 +5587,47 @@ test_that("a series missing a time the others have is refused", {
   msg <- conditionMessage(err)
   expect_match(msg, "'b'", fixed = TRUE)
   expect_match(msg, "response 'NA'", fixed = TRUE)
-  expect_false(grepl("CAR()", msg, fixed = TRUE))
-  # A CAR trend spaces its times unevenly, and the refusal says the
-  # series still share them.
-  car_err <- expect_error(
-    stancode(mvgam_formula(y ~ 1, ~ CAR()), data = ragged,
-             family = poisson()),
-    "must share one time grid"
+  expect_match(msg, "'CAR()' takes series observed at their own times",
+               fixed = TRUE)
+
+  # A CAR trend holds a state for every series at every time. The
+  # frame with the row absent and the frame with the row present and
+  # its response missing are one model.
+  car <- mvgam_formula(y ~ 1, ~ CAR(cor = TRUE))
+  padded <- d
+  padded$y[padded$series == "b" & padded$time == 4] <- NA
+  sd_ragged <- standata(car, data = ragged, family = poisson())
+  sd_padded <- suppressWarnings(
+    standata(car, data = padded, family = poisson())
   )
-  expect_match(conditionMessage(car_err), "'CAR()'", fixed = TRUE)
+  expect_identical(sd_ragged, sd_padded)
+  expect_identical(as.integer(sd_ragged$N_trend), 30L)
+  expect_identical(as.integer(sd_ragged$N), 29L)
+
+  # A multivariate t draws one mixing scale per time, and the times of
+  # one series would then change the trend of another
+  expect_error(
+    stancode(mvgam_formula(y ~ 1, ~ CAR(df = 5)), data = ragged,
+             family = poisson()),
+    "'df' is not supported for series observed at their own times"
+  )
+  expect_no_error(suppressWarnings(
+    stancode(mvgam_formula(y ~ 1, ~ CAR(df = 5)), data = padded,
+             family = poisson())
+  ))
+})
+
+test_that("CAR measures time in gaps between a series' observations", {
+  # Three series observed every two units, each offset from the
+  # others. The union of their times has gaps of 0.01, and the unit
+  # stays the gap one series is observed at.
+  base <- seq(2, 20, by = 2)
+  d <- data.frame(
+    time = c(base, base + 0.01, base + 0.02),
+    series = factor(rep(c("a", "b", "c"), each = length(base))),
+    y = rep(1:5, 6)
+  )
+  sdata <- standata(mvgam_formula(y ~ 1, ~ CAR(cor = TRUE)), data = d,
+                    family = poisson())
+  expect_equal(sort(as.numeric(sdata$gap_trend)), c(0.005, 0.99, 1))
 })

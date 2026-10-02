@@ -33,6 +33,9 @@ trend_registry <- new.env(parent = emptyenv())
 #'   innovation covariance.
 #' @param requires_regular_intervals Logical; does the trend index its
 #'   lags by position, which an uneven time grid breaks?
+#' @param completes_time_grid Logical; does the trend hold a latent
+#'   state for a series at a time the data has no row for? Such a
+#'   trend takes series observed at their own times.
 #' @param generator_func Function that generates Stan code for this
 #'   trend type
 #' @param incompatibility_reason Character string explaining why factor
@@ -42,6 +45,7 @@ trend_registry <- new.env(parent = emptyenv())
 register_trend_type <- function(name, supports_factors, covariance_pattern,
                                 stationary_source,
                                 requires_regular_intervals,
+                                completes_time_grid,
                                 generator_func,
                                 incompatibility_reason = NULL) {
   checkmate::assert_string(name, min.chars = 1)
@@ -52,6 +56,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
   )
   checkmate::assert_choice(stationary_source, c("none", "lift", "omega"))
   checkmate::assert_flag(requires_regular_intervals)
+  checkmate::assert_flag(completes_time_grid)
   checkmate::assert_function(generator_func,
                              args = c("trend_specs", "data_info"))
   checkmate::assert_string(incompatibility_reason,
@@ -62,6 +67,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
     covariance_pattern = covariance_pattern,
     stationary_source = stationary_source,
     requires_regular_intervals = requires_regular_intervals,
+    completes_time_grid = completes_time_grid,
     generator = generator_func,
     incompatibility_reason = incompatibility_reason
   )
@@ -185,7 +191,8 @@ validate_trend_properties <- function(trend_info, func_name) {
   }
   missing_fields <- setdiff(
     c("supports_factors", "covariance_pattern", "stationary_source",
-      "requires_regular_intervals", "incompatibility_reason"),
+      "requires_regular_intervals", "completes_time_grid",
+      "incompatibility_reason"),
     names(trend_info)
   )
   if (length(missing_fields) > 0) {
@@ -209,6 +216,7 @@ ar_trend_properties <- function() {
     # `ar_stationary_factor()` computes from the moving-average weights.
     stationary_source = "lift",
     requires_regular_intervals = TRUE,
+    completes_time_grid = FALSE,
     incompatibility_reason = NULL
   )
 }
@@ -222,6 +230,7 @@ rw_trend_properties <- function() {
     # A random walk has no stationary distribution.
     stationary_source = "none",
     requires_regular_intervals = TRUE,
+    completes_time_grid = FALSE,
     incompatibility_reason = NULL
   )
 }
@@ -236,6 +245,7 @@ var_trend_properties <- function() {
     # `Sigma_trend`. Nothing is recomputed here.
     stationary_source = "omega",
     requires_regular_intervals = TRUE,
+    completes_time_grid = FALSE,
     incompatibility_reason = NULL
   )
 }
@@ -251,6 +261,7 @@ zmvn_trend_properties <- function() {
     stationary_source = "none",
     # A multivariate normal indexed by series is exchangeable in time.
     requires_regular_intervals = FALSE,
+    completes_time_grid = FALSE,
     incompatibility_reason = NULL
   )
 }
@@ -268,6 +279,9 @@ car_trend_properties <- function() {
     stationary_source = "lift",
     # The kernel carries the elapsed gap between observations.
     requires_regular_intervals = FALSE,
+    # Every series has a state at every time of the union grid, and a
+    # time added between two others leaves the model unchanged.
+    completes_time_grid = TRUE,
     incompatibility_reason = paste0(
       "Continuous-time AR dynamics follow each series' own irregular ",
       "time gaps."
@@ -285,6 +299,7 @@ pw_trend_properties <- function() {
     covariance_pattern = "none",
     stationary_source = "none",
     requires_regular_intervals = TRUE,
+    completes_time_grid = FALSE,
     incompatibility_reason =
       "Piecewise trends model changepoints separately for each series."
   )
@@ -1010,10 +1025,10 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #' \code{CAR()} steps a continuous-time AR(1) over the gaps the data
 #' records. A gap \code{dt} is measured in units of the median gap
-#' between the fitted times. \code{ar1_trend} and \code{sigma_trend}
-#' then describe a typical step, and the model does not depend on the
-#' unit the time column is recorded in. Across a gap \code{dt} the
-#' decay is
+#' between two consecutive observations of one series.
+#' \code{ar1_trend} and \code{sigma_trend} then describe a typical
+#' step, and the model does not depend on the unit the time column is
+#' recorded in. Across a gap \code{dt} the decay is
 #' \code{ar1_trend^dt} and the innovation standard deviation is
 #' \code{sigma_trend * sqrt((1 - ar1_trend^(2 dt)) /
 #' (1 - ar1_trend^2))}. The decay and the innovation scale together.
@@ -1035,6 +1050,16 @@ print.mvgam_trend <- function(x, ...) {
 #' closer to zero than that correlation when the series damp at
 #' different rates. On a regular grid the likelihood is that of
 #' \code{AR(p = 1, cor = TRUE)} with positive coefficients.
+#'
+#' The series of a \code{CAR()} trend may be observed at their own
+#' times. The trend has a state for every series at each time any
+#' series was observed, and a series contributes to the likelihood at
+#' the times it has a row. This is the model a frame gives when every
+#' unobserved time of a series has a row with a missing response.
+#' \code{forecast()} takes each series at its own future times.
+#' \code{df} needs the series on shared times: a multivariate t has
+#' one mixing scale per time, and the times of one series would
+#' change the trend of another.
 #'
 #' @note **VAR fits and `init = 0`**: VAR uses the Heaps-2023
 #'   stationary joint-distribution initialisation. Setting
@@ -1282,8 +1307,8 @@ print.mvgam_trend <- function(x, ...) {
 #'   n_timepoints = 120L
 #' )
 #'
-#' # Fit the CAR(1) model. ar1_trend[1] is the continuous-time
-#' # decay parameter and adapts to the per-step time gap.
+#' # Fit the CAR(1) model. ar1_trend[1] is the damping over the
+#' # median gap between observations.
 #' mod_car <- mvgam(
 #'   y ~ 1,
 #'   trend_formula = ~ CAR(),

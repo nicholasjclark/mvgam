@@ -318,8 +318,9 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   innovation variance, and the resulting Jensen correction on a log
 #'   link is \eqn{\sigma^2/(2(1-\rho^2))}. A random walk has no
 #'   stationary distribution and a `ZMVN()` trend has no dynamics to
-#'   settle into, so both draw their innovations directly; `CAR()` does
-#'   the same, its decay depending on the gap between observations. If
+#'   settle into, so both draw their innovations directly. `CAR()`
+#'   holds one stationary covariance at every time of an irregular
+#'   grid and draws from it. If
 #'   `FALSE`, the default, the trend contributes its deterministic
 #'   submodel alone, still at its own per-draw values, so `FALSE` is
 #'   not a collapse to a posterior mean. Read only under

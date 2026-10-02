@@ -14,9 +14,10 @@ types are mapped to one of four covariance patterns:
 
 \itemize{
 \item \code{none}: Deterministic trends (PW) - no innovations
-\item \code{diagonal}: Independent innovations per series (CAR)
+\item \code{diagonal}: Independent innovations per series, which
+a \code{cholesky_scaled} trend takes without \code{cor}
 \item \code{cholesky_scaled}: Correlated via L_Sigma =
-diag(sigma) * L_Omega (RW, AR, ZMVN)
+diag(sigma) * L_Omega (RW, AR, ZMVN, CAR)
 \item \code{full_covariance}: Direct covariance matrix Sigma (VAR)
 }
 

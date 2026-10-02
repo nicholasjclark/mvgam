@@ -48,7 +48,8 @@ test_that("trend properties are validated", {
     args <- utils::modifyList(
       list(name = "T", supports_factors = TRUE,
            covariance_pattern = "diagonal", stationary_source = "none",
-           requires_regular_intervals = TRUE, generator_func = generator),
+           requires_regular_intervals = TRUE, completes_time_grid = FALSE,
+           generator_func = generator),
       list(...)
     )
     do.call(register_trend_type, args)
@@ -73,6 +74,13 @@ test_that("the registry holds each trend's covariance and time facts", {
   )
   # A CAR state holds one covariance at every occasion of its grid
   expect_identical(trend_stationary_source("CAR"), "lift")
+  # CAR alone holds a state at a time a series has no row for
+  completes <- vapply(
+    c("RW", "AR", "VAR", "ZMVN", "PW", "CAR"),
+    function(tt) get_trend_info(tt)$completes_time_grid,
+    logical(1L)
+  )
+  expect_identical(names(completes)[completes], "CAR")
   # PW samples no innovation, which removes `sigma_trend`
   expect_false(samples_innovation_scale(PW()))
   expect_true(samples_innovation_scale(CAR()))

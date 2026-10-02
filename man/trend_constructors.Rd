@@ -261,10 +261,10 @@ and carries no stationarity guarantee. Both take priors on the
 
 \code{CAR()} steps a continuous-time AR(1) over the gaps the data
 records. A gap \code{dt} is measured in units of the median gap
-between the fitted times. \code{ar1_trend} and \code{sigma_trend}
-then describe a typical step, and the model does not depend on the
-unit the time column is recorded in. Across a gap \code{dt} the
-decay is
+between two consecutive observations of one series.
+\code{ar1_trend} and \code{sigma_trend} then describe a typical
+step, and the model does not depend on the unit the time column is
+recorded in. Across a gap \code{dt} the decay is
 \code{ar1_trend^dt} and the innovation standard deviation is
 \code{sigma_trend * sqrt((1 - ar1_trend^(2 dt)) /
 (1 - ar1_trend^2))}. The decay and the innovation scale together.
@@ -286,6 +286,16 @@ prior is placed there. The correlation of \code{Sigma_trend} is
 closer to zero than that correlation when the series damp at
 different rates. On a regular grid the likelihood is that of
 \code{AR(p = 1, cor = TRUE)} with positive coefficients.
+
+The series of a \code{CAR()} trend may be observed at their own
+times. The trend has a state for every series at each time any
+series was observed, and a series contributes to the likelihood at
+the times it has a row. This is the model a frame gives when every
+unobserved time of a series has a row with a missing response.
+\code{forecast()} takes each series at its own future times.
+\code{df} needs the series on shared times: a multivariate t has
+one mixing scale per time, and the times of one series would
+change the trend of another.
 
 Use \code{vignette("mvgam_overview")} to see the full details of
 available stochastic trend types in \pkg{mvgam}, or view the rendered
@@ -439,8 +449,8 @@ simdat_car <- sim_mvgam(
   n_timepoints = 120L
 )
 
-# Fit the CAR(1) model. ar1_trend[1] is the continuous-time
-# decay parameter and adapts to the per-step time gap.
+# Fit the CAR(1) model. ar1_trend[1] is the damping over the
+# median gap between observations.
 mod_car <- mvgam(
   y ~ 1,
   trend_formula = ~ CAR(),

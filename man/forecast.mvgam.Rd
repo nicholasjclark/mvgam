@@ -39,7 +39,8 @@ for a twelve-step-ahead question. Supply every intervening
 time, whether or not the response is observed there.
 \code{CAR()} and \code{ZMVN()} are exempt: \code{CAR()} carries the elapsed
 gap into its kernel, and \code{ZMVN()} has no temporal structure
-to step through.}
+to step through. Under \code{CAR()} each series may have its own
+forecast times, all after the last fitted time.}
 
 \item{...}{Currently unused.}
 
