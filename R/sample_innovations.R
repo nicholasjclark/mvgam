@@ -766,9 +766,40 @@ extract_simple_cholesky_params <- function(draws_mat, n_series) {
   checkmate::assert_int(n_series, lower = 1)
   list(
     sigma_trend = read_draws_vector(draws_mat, "sigma_trend", n_series),
-    L_Omega_trend = read_draws_matrix(draws_mat, "L_Omega_trend",
-                                       n_series, n_series)
+    L_Omega_trend = if (stores_innovation_cov(draws_mat)) {
+      extract_indexed_array_2d(
+        draws_mat, "Sigma_trend", n_series, n_series,
+        required_for = "Sigma_trend (innovation covariance)",
+        transform = innovation_cor_factor
+      )
+    } else {
+      read_draws_matrix(draws_mat, "L_Omega_trend", n_series, n_series)
+    }
   )
+}
+
+
+#' Whether the draws hold the innovation covariance `Sigma_trend`
+#'
+#' `Sigma_trend` is the covariance of the innovations over one step.
+#' `CAR()` places `L_Omega_trend` on the correlation of the shocks over
+#' an instant, and its `Sigma_trend` is then a different matrix from
+#' `sigma_trend` and `L_Omega_trend` multiplied out. Every post-fit
+#' path takes the innovation correlation from `Sigma_trend` where the
+#' fit stores it.
+#'
+#' @param draws Draws with one named column per parameter element
+#' @return `TRUE` or `FALSE`
+#' @noRd
+stores_innovation_cov <- function(draws) {
+  "Sigma_trend[1,1]" %in% colnames(draws)
+}
+
+
+#' Lower Cholesky factor of a covariance matrix's correlation
+#' @noRd
+innovation_cor_factor <- function(Sigma) {
+  t(chol(stats::cov2cor(Sigma)))
 }
 
 

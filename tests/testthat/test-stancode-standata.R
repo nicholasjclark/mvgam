@@ -2103,7 +2103,7 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
   expect_false(grepl("Z_raw", code_with_trend, fixed = TRUE))
   expect_false(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z;", code_with_trend))
 
-  # Should NOT have correlation parameters (CAR doesn't support correlated trends)
+  # No correlation parameters without `cor = TRUE`
   expect_false(grepl("L_Omega_trend", code_with_trend, fixed = TRUE))
   expect_false(grepl("Sigma_trend", code_with_trend, fixed = TRUE))
 
@@ -2118,6 +2118,49 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
 
   # Should NOT have VAR parameters
   expect_false(grepl("A[0-9]+_trend", code_with_trend))
+})
+
+test_that("CAR(cor = TRUE) correlates the diffusion and scales its gaps", {
+  times <- c(10, 14, 16, 26, 28, 30)
+  d <- expand.grid(time = times, series = c("a", "b", "c"),
+                   stringsAsFactors = FALSE)
+  d$series <- factor(d$series)
+  d$y <- seq_len(nrow(d)) %% 5
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ CAR(cor = TRUE))
+  code <- stancode(mf, data = d, family = poisson())
+
+  # The correlation is that of the shocks over an instant, and the
+  # unit-gap covariance follows from it
+  expect_true(stan_pattern("matrix car_unit_coherence\\(vector ar\\)", code))
+  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;",
+                           code))
+  expect_true(stan_pattern(
+    paste0("cov_matrix\\[N_lv_trend\\] Sigma_trend = ",
+           "multiply_lower_tri_self_transpose\\(diag_pre_multiply\\(",
+           "sigma_trend, L_Omega_trend\\)\\) \\.\\* ",
+           "car_unit_coherence\\(ar1_trend\\);"),
+    code
+  ))
+  expect_true(stan_pattern(
+    "Gamma_trend \\.\\* -expm1\\(gap_trend\\[g\\] \\* log_ar_cross_trend\\)",
+    code
+  ))
+  expect_true(stan_pattern(
+    "lkj_corr_cholesky_lpdf\\(L_Omega_trend \\| 2\\)", code
+  ))
+
+  # Gaps are in units of the median gap, one entry per distinct gap
+  sdata <- standata(mf, data = d, family = poisson())
+  expect_equal(as.numeric(sdata$gap_trend[sdata$gap_index_trend][-1L]),
+               diff(times) / 2)
+  expect_identical(as.integer(sdata$N_gaps_trend), 3L)
+  # The same series in another time unit gives the same data
+  d_scaled <- transform(d, time = time * 7.3)
+  expect_equal(standata(mf, data = d_scaled, family = poisson())$gap_trend,
+               sdata$gap_trend)
+
+  prior_classes <- get_prior(mf, data = d, family = poisson())$class
+  expect_true("L_Omega_trend" %in% prior_classes)
 })
 
 test_that("stancode handles different observation families", {

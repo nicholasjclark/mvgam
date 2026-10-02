@@ -65,7 +65,7 @@
 #'   \item{`type = 6`}{`y ~ s(season, bs = "cc")` with `CAR(time,
 #'     series)`. Cyclic seasonal + continuous-time AR(1) on
 #'     irregular time gaps (`Δt ~ Uniform(1, 6)`), with
-#'     autocorrelation 0.7 over one time unit.}
+#'     autocorrelation 0.7 over the median gap.}
 #'   \item{`type = 7`}{`y ~ s(x)` with sparse
 #'     `AR(p = c(1, 12))`. The latent state carries lag-1 momentum
 #'     and lag-12 recurrence, with coefficients 0.55 and 0.40. The
@@ -722,7 +722,9 @@ spec_type_6 <- function() {
           `s(season)` = data.frame(season = grid, f_true = true_sm)
         ),
         time_long = time_long,
-        trend_time = shared_gaps
+        # In units of the median gap, as a fit measures them
+        trend_time = car_scaled_gaps(shared_gaps,
+                                     car_time_scale(shared_times))
       )
     },
     trend_params = function(n_series, n_timepoints, prop_trend) {

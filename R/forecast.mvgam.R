@@ -1332,16 +1332,33 @@ shared_across_series <- function(per_series, trend) {
 }
 
 
-# Internal: per-step time gaps for a CAR forecast. CAR(1) is
-# continuous-time, and the kernel takes the gap from each series'
-# last observed time to each forecast time.
+# Internal: per-step time gaps for a CAR forecast, in the unit the fit
+# measured its own gaps in. The state every series is stepped from is
+# the one at the last occasion of the fitted grid, and the first gap
+# is measured from that occasion. A series whose last responses are
+# missing has a state there too.
 #'@noRd
 compute_car_forecast_time <- function(object, fc_grid,
                                         series_levels) {
-  last_times <- extract_last_observed_times(object, length(series_levels))
-  gaps <- lapply(seq_along(series_levels), function(s) {
-    fut_t <- sort(fc_grid$times[[series_levels[s]]])
-    if (length(fut_t) == 0L) numeric(0L) else diff(c(last_times[s], fut_t))
+  grid_times <- mvgam_axes(object)$time$values
+  origin <- max(grid_times)
+  scale <- car_time_scale(grid_times)
+  gaps <- lapply(series_levels, function(lv) {
+    fut_t <- sort(fc_grid$times[[lv]])
+    if (length(fut_t) == 0L) {
+      return(numeric(0L))
+    }
+    if (fut_t[1L] <= origin) {
+      stop(insight::format_error(c(
+        paste0("CAR forecasts begin after the last fitted time, ",
+               format(origin, trim = TRUE), "."),
+        x = paste0("Series '", lv, "' has 'newdata' times from ",
+                   format(fut_t[1L], trim = TRUE), "."),
+        i = paste0("Use 'hindcast()' or 'posterior_predict()' for times ",
+                   "the model was fitted on.")
+      )), call. = FALSE)
+    }
+    car_scaled_gaps(diff(c(origin, fut_t)), scale)
   })
   shared_across_series(gaps, "CAR")
 }

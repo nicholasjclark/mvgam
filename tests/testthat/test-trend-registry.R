@@ -68,8 +68,11 @@ test_that("the registry holds each trend's covariance and time facts", {
                      get_covariance_pattern, character(1))
   expect_identical(
     unname(patterns),
-    c(rep("cholesky_scaled", 3L), "full_covariance", "diagonal", "none")
+    c(rep("cholesky_scaled", 3L), "full_covariance", "cholesky_scaled",
+      "none")
   )
+  # A CAR state holds one covariance at every occasion of its grid
+  expect_identical(trend_stationary_source("CAR"), "lift")
   # PW samples no innovation, which removes `sigma_trend`
   expect_false(samples_innovation_scale(PW()))
   expect_true(samples_innovation_scale(CAR()))

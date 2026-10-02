@@ -328,27 +328,33 @@ test_that("All multivariate / PW trend types flow through dispatch", {
 # ----- compute_car_forecast_time ----------------------------------
 
 test_that("compute_car_forecast_time builds the right gap vector", {
-  # Fake fit with two series, last training times = c(10, 10).
+  # The fitted grid ends at 10 and has a median gap of 2. Gaps start
+  # at the grid end, where every series has a state, and are in units
+  # of the median gap.
   fit <- make_mock_mvgam(series_levels = c("a", "b"))
   testthat::local_mocked_bindings(
-    extract_last_observed_times = function(fit, n_series) {
-      c(10, 10)
-    }
+    mvgam_axes = function(object) list(time = list(values = c(2, 4, 6, 10)))
   )
   fc_grid <- list(times = list(a = c(11, 14, 16),
                                   b = c(11, 14, 16)))
   out <- compute_car_forecast_time(fit, fc_grid,
                                      series_levels = c("a", "b"))
-  expect_equal(out, c(1, 3, 2))
+  expect_equal(out, c(1, 3, 2) / 2)
+  # A time the model was fitted on is a hindcast
+  expect_error(
+    compute_car_forecast_time(
+      fit, list(times = list(a = c(10, 11), b = c(10, 11))),
+      series_levels = c("a", "b")
+    ),
+    "begin after the last fitted time"
+  )
 })
 
 
 test_that("compute_car_forecast_time errors on per-series time mismatch", {
   fit <- make_mock_mvgam(series_levels = c("a", "b"))
   testthat::local_mocked_bindings(
-    extract_last_observed_times = function(fit, n_series) {
-      c(10, 10)
-    }
+    mvgam_axes = function(object) list(time = list(values = c(2, 4, 6, 10)))
   )
   # Series 'a' has gaps c(1, 1); series 'b' has gaps c(1, 2).
   fc_grid <- list(times = list(a = c(11, 12),
@@ -364,15 +370,13 @@ test_that("compute_car_forecast_time errors on per-series time mismatch", {
 test_that("compute_car_forecast_time ignores series with no forecast rows", {
   fit <- make_mock_mvgam(series_levels = c("a", "b"))
   testthat::local_mocked_bindings(
-    extract_last_observed_times = function(fit, n_series) {
-      c(10, 10)
-    }
+    mvgam_axes = function(object) list(time = list(values = c(2, 4, 6, 10)))
   )
   fc_grid <- list(times = list(a = c(11, 14, 16),
                                   b = integer(0L)))
   out <- compute_car_forecast_time(fit, fc_grid,
                                      series_levels = c("a", "b"))
-  expect_equal(out, c(1, 3, 2))
+  expect_equal(out, c(1, 3, 2) / 2)
 })
 
 

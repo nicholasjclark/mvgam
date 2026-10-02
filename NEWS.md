@@ -23,6 +23,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * Multivariate responses through `mvbind()` and `mvbf()`
 * `mvgam_formula()`, `mvgam_data()` and `check_newdata()` check a model and its data before fitting or prediction
 * Moving average terms in `AR()` and `VAR()`, coefficient pooling in `AR()` and partially fixed `trend_map`
+* `CAR(cor = TRUE)` correlates the series of a continuous-time trend
 * `loadings_prior` for structured factor loadings, with `active_factors()`, `shared_variation()`, `compare_loadings()` and `ordinate()`
 * `jsdgam()` gained `traits`, `trait_slopes` and `phylo`. `by = lv_axis()` gives each latent factor its own smooth
 * The 'brms' post-processing methods, including `posterior_predict()`, `log_lik()`, `update()`, `hypothesis()` and `as_draws_*()`
@@ -33,7 +34,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 ## Changed defaults
 * `posterior_epred()`, `posterior_predict()`, `posterior_linpred()` and `fitted()` default to `process_error = FALSE`, as `predict()` does
 * `conditional_effects()` defaults to `type = "expected"`
-* `CAR()` keeps its autoregressive parameter inside `(0, 1)`
+* `CAR()` keeps its autoregressive parameter inside `(0, 1)`, measures time in units of the median gap and starts forecasts from the last fitted time
 * The `com_binomial()` prior on `nu` is now `normal(1, 1)`
 
 ## Deprecations

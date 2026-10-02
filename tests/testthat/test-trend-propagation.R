@@ -143,7 +143,9 @@ test_that("a burn-in hands on its final states and innovations", {
   max_lag <- 2L
   e <- sin(seq_len(burn_in + max_lag))
   local_mocked_bindings(
-    rmvn = function(n, mu, Sigma) matrix(e[seq_len(n)], n, length(mu))
+    rmvn = function(n, mu, Sigma, df = Inf) {
+      matrix(e[seq_len(n)], n, length(mu))
+    }
   )
   state <- run_burnin(
     ar_lags = 1:2, ma_lags = 1L, drift = 0,
@@ -219,6 +221,60 @@ test_that("propagate_trend(CAR()) accepts irregular intervals", {
   )
   expect_identical(dim(out), c(40L, 2L))
   expect_true(all(is.finite(out)))
+})
+
+
+test_that("correlated CAR steps by the exact continuous-time law", {
+  # Series that damp at very different rates under a strong
+  # correlation, across gaps below and above one.
+  phi <- c(0.9, 0.1, 0.6)
+  sigma <- c(0.5, 0.9, 0.3)
+  rate <- -log(phi)
+  cor_instant <- matrix(c(1, 0.9, -0.6, 0.9, 1, -0.4, -0.6, -0.4, 1), 3L)
+  gain <- sqrt(2 * rate / (1 - phi^2))
+  Sigma <- cor_instant * tcrossprod(sigma * gain) * (1 - tcrossprod(phi)) /
+    outer(rate, rate, "+")
+  gamma <- car_stationary_cov(phi, Sigma)
+
+  # A gap of one returns the unit covariance, and two gaps compose to
+  # their sum, which is what leaves the model unchanged when a time
+  # is added between two others.
+  expect_equal(car_gap_cov(phi, gamma, 1), Sigma)
+  d1 <- 0.3
+  d2 <- 1.7
+  expect_equal(
+    car_gap_cov(phi, gamma, d1 + d2),
+    diag(phi^d2) %*% car_gap_cov(phi, gamma, d1) %*% diag(phi^d2) +
+      car_gap_cov(phi, gamma, d2)
+  )
+
+  gaps <- c(0.004, 0.5, 1, 2.7)
+  z <- matrix(c(0.3, -1.2, 0.8, 1.1, 0.2, -0.5,
+                -0.7, 0.9, 1.4, -0.1, 0.6, -1.3), 4L, 3L)
+  start <- c(0.4, -1.1, 0.2)
+  seen_df <- NULL
+  out <- with_mocked_bindings(
+    propagate_trend(
+      CAR(cor = TRUE, df = 5),
+      params = list(phi = phi, sigma = sigma, Sigma = Sigma),
+      h = 4L, n_series = 3L,
+      last_state = list(trends = matrix(start, 1L)), time = gaps
+    ),
+    draw_trend_innovations = function(h, n_series, df) {
+      seen_df <<- df
+      z
+    }
+  )
+  expected <- matrix(NA_real_, 4L, 3L)
+  state <- start
+  for (i in seq_along(gaps)) {
+    step_cov <- gamma * (1 - tcrossprod(phi)^gaps[i])
+    state <- phi^gaps[i] * state + as.numeric(t(chol(step_cov)) %*% z[i, ])
+    expected[i, ] <- state
+  }
+  expect_equal(out, expected)
+  # The constructor's degrees of freedom reach the innovations
+  expect_identical(seen_df, 5)
 })
 
 

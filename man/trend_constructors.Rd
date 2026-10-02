@@ -33,7 +33,14 @@ AR(
   df = Inf
 )
 
-CAR(time = NA, series = NA, n_lv = NULL, trend_map = NULL, df = Inf)
+CAR(
+  time = NA,
+  series = NA,
+  cor = FALSE,
+  n_lv = NULL,
+  trend_map = NULL,
+  df = Inf
+)
 
 VAR(
   time = NA,
@@ -69,7 +76,7 @@ the \code{subgr} units within each level of \code{gr}, which is
 the model \code{gr} exists to specify. \code{VAR()} and
 \code{ZMVN()} always estimate correlations and refuse
 \code{cor = FALSE}, as do \code{AR(gr = ...)} and
-\code{RW(gr = ...)}.}
+\code{RW(gr = ...)}. \code{CAR()} defaults to \code{FALSE}.}
 
 \item{gr}{An optional grouping variable, which must be a \code{factor} in the
 supplied \code{data}, for setting up hierarchical residual correlation
@@ -253,13 +260,32 @@ and carries no stationarity guarantee. Both take priors on the
 \code{ar{k}_trend} classes.
 
 \code{CAR()} steps a continuous-time AR(1) over the gaps the data
-records. Across a gap \code{dt} the decay is
+records. A gap \code{dt} is measured in units of the median gap
+between the fitted times. \code{ar1_trend} and \code{sigma_trend}
+then describe a typical step, and the model does not depend on the
+unit the time column is recorded in. Across a gap \code{dt} the
+decay is
 \code{ar1_trend^dt} and the innovation standard deviation is
 \code{sigma_trend * sqrt((1 - ar1_trend^(2 dt)) /
 (1 - ar1_trend^2))}. The decay and the innovation scale together.
 The marginal variance is then
 \code{sigma_trend^2 / (1 - ar1_trend^2)} at every occasion of an
 irregular grid, and the first state comes from that marginal.
+
+\code{CAR(cor = TRUE)} correlates the innovations of several
+series. \code{Sigma_trend} is their covariance over a gap of one.
+Series \code{a} and \code{b} have stationary covariance
+\code{Sigma_trend[a, b] / (1 - ar1_trend[a] * ar1_trend[b])}, and
+the innovations across a gap \code{dt} have that covariance times
+\code{1 - (ar1_trend[a] * ar1_trend[b])^dt}. This is the exact
+transition of the continuous-time process. A time point added
+between two others leaves the model for the remaining times
+unchanged. \code{L_Omega_trend} is the Cholesky factor of the
+correlation between the series' shocks over an instant, and its
+prior is placed there. The correlation of \code{Sigma_trend} is
+closer to zero than that correlation when the series damp at
+different rates. On a regular grid the likelihood is that of
+\code{AR(p = 1, cor = TRUE)} with positive coefficients.
 
 Use \code{vignette("mvgam_overview")} to see the full details of
 available stochastic trend types in \pkg{mvgam}, or view the rendered

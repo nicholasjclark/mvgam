@@ -16,12 +16,24 @@ grid. Stage 2 lets each series carry its own times.
 
 ## Model
 
-`K` series, damping `phi_j = ar1_trend[j]` in (0, 1), unit-gap
-innovation covariance
+`K` series, damping `phi_j = ar1_trend[j]` in (0, 1), rate
+`lambda_j = -log(phi_j)`, unit-gap innovation covariance
 
-    Sigma = diag(sigma_trend) * Omega * diag(sigma_trend)
+    Sigma = (diag(sigma_trend) * Omega * diag(sigma_trend)) .* C
+    C[a, b] = g_a g_b (1 - phi_a phi_b) / (lambda_a + lambda_b)
+    g_j = sqrt(2 lambda_j / (1 - phi_j^2))
 
-with `Omega = L_Omega_trend * L_Omega_trend'`. Across a gap `d`:
+with `Omega = L_Omega_trend * L_Omega_trend'` the correlation of the
+diffusion (shocks over an instant) and `C` one on the diagonal.
+`sigma_trend` stays the unit-gap innovation scale of each series.
+
+An LKJ prior on the unit-gap innovation correlation directly was the
+first design. It admits correlations no continuous-time process gives
+when the `phi_j` differ: `phi = (0.9, 0.1)` with correlation 0.9 gives
+`Q(0.5)` a negative eigenvalue. The diffusion form is positive definite
+at every gap.
+
+Across a gap `d`:
 
     x_i = phi^d .* x_{i-1} + e_i,    e_i ~ MVN(0, Q(d))
     Gamma[a, b] = Sigma[a, b] / (1 - phi_a * phi_b)
@@ -67,13 +79,14 @@ Transformed parameters:
 
 ```stan
 cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(
-  diag_pre_multiply(sigma_trend, L_Omega_trend));
+  diag_pre_multiply(sigma_trend, L_Omega_trend))
+  .* car_unit_coherence(ar1_trend);
 {
-  matrix[N_lv_trend, N_lv_trend] ar_cross = ar1_trend * ar1_trend';
-  matrix[N_lv_trend, N_lv_trend] Gamma = Sigma_trend ./ (1 - ar_cross);
+  matrix[N_lv_trend, N_lv_trend] log_ar_cross = log(ar1_trend * ar1_trend');
+  matrix[N_lv_trend, N_lv_trend] Gamma = Sigma_trend ./ -expm1(log_ar_cross);
   array[N_gaps_trend] matrix[N_lv_trend, N_lv_trend] L_Q;
   for (g in 1:N_gaps_trend) {
-    L_Q[g] = cholesky_decompose(Gamma .* (1 - pow(ar_cross, gap_trend[g])));
+    L_Q[g] = cholesky_decompose(Gamma .* -expm1(gap_trend[g] * log_ar_cross));
   }
   lv_trend[1] = (cholesky_decompose(Gamma) * innovations_trend[1]')';
   for (i in 2:N_time_trend) {
@@ -118,11 +131,34 @@ law through `ar_stationary_factor()`, whose factor for one lag is
 `posterior_epred()` under `process_error = TRUE` for existing
 independent CAR fits.
 
+## Time unit (decided 2026-10-02)
+
+`ar1_trend` is damping per unit of time, and its prior and its
+(0.001, 0.999) bounds then depend on whether time is in days or years.
+CAR measures gaps in units of the median gap of the fitted grid:
+`gap = diff(time) / median(diff(time))`. `ar1_trend` and `sigma_trend`
+are then the damping and innovation scale over a typical step, and a
+regular grid gives gaps of one whatever the unit. The scale is stored
+with the trend metadata, and `forecast()`, `propagate_car()` and the
+write-up divide by the same value. This changes existing `CAR()` fits
+whose median gap is not one (NEWS).
+
+Times closer than `1e-6` median gaps merge into one occasion. This
+replaces the absolute `1e-3` floor, which changed the process and broke
+the composition identity.
+
 ## Stage 2: series on their own times
 
 CAR builds the union of all series' times. A cell with no data row is a
 latent state with no likelihood term.
 
+- `df` is refused when the frame is ragged (decided 2026-10-02). The
+  mixing scale of a multivariate t is drawn per occasion, and one
+  series' times would then change another series' law. A padded shared
+  grid keeps `df`.
+- `residual_cor()` and the summary report the stationary correlation of
+  the trends, which does not depend on the time unit.
+- `lfo_cv()` reports the observation count per fold.
 - Registry property `completes_time_grid`, `TRUE` for CAR.
   `extract_and_validate_trend_components()` skips
   `refuse_ragged_trend_grid()` for such a trend, and

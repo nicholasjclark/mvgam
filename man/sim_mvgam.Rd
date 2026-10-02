@@ -113,7 +113,7 @@ to \code{0.2} for this type, which keeps the AR component small
 relative to the smooth and makes the two identifiable.}
 \item{\code{type = 6}}{\code{y ~ s(season, bs = "cc")} with \code{CAR(time, series)}. Cyclic seasonal + continuous-time AR(1) on
 irregular time gaps (\code{Δt ~ Uniform(1, 6)}), with
-autocorrelation 0.7 over one time unit.}
+autocorrelation 0.7 over the median gap.}
 \item{\code{type = 7}}{\code{y ~ s(x)} with sparse
 \code{AR(p = c(1, 12))}. The latent state carries lag-1 momentum
 and lag-12 recurrence, with coefficients 0.55 and 0.40. The

@@ -260,10 +260,12 @@ zmvn_trend_properties <- function() {
 car_trend_properties <- function() {
   list(
     supports_factors = FALSE,
-    covariance_pattern = "diagonal",
-    # Damping of `ar^gap` gives each gap its own variance, and the
-    # irregular grid `CAR()` exists for admits no single one.
-    stationary_source = "none",
+    covariance_pattern = "cholesky_scaled",
+    # Each gap scales the decay and the innovation together. The
+    # state then has covariance `Sigma[a, b] / (1 - ar_a * ar_b)` at
+    # every occasion of an irregular grid, the factor a lag-1
+    # autoregression takes.
+    stationary_source = "lift",
     # The kernel carries the elapsed gap between observations.
     requires_regular_intervals = FALSE,
     incompatibility_reason = paste0(
@@ -945,7 +947,7 @@ print.mvgam_trend <- function(x, ...) {
 #'   the model \code{gr} exists to specify. \code{VAR()} and
 #'   \code{ZMVN()} always estimate correlations and refuse
 #'   \code{cor = FALSE}, as do \code{AR(gr = ...)} and
-#'   \code{RW(gr = ...)}.
+#'   \code{RW(gr = ...)}. \code{CAR()} defaults to \code{FALSE}.
 #'
 #' @param p The autoregressive lags. The accepted form depends on the
 #'   trend type:
@@ -1007,13 +1009,32 @@ print.mvgam_trend <- function(x, ...) {
 #' \code{ar{k}_trend} classes.
 #'
 #' \code{CAR()} steps a continuous-time AR(1) over the gaps the data
-#' records. Across a gap \code{dt} the decay is
+#' records. A gap \code{dt} is measured in units of the median gap
+#' between the fitted times. \code{ar1_trend} and \code{sigma_trend}
+#' then describe a typical step, and the model does not depend on the
+#' unit the time column is recorded in. Across a gap \code{dt} the
+#' decay is
 #' \code{ar1_trend^dt} and the innovation standard deviation is
 #' \code{sigma_trend * sqrt((1 - ar1_trend^(2 dt)) /
 #' (1 - ar1_trend^2))}. The decay and the innovation scale together.
 #' The marginal variance is then
 #' \code{sigma_trend^2 / (1 - ar1_trend^2)} at every occasion of an
 #' irregular grid, and the first state comes from that marginal.
+#'
+#' \code{CAR(cor = TRUE)} correlates the innovations of several
+#' series. \code{Sigma_trend} is their covariance over a gap of one.
+#' Series \code{a} and \code{b} have stationary covariance
+#' \code{Sigma_trend[a, b] / (1 - ar1_trend[a] * ar1_trend[b])}, and
+#' the innovations across a gap \code{dt} have that covariance times
+#' \code{1 - (ar1_trend[a] * ar1_trend[b])^dt}. This is the exact
+#' transition of the continuous-time process. A time point added
+#' between two others leaves the model for the remaining times
+#' unchanged. \code{L_Omega_trend} is the Cholesky factor of the
+#' correlation between the series' shocks over an instant, and its
+#' prior is placed there. The correlation of \code{Sigma_trend} is
+#' closer to zero than that correlation when the series damp at
+#' different rates. On a regular grid the likelihood is that of
+#' \code{AR(p = 1, cor = TRUE)} with positive coefficients.
 #'
 #' @note **VAR fits and `init = 0`**: VAR uses the Heaps-2023
 #'   stationary joint-distribution initialisation. Setting
@@ -1393,13 +1414,14 @@ AR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = NULL,
 
 #' @rdname trend_constructors
 #' @export
-CAR <- function(time = NA, series = NA, n_lv = NULL, trend_map = NULL,
-               df = Inf) {
+CAR <- function(time = NA, series = NA, cor = FALSE, n_lv = NULL,
+               trend_map = NULL, df = Inf) {
   # A continuous-time process evolves per series and has no factor
   # form. The two arguments exist here to refuse a factor request
   # with the reason the registry records, matching the refusal the
   # other three routes to a factor CAR produce.
   refuse_constructor_factor_request(n_lv, trend_map, "CAR")
+  checkmate::assert_flag(cor)
 
   create_mvgam_trend(
     "CAR",  # Base trend type used for ALL dispatch
@@ -1408,7 +1430,7 @@ CAR <- function(time = NA, series = NA, n_lv = NULL, trend_map = NULL,
     .series = substitute(series),
     p = 1,        # CAR is always first-order
     ma = FALSE,   # CAR takes no moving-average term
-    cor = FALSE   # CAR takes no correlated innovations
+    cor = cor
   )
 }
 
