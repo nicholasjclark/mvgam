@@ -1,104 +1,132 @@
-# Per-factor smooth sentinel for trend_formula.
+# The axis a trend's effects vary along.
 #
-# `lv_axis()` is a no-op function whose only purpose is to mark
-# `by = lv_axis()` smooth terms in a trend_formula as per-latent-factor
-# smooths. mvgam's AST detector recognises it by name, switches the
-# trend-side data grain from (time, series) to (time, factor), and
-# rewrites the formula so the literal `lv_axis()` call becomes
-# `by = .trend` before it reaches brms. brms then emits per-level
-# smooth coefficients using its native `by = factor` machinery on the
-# internal `.trend` factor column. The leading dot in `.trend` keeps
-# the injected column collision-safe vs any user-supplied column.
+# `lv_axis()` marks a `trend_formula` term as varying along the
+# trend's own axis: each latent factor of a factor model, and each
+# series of any other model. `detect_and_rewrite_by_lv()` finds every
+# call by name and replaces it with the column the trend data holds
+# for that axis, and brms then builds the term as it builds any term
+# on a factor. In a factor model the column is `.trend`, and the
+# trend data runs over (time, factor). The leading dot keeps `.trend`
+# clear of any column a user supplies.
 
-#' Per-latent-factor smooth sentinel
+#' Vary a trend effect along the trend's axis
 #'
-#' Use inside the `by =` argument of a smooth or GP term in a
-#' `trend_formula` to mark the smooth as per-latent-factor (factor
-#' model) or per-series (non-factor model). For example:
+#' Use `lv_axis()` in a `trend_formula` in any position that takes a
+#' factor variable, to give each latent factor its own effect. In a
+#' model with no latent factors it gives each series its own effect.
 #'
 #' \preformatted{
-#' trend_formula = ~ s(elev, by = lv_axis()) +
-#'                  gp(lon, lat, by = lv_axis()) - 1 +
-#'                  VAR(n_lv = 2)
+#' trend_formula = ~ s(elev, by = lv_axis()) + AR(n_lv = 2)
+#' trend_formula = ~ temp:lv_axis() + AR(n_lv = 2)
+#' trend_formula = ~ (1 + temp | lv_axis()) + AR()
+#' trend_formula = ~ s(temp, lv_axis(), bs = "fs") + AR()
 #' }
 #'
-#' When `n_lv` is set on the trend constructor (factor model), each
-#' factor `k = 1, ..., n_lv` receives its own smooth basis and
-#' species-specific responses arise from the factor loadings
-#' `Z[s, k]` multiplied by the per-factor smooth contributions. This
-#' is the canonical syntax for constrained ordination in mvgam.
+#' With `n_lv` set on the trend constructor, each factor
+#' `k = 1, ..., n_lv` takes its own effect, and the effect of a
+#' covariate on series `s` is the sum over factors of the loading
+#' `Z[s, k]` times the effect on factor `k`. This is constrained
+#' ordination, the model [jsdgam()] fits. Every term of such a
+#' `trend_formula` is then evaluated once per factor and time, and
+#' each covariate must take one value per time.
 #'
-#' When `n_lv` is **not** set on the trend constructor (non-factor
-#' model, e.g. `trend_formula = ~ s(x, by = lv_axis()) + VAR()`),
-#' each series receives its own smooth on the trend side. The
-#' formula is rewritten internally so brms sees the equivalent of
-#' `by = series`, but the smooth stays on the trend (latent-state)
-#' side rather than the observation side.
+#' With no `n_lv`, each series takes its own effect on the latent
+#' state.
 #'
-#' `lv_axis()` is a sentinel: it has no side effects and returns
-#' `NULL` invisibly. Calling it outside the `by =` position of a
-#' smooth/GP term is silently no-op, but the trend-formula validator
-#' will surface a clear error in that case. The legacy syntax
-#' `by = trend` is supported via deprecation warning and auto-translates
-#' to `by = lv_axis()`.
-#'
-#' @details The sentinel is recognised purely by name in the
-#'   formula's abstract syntax tree, so passing it through `eval()`
-#'   or `quote()` outside a mvgam call yields `NULL`. The companion
-#'   validator (in `R/validations.R`) rejects `by = series` in
-#'   `trend_formula`. That pattern is semantically confusing on the
-#'   trend side, and the helper directs users to either
-#'   `by = lv_axis()` (for per-factor smooths) or to moving the
-#'   per-series effect into the observation `formula`.
+#' The series column itself is not supported in a `trend_formula`
+#' term. Write `lv_axis()` for an effect that differs along the
+#' trend's axis, and put an effect of the series on the observations
+#' in `formula`. `by = trend` is deprecated and is treated as
+#' `by = lv_axis()`.
 #'
 #' @return `NULL` (invisibly). The function exists solely as a
 #'   formula sentinel.
 #'
+#' @section What each form estimates:
+#' With no latent factors, `lv_axis()` is each series:
+#' \itemize{
+#'   \item `~ x:lv_axis()` gives a slope of `x` per series.
+#'   \item `~ lv_axis()` gives a level per series.
+#'   \item `~ (1 + x | lv_axis())` gives levels and slopes that are
+#'     partially pooled across series.
+#'   \item `~ s(x, by = lv_axis())` gives a smooth of `x` per series,
+#'     and `~ s(x, lv_axis(), bs = "fs")` gives smooths that share a
+#'     smoothness penalty.
+#' }
+#' With `n_lv` latent factors, each of these is estimated once per
+#' factor. The coefficient of one factor has no scale of its own: the
+#' loadings and the factor effects trade scale, and their product is
+#' what the data identify. [conditional_effects()] and [predict()]
+#' report that product, the effect of the covariate on a series. Pass
+#' `series = "all"` to [conditional_effects()] for a panel per series.
+#'
+#' @seealso [mvgam()], [jsdgam()], [conditional_effects.mvgam()]
+#'
 #' @examples
-#' # `lv_axis()` is a formula sentinel; on its own it returns
-#' # NULL invisibly.
+#' # `lv_axis()` marks a term in a formula. Called by itself it
+#' # returns NULL.
 #' lv_axis()
 #'
 #' \dontrun{
-#' # ---- Non-factor mode (no `n_lv`) ----
-#' # The validator rewrites `by = lv_axis()` to `by = series`
-#' # internally, so each series gets its own smooth on the trend
-#' # side. Use this when you want per-series flexibility without
-#' # the factor-loading machinery.
 #' set.seed(1)
 #' dat <- sim_mvgam(
-#'   family       = poisson(),
+#'   family       = gaussian(),
 #'   n_series     = 3L,
-#'   n_timepoints = 120L
+#'   n_timepoints = 60L
 #' )$data_train
+#' # `x` differs among the series at each time. `season` takes one
+#' # value per time, and its effect here differs among the series.
+#' dat$season <- sin(2 * pi * dat$time / 12)
+#' dat$y <- dat$y + c(1, 0.5, -1)[as.integer(dat$series)] * dat$season
 #'
-#' mod_nonfac <- mvgam(
-#'   formula       = y ~ 0,
-#'   trend_formula = ~ s(x, k = 5, by = lv_axis()) + AR(p = 1),
+#' # ---- No latent factors ----
+#' # A slope of `x` for each series
+#' mod_slopes <- mvgam(
+#'   formula       = y ~ 1,
+#'   trend_formula = ~ x:lv_axis() + AR(p = 1),
 #'   data          = dat,
-#'   family        = poisson(),
+#'   family        = gaussian(),
 #'   chains        = 2,
-#'   iter          = 750,
-#'   warmup        = 500,
 #'   silent        = 2
 #' )
-#' summary(mod_nonfac)
-#' conditional_effects(mod_nonfac)
+#' summary(mod_slopes)
+#' conditional_effects(mod_slopes)
 #'
-#' # ---- Factor mode (`n_lv` set on the trend constructor) ----
-#' # `by = lv_axis()` stays as a per-factor marker; mvgam emits a
-#' # factor-model Stan program with `n_lv` per-factor smooths and a
-#' # loading matrix Z[s, k] that maps factors to species. The
-#' # per-species smooth response is sum over k of Z[s, k] * the
-#' # factor-k smooth contribution. This is the ordination-on-the-
-#' # trend pattern that powers `jsdgam()`. Here we show only the
-#' # generated Stan code so the example stays light; consult
-#' # [jsdgam()] for fitted-model examples of the factor case.
-#' mf_factor <- mvgam_formula(
-#'   formula       = y ~ 0,
-#'   trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR(n_lv = 2)
+#' # A smooth of `x` for each series
+#' mod_smooths <- mvgam(
+#'   formula       = y ~ 1,
+#'   trend_formula = ~ s(x, k = 5, by = lv_axis()) + AR(p = 1),
+#'   data          = dat,
+#'   family        = gaussian(),
+#'   chains        = 2,
+#'   silent        = 2
 #' )
-#' cat(stancode(mf_factor, data = dat, family = poisson()))
+#' conditional_effects(mod_smooths)
+#'
+#' # ---- Two latent factors ----
+#' # Each factor takes its own seasonal slope, and the loadings carry
+#' # the two slopes to the three series. The covariate takes one value
+#' # per time, as every term of this trend formula must.
+#' mod_factors <- mvgam(
+#'   formula       = y ~ 1,
+#'   trend_formula = ~ season:lv_axis() + AR(p = 1, n_lv = 2),
+#'   data          = dat,
+#'   family        = gaussian(),
+#'   chains        = 2,
+#'   silent        = 2
+#' )
+#' # The seasonal effect on each series. With no `series` argument
+#' # the panel shows the first series alone.
+#' conditional_effects(mod_factors, series = "all")
+#'
+#' # The series column is refused in a trend term
+#' try(mvgam(
+#'   formula       = y ~ 1,
+#'   trend_formula = ~ x:series + AR(p = 1),
+#'   data          = dat,
+#'   family        = gaussian(),
+#'   run_model     = FALSE
+#' ))
 #' }
 #'
 #' @export
@@ -107,113 +135,64 @@ lv_axis <- function() {
 }
 
 
-# Internal AST detection + rewrite helpers.
-#
-# These mirror the existing `is_trend_term()` / `remove_trend_expressions()`
-# pattern in R/validations.R so the formula walk reuses the same rlang
-# idioms (`rlang::is_call`, `rlang::call_args`, `rlang::call_name`,
-# `rlang::call2`). The walk is structural: it tracks whether the
-# current node is in one of `MVGAM_SMOOTH_CALLS` and, if so, inspects
-# only the `by` argument of that call.
-
 # The smooth and Gaussian-process constructors brms fits. Each takes
-# its covariates as unnamed arguments and a grouping as `by`, where
-# `lv_axis()` may appear.
+# its covariates as unnamed arguments and a grouping as `by`.
 #'@noRd
 MVGAM_SMOOTH_CALLS <- c("s", "t2", "gp")
 
-#' Check if an expression is a literal call to `lv_axis()`.
+#' Is an expression a call to `lv_axis()`?
 #'
-#' Mirrors `is_trend_term()`'s call-by-name strategy so that
-#' argument-literal variants (`lv_axis()` vs `mvgam::lv_axis()`)
-#' match identically.
+#' Matched on the function called, as `is_trend_term()` matches a
+#' trend constructor, which takes `mvgam::lv_axis()` as well.
 #'
 #' @param expr Unevaluated R expression.
-#' @return `TRUE` if `expr` is a `lv_axis()` call (bare or
-#'   namespace-qualified), else `FALSE`.
+#' @return A single logical.
 #' @noRd
 is_lv_axis_call <- function(expr) {
-  if (!rlang::is_call(expr)) return(FALSE)
-  fn_name <- rlang::call_name(expr)
-  identical(fn_name, "lv_axis")
+  rlang::is_call(expr) && identical(rlang::call_name(expr), "lv_axis")
 }
 
-#' Check if a `by =` argument node is the literal symbol `trend`.
+#' Is a `by` argument the deprecated symbol `trend`?
 #'
-#' The legacy jsdgam API used `by = trend` as the per-factor
-#' sentinel. mvgam supports it via a deprecation warning that
-#' auto-translates the term to `by = lv_axis()`.
-#'
-#' @param expr Unevaluated R expression (the `by` arg value).
-#' @return `TRUE` if `expr` is the bare symbol `trend`.
+#' @param expr Unevaluated R expression (the `by` argument).
+#' @return A single logical.
 #' @noRd
 is_legacy_trend_symbol <- function(expr) {
   is.symbol(expr) && identical(as.character(expr), "trend")
 }
 
-#' Check if a `by =` argument node is the literal symbol `series`.
+#' Replace each `lv_axis()` of a trend formula with its data column
 #'
-#' `by = series` inside `trend_formula` is semantically confusing
-#' (the trend side is for shared/factor effects, not per-series obs
-#' effects). The validator hard rejects it.
+#' Every `lv_axis()` call becomes the symbol `target`, whatever its
+#' position: a smooth's `by`, a parametric interaction, a grouping
+#' factor or a factor-smooth margin. The deprecated `by = trend` of
+#' a smooth is replaced the same way. A term naming the series column
+#' is refused, as `lv_axis()` is how a trend term varies along that
+#' axis.
 #'
-#' @param expr Unevaluated R expression (the `by` arg value).
-#' @return `TRUE` if `expr` is the bare symbol `series`.
+#' @param formula A trend formula with its constructor removed.
+#' @param target The column holding the axis: `".trend"` in a factor
+#'   model, the series column otherwise.
+#' @param series_var The trend's series column, refused in a term.
+#'   `NULL` refuses nothing, for a caller that needs the columns of a
+#'   formula `extract_and_validate_trend_components()` checks later.
+#' @return A list of `has_by_lv`, `n_by_lv`, the number of
+#'   replacements, `deprecated_trend_seen` and the rewritten
+#'   `formula`.
 #' @noRd
-is_series_symbol <- function(expr) {
-  is.symbol(expr) && identical(as.character(expr), "series")
-}
-
-#' Walk a trend_formula AST detecting `by = lv_axis()` (and legacy
-#' equivalents), and rewrite each such `by` arg so the downstream brms
-#' compile sees a normal factor by-variable. The rewrite target depends
-#' on `factor_active`:
-#'
-#' * `factor_active = TRUE` (factor model, `n_lv` set on the trend
-#'   spec): rewrite to the internal `.trend` symbol so the (time,
-#'   .trend)-grain data path emits one smooth basis per factor.
-#' * `factor_active = FALSE` (non-factor model, no `n_lv`): rewrite to
-#'   the `series` symbol so the standard (time, series)-grain path
-#'   emits one smooth basis per series, on the trend side rather than
-#'   the obs side.
-#'
-#' Returns a list with `has_by_lv` (logical), `n_by_lv` (count of
-#' rewritten by-positions), `deprecated_trend_seen` (logical, used
-#' to fire a one-time deprecation warning at the call site), and
-#' `formula` (the rewritten formula).
-#'
-#' Throws an `insight::format_error` on `by = series` (hard reject).
-#'
-#' Reuses the rlang idioms already used by `remove_trend_expressions()`
-#' (`R/validations.R:3952`): structural recursion via `rlang::is_call`,
-#' `rlang::call_args`, `rlang::call_name`, `rlang::call2`.
-#'
-#' @param formula A trend-side formula (one-sided or two-sided).
-#' @param factor_active Logical, default `TRUE` to preserve the
-#'   factor-model rewrite for callers that haven't been updated. The
-#'   wrapper-layer validator passes the actual gate based on whether
-#'   `n_lv` is set on the trend spec.
-#' @return Named list with elements `has_by_lv`, `n_by_lv`,
-#'   `deprecated_trend_seen`, `formula`.
-#' @noRd
-detect_and_rewrite_by_lv <- function(formula, factor_active = TRUE) {
+detect_and_rewrite_by_lv <- function(formula, target = ".trend",
+                                     series_var = NULL) {
   checkmate::assert_class(formula, "formula")
-  checkmate::assert_flag(factor_active)
+  checkmate::assert_string(target, min.chars = 1L)
+  checkmate::assert_string(series_var, null.ok = TRUE)
+
+  rhs <- rlang::f_rhs(formula)
+  refuse_series_terms(rhs, series_var)
 
   state <- new.env(parent = emptyenv())
   state$n_by_lv <- 0L
   state$deprecated_trend_seen <- FALSE
-  # Reason: factor-active rewrites to `.trend` so the (time, .trend)
-  # data grain dispatches per-factor smooths via brms native by-factor;
-  # non-factor rewrites to `series` so the same machinery dispatches
-  # per-series smooths on the standard (time, series) grain.
-  state$rewrite_target <- if (factor_active) {
-    as.symbol(".trend")
-  } else {
-    as.symbol("series")
-  }
-
-  rhs <- rlang::f_rhs(formula)
+  state$target <- as.symbol(target)
   new_rhs <- walk_by_lv(rhs, state, depth = 0L)
 
   list(
@@ -228,23 +207,32 @@ detect_and_rewrite_by_lv <- function(formula, factor_active = TRUE) {
   )
 }
 
-#' Recursive companion to `detect_and_rewrite_by_lv()`.
-#'
-#' Walks the expression tree. At each smooth/GP call (`s`, `te`,
-#' `ti`, `t2`, `gp`), inspects the `by` argument. If `by` is a call
-#' to `lv_axis()` (or the legacy symbol `trend`), increments
-#' `state$n_by_lv` and rewrites the argument to the bare symbol
-#' `.trend`. If `by` is the symbol `series`, raises a hard error.
-#' Otherwise leaves the call untouched but recurses into children
-#' so that arbitrarily nested operators (`+`, `-`, etc.) are
-#' traversed.
-#'
-#' @param expr Current expression node.
-#' @param state Environment holding mutable counters.
-#' @param depth Recursion depth guard (matches the limit used by
-#'   `remove_trend_expressions()`).
-#' @return Possibly-rewritten expression.
-#' @noRd
+# Internal: refuse a trend formula whose terms name the series
+# column. The trend data holds the resolved axis as `series` whatever
+# the user's column is called, and both names are refused.
+#'@noRd
+refuse_series_terms <- function(rhs, series_var) {
+  if (is.null(series_var)) {
+    return(invisible(TRUE))
+  }
+  found <- intersect(all.vars(rhs), c("series", series_var))
+  if (length(found) == 0L) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    paste0("The series column '", found[1L],
+           "' is not supported in a 'trend_formula' term."),
+    x = "A trend term varies along the trend's own axis through 'lv_axis()'.",
+    i = paste0("'lv_axis()' is each latent factor of a factor model ",
+               "and each series of any other model."),
+    i = paste0("Write 'lv_axis()' in place of '", found[1L],
+               "', or move the term to 'formula'.")
+  )), call. = FALSE)
+}
+
+# Internal: the recursion of `detect_and_rewrite_by_lv()`. `state`
+# counts the replacements.
+#'@noRd
 walk_by_lv <- function(expr, state, depth = 0L) {
   if (depth > 50L) {
     stop(insight::format_error(c(
@@ -252,106 +240,69 @@ walk_by_lv <- function(expr, state, depth = 0L) {
       i = "Simplify the trend formula structure."
     )))
   }
-
+  if (is_lv_axis_call(expr)) {
+    state$n_by_lv <- state$n_by_lv + 1L
+    return(state$target)
+  }
   if (!rlang::is_call(expr)) {
     return(expr)
   }
-
-  fn_name <- rlang::call_name(expr)
-
-  if (!is.null(fn_name) && fn_name %in% MVGAM_SMOOTH_CALLS) {
-    args <- rlang::call_args(expr)
-    by_arg <- args[["by"]]
-    if (!is.null(by_arg)) {
-      if (is_lv_axis_call(by_arg)) {
-        state$n_by_lv <- state$n_by_lv + 1L
-        args[["by"]] <- state$rewrite_target
-        return(rlang::call2(fn_name, !!!args))
-      }
-      if (is_legacy_trend_symbol(by_arg)) {
-        state$n_by_lv <- state$n_by_lv + 1L
-        state$deprecated_trend_seen <- TRUE
-        args[["by"]] <- state$rewrite_target
-        return(rlang::call2(fn_name, !!!args))
-      }
-      if (is_series_symbol(by_arg)) {
-        stop(insight::format_error(c(
-          "'by = series' is not allowed inside 'trend_formula'.",
-          x = paste0("The trend side models shared dynamics or effects ",
-                     "that vary by latent factor."),
-          i = "Move an effect that varies by series to 'formula'.",
-          i = paste0("Use 'by = lv_axis()' for a smooth that varies by ",
-                     "factor, in a factor model with 'n_lv < n_series'.")
-        )), call. = FALSE)
-      }
-    }
-    return(expr)
-  }
-
-  # For non-smooth calls, walk arguments recursively so nested
-  # `+`/`-` operators (and any other call) are visited. The call
-  # itself is reconstructed only if at least one child changes.
   args <- as.list(expr)
-  head <- args[[1L]]
+  if (any(call_head_name(expr) %in% MVGAM_SMOOTH_CALLS) &&
+        is_legacy_trend_symbol(args[["by"]])) {
+    state$n_by_lv <- state$n_by_lv + 1L
+    state$deprecated_trend_seen <- TRUE
+    args[["by"]] <- state$target
+  }
   tail <- lapply(args[-1L], walk_by_lv, state = state, depth = depth + 1L)
-  rlang::call2(head, !!!tail)
+  rlang::call2(args[[1L]], !!!tail)
 }
 
-#' Internal: tokens that `detect_and_rewrite_by_lv()` swaps in for
-#' the user's original `by = lv_axis()` argument. Single source of
-#' truth for any display code that needs to hide the rewrite from
-#' the user. The order here mirrors the rewrite targets in
-#' `detect_and_rewrite_by_lv()` (factor path -> `.trend`; non-factor
-#' path -> `series`).
-#'
-#' @return Character vector of rewrite tokens.
-#' @noRd
-by_lv_rewrite_tokens <- function() c(".trend", "series")
+# Internal: the columns `detect_and_rewrite_by_lv()` writes in place
+# of `lv_axis()`. `.trend` is the factor axis and `series` the axis a
+# trend derives from a grouping or from the responses. A fit whose
+# data names its series passes that column as well.
+#'@noRd
+by_lv_rewrite_tokens <- function(series_var = NULL) {
+  unique(c(".trend", "series", series_var))
+}
 
 
-#' Internal: TRUE iff the AST detector found `by = lv_axis()` in
-#' the user's `trend_formula`, regardless of factor / non-factor
-#' codepath. Reads the `had_by_lv` marker persisted on
-#' `trend_metadata` by `validations.R`.
+#' Did the user write `lv_axis()` in the `trend_formula`?
 #'
-#' Display-only consumers (e.g. `conditional_effects.mvgam()`) use
-#' this to strip the internal `series` / `.trend` rewrite tokens
-#' from user-visible plot list names while preserving them in the
-#' `marginaleffects::plot_predictions(condition = ...)` call so
-#' per-series facets still render.
+#' `extract_and_validate_trend_components()` records this on
+#' `trend_metadata`, for a factor model and for any other.
+#' `conditional_effects.mvgam()` uses it to name its panels without
+#' the column that replaced `lv_axis()`.
 #'
-#' @param object A fitted `mvgam` object (or any object with a
-#'   `trend_metadata$had_by_lv` slot).
-#' @return Logical scalar.
+#' @param object A fitted `mvgam` object.
+#' @return A single logical.
 #' @noRd
 mvgam_had_by_lv <- function(object) {
   isTRUE(object$trend_metadata$had_by_lv)
 }
 
 
-#' Strip the internal `by = lv_axis()` rewrite tokens from each
-#' grouping in `cond_labs`. Used by `conditional_effects.mvgam()` to
-#' hide the `series` / `.trend` token from user-visible plot list
-#' names while leaving the underlying `condition` passed to
-#' `marginaleffects::plot_predictions()` unchanged (so per-series
-#' facets still render).
+#' Drop the columns that replaced `lv_axis()` from effect groupings
 #'
-#' Pure on `cond_labs`. The empty-strip guard returns the original
-#' grouping when every element would be removed, so a grouping like
-#' `c("series")` is preserved verbatim rather than collapsing to a
-#' blank label.
+#' `conditional_effects.mvgam()` names each panel by its grouping and
+#' passes the full grouping to `marginaleffects::plot_predictions()`,
+#' which keeps the facet for each series. A grouping holding only such
+#' a column is returned as it is, and its panel keeps a name.
 #'
 #' @param cond_labs List of character vectors (each one a
 #'   conditional-effects grouping).
 #' @param had_by_lv Logical scalar. When `FALSE`, returns
 #'   `cond_labs` unchanged so non-by-lv fits keep their full labels.
+#' @param series_var The fit's series column, or `NULL`.
 #' @return List of character vectors, same length as `cond_labs`.
 #' @noRd
-strip_by_lv_rewrite_tokens <- function(cond_labs, had_by_lv) {
+strip_by_lv_rewrite_tokens <- function(cond_labs, had_by_lv,
+                                       series_var = NULL) {
   if (!isTRUE(had_by_lv)) {
     return(cond_labs)
   }
-  rewrites <- by_lv_rewrite_tokens()
+  rewrites <- by_lv_rewrite_tokens(series_var)
   lapply(cond_labs, function(g) {
     stripped <- setdiff(g, rewrites)
     if (length(stripped) == 0L) g else stripped

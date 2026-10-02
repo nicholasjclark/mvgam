@@ -614,12 +614,12 @@ test_that("bayes_R2.mvgam errors for multivariate without resp", {
 test_that(
   "hidden_par_pattern hides rotation-indeterminate params", {
   # Free-Z factor fit: Z_tilde[ present means raw Z, raw lv_trend,
-  # innovations, Q_tilde and the latent-factor variance block all
-  # get the rotation-indeterminacy hide pattern applied together.
+  # innovations and the latent-factor variance block all get the
+  # rotation-indeterminacy hide pattern applied together.
   pars_free <- c(
     "Intercept", "b_x", "shape", "sigma_trend[1]", "sigma_trend[2]",
     "L_Omega_trend[1,1]", "L_Omega_trend[2,1]", "Sigma_trend[1,1]",
-    "Q_tilde[1,1]", "Z[1,1]", "Z[2,1]", "Z_tilde[1,1]", "Z_tilde[2,1]",
+    "Z[1,1]", "Z[2,1]", "Z_tilde[1,1]", "Z_tilde[2,1]",
     "lv_trend[1,1]", "lv_trend_tilde[1,1]",
     "innovations_trend[1,1]", "scaled_innovations_trend[1,1]"
   )
@@ -631,7 +631,7 @@ test_that(
     hidden,
     c("sigma_trend[1]", "sigma_trend[2]",
       "L_Omega_trend[1,1]", "L_Omega_trend[2,1]", "Sigma_trend[1,1]",
-      "Q_tilde[1,1]", "Z[1,1]", "Z[2,1]",
+      "Z[1,1]", "Z[2,1]",
       "lv_trend[1,1]", "innovations_trend[1,1]",
       "scaled_innovations_trend[1,1]")
   )

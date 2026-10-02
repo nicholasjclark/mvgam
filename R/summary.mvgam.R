@@ -456,12 +456,9 @@ match_trend_specific_pars <- function(pars) {
 #' Match factor loading parameter names
 #'
 #' @description
-#' Identifies factor loading matrix parameters. Prefers
-#' `Z_tilde\[i, j\]` (QR-identified loadings emitted by free-Z
-#' factor models) when present and falls back to `Z\[i, j\]`
-#' for partial-Z fits where the user-supplied pattern is
-#' preserved without rotation. Pattern selection delegates to
-#' `factor_loading_param_pattern()`.
+#' Identifies the reported factor loadings: `Z_tilde\[i, j\]` in a
+#' fit identified by the QR rotation, and `Z\[i, j\]` in every other
+#' factor fit. `factor_loading_param_pattern()` makes the choice.
 #'
 #' @param pars Character vector of all parameter names
 #' @return Logical vector indicating which parameters are factor

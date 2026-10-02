@@ -1304,13 +1304,15 @@ test_that("mvn: one quantity over the grid and over its extension", {
 
   hc <- hindcast(fit, ndraws = 20L, type = "response")
   expect_s3_class(hc, "mvgam_forecast")
-  fc_resp <- forecast(fit, newdata = nd, ndraws = 20L, type = "response")
+  # Twenty draws leave the two spreads within sampling error of each
+  # other, and 500 separate them.
+  fc_resp <- forecast(fit, newdata = nd, ndraws = 500L, type = "response")
   expect_identical(names(fc_resp$forecasts), lev)
 
   # An mvn expectation is its linear predictor, so the expected arm
   # sits inside the drawn arm's spread rather than beside it: the
   # draws are the expectation plus a Normal(0, Psi) residual.
-  fc_exp <- forecast(fit, newdata = nd, ndraws = 20L, type = "expected")
+  fc_exp <- forecast(fit, newdata = nd, ndraws = 500L, type = "expected")
   drawn <- do.call(cbind, fc_resp$forecasts)
   expected <- do.call(cbind, fc_exp$forecasts)
   expect_true(all(is.finite(drawn)) && all(is.finite(expected)))

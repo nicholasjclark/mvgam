@@ -10,11 +10,10 @@
 #' helpers; when \pkg{ggarrow} and \pkg{ggpp} are installed the
 #' arrows are rendered as tapered loadings.
 #'
-#' @note This method needs a fitted factor model. It reads the
-#'   identified latent variables and their loadings from the
-#'   posterior (`lv_trend_tilde[t, k]` and `Z_tilde[i, k]` for
-#'   free-loading factor models, or `lv_trend` and `Z` when the
-#'   loadings follow a fixed pattern).
+#' @note This method needs a fitted factor model. It uses the
+#'   identified latent variables and their loadings: `lv_trend_tilde`
+#'   and `Z_tilde` from a model identified by rotation, and
+#'   `lv_trend` and `Z` from every other factor model.
 #'
 #' @name ordinate
 #'
@@ -52,12 +51,9 @@
 #'       ordered axes. Requires `n_lv >= 2`. `alpha` ignored.}
 #'     \item{`"promax"`}{Oblique extension of varimax that allows
 #'       correlated rotated factors. `alpha` ignored.}
-#'     \item{`"none"`}{Skip rotation entirely; plot raw
-#'       posterior-median LV / Z, centred. The axes correspond
-#'       directly to the Stan parameters
-#'       `lv_trend_tilde[t, k]` and `Z_tilde[i, k]` (free-Z
-#'       factor models) or `lv_trend` / `Z` (partial-Z fits),
-#'       as discussed in Details. `alpha` ignored.}
+#'     \item{`"none"`}{Plot the centred posterior medians of the
+#'       identified latent variables and loadings, as described
+#'       in Details. `alpha` ignored.}
 #'   }
 #'   For varimax / promax the axes are NOT variance-ordered, so
 #'   the choice of `which_lvs` matters in a different way than
@@ -91,26 +87,18 @@
 #'   `ordinate()`. Access via `attr(p, "rotation")`.
 #'
 #' @details
-#' For sampled-Z factor models the Stan model samples an
-#' unconstrained loading matrix `Z` under a structured prior and
-#' then applies a thin-QR decomposition in generated quantities
-#' to produce a lower-triangular, positive-diagonal `Z_tilde`
-#' together with the rotated factor paths `lv_trend_tilde`. The
-#' identified `Z_tilde` and `lv_trend_tilde` are what
-#' `ordinate()` reads. Under `rotation = "svd"` (default) the
-#' axes are SVD-rotated ordination gradients, NOT the original
-#' Stan factors. Under `rotation = "varimax"` / `"promax"` the
-#' axes are rotated for sparsity rather than variance; the
-#' identified lower-triangular pattern is preserved in the
-#' underlying fit but not visible in the plot. Use
-#' `rotation = "none"` (or `plot_factors()`) to view the
-#' un-rotated identified factors directly. See Heaps and Jermyn
-#' (2024) for the structured-prior + post-hoc QR framework.
-#'
-#' For partial-Z fits (free entries marked `NA` in `trend_map`)
-#' no QR rotation is applied, since rotating would overwrite
-#' the user-supplied entries on `Z`. Ordination reads `Z` and
-#' `lv_trend` directly in those fits.
+#' `ordinate()` starts from the identified loadings and latent
+#' variables of the fit. Factors that share their dynamics are
+#' identified by rotation to the lower-triangular `Z_tilde` and its
+#' factor paths `lv_trend_tilde` (Heaps and Jermyn 2024). Factors
+#' that take their own coefficients are identified by one ordering
+#' and orientation of `Z` and `lv_trend`. The Identification section
+#' of the trend constructors describes both. With
+#' `rotation = "svd"` (default) the axes are ordination gradients
+#' ordered by the variance they explain. With `"varimax"` or
+#' `"promax"` each axis loads on as few series as it can.
+#' `rotation = "none"` and `plot_factors()` show the identified
+#' factors themselves.
 #'
 #' A `trend_map` supplies the loading pattern as data, and any
 #' rotation other than `"none"` replaces it with one read off

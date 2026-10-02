@@ -47,10 +47,10 @@ how_to_cite <- function(object, ...) {
 }
 
 
-# Reference database: each entry carries the rendered text
-# citation (matching the in-text "(Author Year)" pointers) and
-# a BibTeX entry. New citations should be added here and
-# referenced by key from the detection table below.
+# The references `how_to_cite()` can return. Each entry gives the
+# citation as text, matching the "(Author Year)" form of the methods
+# text, and as BibTeX. The detection table of `how_to_cite()` names
+# entries by key.
 #'@noRd
 reference_db <- function() {
   list(
@@ -236,6 +236,21 @@ reference_db <- function() {
         "  pages = {37--45},",
         "  year = {2018},",
         "  doi = {10.1080/00031305.2017.1380080}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    papastamoulis_factor = list(
+      text = "Papastamoulis P and Ntzoufras I (2022). On the identifiability of Bayesian factor analytic models. Statistics and Computing 32, 23. https://doi.org/10.1007/s11222-022-10084-4",
+      bibtex = paste(
+        "@article{papastamoulis2022identifiability,",
+        "  title = {On the identifiability of Bayesian factor analytic models},",
+        "  author = {Papastamoulis, Panagiotis and Ntzoufras, Ioannis},",
+        "  journal = {Statistics and Computing},",
+        "  volume = {32},",
+        "  pages = {23},",
+        "  year = {2022},",
+        "  doi = {10.1007/s11222-022-10084-4}",
         "}",
         sep = "\n"
       )
@@ -659,33 +674,26 @@ reference_db <- function() {
   )
 }
 
-# Heavy-tailed latent innovations are a modelling choice worth
-# describing, so the methods text reports them rather than leaving the
-# process implicitly Gaussian.
+# The methods text describes Student-t latent innovations. A reader
+# takes an undescribed process to be Gaussian.
 #' @noRd
 uses_heavy_tailed_trend <- function(object) {
   df <- object$trend_metadata$df %||% Inf
   !is_gaussian_df(df)
 }
 
-# Predicate: was the fit produced by the jsdgam() wrapper? Keys
-# off the `jsdgam` class that jsdgam() adds
-# rather than family or trend type, because jsdgam composes onto
-# the standard mvgam factor-model path and shares the family /
-# trend surface with plain mvgam fits.
+# Was the fit produced by `jsdgam()`? `jsdgam()` adds the `jsdgam`
+# class. Its families and trends are those of any mvgam factor model
+# and do not identify it.
 #' @noRd
 uses_jsdgam <- function(object) {
   inherits(object, "jsdgam")
 }
 
 
-# Predicate: does the fit use any approximate-GP smooth on the
-# observation or trend side? Scans the formulas for `gp(`. The
-# brms-integration architecture parses gp() smooths in the
-# brms formula machinery rather than carrying a separate
-# `gp_att_table` attribute, so the formula scan is the single
-# detection point that stays accurate as the architecture
-# evolves.
+# Does the observation or trend formula hold a `gp()` term? brms
+# parses these terms from the formula and the fit stores no separate
+# record of them.
 #'@noRd
 uses_gp_smooth <- function(object) {
   has_gp <- function(f) {
@@ -714,22 +722,19 @@ uses_threading <- function(object) {
 }
 
 
-# Read sampling info from the stanfit S4 on `object$fit`.
-# mvgam normalises both rstan and cmdstanr output into a
-# stanfit, so the `stan_args` slot is the only access path
-# needed. Returns NULL when stan_args is empty (variational /
-# Laplace / Pathfinder fits).
+# The sampling settings of a fit, taken from the `stan_args` slot of
+# the stanfit that mvgam builds from rstan and cmdstanr output alike.
+# Returns NULL when the slot is empty, as it is for variational,
+# Laplace and Pathfinder fits.
 #
-# Fields returned: chains, warmup, iter (consumed by
-# `how_to_cite()` for the methods-section sentence) plus the
-# extended set (threads, adapt_delta, max_treedepth, init) that
-# `methods_md()`'s Implementation block emits. Defaults stay
-# NA when the user accepted the brms / Stan default so callers
-# can branch on `is.na()` to decide whether to print.
-# An initial-value specification can be echoed back into a
-# reproduction call only when it is a single keyword. Numeric, list
-# and function starts are not printable, and neither is the temporary
-# file path Stan records in their place.
+# `how_to_cite()` uses chains, warmup and iter. The Implementation
+# block of `methods_md()` also uses threads, adapt_delta,
+# max_treedepth and init. A field is NA where the user accepted the
+# brms or Stan default, and callers print the fields that are set.
+# An initial-value specification is echoed into a reproduction call
+# only when it is a single keyword. Numeric, list and function starts
+# are not printable, and neither is the file path Stan records for
+# them.
 #'@noRd
 printable_init <- function(init) {
   if (is.null(init) || length(init) != 1L || !is.character(init)) {
@@ -784,7 +789,7 @@ how_to_cite.mvgam <- function(object, ...) {
     "; Clark & Wells, 2023) to construct, fit and interrogate the model.",
     " mvgam fits Bayesian state-space models that combine flexible",
     " predictor effects in both the process and observation components,",
-    " building on functionality from the brms (Burkner 2017) and",
+    " using functionality from the brms (Burkner 2017) and",
     " mgcv (Wood 2017) packages."
   )
 
@@ -792,10 +797,10 @@ how_to_cite.mvgam <- function(object, ...) {
   # `get_trend_type()` checks the fitted slot and the metadata.
   trend_model <- get_trend_type(object)
 
-  # Every response's family is cited. A multivariate model can take a
-  # tweedie response beside a poisson one, and the family given beside
-  # its formula is neither. `nmix()` names its variants apart, so the
-  # Poisson-binomial rule matches "nmix" alone.
+  # Every response's family is cited. A multivariate model can pair a
+  # tweedie response with a poisson one, and the `family` argument
+  # then names neither. `nmix()` gives each of its variants its own
+  # name, and the Poisson-binomial rule matches "nmix" alone.
   families <- formula_families(object, object$family)
   family_names <- vapply(families, resolve_family_name, character(1L))
   any_family <- function(test) any(vapply(families, test, logical(1L)))
@@ -805,6 +810,8 @@ how_to_cite.mvgam <- function(object, ...) {
   # adds. Keeping all conditional citations in one structure
   # avoids scattering append() calls across the function and
   # makes new citations a one-line addition.
+  identification <- fit_factor_identification(object)
+  fixed_Z <- object$trend_metadata$fixed_Z
   rules <- list(
     list(
       detect = grepl("^VAR", trend_model),
@@ -822,22 +829,24 @@ how_to_cite.mvgam <- function(object, ...) {
       refs = "taylor_pw"
     ),
     list(
-      # Free-loadings branch: default factor model (trend_map
-      # NULL or all-NA) and jsdgam under Heaps identification.
-      # The QR rotation only applies here.
-      detect = !is.null(detect_factor_n_lv(object)) &&
-                 is.null(object$mv_spec$trend_specs$fixed_Z),
+      detect = identical(identification, "rotation"),
       text = " Latent-factor loadings were sampled unconstrained and identified post-hoc via thin QR decomposition following Heaps and Jermyn (2024).",
       refs = "heaps_jermyn"
     ),
     list(
-      # Fixed-loadings branch: user supplied a `trend_map`
-      # with all finite entries. Z is data, so the QR
-      # identification does not apply -- the encoded sharing
-      # pattern is preserved verbatim.
-      detect = !is.null(detect_factor_n_lv(object)) &&
-                 !is.null(object$mv_spec$trend_specs$fixed_Z),
+      detect = identical(identification, "relabel"),
+      text = " Each latent factor took its own autoregressive coefficients, which leaves the factors identified up to their order and signs. The factors of every posterior draw were reordered and reflected after sampling to agree with a reference (Papastamoulis and Ntzoufras 2022).",
+      refs = "papastamoulis_factor"
+    ),
+    list(
+      # Every entry of the `trend_map` is fixed and `Z` is data.
+      detect = !is.null(fixed_Z) && !anyNA(fixed_Z),
       text = " Latent-factor loadings were fixed at the user-supplied `trend_map`, preserving the encoded series-to-trend sharing structure exactly.",
+      refs = character(0)
+    ),
+    list(
+      detect = anyNA(fixed_Z),
+      text = " The user-supplied `trend_map` fixed some latent-factor loadings, and the remaining loadings were sampled.",
       refs = character(0)
     ),
     list(
@@ -911,7 +920,7 @@ how_to_cite.mvgam <- function(object, ...) {
         " Conway and Maxwell 1962), extending the binomial with",
         " a dispersion exponent that admits both under- and",
         " super-dispersed mass on a fixed trials grid. The Stan",
-        " lpmf draws on the adjoint and stability work of",
+        " lpmf uses the adjoint and stability results of",
         " Bogomolovas (2024)."
       ),
       refs = c(

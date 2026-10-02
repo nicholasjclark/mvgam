@@ -33,6 +33,10 @@ trend_registry <- new.env(parent = emptyenv())
 #'   innovation covariance.
 #' @param requires_regular_intervals Logical; does the trend index its
 #'   lags by position, which an uneven time grid breaks?
+#' @param per_factor_coefficients Logical; does each latent factor
+#'   take its own dynamic coefficients? Such factors may be reordered
+#'   and flipped in sign, and `factor_identification()` relabels them.
+#'   Factors without their own coefficients may be rotated freely.
 #' @param generator_func Function that generates Stan code for this
 #'   trend type
 #' @param incompatibility_reason Character string explaining why factor
@@ -42,6 +46,7 @@ trend_registry <- new.env(parent = emptyenv())
 register_trend_type <- function(name, supports_factors, covariance_pattern,
                                 stationary_source,
                                 requires_regular_intervals,
+                                per_factor_coefficients,
                                 generator_func,
                                 incompatibility_reason = NULL) {
   checkmate::assert_string(name, min.chars = 1)
@@ -52,6 +57,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
   )
   checkmate::assert_choice(stationary_source, c("none", "lift", "omega"))
   checkmate::assert_flag(requires_regular_intervals)
+  checkmate::assert_flag(per_factor_coefficients)
   checkmate::assert_function(generator_func,
                              args = c("trend_specs", "data_info"))
   checkmate::assert_string(incompatibility_reason,
@@ -62,6 +68,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
     covariance_pattern = covariance_pattern,
     stationary_source = stationary_source,
     requires_regular_intervals = requires_regular_intervals,
+    per_factor_coefficients = per_factor_coefficients,
     generator = generator_func,
     incompatibility_reason = incompatibility_reason
   )
@@ -185,7 +192,8 @@ validate_trend_properties <- function(trend_info, func_name) {
   }
   missing_fields <- setdiff(
     c("supports_factors", "covariance_pattern", "stationary_source",
-      "requires_regular_intervals", "incompatibility_reason"),
+      "requires_regular_intervals", "per_factor_coefficients",
+      "incompatibility_reason"),
     names(trend_info)
   )
   if (length(missing_fields) > 0) {
@@ -209,6 +217,7 @@ ar_trend_properties <- function() {
     # `ar_stationary_factor()` computes from the moving-average weights.
     stationary_source = "lift",
     requires_regular_intervals = TRUE,
+    per_factor_coefficients = TRUE,
     incompatibility_reason = NULL
   )
 }
@@ -222,6 +231,7 @@ rw_trend_properties <- function() {
     # A random walk has no stationary distribution.
     stationary_source = "none",
     requires_regular_intervals = TRUE,
+    per_factor_coefficients = FALSE,
     incompatibility_reason = NULL
   )
 }
@@ -236,6 +246,7 @@ var_trend_properties <- function() {
     # `Sigma_trend`. Nothing is recomputed here.
     stationary_source = "omega",
     requires_regular_intervals = TRUE,
+    per_factor_coefficients = FALSE,
     incompatibility_reason = NULL
   )
 }
@@ -251,6 +262,7 @@ zmvn_trend_properties <- function() {
     stationary_source = "none",
     # A multivariate normal indexed by series is exchangeable in time.
     requires_regular_intervals = FALSE,
+    per_factor_coefficients = FALSE,
     incompatibility_reason = NULL
   )
 }
@@ -266,6 +278,7 @@ car_trend_properties <- function() {
     stationary_source = "none",
     # The kernel carries the elapsed gap between observations.
     requires_regular_intervals = FALSE,
+    per_factor_coefficients = FALSE,
     incompatibility_reason = paste0(
       "Continuous-time AR dynamics follow each series' own irregular ",
       "time gaps."
@@ -283,6 +296,7 @@ pw_trend_properties <- function() {
     covariance_pattern = "none",
     stationary_source = "none",
     requires_regular_intervals = TRUE,
+    per_factor_coefficients = FALSE,
     incompatibility_reason =
       "Piecewise trends model changepoints separately for each series."
   )
@@ -419,12 +433,13 @@ trend_stationary_source <- function(trend_type) {
 #' property asked of it here is `"none"`.
 #'
 #' @param trend_type A registered trend type name, or `"None"`
-#' @param field `"stationary_source"` or `"covariance_pattern"`
+#' @param field The property's name
 #' @return The registered value
 #' @noRd
 trend_property <- function(trend_type,
                            field = c("stationary_source",
-                                     "covariance_pattern")) {
+                                     "covariance_pattern",
+                                     "per_factor_coefficients")) {
   checkmate::assert_string(trend_type, min.chars = 1)
   field <- match.arg(field)
   if (identical(trend_type, "None")) {
@@ -1152,21 +1167,34 @@ print.mvgam_trend <- function(x, ...) {
 #' extraction takes the same names.
 #'
 #' @section Identification:
-#' Factor-model fits (\code{n_lv < n_series}) sample the loadings
-#' matrix `Z` unconstrained. Following Heaps & Jermyn (2024), generated
-#' quantities identify it by a thin QR decomposition. The fit saves the
-#' identified loadings `Z_tilde` with the unrotated `Z`, and the rotated
-#' factor paths `lv_trend_tilde` with `lv_trend`. Post-fit methods use
-#' the identified versions where they exist. \code{qr_thin_R()} gives `Z_tilde` a non-negative diagonal,
-#' which removes the \eqn{2^k} equivalent sign modes. The per-factor
-#' coefficients `ar1_trend` and `theta1_trend` stay in the unrotated
-#' basis. A VAR factor model also rotates its lag coefficients as
-#' `Phi_trend_tilde[lag] = Q_tilde * Phi_trend[lag] * Q_tilde'`.
+#' A factor model with sampled loadings fits equally well under any
+#' reordering or sign change of its factors, and some models under any
+#' rotation. mvgam reports one version, chosen by the dynamics of the
+#' factors:
+#' \itemize{
+#'   \item \code{AR()} factors each take their own coefficients, and
+#'     a rotation would mix them. After sampling, the factors of every
+#'     draw are reordered and signed to agree with one reference, and
+#'     the loadings `Z`, the factor paths `lv_trend` and the
+#'     coefficients `ar1_trend` or `theta1_trend` move together.
+#'     Factors are numbered by the variance they explain, largest
+#'     first.
+#'   \item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
+#'     \code{AR()} factors with \code{coef_sharing = "shared"}, are
+#'     unchanged by rotation. Following Heaps & Jermyn (2024),
+#'     generated quantities rotate each draw to lower-triangular
+#'     loadings `Z_tilde` with a non-negative diagonal, and rotate the
+#'     factor paths to `lv_trend_tilde`. A VAR factor model rotates
+#'     its coefficients to `Phi_trend_tilde`.
+#' }
+#' Post-fit methods use the identified loadings and factor paths.
+#' `shared_variation()` and `residual_cor()` are the same under every
+#' version.
 #'
-#' A \code{trend_map} skips the QR step and keeps its fixed entries on
-#' `Z` exactly. A `by = lv_axis()` smooth ties each factor to its own
-#' covariate effect. Because a rotation would mix those effects, that
-#' model skips the QR step as well. For a free factor model, the \code{loadings_prior}
+#' A \code{trend_map} keeps its fixed entries on `Z` exactly, and a
+#' `by = lv_axis()` smooth ties each factor to its own covariate
+#' effect. Neither takes a rotation. For a model with every loading
+#' sampled, the \code{loadings_prior}
 #' argument of \code{mvgam()} replaces the default iid Student-t prior
 #' on `Z` with a structured matrix-normal prior. That prior is built
 #' from per-series features, pairwise distance matrices or both. See

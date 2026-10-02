@@ -27,9 +27,9 @@
 #' spatial, temporal, or any other type of predictor effects, which enter
 #' the latent factors via `factor_formula`, while the
 #' observation model itself supports all the smooth, GP and random
-#' effects that mvgam can handle. Use `by = lv_axis()` inside smooth
-#' or GP terms of `factor_formula` to fit per-latent-factor smooths
-#' (constrained ordination).
+#' effects that mvgam can handle. Write [lv_axis()] in a term of
+#' `factor_formula` to give each latent factor its own effect of a
+#' covariate (constrained ordination).
 #'
 #' @param formula A `formula` object specifying the GAM observation
 #'   model formula. These behave exactly like the formula for a GLM
@@ -44,12 +44,11 @@
 #'   warning to that effect.
 #'
 #' @param factor_formula A `formula` for the latent factors' linear
-#'   predictor. Use `by = lv_axis()` inside `s()`, `t2()` or `gp()`
-#'   terms to fit a separate smooth per latent
-#'   factor. The legacy spelling `by = trend` is still accepted and
-#'   emits a one-time deprecation warning before being rewritten to
-#'   `by = lv_axis()` internally. The companion sentinel `lv_axis()`
-#'   is documented at `[lv_axis()]`.
+#'   predictor. Write [lv_axis()] in a term to give each latent
+#'   factor its own effect, as in `~ s(elev, by = lv_axis())` or
+#'   `~ elev:lv_axis()`. Each covariate must take one value per
+#'   sampling unit. `by = trend` is deprecated and is treated as
+#'   `by = lv_axis()`.
 #'
 #' @param knots An optional `list` of knot values for any smooth
 #'   terms, forwarded to [mvgam()] and handled exactly as its own

@@ -510,6 +510,10 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     ))
   }
 
+  if (is_trend) {
+    newdata <- derived_series_column(mvgam_fit, newdata)
+  }
+
   # A trend shared by every response is a model with one response.
   use_resp <- if (!is_trend || brms::is.mvbrmsformula(brms_model$formula)) {
     resp

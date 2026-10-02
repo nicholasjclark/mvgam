@@ -106,6 +106,15 @@ mvgam_brmsterms_parts <- function(bt) {
     }),
     use.names = FALSE
   ))
+  # A covariate whose slope varies by group may appear in no other
+  # term. The design of the group-level term still needs its column.
+  slopes <- unique(unlist(
+    lapply(dpars, function(d) {
+      re <- d[["re"]]
+      if (NROW(re) == 0L) NULL else lapply(re$form, all.vars)
+    }),
+    use.names = FALSE
+  ))
   # The terms as written, which is what a drawn effect is keyed by: an
   # interaction is one effect over two columns, and a smooth of two
   # covariates is one effect over both. `stats::terms()` files an
@@ -124,6 +133,7 @@ mvgam_brmsterms_parts <- function(bt) {
   list(
     conditional = conditional,
     random = groups,
+    slopes = setdiff(slopes, c(conditional, offset)),
     # A `trials()` denominator or a truncation bound is a column the
     # likelihood reads. It is no one's predictor, and a grid built
     # without it is refused by brms.
@@ -146,6 +156,7 @@ mvgam_brmsterms_parts <- function(bt) {
 #'@noRd
 mvgam_side_terms <- function(f, family = NULL) {
   empty <- list(conditional = character(0L), random = character(0L),
+                slopes = character(0L),
                 aterms = character(0L), offset = character(0L),
                 labels = character(0L), all = character(0L))
   if (is.null(f)) {
@@ -189,6 +200,7 @@ mvgam_side_terms <- function(f, family = NULL) {
   }
   list(
     conditional = fold("conditional"), random = fold("random"),
+    slopes = fold("slopes"),
     aterms = fold("aterms"), offset = fold("offset"),
     labels = fold("labels"),
     all = unique(c(fold("all"), all.vars(bt$allvars)))
@@ -256,6 +268,7 @@ mvgam_term_list <- function(x) {
     response = keep(unname(response_columns(x))),
     conditional = conditional,
     random = setdiff(keep(c(obs$random, trend$random)), conditional),
+    slopes = setdiff(keep(c(obs$slopes, trend$slopes)), conditional),
     aterms = setdiff(keep(c(obs$aterms, trend$aterms)), conditional),
     offset = keep(c(obs$offset, trend$offset)),
     index = setdiff(index, conditional),
@@ -290,8 +303,8 @@ find_predictors.mvgam <- function(x, effects = "fixed",
   # here under a name of their own:
   # `marginaleffects::get_predictors()` keeps only the components it
   # knows, so nothing filed here is offered as a term to contrast.
-  grid_only <- unique(c(terms_list$index, terms_list$aterms,
-                        terms_list$offset))
+  grid_only <- unique(c(terms_list$index, terms_list$slopes,
+                        terms_list$aterms, terms_list$offset))
   if (length(grid_only)) {
     out$grid <- grid_only
   }

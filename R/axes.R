@@ -255,6 +255,30 @@ is_response_keyed <- function(object) {
   identical(mvgam_axes(object)$series$source, "multivariate")
 }
 
+#' Give a frame the `series` column a derived trend axis is named by
+#'
+#' A trend whose series come from a grouping has no series column in
+#' the data, and its design names them `series`. A term written with
+#' `lv_axis()` uses that column, and a prediction frame takes it from
+#' the grouping here. Any other fit returns the frame unchanged.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data Frame to predict for
+#' @return `data`, with `series` set to the derived series where the
+#'   trend formula uses it
+#' @noRd
+derived_series_column <- function(object, data) {
+  if (!mvgam_had_by_lv(object) ||
+        identical(mvgam_axes(object)$series$source, "explicit")) {
+    return(data)
+  }
+  rows <- axis_row_series(object, data)
+  if (!is.null(rows)) {
+    data$series <- rows
+  }
+  data
+}
+
 #' Per-row series identity, as the fit resolved it
 #'
 #' Returns a factor whose levels are the axis itself, so the order of

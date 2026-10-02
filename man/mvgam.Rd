@@ -31,10 +31,14 @@ accepts both the approximate Hilbert-space form
 approximate form. An exact \code{gp()} term fits and scores
 in-sample, and \code{mvgam()} says so once per session.}
 
-\item{trend_formula}{Trend formula specification (may be
-response-specific). An exact \code{gp()} term here also predicts
-in-sample alone, and forecasting a model that holds one
-requires the approximate form.}
+\item{trend_formula}{A one-sided formula for the latent process:
+a trend constructor such as \code{AR()}, and any predictors of the
+latent state. Write \code{\link[=lv_axis]{lv_axis()}} in a term to vary its effect by
+latent factor, or by series in a model without factors, as in
+\code{~ x:lv_axis() + AR()}. The series column itself is not
+supported in a term of this formula. An exact \code{gp()} term here
+also predicts in-sample alone, and forecasting a model that
+holds one requires the approximate form.}
 
 \item{data}{Data frame or list of multiply imputed datasets}
 
@@ -140,17 +144,12 @@ standardisation. Heaps Supps S4.2.1 used "root-to-tip
 distance = 1" for ultrametric phylogenies, which corresponds
 to \code{max(d) = 2} (twice the per-leaf depth); pre-standardise
 your distance matrix to match if exact parity matters.
-Identification caveat. The structured prior is placed on the
-unrotated \code{Z} columns, before the post-hoc QR rotation
-identifies \code{Z_tilde}. Each column of the identified
-\code{Z_tilde} is a linear mixture of the unrotated columns
-under the rotation \code{Q_tilde}. Trait or phylogeny effects
-inferred via \code{shared_variation()} or \code{residual_cor()} are
-well-defined on the rotation-invariant outer product
-\verb{Z Z'}, but column-by-column interpretation of \code{Z_tilde}
-does not directly inherit the structured prior. The same
-caveat applies to all per-factor scalars (see the trend
-constructors' Identification sections).
+Identification. The structured prior applies to the sampled
+columns of \code{Z}. Where the QR rotation gives the reported
+loadings \code{Z_tilde}, each of its columns mixes the sampled
+columns. \code{shared_variation()} and \code{residual_cor()} use
+\verb{Z Z'}, which is the same before and after the rotation. See
+the Identification section of the trend constructors.
 
 Compatibility with \code{trend_map}:
 \itemize{

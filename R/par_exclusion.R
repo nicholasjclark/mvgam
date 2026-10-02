@@ -16,11 +16,9 @@
 # stored brmsfit holds the group-level table. Every trend-side name
 # takes mvgam's `_trend` suffix.
 #
-# mvgam's own working arrays stay in the posterior.
-# `sample_innovations.R` takes `Q_tilde` per draw to rebuild the
-# identified loadings, and excluding it would drop a quantity the
-# package needs. `mvgam_par_kind()` hides them when a reader is shown
-# parameter names.
+# mvgam's own working arrays stay in the posterior, where forecasting
+# and the post-fit summaries use them. `mvgam_par_kind()` hides them
+# when a reader is shown parameter names.
 
 
 #' The parameters a fit excludes

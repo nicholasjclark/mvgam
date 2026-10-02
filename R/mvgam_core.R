@@ -205,10 +205,14 @@ mvgam_imputation_forwarded <- c(
 #'   (`gp(x)`, no `k`). Prediction at `newdata` requires the
 #'   approximate form. An exact `gp()` term fits and scores
 #'   in-sample, and `mvgam()` says so once per session.
-#' @param trend_formula Trend formula specification (may be
-#'   response-specific). An exact `gp()` term here also predicts
-#'   in-sample alone, and forecasting a model that holds one
-#'   requires the approximate form.
+#' @param trend_formula A one-sided formula for the latent process:
+#'   a trend constructor such as `AR()`, and any predictors of the
+#'   latent state. Write [lv_axis()] in a term to vary its effect by
+#'   latent factor, or by series in a model without factors, as in
+#'   `~ x:lv_axis() + AR()`. The series column itself is not
+#'   supported in a term of this formula. An exact `gp()` term here
+#'   also predicts in-sample alone, and forecasting a model that
+#'   holds one requires the approximate form.
 #' @param data Data frame or list of multiply imputed datasets
 #' @param newdata Optional held-out `data.frame`, stored on the fit
 #'   as `object$test_data`. `forecast()` forecasts to it when called
@@ -310,17 +314,12 @@ mvgam_imputation_forwarded <- c(
 #'   distance = 1" for ultrametric phylogenies, which corresponds
 #'   to `max(d) = 2` (twice the per-leaf depth); pre-standardise
 #'   your distance matrix to match if exact parity matters.
-#'   Identification caveat. The structured prior is placed on the
-#'   unrotated `Z` columns, before the post-hoc QR rotation
-#'   identifies `Z_tilde`. Each column of the identified
-#'   `Z_tilde` is a linear mixture of the unrotated columns
-#'   under the rotation `Q_tilde`. Trait or phylogeny effects
-#'   inferred via `shared_variation()` or `residual_cor()` are
-#'   well-defined on the rotation-invariant outer product
-#'   `Z Z'`, but column-by-column interpretation of `Z_tilde`
-#'   does not directly inherit the structured prior. The same
-#'   caveat applies to all per-factor scalars (see the trend
-#'   constructors' Identification sections).
+#'   Identification. The structured prior applies to the sampled
+#'   columns of `Z`. Where the QR rotation gives the reported
+#'   loadings `Z_tilde`, each of its columns mixes the sampled
+#'   columns. `shared_variation()` and `residual_cor()` use
+#'   `Z Z'`, which is the same before and after the rotation. See
+#'   the Identification section of the trend constructors.
 #'
 #'   Compatibility with `trend_map`:
 #'   \itemize{
@@ -1252,15 +1251,9 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   # the head was the function object rather than its name, and
   # every argument had already resolved to its value.
 
-  # Defensive sign-canonical pass on saved Z / lv_trend draws.
-  # Free-Z factor models save `Z_tilde` and `lv_trend_tilde`
-  # with positive diagonal via Stan's `qr_thin_R` so the
-  # sign-mode equivalence is already removed at sampling time;
-  # this call short-circuits to a no-op whenever `Z_tilde` is
-  # in the posterior. Active only for fits that lack the
-  # post-hoc QR (none in current architecture, but the function
-  # is kept as a defensive belt).
-  mvgam_object <- sign_canonicalise_factors(mvgam_object)
+  # Factors with their own coefficients are relabelled to one
+  # ordering and orientation. See `R/factor_alignment.R`.
+  mvgam_object <- relabel_factors(mvgam_object)
 
   return(mvgam_object)
 }

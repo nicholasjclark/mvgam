@@ -27,11 +27,10 @@ shown in the legend / facet strips. Defaults to
 \item{which_lvs}{Integer vector of length 2 indicating which
 two latent factors to plot. Defaults to \code{c(1, 2)}.}
 
-\item{align}{Logical. When \code{TRUE} (default) \code{fit_b}'s
-posterior-median \code{Z_tilde} is rotated onto \code{fit_a}'s basis via
-orthogonal Procrustes before plotting. Set to \code{FALSE} to keep
-both fits in their own QR-identified basis (rarely useful
-except for sanity checks on rotation invariance).}
+\item{align}{Logical. When \code{TRUE} (default) the posterior-median
+loadings of \code{fit_b} are rotated onto those of \code{fit_a} by
+orthogonal Procrustes before plotting. \code{FALSE} plots each fit
+with the factors it reports.}
 
 \item{facet}{Logical. When \code{FALSE} (default) both fits are
 overlaid on the same axes in different colours, with
@@ -50,13 +49,13 @@ A \code{ggplot} object.
 }
 \description{
 Side-by-side comparison of the posterior-median species loadings
-(\code{Z_tilde}) from two latent-factor \code{mvgam} / \code{jsdgam} fits on
-the same set of species. The two posteriors are identified only
-up to rotation of the factor basis, so a direct overlay would
-be misleading without an alignment step. \code{compare_loadings()}
-applies the orthogonal Procrustes solution (Schoenemann 1966)
-that rotates \code{fit_b}'s posterior-median \code{Z_tilde} to best match
-\code{fit_a}'s in least-squares sense, then either overlays both
+from two latent-factor \code{mvgam} / \code{jsdgam} fits on the same set of
+species. Two fits need not order or orient their factors alike,
+and a direct overlay of their loadings would mislead.
+\code{compare_loadings()} applies the orthogonal Procrustes solution
+(Schoenemann 1966) that rotates the posterior-median loadings of
+\code{fit_b} to best match those of \code{fit_a} in the least-squares
+sense, then either overlays both
 onto a single biplot with displacement segments (default) or
 splits them into two facets sharing axes.
 

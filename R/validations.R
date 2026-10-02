@@ -764,11 +764,8 @@ argument_series_levels <- function(data, series_var) {
 #'     latent factor; `Z = matrix(1, n_series, 1)`).
 #' }
 #'
-#' Any non-NULL `trend_map` bypasses the post-hoc QR
-#' identification used by default factor models (Heaps & Jermyn
-#' 2024). The user-supplied loadings are saved as `Z[i, j]`
-#' directly; no `Z_tilde` is emitted because the encoded
-#' structure already anchors the basis.
+#' A `trend_map` with a fixed entry takes no QR rotation, and its
+#' loadings are saved as `Z[i, j]` with the fixed entries exact.
 #'
 #' Rejects:
 #' \itemize{
@@ -1034,12 +1031,9 @@ trend_map_from_matrix <- function(input, series_levels) {
       i = "NA marks an entry to be sampled."
     )))
   }
-  # Fully-free columns (every entry NA) are identified up to
-  # sign by the Heaps post-hoc QR rotation emitted in
-  # `generate_factor_model()`, which decomposes Z = Q_tilde'
-  # Z_tilde and saves Z_tilde with a non-negative diagonal.
-  # Post-fit accessors prefer Z_tilde over the raw Z, so no
-  # warning about unfixed columns is needed here.
+  # A column with no fixed entry has no fixed sign or order. Where each
+  # factor takes its own coefficients, `relabel_factors()` aligns such
+  # columns after sampling.
   input
 }
 
@@ -3103,8 +3097,8 @@ validate_newdata_complete <- function(newdata, object) {
     character(0L)
   }
   read <- setdiff(
-    unique(c(terms$conditional, terms$random, terms$aterms,
-             terms$offset, terms$index, time_var)),
+    unique(c(terms$conditional, terms$random, terms$slopes,
+             terms$aterms, terms$offset, terms$index, time_var)),
     terms$response
   )
   # A column the frame omits altogether is the widest gap of all, and
@@ -3830,60 +3824,72 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   time_var <- axis_names$time_var
   series_var <- axis_names$series_var
 
-  # by = lv_axis() machinery: detect per-factor smooth markers in
-  # mv_spec$base_formula, rewrite each `by` argument so the single brms
-  # compile sees a regular factor by-variable. The rewrite target and
-  # downstream codepath depend on whether the trend spec carries n_lv:
+  parsed_trend <- resolve_trend_groupings(parsed_trend, data, series_var)
+
+  data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var,
+                                response_vars)
+
+  # `lv_axis()` in the trend formula is replaced by the trend-data
+  # column of the trend's axis:
   #
-  #   factor model (n_lv set): rewrite to `by = .trend`, switch grain
-  #     to (time, .trend), emit factor-model Stan with loadings Z.
-  #   non-factor (n_lv not set): rewrite to `by = series`, keep the
-  #     standard (time, series) grain. Each series gets its own smooth
-  #     basis on the trend side, exactly as `by = series` would on the
-  #     obs side, but with the contribution living in the latent state.
+  #   factor model (n_lv set): `.trend`. The trend data then runs over
+  #     (time, factor), and Stan passes the whole trend predictor
+  #     through the loadings Z.
+  #   any other model: the series column, on the usual (time, series)
+  #     grain. A trend whose series come from a grouping or from the
+  #     responses has no such column, and takes the `series` column
+  #     `trend_cell_frame()` builds.
   #
-  # `trend_cell_frame()` and the stanvar emission use has_by_lv and
-  # n_lv_for_grain on the factor-model path alone.
+  # `has_by_lv` selects the (time, factor) grain. `had_by_lv` records
+  # that the user wrote `lv_axis()` on either path, and display code
+  # uses it to name effects without the replacement column.
   has_by_lv <- FALSE
-  n_lv_for_grain <- NULL
-  # Reason: `has_by_lv` selects the (time, .trend)-grain codepath and is
-  # FALSE on the non-factor rewrite. `had_by_lv` records that the user
-  # wrote `by = lv_axis()` regardless of which path took it, so display
-  # code (conditional_effects list names, summary tables) can strip the
-  # internal `series` rewrite token and present per-latent-axis
-  # semantics back to the user.
   had_by_lv <- FALSE
-  if (!is.null(mv_spec$base_formula) &&
-      inherits(mv_spec$base_formula, "formula")) {
+  n_lv_for_grain <- NULL
+  if (inherits(mv_spec$base_formula, "formula")) {
     factor_active <- !is.null(parsed_trend$n_lv) &&
       isTRUE(as.integer(parsed_trend$n_lv) >= 1L)
+    explicit <- identical(attr(data, "mvgam_series_source"), "explicit")
     by_lv_res <- detect_and_rewrite_by_lv(
       mv_spec$base_formula,
-      factor_active = factor_active
+      target = if (factor_active) {
+        ".trend"
+      } else if (explicit) {
+        series_var
+      } else {
+        "series"
+      },
+      series_var = series_var
     )
     if (by_lv_res$has_by_lv) {
+      if (!factor_active && identical(attr(data, "mvgam_series_source"),
+                                      "multivariate")) {
+        stop(insight::format_error(c(
+          paste0("'lv_axis()' requires latent factors in a model whose ",
+                 "responses are its series."),
+          x = "The trend design of this model has one row per time.",
+          i = paste0("Set 'n_lv' on the trend constructor, or give each ",
+                     "response its own effect in 'formula'.")
+        )), call. = FALSE)
+      }
+      if (factor_active && spec_n_lv(parsed_trend) < 2L) {
+        stop(insight::format_error(c(
+          "'lv_axis()' requires at least two latent factors.",
+          x = "The trend has one factor, which takes every effect.",
+          i = "Drop 'lv_axis()' from the term, or raise 'n_lv'."
+        )), call. = FALSE)
+      }
       had_by_lv <- TRUE
       mv_spec$base_formula <- by_lv_res$formula
       if (by_lv_res$deprecated_trend_seen) {
         warn_legacy_trend_by()
       }
-
       if (factor_active) {
-        # Factor-model path: switch grain, emit factor-model codegen.
         has_by_lv <- TRUE
         n_lv_for_grain <- spec_n_lv(parsed_trend)
       }
-      # Non-factor path: has_by_lv stays FALSE; the formula was already
-      # rewritten to use `by = series`. The standard (time, series)
-      # codepath handles everything downstream, including conditional
-      # effects via brms native predict.
     }
   }
-
-  parsed_trend <- resolve_trend_groupings(parsed_trend, data, series_var)
-
-  data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var,
-                                response_vars)
 
   # Compute dimensions once to eliminate redundant calls
   dimensions <- extract_time_series_dimensions(
@@ -3894,14 +3900,8 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     response_vars = response_vars
   )
 
-  # Persist the by_lv grain markers on dimensions so downstream stanvar
-  # emission (extract_and_rename_trend_parameters → times_trend) sees
-  # the matching axis. The standard (time, series) path stays unchanged
-  # when has_by_lv is FALSE. `had_by_lv` is a display-only marker (no
-  # effect on codegen) that records whether the AST detector found a
-  # `by = lv_axis()` term, used by conditional_effects.mvgam to hide
-  # the internal `series` / `.trend` rewrite tokens from the
-  # user-visible plot list names.
+  # The grain travels on the dimensions to the stanvar emission, which
+  # sizes `times_trend` by it.
   dimensions$has_by_lv <- has_by_lv
   dimensions$had_by_lv <- had_by_lv
   dimensions$n_lv_for_grain <- n_lv_for_grain
@@ -3944,7 +3944,8 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   series_vals <- get_series_for_grouping(data)
   if (length(covariates) > 0 && !identical(parsed_trend$trend, "CAR")) {
     assert_trend_covariates_constant(data, covariates, parsed_trend,
-                                     time_vals, series_vals)
+                                     time_vals, series_vals,
+                                     by_time = has_by_lv)
   }
 
   if (!has_by_lv) {
@@ -4003,8 +4004,10 @@ trend_formula_covariates <- function(base_formula) {
   checkmate::assert_formula(base_formula)
   # `allvars` names every column a term uses: a slope inside a random
   # effect, a grouping factor, a smooth's `by` and an offset alike.
-  # The axis columns and the `by = lv_axis()` rewrite are carried
+  # brms refuses a call as a grouping factor, and each `lv_axis()` is
+  # replaced before the parse. The axis columns are carried
   # separately.
+  base_formula <- detect_and_rewrite_by_lv(base_formula)$formula
   bterms <- brms::brmsterms(rlang::new_formula(
     quote(.mvgam_lhs), rlang::f_rhs(base_formula)
   ))
@@ -4104,16 +4107,21 @@ trend_cell_frame <- function(data, covariates, time_vals, series_vals,
 #'
 #' A trend cell is one occasion of one series, or of one group under a
 #' grouped trend. The trend's design matrix has one row per cell.
+#' With `lv_axis()` in a factor model the design has one row per time
+#' and factor, and a cell is one occasion.
 #'
 #' @param data The training frame, carrying its axis attributes.
 #' @param trend_variables The trend covariates.
 #' @param trend_model The trend spec.
 #' @param time_vals,series_vals The resolved axes.
+#' @param by_time Does the trend design run over (time, factor)?
 #' @return `TRUE`, invisibly.
 #' @noRd
 assert_trend_covariates_constant <- function(data, trend_variables,
                                              trend_model, time_vals,
-                                             series_vals) {
+                                             series_vals,
+                                             by_time = FALSE) {
+  checkmate::assert_flag(by_time)
   missing_vars <- setdiff(trend_variables, names(data))
   if (length(missing_vars) > 0) {
     stop(insight::format_error(c(
@@ -4125,7 +4133,9 @@ assert_trend_covariates_constant <- function(data, trend_variables,
     )), call. = FALSE)
   }
   groupings <- spec_groupings(trend_model)
-  cell <- if (is.null(groupings$gr)) {
+  cell <- if (by_time) {
+    character(0L)
+  } else if (is.null(groupings$gr)) {
     ".cell_series"
   } else {
     c(groupings$gr, groupings$subgr)
@@ -4151,15 +4161,22 @@ assert_trend_covariates_constant <- function(data, trend_variables,
     dplyr::select(dplyr::where(isTRUE)) %>%
     names()
   if (length(varying) > 0) {
-    cell_label <- paste0(
-      "(time, ", if (identical(cell, ".cell_series")) "series" else
-        paste(cell, collapse = ", "), ")"
-    )
+    cell_label <- if (by_time) {
+      "time"
+    } else {
+      paste0("(time, ", if (identical(cell, ".cell_series")) "series" else
+        paste(cell, collapse = ", "), ") cell")
+    }
     stop(insight::format_error(c(
-      paste0("A trend covariate varies within one ", cell_label, " cell."),
+      paste0("A trend covariate varies within one ", cell_label, "."),
       x = paste0("Varying: ",
                  paste0("'", varying, "'", collapse = ", "), "."),
-      i = "The trend has one design row per cell.",
+      i = if (by_time) {
+        paste0("With 'lv_axis()' in a factor model, the trend has one ",
+               "design row per time and factor.")
+      } else {
+        "The trend has one design row per cell."
+      },
       i = "Aggregate the covariate or move it to the observation formula."
     )), call. = FALSE)
   }

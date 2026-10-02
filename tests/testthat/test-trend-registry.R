@@ -48,7 +48,8 @@ test_that("trend properties are validated", {
     args <- utils::modifyList(
       list(name = "T", supports_factors = TRUE,
            covariance_pattern = "diagonal", stationary_source = "none",
-           requires_regular_intervals = TRUE, generator_func = generator),
+           requires_regular_intervals = TRUE,
+           per_factor_coefficients = FALSE, generator_func = generator),
       list(...)
     )
     do.call(register_trend_type, args)

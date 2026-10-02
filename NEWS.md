@@ -24,7 +24,8 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * `mvgam_formula()`, `mvgam_data()` and `check_newdata()` check a model and its data before fitting or prediction
 * Moving average terms in `AR()` and `VAR()`, coefficient pooling in `AR()` and partially fixed `trend_map`
 * `loadings_prior` for structured factor loadings, with `active_factors()`, `shared_variation()`, `compare_loadings()` and `ordinate()`
-* `jsdgam()` gained `traits`, `trait_slopes` and `phylo`. `by = lv_axis()` gives each latent factor its own smooth
+* AR factor models with estimated loadings give every draw one factor order and orientation. `summary()` reports their loadings as `Z` and their AR coefficients per factor
+* `jsdgam()` gained `traits`, `trait_slopes` and `phylo`. `lv_axis()` in a `trend_formula` term gives each latent factor, or each series of a model without factors, its own effect
 * The 'brms' post-processing methods, including `posterior_predict()`, `log_lik()`, `update()`, `hypothesis()` and `as_draws_*()`
 * `bridge_sampler()`, `bayes_factor()`, `waic()`, `loo_model_weights()`, `pp_average()`, `compare_scores()` and `compare_elpds()` for model comparison
 * `threads`, `init = "pathfinder"`, `mvgam_multiple()` for imputed data, and helpers to pivot wide occupancy and species data

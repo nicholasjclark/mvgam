@@ -2441,10 +2441,8 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series,
 #'   block. No priors, no identification step.
 #' - `is_factor_model = TRUE`, `fixed_Z` NULL: emit
 #'   `matrix\[N_series_trend, N_lv_trend\] Z` in parameters.
-#'   `generate_factor_model()` applies the prior and emits
-#'   post-hoc QR identification (`Z_tilde`, `Q_tilde`,
-#'   `lv_trend_tilde`) with an inline sign-fix in generated
-#'   quantities.
+#'   `generate_factor_model()` applies the prior and, where
+#'   `factor_identification()` asks for it, the QR rotation.
 #' - `is_factor_model = FALSE`, `fixed_Z` NULL: emit diagonal Z
 #'   in tdata (default identity factor structure).
 #'
@@ -2503,49 +2501,25 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
   }
 }
 
-#' Factor-model prior + post-hoc QR identification
+#' The prior on sampled loadings and their QR identification
 #'
-#' Implements the Heaps and Jermyn (2024) factor-model
-#' parameterisation: sample `Z` as an unconstrained
-#' `matrix\[N_series_trend, N_lv_trend\]` parameter (declaration
-#' lives in `generate_matrix_z_parameters()`), apply the prior
-#' on the unconstrained matrix, and recover the identified
-#' lower-triangular `Z_tilde` via thin-QR decomposition in
-#' generated quantities. The factor paths `lv_trend` are
-#' rotated by the same `Q` so the `trend = Z lv_trend^T`
-#' product is invariant.
+#' `Z` is sampled as an unconstrained matrix under its prior. With
+#' `rotate = TRUE`, generated quantities rotate each draw to a
+#' lower-triangular `Z_tilde` by a thin QR decomposition (Heaps and
+#' Jermyn 2024), and rotate the factor paths to `lv_trend_tilde` with
+#' the same matrix. `Z_tilde %*% t(lv_trend_tilde)` equals
+#' `Z %*% t(lv_trend)` in every draw. `qr_thin_R()` returns a
+#' non-negative diagonal, which fixes the sign of each factor.
 #'
-#' `qr_thin_R` guarantees a positive diagonal on the upper
-#' triangular factor by Stan's normalisation. The LQ factor
-#' `Z_tilde = qr_thin_R(Z')'` therefore has a non-negative
-#' diagonal by construction, removing the 2^n_lv sign-mode
-#' equivalence without an inline sign-fix.
+#' A VAR factor model also rotates its coefficients, as
+#' `Phi_trend_tilde[lag] = Q * Phi_trend[lag] * Q'`.
 #'
-#' For VAR factor models the coefficient array `Phi_trend` lives
-#' in the same latent basis as `lv_trend`. The rotation
-#' `Phi_trend_tilde\[lag\] = Q_tilde Phi_trend\[lag\] Q_tilde'` brings
-#' the saved coefficients into the identified `Z_tilde` /
-#' `lv_trend_tilde` basis so downstream summaries (impulse
-#' responses, stationarity checks) are coherent.
+#' `factor_identification()` sets `rotate`. Factors with their own
+#' coefficients are relabelled after sampling by `relabel_factors()`
+#' and take no rotation.
 #'
-#' Scope of identification. The QR rotation is applied to
-#' parameters that index over the latent factor dimension `K`
-#' and whose interpretation only makes sense in the identified
-#' basis: `Z_tilde`, `lv_trend_tilde`, and (VAR only)
-#' `Phi_trend_tilde`. The factor innovations have identity
-#' covariance, which the rotation leaves unchanged. Per-factor
-#' scalar parameters (`ar1_trend`, `ar{p}_trend`, `theta1_trend`)
-#' stay unrotated. They remain in the unrotated `Z` basis, where
-#' element `k` describes factor `k` of the sampled `Z`. After
-#' rotation, factor `k` of `lv_trend_tilde` is a linear
-#' combination of the unrotated factors under `Q_tilde`, so
-#' interpretations like "the AR(1) coefficient of factor `k`"
-#' apply to the unrotated factors, not the identified ones.
-#'
-#' Returns NULL when the fit is not a factor model OR when Z is
-#' user-supplied via `trend_map` (the data-block code path in
-#' `make_fixed_z_stanvars()` / `make_partial_z_stanvars()`
-#' handles identification differently).
+#' Returns NULL for a model without factors, and for a `trend_map`
+#' that supplies `Z`.
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
@@ -2558,9 +2532,8 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 #'   prior spec. When non-NULL replaces the default iid `Z` prior with
 #'   the per-column matrix-normal kernel built by
 #'   `make_loadings_prior_stanvars()`.
-#' @param rotate Logical. Apply post-hoc thin-QR identification of
-#'   `Z` in generated quantities. Set FALSE when factor identification
-#'   comes from `by = lv_axis()` covariate structure rather than QR.
+#' @param rotate Logical. Emit the QR rotation in generated
+#'   quantities?
 #' @param family Optional family / brmsfamily / customfamily object,
 #'   typically `data_info$family` at the trend-generator call sites.
 #'   When `is_simplex_response_family(family)` is TRUE, the Z column
@@ -2627,50 +2600,32 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
   # (Stan >= 2.36; gated by `assert_stan_version()` in
   # `make_stan.R`). No additional prior is needed here.
 
-  # Post-hoc identification via thin QR. `qr_thin_R` guarantees a
-  # positive diagonal on the upper-triangular factor (Stan
-  # normalisation), so the LQ factor Z_tilde has a non-negative
-  # diagonal by construction. `qr_thin_Q` applies the matching
-  # column flips so Z_tilde Q_tilde == Z is preserved.
-  #
-  # When `rotate = FALSE`, the QR step is skipped entirely and Z is
-  # saved directly without Z_tilde / lv_trend_tilde. Used when the
-  # per-factor `by = lv_axis()` smooth pins the factor identification
-  # via covariate structure: applying QR would scramble the factor
-  # vs. environment alignment that the by-lv-axis machinery sets up.
-  # The sign equivalence class is then resolved post-hoc by
-  # `sign_canonicalise_factors()` in R/sign_canonical.R.
   if (!rotate) {
     return(z_prior)
   }
 
+  # The rotation `Q` is a working matrix of this block and is not
+  # stored.
+  is_var <- identical(trend_type, "VAR")
   qr_lines <- c(
     "matrix[N_series_trend, N_lv_trend] Z_tilde = qr_thin_R(Z')';",
-    "matrix[N_lv_trend, N_lv_trend] Q_tilde = qr_thin_Q(Z')';",
-    paste0(
-      "matrix[N_time_trend, N_lv_trend] lv_trend_tilde",
-      " = lv_trend * Q_tilde';"
-    )
+    "matrix[N_time_trend, N_lv_trend] lv_trend_tilde;",
+    # Stan requires a data expression for a top-level array size.
+    # `N_lags_trend` is the data integer that sizes `Phi_trend`.
+    if (is_var) {
+      paste0("array[N_lags_trend] matrix[N_lv_trend, N_lv_trend]",
+             " Phi_trend_tilde;")
+    },
+    "{",
+    "  matrix[N_lv_trend, N_lv_trend] Q = qr_thin_Q(Z')';",
+    "  lv_trend_tilde = lv_trend * Q';",
+    if (is_var) {
+      c("  for (lag in 1:N_lags_trend) {",
+        "    Phi_trend_tilde[lag] = Q * Phi_trend[lag] * Q';",
+        "  }")
+    },
+    "}"
   )
-
-  if (!is.null(trend_type) && trend_type == "VAR") {
-    qr_lines <- c(
-      qr_lines,
-      # `size()` is not a data expression, so Stan refuses it as a
-      # top-level array size. `N_lags_trend` is the data integer the
-      # rest of the VAR code sizes `Phi_trend` by.
-      paste0(
-        "array[N_lags_trend] matrix[N_lv_trend, N_lv_trend]",
-        " Phi_trend_tilde;"
-      ),
-      "for (lag in 1:N_lags_trend) {",
-      paste0(
-        "  Phi_trend_tilde[lag]",
-        " = Q_tilde * Phi_trend[lag] * Q_tilde';"
-      ),
-      "}"
-    )
-  }
 
   z_qr <- brms::stanvar(
     name = "factor_z_identification",
@@ -3709,7 +3664,9 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       is_factor_model, n_lv,
       fixed_Z = trend_specs$fixed_Z,
       loadings_prior_spec = trend_specs$loadings_prior_spec,
-      rotate = !isTRUE(data_info$has_by_lv),
+      rotate = identical(
+        factor_identification(trend_specs, data_info$has_by_lv), "rotation"
+      ),
       family = data_info$family,
       prior = prior
     )
@@ -4769,7 +4726,9 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       is_factor_model, n_lv,
       fixed_Z = trend_specs$fixed_Z,
       loadings_prior_spec = trend_specs$loadings_prior_spec,
-      rotate = !isTRUE(data_info$has_by_lv),
+      rotate = identical(
+        factor_identification(trend_specs, data_info$has_by_lv), "rotation"
+      ),
       family = data_info$family,
       prior = prior
     )
@@ -5472,7 +5431,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       fixed_Z = trend_specs$fixed_Z,
       trend_type = "VAR",
       loadings_prior_spec = trend_specs$loadings_prior_spec,
-      rotate = !isTRUE(data_info$has_by_lv),
+      rotate = identical(
+        factor_identification(trend_specs, data_info$has_by_lv), "rotation"
+      ),
       family = data_info$family,
       prior = prior
     )
@@ -5822,7 +5783,9 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       is_factor_model, n_lv,
       fixed_Z = trend_specs$fixed_Z,
       loadings_prior_spec = trend_specs$loadings_prior_spec,
-      rotate = !isTRUE(data_info$has_by_lv),
+      rotate = identical(
+        factor_identification(trend_specs, data_info$has_by_lv), "rotation"
+      ),
       family = data_info$family,
       prior = prior
     )

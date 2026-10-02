@@ -1,7 +1,7 @@
 # What the observation and trend designs share, and what the sharing
 # costs.
 #
-# `y ~ 1` with `~ series + AR(p = 1)` is the plain way to ask for a
+# `y ~ 1` with `~ lv_axis() + AR(p = 1)` is the plain way to ask for a
 # per-series latent level. The observation intercept and the series
 # columns of the trend design span one direction twice: stacked, the
 # two designs hold four columns of rank three. mvgam names that
@@ -64,7 +64,7 @@ for (s in series_levels) {
 conf <- cached_fit("val_mvgam_confound_conf.rds", function() {
   SM(mvgam(
     y ~ 1,
-    trend_formula = ~ series + AR(p = 1),
+    trend_formula = ~ lv_axis() + AR(p = 1),
     data = dat,
     family = gaussian(),
     chains = 2L,

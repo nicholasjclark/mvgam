@@ -302,7 +302,7 @@ conditional_effects.mvgam <- function(x,
   # `strip_by_lv_rewrite_tokens()` does the strip with the
   # empty-grouping guard.
   display_labs <- strip_by_lv_rewrite_tokens(
-    cond_labs, mvgam_had_by_lv(x)
+    cond_labs, mvgam_had_by_lv(x), axis_vars(x)$series_var
   )
   names(out) <- vapply(display_labs, paste, FUN.VALUE = character(1L),
                        collapse = ":")

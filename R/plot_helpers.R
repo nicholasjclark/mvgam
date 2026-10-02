@@ -759,9 +759,9 @@ reorder_clusters <- function(x, dis) {
 #'   uses it with draws it has already extracted.
 #'
 #' A fully populated `fixed_Z` is broadcast across draws. Otherwise
-#' `extract_Z_loadings()` extracts the draws: the QR-identified
-#' `Z_tilde[i, j]` for free loadings, or `Z[i, j]` for a partial
-#' `trend_map`, whose pattern keeps its orientation.
+#' `extract_Z_loadings()` extracts the draws: `Z_tilde[i, j]` from a
+#' fit identified by the QR rotation, and `Z[i, j]` from every other
+#' factor fit.
 #'
 #' @param object Fitted mvgam object (object-style entry).
 #'   Required when callers omit `n_series`/`n_lv`.
@@ -773,12 +773,12 @@ reorder_clusters <- function(x, dis) {
 #'   explicit-style; derived from `object` otherwise.
 #' @param n_series Integer series count. Required in
 #'   explicit-style; derived from `object` otherwise.
-#' @param basis `"identified"` returns the QR-rotated `Z_tilde`,
-#'   which reporting and plotting show. `"model"` returns the raw
-#'   `Z` the model sampled. A caller combining loadings with
-#'   `sigma_trend`, `Sigma_trend` or `Omega_trend` needs it, because
-#'   the model estimated those parameters in the unrotated basis. A fixed
-#'   `trend_map` has no rotation and both agree.
+#' @param basis `"identified"` returns the loadings a report or plot
+#'   shows. `"model"` returns the `Z` the model sampled. A caller
+#'   combining loadings with `sigma_trend`, `Sigma_trend` or
+#'   `Omega_trend` needs `"model"`: the model estimated those
+#'   parameters with the sampled `Z`. The two differ only in a fit
+#'   identified by the QR rotation.
 #'
 #' @return Numeric array of dimension `[ndraws, n_series, n_lv]`.
 #' @noRd

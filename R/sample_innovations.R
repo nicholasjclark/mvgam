@@ -1055,24 +1055,22 @@ draw_innovation_grid <- function(cov_structure, n_times) {
 }
 
 
-# Shared regex selectors for factor-model parameter names.
-# Free-Z factor fits emit identified `Z_tilde[i, j]` and rotated
-# `lv_trend_tilde[t, k]` in generated quantities (Heaps and Jermyn
-# 2024). Partial-Z fits skip the QR rotation and keep the user-
-# supplied pattern on `Z[i, j]` / `lv_trend[t, k]` directly. These
-# helpers centralise the prefer-identified-then-fall-back rule so
-# `extract_Z_loadings`, `extract_lv_trend_matrices`,
-# `match_z_loadings` (summary.mvgam.R), and
-# `categorize_mvgam_parameters` (index-mvgam.R) stay in lockstep.
+# The parameter names that hold a factor model's reported loadings
+# and factor paths. A fit identified by the QR rotation stores them
+# as `Z_tilde[i, j]` and `lv_trend_tilde[t, k]`. Every other factor
+# fit reports `Z[i, j]` and `lv_trend[t, k]`: relabelled after
+# sampling where the factors take their own coefficients, and as
+# declared under a `trend_map`. `factor_identification()` decides
+# which applies. `extract_Z_loadings()`,
+# `extract_lv_trend_matrices()`, `match_z_loadings()` and
+# `categorize_mvgam_parameters()` all select through these helpers.
 #' @param pars Parameter names from the fit.
-#' @param basis `"identified"` for the QR-rotated `Z_tilde`, which
-#'   is what anything reporting or plotting loadings wants;
-#'   `"model"` for the raw `Z` the model sampled, which is what
-#'   anything combining loadings with `sigma_trend`,
-#'   `Sigma_trend` or `Omega_trend` needs, since those live in the
-#'   unrotated basis. `Z Z'` is invariant to the rotation, so the
-#'   distinction only bites once a non-isotropic covariance sits
-#'   between the loadings.
+#' @param basis `"identified"` for the loadings a report or plot
+#'   shows. `"model"` for the `Z` the model sampled. A caller
+#'   combining loadings with `sigma_trend`, `Sigma_trend` or
+#'   `Omega_trend` needs `"model"`: the model estimated those
+#'   parameters with the sampled `Z`. The two differ only in a
+#'   rotated fit.
 #'@noRd
 factor_loading_param_pattern <- function(pars,
                                          basis = c("identified",
@@ -1083,13 +1081,11 @@ factor_loading_param_pattern <- function(pars,
 }
 
 
-#' Does this fit carry QR-identified loadings?
+#' Does this fit store QR-rotated loadings?
 #'
-#' A free-loading factor fit is rotated to a canonical form and the
-#' result is emitted as `Z_tilde`, alongside the raw `Z` it came from.
-#' Several places need to know whether that happened, and the answer
-#' has to be the same in all of them: the name of the parameter that
-#' settles it lives here, and nowhere else.
+#' A fit identified by rotation stores `Z_tilde` as well as the `Z`
+#' it sampled. Every caller asking whether a fit was rotated tests
+#' for that parameter here.
 #'
 #' @param pars Character vector of parameter names
 #' @return A single logical
@@ -1100,10 +1096,10 @@ has_identified_loadings <- function(pars) {
 }
 
 
-#' Does this fit carry QR-identified factor states?
+#' Does this fit store QR-rotated factor paths?
 #'
-#' The companion to `has_identified_loadings()` for the factor paths
-#' the loadings multiply.
+#' As `has_identified_loadings()`, for the factor paths the loadings
+#' multiply.
 #'
 #' @param pars Character vector of parameter names
 #' @return A single logical
@@ -1122,58 +1118,48 @@ factor_state_param_pattern <- function(pars) {
   }
 }
 
-# Returns the regex matching parameter-draws the summary / tidy
-# classifiers hide, each a raw form of a quantity the posterior
-# reports under another name. Covers:
-#   * Raw loadings `Z[i, j]` when `Z_tilde[i, j]` is present
-#     (free-Z factor fits with the Heaps & Jermyn QR rotation).
-#   * Raw factor paths `lv_trend[t, k]` and the upstream
-#     `innovations_trend[t, k]` / `scaled_innovations_trend[t, k]`
-#     when `lv_trend_tilde[t, k]` is present (same condition).
-#   * Unrotated VAR dynamics `Phi_trend[lag][i, j]` when
-#     `Phi_trend_tilde[lag][i, j]` is present.
-#   * Per-series copies of a shared AR coefficient when the
-#     sampled `shared_ar{k}_trend[.]` scalar is present.
-# The rotation- and sign-indeterminate families show poor Rhat /
-# low ESS while the identified counterpart is well behaved, and
-# the shared copies repeat one sampled value. Hiding the raw form
-# here keeps convergence diagnostics, `summary.mvgam()` print,
-# `posterior_summary.mvgam()` and the variable-keyword machinery
-# on the reported names. Returns NULL when the pattern set is
-# empty.
+# The regex matching the parameters the summary and tidy classifiers
+# hide. Each is a constant or the unidentified form of a quantity the
+# posterior reports under another name:
+#   * With every loading sampled, the factor innovations take unit
+#     scale and zero correlation. `sigma_trend[k]`, `L_Omega_trend`
+#     and `Sigma_trend` are constants, and the innovations are
+#     working arrays of the factor paths.
+#   * With the QR rotation, the unrotated loadings `Z[i, j]` and
+#     factor paths `lv_trend[t, k]` vary by rotation and sign between
+#     draws. `Z_tilde` and `lv_trend_tilde` are their reported forms.
+#   * `Phi_trend_tilde` replaces the unrotated `Phi_trend` of a VAR
+#     factor model.
+#   * A partial `trend_map` samples `Z_free_vec`, and `Z` repeats
+#     each of its entries.
+#   * A shared AR coefficient is sampled once, and the per-series
+#     copies repeat it.
+# The grouped scale and correlation parameters of a hierarchical trend
+# have other names and stay visible. Returns NULL when nothing is
+# hidden.
 #'@noRd
 hidden_par_pattern <- function(pars) {
   patterns <- character(0L)
   if (any(grepl("^Phi_trend_tilde\\[", pars))) {
     patterns <- c(patterns, "^Phi_trend\\[")
   }
-  if (has_identified_loadings(pars)) {
-    # Free-Z factor fit detected. The raw loadings `Z[i, j]`,
-    # raw factor paths `lv_trend[t, k]`, the innovations driving
-    # them, the rotation orthogonal matrix `Q_tilde[i, j]`, and
-    # the latent-factor-level variance-block parameters
-    # (`sigma_trend[k]`, `L_Omega_trend[i, j]`,
-    # `Sigma_trend[i, j]`) are all rotation- or sign-indeterminate
-    # because the QR step in generated quantities absorbs the
-    # rotation orbit; gate them all together on the `Z_tilde[`
-    # signal so the hide pattern survives the latent-state filter
-    # upstream of `summary.mvgam()`. The `^sigma_trend\\[` /
-    # `^L_Omega_trend\\[` / `^Sigma_trend\\[` patterns are safe
-    # against hierarchical-trend false positives: the grouped
-    # variants emit as `sigma_group_trend[g, s]` /
-    # `L_Omega_global_trend[i, j]` etc., which do not match
-    # these prefixes and remain visible.
+  partial_map <- any(grepl("^Z_free_vec\\[", pars))
+  every_loading_sampled <- any(grepl("^Z\\[", pars)) && !partial_map
+  if (every_loading_sampled) {
     patterns <- c(
       patterns,
-      "^Z\\[",
-      "^lv_trend\\[",
       "^innovations_trend\\[",
       "^scaled_innovations_trend\\[",
-      "^Q_tilde\\[",
       "^sigma_trend\\[",
       "^L_Omega_trend\\[",
       "^Sigma_trend\\["
     )
+  }
+  if (has_identified_loadings(pars)) {
+    patterns <- c(patterns, "^Z\\[", "^lv_trend\\[")
+  }
+  if (partial_map) {
+    patterns <- c(patterns, "^Z_free_vec\\[")
   }
   # `coef_sharing = "shared"` samples one coefficient per lag and
   # broadcasts it across the series. The per-series copies repeat the

@@ -2,7 +2,7 @@
 % Please edit documentation in R/lv_axis.R
 \name{lv_axis}
 \alias{lv_axis}
-\title{Per-latent-factor smooth sentinel}
+\title{Vary a trend effect along the trend's axis}
 \usage{
 lv_axis()
 }
@@ -11,91 +11,123 @@ lv_axis()
 formula sentinel.
 }
 \description{
-Use inside the \verb{by =} argument of a smooth or GP term in a
-\code{trend_formula} to mark the smooth as per-latent-factor (factor
-model) or per-series (non-factor model). For example:
+Use \code{lv_axis()} in a \code{trend_formula} in any position that takes a
+factor variable, to give each latent factor its own effect. In a
+model with no latent factors it gives each series its own effect.
 }
 \details{
 \preformatted{
-trend_formula = ~ s(elev, by = lv_axis()) +
-                 gp(lon, lat, by = lv_axis()) - 1 +
-                 VAR(n_lv = 2)
+trend_formula = ~ s(elev, by = lv_axis()) + AR(n_lv = 2)
+trend_formula = ~ temp:lv_axis() + AR(n_lv = 2)
+trend_formula = ~ (1 + temp | lv_axis()) + AR()
+trend_formula = ~ s(temp, lv_axis(), bs = "fs") + AR()
 }
 
-When \code{n_lv} is set on the trend constructor (factor model), each
-factor \verb{k = 1, ..., n_lv} receives its own smooth basis and
-species-specific responses arise from the factor loadings
-\code{Z[s, k]} multiplied by the per-factor smooth contributions. This
-is the canonical syntax for constrained ordination in mvgam.
+With \code{n_lv} set on the trend constructor, each factor
+\verb{k = 1, ..., n_lv} takes its own effect, and the effect of a
+covariate on series \code{s} is the sum over factors of the loading
+\code{Z[s, k]} times the effect on factor \code{k}. This is constrained
+ordination, the model \code{\link[=jsdgam]{jsdgam()}} fits. Every term of such a
+\code{trend_formula} is then evaluated once per factor and time, and
+each covariate must take one value per time.
 
-When \code{n_lv} is \strong{not} set on the trend constructor (non-factor
-model, e.g. \code{trend_formula = ~ s(x, by = lv_axis()) + VAR()}),
-each series receives its own smooth on the trend side. The
-formula is rewritten internally so brms sees the equivalent of
-\code{by = series}, but the smooth stays on the trend (latent-state)
-side rather than the observation side.
+With no \code{n_lv}, each series takes its own effect on the latent
+state.
 
-\code{lv_axis()} is a sentinel: it has no side effects and returns
-\code{NULL} invisibly. Calling it outside the \verb{by =} position of a
-smooth/GP term is silently no-op, but the trend-formula validator
-will surface a clear error in that case. The legacy syntax
-\code{by = trend} is supported via deprecation warning and auto-translates
-to \code{by = lv_axis()}.
-
-The sentinel is recognised purely by name in the
-formula's abstract syntax tree, so passing it through \code{eval()}
-or \code{quote()} outside a mvgam call yields \code{NULL}. The companion
-validator (in \code{R/validations.R}) rejects \code{by = series} in
-\code{trend_formula}. That pattern is semantically confusing on the
-trend side, and the helper directs users to either
-\code{by = lv_axis()} (for per-factor smooths) or to moving the
-per-series effect into the observation \code{formula}.
+The series column itself is not supported in a \code{trend_formula}
+term. Write \code{lv_axis()} for an effect that differs along the
+trend's axis, and put an effect of the series on the observations
+in \code{formula}. \code{by = trend} is deprecated and is treated as
+\code{by = lv_axis()}.
 }
+\section{What each form estimates}{
+
+With no latent factors, \code{lv_axis()} is each series:
+\itemize{
+\item \code{~ x:lv_axis()} gives a slope of \code{x} per series.
+\item \code{~ lv_axis()} gives a level per series.
+\item \code{~ (1 + x | lv_axis())} gives levels and slopes that are
+partially pooled across series.
+\item \code{~ s(x, by = lv_axis())} gives a smooth of \code{x} per series,
+and \code{~ s(x, lv_axis(), bs = "fs")} gives smooths that share a
+smoothness penalty.
+}
+With \code{n_lv} latent factors, each of these is estimated once per
+factor. The coefficient of one factor has no scale of its own: the
+loadings and the factor effects trade scale, and their product is
+what the data identify. \code{\link[=conditional_effects]{conditional_effects()}} and \code{\link[=predict]{predict()}}
+report that product, the effect of the covariate on a series. Pass
+\code{series = "all"} to \code{\link[=conditional_effects]{conditional_effects()}} for a panel per series.
+}
+
 \examples{
-# `lv_axis()` is a formula sentinel; on its own it returns
-# NULL invisibly.
+# `lv_axis()` marks a term in a formula. Called by itself it
+# returns NULL.
 lv_axis()
 
 \dontrun{
-# ---- Non-factor mode (no `n_lv`) ----
-# The validator rewrites `by = lv_axis()` to `by = series`
-# internally, so each series gets its own smooth on the trend
-# side. Use this when you want per-series flexibility without
-# the factor-loading machinery.
 set.seed(1)
 dat <- sim_mvgam(
-  family       = poisson(),
+  family       = gaussian(),
   n_series     = 3L,
-  n_timepoints = 120L
+  n_timepoints = 60L
 )$data_train
+# `x` differs among the series at each time. `season` takes one
+# value per time, and its effect here differs among the series.
+dat$season <- sin(2 * pi * dat$time / 12)
+dat$y <- dat$y + c(1, 0.5, -1)[as.integer(dat$series)] * dat$season
 
-mod_nonfac <- mvgam(
-  formula       = y ~ 0,
-  trend_formula = ~ s(x, k = 5, by = lv_axis()) + AR(p = 1),
+# ---- No latent factors ----
+# A slope of `x` for each series
+mod_slopes <- mvgam(
+  formula       = y ~ 1,
+  trend_formula = ~ x:lv_axis() + AR(p = 1),
   data          = dat,
-  family        = poisson(),
+  family        = gaussian(),
   chains        = 2,
-  iter          = 750,
-  warmup        = 500,
   silent        = 2
 )
-summary(mod_nonfac)
-conditional_effects(mod_nonfac)
+summary(mod_slopes)
+conditional_effects(mod_slopes)
 
-# ---- Factor mode (`n_lv` set on the trend constructor) ----
-# `by = lv_axis()` stays as a per-factor marker; mvgam emits a
-# factor-model Stan program with `n_lv` per-factor smooths and a
-# loading matrix Z[s, k] that maps factors to species. The
-# per-species smooth response is sum over k of Z[s, k] * the
-# factor-k smooth contribution. This is the ordination-on-the-
-# trend pattern that powers `jsdgam()`. Here we show only the
-# generated Stan code so the example stays light; consult
-# [jsdgam()] for fitted-model examples of the factor case.
-mf_factor <- mvgam_formula(
-  formula       = y ~ 0,
-  trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR(n_lv = 2)
+# A smooth of `x` for each series
+mod_smooths <- mvgam(
+  formula       = y ~ 1,
+  trend_formula = ~ s(x, k = 5, by = lv_axis()) + AR(p = 1),
+  data          = dat,
+  family        = gaussian(),
+  chains        = 2,
+  silent        = 2
 )
-cat(stancode(mf_factor, data = dat, family = poisson()))
+conditional_effects(mod_smooths)
+
+# ---- Two latent factors ----
+# Each factor takes its own seasonal slope, and the loadings carry
+# the two slopes to the three series. The covariate takes one value
+# per time, as every term of this trend formula must.
+mod_factors <- mvgam(
+  formula       = y ~ 1,
+  trend_formula = ~ season:lv_axis() + AR(p = 1, n_lv = 2),
+  data          = dat,
+  family        = gaussian(),
+  chains        = 2,
+  silent        = 2
+)
+# The seasonal effect on each series. With no `series` argument
+# the panel shows the first series alone.
+conditional_effects(mod_factors, series = "all")
+
+# The series column is refused in a trend term
+try(mvgam(
+  formula       = y ~ 1,
+  trend_formula = ~ x:series + AR(p = 1),
+  data          = dat,
+  family        = gaussian(),
+  run_model     = FALSE
+))
 }
 
+}
+\seealso{
+\code{\link[=mvgam]{mvgam()}}, \code{\link[=jsdgam]{jsdgam()}}, \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}}
 }

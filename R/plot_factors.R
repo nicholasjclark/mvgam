@@ -45,13 +45,12 @@
 #'   pushed `sigma_trend[k]` itself to zero, inspect the raw
 #'   posterior of `sigma_trend[k]` via [as_draws_df.mvgam()].
 #'
-#' @details Factor paths are read from the Stan posterior,
-#'   preferring `lv_trend_tilde[t, k]` (the rotated factor
-#'   paths from free-Z factor models, in the identified
-#'   `Z_tilde` basis) and falling back to `lv_trend[t, k]` for
-#'   partial-Z fits where the user-supplied loading pattern is
-#'   preserved without rotation. Time runs along the training
-#'   grid only; out-of-sample factor draws are not displayed.
+#' @details The factor paths plotted are the identified ones. A
+#'   model identified by rotation stores them as
+#'   `lv_trend_tilde[t, k]`, and every other factor model as
+#'   `lv_trend[t, k]`. See the Identification section of the trend
+#'   constructors. Time runs along the training grid, and
+#'   out-of-sample factor draws are not shown.
 #'
 #' @seealso [as_draws_df.mvgam()], [residual_cor()], [ordinate()]
 #'

@@ -1,12 +1,11 @@
-# Tests for `s(x, by = lv_axis())` per-latent-factor smooth machinery.
+# Tests for `lv_axis()`, the axis a trend term varies along.
 # Two layers (CI):
 #   1. Unit tests for the AST detector + formula rewriter in
 #      `detect_and_rewrite_by_lv()` (cheap, no Stan).
 #   2. Validator error paths via `mvgam(... run_model = FALSE)`
 #      (validator fires before codegen).
 #
-# Stancode + standata contract tests and recovery tests against
-# cached fits live in `tests/local/test-by-lv-axis-cached-fits.R`.
+# Fitted-model tests are in `tests/local/test-factor-lv-axis.R`.
 
 # 1. AST detector unit tests -------------------------------------------
 
@@ -32,12 +31,27 @@ test_that("legacy by = trend triggers deprecation + auto-translate", {
   expect_match(deparse(res$formula), "by = \\.trend", fixed = FALSE)
 })
 
-test_that("by = series in trend_formula is hard rejected", {
-  f <- ~ s(elev, by = series) - 1
-  expect_error(
-    detect_and_rewrite_by_lv(f),
-    "'by = series' is not allowed inside 'trend_formula'"
+test_that("lv_axis() is replaced in every position of a term", {
+  f <- ~ temp:lv_axis() + (1 + temp | lv_axis()) +
+    s(temp, lv_axis(), bs = "fs") + lv_axis()
+  res <- detect_and_rewrite_by_lv(f, target = "site")
+  expect_equal(res$n_by_lv, 4L)
+  expect_equal(
+    res$formula,
+    ~ temp:site + (1 + temp | site) + s(temp, site, bs = "fs") + site,
+    ignore_formula_env = TRUE
   )
+})
+
+test_that("the series column is refused in a trend_formula term", {
+  # The trend data names the resolved axis `series` whatever the
+  # user's column is called, and both names are refused.
+  for (f in list(~ s(elev, by = series), ~ elev:site, ~ (1 | site))) {
+    expect_error(
+      detect_and_rewrite_by_lv(f, series_var = "site"),
+      "is not supported in a 'trend_formula' term"
+    )
+  }
 })
 
 test_that("no by-lv terms leaves has_by_lv FALSE", {
@@ -60,22 +74,7 @@ test_that("lv_axis() returns NULL invisibly", {
   expect_null(lv_axis())
 })
 
-# 2. Validator acceptance + factor_active rewrite ------------------------
-
-test_that("detect_and_rewrite_by_lv with factor_active=FALSE rewrites to series", {
-  f <- ~ s(elev, by = lv_axis()) - 1
-  res <- detect_and_rewrite_by_lv(f, factor_active = FALSE)
-  expect_true(res$has_by_lv)
-  expect_match(deparse(res$formula), "by = series", fixed = FALSE)
-  expect_false(grepl(".trend", deparse(res$formula), fixed = TRUE))
-})
-
-test_that("detect_and_rewrite_by_lv with factor_active=TRUE rewrites to .trend", {
-  f <- ~ s(elev, by = lv_axis()) - 1
-  res <- detect_and_rewrite_by_lv(f, factor_active = TRUE)
-  expect_true(res$has_by_lv)
-  expect_match(deparse(res$formula), "by = .trend", fixed = TRUE)
-})
+# 2. Validator acceptance ------------------------------------------------
 
 test_that("by = lv_axis() without n_lv is accepted (non-factor path)", {
   set.seed(1)
@@ -121,6 +120,25 @@ test_that("by = lv_axis() with n_lv = n_series is accepted (factor path)", {
   expect_equal(mod$trend_metadata$n_lv_for_grain, 3L)
 })
 
+test_that("lv_axis() refuses a varying covariate and a single factor", {
+  set.seed(4)
+  dat <- expand.grid(time = 1:30, series = factor(paste0("sp", 1:3)))
+  dat$elev <- rnorm(nrow(dat))
+  dat$y <- rnorm(nrow(dat))
+  refused <- function(trend_formula, ...) {
+    mvgam(y ~ 1, trend_formula = trend_formula, data = dat,
+          family = gaussian(), run_model = FALSE, silent = 2, ...)
+  }
+  # The factor grain holds one covariate value per time, and `elev`
+  # differs among the series.
+  expect_error(refused(~ elev:lv_axis() + AR(n_lv = 2)),
+               "A trend covariate varies within one time")
+  expect_error(refused(~ s(time, by = lv_axis()) + AR(n_lv = 1)),
+               "requires at least two latent factors")
+  expect_error(refused(~ elev:series + AR()),
+               "is not supported in a 'trend_formula' term")
+})
+
 test_that("by = lv_axis() with n_lv > n_series still errors", {
   set.seed(3)
   dat <- expand.grid(time = 1:30, series = paste0("sp", 1:3))
@@ -156,10 +174,6 @@ test_that("the n_lv ceiling counts series the responses define", {
 })
 
 # 3. Display-relabel: had_by_lv marker + by_lv_rewrite_tokens helper -----
-
-test_that("by_lv_rewrite_tokens returns both AST rewrite targets", {
-  expect_setequal(by_lv_rewrite_tokens(), c(".trend", "series"))
-})
 
 test_that("mvgam_had_by_lv reads the trend_metadata marker", {
   expect_false(mvgam_had_by_lv(list()))

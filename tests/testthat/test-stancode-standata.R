@@ -246,11 +246,17 @@ trend_shapes <- list(
     )
   }),
   # `by = lv_axis()` runs the trend design on the factor grain
-  by_lv = list(resp = NULL, grain = "lv", args = function() list(
-    mvgam_formula(count ~ 1,
-                  trend_formula = ~ s(x, by = lv_axis()) + AR(p = 1, n_lv = 2)),
-    data = setup_stan_test_data()$multivariate, family = poisson()
-  )),
+  by_lv = list(resp = NULL, grain = "lv", args = function() {
+    # The factor grain takes one covariate value per time
+    data <- setup_stan_test_data()$multivariate
+    data$x <- sin(data$time)
+    list(
+      mvgam_formula(count ~ 1,
+                    trend_formula = ~ s(x, by = lv_axis()) +
+                      AR(p = 1, n_lv = 2)),
+      data = data, family = poisson()
+    )
+  }),
   distributional = list(resp = NULL, args = function() list(
     mvgam_formula(bf(y ~ x, sigma ~ temperature), trend_formula = ~ RW()),
     data = setup_stan_test_data()$univariate, family = gaussian()
@@ -809,10 +815,9 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 0.5\\);", code_with_trend))
   expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~", code_with_trend))
 
-  # Post-hoc QR identification in generated quantities
-  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z_tilde = qr_thin_R\\(Z'\\)';", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] Q_tilde = qr_thin_Q\\(Z'\\)';", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend_tilde = lv_trend \\* Q_tilde';", code_with_trend))
+  # AR factors take their own coefficients and are relabelled after
+  # sampling. A rotation would mix them.
+  expect_false(grepl("qr_thin", code_with_trend, fixed = TRUE))
 
   # Generated quantities for all three families
   expect_true(stan_pattern("real b_count_Intercept = Intercept_count - dot_product\\(means_X_count, b_count\\);", code_with_trend))
@@ -879,8 +884,7 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
 
   # Post-hoc QR identification in generated quantities
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z_tilde = qr_thin_R\\(Z'\\)';", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] Q_tilde = qr_thin_Q\\(Z'\\)';", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend_tilde = lv_trend \\* Q_tilde';", code_with_trend))
+  expect_true(stan_pattern("lv_trend_tilde = lv_trend \\* Q';", code_with_trend))
 
   # ZMVN dynamics (just scaled innovations, no complex dynamics)
   expect_true(stan_pattern("lv_trend = scaled_innovations_trend;", code_with_trend))
@@ -3325,7 +3329,6 @@ test_that("loadings_prior with features only emits ARD prior on Z", {
   # the emptiness here is the structured prior displacing it rather
   # than a pattern that no longer matches anything.
   expect_length(stan_prior_on(sc, "Z"), 0L)
-  expect_match(sc, "qr_thin_R", fixed = TRUE)
 })
 
 
@@ -3397,7 +3400,6 @@ test_that("default factor model still emits the iid student_t default", {
                             "|student_t_lpdf\\(to_vector\\(Z\\)"))
   expect_false(grepl("Phi_loadings", sc, fixed = TRUE))
   expect_false(grepl("gp_exponential_cov", sc, fixed = TRUE))
-  expect_match(sc, "qr_thin_R", fixed = TRUE)
 })
 
 
@@ -4431,7 +4433,7 @@ test_that("time works as a trend covariate on the by = lv_axis() path", {
   set.seed(5)
   dat <- expand.grid(time = 1:60, series = factor(paste0("s", 1:4)))
   dat$y <- rpois(nrow(dat), 5)
-  dat$env <- rnorm(nrow(dat))
+  dat$env <- rnorm(60)[dat$time]
 
   sc_time <- paste(unlist(stancode(
     mvgam_formula(y ~ 1,
@@ -5495,7 +5497,7 @@ test_that("the stacked design names the columns the two sides share", {
   }
 
   # A per-series latent level against an observation intercept.
-  expect_match(shared(y ~ 1, ~ series + AR(p = 1)), "^X_trend:series")
+  expect_match(shared(y ~ 1, ~ lv_axis() + AR(p = 1)), "^X_trend:series")
 
   # The same covariate on both sides.
   expect_identical(shared(y ~ x, ~ x + AR(p = 1)), "X_trend:x")
@@ -5505,7 +5507,7 @@ test_that("the stacked design names the columns the two sides share", {
 
   # The placeholder for an empty observation formula is a column of
   # zeros pinned at zero, and shares a direction with nothing.
-  expect_length(shared(y ~ 0, ~ series + AR(p = 1)), 0L)
+  expect_length(shared(y ~ 0, ~ lv_axis() + AR(p = 1)), 0L)
 
   # A smooth repeated across the two formulas shares its whole basis.
   # A check over the parametric designs alone reports this pairing at

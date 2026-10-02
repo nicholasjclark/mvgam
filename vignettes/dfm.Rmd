@@ -213,12 +213,12 @@ plot(fc_known)
 ## Estimating the loadings
 
 When the grouping is unknown, a matrix of `NA` asks mvgam to estimate
-every loading. The loadings take a Student-t prior. A factor model
-with free loadings gives the same fit under any rotation of its
-factors. mvgam reports the loadings and factors in the rotation of
-Heaps & Jermyn
-([2024](https://doi.org/10.1007/s11222-024-10454-0)), which orders the
-factors and fixes their signs.
+every loading. The loadings take a Student-t prior, and the innovation
+SD of every factor is fixed at one to set the scale of the loadings.
+Because each factor has its own AR coefficient, the model
+distinguishes the factors by their dynamics, and only their order and
+signs are arbitrary. mvgam orders the factors by the variance they
+explain and gives each a positive largest loading.
 
 ```{r fit-free, results = "hide"}
 fit_free <- mvgam(
@@ -235,29 +235,36 @@ fit_free <- mvgam(
 )
 ```
 
-```{r plot-factors-free, fig.cap = "The three latent factors of the model that estimates its loadings. The first factor matches trend 1 of the simulation."}
+```{r summary-free}
+summary(fit_free)
+```
+
+`summary()` reports the loading of every series on every factor,
+where `Z[i, k]` is the loading of series `i` on factor `k`. Series 1
+to 3 load on the first factor and series 6 on the second. Series 4
+and 5 load on the third. The 95% intervals of all other loadings
+contain zero. The model recovered the simulated grouping, which it was never
+given, and the interval of each AR coefficient contains the simulated
+value of the trend its factor matches.
+
+```{r plot-factors-free, fig.cap = "The three latent factors of the model that estimates its loadings. Factors 1, 2 and 3 match trends 1, 3 and 2 of the simulation."}
 plot(fit_free, type = "factors")
 ```
 
-The first factor reproduces trend 1 and explains a similar share of
-the variance as it does in the model given the true loadings. Because
-the rotation orders factors by the variance they explain, with no
-knowledge of the simulated grouping, the second and third factors are
-mixtures of trends 2 and 3. A single factor of a model with free
-loadings seldom maps onto one process.
+Each factor explains a similar share of the variance as its trend
+does in the model given the true loadings.
 
-The dependence among series is the same under every rotation, and it
-is often the target of a factor model. `residual_cor()` computes the
-correlations that the loadings imply between each pair of series:
+The dependence among series is often the target of a factor model.
+`residual_cor()` computes the correlations that the loadings imply
+between each pair of series:
 
 ```{r plot-residcor-free, fig.cap = "Posterior median correlations among the six series, implied by the estimated loadings."}
 plot(residual_cor(fit_free))
 ```
 
-The estimated correlations recover the simulated grouping, which this
-model was never given. Series 1 to 3 are strongly correlated with one
-another, as are series 4 and 5, and series 6 is weakly correlated
-with the rest.
+The correlations show the same grouping. Series 1 to 3 are strongly
+correlated with one another, as are series 4 and 5, and series 6 is
+weakly correlated with the rest.
 
 `ordinate()` shows the same structure as a biplot. Each arrow is the
 loading of one series on the first two factors, and each numbered

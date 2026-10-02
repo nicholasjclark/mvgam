@@ -386,25 +386,43 @@ and `mvgam(trend_map = ...)` passes it to the constructor. An `NA`
 entry marks a loading to sample, and a finite entry stays on `Z`
 exactly.
 
-Sampled loadings are identified after sampling (Heaps & Jermyn 2024).
-Generated quantities compute `Z_tilde = qr_thin_R(Z')'` and
-`Q_tilde = qr_thin_Q(Z')'` and rotate the factor paths to match with
-`lv_trend_tilde = lv_trend * Q_tilde'`. A VAR factor model also
-rotates its coefficients as
-`Phi_trend_tilde[lag] = Q_tilde * Phi_trend[lag] * Q_tilde'`.
-`qr_thin_R()` returns an upper triangle with a non-negative diagonal,
-which gives `Z_tilde` a lower triangular form with a positive
-diagonal and removes the `2^k` sign modes. The factorisation is
-exact, `Z_tilde * Q_tilde == Z` in every draw, and the likelihood is
-unchanged. The per-factor coefficients `ar1_trend` and `theta1_trend`
-stay in the unrotated basis. A `trend_map` skips the rotation, which
-would corrupt the pattern it encodes. A `by = lv_axis()` smooth ties
-each factor to its own covariate effect and skips it too, and
-`sign_canonicalise_factors()` (`R/sign_canonical.R`) resolves the
-sign of those factors after sampling. `resolve_factor_loadings()`
+`factor_identification()` (`R/factor_alignment.R`) chooses how
+sampled loadings are identified, for the Stan generators and the
+post-fit step alike. The choice follows from the transforms of the
+factors that leave the model unchanged.
+
+Factors without their own coefficients (RW, VAR, ZMVN and AR with
+`coef_sharing = "shared"`) are unchanged by any rotation. Following
+Heaps & Jermyn (2024), generated quantities compute
+`Z_tilde = qr_thin_R(Z')'` and rotate the factor paths to
+`lv_trend_tilde` with the matching orthogonal matrix, which the
+program keeps local. A VAR factor model also rotates its
+coefficients to `Phi_trend_tilde`. `qr_thin_R()` returns a
+non-negative diagonal, which fixes each factor's sign. The
+factorisation is exact in every draw and the likelihood is unchanged.
+
+AR factors each take their own coefficients, and are unchanged only
+by reordering and sign flips. A rotation would mix factors with
+different dynamics and leave `ar1_trend` without a consistent label.
+`relabel_factors()` runs once where the fit is assembled. It matches
+each draw's loading columns to a reference by the largest summed
+absolute inner product, iterates the reference to the mean of the
+aligned draws, then orders the factors by the variance they
+contribute and signs each so its largest loading is positive. The
+stored draws of every parameter in `factor_indexed_pars` are
+rewritten together, and every post-fit method uses the one labelling.
+The Stan program emits no rotation for these models.
+
+A partial `trend_map` limits the relabelling to columns that share a
+template, and a column with a non-zero fixed entry keeps its sign.
+Under the multiplicative gamma process the shrinkage scales
+`Psi_diag` move with their factors and `varrho_inv` is recomputed
+from them. A partial map with a sampled
+correlation matrix, and a `by = lv_axis()` model, keep the labelling
+they were sampled in. `resolve_factor_loadings()`
 (`R/plot_helpers.R`) returns the per-draw loadings for every
-consumer: `Z_tilde` where it exists, `Z` for an unrotated fit and the
-fixed matrix for a fully fixed one.
+consumer: `Z_tilde` where it exists, `Z` otherwise and the fixed
+matrix for a fully fixed map.
 
 `mvgam(loadings_prior = ...)` replaces the iid prior on `Z` with the
 structured matrix-normal of Heaps & Jermyn (2024). A per-series

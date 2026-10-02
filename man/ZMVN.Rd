@@ -142,21 +142,34 @@ purely to help set up a model with particular error processes
 }
 \section{Identification}{
 
-Factor-model fits (\code{n_lv < n_series}) sample the loadings
-matrix \code{Z} unconstrained. Following Heaps & Jermyn (2024), generated
-quantities identify it by a thin QR decomposition. The fit saves the
-identified loadings \code{Z_tilde} with the unrotated \code{Z}, and the rotated
-factor paths \code{lv_trend_tilde} with \code{lv_trend}. Post-fit methods use
-the identified versions where they exist. \code{qr_thin_R()} gives \code{Z_tilde} a non-negative diagonal,
-which removes the \eqn{2^k} equivalent sign modes. The per-factor
-coefficients \code{ar1_trend} and \code{theta1_trend} stay in the unrotated
-basis. A VAR factor model also rotates its lag coefficients as
-\verb{Phi_trend_tilde[lag] = Q_tilde * Phi_trend[lag] * Q_tilde'}.
+A factor model with sampled loadings fits equally well under any
+reordering or sign change of its factors, and some models under any
+rotation. mvgam reports one version, chosen by the dynamics of the
+factors:
+\itemize{
+\item \code{AR()} factors each take their own coefficients, and
+a rotation would mix them. After sampling, the factors of every
+draw are reordered and signed to agree with one reference, and
+the loadings \code{Z}, the factor paths \code{lv_trend} and the
+coefficients \code{ar1_trend} or \code{theta1_trend} move together.
+Factors are numbered by the variance they explain, largest
+first.
+\item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
+\code{AR()} factors with \code{coef_sharing = "shared"}, are
+unchanged by rotation. Following Heaps & Jermyn (2024),
+generated quantities rotate each draw to lower-triangular
+loadings \code{Z_tilde} with a non-negative diagonal, and rotate the
+factor paths to \code{lv_trend_tilde}. A VAR factor model rotates
+its coefficients to \code{Phi_trend_tilde}.
+}
+Post-fit methods use the identified loadings and factor paths.
+\code{shared_variation()} and \code{residual_cor()} are the same under every
+version.
 
-A \code{trend_map} skips the QR step and keeps its fixed entries on
-\code{Z} exactly. A \code{by = lv_axis()} smooth ties each factor to its own
-covariate effect. Because a rotation would mix those effects, that
-model skips the QR step as well. For a free factor model, the \code{loadings_prior}
+A \code{trend_map} keeps its fixed entries on \code{Z} exactly, and a
+\code{by = lv_axis()} smooth ties each factor to its own covariate
+effect. Neither takes a rotation. For a model with every loading
+sampled, the \code{loadings_prior}
 argument of \code{mvgam()} replaces the default iid Student-t prior
 on \code{Z} with a structured matrix-normal prior. That prior is built
 from per-series features, pairwise distance matrices or both. See

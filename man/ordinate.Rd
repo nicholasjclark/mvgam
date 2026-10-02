@@ -60,12 +60,9 @@ interpretable factor "names" rather than variance-
 ordered axes. Requires \code{n_lv >= 2}. \code{alpha} ignored.}
 \item{\code{"promax"}}{Oblique extension of varimax that allows
 correlated rotated factors. \code{alpha} ignored.}
-\item{\code{"none"}}{Skip rotation entirely; plot raw
-posterior-median LV / Z, centred. The axes correspond
-directly to the Stan parameters
-\code{lv_trend_tilde[t, k]} and \code{Z_tilde[i, k]} (free-Z
-factor models) or \code{lv_trend} / \code{Z} (partial-Z fits),
-as discussed in Details. \code{alpha} ignored.}
+\item{\code{"none"}}{Plot the centred posterior medians of the
+identified latent variables and loadings, as described
+in Details. \code{alpha} ignored.}
 }
 For varimax / promax the axes are NOT variance-ordered, so
 the choice of \code{which_lvs} matters in a different way than
@@ -113,26 +110,18 @@ helpers; when \pkg{ggarrow} and \pkg{ggpp} are installed the
 arrows are rendered as tapered loadings.
 }
 \details{
-For sampled-Z factor models the Stan model samples an
-unconstrained loading matrix \code{Z} under a structured prior and
-then applies a thin-QR decomposition in generated quantities
-to produce a lower-triangular, positive-diagonal \code{Z_tilde}
-together with the rotated factor paths \code{lv_trend_tilde}. The
-identified \code{Z_tilde} and \code{lv_trend_tilde} are what
-\code{ordinate()} reads. Under \code{rotation = "svd"} (default) the
-axes are SVD-rotated ordination gradients, NOT the original
-Stan factors. Under \code{rotation = "varimax"} / \code{"promax"} the
-axes are rotated for sparsity rather than variance; the
-identified lower-triangular pattern is preserved in the
-underlying fit but not visible in the plot. Use
-\code{rotation = "none"} (or \code{plot_factors()}) to view the
-un-rotated identified factors directly. See Heaps and Jermyn
-(2024) for the structured-prior + post-hoc QR framework.
-
-For partial-Z fits (free entries marked \code{NA} in \code{trend_map})
-no QR rotation is applied, since rotating would overwrite
-the user-supplied entries on \code{Z}. Ordination reads \code{Z} and
-\code{lv_trend} directly in those fits.
+\code{ordinate()} starts from the identified loadings and latent
+variables of the fit. Factors that share their dynamics are
+identified by rotation to the lower-triangular \code{Z_tilde} and its
+factor paths \code{lv_trend_tilde} (Heaps and Jermyn 2024). Factors
+that take their own coefficients are identified by one ordering
+and orientation of \code{Z} and \code{lv_trend}. The Identification section
+of the trend constructors describes both. With
+\code{rotation = "svd"} (default) the axes are ordination gradients
+ordered by the variance they explain. With \code{"varimax"} or
+\code{"promax"} each axis loads on as few series as it can.
+\code{rotation = "none"} and \code{plot_factors()} show the identified
+factors themselves.
 
 A \code{trend_map} supplies the loading pattern as data, and any
 rotation other than \code{"none"} replaces it with one read off
@@ -141,11 +130,10 @@ rotation it applied; \code{plot_factors(fit)} shows the loadings
 the map declared.
 }
 \note{
-This method needs a fitted factor model. It reads the
-identified latent variables and their loadings from the
-posterior (\code{lv_trend_tilde[t, k]} and \code{Z_tilde[i, k]} for
-free-loading factor models, or \code{lv_trend} and \code{Z} when the
-loadings follow a fixed pattern).
+This method needs a fitted factor model. It uses the
+identified latent variables and their loadings: \code{lv_trend_tilde}
+and \code{Z_tilde} from a model identified by rotation, and
+\code{lv_trend} and \code{Z} from every other factor model.
 }
 \section{Known limitations}{
 

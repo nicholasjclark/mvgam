@@ -146,7 +146,7 @@ test_that("one taxonomy answers for every consumer of a name", {
     "trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
     "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
     "init_trend[1,1]", "ma_innovations_trend[1,1]",
-    "Q_tilde[1,1]", "z_1[1,1]",
+    "z_1[1,1]",
     "L_Omega_trend[1,1]", "A_trend[1,1,1]",
     "Phi_trend[1,1,1]", "Sigma_trend[1,1]",
     "lscale_1[1]", "zs_1_1[1]", "Z[1,1]", "Z_tilde[1,1]"
@@ -174,7 +174,7 @@ test_that("one taxonomy answers for every consumer of a name", {
   # `Phi_trend`. `residual_cor()` takes each one from the raw draws.
   expect_identical(
     pars[kind == "internal"],
-    c("ma_innovations_trend[1,1]", "Q_tilde[1,1]", "z_1[1,1]",
+    c("ma_innovations_trend[1,1]", "z_1[1,1]",
       "L_Omega_trend[1,1]", "A_trend[1,1,1]")
   )
   # The per-cell matrices a reader interprets, which

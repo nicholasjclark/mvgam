@@ -111,12 +111,10 @@ test_that("matrix with all-NA row passes (every entry free)", {
   expect_true(all(is.na(out$Z[1L, ])))
 })
 
-test_that("fully-free Z passes validation (Heaps QR identifies it)", {
-  # All-NA matrix must be explicitly numeric (NA defaults to
-  # logical, which the matrix branch rejects). Fully-free
-  # columns are identified up to sign by the post-hoc QR
-  # rotation emitted in generate_factor_model(); no warning
-  # about unfixed columns is raised at validation time.
+test_that("a trend_map with every entry free passes validation", {
+  # An all-NA matrix must be numeric: a bare NA is logical, which the
+  # matrix branch refuses. Free columns are identified after
+  # sampling, and validation raises no warning about them.
   Z_in <- matrix(NA_real_, nrow = 3L, ncol = 2L)
   expect_no_warning(
     out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
@@ -147,7 +145,7 @@ test_that("data.frame missing the trend column errors", {
   tm <- data.frame(series = c("s1", "s2", "s3"))
   expect_error(
     mvgam:::normalise_trend_map(tm, .make_data(3L)),
-    "not found"
+    "Absent: 'trend'"
   )
 })
 
@@ -192,7 +190,7 @@ test_that("data.frame with duplicate series errors", {
   )
   expect_error(
     mvgam:::normalise_trend_map(tm, .make_data(3L)),
-    "duplicate"
+    "Duplicated: 's1'"
   )
 })
 

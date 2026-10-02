@@ -23,7 +23,7 @@
 #   1. `trend_formula = ~ elev + AR(p = 1)`. The trend carries a
 #      covariate and no intercept, so the placeholder is the only
 #      constant in the model and is identified.
-#   2. `trend_formula = ~ series + AR(p = 1)`. The trend carries a
+#   2. `trend_formula = ~ lv_axis() + AR(p = 1)`. The trend carries a
 #      per-series intercept, whose span already contains the
 #      constant the placeholder adds. This is the VAR article's
 #      shape, and it is where a free placeholder would reach the
@@ -191,7 +191,7 @@ fit_cached <- function(name, trend) {
 }
 
 fit_free <- fit_cached("free", ~ elev + AR(p = 1))
-fit_conf <- fit_cached("conf", ~ series + AR(p = 1))
+fit_conf <- fit_cached("conf", ~ lv_axis() + AR(p = 1))
 
 
 test_that("the summary shows no name the user cannot look up", {
@@ -256,7 +256,7 @@ test_that("prediction and forecasting run on an empty design", {
 
 
 test_that("the constant mvgam adds is identified against the trend", {
-  # The block the file exists for. `~ series + AR(p = 1)` gives the
+  # The block the file exists for. `~ lv_axis() + AR(p = 1)` gives the
   # trend one intercept per series, whose span already contains any
   # constant. A free placeholder beside them was an exact ridge: it
   # correlated at -1.000 with every trend intercept, each carried a

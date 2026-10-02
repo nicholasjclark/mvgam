@@ -2,13 +2,13 @@
 #'
 #' @description
 #' Side-by-side comparison of the posterior-median species loadings
-#' (`Z_tilde`) from two latent-factor `mvgam` / `jsdgam` fits on
-#' the same set of species. The two posteriors are identified only
-#' up to rotation of the factor basis, so a direct overlay would
-#' be misleading without an alignment step. `compare_loadings()`
-#' applies the orthogonal Procrustes solution (Schoenemann 1966)
-#' that rotates `fit_b`'s posterior-median `Z_tilde` to best match
-#' `fit_a`'s in least-squares sense, then either overlays both
+#' from two latent-factor `mvgam` / `jsdgam` fits on the same set of
+#' species. Two fits need not order or orient their factors alike,
+#' and a direct overlay of their loadings would mislead.
+#' `compare_loadings()` applies the orthogonal Procrustes solution
+#' (Schoenemann 1966) that rotates the posterior-median loadings of
+#' `fit_b` to best match those of `fit_a` in the least-squares
+#' sense, then either overlays both
 #' onto a single biplot with displacement segments (default) or
 #' splits them into two facets sharing axes.
 #'
@@ -36,11 +36,10 @@
 #'   `c("fit_a", "fit_b")`.
 #' @param which_lvs Integer vector of length 2 indicating which
 #'   two latent factors to plot. Defaults to `c(1, 2)`.
-#' @param align Logical. When `TRUE` (default) `fit_b`'s
-#'   posterior-median `Z_tilde` is rotated onto `fit_a`'s basis via
-#'   orthogonal Procrustes before plotting. Set to `FALSE` to keep
-#'   both fits in their own QR-identified basis (rarely useful
-#'   except for sanity checks on rotation invariance).
+#' @param align Logical. When `TRUE` (default) the posterior-median
+#'   loadings of `fit_b` are rotated onto those of `fit_a` by
+#'   orthogonal Procrustes before plotting. `FALSE` plots each fit
+#'   with the factors it reports.
 #' @param facet Logical. When `FALSE` (default) both fits are
 #'   overlaid on the same axes in different colours, with
 #'   segments connecting the same species across fits. When
@@ -198,16 +197,15 @@ compare_loadings <- function(
       subtitle = if (align) {
         "Procrustes-aligned to a shared basis"
       } else {
-        "No alignment applied (raw QR-identified bases)"
+        "Each fit shown with its own factors"
       }
     ) +
     mvgam_theme()
 }
 
 
-# Posterior-median species loadings matrix [n_species x n_lv] from
-# the QR-identified `Z_tilde` slice of the posterior. Errors with
-# a friendly message when the fit has no factor model.
+# Posterior-median identified loadings, [n_species x n_lv]. Errors
+# when the fit has no factor model.
 #'@noRd
 extract_median_Z <- function(object) {
   n_lv <- detect_factor_n_lv(object)
