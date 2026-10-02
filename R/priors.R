@@ -221,23 +221,25 @@ generate_trend_priors <- function(trend_model, base_formula, data,
   bind_brmsprior_rows(prior_list)
 }
 
-#' Row-bind brmsprior data frames with column-schema union
+#' Row-bind `brmsprior` tables whose columns differ
 #'
-#' brms's prior data frames carry slightly different columns depending
-#' on which generator built them (the obs side picks up newer columns
-#' like `tag` from brms; the trend side and mvgam-internal generators
-#' may not). dplyr::bind_rows fills missing columns with NA, which
-#' lets this helper accept future brms schema additions without
-#' tracking each column individually.
+#' brms builds prior tables with different columns: the observation
+#' side has newer columns such as `tag`, and a bare `prior()` row
+#' lacks them. Every table is padded
+#' to the union of the columns by `align_brmsprior_schemas()`.
 #'
-#' @param prior_list List of brmsprior / data.frame objects.
-#' @return brmsprior object with all rows row-bound and columns unioned.
+#' @param prior_list List of `brmsprior` tables. `NULL` entries are
+#'   dropped.
+#' @return One `brmsprior`, or `NULL` when the list holds no table.
 #' @noRd
 bind_brmsprior_rows <- function(prior_list) {
-  checkmate::assert_list(prior_list, min.len = 1)
-  combined <- dplyr::bind_rows(prior_list)
-  class(combined) <- c("brmsprior", "data.frame")
-  combined
+  checkmate::assert_list(prior_list)
+  prior_list <- Filter(Negate(is.null), prior_list)
+  if (!length(prior_list)) {
+    return(NULL)
+  }
+  combined <- do.call(rbind, align_brmsprior_schemas(prior_list))
+  structure(combined, class = c("brmsprior", "data.frame"))
 }
 
 #' Prior rows for the parameters a trend samples
@@ -273,7 +275,7 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
   }
 
   if (length(monitor_params) == 0) {
-    return(create_empty_brmsprior())
+    return(brms::empty_prior())
   }
 
   # Generate prior specifications for each parameter
@@ -451,61 +453,31 @@ get_parameter_type_default_prior <- function(param_name) {
   } else if (grepl("sigma.*_trend$", param_name)) {
     # Variance parameters: positive with lower bound
     return(list(prior = "", lb = "0", ub = ""))
-  } else if (grepl("L_Omega.*_trend$", param_name)) {
-    # Correlation matrix Cholesky factors
-    return(list(prior = "", lb = "", ub = ""))
   } else if (grepl("theta.*_trend$", param_name)) {
     # Theta parameters (e.g., CAR): typically bounded [0, 1]
     return(list(prior = "", lb = "0", ub = "1"))
   } else if (grepl("alpha_cor.*_trend$", param_name)) {
     # Alpha correlation parameters (hierarchical mixing): bounded [0, 1]
     return(list(prior = "", lb = "0", ub = "1"))
-  } else if (grepl("A[0-9]+_trend$", param_name)) {
-    # VAR coefficient matrices
-    return(list(prior = "", lb = "", ub = ""))
-  } else if (grepl("^[AD]mu_trend$", param_name)) {
-    # VAR/VARMA hyperprior means (Amu_trend, Dmu_trend)
-    return(list(prior = "", lb = "", ub = ""))
   } else if (grepl("^[AD]omega_trend$", param_name)) {
-    # VAR/VARMA hyperprior precisions (Aomega_trend, Domega_trend) - positive
+    # VAR/VARMA hyperprior precisions (Aomega_trend, Domega_trend)
     return(list(prior = "", lb = "0", ub = ""))
-  } else if (grepl(".*_trend$", param_name)) {
-    # Generic trend parameter
-    return(list(prior = "", lb = "", ub = ""))
-  } else if (param_name == "Z") {
-    # Factor loading matrix (factor models)
-    return(list(prior = "", lb = "", ub = ""))
-  } else {
-    # Other parameters (non-trend parameters in mixed contexts)
-    return(list(prior = "", lb = "", ub = ""))
   }
-}
-
-#' Create Empty brmsprior Object
-#'
-#' @return Empty brmsprior data frame
-#' @noRd
-create_empty_brmsprior <- function() {
-  # Delegate to brms so the empty schema always tracks the current
-  # brmsprior columns (e.g. `tag` added in recent brms versions). Any
-  # mvgam-internal prior rows that get appended downstream will inherit
-  # the canonical column set instead of drifting away from brms.
-  brms::empty_prior()
+  # Every other parameter is unbounded with Stan's default prior:
+  # correlation Cholesky factors, VAR coefficient matrices and their
+  # hyperprior means, and the loadings `Z`.
+  list(prior = "", lb = "", ub = "")
 }
 
 # =============================================================================
-# SECTION 3: TREND-SPECIFIC PRIOR CUSTOMIZATION (OPTIONAL)
+# SECTION 3: TREND-SPECIFIC PRIOR RESOLVERS
 # =============================================================================
-# WHY: While the integrated system handles most cases automatically via
-# monitor_params, some trends may need custom prior logic. These functions
-# provide trend-specific customization when the default parameter-type-based
-# approach isn't sufficient.
+# `get_default_trend_parameter_prior()` looks up a function named
+# `get_<trend>_parameter_prior()` for the trend being built. A resolver
+# returns a prior, bounds or both for the parameters whose default
+# depends on the trend, and NULL for every other parameter.
 
-# Note: These functions are optional. If they don't exist, the system falls
-# back to parameter-type-based defaults. This provides flexibility while
-# maintaining the convention-based approach.
-
-#' Get CAR-Specific Parameter Prior (Optional Customization)
+#' CAR bounds for its damping coefficient
 #'
 #' @param param_name Character string parameter name
 #' @param trend_obj mvgam_trend object
@@ -513,18 +485,12 @@ create_empty_brmsprior <- function() {
 #' @noRd
 get_car_parameter_prior <- function(param_name, trend_obj) {
   # A continuous-time damping coefficient is raised to a real power,
-  # so Stan declares it strictly inside the unit interval rather than
-  # on it. This branch tested the suffix-less `ar1`, a name no trend
-  # monitors, so it never fired and the reported bounds were the
-  # ordinary autoregressive ones, putting most of the reported mass
-  # outside the support the model actually samples on. The
-  # distribution itself comes from the shared default, as elsewhere.
+  # and Stan declares it strictly inside the unit interval. The shared
+  # default supplies the distribution.
   if (identical(param_name, "ar1_trend")) {
     return(list(prior = "", lb = "0.001", ub = "0.999"))
   }
-
-  # Return NULL to use default parameter-type handling
-  return(NULL)
+  NULL
 }
 
 #' Get PW-Specific Parameter Prior
@@ -571,22 +537,7 @@ combine_obs_trend_priors <- function(obs_priors, trend_priors) {
   checkmate::assert_class(obs_priors, "brmsprior", null.ok = TRUE)
   checkmate::assert_class(trend_priors, "brmsprior", null.ok = TRUE)
 
-  # Handle null cases
-  if (is.null(obs_priors) && is.null(trend_priors)) {
-    return(NULL)
-  }
-  if (is.null(obs_priors)) {
-    return(trend_priors)
-  }
-  if (is.null(trend_priors)) {
-    return(obs_priors)
-  }
-
-  aligned <- align_brmsprior_schemas(list(obs_priors, trend_priors))
-  combined <- rbind(aligned[[1L]], aligned[[2L]])
-
-  # Return standard brms prior object
-  structure(combined, class = c("brmsprior", "data.frame"))
+  bind_brmsprior_rows(list(obs_priors, trend_priors))
 }
 
 
@@ -715,8 +666,7 @@ brmsprior_key_cols <- c("class", "coef", "group", "resp", "dpar",
 #' `lb`, `ub`). brms convention: an empty user-side key field (e.g.
 #' `coef = ""`) is a wildcard that matches every row of that class.
 #' Matched rows have their `prior` string replaced and `source` set
-#' to `"user"`. Unmatched user rows are reported back so the caller
-#' can warn.
+#' to `"user"`. A user row matching no default is appended.
 #'
 #' @param default_priors A `brmsprior` data frame; the table to merge
 #'   onto. Must include a `source` column.
@@ -726,10 +676,7 @@ brmsprior_key_cols <- c("class", "coef", "group", "resp", "dpar",
 #'   matched row. Defaults to `"user"`; the family-default overlay
 #'   passes `"default"` so `get_prior()` still reports those rows as
 #'   defaults rather than as something the user asked for.
-#' @return A list with two elements:
-#'   * `priors` -- the merged `brmsprior` data frame
-#'   * `unmatched` -- a character vector of `class` strings for user
-#'     rows that did not match any default row
+#' @return The merged `brmsprior` data frame
 #' @noRd
 merge_user_priors <- function(default_priors, user_priors,
                               source = "user") {
@@ -737,14 +684,13 @@ merge_user_priors <- function(default_priors, user_priors,
   checkmate::assert_class(user_priors, "brmsprior", null.ok = TRUE)
   checkmate::assert_string(source, min.chars = 1L)
   if (is.null(user_priors) || nrow(user_priors) == 0L) {
-    return(list(priors = default_priors, unmatched = character(0L)))
+    return(default_priors)
   }
   key_cols <- intersect(
     brmsprior_key_cols,
     intersect(names(default_priors), names(user_priors))
   )
   is_wildcard <- function(x) is.na(x) | !nzchar(as.character(x))
-  unmatched_classes <- character(0L)
   unmatched_rows <- list()
   for (i in seq_len(nrow(user_priors))) {
     row <- user_priors[i, , drop = FALSE]
@@ -765,8 +711,6 @@ merge_user_priors <- function(default_priors, user_priors,
       # Unmatched user row: keep it (brms convention is to preserve
       # user rows even when no default exists, e.g. mvgam-managed
       # `ar1_trend` / `sigma_trend` that the brms pipeline strips).
-      # Tagged for the caller's warning, then appended below.
-      unmatched_classes <- c(unmatched_classes, row$class)
       unmatched_rows[[length(unmatched_rows) + 1L]] <- row
     }
   }
@@ -783,11 +727,7 @@ merge_user_priors <- function(default_priors, user_priors,
     }))
     default_priors <- rbind(default_priors, appended)
   }
-  list(
-    priors = structure(default_priors,
-                         class = c("brmsprior", "data.frame")),
-    unmatched = unmatched_classes
-  )
+  structure(default_priors, class = c("brmsprior", "data.frame"))
 }
 
 
@@ -811,7 +751,7 @@ overlay_family_default_priors <- function(obs_priors, formula, family) {
   if (is.null(defaults) || nrow(defaults) == 0L) {
     return(obs_priors)
   }
-  merge_user_priors(obs_priors, defaults, source = "default")$priors
+  merge_user_priors(obs_priors, defaults, source = "default")
 }
 
 
@@ -824,9 +764,7 @@ overlay_family_default_priors <- function(obs_priors, formula, family) {
 #'   4. Layer the user's full `priors = ` argument over the result,
 #'      marking matched rows as `source = "user"` so mvgam-managed
 #'      trend overrides (sigma_trend, ar1_trend, etc.) that the brms
-#'      pipeline strips are still recorded on the fit. Unmatched user
-#'      rows are silently retained (the warning path lives in
-#'      `get_prior.mvgam()` so fitting itself stays quiet).
+#'      pipeline strips are still recorded on the fit.
 #'
 #' @param obs_priors The obs-side `brmsprior` from `setup_brms_lightweight()`.
 #' @param trend_priors The trend-side `brmsprior` from `setup_brms_lightweight()`,
@@ -853,7 +791,7 @@ assemble_stored_prior_table <- function(obs_priors, trend_priors,
     brms_owned = paste0(brms_trend, "_trend")
   )
   if (!is.null(user_prior) && nrow(user_prior) > 0L) {
-    lifted <- merge_user_priors(lifted, user_prior)$priors
+    lifted <- merge_user_priors(lifted, user_prior)
   }
   # Hidden on the table the fit stores and `prior_summary()` returns.
   # The code generator reads another table, which keeps the pin.
@@ -1004,327 +942,192 @@ disable_trend_prior_autoscale <- function(priors) {
 }
 
 
-#' Strip the `_trend` suffix from the keys of a `brmsprior` table so
-#' the remaining rows can be merged back into a brms-only prior set.
-#' Used by the trend-side prior pipeline to hand off
-#' brms-managed parameters once mvgam's dynamics rows have been
-#' factored out via `filter_priors_by_side()`.
+#' The user's priors on the trend formula's own terms, as brms names them
+#'
+#' `filter_priors_by_side()` leaves the rows scoped to the trend. They
+#' are checked against the table `get_prior()` shows for the model.
+#' mvgam then handles the rows for the parameters the trend
+#' constructor samples. The rest belong to the brms model of the trend
+#' formula, which names its classes with no `_trend` suffix.
 #'
 #' @param trend_priors `brmsprior` rows scoped to the trend formula.
 #' @param trend_specs Trend specifications from `mv_spec`.
 #' @param base_formula The trend formula with mvgam constructors removed.
-#' @param data Data frame; passed through to brms for prior validation.
+#' @param data The trend-grain data frame.
+#' @param codegen A list from `mvgam_codegen_options()`, or NULL.
 #' @return `brmsprior` with the `_trend` suffix stripped, or NULL when
-#'   the input is empty.
+#'   no row belongs to brms.
 #' @noRd
-remove_trend_suffix_from_priors <- function(trend_priors, trend_specs, base_formula, data) {
+remove_trend_suffix_from_priors <- function(trend_priors, trend_specs,
+                                            base_formula, data,
+                                            codegen = NULL) {
   checkmate::assert_class(trend_priors, "brmsprior", null.ok = TRUE)
   checkmate::assert_list(trend_specs, null.ok = TRUE)
   checkmate::assert_class(base_formula, "formula")
   checkmate::assert_data_frame(data, min.rows = 1)
-  
+
   if (is.null(trend_priors) || nrow(trend_priors) == 0) {
     return(NULL)
   }
-  
-  # Get all mvgam-generated parameters from trend system
-  mvgam_generated_params <- get_all_mvgam_trend_parameters(trend_specs)
-  
-  # Filter out mvgam-generated parameters - they belong to mvgam, not brms
-  is_brms_compatible <- !trend_priors$class %in% mvgam_generated_params
-  
-  if (!any(is_brms_compatible)) {
+  trend_priors <- check_trend_priors(
+    trend_priors,
+    generate_trend_priors(trend_spec_head(trend_specs), base_formula,
+                          data, codegen),
+    get_all_mvgam_trend_parameters(trend_specs)
+  )
+  result <- trend_priors[!attr(trend_priors, "constructor"), , drop = FALSE]
+  if (nrow(result) == 0L) {
     return(NULL)
   }
-  
-  # Keep only brms-compatible parameters and remove _trend suffix
-  result <- trend_priors[is_brms_compatible, , drop = FALSE]
   result$class <- gsub("_trend$", "", result$class)
   result <- disable_trend_prior_autoscale(result)
-  
+
   structure(result, class = c("brmsprior", "data.frame"))
 }
 
 
-
-#' Convert brmsprior row to Stan distribution string
+#' Check the user's trend priors against the trend's parameters
 #'
-#' Takes a single row from a brmsprior data frame and extracts the prior
-#' specification as a clean Stan distribution string suitable for use in
-#' Stan model code. All brms prior functions include prior strings, so no
-#' fallback is needed.
+#' Each row must match a row of the table `get_prior()` shows. A prior
+#' on a class the model lacks, such as `sigma_trend` under `PW()`,
+#' would otherwise be dropped unseen. The bounds of a parameter the
+#' trend constructor samples are fixed by its Stan declaration. A
+#' class-wide row is dropped with a warning when every coefficient of
+#' the class has a prior of its own, which is how brms sets the
+#' length-scale of each `gp()` term.
 #'
-#' @param prior_row Data frame with exactly one row containing brmsprior
-#'   specification. Must have a 'prior' column with valid prior string.
-#'
-#' @return Character string containing Stan distribution syntax like
-#'   "normal(0, 1)" or "exponential(2)".
-#'
+#' @param priors The user's rows scoped to the trend
+#' @param defaults The trend rows of `get_prior()`
+#' @param constructor_classes Classes the trend constructor samples
+#' @return The rows the model will use, with a logical `constructor`
+#'   attribute marking the rows mvgam handles
 #' @noRd
-map_prior_to_stan_string <- function(prior_row) {
-  # Input validation
-  checkmate::assert_data_frame(prior_row, nrows = 1)
-
-  # Validate required column exists
-  if (!"prior" %in% names(prior_row)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Input {.field prior_row} must contain a 'prior' column"
-      )
-    ))
+check_trend_priors <- function(priors, defaults, constructor_classes) {
+  cell <- intersect(setdiff(brmsprior_key_cols, c("coef", "lb", "ub")),
+                    intersect(names(priors), names(defaults)))
+  # `c()` on a `brmsprior` adds priors. The columns are taken from a
+  # plain list.
+  key <- function(tab, cols) {
+    cols <- lapply(unclass(tab)[cols], function(x) {
+      ifelse(is.na(x), "", as.character(x))
+    })
+    do.call(paste, c(cols, sep = "\r"))
   }
-
-  # Extract prior string
-  extracted_prior <- prior_row$prior
-
-  # Validate prior string exists and is not empty
-  if (is.null(extracted_prior) || is.na(extracted_prior) ||
-      nchar(trimws(extracted_prior)) == 0) {
+  describe <- function(tab) {
+    paste0("class = ", tab$class,
+           ifelse(nzchar(tab$coef), paste0(", coef = ", tab$coef), ""),
+           ifelse(nzchar(tab$group), paste0(", group = ", tab$group), ""))
+  }
+  refuse <- function(headline, rows, hint) {
+    lines <- describe(priors[rows, , drop = FALSE])
     stop(insight::format_error(c(
-      "Every prior needs a distribution.",
-      x = paste0("The prior for class '", prior_row$class,
-                 "' is empty.")
+      headline, stats::setNames(lines, rep("x", length(lines))), i = hint
     )), call. = FALSE)
   }
 
-  # Clean prior string
-  extracted_prior <- trimws(extracted_prior)
-
-  # Stan distribution syntax validation
-  # Check for distribution name followed by parentheses with parameters
-  stan_pattern <- "^[a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^\\(\\)]*\\)$"
-  if (!grepl(stan_pattern, extracted_prior)) {
-    warn_once(
-      paste("Prior string", shQuote(extracted_prior),
-        "may not be valid Stan syntax.",
-        "Expected format: distribution_name(parameters)"),
-      "mvgam_stan_syntax"
-    )
+  unknown <- !key(priors, c(cell, "coef")) %in% key(defaults, c(cell, "coef"))
+  if (any(unknown)) {
+    refuse("Each trend prior must match a parameter of the trend.",
+           unknown,
+           "'get_prior()' lists the classes and coefficients of the model.")
+  }
+  constructor <- priors$class %in% constructor_classes
+  has_bound <- function(x) !is.na(x) & nzchar(as.character(x))
+  bounded <- constructor & (has_bound(priors$lb) | has_bound(priors$ub))
+  if (any(bounded)) {
+    refuse("The trend sets the bounds of its own parameters.", bounded,
+           "Drop 'lb' and 'ub' from these priors.")
   }
 
-  return(extracted_prior)
-}
-
-#' Extract Prior String from brmsprior Object by Class and Coefficient
-#'
-#' Finds a matching prior in a brmsprior object based on class and coefficient
-#' names, with special handling for the _trend suffix convention used in mvgam.
-#' Implements hierarchical matching: exact match -> class default -> pattern
-#' match -> fallback.
-#'
-#' @param prior_frame A brmsprior object containing prior specifications
-#' @param class_name Character string specifying the parameter class to match
-#'   (e.g., "sigma_trend", "ar1_trend", "b")
-#' @param coef_name Character string specifying the coefficient name to match.
-#'   If NULL, matches class-level defaults. Default is NULL.
-#' @param handle_suffix Logical indicating whether to handle _trend suffix
-#'   matching. If TRUE, will attempt to match both with and without suffix.
-#'   Default is TRUE.
-#'
-#' @return Character string containing the matched prior specification, or
-#'   NULL if no match is found.
-#'
-#' @noRd
-extract_prior_string <- function(prior_frame, class_name, coef_name = NULL,
-                                 handle_suffix = TRUE) {
-  # Input validation
-  checkmate::assert_class(prior_frame, "brmsprior")
-  checkmate::assert_string(class_name, min.chars = 1)
-  checkmate::assert_string(coef_name, null.ok = TRUE)
-  checkmate::assert_logical(handle_suffix, len = 1)
-
-  # Validate required columns exist
-  required_cols <- c("prior", "class", "coef")
-  missing_cols <- setdiff(required_cols, names(prior_frame))
-  if (length(missing_cols) > 0) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "brmsprior object missing required columns: {.field {missing_cols}}"
-      )
+  # The prior each coefficient ends with: the user's row, else the
+  # default.
+  own <- defaults[nzchar(defaults$coef), , drop = FALSE]
+  given <- match(key(own, c(cell, "coef")), key(priors, c(cell, "coef")))
+  own$prior[!is.na(given)] <- priors$prior[given[!is.na(given)]]
+  unused <- vapply(seq_len(nrow(priors)), function(i) {
+    if (nzchar(priors$coef[i])) {
+      return(FALSE)
+    }
+    siblings <- own$prior[key(own, cell) == key(priors[i, ], cell)]
+    length(siblings) > 0L && all(nzchar(siblings))
+  }, logical(1L))
+  for (i in which(unused)) {
+    coefs <- own$coef[key(own, cell) == key(priors[i, ], cell)]
+    insight::format_warning(c(
+      paste0("Every coefficient of class '", priors$class[i],
+             "' has its own prior."),
+      x = paste0("The class-wide prior '", priors$prior[i],
+                 "' was dropped."),
+      i = paste0("Set it by coefficient: prior(", priors$prior[i],
+                 ", class = ", priors$class[i], ", coef = ", coefs[1L], ").")
     ))
   }
-
-  # Strategy 1: Exact class and coef match
-  if (!is.null(coef_name)) {
-    exact_match <- subset(prior_frame,
-                         class == class_name & coef == coef_name)
-    if (nrow(exact_match) > 0) {
-      return(get_best_prior_match(exact_match))
-    }
-  }
-
-  # Strategy 2: Class match with empty coef (class-level default)
-  class_default <- subset(prior_frame,
-                         class == class_name & (coef == "" | is.na(coef)))
-  if (nrow(class_default) > 0) {
-    return(get_best_prior_match(class_default))
-  }
-
-  # Strategy 3: Handle suffix matching if enabled
-  if (handle_suffix && !is.null(coef_name)) {
-    # Try matching with _trend suffix added
-    if (!grepl("_trend$", coef_name)) {
-      trend_coef <- paste0(coef_name, "_trend")
-      trend_match <- subset(prior_frame,
-                           class == class_name & coef == trend_coef)
-      if (nrow(trend_match) > 0) {
-        return(get_best_prior_match(trend_match))
-      }
-    }
-
-    # Try matching with _trend suffix removed
-    if (grepl("_trend$", coef_name)) {
-      base_coef <- gsub("_trend$", "", coef_name)
-      base_match <- subset(prior_frame,
-                          class == class_name & coef == base_coef)
-      if (nrow(base_match) > 0) {
-        return(get_best_prior_match(base_match))
-      }
-    }
-  }
-
-  # Strategy 4: Pattern matching for complex coefficient names
-  if (!is.null(coef_name)) {
-    # Create safe regex pattern from coef_name
-    safe_pattern <- gsub("([.()^${}+*?|\\\\\\[\\]])", "\\\\\\1", coef_name)
-    pattern_match <- subset(prior_frame,
-                           class == class_name & grepl(safe_pattern, coef))
-    if (nrow(pattern_match) > 0) {
-      return(get_best_prior_match(pattern_match))
-    }
-  }
-
-  # No match found
-  return(NULL)
+  structure(priors[!unused, , drop = FALSE],
+            constructor = constructor[!unused])
 }
 
-#' Get Best Prior Match from Multiple Candidates
+
+
+#' The user's prior on a class mvgam samples itself
 #'
-#' When multiple rows match the search criteria, prioritize user-specified
-#' priors over defaults and non-empty priors over empty ones.
+#' The trend constructor's parameters are set by class alone, as in
+#' `prior(exponential(2), class = sigma_trend)`.
 #'
-#' @param matches Data frame subset of brmsprior with matching rows
-#' @return Character string of best prior, or NULL if no valid prior found
+#' @param prior_frame A `brmsprior` of user priors
+#' @param class_name The class, such as `"sigma_trend"`
+#' @return The prior string, or `NULL` when the user gave none
 #' @noRd
-get_best_prior_match <- function(matches) {
-  if (nrow(matches) == 0) {
+extract_prior_string <- function(prior_frame, class_name) {
+  checkmate::assert_class(prior_frame, "brmsprior")
+  checkmate::assert_string(class_name, min.chars = 1)
+  rows <- prior_frame$class == class_name &
+    (is.na(prior_frame$coef) | !nzchar(prior_frame$coef))
+  given <- trimws(prior_frame$prior[rows])
+  given <- given[!is.na(given) & nzchar(given)]
+  if (!length(given)) {
     return(NULL)
   }
-
-  # Priority 1: User-specified priors (source != "default")
-  if ("source" %in% names(matches)) {
-    user_priors <- subset(matches, source != "default")
-    if (nrow(user_priors) > 0) {
-      matches <- user_priors
-    }
-  }
-
-  # Priority 2: Non-empty prior strings
-  non_empty <- subset(matches,
-                     !is.na(prior) & nchar(trimws(prior)) > 0)
-  if (nrow(non_empty) > 0) {
-    matches <- non_empty
-  }
-
-  # Return first (best) match
-  prior_string <- matches$prior[1]
-
-  # Handle empty/missing priors
-  if (is.na(prior_string) || nchar(trimws(prior_string)) == 0) {
-    return(NULL)
-  }
-
-  return(trimws(prior_string))
+  given[[1L]]
 }
 
 
-#' Get Trend Parameter Prior with Fallback to Common Default
+#' The prior a trend parameter is sampled under
 #'
-#' @description
-#' Centralized helper for any trend generator to access user-defined priors
-#' with automatic fallback to common defaults, so every trend type
-#' resolves its priors through one path.
+#' A user prior wins where one is given. The default comes from
+#' `get_default_trend_parameter_prior()`, which also builds the table
+#' `get_prior()` shows.
 #'
-#' @param prior A brmsprior object containing custom prior specifications, or NULL
-#' @param param_name Character string parameter name (e.g., "sigma_trend", "ar1_trend")
-#' @param trend_obj Optional mvgam_trend object. Supply it wherever a
-#'   trend type resolves a prior from its own arguments, as `PW()` does
-#'   for the changepoint scale; without it that step is skipped.
-#' @return Character string containing Stan prior distribution (e.g., "exponential(2)")
-#'   or empty string if no prior is specified (Stan will use its defaults)
-#'
-#' @details
-#' A user prior wins where one is given. Everything below that is
-#' `get_default_trend_parameter_prior()`, which is also what builds the
-#' table `get_prior()` shows, so the prior a model samples under and the
-#' prior it reports cannot come apart.
-#'
-#' This design ensures maximum extensibility - any new trend type can call this
-#' function for any parameter and get consistent behavior. New parameters can
-#' be added to `common_trend_priors` and automatically work across all trends.
-#'
-#' @seealso \code{\link{extract_prior_string}}, \code{common_trend_priors}
+#' @param prior A `brmsprior` of user priors, or NULL
+#' @param param_name The class, such as `"sigma_trend"`
+#' @param trend_obj Optional `mvgam_trend`. Supply it wherever a trend
+#'   resolves a prior from its own arguments, as `PW()` does for the
+#'   changepoint scale.
+#' @return A Stan distribution such as `"exponential(2)"`, or `""`
+#'   where Stan's default applies
 #' @noRd
 get_trend_parameter_prior <- function(prior = NULL, param_name,
                                       trend_obj = NULL) {
-  # Input validation
-  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE, .var.name = "prior")
-  checkmate::assert_character(param_name, len = 1, min.chars = 1,
-                             any.missing = FALSE, .var.name = "param_name")
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  checkmate::assert_string(param_name, min.chars = 1)
   checkmate::assert_class(trend_obj, "mvgam_trend", null.ok = TRUE)
 
-  # Strategy 1: Try user specification first
-  if (!is.null(prior)) {
-    user_prior <- extract_prior_string(prior, param_name, handle_suffix = TRUE)
-    if (!is.null(user_prior)) {
-      # Defensive check for helper function return
-      if (!is.character(user_prior)) {
-        stop(insight::format_error(
-          cli::format_inline(
-            "extract_prior_string returned non-character value for parameter {.field {param_name}}"
-          )
-        ))
-      }
-
-      # `constant()` is not a distribution. brms implements it by
-      # moving the parameter out of the parameters block and
-      # assigning it, which every emitter below would have to do
-      # too; written as a sampling statement it reaches Stan as a
-      # call to a `constant_lpdf` that does not exist, and the
-      # model fails to compile with the class name nowhere in the
-      # message. Refusing beats emitting a program that cannot
-      # build.
-      if (is_constant_prior(user_prior)) {
-        stop(insight::format_error(c(
-          paste0("A 'constant()' prior is not supported for '",
-                 param_name, "'."),
-          x = "Stan samples this parameter from a distribution.",
-          i = paste0("Give '", param_name, "' a narrow proper prior or ",
-                     "fix it through its trend constructor argument.")
-        )), call. = FALSE)
-      }
-
-      # Convert to clean Stan string
-      temp_prior_row <- data.frame(prior = user_prior, stringsAsFactors = FALSE)
-      stan_string <- map_prior_to_stan_string(temp_prior_row)
-
-      # Validate the result
-      if (!is.character(stan_string) || length(stan_string) != 1) {
-        stop(insight::format_error(
-          cli::format_inline(
-            "map_prior_to_stan_string returned invalid result for parameter {.field {param_name}}"
-          )
-        ))
-      }
-
-      return(stan_string)
-    }
+  user_prior <- if (!is.null(prior)) extract_prior_string(prior, param_name)
+  if (is.null(user_prior)) {
+    return(get_default_trend_parameter_prior(param_name, trend_obj)$prior)
   }
-
-  # Strategy 2: the default, resolved by the one chain that also
-  # builds the table `get_prior()` shows. Reading the defaults here
-  # separately is how the two surfaces came to disagree.
-  get_default_trend_parameter_prior(param_name, trend_obj)$prior
+  # brms implements `constant()` by moving the parameter out of the
+  # parameters block. Written as a sampling statement it reaches Stan
+  # as a call to `constant_lpdf`, which does not exist.
+  if (is_constant_prior(user_prior)) {
+    stop(insight::format_error(c(
+      paste0("A 'constant()' prior is not supported for '",
+             param_name, "'."),
+      x = "Stan samples this parameter from a distribution.",
+      i = paste0("Give '", param_name, "' a narrow proper prior or ",
+                 "fix it through its trend constructor argument.")
+    )), call. = FALSE)
+  }
+  user_prior
 }
 
 # =============================================================================

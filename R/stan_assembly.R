@@ -3469,8 +3469,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     # `sigma_trend` names a quantity the model derives rather than
     # samples. Refusing beats accepting one and ignoring it.
     user_sigma_prior <- !is.null(prior) &&
-      !is.null(extract_prior_string(prior, "sigma_trend",
-                                     handle_suffix = TRUE))
+      !is.null(extract_prior_string(prior, "sigma_trend"))
     if (mgp_scale && user_sigma_prior) {
       stop(insight::format_error(c(
         paste0(
@@ -4253,7 +4252,7 @@ refuse_unit_factor_priors <- function(prior, unit_factors) {
   }
   fixed <- c("sigma_trend", "L_Omega_trend")
   given <- fixed[vapply(fixed, function(cls) {
-    !is.null(extract_prior_string(prior, cls, handle_suffix = TRUE))
+    !is.null(extract_prior_string(prior, cls))
   }, logical(1L))]
   if (length(given)) {
     stop(insight::format_error(c(

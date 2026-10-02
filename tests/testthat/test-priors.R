@@ -1356,3 +1356,40 @@ test_that("get_prior refuses a factor request the trend cannot take", {
     "Factor models are not supported for CAR trends"
   )
 })
+
+
+test_that("trend priors are checked against the table get_prior() shows", {
+  defaults <- rbind(
+    brms::set_prior("exponential(2)", class = "sigma_trend"),
+    brms::set_prior("", class = "lscale_trend"),
+    brms::set_prior("inv_gamma(1.5, 0.06)", class = "lscale_trend",
+                    coef = "gpz")
+  )
+  check <- function(p) check_trend_priors(p, defaults, "sigma_trend")
+  # A class the model lacks was dropped unseen: 'nu_trend' on gaussian
+  # innovations, 'sigma_trend' under PW().
+  expect_error(check(brms::set_prior("gamma(2, 0.1)", class = "nu_trend")),
+               "class = nu_trend")
+  expect_error(
+    check(brms::set_prior("normal(0, 1)", class = "lscale_trend",
+                          coef = "gpx")),
+    "class = lscale_trend, coef = gpx"
+  )
+  # The Stan declaration keeps its own bounds whatever the row says.
+  expect_error(
+    check(brms::set_prior("exponential(5)", class = "sigma_trend", lb = 0.5)),
+    "sets the bounds"
+  )
+  # brms ignores a class-wide length-scale prior, and its own warning
+  # names the class with the suffix removed.
+  expect_warning(
+    kept <- check(brms::set_prior("inv_gamma(3, 1)", class = "lscale_trend")),
+    "class = lscale_trend, coef\\s+= gpz"
+  )
+  expect_identical(nrow(kept), 0L)
+  by_coef <- check(
+    brms::set_prior("exponential(5)", class = "sigma_trend") +
+      brms::set_prior("inv_gamma(3, 1)", class = "lscale_trend", coef = "gpz")
+  )
+  expect_identical(attr(by_coef, "constructor"), c(TRUE, FALSE))
+})

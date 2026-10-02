@@ -503,7 +503,7 @@ merge_update_priors <- function(new, old_user) {
   if (is.null(old_user) || nrow(old_user) == 0L) {
     return(new)
   }
-  combined <- do.call(rbind, align_brmsprior_schemas(list(new, old_user)))
+  combined <- bind_brmsprior_rows(list(new, old_user))
   keys <- combined[, intersect(brmsprior_key_cols, names(combined)),
                    drop = FALSE]
   keys[] <- lapply(keys, function(x) {

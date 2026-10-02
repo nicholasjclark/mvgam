@@ -286,7 +286,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
         family = gaussian(),
         prior = remove_trend_suffix_from_priors(
           trend_priors, mv_spec$trend_specs, mv_spec$base_formula,
-          trend_data
+          trend_data, codegen
         ),
         stanvars = trend_stanvars_in,
         # Mark this as the trend invocation so
