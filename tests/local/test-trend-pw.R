@@ -220,12 +220,12 @@ test_that("the trend runs on the series axis, one rate per series", {
   # adjustments. A `delta` shared across series would fit a single
   # break pattern to both and lose the per-series dynamics.
   sc <- as.character(stancode(prefit))
-  expect_true(grepl("vector[N_lv_trend] k_trend", sc, fixed = TRUE))
+  expect_true(grepl("[N_lv_trend] k_trend;", sc, fixed = TRUE))
   # A linear PW takes its level from the observation formula. The
   # `m_trend` offset belongs to logistic growth.
-  expect_false(grepl("vector[N_lv_trend] m_trend", sc, fixed = TRUE))
+  expect_false(grepl("[N_lv_trend] m_trend;", sc, fixed = TRUE))
   expect_true(grepl(
-    "matrix[N_change_trend, N_lv_trend] delta_trend", sc,
+    "[N_change_trend, N_lv_trend] delta_trend;", sc,
     fixed = TRUE
   ))
   # Linear growth by default. Both helper functions are always
@@ -626,17 +626,6 @@ test_that("the changepoint arguments reach Stan as asked", {
     max(build(n_changepoints = 6L, changepoint_range = r)$standata$t_change_trend)
   }, numeric(1))
   expect_true(all(diff(last_at) > 0))
-  # `changepoint_scale` is the prior width on the rate adjustments and
-  # reaches the program as the double exponential's scale.
-  for (sc in c(0.05, 5)) {
-    code <- as.character(stancode(build(n_changepoints = 6L,
-                                        changepoint_scale = sc)))
-    expect_match(
-      code,
-      paste0("double_exponential_lpdf\\(to_vector\\(delta_trend\\) \\| 0, ",
-             sc, "\\)")
-    )
-  }
 })
 
 
@@ -679,7 +668,7 @@ test_that("the cap the refusal names as sufficient is sufficient", {
   # The logistic form samples the offset that positions its curve
   # along the time axis, which the linear form leaves to the
   # observation intercept.
-  expect_true(grepl("vector[N_lv_trend] m_trend", sc, fixed = TRUE))
+  expect_true(grepl("[N_lv_trend] m_trend;", sc, fixed = TRUE))
 })
 
 

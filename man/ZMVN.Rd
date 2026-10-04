@@ -24,13 +24,12 @@ functionalities in \pkg{mvgam}, though note that the data need not be time
 series in this case. See examples below for further details and
 explanations.
 
-Unlike \code{\link{AR}} / \code{\link{VAR}} / \code{\link{RW}}, ZMVN
-does not require the \code{unit} values to be regularly spaced. The
-likelihood is \eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma}
-indexed by series only, so \eqn{\Delta u} never enters the math.
-Use ZMVN for spatial or otherwise non-temporal grouping factors
-where gaps in the \code{unit} axis are natural (e.g. dropped sites,
-stratified k-fold refits, irregular sampling grids).}
+ZMVN takes these values at any spacing. The likelihood is
+\eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma} indexed by
+series alone, and the gap between two units enters nowhere. Use
+ZMVN for spatial or otherwise non-temporal units, where gaps are
+natural: dropped sites, stratified k-fold refits or irregular
+sampling grids.}
 
 \item{series}{The unquoted name of the \code{factor} variable in \code{data} that
 names each row's series. Its levels fix the order of the series. A
@@ -58,9 +57,9 @@ and \code{data} then needs no \code{series} column.
 
 For example, to model counts of several species (\code{species} in
 \code{data}) at sampling sites (\code{site}) in three regions (\code{region})
-with residuals correlated within regions, specify \code{unit = site},
+with residuals correlated within regions, specify \code{time = site},
 \code{gr = region} and \code{subgr = species}. \code{mvgam()} orders the data by
-\code{unit} and builds the series as
+\code{site} and builds the series as
 
 \verb{series = interaction(gr, subgr, drop = TRUE, sep = "_",}
 \verb{lex.order = TRUE)}
@@ -147,16 +146,17 @@ reordering or sign change of its factors, and some models under any
 rotation. mvgam reports one version, chosen by the dynamics of the
 factors:
 \itemize{
-\item \code{AR()} factors each take their own coefficients, and
-a rotation would mix them. After sampling, the factors of every
-draw are reordered and signed to agree with one reference, and
-the loadings \code{Z}, the factor paths \code{lv_trend} and the
+\item \code{AR()} factors, and \code{RW()} or \code{AR()}
+factors with \code{ma = TRUE}, each take their own coefficients,
+and a rotation would mix them. After sampling, the factors of
+every draw are reordered and signed to agree with one reference,
+and the loadings \code{Z}, the factor paths \code{lv_trend} and the
 coefficients \code{ar1_trend} or \code{theta1_trend} move together.
 Factors are numbered by the variance they explain, largest
 first.
 \item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
 \code{AR()} factors with \code{coef_sharing = "shared"}, are
-unchanged by rotation. Following Heaps & Jermyn (2024),
+unchanged by rotation when they carry no moving-average term. Following Heaps & Jermyn (2024),
 generated quantities rotate each draw to lower-triangular
 loadings \code{Z_tilde} with a non-negative diagonal, and rotate the
 factor paths to \code{lv_trend_tilde}. A VAR factor model rotates

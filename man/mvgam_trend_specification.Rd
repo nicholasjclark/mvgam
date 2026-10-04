@@ -18,8 +18,6 @@ and the registry look the type up by this name.}
 \code{"time"} and \code{"series"} unless given.}
 \item{gr, subgr}{The names of the grouping and subgrouping
 columns of a hierarchical trend, or \code{"NA"}.}
-\item{cap}{The name of the carrying-capacity column that a
-logistic \code{\link[=PW]{PW()}} trend uses, \code{"cap"} unless given.}
 \item{ma}{\code{TRUE} for a moving-average term.}
 \item{cor}{\code{TRUE} for correlated innovations. A grouped trend
 always has them.}
@@ -42,6 +40,9 @@ series.}
 Gaussian, \code{NA} to estimate them.}
 \item{growth, n_changepoints, changepoint_range,
 changepoint_scale}{The arguments of \code{\link[=PW]{PW()}}.}
+\item{damped}{\code{TRUE} for an \code{\link[=LLT]{LLT()}} whose slope is damped.}
+\item{cap}{The name of the carrying-capacity column that a
+logistic \code{\link[=PW]{PW()}} trend uses, \code{"cap"} unless given.}
 }
 }
 

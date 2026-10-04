@@ -444,20 +444,13 @@ expect_axes_sound <- function(prefit, resp_names, lab, frame,
     )
   }
 
-  # `time_dis` is what `CAR()` raises its coefficient to, so it is
-  # indexed by the same time axis. One shared grid means the columns
-  # are equal, and an NA would reach a `real<lower=0>` declaration.
-  if (!is.null(sd$time_dis)) {
-    expect_identical(dim(sd$time_dis), c(n_time, n_series))
-    expect_false(anyNA(sd$time_dis),
-                 label = paste(lab, "time_dis resolved"))
-    for (col in seq_len(n_series)) {
-      expect_identical(
-        as.numeric(sd$time_dis[, col]),
-        as.numeric(sd$time_dis[, 1L]),
-        label = paste(lab, "time_dis shares one grid")
-      )
-    }
+  # The gap index runs over the time axis: `CAR()` raises its
+  # coefficient to the gap of each step. An NA would reach a
+  # `real<lower=0>` declaration.
+  if (!is.null(sd$gap_index_trend)) {
+    expect_identical(length(sd$gap_index_trend), n_time)
+    expect_false(anyNA(sd$gap_trend[sd$gap_index_trend]),
+                 label = paste(lab, "gaps resolved"))
   }
 
   # `group_inds_trend[s]` names the group the series in column `s`
@@ -1265,19 +1258,10 @@ axis_matrix <- function() {
     list("by lv / AR factor", "long",
          ~ s(time, by = lv_axis(), k = 4) + AR(p = 1, n_lv = 2),
          "sound", "uni"),
-    # `CAR()` never reaches that second grain, and the two cells
-    # below say why rather than leaving the combination untried.
-    # `time_dis` is declared `[N_time_trend, N_series_trend]` and
-    # then read as `time_dis[i, j]` against `lv_trend`'s columns, so
-    # the array is sized on one axis and subscripted on another.
-    # Nothing has to reconcile the two, because a multivariate
-    # `CAR()` takes no trend covariate and `by = lv_axis()` is one,
-    # and because a factor `CAR()` meets the registry's refusal.
-    # Pinned: the day either restriction lifts is the day the two
-    # grains have to be told apart.
+    # Without factors the latent axis is the series axis, which a
+    # `CAR()` takes. The registry refuses a factor `CAR()`.
     list("by lv / CAR", "long",
-         ~ s(env, by = lv_axis()) + CAR(), "refuse", "uni",
-         "on a single series only"),
+         ~ s(env, by = lv_axis()) + CAR(), "sound", "uni"),
     list("by lv / CAR factor", "long",
          ~ s(env, by = lv_axis()) + CAR(n_lv = 2), "refuse", "uni",
          "Factor models are not supported for CAR trends"),
@@ -1848,21 +1832,13 @@ test_that("irregular time distances agree with the time index", {
   )
 
   sorted_times <- sort(unique(d$time))
-  expect_identical(as.integer(sd$N_time_trend), length(sorted_times))
-  expect_identical(
-    dim(sd$time_dis),
-    c(length(sorted_times), as.integer(sd$N_series_trend))
-  )
-  # Every series shares one time grid, so the columns are equal by
-  # construction and one of them carries the claim. Step `t` holds
-  # the gap from `t - 1` in units of the median gap. The first step
-  # has no predecessor and holds a placeholder.
+  # Step `t` spans the gap from `t - 1` in units of the median gap.
+  # The first step has no predecessor and holds a placeholder.
   expect_equal(
-    as.numeric(sd$time_dis[-1L, 1L]),
+    as.numeric(sd$gap_trend[sd$gap_index_trend])[-1L],
     diff(sorted_times) / median(diff(sorted_times)),
     tolerance = 1e-8
   )
-  expect_false(anyNA(sd$time_dis))
 })
 
 
@@ -1886,7 +1862,7 @@ test_that("CAR gaps and the PW cap are placed by the axis seams", {
   index_time <- numeric(as.integer(sd$N_time_trend))
   index_time[sd$obs_trend_time] <- d$time
   expect_equal(
-    as.numeric(sd$time_dis[-1L, 1L]),
+    as.numeric(sd$gap_trend[sd$gap_index_trend])[-1L],
     pmax(1e-6, diff(index_time) / median(diff(times))),
     tolerance = 1e-8
   )

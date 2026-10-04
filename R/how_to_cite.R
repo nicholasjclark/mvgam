@@ -181,6 +181,33 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    harvey_llt = list(
+      text = "Harvey AC (1989). Forecasting, Structural Time Series Models and the Kalman Filter. Cambridge University Press, Cambridge.",
+      bibtex = paste(
+        "@book{harvey1989forecasting,",
+        "  title = {Forecasting, Structural Time Series Models and the {K}alman Filter},",
+        "  author = {Harvey, Andrew C.},",
+        "  publisher = {Cambridge University Press},",
+        "  address = {Cambridge},",
+        "  year = {1989}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    gardner_damped = list(
+      text = "Gardner ES and McKenzie E (1985). Forecasting trends in time series. Management Science 31, 1237-1246.",
+      bibtex = paste(
+        "@article{gardner1985forecasting,",
+        "  title = {Forecasting trends in time series},",
+        "  author = {Gardner, Everette S. and McKenzie, Ed},",
+        "  journal = {Management Science},",
+        "  volume = {31},",
+        "  pages = {1237--1246},",
+        "  year = {1985}",
+        "}",
+        sep = "\n"
+      )
+    ),
     heaps_var = list(
       text = "Heaps SE (2023). Enforcing stationarity through the prior in vector autoregressions. Journal of Computational and Graphical Statistics 32, 74-83.",
       bibtex = paste(
@@ -824,6 +851,16 @@ how_to_cite.mvgam <- function(object, ...) {
       refs = "riutort_gp"
     ),
     list(
+      detect = identical(trend_model, "LLT"),
+      text = " The latent level followed a local linear trend with a time-varying slope (Harvey 1989).",
+      refs = "harvey_llt"
+    ),
+    list(
+      detect = "ar1_slope_trend" %in% object$prior$class,
+      text = " The slope was damped toward zero (Gardner and McKenzie 1985).",
+      refs = "gardner_damped"
+    ),
+    list(
       detect = grepl("^PW", trend_model),
       text = " Piecewise dynamic trends were parameterised following Taylor and Letham (2018).",
       refs = "taylor_pw"
@@ -835,7 +872,7 @@ how_to_cite.mvgam <- function(object, ...) {
     ),
     list(
       detect = identical(identification, "relabel"),
-      text = " Each latent factor took its own autoregressive coefficients, which leaves the factors identified up to their order and signs. The factors of every posterior draw were reordered and reflected after sampling to agree with a reference (Papastamoulis and Ntzoufras 2022).",
+      text = " Each latent factor took its own autoregressive or moving-average coefficients, which leaves the factors identified up to their order and signs. The factors of every posterior draw were reordered and reflected after sampling to agree with a reference (Papastamoulis and Ntzoufras 2022).",
       refs = "papastamoulis_factor"
     ),
     list(

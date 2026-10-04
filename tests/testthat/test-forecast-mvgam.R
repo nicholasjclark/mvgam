@@ -324,9 +324,9 @@ test_that("All multivariate / PW trend types flow through dispatch", {
 })
 
 
-# ----- compute_car_forecast_time ----------------------------------
+# ----- forecast_context_car ---------------------------------------
 
-test_that("compute_car_forecast_time builds the right gap vector", {
+test_that("forecast_context_car builds the right gap vector", {
   # The fitted grid ends at 10 and has a median gap of 2. Gaps start
   # at the grid end, where every series has a state, and are in units
   # of the median gap.
@@ -336,13 +336,13 @@ test_that("compute_car_forecast_time builds the right gap vector", {
   )
   fc_grid <- list(times = list(a = c(11, 14, 16),
                                   b = c(11, 14, 16)))
-  out <- compute_car_forecast_time(fit, fc_grid,
-                                     series_levels = c("a", "b"))
+  out <- forecast_context_car(fit, NULL, fc_grid,
+                              series_levels = c("a", "b"))$time
   expect_equal(out, c(1, 3, 2) / 2)
   # A time the model was fitted on is a hindcast
   expect_error(
-    compute_car_forecast_time(
-      fit, list(times = list(a = c(10, 11), b = c(10, 11))),
+    forecast_context_car(
+      fit, NULL, list(times = list(a = c(10, 11), b = c(10, 11))),
       series_levels = c("a", "b")
     ),
     "begin after the last fitted time"
@@ -350,7 +350,7 @@ test_that("compute_car_forecast_time builds the right gap vector", {
 })
 
 
-test_that("compute_car_forecast_time steps over the union of times", {
+test_that("forecast_context_car steps over the union of times", {
   fit <- make_mock_mvgam(series_levels = c("a", "b"))
   testthat::local_mocked_bindings(
     mvgam_axes = function(object) list(time = list(values = c(2, 4, 6, 10)))
@@ -359,21 +359,21 @@ test_that("compute_car_forecast_time steps over the union of times", {
   # union 11, 12, 13.
   fc_grid <- list(times = list(a = c(11, 12),
                                   b = c(11, 13)))
-  out <- compute_car_forecast_time(fit, fc_grid,
-                                     series_levels = c("a", "b"))
+  out <- forecast_context_car(fit, NULL, fc_grid,
+                              series_levels = c("a", "b"))$time
   expect_equal(out, c(1, 1, 1) / 2)
 })
 
 
-test_that("compute_car_forecast_time ignores series with no forecast rows", {
+test_that("forecast_context_car steps over the series with forecast rows", {
   fit <- make_mock_mvgam(series_levels = c("a", "b"))
   testthat::local_mocked_bindings(
     mvgam_axes = function(object) list(time = list(values = c(2, 4, 6, 10)))
   )
   fc_grid <- list(times = list(a = c(11, 14, 16),
                                   b = integer(0L)))
-  out <- compute_car_forecast_time(fit, fc_grid,
-                                     series_levels = c("a", "b"))
+  out <- forecast_context_car(fit, NULL, fc_grid,
+                              series_levels = c("a", "b"))$time
   expect_equal(out, c(1, 3, 2) / 2)
 })
 

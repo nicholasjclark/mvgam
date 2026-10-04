@@ -6,11 +6,6 @@ trend_arma_recursC <- function(ar_lags, ma_lags, drift, A, B, innovations, linpr
     .Call(`_mvgam_trend_arma_recursC`, ar_lags, ma_lags, drift, A, B, innovations, linpreds, last_trends, h)
 }
 
-#' @noRd
-car1_recursC <- function(phi, sigma, time_dis, innovations, last_trend, h) {
-    .Call(`_mvgam_car1_recursC`, phi, sigma, time_dis, innovations, last_trend, h)
-}
-
 pw_trendC <- function(t, k, m, delta, t_change, cap, growth_type) {
     .Call(`_mvgam_pw_trendC`, t, k, m, delta, t_change, cap, growth_type)
 }

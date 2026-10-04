@@ -1430,7 +1430,7 @@ refuse_factor_request_for_trend <- function(trend_name) {
     x = info$incompatibility_reason,
     i = paste0(
       "Drop 'n_lv' and 'trend_map', or use a trend with a factor form: ",
-      registered_trend_constructors(factors_only = TRUE), "."
+      registered_trend_constructors("supports_factors"), "."
     )
   )), call. = FALSE)
 }
@@ -2276,7 +2276,7 @@ refuse_trend_formula_offset <- function(terms_obj) {
 #' Validate a trend formula
 #'
 #' Refuses a response, an offset, brms autocorrelation and addition
-#' terms, more than one trend constructor, and an exact `gp()`. The
+#' terms, `mi()`, more than one trend constructor, and an exact `gp()`. The
 #' checks walk the formula's calls. A variable such as `se_x` or
 #' `weights` is no call, and none of them refuses it.
 #'
@@ -2304,8 +2304,14 @@ validate_trend_formula <- function(formula) {
     )), call. = FALSE)
   }
 
-  # `mi()` is absent: missing-predictor imputation is allowed on the
-  # latent scale.
+  if (length(find_calls(rhs, "mi")) > 0L) {
+    stop(insight::format_error(c(
+      "'mi()' is not supported in 'trend_formula'.",
+      x = "brms imputes a 'mi()' predictor as a response of the model.",
+      i = "Impute missing trend covariates before fitting."
+    )), call. = FALSE)
+  }
+
   addition <- find_calls(rhs, brms_addition_terms)
   if (length(addition) > 0L) {
     stop(insight::format_error(c(
@@ -3655,7 +3661,7 @@ axis_record <- function(dimensions, covariates = character(0),
     has_by_lv = has_by_lv,
     had_by_lv = had_by_lv,
     n_lv_for_grain = n_lv_for_grain,
-    axes = complete_axes_grain(dimensions$axes, has_by_lv, had_by_lv)
+    axes = complete_axes_grain(dimensions$axes, has_by_lv)
   )
 }
 
@@ -3918,21 +3924,17 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     warn_zmvn_single_series(mv_spec, family, dimensions$n_series)
   }
 
-  # A CAR trend with covariates is refused on more than one series.
-  # The count is the resolved series axis, which also holds series
-  # that a grouping or the responses define with no series column.
-  if (identical(parsed_trend$trend, "CAR") &&
-      length(mv_spec$regular_terms) > 0L && dimensions$n_series > 1L) {
-    stop(insight::format_error(c(
-      "'CAR()' takes 'trend_formula' covariates on a single series only.",
-      x = paste0("The trend has ", dimensions$n_series, " series."),
-      i = "Move the covariates to the observation formula."
-    )), call. = FALSE)
+  # What a trend requires of the data, on the resolved axes
+  if (!is.null(parsed_trend$trend)) {
+    trend_method(
+      parsed_trend$trend,
+      trend_method_optional_templates[["validate_data"]],
+      default = function(...) invisible(NULL)
+    )(parsed_trend, dimensions, mv_spec)
   }
 
   # The trend formula's covariates. A response may not be one, and
-  # each has to be constant within a trend cell. A CAR trend shares no
-  # latent state across rows, and its covariates may vary.
+  # each has to be constant within a trend cell.
   covariates <- trend_formula_covariates(mv_spec$base_formula)
   offending_vars <- intersect(covariates, response_vars)
   if (length(offending_vars) > 0) {
@@ -3945,7 +3947,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   }
   time_vals <- get_time_for_grouping(data)
   series_vals <- get_series_for_grouping(data)
-  if (length(covariates) > 0 && !identical(parsed_trend$trend, "CAR")) {
+  if (length(covariates) > 0) {
     assert_trend_covariates_constant(data, covariates, parsed_trend,
                                      time_vals, series_vals,
                                      by_time = has_by_lv)
@@ -3957,6 +3959,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   completes_grid <- trend_completes_time_grid(parsed_trend)
   if (completes_grid) {
     refuse_heavy_tails_on_ragged_grid(time_vals, series_vals, parsed_trend)
+    refuse_covariates_on_ragged_grid(time_vals, series_vals, covariates)
   } else if (!has_by_lv) {
     refuse_ragged_trend_grid(time_vals, series_vals)
   }
@@ -3968,10 +3971,18 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     had_by_lv = had_by_lv, n_lv_for_grain = n_lv_for_grain
   )
 
+  # The trend's default scale priors take the responses' spread on
+  # their link scale, as brms's defaults do
+  prior_unit <- if (!is.null(family) && !is.null(mv_spec$obs_formula)) {
+    trend_prior_unit(mv_spec$obs_formula, family, data)
+  } else {
+    1
+  }
   enhanced_mv_spec <- mv_spec
   enhanced_mv_spec$trend_specs <- map_trend_specs(
     mv_spec$trend_specs, function(spec) {
       spec$dimensions <- dimensions
+      spec$prior_unit <- prior_unit
       spec
     }
   )
@@ -4116,6 +4127,33 @@ refuse_heavy_tails_on_ragged_grid <- function(time_vals, series_vals,
 }
 
 
+#' Refuse trend covariates for series observed at their own times
+#'
+#' The trend holds a state for each series at every time of the union
+#' grid. The trend's design matrix needs a covariate value in each
+#' cell added for a time a series was not observed at.
+#'
+#' @param time_vals,series_vals The resolved axes, one per row.
+#' @param covariates The trend covariates.
+#' @return `TRUE`, invisibly.
+#' @noRd
+refuse_covariates_on_ragged_grid <- function(time_vals, series_vals,
+                                             covariates) {
+  short <- ragged_series(time_vals, series_vals)
+  if (length(covariates) == 0L || length(short) == 0L) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    "Trend covariates need every series observed at every time.",
+    x = paste0("Series missing a time the others have: ",
+               paste0("'", short, "'", collapse = ", "), "."),
+    x = "The trend's design matrix needs a covariate value at those times.",
+    i = "Give each unobserved time of a series a row with response 'NA'.",
+    i = "Or move the covariates to the observation formula."
+  )), call. = FALSE)
+}
+
+
 #' Collapse a frame to one row per trend cell
 #'
 #' A trend cell is one occasion of one series. Under `by = lv_axis()`
@@ -4129,8 +4167,8 @@ refuse_heavy_tails_on_ragged_grid <- function(time_vals, series_vals,
 #' @param time_vals,series_vals The resolved axes.
 #' @param has_by_lv,n_lv_for_grain The `by = lv_axis()` grain.
 #' @param complete Whether to add a cell for each time a series has no
-#'   row at. A trend that completes its grid on several series takes
-#'   no covariates, and the added cells need none.
+#'   row at. Trend covariates are refused on such a grid, and the
+#'   added cells need none.
 #' @return A data frame sorted by time, then by series or factor.
 #' @noRd
 trend_cell_frame <- function(data, covariates, time_vals, series_vals,
@@ -4560,16 +4598,11 @@ assert_distance_names_unreserved <- function(nms) {
 }
 
 
-# Trends that carry the multiplicative gamma process column scale.
-# The scale reaches the model through `sigma_trend`, which only the
-# shared-innovation path builds, so a trend that opts out of shared
-# innovations has nowhere to put it. `PW()` and `CAR()` refuse factor
-# models outright and never reach this.
-#'@noRd
-mgp_capable_trends <- c("AR", "RW", "ZMVN")
-
-
-#' Refuse MGP column shrinkage on a trend that cannot apply it.
+#' Refuse MGP column shrinkage on a trend that cannot apply it
+#'
+#' The column scale reaches the model through `sigma_trend`, which the
+#' shared innovation system builds. A trend needs that system and
+#' factor support to take it.
 #'
 #' @param loadings_prior_spec Normalised loadings-prior spec, or NULL.
 #' @param trend Character trend name from the trend spec.
@@ -4583,13 +4616,16 @@ assert_column_shrinkage_compatible <- function(loadings_prior_spec, trend) {
     return(invisible(NULL))
   }
   trend_nm <- toupper(as.character(trend)[1L])
-  if (trend_nm %in% mgp_capable_trends) {
+  if (trend_property(trend_nm, "shared_innovations") &&
+      trend_property(trend_nm, "supports_factors")) {
     return(invisible(NULL))
   }
   stop(insight::format_error(c(
     paste0(
       "Multiplicative gamma process shrinkage applies to ",
-      paste0("'", mgp_capable_trends, "()'", collapse = ", "),
+      registered_trend_constructors(
+        c("shared_innovations", "supports_factors")
+      ),
       " trends."
     ),
     x = paste0("Got '", trend_nm, "()'.")

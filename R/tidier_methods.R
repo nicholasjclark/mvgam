@@ -42,7 +42,7 @@ generics::glance
 #'   * `"random_effect_beta"` (`ran_vals`) -- the group-level
 #'     coefficients themselves, one per level and term.
 #'   * `"trend_model_param"` (`ran_pars`) -- parameters of the trend
-#'     dynamics (`ar1_trend`, `theta_trend`, `Sigma_trend`,
+#'     dynamics (`ar1_trend`, `theta1_trend`, `Sigma_trend`,
 #'     `k_trend`, `m_trend`, `delta_trend`, etc.) and the factor
 #'     loadings.
 #'   * `"trend_beta"`, `"trend_smooth_param"`, `"trend_smooth_coef"`,

@@ -18,8 +18,12 @@ call_name <- function(e) {
   if (!is.call(e)) return("")
   head <- e[[1L]]
   if (is.name(head)) return(as.character(head))
-  # `insight::format_error` and friends.
-  if (is.call(head) && length(head) == 3L) return(as.character(head[[3L]]))
+  # `insight::format_error` and friends. A call returning a function,
+  # as `trend_method(type, task)(...)`, names nothing.
+  if (is.call(head) && length(head) == 3L &&
+      as.character(head[[1L]]) %in% c("::", ":::")) {
+    return(as.character(head[[3L]]))
+  }
   ""
 }
 

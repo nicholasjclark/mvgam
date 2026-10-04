@@ -1595,4 +1595,63 @@ test_that("contributing changes what the fevd plot draws", {
 })
 
 
+# -- Grouped VAR(2) --------------------------------------------------------
+# Each group maps its lags to coefficients jointly. Only the joint
+# mapping guarantees a stationary VAR(2).
+set.seed(12L)
+gr_lv_true <- local({
+  Phi1 <- matrix(c(0.5, 0.1, 0.2, 0.3), 2L, 2L)
+  Phi2 <- matrix(c(0.2, 0, -0.1, 0.1), 2L, 2L)
+  one_region <- function() {
+    x <- matrix(0, 130L, 2L)
+    for (t in 3:130) {
+      x[t, ] <- Phi1 %*% x[t - 1L, ] + Phi2 %*% x[t - 2L, ] + rnorm(2L, 0, 0.4)
+    }
+    x[-(1:50), ]
+  }
+  cbind(one_region(), one_region())
+})
+gr_dat <- expand.grid(time = 1:80, sp = c("a", "b"), region = c("r1", "r2"))
+gr_dat$y <- rpois(nrow(gr_dat), exp(1 + as.vector(gr_lv_true)))
+gr_fit <- cached_fit(
+  "val_mvgam_var_grouped.rds",
+  function() {
+    mvgam(y ~ 1, trend_formula = ~ VAR(p = 2, gr = region, subgr = sp),
+          data = gr_dat, family = poisson(), chains = 2L, iter = 1000L,
+          warmup = 500L, silent = 2, backend = "cmdstanr")
+  },
+  key = gr_lv_true
+)
+
+test_that("a grouped VAR(2) is stationary, block by block", {
+  dm <- posterior::as_draws_matrix(gr_fit$fit)
+  phi <- function(r, lag) {
+    matrix(as.numeric(dm[r, sprintf("Phi_trend[%d,%d,%d]", lag,
+                                     rep(1:4, 4), rep(1:4, each = 4))]), 4L)
+  }
+  modulus <- vapply(seq_len(nrow(dm)), function(r) {
+    comp <- rbind(cbind(phi(r, 1L), phi(r, 2L)), cbind(diag(4), diag(0, 4)))
+    max(Mod(eigen(comp, only.values = TRUE)$values))
+  }, numeric(1L))
+  expect_lt(max(modulus), 1)
+  # The groups do not interact
+  cross <- vapply(seq_len(nrow(dm)), function(r) {
+    max(abs(c(phi(r, 1L)[1:2, 3:4], phi(r, 1L)[3:4, 1:2],
+              phi(r, 2L)[1:2, 3:4], phi(r, 2L)[3:4, 1:2])))
+  }, numeric(1L))
+  expect_identical(max(cross), 0)
+  # The start covariance is the stationary covariance of the companion
+  # form, from the Lyapunov equation solved in R
+  r <- 1L
+  comp <- rbind(cbind(phi(r, 1L), phi(r, 2L)), cbind(diag(4), diag(0, 4)))
+  S <- matrix(as.numeric(dm[r, sprintf("Sigma_trend[%d,%d]", rep(1:4, 4),
+                                       rep(1:4, each = 4))]), 4L)
+  Q <- diag(0, 8); Q[1:4, 1:4] <- S
+  Omega <- matrix(solve(diag(64) - kronecker(comp, comp), as.vector(Q)), 8L)
+  stored <- matrix(as.numeric(dm[r, sprintf("Omega_trend[%d,%d]",
+                                            rep(1:8, 8), rep(1:8, each = 8))]), 8L)
+  expect_lt(max(abs(Omega - stored)), 1e-6)
+})
+
+
 cat("\nDone.\n")

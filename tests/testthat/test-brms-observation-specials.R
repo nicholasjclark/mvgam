@@ -195,12 +195,11 @@ test_that(
   }
 })
 
-test_that("mvgam_formula() allows mi() on trend_formula", {
-  d <- make_specials_data()
-  d$x_mi <- d$x
-  d$x_mi[c(3L, 17L, 28L)] <- NA_real_
-  expect_no_error(
-    mvgam_formula(y ~ 1, trend_formula = ~ mi(x_mi) + AR(p = 1))
+test_that("mvgam_formula() refuses mi() on trend_formula", {
+  # brms imputes a `mi()` predictor as a response of the model
+  expect_error(
+    mvgam_formula(y ~ 1, trend_formula = ~ mi(x_mi) + AR(p = 1)),
+    "'mi\\(\\)' is not supported"
   )
 })
 

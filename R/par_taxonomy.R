@@ -263,8 +263,10 @@ MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "sd", "cor", "sdgp", "lscale")
 # column scales `Psi_diag` from the increments `varrho_inv`. `residual_cor()`
 # and `shared_variation()` take all of them from
 # `posterior::as_draws_matrix(object$fit)`, which reaches the draws
-# without this projection. `scaled_innovations_trend` is the
-# innovation a forecast seed needs and is classified a state.
+# without this projection. A local linear trend samples its slope
+# scale as `sigma_slope_raw_trend`, in units of the default prior's
+# scale, and reports `sigma_slope_trend`. `scaled_innovations_trend`
+# is the innovation a forecast seed needs and is classified a state.
 #
 # The second alternation is brms's own group-level workspace, as
 # `brms:::exclude_pars_re()` lists it. brms computes the scaled
@@ -278,18 +280,20 @@ MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "sd", "cor", "sdgp", "lscale")
 # vector is a different parameter, which is aliased and kept.
 #'@noRd
 MVGAM_PAR_INTERNAL_PATTERN <- paste0(
-  "^(P_var|result_var|P_ma|result_ma|empty_theta|",
+  "^(P_var|result_var|P_ma|result_ma|",
   "ma_innovations_trend|A_trend|A_group_trend|D_trend|",
   "L_Omega_trend|L_Sigma_trend|L_Omega_global_trend|",
   "L_Omega_group_trend|L_deviation_group_trend|L_group_trend|",
-  "Z_cols|varrho_inv|Phi_loadings|L_Phi_loadings)\\[",
+  "Z_cols|varrho_inv|Phi_loadings|L_Phi_loadings|",
+  "sigma_slope_raw_trend)\\[",
   "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\["
 )
 
 #'@noRd
 MVGAM_PAR_STATE_PATTERN <- paste0(
   "^(trend|lv_trend|lv_trend_tilde|innovations_trend|",
-  "scaled_innovations_trend|init_trend|mu_trend)\\["
+  "scaled_innovations_trend|init_trend|mu_trend|slope_trend|",
+  "slope_trend_tilde|innovations_slope_trend)\\["
 )
 
 # The per-cell matrix arrays a correlated or hierarchical trend

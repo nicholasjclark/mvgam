@@ -13,9 +13,9 @@
 # counted occasions instead of measuring them fails.
 #
 # The file also pins the two structures `CAR()` refuses. A
-# continuous-time trend has no factor decomposition and no pooled
-# correlation, so `by = lv_axis()` and a `gr` / `subgr` grouping are
-# both errors rather than quietly ignored arguments.
+# continuous-time trend takes neither a factor decomposition nor a
+# pooled correlation, and `n_lv` and a `gr` / `subgr` grouping are
+# both errors.
 #
 #   data: 9 series x 26 irregular occasions, poisson
 #   times: 3, 4, 5, 7, 10, 11, 15, ... (gaps of 1, 2, 3, 4)
@@ -40,6 +40,12 @@ suppressMessages({
 # depends on no shared fixture and no build step.
 
 set.seed(808L)
+
+# The gap each step spans, from the distinct gaps and their index
+step_gaps <- function(object) {
+  sd <- object$standata
+  as.numeric(sd$gap_trend[sd$gap_index_trend])
+}
 
 n_series <- 3L
 series_levels <- c("delta", "alpha", "charlie")
@@ -118,33 +124,19 @@ test_that("the record keeps the irregular grid the user supplied", {
 })
 
 
-test_that("time_dis is the measured gap in units of the median gap", {
-  # The array the CAR recursion raises its damping to the power of.
-  # A derivation that counted occasions returns a column of ones and
-  # keeps every dimension, every index and every prior intact, so a
-  # shape check cannot see it and only the values can.
-  sd <- prefit$standata
-  td <- sd$time_dis
-  expect_identical(dim(td), c(n_time, n_series))
+test_that("the gaps are measured in units of the median gap", {
+  # The CAR recursion raises its damping to these gaps. A derivation
+  # that counted occasions returns ones and keeps every dimension,
+  # every index and every prior intact. Only the values show it.
+  td <- step_gaps(prefit)
+  expect_identical(length(td), n_time)
 
   # Step `t` holds the distance from `t - 1`. The first has no
-  # predecessor and takes 1, because Stan raises the damping to this
-  # power.
-  expected <- c(1, model_gaps)
-  expect_equal(as.numeric(td[, 1L]), as.numeric(expected))
-  expect_identical(as.numeric(td[1L, 1L]), 1)
-
-  # This is the assertion the regular fixtures cannot make: the
-  # column is not all ones.
-  expect_gt(length(unique(as.numeric(td[, 1L]))), 1L)
-  expect_gt(max(as.numeric(td[, 1L])), 1)
-
-  # Every series shares one grid, so every column is the same.
-  for (s in seq_len(n_series)) {
-    expect_equal(as.numeric(td[, s]), as.numeric(expected))
-  }
+  # predecessor and takes 1.
+  expect_equal(td, as.numeric(c(1, model_gaps)))
+  expect_gt(max(td), 1)
   # The gaps span the user's own grid
-  expect_equal(sum(as.numeric(td[-1L, 1L])) * time_scale,
+  expect_equal(sum(td[-1L]) * time_scale,
                as.numeric(max(time_vals) - min(time_vals)))
   # The same grid in another time unit gives the same gaps
   dat_scaled <- transform(dat, time = time * 7.3)
@@ -152,7 +144,7 @@ test_that("time_dis is the measured gap in units of the median gap", {
     formula = y ~ temp, trend_formula = ~ CAR(),
     data = dat_scaled, family = poisson(), run_model = FALSE, silent = 2
   )
-  expect_equal(scaled$standata$time_dis, td)
+  expect_equal(step_gaps(scaled), td)
 })
 
 
@@ -174,50 +166,27 @@ test_that("the CAR trend is sized by series, not by factor", {
 })
 
 
-test_that("a multivariate CAR refuses every trend covariate", {
-  # The rule is broader than it first looks, and worth pinning
-  # because it decides which of these models can exist at all: a CAR
-  # over more than one series takes no trend covariate of any kind.
-  # A plain smooth is refused for the same reason a factor-split one
-  # is, so `by = lv_axis()` never reaches the factor machinery here.
-  # That answers, structurally, why there is no multivariate
-  # CAR-by-factor cell to test: the covariate is refused first.
-  plain <- expect_error(
-    mvgam(
-      formula = y ~ temp,
-      trend_formula = ~ s(temp, k = 4) + CAR(),
-      data = dat, family = poisson(), run_model = FALSE, silent = 2
-    ),
-    "on a single series only"
+test_that("a multivariate CAR takes trend covariates on a shared grid", {
+  # A covariate that differs by series pins each design row to its own
+  # (time, series) cell
+  wdat <- transform(dat, w = round(rnorm(nrow(dat)), 3))
+  shared <- mvgam(
+    formula = y ~ 1, trend_formula = ~ w + CAR(cor = TRUE),
+    data = wdat, family = poisson(), run_model = FALSE, silent = 2
   )
-  expect_match(conditionMessage(plain), "trend_formula", fixed = TRUE)
+  sd <- shared$standata
+  cell <- cbind(match(wdat$time, time_vals),
+                match(as.character(wdat$series), series_levels))
+  expect_identical(unname(sd$X_trend[sd$times_trend[cell], "w"]), wdat$w)
 
-  by_lv <- expect_error(
-    mvgam(
-      formula = y ~ temp,
-      trend_formula = ~ s(temp, k = 4, by = lv_axis()) - 1 + CAR(),
-      data = dat, family = poisson(), run_model = FALSE, silent = 2
-    ),
-    "on a single series only"
+  # A series missing a time leaves a trend cell with no covariate
+  ragged <- wdat[!(wdat$series == series_levels[2L] &
+                     wdat$time == time_vals[5L]), ]
+  expect_error(
+    mvgam(formula = y ~ 1, trend_formula = ~ w + CAR(), data = ragged,
+          family = poisson(), run_model = FALSE, silent = 2),
+    "every series observed at every time"
   )
-  # The two are refused by one rule, so they carry one message. A
-  # separate wording for the factor case would mean a second layer
-  # had formed its own opinion about the same frame.
-  expect_identical(conditionMessage(by_lv), conditionMessage(plain))
-
-  # The message tells the user what does work, and that claim is
-  # checked rather than taken on trust: a single-series CAR accepts
-  # the covariate the multivariate one refuses.
-  one <- dat[as.character(dat$series) == series_levels[1L], ,
-             drop = FALSE]
-  one$series <- droplevels(one$series)
-  uni <- mvgam(
-    formula = y ~ 1, trend_formula = ~ s(temp, k = 4) + CAR(),
-    data = one, family = poisson(), run_model = FALSE, silent = 2
-  )
-  expect_identical(as.integer(uni$standata$N_series_trend), 1L)
-  expect_equal(as.numeric(uni$standata$time_dis[, 1L]),
-               as.numeric(c(1, model_gaps)))
 })
 
 
@@ -345,7 +314,7 @@ test_that("a repeated timestamp cannot collapse the damping", {
   dup_times[5L] <- dup_times[4L]
   info <- list(time_axis = list(values = as.numeric(dup_times)),
                n_series = n_series)
-  td <- mvgam:::calculate_car_time_distances(info)$time_dis
+  td <- mvgam:::calculate_car_time_distances(info)$gaps
   expect_true(all(as.numeric(td) > 0))
   expect_true(all(is.finite(as.numeric(td))))
 })
@@ -372,7 +341,7 @@ test_that("the refusals carry messages a user can act on", {
   expect_identical(as.integer(completed$standata$N_trend),
                    n_time * n_series)
   expect_identical(as.integer(completed$standata$N), nrow(ragged))
-  expect_equal(completed$standata$time_dis, prefit$standata$time_dis)
+  expect_equal(step_gaps(completed), step_gaps(prefit))
   zmvn_err <- expect_error(
     mvgam(
       formula = y ~ temp, trend_formula = ~ ZMVN(),
@@ -427,8 +396,7 @@ fit <- cached_fit(
 test_that("the fitted CAR keeps the irregular grid", {
   expect_identical(as.integer(mvgam:::mvgam_axes(fit)$time$values),
                    time_vals)
-  expect_equal(as.numeric(fit$standata$time_dis[, 1L]),
-               as.numeric(c(1, model_gaps)))
+  expect_equal(step_gaps(fit), as.numeric(c(1, model_gaps)))
 })
 
 
@@ -604,7 +572,7 @@ test_that("the CAR innovation scales with the gap it spans", {
   # stationary marginal, sigma / sqrt(1 - phi^2). Stored draws keep
   # about nine significant digits.
   dm <- posterior::as_draws_matrix(fit$fit)
-  td <- fit$standata$time_dis
+  td <- step_gaps(fit)
   for (s in seq_along(series_levels)) {
     phi <- as.numeric(dm[, paste0("ar1_trend[", s, "]")])
     sg <- as.numeric(dm[, paste0("sigma_trend[", s, "]")])
@@ -616,7 +584,7 @@ test_that("the CAR innovation scales with the gap it spans", {
       lv_i <- as.numeric(dm[, paste0("lv_trend[", i, ",", s, "]")])
       lv_p <- as.numeric(dm[, paste0("lv_trend[", i - 1L, ",", s, "]")])
       z_i <- as.numeric(dm[, paste0("innovations_trend[", i, ",", s, "]")])
-      dt <- as.numeric(td[i, s])
+      dt <- td[i]
       step <- phi^dt * lv_p +
         sg * sqrt((1 - phi^(2 * dt)) / (1 - phi^2)) * z_i
       worst <- max(worst, max(abs(lv_i - step)))
@@ -986,7 +954,7 @@ test_that("the continuous grid reaches the record as the user gave it", {
   expect_equal(as.numeric(mvgam_axes(fit_c)$time$values),
                as.numeric(sim$times))
   # The damping is raised to the measured gaps, in median-gap units
-  expect_equal(as.numeric(fit_c$standata$time_dis[, 1L]),
+  expect_equal(step_gaps(fit_c),
                as.numeric(c(1, diff(sim$times) / sim$time_scale)))
 })
 
@@ -1175,10 +1143,8 @@ test_that("the correlated CAR program is the exact continuous-time law", {
   fit_k <- cor_fit()
   k <- sim$n_series
   n_t <- length(sim$times)
-  sd <- fit_k$standata
   # One gap entry per distinct gap, in median-gap units, some below one
-  expect_equal(as.numeric(sd$gap_trend[sd$gap_index_trend][-1L]),
-               sim$gaps, tolerance = 1e-8)
+  expect_equal(step_gaps(fit_k)[-1L], sim$gaps, tolerance = 1e-8)
   expect_lt(min(sim$gaps), 1)
 
   # Ground truth is the process itself: the stored states are rebuilt

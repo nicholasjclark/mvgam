@@ -76,7 +76,7 @@ draw, where \code{Omega} is the covariance of the latent states,
 using the posterior loadings \code{Z} for the default sampled-Z
 factor model, or the user-supplied loadings broadcast across
 draws when \code{trend_map = ...} fixes Z (see \code{\link[=mvgam]{mvgam()}} /
-\code{\link[=AR]{AR()}} / \code{\link[=VAR]{VAR()}} / \code{\link[=RW]{RW()}} / \code{\link[=ZMVN]{ZMVN()}}). Taking \verb{Z Z^T} instead
+\code{\link[=AR]{AR()}} / \code{\link[=VAR]{VAR()}} / \code{\link[=RW]{RW()}} / \code{\link[=LLT]{LLT()}} / \code{\link[=ZMVN]{ZMVN()}}). Taking \verb{Z Z^T} instead
 would drop whatever scale the latent columns carry, which
 under multiplicative gamma shrinkage is the entire shrinkage.
 \item Correlated process-error trends (\code{cor = TRUE} on \code{RW()} /

@@ -3,13 +3,10 @@
 # trend constructors (RW, AR, VAR, CAR, ZMVN, PW).
 
 # =============================================================================
-# SECTION 1: TREND REGISTRY SYSTEM
+# SECTION 1: TREND REGISTRY
 # =============================================================================
-# WHY: The registry system is essential for mvgam-brms integration because
-# it enables dynamic dispatch to appropriate Stan code generators while
-# maintaining type safety and factor model compatibility validation.
-# Without centralized registration, the system cannot determine which
-# trends support factor models or locate the correct Stan code generators.
+# Each trend type records its properties and its Stan generator here.
+# `get_trend_info()` and `trend_property()` return them.
 
 # Global trend registry
 trend_registry <- new.env(parent = emptyenv())
@@ -40,6 +37,11 @@ trend_registry <- new.env(parent = emptyenv())
 #' @param completes_time_grid Logical; does the trend hold a latent
 #'   state for a series at a time the data has no row for? Such a
 #'   trend takes series observed at their own times.
+#' @param shared_innovations Logical; does the trend take its
+#'   innovations from the shared system, which emits `sigma_trend`,
+#'   `L_Omega_trend`, the grouped correlations and the multiplicative
+#'   gamma process column scale? A trend that scales its own
+#'   innovations declares them in its generator.
 #' @param generator_func Function that generates Stan code for this
 #'   trend type
 #' @param incompatibility_reason Character string explaining why factor
@@ -51,6 +53,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
                                 requires_regular_intervals,
                                 per_factor_coefficients,
                                 completes_time_grid,
+                                shared_innovations,
                                 generator_func,
                                 incompatibility_reason = NULL) {
   checkmate::assert_string(name, min.chars = 1)
@@ -63,6 +66,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
   checkmate::assert_flag(requires_regular_intervals)
   checkmate::assert_flag(per_factor_coefficients)
   checkmate::assert_flag(completes_time_grid)
+  checkmate::assert_flag(shared_innovations)
   checkmate::assert_function(generator_func,
                              args = c("trend_specs", "data_info"))
   checkmate::assert_string(incompatibility_reason,
@@ -75,6 +79,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
     requires_regular_intervals = requires_regular_intervals,
     per_factor_coefficients = per_factor_coefficients,
     completes_time_grid = completes_time_grid,
+    shared_innovations = shared_innovations,
     generator = generator_func,
     incompatibility_reason = incompatibility_reason
   )
@@ -171,6 +176,10 @@ register_core_trends <- function() {
     }
     trend_info <- properties()
     validate_trend_properties(trend_info, properties_name)
+    # A trend is registered once it defines a function for every task.
+    for (template in trend_method_templates) {
+      trend_method(trend_type, template)
+    }
     do.call(register_trend_type, c(
       list(name = trend_type,
            generator_func = get(generator_name, envir = ns)),
@@ -180,6 +189,71 @@ register_core_trends <- function() {
 
   invisible(TRUE)
 }
+
+#' The tasks each trend performs with its own function
+#'
+#' `%s` takes the lower-case trend type. `register_core_trends()`
+#' requires each trend to define all of them, and `trend_method()`
+#' finds one.
+#' @noRd
+trend_method_templates <- c(
+  monitor_params = "generate_%s_monitor_params",
+  last_state = "extract_%s_state",
+  propagate = "propagate_%s",
+  latent_rows = "render_latent_%s",
+  glossary = "glossary_%s"
+)
+
+#' The tasks a trend may perform with its own function
+#'
+#' A trend without one takes the default `trend_method()` is given.
+#' `forecast_context` returns the named arguments of
+#' `propagate_trend()` a forecast derives from the fit and the new
+#' times. `parameter_prior` returns the prior and bounds of a
+#' parameter whose default depends on the trend, or NULL.
+#' `validate_data` takes the specification, the data's resolved axes
+#' and the model specification, and refuses data the trend cannot
+#' model.
+#' @noRd
+trend_method_optional_templates <- c(
+  forecast_context = "forecast_context_%s",
+  parameter_prior = "get_%s_parameter_prior",
+  validate_data = "validate_data_%s"
+)
+
+
+#' The function a trend type supplies for one task
+#'
+#' Found by name, as `register_core_trends()` finds a trend's
+#' generator. Each task's functions share one signature.
+#'
+#' @param trend_type A registered trend type, such as `"AR"`
+#' @param template One of `trend_method_templates` or
+#'   `trend_method_optional_templates`
+#' @param default The function an optional task falls back to
+#' @return The function
+#' @noRd
+trend_method <- function(trend_type, template,
+                         default = function(...) list()) {
+  checkmate::assert_string(trend_type, min.chars = 1L)
+  checkmate::assert_choice(
+    template, c(trend_method_templates, trend_method_optional_templates)
+  )
+  name <- sprintf(template, tolower(trend_type))
+  fn <- get0(name, envir = asNamespace("mvgam"), mode = "function",
+             inherits = FALSE)
+  if (is.null(fn) && template %in% trend_method_optional_templates) {
+    return(default)
+  }
+  if (is.null(fn)) {
+    stop_mvgam_fault(
+      paste0("The '", trend_type, "' trend lacks '", name, "()'."),
+      "Each registered trend defines one function per task."
+    )
+  }
+  fn
+}
+
 
 #' Validate Trend Properties Function Output
 #'
@@ -199,7 +273,7 @@ validate_trend_properties <- function(trend_info, func_name) {
   missing_fields <- setdiff(
     c("supports_factors", "covariance_pattern", "stationary_source",
       "requires_regular_intervals", "per_factor_coefficients",
-      "completes_time_grid",
+      "completes_time_grid", "shared_innovations",
       "incompatibility_reason"),
     names(trend_info)
   )
@@ -226,6 +300,7 @@ ar_trend_properties <- function() {
     requires_regular_intervals = TRUE,
     per_factor_coefficients = TRUE,
     completes_time_grid = FALSE,
+    shared_innovations = TRUE,
     incompatibility_reason = NULL
   )
 }
@@ -241,6 +316,7 @@ rw_trend_properties <- function() {
     requires_regular_intervals = TRUE,
     per_factor_coefficients = FALSE,
     completes_time_grid = FALSE,
+    shared_innovations = TRUE,
     incompatibility_reason = NULL
   )
 }
@@ -257,8 +333,75 @@ var_trend_properties <- function() {
     requires_regular_intervals = TRUE,
     per_factor_coefficients = FALSE,
     completes_time_grid = FALSE,
+    shared_innovations = FALSE,
     incompatibility_reason = NULL
   )
+}
+
+#' LLT Trend Properties
+#'
+#' The level takes the shared innovations. Under sampled loadings the
+#' factors share one slope scale and one damping, which keeps the
+#' factors exchangeable under rotation.
+#' @noRd
+llt_trend_properties <- function() {
+  list(
+    supports_factors = TRUE,
+    covariance_pattern = "cholesky_scaled",
+    # An undamped trend has no stationary covariance, and the
+    # marginal prediction keeps the innovation covariance.
+    stationary_source = "none",
+    requires_regular_intervals = TRUE,
+    per_factor_coefficients = FALSE,
+    completes_time_grid = FALSE,
+    shared_innovations = TRUE,
+    incompatibility_reason = NULL
+  )
+}
+
+#' Refuse data too short for a local linear trend
+#'
+#' The slope variance is the variance of the level's second
+#' differences, which a short series barely informs. A time term in a
+#' formula competes with the slope for the same variation.
+#'
+#' @param spec The parsed `LLT()` specification
+#' @param dimensions The data's resolved axes
+#' @param mv_spec The model specification
+#' @return `NULL`, invisibly
+#' @noRd
+validate_data_llt <- function(spec, dimensions, mv_spec) {
+  n_time <- dimensions$n_time
+  if (n_time < 5L) {
+    stop(insight::format_error(c(
+      "'LLT()' needs at least 5 time points.",
+      x = paste0("The data have ", n_time, "."),
+      i = "Use 'RW()' for a shorter series."
+    )), call. = FALSE)
+  }
+  if (n_time < 20L) {
+    insight::format_warning(c(
+      paste0("'LLT()' on ", n_time, " time points barely informs ",
+             "'sigma_slope_trend'."),
+      i = paste0("Use 'RW()', or give 'sigma_slope_trend' an ",
+                 "informative prior.")
+    ))
+  }
+  time_var <- spec$time
+  in_formula <- time_var %in% c(
+    all.vars(mv_spec$base_formula),
+    if (!is.null(mv_spec$obs_formula)) {
+      all.vars(brms::brmsterms(mv_spec$obs_formula)$allvars)
+    }
+  )
+  if (in_formula) {
+    insight::format_warning(c(
+      paste0("'", time_var, "' appears in a formula with 'LLT()'."),
+      x = "A function of time and the latent slope explain the same variation.",
+      i = paste0("Drop the '", time_var, "' term or use 'RW()'.")
+    ))
+  }
+  invisible(NULL)
 }
 
 #' ZMVN Trend Properties
@@ -274,6 +417,7 @@ zmvn_trend_properties <- function() {
     requires_regular_intervals = FALSE,
     per_factor_coefficients = FALSE,
     completes_time_grid = FALSE,
+    shared_innovations = TRUE,
     incompatibility_reason = NULL
   )
 }
@@ -295,6 +439,7 @@ car_trend_properties <- function() {
     # Every series has a state at every time of the union grid, and a
     # time added between two others leaves the model unchanged.
     completes_time_grid = TRUE,
+    shared_innovations = FALSE,
     incompatibility_reason = paste0(
       "Continuous-time AR dynamics follow each series' own irregular ",
       "time gaps."
@@ -314,22 +459,28 @@ pw_trend_properties <- function() {
     requires_regular_intervals = TRUE,
     per_factor_coefficients = FALSE,
     completes_time_grid = FALSE,
+    shared_innovations = FALSE,
     incompatibility_reason =
       "Piecewise trends model changepoints separately for each series."
   )
 }
 
-# Internal: the trend constructors for a message, taken from the
-# registry.
-#'@noRd
-registered_trend_constructors <- function(factors_only = FALSE) {
-  checkmate::assert_flag(factors_only)
+#' The trend constructors with given properties, for a message
+#'
+#' @param require Names of logical registry properties every listed
+#'   trend holds, such as `"supports_factors"`
+#' @return Character scalar such as `"AR(), RW()"`
+#' @noRd
+registered_trend_constructors <- function(require = character(0)) {
+  checkmate::assert_character(require, any.missing = FALSE)
   ensure_registry_initialized()
-  trends <- list_trend_types()
-  if (factors_only) {
-    trends <- trends[trends$supports_factors, , drop = FALSE]
-  }
-  paste(paste0(sort(trends$trend_type), "()"), collapse = ", ")
+  trends <- ls(trend_registry)
+  keep <- vapply(trends, function(tt) {
+    all(vapply(require, function(field) {
+      isTRUE(trend_registry[[tt]][[field]])
+    }, logical(1L)))
+  }, logical(1L))
+  paste(paste0(sort(trends[keep]), "()"), collapse = ", ")
 }
 
 #' Check if Registry is Initialized
@@ -446,8 +597,8 @@ trend_stationary_source <- function(trend_type) {
 #' One registered property of a trend type
 #'
 #' A fit with no trend, which `get_trend_type()` reports as `"None"`,
-#' has neither innovations nor a stationary covariance, and every
-#' property asked of it here is `"none"`.
+#' has neither innovations nor a stationary covariance. A character
+#' property asked of it is `"none"` and a logical one `FALSE`.
 #'
 #' @param trend_type A registered trend type name, or `"None"`
 #' @param field The property's name
@@ -456,11 +607,17 @@ trend_stationary_source <- function(trend_type) {
 trend_property <- function(trend_type,
                            field = c("stationary_source",
                                      "covariance_pattern",
-                                     "per_factor_coefficients")) {
+                                     "per_factor_coefficients",
+                                     "shared_innovations",
+                                     "supports_factors")) {
   checkmate::assert_string(trend_type, min.chars = 1)
   field <- match.arg(field)
   if (identical(trend_type, "None")) {
-    return("none")
+    return(if (field %in% c("stationary_source", "covariance_pattern")) {
+      "none"
+    } else {
+      FALSE
+    })
   }
   ensure_registry_initialized()
   get_trend_info(trend_type)[[field]]
@@ -498,18 +655,12 @@ generate_monitor_params <- function(trend_spec) {
     character(0)
   }
 
-  trend_specific <- switch(trend_type,
-    "RW" = generate_rw_monitor_params(trend_spec),
-    "AR" = generate_ar_monitor_params(trend_spec),
-    "VAR" = generate_var_monitor_params(trend_spec),
-    "CAR" = generate_car_monitor_params(trend_spec),
-    "ZMVN" = character(0),
-    "PW" = generate_pw_monitor_params(trend_spec)
-  )
+  trend_specific <- trend_method(
+    trend_type, trend_method_templates[["monitor_params"]]
+  )(trend_spec)
 
-  # Add correlation parameters if enabled
-  # Note: Sigma_trend is computed from sigma_trend * L_Omega_trend in Stan,
-  # so users should not place priors on it directly
+  # The correlation factor takes a prior. `Sigma_trend` is derived
+  # from it and takes none.
   correlation_params <- if (!is_grouped && (trend_spec$cor %||% FALSE) &&
                             !samples_factor_loadings(trend_spec)) {
     "L_Omega_trend"
@@ -617,27 +768,40 @@ generate_ar_monitor_params <- function(trend_spec) {
 #' @return Character vector of VAR-specific parameters
 #' @noRd
 generate_var_monitor_params <- function(trend_spec) {
-  # VAR uses hierarchical hyperparameters following Heaps 2023 methodology
-
-  # Base VAR hyperparameters - always present
-  var_params <- c("Amu_trend", "Aomega_trend")
-
-  var_params <- c(var_params, ma_params_for(trend_spec, "VAR"))
-
-
-  # VAR uses variance-correlation decomposition (sigma_trend + L_Omega_trend)
-  # These are handled by base_params and correlation_params in the main function
-
-  return(var_params)
+  # The hyperparameters of the stationary prior of Heaps (2023).
+  # `sigma_trend` and `L_Omega_trend` come from the main list.
+  c("Amu_trend", "Aomega_trend", ma_params_for(trend_spec, "VAR"))
 }
 
 #' Generate CAR-specific monitor parameters
 #' @param trend_spec CAR trend specification
-#' @return Character vector of CAR-specific parameters
+#' @return The damping `ar1_trend`
 #' @noRd
 generate_car_monitor_params <- function(trend_spec) {
-  # CAR uses ar1_trend following standard _trend suffix convention
-  return(c("ar1_trend"))
+  "ar1_trend"
+}
+
+
+#' LLT monitor parameters
+#'
+#' The slope scale, any damping and the free initial slope.
+#' @param trend_spec LLT trend specification
+#' @return Character vector of LLT-specific parameters
+#' @noRd
+generate_llt_monitor_params <- function(trend_spec) {
+  c("sigma_slope_trend",
+    if (isTRUE(trend_spec$damped)) "ar1_slope_trend", "init_slope_trend")
+}
+
+
+#' ZMVN monitor parameters
+#'
+#' The shared innovation system declares every ZMVN parameter.
+#' @param trend_spec ZMVN trend specification
+#' @return An empty character vector
+#' @noRd
+generate_zmvn_monitor_params <- function(trend_spec) {
+  character(0)
 }
 
 
@@ -695,7 +859,7 @@ ar_coef_sharing <- function(spec) {
 
 
 # Internal: the column that holds a logistic PW model's carrying
-# capacity. `create_mvgam_trend()` records it on every spec, as the
+# capacity. `create_mvgam_trend()` records it on a `PW()` spec, as the
 # name the user gave or `"cap"`. The Stan data builder and the
 # forecast both take the name from here.
 #'@noRd
@@ -711,7 +875,7 @@ pw_cap_var <- function(spec) {
 }
 
 # =============================================================================
-# SECTION 3: MVGAM_TREND OBJECT SPECIFICATION
+# SECTION 2: THE MVGAM_TREND OBJECT
 # =============================================================================
 
 #' Fields of an mvgam_trend object
@@ -730,8 +894,6 @@ pw_cap_var <- function(spec) {
 #'     `"time"` and `"series"` unless given.}
 #'   \item{gr, subgr}{The names of the grouping and subgrouping
 #'     columns of a hierarchical trend, or `"NA"`.}
-#'   \item{cap}{The name of the carrying-capacity column that a
-#'     logistic [PW()] trend uses, `"cap"` unless given.}
 #'   \item{ma}{`TRUE` for a moving-average term.}
 #'   \item{cor}{`TRUE` for correlated innovations. A grouped trend
 #'     always has them.}
@@ -752,6 +914,9 @@ pw_cap_var <- function(spec) {
 #'     Gaussian, `NA` to estimate them.}
 #'   \item{growth, n_changepoints, changepoint_range,
 #'     changepoint_scale}{The arguments of [PW()].}
+#'   \item{damped}{`TRUE` for an [LLT()] whose slope is damped.}
+#'   \item{cap}{The name of the carrying-capacity column that a
+#'     logistic [PW()] trend uses, `"cap"` unless given.}
 #' }
 #'
 #' @section Fields model building adds:
@@ -781,12 +946,10 @@ rule_requires_regular_intervals <- "requires_regular_intervals"
 
 
 # =============================================================================
-# SECTION 4: TREND VALIDATION AND PARSING
+# SECTION 3: TREND FORMULA PARSING
 # =============================================================================
-# WHY: Trend validation ensures data integrity and prevents runtime errors
-# during Stan model compilation. Formula parsing enables complex multivariate
-# trend specifications while maintaining compatibility with brms syntax.
-# This layer bridges user-friendly R formulas to internal trend objects.
+# Turns a `trend_formula` into its trend constructor and the brms terms
+# that build the trend's linear predictor.
 
 #' Trend type registry for extensible dispatch
 #'
@@ -889,8 +1052,6 @@ eval_trend_constructor <- function(trend_call, formula_env) {
 print.mvgam_trend <- function(x, ...) {
   cat("mvgam trend specification:\n")
   cat("  Type:", x$trend, "\n")
-  cat("  Label:", x$label, "\n")
-  cat("  Parameters:", paste(x$tpars, collapse = ", "), "\n")
 
   if (!is.null(x$n_lv) && x$n_lv > 0) {
     cat("  Dynamic factors:", x$n_lv, "\n")
@@ -904,6 +1065,10 @@ print.mvgam_trend <- function(x, ...) {
     cat("  Moving average: enabled\n")
   }
 
+  if (isTRUE(x$damped)) {
+    cat("  Damped slope: enabled\n")
+  }
+
   if (named_var(x$gr)) {
     cat("  Hierarchical grouping:", x$gr, "\n")
   }
@@ -912,7 +1077,7 @@ print.mvgam_trend <- function(x, ...) {
 }
 
 # =============================================================================
-# SECTION 3: TREND CONSTRUCTOR FUNCTIONS
+# SECTION 4: TREND CONSTRUCTORS
 # =============================================================================
 # The trend constructors are the user-facing API for trend
 # specifications. Each validates its arguments, sets defaults and
@@ -923,7 +1088,8 @@ print.mvgam_trend <- function(x, ...) {
 #' Specify trend models for multivariate State-Space models in \pkg{mvgam}.
 #' These constructor functions create trend specifications for various temporal
 #' dynamics including random walks (RW), autoregressive models (AR, VAR, CAR),
-#' and piecewise trends (PW). These functions do not evaluate their arguments
+#' local linear trends (LLT) and piecewise trends (PW). These functions do not
+#' evaluate their arguments
 #' – they exist purely to help set up models with particular trend structures.
 #'
 #' @param df Degrees of freedom for the latent process innovations.
@@ -1188,6 +1354,9 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #' @rdname trend_constructors
 #'
+#' @seealso [LLT()], [PW()], [ZMVN()], [get_prior()] for the default
+#'   priors
+#'
 #' @details Use `vignette("mvgam_overview")` to see the full details of
 #'   available stochastic trend types in \pkg{mvgam}, or view the rendered
 #'   version on the package website at:
@@ -1216,16 +1385,17 @@ print.mvgam_trend <- function(x, ...) {
 #' rotation. mvgam reports one version, chosen by the dynamics of the
 #' factors:
 #' \itemize{
-#'   \item \code{AR()} factors each take their own coefficients, and
-#'     a rotation would mix them. After sampling, the factors of every
-#'     draw are reordered and signed to agree with one reference, and
-#'     the loadings `Z`, the factor paths `lv_trend` and the
+#'   \item \code{AR()} factors, and \code{RW()} or \code{AR()}
+#'     factors with \code{ma = TRUE}, each take their own coefficients,
+#'     and a rotation would mix them. After sampling, the factors of
+#'     every draw are reordered and signed to agree with one reference,
+#'     and the loadings `Z`, the factor paths `lv_trend` and the
 #'     coefficients `ar1_trend` or `theta1_trend` move together.
 #'     Factors are numbered by the variance they explain, largest
 #'     first.
 #'   \item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
 #'     \code{AR()} factors with \code{coef_sharing = "shared"}, are
-#'     unchanged by rotation. Following Heaps & Jermyn (2024),
+#'     unchanged by rotation when they carry no moving-average term. Following Heaps & Jermyn (2024),
 #'     generated quantities rotate each draw to lower-triangular
 #'     loadings `Z_tilde` with a non-negative diagonal, and rotate the
 #'     factor paths to `lv_trend_tilde`. A VAR factor model rotates
@@ -1558,6 +1728,139 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
   )
 }
 
+#' Specify local linear trends in \pkg{mvgam} models
+#'
+#' A latent level that moves with a latent growth rate, the local
+#' linear trend of Harvey (1989). Each latent process carries a level
+#' and a slope:
+#'
+#' \deqn{\mu_t = \mu_{t-1} + \beta_{t-1} + \eta_t}
+#' \deqn{\beta_t = \phi \beta_{t-1} + \zeta_t}
+#'
+#' The level shocks \eqn{\eta_t} have scale `sigma_trend` and the slope
+#' shocks \eqn{\zeta_t} scale `sigma_slope_trend`. A small
+#' `sigma_slope_trend` gives a trend that keeps its direction, and zero
+#' gives a random walk with a fixed drift. `damped = TRUE` estimates
+#' \eqn{\phi} on (0, 1) as `ar1_slope_trend`, which pulls the growth
+#' rate back toward zero over the horizon (Gardner and McKenzie 1985).
+#' The undamped trend has \eqn{\phi = 1}, and its forecasts extend the
+#' current growth rate.
+#'
+#' @inheritParams RW
+#' @param damped Logical. Estimate a damping coefficient for the
+#'   slope? Default `FALSE`.
+#'
+#' @details
+#' The level shocks take the innovation structure of `RW()`: `cor`
+#' correlates them across series, `gr` and `subgr` pool their
+#' correlations hierarchically and `df` gives them a multivariate t.
+#' The slope shocks are Gaussian and take the level's correlation
+#' matrix with scales of their own.
+#'
+#' The slope starts at a free value, `init_slope_trend`, damped or not,
+#' as in the damped trends of exponential smoothing. A series that
+#' starts with fast growth and slows is the case damping serves, and
+#' its initial slope can lie far outside the slope's stationary
+#' distribution. The level starts at its first shock, and the
+#' observation intercept carries its mean.
+#'
+#' Default priors scale with the number of time points \eqn{N} and
+#' widen by the factor \eqn{s} that brms applies to its own default
+#' scales, as [get_prior()] describes. `sigma_slope_trend` takes a
+#' half-Student-t with 3 degrees of freedom. Its scale gives the
+#' trend's movement over the series from the slope shocks a standard
+#' deviation with prior median \eqn{s}, and the movement itself a 90th
+#' percentile near \eqn{2.8 s}. The scale accounts for the damping at the median of its
+#' prior. `init_slope_trend ~ normal(0, 2 / r)`, where \eqn{r = 1 +
+#' \phi + \dots + \phi^{N - 2}} is how far a unit initial slope moves the
+#' level by the end of the series, gives the initial slope \eqn{2 s} of
+#' growth over the series at one prior standard deviation. An undamped
+#' slope has \eqn{r = N - 1}. A factor model with every loading sampled
+#' measures both in units of its level's spread over the series,
+#' \eqn{\sqrt{N}}, and its loadings carry \eqn{s}. `ar1_slope_trend` takes `beta(18, 2)`, with median
+#' 0.91. `get_prior()` prints the resolved values.
+#'
+#' A smooth or linear function of time in either formula competes with
+#' the slope for the same variation, and `mvgam()` warns when the time
+#' variable appears in one. The slope variance is weakly identified on
+#' short series: `LLT()` warns below 20 time points and refuses fewer
+#' than 5. On informative data, such as large counts, a chain started
+#' at random can stall far from the posterior. `init = "pathfinder"`
+#' in [mvgam()] starts every chain from Stan's Pathfinder
+#' approximation.
+#'
+#' In a factor model with every loading sampled, the loadings set
+#' each factor's scale and the level shocks take unit scale. The
+#' factors share one `sigma_slope_trend` and one `ar1_slope_trend`,
+#' which leaves the model unchanged under a rotation of the factors,
+#' and the QR rotation that `RW()` factors take identifies the
+#' loadings. A trend with no level noise then needs an infinite slope
+#' scale, and a factor model always keeps some level noise. A
+#' `trend_map` that fixes loadings keeps one slope scale per factor.
+#'
+#' @return An object of class `mvgam_trend`.
+#'
+#' @references
+#' Harvey, A. C. (1989). \emph{Forecasting, Structural Time Series
+#' Models and the Kalman Filter}. Cambridge University Press.
+#'
+#' Gardner, E. S. and McKenzie, E. (1985). Forecasting trends in time
+#' series. \emph{Management Science}, 31:1237-1246.
+#'
+#' @seealso [RW()], [PW()], [trend_constructors], [get_prior()] for the
+#'   scale of the default priors, [forecast.mvgam()]
+#'
+#' @examples
+#' \dontrun{
+#' # A series that grows, then levels off
+#' set.seed(4)
+#' n_t <- 80
+#' growth <- cumsum(c(0.08, rnorm(n_t - 1, 0, 0.01))) * exp(-(1:n_t) / 60)
+#' dat <- data.frame(
+#'   time = 1:n_t,
+#'   series = factor("s1"),
+#'   y = rpois(n_t, exp(1 + cumsum(growth) + rnorm(n_t, 0, 0.1)))
+#' )
+#'
+#' mod <- mvgam(
+#'   y ~ 1,
+#'   trend_formula = ~ LLT(damped = TRUE),
+#'   data = dat[1:70, ],
+#'   family = poisson(),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#' summary(mod)
+#'
+#' # The damped slope bends the forecast toward a level
+#' fc <- forecast(mod, newdata = dat[71:80, ])
+#' plot(fc)
+#'
+#' # How strongly the slope is damped
+#' mcmc_plot(mod, variable = "ar1_slope_trend", type = "hist")
+#' }
+#'
+#' @export
+LLT <- function(time = NA, series = NA, damped = FALSE, cor = NULL,
+                gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL,
+                df = Inf) {
+  checkmate::assert_flag(damped)
+  assert_trend_map_input(trend_map)
+
+  create_mvgam_trend(
+    "LLT",
+    df = assert_trend_df(df),
+    .time = substitute(time),
+    .series = substitute(series),
+    .gr = substitute(gr),
+    .subgr = substitute(subgr),
+    damped = damped,
+    cor = cor,
+    n_lv = n_lv,
+    trend_map = trend_map
+  )
+}
+
 #' Specify piecewise linear or logistic trends in \pkg{mvgam} models
 #'
 #' Set up piecewise linear or logistic trend models in \code{mvgam}. These
@@ -1577,12 +1880,17 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' @param changepoint_range Proportion of history in \code{data} in which trend
 #'   changepoints will be estimated. Defaults to `0.8` for the first 80%.
 #'
-#' @param changepoint_scale Parameter modulating the flexibility of the
-#'   automatic changepoint selection by altering the scale parameter of a
-#'   Laplace distribution. The resulting prior will be
-#'   `double_exponential(0, changepoint_scale)`. Large values will allow many
-#'   changepoints and a more flexible trend, while small values will allow few
-#'   changepoints. Default is `0.05`.
+#' @param changepoint_scale A positive number: the typical change in
+#'   growth at one changepoint over the whole series, as in Prophet, in
+#'   link units for linear growth and in logits for logistic growth.
+#'   For a series of `N` time points the prior on each per-step rate
+#'   change is `double_exponential(0, s * changepoint_scale / N)`,
+#'   where `s` is the factor [get_prior()] describes for linear growth
+#'   and 1 for logistic growth. Larger values give a more flexible trend. The default of `0.3`
+#'   gives the ten default changepoints a prior median movement of the
+#'   level of about half a unit over the series, the movement the
+#'   [LLT()] slope prior allows. Prophet's own default of `0.05` holds a
+#'   link-scale trend close to a straight line.
 #'
 #' @param growth Character string specifying either `'linear'` or `'logistic'`
 #'   growth of the trend. If `'logistic'`, the `cap` argument must specify the
@@ -1596,6 +1904,9 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #'
 #' @references Taylor, Sean J., and Benjamin Letham. "Forecasting at scale."
 #'   The American Statistician 72.1 (2018): 37–45.
+#'
+#' @seealso [LLT()] for a trend whose growth changes continuously,
+#'   [get_prior()] for the scale of the default priors
 #'
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #'   arguments to be interpreted by the parsing functions in \code{mvgam}.
@@ -1612,6 +1923,16 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' expectation at the `cap` you supply when the observation formula
 #' omits its intercept (`y ~ -1` or `y ~ 0 + ...`). An intercept
 #' there raises the ceiling above `cap`.
+#'
+#' *Priors*:
+#' Time runs in steps `1, ..., N`, and the default priors are set on
+#' the span of the series. The base growth rate takes
+#' `k_trend ~ normal(0, 2 s / (N - 1))`, two units of growth over the
+#' series at one standard deviation, where \eqn{s} is the factor
+#' [get_prior()] describes for linear growth and 1 for logistic
+#' growth. The logistic inflection takes
+#' `m_trend ~ normal((N + 1) / 2, N / 2)`, centred on the middle of the
+#' series. [get_prior()] shows the values for a given model.
 #'
 #' *Logistic growth and the cap variable*:
 #' Many growing series approach a ceiling, such as a total market size,
@@ -1656,13 +1977,18 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #'
 #' @export
 PW <- function(time = NA, series = NA, cap = NA, n_changepoints = 10,
-              changepoint_range = 0.8, changepoint_scale = 0.05,
+              changepoint_range = 0.8, changepoint_scale = 0.3,
               growth = 'linear', n_lv = NULL, trend_map = NULL) {
   # Validate arguments
   growth <- match.arg(growth, choices = c('linear', 'logistic'))
   checkmate::assert_number(changepoint_range, lower = 0, upper = 1)
   checkmate::assert_int(n_changepoints, lower = 1)
-  checkmate::assert_number(changepoint_scale, lower = 0)
+  if (!checkmate::test_number(changepoint_scale, finite = TRUE) ||
+      changepoint_scale <= 0) {
+    stop(insight::format_error(
+      "'changepoint_scale' must be a positive number."
+    ), call. = FALSE)
+  }
 
   # A factor request written on the constructor is refused here.
   # `CAR()` uses the same helper.
@@ -1699,13 +2025,12 @@ PW <- function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'   series in this case. See examples below for further details and
 #'   explanations.
 #'
-#'   Unlike \code{\link{AR}} / \code{\link{VAR}} / \code{\link{RW}}, ZMVN
-#'   does not require the `unit` values to be regularly spaced. The
-#'   likelihood is \eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma}
-#'   indexed by series only, so \eqn{\Delta u} never enters the math.
-#'   Use ZMVN for spatial or otherwise non-temporal grouping factors
-#'   where gaps in the `unit` axis are natural (e.g. dropped sites,
-#'   stratified k-fold refits, irregular sampling grids).
+#'   ZMVN takes these values at any spacing. The likelihood is
+#'   \eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma} indexed by
+#'   series alone, and the gap between two units enters nowhere. Use
+#'   ZMVN for spatial or otherwise non-temporal units, where gaps are
+#'   natural: dropped sites, stratified k-fold refits or irregular
+#'   sampling grids.
 #'
 #' @param gr An optional grouping `factor` in `data` that sets up
 #'   hierarchical residual correlations. The correlation matrix of each
@@ -1729,9 +2054,9 @@ PW <- function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'
 #'   For example, to model counts of several species (`species` in
 #'   `data`) at sampling sites (`site`) in three regions (`region`)
-#'   with residuals correlated within regions, specify `unit = site`,
+#'   with residuals correlated within regions, specify `time = site`,
 #'   `gr = region` and `subgr = species`. `mvgam()` orders the data by
-#'   `unit` and builds the series as
+#'   `site` and builds the series as
 #'
 #'   `series = interaction(gr, subgr, drop = TRUE, sep = "_",`
 #'   `lex.order = TRUE)`
@@ -1823,11 +2148,9 @@ ZMVN <- function(time = NA, series = NA, gr = NA, subgr = NA,
 }
 
 # =============================================================================
-# SECTION 6: TREND CONSTRUCTOR HELPER FUNCTIONS
+# SECTION 5: TREND CONSTRUCTOR HELPERS
 # =============================================================================
-# WHY: These helper functions simplify trend constructor development and
-# ensure consistency across all trend types. They provide universal defaults,
-# automatic validation rule assignment, and standardized creation patterns.
+# The defaults and checks every trend constructor shares.
 
 #' Get Universal mvgam Trend Defaults
 #'
@@ -1937,31 +2260,26 @@ create_mvgam_trend <- function(trend_type, ...,
     deparsed
   }
 
-  # Process all variables consistently
   time_var <- process_arg(.time)
   series_var <- process_arg(.series)
   gr_var <- process_arg(.gr)
   subgr_var <- process_arg(.subgr)
-  cap_var <- process_arg(.cap)
-
-  # Handle default variable names
   if (time_var == "NA") time_var <- "time"
   if (series_var == "NA") series_var <- "series"
 
-  # Handle cap default
-  if (cap_var == "NA") cap_var <- "cap"
-
-
-  # Create base trend object
   trend_obj <- list(
     trend = trend_type,
     time = time_var,
     series = series_var,
     gr = gr_var,
     subgr = subgr_var,
-    cap = cap_var,
     ...
   )
+  # A carrying capacity belongs to the constructor that names one
+  if (!is.null(.cap)) {
+    cap_var <- process_arg(.cap)
+    trend_obj$cap <- if (cap_var == "NA") "cap" else cap_var
+  }
 
   # The arguments the constructors share, checked once for all of
   # them

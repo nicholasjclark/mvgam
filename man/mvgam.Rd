@@ -2,7 +2,7 @@
 % Please edit documentation in R/mvgam_core.R
 \name{mvgam}
 \alias{mvgam}
-\title{mvgam Function with Single-Fit Architecture}
+\title{Fit a Bayesian multivariate state-space model}
 \usage{
 mvgam(
   formula,
@@ -224,7 +224,7 @@ whatever \code{threads} says. brms moves the \code{mu} assignment inside
 \code{partial_log_lik_lpmf} when it threads, where mvgam cannot add
 the trend to it, so the program is built without threading.
 This holds for every trend model under a brms-native family:
-\code{RW()}, \code{AR()}, \code{VAR()}, \code{VARMA()}, \code{ZMVN()}, \code{CAR()} and
+\code{RW()}, \code{AR()}, \code{VAR()}, \code{LLT()}, \code{ZMVN()}, \code{CAR()} and
 \code{PW()}. Each fit that drops the request warns, so a batch
 script that fits repeatedly shows it every time.}
 
@@ -288,11 +288,14 @@ them is faster and leaves the posterior unchanged. \code{save_model}
 names a file to write the assembled Stan program to.}
 }
 \value{
-mvgam object with dual brmsfit-like structure
+An object of class \code{mvgam}.
 }
 \description{
-mvgam implementation using single-fit dual-object architecture
-with native multiple imputation support and brms ecosystem integration.
+Fits the model in Stan. The observation \code{formula} takes brms syntax,
+and \code{trend_formula} adds a latent dynamic process, such as a random
+walk or an autoregression, with predictors of its own. A list of
+multiply imputed data frames fits the model to each frame and pools
+the draws.
 }
 \examples{
 \dontrun{

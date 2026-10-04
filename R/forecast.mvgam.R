@@ -1046,33 +1046,15 @@ build_forecast_arms <- function(object, trend_model, meta,
     )
   }
 
-  # CAR forecasts need a per-step time-gap vector for the
-  # kernel's `time_dis` parameter. Computed once here because
-  # both inputs (per-series last training time + the forecast
-  # time grid) are deterministic across draws -- moving this
-  # inside the per-draw loop would re-derive the same gaps
-  # `ndraws_use` times. NULL for non-CAR trends.
-  fc_time <- if (identical(meta$trend_type, "CAR")) {
-    compute_car_forecast_time(object, fc_grid, series_levels)
-  } else {
-    NULL
-  }
+  # What the trend's kernel takes from the new times, the same in
+  # every draw: CAR's gaps, PW's times and capacities.
+  context <- trend_method(
+    meta$trend_type, trend_method_optional_templates[["forecast_context"]]
+  )(object, training, fc_grid, series_levels)
   # One step per time of the union, which exceeds a single series'
   # count when the series are forecast at their own times
-  if (!is.null(fc_time)) {
-    h_max <- length(fc_time)
-  }
-
-  # PW forecasts evaluate a piecewise function at user-
-  # supplied forecast times. Pre-compute the shared
-  # absolute-time vector for the horizon and the training
-  # time range that drives the changepoint frequency; these
-  # are deterministic across draws, like CAR's gap vector.
-  pw_extras <- if (identical(meta$trend_type, "PW")) {
-    compute_pw_forecast_extras(object, training, fc_grid,
-                                 series_levels)
-  } else {
-    NULL
+  if (!is.null(context$time)) {
+    h_max <- length(context$time)
   }
 
   # Factor-model precompute: when the fit is a latent-factor model
@@ -1143,8 +1125,7 @@ build_forecast_arms <- function(object, trend_model, meta,
       trend_lp_fc = trend_lp_fc,
       obs_struct_tail = obs_struct_tail,
       obs_struct_fc = obs_struct_fc,
-      fc_time = fc_time,
-      pw_extras = pw_extras,
+      context = context,
       Z_slice = Z_slice_d
     )
     trend_flat[i, ] <- flatten_grid_to_obs_order(fc_link_d,
@@ -1187,8 +1168,7 @@ propagate_one_draw <- function(object, trend_model, meta,
                                  h_max, n_series,
                                  trend_lp_tail, trend_lp_fc,
                                  obs_struct_tail, obs_struct_fc,
-                                 fc_time = NULL, pw_extras = NULL,
-                                 Z_slice = NULL) {
+                                 context = list(), Z_slice = NULL) {
   ls_d <- extract_last_state(object, d_state,
                                 draws_mat = draws_mat)
   max_lag <- as.integer(meta$max_lag %||% 0L)
@@ -1214,23 +1194,6 @@ propagate_one_draw <- function(object, trend_model, meta,
     trend_lp_fc, obs_struct_fc, d_lin, h_max, n_series
   )
 
-  # PW evaluates a closed-form Prophet-style curve at
-  # user-supplied times rather than running a recursion, so it
-  # needs the PW-specific extras and no latent state.
-  if (identical(meta$trend_type, "PW")) {
-    fc_pw <- propagate_trend(
-      trend_model = trend_model,
-      params = ls_d$params,
-      h = h_max,
-      n_series = n_series,
-      fc_times = pw_extras$fc_times,
-      training_times = pw_extras$training_times,
-      cap = pw_extras$cap,
-      changepoint_range = meta$pw_changepoint_range
-    )
-    return(fc_pw + lp_forecast)
-  }
-
   # Factor mode: propagate at the LV grain `extract_last_state()`
   # returned (n_lv columns instead of n_series), then project
   # back to series scale with `apply_factor_projection()`.
@@ -1246,14 +1209,11 @@ propagate_one_draw <- function(object, trend_model, meta,
     ls_d$last_state$trends <- ls_d$last_state$trends - lp_history
   }
 
-  fc_lv <- propagate_trend(
-    trend_model = trend_model,
-    params = ls_d$params,
-    h = h_max,
-    n_series = n_prop,
-    last_state = ls_d$last_state,
-    time = fc_time
-  )
+  fc_lv <- do.call(propagate_trend, c(
+    list(trend_model = trend_model, params = ls_d$params, h = h_max,
+         n_series = n_prop, last_state = ls_d$last_state),
+    context
+  ))
   fc_series <- if (in_factor_mode) {
     apply_factor_projection(fc_lv, Z_slice, n_series)
   } else {
@@ -1340,15 +1300,15 @@ shared_across_series <- function(per_series, trend) {
 }
 
 
-# Internal: per-step time gaps for a CAR forecast, in the unit the fit
-# measured its own gaps in. Every series is stepped together over the
-# union of the forecast times, from its state at the last occasion of
-# the fitted grid, and each series is then reported at its own times.
-# A series whose last responses are missing has a state at the last
-# occasion too.
+# Internal: the per-step time gaps of a CAR forecast, as `time`, in
+# the unit the fit measured its own gaps in. Every series is stepped
+# together over the union of the forecast times, from its state at the
+# last occasion of the fitted grid, and each series is then reported
+# at its own times. A series whose last responses are missing has a
+# state at the last occasion too.
 #'@noRd
-compute_car_forecast_time <- function(object, fc_grid,
-                                        series_levels) {
+forecast_context_car <- function(object, training, fc_grid,
+                                 series_levels) {
   time_axis <- mvgam_axes(object)$time
   origin <- max(time_axis$values)
   for (lv in series_levels) {
@@ -1367,20 +1327,22 @@ compute_car_forecast_time <- function(object, fc_grid,
   horizon <- sort(unique(as.numeric(
     unlist(fc_grid$times[series_levels], use.names = FALSE)
   )))
-  car_scaled_gaps(diff(c(origin, horizon)), car_time_scale(time_axis))
+  list(time = car_scaled_gaps(diff(c(origin, horizon)),
+                              car_time_scale(time_axis)))
 }
 
 
-# Internal: extras the PW kernel needs for its closed-form
-# evaluation:
+# Internal: what the PW kernel evaluates its closed form at:
 #   * `fc_times`: shared horizon time vector (one per step).
 #   * `training_times`: training time vector (drives the
 #     Prophet-style horizon-changepoint frequency).
 #   * `cap`: forecast-horizon carrying capacities [h, n_series]
 #     for the logistic growth path; NULL for linear.
+#   * `changepoint_range`: the share of the history that holds
+#     changepoints.
 #'@noRd
-compute_pw_forecast_extras <- function(object, training,
-                                          fc_grid, series_levels) {
+forecast_context_pw <- function(object, training, fc_grid,
+                                series_levels) {
   fc_times <- shared_across_series(
     lapply(series_levels, function(lv) {
       sort(unique(as.numeric(fc_grid$times[[lv]])))
@@ -1416,7 +1378,8 @@ compute_pw_forecast_extras <- function(object, training,
 
   list(fc_times = to_index(fc_times),
        training_times = training_times,
-       cap = cap)
+       cap = cap,
+       changepoint_range = object$trend_metadata$pw_changepoint_range)
 }
 
 

@@ -8,7 +8,7 @@
 #'
 #' @param object A fitted `mvgam` object that included latent
 #'   dynamic factors via the `n_lv` argument of an
-#'   [AR()]/[VAR()]/[RW()]/[ZMVN()] trend constructor.
+#'   [AR()]/[VAR()]/[RW()]/[LLT()]/[ZMVN()] trend constructor.
 #' @param probs Numeric vector of credible interval widths used
 #'   for the ribbon. Defaults to four nested bands at 20 / 40 /
 #'   60 / 90% credible intervals.

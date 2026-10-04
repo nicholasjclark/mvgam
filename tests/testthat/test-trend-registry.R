@@ -22,7 +22,7 @@ test_that("the registry initialises once with every core trend", {
 
   trends <- list_trend_types()
   expect_setequal(trends$trend_type[trends$supports_factors],
-                  c("AR", "RW", "VAR", "ZMVN"))
+                  c("AR", "LLT", "RW", "VAR", "ZMVN"))
   expect_setequal(trends$trend_type[!trends$supports_factors],
                   c("CAR", "PW"))
   expect_error(get_trend_info("NonExistentTrend"),
@@ -32,7 +32,8 @@ test_that("the registry initialises once with every core trend", {
 test_that("trend properties are validated", {
   for (props in list(ar_trend_properties(), rw_trend_properties(),
                      var_trend_properties(), zmvn_trend_properties(),
-                     car_trend_properties(), pw_trend_properties())) {
+                     car_trend_properties(), pw_trend_properties(),
+                     llt_trend_properties())) {
     expect_invisible(validate_trend_properties(props, "f"))
   }
   # Every property is declared by each trend and none has a default
@@ -50,7 +51,7 @@ test_that("trend properties are validated", {
            covariance_pattern = "diagonal", stationary_source = "none",
            requires_regular_intervals = TRUE,
            per_factor_coefficients = FALSE, completes_time_grid = FALSE,
-           generator_func = generator),
+           shared_innovations = TRUE, generator_func = generator),
       list(...)
     )
     do.call(register_trend_type, args)

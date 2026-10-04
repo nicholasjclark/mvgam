@@ -350,17 +350,18 @@ axis_row_series <- function(object, data, required = FALSE) {
 #' formula has been walked, so the record is completed here rather
 #' than built a second time.
 #'
+#' Without factors, `by = lv_axis()` is rewritten onto the series, and
+#' the design runs on the series grain.
+#'
 #' @param axes The axes record, or `NULL`
 #' @param has_by_lv Whether the emitted trend takes the factor grain
-#' @param had_by_lv Whether the user wrote `by = lv_axis()`, kept for
-#'   the non-factor rewrite where the emitted trend does not
 #' @return The record with `grain` named, or `NULL`
 #' @noRd
-complete_axes_grain <- function(axes, has_by_lv, had_by_lv) {
+complete_axes_grain <- function(axes, has_by_lv) {
   if (is.null(axes)) {
     return(NULL)
   }
-  axes$grain <- if (isTRUE(has_by_lv) || isTRUE(had_by_lv)) {
+  axes$grain <- if (isTRUE(has_by_lv)) {
     "lv"
   } else {
     "series"

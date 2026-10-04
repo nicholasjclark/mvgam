@@ -36,7 +36,9 @@
 #'
 #' @format Named list with parameter specifications. Each element is a list with:
 #' \describe{
-#'   \item{default}{Character string of Stan distribution (e.g., "exponential(2)")}
+#'   \item{default}{Character string of Stan distribution (e.g.,
+#'     "exponential(2)"), or a function of the data's spread on the
+#'     link scale returning one}
 #'   \item{bounds}{Numeric vector c(lower, upper) with NA for unbounded}
 #'   \item{description}{Character string describing the parameter}
 #'   \item{dimension}{Character string: "vector", "matrix", or "scalar"}
@@ -53,7 +55,7 @@
 #' @noRd
 common_trend_priors <- list(
   sigma_trend = list(
-    default = "exponential(2)",
+    default = function(unit) paste0("exponential(", signif(2 / unit, 4), ")"),
     bounds = c(0, NA),
     description = "Innovation standard deviation",
     dimension = "vector"
@@ -91,22 +93,8 @@ common_trend_priors <- list(
     dimension = "scalar"
   ),
 
-  m_trend = list(
-    default = "student_t(3, 0, 2.5)",
-    bounds = c(NA, NA),
-    description = "Piecewise trend offset",
-    dimension = "vector"
-  ),
-
-  k_trend = list(
-    default = "std_normal()",
-    bounds = c(NA, NA),
-    description = "Piecewise base growth rate",
-    dimension = "vector"
-  ),
-
   sigma_group_trend = list(
-    default = "exponential(2)",
+    default = function(unit) paste0("exponential(", signif(2 / unit, 4), ")"),
     bounds = c(0, NA),
     description = "Per-group innovation standard deviation",
     dimension = "vector"
@@ -134,7 +122,8 @@ common_trend_priors <- list(
   ),
 
   Z = list(
-    default = "student_t(3, 0, 0.5)",
+    default = function(unit) paste0("student_t(3, 0, ", signif(0.5 * unit, 4),
+                                    ")"),
     bounds = c(NA, NA),
     description = "Factor loadings matrix",
     dimension = "matrix"
@@ -238,7 +227,8 @@ bind_brmsprior_rows <- function(prior_list) {
   if (!length(prior_list)) {
     return(NULL)
   }
-  combined <- do.call(rbind, align_brmsprior_schemas(prior_list))
+  combined <- do.call(rbind, unname(align_brmsprior_schemas(prior_list)))
+  rownames(combined) <- NULL
   structure(combined, class = c("brmsprior", "data.frame"))
 }
 
@@ -351,18 +341,14 @@ get_default_trend_parameter_prior <- function(param_name,
   # A trend-specific resolver may only tighten a bound, as CAR's does
   # for its damping coefficient. The shared default then supplies the
   # distribution. A call without a trend object has no resolver.
-  custom_result <- NULL
-  if (!is.null(trend_obj)) {
-    resolver <- get0(
-      paste0("get_", tolower(trend_obj$trend), "_parameter_prior"),
-      envir = asNamespace("mvgam"), mode = "function", inherits = FALSE
-    )
-    if (!is.null(resolver)) {
-      custom_result <- resolver(param_name, trend_obj)
-      if (!is.null(custom_result) && nzchar(custom_result$prior)) {
-        return(custom_result)
-      }
-    }
+  custom_result <- if (!is.null(trend_obj)) {
+    trend_method(
+      trend_obj$trend, trend_method_optional_templates[["parameter_prior"]],
+      default = function(...) NULL
+    )(param_name, trend_obj)
+  }
+  if (!is.null(custom_result) && nzchar(custom_result$prior)) {
+    return(custom_result)
   }
 
   # The shared table covers the parameters every trend can have. The
@@ -371,7 +357,11 @@ get_default_trend_parameter_prior <- function(param_name,
   if (!is.null(spec)) {
     bounds <- spec$bounds
     return(list(
-      prior = spec$default,
+      prior = if (is.function(spec$default)) {
+        spec$default(trend_prior_unit_of(trend_obj))
+      } else {
+        spec$default
+      },
       lb = custom_result$lb %||%
         (if (!is.na(bounds[1L])) as.character(bounds[1L]) else ""),
       ub = custom_result$ub %||%
@@ -388,6 +378,80 @@ get_default_trend_parameter_prior <- function(param_name,
   }
   pattern
 }
+
+#' The factor brms widens its default scale priors by
+#'
+#' brms sets the scale of its default intercept, `sd` and `sigma`
+#' priors to `max(2.5, mad(link(y)))` under the identity, log, inverse,
+#' square-root and inverse-square links (`brms:::def_scale_prior()`),
+#' which widens its base scale of 2.5 by `max(1, mad(link(y)) / 2.5)`.
+#' The trend's scale priors are calibrated in link units and widen by
+#' the same factor. A count model on the log link rarely spreads past
+#' 2.5 and keeps its link-unit defaults. Zeros take 0.1 before a log or
+#' inverse link, and a family on the log scale, such as `lognormal()`,
+#' takes the log link, as in brms. Under any other link the factor is
+#' one. Several responses take the widest.
+#'
+#' @param formula The observation formula
+#' @param family The observation family
+#' @param data The training frame
+#' @return A number of at least 1
+#' @noRd
+trend_prior_unit <- function(formula, family, data) {
+  checkmate::assert_data_frame(data)
+  forms <- response_formulas(formula)
+  families <- formula_families(formula, family)
+  columns <- response_columns(formula)
+  spreads <- vapply(names(forms), function(key) {
+    link_scale_spread(data[[columns[[key]]]], families[[key]])
+  }, numeric(1L))
+  max(1, spreads / 2.5)
+}
+
+#' The spread of one response on its link scale
+#'
+#' A simplex family's response names categories or shares, which its
+#' log-ratio predictor does not measure, and a binary detection is no
+#' count. Both take zero, as brms's categorical families do. Missing
+#' responses are dropped. A transform outside its domain, such as the
+#' log of a negative value, gives no finite spread, as in brms.
+#'
+#' @param y The response column
+#' @param family Its family
+#' @return The rounded median absolute deviation, or 0
+#' @noRd
+link_scale_spread <- function(y, family) {
+  if (is_simplex_response_family(family) ||
+      is_binary_response_family(family)) {
+    return(0)
+  }
+  link <- if ("logscale" %in% family$specials) "log" else family$link
+  transform <- switch(
+    link %||% "",
+    identity = identity, log = log, sqrt = sqrt,
+    inverse = function(x) 1 / x, "1/mu^2" = function(x) 1 / x^2,
+    NULL
+  )
+  if (is.null(transform) || !is.numeric(y)) {
+    return(0)
+  }
+  y <- y[!is.na(y)]
+  if (link %in% c("log", "inverse", "1/mu^2")) {
+    y <- ifelse(y == 0, y + 0.1, y)
+  }
+  spread <- round(stats::mad(suppressWarnings(transform(y))), 1)
+  if (is.finite(spread)) spread else 0
+}
+
+#' The spread a trend's default priors are scaled by
+#'
+#' @param trend_obj An `mvgam_trend`, or NULL where the caller has none
+#' @return The spread `trend_prior_unit()` recorded on the trend, or 1
+#' @noRd
+trend_prior_unit_of <- function(trend_obj) {
+  trend_obj$prior_unit %||% 1
+}
+
 
 #' Is this class one of the loadings-kernel length-scales?
 #'
@@ -450,15 +514,6 @@ get_parameter_type_default_prior <- function(param_name) {
   } else if (grepl("^sigma_ar[0-9]+_trend$", param_name)) {
     # Population scale for hierarchical AR coefficient
     return(list(prior = "exponential(2)", lb = "0", ub = ""))
-  } else if (grepl("sigma.*_trend$", param_name)) {
-    # Variance parameters: positive with lower bound
-    return(list(prior = "", lb = "0", ub = ""))
-  } else if (grepl("theta.*_trend$", param_name)) {
-    # Theta parameters (e.g., CAR): typically bounded [0, 1]
-    return(list(prior = "", lb = "0", ub = "1"))
-  } else if (grepl("alpha_cor.*_trend$", param_name)) {
-    # Alpha correlation parameters (hierarchical mixing): bounded [0, 1]
-    return(list(prior = "", lb = "0", ub = "1"))
   } else if (grepl("^[AD]omega_trend$", param_name)) {
     # VAR/VARMA hyperprior precisions (Aomega_trend, Domega_trend)
     return(list(prior = "", lb = "0", ub = ""))
@@ -472,8 +527,8 @@ get_parameter_type_default_prior <- function(param_name) {
 # =============================================================================
 # SECTION 3: TREND-SPECIFIC PRIOR RESOLVERS
 # =============================================================================
-# `get_default_trend_parameter_prior()` looks up a function named
-# `get_<trend>_parameter_prior()` for the trend being built. A resolver
+# `get_default_trend_parameter_prior()` takes the trend's
+# `get_<trend>_parameter_prior()` through `trend_method()`. A resolver
 # returns a prior, bounds or both for the parameters whose default
 # depends on the trend, and NULL for every other parameter.
 
@@ -493,39 +548,167 @@ get_car_parameter_prior <- function(param_name, trend_obj) {
   NULL
 }
 
-#' Get PW-Specific Parameter Prior
+#' LLT priors scaled to the number of time points
+#'
+#' A slope shock at time `t` moves the level at the end of the series
+#' by `w_t = 1 + phi + ... + phi^(N - t - 1)`, and the slope shocks
+#' move it with variance `sigma_slope^2 v`, where `v` sums the squared
+#' weights. `student_t(3, 0, 1.3 / sqrt(v))` on `sigma_slope_trend`
+#' puts the prior median of that movement's standard deviation at one
+#' link unit at every `N`. The movement itself then has prior median
+#' 0.55, 90th percentile 2.8 and 99th percentile 8.4 link units. The
+#' heavy tail lets an informative series move the posterior.
+#'
+#' The initial slope moves the level at time `N` by its reach,
+#' `1 + phi + ... + phi^(N - 2)` per unit, and a prior standard
+#' deviation of two over the reach gives it two link units of
+#' growth over the series at one standard deviation: `2 / (N - 1)` for
+#' an undamped slope. A damped slope takes `v` and the reach at
+#' `phi = 0.913`, the median of the `beta(18, 2)` prior on
+#' `ar1_slope_trend`.
+#'
+#' A link unit is the responses' spread on their link scale where that
+#' exceeds one, as `trend_prior_unit()` measures it. Factors with
+#' sampled loadings have unit level shocks, whose path spreads by
+#' `sqrt(N)` over the series, and both priors take that spread as
+#' their unit. Their loadings carry the data's spread.
 #'
 #' @param param_name Character string parameter name
-#' @param trend_obj mvgam_trend object
+#' @param trend_obj The prepared `LLT()` specification, carrying the
+#'   data's dimensions
+#' @return List with prior, lb, ub elements, or NULL for default handling
+#' @noRd
+get_llt_parameter_prior <- function(param_name, trend_obj) {
+  checkmate::assert_string(param_name)
+  if (identical(param_name, "ar1_slope_trend")) {
+    return(list(prior = "beta(18, 2)", lb = "0", ub = "1"))
+  }
+  if (!param_name %in% c("sigma_slope_trend", "init_slope_trend")) {
+    return(NULL)
+  }
+  n_time <- trend_obj$dimensions$n_time
+  if (is.null(n_time)) {
+    stop_mvgam_fault(
+      "The LLT specification lacks the data's dimensions.",
+      "The LLT slope priors scale with the number of time points."
+    )
+  }
+  scales <- llt_prior_scales(n_time, isTRUE(trend_obj$damped),
+                             samples_factor_loadings(trend_obj),
+                             trend_prior_unit_of(trend_obj))
+  if (identical(param_name, "sigma_slope_trend")) {
+    return(list(prior = paste0("student_t(3, 0, ", scales$sigma, ")"),
+                lb = "0", ub = ""))
+  }
+  list(prior = paste0("normal(0, ", scales$init, ")"), lb = "", ub = "")
+}
+
+#' The scales of the default LLT slope priors
+#'
+#' The Stan program also samples both slope parameters in these units,
+#' which keeps a random start within a few prior scales of zero.
+#'
+#' @param n_time Number of time points
+#' @param damped Whether the slope is damped
+#' @param unit_factors Whether every factor loading is sampled
+#' @param spread The responses' spread on their link scale
+#' @return List of `sigma` and `init`, each a scalar to four
+#'   significant digits
+#' @noRd
+llt_prior_scales <- function(n_time, damped, unit_factors, spread = 1) {
+  checkmate::assert_int(n_time, lower = 3L)
+  checkmate::assert_flag(damped)
+  checkmate::assert_flag(unit_factors)
+  checkmate::assert_number(spread, lower = 1)
+  unit <- if (unit_factors) sqrt(n_time) else spread
+  phi <- if (damped) 0.913 else 1
+  # How far a unit slope at time `t` moves the level at time `N`
+  reach <- function(steps) sum(phi^(seq_len(steps) - 1L))
+  shocks <- vapply(seq_len(n_time - 2L), reach, numeric(1L))
+  list(sigma = signif(1.3 * unit / sqrt(sum(shocks^2)), 4),
+       init = signif(2 * unit / reach(n_time - 1L), 4))
+}
+
+#' PW priors scaled to the number of time points
+#'
+#' Time runs in steps, and each prior is set on the series' span:
+#'
+#' - `k_trend ~ normal(0, 2 / (N - 1))` gives two link units of growth over
+#'   the series at one standard deviation, the scale of the undamped
+#'   `LLT()` initial slope.
+#' - `delta_trend ~ double_exponential(0, changepoint_scale / N)`
+#'   makes `changepoint_scale` the typical change in growth over the
+#'   series at one changepoint, as Prophet's time scaling does.
+#' - `m_trend ~ normal((N + 1) / 2, N / 2)` centres the logistic
+#'   inflection on the middle of the series.
+#'
+#' The linear form's growth is in link units, scaled by the responses'
+#' spread on their link scale as `trend_prior_unit()` measures it. The
+#' logistic form's growth is in logits of the capacity.
+#'
+#' @param param_name Character string parameter name
+#' @param trend_obj The prepared `PW()` specification, carrying the
+#'   data's dimensions
 #' @return List with prior, lb, ub elements, or NULL for default handling
 #' @noRd
 get_pw_parameter_prior <- function(param_name, trend_obj) {
   checkmate::assert_string(param_name)
   checkmate::assert_class(trend_obj, "mvgam_trend")
-
-  # The changepoint scale is a `PW()` argument, so the prior on the
-  # rate deviations is only knowable from the trend object. Naming it
-  # here rather than at the emission site is what lets the reported
-  # prior carry the user's own scale.
-  if (identical(param_name, "delta_trend")) {
-    scale <- trend_obj$changepoint_scale
-    checkmate::assert_number(scale, lower = 0)
-    return(list(
-      prior = paste0("double_exponential(0, ", scale, ")"),
-      lb = "", ub = ""
-    ))
+  if (!param_name %in% c("k_trend", "delta_trend", "m_trend")) {
+    return(NULL)
   }
+  n_time <- trend_obj$dimensions$n_time
+  if (is.null(n_time)) {
+    stop_mvgam_fault(
+      "The PW specification lacks the data's dimensions.",
+      "The PW priors scale with the number of time points."
+    )
+  }
+  scales <- pw_prior_scales(n_time, trend_obj$changepoint_scale,
+                            pw_growth_spread(trend_obj))
+  prior <- switch(
+    param_name,
+    k_trend = paste0("normal(0, ", scales$rate, ")"),
+    delta_trend = paste0("double_exponential(0, ", scales$changepoint, ")"),
+    m_trend = paste0("normal(", (n_time + 1) / 2, ", ", n_time / 2, ")")
+  )
+  list(prior = prior, lb = "", ub = "")
+}
 
-  # Return NULL to use default parameter-type handling
-  return(NULL)
+#' The scales of the default PW growth priors, per step
+#'
+#' @param n_time Number of time points
+#' @param changepoint_scale The `PW()` argument
+#' @param spread The unit of growth, from `pw_growth_spread()`
+#' @return List of `rate` and `changepoint`, each a scalar to four
+#'   significant digits
+#' @noRd
+pw_prior_scales <- function(n_time, changepoint_scale, spread = 1) {
+  checkmate::assert_int(n_time, lower = 2L)
+  checkmate::assert_number(changepoint_scale, lower = 0)
+  checkmate::assert_number(spread, lower = 1)
+  list(rate = signif(2 * spread / (n_time - 1), 4),
+       changepoint = signif(changepoint_scale * spread / n_time, 4))
+}
+
+#' The unit a PW trend's growth priors are set in
+#'
+#' @param trend_obj A `PW()` specification
+#' @return The responses' spread for linear growth, and 1 for logistic
+#'   growth, whose rate is in logits of the capacity
+#' @noRd
+pw_growth_spread <- function(trend_obj) {
+  if (identical(pw_growth(trend_obj), "logistic")) {
+    return(1)
+  }
+  trend_prior_unit_of(trend_obj)
 }
 
 # =============================================================================
 # SECTION 4: PRIOR COMBINATION FUNCTIONS
 # =============================================================================
-# WHY: Combining observation and trend priors into a single brmsprior object
-# enables use with brms functions while maintaining clear separation
-# via the _trend suffix convention.
+# One brmsprior holds the observation and trend priors, which the
+# `_trend` suffix tells apart.
 
 #' Combine Observation and Trend Priors
 #'
@@ -1133,8 +1316,6 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 # =============================================================================
 # SECTION 5: UTILITY FUNCTIONS
 # =============================================================================
-# WHY: Utility functions provide common operations needed across the prior
-# system.
 
 #' Null-coalescing Operator
 #'
@@ -1149,10 +1330,8 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 # =============================================================================
 # SECTION 6: MVGAM FORMULA INTERFACE
 # =============================================================================
-# WHY: Provides a consistent interface for model specification that extends
-# brms functionality with state-space trend components. The mvgam_formula
-# constructor and associated S3 methods enable clean integration with brms
-# inspection functions without masking or conflicts.
+# `mvgam_formula()` pairs an observation formula with a trend formula
+# for `get_prior()`, `stancode()` and `standata()`.
 
 #' Create an mvgam Formula Object
 #'
@@ -1178,7 +1357,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #' observation model. When specified, the trend_formula can include:
 #' \itemize{
 #'   \item Trend constructors: \code{RW()}, \code{AR()}, \code{CAR()},
-#'     \code{ZMVN()}, \code{VAR()}, \code{PW()}
+#'     \code{ZMVN()}, \code{VAR()}, \code{LLT()}, \code{PW()}
 #'   \item Covariates that affect trend dynamics
 #'   \item Smooth terms using mgcv syntax: \code{s()}, \code{t2()}
 #'   \item Random effects: \code{(1|group)}, \code{(slope|group)}
@@ -1192,19 +1371,22 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #'
 #' \strong{Forbidden Terms:}
 #' \itemize{
-#'   \item brms addition-terms: \code{weights()}, \code{cens()}, \code{trunc()},
-#'     \code{mi()}, \code{trials()}, \code{rate()}, \code{vreal()}, \code{vint()},
-#'     \code{subset()}, \code{index()}
+#'   \item brms addition-terms: \code{weights()}, \code{se()},
+#'     \code{cens()}, \code{trunc()}, \code{trials()}, \code{rate()},
+#'     \code{vreal()}, \code{vint()}, \code{subset()}, \code{index()},
+#'     \code{dec()}, \code{cat()}, \code{thres()}
+#'   \item Missing-value imputation: \code{mi()}
 #'   \item brms autocorrelation: \code{ar()}, \code{ma()}, \code{arma()},
 #'     \code{cosy()}, \code{unstr()}, \code{autocor()}
 #'   \item Offset terms: \code{offset()}
 #' }
 #'
 #' \strong{Rationale:}
-#' Addition-terms modify observation model behavior (weights, censoring, exposure,
-#' etc.) and should be specified in the main observation formula. Autocorrelation
-#' terms conflict with mvgam's State-Space dynamics. All forbidden terms remain
-#' fully supported in the main observation formula.
+#' Addition terms change the observation model, through weights,
+#' censoring or exposure, and belong in the observation formula.
+#' Autocorrelation terms conflict with the trend's state-space
+#' dynamics. brms imputes a \code{mi()} predictor as a response of the
+#' model, and a trend formula holds no response.
 #'
 #' @section Multivariate models, single shared trend type:
 #' For multivariate observation models (\code{mvbind()} or
@@ -1474,27 +1656,40 @@ get_prior.mvgam <- function(object, ...) {
 #'   at \code{\link[brms]{stancode}}, which does take it.
 #' @param ... Additional arguments passed to \code{brms::get_prior}
 #'
-#' @return A \code{brmsprior} data frame combining observation and trend priors
-#'   with an additional \code{trend_component} column distinguishing:
-#'   \itemize{
-#'     \item \code{"observation"}: Parameters from the observation model
-#'     \item \code{"trend"}: Parameters from the trend model (with _trend suffix)
-#'   }
-#'   The returned object is fully compatible with \code{brms::set_prior()} and
-#'   \code{brms::prior()} functions for customizing priors.
+#' @return A \code{brmsprior} data frame of the observation and trend
+#'   priors, usable with \code{brms::set_prior()} and
+#'   \code{brms::prior()}. A trend class carries the \code{_trend}
+#'   suffix.
 #'
 #' @details
-#' When a trend formula is specified, the function:
-#' \enumerate{
-#'   \item Extracts observation model priors using \code{brms::get_prior}
-#'   \item Extracts trend model priors using mvgam's trend system
-#'   \item Combines them into a single \code{brmsprior} object
-#'   \item Adds the \code{trend_component} column for easy filtering
-#' }
+#' The observation priors are those \code{brms::get_prior()} gives,
+#' with mvgam's defaults for the families it adds. The trend rows list
+#' every parameter the trend constructor samples and the coefficients
+#' of the trend formula.
 #'
-#' The function handles embedded families automatically when using \code{bf()}
-#' specifications and supports all brms family types for observation models
-#' while trend components are always modeled as Gaussian State-Space processes.
+#' \strong{Default trend priors.} brms sets the scale of its default
+#' intercept, standard deviation and residual priors to
+#' \code{max(2.5, mad(link(y)))}, from the spread of the response on
+#' the link scale under the identity, log, inverse, square-root and
+#' inverse-square links. That widens its base scale of 2.5 by the
+#' factor \eqn{s = \max(1, \mathrm{mad}(\mathrm{link}(y)) / 2.5)}.
+#' mvgam widens the trend's scale priors by the same factor, taking the
+#' widest over several responses and \eqn{s = 1} under any other
+#' link:
+#' \itemize{
+#'   \item \code{sigma_trend} and \code{sigma_group_trend} take
+#'     \code{exponential(2 / s)}, with mean \eqn{s / 2}.
+#'   \item The factor loadings \code{Z} take
+#'     \code{student_t(3, 0, 0.5 s)}.
+#'   \item The slope priors of \code{\link{LLT}()} and the growth priors
+#'     of a linear \code{\link{PW}()} also scale with the number of
+#'     time points. Their help pages give the forms.
+#' }
+#' A count model on the log link rarely spreads past 2.5, and its
+#' defaults keep their link-scale values. Coefficients without
+#' units keep fixed priors: autoregressive and damping coefficients,
+#' correlations and degrees of freedom. The table this returns holds
+#' the resolved values for the data given.
 #'
 #' A shrinkage prior on a trend-side class is written without
 #' autoscaling. \code{horseshoe()} and \code{R2D2()} scale their global
@@ -1607,7 +1802,7 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   # formula has its `by = lv_axis()` terms rewritten to the columns
   # the trend data holds.
   components <- extract_and_validate_trend_components(
-    data, mv_spec, response_vars
+    data, mv_spec, response_vars, family = family
   )
   trend_priors <- generate_trend_priors(
     trend_model = trend_spec_head(components$enhanced_mv_spec$trend_specs),

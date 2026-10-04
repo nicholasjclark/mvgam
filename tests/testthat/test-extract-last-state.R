@@ -314,31 +314,22 @@ test_that("VARMA seeds the forecast with the last innovation it fitted", {
 
 # ----- CAR -------------------------------------------------------
 
-test_that("CAR pulls phi, sigma, trend history, and the grid end", {
+test_that("CAR pulls phi, sigma and the trend history", {
   n_series <- 2L; n_time <- 6L
-  obs_data <- data.frame(
-    time = c(1, 4, 7, 10, 12, 15,
-              2, 5, 8, 11, 13, 16),
-    series = factor(rep(c("a", "b"), each = 6L),
-                     levels = c("a", "b"))
-  )
   draws <- make_draws(list(
     ar1_trend = c(0.6, 0.8),
     sigma_trend = c(0.3, 0.4),
     trend = matrix(seq_len(n_time * n_series),
                    nrow = n_time, byrow = TRUE)
   ))
-  meta <- c(mock_axis_record(obs_data),
-            list(trend_type = "CAR", ar_lags = 1L,
-                 ma_lags = integer(0), max_lag = 1L, has_cor = FALSE))
-  fit <- make_mock_fit(draws, n_series, n_lv = 2L,
-                        n_time, meta, data = obs_data)
+  meta <- list(trend_type = "CAR", ar_lags = 1L, ma_lags = integer(0),
+               max_lag = 1L, has_cor = FALSE)
+  fit <- make_mock_fit(draws, n_series, n_lv = 2L, n_time, meta)
   res <- extract_last_state(fit, 1L)
   expect_named(res$params, c("phi", "sigma"))
   expect_equal(res$params$phi, c(0.6, 0.8))
   expect_equal(res$params$sigma, c(0.3, 0.4))
-  # Every series has a state at the last occasion of the grid
-  expect_equal(unname(res$last_state$time), c(16, 16))
+  expect_equal(as.numeric(res$last_state$trends), c(11, 12))
 
   # Correlated innovations add their unit-time covariance, and
   # estimated degrees of freedom reach the forecast with the draw.
@@ -352,8 +343,7 @@ test_that("CAR pulls phi, sigma, trend history, and the grid end", {
   ))
   meta$has_cor <- TRUE
   res_cor <- extract_last_state(
-    make_mock_fit(draws_cor, n_series, n_lv = 2L, n_time, meta,
-                  data = obs_data),
+    make_mock_fit(draws_cor, n_series, n_lv = 2L, n_time, meta),
     1L
   )
   expect_equal(unname(res_cor$params$Sigma),
@@ -371,21 +361,47 @@ test_that("CAR pulls phi, sigma, trend history, and the grid end", {
     trend = matrix(0, nrow = n_time, ncol = n_series)
   ))
   res_stored <- extract_last_state(
-    make_mock_fit(draws_stored, n_series, n_lv = 2L, n_time, meta,
-                  data = obs_data),
+    make_mock_fit(draws_stored, n_series, n_lv = 2L, n_time, meta),
     1L
   )
   expect_equal(unname(res_stored$params$Sigma), stored)
 })
 
 
+# ----- LLT -------------------------------------------------------
+
+test_that("LLT hands on the last level and slope and the slope covariance", {
+  n_series <- 2L; n_time <- 4L
+  slope <- matrix(c(0.1, 0.2, 0.3, 0.4, -0.1, -0.2, -0.3, -0.4), n_time)
+  L <- t(chol(matrix(c(1, 0.5, 0.5, 1), 2L)))
+  draws <- make_draws(list(
+    sigma_trend = c(0.5, 1),
+    L_Omega_trend = L,
+    sigma_slope_trend = c(0.1, 0.2),
+    ar1_slope_trend = c(0.9, 0.7),
+    slope_trend = slope,
+    trend = matrix(1:8, n_time)
+  ))
+  meta <- list(trend_type = "LLT", ar_lags = 1L, ma_lags = integer(0),
+               max_lag = 1L, has_cor = TRUE)
+  fit <- make_mock_fit(draws, n_series, n_lv = 2L, n_time, meta)
+  res <- extract_last_state(fit, 1L)
+  expect_equal(as.numeric(res$last_state$trends), c(4, 8))
+  expect_equal(res$last_state$slope, c(0.4, -0.4))
+  expect_equal(res$params$phi_slope, c(0.9, 0.7))
+  # The slope shocks share the level's correlation, 0.5
+  expect_equal(res$params$Sigma_slope,
+               matrix(c(0.01, 0.01, 0.01, 0.04), 2L))
+})
+
+
 # ----- ZMVN ------------------------------------------------------
 
-test_that("ZMVN returns Sigma + sigma and an empty trend history", {
+test_that("ZMVN returns the innovation covariance and an empty history", {
   n_series <- 2L; n_time <- 5L
-  L <- diag(2L)
+  L <- t(chol(matrix(c(1, 0.3, 0.3, 1), 2L)))
   draws <- make_draws(list(
-    sigma_trend = c(0.5, 0.5),
+    sigma_trend = c(0.5, 2),
     L_Omega_trend = L
   ))
   meta <- list(trend_type = "ZMVN",
@@ -395,11 +411,8 @@ test_that("ZMVN returns Sigma + sigma and an empty trend history", {
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
   res <- extract_last_state(fit, 1L)
-  expect_true("Sigma" %in% names(res$params))
-  expect_identical(dim(res$last_state$trends), c(0L, 2L))
-  # The recursion is advanced zero-mean, so the state carries no
-  # linear-predictor field for a caller to fill.
-  expect_false("linpreds" %in% names(res$last_state))
+  expect_equal(res$params$Sigma, matrix(c(0.25, 0.3, 0.3, 4), 2L))
+  expect_identical(nrow(res$last_state$trends), 0L)
 })
 
 
@@ -518,11 +531,8 @@ test_that("a logistic PW pulls k / m / delta and t_change from standata", {
     m_trend = c(0.4, 0.6),
     delta_trend = delta_post
   ))
-  # Standata carries t_change_trend (fixed at fit time) and
-  # cap_trend (logistic only); both are pulled by the helper.
+  # Standata carries t_change_trend, fixed at fit time
   t_change_data <- c(5, 10, 15)
-  cap_data <- matrix(seq_len(n_time * n_series),
-                      nrow = n_time, ncol = n_series)
   # The logistic form samples `m_trend`, and `trend_metadata`
   # persists the growth for post-fit callers.
   meta <- list(trend_type = "PW", ar_lags = integer(0),
@@ -531,7 +541,6 @@ test_that("a logistic PW pulls k / m / delta and t_change from standata", {
   fit <- make_mock_fit(draws, n_series, n_lv, n_time, meta)
   fit$standata$N_change_trend <- n_change
   fit$standata$t_change_trend <- t_change_data
-  fit$standata$cap_trend <- cap_data
   res <- extract_last_state(fit, 1L)
   expect_named(res$params,
                 c("k", "m", "delta", "t_change"))
@@ -542,8 +551,6 @@ test_that("a logistic PW pulls k / m / delta and t_change from standata", {
   expect_equal(res$params$delta, delta_post,
                 tolerance = 1e-12)
   expect_equal(res$params$t_change, c(5, 10, 15))
-  # last_state holds cap for the forecast caller, cell for cell.
-  expect_equal(unname(res$last_state$cap_train), unname(cap_data))
 })
 
 

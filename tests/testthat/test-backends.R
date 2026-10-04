@@ -128,6 +128,14 @@ test_that("run_pathfinder() supplies one path per chain", {
   expect_identical(got$num_paths, 4)
   expect_identical(got$data, list(N = 1))
   expect_identical(got$seed, 2)
+  # A resample of the approximation can hold fewer distinct draws than
+  # there are chains to start
+  starts <- mvgam:::run_pathfinder(
+    fake_pathfinder_model(), args = list(init = NULL), chains = 4,
+    threading_on = FALSE, threads = NULL, starts = TRUE
+  )
+  expect_false(starts$psis_resample)
+  expect_null(got$psis_resample)
 })
 
 test_that("run_pathfinder() lets caller-supplied arguments win", {

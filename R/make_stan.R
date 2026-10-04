@@ -350,7 +350,8 @@ build_stan_components <- function(formula, data, family = gaussian(),
   
   # The two designs one likelihood sees together, checked once the
   # data is assembled.
-  warn_confounded_design(combined_components$standata)
+  warn_confounded_design(combined_components$standata,
+                         combined_components$stancode)
 
   # Return all components needed for mvgam object creation
   return(list(
@@ -438,11 +439,15 @@ warn_zmvn_single_series <- function(mv_spec, family, n_series) {
 # brms passes it as a sparse expansion against its own index, and
 # partial pooling identifies it by shrinkage.
 #
+# A trend formula holding only an intercept has no design matrix, and
+# `trend_intercept` adds its column of ones.
+#
 # `NULL` where no comparison exists: a fit carrying one design alone,
 # a multivariate formula whose responses hold designs of their own,
 # and a `by = lv_axis()` trend whose second dimension counts factors.
 #'@noRd
-stacked_design_matrix <- function(sdata) {
+stacked_design_matrix <- function(sdata, trend_intercept = FALSE) {
+  checkmate::assert_flag(trend_intercept)
   n <- sdata$N
   n_trend <- sdata$N_trend
   idx <- obs_rows_to_trend_rows(sdata)
@@ -468,7 +473,7 @@ stacked_design_matrix <- function(sdata) {
   }, nms)
   # One observation design named `X`. A multivariate formula keys its
   # designs by response, and those belong to separate likelihoods.
-  if (!("X" %in% obs_nms) || !length(trend_nms)) {
+  if (!("X" %in% obs_nms) || !(length(trend_nms) || trend_intercept)) {
     return(NULL)
   }
   # A block carries its own column names where brms wrote them, and
@@ -489,7 +494,12 @@ stacked_design_matrix <- function(sdata) {
     block
   }
   obs_part <- do.call(cbind, lapply(obs_nms, labelled, rows = NULL))
-  trend_part <- do.call(cbind, lapply(trend_nms, labelled, rows = idx))
+  trend_part <- do.call(cbind, c(
+    lapply(trend_nms, labelled, rows = idx),
+    if (trend_intercept) {
+      list(matrix(1, n, 1L, dimnames = list(NULL, "Intercept_trend")))
+    }
+  ))
   cbind(obs_part, trend_part)
 }
 
@@ -530,9 +540,16 @@ confounded_columns <- function(m) {
 # split between the two coefficients. `y ~ 1` with
 # `~ series + AR(p = 1)` is one such pairing and a reasonable model
 # to write. This names the columns involved and continues.
+#
+# @param sdata The assembled Stan data
+# @param stancode The assembled program, which declares any trend
+#   intercept
 #'@noRd
-warn_confounded_design <- function(sdata) {
-  dependent <- confounded_columns(stacked_design_matrix(sdata))
+warn_confounded_design <- function(sdata, stancode) {
+  trend_intercept <- "Intercept_trend" %in% brms_declared_params(stancode)
+  dependent <- confounded_columns(
+    stacked_design_matrix(sdata, trend_intercept)
+  )
   if (!length(dependent)) {
     return(invisible(NULL))
   }

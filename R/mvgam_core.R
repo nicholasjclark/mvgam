@@ -1,14 +1,9 @@
 # ==============================================================================
 # MVGAM CORE: Model Fitting and Multiple Imputation Support
 # ==============================================================================
-# This file consolidates the core mvgam fitting architecture, dual-object
-# system, and multiple imputation capabilities. The single-fit dual-object
-# architecture enables brms ecosystem integration while preserving
-# mvgam-specific State-Space modeling functionality.
-
-# The mvgam function provides a single entry point that handles both
-# single datasets and multiple imputation scenarios transparently, ensuring
-# consistent behavior across different input types.
+# `mvgam()` fits one data frame, or a list of imputed frames through
+# `mvgam_multiple()`, and returns an `mvgam` object for the post-fit
+# methods.
 
 # Arguments mvgam 1.x took that 2.0 does not, each paired with the
 # 2.0 way of asking for the same thing. They are refused rather than
@@ -190,11 +185,14 @@ mvgam_imputation_forwarded <- c(
 )
 
 
-#' mvgam Function with Single-Fit Architecture
+#' Fit a Bayesian multivariate state-space model
 #'
 #' @description
-#' mvgam implementation using single-fit dual-object architecture
-#' with native multiple imputation support and brms ecosystem integration.
+#' Fits the model in Stan. The observation `formula` takes brms syntax,
+#' and `trend_formula` adds a latent dynamic process, such as a random
+#' walk or an autoregression, with predictors of its own. A list of
+#' multiply imputed data frames fits the model to each frame and pools
+#' the draws.
 #'
 #' @param formula Main observation model formula (supports brms syntax).
 #'   Smooth specials `s()`, `t2()`, `gp()`, varying intercepts and
@@ -391,7 +389,7 @@ mvgam_imputation_forwarded <- c(
 #'   `partial_log_lik_lpmf` when it threads, where mvgam cannot add
 #'   the trend to it, so the program is built without threading.
 #'   This holds for every trend model under a brms-native family:
-#'   `RW()`, `AR()`, `VAR()`, `VARMA()`, `ZMVN()`, `CAR()` and
+#'   `RW()`, `AR()`, `VAR()`, `LLT()`, `ZMVN()`, `CAR()` and
 #'   `PW()`. Each fit that drops the request warns, so a batch
 #'   script that fits repeatedly shows it every time.
 #' @param run_model Logical. Setting `run_model = FALSE` stops before
@@ -450,7 +448,7 @@ mvgam_imputation_forwarded <- c(
 #'   sampling statements carry their normalising constants; dropping
 #'   them is faster and leaves the posterior unchanged. `save_model`
 #'   names a file to write the assembled Stan program to.
-#' @return mvgam object with dual brmsfit-like structure
+#' @return An object of class `mvgam`.
 #'
 #' @examples
 #' \dontrun{

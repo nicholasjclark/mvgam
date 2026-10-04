@@ -499,7 +499,7 @@ fit_model <- function(model, backend, ...) {
       rlang::inform("Running Pathfinder to obtain initial values")
     }
     args$init <- run_pathfinder(model, args, chains, threading_on,
-                                threads)
+                                threads, starts = TRUE)
   }
   if (algorithm %in% c("sampling", "fixed_param")) {
     c(args) <- list(
@@ -1004,10 +1004,19 @@ refuse_unknown_cmdstanr_args <- function(model, algorithm, arg_names) {
 #' @param chains Number of chains, used as the number of paths
 #' @param threading_on Logical; is within-chain threading active?
 #' @param threads Validated `brmsthreads` object, or `NULL`
+#' @param starts Whether the draws start the sampler's chains
 #' @return A `CmdStanPathfinder` object
 #' @noRd
-run_pathfinder <- function(model, args, chains, threading_on, threads) {
+run_pathfinder <- function(model, args, chains, threading_on, threads,
+                           starts = FALSE) {
+  checkmate::assert_flag(starts)
   defaults <- list(num_paths = chains)
+  # Starting values take draws from the approximation itself. An
+  # importance resample of it can collapse onto too few distinct
+  # draws to start every chain, which cmdstanr refuses.
+  if (starts) {
+    defaults$psis_resample <- FALSE
+  }
   if (threading_on) {
     defaults$num_threads <- threads$threads
   }

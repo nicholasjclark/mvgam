@@ -3,15 +3,17 @@
 # structured `last_state` list AND the `params` list
 # `propagate_trend()` consumes.
 #
-# Contract for one draw:
+# Every trend defines `extract_<type>_state(one_draw, meta, n_series,
+# n_lv, fit, state_var)`, which returns for one draw:
 #   list(
 #     params     = <named list, see propagate_trend(@details)>,
 #     last_state = list(
 #       trends   = matrix[max_lag, n_series],
-#       errors   = matrix[max_ma, n_series] | NULL,
-#       time     = numeric(n_series)           # CAR only
+#       errors   = matrix[max_ma, n_series] | NULL
 #     )
 #   )
+# `n_series` is the dimension of the state stepped forward: the
+# factor count of a factor model, the series count otherwise.
 
 
 # Internal: pull the per-draw `(params, last_state)` pair for
@@ -87,26 +89,10 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   state_dim <- if (is_factor) n_lv else n_series
   state_var <- if (is_factor) "lv_trend" else "trend"
 
-  out <- switch(
-    meta$trend_type,
-    "RW" = extract_rw_state(one_draw, meta, state_dim, n_lv, fit,
-                             state_var = state_var),
-    "AR" = extract_ar_state(one_draw, meta, state_dim, n_lv, fit,
-                             state_var = state_var),
-    "VAR" = extract_var_state(one_draw, meta, state_dim, n_lv, fit,
-                                state_var = state_var),
-    "CAR" = extract_car_state(one_draw, meta, n_series, fit),
-    "ZMVN" = extract_zmvn_state(one_draw, state_dim, n_lv, fit),
-    "PW" = extract_pw_state(one_draw, meta, n_series, n_lv, fit),
-    stop(insight::format_error(c(
-      paste0(
-        "Trend type '", meta$trend_type,
-        "' is not supported by 'extract_last_state'."
-      ),
-      i = paste0(
-        "Supported: 'RW', 'AR', 'VAR', 'CAR', 'ZMVN', 'PW'."
-      )
-    )))
+  # Each trend's extractor takes the state at its own grain. A trend
+  # without factors has `state_dim` equal to the series count.
+  out <- trend_method(meta$trend_type, trend_method_templates[["last_state"]])(
+    one_draw, meta, state_dim, n_lv, fit, state_var = state_var
   )
   # The degrees of freedom this draw's innovations take, absent for a
   # Gaussian trend. Forecast innovations then follow the law the model
@@ -463,14 +449,14 @@ varma_last_innovation <- function(one_draw, A_cube, D, ar_lags, n,
 
 
 # CAR(1): continuous-time AR(1). Pulls phi per series from
-# `ar1_trend[s]`, sigma per series from `sigma_trend[s]`, the
-# last latent state from the trailing row of `trend[t, s]`, and the
-# time of that state, the last occasion of the fitted grid. A fit
-# with correlated innovations adds `Sigma`, their covariance over a
-# gap of one.
+# `ar1_trend[s]`, sigma per series from `sigma_trend[s]` and the last
+# latent state from the trailing row of `trend[t, s]`, at the last
+# occasion of the fitted grid. A fit with correlated innovations adds
+# `Sigma`, their covariance over a gap of one. The forecast measures
+# its gaps from that occasion, in `forecast_context_car()`.
 #'@noRd
-extract_car_state <- function(one_draw, meta, n_series, fit) {
-  n_lv <- as.integer(fit$standata$N_lv_trend %||% n_series)
+extract_car_state <- function(one_draw, meta, n_series, n_lv, fit,
+                              state_var = "trend") {
   n_time <- as.integer(fit$standata$N_time_trend)
   phi <- broadcast_to_series(draw_vector(one_draw, "ar1_trend", n_lv),
                              n_series)
@@ -478,17 +464,13 @@ extract_car_state <- function(one_draw, meta, n_series, fit) {
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv, has_cor,
                                 fit$standata)
   trends_hist <- extract_trend_history(
-    one_draw, n_series, n_lv, max_lag = 1L, n_time = n_time
+    one_draw, n_series, n_lv, max_lag = 1L, n_time = n_time,
+    state_var = state_var
   )
-  last_time <- rep(max(mvgam_axes(fit)$time$values), n_series)
   list(
     params = c(list(phi = phi, sigma = scov$sigma),
                if (has_cor) list(Sigma = scov$Sigma)),
-    last_state = list(
-      trends = trends_hist,
-      errors = NULL,
-      time = last_time
-    )
+    last_state = list(trends = trends_hist, errors = NULL)
   )
 }
 
@@ -510,6 +492,51 @@ extract_last_observed_times <- function(fit, n_series) {
 }
 
 
+# LLT: the level and the slope at the last occasion, the level and
+# slope scales, and the slope damping. The slope shocks share the
+# level shocks' correlation, which `cov2cor()` recovers from the level
+# covariance, grouped or not. Sampled factor loadings give one slope
+# scale and one damping, broadcast to every factor.
+#'@noRd
+extract_llt_state <- function(one_draw, meta, n_series, n_lv, fit,
+                              state_var = "trend") {
+  n_time <- as.integer(fit$standata$N_time_trend)
+  scov <- extract_sigma_and_cov(one_draw, n_series, n_lv, meta$has_cor,
+                                fit$standata)
+  n_par <- function(prefix) {
+    sum(startsWith(colnames(one_draw), paste0(prefix, "[")))
+  }
+  sigma_slope <- broadcast_to_series(
+    draw_vector(one_draw, "sigma_slope_trend", n_par("sigma_slope_trend")),
+    n_series
+  )
+  phi_slope <- if (n_par("ar1_slope_trend") > 0L) {
+    broadcast_to_series(
+      draw_vector(one_draw, "ar1_slope_trend", n_par("ar1_slope_trend")),
+      n_series
+    )
+  } else {
+    rep(1, n_series)
+  }
+  list(
+    params = list(
+      sigma = scov$sigma, Sigma = scov$Sigma, sigma_slope = sigma_slope,
+      Sigma_slope = sigma_slope * stats::cov2cor(scov$Sigma) *
+        rep(sigma_slope, each = n_series),
+      phi_slope = phi_slope
+    ),
+    last_state = list(
+      trends = extract_trend_history(one_draw, n_series, n_lv,
+                                     max_lag = 1L, n_time = n_time,
+                                     state_var = state_var),
+      errors = NULL,
+      slope = as.numeric(draw_block(one_draw, "slope_trend", n_time,
+                                    n_series, rows = n_time))
+    )
+  )
+}
+
+
 # ZMVN: no temporal recursion. Each forecast step is an
 # independent MVN draw, so the only params field is `Sigma`.
 # `last_state$trends` is a zero-row matrix (max_lag = 0).
@@ -518,7 +545,8 @@ extract_last_observed_times <- function(fit, n_series) {
 # read gives `sigma_trend[1..n_lv]` and the `n_lv` square
 # `L_Omega_trend` the latent draws are actually scaled by.
 #'@noRd
-extract_zmvn_state <- function(one_draw, n_series, n_lv, fit) {
+extract_zmvn_state <- function(one_draw, meta, n_series, n_lv, fit,
+                               state_var = "trend") {
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
                                  has_cor = TRUE,
                                  standata = fit$standata)
@@ -538,12 +566,11 @@ extract_zmvn_state <- function(one_draw, n_series, n_lv, fit) {
 # changepoint times `t_change_trend` from `standata`. The
 # latter is a fixed quantity, set at fit time on a regular
 # grid over the training history. A logistic fit adds the
-# `m_trend[s]` offset. The `cap_trend` data array of a
-# logistic fit is also pulled here, which saves the forecast
-# caller a second pass over standata.
+# `m_trend[s]` offset. A forecast takes the capacities of the new
+# times from `newdata`, in `forecast_context_pw()`.
 #'@noRd
-extract_pw_state <- function(one_draw, meta, n_series, n_lv,
-                                fit) {
+extract_pw_state <- function(one_draw, meta, n_series, n_lv, fit,
+                             state_var = "trend") {
   k_vec <- broadcast_to_series(draw_vector(one_draw, "k_trend", n_lv),
                                n_series)
   # The logistic form samples `m_trend`. For the linear form, the
@@ -568,11 +595,6 @@ extract_pw_state <- function(one_draw, meta, n_series, n_lv,
   }
   t_change <- as.numeric(fit$standata$t_change_trend %||%
                            numeric(0L))
-  # `cap_trend` is a fit-time `[N_time_trend, N_series_trend]`
-  # data matrix (logistic only); store it on `last_state` so
-  # the forecast caller can read it without re-traversing
-  # standata. Linear fits store it as NULL.
-  cap <- fit$standata$cap_trend
   list(
     params = list(
       k = k_vec,
@@ -582,8 +604,7 @@ extract_pw_state <- function(one_draw, meta, n_series, n_lv,
     ),
     last_state = list(
       trends = matrix(0, nrow = 0L, ncol = n_series),
-      errors = NULL,
-      cap_train = cap
+      errors = NULL
     )
   )
 }

@@ -209,24 +209,14 @@ sim_mvgam <- function(type = 1L,
   if (!is.null(built$trend_time)) {
     trend_args$time <- built$trend_time
   }
-  is_pw <- is_pw_trend(trend_model)
-  if (is_pw) {
-    # PW (piecewise linear or logistic) needs its own param
-    # defaults (k, m, delta, t_change) and a direct kernel
-    # call -- the propagate_trend dispatcher's PW arm is
-    # designed for forecast-horizon changepoint sampling,
-    # which is wrong for simulation (we want a fully
-    # deterministic trend at the training time grid).
+  trend_mat <- if (is_pw_trend(trend_model)) {
+    # A piecewise trend is deterministic given (k, m, delta,
+    # t_change), evaluated at the training times. `propagate_pw()`
+    # samples changepoints over a forecast horizon, which a
+    # simulation has none of.
     trend_args$params <- fill_pw_trend_defaults(
       trend_model, trend_args$params, n_series, n_timepoints
     )
-  }
-  trend_mat <- if (is_pw) {
-    # PW is fully deterministic given (k, m, delta, t_change);
-    # bypass the propagate_trend dispatcher (whose PW arm is
-    # tuned for forecast-horizon changepoint sampling) and
-    # evaluate the kernel directly at the training time grid.
-    growth <- pw_growth(trend_model)
     pw_trendC(
       t = as.numeric(seq_len(n_timepoints)),
       k = as.numeric(trend_args$params$k),
@@ -238,7 +228,7 @@ sim_mvgam <- function(type = 1L,
       } else {
         matrix(0, 0L, 0L)
       },
-      growth_type = growth
+      growth_type = pw_growth(trend_model)
     )
   } else {
     propagate_trend(
@@ -819,15 +809,10 @@ intercept_for_family <- function(fam_name) {
 }
 
 
-# Internal: target latent-trend sigma given a prop_trend share of
-# total link-scale variance. With obs-side deterministic SD ~ 1,
-# `prop_trend` of the link-scale variance becomes the trend's
-# variance share. Kept as a thin wrapper so type specs can pass a
-# sensible scalar to propagate_trend's params; the empirical
-# trend SD is rescaled post hoc inside `sim_mvgam` for
-# stationary trends. Non-stationary trends (RW) override
-# `sigma` upfront in the main flow rather than going through
-# this helper.
+# Internal: the innovation scale a type spec passes to
+# `propagate_trend()`, from the trend's share of the link-scale
+# variance. `sim_mvgam()` rescales every simulated trend to its
+# target SD afterwards, and this sets only the starting amplitude.
 #'@noRd
 trend_sigma <- function(prop_trend) {
   prop_trend <- max(min(prop_trend, 0.99), 0.01)
@@ -835,15 +820,6 @@ trend_sigma <- function(prop_trend) {
 }
 
 
-# Internal: TRUE when the trend kernel produces an integrated
-# (non-stationary) trajectory whose variance grows with time.
-# Post-propagation SD-rescaling is skipped for these trends to
-# preserve the linearly-growing variance that defines the
-# process; sim_mvgam picks `sigma_innov` upfront instead.
-#
-# RW is the only non-stationary kernel this predicate recognises;
-# PW is identified separately, by the helper below.
-#'@noRd
 # Internal: TRUE when the trend constructor is `PW()`. PW
 # trends need their own simulation path (deterministic kernel
 # evaluation, not stochastic propagation) and their own
@@ -863,13 +839,14 @@ is_pw_trend <- function(trend_model) {
 
 
 # Internal: PW-specific param defaults. The `PW()` constructor
-# carries `n_changepoints`, `growth`, and `changepoint_scale`;
+# carries `n_changepoints` and `growth`;
 # this helper turns those into (k, m, delta, t_change) plus an
 # optional cap matrix for logistic growth.
 #
 # Defaults:
 #   * k       : 0.02 per unit time -- gentle linear growth.
-#   * m       : 0.5 -- mild positive intercept.
+#   * m       : 0.5, the time of the logistic inflection. The
+#     curve starts near half its capacity.
 #   * delta   : alternating +/- 0.05 magnitudes across
 #     changepoints, independently per series so multi-series
 #     PW sims have visibly distinct trajectories.

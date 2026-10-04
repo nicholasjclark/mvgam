@@ -10,7 +10,7 @@ PW(
   cap = NA,
   n_changepoints = 10,
   changepoint_range = 0.8,
-  changepoint_scale = 0.05,
+  changepoint_scale = 0.3,
   growth = "linear",
   n_lv = NULL,
   trend_map = NULL
@@ -37,12 +37,17 @@ Default is \code{10}.}
 \item{changepoint_range}{Proportion of history in \code{data} in which trend
 changepoints will be estimated. Defaults to \code{0.8} for the first 80\%.}
 
-\item{changepoint_scale}{Parameter modulating the flexibility of the
-automatic changepoint selection by altering the scale parameter of a
-Laplace distribution. The resulting prior will be
-\code{double_exponential(0, changepoint_scale)}. Large values will allow many
-changepoints and a more flexible trend, while small values will allow few
-changepoints. Default is \code{0.05}.}
+\item{changepoint_scale}{A positive number: the typical change in
+growth at one changepoint over the whole series, as in Prophet, in
+link units for linear growth and in logits for logistic growth.
+For a series of \code{N} time points the prior on each per-step rate
+change is \code{double_exponential(0, s * changepoint_scale / N)},
+where \code{s} is the factor \code{\link[=get_prior]{get_prior()}} describes for linear growth
+and 1 for logistic growth. Larger values give a more flexible trend. The default of \code{0.3}
+gives the ten default changepoints a prior median movement of the
+level of about half a unit over the series, the movement the
+\code{\link[=LLT]{LLT()}} slope prior allows. Prophet's own default of \code{0.05} holds a
+link-scale trend close to a straight line.}
 
 \item{growth}{Character string specifying either \code{'linear'} or \code{'logistic'}
 growth of the trend. If \code{'logistic'}, the \code{cap} argument must specify the
@@ -82,6 +87,16 @@ positions its curve along the time axis. It contributes
 expectation at the \code{cap} you supply when the observation formula
 omits its intercept (\code{y ~ -1} or \code{y ~ 0 + ...}). An intercept
 there raises the ceiling above \code{cap}.
+
+\emph{Priors}:
+Time runs in steps \verb{1, ..., N}, and the default priors are set on
+the span of the series. The base growth rate takes
+\verb{k_trend ~ normal(0, 2 s / (N - 1))}, two units of growth over the
+series at one standard deviation, where \eqn{s} is the factor
+\code{\link[=get_prior]{get_prior()}} describes for linear growth and 1 for logistic
+growth. The logistic inflection takes
+\code{m_trend ~ normal((N + 1) / 2, N / 2)}, centred on the middle of the
+series. \code{\link[=get_prior]{get_prior()}} shows the values for a given model.
 
 \emph{Logistic growth and the cap variable}:
 Many growing series approach a ceiling, such as a total market size,
@@ -126,6 +141,10 @@ mcmc_plot(mod, variable = "trend_params", type = "intervals")
 \references{
 Taylor, Sean J., and Benjamin Letham. "Forecasting at scale."
 The American Statistician 72.1 (2018): 37–45.
+}
+\seealso{
+\code{\link[=LLT]{LLT()}} for a trend whose growth changes continuously,
+\code{\link[=get_prior]{get_prior()}} for the scale of the default priors
 }
 \author{
 Nicholas J Clark

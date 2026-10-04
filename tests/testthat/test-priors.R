@@ -451,11 +451,10 @@ test_that("validate_trend_formula rejects invalid terms", {
   expect_error(mvgam:::validate_trend_formula(~ weights(w) + AR()))
   expect_error(mvgam:::validate_trend_formula(~ trials(n) + AR()))
   expect_error(mvgam:::validate_trend_formula(~ cens(c) + AR()))
-  # mi() is the one brms addition-term special that IS allowed on
-  # the trend side (the gatekeeper in validate_trend_formula
-  # whitelists it so users can impute missing latent-scale
-  # predictors).
-  expect_no_error(mvgam:::validate_trend_formula(~ mi(x) + AR()))
+  # brms imputes a `mi()` predictor as a response, which a trend
+  # formula cannot hold
+  expect_error(mvgam:::validate_trend_formula(~ mi(x) + AR()),
+               "'mi\\(\\)' is not supported")
   # Every response shares one trend. The refusal names one constructor.
   expect_error(
     mvgam:::validate_trend_formula(~ AR() + RW()),
@@ -947,7 +946,7 @@ test_that("every shared default names a distribution", {
   # `LV` sat here with a default for a parameter the generator never
   # emits, reachable only from a function with no caller.
   for (par in names(mvgam:::common_trend_priors)) {
-    expect_true(nzchar(mvgam:::common_trend_priors[[par]]$default))
+    expect_true(nzchar(mvgam:::get_default_trend_parameter_prior(par)$prior))
   }
 })
 
@@ -997,18 +996,68 @@ test_that("the trend priors reported are the ones sampled", {
 })
 
 
-test_that("a prior a trend argument sets is reported with that value", {
-  # `delta_trend`'s scale is the user's own `changepoint_scale`, so it
-  # is the one default the shared registry cannot hold.
-  reported_delta <- function(scale) {
-    mf <- mvgam_formula(y ~ -1,
-                        trend_formula = ~ PW(changepoint_scale = scale))
-    tab <- as.data.frame(get_prior(mf, data = prior_test_data(),
-                                    family = poisson()))
-    tab$prior[tab$class == "delta_trend"]
+test_that("trend scale priors take the response's spread, as brms does", {
+  dat <- prior_test_data()
+  sigma_prior <- function(d, fam) {
+    tab <- as.data.frame(get_prior(mvgam_formula(y ~ 1, ~ RW()), data = d,
+                                   family = fam))
+    tab$prior[tab$class == "sigma_trend"]
   }
-  expect_identical(reported_delta(0.05), "double_exponential(0, 0.05)")
-  expect_identical(reported_delta(0.4), "double_exponential(0, 0.4)")
+  # A Gaussian response in its own units
+  dat$y <- 100 + 40 * sin(seq_len(nrow(dat)))
+  s <- round(stats::mad(dat$y), 1) / 2.5
+  expect_identical(sigma_prior(dat, gaussian()),
+                   paste0("exponential(", signif(2 / s, 4), ")"))
+  # Counts on the log link spread by less than one
+  dat$y <- rpois(nrow(dat), 5)
+  expect_identical(sigma_prior(dat, poisson()), "exponential(2)")
+
+  # A missing response is dropped. As in brms, a log link takes 0.1
+  # for a zero and no spread from a negative value. A simplex share and a binary detection take unit
+  # spread: the link scale does not measure them.
+  expect_identical(link_scale_spread(c(0, 1, 4, NA), poisson()),
+                   round(stats::mad(log(c(0.1, 1, 4))), 1))
+  expect_identical(link_scale_spread(c(-1, 2, 3), Gamma(link = "log")), 0)
+  expect_identical(link_scale_spread(c(0.2, 0.5, 0.3), diri()), 0)
+  expect_identical(
+    link_scale_spread(c(0, 1, 1, 0), nmix(type = "royle_nichols")), 0
+  )
+})
+
+test_that("LLT and PW growth priors scale with the number of time points", {
+  # 60 time points. A factor model measures the slope in units of its
+  # level's spread, sqrt(60).
+  dat <- prior_test_data()
+  resolved <- function(trend) {
+    tab <- as.data.frame(get_prior(mvgam_formula(y ~ 1, trend), data = dat,
+                                   family = poisson()))
+    stats::setNames(tab$prior, tab$class)
+  }
+  # The shocks at times 2 to 59 reach time 60 with weights 58 to 1,
+  # and the initial slope with weight 59
+  plain <- resolved(~ LLT())
+  expect_identical(plain[["sigma_slope_trend"]],
+                   paste0("student_t(3, 0, ",
+                          signif(1.3 / sqrt(sum((1:58)^2)), 4), ")"))
+  expect_identical(plain[["init_slope_trend"]],
+                   paste0("normal(0, ", signif(2 / 59, 4), ")"))
+  # A damped slope reaches with geometric weights at phi = 0.913
+  factor <- resolved(~ LLT(n_lv = 2, damped = TRUE))
+  reach <- function(m) (1 - 0.913^m) / (1 - 0.913)
+  expect_identical(factor[["sigma_slope_trend"]],
+                   paste0("student_t(3, 0, ",
+                          signif(1.3 * sqrt(60 / sum(reach(1:58)^2)), 4), ")"))
+  expect_identical(factor[["init_slope_trend"]],
+                   paste0("normal(0, ", signif(2 * sqrt(60) / reach(59), 4),
+                          ")"))
+  expect_identical(factor[["ar1_slope_trend"]], "beta(18, 2)")
+
+  # PW's base rate takes the LLT initial slope's scale, and its
+  # changepoint scale is the user's own, per step
+  pw <- resolved(~ PW(changepoint_scale = 0.4))
+  expect_identical(pw[["k_trend"]], plain[["init_slope_trend"]])
+  expect_identical(pw[["delta_trend"]],
+                   paste0("double_exponential(0, ", signif(0.4 / 60, 4), ")"))
 })
 
 

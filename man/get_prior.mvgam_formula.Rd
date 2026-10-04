@@ -41,14 +41,10 @@ at \code{\link[brms]{stancode}}, which does take it.}
 \item{...}{Additional arguments passed to \code{brms::get_prior}}
 }
 \value{
-A \code{brmsprior} data frame combining observation and trend priors
-with an additional \code{trend_component} column distinguishing:
-\itemize{
-\item \code{"observation"}: Parameters from the observation model
-\item \code{"trend"}: Parameters from the trend model (with _trend suffix)
-}
-The returned object is fully compatible with \code{brms::set_prior()} and
-\code{brms::prior()} functions for customizing priors.
+A \code{brmsprior} data frame of the observation and trend
+priors, usable with \code{brms::set_prior()} and
+\code{brms::prior()}. A trend class carries the \code{_trend}
+suffix.
 }
 \description{
 Extracts and combines prior specifications for both observation and trend
@@ -58,17 +54,34 @@ for prior inspection before model fitting. When
 \code{brms::get_prior} for observation-only models.
 }
 \details{
-When a trend formula is specified, the function:
-\enumerate{
-\item Extracts observation model priors using \code{brms::get_prior}
-\item Extracts trend model priors using mvgam's trend system
-\item Combines them into a single \code{brmsprior} object
-\item Adds the \code{trend_component} column for easy filtering
-}
+The observation priors are those \code{brms::get_prior()} gives,
+with mvgam's defaults for the families it adds. The trend rows list
+every parameter the trend constructor samples and the coefficients
+of the trend formula.
 
-The function handles embedded families automatically when using \code{bf()}
-specifications and supports all brms family types for observation models
-while trend components are always modeled as Gaussian State-Space processes.
+\strong{Default trend priors.} brms sets the scale of its default
+intercept, standard deviation and residual priors to
+\code{max(2.5, mad(link(y)))}, from the spread of the response on
+the link scale under the identity, log, inverse, square-root and
+inverse-square links. That widens its base scale of 2.5 by the
+factor \eqn{s = \max(1, \mathrm{mad}(\mathrm{link}(y)) / 2.5)}.
+mvgam widens the trend's scale priors by the same factor, taking the
+widest over several responses and \eqn{s = 1} under any other
+link:
+\itemize{
+\item \code{sigma_trend} and \code{sigma_group_trend} take
+\code{exponential(2 / s)}, with mean \eqn{s / 2}.
+\item The factor loadings \code{Z} take
+\code{student_t(3, 0, 0.5 s)}.
+\item The slope priors of \code{\link{LLT}()} and the growth priors
+of a linear \code{\link{PW}()} also scale with the number of
+time points. Their help pages give the forms.
+}
+A count model on the log link rarely spreads past 2.5, and its
+defaults keep their link-scale values. Coefficients without
+units keep fixed priors: autoregressive and damping coefficients,
+correlations and degrees of freedom. The table this returns holds
+the resolved values for the data given.
 
 A shrinkage prior on a trend-side class is written without
 autoscaling. \code{horseshoe()} and \code{R2D2()} scale their global

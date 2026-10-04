@@ -185,17 +185,54 @@ test_that("propagate_trend(AR(p = 2, ma = TRUE)) settles at its own variance", {
 
 # ---- VAR ----------------------------------------------------------
 
-test_that("propagate_trend(VAR(p = 1)) accepts explicit A and Sigma", {
-  A <- array(0, dim = c(3L, 3L, 1L))
-  diag(A[, , 1L]) <- c(0.6, 0.5, 0.4)
-  A[1L, 2L, 1L] <- 0.2
-  out <- propagate_trend(
-    VAR(p = 1L),
-    params = list(A = A, Sigma = diag(3L) * 0.25),
-    h = 40L, n_series = 3L
+test_that("an LLT forecast adds the slope to the level, damped by phi", {
+  # The reference replays the recursion on the propagator's own draws:
+  # level shocks first, then slope shocks.
+  state <- list(trends = matrix(c(1, 2), 1L), errors = NULL,
+                slope = c(0.5, -0.2))
+  params <- list(sigma = c(0.3, 0.2), sigma_slope = c(0.1, 0.05),
+                 phi_slope = c(0.8, 0.6))
+  set.seed(9)
+  out <- propagate_trend(LLT(damped = TRUE), params, h = 6L, n_series = 2L,
+                         last_state = state)
+  set.seed(9)
+  eta <- rmvn(6L, c(0, 0), diag(c(0.09, 0.04)))
+  zeta <- rmvn(6L, c(0, 0), diag(c(0.01, 0.0025)))
+  level <- c(1, 2)
+  slope <- c(0.5, -0.2)
+  ref <- matrix(0, 6L, 2L)
+  for (t in 1:6) {
+    level <- level + slope + eta[t, ]
+    slope <- c(0.8, 0.6) * slope + zeta[t, ]
+    ref[t, ] <- level
+  }
+  expect_equal(out, ref)
+})
+
+test_that("the VAR kernel multiplies each lag's matrix into its state", {
+  # The Stan program steps as `Phi[1] x[t - 1] + Phi[2] x[t - 2]`.
+  # Every coefficient off the diagonal differs from its transpose, so
+  # a kernel applying `t(Phi)` or dropping a cross term lands
+  # elsewhere.
+  A <- array(c(0.5, 0.2, -0.1, 0.3, 0.4, 0.05, -0.2, 0.1, 0.3,
+               0.1, -0.05, 0.02, 0.0, 0.15, -0.1, 0.08, 0.0, -0.12),
+             dim = c(3L, 3L, 2L))
+  h <- 6L
+  set.seed(3L)
+  e <- matrix(rnorm((h + 2L) * 3L), ncol = 3L)
+  last <- matrix(c(0.4, -0.7, 1.1, -0.2, 0.9, 0.3), nrow = 2L,
+                 byrow = TRUE)
+  kernel <- trend_arma_recursC(
+    ar_lags = 1:2, ma_lags = integer(0L), drift = rep(0, 3L),
+    A = A, B = array(0, dim = c(3L, 3L, 0L)), innovations = e,
+    linpreds = matrix(0, nrow = h + 2L, ncol = 3L),
+    last_trends = last, h = h
   )
-  expect_identical(dim(out), c(40L, 3L))
-  expect_true(all(is.finite(out)))
+  x <- rbind(last, matrix(NA_real_, h, 3L))
+  for (t in 3:(h + 2L)) {
+    x[t, ] <- A[, , 1L] %*% x[t - 1L, ] + A[, , 2L] %*% x[t - 2L, ] + e[t, ]
+  }
+  expect_equal(kernel, x[3:(h + 2L), ], tolerance = 1e-12)
 })
 
 
@@ -340,14 +377,15 @@ test_that("propagate_trend accepts a caller-supplied last_state", {
 # ---- Unsupported trend type ---------------------------------------
 
 test_that("an unregistered trend type reaching the propagator is a fault", {
-  # Every registered trend has a branch. Only a hand-built object
-  # reaches the fallback, which points the user at the issue tracker.
+  # Registration requires every trend's propagator. Only a hand-built
+  # object reaches the fault, which points the user at the issue
+  # tracker.
   fake_trend <- structure(
     list(trend = "UNKNOWN"), class = "mvgam_trend"
   )
   expect_error(
     propagate_trend(fake_trend, list(), h = 10L, n_series = 1L),
-    "lacks a branch for trend 'UNKNOWN'"
+    "lacks 'propagate_unknown\\(\\)'"
   )
 })
 

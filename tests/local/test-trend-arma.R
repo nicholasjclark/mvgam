@@ -610,9 +610,60 @@ test_that("every per-series plot panels in the model's own order", {
 test_that("forecast with no newdata says what it needs", {
   # A fit given no held-out data has no occasions to forecast at,
   # and the refusal names what `forecast()` needs.
-  expect_error(forecast(fit), "'newdata' is required to forecast")
-  msg <- tryCatch(forecast(fit), error = conditionMessage)
-  expect_true(grepl("hindcast", msg, fixed = TRUE))
+  err <- expect_error(forecast(fit), "'newdata' is required to forecast")
+  expect_match(conditionMessage(err), "hindcast", fixed = TRUE)
+})
+
+
+# -- Factor RW with a moving-average term ---------------------------------
+# Each factor takes its own `theta1_trend`, which a rotation would mix
+# with the other factor's. The factors are relabelled instead, and the
+# coefficients move with their factors.
+set.seed(11L)
+ma_lv_true <- local({
+  n_t <- 60L
+  z <- matrix(rnorm(n_t * 2L), n_t, 2L)
+  e <- z
+  e[-1L, ] <- z[-1L, ] + sweep(z[-n_t, ], 2L, c(0.6, -0.3), `*`)
+  apply(e, 2L, cumsum) * 0.25
+})
+ma_Z_true <- matrix(c(1, 0.8, 0.3, -0.5, 0.2, 0, 0.4, 1, 0.6, -0.9), 5L, 2L)
+ma_dat <- data.frame(
+  time = rep(1:60, 5L),
+  series = factor(rep(paste0("s", 1:5), each = 60L)),
+  y = rpois(300L, exp(as.vector(ma_lv_true %*% t(ma_Z_true)) + 1))
+)
+ma_factor_fit <- cached_fit(
+  "val_mvgam_rw_ma_factor.rds",
+  function() {
+    mvgam(y ~ 1, trend_formula = ~ RW(ma = TRUE, n_lv = 2), data = ma_dat,
+          family = poisson(), chains = 2L, iter = 1000L, warmup = 500L,
+          silent = 2, backend = "cmdstanr")
+  },
+  key = ma_lv_true
+)
+
+test_that("MA factors are relabelled, and theta moves with its factor", {
+  expect_identical(mvgam:::fit_factor_identification(ma_factor_fit),
+                   "relabel")
+  dm <- posterior::as_draws_matrix(ma_factor_fit$fit)
+  expect_false(any(grepl("^Z_tilde", colnames(dm))))
+  cells <- function(name, nr, nc) {
+    sprintf("%s[%d,%d]", name, rep(seq_len(nr), nc), rep(seq_len(nc), each = nr))
+  }
+  # Ground truth is the recursion: the stored states rebuilt from the
+  # relabelled innovations and coefficients at unit scale. A theta
+  # left with the other factor rebuilds the wrong path.
+  worst <- 0
+  for (r in round(seq(1, nrow(dm), length.out = 6))) {
+    z <- matrix(as.numeric(dm[r, cells("innovations_trend", 60L, 2L)]), 60L)
+    th <- as.numeric(dm[r, c("theta1_trend[1]", "theta1_trend[2]")])
+    e <- z
+    e[-1L, ] <- z[-1L, ] + sweep(z[-60L, ], 2L, th, `*`)
+    lv <- matrix(as.numeric(dm[r, cells("lv_trend", 60L, 2L)]), 60L)
+    worst <- max(worst, abs(apply(e, 2L, cumsum) - lv))
+  }
+  expect_lt(worst, 1e-5)
 })
 
 cat("\nDone.\n")

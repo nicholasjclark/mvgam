@@ -1,39 +1,35 @@
-# Single dispatch surface for forward-in-time trend simulation
-# AND (future) forecast extrapolation. Both operations share the
-# same C++ kernels and the same parameter contract; the only
-# difference is whether `last_state` comes from a burn-in (sim) or
-# from posterior draws (forecast).
-#
-# Shared by sim_mvgam and forecast.mvgam so a simulated trend and a
-# forecast trend advance by the same recursion.
+# One dispatch for forward-in-time trend simulation and forecasting.
+# `sim_mvgam()` starts from a burn-in and `forecast.mvgam()` from a
+# posterior draw's fitted state, and both advance by the same
+# recursion.
 
 
 #' Propagate an `mvgam` trend forward in time
 #'
-#' Dispatches on the supplied `mvgam_trend` constructor to the
-#' appropriate C++ kernel (`trend_arma_recursC()` for
-#' AR/RW/ARMA/VAR/VARMA, `car1_recursC()` for CAR(1)) or pure-R
-#' path (ZMVN, None). Draws innovations with the appropriate
-#' covariance structure, applies any burn-in needed when no
-#' explicit `last_state` is supplied, and returns the forward
-#' trajectory.
+#' Dispatches on the supplied `mvgam_trend` constructor to its
+#' propagator: the C++ kernel `trend_arma_recursC()` for RW, AR and
+#' VAR with or without a moving-average term, and R for CAR, LLT, PW
+#' and ZMVN. Draws innovations with the appropriate covariance
+#' structure, applies any burn-in needed when no explicit
+#' `last_state` is supplied, and returns the forward trajectory.
 #'
-#' @param trend_model An `mvgam_trend` object built by one of
-#'   [`RW()`], [`AR()`], [`VAR()`], [`CAR()`], [`ZMVN()`], or
-#'   the string `"None"`.
+#' @param trend_model An `mvgam_trend` object built by one of the
+#'   trend constructors, or the string `"None"`.
 #' @param params A named list of dynamics parameters. See *Details*
 #'   for the per-trend-type contract.
 #' @param h Integer forecast horizon.
 #' @param n_series Integer number of series (dimensions).
 #' @param last_state Either `NULL` (default; the dispatcher
 #'   generates a 200-step burn-in from zero) or a list with
-#'   elements `trends`, `errors` and `time` as documented in the
-#'   kernel header. Forecast callers must populate `trends` with
+#'   elements `trends` and `errors` as `extract_last_state()`
+#'   documents them. Forecast callers must populate `trends` with
 #'   posterior draws of the latent trend state, not observed
 #'   responses, and must centre them on the trend linear
 #'   predictor: the recursion advances a zero-mean process.
 #' @param time Required only for `CAR()` trends; length-`h`
 #'   numeric vector of time gaps for the forecast steps.
+#' @param fc_times,training_times,cap,changepoint_range Required only
+#'   for `PW()` trends, from `forecast_context_pw()`.
 #'
 #' @details
 #' The `params` list expects different fields per trend type:
@@ -104,26 +100,14 @@ propagate_trend <- function(trend_model,
     params$df <- if (is.na(df)) Inf else df
   }
 
-  trend_type <- trend_model$trend
-
-  switch(
-    trend_type,
-    "ZMVN" = propagate_zmvn(params, h, n_series),
-    "CAR" = propagate_car(params, h, n_series, last_state, time),
-    "RW" = propagate_arma(trend_model, params, h, n_series,
-                            last_state),
-    "AR" = propagate_arma(trend_model, params, h, n_series,
-                            last_state),
-    "VAR" = propagate_arma(trend_model, params, h, n_series,
-                              last_state),
-    "PW" = propagate_pw(trend_model, params, h, n_series,
-                          fc_times, training_times, cap,
-                          changepoint_range),
-    stop_mvgam_fault(
-      paste0("The trend propagator lacks a branch for trend '",
-             trend_type, "'."),
-      "Each registered trend type is forecast by its own branch."
-    )
+  # Every trend defines `propagate_<type>(trend_model, params, h,
+  # n_series, last_state, context)`. `context` holds the times and
+  # capacities that CAR and PW take.
+  context <- list(time = time, fc_times = fc_times,
+                  training_times = training_times, cap = cap,
+                  changepoint_range = changepoint_range)
+  trend_method(trend_model$trend, trend_method_templates[["propagate"]])(
+    trend_model, params, h, n_series, last_state, context
   )
 }
 
@@ -132,7 +116,8 @@ propagate_trend <- function(trend_model,
 # ZMVN: no temporal recursion; one MVN draw per timestep.
 # ------------------------------------------------------------------
 #'@noRd
-propagate_zmvn <- function(params, h, n_series) {
+propagate_zmvn <- function(trend_model, params, h, n_series, last_state,
+                           context) {
   Sigma <- params$Sigma
   if (is.null(Sigma)) {
     sigma_vec <- params$sigma %||% rep(1, n_series)
@@ -146,10 +131,12 @@ propagate_zmvn <- function(params, h, n_series) {
 
 
 # ------------------------------------------------------------------
-# CAR(1): continuous-time AR, one kernel call per (series, gap).
+# CAR(1): continuous-time AR, one exact transition per gap.
 # ------------------------------------------------------------------
 #'@noRd
-propagate_car <- function(params, h, n_series, last_state, time) {
+propagate_car <- function(trend_model, params, h, n_series, last_state,
+                          context) {
+  time <- context$time
   if (is.null(time)) {
     stop_mvgam_fault(
       "CAR(1) propagation needs the forecast time gaps.",
@@ -182,16 +169,11 @@ propagate_car <- function(params, h, n_series, last_state, time) {
     as.numeric(rmvn(1L, mu = rep(0, n_series), Sigma = start_cov, df = df))
   }
   innovations <- draw_trend_innovations(h, n_series, df)
-  if (is.null(Sigma)) {
-    return(car1_recursC(
-      phi = phi, sigma = sigma, time_dis = as.numeric(time),
-      innovations = innovations, last_trend = last_trend, h = h
-    ))
-  }
+  Sigma <- Sigma %||% diag(sigma^2, nrow = n_series)
   checkmate::assert_matrix(Sigma, nrows = n_series, ncols = n_series,
                            any.missing = FALSE)
-  # Correlated innovations take one covariance per gap, the exact
-  # transition of the continuous-time process.
+  # Each gap takes its own covariance, the exact transition of the
+  # continuous-time process
   gamma <- car_stationary_cov(phi, Sigma)
   states <- matrix(NA_real_, nrow = h, ncol = n_series)
   for (step in seq_len(h)) {
@@ -235,9 +217,12 @@ car_gap_cov <- function(phi, gamma, gap) {
 # deterministic and testable.
 # ------------------------------------------------------------------
 #'@noRd
-propagate_pw <- function(trend_model, params, h, n_series,
-                           fc_times, training_times, cap = NULL,
-                           changepoint_range = NULL) {
+propagate_pw <- function(trend_model, params, h, n_series, last_state,
+                         context) {
+  fc_times <- context$fc_times
+  training_times <- context$training_times
+  cap <- context$cap
+  changepoint_range <- context$changepoint_range
   growth <- pw_growth(trend_model)
   if (is.null(fc_times) || length(fc_times) != h) {
     stop_shape_fault("'fc_times'", length(fc_times), h)
@@ -383,27 +368,91 @@ sample_horizon_changepoints <- function(delta_train_s,
 
 
 # ------------------------------------------------------------------
-# AR / RW / ARMA / VAR / VARMA: route through the general kernel.
-# Builds the cube + lag vectors per the trend's $p, $ma, $cor flags
-# and the supplied params; performs burn-in init when last_state is
-# NULL; calls trend_arma_recursC.
+# LLT: the level adds the last slope and a level shock, and the slope
+# its own Gaussian shock, damped by `phi_slope`. The fitted state
+# holds the level and the slope at the last occasion. A simulation
+# starts the level at zero and the slope at `normal(0, 2 / h)`. With no
+# slope scale given, `sigma * sqrt(3) / h` gives the slope and the
+# level shocks equal variance over the horizon.
 # ------------------------------------------------------------------
 #'@noRd
-propagate_arma <- function(trend_model, params, h, n_series,
-                            last_state) {
-  trend_type <- trend_model$trend
-  # mvgam's AR()/VAR() constructors accept `p` as either a scalar
-  # (consecutive lags 1..p) or a vector (sparse lag indices). The
-  # kernel takes an integer vector of active lags, so expand the
-  # scalar form here.
-  p_arg <- trend_model$p %||% 1L
-  ar_lags <- if (identical(trend_type, "RW")) {
-    1L
-  } else if (length(p_arg) == 1L) {
-    seq_len(as.integer(p_arg))
+propagate_llt <- function(trend_model, params, h, n_series, last_state,
+                          context) {
+  df <- params$df %||% Inf
+  sigma <- rep_len(as.numeric(params$sigma %||% 1), n_series)
+  Sigma <- params$Sigma %||% diag(sigma^2, nrow = n_series)
+  damped <- isTRUE(trend_model$damped)
+  phi <- if (damped) {
+    rep_len(as.numeric(params$phi_slope %||% 0.9), n_series)
   } else {
-    as.integer(p_arg)
+    rep(1, n_series)
   }
+  sigma_slope <- rep_len(
+    as.numeric(params$sigma_slope %||% (sigma * sqrt(3) / h)), n_series
+  )
+  # The slope shocks take the level's correlation with their own scales
+  Sigma_slope <- params$Sigma_slope %||%
+    (sigma_slope * stats::cov2cor(Sigma) * rep(sigma_slope, each = n_series))
+
+  if (is.null(last_state)) {
+    level <- rep(0, n_series)
+    slope <- stats::rnorm(n_series, 0, 2 / h)
+  } else {
+    level <- as.numeric(last_state$trends[nrow(last_state$trends), ])
+    slope <- as.numeric(last_state$slope)
+  }
+  level_shocks <- rmvn(h, rep(0, n_series), Sigma, df = df)
+  slope_shocks <- rmvn(h, rep(0, n_series), Sigma_slope)
+  out <- matrix(NA_real_, nrow = h, ncol = n_series)
+  for (step in seq_len(h)) {
+    level <- level + slope + level_shocks[step, ]
+    slope <- phi * slope + slope_shocks[step, ]
+    out[step, ] <- level
+  }
+  out
+}
+
+
+# ------------------------------------------------------------------
+# RW / AR / ARMA / VAR / VARMA: one general kernel. A random walk is
+# an AR(1) with coefficient one, and a simulation without supplied
+# coefficients takes 0.7 at every AR lag.
+# ------------------------------------------------------------------
+#'@noRd
+propagate_rw <- function(trend_model, params, h, n_series, last_state,
+                         context) {
+  params$ar <- params$ar %||% 1
+  propagate_arma(trend_model, params, h, n_series, last_state,
+                 ar_lags = 1L)
+}
+
+#'@noRd
+propagate_ar <- function(trend_model, params, h, n_series, last_state,
+                         context) {
+  ar_lags <- resolve_active_lags(trend_model$p %||% 1L)
+  params$ar <- params$ar %||% rep(0.7, length(ar_lags))
+  propagate_arma(trend_model, params, h, n_series, last_state,
+                 ar_lags = ar_lags)
+}
+
+#'@noRd
+propagate_var <- function(trend_model, params, h, n_series, last_state,
+                          context) {
+  if (is.null(params$A)) {
+    stop(insight::format_error(c(
+      "VAR propagation requires 'A' in params.",
+      i = "'A' must be an array of shape [n_series, n_series, length(p)]."
+    )))
+  }
+  propagate_arma(trend_model, params, h, n_series, last_state,
+                 ar_lags = resolve_active_lags(trend_model$p %||% 1L))
+}
+
+# Builds the coefficient cubes from the supplied params, burns in a
+# start when `last_state` is NULL and calls `trend_arma_recursC()`.
+#'@noRd
+propagate_arma <- function(trend_model, params, h, n_series,
+                            last_state, ar_lags) {
   has_ma <- isTRUE(trend_model$ma)
   ma_lags <- if (has_ma) 1L else integer(0L)
 
@@ -413,7 +462,7 @@ propagate_arma <- function(trend_model, params, h, n_series,
   max_lag <- max(max_ar, max_ma)
   total <- h + max_lag
 
-  A_cube <- build_arma_A(trend_type, params, ar_lags, n_series)
+  A_cube <- build_arma_A(params, ar_lags, n_series)
   B_cube <- build_arma_B(has_ma, params, m_b, n_series)
   drift <- as.numeric(params$drift %||% rep(0, n_series))
   if (length(drift) == 1L) drift <- rep(drift, n_series)
@@ -475,32 +524,20 @@ propagate_arma <- function(trend_model, params, h, n_series,
 }
 
 
-# Build the AR coefficient cube. For univariate AR / RW each slice
-# is a diagonal matrix; for VAR each slice is a full matrix from
-# params$A.
+# Build the AR coefficient cube: the full matrices `params$A` where
+# given, and otherwise a diagonal slice per lag from `params$ar`.
 #'@noRd
-build_arma_A <- function(trend_type, params, ar_lags, n_series) {
+build_arma_A <- function(params, ar_lags, n_series) {
   m_a <- length(ar_lags)
-  if (identical(trend_type, "VAR")) {
+  if (!is.null(params$A)) {
     A_cube <- params$A
-    if (is.null(A_cube)) {
-      stop(insight::format_error(c(
-        "VAR propagation requires 'A' in params.",
-        i = paste0(
-          "'A' must be an array of shape ",
-          "[n_series, n_series, length(p)]."
-        )
-      )))
-    }
     checkmate::assert_array(A_cube, d = 3L)
     if (any(dim(A_cube) != c(n_series, n_series, m_a))) {
       stop_shape_fault("'A'", dim(A_cube), c(n_series, n_series, m_a))
     }
     return(A_cube)
   }
-  # AR / RW: build diagonal A from params$ar (or default 0.7 / 1.0).
-  ar_default <- if (identical(trend_type, "RW")) 1.0 else 0.7
-  ar_coefs <- params$ar %||% rep(ar_default, m_a)
+  ar_coefs <- params$ar
   if (is.matrix(ar_coefs)) {
     if (any(dim(ar_coefs) != c(m_a, n_series))) {
       stop_shape_fault("'ar'", dim(ar_coefs), c(m_a, n_series))
@@ -554,7 +591,7 @@ build_arma_B <- function(has_ma, params, m_b, n_series) {
 
 # Burn in 200 zero-seed steps to draw a stationary initial state.
 # Returns a `last_state` list compatible with the propagate_arma
-# contract (trends, errors, time).
+# contract (trends, errors).
 #'@noRd
 run_burnin <- function(ar_lags, ma_lags, drift, A_cube, B_cube,
                         Sigma, n_series, burn_in, max_lag, df = Inf) {
@@ -579,8 +616,7 @@ run_burnin <- function(ar_lags, ma_lags, drift, A_cube, B_cube,
   )
   list(
     trends = utils::tail(bi_states, max_lag),
-    errors = utils::tail(innovations, max_lag),
-    time = NULL
+    errors = utils::tail(innovations, max_lag)
   )
 }
 
@@ -667,7 +703,7 @@ rmvn <- function(n, mu, Sigma, df = Inf) {
 #   * `trend_type`  - character; one of "RW", "AR", "VAR", "CAR",
 #                     "ZMVN", "PW".
 #   * `ar_lags`     - integer vector of active AR lag indices.
-#                     `1` for RW / CAR, `seq_len(p)` for
+#                     `1` for RW / LLT / CAR, `seq_len(p)` for
 #                     `AR(p = k)` / `VAR(p = k)`, `as.integer(p)`
 #                     for sparse-lag `AR(p = c(...))`, empty for
 #                     ZMVN / PW.
@@ -721,6 +757,7 @@ derive_ar_lags <- function(spec) {
   switch(
     spec$trend,
     "RW" = 1L,
+    "LLT" = 1L,
     "AR" = ,
     "VAR" = resolve_active_lags(spec$p),
     "CAR" = 1L,

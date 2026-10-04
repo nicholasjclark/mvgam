@@ -933,51 +933,7 @@ model_glossary <- function(obj) {
       }
     }
     defs <- c(defs, innovation_glossary(obj, is_factor))
-    if (identical(tt, "AR")) {
-      defs <- c(defs, ar_glossary(obj))
-    }
-    if (identical(tt, "VAR")) {
-      defs <- c(defs, paste0(
-        "- $\\boldsymbol{\\Phi}_l$: autoregressive coefficient matrix at ",
-        "lag $l$, mapped into the stationary region from an unconstrained ",
-        "matrix $\\mathbf{A}_l$"
-      ))
-      if ("Amu_trend" %in% obj$prior$class) {
-        defs <- c(defs, paste0(
-          "- $\\mu^{(A)}$, $\\omega^{(A)}$: mean and precision of the ",
-          "normal prior on the entries of $\\mathbf{A}_l$, one pair for ",
-          "the diagonal and one for the off-diagonal"
-        ))
-      }
-    }
-    if (trend_has_ma(obj) && identical(tt, "VAR")) {
-      defs <- c(defs, paste0(
-        "- $\\boldsymbol{\\Theta}_l$: moving-average coefficient matrix ",
-        "at lag $l$, mapped into the invertible region from an ",
-        "unconstrained matrix $\\mathbf{D}_l$ whose entries take normal ",
-        "priors with means $\\mu^{(D)}$ and precisions $\\omega^{(D)}$"
-      ))
-    } else if (trend_has_ma(obj)) {
-      defs <- c(defs, paste0(
-        "- $", lag_symbol("\\theta", "l", trend_process_index(obj)),
-        "$: moving-average coefficient at lag $l$"
-      ))
-    }
-    if (identical(tt, "CAR")) {
-      defs <- c(defs, paste0(
-        "- $", trend_symbols(obj)[["ar1_trend"]],
-        "$: autocorrelation over a gap of one, and $", car_gap_symbol,
-        "$ the time between occasions $t - 1$ and $t$ in units of the ",
-        "median gap between a series' observations"
-      ))
-      if (trend_samples_cor(obj)) {
-        defs <- c(defs, paste0(
-          "- $", sigma_symbol(), "$: innovation covariance over a gap ",
-          "of one, and $\\lambda_i = -\\log \\rho_i$"
-        ))
-      }
-    }
-    if (identical(tt, "PW")) defs <- c(defs, pw_glossary(obj))
+    defs <- c(defs, trend_method(tt, trend_method_templates[["glossary"]])(obj))
     gr <- trend_grouping_var(obj)
     if (!is.null(gr)) {
       sym <- trend_symbols(obj)
@@ -1047,9 +1003,74 @@ trend_has_ma <- function(obj) {
 }
 
 
-# Internal: the glossary entries for an AR trend's coefficients.
+# The glossary entries for a trend's own parameters. Every trend
+# defines `glossary_<type>(obj)`, which `model_glossary()` calls.
+
+#' The moving-average coefficient a univariate trend samples
 #' @noRd
-ar_glossary <- function(obj) {
+ma_glossary <- function(obj) {
+  if (!trend_has_ma(obj)) return(character(0L))
+  paste0(
+    "- $", lag_symbol("\\theta", "l", trend_process_index(obj)),
+    "$: moving-average coefficient at lag $l$"
+  )
+}
+
+#' @noRd
+glossary_rw <- function(obj) {
+  ma_glossary(obj)
+}
+
+#' @noRd
+glossary_zmvn <- function(obj) {
+  character(0L)
+}
+
+#' @noRd
+glossary_var <- function(obj) {
+  out <- paste0(
+    "- $\\boldsymbol{\\Phi}_l$: autoregressive coefficient matrix at ",
+    "lag $l$, mapped into the stationary region from an unconstrained ",
+    "matrix $\\mathbf{A}_l$"
+  )
+  if ("Amu_trend" %in% obj$prior$class) {
+    out <- c(out, paste0(
+      "- $\\mu^{(A)}$, $\\omega^{(A)}$: mean and precision of the ",
+      "normal prior on the entries of $\\mathbf{A}_l$, one pair for ",
+      "the diagonal and one for the off-diagonal"
+    ))
+  }
+  if (trend_has_ma(obj)) {
+    out <- c(out, paste0(
+      "- $\\boldsymbol{\\Theta}_l$: moving-average coefficient matrix ",
+      "at lag $l$, mapped into the invertible region from an ",
+      "unconstrained matrix $\\mathbf{D}_l$ whose entries take normal ",
+      "priors with means $\\mu^{(D)}$ and precisions $\\omega^{(D)}$"
+    ))
+  }
+  out
+}
+
+#' @noRd
+glossary_car <- function(obj) {
+  out <- paste0(
+    "- $", trend_symbols(obj)[["ar1_trend"]],
+    "$: autocorrelation over a gap of one, and $", car_gap_symbol,
+    "$ the time between occasions $t - 1$ and $t$ in units of the ",
+    "median gap between a series' observations"
+  )
+  if (trend_samples_cor(obj)) {
+    out <- c(out, paste0(
+      "- $", sigma_symbol(), "$: innovation covariance over a gap ",
+      "of one, and $\\lambda_i = -\\log \\rho_i$"
+    ))
+  }
+  out
+}
+
+#' The glossary entries for an AR trend's coefficients
+#' @noRd
+glossary_ar <- function(obj) {
   classes <- obj$prior$class
   shared <- any(startsWith(classes, "shared_ar"))
   idx <- if (!shared) trend_process_index(obj)
@@ -1071,7 +1092,7 @@ ar_glossary <- function(obj) {
       "and SD of the lag-$l$ coefficients across series"
     ))
   }
-  out
+  c(out, ma_glossary(obj))
 }
 
 
@@ -2655,6 +2676,7 @@ trend_symbols <- function(obj) {
     sigma_trend = if (is.null(idx)) "\\sigma_\\eta" else {
       paste0("\\sigma_{\\eta,", idx, "}")
     },
+    llt_symbols(obj, idx),
     # A continuous-time AR has one decay rate per series.
     if (identical(tt, "CAR")) {
       c(ar1_trend = if (is.null(idx)) "\\rho" else paste0("\\rho_{", idx, "}"))
@@ -2669,6 +2691,26 @@ trend_symbols <- function(obj) {
                       paste0("theta", ma_lags, "_trend"))
     }
   )
+}
+
+#' Symbols for the slope parameters of a local linear trend
+#'
+#' Sampled factor loadings give the slope one scale and one damping,
+#' each written without an index. The initial slope keeps one value per
+#' process.
+#' @param obj An `mvgam` object
+#' @param idx The process index, or `NULL` for one process
+#' @return Named character vector keyed by prior class
+#' @noRd
+llt_symbols <- function(obj, idx) {
+  shared <- methods_md_has_factor_model(obj) &&
+    samples_factor_loadings(first_trend_spec(obj))
+  sub <- if (shared || is.null(idx)) "" else paste0(",", idx)
+  start <- if (methods_md_has_factor_model(obj)) "\\tilde\\beta_{k,1}" else
+    "\\beta_{i,1}"
+  c(sigma_slope_trend = paste0("\\sigma_{\\beta", sub, "}"),
+    ar1_slope_trend = paste0("\\phi_{\\beta", sub, "}"),
+    init_slope_trend = start)
 }
 
 #' The index a trend's per-process parameters carry
@@ -2719,41 +2761,20 @@ ma_terms <- function(obj) {
 
 
 # ---------------------------------------------------------------
-# Latent registry
+# Latent dynamics
 # ---------------------------------------------------------------
-# Each entry returns a list of {lhs, op, rhs} rows for the
-# dynamics of eta_{i,t} and its innovation distribution. The
-# composer appends these rows to the model's align* block.
-
-#' @noRd
-methods_md_latent_registry <- function() {
-  list(
-    None  = NULL,
-    RW    = render_latent_rw,
-    AR    = render_latent_ar,
-    VAR   = render_latent_var,
-    CAR   = render_latent_car,
-    ZMVN  = render_latent_zmvn,
-    PW    = render_latent_pw
-  )
-}
+# Every trend defines `render_latent_<type>(obj, notation)`, which
+# returns the {lhs, op, rhs} rows for the dynamics of eta_{i,t} and
+# its innovation distribution. The composer appends these rows to
+# the model's align* block.
 
 #' @noRd
 latent_dynamics_rows <- function(obj, notation) {
-  tt <- obj$trend_metadata$trend_type
-  if (is.null(tt) || identical(tt, "None") || identical(tt, "none")) {
+  if (!methods_md_has_latent_trend(obj)) {
     return(list())
   }
-  reg <- methods_md_latent_registry()
-  renderer <- reg[[tt]]
-  if (is.null(renderer)) {
-    return(list(list(
-      lhs = "\\eta_{i,t}",
-      op  = "\\sim",
-      rhs = paste0("\\text{", tt, "}")
-    )))
-  }
-  renderer(obj, notation)
+  trend_method(obj$trend_metadata$trend_type,
+               trend_method_templates[["latent_rows"]])(obj, notation)
 }
 
 #' @noRd
@@ -2821,6 +2842,83 @@ render_latent_car <- function(obj, notation) {
   )
 }
 
+#' The slope symbol of a local linear trend, at `t` or a lag
+#' @noRd
+llt_slope <- function(obj, lag = 0L) {
+  is_factor <- methods_md_has_factor_model(obj)
+  idx <- if (is_factor) "k" else "i"
+  tilde <- if (is_factor) "\\tilde" else ""
+  paste0(tilde, "\\beta_{", idx, ",", time_subscript(lag), "}")
+}
+
+#' @noRd
+render_latent_llt <- function(obj, notation) {
+  sym <- trend_symbols(obj)
+  is_factor <- methods_md_has_factor_model(obj)
+  zeta <- paste0(if (is_factor) "\\tilde", "\\epsilon^{(\\beta)}_{",
+                 if (is_factor) "k" else "i", ",t}")
+  damping <- if ("ar1_slope_trend" %in% obj$prior$class) {
+    paste0(sym[["ar1_slope_trend"]], " ")
+  } else {
+    ""
+  }
+  c(
+    list(
+      list(
+        lhs = trend_eta(obj), op = "=",
+        rhs = paste(trend_eta(obj, lag = 1L), llt_slope(obj, lag = 1L),
+                    trend_eps(obj), sep = " + ")
+      ),
+      list(
+        lhs = llt_slope(obj), op = "=",
+        rhs = paste0(damping, llt_slope(obj, lag = 1L), " + ", zeta)
+      ),
+      llt_slope_shock_row(obj, zeta)
+    ),
+    innovation_rows(obj, is_vector = FALSE)
+  )
+}
+
+#' The law of the slope shocks: the level's correlation when it has one
+#' @noRd
+llt_slope_shock_row <- function(obj, zeta) {
+  sd <- llt_symbols(obj, trend_process_index(obj))[["sigma_slope_trend"]]
+  if (!trend_samples_cor(obj)) {
+    return(list(lhs = zeta, op = "\\sim",
+                rhs = paste0("\\text{Normal}(0, ", sd, ")")))
+  }
+  gr <- trend_grouping_var(obj)
+  omega <- paste0("\\boldsymbol{\\Omega}", if (!is.null(gr)) {
+    paste0("_{", gr, "}")
+  })
+  sd_vec <- "\\boldsymbol{\\sigma}_\\beta"
+  list(
+    lhs = "\\boldsymbol{\\epsilon}^{(\\beta)}_t", op = "\\sim",
+    rhs = paste0("\\text{MVNormal}(\\mathbf{0}, \\text{diag}(", sd_vec,
+                 ") ", omega, " \\text{diag}(", sd_vec, "))")
+  )
+}
+
+#' @noRd
+glossary_llt <- function(obj) {
+  sym <- trend_symbols(obj)
+  out <- c(
+    paste0("- $", llt_slope(obj), "$: slope, the level's growth from ",
+           "$t$ to $t + 1$"),
+    paste0("- $", sym[["sigma_slope_trend"]], "$: SD of the slope shocks",
+           if (trend_samples_cor(obj)) {
+             ", which take the correlation of the level shocks"
+           })
+  )
+  if ("ar1_slope_trend" %in% obj$prior$class) {
+    out <- c(out, paste0(
+      "- $", sym[["ar1_slope_trend"]], "$: slope damping"
+    ))
+  }
+  c(out, paste0("- $", sym[["init_slope_trend"]], "$: initial slope, ",
+                "estimated"))
+}
+
 #' @noRd
 render_latent_zmvn <- function(obj, notation) {
   gr <- trend_grouping_var(obj)
@@ -2858,7 +2956,7 @@ render_latent_pw <- function(obj, notation) {
 }
 
 #' @noRd
-pw_glossary <- function(obj) {
+glossary_pw <- function(obj) {
   out <- c(
     "- $k_i$: base growth rate of series $i$",
     paste0(

@@ -80,7 +80,7 @@ group-level terms.
 \item \code{"random_effect_beta"} (\code{ran_vals}) -- the group-level
 coefficients themselves, one per level and term.
 \item \code{"trend_model_param"} (\code{ran_pars}) -- parameters of the trend
-dynamics (\code{ar1_trend}, \code{theta_trend}, \code{Sigma_trend},
+dynamics (\code{ar1_trend}, \code{theta1_trend}, \code{Sigma_trend},
 \code{k_trend}, \code{m_trend}, \code{delta_trend}, etc.) and the factor
 loadings.
 \item \code{"trend_beta"}, \code{"trend_smooth_param"}, \code{"trend_smooth_coef"},

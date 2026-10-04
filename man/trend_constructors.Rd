@@ -223,7 +223,8 @@ arguments to be interpreted by the parsing functions in \pkg{mvgam}.
 Specify trend models for multivariate State-Space models in \pkg{mvgam}.
 These constructor functions create trend specifications for various temporal
 dynamics including random walks (RW), autoregressive models (AR, VAR, CAR),
-and piecewise trends (PW). These functions do not evaluate their arguments
+local linear trends (LLT) and piecewise trends (PW). These functions do not
+evaluate their arguments
 – they exist purely to help set up models with particular trend structures.
 }
 \details{
@@ -360,16 +361,17 @@ reordering or sign change of its factors, and some models under any
 rotation. mvgam reports one version, chosen by the dynamics of the
 factors:
 \itemize{
-\item \code{AR()} factors each take their own coefficients, and
-a rotation would mix them. After sampling, the factors of every
-draw are reordered and signed to agree with one reference, and
-the loadings \code{Z}, the factor paths \code{lv_trend} and the
+\item \code{AR()} factors, and \code{RW()} or \code{AR()}
+factors with \code{ma = TRUE}, each take their own coefficients,
+and a rotation would mix them. After sampling, the factors of
+every draw are reordered and signed to agree with one reference,
+and the loadings \code{Z}, the factor paths \code{lv_trend} and the
 coefficients \code{ar1_trend} or \code{theta1_trend} move together.
 Factors are numbered by the variance they explain, largest
 first.
 \item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
 \code{AR()} factors with \code{coef_sharing = "shared"}, are
-unchanged by rotation. Following Heaps & Jermyn (2024),
+unchanged by rotation when they carry no moving-average term. Following Heaps & Jermyn (2024),
 generated quantities rotate each draw to lower-triangular
 loadings \code{Z_tilde} with a non-negative diagonal, and rotate the
 factor paths to \code{lv_trend_tilde}. A VAR factor model rotates
@@ -576,6 +578,10 @@ Clark, N. J., Ernest, S. K. M., Senyondo, H., Simonis, J.,
 White, E. P., Yenni, G. M. and Karunarathna, K. A. N. K.
 (2025). Beyond single-species models: multispecies forecasts
 for ecological predictability. \emph{PeerJ}, 13:e18929.
+}
+\seealso{
+\code{\link[=LLT]{LLT()}}, \code{\link[=PW]{PW()}}, \code{\link[=ZMVN]{ZMVN()}}, \code{\link[=get_prior]{get_prior()}} for the default
+priors
 }
 \author{
 Nicholas J Clark

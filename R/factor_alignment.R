@@ -61,13 +61,21 @@ fit_factor_identification <- function(object) {
 
 #' Does each factor of this trend take its own coefficients?
 #'
+#' A moving-average term on shared innovations, as `RW(ma = TRUE)` and
+#' `AR(ma = TRUE)` take, has one `theta1_trend` per factor whatever the
+#' trend's other coefficients do. A rotation mixes factors that
+#' smooth their innovations differently.
+#'
 #' @param trend_spec A normalised trend specification.
 #' @return A single logical.
 #' @noRd
 has_factor_coefficients <- function(trend_spec) {
   spec <- trend_spec_head(trend_spec)
-  trend_property(spec$trend, "per_factor_coefficients") &&
+  own_dynamics <- trend_property(spec$trend, "per_factor_coefficients") &&
     !identical(ar_coef_sharing(spec), "shared")
+  own_ma <- isTRUE(spec$ma) &&
+    trend_property(spec$trend, "shared_innovations")
+  own_dynamics || own_ma
 }
 
 

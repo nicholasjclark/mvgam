@@ -110,23 +110,42 @@ trend gives the same result as the brms function.
 
 ## 3. Trend registry and constructors
 
-The registry (`R/trend_system.R`) holds the six built-in trends: AR,
-RW, VAR, ZMVN, CAR and PW. Users cannot register their own. For trend
-`FOO` the package defines `generate_foo_trend_stanvars()`, which
-emits its Stan code, and `foo_trend_properties()`, which declares its
-entry. `register_core_trends()` finds both by name on the first use
-of the registry. Each entry records:
+The registry (`R/trend_system.R`) holds the seven built-in trends:
+AR, RW, LLT, VAR, ZMVN, CAR and PW. Users cannot register their own.
+For trend `FOO`, `generate_foo_trend_stanvars()` emits the Stan code
+and `foo_trend_properties()` declares the entry. `register_core_trends()`
+finds both by name on the first use of the registry. Each entry
+records:
 
 - `supports_factors`, and the `incompatibility_reason` a factor
   request is refused with;
 - `covariance_pattern`: `"none"` for PW, `"cholesky_scaled"` for RW,
-  AR, ZMVN and CAR, `"full_covariance"` for VAR;
+  LLT, AR, ZMVN and CAR, `"full_covariance"` for VAR;
 - `stationary_source`: how a marginal prediction obtains the
   covariance it integrates over (section 10);
 - `requires_regular_intervals`: `TRUE` for a trend that indexes its
   lags by position, `FALSE` for CAR, whose kernel takes the elapsed
   gap, and for ZMVN, whose likelihood is exchangeable in time;
+- `per_factor_coefficients`: `TRUE` for AR, whose factors take their
+  own coefficients and are relabelled. An MA term on shared
+  innovations has the same effect (`has_factor_coefficients()`);
+- `completes_time_grid`: `TRUE` for CAR, which holds a state for a
+  series at a time the frame has no row for;
+- `shared_innovations`: `TRUE` for RW, LLT, AR and ZMVN, whose
+  generators take `sigma_trend`, the correlations, `df` and the
+  factor scale from the shared innovation system and supply only
+  their recursion to `assemble_shared_innovation_trend()`;
 - `generator`, the Stan generator.
+
+Every other task a trend performs is a function found by name through
+`trend_method(type, template)`. `trend_method_templates` lists the
+tasks each trend must define: its monitored parameters, the
+extraction of its last state, its propagation and its rows and
+glossary in the model description. `register_core_trends()` refuses a
+trend missing one.
+`trend_method_optional_templates` lists the tasks a trend may define,
+with a default otherwise: its forecast context (CAR's gaps, PW's
+times and capacities), its trend-specific priors and its data checks.
 
 Because no property has a default, every trend states each one.
 `get_trend_info()` returns an entry, and `trend_property()` returns
@@ -490,6 +509,25 @@ defaults by name pattern. The Stan generators take a prior through
 `get_trend_parameter_prior()`, which returns a user's prior for the
 class where one was given and this default otherwise.
 
+Every trend evolves in time steps. A fixed per-step prior on a growth
+rate allows more change in a longer series, and the resolvers for
+`LLT()` and `PW()` set each growth default on the span of the series.
+A growth rate takes `normal(0, 2 / (N - 1))`, two link units over the
+series at one standard deviation. The slope shock and
+changepoint scales give the level a prior median movement of about
+half a link unit over the series. The Stan program samples
+these parameters in units of their default scales, through Stan's
+`multiplier` or a fixed rescaling, which keeps a random start within
+a few prior scales of zero. A per-step scale such as `sigma_trend`
+keeps one default at every length.
+
+Every trend scale prior widens by `s = max(1, mad(link(y)) / 2.5)`,
+the factor brms widens its own default scale of 2.5 by
+(`trend_prior_unit()`). A count model on the log link rarely spreads
+past 2.5 and keeps its link-unit defaults. A Gaussian response in its
+own units moves the trend priors with it, which link units alone
+cannot.
+
 ## 9. Observation families
 
 brms's multi-category families and `mixture()` are refused.
@@ -548,9 +586,14 @@ The Stan program starts every contiguous `AR()` at the same law: the
 scalar closed forms at one lag, `ar_stationary_init()` for
 independent series above one lag and `joint_init_stanblock()` for
 correlated or grouped innovations at any order and for a
-moving-average term above one lag. A random walk has no stationary
-distribution and `ZMVN()` has no dynamics to settle into. Both keep
-their innovation covariance.
+moving-average term above one lag. A random walk and the level of a
+local linear trend have no stationary distribution, and `ZMVN()` has
+no dynamics to settle into. All three keep their innovation
+covariance. The slope of a local linear trend starts at a free value,
+damped or not, as the damped trends of `forecast::ets()` and bsts do.
+A series whose growth starts fast and slows is the case damping
+serves, and its initial slope lies far outside the slope's stationary
+distribution.
 
 `CAR()` is the exact discretisation of a continuous-time AR(1). Across
 a gap `d` the state decays by `ar^d` and the innovations have

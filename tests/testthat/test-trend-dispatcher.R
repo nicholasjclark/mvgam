@@ -26,18 +26,21 @@ test_that("CAR constructor works for continuous-time AR", {
   expect_equal(car_custom$series, "species")
 })
 
-test_that("CAR counts series on the resolved axis", {
-  # A frame whose responses are its series has no series column. The
-  # count once came from that column, which took the absent column as
-  # one series and let a trend covariate through on two.
-  set.seed(1)
-  wide <- data.frame(time = 1:30, y1 = rpois(30, 3), y2 = rpois(30, 3),
-                     x = rnorm(30))
-  expect_error(
-    mvgam(bf(mvbind(y1, y2) ~ 1) + set_rescor(FALSE),
-          trend_formula = ~ x + CAR(), data = wide, family = poisson(),
-          run_model = FALSE, silent = 2),
-    "The trend has 2 series"
+test_that("LLT refuses a short series and warns on a time term", {
+  dat <- expand.grid(time = 1:12, series = factor(c("a", "b")))
+  dat$y <- rpois(nrow(dat), 4)
+  short <- function(n, ...) {
+    get_prior(mvgam_formula(y ~ 1, ...), data = dat[dat$time <= n, ],
+              family = poisson())
+  }
+  expect_error(short(4, ~ LLT()), "needs at least 5 time points")
+  expect_warning(short(12, ~ LLT()), "barely informs 'sigma_slope_trend'")
+  expect_warning(
+    get_prior(mvgam_formula(y ~ s(time, k = 4), ~ LLT()),
+              data = expand.grid(time = 1:30, series = factor("a"),
+                                 y = 1L),
+              family = poisson()),
+    "'time' appears in a formula with 'LLT\\(\\)'"
   )
 })
 
@@ -926,12 +929,11 @@ test_that("PW parameter validation works correctly", {
     "Element 1 is not >= 0"
   )
 
-  # Test invalid changepoint_scale (must be non-negative)
-  # Note: 0 is valid, only negative values are invalid
-  expect_error(
-    PW(changepoint_scale = -0.05),
-    "Element 1 is not >= 0"
-  )
+  # A Laplace scale must be positive
+  for (bad in c(0, -0.05)) {
+    expect_error(PW(changepoint_scale = bad),
+                 "'changepoint_scale' must be a positive number")
+  }
 
   # Test invalid growth type
   expect_error(

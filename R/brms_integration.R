@@ -16,48 +16,22 @@
 # HELPER FUNCTIONS
 # =============================================================================
 
-#' Decide if a trend formula should include an intercept (mvgam convention)
-#' 
-#' @description
-#' Analyzes trend formulas to determine intercept inclusion following mvgam 
-#' conventions rather than R's default formula behavior. Trend constructors
-#' like RW() and AR() default to no intercept unless explicitly specified.
-#' 
-#' @param formula A formula object for trend specification
-#' @return Logical indicating whether intercept should be included
+#' Does a trend formula keep its intercept?
+#'
+#' Only a formula holding nothing but an intercept, as `~ 1 + RW()`
+#' leaves once the constructor is removed, keeps one. Every other
+#' trend formula is given to brms without its implicit intercept, which
+#' leaves the level to the observation formula. The `1` of `~ 1 + x`
+#' reaches brms as a column of the trend design.
+#'
+#' @param formula The trend formula without its constructor
+#' @return `TRUE` when the formula is `~ 1`
 #' @noRd
 should_trend_formula_have_intercept <- function(formula) {
-  # Input validation following mvgam standards
   checkmate::assert_formula(formula)
-  
-  # Get formula terms for analysis
-  formula_terms <- terms(formula)
-  
-  # Check R's built-in intercept attribute
-  has_r_intercept <- attr(formula_terms, 'intercept') == 1
-  
-  if (!has_r_intercept) {
-    # Explicitly excluded via ~ -1 or ~ 0 
-    return(FALSE)
-  }
-  
-  # For formulas with R intercept = 1, check if intercept was explicit
-  # Parse right-hand side of formula to detect explicit "+1" vs default behavior
-  rhs_terms <- attr(formula_terms, "term.labels")
-  
-  # If no terms on RHS beyond intercept, this is ~ 1 (explicit intercept only)
-  if (length(rhs_terms) == 0) {
-    return(TRUE)
-  }
-  
-  # Check if "1" is explicitly listed as a term (~ 1 + RW())
-  if ("1" %in% rhs_terms) {
-    return(TRUE)
-  }
-  
-  # Pure trend constructor formulas (~ RW(), ~ AR()) follow the mvgam
-  # convention of no intercept for trend innovations
-  return(FALSE)
+  formula_terms <- stats::terms(formula)
+  attr(formula_terms, "intercept") == 1L &&
+    length(attr(formula_terms, "term.labels")) == 0L
 }
 
 #' Collect the brms code-generation options into one list
@@ -734,7 +708,7 @@ apply_trend_class_suffix <- function(class) {
 mvgam_state_params <- c(
   "trend", "lv_trend", "lv_trend_tilde",
   "innovations_trend", "scaled_innovations_trend", "init_trend",
-  "init_innovations_trend"
+  "init_innovations_trend", "slope_trend", "innovations_slope_trend"
 )
 
 
@@ -1130,7 +1104,8 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     is_multivariate = is_mv_main,
     trend_specs = trend_specs,
     base_formula = parsed_trend$base_formula,
-    regular_terms = parsed_trend$regular_terms
+    regular_terms = parsed_trend$regular_terms,
+    obs_formula = formula
   ))
 }
 

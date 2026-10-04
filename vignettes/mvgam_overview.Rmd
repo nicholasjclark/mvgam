@@ -84,6 +84,7 @@ can hold covariates and smooths that act on the state:
 | Constructor | Latent state | Typical use |
 |:------------|:-------------|:------------|
 | `RW()` | Random walk | Series with no fixed mean |
+| `LLT(damped = )` | Level with a time-varying slope | Growth that changes rate, or levels off when damped |
 | `AR(p = )` | Autoregression, including sparse lags such as `p = c(1, 12)` | Momentum and seasonal recurrence |
 | `VAR(p = )` | Vector autoregression | Series that drive one another |
 | `CAR()` | Continuous-time AR(1) | Irregular times, and series observed at their own times |

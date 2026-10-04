@@ -11,7 +11,7 @@
 #'     using the posterior loadings `Z` for the default sampled-Z
 #'     factor model, or the user-supplied loadings broadcast across
 #'     draws when `trend_map = ...` fixes Z (see [mvgam()] /
-#'     [AR()] / [VAR()] / [RW()] / [ZMVN()]). Taking `Z Z^T` instead
+#'     [AR()] / [VAR()] / [RW()] / [LLT()] / [ZMVN()]). Taking `Z Z^T` instead
 #'     would drop whatever scale the latent columns carry, which
 #'     under multiplicative gamma shrinkage is the entire shrinkage.
 #'   \item Correlated process-error trends (`cor = TRUE` on `RW()` /

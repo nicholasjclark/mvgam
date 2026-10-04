@@ -79,6 +79,7 @@ reference:
   - print.mvgam_formula
   - formula.mvgam
   - RW
+  - LLT
   - PW
   - ZMVN
   - lv_axis

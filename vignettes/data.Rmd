@@ -130,8 +130,8 @@ levels(extra_level$series)
 
 ## The `time` variable
 
-The time column must be numeric. `RW()`, `AR()`, `VAR()` and
-`PW()` advance the latent state one time step at a time. They need
+The time column must be numeric. `RW()`, `AR()`, `VAR()`, `LLT()`
+and `PW()` advance the latent state one time step at a time. They need
 evenly spaced times within each series, although the response may
 be missing at any time.
 
@@ -442,8 +442,8 @@ mvgam(
 )
 ```
 
-`RW()`, `AR()`, `VAR()`, `CAR()`, `PW()` and `ZMVN()` all take
-these arguments.
+`RW()`, `AR()`, `VAR()`, `LLT()`, `CAR()`, `PW()` and `ZMVN()` all
+take these arguments.
 
 ## A pre-fit checklist
 
@@ -452,7 +452,7 @@ Before calling `mvgam()`, check that:
 1. The series column is a factor. A hierarchical trend takes its
    series from the `gr` and `subgr` columns instead.
 2. The time column is numeric, and evenly spaced within each
-   series for `RW()`, `AR()`, `VAR()` and `PW()`.
+   series for `RW()`, `AR()`, `VAR()`, `LLT()` and `PW()`.
 3. Every column the formulas use is in the data: covariates,
    offsets, random-effect grouping factors and addition terms.
 4. No such column has missing values.

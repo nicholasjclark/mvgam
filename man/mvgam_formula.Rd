@@ -38,7 +38,7 @@ When \code{trend_formula = NULL}, the model reduces to a pure brms
 observation model. When specified, the trend_formula can include:
 \itemize{
 \item Trend constructors: \code{RW()}, \code{AR()}, \code{CAR()},
-\code{ZMVN()}, \code{VAR()}, \code{PW()}
+\code{ZMVN()}, \code{VAR()}, \code{LLT()}, \code{PW()}
 \item Covariates that affect trend dynamics
 \item Smooth terms using mgcv syntax: \code{s()}, \code{t2()}
 \item Random effects: \code{(1|group)}, \code{(slope|group)}
@@ -53,19 +53,22 @@ trend-level modeling:
 
 \strong{Forbidden Terms:}
 \itemize{
-\item brms addition-terms: \code{weights()}, \code{cens()}, \code{trunc()},
-\code{mi()}, \code{trials()}, \code{rate()}, \code{vreal()}, \code{vint()},
-\code{subset()}, \code{index()}
+\item brms addition-terms: \code{weights()}, \code{se()},
+\code{cens()}, \code{trunc()}, \code{trials()}, \code{rate()},
+\code{vreal()}, \code{vint()}, \code{subset()}, \code{index()},
+\code{dec()}, \code{cat()}, \code{thres()}
+\item Missing-value imputation: \code{mi()}
 \item brms autocorrelation: \code{ar()}, \code{ma()}, \code{arma()},
 \code{cosy()}, \code{unstr()}, \code{autocor()}
 \item Offset terms: \code{offset()}
 }
 
 \strong{Rationale:}
-Addition-terms modify observation model behavior (weights, censoring, exposure,
-etc.) and should be specified in the main observation formula. Autocorrelation
-terms conflict with mvgam's State-Space dynamics. All forbidden terms remain
-fully supported in the main observation formula.
+Addition terms change the observation model, through weights,
+censoring or exposure, and belong in the observation formula.
+Autocorrelation terms conflict with the trend's state-space
+dynamics. brms imputes a \code{mi()} predictor as a response of the
+model, and a trend formula holds no response.
 }
 
 \section{Multivariate models, single shared trend type}{

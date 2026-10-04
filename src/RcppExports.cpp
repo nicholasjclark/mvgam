@@ -30,22 +30,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// car1_recursC
-arma::mat car1_recursC(const arma::vec& phi, const arma::vec& sigma, const arma::vec& time_dis, const arma::mat& innovations, const arma::vec& last_trend, int h);
-RcppExport SEXP _mvgam_car1_recursC(SEXP phiSEXP, SEXP sigmaSEXP, SEXP time_disSEXP, SEXP innovationsSEXP, SEXP last_trendSEXP, SEXP hSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type sigma(sigmaSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type time_dis(time_disSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type innovations(innovationsSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type last_trend(last_trendSEXP);
-    Rcpp::traits::input_parameter< int >::type h(hSEXP);
-    rcpp_result_gen = Rcpp::wrap(car1_recursC(phi, sigma, time_dis, innovations, last_trend, h));
-    return rcpp_result_gen;
-END_RCPP
-}
 // pw_trendC
 arma::mat pw_trendC(const arma::vec& t, const arma::vec& k, const arma::vec& m, const arma::mat& delta, const arma::vec& t_change, const arma::mat& cap, const std::string& growth_type);
 RcppExport SEXP _mvgam_pw_trendC(SEXP tSEXP, SEXP kSEXP, SEXP mSEXP, SEXP deltaSEXP, SEXP t_changeSEXP, SEXP capSEXP, SEXP growth_typeSEXP) {
@@ -66,7 +50,6 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_mvgam_trend_arma_recursC", (DL_FUNC) &_mvgam_trend_arma_recursC, 9},
-    {"_mvgam_car1_recursC", (DL_FUNC) &_mvgam_car1_recursC, 6},
     {"_mvgam_pw_trendC", (DL_FUNC) &_mvgam_pw_trendC, 7},
     {NULL, NULL, 0}
 };

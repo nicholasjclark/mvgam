@@ -1165,8 +1165,12 @@ factor_state_param_pattern <- function(pars) {
 #'@noRd
 hidden_par_pattern <- function(pars) {
   patterns <- character(0L)
-  if (any(grepl("^Phi_trend_tilde\\[", pars))) {
-    patterns <- c(patterns, "^Phi_trend\\[")
+  # A quantity rotated to the identified factor basis replaces its
+  # unrotated source, which no rotation-invariant summary uses
+  rotated <- unique(sub("_tilde\\[.*$", "",
+                        grep("_trend_tilde\\[", pars, value = TRUE)))
+  if (length(rotated)) {
+    patterns <- c(patterns, paste0("^", rotated, "\\["))
   }
   partial_map <- any(grepl("^Z_free_vec\\[", pars))
   every_loading_sampled <- any(grepl("^Z\\[", pars)) && !partial_map

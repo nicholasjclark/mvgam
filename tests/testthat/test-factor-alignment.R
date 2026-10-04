@@ -87,6 +87,12 @@ test_that("identification follows the dynamics of the factors", {
     factor_identification(spec("AR", coef_sharing = "shared")), "rotation"
   )
   expect_identical(factor_identification(spec("RW")), "rotation")
+  # Each factor takes its own moving-average coefficient
+  expect_identical(factor_identification(spec("RW", ma = TRUE)), "relabel")
+  expect_identical(
+    factor_identification(spec("AR", coef_sharing = "shared", ma = TRUE)),
+    "relabel"
+  )
   expect_identical(factor_identification(spec("VAR")), "rotation")
   expect_identical(factor_identification(spec("ZMVN")), "rotation")
   expect_identical(factor_identification(spec("AR", fixed_Z = partial)),
