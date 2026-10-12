@@ -219,10 +219,21 @@ twcrps_cell <- function(truth, fc, lower = -Inf, upper = Inf,
 
 # ----- Per-horizon multivariate kernels ---------------------------
 
-# Internal: shared NA-column drop + optional log offset for the
-# multivariate score cells (energy, twenergy).
-#'@noRd
+#' Forecast draws prepared for an energy score
+#'
+#' Drops every draw column holding a missing value and applies the log
+#' offset when `log = TRUE`. The energy and threshold-weighted energy
+#' score cells both call it.
+#'
+#' @param truth Numeric vector of observed values, one per series
+#' @param fc Numeric matrix of forecast draws, one row per series
+#' @param log Logical flag to score on the log scale
+#' @return List holding the prepared `truth` and `fc`
+#' @noRd
 clean_fc_for_es <- function(truth, fc, log = FALSE) {
+  checkmate::assert_atomic_vector(truth)
+  checkmate::assert_matrix(fc)
+  checkmate::assert_flag(log)
   has_na <- apply(fc, 2L, function(x) any(is.na(x)))
   fc <- fc[, !has_na, drop = FALSE]
   if (log) {

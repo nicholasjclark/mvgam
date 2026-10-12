@@ -3,7 +3,10 @@
 # Generated Stan reads the two together:
 #
 #   trend[t, s] = Z[s, ] * lv_trend[t, ] + mu_trend[times_trend[t, s]]
-#   mu[n]      += trend[obs_trend_time[n], obs_trend_series[n]]
+#   mu += to_vector(trend)[obs_trend_idx]
+#
+# where `obs_trend_idx[n]` is the column-major cell of
+# `(obs_trend_time[n], obs_trend_series[n])`,
 #
 # so one question, which latent state an observation reads, decides
 # every fitted value, forecast, residual and label. Answering it in

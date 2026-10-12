@@ -2,12 +2,13 @@
 % Please edit documentation in R/priors.R
 \name{get_prior}
 \alias{get_prior}
-\title{Get Prior Specifications for Model Objects}
+\title{Get prior specifications for model objects}
 \usage{
 get_prior(object, ...)
 }
 \arguments{
-\item{object}{Model specification object (formula, brmsformula, mvgam_formula, etc.)}
+\item{object}{Model specification object (formula, brmsformula,
+mvgam_formula, etc.)}
 
 \item{...}{Additional arguments passed to methods}
 }
@@ -15,13 +16,12 @@ get_prior(object, ...)
 A \code{brmsprior} data frame with prior specifications
 }
 \description{
-S3 generic function for extracting prior specifications from various model
-objects. This function provides a single interface for prior inspection
-across different model types, with extensions for mvgam
-State-Space models.
+S3 generic for extracting prior specifications from model objects.
+One interface serves prior inspection across model types, with
+extensions for mvgam State-Space models.
 }
 \details{
-This generic function dispatches to appropriate methods based on object class:
+This generic dispatches to a method based on object class:
 \itemize{
 \item \code{formula}: Delegates to \code{brms::get_prior}
 \item \code{brmsformula}: Delegates to \code{brms::get_prior}

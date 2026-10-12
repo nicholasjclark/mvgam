@@ -326,6 +326,8 @@ one_draw <- function(...) {
 
 test_that("predictor_suffix() writes brms's order of parts", {
   expect_identical(predictor_suffix(), "")
+  # A univariate program passes its response key as ""
+  expect_identical(predictor_suffix(resp = ""), "")
   expect_identical(predictor_suffix(dpar = "mu"), "")
   expect_identical(predictor_suffix(resp = "y1"), "_y1")
   expect_identical(predictor_suffix(dpar = "sigma"), "_sigma")

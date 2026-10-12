@@ -22,8 +22,7 @@ irf(object, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
-that used a Vector Autoregressive latent process model (either as \code{VAR(cor = FALSE)} or
-\code{VAR(cor = TRUE)}; see \code{\link[=VAR]{VAR()}} for details)}
+that used a \code{VAR()} latent process model}
 
 \item{...}{Unused. Anything passed here is refused.}
 

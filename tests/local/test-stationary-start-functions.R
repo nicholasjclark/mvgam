@@ -1,5 +1,5 @@
-# The Stan code an AR() trend starts its latent states with, compiled
-# on its own and checked against the definition.
+# The Stan code an AR() or VAR() trend starts its latent states with,
+# compiled on its own and checked against the definition.
 #
 # Correlated or grouped innovations at any order, and a moving-average
 # term above one lag, start through `joint_init_stanblock()`. It draws
@@ -91,9 +91,11 @@ starts$name <- sprintf("start_p%d_%s_%s", starts$p,
                        ifelse(starts$has_ma, "ma", "ar"), starts$set)
 
 sv <- c(stationary_joint_functions_stanvar(kernel = "ar"),
-        ar_pacf_functions_stanvar(with_init = TRUE))
+        ar_pacf_functions_stanvar(with_init = TRUE),
+        var_heaps_functions_stanvar())
 stan_file <- cmdstanr::write_stan_file(paste0(
-  "functions {\n", sv[[1]]$scode, "\n", sv[[2]]$scode, "\n",
+  "functions {\n", paste(vapply(sv, `[[`, "", "scode"), collapse = "\n"),
+  "\n",
   paste(unlist(Map(start_function, starts$name, starts$p, starts$has_ma,
                    starts$set)), collapse = "\n"),
   "}\n"
@@ -101,6 +103,21 @@ stan_file <- cmdstanr::write_stan_file(paste0(
 mod <- cmdstanr::cmdstan_model(stan_file, compile_standalone = TRUE,
                                quiet = TRUE)
 ar_diag_joint_var <- mod$functions$ar_diag_joint_var
+rev_mapping <- mod$functions$rev_mapping
+
+# The AR and VARMA kernels each define the Kronecker product. A second
+# program holds the VARMA kernel, whose placement serves a VAR too.
+varma_mod <- cmdstanr::cmdstan_model(
+  cmdstanr::write_stan_file(paste0(
+    "functions {\n",
+    stationary_joint_functions_stanvar(kernel = "varma")[[1L]]$scode,
+    "}\n"
+  )),
+  compile_standalone = TRUE, quiet = TRUE
+)
+var_stationary_joint <- varma_mod$functions$var_stationary_joint
+varma_autocov <- varma_mod$functions$varma_autocov
+varma_stationary_joint <- varma_mod$functions$varma_stationary_joint
 
 
 # -- Random inputs -------------------------------------------------------
@@ -201,6 +218,49 @@ test_that("the pairwise solve places each companion on its own side", {
 })
 
 
+test_that("a VAR or VARMA start covariance holds the companion's law", {
+  # The map of Heaps (2023) returns the coefficients and the
+  # autocovariances at lags 0 to p - 1. `var_stationary_joint` places
+  # them. A VARMA solves for its own autocovariances over the states
+  # alone, with the MA term in the noise covariance. The truth is the
+  # Neumann sum over the companion state that holds the MA error too.
+  # Partial autocorrelation matrices come from random matrices through
+  # `(I + A A')^(-1/2) A`, whose singular values lie below one. The
+  # coefficients they map to are dense.
+  pacf_matrix <- function(A) {
+    e <- eigen(diag(nrow(A)) + tcrossprod(A), symmetric = TRUE)
+    e$vectors %*% diag(1 / sqrt(e$values), nrow(A)) %*% t(e$vectors) %*% A
+  }
+  set.seed(4471L)
+  for (k in 1:24) {
+    m <- sample(1:4, 1L)
+    p <- sample(1:3, 1L)
+    # The last shape scales its matrices toward singular values of one,
+    # a step from a unit root. Its stationary variance reaches 10^9
+    # times the innovation variance. The map and the solve each lose
+    # about seven digits of relative precision there. The six digits a
+    # stored draw holds set its tolerance.
+    near_unit <- k == 24L
+    scale <- if (near_unit) 40 else 0.8
+    tol_k <- if (near_unit) 1e-6 else tol
+    P <- lapply(seq_len(p), function(i) {
+      pacf_matrix(matrix(stats::rnorm(m * m, 0, scale), m))
+    })
+    B <- matrix(stats::rnorm(m * m), m)
+    Sigma <- crossprod(B) + diag(m)
+    res <- rev_mapping(P, Sigma)
+    want <- neumann_omega(Sigma, res[[1]])
+    expect_equal(var_stationary_joint(res[[2]]), want, tolerance = tol_k)
+    theta <- matrix(stats::rnorm(m * m, 0, 0.5), m)
+    expect_equal(
+      varma_stationary_joint(varma_autocov(Sigma, res[[1]], theta), Sigma),
+      neumann_omega(Sigma, res[[1]], theta),
+      tolerance = tol_k
+    )
+  }
+})
+
+
 # -- The emitted start ---------------------------------------------------
 
 # The covariance of the companion state at t = p that one start
@@ -277,13 +337,13 @@ test_that("a joint start holds its law a step from a unit root", {
   # at 0.99997, and the stationary variance above 10^4 times the
   # innovation variance. The covariance factored there is the least well
   # conditioned a stationary draw reaches, and a Cholesky failure would
-  # reject the draw. The sum needs 5 x 10^5 terms to settle, and the
-  # solve loses about four digits of relative precision.
+  # reject the draw. The solve loses about four digits of relative
+  # precision there.
   sh <- with_pacf(random_shape(3L, 2L), rbind(c(0.9999, 0.999, -0.9999),
                                               0.5))
   start <- starts[starts$name == "start_p2_ar_all", ]
   members <- seq_len(3L)
-  want <- neumann_omega(sh$Sigma, sh$phi, n_terms = 500000L)
+  want <- neumann_omega(sh$Sigma, sh$phi)
   got <- implied_state_cov(start, sh, members)
   expect_equal(got, want, tolerance = 1e-6)
 })

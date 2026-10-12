@@ -17,16 +17,14 @@ ggplot2 default.}
 A \code{\link[ggplot2:theme]{ggplot2::theme()}} object.
 }
 \description{
-Every figure the package draws uses this theme, which is built on
-\code{\link[ggplot2:ggtheme]{ggplot2::theme_classic()}} so it composes with the bayesplot
-family. Apply it to a plot of your own to sit alongside mvgam
-output without the two looking like they came from different
-packages.
+Every figure the package draws uses this theme. It extends
+\code{\link[ggplot2:ggtheme]{ggplot2::theme_classic()}} and matches the bayesplot figures. Apply
+it to a plot of your own to give it the look of mvgam output.
 
-Colours are a separate question and come from the active
-bayesplot scheme, so \code{\link[bayesplot:bayesplot-colors]{bayesplot::color_scheme_set()}} moves mvgam's
-figures and yours together, and
-\code{\link[bayesplot:bayesplot-colors]{bayesplot::color_scheme_get()}} reads the current one.
+Colours come from the active bayesplot scheme.
+\code{\link[bayesplot:bayesplot-colors]{bayesplot::color_scheme_set()}} changes the colours of mvgam's
+figures and yours together. \code{\link[bayesplot:bayesplot-colors]{bayesplot::color_scheme_get()}} returns
+the current scheme.
 }
 \examples{
 library(ggplot2)

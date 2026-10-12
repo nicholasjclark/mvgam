@@ -1,4 +1,4 @@
-#' Prior Specification and Inspection System for mvgam
+#' Prior specification and inspection for mvgam
 #'
 #' @description
 #' Prior extraction, combination, and inspection system for mvgam
@@ -7,7 +7,7 @@
 #' throughout.
 #'
 #' @section Architecture:
-#' The prior system uses brmsprior objects directly for maximum compatibility:
+#' The prior system uses brmsprior objects throughout:
 #' - **Extraction Layer**: Get priors from observation and trend models
 #' - **Combination Layer**: Merge observation and trend priors
 #' - **Inspection Layer**: User-facing functions for prior specification
@@ -20,13 +20,13 @@
 #' - Direct pass-through to brms for observation model priors
 
 # =============================================================================
-# SECTION 1: COMMON TREND PRIOR SPECIFICATIONS
+# Common trend prior specifications
 # =============================================================================
 # Prior specifications shared by parameters that appear in more than one
-# trend type (sigma_trend is used by RW, AR and CAR), defined once so the
-# trends cannot drift apart on a default.
+# trend type (sigma_trend is used by RW, AR and CAR). One definition
+# keeps every trend on the same default.
 
-#' Common Prior Specifications for Trend Parameters
+#' Common prior specifications for trend parameters
 #'
 #' @description
 #' Default priors for the trend parameters several trend types share,
@@ -34,7 +34,8 @@
 #' distribution string, parameter bounds, a description and a
 #' dimension.
 #'
-#' @format Named list with parameter specifications. Each element is a list with:
+#' @format Named list with parameter specifications. Each element is a
+#'   list with:
 #' \describe{
 #'   \item{default}{Character string of Stan distribution (e.g.,
 #'     "exponential(2)"), or a function of the data's spread on the
@@ -61,10 +62,9 @@ common_trend_priors <- list(
     dimension = "vector"
   ),
 
-  # The residual scale the mvn() and mvt() families declare. It
-  # carries no `_trend` suffix because the parameter is named after
-  # the quantity, and it resolves through the same chain as every
-  # entry here.
+  # The residual scale the mvn() and mvt() families declare. The
+  # parameter is named after the quantity and has no `_trend` suffix.
+  # It resolves through the same chain as every entry here.
   Psi = list(
     default = "exponential(1)",
     bounds = c(0, NA),
@@ -191,7 +191,7 @@ generate_trend_priors <- function(trend_model, base_formula, data,
   if (!is.null(base_formula)) {
     # brms has coefficients to report only for a formula with a
     # population term. An intercept counts: `~ 1` gives
-    # `Intercept_trend`, and `~ 0` and `~ -1` give no rows.
+    # `Intercept_trend`. Neither `~ 0` nor `~ -1` gives a row.
     if (formula_has_population_terms(base_formula)) {
       # The codegen options the observation side takes, which fix the
       # coefficients the fit estimates
@@ -212,10 +212,10 @@ generate_trend_priors <- function(trend_model, base_formula, data,
 
 #' Row-bind `brmsprior` tables whose columns differ
 #'
-#' brms builds prior tables with different columns: the observation
-#' side has newer columns such as `tag`, and a bare `prior()` row
-#' lacks them. Every table is padded
-#' to the union of the columns by `align_brmsprior_schemas()`.
+#' brms builds prior tables with different columns. The observation
+#' side has newer columns such as `tag`. A bare `prior()` row lacks
+#' them. `align_brmsprior_schemas()` pads every table to the union of
+#' the columns.
 #'
 #' @param prior_list List of `brmsprior` tables. `NULL` entries are
 #'   dropped.
@@ -242,8 +242,7 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
 
   monitor_params <- generate_monitor_params(trend_obj)
 
-  # Filter out correlation parameters for single-series trends
-  # L_Omega_trend only makes sense with multiple series (n_series > 1)
+  # A single-series trend has no correlation parameters
   if ("L_Omega_trend" %in% monitor_params &&
       !is.null(trend_obj$dimensions) &&
       trend_obj$dimensions$n_series == 1) {
@@ -251,12 +250,12 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
   }
 
   # Under either sharing mode the per-series coefficient is derived
-  # from something else the program samples: a broadcast scalar under
-  # `"shared"`, and a population mean and scale under
-  # `"hierarchical"`. A prior row for the derived vector promises an
-  # override the program would discard. The editable rows are the
-  # parameters each mode samples. `generate_monitor_params()` keeps
-  # the coefficients, because mvgam withholds them from brms.
+  # from another sampled quantity. Under `"shared"` it is a broadcast
+  # scalar. Under `"hierarchical"` it comes from a population mean and
+  # scale. A prior row for the derived vector would promise an override
+  # the program discards. The editable rows are the parameters each
+  # mode samples. `generate_monitor_params()` keeps the coefficients,
+  # because mvgam withholds them from brms.
   sharing <- ar_coef_sharing(trend_obj)
   if (sharing %in% c("shared", "hierarchical")) {
     monitor_params <- monitor_params[
@@ -268,21 +267,15 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
     return(brms::empty_prior())
   }
 
-  # Generate prior specifications for each parameter
   prior_data <- lapply(monitor_params, function(param) {
     create_trend_parameter_prior(param, trend_obj)
   })
-
-  # Combine into data frame
   combined_priors <- do.call(rbind, prior_data)
-
-  # Convert to brmsprior object
   class(combined_priors) <- c("brmsprior", "data.frame")
-
-  return(combined_priors)
+  combined_priors
 }
 
-#' Create Prior Specification for Single Trend Parameter
+#' Create the prior specification of one trend parameter
 #'
 #' @param param_name Character string parameter name (e.g., "ar1_trend")
 #' @param trend_obj mvgam_trend object for context
@@ -292,14 +285,12 @@ create_trend_parameter_prior <- function(param_name, trend_obj) {
   checkmate::assert_string(param_name)
   checkmate::assert_class(trend_obj, "mvgam_trend")
 
-  # Get default prior and bounds for this parameter type
   prior_info <- get_default_trend_parameter_prior(param_name, trend_obj)
 
-  # `Z` is drawn from one of three branches depending on the
-  # loadings prior; only the unstructured one matches the registry
-  # default. Both the branch and its statement come from the
-  # emitter's own helpers, so the table cannot describe a prior the
-  # model does not sample.
+  # `Z` takes one of three branches depending on the loadings prior.
+  # Only the unstructured branch matches the registry default. The
+  # branch and its statement come from the emitter's own helpers. The
+  # table then describes the prior the model samples.
   if (identical(param_name, "Z")) {
     branch_prior <- loadings_z_prior_string(
       loadings_z_branch(trend_obj$loadings_prior_spec)
@@ -307,26 +298,25 @@ create_trend_parameter_prior <- function(param_name, trend_obj) {
     if (!is.null(branch_prior)) prior_info$prior <- branch_prior
   }
 
-  # Delegate to brms::set_prior so the returned row always carries the
-  # full canonical brmsprior schema (including columns like `tag` that
-  # newer brms versions add). Avoids drift between mvgam-internal and
-  # brms-generated prior rows.
+  # `brms::set_prior()` gives the row the full brmsprior schema,
+  # including columns such as `tag` that newer brms versions add.
+  # mvgam-internal and brms-generated rows then share one schema.
   row <- brms::set_prior(
     prior = prior_info$prior %||% "",
     class = param_name,
     lb = if (nzchar(prior_info$lb %||% "")) prior_info$lb else NA,
     ub = if (nzchar(prior_info$ub %||% "")) prior_info$ub else NA
   )
-  # brms::set_prior returns NA for unbounded; brms::get_prior returns
-  # "". Normalise to "" so prior rows mvgam emits compare equal to
-  # rows that came in via get_prior on the obs side.
+  # `brms::set_prior()` returns NA for an unbounded parameter and
+  # `brms::get_prior()` returns "". The rows mvgam emits use "" to
+  # compare equal to observation-side rows.
   if (is.na(row$lb)) row$lb <- ""
   if (is.na(row$ub)) row$ub <- ""
   row$source <- "default"
   row
 }
 
-#' Get Default Prior Information for Trend Parameter
+#' Default prior information for a trend parameter
 #'
 #' @param param_name Character string parameter name
 #' @param trend_obj mvgam_trend object for context, or NULL where the
@@ -386,9 +376,10 @@ get_default_trend_parameter_prior <- function(param_name,
 #' square-root and inverse-square links (`brms:::def_scale_prior()`),
 #' which widens its base scale of 2.5 by `max(1, mad(link(y)) / 2.5)`.
 #' The trend's scale priors are calibrated in link units and widen by
+#' The trend's scale priors are calibrated in link units and widen by
 #' the same factor. A count model on the log link rarely spreads past
 #' 2.5 and keeps its link-unit defaults. Zeros take 0.1 before a log or
-#' inverse link, and a family on the log scale, such as `lognormal()`,
+#' inverse link. A family on the log scale, such as `lognormal()`,
 #' takes the log link, as in brms. Under any other link the factor is
 #' one. Several responses take the widest.
 #'
@@ -398,6 +389,12 @@ get_default_trend_parameter_prior <- function(param_name,
 #' @return A number of at least 1
 #' @noRd
 trend_prior_unit <- function(formula, family, data) {
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_list(formula),
+    .var.name = "formula"
+  )
+  checkmate::assert_list(family, null.ok = TRUE)
   checkmate::assert_data_frame(data)
   forms <- response_formulas(formula)
   families <- formula_families(formula, family)
@@ -411,7 +408,7 @@ trend_prior_unit <- function(formula, family, data) {
 #' The spread of one response on its link scale
 #'
 #' A simplex family's response names categories or shares, which its
-#' log-ratio predictor does not measure, and a binary detection is no
+#' log-ratio predictor does not measure. A binary detection is no
 #' count. Both take zero, as brms's categorical families do. Missing
 #' responses are dropped. A transform outside its domain, such as the
 #' log of a negative value, gives no finite spread, as in brms.
@@ -421,6 +418,7 @@ trend_prior_unit <- function(formula, family, data) {
 #' @return The rounded median absolute deviation, or 0
 #' @noRd
 link_scale_spread <- function(y, family) {
+  checkmate::assert_list(family, null.ok = TRUE)
   if (is_simplex_response_family(family) ||
       is_binary_response_family(family)) {
     return(0)
@@ -449,17 +447,17 @@ link_scale_spread <- function(y, family) {
 #' @return The spread `trend_prior_unit()` recorded on the trend, or 1
 #' @noRd
 trend_prior_unit_of <- function(trend_obj) {
+  checkmate::assert_list(trend_obj, null.ok = TRUE)
   trend_obj$prior_unit %||% 1
 }
 
 
 #' Is this class one of the loadings-kernel length-scales?
 #'
-#' `theta_features` and one `theta_dist_<name>` per supplied
-#' distance matrix. They are named after the quantity rather than
-#' the submodel, so they carry no `_trend` suffix, and the set is
-#' open: a model declares one length-scale per distance source it
-#' was given.
+#' `theta_features` and one `theta_dist_<name>` per supplied distance
+#' matrix. They are named after the quantity and have no `_trend`
+#' suffix. The set is open: a model declares one length-scale per
+#' distance source it was given.
 #'
 #' @param param_name Character vector of class names.
 #' @return Logical vector.
@@ -470,7 +468,7 @@ is_loadings_length_scale <- function(param_name) {
 }
 
 
-#' Get Default Prior Based on Parameter Type
+#' Default prior for a parameter type
 #'
 #' @param param_name Character string parameter name
 #' @return List with prior, lb, ub elements
@@ -480,18 +478,17 @@ get_parameter_type_default_prior <- function(param_name) {
 
   # Pattern matching for common parameter types
   if (identical(param_name, "nu_trend")) {
-    # Innovation degrees of freedom. The lower bound of 2 is required
-    # rather than conventional: below it the innovations have no finite
-    # variance and the stationary initialisation of an autoregressive
-    # trend is undefined.
+    # Innovation degrees of freedom. The lower bound of 2 is required:
+    # below it the innovations have infinite variance and the
+    # stationary initialisation of an autoregressive trend is
+    # undefined.
     return(list(
       prior = common_trend_priors$nu_trend$default, lb = "2", ub = ""
     ))
   } else if (any(is_loadings_length_scale(param_name))) {
-    # A kernel length-scale is a modelling choice, not a nuisance:
-    # for a phylogenetic distance it sets how fast covariance decays
-    # with relatedness. Reported here so it can be seen and set,
-    # rather than emitted as a literal nothing reads back.
+    # A kernel length-scale is a modelling choice. For a phylogenetic
+    # distance it sets how fast covariance decays with relatedness. The
+    # table reports it so a user can see and set it.
     return(list(prior = "lognormal(0, 1)", lb = "0", ub = ""))
   } else if (is_ar_coefficient(param_name)) {
     # AR coefficients: typically bounded [-1, 1] for stationarity
@@ -518,19 +515,19 @@ get_parameter_type_default_prior <- function(param_name) {
     # VAR/VARMA hyperprior precisions (Aomega_trend, Domega_trend)
     return(list(prior = "", lb = "0", ub = ""))
   }
-  # Every other parameter is unbounded with Stan's default prior:
-  # correlation Cholesky factors, VAR coefficient matrices and their
-  # hyperprior means, and the loadings `Z`.
+  # Every other parameter is unbounded with Stan's default prior. These
+  # are the correlation Cholesky factors, the VAR coefficient matrices,
+  # their hyperprior means and the loadings `Z`.
   list(prior = "", lb = "", ub = "")
 }
 
 # =============================================================================
-# SECTION 3: TREND-SPECIFIC PRIOR RESOLVERS
+# Trend-specific prior resolvers
 # =============================================================================
 # `get_default_trend_parameter_prior()` takes the trend's
 # `get_<trend>_parameter_prior()` through `trend_method()`. A resolver
 # returns a prior, bounds or both for the parameters whose default
-# depends on the trend, and NULL for every other parameter.
+# depends on the trend. It returns NULL for every other parameter.
 
 #' CAR bounds for its damping coefficient
 #'
@@ -539,6 +536,8 @@ get_parameter_type_default_prior <- function(param_name) {
 #' @return List with prior, lb, ub elements, or NULL for default handling
 #' @noRd
 get_car_parameter_prior <- function(param_name, trend_obj) {
+  checkmate::assert_string(param_name)
+  checkmate::assert_class(trend_obj, "mvgam_trend")
   # A continuous-time damping coefficient is raised to a real power,
   # and Stan declares it strictly inside the unit interval. The shared
   # default supplies the distribution.
@@ -551,8 +550,8 @@ get_car_parameter_prior <- function(param_name, trend_obj) {
 #' LLT priors scaled to the number of time points
 #'
 #' A slope shock at time `t` moves the level at the end of the series
-#' by `w_t = 1 + phi + ... + phi^(N - t - 1)`, and the slope shocks
-#' move it with variance `sigma_slope^2 v`, where `v` sums the squared
+#' by `w_t = 1 + phi + ... + phi^(N - t - 1)`. The slope shocks move it
+#' with variance `sigma_slope^2 v`, where `v` sums the squared
 #' weights. `student_t(3, 0, 1.3 / sqrt(v))` on `sigma_slope_trend`
 #' puts the prior median of that movement's standard deviation at one
 #' link unit at every `N`. The movement itself then has prior median
@@ -560,18 +559,18 @@ get_car_parameter_prior <- function(param_name, trend_obj) {
 #' heavy tail lets an informative series move the posterior.
 #'
 #' The initial slope moves the level at time `N` by its reach,
-#' `1 + phi + ... + phi^(N - 2)` per unit, and a prior standard
-#' deviation of two over the reach gives it two link units of
-#' growth over the series at one standard deviation: `2 / (N - 1)` for
-#' an undamped slope. A damped slope takes `v` and the reach at
+#' `1 + phi + ... + phi^(N - 2)` per unit. A prior standard deviation
+#' of two over the reach gives it two link units of growth over the
+#' series at one standard deviation: `2 / (N - 1)` for an undamped
+#' slope. A damped slope takes `v` and the reach at
 #' `phi = 0.913`, the median of the `beta(18, 2)` prior on
 #' `ar1_slope_trend`.
 #'
 #' A link unit is the responses' spread on their link scale where that
 #' exceeds one, as `trend_prior_unit()` measures it. Factors with
 #' sampled loadings have unit level shocks, whose path spreads by
-#' `sqrt(N)` over the series, and both priors take that spread as
-#' their unit. Their loadings carry the data's spread.
+#' `sqrt(N)` over the series. Both priors take that spread as their
+#' unit. Their loadings carry the data's spread.
 #'
 #' @param param_name Character string parameter name
 #' @param trend_obj The prepared `LLT()` specification, carrying the
@@ -580,6 +579,7 @@ get_car_parameter_prior <- function(param_name, trend_obj) {
 #' @noRd
 get_llt_parameter_prior <- function(param_name, trend_obj) {
   checkmate::assert_string(param_name)
+  checkmate::assert_class(trend_obj, "mvgam_trend")
   if (identical(param_name, "ar1_slope_trend")) {
     return(list(prior = "beta(18, 2)", lb = "0", ub = "1"))
   }
@@ -631,11 +631,11 @@ llt_prior_scales <- function(n_time, damped, unit_factors, spread = 1) {
 
 #' PW priors scaled to the number of time points
 #'
-#' Time runs in steps, and each prior is set on the series' span:
+#' Time runs in steps. Each prior is set on the series' span:
 #'
-#' - `k_trend ~ normal(0, 2 / (N - 1))` gives two link units of growth over
-#'   the series at one standard deviation, the scale of the undamped
-#'   `LLT()` initial slope.
+#' - `k_trend ~ normal(0, 2 / (N - 1))` gives two link units of growth
+#'   over the series at one standard deviation, the scale of the
+#'   undamped `LLT()` initial slope.
 #' - `delta_trend ~ double_exponential(0, changepoint_scale / N)`
 #'   makes `changepoint_scale` the typical change in growth over the
 #'   series at one changepoint, as Prophet's time scaling does.
@@ -694,10 +694,11 @@ pw_prior_scales <- function(n_time, changepoint_scale, spread = 1) {
 #' The unit a PW trend's growth priors are set in
 #'
 #' @param trend_obj A `PW()` specification
-#' @return The responses' spread for linear growth, and 1 for logistic
-#'   growth, whose rate is in logits of the capacity
+#' @return The responses' spread for linear growth. Logistic growth,
+#'   whose rate is in logits of the capacity, takes 1.
 #' @noRd
 pw_growth_spread <- function(trend_obj) {
+  checkmate::assert_class(trend_obj, "mvgam_trend")
   if (identical(pw_growth(trend_obj), "logistic")) {
     return(1)
   }
@@ -705,12 +706,12 @@ pw_growth_spread <- function(trend_obj) {
 }
 
 # =============================================================================
-# SECTION 4: PRIOR COMBINATION FUNCTIONS
+# Prior combination
 # =============================================================================
 # One brmsprior holds the observation and trend priors, which the
 # `_trend` suffix tells apart.
 
-#' Combine Observation and Trend Priors
+#' Combine observation and trend priors
 #'
 #' @param obs_priors A brmsprior object with observation model priors
 #' @param trend_priors A brmsprior object with trend model priors
@@ -727,12 +728,10 @@ combine_obs_trend_priors <- function(obs_priors, trend_priors) {
 #' Align column schemas of one or more `brmsprior` frames
 #'
 #' brms's prior tables can carry different columns depending on which
-#' generator built them (e.g. the obs side picks up newer columns like
-#' `tag` from brms; trend setup output and bare `prior()` rows don't).
-#' Returns a list with every input padded to the union of column names
-#' so they can be safely `rbind`ed without losing data and without
-#' breaking when brms adds new columns in future releases.
-#'
+#' generator built them. The observation side picks up newer columns
+#' such as `tag`. Trend setup output and bare `prior()` rows lack them.
+#' Returns a list with every input padded to the union of column names.
+#' The tables then bind without losing data when brms adds columns.
 #' Padding rule: character columns get `""`; everything else gets `NA`.
 #'
 #' @param prior_list A list of `brmsprior` data frames.
@@ -754,19 +753,17 @@ align_brmsprior_schemas <- function(prior_list) {
 #' Normalise the `priors` / `prior` argument alias
 #'
 #' Accepts a `...` list and returns it with any `priors` entry
-#' renamed to `prior`. The brms convention is the singular form;
-#' historic mvgam / jsdgam docs use the plural. Without this
-#' normalisation, callers using the plural lose their brms prior
-#' table silently because internal codegen takes `prior = NULL`
-#' and never inspects `...$priors`.
+#' renamed to `prior`. brms uses the singular form. mvgam and jsdgam
+#' also accept the plural. Internal code generation takes `prior` and
+#' ignores `...$priors`.
 #'
-#' Errors if both forms are supplied and disagree, to surface the
-#' ambiguity rather than picking one silently.
+#' Errors if both forms are supplied and disagree.
 #'
 #' @param dots A list captured from `...`.
 #' @return The same list with `prior` populated.
 #' @noRd
 normalise_prior_arg_alias <- function(dots) {
+  checkmate::assert_list(dots)
   if (is.null(dots$priors)) {
     return(dots)
   }
@@ -774,23 +771,23 @@ normalise_prior_arg_alias <- function(dots) {
     stop(insight::format_error(c(
       "Both 'prior' and 'priors' supplied with different values.",
       i = "Pass priors once via 'prior =' (brms convention)."
-    )))
+    )), call. = FALSE)
   }
-  dots$prior  <- dots$priors
+  dots$prior <- dots$priors
   dots$priors <- NULL
   dots
 }
+
+
 #' Split a combined prior object down the middle
 #'
-#' brms is handed the observation-side priors and mvgam keeps the
-#' rest, so the same partition is read from both ends. Taking each
-#' end separately meant the two could stop being complements: a
-#' class added to one side and not removed from the other would be
-#' passed to brms, which has no parameter for it, and kept by
-#' mvgam as well.
+#' brms takes the observation-side priors and mvgam keeps the rest. One
+#' predicate decides both halves. They are then exact complements. A
+#' class on both sides would reach brms, which has no parameter for
+#' it.
 #'
-#' The split is by class rather than by the `_trend` suffix. `Z`
-#' carries no suffix and is still mvgam's.
+#' The split is by class. A split on the `_trend` suffix would miss
+#' `Z`, which has no suffix and is still mvgam's.
 #'
 #' @param combined_priors A `brmsprior` holding both sides, or NULL.
 #' @param side Which half to return, `"obs"` or `"trend"`.
@@ -812,12 +809,13 @@ filter_priors_by_side <- function(combined_priors, side) {
 }
 
 
-#' Get all mvgam-generated trend parameters using trend system infrastructure
+#' All mvgam-generated trend parameters
 #'
 #' @param trend_specs List of trend specifications from mv_spec
 #' @return Character vector of all mvgam-generated parameter names
 #' @noRd
 get_all_mvgam_trend_parameters <- function(trend_specs) {
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
   spec <- trend_spec_head(trend_specs)
   if (is.null(spec)) {
     return(character(0))
@@ -827,17 +825,19 @@ get_all_mvgam_trend_parameters <- function(trend_specs) {
     generate_monitor_params(spec)
   }
 
-  # These two are mvgam's whenever they appear, which is a different
-  # question from whether a given model samples them. This list only
-  # decides what must never be handed to brms, so naming them
-  # unconditionally is the safe direction: dropping one lets it reach
-  # brms as `sigma`, an observation-side prior on the wrong scale.
-  # What a model actually samples is `samples_innovation_scale()`.
+  # These two belong to mvgam whenever they appear, whether or not a
+  # given model samples them. This list decides what brms never
+  # receives. Dropping one would let it reach brms as `sigma`, an
+  # observation-side prior on the wrong scale.
+  # `samples_innovation_scale()` reports what a model samples.
   unique(c(all_mvgam_params, "sigma_trend", "nu_trend"))
 }
 
-# The columns that identify a prior row. Two rows agreeing on all of
-# them set the same prior.
+#' The columns that identify a prior row
+#'
+#' Two rows agreeing on all of them set the same prior.
+#'
+#' @noRd
 brmsprior_key_cols <- c("class", "coef", "group", "resp", "dpar",
                         "nlpar", "lb", "ub")
 
@@ -856,9 +856,9 @@ brmsprior_key_cols <- c("class", "coef", "group", "resp", "dpar",
 #' @param user_priors A `brmsprior` data frame of user overrides, or
 #'   NULL.
 #' @param source String written to the `source` column of every
-#'   matched row. Defaults to `"user"`; the family-default overlay
-#'   passes `"default"` so `get_prior()` still reports those rows as
-#'   defaults rather than as something the user asked for.
+#'   matched row. Defaults to `"user"`. The family-default overlay
+#'   passes `"default"`. `get_prior()` then reports those rows as
+#'   defaults.
 #' @return The merged `brmsprior` data frame
 #' @noRd
 merge_user_priors <- function(default_priors, user_priors,
@@ -918,18 +918,19 @@ merge_user_priors <- function(default_priors, user_priors,
 #'
 #' Stan code generation replaces the brms fallback prior for a few
 #' families (see `family_default_priors()`). Without this overlay
-#' `get_prior()` would advertise the brms fallback while the model
-#' sampled under mvgam's, which for `com_binomial()` means showing a
-#' positive-only `gamma(2, 0.1)` on a `nu` declared with `lb = -5`.
+#' `get_prior()` would show the brms fallback while the model sampled
+#' under mvgam's. For `com_binomial()` it would show a positive-only
+#' `gamma(2, 0.1)` on a `nu` declared with `lb = -5`.
 #' The defaults are the ones `response_default_priors()` gives the
 #' fit, one set per response.
 #'
 #' @param obs_priors The `brmsprior` returned by `brms::get_prior()`.
 #' @param formula The observation formula.
-#' @param family The family given beside it, validated.
+#' @param family The validated family of the observation formula.
 #' @return `obs_priors` with mvgam's defaults substituted in place.
 #' @noRd
 overlay_family_default_priors <- function(obs_priors, formula, family) {
+  checkmate::assert_class(obs_priors, "brmsprior")
   defaults <- response_default_priors(formula, family)
   if (is.null(defaults) || nrow(defaults) == 0L) {
     return(obs_priors)
@@ -940,29 +941,37 @@ overlay_family_default_priors <- function(obs_priors, formula, family) {
 
 #' Assemble the post-fit prior table stored on an `mvgam` object
 #'
-#' Wraps the canonical sequence:
-#'   1. Re-suffix the brms-validated trend priors (`<class>` -> `<class>_trend`).
+#' Wraps the sequence:
+#'   1. Re-suffix the brms-validated trend priors
+#'      (`<class>` -> `<class>_trend`).
 #'   2. Combine obs + trend rows into a single brmsprior frame.
 #'   3. Append mvgam stanvar rows (Z_free_vec, varrho_inv, etc.).
 #'   4. Layer the user's full `priors = ` argument over the result,
-#'      marking matched rows as `source = "user"` so mvgam-managed
+#'      marking matched rows as `source = "user"`. The mvgam-managed
 #'      trend overrides (sigma_trend, ar1_trend, etc.) that the brms
-#'      pipeline strips are still recorded on the fit.
+#'      pipeline strips are then recorded on the fit.
 #'
-#' @param obs_priors The obs-side `brmsprior` from `setup_brms_lightweight()`.
-#' @param trend_priors The trend-side `brmsprior` from `setup_brms_lightweight()`,
-#'   or NULL when the fit has no trend model.
+#' @param obs_priors The obs-side `brmsprior` from
+#'   `setup_brms_lightweight()`.
+#' @param trend_priors The trend-side `brmsprior` from
+#'   `setup_brms_lightweight()`, or NULL when the fit has no trend
+#'   model.
 #' @param user_prior The user's original `prior` / `priors` argument
 #'   (already aliased via `normalise_prior_arg_alias()`), or NULL.
-#' @param combined_stancode The assembled Stan code, used by
-#'   `lift_mvgam_stanvar_priors()` to detect mvgam-injected stanvar
-#'   rows.
+#' @param combined_stancode The assembled Stan code.
+#'   `lift_mvgam_stanvar_priors()` takes the mvgam-injected stanvar
+#'   rows from it.
 #' @param trend_stancode The trend-side brms program, or NULL.
 #' @return A `brmsprior` data frame ready to land on `mvgam_object$prior`.
 #' @noRd
 assemble_stored_prior_table <- function(obs_priors, trend_priors,
                                           user_prior, combined_stancode,
                                           trend_stancode = NULL) {
+  checkmate::assert_class(obs_priors, "brmsprior", null.ok = TRUE)
+  checkmate::assert_class(trend_priors, "brmsprior", null.ok = TRUE)
+  checkmate::assert_class(user_prior, "brmsprior", null.ok = TRUE)
+  checkmate::assert_character(combined_stancode, null.ok = TRUE)
+  checkmate::assert_character(trend_stancode, null.ok = TRUE)
   combined <- combine_obs_trend_priors(
     obs_priors, add_trend_suffix_to_priors(trend_priors)
   )
@@ -977,29 +986,29 @@ assemble_stored_prior_table <- function(obs_priors, trend_priors,
     lifted <- merge_user_priors(lifted, user_prior)
   }
   # Hidden on the table the fit stores and `prior_summary()` returns.
-  # The code generator reads another table, which keeps the pin.
+  # The code generator uses another table, which keeps the pin.
   hide_obs_placeholder_prior(lifted)
 }
 
 
-#' Hide the empty-obs placeholder's pin from a prior table a user reads
+#' Hide the empty-obs placeholder's pin from a user-facing prior table
 #'
-#' The pin is structural: it holds a column mvgam had to invent at
-#' zero, and names no parameter the user wrote. It stays in the table
-#' the code generator reads, where dropping it would leave the
-#' placeholder free.
+#' The pin holds a column mvgam had to invent at zero. It names no
+#' parameter the user wrote. It stays in the table the code generator
+#' uses. Without it the placeholder would be free.
 #'
-#' @param prior A `brmsprior` data frame
-#' @return The table without the pin's row, or the `b` rows of the mean
-#'   the pin sits in
+#' @param prior A `brmsprior` data frame, or any other object to
+#'   return unchanged
+#' @return The table without the pin's row and the `b` rows of the
+#'   mean that holds the pin
 #' @noRd
 hide_obs_placeholder_prior <- function(prior) {
   if (!is.data.frame(prior) || !nrow(prior) || !"coef" %in% names(prior)) {
     return(prior)
   }
-  # The placeholder is the only coefficient of the mean it sits in.
-  # The class-level `b` row brms writes for that mean describes nothing
-  # the user wrote either, and goes with the pin.
+  # The placeholder is the sole coefficient of its mean. brms writes a
+  # class-level `b` row for that mean, which also names nothing the
+  # user wrote. That row goes with the pin.
   mean_of <- paste(prior$resp, prior$dpar, prior$nlpar)
   held <- mean_of[prior$coef == MVGAM_EMPTY_OBS_PLACEHOLDER]
   prior[!(prior$class == "b" & mean_of %in% held), , drop = FALSE]
@@ -1009,39 +1018,37 @@ hide_obs_placeholder_prior <- function(prior) {
 #' Does this prior string hold its parameter at a constant?
 #'
 #' `constant()` names no distribution. brms implements it by moving the
-#' parameter out of the `parameters` block and assigning the value, so
-#' a coefficient carrying one has no free parameter behind it. Two
-#' consequences follow, and both are read off this predicate: mvgam's
-#' own prior emitters cannot write a constant as a sampling statement
-#' and refuse it, and the identification check leaves a pinned column
-#' out of the design it ranks.
+#' parameter out of the `parameters` block and assigning the value. A
+#' coefficient with a constant prior has no free parameter. Two
+#' consequences follow from this predicate. mvgam's own prior emitters
+#' cannot write a constant as a sampling statement and refuse it. The
+#' identification check leaves a pinned column out of the design it
+#' ranks.
 #'
 #' @param x Character vector of prior strings.
 #' @return Logical vector, `TRUE` where the string is a `constant()`.
 #' @noRd
 is_constant_prior <- function(x) {
+  checkmate::assert_atomic(x)
   if (length(x) == 0L) return(logical(0))
   grepl("^\\s*constant\\s*\\(", as.character(x))
 }
 
-
-
-
 #' Re-attach the `_trend` suffix to a brms-validated trend prior table
 #'
-#' Inverse of `remove_trend_suffix_from_priors`: takes the prior table
-#' returned by the trend-side `setup_brms_lightweight()` call (whose
-#' classes carry brms's own names like `b`, `sigma`, `sds`, `ar1`) and
-#' suffixes every class with `_trend` so the combined obs + trend table
-#' uses the same convention as `get_prior.mvgam_formula()`. Rows already
-#' suffixed (mvgam-injected stanvars) are left untouched.
+#' Inverse of `remove_trend_suffix_from_priors`. Takes the prior table
+#' returned by the trend-side `setup_brms_lightweight()` call, whose
+#' classes have brms's own names like `b`, `sigma`, `sds`, `ar1`.
+#' Suffixes every class with `_trend`, the convention of
+#' `get_prior.mvgam_formula()`. Rows already suffixed (mvgam-injected
+#' stanvars) are left untouched.
 #'
-#' The trend submodel is handed to brms as a gaussian, so brms returns
-#' a `sigma` row carrying its own residual-scale default. The trend's
+#' The trend submodel reaches brms as a gaussian. brms then returns a
+#' `sigma` row with its own residual-scale default. The trend's
 #' process noise is `sigma_trend`, which the Stan generator samples
-#' under `common_trend_priors` and which reaches the stored table from
+#' under `common_trend_priors`. Its row reaches the stored table from
 #' the compiled code via `lift_mvgam_stanvar_priors()`. Suffixing
-#' brms's row would file its value under mvgam's name, so it is
+#' brms's row would file its value under mvgam's name. That row is
 #' dropped. A row scoped to a coefficient belongs to a distributional
 #' sub-formula and is kept.
 #'
@@ -1059,17 +1066,16 @@ add_trend_suffix_to_priors <- function(trend_priors) {
 
 #' Suffix a trend-side prior table's classes with `_trend`
 #'
-#' The one implementation of that rule. It was written twice, and the
-#' copies drifted: one dropped brms's residual-scale `sigma` row but
-#' would suffix an already-suffixed class twice, the other guarded the
-#' double suffix but turned an empty class into `"_trend"` and filed
-#' brms's `sigma` value under mvgam's `sigma_trend`.
+#' Both trend-side tables apply this rule. It drops brms's
+#' residual-scale `sigma` row. It leaves an empty class empty and an
+#' already-suffixed class unchanged.
 #'
-#' @param priors A prior table carrying a `class` column.
+#' @param priors A prior table with a `class` column, or NULL.
 #' @return The same table, minus brms's bookkeeping `sigma` row, with
 #'   every remaining unsuffixed non-empty class suffixed.
 #' @noRd
 suffix_trend_prior_classes <- function(priors) {
+  checkmate::assert_data_frame(priors, null.ok = TRUE)
   if (is.null(priors) || nrow(priors) == 0L) return(priors)
   coefs <- priors$coef %||% rep("", nrow(priors))
   bookkeeping_sigma <- priors$class %in% brms_trend_dropped_params &
@@ -1089,15 +1095,16 @@ suffix_trend_prior_classes <- function(priors) {
 #' The trend submodel reaches brms as a gaussian whose residual scale
 #' mvgam takes back out: the process noise is `sigma_trend`, one scale
 #' per latent series. The factor names a parameter the combined program
-#' leaves undeclared, and under a gaussian observation family it
-#' resolves to the observation model's own `sigma`, a different
-#' quantity. brms takes `autoscale = FALSE` for this case.
+#' leaves undeclared. Under a gaussian observation family it resolves
+#' to the observation model's own `sigma`, a different quantity. brms
+#' takes `autoscale = FALSE` for this case.
 #'
 #' @param priors A `brmsprior` table scoped to the trend formula.
 #' @return The same table, with `autoscale = FALSE` on each special
 #'   prior that left it unset.
 #' @noRd
 disable_trend_prior_autoscale <- function(priors) {
+  checkmate::assert_data_frame(priors)
   special <- "^\\s*(horseshoe|R2D2)\\s*\\("
   texts <- priors$prior %||% character(0)
   for (i in which(grepl(special, texts))) {
@@ -1152,6 +1159,10 @@ remove_trend_suffix_from_priors <- function(trend_priors, trend_specs,
   if (is.null(trend_priors) || nrow(trend_priors) == 0) {
     return(NULL)
   }
+  trend_priors <- translate_lv_axis_labels(
+    trend_priors, trend_spec_head(trend_specs)$dimensions$by_lv_target,
+    to = "brms"
+  )
   trend_priors <- check_trend_priors(
     trend_priors,
     generate_trend_priors(trend_spec_head(trend_specs), base_formula,
@@ -1186,6 +1197,9 @@ remove_trend_suffix_from_priors <- function(trend_priors, trend_specs,
 #'   attribute marking the rows mvgam handles
 #' @noRd
 check_trend_priors <- function(priors, defaults, constructor_classes) {
+  checkmate::assert_data_frame(priors)
+  checkmate::assert_data_frame(defaults)
+  checkmate::assert_character(constructor_classes)
   cell <- intersect(setdiff(brmsprior_key_cols, c("coef", "lb", "ub")),
                     intersect(names(priors), names(defaults)))
   # `c()` on a `brmsprior` adds priors. The columns are taken from a
@@ -1314,10 +1328,10 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 }
 
 # =============================================================================
-# SECTION 5: UTILITY FUNCTIONS
+# Utilities
 # =============================================================================
 
-#' Null-coalescing Operator
+#' Null-coalescing operator
 #'
 #' @param x Value to check
 #' @param y Default value if x is NULL
@@ -1328,18 +1342,17 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 }
 
 # =============================================================================
-# SECTION 6: MVGAM FORMULA INTERFACE
+# mvgam_formula interface
 # =============================================================================
 # `mvgam_formula()` pairs an observation formula with a trend formula
 # for `get_prior()`, `stancode()` and `standata()`.
 
-#' Create an mvgam Formula Object
+#' Create an mvgam formula object
 #'
 #' @description
-#' Constructs a lightweight mvgam formula object that combines observation and
-#' trend model formulas. This provides a clean interface for model specification
-#' that can be used with inspection functions like \code{get_prior()},
-#' \code{stancode()}, and \code{standata()}.
+#' Constructs a lightweight mvgam formula object that combines
+#' observation and trend model formulas. The inspection functions
+#' \code{get_prior()}, \code{stancode()} and \code{standata()} take it.
 #'
 #' @param formula An object of class \code{formula}, \code{brmsformula}, or
 #'   \code{mvbrmsformula} describing the observation model.
@@ -1351,7 +1364,8 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #' formula with an optional trend formula. Data, family, and other model
 #' specifications are provided when calling inspection or fitting functions:
 #'
-#' \code{get_prior(mvgam_formula(y ~ x, ~ AR()), data = dat, family = poisson())}
+#' \code{get_prior(mvgam_formula(y ~ x, ~ AR()), data = dat,
+#'   family = poisson())}
 #'
 #' When \code{trend_formula = NULL}, the model reduces to a pure brms
 #' observation model. When specified, the trend_formula can include:
@@ -1364,7 +1378,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #'   \item Gaussian processes: \code{gp()}
 #' }
 #'
-#' @section Trend Formula Restrictions:
+#' @section Trend formula restrictions:
 #' The trend_formula has specific restrictions to maintain compatibility with
 #' State-Space dynamics and prevent conflicts between observation-level and
 #' trend-level modeling:
@@ -1383,10 +1397,10 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #'
 #' \strong{Rationale:}
 #' Addition terms change the observation model, through weights,
-#' censoring or exposure, and belong in the observation formula.
+#' censoring or exposure. They belong in the observation formula.
 #' Autocorrelation terms conflict with the trend's state-space
 #' dynamics. brms imputes a \code{mi()} predictor as a response of the
-#' model, and a trend formula holds no response.
+#' model. A trend formula holds no response.
 #'
 #' @section Multivariate models, single shared trend type:
 #' For multivariate observation models (\code{mvbind()} or
@@ -1399,7 +1413,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #' dynamics machinery throughout the codegen, sampling, and prediction
 #' pipelines.
 #'
-#' What multivariate models DO support:
+#' What multivariate models support:
 #' \itemize{
 #'   \item Different observation families per response (e.g.
 #'     \code{bf(count ~ x, family = poisson()) +
@@ -1410,7 +1424,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #'     the (single) trend constructor.
 #' }
 #'
-#' If you need genuinely different dynamics per response, fit
+#' If you need different dynamics per response, fit
 #' independent univariate \code{mvgam()} models for each response.
 #'
 #' \strong{Examples:}
@@ -1437,8 +1451,6 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #'
 #' @export
 mvgam_formula <- function(formula, trend_formula = NULL) {
-
-  # Validate formula parameter - must be formula, brmsformula, or mvbrmsformula
   checkmate::assert(
     checkmate::check_formula(formula),
     checkmate::check_class(formula, "brmsformula"),
@@ -1471,11 +1483,10 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 
     checkmate::assert_formula(trend_formula, .var.name = "trend_formula")
 
-    # Use trend formula validation from validations.R
     validate_trend_formula(trend_formula)
   }
 
-  # Determine and store formula type for later use
+  # Formula type, stored as an attribute
   if (inherits(formula, "mvbrmsformula")) {
     formula_class <- "mvbrmsformula"
   } else if (inherits(formula, "brmsformula")) {
@@ -1484,13 +1495,12 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
     formula_class <- "formula"
   }
 
-  # Create structure with formulas and class metadata
   out <- list(
     formula = formula,
     trend_formula = trend_formula
   )
 
-  # Set S3 class hierarchy preserving original formula class
+  # The S3 class hierarchy keeps the original formula class
   if (formula_class == "mvbrmsformula") {
     class(out) <- c("mvgam_formula", "mvbrmsformula")
   } else if (formula_class == "brmsformula") {
@@ -1500,22 +1510,22 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
   }
   attr(out, "formula_class") <- formula_class
 
-  return(out)
+  out
 }
 
-#' Get Prior Specifications for Model Objects
+#' Get prior specifications for model objects
 #'
 #' @description
-#' S3 generic function for extracting prior specifications from various model
-#' objects. This function provides a single interface for prior inspection
-#' across different model types, with extensions for mvgam
-#' State-Space models.
+#' S3 generic for extracting prior specifications from model objects.
+#' One interface serves prior inspection across model types, with
+#' extensions for mvgam State-Space models.
 #'
-#' @param object Model specification object (formula, brmsformula, mvgam_formula, etc.)
+#' @param object Model specification object (formula, brmsformula,
+#'   mvgam_formula, etc.)
 #' @param ... Additional arguments passed to methods
 #'
 #' @details
-#' This generic function dispatches to appropriate methods based on object class:
+#' This generic dispatches to a method based on object class:
 #' \itemize{
 #'   \item \code{formula}: Delegates to \code{brms::get_prior}
 #'   \item \code{brmsformula}: Delegates to \code{brms::get_prior}
@@ -1534,9 +1544,9 @@ get_prior <- function(object, ...) {
 #' Build the `mvgam_formula` that a `trend_formula` names
 #'
 #' A `trend_formula` in the same call names an mvgam model. The brms
-#' path takes the formula and discards the rest, giving a
-#' complete-looking result that omits the trend entirely. Building the
-#' `mvgam_formula` and dispatching on it covers the trend as well.
+#' path takes the formula and discards the rest. Its result would omit
+#' the trend without any sign. Building the `mvgam_formula` and
+#' dispatching on it covers the trend as well.
 #'
 #' Each caller handles its own no-trend case. `stancode()` and
 #' `standata()` fall through with `NextMethod()`, which works only
@@ -1553,6 +1563,13 @@ get_prior <- function(object, ...) {
 #' @return Whatever `mvgam_fun` returns
 #' @noRd
 route_trend_formula <- function(object, dots, mvgam_fun) {
+  checkmate::assert(
+    checkmate::check_formula(object),
+    checkmate::check_list(object),
+    .var.name = "object"
+  )
+  checkmate::assert_list(dots)
+  checkmate::assert_function(mvgam_fun)
   trend_formula <- dots$trend_formula
   dots$trend_formula <- NULL
 
@@ -1562,7 +1579,11 @@ route_trend_formula <- function(object, dots, mvgam_fun) {
   )
 }
 
-#' Default method for get_prior - delegates to brms
+#' Default method for get_prior, delegating to brms
+#'
+#' Covers a `formula`, `brmsformula` or `mvbrmsformula`. A
+#' `trend_formula` in the call builds the \code{\link{mvgam_formula}}
+#' it describes. A call without one delegates to \pkg{brms}.
 #'
 #' @param object Model specification object
 #' @param ... Additional arguments passed to \code{brms::get_prior}
@@ -1576,44 +1597,14 @@ get_prior.default <- function(object, ...) {
   route_trend_formula(object, dots, get_prior)
 }
 
-#' Formula method for get_prior - explicit brms delegation
+#' Method for fitted mvgam objects returning the stored prior table
 #'
-#' @param object A formula object
-#' @param ... Additional arguments passed to \code{brms::get_prior}
-#' @return A \code{brmsprior} data frame
-#' @export
-get_prior.formula <- function(object, ...) {
-  dots <- list(...)
-  if (is.null(dots$trend_formula)) {
-    return(brms::get_prior(object, ...))
-  }
-  route_trend_formula(object, dots, get_prior)
-}
-
-#' brmsformula method for get_prior - explicit brms delegation
-#'
-#' @param object A brmsformula object
-#' @param ... Additional arguments passed to \code{brms::get_prior}
-#' @return A \code{brmsprior} data frame
-#' @export
-get_prior.brmsformula <- function(object, ...) {
-  dots <- list(...)
-  if (is.null(dots$trend_formula)) {
-    return(brms::get_prior(object, ...))
-  }
-  route_trend_formula(object, dots, get_prior)
-}
-
-#' Method for fitted mvgam objects - returns the stored prior table
-#'
-#' Convenience shortcut for the post-fit prior table. In brms the
-#' canonical post-fit accessor is `prior_summary()`; mvgam keeps
-#' that path and exports `get_prior.mvgam()` as well because users
-#' frequently type `get_prior(fit)` by analogy with the formula
-#' method. Both return the one table the model was built with. It can
-#' be edited and fed back through
-#' `update(fit, prior = ..., recompile = FALSE)` for refits that reuse
-#' the compiled Stan model.
+#' A shortcut for the post-fit prior table. In brms the post-fit
+#' accessor is `prior_summary()`. mvgam keeps that path and exports
+#' `get_prior.mvgam()` as well, matching the formula method. Both
+#' return the one table the model was built with. It can be edited and
+#' passed to `update(fit, prior = ..., recompile = FALSE)` for refits
+#' that reuse the compiled Stan model.
 #'
 #' @param object A fitted \code{mvgam} model.
 #' @param ... Unused; an argument given here is refused.
@@ -1628,32 +1619,33 @@ get_prior.mvgam <- function(object, ...) {
   prior_summary.mvgam(object)
 }
 
-#' Extract Prior Specifications for mvgam Formula Objects
+#' Extract prior specifications for mvgam formula objects
 #'
 #' @description
-#' Extracts and combines prior specifications for both observation and trend
-#' components of an mvgam model. This method provides a single interface
-#' for prior inspection before model fitting. When
+#' Extracts and combines prior specifications for both observation and
+#' trend components of an mvgam model. One interface serves prior
+#' inspection before model fitting. With
 #' \code{trend_formula = NULL}, this function behaves identically to
 #' \code{brms::get_prior} for observation-only models.
 #'
 #' @param object An object of class \code{mvgam_formula} created by
 #'   \code{\link{mvgam_formula}}
-#' @param data A data frame containing the variables in the model (required)
-#' @param family A description of the response distribution and link function.
-#'   Default is \code{gaussian()}. Not required if formula contains embedded
-#'   families via \code{bf()} specifications.
+#' @param data A data frame containing the variables in the model
+#'   (required)
+#' @param family A description of the response distribution and link
+#'   function. Default is \code{gaussian()}. Not required if formula
+#'   contains embedded families via \code{bf()} specifications.
+#' @param loadings_prior Optional structured prior on the factor
 #' @param loadings_prior Optional structured prior on the factor
 #'   loadings, in the form \code{\link{mvgam}} accepts. The prior
-#'   reported for \code{Z} depends on it, so pass the same value here
-#'   that the fit will use.
+#'   reported for \code{Z} depends on it. Pass the value the fit will
+#'   use.
 #' @param data2 Optional named list holding objects a
 #'   \code{loadings_prior} refers to by name, matching the argument
 #'   \code{\link{mvgam}} takes.
-#' @param trend_map Not supported. Fixed and partial loadings change
-#'   which parameters the model has, so the free-loadings table this
-#'   returns cannot describe them; supplying it is an error that points
-#'   at \code{\link[brms]{stancode}}, which does take it.
+#' @param trend_map Optional fixed or partial factor loadings, in the
+#'   form \code{\link{mvgam}} accepts. The table then lists the
+#'   loadings the map leaves free.
 #' @param ... Additional arguments passed to \code{brms::get_prior}
 #'
 #' @return A \code{brmsprior} data frame of the observation and trend
@@ -1685,7 +1677,7 @@ get_prior.mvgam <- function(object, ...) {
 #'     of a linear \code{\link{PW}()} also scale with the number of
 #'     time points. Their help pages give the forms.
 #' }
-#' A count model on the log link rarely spreads past 2.5, and its
+#' A count model on the log link rarely spreads past 2.5. Its
 #' defaults keep their link-scale values. Coefficients without
 #' units keep fixed priors: autoregressive and damping coefficients,
 #' correlations and degrees of freedom. The table this returns holds
@@ -1693,10 +1685,11 @@ get_prior.mvgam <- function(object, ...) {
 #'
 #' A shrinkage prior on a trend-side class is written without
 #' autoscaling. \code{horseshoe()} and \code{R2D2()} scale their global
-#' parameter by the family's residual standard deviation, and the
-#' trend's own scale is \code{sigma_trend}, one per latent series, so
-#' \code{autoscale = FALSE} is set for those rows. Writing
-#' \code{autoscale = TRUE} on a trend-side class is refused.
+#' parameter by the family's residual standard deviation. The trend's
+#' own scale is \code{sigma_trend}, one per latent series. A family's
+#' residual scale has no meaning on the trend side. Those rows take
+#' \code{autoscale = FALSE}. Writing \code{autoscale = TRUE} on a
+#' trend-side class is refused.
 #'
 #' @examples
 #' \dontrun{
@@ -1704,17 +1697,17 @@ get_prior.mvgam <- function(object, ...) {
 #' # then pass the result back to `mvgam()`.
 #' set.seed(1)
 #' dat <- sim_mvgam(
-#'   family       = poisson(),
-#'   n_series     = 2L,
+#'   family = poisson(),
+#'   n_series = 2L,
 #'   n_timepoints = 120L,
-#'   trend_model  = AR()
+#'   trend_model = AR()
 #' )$data_train
 #'
 #' # Wrap the formula pair in `mvgam_formula()` so this S3 method
 #' # dispatches; the returned `brmsprior` data frame lists every
 #' # adjustable row keyed by `class` and `coef`.
 #' mf <- mvgam_formula(
-#'   formula       = y ~ s(x, k = 5),
+#'   formula = y ~ s(x, k = 5),
 #'   trend_formula = ~ AR(p = 1)
 #' )
 #' get_prior(mf, data = dat, family = poisson())
@@ -1724,26 +1717,27 @@ get_prior.mvgam <- function(object, ...) {
 #' # `_trend` suffix so they do not collide with obs-side classes
 #' # of the same name (e.g. `b` vs `b_trend`).
 #' my_priors <- c(
-#'   prior(normal(0, 1),    class = b),
-#'   prior(exponential(2),  class = sigma_trend),
-#'   prior(normal(0, 0.5),  class = ar1_trend)
+#'   prior(normal(0, 1), class = b),
+#'   prior(exponential(2), class = sigma_trend),
+#'   prior(normal(0, 0.5), class = ar1_trend)
 #' )
 #'
 #' mod <- mvgam(
-#'   formula       = y ~ s(x, k = 5),
+#'   formula = y ~ s(x, k = 5),
 #'   trend_formula = ~ AR(p = 1),
-#'   data          = dat,
-#'   family        = poisson(),
-#'   priors        = my_priors,
-#'   chains        = 2,
-#'   iter          = 750,
-#'   warmup        = 500,
-#'   silent        = 2
+#'   data = dat,
+#'   family = poisson(),
+#'   priors = my_priors,
+#'   chains = 2,
+#'   iter = 750,
+#'   warmup = 500,
+#'   silent = 2
 #' )
 #'
 #' # Inspect the posterior to confirm the overrides took effect. The
-#' # `ar1_trend` and `sigma_trend` rows should sit on the scale set
-#' # by their custom priors rather than the flat defaults.
+#' # `ar1_trend` and `sigma_trend` estimates follow the scale their
+#' # custom priors set.
+#' # priors set.
 #' summary(mod)
 #' }
 #'
@@ -1757,21 +1751,21 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   checkmate::assert_class(object, "mvgam_formula")
   checkmate::assert_data_frame(data, min.rows = 1)
 
-  # Extract formula components from mvgam_formula object
-  formula <- object[[1]]  # object$formula triggers S3 dispatch issues
-  trend_formula <- object[[2]]  # object$trend_formula
+  # `object$formula` would trigger S3 dispatch on the formula class
+  formula <- object[[1]]
+  trend_formula <- object[[2]]
 
-  # The family a univariate `bf()` names becomes the model's, and each
-  # response's family is checked, as they are when the model is built.
+  # The family a univariate `bf()` names becomes the model's. Each
+  # response's family is checked, as it is when the model is built.
   resolved <- resolve_observation_family(formula, family)
   formula <- resolved$formula
   family <- resolved$family
 
   # A formula declining every coefficient (`y ~ 0` for a pure-trend
-  # state-space model) is built with a pinned placeholder, because
-  # brms has no parameter class to set a default on without one. The
-  # table is read off the same formula the model is built from, and
-  # the pin is hidden here as it is on a fit's stored table.
+  # state-space model) is built with a pinned placeholder. brms has no
+  # parameter class to set a default on without one. The table comes
+  # from the same formula the model is built from. The pin is hidden
+  # here as it is on a fit's stored table.
   injected <- inject_obs_zero_placeholder(formula, data, prior = NULL)
   # brms applies `family` to every response that names none, as the
   # fit does.
@@ -1781,9 +1775,7 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   obs_priors <- overlay_family_default_priors(obs_priors, formula, family)
   obs_priors <- hide_obs_placeholder_prior(obs_priors)
 
-  # Handle case where no trend formula is specified
   if (is.null(trend_formula)) {
-    # Return standard brms prior object
     return(obs_priors)
   }
 
@@ -1791,7 +1783,6 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   # builds them
   response_vars <- response_columns(formula)
 
-  # Parse multivariate trends and validate
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
 
   mv_spec$trend_specs <- prepare_trend_specs(
@@ -1804,11 +1795,15 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   components <- extract_and_validate_trend_components(
     data, mv_spec, response_vars, family = family
   )
+  trend_head <- trend_spec_head(components$enhanced_mv_spec$trend_specs)
   trend_priors <- generate_trend_priors(
-    trend_model = trend_spec_head(components$enhanced_mv_spec$trend_specs),
+    trend_model = trend_head,
     base_formula = components$enhanced_mv_spec$base_formula,
     data = components$trend_data,
     codegen = codegen_from_dots(list(...))
+  )
+  trend_priors <- translate_lv_axis_labels(
+    trend_priors, trend_head$dimensions$by_lv_target, to = "user"
   )
 
   combine_obs_trend_priors(obs_priors, trend_priors)

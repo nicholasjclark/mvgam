@@ -323,21 +323,20 @@ plot.mvgam_conditional_smooths <- function(x, plot = TRUE,
 print.mvgam_conditional_smooths <- function(x, ...) plot(x, ...)
 
 
-# Internal: split a smooth's panel by condition when it has more
-# than one.
-#
-# A `by`-factor smooth returns one curve per level, stacked in a
-# single frame and told apart by `cond__`. Drawn as one group the
-# line runs the width of the covariate once per level and returns,
-# which comes out as a sawtooth under a ribbon spanning every
-# curve's uncertainty at once. brms facets its own
-# conditional-effects panels on `cond__`, and the same split here
-# keeps the two renderers agreeing about what a condition is.
-#
-# Returns NULL for a smooth with one condition, which adds nothing
-# to the plot.
+#' A facet layer splitting a smooth's panel by condition
+#'
+#' A `by`-factor smooth gives one curve per level in a single frame,
+#' told apart by `cond__`. Drawn as one group, the curves join into a
+#' sawtooth under one ribbon. brms facets its own conditional-effects
+#' panels on `cond__`. The same split here gives both renderers one
+#' definition of a condition.
+#'
+#' @param df Data frame of one smooth's plotting data
+#' @return A ggplot2 facet layer, or `NULL` for a smooth with one
+#'   condition. Adding `NULL` leaves the plot unchanged.
 #' @noRd
 smooth_condition_facet <- function(df) {
+  checkmate::assert_data_frame(df)
   if (!"cond__" %in% names(df) || length(unique(df$cond__)) < 2L) {
     return(NULL)
   }
@@ -458,7 +457,7 @@ smooths <- function(x) {
 
 
 # ------------------------------------------------------------------
-# Internal helpers
+# Helpers
 # ------------------------------------------------------------------
 
 

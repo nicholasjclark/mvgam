@@ -99,10 +99,11 @@ A grouped trend estimates correlations among the \code{subgr} units
 within each level of \code{gr}. \code{cor} defaults to \code{TRUE} for such a
 trend, and an explicit \code{cor = FALSE} is refused.
 
-When used within a \code{VAR()} model, this essentially sets up a hierarchical
-panel vector autoregression where both the autoregressive and correlation
-matrices are learned hierarchically. If \code{gr} is supplied then \code{subgr}
-\emph{must} also be supplied.
+Within a \code{VAR()} it sets up a hierarchical panel vector
+autoregression. Each group learns its autoregressive, moving-average
+and correlation matrices from shared hyperparameters. The groups do
+not interact. Without \code{subgr}, the series column names the units
+within each group.
 
 Two constraints currently apply to hierarchical trend models:
 \itemize{
@@ -223,18 +224,18 @@ arguments to be interpreted by the parsing functions in \pkg{mvgam}.
 Specify trend models for multivariate State-Space models in \pkg{mvgam}.
 These constructor functions create trend specifications for various temporal
 dynamics including random walks (RW), autoregressive models (AR, VAR, CAR),
-local linear trends (LLT) and piecewise trends (PW). These functions do not
-evaluate their arguments
-– they exist purely to help set up models with particular trend structures.
+local linear trends (LLT) and piecewise trends (PW). A constructor
+records its arguments. The model evaluates them against the data.
 }
 \details{
-\strong{Important}: Only ONE trend constructor is allowed per \code{trend_formula}.
-For complex temporal dynamics, use the parameter options of a single trend type:
+A \code{trend_formula} takes one trend constructor. The arguments of that
+constructor express richer dynamics:
 \itemize{
 \item For seasonal patterns: \code{AR(p = c(1, 12))}. A sum such as
 \code{RW() + AR(p = 12)} is refused
-\item For multiple time scales: \code{AR(p = c(1, 7, 30))} for daily, weekly, monthly
-\item For multivariate dynamics: \code{VAR(p = 2)} captures cross-series relationships
+\item For several time scales: \code{AR(p = c(1, 7, 30))} for daily,
+weekly and monthly lags
+\item For cross-series dynamics: \code{VAR(p = 2)}
 }
 
 \strong{Stationarity of \code{AR(p)}}: a consecutive lag set with
@@ -309,14 +310,15 @@ with fewer latent processes than observed series, see
 \code{vignette("dfm", package = "mvgam")}.
 }
 \note{
-\strong{VAR fits and \code{init = 0}}: VAR uses the Heaps-2023
-stationary joint-distribution initialisation. Setting
-\code{init = 0} in the call to \code{\link[=mvgam]{mvgam()}} starts all parameters
-at zero on the unconstrained scale, which collapses the
-stationary covariance matrix and prevents the chain from
-making any valid first step. Leave the sampler's \code{init}
-argument at its default (random) for VAR fits. AR / RW /
-CAR / ZMVN are unaffected.
+\strong{VAR fits and \code{init = 0}}: the stationary map of Heaps
+(2023) takes matrix square roots by eigendecomposition. The
+gradient of an eigendecomposition divides by differences between
+eigenvalues. \code{init = 0} in the call to \code{\link[=mvgam]{mvgam()}} sets every raw
+coefficient to zero and every innovation scale to one. Each matrix
+the map decomposes is then the identity, with repeated eigenvalues,
+and the first gradient is not finite. Leave \code{init} at its default
+random draws for \code{VAR()} fits. \code{AR()}, \code{RW()}, \code{CAR()} and \code{ZMVN()}
+are unaffected.
 }
 \section{AR coefficient-sharing surface}{
 
@@ -324,10 +326,11 @@ The \code{coef_sharing} argument selects how AR coefficients
 vary across the latent series. The three settings and the
 Stan parameters each declares are:
 \tabular{ll}{
-\strong{coef_sharing}    \tab \strong{Stan parameters with priors} \cr
-\code{"none"}                 \tab \verb{ar\{lag\}\{stem\}_trend} per series \cr
-\code{"shared"}               \tab \verb{shared_ar\{lag\}\{stem\}_trend} (one per lag) \cr
-\code{"hierarchical"}         \tab \verb{mu_ar\{lag\}\{stem\}_trend}, \verb{sigma_ar\{lag\}\{stem\}_trend} \cr
+\strong{coef_sharing} \tab \strong{Stan parameters with priors} \cr
+\code{"none"}         \tab \verb{ar\{lag\}\{stem\}_trend} per series \cr
+\code{"shared"}       \tab \verb{shared_ar\{lag\}\{stem\}_trend} (one per lag) \cr
+\code{"hierarchical"} \tab \verb{mu_ar\{lag\}\{stem\}_trend},
+\verb{sigma_ar\{lag\}\{stem\}_trend} \cr
 }
 \code{{stem}} is \verb{_pacf} for a contiguous lag set of two or more
 lags, where the sampled quantity is a partial autocorrelation,
@@ -371,11 +374,11 @@ Factors are numbered by the variance they explain, largest
 first.
 \item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
 \code{AR()} factors with \code{coef_sharing = "shared"}, are
-unchanged by rotation when they carry no moving-average term. Following Heaps & Jermyn (2024),
-generated quantities rotate each draw to lower-triangular
-loadings \code{Z_tilde} with a non-negative diagonal, and rotate the
-factor paths to \code{lv_trend_tilde}. A VAR factor model rotates
-its coefficients to \code{Phi_trend_tilde}.
+unchanged by rotation when they carry no moving-average term.
+Following Heaps & Jermyn (2024), generated quantities rotate each
+draw to lower-triangular loadings \code{Z_tilde} with a non-negative
+diagonal. The factor paths rotate to \code{lv_trend_tilde}. A VAR
+factor model rotates its coefficients to \code{Phi_trend_tilde}.
 }
 Post-fit methods use the identified loadings and factor paths.
 \code{shared_variation()} and \code{residual_cor()} are the same under every

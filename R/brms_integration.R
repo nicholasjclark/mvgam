@@ -1,9 +1,9 @@
-#' brms Ecosystem Integration for mvgam
+#' brms integration for mvgam
 #'
 #' @description
 #' brms integration and validation for mvgam models.
-#' This file consolidates brms setup, formula validation, multivariate
-#' parsing, and nonlinear model support.
+#' This file holds brms setup, formula validation, multivariate parsing
+#' and nonlinear model support.
 #'
 #' @section Architecture:
 #' The brms integration system provides compatibility across layers:
@@ -13,7 +13,7 @@
 #' - **Extension Layer**: Functionality beyond base brms capabilities
 
 # =============================================================================
-# HELPER FUNCTIONS
+# Helper functions
 # =============================================================================
 
 #' Does a trend formula keep its intercept?
@@ -57,22 +57,28 @@ mvgam_codegen_options <- function(knots = NULL, sample_prior = "no",
   )
 }
 
-# Which options each brms generator declares. Both sets are derived
-# from the one options list rather than written out again, so an
-# option added to `mvgam_codegen_options()` is routed without a second
-# edit. `brms::standata()` takes no `normalize`: whether the sampling
-# statements carry their normalising constants is a property of the
-# program alone.
+#' The options each brms code generator declares
+#'
+#' Both sets derive from the formals of `mvgam_codegen_options()`. An
+#' option added there reaches both generators. `brms::standata()` takes
+#' no `normalize`: whether the sampling statements carry their
+#' normalising constants is a property of the program alone.
+#'
+#' @noRd
 mvgam_codegen_stancode_options <- names(formals(mvgam_codegen_options))
+
+#' The options `brms::standata()` declares
+#'
+#' @noRd
 mvgam_codegen_standata_options <- setdiff(
   mvgam_codegen_stancode_options, "normalize"
 )
 
 #' Build the options list from a call's dots
 #'
-#' `get_prior()` hands its dots to brms for the observation side. The
-#' trend side is built by mvgam rather than brms, so it has to be given
-#' the same options explicitly or the two halves of one prior table
+#' `get_prior()` hands its dots to brms for the observation side. mvgam
+#' builds the trend side itself. That side takes the same options
+#' explicitly. Without them the two halves of one prior table would
 #' describe different models.
 #'
 #' @param dots A list of named arguments, usually `list(...)`.
@@ -100,13 +106,14 @@ codegen_args_for <- function(codegen, accepted) {
 }
 
 # =============================================================================
-# SECTION 1: BRMS LIGHTWEIGHT SETUP SYSTEM
+# brms lightweight setup
 # =============================================================================
-# WHY: Lightweight brms setup enables rapid model prototyping and validation
-# without full compilation overhead. This is essential for mvgam's two-stage
-# assembly system where brms provides the foundation and mvgam adds trends
-# through stanvars injection without modifying brms internals.
-#' Lightweight brms Setup with Prior Support
+
+#' Lightweight brms setup with prior support
+#'
+#' Builds a mock brms fit without compiling. brms provides the
+#' observation model. mvgam adds the trends through stanvars without
+#' modifying brms internals.
 #'
 #' @param formula Formula or brms formula object for model specification
 #' @param data Data frame containing model variables
@@ -114,12 +121,17 @@ codegen_args_for <- function(codegen, accepted) {
 #' @param stanvars Optional brms stanvars object (default: NULL)
 #' @param prior A brmsprior object or NULL. Prior specifications
 #'   for model parameters. Defaults to NULL.
+#' @param data2 Named list of objects brms specials look up outside
+#'   `data`, such as `car()` adjacency matrices, or NULL
 #' @param is_trend_setup Logical. `TRUE` for the trend submodel, whose
 #'   data `extract_and_validate_trend_components()` has already reduced
 #'   to one row per trend cell. Default: FALSE.
 #' @param codegen A list from `mvgam_codegen_options()` holding the brms
 #'   code-generation options, or NULL to take brms's own defaults.
 #' @param ... Additional arguments passed to brms functions
+#' @return List holding the formula, data, data2, family, stanvars,
+#'   threads, codegen, Stan code, Stan data, prior table and mock
+#'   `brmsfit`
 #' @noRd
 setup_brms_lightweight <- function(formula, data, family = gaussian(),
                                    stanvars = NULL,
@@ -138,21 +150,23 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   )
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert(
-    checkmate::check_null(prior), 
+    checkmate::check_null(prior),
     checkmate::check_class(prior, "brmsprior"),
     combine = "or"
   )
   checkmate::assert_flag(is_trend_setup)
   checkmate::assert_list(codegen, names = "named", null.ok = TRUE)
+  checkmate::assert_list(family)
+  checkmate::assert_class(stanvars, "stanvars", null.ok = TRUE)
+  checkmate::assert_list(data2, null.ok = TRUE)
 
-  # Handle trend formulas without response variables
-  # Only apply this logic to regular formula objects, not brms formula objects
+  # A plain formula without a response is a trend formula. brms formula
+  # objects keep their response.
   if (inherits(formula, "formula") &&
       !inherits(formula, c("brmsformula", "mvbrmsformula", "bform"))) {
-    # Check if formula lacks response variable (e.g., ~ 1, ~ x + y).
-    # `deparse()` on a long multi-term formula returns multiple
-    # lines, so collapse to a single string before the scalar
-    # grepl checks.
+    # A formula without a response (e.g. ~ 1, ~ x + y). `deparse()`
+    # splits a long formula over several lines. The lines are collapsed
+    # into one string for the scalar `grepl()` checks.
     formula_chr <- paste(deparse(formula), collapse = " ")
     if (!grepl("~.*~", formula_chr) && grepl("^\\s*~", formula_chr)) {
       # This is a trend formula without response variable
@@ -162,7 +176,6 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
       # Update formula to include trend_y response
       # Use mvgam-aware intercept detection for trend formulas
       has_intercept_check <- should_trend_formula_have_intercept(formula)
-      
       # Check formula structure. Collapse multi-line deparse so
       # the scalar `||` comparison below sees one string.
       rhs_str <- paste(
@@ -190,7 +203,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   }
 
   # The trend submodel's formula is the trend formula with its
-  # constructor removed, and the observation rules do not apply to it
+  # constructor removed. The observation rules do not apply to it.
   if (!is_trend_setup) {
     validate_obs_formula_brms(formula)
   }
@@ -203,8 +216,8 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   if (!isTRUE(is_trend_setup)) {
     injected <- inject_obs_zero_placeholder(formula, data, prior)
     formula <- injected$formula
-    data    <- injected$data
-    prior   <- injected$prior
+    data <- injected$data
+    prior <- injected$prior
   }
 
   # Use mock backend for rapid setup (creates brmsfit object
@@ -222,11 +235,10 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # families thread via their own `partial_sum_*_lpmf`
   # stanvars and do not depend on this path.
   dots <- list(...)
-  # Forward threads only when the user actually asked for > 1
-  # thread. Default `threads = getOption("mc.cores", 1)` upstream
-  # would otherwise emit brms's `partial_log_lik_lpmf` wrapper on
-  # every fit (correctness-preserving but unnecessary compile-time
-  # overhead and a behaviour change vs prior releases).
+  # Threads are forwarded only when the user asked for more than one.
+  # The upstream default `threads = getOption("mc.cores", 1)` would
+  # otherwise wrap every fit in brms's `partial_log_lik_lpmf`, adding
+  # compile time for no gain.
   raw_threads <- dots$threads
   if (inherits(raw_threads, "brmsthreads")) {
     raw_threads <- raw_threads$threads
@@ -237,10 +249,10 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   } else {
     NULL
   }
-  # The code-generation options ride along here and again in every
-  # downstream regeneration, so the mock fit, the assembled Stan
-  # program and the assembled Stan data are all built under the same
-  # basis expansions, factor levels and prior-only setting.
+  # The code-generation options travel with the mock fit and with every
+  # later regeneration. The mock fit, the assembled Stan program and
+  # the assembled Stan data then share their basis expansions, factor
+  # levels and prior-only setting.
   #
   # brms announces the defaults it settles, such as `rescor` on a
   # multivariate formula, with `message()`. `silent = 2` turns
@@ -272,11 +284,11 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   mock_setup$version <- list(brms = utils::packageVersion("brms"))
 
   # The program and its data are generated again from `formula`, once
-  # per response for the data. A multivariate formula that leaves
-  # `rescor` unset has it settled and announced by brms on every
-  # pass. The mock fit settled it once, and the formula carries that
-  # value from here. A bare `mvbind(y1, y2) ~ x` becomes the
-  # `mvbrmsformula` that `bf()` makes of it.
+  # per response for the data. brms settles an unset `rescor` on a
+  # multivariate formula and announces it on every pass. The mock fit
+  # settled it once. The formula carries that value from here. A bare
+  # `mvbind(y1, y2) ~ x` becomes the `mvbrmsformula` that `bf()` makes
+  # of it.
   if (inherits(mock_setup$formula, "mvbrmsformula")) {
     if (!inherits(formula, "mvbrmsformula")) {
       formula <- brms::bf(formula)
@@ -286,94 +298,101 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     }
   }
 
-  # NB: the placeholder column is retained in `data` (and in
-  # `mock_setup$data`) because mvgam's stancode regenerator,
-  # brms's prediction helpers and any post-fit code that re-runs
-  # `validate_data()` against the rewritten formula need the
-  # column to satisfy the formula. Hiding the placeholder from the
-  # user happens downstream, where a reader meets it: the
-  # stored prior table (`assemble_stored_prior_table()`), the
-  # variables list (`variables.mvgam()`), the term list
-  # (`insight::find_predictors()`) and the displayed formula in
-  # `summary.mvgam()`. None of those filters may run on a table the
-  # code generator reads, or the pin holding the placeholder at
-  # zero leaves the program with them.
+  # The placeholder column stays in `data` and in `mock_setup$data`.
+  # mvgam's stancode regenerator, brms's prediction helpers and any
+  # post-fit `validate_data()` against the rewritten formula need the
+  # column. The user-facing outputs hide it: the stored prior table
+  # (`assemble_stored_prior_table()`), the variables list
+  # (`variables.mvgam()`), the term list (`insight::find_predictors()`)
+  # and the displayed formula in `summary.mvgam()`. A table the code
+  # generator uses must keep the placeholder and its zero pin.
 
-  # Extract key components for mvgam integration. `data2` is retained
-  # on the setup so downstream Stan-code regenerators
-  # (`generate_base_stancode_with_stanvars`) can forward it to brms
-  # for specials whose lookups live outside `data` (e.g. `car()`,
-  # `cov_ranef()`).
-  setup_components <- list(
+  # Key components for mvgam integration. `data2` stays on the setup.
+  # The downstream Stan-code regenerators
+  # (`generate_base_stancode_with_stanvars`) forward it to brms for
+  # specials whose lookups live outside `data` (e.g. `car()`,
+  # `cov_ranef()`). They also take `threads` and `codegen` again. The
+  # mock `brmsfit` serves prediction.
+  list(
     formula = formula,
     data = data,
     data2 = data2,
     family = family,
     stanvars = stanvars,
-    threads = brm_threads,  # honoured by downstream make_stancode
-    codegen = codegen,      # read again by the downstream generators
+    threads = brm_threads,
+    codegen = codegen,
     stancode = brms::stancode(mock_setup),
     standata = brms::standata(mock_setup),
     prior = extract_prior_from_setup(mock_setup, codegen),
-    brmsfit = mock_setup  # Keep the mock brmsfit for prediction
+    brmsfit = mock_setup
   )
-  setup_components
 }
 
 
-#' Extract Prior Information from brms Setup
-#' @param setup_object brms setup object
+#' Extract prior information from a brms setup
+#'
+#' @param setup_object Mock `brmsfit` from the brms setup, or a list
+#'   holding its `formula`, `data`, `family`, `data2` and `prior`
 #' @param codegen A list from `mvgam_codegen_options()`, or NULL. The
-#'   prior table is keyed by the coefficients the design matrix holds,
-#'   so it has to be merged under the same knots and factor levels the
-#'   Stan data is built under.
+#'   prior table is keyed by the coefficients the design matrix holds.
+#'   It is merged under the knots and factor levels the Stan data is
+#'   built under.
 #' @return Data frame of prior specifications
 #' @noRd
 extract_prior_from_setup <- function(setup_object, codegen = NULL) {
-  # Always return the full merged prior table: brms defaults for
-  # every parameter class, with user-supplied rows overlaid on top
-  # and tagged `source = "user"`. brms::validate_prior() is the
-  # canonical merge engine; calling it here makes prior_summary()
-  # on an mvgam fit match the brmsfit convention exactly.
-  # The user prior may be NULL (no overrides), in which case
-  # validate_prior just returns the default table.
+  checkmate::assert_list(setup_object)
+  checkmate::assert_list(codegen, names = "named", null.ok = TRUE)
+  # The full merged prior table: brms defaults for every parameter
+  # class, with user-supplied rows overlaid and tagged
+  # `source = "user"`. `brms::validate_prior()` performs the merge.
+  # `prior_summary()` on an mvgam fit then matches the brmsfit
+  # convention. A NULL user prior gives the default table.
   prior <- do.call(brms::validate_prior, c(
     list(
-      prior   = setup_object$prior,
+      prior = setup_object$prior,
       formula = setup_object$formula,
-      data    = setup_object$data,
-      family  = setup_object$family,
-      data2   = setup_object$data2
+      data = setup_object$data,
+      family = setup_object$family,
+      data2 = setup_object$data2
     ),
     codegen_args_for(codegen, mvgam_codegen_standata_options)
   ))
-  # The placeholder's `constant(0)` row stays in this table. It is
-  # read again by `generate_base_stancode_with_stanvars()`, which
-  # regenerates the program mvgam actually compiles, so dropping it
-  # here dropped the pin from the model rather than from the
-  # display: a formula that declined an intercept was fitted with a
-  # free one, lying on an exact ridge against any trend intercept.
-  # `assemble_stored_prior_table()` hides the row where the user
-  # reads it.
+  # The placeholder's `constant(0)` row stays in this table.
+  # `generate_base_stancode_with_stanvars()` regenerates the compiled
+  # program from it. Without the row a formula that declined an
+  # intercept would fit a free one, on an exact ridge with any trend
+  # intercept. `assemble_stored_prior_table()` hides the row from the
+  # user.
   prior
 }
 
 
-# Reserved column name for the empty-obs-formula placeholder,
-# referenced by `inject_obs_zero_placeholder()` (the injection
-# site) and by any post-fit code that needs to filter the
-# placeholder out of user-visible output.
-#'@noRd
+#' Reserved column name of the empty-observation-formula placeholder
+#'
+#' `inject_obs_zero_placeholder()` writes it. Post-fit code filters it
+#' out of user-visible output.
+#'
+#' @noRd
 MVGAM_EMPTY_OBS_PLACEHOLDER <- ".mvgam_empty_obs"
 
 
-# Internal: the responses whose observation formula names the
-# placeholder, as brms keys them, with `""` standing for the one
-# response of a univariate formula. The rewritten formula decides
-# whether a frame or a prior table needs the column and its pin, and
-# the stored frame need not carry the column.
-#'@noRd
+#' The responses whose observation formula names the placeholder
+#'
+#' Responses are keyed as brms keys them, with `""` for the single
+#' response of a univariate formula. The rewritten formula decides
+#' whether a frame or a prior table needs the column and its pin. The
+#' stored frame need not hold the column.
+#'
+#' @param formula Formula, `brmsformula`, `mvbrmsformula`,
+#'   `mvgam_formula` or `NULL`
+#' @return Character vector of response names
+#' @noRd
 obs_placeholder_resps <- function(formula) {
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_list(formula),
+    checkmate::check_null(formula)
+  )
   if (inherits(formula, "mvgam_formula")) formula <- formula$formula
   mv <- inherits(formula, "mvbrmsformula")
   forms <- if (mv) formula$forms else list(formula)
@@ -389,29 +408,57 @@ obs_placeholder_resps <- function(formula) {
 }
 
 
-# Internal: does this observation formula name the placeholder?
-#'@noRd
+#' Whether an observation formula names the placeholder
+#'
+#' @param formula Formula, `brmsformula`, `mvbrmsformula`,
+#'   `mvgam_formula` or `NULL`
+#' @return Logical scalar
+#' @noRd
 obs_formula_needs_placeholder <- function(formula) {
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_list(formula),
+    checkmate::check_null(formula)
+  )
   length(obs_placeholder_resps(formula)) > 0L
 }
 
 
-# Internal: the main formula of one response's observation model. A
-# `brmsformula` keeps it in `$formula`, beside its distributional and
-# non-linear sub-formulas; a plain formula is its own main formula.
-#'@noRd
+#' The main formula of one response's observation model
+#'
+#' A `brmsformula` keeps it in `formula`, together with its
+#' distributional and non-linear sub-formulas. A plain formula is its
+#' own main formula.
+#'
+#' @param f Formula or `brmsformula`
+#' @return The main formula
+#' @noRd
 obs_arm_main_formula <- function(f) {
+  checkmate::assert(
+    checkmate::check_formula(f),
+    checkmate::check_list(f)
+  )
   if (inherits(f, "brmsformula")) f$formula else f
 }
 
 
-# Internal: stamp the placeholder column on a frame that is about
-# to reach brms, when the fit's rewritten formula names it.
-# Without this, brms's `validate_data()` rejects predict / forecast
-# / posterior_predict / pp_check frames, whether the user assembled
-# them or mvgam resolved them from its own training data.
-#'@noRd
+#' A frame given the placeholder column the rewritten formula names
+#'
+#' The brms data check refuses a prediction frame without the column.
+#' Frames the user built and frames mvgam resolved from its training
+#' data both need it.
+#'
+#' @param data Data frame or list of new data, or `NULL`
+#' @param object Fitted `mvgam` object
+#' @return `data` with the placeholder column added when needed
+#' @noRd
 ensure_obs_placeholder <- function(data, object) {
+  checkmate::assert(
+    checkmate::check_data_frame(data),
+    checkmate::check_list(data),
+    checkmate::check_null(data)
+  )
+  checkmate::assert_list(object)
   if (is.null(data)) return(data)
   if (MVGAM_EMPTY_OBS_PLACEHOLDER %in% names(data)) return(data)
   if (!obs_formula_needs_placeholder(object$formula)) return(data)
@@ -420,12 +467,15 @@ ensure_obs_placeholder <- function(data, object) {
 }
 
 
-# Internal: take the placeholder back out of a frame the user
-# reads. `mvgam()` writes it into the frame brms is given, and the
-# fit stores that frame, so the column would otherwise sit beside
-# the user's own columns in `fit$data` and everything drawn from
-# it.
-#'@noRd
+#' A frame without the placeholder column
+#'
+#' `mvgam()` writes the column into the frame brms receives. The fit
+#' stores that frame. Removing the column keeps it out of `fit$data`
+#' and everything drawn from it.
+#'
+#' @param data Data frame, or any other object to return unchanged
+#' @return `data` without the placeholder column
+#' @noRd
 drop_obs_placeholder <- function(data) {
   if (!is.data.frame(data)) return(data)
   keep <- setdiff(names(data), MVGAM_EMPTY_OBS_PLACEHOLDER)
@@ -433,16 +483,16 @@ drop_obs_placeholder <- function(data) {
 }
 
 
-# Internal: strip the ` + .mvgam_empty_obs` placeholder term
-# from a formatted formula string before it goes to the user.
-# Used by `summary.mvgam()` so the displayed obs formula matches
-# what the user actually passed (`y ~ 0`), not the rewritten
-# pinned-coefficient form that brms received. `format()` on a
-# canonical formula always emits ` + <term>` with single spaces;
-# matching that literal with `fixed = TRUE` avoids any regex
-# metacharacter ambiguity around the leading `.` in the
-# placeholder name.
-#'@noRd
+#' A formatted formula without the placeholder term
+#'
+#' The displayed formula then matches what the user wrote, such as
+#' `y ~ 0`. `format()` writes the term as ` + <term>` with single
+#' spaces. A fixed match on that literal avoids treating the leading
+#' `.` of the placeholder as a regular expression.
+#'
+#' @param formula_str Character vector of formatted formulas
+#' @return Character vector with the placeholder term removed
+#' @noRd
 strip_empty_obs_placeholder <- function(formula_str) {
   checkmate::assert_character(formula_str, any.missing = FALSE)
   pat <- paste0(" + ", MVGAM_EMPTY_OBS_PLACEHOLDER)
@@ -450,17 +500,22 @@ strip_empty_obs_placeholder <- function(formula_str) {
 }
 
 
-# Internal: deparse a model formula for display. `format()` on a
-# `brmsformula` returns one string per list element (`formula`,
-# `pforms`, `family`, `resp`, ...), so printing with `sep = ""`
-# glues the trailing `NULL`s onto the formula text. Reaching the
-# plain formula first keeps an addition-term model displaying as
-# `y | trials(n) ~ 1`. Stripping per formula rather than on a
-# joined string matters for multivariate models, where
-# `strip_empty_obs_placeholder()` would otherwise only clear the
-# placeholder from the first response.
+#' A model formula formatted for display
+#'
+#' `format()` on a `brmsformula` returns one string per list element.
+#' Formatting the main formula keeps an addition-term model displaying
+#' as `y | trials(n) ~ 1`. Each distributional formula gets its own
+#' line. A multivariate formula gives each response its own lines, with
+#' the placeholder stripped from every response.
+#'
+#' @param formula Formula, `brmsformula` or `mvbrmsformula`
+#' @return Character vector with one line per formula
 #' @noRd
 format_model_formula <- function(formula) {
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_list(formula)
+  )
   # A multivariate formula gives each response its own lines, in the
   # order brms prints them.
   if (brms::is.mvbrmsformula(formula)) {
@@ -472,7 +527,7 @@ format_model_formula <- function(formula) {
   }
   # brms stores one formula per distributional parameter in `pforms`
   # and prints each on its own line under the response formula. A
-  # reader who wrote `sigma ~ x` needs to see it, and the lines are
+  # reader who wrote `sigma ~ x` needs to see it. The lines are
   # collected before `formula` is narrowed to the response formula.
   dpar_lines <- unlist(lapply(formula$pforms, format), use.names = FALSE)
   c(strip_empty_obs_placeholder(format(formula$formula)), dpar_lines)
@@ -481,18 +536,19 @@ format_model_formula <- function(formula) {
 
 #' Format the link of every distributional parameter a family carries
 #'
-#' brms names a link per distributional parameter, keeping the mean's on
-#' `family$link` and the rest on `family$link_<dpar>`. A header that
-#' reports only the mean leaves a reader of a `sigma ~ x` or `nu ~ x`
-#' block with no way to tell which scale those coefficients are on.
-#' Families that declare no distributional parameters, such as Poisson,
-#' still report the single mean link.
+#' brms names a link per distributional parameter. The mean's link is
+#' `family$link` and every other is `family$link_<dpar>`. A header that
+#' reports only the mean gives a reader of a `sigma ~ x` or `nu ~ x`
+#' block no way to tell the scale of those coefficients. Families that
+#' declare no distributional parameters, such as Poisson, still report
+#' the single mean link.
 #'
 #' @param family A family object
 #' @return A single string of the form `"mu = logit; nu = identity"`
 #'
 #' @noRd
 format_family_links <- function(family) {
+  checkmate::assert_class(family, "family")
   dpars <- family$dpars
   if (length(dpars) == 0) {
     return(paste0("mu = ", family$link))
@@ -504,36 +560,26 @@ format_family_links <- function(family) {
 }
 
 
-# Internal: `formula = y ~ 0` (or `~ -1`) is a legitimate
-# state-space pattern where the entire linear predictor flows
-# through the trend formula. brms cannot build it under a family
-# with no distributional parameter of its own, such as poisson or
-# bernoulli: the formula then leaves no parameter class at all, and
-# brms's prior pipeline stamps `source = "default"` onto a 0-row
-# brmsprior and stops with `replacement has 1 row, data has 0`.
-#
-# The injection adds a column of zeros (`MVGAM_EMPTY_OBS_PLACEHOLDER`)
-# to `data`, rewrites the formula to `y ~ 0 + <placeholder>` and holds
-# the coefficient at zero with `prior(constant(0), class = "b",
-# coef = <placeholder>)`. brms then declares `b` in `transformed
-# parameters` as `b[1] = 0`, the `parameters` block keeps only the
-# family's own scale, and the linear predictor is the user's `y ~ 0`.
-# The rewrite runs under every family, and brms meets one formula
-# shape whichever family is chosen.
-#
-# The pin only holds if it survives to the table
-# `generate_base_stancode_with_stanvars()` regenerates the
-# compiled program from. Filtering the row anywhere upstream of
-# that leaves the placeholder free, and against a trend intercept
-# the two lie on an exact ridge.
-#
-# Detection is strict: only when the formula's RHS has zero term
-# labels and zero intercept (empty model matrix). Formulas with
-# even one term (e.g. `y ~ 1`, `y ~ x`) pass through unchanged. A
-# `brmsformula` is rewritten in its main formula, and a multivariate
-# formula in each response's main formula that declines every term,
-# with a pin per rewritten response.
-#'@noRd
+#' A formula without population terms given a pinned placeholder
+#'
+#' `formula = y ~ 0` is a state-space model whose linear predictor comes
+#' entirely from the trend. brms cannot build it under a family without
+#' its own distributional parameter, such as poisson. Its prior pipeline
+#' then fails on an empty prior table. The rewrite adds a column of
+#' zeros to `data` and writes the formula as `y ~ 0 + <placeholder>`. A
+#' `constant(0)` prior pins the coefficient. The rewrite runs under
+#' every family, giving brms one formula shape. The pin must reach the
+#' prior table that `generate_base_stancode_with_stanvars()` rebuilds
+#' the program from. A free placeholder and a trend intercept lie on an
+#' exact ridge. Only a formula with no term labels and no intercept is
+#' rewritten. Each response of a multivariate formula is rewritten on
+#' its own, with its own pin.
+#'
+#' @param formula Formula, `brmsformula` or `mvbrmsformula`
+#' @param data Data frame of training data
+#' @param prior `brmsprior` table, or `NULL`
+#' @return List holding the rewritten `formula`, `data` and `prior`
+#' @noRd
 inject_obs_zero_placeholder <- function(formula, data, prior) {
   checkmate::assert(
     checkmate::check_formula(formula),
@@ -572,9 +618,8 @@ inject_obs_zero_placeholder <- function(formula, data, prior) {
   } else {
     formula <- forms[[1L]]
   }
-  # Zero, not one. The pin already holds the coefficient at zero, so
-  # the contribution is nil either way, but a column of ones is an
-  # intercept a reader of `standata()$X` would take at face value on a
+  # Zero. The pin already holds the coefficient at zero. A column of
+  # ones would still appear as an intercept in `standata()$X` on a
   # formula that declined one.
   data[[MVGAM_EMPTY_OBS_PLACEHOLDER]] <- 0
   pin <- obs_placeholder_pin(resps)
@@ -586,15 +631,21 @@ inject_obs_zero_placeholder <- function(formula, data, prior) {
 }
 
 
-# Internal: rewrite one response's main formula from `y ~ 0` to
-# `y ~ 0 + <placeholder>`. The placeholder is appended to the
-# right-hand side as written. An `offset()` carries no population
-# coefficient, and a formula holding one alone reaches here with its
-# offset intact. Editing the call keeps the formula's class,
-# environment and the attributes brms stores on it, such as
-# `nl = TRUE`.
-#'@noRd
+#' One response's main formula with the placeholder appended
+#'
+#' The placeholder joins the right-hand side as written. An `offset()`
+#' has no population coefficient and stays in place. Editing the call
+#' keeps the formula's class, environment and the attributes brms
+#' stores on it, such as `nl = TRUE`.
+#'
+#' @param f Formula or `brmsformula` of one response
+#' @return `f` with the placeholder term appended
+#' @noRd
 rewrite_empty_obs_arm <- function(f) {
+  checkmate::assert(
+    checkmate::check_formula(f),
+    checkmate::check_list(f)
+  )
   main <- obs_arm_main_formula(f)
   main[[3L]] <- call("+", main[[3L]], as.name(MVGAM_EMPTY_OBS_PLACEHOLDER))
   if (!inherits(f, "brmsformula")) return(main)
@@ -603,13 +654,16 @@ rewrite_empty_obs_arm <- function(f) {
 }
 
 
-# Internal: the priors that hold the injected placeholder's
-# coefficient at zero, one per response it was written into. The
-# column then contributes `0 * 0 = 0` and the formula means what the
-# user wrote. A refit needs the same rows and cannot get them from
-# the injection: the stored formula already names the placeholder,
-# and the injection does not fire a second time.
-#'@noRd
+#' The priors that pin the placeholder coefficient at zero
+#'
+#' One prior per response the placeholder was written into. A refit
+#' needs the same rows. Its stored formula already names the
+#' placeholder. The injection then skips it.
+#'
+#' @param resps Character vector of response names, `""` for a
+#'   univariate formula
+#' @return A `brmsprior` table
+#' @noRd
 obs_placeholder_pin <- function(resps) {
   checkmate::assert_character(resps, min.len = 1L, any.missing = FALSE)
   pins <- lapply(resps, function(r) {
@@ -620,14 +674,20 @@ obs_placeholder_pin <- function(resps) {
 }
 
 
-# Internal: put the placeholder's pins back into a prior table that
-# lost them. `mvgam()` filters the rows out of the table it stores,
-# and the user never reads a prior for a column they did not write.
-# A refit inheriting that table would sample the placeholder free,
-# and against a trend intercept the two lie on an exact ridge. The
-# sibling of `ensure_obs_placeholder()`, which restores the column.
-#'@noRd
+#' A prior table given back the placeholder pins it lost
+#'
+#' `mvgam()` removes the pins from the table it stores, hiding a prior
+#' for a column the user never wrote. A refit inheriting that table
+#' would leave the placeholder free, on an exact ridge with a trend
+#' intercept. `ensure_obs_placeholder()` restores the column.
+#'
+#' @param prior `brmsprior` table, or `NULL`
+#' @param object Fitted `mvgam` object
+#' @return `prior` with a pin for every response that needs one
+#' @noRd
 ensure_obs_placeholder_pin <- function(prior, object) {
+  checkmate::assert_data_frame(prior, null.ok = TRUE)
+  checkmate::assert_list(object)
   resps <- obs_placeholder_resps(object$formula)
   if (!is.null(prior) && nrow(prior) > 0L) {
     held <- prior$resp[prior$coef == MVGAM_EMPTY_OBS_PLACEHOLDER]
@@ -639,31 +699,36 @@ ensure_obs_placeholder_pin <- function(prior, object) {
 }
 
 
-# Parameters mvgam injects that do not carry the `_trend` suffix.
-# Everything else it emits is suffixed, so the two rules together name
-# the whole mvgam-side surface without naming any brms parameter.
+#' Parameters mvgam injects without the `_trend` suffix
+#'
+#' Every other parameter mvgam emits ends in the suffix. The two rules
+#' together name the whole mvgam-side surface and no brms parameter.
+#'
+#' @noRd
 mvgam_unsuffixed_params <- c(
   "Z", "Z_free_vec", "Psi", "varrho_inv", "theta_features"
 )
 
 
-# The trend reaches brms as a gaussian model. The assembled program
-# drops that model's residual `sigma`: the process noise is the
-# `sigma_trend` mvgam declares, one per latent series.
+#' The brms trend parameters the assembled program drops
+#'
+#' The trend reaches brms as a gaussian model. The assembled program
+#' drops that model's residual `sigma`. The process noise is the
+#' `sigma_trend` mvgam declares, one per latent series.
+#'
+#' @noRd
 brms_trend_dropped_params <- "sigma"
 
 
 #' Does this prior class name a parameter mvgam manages?
 #'
 #' @description
-#' Most of what mvgam emits carries the `_trend` suffix, but not all
-#' of it: the loadings matrix and the loadings-prior parameters are
-#' named after the quantity rather than the submodel. Splitting a
-#' prior table on the suffix alone therefore files `Z` as
-#' observation-side, hands it to brms, and brms refuses a class it
-#' has no parameter for, while `default_prior()` was the source of
-#' the class name. One predicate so the split cannot disagree with
-#' the emitter about whose parameter a class names.
+#' Most of what mvgam emits carries the `_trend` suffix. The loadings
+#' matrix and the loadings-prior parameters are named after the
+#' quantity. A split on the suffix alone would file `Z` as
+#' observation-side. brms would then refuse a class it has no
+#' parameter for. The prior table split and the emitter both use this
+#' predicate.
 #'
 #' @param class Character vector of prior class names.
 #' @return Logical vector, `TRUE` where mvgam owns the class.
@@ -679,12 +744,11 @@ is_mvgam_managed_class <- function(class) {
 #' Name the trend-side rows of a prior table after their Stan parameters
 #'
 #' A prior table built from the trend prefit carries brms's own class
-#' names, so `sigma` there is the trend's innovation scale and has to
-#' become `sigma_trend` before a reader can match it to the program.
-#' The classes that must not move are exactly the ones that already
-#' name an mvgam parameter: `Z` is `Z` in the Stan, and `Z_trend`
-#' names nothing. That makes the suffix rule the complement of the
-#' class predicate rather than a second list to keep in step with it.
+#' names. Its `sigma` is the trend's innovation scale and becomes
+#' `sigma_trend` to match the program. The classes that keep their
+#' names are those that already name an mvgam parameter. `Z` is `Z` in
+#' the Stan. `Z_trend` names nothing. The suffix rule is the
+#' complement of `is_mvgam_managed_class()`.
 #'
 #' @param class Character vector of prior class names.
 #' @return The same vector, suffixed where a suffix was owed.
@@ -697,14 +761,17 @@ apply_trend_class_suffix <- function(class) {
 }
 
 
-# The latent states. Their sampling statements are the trend equation
-# and the non-centred reparameterisation it is written under, not
-# priors a user set or could change. `init_trend` holds the states
-# before the first observed time, drawn from the stationary
-# distribution the autoregression implies. Its statement is a
-# density built from `Phi_trend` and `Sigma_trend`, with no prior of
-# its own. `init_innovations_trend` holds the standard variates an ARMA
-# start scales to its stationary law.
+#' The latent state parameters
+#'
+#' Their sampling statements are the trend equation and its non-centred
+#' reparameterisation. A user cannot set them as priors. `init_trend`
+#' is the vector of states before the first observed time, drawn from
+#' the stationary distribution of the autoregression. Its statement is
+#' a density built from `Phi_trend` and `Sigma_trend`. It has no prior
+#' of its own. `init_innovations_trend` contains the standard variates
+#' an ARMA start scales to its stationary law.
+#'
+#' @noRd
 mvgam_state_params <- c(
   "trend", "lv_trend", "lv_trend_tilde",
   "innovations_trend", "scaled_innovations_trend", "init_trend",
@@ -716,14 +783,14 @@ mvgam_state_params <- c(
 #'
 #' A Stan declaration carries the parameter's support in the same
 #' line that names it, as `vector<lower=-1, upper=1>[N] ar1_trend;`.
-#' Reading it here keeps the prior table describing the program that
-#' was compiled rather than a second opinion about it.
+#' The prior table takes its bounds from the compiled program.
 #'
 #' @param sc The generated Stan code, as one string.
 #' @return A named list of `list(lb, ub)`, both character and empty
 #'   where the declaration names no bound.
 #' @noRd
 stancode_declared_bounds <- function(sc) {
+  checkmate::assert_string(sc)
   decl_re <- paste0(
     "(?:real|int|vector|row_vector|matrix|simplex|ordered|",
     "positive_ordered|unit_vector|cholesky_factor_corr|",
@@ -749,38 +816,35 @@ stancode_declared_bounds <- function(sc) {
 }
 
 
-#' Read every mvgam prior statement out of an assembled Stan model
+#' The mvgam prior statements of an assembled Stan model
 #'
-#' The compiled code is what the sampler ran, so a prior table read
-#' from it cannot disagree with what the model sampled. Two emission
-#' forms appear: `x ~ dist(args);` and the `target += dist_lpdf(x |
-#' args)` an mvgam stanvar writes when it also adds a Jacobian or a
-#' truncation term. A container call on the left, as in
+#' The sampler ran the compiled code. A prior table built from it
+#' matches what the model sampled. Two emission forms appear:
+#' `x ~ dist(args);` and the `target += dist_lpdf(x | args)` an mvgam
+#' stanvar writes when it also adds a Jacobian or a truncation term. A
+#' container call on the left, as in
 #' `to_vector(Z) ~ student_t(3, 0, 0.5)`, is unwrapped to the
 #' parameter it holds.
 #'
 #' The latent states are excluded. `innovations_trend` carries a
-#' `std_normal()` because the trend is written non-centred, so that
-#' statement is a reparameterisation rather than a prior anyone set,
-#' and the state paths are governed by the trend equation rather than
-#' by a prior of their own.
+#' `std_normal()` because the trend is written non-centred. That
+#' statement is a reparameterisation. The trend equation governs the
+#' state paths.
 #'
 #' @param sc Character scalar holding the assembled Stan model.
 #' @return A list of single-row `brmsprior` objects, possibly empty.
 #' @noRd
 mvgam_stancode_prior_rows <- function(sc) {
   checkmate::assert_string(sc)
-  # States are excluded on top of the shared predicate: their
-  # sampling statements are the trend equation, not priors.
+  # The shared predicate, less the latent states. Their sampling
+  # statements are the trend equation.
   is_mvgam_param <- function(nm) {
     is_mvgam_managed_class(nm) & !nm %in% mvgam_state_params
   }
-  # The support a parameter is sampled on is declared in the same
-  # program as its prior, a line or two above it. Reading the prior
-  # and leaving the bounds behind reported `normal(0, 0.5)` for an
-  # autoregressive coefficient held inside (-1, 1), and for a
-  # continuous-time one held inside (0.001, 0.999), as though half
-  # the mass of each sat outside the model's own support.
+  # Each parameter's support is declared in the same program as its
+  # prior. Without the bounds an autoregressive coefficient held inside
+  # (-1, 1) would report `normal(0, 0.5)` with half its mass outside
+  # the support.
   declared <- stancode_declared_bounds(sc)
 
   rows <- list()
@@ -796,7 +860,7 @@ mvgam_stancode_prior_rows <- function(sc) {
       ub = if (nzchar(bound$ub)) bound$ub else NA
     )
     # brms returns NA for an unbounded parameter and `get_prior()`
-    # returns "", so the two sides of the table compare equal.
+    # returns "". Both sides of the table use "".
     if (is.na(row$lb)) row$lb <- ""
     if (is.na(row$ub)) row$ub <- ""
     rows[[length(rows) + 1L]] <<- row
@@ -804,8 +868,8 @@ mvgam_stancode_prior_rows <- function(sc) {
   }
 
   # An index names a coefficient. A bare identifier there is a loop
-  # variable, as in `Amu_trend[k]`, and the statement covers the
-  # whole parameter.
+  # variable, as in `Amu_trend[k]`. The statement then covers the whole
+  # parameter.
   statement_coef <- function(index) {
     coef <- gsub("^\\[|\\]$", "", index)
     if (grepl("^[A-Za-z_][A-Za-z0-9_]*$", coef)) "" else coef
@@ -823,23 +887,23 @@ mvgam_stancode_prior_rows <- function(sc) {
     m <- regmatches(hit, regexec(tilde_re, hit))[[1L]]
     if (length(m) < 4L || !is_mvgam_param(m[2L])) next
     coef <- statement_coef(m[3L])
-    # A multi-dimensional slice is a loop body rather than a prior on
-    # a named coefficient: `Z[ : , i_z] ~ ...` sits inside a `for` and
-    # names a Stan local. `varrho_inv[1]` and `varrho_inv[2:N]` carry
-    # a single index and are the rows a reader wants.
+    # A multi-dimensional slice is a loop body. `Z[ : , i_z] ~ ...` is
+    # inside a `for` and names a Stan local. `varrho_inv[1]` and
+    # `varrho_inv[2:N]` carry a single index and are the rows a reader
+    # wants.
     if (grepl(",", coef, fixed = TRUE)) next
     add(m[2L], coef, gsub("[[:space:]]+", " ", trimws(m[4L])))
   }
 
-  # `target += dist_lpdf(x | args);`, the form a statement carries
-  # when it keeps its normalising constant. The left side takes the
-  # same shapes the tilde branch allows, a container call or a single
-  # index, so both readers name the same parameter. The bar is
-  # optional because a parameter-free density is written without one,
-  # as `std_normal_lpdf(to_vector(Z))`. Anchoring on the accumulator
-  # keeps density calls inside a function body out of the table, and
-  # the likelihood stays out because its response is not an mvgam
-  # parameter.
+  # `target += dist_lpdf(x | args);`, the form a statement takes when
+  # it keeps its normalising constant. The left side takes the shapes
+  # of the tilde branch, a container call or a single index. Both
+  # branches then name the same parameter. The bar is optional because
+  # a parameter-free density is written without one, as
+  # `std_normal_lpdf(to_vector(Z))`. The pattern requires the
+  # accumulator. Density calls inside a function body stay out of the
+  # table. The likelihood stays out because its response is outside the
+  # mvgam parameters.
   lpdf_re <- paste0(
     "(?:target|lprior)[[:space:]]*\\+=[[:space:]]*",
     "([A-Za-z_][A-Za-z0-9_]*)_", stan_density_call_rx,
@@ -853,8 +917,8 @@ mvgam_stancode_prior_rows <- function(sc) {
     m <- regmatches(hit, regexec(lpdf_re, hit))[[1L]]
     if (length(m) < 5L || !is_mvgam_param(m[3L])) next
     coef <- statement_coef(m[4L])
-    # A multi-index names a cell rather than a coefficient, which the
-    # prior table has no row shape for.
+    # A multi-index names a cell. The prior table has no row shape for
+    # a cell.
     if (grepl(",", coef, fixed = TRUE)) next
     args <- gsub("[[:space:]]+", " ", trimws(m[5L]))
     add(m[3L], coef, paste0(m[2L], "(", args, ")"))
@@ -865,19 +929,18 @@ mvgam_stancode_prior_rows <- function(sc) {
 
 #' Name the mvgam parameters carrying a `~` sampling statement
 #'
-#' Stan drops the normalising constant of every `x ~ dist(args);`, so
-#' each one offsets a program's `lp__` by a constant. Reading whole
-#' left-hand sides rather than one spelling of them resolves a
-#' container call, a slice, a transpose and a loop body alike:
-#' `diagonal(A_trend[lag])` and `lv_trend[t, : ]'` are statements
-#' a parameter-shaped pattern does not see.
+#' Stan drops the normalising constant of every `x ~ dist(args);`.
+#' Each one offsets a program's `lp__` by a constant. The scan takes
+#' whole left-hand sides. It resolves a container call, a slice, a
+#' transpose and a loop body alike: `diagonal(A_trend[lag])` and
+#' `lv_trend[t, : ]'` are statements a parameter-shaped pattern misses.
 #'
 #' Ownership comes from `is_mvgam_managed_class()`, the predicate the
-#' prior table is built from, so the two readers cannot disagree
-#' about whose parameter a statement names. Latent states count here
-#' and not there: their statements are the trend equation rather than
-#' priors, but they drop a constant all the same, and the
-#' innovations are the largest such term in a factor program.
+#' prior table is built from. Both scans then agree about whose
+#' parameter a statement names. Latent states count here and not
+#' there. Their statements are the trend equation. They drop a
+#' constant all the same. The innovations are the largest such term in
+#' a factor program.
 #'
 #' @param sc Character scalar holding the assembled Stan model.
 #' @return Character vector of parameter names, possibly empty.
@@ -890,7 +953,8 @@ mvgam_tilde_statement_params <- function(sc) {
     return(character(0L))
   }
   # `stan_statement_lhs()` drops a block a generator opened on the
-  # same line, so a loop bound is not read as a sampled parameter.
+  # same line. A loop bound is then excluded from the sampled
+  # parameters.
   lhs <- vapply(stmts, stan_statement_lhs, character(1L),
                   USE.NAMES = FALSE)
   lhs <- lhs[!is.na(lhs)]
@@ -906,9 +970,8 @@ mvgam_tilde_statement_params <- function(sc) {
 
 #' Which densities in a Stan program drop a normalising constant
 #'
-#' brms signals the choice by calling `_lupdf` or `_lupmf`; mvgam
-#' signals it by writing `~`. A program can carry either, so both
-#' have to be read for the answer to cover the whole model.
+#' brms marks the choice by calling `_lupdf` or `_lupmf`. mvgam marks
+#' it by writing `~`. A program can carry either. The scan covers both.
 #'
 #' @param stancode Character vector or scalar holding the program.
 #' @return Character vector naming what was found, empty when the
@@ -929,17 +992,14 @@ mvgam_unnormalized_terms <- function(stancode) {
 
 #' Does this formula contribute any population-level term?
 #'
-#' `~ 0` and `~ -1` describe the same empty linear predictor, so a
-#' formula compared against `~ 0` answers for one spelling and not
-#' the other. Reading the terms object answers for every spelling at
-#' once, and does not depend on `all.equal()` happening to return a
-#' length-one result, which is what kept the comparison from erroring
-#' on a vector condition.
+#' `~ 0` and `~ -1` describe the same empty linear predictor. The terms
+#' object covers every spelling. A comparison with `~ 0` would cover
+#' one.
 #'
 #' An intercept counts: `~ 1` has a term to report even though it
 #' names no predictor.
 #'
-#' @param formula A formula.
+#' @param formula A formula. Any other object gives `FALSE`.
 #' @return `TRUE` when the formula has predictors or an intercept.
 #' @noRd
 formula_has_population_terms <- function(formula) {
@@ -956,6 +1016,7 @@ formula_has_population_terms <- function(formula) {
 #' @return Character vector of parameter names, empty for NULL.
 #' @noRd
 brms_declared_params <- function(stancode) {
+  checkmate::assert_character(stancode, null.ok = TRUE)
   if (is.null(stancode)) return(character(0L))
   lines <- strsplit(paste(stancode, collapse = "\n"), "\n", fixed = TRUE)[[1L]]
   body <- stan_block_body(lines, "parameters")
@@ -977,10 +1038,10 @@ brms_declared_params <- function(stancode) {
 #'   - closure-unit family scale (`Psi ~ exponential(1)` for mvn /
 #'     mvt families)
 #'
-#' This helper scans the fully assembled Stan model for those known
-#' emission sites and appends matching `brmsprior` rows tagged
-#' `source = "mvgam"`. The scan is pattern-driven, not flag-driven:
-#' adding a new mvgam-side prior is a single regex entry here.
+#' This helper scans the fully assembled Stan model for mvgam prior
+#' statements and appends matching `brmsprior` rows tagged
+#' `source = "mvgam"`. The scan matches statement patterns. A new
+#' mvgam-side prior appears without a new entry here.
 #'
 #' @param prior A `brmsprior` returned by `validate_prior()`.
 #' @param stancode Character string (or vector of lines) holding the
@@ -1002,16 +1063,15 @@ lift_mvgam_stanvar_priors <- function(prior, stancode,
   )
   if (is.null(stancode)) return(prior)
   # A comment can carry a statement's shape, as the AR(1) start's
-  # `lv_trend[1, j] ~ Normal(...)` does, and the program's comments are
-  # kept.
+  # `lv_trend[1, j] ~ Normal(...)` does. The program keeps its comments.
   sc <- strip_stan_comments(paste(as.character(stancode), collapse = "\n"))
   if (!nzchar(sc)) return(prior)
 
   rows <- mvgam_stancode_prior_rows(sc)
   # A row brms already validated is in the table. The trend's brms
   # model writes its own priors into the program under the `_trend`
-  # suffix, and the scan above finds `b_trend` there a second time.
-  # The scanned prior fills a row brms left flat, and is otherwise
+  # suffix. The scan above finds `b_trend` there a second time. The
+  # scanned prior fills a row brms left flat. Every other held row is
   # already stated.
   held <- paste0(prior$class, "|", prior$coef)
   for (r in rows) {
@@ -1049,14 +1109,22 @@ lift_mvgam_stanvar_priors <- function(prior, stancode,
 }
 
 # =============================================================================
-# SECTION 2: MULTIVARIATE TRENDS PARSING
+# Multivariate trend parsing
 # =============================================================================
-# One trend formula serves every response of a multivariate model.
-# Each response gets a copy of the same parsed specification, keyed by
-# the name brms gives that response.
+#' Parse the trend formula for each response
+#'
+#' One trend formula serves every response of a multivariate model.
+#' Each response gets a copy of the same parsed specification, keyed by
+#' the name brms gives that response.
+#'
+#' @param formula Observation formula, `brmsformula` or
+#'   `mvbrmsformula`
+#' @param trend_formula Trend formula, or `NULL`
+#' @return List holding `has_trends`, `is_multivariate`, `trend_specs`
+#'   and `base_formula`. A model with a trend also holds
+#'   `regular_terms` and `obs_formula`.
 #' @noRd
 parse_multivariate_trends <- function(formula, trend_formula = NULL) {
-  # Validate inputs - accept either regular formula or brms formula objects
   checkmate::assert(
     checkmate::check_formula(formula),
     checkmate::check_class(formula, "mvbrmsformula"),
@@ -1109,16 +1177,17 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   ))
 }
 
-# Names that a `pforms` entry can carry while still describing one
-# response. Anything else there names a second response, so a
-# missing entry reads a distributional parameter as a whole extra
-# response: the formula is taken for multivariate and the trend
-# never reaches `mu`, which compiles and samples and is wrong.
-# `tests/testthat/test-brms-integration.R` asserts every mvgam
-# family's own dpars appear here, so adding a family with a new one
-# fails a test rather than producing a model with no trend.
-# `Psi` is not a dpar; mvn() and mvt() declare it as a parameter
-# through stanvars, and it is named here for the same reason.
+#' Names a `pforms` entry can carry while describing one response
+#'
+#' Any other name there marks a second response. A dpar missing from
+#' this list would make a univariate formula look multivariate. The
+#' trend would then miss `mu`. The model would still compile and
+#' sample. `tests/testthat/test-brms-observation-specials.R` asserts
+#' that every mvgam family's dpars appear here. A family with a new dpar
+#' then fails a test. `Psi` is a parameter that mvn() and mvt() declare
+#' through stanvars. It is listed for the same reason.
+#'
+#' @noRd
 mvgam_distributional_params <- c(
   "sigma", "sigma2", "shape", "nu", "phi", "kappa", "theta",
   "zi", "hu", "disc", "bs", "ndt", "bias", "xi", "coi", "zoi",
@@ -1127,19 +1196,20 @@ mvgam_distributional_params <- c(
 )
 
 
-#' Check if Formula Object is Multivariate
+#' Whether a formula has several responses
 #'
 #' @description
 #' Detects multivariate formula specifications across all brms patterns:
-#' mvbind(), bf() with multiple responses, mvbf(), and combined bf() objects.
-#' Uses brms-compatible structural validation to detect them.
+#' mvbind(), bf() with multiple responses, mvbf(), and combined bf()
+#' objects. Uses brms-compatible structural validation to detect them.
 #'
-#' Note: cbind() is NOT considered multivariate per brms standards - it creates
-#' binomial trial specifications (univariate models with trials structure).
+#' brms treats a cbind() response as a binomial trials specification,
+#' a univariate model.
 #'
 #' @param formula Formula object to check. Can be formula, brmsformula,
 #'   mvbrmsformula, or bform class
-#' @return Logical indicating if formula contains multiple response variables
+#' @return Logical indicating if formula contains multiple response
+#'   variables
 #'
 #' @details
 #' Supports all major brms multivariate patterns:
@@ -1147,15 +1217,17 @@ mvgam_distributional_params <- c(
 #'   \item mvbrmsformula class objects (combined bf() formulas)
 #'   \item brmsformula objects with additional responses (bf(y1~x, y2~z))
 #'   \item formula objects with mvbind() response binding
-#'   \item All patterns validated using brms-compatible structure checks
 #' }
 #'
 #' @seealso \code{\link{parse_multivariate_trends}}
 #' @noRd
 is_multivariate_formula <- function(formula) {
-  # Parameter validation - support all brms formula types
   checkmate::assert(
-    inherits(formula, c("formula", "brmsformula", "mvbrmsformula", "bform")),
+    checkmate::check_class(formula, "formula"),
+    checkmate::check_class(formula, "brmsformula"),
+    checkmate::check_class(formula, "mvbrmsformula"),
+    checkmate::check_class(formula, "bform"),
+    combine = "or",
     .var.name = "formula"
   )
 
@@ -1165,13 +1237,13 @@ is_multivariate_formula <- function(formula) {
     return(TRUE)
   }
 
-  # Case 2: brmsformula with distributional parameters or multiple responses  
+  # Case 2: brmsformula with distributional parameters or several
+  # responses
   if (inherits(formula, "brmsformula")) {
     # Nonlinear formulas already handled correctly
     if (is_nonlinear_formula(formula)) {
       return(FALSE)
     }
-    
     # Check pforms content
     if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
       pform_names <- names(formula$pforms)
@@ -1182,12 +1254,11 @@ is_multivariate_formula <- function(formula) {
       }
       return(TRUE)
     }
-    
     return(FALSE)
   }
 
-  # Case 3: Standard formula with mvbind binding ONLY (corrected)
-  # This covers: mvbind(y1, y2) ~ x (cbind REMOVED - not multivariate per brms)
+  # Case 3: a plain formula is multivariate only with an mvbind()
+  # response. brms treats a cbind() response as binomial trials.
   if (inherits(formula, "formula")) {
     return(has_mvbind_response(formula))
   }
@@ -1196,27 +1267,15 @@ is_multivariate_formula <- function(formula) {
   return(FALSE)
 }
 
-#' Check for mvbind Response in Formula
+#' The function a response call invokes
 #'
-#' @description
-#' Helper function that checks formula response side for mvbind() binding
-#' using expression parsing. cbind() is explicitly excluded as it
-#' creates binomial trial specifications, not multivariate models.
+#' Tolerates namespace qualification. `as.character()` on
+#' `brms::mvbind(y1, y2)` returns `c("::", "brms", "mvbind")`. A direct
+#' comparison with one name would fail on a length-three condition.
 #'
-#' @param formula Formula object to check
-#' @return Logical indicating presence of mvbind response binding
-#'
-#' @details
-#' Uses safe expression parsing rather than fragile regex patterns.
-#' Validates formula structure and ensures mvbind() is well-formed.
-#'
+#' @param response_expr The left-hand side of a formula
+#' @return The function name, or `""` for an expression without a call
 #' @noRd
-# Name of the function a response call invokes, tolerating namespace
-# qualification. `as.character()` on `brms::mvbind(y1, y2)` returns
-# c("::", "brms", "mvbind"), so comparing it directly to a single name
-# errors with "the condition has length > 1" rather than reporting an
-# unrecognised response.
-#'@noRd
 response_call_name <- function(response_expr) {
   if (!is.call(response_expr)) {
     return("")
@@ -1231,6 +1290,20 @@ response_call_name <- function(response_expr) {
   ""
 }
 
+#' Whether a formula has an mvbind() response
+#'
+#' @description
+#' Checks the response side of a formula for an mvbind() call by
+#' expression parsing. A cbind() response is a binomial trials
+#' specification and gives `FALSE`.
+#'
+#' @param formula Formula object to check
+#' @return Logical indicating presence of mvbind response binding
+#'
+#' @details
+#' Refuses an mvbind() call with fewer than two responses.
+#'
+#' @noRd
 has_mvbind_response <- function(formula) {
   checkmate::assert_formula(formula)
 
@@ -1269,9 +1342,9 @@ has_mvbind_response <- function(formula) {
 #' Drop the addition terms from a formula's left-hand side
 #'
 #' `y | trials(n) ~ x` carries the response and the terms that qualify
-#' it in one expression. Reading variable names off the whole
-#' left-hand side counts the qualifiers as responses, so they are
-#' removed first.
+#' it in one expression. Variable names taken from the whole left-hand
+#' side would count the qualifiers as responses. They are removed
+#' first.
 #'
 #' @param formula A two-sided formula
 #' @return The same formula with the left-hand side reduced to the
@@ -1279,6 +1352,7 @@ has_mvbind_response <- function(formula) {
 #'
 #' @noRd
 strip_addition_terms <- function(formula) {
+  checkmate::assert_formula(formula)
   lhs <- formula[[2L]]
   if (!is.call(lhs) || !identical(as.character(lhs[[1L]]), "|")) {
     return(formula)

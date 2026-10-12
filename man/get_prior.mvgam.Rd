@@ -2,7 +2,7 @@
 % Please edit documentation in R/priors.R
 \name{get_prior.mvgam}
 \alias{get_prior.mvgam}
-\title{Method for fitted mvgam objects - returns the stored prior table}
+\title{Method for fitted mvgam objects returning the stored prior table}
 \usage{
 \method{get_prior}{mvgam}(object, ...)
 }
@@ -19,12 +19,10 @@ their defaults carry \code{source = "default"} (or whatever source
 string \pkg{brms} assigned).
 }
 \description{
-Convenience shortcut for the post-fit prior table. In brms the
-canonical post-fit accessor is \code{prior_summary()}; mvgam keeps
-that path and exports \code{get_prior.mvgam()} as well because users
-frequently type \code{get_prior(fit)} by analogy with the formula
-method. Both return the one table the model was built with. It can
-be edited and fed back through
-\code{update(fit, prior = ..., recompile = FALSE)} for refits that reuse
-the compiled Stan model.
+A shortcut for the post-fit prior table. In brms the post-fit
+accessor is \code{prior_summary()}. mvgam keeps that path and exports
+\code{get_prior.mvgam()} as well, matching the formula method. Both
+return the one table the model was built with. It can be edited and
+passed to \code{update(fit, prior = ..., recompile = FALSE)} for refits
+that reuse the compiled Stan model.
 }

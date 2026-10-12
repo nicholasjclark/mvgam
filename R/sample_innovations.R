@@ -1,4 +1,4 @@
-#' Process Error Innovation Sampling for Trend Models
+#' Process error innovation sampling for trend models
 #'
 #' @description
 #' Infrastructure for sampling process errors (innovations) from trend
@@ -25,7 +25,7 @@
 NULL
 
 
-#' Get Covariance Pattern for Trend Type
+#' The covariance pattern of a trend type
 #'
 #' Each trend registers how its innovations are parameterised in
 #' `<name>_trend_properties()`. A fit with no trend, which
@@ -34,20 +34,20 @@ NULL
 #' @param trend_type A registered trend type name, or `"None"`
 #'
 #' @return Character string: one of "none", "diagonal",
-#'   "cholesky_scaled", or "full_covariance"
+#'   "cholesky_scaled" or "full_covariance"
 #'
 #' @noRd
 get_covariance_pattern <- function(trend_type) {
+  checkmate::assert_character(trend_type, min.len = 1L, any.missing = FALSE)
   trend_property(trend_type, "covariance_pattern")
 }
 
 
-#' Prepare a frame the way the fit's own series identity was built
+#' Prepare a frame with the fit's own series identity
 #'
-#' Both the training frame and any prediction frame have to be read
-#' through the same preparation, or the series each names is spelled
-#' one way on one side and another way on the other and no comparison
-#' between them means anything.
+#' The training frame and every prediction frame pass through the same
+#' preparation. Each series then has one label on both sides of any
+#' comparison.
 #'
 #' @param object A fitted `mvgam` object
 #' @param data A data frame to prepare
@@ -55,6 +55,8 @@ get_covariance_pattern <- function(trend_type) {
 #'
 #' @noRd
 prepare_mvgam_frame <- function(object, data) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(data)
   meta <- object$trend_metadata
   ensure_mvgam_variables(
     data = data,
@@ -67,12 +69,11 @@ prepare_mvgam_frame <- function(object, data) {
 }
 
 
-#' The series label each row of a frame carries
+#' The series label of each row of a frame
 #'
-#' The same identity `fitted_series_levels()` names, read per
-#' row rather than per level, so a caller naming its output by one
-#' and subsetting by the other cannot end up comparing a derived
-#' series against the column it superseded.
+#' Gives per row the identity `fitted_series_levels()` gives per level.
+#' A caller naming its output by one and subsetting by the other then
+#' compares like with like.
 #'
 #' @param object A fitted `mvgam` object
 #' @param data A frame to label, defaulting to the training data
@@ -80,6 +81,8 @@ prepare_mvgam_frame <- function(object, data) {
 #'
 #' @noRd
 training_series_labels <- function(object, data = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(data, null.ok = TRUE)
   data <- data %||% object$data
   as.character(get_series_for_grouping(
     prepare_mvgam_frame(object, data)
@@ -89,41 +92,43 @@ training_series_labels <- function(object, data = NULL) {
 
 #' The series a model was fitted on
 #'
-#' In the order `trend[t, s]` numbers its columns, from the axis record.
-#' A hierarchical fit derives its series from `gr` and `subgr`, and
-#' sorting the column it superseded gives a permutation of that order.
-#' Every label stays valid under a permutation. Each series would then
-#' take another series' state and nothing would fail.
+#' Taken from the axis record, in the order `trend[t, s]` numbers its
+#' columns. A hierarchical fit derives its series from `gr` and
+#' `subgr`. Sorting the superseded series column gives a permutation of
+#' that order. Every label would stay valid under the permutation. Each
+#' series would then take another series' state without an error.
 #'
 #' @param object A fitted `mvgam` object or prefit
 #' @return Character vector, or `NULL` for a model whose frame names no
 #'   axis
 #' @noRd
 fitted_series_levels <- function(object) {
+  checkmate::assert_list(object)
   levels <- mvgam_axes(object)$series$levels
   if (!is.null(levels)) as.character(levels)
 }
 
 
-#' Get Observation Structure for Innovation Sampling
+#' The time and series indices of each observation
 #'
 #' Extracts time and series indices for each observation in newdata.
-#' Uses existing mvgam infrastructure for handling all series creation
-#' strategies (explicit, hierarchical, multivariate).
+#' Uses the mvgam series preparation for every series creation
+#' strategy (explicit, hierarchical, multivariate).
 #'
 #' @param object mvgam object with fitted trend model
 #' @param newdata Data frame with prediction covariates. If NULL, uses
 #'   training data from object.
 #' @param resp The response this structure is for. Required on a fit
-#'   whose series are its responses, where it is what names the trend
-#'   column a row reads; ignored otherwise.
+#'   whose series are its responses, where it selects the trend column
+#'   of each row; ignored otherwise.
 #'
 #' @return List with components:
 #'   \itemize{
 #'     \item \code{time}: Integer vector of time indices (1-based)
 #'     \item \code{series}: Factor/character vector of series identifiers
 #'     \item \code{series_int}: Integer vector, the column of
-#'       `trend[t, s]` each row reads (1-based)
+#'       `trend[t, s]` that holds each row's state (1-based)
+#'     \item \code{series_levels}: The series the model was fitted on
 #'     \item \code{n_obs}: Number of observations
 #'     \item \code{n_times}: Number of unique time points
 #'     \item \code{n_series}: Number of unique series
@@ -172,37 +177,27 @@ get_observation_structure <- function(object, newdata = NULL,
     ))
   }
 
-  # Otherwise: prepare data with standardized time/series attributes.
-  # For multivariate fits the data may not carry an explicit `series`
-  # column (mvbind builds it implicitly), and the preparation
-  # rebuilds the multivariate series from the fit's own responses.
+  # Otherwise the frame takes the standard time and series attributes.
+  # A multivariate frame may lack an explicit `series` column. The
+  # preparation rebuilds those series from the fit's responses.
   data_prepared <- prepare_mvgam_frame(object, newdata)
 
-  # Extract indices using existing accessor functions
   time_indices <- get_time_for_grouping(data_prepared)
   series_indices <- get_series_for_grouping(data_prepared)
 
-  # The integer is an index into the fitted trend matrix, so it has to
-  # be read against the series the model was fitted on rather than the
-  # ones this frame happens to contain. Factoring `newdata` on its own
-  # values numbers them from one within the frame: a caller asking
-  # about a single series, which is what the per-series hindcast arms
-  # do, would get index 1 for every series and read the first series'
-  # latent state throughout. A frame carrying a `series` column keeps
-  # its full level set through subsetting and so survives that; one
-  # whose series is rebuilt from a `gr` / `subgr` pair does not,
-  # because the rebuild sees only the levels present.
+  # The integer indexes the fitted trend matrix. It is matched against
+  # the series the model was fitted on. Factoring the frame's own
+  # values would number a single-series frame from one and give every
+  # series the first series' state. A frame whose series are rebuilt
+  # from `gr` and `subgr` holds only the levels present in it.
   series_levels <- fitted_series_levels(object) %||%
     observed_levels(series_indices)
   refuse_unseen_levels("Series", unique(as.character(series_indices)),
                        series_levels)
   series_int <- match(as.character(series_indices), series_levels)
 
-  # Every reader of this structure indexes the trend, or the
-  # innovations drawn for it, with `series_int`, so the rule for a
-  # wide frame is applied once here. Left to each reader, three of
-  # four forgot it and read the first response's column for all of
-  # them.
+  # Every consumer of this structure indexes the trend, or its
+  # innovations, by `series_int`. The wide-frame rule applies once here.
   series_int <- trend_series_index(object, series_int, resp)
   unique_times <- sort(unique(time_indices))
 
@@ -219,24 +214,25 @@ get_observation_structure <- function(object, newdata = NULL,
 }
 
 
-#' Build a single-series observation structure directly
+#' A single-series observation structure built from the time column
 #'
-#' Shortcut for trained models with `n_series == 1`. The trained model
-#' already encodes the (single) series identity in its standata, so we
-#' don't need to round-trip through `ensure_mvgam_variables`. We just
-#' read newdata's time column, repeat the trained series label across
-#' all rows, and produce the same structure
-#' `get_observation_structure()` returns for the multi-series path.
+#' Serves fits with `n_series == 1`. The fit's Stan data already holds
+#' the single series identity. The structure repeats the trained series
+#' label across the rows of `newdata`. It matches the structure
+#' `get_observation_structure()` returns for several series.
 #'
 #' @param newdata Data frame; must have a column matching `time_var`.
 #' @param time_var Character; name of the time column.
 #' @param level_label Character; the single trained series level used
 #'   for the integer/factor mapping. Pulled from
 #'   `attr(object$data, "mvgam_series")\[1\]`.
-#'
+#' @return List with the components of `get_observation_structure()`
 #' @noRd
 build_single_series_observation_structure <- function(newdata, time_var,
                                                        level_label) {
+  checkmate::assert_data_frame(newdata)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(level_label)
   assert_axis_column(newdata, time_var, "time")
   time_indices <- newdata[[time_var]]
   unique_times <- sort(unique(time_indices))
@@ -255,40 +251,39 @@ build_single_series_observation_structure <- function(newdata, time_var,
 }
 
 
-#' Get Trend Type from mvgam Object
+#' The trend type of a fit
 #'
 #' @param object An `mvgam` object or prefit
 #' @return The base trend type (e.g. "AR", "RW", "VAR"), or "None"
 #'   for a model without a trend
 #' @noRd
 get_trend_type <- function(object) {
+  checkmate::assert_list(object)
   object$trend_metadata$trend_type %||% "None"
 }
 
 
-#' Check if Model Has Stochastic Trend
+#' Whether a fit's trend draws stochastic innovations
 #'
-#' Determines if the model has a trend component that produces
-#' stochastic innovations (i.e., not PW or None).
+#' A piecewise trend and a fit without a trend draw none.
 #'
-#' @param object mvgam object
-#'
-#' @return Logical indicating if model has stochastic innovations
-#'
+#' @param object An `mvgam` object
+#' @return A single logical
 #' @noRd
 has_stochastic_trend <- function(object) {
+  checkmate::assert_list(object)
   trend_type <- get_trend_type(object)
   pattern <- get_covariance_pattern(trend_type)
   pattern != "none"
 }
 
 
-#' Sample Process Errors for a Fitted mvgam Object
+#' Sampled process errors of a fitted model
 #'
-#' Top-level entry point for innovation sampling. Composes the
-#' observation structure, the trend covariance structure, and the
-#' pattern-specific transform into a single matrix of process-error
-#' draws aligned with the observation grid.
+#' Top-level entry point for innovation sampling. Combines the
+#' observation structure, the trend covariance structure and the
+#' pattern-specific transform. The result is one matrix of
+#' process-error draws aligned with the observation grid.
 #'
 #' @param object A fitted `mvgam` object.
 #' @param ndraws Optional number of posterior draws to use. Mutually
@@ -297,11 +292,14 @@ has_stochastic_trend <- function(object) {
 #'   `NULL`, the observation grid is taken from the training data.
 #' @param draw_ids Optional integer vector of specific draw indices.
 #'   Mutually exclusive with `ndraws`.
+#' @param resp Character vector of responses on a fit whose series are
+#'   its responses, or `NULL`.
 #'
 #' @return Numeric matrix \[ndraws x n_obs\] of sampled innovations,
 #'   in the same column order as `newdata` (or training data) rows.
 #'   Returns a matrix of zeros for deterministic-trend models (PW,
-#'   None) so callers can add it unconditionally.
+#'   None) so callers can add it unconditionally. When `resp` names
+#'   several responses, a named list of such matrices.
 #'
 #' @details
 #' For deterministic trends the routine short-circuits and returns a
@@ -331,10 +329,9 @@ sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
   cov_structure <- get_trend_covariance_structure(
     object, ndraws = ndraws, draw_ids = draw_ids
   )
-  # One structure per response the noise is read for. Every response
-  # reads the same joint draw, so on a wide frame they keep the
-  # correlation the trend was fitted with; each reads its own column,
-  # so each keeps its own scale.
+  # One structure per response. Every response takes its own column of
+  # the same joint draw. On a wide frame the responses keep the
+  # correlation and the scales the trend was fitted with.
   structures <- lapply(resp %||% list(NULL), function(r) {
     get_observation_structure(object, newdata, resp = r)
   })
@@ -353,7 +350,7 @@ sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
 }
 
 
-#' Required Parameter Names by Covariance Pattern
+#' Posterior parameter names required by each covariance pattern
 #'
 #' Defines which posterior parameters are needed for each pattern type.
 #'
@@ -377,14 +374,11 @@ covariance_param_specs <- list(
 
 #' Name the covariance structure innovations are drawn from
 #'
-#' A hierarchical trend carries its correlations as a population
-#' Cholesky factor plus per-group deviations, whatever the trend
-#' constructor was, so a hierarchical `VAR(gr = ...)` is parameterised
-#' exactly as a hierarchical `AR(gr = ...)`. Naming the structure once
-#' keeps the parameter extraction and the innovation transform from
-#' disagreeing about which shape they are working with: reading it two
-#' ways is how a hierarchical VAR came to be handed the parameters of
-#' one structure and then asked for the covariance of another.
+#' A hierarchical trend stores its correlations as a population
+#' Cholesky factor plus per-group deviations for any trend
+#' constructor. A hierarchical `VAR(gr = ...)` is then parameterised
+#' exactly as a hierarchical `AR(gr = ...)`. The parameter extraction
+#' and the innovation transform both take the structure from this key.
 #'
 #' @param hierarchical Whether the trend is grouped
 #' @param effective_pattern Covariance pattern after the
@@ -393,6 +387,8 @@ covariance_param_specs <- list(
 #'
 #' @noRd
 covariance_structure_key <- function(hierarchical, effective_pattern) {
+  checkmate::assert_flag(hierarchical, null.ok = TRUE)
+  checkmate::assert_string(effective_pattern)
   if (isTRUE(hierarchical) &&
       effective_pattern %in% c("cholesky_scaled", "full_covariance")) {
     return("hier.cholesky_scaled")
@@ -402,40 +398,17 @@ covariance_structure_key <- function(hierarchical, effective_pattern) {
 }
 
 
-#' Get Trend Covariance Structure from Posterior
+#' Per-draw innovation degrees of freedom for forecasting
 #'
-#' Extracts covariance parameters from posterior draws based on the
-#' trend model's covariance pattern. Uses trend_metadata as ground truth
-#' for structure determination.
-#'
-#' @param object mvgam object with fitted trend model
-#' @param ndraws Number of posterior draws to extract (NULL = all).
-#'   Mutually exclusive with draw_ids.
-#' @param draw_ids Specific draw indices to use. Mutually exclusive
-#'   with ndraws.
-#'
-#' @return List with components:
-#'   \itemize{
-#'     \item \code{pattern}: Covariance pattern type
-#'     \item \code{n_series}: Number of series
-#'     \item \code{hierarchical}: Whether model uses hierarchical structure
-#'     \item \code{has_correlations}: Whether \code{cor} resolved to
-#'       TRUE on the trend spec. A grouping resolves it to TRUE.
-#'     \item \code{ndraws}: Number of posterior draws extracted
-#'     \item \code{params}: List of extracted parameter matrices
-#'     \item \code{group_info}: Group structure (if hierarchical)
-#'   }
-#'   Cholesky factors are kept as flat per-draw vectors (in row-major
-#'   order from posterior sort); reshape via
-#'   matrix(vec, dim, dim, byrow = TRUE) to get L.
-#'
-# Per-draw innovation degrees of freedom for forecasting.
-#
-# Returns NULL when the trend has Gaussian innovations, a length-ndraws
-# vector of posterior draws when they were estimated, and a repeated
-# constant when they were fixed at a finite value on the constructor.
-#'@noRd
+#' @param draws_mat Draws matrix of the fit
+#' @param object Fitted `mvgam` object
+#' @return `NULL` for Gaussian innovations, the posterior draws of
+#'   `nu_trend` when they were estimated, or the fixed constructor
+#'   value repeated once per draw
+#' @noRd
 extract_nu_trend_draws <- function(draws_mat, object) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_list(object)
   if ("nu_trend" %in% colnames(draws_mat)) {
     return(as.numeric(draws_mat[, "nu_trend"]))
   }
@@ -446,6 +419,33 @@ extract_nu_trend_draws <- function(draws_mat, object) {
   rep(as.numeric(df), nrow(draws_mat))
 }
 
+
+#' The trend covariance structure of a fit's posterior
+#'
+#' Extracts covariance parameters from posterior draws based on the
+#' trend model's covariance pattern. The trend metadata determines the
+#' structure.
+#'
+#' @param object mvgam object with fitted trend model
+#' @param ndraws Number of posterior draws to extract (NULL = all).
+#'   Mutually exclusive with draw_ids.
+#' @param draw_ids Specific draw indices to use. Mutually exclusive
+#'   with ndraws.
+#'
+#' @return List with components:
+#'   \itemize{
+#'     \item \code{pattern}: Covariance pattern type
+#'     \item \code{n_series}: Number of series, or of latent factors
+#'     \item \code{hierarchical}: Whether model uses hierarchical structure
+#'     \item \code{has_correlations}: Whether \code{cor} resolved to
+#'       TRUE on the trend spec. A grouping resolves it to TRUE.
+#'     \item \code{ndraws}: Number of posterior draws extracted
+#'     \item \code{params}: List of extracted parameter arrays
+#'     \item \code{group_info}: Group structure (if hierarchical)
+#'     \item \code{is_lv}, \code{n_obs_series}, \code{draws_mat},
+#'       \code{fixed_Z}: The factor model inputs of the loadings map
+#'     \item \code{nu_trend}: Per-draw innovation degrees of freedom
+#'   }
 #' @noRd
 get_trend_covariance_structure <- function(object, ndraws = NULL,
                                            draw_ids = NULL) {
@@ -501,29 +501,30 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   group_info <- if (hierarchical) get_group_info(object$standata) else NULL
   n_series_int <- as.integer(n_series)
 
-  # Dispatch posterior-parameter extraction on (hierarchical, pattern).
-  # Multi-index params (Cholesky factors, full covariance) require
-  # explicit named-column lookup; extract_named_params()
-  # sorts only by first index, which is brittle for 2D+ arrays where the
-  # secondary order then depends on the source storage convention.
-  # The fallback covers patterns that are single-index (e.g. simple
-  # diagonal: just "sigma_trend").
-  # Hierarchical VAR (`VAR(gr = ..., subgr = ..., cor = TRUE)`) emits
-  # the same population-vs-deviation parameter shapes as the
-  # hierarchical Cholesky-scaled case: `alpha_cor_trend`,
-  # `L_Omega_global_trend`, `L_deviation_group_trend`, and
-  # `sigma_group_trend`. See `generate_hierarchical_correlation_parameters()`
-  # in R/stan_assembly.R. One extractor populates both, and
-  # `compute_residcor_hierarchical()` reads the same fields downstream.
+  # Multi-index parameters (Cholesky factors, full covariance) are
+  # looked up by explicit column name. `extract_named_params()` sorts
+  # by the first index alone. The order of the later indices would
+  # then depend on the storage convention. The fallback covers
+  # single-index patterns such as the simple diagonal `sigma_trend`.
+  # A hierarchical VAR (`VAR(gr = ..., subgr = ..., cor = TRUE)`) emits
+  # the population and deviation parameters of the hierarchical
+  # Cholesky-scaled case: `alpha_cor_trend`, `L_Omega_global_trend`,
+  # `L_deviation_group_trend` and `sigma_group_trend`.
+  # `generate_hierarchical_correlation_parameters()` in
+  # R/stan_assembly.R declares them. One extractor serves both.
+  # `compute_residcor_hierarchical()` uses the same fields.
   dispatch_key <- covariance_structure_key(hierarchical, effective_pattern)
   params <- switch(
     dispatch_key,
-    "hier.cholesky_scaled"  = extract_hierarchical_cholesky_params(
-                                draws_mat, group_info),
-    "flat.cholesky_scaled"  = extract_simple_cholesky_params(
-                                draws_mat, n_series_int),
-    "flat.full_covariance"  = extract_simple_full_cov_params(
-                                draws_mat, n_series_int),
+    "hier.cholesky_scaled" = extract_hierarchical_cholesky_params(
+      draws_mat, group_info
+    ),
+    "flat.cholesky_scaled" = extract_simple_cholesky_params(
+      draws_mat, n_series_int
+    ),
+    "flat.full_covariance" = extract_simple_full_cov_params(
+      draws_mat, n_series_int
+    ),
     {
       param_names <- covariance_param_specs[[effective_pattern]][[
         if (hierarchical) "hierarchical" else "simple"
@@ -532,9 +533,9 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     }
   )
 
-  # A marginal prediction integrates over the state's own spread, not
-  # over one innovation, so the covariance the transforms read is the
-  # stationary one wherever the kernel settles at all.
+  # A marginal prediction integrates over the spread of the state. The
+  # transforms then take the stationary covariance wherever the kernel
+  # settles.
   params <- rescale_params_to_stationary(
     params = params, object = object, draws_mat = draws_mat,
     group_info = group_info
@@ -563,20 +564,25 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
 }
 
 
+#' Refuse a fit without posterior draws
+#'
+#' @param object Fitted `mvgam` object
+#' @param ndraws Requested number of draws, or `NULL`
+#' @param draw_ids Requested draw indices, or `NULL`
+#' @return `NULL`, invisibly
 #' @noRd
 validate_covariance_inputs <- function(object, ndraws, draw_ids) {
   checkmate::assert_class(object, "mvgam")
   validate_draw_selectors(ndraws, draw_ids)
 
-  # A prefit is the user-facing shape of this condition and carries
-  # the message every other method gives it. The slot test stays for
-  # the classed stubs the tests build, which a user cannot construct
-  # and which that message would describe wrongly.
+  # `require_fitted_model()` refuses a prefit with the message every
+  # other method gives it. The slot test catches the classed stubs the
+  # tests build.
   require_fitted_model(object, "residual_cor")
   if (is.null(object$fit)) {
     stop(insight::format_error(
       "mvgam object has no fitted posterior draws."
-    ))
+    ), call. = FALSE)
   }
 
   invisible(NULL)
@@ -585,11 +591,9 @@ validate_covariance_inputs <- function(object, ndraws, draw_ids) {
 
 #' Take the rows of a draws matrix belonging to the chosen draws
 #'
-#' The companion to `resolve_draw_indices()`, and the shape every
-#' extractor in the package ends in: find the columns holding a
-#' quantity, then keep the rows holding the iterations the rest of the
-#' answer is built from. Going through one reader is what keeps a
-#' second extractor from choosing its own draws.
+#' The companion to `resolve_draw_indices()`. Every extractor finds the
+#' columns of a quantity, then keeps the rows of the chosen draws. One
+#' shared helper keeps every extractor on the same draws.
 #'
 #' @param x A draws matrix, or any matrix whose rows are draws
 #' @param ndraws Requested number of draws, or `NULL`
@@ -598,23 +602,22 @@ validate_covariance_inputs <- function(object, ndraws, draw_ids) {
 #'
 #' @noRd
 subset_draws_rows <- function(x, ndraws = NULL, draw_ids = NULL) {
+  checkmate::assert_matrix(x)
   x[resolve_draw_indices(nrow(x), ndraws, draw_ids), , drop = FALSE]
 }
 
 
 #' Turn a draw count into draw indices
 #'
-#' The single place a requested number of draws becomes a set of
-#' rows. Everything a post-fit method assembles has to be read out of
-#' the same iterations, and it only takes two extractions choosing
-#' differently for a mean to be paired with a dispersion, a trend or a
-#' set of innovations that belong to another draw. A count therefore
-#' resolves to indices once and those indices are passed on, rather
-#' than each extraction being handed the count and choosing again.
+#' A requested number of draws becomes a set of rows here alone. Every
+#' quantity a post-fit method assembles must come from the same
+#' iterations. Two extractions that each sampled their own draws would
+#' pair a mean with a dispersion, a trend or innovations from another
+#' draw. A count resolves to indices once. Callers pass those indices
+#' on.
 #'
-#' A count covering the whole posterior still resolves, because the
-#' subsample is random: handed the bare count, one extraction would
-#' return the draws shuffled and another would not.
+#' A count equal to the number of draws gives every draw in sampled
+#' order. A smaller count gives a sorted random subset.
 #'
 #' @param total_draws Number of draws the posterior holds
 #' @param ndraws Requested number of draws, or `NULL`
@@ -623,13 +626,17 @@ subset_draws_rows <- function(x, ndraws = NULL, draw_ids = NULL) {
 #'
 #' @noRd
 resolve_draw_indices <- function(total_draws, ndraws, draw_ids) {
+  checkmate::assert_count(total_draws)
+  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1L, any.missing = FALSE,
+                               min.len = 1L, null.ok = TRUE)
   if (!is.null(draw_ids)) {
     if (max(draw_ids) > total_draws) {
       stop(insight::format_error(c(
         "Requested 'draw_ids' exceed available draws.",
         x = paste0("Max requested: ", max(draw_ids),
                    ", available: ", total_draws, ".")
-      )))
+      )), call. = FALSE)
     }
     return(as.integer(draw_ids))
   }
@@ -652,8 +659,15 @@ resolve_draw_indices <- function(total_draws, ndraws, draw_ids) {
 }
 
 
+#' Draws of each named parameter, located by name
+#'
+#' @param draws_mat Draws matrix of the fit
+#' @param param_names Character vector of parameter names
+#' @return Named list of draws matrices, one per parameter
 #' @noRd
 extract_named_params <- function(draws_mat, param_names) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_character(param_names, any.missing = FALSE)
   all_cols <- colnames(draws_mat)
   params <- lapply(param_names, function(name) {
     extract_posterior_param(draws_mat, all_cols, name)
@@ -663,8 +677,19 @@ extract_named_params <- function(draws_mat, param_names) {
 }
 
 
+#' Draws of one parameter, indexed or scalar
+#'
+#' Indexed columns are ordered by their first index.
+#'
+#' @param draws_mat Draws matrix of the fit
+#' @param all_cols Character vector of the column names of `draws_mat`
+#' @param param_name Character parameter name
+#' @return Draws matrix with one column per element
 #' @noRd
 extract_posterior_param <- function(draws_mat, all_cols, param_name) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_character(all_cols)
+  checkmate::assert_string(param_name)
   # Match indexed params (param[...]) or scalar (param)
   indexed_pattern <- paste0("^", param_name, "\\[")
   scalar_pattern <- paste0("^", param_name, "$")
@@ -687,26 +712,16 @@ extract_posterior_param <- function(draws_mat, all_cols, param_name) {
 }
 
 
-#' Extract Simple Cholesky Parameters as Structured Arrays
+#' An indexed Stan matrix parameter as a per-draw array
 #'
-#' Builds a per-draw \[ndraws, n, n\] array for `L_Omega_trend` and
-#' \[ndraws, n\] matrix for `sigma_trend` via direct column-name
-#' lookup. Mirrors `extract_hierarchical_cholesky_params()` for the
-#' non-hierarchical case so reconstruction is independent of any
-#' sort-order assumption in `extract_named_params()`.
-#'
-#' @noRd
-NULL
-
-#' Pull an indexed Stan matrix parameter into a per-draw
-#' `[ndraws, nrow, ncol]` array. Handles matrix-valued (`name[i, j]`)
-#' or array-of-matrix (`name[c, i, j]`, `name[c, l, i, j]`) Stan
-#' declarations via `prefix_ids`, applies an optional per-draw
-#' matrix `transform` (e.g. `stats::cov2cor`, `tcrossprod`) and
-#' can label dims 2-3 for user-facing return values. Shared by
-#' Cholesky / covariance / factor-loading extractors that build
-#' `[d, i, j]` arrays from posterior draws, and by
-#' `posterior_innovation_cor()` / `posterior_transition_matrix()`.
+#' Returns a `[ndraws, nrow, ncol]` array. `prefix_ids` handles
+#' matrix-valued (`name[i, j]`) and array-of-matrix (`name[c, i, j]`,
+#' `name[c, l, i, j]`) Stan declarations. An optional `transform`
+#' applies to each draw's matrix (e.g. `stats::cov2cor`,
+#' `tcrossprod`). `labels` names dimensions 2 and 3 for user-facing
+#' return values. Serves the Cholesky, covariance and loading
+#' extractors, `posterior_innovation_cor()` and
+#' `posterior_transition_matrix()`.
 #'
 #' @param draws_mat A posterior draws matrix
 #'   (`posterior::as_draws_matrix()`).
@@ -738,6 +753,9 @@ extract_indexed_array_2d <- function(draws_mat, name, nrow, ncol,
   checkmate::assert_int(nrow, lower = 1)
   checkmate::assert_int(ncol, lower = 1)
   checkmate::assert_integerish(prefix_ids, lower = 1L, min.len = 0L)
+  checkmate::assert_function(transform, null.ok = TRUE)
+  checkmate::assert_character(labels, null.ok = TRUE)
+  checkmate::assert_string(required_for)
   lead <- if (length(prefix_ids)) {
     paste(as.integer(prefix_ids), collapse = ",")
   }
@@ -755,6 +773,16 @@ extract_indexed_array_2d <- function(draws_mat, name, nrow, ncol,
 }
 
 
+#' Simple Cholesky parameters as per-draw arrays
+#'
+#' Builds a `[ndraws, n]` matrix of `sigma_trend` and a
+#' `[ndraws, n, n]` array of `L_Omega_trend` by column name. A fit that
+#' stores `Sigma_trend` gives the Cholesky factor of its correlation.
+#'
+#' @param draws_mat Draws matrix of the fit
+#' @param n_series Integer number of series
+#' @return List holding `sigma_trend` and `L_Omega_trend`
+#' @noRd
 extract_simple_cholesky_params <- function(draws_mat, n_series) {
   checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
   checkmate::assert_int(n_series, lower = 1)
@@ -777,10 +805,9 @@ extract_simple_cholesky_params <- function(draws_mat, n_series) {
 #'
 #' `Sigma_trend` is the covariance of the innovations over one step.
 #' `CAR()` places `L_Omega_trend` on the correlation of the shocks over
-#' an instant, and its `Sigma_trend` is then a different matrix from
-#' `sigma_trend` and `L_Omega_trend` multiplied out. Every post-fit
-#' path takes the innovation correlation from `Sigma_trend` where the
-#' fit stores it.
+#' an instant. Its `Sigma_trend` then differs from the product of
+#' `sigma_trend` and `L_Omega_trend`. Every post-fit path takes the
+#' innovation correlation from `Sigma_trend` where the fit stores it.
 #'
 #' @param draws Draws with one named column per parameter element
 #' @return `TRUE` or `FALSE`
@@ -791,16 +818,23 @@ stores_innovation_cov <- function(draws) {
 
 
 #' Lower Cholesky factor of a covariance matrix's correlation
+#'
+#' @param Sigma Numeric covariance matrix
+#' @return Lower-triangular matrix
 #' @noRd
 innovation_cor_factor <- function(Sigma) {
+  checkmate::assert_matrix(Sigma, mode = "numeric")
   t(chol(stats::cov2cor(Sigma)))
 }
 
 
-#' Extract Simple Full Covariance Parameters as Structured Arrays
+#' Simple full covariance parameters as a per-draw array
 #'
-#' A \[ndraws, n, n\] array of `Sigma_trend`, located by name.
+#' A `[ndraws, n, n]` array of `Sigma_trend`, located by name.
 #'
+#' @param draws_mat Draws matrix of the fit
+#' @param n_series Integer number of series
+#' @return List holding `Sigma_trend`
 #' @noRd
 extract_simple_full_cov_params <- function(draws_mat, n_series) {
   checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
@@ -810,13 +844,15 @@ extract_simple_full_cov_params <- function(draws_mat, n_series) {
 }
 
 
-#' Extract Hierarchical Cholesky Parameters as Structured Arrays
+#' Hierarchical Cholesky parameters as per-draw arrays
 #'
-#' Builds named arrays for hierarchical Cholesky covariance from posterior
-#' draws via direct column-name lookup. Unlike `extract_named_params()`
-#' (which sorts only by first index), this preserves multi-index ordering
-#' so downstream code can use `arr\[d, g, i, j\]` directly.
+#' Builds named arrays by direct column-name lookup.
+#' `extract_named_params()` sorts by the first index alone. This
+#' extractor keeps the multi-index order. Downstream code then indexes
+#' `arr\[d, g, i, j\]` directly.
 #'
+#' @param draws_mat Draws matrix of the fit
+#' @param group_info Group information from `get_group_info()`
 #' @return List with components:
 #'   - `alpha_cor_trend`: numeric vector length ndraws
 #'   - `L_Omega_global_trend`: array \[ndraws, n_sub, n_sub\]
@@ -842,7 +878,7 @@ extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
       stop(insight::format_error(c(
         paste0("Posterior parameter '", name, "' not found."),
         i = "Required for hierarchical Cholesky covariance."
-      )))
+      )), call. = FALSE)
     }
     as.numeric(draws_mat[, name])
   }
@@ -891,8 +927,15 @@ extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
 }
 
 
+#' The group structure of a hierarchical trend's Stan data
+#'
+#' @param standata Stan data list holding `group_inds_trend`,
+#'   `N_groups_trend` and `N_subgroups_trend`
+#' @return List holding `n_groups`, `n_subgroups`, `group_inds` and
+#'   `members`
 #' @noRd
 get_group_info <- function(standata) {
+  checkmate::assert_list(standata)
   group_inds <- as.integer(standata$group_inds_trend)
   list(
     n_groups = standata$N_groups_trend,
@@ -906,7 +949,7 @@ get_group_info <- function(standata) {
 #' The member series of each group of a grouped trend
 #'
 #' Ascending series order within each group. The Stan data
-#' `group_members_trend` is built from this, and every R path that
+#' `group_members_trend` is built from this list. Every R path that
 #' takes a group's series takes them from it. A group's coefficients,
 #' variates and covariance block then fall on the same series on both
 #' sides.
@@ -935,36 +978,30 @@ group_members <- function(group_inds, n_subgroups) {
 }
 
 
-
-
-# ============================================================================
-# Pattern-Specific Innovation Samplers
-# ============================================================================
+# ----- Pattern-specific innovation samplers -----------------------
 #
-# All trend models sample from MVN with different covariance
-# parameterizations. These functions transform standard normal samples
-# z ~ N(0,I) into innovations with the appropriate covariance structure.
-#
-# Design: Vectorize where possible, minimize memory allocations.
-# Per-draw loops only when unavoidable (different covariance per draw).
+# All trend models sample from a multivariate normal with different
+# covariance parameterisations. These functions transform standard
+# normal samples z ~ N(0, I) into innovations with the required
+# covariance structure. Per-draw loops appear only where the
+# covariance varies by draw.
 
 
 #' One joint draw of a trend's innovations over its whole grid
 #'
-#' The innovations every series receives at a time are drawn together,
-#' from the covariance the trend was fitted with, so a correlated or
-#' factor trend moves its series jointly. Drawing the grid is kept
-#' apart from reading it row by row because one draw can be read more
-#' than once: the responses of a wide frame are its series, and each
-#' reads its own column of the same draw. Drawing once per response
-#' instead would lose the correlation between them, and reading one
-#' column for all of them gave every response the first one's noise.
+#' The innovations of every series at a time are drawn together from
+#' the covariance the trend was fitted with. A correlated or factor
+#' trend then moves its series jointly. The responses of a wide frame
+#' are its series. Each response takes its own column of one joint
+#' draw. Separate draws per response would lose the correlation
+#' between them.
 #'
 #' @param cov_structure List from `get_trend_covariance_structure()`.
 #' @param n_times Number of occasions the grid spans.
-#' @return List with `innovations`, a `[ndraws x (n_times * n_series)]`
-#'   matrix laid out time-fastest within each series block, and
-#'   `n_series`, the series count that layout uses.
+#' @return List with `innovations` and `n_series`. `innovations` is a
+#'   `[ndraws x (n_times * n_series)]` matrix laid out time-fastest
+#'   within each series block. `n_series` is the series count of that
+#'   layout.
 #' @noRd
 draw_innovation_grid <- function(cov_structure, n_times) {
   checkmate::assert_list(cov_structure, min.len = 1)
@@ -1005,11 +1042,10 @@ draw_innovation_grid <- function(cov_structure, n_times) {
     effective_pattern <- "diagonal"
   }
 
-  # Standardised innovations for the entire (time, series) grid, drawn
-  # from whichever distribution the model was fitted with. The mixing
-  # value is shared across series within a (draw, time) cell, matching
-  # the multivariate t in the Stan model rather than giving each series
-  # its own independent tail.
+  # Standardised innovations for the whole (time, series) grid, drawn
+  # from the distribution the model was fitted with. The mixing value
+  # is shared across series within a (draw, time) cell. The Stan
+  # model's multivariate t shares it the same way.
   nu <- cov_structure$nu_trend
   z <- matrix(0, ndraws, n_times * n_series)
   for (d in seq_len(ndraws)) {
@@ -1017,11 +1053,9 @@ draw_innovation_grid <- function(cov_structure, n_times) {
     z[d, ] <- as.numeric(draw_trend_innovations(n_times, n_series, df_d))
   }
 
-  # Transform by covariance structure. The hierarchical case uses a
-  # per-group convex combination of correlations, so it has its own
-  # transform. The structure is named by the same helper the parameter
-  # extraction used, so the two cannot disagree about which shape the
-  # parameters in hand describe.
+  # The hierarchical case combines correlations per group and has its
+  # own transform. `covariance_structure_key()` names the structure
+  # here and in the parameter extraction.
   is_hier_chol <- identical(
     covariance_structure_key(cov_structure$hierarchical, effective_pattern),
     "hier.cholesky_scaled"
@@ -1044,24 +1078,22 @@ draw_innovation_grid <- function(cov_structure, n_times) {
       full_covariance = transform_full_cov_innovations(
         z, cov_structure$params, n_times, n_series, ndraws
       ),
-      stop(insight::format_error(
-        paste0("Unknown covariance pattern: '", effective_pattern, "'.")
-      ))
+      stop_mvgam_fault(
+        "The covariance pattern is unknown.",
+        paste0("Got '", effective_pattern, "'.")
+      )
     )
   }
 
-  # Latent-factor map: innovations were sampled at the LV level
-  # (`n_series == n_lv` here). Convert to per-series innovations
-  # via the loadings `Z[s, lv]` before mapping to obs. The
-  # resolver returns sampled Z draws or the broadcast fixed Z
-  # transparently.
+  # A factor trend draws its innovations at the latent grain
+  # (`n_series == n_lv` here). The loadings `Z[s, lv]` map them to the
+  # series. The resolver returns sampled Z draws or the repeated fixed
+  # Z.
   if (isTRUE(cov_structure$is_lv)) {
-    # The model basis. The innovations were drawn from the latent
-    # covariance, which is stated for the columns the model
-    # sampled, so they have to be mapped through those same
-    # columns. Using the QR-identified loadings pairs a rotated
-    # basis with an unrotated covariance and changes the spread
-    # these innovations carry to the series.
+    # The model basis. The latent covariance is stated for the sampled
+    # loadings. The QR-identified loadings would pair a rotated basis
+    # with an unrotated covariance and change the spread of the series
+    # innovations.
     Z <- resolve_factor_loadings(
       draws_mat = cov_structure$draws_mat,
       fixed_Z = cov_structure$fixed_Z,
@@ -1080,15 +1112,18 @@ draw_innovation_grid <- function(cov_structure, n_times) {
 }
 
 
-# The parameter names that hold a factor model's reported loadings
-# and factor paths. A fit identified by the QR rotation stores them
-# as `Z_tilde[i, j]` and `lv_trend_tilde[t, k]`. Every other factor
-# fit reports `Z[i, j]` and `lv_trend[t, k]`: relabelled after
-# sampling where the factors take their own coefficients, and as
-# declared under a `trend_map`. `factor_identification()` decides
-# which applies. `extract_Z_loadings()`,
-# `extract_lv_trend_matrices()`, `match_z_loadings()` and
-# `categorize_mvgam_parameters()` all select through these helpers.
+#' The parameter pattern of a factor model's loadings
+#'
+#' A fit identified by the QR rotation stores its reported loadings
+#' and factor paths as `Z_tilde[i, j]` and `lv_trend_tilde[t, k]`.
+#' Every other factor fit reports `Z[i, j]` and `lv_trend[t, k]`. A
+#' fit whose factors take their own coefficients relabels them after
+#' sampling. A `trend_map` fit stores them as declared.
+#' `factor_identification()` decides which applies.
+#' `extract_Z_loadings()`, `extract_lv_trend_matrices()`,
+#' `match_z_loadings()` and `categorize_mvgam_parameters()` select
+#' through these helpers.
+#'
 #' @param pars Parameter names from the fit.
 #' @param basis `"identified"` for the loadings a report or plot
 #'   shows. `"model"` for the `Z` the model sampled. A caller
@@ -1096,10 +1131,12 @@ draw_innovation_grid <- function(cov_structure, n_times) {
 #'   `Omega_trend` needs `"model"`: the model estimated those
 #'   parameters with the sampled `Z`. The two differ only in a
 #'   rotated fit.
-#'@noRd
+#' @return Regular expression matching the loading columns
+#' @noRd
 factor_loading_param_pattern <- function(pars,
                                          basis = c("identified",
                                                    "model")) {
+  checkmate::assert_character(pars)
   basis <- match.arg(basis)
   if (identical(basis, "model")) return("^Z\\[")
   if (has_identified_loadings(pars)) "^Z_tilde\\[" else "^Z\\["
@@ -1117,6 +1154,7 @@ factor_loading_param_pattern <- function(pars,
 #'
 #' @noRd
 has_identified_loadings <- function(pars) {
+  checkmate::assert_character(pars)
   any(grepl("^Z_tilde\\[", pars))
 }
 
@@ -1131,11 +1169,17 @@ has_identified_loadings <- function(pars) {
 #'
 #' @noRd
 has_identified_factor_states <- function(pars) {
+  checkmate::assert_character(pars)
   any(grepl("^lv_trend_tilde\\[", pars))
 }
 
-#'@noRd
+#' The parameter pattern of a factor model's paths
+#'
+#' @param pars Character vector of parameter names
+#' @return Regular expression matching the factor path columns
+#' @noRd
 factor_state_param_pattern <- function(pars) {
+  checkmate::assert_character(pars)
   if (has_identified_factor_states(pars)) {
     "^lv_trend_tilde\\["
   } else {
@@ -1143,27 +1187,33 @@ factor_state_param_pattern <- function(pars) {
   }
 }
 
-# The regex matching the parameters the summary and tidy classifiers
-# hide. Each is a constant or the unidentified form of a quantity the
-# posterior reports under another name:
-#   * With every loading sampled, the factor innovations take unit
-#     scale and zero correlation. `sigma_trend[k]`, `L_Omega_trend`
-#     and `Sigma_trend` are constants, and the innovations are
-#     working arrays of the factor paths.
-#   * With the QR rotation, the unrotated loadings `Z[i, j]` and
-#     factor paths `lv_trend[t, k]` vary by rotation and sign between
-#     draws. `Z_tilde` and `lv_trend_tilde` are their reported forms.
-#   * `Phi_trend_tilde` replaces the unrotated `Phi_trend` of a VAR
-#     factor model.
-#   * A partial `trend_map` samples `Z_free_vec`, and `Z` repeats
-#     each of its entries.
-#   * A shared AR coefficient is sampled once, and the per-series
-#     copies repeat it.
-# The grouped scale and correlation parameters of a hierarchical trend
-# have other names and stay visible. Returns NULL when nothing is
-# hidden.
-#'@noRd
+#' The pattern of the parameters the default view hides
+#'
+#' The summary and tidy classifiers hide each parameter that is a
+#' constant or the unidentified form of a quantity reported under
+#' another name:
+#' - With every loading sampled, the factor innovations take unit
+#'   scale and zero correlation. `sigma_trend[k]`, `L_Omega_trend` and
+#'   `Sigma_trend` are constants. The innovations are working arrays
+#'   of the factor paths.
+#' - With the QR rotation, the unrotated loadings `Z[i, j]` and factor
+#'   paths `lv_trend[t, k]` vary by rotation and sign between draws.
+#'   `Z_tilde` and `lv_trend_tilde` are their reported forms.
+#' - `Phi_trend_tilde` replaces the unrotated `Phi_trend` of a VAR
+#'   factor model.
+#' - A partial `trend_map` samples `Z_free_vec`. `Z` repeats each of
+#'   its entries.
+#' - A shared AR coefficient is sampled once. The per-series copies
+#'   repeat it.
+#'
+#' The grouped scale and correlation parameters of a hierarchical
+#' trend have other names and stay visible.
+#'
+#' @param pars Character vector of parameter names
+#' @return A regular expression, or `NULL` when nothing is hidden
+#' @noRd
 hidden_par_pattern <- function(pars) {
+  checkmate::assert_character(pars)
   patterns <- character(0L)
   # A quantity rotated to the identified factor basis replaces its
   # unrotated source, which no rotation-invariant summary uses
@@ -1192,8 +1242,7 @@ hidden_par_pattern <- function(pars) {
   }
   # `coef_sharing = "shared"` samples one coefficient per lag and
   # broadcasts it across the series. The per-series copies repeat the
-  # sampled scalar's value, and reporting all of them presents one
-  # quantity as several. The sampled name stays, and the copies are
+  # sampled value. The sampled name stays visible. The copies stay
   # reachable by name.
   shared <- grep("^shared_ar[0-9]+(_pacf)?_trend\\[", pars, value = TRUE)
   if (length(shared) > 0L) {
@@ -1204,37 +1253,48 @@ hidden_par_pattern <- function(pars) {
   paste(patterns, collapse = "|")
 }
 
-# Which of `pars` the default parameter view hides, as a logical
-# mask. Callers need two shapes: a mask to combine with other
-# conditions, and a filtered vector. The regex from
-# `hidden_par_pattern()` is applied here once, and
-# `filter_hidden_pars()` is defined in terms of it. A mask
-# rebuilt inline at each call site drifts: one such copy covered
-# a single parameter bucket, which let `L_Omega_trend` reach
-# `tidy()` while every other accessor hid it.
-#'@noRd
+#' Which parameters the default view hides, as a logical mask
+#'
+#' Callers need a mask to combine with other conditions and a filtered
+#' vector. Both apply the regex of `hidden_par_pattern()` here.
+#' `filter_hidden_pars()` is defined in terms of this mask.
+#'
+#' @param pars Character vector of parameter names
+#' @return Logical vector, one entry per parameter
+#' @noRd
 is_hidden_par <- function(pars) {
+  checkmate::assert_character(pars)
   hide_pat <- hidden_par_pattern(pars)
   if (is.null(hide_pat)) return(rep(FALSE, length(pars)))
   grepl(hide_pat, pars)
 }
 
-# Return the input vector with the names `is_hidden_par()` marks
-# dropped. Used by `variables.mvgam()`, `extract_mvgam_draws()`
-# and `summary.mvgam()`.
-#'@noRd
+#' Parameter names with the hidden ones dropped
+#'
+#' Used by `variables.mvgam()`, `extract_mvgam_draws()` and
+#' `summary.mvgam()`.
+#'
+#' @param pars Character vector of parameter names
+#' @return Character vector of the visible names
+#' @noRd
 filter_hidden_pars <- function(pars) {
   pars[!is_hidden_par(pars)]
 }
 
-# Internal: extract factor-loading draws from the posterior.
-# Returns array [ndraws, n_obs_series, n_lv] sorted by series
-# index (outer) then by lv index (inner), matching Stan's
-# column-major storage convention. Selects `Z_tilde` or `Z` via
-# `factor_loading_param_pattern()`. `resolve_factor_loadings()`
-# also returns the loadings of a fully fixed trend_map fit, whose Z
-# is data.
-#'@noRd
+#' Factor-loading draws from the posterior
+#'
+#' `factor_loading_param_pattern()` selects `Z_tilde` or `Z`. The array
+#' follows the column-major order Stan stores the loading matrix in.
+#' `resolve_factor_loadings()` also covers a fully fixed `trend_map`
+#' fit, whose loadings are data.
+#'
+#' @param draws_mat Numeric draws matrix with parameter column names
+#' @param n_obs_series Integer number of observed series
+#' @param n_lv Integer number of latent factors
+#' @param basis Character loading basis, `"identified"` for the
+#'   QR-identified loadings or `"model"` for the sampled ones
+#' @return Numeric array with dimensions `[ndraws, n_obs_series, n_lv]`
+#' @noRd
 extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv,
                                basis = c("identified", "model")) {
   checkmate::assert_matrix(draws_mat)
@@ -1263,18 +1323,30 @@ extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv,
 }
 
 
-# Internal: vectorised LV->series mapping for innovations.
-# `lv_innov` is `[ndraws, n_times * n_lv]` laid out
-# time-fastest-within-lv (matching `transform_diagonal_innovations`).
-# `Z` is `[ndraws, n_obs_series, n_lv]`. Output is
-# `[ndraws, n_times * n_obs_series]` laid out
-# time-fastest-within-series, matching what
-# `map_innovations_to_obs` expects. Per draw d, for each time t
-# and series s: out[d, t + (s-1)*n_times] =
-#   sum_lv Z[d, s, lv] * lv_innov[d, t + (lv-1)*n_times].
-#'@noRd
+#' Latent-factor innovations mapped to the observed series
+#'
+#' For draw `d`, time `t` and series `s` the output holds
+#' `sum_lv Z[d, s, lv] * lv_innov[d, t + (lv - 1) * n_times]` in column
+#' `t + (s - 1) * n_times`. Time varies fastest within each factor on
+#' input, as `transform_diagonal_innovations()` lays it out. Time
+#' varies fastest within each series on output, as
+#' `map_innovations_to_obs()` expects.
+#'
+#' @param lv_innov Numeric matrix of factor innovations with dimensions
+#'   `[ndraws, n_times * n_lv]`
+#' @param Z Numeric loading array with dimensions
+#'   `[ndraws, n_obs_series, n_lv]`
+#' @param n_times Integer number of time points
+#' @param n_lv Integer number of latent factors
+#' @param n_obs_series Integer number of observed series
+#' @return Numeric matrix with dimensions
+#'   `[ndraws, n_times * n_obs_series]`
+#' @noRd
 map_lv_to_series_innovations <- function(lv_innov, Z, n_times,
                                           n_lv, n_obs_series) {
+  checkmate::assert_int(n_times, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_int(n_obs_series, lower = 1L)
   ndraws <- nrow(lv_innov)
   checkmate::assert_matrix(lv_innov,
                             ncols = n_times * n_lv)
@@ -1294,7 +1366,7 @@ map_lv_to_series_innovations <- function(lv_innov, Z, n_times,
 }
 
 
-#' Transform Innovations: Diagonal Pattern
+#' Diagonal-pattern innovation transform
 #'
 #' For models with independent innovations per series (RW, AR, ZMVN
 #' or CAR with cor = FALSE). Vectorized implementation without per-draw loops.
@@ -1318,6 +1390,7 @@ transform_diagonal_innovations <- function(z, params, n_times, n_series,
   checkmate::assert_int(n_times, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(ndraws, lower = 1)
+  checkmate::assert_list(params)
 
   sigma <- params$sigma_trend
   checkmate::assert_matrix(sigma, nrows = ndraws, ncols = n_series)
@@ -1334,7 +1407,7 @@ transform_diagonal_innovations <- function(z, params, n_times, n_series,
 }
 
 
-#' Transform Innovations: Cholesky-Scaled Pattern
+#' Cholesky-scaled innovation transform
 #'
 #' For correlated innovations via L_Sigma = diag(sigma) %*% L_Omega.
 #' Requires per-draw loop because covariance matrices vary across draws.
@@ -1362,6 +1435,7 @@ transform_cholesky_innovations <- function(z, params, n_times, n_series,
   checkmate::assert_int(n_times, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(ndraws, lower = 1)
+  checkmate::assert_list(params)
 
   sigma <- params$sigma_trend
   L_omega_arr <- params$L_Omega_trend
@@ -1392,7 +1466,7 @@ transform_cholesky_innovations <- function(z, params, n_times, n_series,
 }
 
 
-#' Transform Innovations: Full Covariance Pattern
+#' Full-covariance innovation transform
 #'
 #' For VAR models with direct Sigma matrix. Requires Cholesky decomposition
 #' per draw, which is O(n^3) where n = n_series.
@@ -1419,6 +1493,7 @@ transform_full_cov_innovations <- function(z, params, n_times, n_series,
   checkmate::assert_int(n_times, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(ndraws, lower = 1)
+  checkmate::assert_list(params)
 
   Sigma_arr <- params$Sigma_trend
   expected <- c(ndraws, n_series, n_series)
@@ -1446,7 +1521,7 @@ transform_full_cov_innovations <- function(z, params, n_times, n_series,
 }
 
 
-#' Map Grid Innovations to Observations
+#' Grid innovations mapped to the observations
 #'
 #' Maps innovations from (time, series) grid to observation vector using
 #' linear indexing. Multiple observations at the same (time, series)
@@ -1475,6 +1550,7 @@ map_innovations_to_obs <- function(innovations_flat, n_times, n_series,
   )
   checkmate::assert_int(n_times, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
+  checkmate::assert_list(obs_structure)
 
   # Convert observation (time, series) to grid indices
   time_idx <- match(obs_structure$time, obs_structure$unique_times)
@@ -1504,10 +1580,12 @@ map_innovations_to_obs <- function(innovations_flat, n_times, n_series,
 }
 
 
-# The Stan names a grouped trend's covariance is read from. Both
-# readers of that structure -- the innovation transform here and the
-# forecast state reader in extract_last_state.R -- name it through
-# these, so neither can spell a parameter the other does not.
+#' The Stan names of a grouped trend's covariance parameters
+#'
+#' The innovation transform here and the forecast state extraction in
+#' extract_last_state.R both name the parameters through this list.
+#'
+#' @noRd
 HIER_COV_PARS <- list(
   alpha = "alpha_cor_trend",
   global = "L_Omega_global_trend",
@@ -1518,8 +1596,8 @@ HIER_COV_PARS <- list(
 
 #' Stan names of a matrix parameter's elements
 #'
-#' Stan writes a matrix element as `name[i,j]` and a per-group matrix
-#' as `name[g,i,j]`. Names come back in column-major order, so the
+#' as `name[g,i,j]`. Names come back in column-major order. The values
+#' they select fill a matrix directly.
 #' values they pull fill a matrix directly.
 #'
 #' @param prefix Parameter name
@@ -1532,6 +1610,11 @@ HIER_COV_PARS <- list(
 #' @noRd
 stan_matrix_names <- function(prefix, n_row, n_col, lead = NULL,
                               rows = seq_len(n_row)) {
+  checkmate::assert_string(prefix)
+  checkmate::assert_count(n_row)
+  checkmate::assert_count(n_col)
+  checkmate::assert_scalar(lead, null.ok = TRUE)
+  checkmate::assert_integerish(rows, lower = 1)
   head <- if (is.null(lead)) "" else paste0(lead, ",")
   paste0(prefix, "[", head,
          rep(rows, times = n_col), ",",
@@ -1548,6 +1631,9 @@ stan_matrix_names <- function(prefix, n_row, n_col, lead = NULL,
 #'
 #' @noRd
 stan_vector_names <- function(prefix, n, lead = NULL) {
+  checkmate::assert_string(prefix)
+  checkmate::assert_count(n)
+  checkmate::assert_scalar(lead, null.ok = TRUE)
   head <- if (is.null(lead)) "" else paste0(lead, ",")
   paste0(prefix, "[", head, seq_len(n), "]")
 }
@@ -1574,6 +1660,11 @@ stan_vector_names <- function(prefix, n, lead = NULL) {
 #' @noRd
 draws_columns <- function(draws_mat, nms, prefix, required = TRUE,
                           needed_for = NULL) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_character(nms, any.missing = FALSE)
+  checkmate::assert_string(prefix)
+  checkmate::assert_flag(required)
+  checkmate::assert_string(needed_for, null.ok = TRUE)
   idx <- match(nms, colnames(draws_mat))
   if (anyNA(idx)) {
     if (!isTRUE(required)) {
@@ -1597,12 +1688,14 @@ draws_columns <- function(draws_mat, nms, prefix, required = TRUE,
 #' Draws of a vector parameter
 #'
 #' Pairs the naming convention with the lookup. A caller names the
-#' parameter once, and this builds its Stan names.
+#' parameter once. This helper builds its Stan names.
 #'
-#' @inheritParams draws_columns
+#' @param draws_mat A draws matrix, one row per draw
 #' @param prefix Parameter name
 #' @param n Vector length
 #' @param lead Leading index for a per-group vector, or `NULL`
+#' @param required Whether a missing name is an error. `FALSE` returns
+#'   `NULL`.
 #' @return `[ndraws x n]` matrix, or `NULL`
 #'
 #' @noRd
@@ -1616,9 +1709,15 @@ read_draws_vector <- function(draws_mat, prefix, n, lead = NULL,
 
 #' Draws of a matrix parameter
 #'
-#' @inheritParams read_draws_vector
+#' @param draws_mat A draws matrix, one row per draw
+#' @param prefix Parameter name
 #' @param n_row,n_col Matrix dimensions
+#' @param lead Leading index for a per-group matrix, or `NULL`
+#' @param required Whether a missing name is an error. `FALSE` returns
+#'   `NULL`.
 #' @param rows The rows to return, all of them by default
+#' @param needed_for What the parameter is needed for, named in the
+#'   refusal, or `NULL`
 #' @return `[ndraws x length(rows) x n_col]` array, or `NULL`
 #'
 #' @noRd
@@ -1636,11 +1735,10 @@ read_draws_matrix <- function(draws_mat, prefix, n_row, n_col,
 
 #' Cholesky factor of one group's trend covariance
 #'
-#' A grouped trend gives every group the same population correlation
-#' pulled part of the way towards its own, then scales by that group's
-#' standard deviations. Both the innovation transform and the forecast
-#' reader need the resulting factor, and reading it two ways is what let
-#' them disagree about the structure before.
+#' A grouped trend gives every group the population correlation pulled
+#' part of the way towards its own, then scales by that group's
+#' standard deviations. The innovation transform and the forecast
+#' extraction both build the factor here.
 #'
 #' @param alpha Weight on the population correlation, one draw
 #' @param L_global Lower Cholesky factor of the population correlation
@@ -1652,6 +1750,10 @@ read_draws_matrix <- function(draws_mat, prefix, n_row, n_col,
 #' @noRd
 hierarchical_group_cholesky <- function(alpha, L_global, L_deviation,
                                         sigma) {
+  checkmate::assert_number(alpha)
+  checkmate::assert_matrix(L_global, mode = "numeric")
+  checkmate::assert_matrix(L_deviation, mode = "numeric")
+  checkmate::assert_numeric(sigma, len = nrow(L_global))
   combined <- alpha * tcrossprod(L_global) +
     (1 - alpha) * tcrossprod(L_deviation)
   # R's chol() is upper-triangular; transpose for Stan's lower-triangular
@@ -1678,6 +1780,10 @@ hierarchical_group_cholesky <- function(alpha, L_global, L_deviation,
 #'
 #' @noRd
 group_trend_factor <- function(params, d, g, n_sub) {
+  checkmate::assert_list(params)
+  checkmate::assert_int(d, lower = 1L)
+  checkmate::assert_int(g, lower = 1L)
+  checkmate::assert_int(n_sub, lower = 1L)
   L_stat <- params$L_group_stationary
   if (!is.null(L_stat)) {
     return(matrix(L_stat[d, g, , ], n_sub, n_sub))
@@ -1693,7 +1799,7 @@ group_trend_factor <- function(params, d, g, n_sub) {
 }
 
 
-#' Transform Innovations: Hierarchical Cholesky Pattern
+#' Hierarchical Cholesky innovation transform
 #'
 #' For models declared with `gr=` grouping. The per-group covariance is
 #' assembled via Stan's `combine_cholesky()` (see R/stan_assembly.R) as a
@@ -1794,23 +1900,25 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
 }
 
 
-# Draw standardised trend innovations for forecasting.
-#
-# Mirrors the Stan sampling statement built by
-# `innovation_sampling_code()`. Draws are at the identity scale and the
-# caller applies the covariance transform, exactly as the Stan
-# transformed-parameters block does, so the two sides cannot drift
-# apart in the distribution they assume.
-#
-# A multivariate t is drawn as a scale mixture with one mixing value
-# per row, shared across series. Sharing the scale makes large
-# innovations tend to occur together in time; it does not make the
-# series move together, since each still draws its own standard normal
-# and so keeps its own direction and magnitude.
-#
-# `df` here is always `Inf` or a finite value: when the degrees of
-# freedom are estimated the caller passes the posterior draw, never NA.
-#'@noRd
+#' Standardised trend innovations for forecasting
+#'
+#' Mirrors the Stan sampling statement built by
+#' `innovation_sampling_code()`. Draws are at the identity scale. The
+#' caller applies the covariance transform, as the Stan
+#' transformed-parameters block does. Both sides then assume the same
+#' distribution.
+#'
+#' A multivariate t is drawn as a scale mixture with one mixing value
+#' per row, shared across series. Sharing the scale makes large
+#' innovations tend to occur together in time. Each series still draws
+#' its own standard normal and keeps its own direction and magnitude.
+#'
+#' @param n_draws Integer number of rows to draw
+#' @param n_series Integer number of series
+#' @param df Degrees of freedom, `Inf` for Gaussian innovations. An
+#'   estimated `df` arrives as one posterior draw.
+#' @return Numeric matrix with `n_draws` rows and `n_series` columns
+#' @noRd
 draw_trend_innovations <- function(n_draws, n_series, df = Inf) {
   checkmate::assert_int(n_draws, lower = 0L)
   checkmate::assert_int(n_series, lower = 1L)
@@ -1818,16 +1926,14 @@ draw_trend_innovations <- function(n_draws, n_series, df = Inf) {
   if (is_gaussian_df(df)) {
     return(z)
   }
-  # Repeated from `assert_trend_df()` on purpose. That runs once at the
-  # constructor; this runs on every forecast draw, where the value
-  # arrives from a posterior column rather than from the user, so a
-  # corrupted or out-of-range draw is caught before it silently
-  # produces innovations with no finite variance.
+  # `assert_trend_df()` checks the constructor value once. This check
+  # covers each posterior draw of `df`. A draw at or below 2 gives
+  # innovations with infinite variance.
   checkmate::assert_number(df, finite = TRUE)
   if (df <= 2) {
     stop(insight::format_error(
       "Innovation 'df' must be greater than 2 to have finite variance."
-    ))
+    ), call. = FALSE)
   }
   u <- 1 / stats::rgamma(n_draws, shape = df / 2, rate = df / 2)
   z * sqrt(u)
@@ -1837,11 +1943,11 @@ draw_trend_innovations <- function(n_draws, n_series, df = Inf) {
 #' Coefficients of a trend's autoregression, one matrix per lag
 #'
 #' One collection for every consumer of the stationary distribution.
-#' The lag set comes from the trend spec, each lag's coefficients from
-#' the draws under the name the generator emitted, and a
-#' moving-average term from `theta1_trend`. A fit with no
+#' The lag set comes from the trend spec. Each lag's coefficients come
+#' from the draws under the name the generator emitted. A
+#' moving-average term comes from `theta1_trend`. A fit without an
 #' autoregression, or missing a coefficient the spec names, returns
-#' `NULL`, and its caller keeps the innovation covariance.
+#' `NULL`. Its caller then keeps the innovation covariance.
 #'
 #' @param object A fitted `mvgam` object
 #' @param draws_mat Posterior draws, already subset to the draws in play
@@ -1851,6 +1957,9 @@ draw_trend_innovations <- function(n_draws, n_series, df = Inf) {
 #'
 #' @noRd
 ar_coef_draws <- function(object, draws_mat, n_series) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_int(n_series, lower = 1L)
   spec <- first_trend_spec(object)
   lags <- as.integer(resolve_active_lags(spec$p))
   if (length(lags) == 0L) {
@@ -1878,21 +1987,21 @@ ar_coef_draws <- function(object, draws_mat, n_series) {
 #' Each series of an `AR()` trend is a scalar autoregression, with a
 #' moving-average term of order one where the trend has one. Its
 #' moving-average weights run `psi_0 = 1` and
-#' `psi_j = sum_k ar_k psi_{j - lag_k} + theta [j == 1]`, and two series
+#' `psi_j = sum_k ar_k psi_{j - lag_k} + theta [j == 1]`. Two series
 #' with innovation covariance `Sigma[a, b]` settle at
 #' `Sigma[a, b] * F[a, b]` for `F[a, b] = sum_j psi_{a, j} psi_{b, j}`.
 #' One sum covers every lag set, contiguous or sparse, with or without
-#' a moving-average term, and gives the cross-covariances as exactly as
+#' a moving-average term. It gives the cross-covariances as exactly as
 #' the variances.
 #'
-#' The weights are advanced for every draw at once, and a draw stops
-#' once each of its series has held below `tol` for a full cycle
-#' of the largest lag. A weight passing `1 / tol` marks the draw
-#' explosive. A draw near a unit root settles slowly, and one still
-#' running at `max_terms` takes `companion_factor()`, which needs no
-#' truncation. A sparse lag set bounds its coefficients one at a time
-#' and admits an explosive draw; the partial autocorrelations of a
-#' contiguous set do not.
+#' The weights advance for every draw at once. A draw stops once each
+#' of its series has stayed below `tol` for a full cycle of the
+#' largest lag. A weight passing `1 / tol` marks the draw explosive. A
+#' draw near a unit root settles slowly. One still running at
+#' `max_terms` takes `companion_factor()`, which needs no truncation.
+#' A sparse lag set bounds its coefficients one at a time and admits
+#' an explosive draw; the partial autocorrelations of a contiguous set
+#' do not.
 #'
 #' @param ar_coefs The collected coefficients from `ar_coef_draws()`
 #' @param cross Whether to sum the cross-covariances. Without them the
@@ -1935,7 +2044,7 @@ ar_stationary_factor <- function(ar_coefs, cross = TRUE, tol = 1e-10,
   # The working set: `rows` names its draws, `acc` their running sums,
   # `past[[k]]` their `psi_{j - k}`, the most recent first. A settled
   # draw stays in it with its weights zeroed until a fifth of the set
-  # has settled, and the set is then compacted.
+  # has settled. The set is then compacted.
   rows <- seq_len(ndraws)
   psi <- matrix(1, ndraws, n)
   acc <- out + 1
@@ -2000,8 +2109,8 @@ ar_stationary_factor <- function(ar_coefs, cross = TRUE, tol = 1e-10,
 #' every pair, settles at `X = sum_k A^k Q A'^k`, whose leading block is
 #' `F`. The doubling `X <- X + A X A'`, `A <- A^2` sums `2^k` terms at
 #' step `k`. For spectral radius `r` it needs `log2(1 / (1 - r))` steps
-#' where the weight sum needs `1 / (1 - r)` terms. Powers of `A` that stop shrinking mark a spectral
-#' radius of one or more.
+#' where the weight sum needs `1 / (1 - r)` terms. Powers of `A` that
+#' stop shrinking mark a spectral radius of one or more.
 #'
 #' @param phi Coefficient vectors, one per lag, one value per series
 #' @param lags The lags `phi` belongs to
@@ -2011,6 +2120,9 @@ ar_stationary_factor <- function(ar_coefs, cross = TRUE, tol = 1e-10,
 #'
 #' @noRd
 companion_factor <- function(phi, lags, theta) {
+  checkmate::assert_list(phi, min.len = 1L)
+  checkmate::assert_integerish(lags, lower = 1, len = length(phi))
+  checkmate::assert_numeric(theta, null.ok = TRUE)
   n <- length(phi[[1L]])
   has_ma <- !is.null(theta)
   width <- max(lags) + has_ma
@@ -2052,8 +2164,7 @@ companion_factor <- function(phi, lags, theta) {
 #'
 #' A draw with no stationary distribution keeps its innovation form in
 #' a marginal prediction and in `residual_cor()`. Only a sparse lag set
-#' produces one, and the count tells a user how much of the posterior
-#' that covers.
+#' produces one. The count shows how much of the posterior that covers.
 #'
 #' @param factor The array from `ar_stationary_factor()`
 #' @return `NULL`, invisibly
@@ -2091,6 +2202,7 @@ warn_explosive_draws <- function(factor) {
 #'
 #' @noRd
 as_stationary_cov <- function(x) {
+  checkmate::assert_matrix(x, mode = "numeric")
   if (any(!is.finite(x))) {
     return(NULL)
   }
@@ -2105,18 +2217,23 @@ as_stationary_cov <- function(x) {
 
 #' Rescale a trend's innovation covariance to its stationary spread
 #'
-#' Applied once, on the parameters every innovation transform uses,
-#' which gives the diagonal, correlated, grouped and factor paths the
-#' rule without restating it.
+#' Applied once, on the parameters every innovation transform uses.
+#' The diagonal, correlated, grouped and factor paths all take the
+#' rescaled values.
 #'
-#' A `VAR()` fit needs no rescaling here. Its Stan model already
-#' supplies `Omega_trend`, the stationary joint variance of the
-#' companion state, whose leading block is the covariance a marginal
-#' prediction integrates over.
+#' A `VAR()` fit takes `Omega_trend` from its Stan model, the
+#' stationary joint variance of the companion state. Its leading block
+#' is the covariance a marginal prediction integrates over.
 #'
 #' An `AR()` trend takes `ar_stationary_factor()`, exact for every lag
 #' set in the cross-covariances as well as the variances.
 #'
+#' @param params Extracted trend parameters
+#' @param object Fitted `mvgam` object
+#' @param draws_mat Draws matrix restricted to the draws in use
+#' @param group_info Group information from `get_group_info()`, or
+#'   `NULL`
+#' @return `params` with the stationary covariance
 #' @noRd
 rescale_params_to_stationary <- function(params, object, draws_mat,
                                           group_info = NULL) {
@@ -2124,20 +2241,19 @@ rescale_params_to_stationary <- function(params, object, draws_mat,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_matrix(draws_mat)
   checkmate::assert_list(group_info, null.ok = TRUE)
-  # A multivariate fit names its trend type after the response, and a
-  # shared trend still answers for every one of them, so the name is
-  # dropped before the kernel is identified.
+  # A multivariate fit names its trend type after the response. A
+  # shared trend serves every response. The name is dropped before the
+  # kernel is identified.
   trend_type <- unname(as.character(get_trend_type(object)))[1L]
-  # Which kernels settle, and how each one supplies the covariance, is
-  # one registry fact.
+  # The registry records which kernels settle and how each one
+  # supplies the covariance.
   stat_source <- trend_stationary_source(trend_type)
   if (identical(stat_source, "none")) {
     return(params)
   }
   if (identical(stat_source, "omega")) {
-    # Sized from the covariance being replaced, since a shared or
-    # factor trend carries fewer latent series than the fit has
-    # responses.
+    # Sized from the covariance it replaces. A shared or factor trend
+    # has fewer latent series than the fit has responses.
     k <- dim(params$Sigma_trend)[2L]
     omega <- if (is.null(k)) {
       NULL
@@ -2149,15 +2265,15 @@ rescale_params_to_stationary <- function(params, object, draws_mat,
       return(params)
     }
     # A grouped VAR gives the extraction the per-group correlation
-    # parameters, which leaves `Sigma_trend` out of `params` and `k`
-    # empty above. The program gives its first state `Omega_trend`
-    # over every series, and each group's block becomes one factor.
+    # parameters. `Sigma_trend` is then absent from `params` and `k` is
+    # empty above. The program gives its first state `Omega_trend` over
+    # every series. Each group's block becomes one factor.
     return(stationary_group_var_params(params, draws_mat, group_info))
   }
   # The factor is sized from the scales it lifts. A trend shared across
-  # responses, a factor trend and a `trend_map` fit all carry fewer
-  # latent series than the observation model has, and a series count
-  # would overstate them.
+  # responses, a factor trend and a `trend_map` fit all have fewer
+  # latent series than the observation model. A series count would
+  # overstate them.
   sg <- params[[HIER_COV_PARS$sigma]]
   grouped <- is.null(params$sigma_trend)
   n <- if (grouped) dim(sg)[2L] * dim(sg)[3L] else ncol(params$sigma_trend)
@@ -2190,10 +2306,10 @@ rescale_params_to_stationary <- function(params, object, draws_mat,
 #'
 #' `Gamma = Sigma * F` elementwise, returned in the scale-and-correlation
 #' form every innovation transform takes. A diagonal scaling commutes
-#' with the elementwise product, and the lift takes the correlation
-#' factor with the scales multiplied in after. A draw with no
-#' stationary covariance, or one rounding leaves outside the
-#' positive-definite cone, keeps its innovations.
+#' with the elementwise product. The lift takes the correlation factor
+#' and multiplies the scales in after. A draw with no stationary
+#' covariance, or one that rounding leaves outside the positive-definite
+#' cone, keeps its innovations.
 #'
 #' @param params Extracted trend parameters
 #' @param factor The array from `ar_stationary_factor()`
@@ -2209,9 +2325,9 @@ stationary_correlated_params <- function(params, factor) {
   n <- ncol(sigma)
   for (d in seq_len(nrow(sigma))) {
     # `L_Omega_trend` is the correlation factor. A stored draw rounds
-    # its rows off unit norm, and normalising by the result's own
-    # diagonal absorbs that, which keeps the scale and the correlation
-    # reconstructing the covariance they describe.
+    # its rows off unit norm. Normalising by the result's own diagonal
+    # absorbs that. The scale and the correlation then reconstruct the
+    # covariance they describe.
     gamma_d <- as_stationary_cov(tcrossprod(matrix(L[d, , ], n, n)) *
                                    matrix(factor[d, , ], n, n))
     if (is.null(gamma_d)) {
@@ -2270,6 +2386,11 @@ stationary_group_factors <- function(params, group_info, ndraws, block) {
 #' and gives its first latent state that covariance. Each group's block
 #' of it becomes that group's factor.
 #'
+#' @param params Extracted trend parameters
+#' @param draws_mat Draws matrix restricted to the draws in use
+#' @param group_info The fit's grouping, from `get_group_info()`
+#' @return `params`, with `L_group_stationary` added when the draws
+#'   hold `Omega_trend`
 #' @noRd
 stationary_group_var_params <- function(params, draws_mat, group_info) {
   checkmate::assert_list(params)
@@ -2303,6 +2424,8 @@ stationary_group_var_params <- function(params, draws_mat, group_info) {
 #' @noRd
 stationary_group_params <- function(params, factor, group_info) {
   checkmate::assert_array(factor, d = 3L)
+  checkmate::assert_list(params)
+  checkmate::assert_list(group_info)
   stationary_group_factors(
     params, group_info, dim(factor)[1L],
     function(d, members, L_g) {

@@ -158,7 +158,7 @@ test_that("the correlated damped states follow the recursion", {
     phi <- as.numeric(dm[r, sprintf("ar1_slope_trend[%d]", 1:3)])
     L <- block(dm, r, "L_Omega_trend", 3L, 3L)
     eps <- block(dm, r, "innovations_trend", 80L, 3L) %*% t(diag(sig) %*% L)
-    shocks <- block(dm, r, "innovations_slope_trend", 80L, 3L) %*%
+    shocks <- block(dm, r, "innovations_slope_trend", 79L, 3L) %*%
       t(diag(sds) %*% L)
     slope <- matrix(0, 80L, 3L)
     level <- matrix(0, 80L, 3L)
@@ -167,7 +167,7 @@ test_that("the correlated damped states follow the recursion", {
     level[1L, ] <- eps[1L, ]
     for (t in 2:80) {
       level[t, ] <- level[t - 1L, ] + slope[t - 1L, ] + eps[t, ]
-      slope[t, ] <- phi * slope[t - 1L, ] + shocks[t, ]
+      slope[t, ] <- phi * slope[t - 1L, ] + shocks[t - 1L, ]
     }
     worst <- max(worst, abs(level - block(dm, r, "lv_trend", 80L, 3L)),
                  abs(slope - block(dm, r, "slope_trend", 80L, 3L)))
@@ -197,7 +197,7 @@ test_that("the factors share one slope scale and keep their rotation", {
   for (r in round(seq(1, nrow(dm), length.out = 6))) {
     sds <- as.numeric(dm[r, "sigma_slope_trend[1]"])
     eps <- block(dm, r, "innovations_trend", 60L, 2L)
-    shocks <- block(dm, r, "innovations_slope_trend", 60L, 2L) * sds
+    shocks <- block(dm, r, "innovations_slope_trend", 59L, 2L) * sds
     slope <- matrix(0, 60L, 2L)
     level <- matrix(0, 60L, 2L)
     slope[1L, ] <- as.numeric(dm[r, c("init_slope_trend[1]",
@@ -205,7 +205,7 @@ test_that("the factors share one slope scale and keep their rotation", {
     level[1L, ] <- eps[1L, ]
     for (t in 2:60) {
       level[t, ] <- level[t - 1L, ] + slope[t - 1L, ] + eps[t, ]
-      slope[t, ] <- slope[t - 1L, ] + shocks[t, ]
+      slope[t, ] <- slope[t - 1L, ] + shocks[t - 1L, ]
     }
     worst <- max(worst, abs(level - block(dm, r, "lv_trend", 60L, 2L)))
   }
@@ -388,10 +388,11 @@ test_that("a grouped trend correlates its shocks within each region", {
   worst <- 0
   for (r in round(seq(1, nrow(dm), length.out = 6))) {
     z <- block(dm, r, "innovations_trend", 114L, 4L)
-    zs <- block(dm, r, "innovations_slope_trend", 114L, 4L)
+    zs <- block(dm, r, "innovations_slope_trend", 113L, 4L)
     sds <- as.numeric(dm[r, sprintf("sigma_slope_trend[%d]", 1:4)])
     phi <- as.numeric(dm[r, sprintf("ar1_slope_trend[%d]", 1:4)])
-    eps <- shocks <- matrix(0, 114L, 4L)
+    eps <- matrix(0, 114L, 4L)
+    shocks <- matrix(0, 113L, 4L)
     for (g in 1:2) {
       m <- members[g, ]
       eps[, m] <- z[, m] %*% t(diag(group_sd(r, g)) %*% group_cor(r, g))
@@ -402,7 +403,7 @@ test_that("a grouped trend correlates its shocks within each region", {
     level[1L, ] <- eps[1L, ]
     for (t in 2:114) {
       level[t, ] <- level[t - 1L, ] + slope[t - 1L, ] + eps[t, ]
-      slope[t, ] <- phi * slope[t - 1L, ] + shocks[t, ]
+      slope[t, ] <- phi * slope[t - 1L, ] + shocks[t - 1L, ]
     }
     worst <- max(worst, abs(level - block(dm, r, "lv_trend", 114L, 4L)),
                  abs(slope - block(dm, r, "slope_trend", 114L, 4L)))

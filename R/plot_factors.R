@@ -16,17 +16,16 @@
 #'   each facet strip shows the factor's contribution share as
 #'   a percentage. Set `FALSE` to fall back to bare `"Factor k"`
 #'   strip labels.
-#' @param ... Currently unused; reserved for future arguments.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object. The returned object carries a
 #'   `contribution` attribute: a `data.frame` with columns
-#'   `Factor`, `PathVarShare`, `Lower`, and `Upper`.
+#'   `Factor`, `PathVarShare`, `Lower` and `Upper`.
 #'   `PathVarShare` is the factor's share of the total
-#'   loading-weighted posterior path variance: for each draw,
-#'   factor k's raw score is
-#'   `||Z[, k]||^2 * Var(lv_trend[, k])` where `Z[, k]` is the
-#'   loadings vector that maps factor k onto the series, and the
-#'   draw-level shares are then averaged across draws.
+#'   loading-weighted posterior path variance. For each draw,
+#'   factor k's raw score is `||Z[, k]||^2 * Var(lv_trend[, k])`,
+#'   where `Z[, k]` is the loadings vector that maps factor k onto the
+#'   series. The draw-level shares are averaged across draws.
 #'   `Lower` / `Upper` are the 2.5th and 97.5th percentiles of
 #'   the draw-level shares, a credible interval on the share
 #'   itself.
@@ -35,8 +34,8 @@
 #'   it loads onto the series: a factor with wide posterior
 #'   excursions but near-zero loadings contributes near-zero,
 #'   matching the standard communality decomposition for factor
-#'   models. Shares sum to 1 across factors per draw, so the
-#'   marginal means sum to 1 as well.
+#'   models. Shares sum to 1 across factors in each draw. Their
+#'   marginal means also sum to 1.
 #'
 #'   This is a descriptive within-fit variance-partition summary,
 #'   not a formal hypothesis test; contributions are not
@@ -47,10 +46,10 @@
 #'
 #' @details The factor paths plotted are the identified ones. A
 #'   model identified by rotation stores them as
-#'   `lv_trend_tilde[t, k]`, and every other factor model as
+#'   `lv_trend_tilde[t, k]`. Every other factor model stores them as
 #'   `lv_trend[t, k]`. See the Identification section of the trend
-#'   constructors. Time runs along the training grid, and
-#'   out-of-sample factor draws are not shown.
+#'   constructors. Time runs along the training grid. The plot shows
+#'   in-sample factor draws only.
 #'
 #' @seealso [as_draws_df.mvgam()], [residual_cor()], [ordinate()]
 #'
@@ -72,20 +71,17 @@ plot_factors <- function(
 
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv)) {
-    stop(insight::format_error(c(
+    stop(insight::format_error(
       "The model has no latent factors to plot."
-    )))
+    ), call. = FALSE)
   }
 
   per_lv <- extract_lv_trend_matrices(object, n_lv)
   n_time <- ncol(per_lv[[1L]])
-  # The occasions the model was given, not their ranks. Every other
-  # panel draws the user's own times under this same "Time" label,
-  # so a reader setting a factor trajectory beside a series one was
-  # off by the offset between the two numberings; on a frame that
-  # starts at one the two coincide and nothing shows. A fit that
-  # recorded no times, or whose factor grid is some other length,
-  # keeps the positions rather than a guess at what they mean.
+  # The x axis shows the recorded time values. The other mvgam panels
+  # use the same values under the same "Time" label. A fit without
+  # recorded times, or whose factor grid has another length, plots
+  # the time positions 1 to n_time.
   recorded <- mvgam_axes(object)$time$values
   times <- if (length(recorded) == n_time) {
     as.numeric(recorded)
@@ -130,89 +126,85 @@ plot_factors <- function(
 }
 
 
-# Per-(series, time) latent-state ribbon for a closure-unit
-# `mvgam` fit. Calls the family-registered `latent_state` method
-# (returns `[ndraws x N_unit]`), groups unit columns by
-# `(series, time)`, pools across sites for multi-season fits, and
-# emits a ribbon-and-median plot faceted by series. Single entry
-# point used by `plot.mvgam(type = "latent_state")` for both
-# `nmix()` (marginal latent `N`) and `occ()` (marginal occupancy
-# `psi`).
-#
-# @noRd
+#' Posterior latent state of a closure-unit fit by series and time
+#'
+#' Serves `plot.mvgam(type = "latent_state")` for `nmix()` (marginal
+#' latent `N`) and `occ()` (marginal occupancy `psi`). The family's
+#' registered `latent_state` method returns a `[ndraws, N_unit]`
+#' matrix. Unit columns are grouped by series and time. A
+#' multi-season fit pools the draws over sites. The plot shows a
+#' ribbon and median line in one facet per series.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family
+#' @param probs Numeric vector of credible interval widths for the
+#'   ribbon
+#' @param ndraws Integer number of draws, or `NULL` for every draw
+#' @param ... Unused. Anything passed here is refused.
+#' @return A `ggplot` object
+#' @noRd
 plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
                                 ndraws = NULL, ...) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_numeric(probs, lower = 0, upper = 1, min.len = 1L,
+                            any.missing = FALSE)
+  checkmate::assert_count(ndraws, positive = TRUE, null.ok = TRUE)
   rlang::check_dots_empty()
-  # Sharing the closure-unit pipeline does not mean exposing a
-  # latent state, and asking only that admitted `mvn()`, `mvt()`,
-  # `diri()`, `multi()` and `categ()` as far as a dispatcher with no
-  # branch for them, which answered by naming a source file for the
-  # user to edit. The guard that would have caught it sat below,
-  # testing a NULL the dispatcher raises rather than returns, so it
-  # could never fire. The registry is asked instead.
+  # Some closure-unit families have no latent state, such as `mvn()`,
+  # `mvt()`, `diri()`, `multi()` and `categ()`. The family registry
+  # records which families expose one.
   require_closure_unit_predict_type(object$family, "latent_state")
   state_fn <- dispatch_closure_unit_method(object$family, "latent_state")
-  # Marginal latent state (no conditioning on observed detections);
-  # this is the surface comparable to flocker's `get_Z(history_",
-  # "condition = FALSE)` and spOccupancy's `psi.samples`.
+  # Marginal latent state, unconditioned on the observed detections.
+  # It matches flocker's `get_Z(history_condition = FALSE)` and
+  # spOccupancy's `psi.samples`.
   state <- if ("conditional" %in% names(formals(state_fn))) {
     state_fn(object, conditional = FALSE)
   } else {
     state_fn(object)
   }
   checkmate::assert_matrix(state)
+  state <- subset_draws_rows(state, ndraws = ndraws)
 
-  # Per-unit labels come off the unit grid the arrays carry, one row
-  # per unit in unit order, rather than from the frame's own columns:
-  # the grid holds the values the grouping was built on, so a fit
-  # whose closure unit is keyed by something other than `series` and
-  # `time` is labelled by what it was actually grouped on. The
-  # grouping runs series-first and time-last, and a multi-season fit
-  # carries a `site` axis between them that the ribbon pools over.
+  # Per-unit labels come from the unit grid of the closure-unit
+  # arrays, one row per unit in unit order. The grid stores the
+  # grouping values. A fit whose closure unit uses columns other than
+  # `series` and `time` is labelled by its own grouping columns. The
+  # grouping lists series first and time last. A multi-season fit
+  # adds a `site` axis between them.
   data <- object$data
   arrays <- closure_unit_arrays_for(object, data)
   unit_vars <- arrays$unit_vars
   unit_meta <- data.frame(
     series = as.factor(arrays$unit_grid[[unit_vars[1L]]]),
-    time   = arrays$unit_grid[[unit_vars[length(unit_vars)]]]
+    time = arrays$unit_grid[[unit_vars[length(unit_vars)]]]
   )
   if (ncol(state) != nrow(unit_meta)) {
     stop_shape_fault("The latent-state matrix", ncol(state),
                      nrow(unit_meta))
   }
 
-  series_levels <- levels(unit_meta$series)
-  time_levels <- sort(unique(unit_meta$time))
   y_label <- if (models_latent_count(object$family)) {
     "Posterior latent N"
   } else {
     "Posterior occupancy (psi)"
   }
 
+  # The band helpers pool the columns that share a time. A
+  # multi-season fit has one column per site at each time. Its bands
+  # cover site and posterior uncertainty together.
   set_color_scheme_local("red")
+  series_levels <- levels(unit_meta$series)
   layers <- list()
   for (sp in series_levels) {
-    # Collect per-time pooled posterior draws for this species.
-    # Each (series, time) cell pools `ndraws * n_sites` values, so
-    # quantile bands reflect cross-site and posterior uncertainty
-    # jointly.
-    sp_idx <- unit_meta$series == sp
-    if (!any(sp_idx)) next
-    pooled <- vapply(time_levels, function(tt) {
-      cols <- which(sp_idx & unit_meta$time == tt)
-      as.numeric(state[, cols, drop = FALSE])
-    }, FUN.VALUE = numeric(nrow(state) *
-                            max(1L, sum(sp_idx & unit_meta$time ==
-                                          time_levels[1L]))))
-    # Per-time draw pool. `pooled` is `[ndraws * n_sites_t, n_time]`.
-    # A factor, so the facet keeps the series order rather than
-    # sorting a character column.
+    cols <- which(unit_meta$series == sp)
+    if (!length(cols)) next
     panel <- factor(sp, levels = series_levels)
     layers <- c(
       layers,
-      mvgam_band_layer(pooled, time_levels, probs = probs,
-                        group = panel),
-      list(mvgam_median_layer(pooled, time_levels, group = panel))
+      mvgam_band_layer(state[, cols, drop = FALSE], unit_meta$time[cols],
+                       probs = probs, group = panel),
+      list(mvgam_median_layer(state[, cols, drop = FALSE],
+                              unit_meta$time[cols], group = panel))
     )
   }
   ggplot2::ggplot() +
@@ -223,16 +215,19 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
 }
 
 
-# Internal: shared column-name lookup for tilde-aware lv_trend
-# extraction. Returns a `[n_time, n_lv]` character matrix of
-# `lv_trend[t, k]` (or `lv_trend_tilde[t, k]`) column names ordered
-# `[time, factor]`, plus the resolved parameter name. Used by
-# `extract_lv_trend_matrices()`, which builds a per-factor list of
-# `[draws, n_time]` matrices for plotting. Pattern selection
-# delegates to `factor_state_param_pattern()` so Z_tilde / Z fits
-# stay aligned in lockstep.
-#'@noRd
+#' The draw column names of each latent factor path
+#'
+#' `factor_state_param_pattern()` selects `lv_trend_tilde` or
+#' `lv_trend`, keeping the states aligned with the loadings.
+#'
+#' @param par_names Character vector of draw column names
+#' @param n_lv Integer number of latent factors
+#' @return List holding the resolved `param_name` and `cols_by_tk`, a
+#'   character matrix of column names with dimensions `[n_time, n_lv]`
+#' @noRd
 collect_lv_trend_column_names <- function(par_names, n_lv) {
+  checkmate::assert_character(par_names)
+  checkmate::assert_int(n_lv, lower = 1L)
   pattern <- factor_state_param_pattern(par_names)
   param_name <- if (pattern == "^lv_trend_tilde\\[") {
     "lv_trend_tilde"
@@ -264,12 +259,16 @@ collect_lv_trend_column_names <- function(par_names, n_lv) {
 }
 
 
-# Internal: extract per-factor (ndraws x n_time) matrices of
-# factor paths from the Stan posterior. Returns a named list of
-# length `n_lv`, names "Factor 1" ... "Factor n_lv". Column
-# resolution comes from `collect_lv_trend_column_names()`.
-#'@noRd
+#' The posterior draws of each latent factor path
+#'
+#' @param object Fitted `mvgam` factor model
+#' @param n_lv Integer number of latent factors
+#' @return List of `n_lv` draws matrices with dimensions
+#'   `[ndraws, n_time]`, named `"Factor 1"` onward
+#' @noRd
 extract_lv_trend_matrices <- function(object, n_lv) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_int(n_lv, lower = 1L)
   draws_mat <- posterior::as_draws_matrix(object$fit)
   meta <- collect_lv_trend_column_names(colnames(draws_mat), n_lv)
   setNames(
@@ -281,16 +280,24 @@ extract_lv_trend_matrices <- function(object, n_lv) {
 }
 
 
-# Internal: per-factor contribution as a loading-weighted
-# variance partition. For each draw d and factor k:
-#   raw_dk = ||Z[d, , k]||^2 * Var(lv_trend[d, , k])
-# Per-draw shares share_dk = raw_dk / sum_j(raw_dj). Returns the
-# posterior mean of share_dk plus 95% credible bounds. When
-# `Z_arr` is NULL (e.g. fixed-loadings models where Z is not in
-# the posterior) all loadings are treated as unit-norm, which
-# reduces to the bare path-variance partition.
-#'@noRd
+#' Each factor's share of the loading-weighted path variance
+#'
+#' For draw `d` and factor `k` the raw contribution is
+#' `||Z[d, , k]||^2 * Var(lv_trend[d, , k])`. Each draw's shares are
+#' the raw contributions divided by their sum. A `NULL` loading array,
+#' as in a fixed-loadings fit, gives every factor unit-norm loadings.
+#' The shares then partition the path variance alone.
+#'
+#' @param per_lv List of factor path draws matrices from
+#'   `extract_lv_trend_matrices()`
+#' @param Z_arr Numeric loading array with dimensions
+#'   `[ndraws, n_series, n_lv]`, or `NULL`
+#' @return Data frame of the posterior mean share and its 95% interval
+#'   for each factor, sorted by decreasing share
+#' @noRd
 lv_contribution_table <- function(per_lv, Z_arr = NULL) {
+  checkmate::assert_list(per_lv, types = "matrix", min.len = 1L)
+  checkmate::assert_array(Z_arr, d = 3L, null.ok = TRUE)
   n_lv <- length(per_lv)
   ndraws <- nrow(per_lv[[1L]])
   raw_dk <- matrix(NA_real_, nrow = ndraws, ncol = n_lv)
@@ -321,15 +328,19 @@ lv_contribution_table <- function(per_lv, Z_arr = NULL) {
 }
 
 
-# Internal: extract per-draw factor loadings array
-# `[ndraws, n_series, n_lv]` for plotting. Returns NULL when the
-# fit has neither sampled loading columns (`Z_tilde[i, j]` or
-# `Z[i, j]`) nor a fixed Z stashed on `trend_metadata$fixed_Z`
-# (e.g. non-factor trend types). Delegates to
-# `resolve_factor_loadings()` so the fixed-vs-sampled decision
-# lives in exactly one place.
-#'@noRd
+#' The factor loading draws of a fit for plotting
+#'
+#' `resolve_factor_loadings()` decides between fixed and sampled
+#' loadings.
+#'
+#' @param object Fitted `mvgam` factor model
+#' @param n_lv Integer number of latent factors
+#' @return Numeric array with dimensions `[ndraws, n_series, n_lv]`, or
+#'   `NULL` when the fit has neither sampled loadings nor a fixed `Z`
+#' @noRd
 extract_factor_loadings_array <- function(object, n_lv) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_int(n_lv, lower = 1L)
   if (!is.null(object$trend_metadata$fixed_Z) &&
       !anyNA(object$trend_metadata$fixed_Z)) {
     return(resolve_factor_loadings(object = object, n_lv = n_lv))

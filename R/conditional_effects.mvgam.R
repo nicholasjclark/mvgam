@@ -351,11 +351,16 @@ plot.mvgam_conditional_effects <- function(x, plot = TRUE, ask = FALSE,
 }
 
 
-# Internal: the panels of a conditional-effects object as one list.
-# A multivariate fit holds one set of panels per response, and each
-# panel's name takes its response as a prefix.
-#'@noRd
+#' The panels of a conditional-effects object as one list
+#'
+#' A multivariate fit holds one set of panels per response. Each
+#' panel's name takes its response as a prefix.
+#'
+#' @param x Object of class `mvgam_conditional_effects`
+#' @return Flat named list of panels
+#' @noRd
 conditional_effects_panels <- function(x) {
+  checkmate::assert_list(x)
   if (!isTRUE(attr(x, "mv_wrapper"))) {
     return(unclass(x))
   }

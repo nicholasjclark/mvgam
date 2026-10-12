@@ -205,6 +205,10 @@ test_that("simplified AR constructor works correctly", {
   ar_grouped <- AR(gr = region, subgr = species)
   expect_equal(ar_grouped$gr, "region")
   expect_equal(ar_grouped$subgr, "species")
+
+  # Columns named after the arguments themselves are kept
+  var_named <- VAR(gr = gr, subgr = subgr)
+  expect_equal(c(var_named$gr, var_named$subgr), c("gr", "subgr"))
 })
 
 test_that("create_mvgam_trend handles all parameters consistently", {

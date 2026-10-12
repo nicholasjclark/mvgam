@@ -2,7 +2,7 @@
 % Please edit documentation in R/priors.R
 \name{get_prior.default}
 \alias{get_prior.default}
-\title{Default method for get_prior - delegates to brms}
+\title{Default method for get_prior, delegating to brms}
 \usage{
 \method{get_prior}{default}(object, ...)
 }
@@ -15,5 +15,7 @@
 A \code{brmsprior} data frame
 }
 \description{
-Default method for get_prior - delegates to brms
+Covers a \code{formula}, \code{brmsformula} or \code{mvbrmsformula}. A
+\code{trend_formula} in the call builds the \code{\link{mvgam_formula}}
+it describes. A call without one delegates to \pkg{brms}.
 }

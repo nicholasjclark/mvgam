@@ -1,24 +1,21 @@
-# Internal helpers for sim_mvgam. Each helper builds one
-# kind of observation-side structure that the typed catalog
-# composes into a full simulation. Each lives outside sim_mvgam
-# to be unit-tested in isolation.
+# Helpers for sim_mvgam. Each one builds one kind of observation-side
+# structure for the typed catalog to compose into a simulation. Each is
+# a separate function for unit testing.
 
 
-# Internal: Sample a single smooth function on a fine grid by
-# fitting a thin-plate spline basis (or user-chosen `bs`) to
-# uniformly-spaced training points, drawing random spline
-# coefficients, and evaluating the resulting smooth.
-#
-# Inputs:
-#   x       numeric vector of covariate values where the smooth
-#           should be evaluated.
-#   k       basis dimension (default 8).
-#   bs      smooth basis type (default "tp"; "cc" for cyclic).
-#   scale   marginal SD of the random spline coefficients.
-#
-# Returns a list with `f` (the smooth at each `x`) + `basis` (the
-# mgcv smooth object, for downstream reconstruction).
-#'@noRd
+#' A random smooth function evaluated at covariate values
+#'
+#' Builds an mgcv basis on `x`, draws random spline coefficients and
+#' evaluates the smooth they define.
+#'
+#' @param x Numeric vector of covariate values to evaluate the smooth at
+#' @param k Integer basis dimension
+#' @param bs Character smooth basis type, such as `"tp"` or `"cc"` for a
+#'   cyclic smooth
+#' @param scale Non-negative marginal SD of the spline coefficients
+#' @return List holding the smooth at each `x` in `f`, the mgcv smooth
+#'   object in `basis` and the drawn coefficients in `coefs`
+#' @noRd
 sim_smooth <- function(x, k = 8L, bs = "tp", scale = 1) {
   checkmate::assert_numeric(x, finite = TRUE, min.len = 2L)
   checkmate::assert_int(k, lower = 3L)
@@ -35,16 +32,17 @@ sim_smooth <- function(x, k = 8L, bs = "tp", scale = 1) {
 }
 
 
-# Internal: Sample a Gaussian process realisation on the supplied
-# covariate values via a squared-exponential kernel.
-#
-# Inputs:
-#   x       numeric vector of covariate values.
-#   alpha   marginal SD (kernel amplitude).
-#   rho     length-scale.
-#
-# Returns a numeric vector of length `length(x)`.
-#'@noRd
+#' A Gaussian process draw at covariate values
+#'
+#' Uses a squared-exponential kernel with a small diagonal jitter to keep
+#' the covariance positive definite.
+#'
+#' @param x Numeric vector of covariate values
+#' @param alpha Non-negative marginal SD of the kernel
+#' @param rho Positive length-scale, or `NULL` for a quarter of the range
+#'   of `x`
+#' @return Numeric vector with one value per element of `x`
+#' @noRd
 sim_gp_cov <- function(x, alpha = 1, rho = NULL) {
   checkmate::assert_numeric(x, finite = TRUE, min.len = 2L)
   checkmate::assert_number(alpha, lower = 0)
@@ -60,18 +58,15 @@ sim_gp_cov <- function(x, alpha = 1, rho = NULL) {
 }
 
 
-# Internal: Sample random-effect coefficients for a grouping
-# factor.
-#
-# Inputs:
-#   grp     factor (or coercible to one) of group memberships.
-#   sigma   marginal SD of the random effect.
-#
-# Returns a list with `levels`, `coefs` (named numeric, length
-# = nlevels(grp)), and `values` (the random-effect contribution
-# aligned with `grp`, length = length(grp)).
-#'@noRd
+#' Random-effect coefficients drawn for a grouping factor
+#'
+#' @param grp Factor of group memberships, or a vector coercible to one
+#' @param sigma Non-negative marginal SD of the random effect
+#' @return List holding the group `levels`, the named `coefs` with one
+#'   value per level and the `values` matched to each element of `grp`
+#' @noRd
 sim_re <- function(grp, sigma = 1) {
+  checkmate::assert_atomic_vector(grp, min.len = 1L)
   grp <- as.factor(grp)
   checkmate::assert_number(sigma, lower = 0)
   levs <- levels(grp)
@@ -81,33 +76,32 @@ sim_re <- function(grp, sigma = 1) {
 }
 
 
-# Internal: Family-specific RNG dispatcher. Given an `eta` linear
-# predictor (link scale) and any auxiliary parameters in `pars`,
-# return a vector of length(eta) of simulated response values
-# under the chosen family. Mirrors what brms / mvgam fit on the
-# inverse side.
-#
-# Supported families (v1):
-#   gaussian   pars$sigma
-#   student    pars$nu, pars$sigma
-#   poisson    (none, log link)
-#   negbinomial pars$size (brms NB2 parametrisation;
-#                          uses extraDistr::rnbinom)
-#   binomial   pars$trials (length(eta) or scalar)
-#   beta       pars$phi (precision)
-#   Gamma      pars$shape
-#   tweedie    pars$phi, pars$power
-#   com_binomial pars$trials, pars$nu (Conway-Maxwell-Binomial;
-#                logit link only; mu = plogis(eta) is the
-#                location, nu the dispersion: nu = 1 binomial,
-#                nu > 1 under-dispersed, nu < 1 over-dispersed,
-#                nu < 0 super-dispersed / bimodal)
-#
-# `family` is a brms- / stats-style `family` object; the function
-# reads `family$family` and `family$link` to decide.
-#'@noRd
+#' Simulated responses from a family given a linear predictor
+#'
+#' Applies the inverse link of `family` to `eta` and draws one response
+#' per element from the parametrisation brms and mvgam fit. The
+#' auxiliary parameters each family takes from `pars` are listed here.
+#' * gaussian: `sigma`
+#' * student: `nu`, `sigma`
+#' * negbinomial: `size`, in the NB2 parametrisation
+#' * binomial: `trials`, a scalar or one per element of `eta`
+#' * beta: `phi`, the precision
+#' * Gamma: `shape`
+#' * tweedie: `phi`, `power`
+#' * com_binomial: `trials`, `nu`, with the logit link only. `nu = 1`
+#'   gives the binomial, `nu > 1` under-dispersion, `nu < 1`
+#'   over-dispersion and `nu < 0` a bimodal response.
+#'
+#' @param eta Numeric vector of finite link-scale linear predictors
+#' @param family Family object holding `family` and `link`
+#' @param pars Named list of auxiliary family parameters
+#' @return Numeric vector of simulated responses, one per element of
+#'   `eta`
+#' @noRd
 sim_family_rng <- function(eta, family, pars = list()) {
   checkmate::assert_numeric(eta, finite = TRUE)
+  checkmate::assert_list(family)
+  checkmate::assert_list(pars)
   # `resolve_family_name()` returns the user-visible name for both
   # base R / brms families and customfamily objects (where
   # `family$family` is the literal string "custom"). Routing
@@ -189,12 +183,17 @@ sim_family_rng <- function(eta, family, pars = list()) {
   )
 }
 
-# Internal: Tweedie (compound Poisson-Gamma) sampler for
-# 1 < power < 2. Generates N ~ Poisson(lambda) jumps and sums
-# Gamma(shape, rate) summands. Avoids the optional `tweedie`
-# package dependency; matches Jorgensen's CP parameterisation
-# used by `brms::brmsfamily('tweedie')` and mvgam::tweedie().
-#'@noRd
+#' Tweedie draws from the compound Poisson-Gamma representation
+#'
+#' Valid for `1 < power < 2`. Each draw sums `N ~ Poisson(lambda)`
+#' Gamma summands, using the parametrisation `mvgam::tweedie()` fits.
+#' The `tweedie` package is not needed.
+#'
+#' @param mu Numeric vector of positive means
+#' @param phi Positive dispersion
+#' @param power Power parameter strictly between 1 and 2
+#' @return Numeric vector of draws, one per element of `mu`
+#' @noRd
 sim_tweedie <- function(mu, phi, power) {
   checkmate::assert_numeric(mu, lower = .Machine$double.eps,
                               finite = TRUE)
@@ -219,23 +218,34 @@ sim_tweedie <- function(mu, phi, power) {
 }
 
 
-# Internal: Negbinomial NB2 sampler. brms uses
-# `negative_binomial_2(mu, size)`; the equivalent in base R is
-# `stats::rnbinom(n, size, mu)` (note: positional arg order is
-# size first). `extraDistr::rnbinom` accepts named `mu` + `size`
-# directly, which is clearer when extraDistr is available;
-# falls back to base R otherwise.
-#'@noRd
+#' Negative binomial draws in the NB2 parametrisation
+#'
+#' Matches the Stan `neg_binomial_2(mu, size)` density that brms fits.
+#'
+#' @param mu Numeric vector of non-negative means
+#' @param size Positive size, a scalar or one per element of `mu`
+#' @return Integer vector of draws, one per element of `mu`
+#' @noRd
 sim_negbinom <- function(mu, size) {
+  checkmate::assert_numeric(mu, lower = 0)
+  checkmate::assert_numeric(size, lower = 0, min.len = 1L)
   stats::rnbinom(length(mu), size = size, mu = mu)
 }
 
 
-# Internal: Build a balanced group factor with `n_levels` groups
-# and `n` total observations.
-#'@noRd
+#' A balanced grouping factor
+#'
+#' @param n Integer number of observations
+#' @param n_levels Integer number of groups
+#' @param labels Character vector of group labels, or `NULL` for letters
+#'   when there are 26 groups or fewer and `g1`, `g2` and so on otherwise
+#' @return Factor of length `n` cycling through the group labels
+#' @noRd
 sim_grp <- function(n, n_levels = 5L,
                      labels = NULL) {
+  checkmate::assert_int(n, lower = 1L)
+  checkmate::assert_int(n_levels, lower = 1L)
+  checkmate::assert_character(labels, min.len = 1L, null.ok = TRUE)
   if (is.null(labels)) {
     labels <- if (n_levels <= 26L) {
       letters[seq_len(n_levels)]

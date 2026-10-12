@@ -282,9 +282,13 @@ mvgam_data <- function(data,
 }
 
 
-# Internal: the family and its link, as the data check names them.
-#'@noRd
+#' The family and link label the data check prints
+#'
+#' @param family Family object holding `link`
+#' @return Character scalar such as `"poisson (link = log)"`
+#' @noRd
 mvgam_data_family_label <- function(family) {
+  checkmate::assert_list(family)
   fam_name <- resolve_family_name(family)
   if (is.null(family$link)) {
     return(fam_name)
@@ -293,10 +297,16 @@ mvgam_data_family_label <- function(family) {
 }
 
 
-# Internal: the series, time and observation lines that the check
-# reports and print.mvgam_data() repeats.
-#'@noRd
+#' The series, time and observation lines of a data check
+#'
+#' `mvgam_data()` reports them after the check and
+#' `print.mvgam_data()` prints them again.
+#'
+#' @param x Object of class `mvgam_data`
+#' @return Character vector of three summary lines
+#' @noRd
 mvgam_data_summary_lines <- function(x) {
+  checkmate::assert_class(x, "mvgam_data")
   c(
     if (is.null(x$series_levels)) {
       "series: all rows as one"

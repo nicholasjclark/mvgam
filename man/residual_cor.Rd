@@ -80,7 +80,7 @@ draws when \code{trend_map = ...} fixes Z (see \code{\link[=mvgam]{mvgam()}} /
 would drop whatever scale the latent columns carry, which
 under multiplicative gamma shrinkage is the entire shrinkage.
 \item Correlated process-error trends (\code{cor = TRUE} on \code{RW()} /
-\code{AR()} / \code{ZMVN()}, or any \code{VAR()} / \code{VARMA()} trend).
+\code{AR()} / \code{ZMVN()}, or any \code{VAR()} trend).
 \item Hierarchical correlation structures (grouping variable on
 the trend via \code{gr = ...}).
 }
@@ -92,35 +92,30 @@ matrix is reconstructed from the trend's posterior covariance:
 \code{ZMVN(cor = TRUE)}) reconstruct
 \code{Sigma = diag(sigma) \%*\% L_Omega \%*\% t(L_Omega) \%*\% diag(sigma)}
 per draw.
-\item Full-covariance trends (\code{VAR}, \code{VARMA}) read \code{Omega_trend},
-the stationary covariance the Stan model derives from
-\code{Phi_trend} and \code{Sigma_trend}.
+\item \code{VAR()} trends take the leading block of \code{Omega_trend}, the
+stationary covariance the Stan model derives from \code{Phi_trend},
+\code{Sigma_trend} and, under \code{ma = TRUE}, \code{Theta_trend}.
 }
 
-The covariance summarised is the one the latent states settle at,
-not the covariance of a single innovation, because a residual
-correlation describes where the process sits rather than how far
-one step moves it. The two coincide only when nothing propagates
-the state between times. They differ for \code{VAR()} and \code{VARMA()},
-where \code{Omega_trend} solves \verb{Omega = A Omega A' + Sigma}, and for
-\code{AR(cor = TRUE)}, which takes the leading block of the same solve
-over the companion form of its lag set, a moving-average term
-included. At one lag that block is
-\code{Sigma[a, b] / (1 - ar_a * ar_b)}, which is also the covariance a
-\code{CAR(cor = TRUE)} trend holds at every time of an irregular grid.
-That covariance is the same whatever unit the times are recorded
-in. The correlation moves with the
-scales at every order and for every lag set. A sparse lag set such
-as \code{p = c(1, 12)} bounds its coefficients one at a time and admits
-a jointly explosive draw, which has no stationary covariance. Such a
-draw keeps its innovation covariance, and a warning gives the count
-once per session. For \code{ZMVN()} there is no
-propagation and for \code{RW()} no stationary distribution exists, so
-both report the innovation covariance itself. A grouping variable
-does not change which rule applies: a hierarchical \code{AR()} has its
-per-group scales lifted the same way before the global and
-per-group factors are mixed, while hierarchical \code{RW()} and
-\code{ZMVN()} are left alone.
+The covariance summarised is the stationary covariance of the latent
+states. A residual correlation describes the states over the whole
+series. An innovation covariance describes one step. The two
+coincide when the states keep no memory between times. An
+\code{AR(cor = TRUE)} trend takes the leading block of the stationary
+covariance of its companion state, a moving-average term included.
+At one lag that block is \code{Sigma[a, b] / (1 - ar_a * ar_b)}. A
+\code{CAR(cor = TRUE)} trend holds this covariance at every time of an
+irregular grid, whatever unit the times are recorded in. The
+correlation moves with the scales at every order and for every lag
+set. A sparse lag set such as \code{p = c(1, 12)} bounds its coefficients
+one at a time and admits a jointly explosive draw, which has no
+stationary covariance. Such a draw keeps its innovation covariance.
+A warning gives the count once per session. \code{ZMVN()} keeps no memory
+between times. \code{RW()} has no stationary distribution. Both report
+the innovation covariance. A hierarchical \code{AR()} lifts its per-group
+scales the same way before the global and per-group factors are
+mixed. Hierarchical \code{RW()} and \code{ZMVN()} report their innovation
+covariances.
 
 To ask the other question, what the \emph{contemporaneous shocks} share,
 read \code{Sigma_trend} from the posterior and apply \code{\link[stats:cor]{stats::cov2cor()}}

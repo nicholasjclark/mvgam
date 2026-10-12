@@ -24,29 +24,29 @@ mvgam(
 \item{formula}{Main observation model formula (supports brms syntax).
 Smooth specials \code{s()}, \code{t2()}, \code{gp()}, varying intercepts and
 slopes, monotonic \code{mo()}, measurement-error \code{me()}, distributional
-\code{dpar} sub-formulas, and \code{offset()} are all available. \code{gp()}
+\code{dpar} sub-formulas and \code{offset()} are all available. \code{gp()}
 accepts both the approximate Hilbert-space form
 (\code{gp(x, k = 20)}) and the exact full-covariance form
 (\code{gp(x)}, no \code{k}). Prediction at \code{newdata} requires the
 approximate form. An exact \code{gp()} term fits and scores
-in-sample, and \code{mvgam()} says so once per session.}
+in-sample. \code{mvgam()} says so once per session.}
 
 \item{trend_formula}{A one-sided formula for the latent process:
-a trend constructor such as \code{AR()}, and any predictors of the
+a trend constructor such as \code{AR()} with any predictors of the
 latent state. Write \code{\link[=lv_axis]{lv_axis()}} in a term to vary its effect by
 latent factor, or by series in a model without factors, as in
 \code{~ x:lv_axis() + AR()}. The series column itself is not
 supported in a term of this formula. An exact \code{gp()} term here
-also predicts in-sample alone, and forecasting a model that
-holds one requires the approximate form.}
+also predicts in-sample alone. Forecasting a model that holds one
+requires the approximate form.}
 
 \item{data}{Data frame or list of multiply imputed datasets}
 
 \item{newdata}{Optional held-out \code{data.frame}, stored on the fit
 as \code{object$test_data}. \code{forecast()} forecasts to it when called
-without \code{newdata}, and \code{plot(fit, type = "series")} overlays it.
+without \code{newdata}. \code{plot(fit, type = "series")} overlays it.
 The fit itself draws no forecasts. \code{forecast()} propagates the
-fitted latent state forward in time per posterior draw, and
+fitted latent state forward in time per posterior draw.
 \code{posterior_predict(mod, newdata = mod$test_data)} marginalises
 over the trend's stochastic dynamics at the supplied design
 points. Use \code{forecast()} for time-series forecasting and
@@ -78,9 +78,9 @@ error.}
 \item{loadings_prior}{Optional named list specifying a
 structured prior on the unconstrained factor loadings
 matrix following Heaps & Jermyn (2024). The loadings belong
-to a trend carrying latent factors, and the argument
-requires a \code{trend_formula}. Supplying it without one is an
-error. When supplied, the
+to a trend with latent factors. The argument requires a
+\code{trend_formula}. Supplying it without one is an error. When
+supplied, the
 default iid \code{to_vector(Z) ~ student_t(3, 0, 0.5)} prior is
 replaced with a per-column matrix-normal prior of the form
 \code{Z[, i] ~ multi_normal_cholesky(0, L_Phi)}, where the
@@ -113,13 +113,13 @@ scale (matching Heaps Supps S4.2.1).
 or \code{"mgp"} (multiplicative-gamma-process increasing
 shrinkage of Bhattacharya & Dunson 2011, used in
 Heaps Eq. (9)). \code{"mgp"} applies its column scale through
-the shared innovation scale, so it is available for
-\code{AR()}, \code{RW()} and \code{ZMVN()} trends. \code{VAR()} builds its
-own innovation covariance and has nowhere to put it;
-pair a \code{VAR()} factor model with \code{"iid"} instead.
+the shared innovation scale. It is available for \code{AR()},
+\code{RW()} and \code{ZMVN()} trends. \code{VAR()} builds its own innovation
+covariance and has no shared scale for it; pair a \code{VAR()}
+factor model with \code{"iid"} instead.
 \item \code{mgp_a1}, \code{mgp_a2}: numeric MGP hyperparameters,
 only used when \code{column_shrinkage = "mgp"}. Default
-\verb{(2, 4)} sits within the \verb{a2 in [3, 5]} range
+\verb{(2, 4)} lies within the \verb{a2 in [3, 5]} range
 recommended for moderate-n ecology / community panels
 by Legramanti, Durante and Dunson (2020, JRSS-B) and
 Schiavon, Canale and Dunson (2022, Biometrics 78:995).
@@ -130,9 +130,9 @@ the data weakly identify the active rank.
 }
 
 Length-scales receive a \code{lognormal(0, 1)} prior in the
-model block. This prior lives on the standardised distance
-scale: pairwise distance matrices are rescaled to
-\code{max(d) = 1} inside the normaliser, so a length-scale of 1
+model block. This prior is set on the standardised distance
+scale. Pairwise distance matrices are rescaled to
+\code{max(d) = 1} inside the normaliser. A length-scale of 1 then
 corresponds to correlation \code{exp(-1)} between the two most
 distant series. Heaps' Finnish-birds application (Sect.
 6.2.2) used the wider \code{lognormal(0, sqrt(10))} instead;
@@ -153,21 +153,20 @@ the Identification section of the trend constructors.
 
 Compatibility with \code{trend_map}:
 \itemize{
-\item \code{trend_map = NULL} (default): COMPATIBLE. \code{n_lv} alone
-triggers the free-Z factor model; \code{loadings_prior} wires
-onto the sampled \code{Z} column-wise.
+\item \code{trend_map = NULL} (default): compatible. \code{n_lv} alone
+triggers the free-Z factor model; \code{loadings_prior} applies
+to the sampled \code{Z} column-wise.
 \item \code{trend_map = matrix(NA_real_, n_series, n_lv)}
-(all-NA mask, used internally by \code{jsdgam()}): COMPATIBLE.
+(all-NA mask, used internally by \code{jsdgam()}): compatible.
 Treated as a free-Z trigger upstream; \code{loadings_prior}
 applies as if \code{trend_map} were \code{NULL}.
 \item \code{trend_map} with a mix of fixed entries and \code{NA}s:
-INCOMPATIBLE. Partial-Z parameterises the free entries
+incompatible. Partial-Z parameterises the free entries
 as a vector under an iid \code{student_t(3, 0, 1)} prior,
 which would overlap with the matrix-normal structure
 and double-count regularisation.
-\item Fully-fixed \code{trend_map} (no \code{NA}s): INCOMPATIBLE.
-No free parameters left for the structured prior to act
-on.
+\item Fully-fixed \code{trend_map} (no \code{NA}s): incompatible.
+The structured prior has no free parameters to act on.
 }}
 
 \item{backend}{Stan backend (defaults to "cmdstanr")}
@@ -187,11 +186,11 @@ whose mean has to stay positive needs a link that keeps it there
 once a trend enters the linear predictor: pair \code{\link[stats:family]{stats::Gamma()}},
 \code{\link[brms:brmsfamily]{brms::weibull()}}, \code{\link[brms:brmsfamily]{brms::exponential()}}, \code{\link[brms:brmsfamily]{brms::frechet()}} and
 \code{\link[stats:family]{stats::inverse.gaussian()}} with \code{link = "log"}. Their default
-links leave the mean positive only where the predictor is, and a
+links leave the mean positive only where the predictor is. A
 latent trend is centred near zero and reaches negative values,
 where the likelihood is undefined. \code{mvgam()} warns before
-fitting. \code{\link[brms:brmsfamily]{brms::lognormal()}} is the exception, since its \code{mu} is
-a log-scale location that takes any sign.
+fitting. \code{\link[brms:brmsfamily]{brms::lognormal()}} is the exception: its \code{mu} is a
+log-scale location that takes any sign.
 
 A family written inside a univariate \code{\link[brms:brmsformula]{brms::bf()}} is the model's
 family, as in brms. In a multivariate model each response may take
@@ -202,7 +201,7 @@ belongs to the response that names it. A single family given here
 applies to every response that does not name one of its own.
 Closure-unit and multi-response families (\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}},
 \code{\link[=mvn]{mvn()}}, \code{\link[=mvt]{mvt()}}, \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}) lay their data
-out by unit, so each models its response alone and cannot be one
+out by unit. Each models its response alone and cannot be one
 response of a multivariate model.}
 
 \item{threads}{Positive integer or \code{NULL}. When non-NULL the
@@ -220,13 +219,13 @@ thread-overhead-dominated regressions. The internal grainsize
 is auto-tuned to ~8 chunks regardless of \code{threads}.
 
 A brms-native family with a \code{trend_formula} samples serially
-whatever \code{threads} says. brms moves the \code{mu} assignment inside
-\code{partial_log_lik_lpmf} when it threads, where mvgam cannot add
-the trend to it, so the program is built without threading.
-This holds for every trend model under a brms-native family:
+whatever \code{threads} says. When it threads, brms moves the \code{mu}
+assignment inside \code{partial_log_lik_lpmf}, where mvgam cannot add
+the trend to it. The program is then built without threading.
+This applies to every trend model under a brms-native family:
 \code{RW()}, \code{AR()}, \code{VAR()}, \code{LLT()}, \code{ZMVN()}, \code{CAR()} and
-\code{PW()}. Each fit that drops the request warns, so a batch
-script that fits repeatedly shows it every time.}
+\code{PW()}. Each fit that drops the request warns. A batch script
+that fits repeatedly shows it every time.}
 
 \item{save_pars}{A \code{\link[brms:save_pars]{brms::save_pars()}} object naming which
 parameters the posterior keeps. A model is built from working
@@ -234,10 +233,10 @@ variables it also reports under another name: the standardised
 deviates a group-level block is scaled from, the unscaled
 coefficients a shrinkage prior scales, the ordered intercepts a
 mixture is identified by. Those are left out by default, as brms
-leaves them out. \code{save_pars(all = TRUE)} keeps every one, \code{group}
+leaves them out. \code{save_pars(all = TRUE)} keeps every one. \code{group}
 and \code{latent} keep the per-level deviations and the latent values
-of a \code{me()} covariate, and \code{manual} names individual parameters
-to keep.}
+of a \code{me()} covariate. \code{manual} names individual parameters to
+keep.}
 
 \item{run_model}{Logical. Setting \code{run_model = FALSE} stops before
 Stan parse, compile and sampling and returns a stub \code{mvgam}
@@ -257,35 +256,33 @@ accepts \code{"sampling"} (the default), \code{"meanfield"}, \code{"fullrank"} o
 \code{"fixed_param"} on either backend, plus \code{"pathfinder"} and
 \code{"laplace"} when \code{backend = "cmdstanr"}. \code{init} sets the starting
 values and accepts \code{"random"} (the default), \code{"0"}, a numeric
-value, a list or a function, and additionally \code{"pathfinder"} when
-\code{backend = "cmdstanr"}. The \code{"pathfinder"} keyword runs Stan's
+value, a list or a function. With \code{backend = "cmdstanr"} it also
+accepts \code{"pathfinder"}. The \code{"pathfinder"} keyword runs Stan's
 Pathfinder approximation on the compiled model and draws one
-starting value per chain from it. The posterior is still explored
-by the algorithm you asked for, so the fit remains exact.
+starting value per chain from it. The algorithm you asked for
+still explores the posterior. The fit remains exact.
 
-Treat \code{init = "pathfinder"} as a recovery option rather than a
-speedup. On models that already warm up cleanly it is slower, not
-faster: across random walk, autoregressive, correlated
-autoregressive and dynamic factor trends carrying 60 to 750 latent
-states, it added roughly a second of wall time, left warmup
-duration essentially unchanged, and returned 15 to 25 percent
-fewer effective samples per second. Its value is on models that
-struggle to leave a poor starting point at all, where the extra
-second buys a warmup that would otherwise stall or fill with
-divergences.
+\code{init = "pathfinder"} is a recovery option. On models that already
+warm up cleanly it is slower: across random walk, autoregressive,
+correlated autoregressive and dynamic factor trends with 60 to 750
+latent states, it added roughly a second of wall time. Warmup
+duration was essentially unchanged. Effective samples per second
+fell by 15 to 25 percent. It pays off on models that struggle to
+leave a poor starting point at all. There the extra second buys a
+warmup that would otherwise stall or fill with divergences.
 
-Four arguments shape the Stan program rather than the sampler, and
-are passed on to brms unchanged. \code{knots} gives knot positions by
-covariate name and reaches the basis constructors for the
-observation and trend formulas alike. \code{drop_unused_levels} decides
-whether a factor level with no observations still earns a
-coefficient. \code{sample_prior} takes \code{"no"}, \code{"yes"} or \code{"only"}, and
-under \code{"only"} the observation likelihood drops out while the
-latent process keeps its own prior, so the draws describe the
-model before it sees the response. \code{normalize} decides whether the
-sampling statements carry their normalising constants; dropping
-them is faster and leaves the posterior unchanged. \code{save_model}
-names a file to write the assembled Stan program to.}
+Four arguments shape the Stan program. brms receives them
+unchanged. \code{knots} gives knot positions by covariate name and
+reaches the basis constructors for the observation and trend
+formulas alike. \code{drop_unused_levels} decides whether a factor
+level with no observations still earns a coefficient.
+\code{sample_prior} takes \code{"no"}, \code{"yes"} or \code{"only"}. Under \code{"only"}
+the observation likelihood drops out while the latent process
+keeps its own prior. The draws then describe the model before it
+sees the response. \code{normalize} decides whether the sampling
+statements carry their normalising constants; dropping them is
+faster and leaves the posterior unchanged. \code{save_model} names a
+file to write the assembled Stan program to.}
 }
 \value{
 An object of class \code{mvgam}.
@@ -319,7 +316,7 @@ mcmc_plot(mod, variable = "^ar1", regex = TRUE, type = "hist")
 # ---- Positive continuous response with a trend ----
 # A mean that must stay positive needs `link = "log"` once a trend
 # enters the linear predictor. `stats::Gamma()` supplies the
-# `inverse` link instead, and a trend reaching negative values
+# `inverse` link by default. A trend reaching negative values then
 # leaves the likelihood undefined. mvgam warns on that pairing.
 set.seed(3)
 gamdat <- sim_mvgam(family = Gamma(link = "log"))
@@ -335,16 +332,16 @@ summary(gmod)
 
 # ---- Multivariate VAR(1) with intercept suppression + custom priors ----
 # Three correlated series, no observation intercept (`y ~ 0`),
-# per-series smooth on the trend side, and tighter custom
+# a per-series smooth on the trend side and tighter custom
 # priors on the regression coefficients and trend innovation
 # scale. Mirrors the workflow used in the README's Portal VAR
 # example.
 set.seed(2)
 vardat <- sim_mvgam(
-  family       = poisson(),
-  n_series     = 3L,
+  family = poisson(),
+  n_series = 3L,
   n_timepoints = 120L,
-  trend_model  = VAR(cor = TRUE)
+  trend_model = VAR(cor = TRUE)
 )
 
 # Inspect the default priors before fitting. Wrap the formula
@@ -353,24 +350,24 @@ vardat <- sim_mvgam(
 # `class` and `coef`; pass a modified subset back via
 # `priors = c(prior(...), ...)` to override.
 mf <- mvgam_formula(
-  formula       = y ~ 0,
+  formula = y ~ 0,
   trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR()
 )
 get_prior(mf, data = vardat$data_train, family = poisson())
 
 var_mod <- mvgam(
-  formula       = y ~ 0,
+  formula = y ~ 0,
   trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR(),
-  data          = vardat$data_train,
-  family        = poisson(),
-  priors        = c(
+  data = vardat$data_train,
+  family = poisson(),
+  priors = c(
     prior(normal(0, 2), class = b),
     prior(exponential(2.5), class = sigma_trend)
   ),
-  chains        = 2,
-  iter          = 1000,
-  warmup        = 500,
-  silent        = 2
+  chains = 2,
+  iter = 1000,
+  warmup = 500,
+  silent = 2
 )
 summary(var_mod)
 
@@ -414,12 +411,12 @@ tvdat$y <- tvdat$x * seq(0, 2, length.out = n) +
 
 tv_mod <- mvgam(
   y ~ 0 + s(time, by = x, k = 6),
-  data     = tvdat,
-  family   = gaussian(),
-  chains   = 2,
-  iter     = 1000,
-  warmup   = 500,
-  silent   = 2
+  data = tvdat,
+  family = gaussian(),
+  chains = 2,
+  iter = 1000,
+  warmup = 500,
+  silent = 2
 )
 # `conditional_effects()` shows the two-way surface: the
 # slope on x visibly steepens as time progresses.

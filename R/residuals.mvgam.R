@@ -124,7 +124,7 @@
 #'   support, so per-unit residuals on fits with small `n_rep`
 #'   (~ 2-4 visits) have heavier QQ-tails than analytic
 #'   `qnorm(N(0, 1))` lines under a correctly-specified model
-#'   (Dunn & Smyth 1996 §3; Hartig 2024 DHARMa vignette). A
+#'   (Dunn & Smyth 1996 Section 3; Hartig 2024 DHARMa vignette). A
 #'   one-time warning fires when any closure unit has 4 or
 #'   fewer visits; interpret QQ-plots against simulated N(0, 1)
 #'   envelopes rather than the analytic line in that regime.
@@ -177,7 +177,7 @@
 #'   1 - .Machine$double.eps]` before `qnorm` so the residual
 #'   stays finite even when an observation lies in the extreme
 #'   floating-point tail of the predictive distribution. This
-#'   bound corresponds to `|qnorm(u)| ≈ 8.13`.
+#'   bound corresponds to `|qnorm(u)| ~= 8.13`.
 #'
 #'   *ndraws sensitivity.* The two routes react differently to
 #'   the posterior draw count:
@@ -187,7 +187,7 @@
 #'     happen to place the observed `y_i` more than ~38 SDs
 #'     from the predictive mean -- `pnorm` underflows to exactly
 #'     0 or 1 and the clamp triggers. These look like extreme
-#'     `±8.13` residuals in the per-draw matrix but are a
+#'     `+/-8.13` residuals in the per-draw matrix but are a
 #'     property of the posterior, not a misfit signal. They get
 #'     proportionally rarer with more draws but never vanish.
 #'
@@ -196,7 +196,7 @@
 #'     `ndraws` many observations land outside the simulated
 #'     range entirely, so `u` is exactly 0 or 1 deterministically
 #'     and the clamp turns every draw for that observation into
-#'     `±8.13`. Setting `ndraws >= 500` resolves the empirical
+#'     `+/-8.13`. Setting `ndraws >= 500` resolves the empirical
 #'     PIT well enough that this artefact disappears in
 #'     typical cases.
 #'
@@ -307,7 +307,7 @@ residuals.mvgam <- function(object,
   # (per-unit detection / count totals); the empirical-PIT path
   # then operates on the aggregated draws so DHARMa-style
   # diagnostics on the returned matrix carry the correct
-  # exchangeability (Hartig 2024 §3; Vehtari et al. 2017 §4.2).
+  # exchangeability (Hartig 2024 Section 3; Vehtari et al. 2017 Section 4.2).
   # Mv-response closure-unit families (mvn, mvt) have one
   # observation per (site, species) row, so residuals at the row
   # grain are conditionally independent given lv. Routes through
@@ -356,20 +356,33 @@ residuals.mvgam <- function(object,
 }
 
 
-# Internal: per-closure-unit residuals for closure-unit families
-# (nmix, occ). Aggregates the per-visit posterior predictive
-# matrix to the unit grain via `aggregate_closure_unit_visits()`
-# (the unit total of detections / counts is the sufficient
-# summary for the per-unit Bernoulli-binomial / Poisson-binomial
-# marginal), then routes the resulting `[ndraws x N_unit]`
-# matrix through the same empirical-PIT or ordinary path used
-# for any other family. Per-visit residuals are not produced
-# because visits within a unit share the latent state and are
-# only marginally independent (Royle 2004; MacKenzie et al.
-# 2002; flocker_format vignette).
-#'@noRd
+#' Residuals of a closure-unit fit at the unit grain
+#'
+#' Visits within a closure unit share the latent state and are only
+#' marginally independent (MacKenzie et al. 2002; Royle 2004). The
+#' per-visit predictive draws are summed to unit totals with
+#' `aggregate_closure_unit_visits()`. The unit total of detections or
+#' counts is sufficient for the per-unit marginal. Quantile residuals
+#' then take the empirical PIT. Their support is coarse when a unit has
+#' few visits. A once-per-session warning reports that case.
+#'
+#' @param object Fitted `mvgam` object with an `occ()` or `nmix()`
+#'   family
+#' @param newdata Data frame of new data, or `NULL` for the training
+#'   data
+#' @param type Character residual type, `"quantile"` or `"ordinary"`
+#' @param draw_ids Integer vector of draw indices, or `NULL`
+#' @param ndraws Integer number of draws, or `NULL`
+#' @param ... Further arguments to `posterior_predict()`
+#' @return Numeric matrix with dimensions `[ndraws, N_unit]`
+#' @noRd
 compute_closure_unit_residuals <- function(object, newdata, type,
                                              draw_ids, ndraws, ...) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(newdata, null.ok = TRUE)
+  checkmate::assert_choice(type, c("quantile", "ordinary"))
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   # Whether the fit saw these rows is settled before the training
   # frame is substituted for them, since afterwards every test on
   # `newdata` answers as though the user had supplied new data.
@@ -389,7 +402,7 @@ compute_closure_unit_residuals <- function(object, newdata, type,
   )
   # The empirical-PIT randomisation widens the per-residual
   # variance above 1 whenever the discrete support is coarse
-  # (Dunn & Smyth 1996 §3; DHARMa vignette "Residuals for
+  # (Dunn & Smyth 1996 Section 3; DHARMa vignette "Residuals for
   # discrete distributions"). For closure-unit families that
   # surfaces when n_rep is small: the per-unit sum lives on
   # {0, ..., n_rep}, so QQ-tails can read as heavier than N(0, 1)
@@ -419,11 +432,18 @@ compute_closure_unit_residuals <- function(object, newdata, type,
 }
 
 
-# Internal: prediction arguments for a residual. Names the surface
-# through the shared rule, and carries the response the mv fan-out
-# scoped this call to; the marginal branch must not drop it.
-#'@noRd
+#' Prediction arguments for a residual
+#'
+#' `diagnostic_surface_args()` names the prediction surface. The
+#' response the multivariate fan-out scoped the call to is kept.
+#'
+#' @param pp_args Named list of prediction arguments
+#' @param resp Character response name, or `NULL`
+#' @return Named list of prediction arguments
+#' @noRd
 residuals_pred_args <- function(pp_args, resp) {
+  checkmate::assert_list(pp_args)
+  checkmate::assert_string(resp, null.ok = TRUE)
   args <- diagnostic_surface_args(pp_args, is.null(pp_args$newdata))
   if (!"resp" %in% names(args)) {
     args$resp <- resp
@@ -432,25 +452,38 @@ residuals_pred_args <- function(pp_args, resp) {
 }
 
 
-# Internal: the per-draw PIT bounds an analytic family supplies.
-#
-# `family_dist_spec()` is the package's one account of how a family
-# is parameterised: `log_lik()` reads it for the density and the
-# `cens()` / `trunc()` terms read it for the distribution function,
-# so a residual reads it too rather than keeping a second table of
-# CDFs that can drift from it.
-#
-# A discrete family carries an atom at each observed value, so the
-# Dunn-Smyth construction randomises over `[F(y - 1), F(y)]`. A
-# continuous one has no atom, both bounds are `F(y)`, and the
-# residual is a deterministic function of the draw. An ordinal
-# family's distribution is its category probabilities, read through
-# `ordinal_category_probs()` as `log_lik()` reads them. Returns NULL
-# for any other family the spec does not name, which is what sends
-# that family to the empirical PIT.
-#'@noRd
+#' The per-draw PIT bounds an analytic family supplies
+#'
+#' `family_dist_spec()` defines how each family is parametrised.
+#' `log_lik()` takes the density from it. The `cens()` and `trunc()`
+#' terms take the distribution function from it. Residuals use the same
+#' spec to keep one table of CDFs. A discrete family has an atom at each
+#' observed value. The Dunn-Smyth construction then randomises over
+#' `[F(y - 1), F(y)]`. A continuous family gives `F(y)` for both
+#' bounds. An ordinal family takes its bounds from the category
+#' probabilities of `ordinal_category_probs()`.
+#'
+#' @param object Fitted `mvgam` object
+#' @param y Numeric vector of observed responses
+#' @param pp_args Named list of prediction arguments
+#' @param d Data frame of the prediction rows
+#' @param draw_ids Integer vector of draw indices, or `NULL`
+#' @param resp Character response name, or `NULL`
+#' @return List holding the `lower` and `upper` bound matrices, or
+#'   `NULL` for a family without a distribution spec. `NULL` sends the
+#'   family to the empirical PIT.
+#' @noRd
 analytic_pit_bounds <- function(object, y, pp_args, d,
                                 draw_ids = NULL, resp = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_numeric(y)
+  checkmate::assert_list(pp_args)
+  checkmate::assert(
+    checkmate::check_data_frame(d),
+    checkmate::check_list(d)
+  )
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  checkmate::assert_string(resp, null.ok = TRUE)
   family_obj <- model_families(object, resp)
   family_name <- resolve_family_name(family_obj)
   ordinal <- is_ordinal_family(family_obj)
@@ -535,17 +568,34 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
 }
 
 
-# Internal: top-level dispatcher for `type = "quantile"`. A family
-# the distribution spec names gets its PIT evaluated per draw, from
-# that draw's own parameters, which is the Dunn-Smyth construction.
-# Every other family falls through to the empirical PIT over
-# `posterior_predict` draws. Both read the surface
-# `diagnostic_surface_args()` names, which in sample is the per-draw
-# `trend[t, s]` the model inferred.
-#'@noRd
+#' Randomised quantile residuals of a fit
+#'
+#' A family with a distribution spec gets the Dunn-Smyth construction,
+#' with the PIT evaluated from each draw's own parameters. Every other
+#' family takes the empirical PIT over `posterior_predict()` draws. Both
+#' use the surface `diagnostic_surface_args()` names, which in sample
+#' is the per-draw latent trend the model inferred.
+#'
+#' @param object Fitted `mvgam` object
+#' @param y Numeric vector of observed responses
+#' @param pp_args Named list of prediction arguments
+#' @param d Data frame of the prediction rows
+#' @param draw_ids Integer vector of draw indices, or `NULL`
+#' @param resp Character response name, or `NULL`
+#' @return Numeric matrix of residuals with one column per observation
+#' @noRd
 compute_quantile_residuals <- function(object, y, pp_args,
                                          d, draw_ids = NULL,
                                          resp = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_numeric(y)
+  checkmate::assert_list(pp_args)
+  checkmate::assert(
+    checkmate::check_data_frame(d),
+    checkmate::check_list(d)
+  )
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  checkmate::assert_string(resp, null.ok = TRUE)
   bounds <- analytic_pit_bounds(
     object = object, y = y, pp_args = pp_args, d = d,
     draw_ids = draw_ids, resp = resp
@@ -562,16 +612,25 @@ compute_quantile_residuals <- function(object, y, pp_args,
 }
 
 
-# Internal: the randomised quantile residual itself, given the PIT
-# interval each draw places the observation in. Both the analytic
-# and the empirical route end here, so the randomisation and the
-# clamp that keeps `qnorm` finite are written once.
-#
-# `runif` on a degenerate interval returns its endpoint, which is
-# what makes a continuous family the special case of the discrete
-# one rather than a separate path.
-#'@noRd
+#' Randomised quantile residuals from PIT intervals
+#'
+#' The analytic and empirical routes both end here. A uniform value
+#' drawn from each interval is clamped away from 0 and 1 to keep
+#' `qnorm()` finite. `runif()` on a degenerate interval returns its
+#' endpoint, making a continuous family the special case of a discrete
+#' one.
+#'
+#' @param lower Numeric matrix of lower PIT bounds, one column per
+#'   observation
+#' @param upper Numeric matrix of upper PIT bounds, shaped as `lower`
+#' @param y Numeric vector of observed responses. A missing value gives
+#'   a missing residual column.
+#' @return Numeric matrix of residuals shaped as `lower`
+#' @noRd
 randomised_quantile_residuals <- function(lower, upper, y) {
+  checkmate::assert_matrix(lower)
+  checkmate::assert_matrix(upper)
+  checkmate::assert_numeric(y)
   lo <- pmin(lower, upper)
   hi <- pmax(lower, upper)
   ok <- is.finite(lo) & is.finite(hi)
@@ -588,22 +647,24 @@ randomised_quantile_residuals <- function(lower, upper, y) {
 }
 
 
-# Internal: empirical-PIT quantile residuals (DHARMa / Hartig
-# 2024 helper.R::getQuantile convention). Per obs the lower /
-# upper PIT bounds are `mean(yrep < y)` and `mean(yrep <= y)`,
-# pooled over draws, so one interval serves every draw. This is
-# the route for a family with no analytic distribution function,
-# and it is why such a family's residuals carry less spread than
-# the per-draw construction: the pooled predictive absorbs the
-# posterior uncertainty in the latent state that the conditional
-# CDF holds fixed.
-#
-# The draw count is read from `yrep` rather than taken as an
-# argument: both callers passed `nrow()` of the matrix they were
-# already passing, so the argument could only ever agree with it or
-# be wrong.
-#'@noRd
+#' Empirical-PIT quantile residuals
+#'
+#' The PIT bounds of each observation are `mean(yrep < y)` and
+#' `mean(yrep <= y)`, pooled over draws, following the `getQuantile()`
+#' convention of DHARMa (Hartig 2024). One interval serves every draw.
+#' A family without an analytic distribution function takes this
+#' route. Its residuals have less spread than the per-draw construction
+#' gives. The pooled predictive absorbs the posterior uncertainty in
+#' the latent state that the conditional CDF holds fixed.
+#'
+#' @param y Numeric vector of observed responses
+#' @param yrep Numeric matrix of predictive draws, one column per
+#'   observation
+#' @return Numeric matrix of residuals shaped as `yrep`
+#' @noRd
 compute_quantile_residuals_empirical <- function(y, yrep) {
+  checkmate::assert_numeric(y)
+  checkmate::assert_matrix(yrep, ncols = length(y))
   ndraws_used <- nrow(yrep)
   nobs <- length(y)
   bound <- function(cmp) {
@@ -624,12 +685,24 @@ compute_quantile_residuals_empirical <- function(y, yrep) {
 
 
 
-# Internal: shape the residual draws matrix into the form
-# requested by `summary` / `robust` / `probs`. Mirrors the
-# brms / mvgam summary convention so its callers
-# (augment.mvgam, plot.mvgam_resids) see a stable shape.
-#'@noRd
+#' Residual draws returned as draws or as a summary
+#'
+#' The summary matches what `mvgam_post_summary()` gives every other
+#' accessor. With `robust = TRUE` the spread is `stats::mad()`, which
+#' includes the 1.4826 consistency constant. A column with any missing
+#' draw gets a missing summary.
+#'
+#' @param resids Numeric matrix of residual draws
+#' @param summary Logical flag to summarise the draws
+#' @param robust Logical flag to report the median and MAD
+#' @param probs Numeric vector of quantile probabilities
+#' @return `resids`, or a summary matrix with one row per observation
+#' @noRd
 residuals_finalise <- function(resids, summary, robust, probs) {
+  checkmate::assert_matrix(resids)
+  checkmate::assert_flag(summary)
+  checkmate::assert_flag(robust)
+  checkmate::assert_numeric(probs, lower = 0, upper = 1)
   if (!summary) return(resids)
   # The summary every other accessor reports, so a residual and a
   # prediction describe their spread the same way. Under

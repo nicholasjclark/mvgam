@@ -17,19 +17,16 @@ ensemble(object, ...)
 \item{...}{More \code{mvgam_forecast} objects to combine.}
 
 \item{weights}{Either \code{NULL} (the default, equivalent to even
-weighting), or a numeric vector with one entry per supplied
-forecast. Non-negative numeric weights are auto-normalised
-so that they sum to 1. Strategy strings such as
-\code{"stacking"} are intentionally not accepted here because
-computing them requires the fitted models, not just the
-forecast draws; pre-compute via
-\code{\link[loo:loo_model_weights]{loo::loo_model_weights()}} / \code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}}
-on the fits and pass the numeric result.}
+weighting), or a numeric vector with one non-negative entry per
+supplied forecast. The weights are normalised to sum to 1.
+Strategies such as stacking need the fitted models. Compute them
+with \code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}} on the fits and pass the numeric
+result.}
 
 \item{ndraws}{Positive integer giving the total number of
 ensemble draws to return per series. Defaults to \code{5000}.
-If \code{ndraws} exceeds the total number of input draws,
-sampling is done with replacement.}
+A model allocated more draws than it holds is sampled with
+replacement.}
 
 \item{seed}{Optional integer seed for reproducibility.}
 }
@@ -37,29 +34,28 @@ sampling is done with replacement.}
 An object of class \code{mvgam_forecast} containing the
 ensembled hindcasts and forecasts. Suitable for
 \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}} and \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}.
-Attribute \code{weights} records the per-model weights actually
-used; attribute \code{ndraws_per_model} records the integer draw
+Attribute \code{weights} records the per-model weights used.
+Attribute \code{ndraws_per_model} records the integer draw
 counts drawn from each input.
 }
 \description{
-Build a single \code{mvgam_forecast} whose hindcast and forecast
-draws are a multinomially-resampled combination of two or more
-input \code{mvgam_forecast} objects. Defaults to even weighting, but
-a numeric vector of user-supplied per-model weights is also
-accepted (auto-normalised to sum to 1).
+Build a single \code{mvgam_forecast} from the hindcast and forecast
+draws of two or more \code{mvgam_forecast} objects. Each input supplies
+a share of the draws set by its weight. Weights are even by
+default.
 }
 \details{
 Per-model weights are split into integer draw counts
-that sum to \code{ndraws} using the largest-remainder rule
-(largest-remainder rule, after \code{brms::round_largest_remainder()}),
-then that
-many rows are sampled (with replacement when a model has
-fewer draws than its assigned share) from each input's
-hindcasts and forecasts. The returned object inherits its
-\code{series_names}, \code{family}, \code{trend_model}, training arms and
-test arms from the first input. All forecast objects must
-share matching \code{series_names}, hindcast / forecast counts,
-forecast horizons and (when present) test observations.
+that sum to \code{ndraws} by the largest-remainder rule, after
+\code{brms::round_largest_remainder()}. Each model then gives one set
+of sampled draws. Every series, in the hindcasts and in the
+forecasts, takes that same set. The ensemble keeps the dependence
+between series and the pairing of each hindcast with its forecast.
+
+The returned object takes its series names, family, training data
+and test data from the first input. All inputs must share the
+series names, the hindcast lengths, the forecast horizons and, when
+present, the test observations.
 }
 \seealso{
 \code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}},

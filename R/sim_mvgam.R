@@ -64,7 +64,7 @@
 #'     relative to the smooth and makes the two identifiable.}
 #'   \item{`type = 6`}{`y ~ s(season, bs = "cc")` with `CAR(time,
 #'     series)`. Cyclic seasonal + continuous-time AR(1) on
-#'     irregular time gaps (`Δt ~ Uniform(1, 6)`), with
+#'     irregular time gaps (`Delta t ~ Uniform(1, 6)`), with
 #'     autocorrelation 0.7 over the median gap.}
 #'   \item{`type = 7`}{`y ~ s(x)` with sparse
 #'     `AR(p = c(1, 12))`. The latent state carries lag-1 momentum
@@ -677,7 +677,7 @@ spec_type_5 <- function() {
 
 
 # Type 6: y ~ s(season, bs = "cc"), CAR(time, series) with
-# irregular Δt ~ Uniform(1, 6).
+# irregular Delta t ~ Uniform(1, 6).
 #'@noRd
 spec_type_6 <- function() {
   list(
@@ -787,10 +787,16 @@ spec_type_7 <- function() {
 # ------------------------------------------------------------------
 
 
-# Internal: family-specific intercept on the LINK scale. Chosen so
-# the inverse-link image is in a sensible response range.
-#'@noRd
+#' The link-scale intercept a simulation uses for a family
+#'
+#' Each value places the inverse-link mean in a plausible response
+#' range, such as a Poisson mean near 5 or a probability near 0.5.
+#'
+#' @param fam_name Character family name from `resolve_family_name()`
+#' @return Numeric scalar intercept on the link scale
+#' @noRd
 intercept_for_family <- function(fam_name) {
+  checkmate::assert_string(fam_name)
   switch(
     fam_name,
     "gaussian" = 0,
@@ -809,25 +815,40 @@ intercept_for_family <- function(fam_name) {
 }
 
 
-# Internal: the innovation scale a type spec passes to
-# `propagate_trend()`, from the trend's share of the link-scale
-# variance. `sim_mvgam()` rescales every simulated trend to its
-# target SD afterwards, and this sets only the starting amplitude.
-#'@noRd
+#' The innovation SD a simulation type passes to `propagate_trend()`
+#'
+#' Derived from the trend's share of the link-scale variance, clamped to
+#' `[0.01, 0.99]`. `sim_mvgam()` rescales every simulated trend to its
+#' target SD after propagation. This value sets only the starting
+#' amplitude.
+#'
+#' @param prop_trend Numeric share of link-scale variance given to the
+#'   trend
+#' @return Positive numeric scalar
+#' @noRd
 trend_sigma <- function(prop_trend) {
+  checkmate::assert_number(prop_trend)
   prop_trend <- max(min(prop_trend, 0.99), 0.01)
   sqrt(prop_trend / (1 - prop_trend))
 }
 
 
-# Internal: TRUE when the trend constructor is `PW()`. PW
-# trends need their own simulation path (deterministic kernel
-# evaluation, not stochastic propagation) and their own
-# parameter set (k, m, delta, t_change), so they bypass the
-# multivariate-default + propagate_trend pipeline used for the
-# stationary / non-stationary stochastic trends.
-#'@noRd
+#' Whether a simulation trend is a piecewise `PW()` trend
+#'
+#' A piecewise trend is deterministic given `k`, `m`, `delta` and
+#' `t_change`. Its simulation evaluates the kernel directly and skips
+#' `propagate_trend()`.
+#'
+#' @param trend_model Trend constructor object, a character trend name or
+#'   `NULL`
+#' @return Logical scalar
+#' @noRd
 is_pw_trend <- function(trend_model) {
+  checkmate::assert(
+    checkmate::check_null(trend_model),
+    checkmate::check_character(trend_model),
+    checkmate::check_list(trend_model)
+  )
   if (is.null(trend_model)) return(FALSE)
   t <- if (is.character(trend_model)) {
     trend_model
@@ -838,28 +859,35 @@ is_pw_trend <- function(trend_model) {
 }
 
 
-# Internal: PW-specific param defaults. The `PW()` constructor
-# carries `n_changepoints` and `growth`;
-# this helper turns those into (k, m, delta, t_change) plus an
-# optional cap matrix for logistic growth.
-#
-# Defaults:
-#   * k       : 0.02 per unit time -- gentle linear growth.
-#   * m       : 0.5, the time of the logistic inflection. The
-#     curve starts near half its capacity.
-#   * delta   : alternating +/- 0.05 magnitudes across
-#     changepoints, independently per series so multi-series
-#     PW sims have visibly distinct trajectories.
-#   * t_change: evenly spaced across the training horizon,
-#     respecting `changepoint_range` (defaults 0.8) so the
-#     last 20% of the training period stays changepoint-free
-#     and the trend has room to settle before forecasting.
-#   * cap     : logistic only; defaults to a constant ceiling
-#     of `exp(intercept) * 3` per series so the inverse-logit
-#     output stays well clear of the saturation regime.
-#'@noRd
+#' Default parameters for a simulated piecewise trend
+#'
+#' Fills each of `k`, `m`, `delta`, `t_change` and, for logistic growth,
+#' `cap` that `params` leaves unset.
+#' * `k` is 0.02 per unit time, a gentle linear growth.
+#' * `m` is 0.5, placing the logistic curve near half its capacity at
+#'   the start.
+#' * `delta` alternates in sign across changepoints with magnitudes near
+#'   0.05. The magnitude grows with the series index to give each series
+#'   a distinct path.
+#' * `t_change` spaces changepoints evenly over the first
+#'   `changepoint_range` share of the horizon. The default of 0.8 leaves
+#'   the last fifth free of changepoints before forecasting.
+#' * `cap` is a constant ceiling of three times `exp(m[1])`, keeping the
+#'   logistic output away from saturation.
+#'
+#' @param trend_model `PW()` trend object holding `n_changepoints`,
+#'   `changepoint_range` and `growth`
+#' @param params Named list of user-supplied trend parameters
+#' @param n_series Integer number of series
+#' @param n_timepoints Integer number of time points
+#' @return `params` with every missing piecewise parameter filled
+#' @noRd
 fill_pw_trend_defaults <- function(trend_model, params,
                                       n_series, n_timepoints) {
+  checkmate::assert_list(trend_model)
+  checkmate::assert_list(params, null.ok = TRUE)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_timepoints, lower = 1L)
   n_change <- as.integer(trend_model$n_changepoints %||% 5L)
   range_prop <- as.numeric(
     trend_model$changepoint_range %||% 0.8
@@ -897,30 +925,34 @@ fill_pw_trend_defaults <- function(trend_model, params,
 }
 
 
-# Internal: trend-model-specific param defaults. Each per-type
-# spec returns AR-style defaults (`sigma`, optionally `ar`),
-# which suffice for univariate RW / AR / CAR / ZMVN. VAR
-# needs an `A` cube of cross-series transition coefficients,
-# and any cor = TRUE trend needs an off-diagonal `Sigma` to
-# generate truly correlated draws. Fill those in here when
-# the supplied `trend_model` requires them and the per-type
-# spec didn't set them. Lets users sim with arbitrary trend
-# constructors via `trend_model = VAR(p = 1)` etc.
-#
-# Defaults:
-#   * VAR A: diagonal `phi_diag = 0.5`, off-diagonal
-#     `phi_off = 0.30`. Stable (spectral radius 0.5 + 0.30 *
-#     (n_series - 1) < 1 for n_series <= 2; larger n_series
-#     reduces phi_off proportionally below). Off-diagonal is
-#     large enough that the multivariate energy / variogram
-#     scores can reliably discriminate VAR vs independent-AR
-#     in misspecification tests.
-#   * cor=TRUE Sigma: correlation `rho = 0.5` across all
-#     series pairs (so the test discrimination has signal
-#     without driving the predictive too far off the marginal)
-#'@noRd
+#' Trend-specific default parameters for a simulation
+#'
+#' The simulation types supply `sigma` and sometimes `ar`, enough for
+#' univariate RW, AR, CAR and ZMVN trends. This fills the parameters
+#' other trend constructors need when `params` leaves them unset.
+#' * An `AR(p)` trend with a scalar `ar` gets a geometric taper over `p`
+#'   lags, `ar[l] = ar[1] * 0.3^(l - 1)`.
+#' * A `VAR` trend gets a lag-1 transition matrix with 0.5 on the
+#'   diagonal. The off-diagonal entries share 0.30 over the other
+#'   series, which keeps every row sum below 1 for stability.
+#' * A `VAR`, `ZMVN` or `cor = TRUE` trend gets a `Sigma` with
+#'   correlation 0.5 between every pair of series.
+#'
+#' @param trend_model Trend constructor object, a character trend name or
+#'   `NULL`
+#' @param params Named list of trend parameters from the simulation type
+#' @param n_series Integer number of series
+#' @return `params` with the trend-specific defaults filled
+#' @noRd
 fill_multivariate_trend_defaults <- function(trend_model,
                                                 params, n_series) {
+  checkmate::assert(
+    checkmate::check_null(trend_model),
+    checkmate::check_character(trend_model),
+    checkmate::check_list(trend_model)
+  )
+  checkmate::assert_list(params, null.ok = TRUE)
+  checkmate::assert_int(n_series, lower = 1L)
   if (is.null(trend_model) || is.character(trend_model)) {
     return(params)
   }
@@ -1001,15 +1033,18 @@ fill_multivariate_trend_defaults <- function(trend_model,
 }
 
 
-# Internal: total link-scale variance budget per family. Bounds
-# eta so the inverse-link image lands in a recoverable, plottable
-# range:
-#   identity:  SD ~ 1 (gaussian/student)
-#   log:       SD ~ 1 (exp(eta) varies by ~factor of 7 at +/- 1 SD)
-#   logit:     SD ~ 1.5 (probabilities span ~[0.10, 0.90])
-#   sqrt/inv:  SD ~ 1 (conservative)
-#'@noRd
+#' The total link-scale SD a simulation allows for a family
+#'
+#' Bounds the linear predictor to keep the simulated response in a
+#' recoverable range. Log-link families get 0.8 and logit-link families
+#' get 1.5, which spans probabilities near 0.10 to 0.90. Identity-link
+#' and other families get 1.
+#'
+#' @param fam_name Character family name from `resolve_family_name()`
+#' @return Positive numeric scalar
+#' @noRd
 link_scale_budget <- function(fam_name) {
+  checkmate::assert_string(fam_name)
   switch(
     fam_name,
     "gaussian" = 1.0,
@@ -1028,14 +1063,20 @@ link_scale_budget <- function(fam_name) {
 }
 
 
-# Internal: scalar factor that, multiplied into `x`, gives an
-# output with sample SD == `target_sd`. Returned as a scalar so
-# the caller can apply it consistently across an arbitrary set of
-# coupled tensors (trend matrix, obs contribution, ground-truth
-# smooths) and keep them on the same scale. Returns 0 if the
-# input is degenerate (avoids producing NaN downstream).
-#'@noRd
+#' The scalar that rescales a vector to a target SD
+#'
+#' A scalar lets the caller apply one factor to several linked objects,
+#' such as the observation contribution and its ground-truth smooths.
+#' A constant or non-finite input returns 0 to keep NaN out of the
+#' simulation.
+#'
+#' @param x Numeric vector or matrix to rescale
+#' @param target_sd Non-negative target sample SD
+#' @return Numeric scalar factor
+#' @noRd
 sd_rescale_factor <- function(x, target_sd) {
+  checkmate::assert_numeric(x)
+  checkmate::assert_number(target_sd, lower = 0)
   current <- stats::sd(as.numeric(x))
   if (!is.finite(current) || current < 1e-8) {
     return(0)
@@ -1044,11 +1085,25 @@ sd_rescale_factor <- function(x, target_sd) {
 }
 
 
-# Internal: derive family-side dispersion parameters (sigma, phi,
-# size, etc.) from the obs-side linpred scale and user overrides.
-#'@noRd
+#' Family dispersion parameters for a simulation
+#'
+#' User values in `family_pars` win. A Gaussian or Student-t `sigma`
+#' defaults to the observation share of the link-scale SD, with a floor
+#' of 0.1. Other families get fixed defaults.
+#'
+#' @param family Family object of the simulated model
+#' @param family_pars Named list of user-supplied family parameters
+#' @param prop_trend Numeric share of link-scale variance given to the
+#'   trend
+#' @param eta_sd Numeric SD of the simulated linear predictor
+#' @return Named list of family parameters for `sim_family_rng()`
+#' @noRd
 sim_family_pars <- function(family, family_pars, prop_trend,
                               eta_sd) {
+  checkmate::assert_list(family)
+  checkmate::assert_list(family_pars)
+  checkmate::assert_number(prop_trend)
+  checkmate::assert_number(eta_sd, na.ok = TRUE)
   fam_name <- resolve_family_name(family)
   # obs noise SD = (1 - prop_trend) share of link-scale variance,
   # converted to family-specific scale.
@@ -1084,11 +1139,20 @@ sim_family_pars <- function(family, family_pars, prop_trend,
 }
 
 
-# Internal: rebuild a smooth on a fine grid from its basis +
-# coefficients (for the ground-truth `true_smooths` slot). Uses
-# mgcv::PredictMat to evaluate the basis at new x.
-#'@noRd
+#' A simulated smooth evaluated on a grid
+#'
+#' Fills the ground-truth `true_smooths` slot by evaluating the basis at
+#' new covariate values with `mgcv::PredictMat()`.
+#'
+#' @param basis mgcv smooth object from `sim_smooth()`
+#' @param coefs Numeric vector of spline coefficients
+#' @param grid_x Numeric vector of covariate values
+#' @return Numeric vector with the smooth at each value of `grid_x`
+#' @noRd
 sim_smooth_on_grid <- function(basis, coefs, grid_x) {
+  checkmate::assert_list(basis)
+  checkmate::assert_numeric(coefs, min.len = 1L)
+  checkmate::assert_numeric(grid_x, min.len = 1L)
   newdata <- stats::setNames(
     list(grid_x), basis$term[1L]
   )
@@ -1097,11 +1161,21 @@ sim_smooth_on_grid <- function(basis, coefs, grid_x) {
 }
 
 
-# Internal: train / test split by time. Held-out timepoints come
-# from the END of the series (forecast-style split).
-#'@noRd
+#' A simulated data set split by time into training and test sets
+#'
+#' The test set takes the last time points, as a forecast would.
+#'
+#' @param data_long Data frame holding a `time` column
+#' @param n_timepoints Integer number of time points
+#' @param proportional_train Numeric share of time points to train on
+#' @return List holding the `train` and `test` data frames. `test` is
+#'   `NULL` when every time point trains.
+#' @noRd
 split_train_test <- function(data_long, n_timepoints,
                               proportional_train) {
+  checkmate::assert_data_frame(data_long)
+  checkmate::assert_int(n_timepoints, lower = 1L)
+  checkmate::assert_number(proportional_train, lower = 0, upper = 1)
   n_train <- max(2L, floor(proportional_train * n_timepoints))
   if (n_train >= n_timepoints) {
     return(list(train = data_long, test = NULL))

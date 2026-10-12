@@ -215,11 +215,12 @@ test_that("each arm is as long as its own response, not the frame", {
 
 test_that("the program reads the trend on both axes, per response", {
   sc <- paste(as.character(stancode(prefit)), collapse = "\n")
+  flat <- gsub("\\s+", " ", sc)
   for (r in responses) {
     expect_true(grepl(
-      paste0("trend[obs_trend_time_", r, "[n], obs_trend_series_",
-             r, "[n]]"),
-      sc, fixed = TRUE
+      paste0("obs_trend_idx_", r, "[n] = (obs_trend_series_", r,
+             "[n] - 1) * N_time_trend + obs_trend_time_", r, "[n];"),
+      flat, fixed = TRUE
     ))
   }
   # One latent dimension per response, and the innovations are drawn

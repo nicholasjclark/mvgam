@@ -13,22 +13,25 @@
 # builds its arguments once and the two callers share it.
 
 
-# Internal: a beta's two shapes from a mean and a precision, in the
-# parameterisation brms uses.
-#
-# Four callers share it: the univariate beta family, the
-# beta-binomial's mixing law, one component of a Dirichlet, and the
-# simulator that draws a beta response.
-#
-# `boundary_na` is for the one caller whose spec is read only as a
-# distribution function. At a mean of zero or one a shape reaches
-# zero and the transform has no interior: every value returns a
-# boundary, which `qnorm` reports as an eight-sigma residual rather
-# than as the undefined quantity it is. A density and a draw are
-# both well defined there -- degenerate, but not undefined -- so
-# they keep the shapes they were given.
+#' The two shapes of a beta from its mean and precision
+#'
+#' Uses the brms parametrisation. The beta family, the beta-binomial
+#' mixing law, a Dirichlet component and the simulator all call it.
+#' `boundary_na = TRUE` serves the caller that uses the spec only as a
+#' distribution function. A mean of 0 or 1 sets a shape to zero.
+#' `qnorm()` would then turn the boundary value into an eight-sigma
+#' residual. A density and a draw stay defined there and keep the
+#' shapes they were given.
+#'
+#' @param mu Numeric mean in `[0, 1]`
+#' @param phi Numeric precision
+#' @param boundary_na Logical flag to set a mean of 0 or 1 to `NA`
+#' @return List holding `shape1` and `shape2`
 #' @noRd
 beta_shapes <- function(mu, phi, boundary_na = FALSE) {
+  checkmate::assert_numeric(mu)
+  checkmate::assert_numeric(phi)
+  checkmate::assert_flag(boundary_na)
   if (boundary_na) {
     mu[!is.na(mu) & (mu <= 0 | mu >= 1)] <- NA_real_
   }
@@ -36,14 +39,25 @@ beta_shapes <- function(mu, phi, boundary_na = FALSE) {
 }
 
 
-# Internal: the R distribution a family maps onto, with a builder that
-# returns that distribution's arguments for one column of draws.
-#
-# Returns NULL for a family with no single R distribution, which is
-# what makes `cens()` and `trunc()` unavailable for it.
+#' The R distribution a family maps onto
+#'
+#' @param family_name Character family name
+#' @param link Character link name
+#' @param linpred Numeric linear predictor matrix, one row per draw
+#' @param family_pars Named list of distributional parameter matrices
+#' @param trials Numeric vector of trials, or `NULL`
+#' @return List holding the distribution name `dist` and `args`, a
+#'   function giving the distribution's arguments for one column of
+#'   draws. `NULL` for a family without a single R distribution, which
+#'   makes `cens()` and `trunc()` unavailable for it.
 #' @noRd
 family_dist_spec <- function(family_name, link, linpred, family_pars,
                              trials) {
+  checkmate::assert_string(family_name)
+  checkmate::assert_string(link, null.ok = TRUE)
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_list(family_pars)
+  checkmate::assert_numeric(trials, null.ok = TRUE)
   mu <- inv_link(linpred, link)
   sigma <- family_pars$sigma
   shape <- family_pars$shape
@@ -161,12 +175,18 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
 }
 
 
-# Internal: the density or distribution function a spec's
-# distribution is served by. Most are base R's. `bbinom` comes from
-# extraDistr. `cmb`, `beta_nb` and `tweedie` come from the package's
-# own kernels. Every caller obtains them through this one lookup.
+#' The density, distribution or quantile function of a distribution
+#'
+#' Most come from base R. `bbinom` comes from extraDistr. `cmb`,
+#' `beta_nb` and `tweedie` use the package's own kernels.
+#'
+#' @param dist Character distribution name from `family_dist_spec()`
+#' @param kind Character function kind, `"d"`, `"p"` or `"q"`
+#' @return A function, or `NULL` for a quantile function the
+#'   distribution lacks
 #' @noRd
 dist_fun <- function(dist, kind = c("d", "p", "q")) {
+  checkmate::assert_string(dist)
   kind <- match.arg(kind)
   switch(
     dist,
@@ -197,28 +217,39 @@ dist_fun <- function(dist, kind = c("d", "p", "q")) {
 }
 
 
-# Internal: whether a family is one `family_dist_spec()` names.
-#
-# Asked before a predictor is computed, so a family with no spec does
-# not pay for a prediction only the spec would use. It answers by
-# building the spec against an empty predictor rather than by keeping
-# a second list of family names beside the switch, which would be the
-# duplication the spec exists to remove.
+#' Whether `family_dist_spec()` names a family
+#'
+#' Called before a predictor is computed, sparing a family without a
+#' spec the prediction. The spec is built against an empty predictor,
+#' keeping the family list in one switch.
+#'
+#' @param family_name Character family name
+#' @param link Character link name
+#' @return Logical scalar
 #' @noRd
 family_has_dist_spec <- function(family_name, link) {
+  checkmate::assert_string(family_name)
+  checkmate::assert_string(link, null.ok = TRUE)
   !is.null(
     family_dist_spec(family_name, link, matrix(0), list(), NULL)
   )
 }
 
 
-# Internal: a location-scale family is evaluated on its standardised
-# variate, because the base distribution takes neither a location nor
-# a scale. Standardises the value, drops those two entries from the
-# argument list, and returns the scale a density needs to correct by
-# and a sampler needs to undo.
+#' A value standardised for a location-scale distribution
+#'
+#' The base distribution of a location-scale family takes neither a
+#' location nor a scale. The value is standardised and both entries are
+#' dropped from the arguments.
+#'
+#' @param value Numeric value to evaluate
+#' @param args Named list of distribution arguments, possibly holding
+#'   `.shift` and `.scale`
+#' @return List holding the standardised `value`, the remaining `args`
+#'   and the `scale` a density corrects by and a sampler undoes
 #' @noRd
 standardise_for_dist <- function(value, args) {
+  checkmate::assert_list(args)
   scale <- args$.scale
   if (!is.null(args$.shift)) {
     value <- (value - args$.shift) / scale
@@ -229,15 +260,25 @@ standardise_for_dist <- function(value, args) {
 }
 
 
-# Internal: `P(Y <= q)` for every draw and observation, as an
-# `[ndraws x nobs]` matrix.
-#
-# `lower.tail` and `log.p` are handed to the distribution function
-# rather than applied afterwards, which is what keeps a far-tail
-# survival probability accurate.
+#' `P(Y <= q)` for every draw and observation
+#'
+#' `lower.tail` and `log.p` go to the distribution function itself,
+#' keeping far-tail survival probabilities accurate.
+#'
+#' @param spec Distribution spec from `family_dist_spec()`
+#' @param linpred Numeric linear predictor matrix, one row per draw
+#' @param q Numeric quantiles, one per observation or a single value
+#' @param lower.tail Logical flag for `P(Y <= q)`
+#' @param log.p Logical flag to return log probabilities
+#' @return Numeric matrix with dimensions `[ndraws, nobs]`
 #' @noRd
 dist_cdf <- function(spec, linpred, q, lower.tail = TRUE,
                      log.p = FALSE) {
+  checkmate::assert_list(spec)
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_numeric(q)
+  checkmate::assert_flag(lower.tail)
+  checkmate::assert_flag(log.p)
   n <- ncol(linpred)
   q <- if (length(q) == 1L) rep(q, n) else q
   pfun <- dist_fun(spec$dist, "p")
@@ -254,21 +295,30 @@ dist_cdf <- function(spec, linpred, q, lower.tail = TRUE,
 }
 
 
-# Internal: draws from a family restricted to `[lb, ub]`, by the
-# inverse-transform method: a uniform on `[F(lb), F(ub)]` mapped back
-# through the quantile function lands inside the bounds by
-# construction. One pass and exact, where rejecting and redrawing
-# costs a draw per attempt and still leaves whatever it could not
-# place, which then has to be clamped onto the bound and shows up as
-# a spike of mass sitting on it.
-#
-# `cells` is a logical matrix marking which of the `[ndraws x nobs]`
-# cells to redraw. A discrete family opens the interval at
-# `F(lb - 1)` so that `lb` itself remains attainable. Returns NULL
-# when the family has no quantile function, which is what sends the
-# caller to rejection sampling.
+#' Draws from a family restricted to `[lb, ub]`
+#'
+#' Uses the inverse-transform method. A uniform on `[F(lb), F(ub)]`
+#' mapped through the quantile function lands inside the bounds. One
+#' pass is exact. Rejection sampling would leave unplaced draws to clamp
+#' onto a bound. A discrete family opens the interval at `F(lb - 1)`,
+#' keeping `lb` attainable.
+#'
+#' @param spec Distribution spec from `family_dist_spec()`
+#' @param cells Logical matrix marking the `[ndraws, nobs]` cells to
+#'   redraw
+#' @param lb Numeric lower bounds
+#' @param ub Numeric upper bounds
+#' @param discrete Logical flag for an integer-valued family
+#' @return Numeric matrix shaped as `cells`, or `NULL` when the family
+#'   has no quantile function. `NULL` sends the caller to rejection
+#'   sampling.
 #' @noRd
 truncated_dist_draws <- function(spec, cells, lb, ub, discrete) {
+  checkmate::assert_list(spec)
+  checkmate::assert_matrix(cells, mode = "logical")
+  checkmate::assert_numeric(lb)
+  checkmate::assert_numeric(ub)
+  checkmate::assert_flag(discrete)
   qfun <- dist_fun(spec$dist, "q")
   if (is.null(qfun)) return(NULL)
   pfun <- dist_fun(spec$dist, "p")
@@ -302,10 +352,19 @@ truncated_dist_draws <- function(spec, cells, lb, ub, discrete) {
 }
 
 
-# Internal: log density from the same spec the CDF reads, so a family
-# is parameterised in exactly one place.
+#' The log density of every draw and observation
+#'
+#' Uses the spec `dist_cdf()` uses, defining each family's
+#' parametrisation in one place.
+#'
+#' @param spec Distribution spec from `family_dist_spec()`
+#' @param linpred Numeric linear predictor matrix, one row per draw
+#' @param y Numeric responses, one per observation or a single value
+#' @return Numeric matrix with dimensions `[ndraws, nobs]`
 #' @noRd
 dist_log_density <- function(spec, linpred, y) {
+  checkmate::assert_list(spec)
+  checkmate::assert_matrix(linpred)
   n <- ncol(linpred)
   y <- if (length(y) == 1L) rep(y, n) else y
   dfun <- dist_fun(spec$dist, "d")
@@ -320,14 +379,23 @@ dist_log_density <- function(spec, linpred, y) {
 }
 
 
-# Internal: the addition-term data brms recorded for one response.
-#
-# brms writes `weights`, `cens`, `rcens`, `lb` and `ub` into standata,
-# one value per observation and suffixed with the response name on a
-# multivariate fit. Bounds arrive already expanded per row, so a
-# constant bound and a per-observation bound read the same way.
+#' The addition-term data brms recorded for one response
+#'
+#' brms writes `weights`, `cens`, `rcens`, `lb` and `ub` into the Stan
+#' data, one value per observation. A multivariate fit suffixes each
+#' key with the response name. Bounds arrive expanded per row, covering
+#' constant and per-observation bounds alike.
+#'
+#' @param object Fitted `mvgam` object
+#' @param resp Character response name, or `NULL`
+#' @param nobs Integer number of likelihood columns
+#' @return Named list of the recorded terms, empty when the fit has no
+#'   Stan data
 #' @noRd
 addition_term_data <- function(object, resp, nobs) {
+  checkmate::assert_list(object)
+  checkmate::assert_string(resp, null.ok = TRUE)
+  checkmate::assert_int(nobs, lower = 0L)
   sdata <- object$standata
   if (is.null(sdata)) {
     return(list())
@@ -379,15 +447,28 @@ addition_term_data <- function(object, resp, nobs) {
 }
 
 
-# Internal: replace the density at censored rows with the probability
-# the censoring actually observed.
-#
-# brms codes `cens` as 0 observed, -1 left, 1 right and 2 interval,
-# the interval's upper end being `rcens`. A right-censored row
-# contributes `log(1 - F(y))`, a left-censored row `log F(y)`, and an
-# interval `log(F(rcens) - F(y))`.
+#' Log-likelihood with censored rows given their censoring probability
+#'
+#' brms codes `cens` as 0 for observed, -1 for left, 1 for right and 2
+#' for interval censoring, with `rcens` the upper end of an interval. A
+#' right-censored row contributes `log(1 - F(y))`. A left-censored row
+#' contributes `log F(y)`. An interval contributes
+#' `log(F(rcens) - F(y))`.
+#'
+#' @param ll Numeric log-likelihood matrix, one row per draw
+#' @param cens Numeric censoring codes, or `NULL`
+#' @param rcens Numeric interval upper bounds, or `NULL`
+#' @param spec Distribution spec from `family_dist_spec()`
+#' @param linpred Numeric linear predictor matrix
+#' @param y Numeric responses
+#' @return `ll` with the censored columns replaced
 #' @noRd
 apply_censoring <- function(ll, cens, rcens, spec, linpred, y) {
+  checkmate::assert_matrix(ll)
+  checkmate::assert_numeric(cens, null.ok = TRUE)
+  checkmate::assert_numeric(rcens, null.ok = TRUE)
+  checkmate::assert_list(spec)
+  checkmate::assert_matrix(linpred)
   if (is.null(cens) || all(cens == 0)) {
     return(ll)
   }
@@ -419,21 +500,31 @@ apply_censoring <- function(ll, cens, rcens, spec, linpred, y) {
 }
 
 
-# Internal: renormalise the density over the truncation bounds.
-#
-# A truncated model places all its mass inside `[lb, ub]`, so each
-# contribution loses `log(F(ub) - F(lb))`. Without this every
-# information criterion reads an un-normalised density, and
-# `pp_check(type = "loo_pit*")` mixes truncated draws with weights
-# that were never renormalised.
-#
-# A discrete family puts mass on the lower bound itself, so the
-# excluded tail stops one step below it. This follows the Stan program
-# brms generates, `log_diff_exp(lcdf(ub), lcdf(lb - 1))`, which is
-# what the posterior was actually sampled under.
+#' Log-likelihood renormalised over the truncation bounds
+#'
+#' A truncated model places all its mass inside `[lb, ub]`. Each
+#' contribution loses `log(F(ub) - F(lb))`. A discrete family puts mass
+#' on the lower bound itself. Its excluded tail stops one step below the
+#' bound, as in the brms Stan program,
+#' `log_diff_exp(lcdf(ub), lcdf(lb - 1))`, under which the posterior
+#' was sampled.
+#'
+#' @param ll Numeric log-likelihood matrix, one row per draw
+#' @param lb Numeric lower bounds, or `NULL`
+#' @param ub Numeric upper bounds, or `NULL`
+#' @param spec Distribution spec from `family_dist_spec()`
+#' @param linpred Numeric linear predictor matrix
+#' @param discrete Logical flag for an integer-valued family
+#' @return `ll` renormalised over the bounds
 #' @noRd
 apply_truncation_to_loglik <- function(ll, lb, ub, spec, linpred,
                                        discrete) {
+  checkmate::assert_matrix(ll)
+  checkmate::assert_numeric(lb, null.ok = TRUE)
+  checkmate::assert_numeric(ub, null.ok = TRUE)
+  checkmate::assert_list(spec)
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_flag(discrete)
   has_lb <- !is.null(lb) && any(is.finite(lb))
   has_ub <- !is.null(ub) && any(is.finite(ub))
   if (!has_lb && !has_ub) {
@@ -453,12 +544,18 @@ apply_truncation_to_loglik <- function(ll, lb, ub, spec, linpred,
 }
 
 
-# Internal: scale each contribution by its case weight.
-#
-# `weights()` states how many observations a row stands for, so its
-# log density enters every sum that many times.
+#' Log-likelihood scaled by case weights
+#'
+#' A case weight gives the number of observations a row represents. Its
+#' log density enters every sum that many times.
+#'
+#' @param ll Numeric log-likelihood matrix, one row per draw
+#' @param weights Numeric weights, one per column, or `NULL`
+#' @return `ll` with each column multiplied by its weight
 #' @noRd
 apply_case_weights <- function(ll, weights) {
+  checkmate::assert_matrix(ll)
+  checkmate::assert_numeric(weights, null.ok = TRUE)
   if (is.null(weights) || all(weights == 1)) {
     return(ll)
   }
@@ -466,15 +563,30 @@ apply_case_weights <- function(ll, weights) {
 }
 
 
-# Internal: apply every addition term recorded for this response.
-#
-# The order follows brms: censoring replaces the contribution at a
-# censored row, truncation then renormalises whatever that row
-# contributes, and the case weight scales the result. Renormalising
-# first would be undone by the censored replacement.
+#' Log-likelihood with every recorded addition term applied
+#'
+#' Follows the brms order. Censoring replaces a censored row's
+#' contribution. Truncation then renormalises each row. The case weight
+#' scales the result. Renormalising first would be undone by the
+#' censored replacement.
+#'
+#' @param ll Numeric log-likelihood matrix, one row per draw
+#' @param object Fitted `mvgam` object
+#' @param resp Character response name, or `NULL`
+#' @param family_name Character family name
+#' @param link Character link name
+#' @param linpred Numeric linear predictor matrix
+#' @param y Numeric responses
+#' @param family_pars Named list of distributional parameter matrices
+#' @param trials Numeric vector of trials, or `NULL`
+#' @return `ll` with the addition terms applied
 #' @noRd
 apply_addition_terms <- function(ll, object, resp, family_name, link,
                                  linpred, y, family_pars, trials) {
+  checkmate::assert_matrix(ll)
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_string(resp, null.ok = TRUE)
+  checkmate::assert_string(family_name)
   terms <- addition_term_data(object, resp, nobs = ncol(ll))
   if (!length(terms)) {
     return(ll)

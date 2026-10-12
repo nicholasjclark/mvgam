@@ -378,6 +378,21 @@ test_that("forecast_context_car steps over the series with forecast rows", {
 })
 
 
+test_that("ZMVN forecasts refuse series at their own times", {
+  # A series with no forecast rows shares any set of times
+  shared <- list(times = list(a = c(11, 12), b = c(12, 11), c = numeric(0)))
+  expect_identical(
+    forecast_context_zmvn(NULL, NULL, shared, c("a", "b", "c")),
+    list()
+  )
+  own <- list(times = list(a = c(11, 12), b = c(12, 13)))
+  expect_error(
+    forecast_context_zmvn(NULL, NULL, own, c("a", "b")),
+    "Series 'a' and 'b' have different times"
+  )
+})
+
+
 test_that("Trendless fit rejects type = 'trend' but accepts others", {
   # Trendless forecasting projects the obs-side linear predictor
   # onto newdata; there is no latent trend trajectory to extract,
@@ -459,66 +474,27 @@ test_that("Newdata that names no time or no series errors", {
 })
 
 
-# ----- pad_or_trim_rows -------------------------------------------
-
-test_that("pad_or_trim_rows pads short grids by repeating final row", {
-  g <- matrix(c(1, 2, 3, 4), nrow = 2L, ncol = 2L)
-  # Rows 3 and 4 repeat the final source row.
-  expect_equal(pad_or_trim_rows(g, target_rows = 4L), g[c(1, 2, 2, 2), ])
-})
-
-
-test_that("pad_or_trim_rows trims long grids from the head", {
-  g <- matrix(seq_len(6L), nrow = 6L, ncol = 1L)
-  # Trimming from the head keeps the trailing 3 rows.
-  expect_equal(as.numeric(pad_or_trim_rows(g, target_rows = 3L)), c(4, 5, 6))
-})
-
-
-test_that("pad_or_trim_rows handles zero-row input as a zero pad", {
-  g <- matrix(0, nrow = 0L, ncol = 2L)
-  expect_equal(pad_or_trim_rows(g, target_rows = 3L), matrix(0, 3L, 2L))
-})
-
-
 # ----- trend_linpred_grid -----------------------------------------
 
-# A small obs_struct standing in for `get_observation_structure()`:
-# 3 times x 2 series, stored in (time, series) row order.
-lp_obs_struct <- function() {
-  list(
+test_that("trend_linpred_grid places one draw and keeps the last times", {
+  # 3 times x 2 series, in (time, series) row order
+  obs_struct <- list(
     unique_times = c(41, 42, 43),
     time = c(41, 41, 42, 42, 43, 43),
     series_int = c(1L, 2L, 1L, 2L, 1L, 2L),
     n_series = 2L
   )
-}
-
-
-test_that("trend_linpred_grid reshapes one draw to series scale", {
   lp <- matrix(seq_len(12), nrow = 2L, byrow = TRUE)
-  out <- trend_linpred_grid(lp, lp_obs_struct(), draw_row = 2L,
-                              n_rows = 3L, n_series = 2L)
-  # Row 2 of `lp` is 7:12, laid out as (t, s) pairs.
-  expect_equal(out, matrix(7:12, nrow = 3L, byrow = TRUE))
-})
-
-
-test_that("trend_linpred_grid is zero without a trend formula", {
-  out <- trend_linpred_grid(NULL, NULL, draw_row = 1L,
-                              n_rows = 4L, n_series = 3L)
-  expect_equal(out, matrix(0, 4L, 3L))
-})
-
-
-test_that("trend_linpred_grid keeps series scale, not draw width", {
-  # The grid is indexed by series even when the caller propagates
-  # at the latent-variable grain, so its width tracks `n_series`.
-  lp <- matrix(seq_len(6), nrow = 1L)
-  out <- trend_linpred_grid(lp, lp_obs_struct(), draw_row = 1L,
-                              n_rows = 2L, n_series = 2L)
-  # Trimming from the head keeps the two most recent times.
-  expect_equal(out[2, ], c(5, 6))
+  expect_equal(
+    trend_linpred_grid(lp, obs_struct, draw_row = 2L, n_rows = 2L,
+                       n_series = 2L),
+    matrix(9:12, nrow = 2L, byrow = TRUE)
+  )
+  expect_error(
+    trend_linpred_grid(lp, obs_struct, draw_row = 1L, n_rows = 4L,
+                       n_series = 2L),
+    "predictor grid"
+  )
 })
 
 

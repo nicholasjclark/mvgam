@@ -1,9 +1,7 @@
 #' Write an assembled Stan program to disk
 #'
-#' `save_model` names a path rather than a directory, and brms appends
-#' no extension of its own, so the path is taken as given. The parent
-#' directory has to exist: creating one silently would put a Stan file
-#' somewhere the user did not ask for.
+#' `save_model` names a file path, used as given. The parent directory
+#' has to exist. mvgam writes a Stan file only where the user asks.
 #'
 #' @param stancode Character string holding the assembled program.
 #' @param path File path to write to.
@@ -18,50 +16,40 @@ write_stan_program <- function(stancode, path) {
       "Cannot write the Stan program to 'save_model'.",
       x = paste0("The directory '", parent, "' does not exist."),
       i = "Create it first, or give a path under a directory that exists."
-    )))
+    )), call. = FALSE)
   }
   writeLines(stancode, con = path)
   invisible(path)
 }
 
-#' Generate Stan Components for mvgam Formula
+#' The Stan program, data and setups of an `mvgam_formula`
 #'
-#' Internal shared infrastructure function that serves as the single source of
-#' truth for Stan code generation. Used by both model fitting (\code{mvgam()}) 
-#' and inspection functions (\code{stancode()}, \code{standata()}).
+#' The one code generator for `mvgam()`, `stancode()` and `standata()`.
+#' It resolves the families and the trend and sets up the observation
+#' and trend models through brms. It then assembles, polishes and
+#' validates the program. The three callers compile and report one
+#' program.
 #'
-#' @param formula An \code{mvgam_formula} object containing observation and trend formulas
-#' @param data Data frame containing response and predictor variables
-#' @param family Response distribution family, defaults to gaussian()
-#' @param prior Prior specifications from \code{get_prior()} or \code{set_prior()}
-#' @param data2 Optional additional data for predictions
-#' @param sample_prior Whether to sample from priors only ("no", "yes", "only")
-#' @param knots Optional knot locations for smooth terms
-#' @param drop_unused_levels Whether to drop unused factor levels
-#' @param backend Stan backend to use ("rstan" or "cmdstanr")
-#' @param threads Number of threads for threading
-#' @param normalize Whether to normalize design matrices
-#' @param save_model Path to write the assembled Stan program to
-#' @param silent Verbosity level (0-2)
-#' @param stanvars Additional stanvars to include
-#' @param validate Whether to validate generated Stan code
-#' @param ... Additional arguments passed to downstream functions
+#' @param formula An `mvgam_formula`
+#' @param data Data frame of the response and predictors
+#' @param family Observation family
+#' @param prior A `brmsprior`, or NULL
+#' @param data2 Further data brms takes, or NULL
+#' @param sample_prior,knots,drop_unused_levels,normalize brms code
+#'   generation options, gathered by `mvgam_codegen_options()`
+#' @param backend "rstan" or "cmdstanr"
+#' @param threads Threads per chain
+#' @param save_model Path to write the assembled program to, or NULL
+#' @param silent Verbosity, 0 to 2
+#' @param stanvars User stanvars, or NULL
+#' @param validate Whether to parse the polished program
+#' @param trend_map,loadings_prior Factor loadings structure and prior,
+#'   from `mvgam()`
+#' @param ... Arguments for brms
 #'
-#' @return Named list containing:
-#'   \describe{
-#'     \item{combined_components}{List with \code{stancode} and \code{standata} elements}
-#'     \item{obs_setup}{Observation model setup from brms}
-#'     \item{trend_setup}{Trend model setup from brms (NULL if no trends)}
-#'     \item{mv_spec}{Multivariate specification object}
-#'   }
-#'
-#' @details
-#' This function is the single Stan code-generation entry point used by
-#' \code{mvgam()}, \code{stancode()}, and \code{standata()}. It processes
-#' formulas, validates time series structure, sets up brms models, generates
-#' stanvars, assembles Stan code, and applies polishing. The polished Stan
-#' code is byte-identical across the three call sites.
-#'
+#' @return List of `combined_components` (the `stancode` and
+#'   `standata`), `obs_setup`, `trend_setup` (NULL without a trend),
+#'   `mv_spec` and `trend_metadata`
 #' @noRd
 build_stan_components <- function(formula, data, family = gaussian(),
                                  prior = NULL, data2 = NULL,
@@ -85,9 +73,9 @@ build_stan_components <- function(formula, data, family = gaussian(),
       .var.name = "data2"
     )
   }
-  if (!is.null(save_model)) checkmate::assert_string(save_model)
-  if (!is.null(stanvars)) checkmate::assert_class(stanvars, "stanvars")
-  if (!is.null(prior)) checkmate::assert_class(prior, "brmsprior")
+  checkmate::assert_string(save_model, null.ok = TRUE)
+  checkmate::assert_class(stanvars, "stanvars", null.ok = TRUE)
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
   checkmate::assert_int(threads, lower = 1)
   checkmate::assert_int(silent, lower = 0, upper = 2)
@@ -128,13 +116,10 @@ build_stan_components <- function(formula, data, family = gaussian(),
   mv_spec <- parse_multivariate_trends(obs_formula, trend_formula)
   axis_names <- spec_axis_vars(mv_spec$trend_specs)
 
-  # Closure-unit families (`nmix()` and its variants, `occ()`, and the
-  # multi-response families) carry per-data Stan stanvars that are built
-  # at fit time from the user's observation data: unit indexing
-  # arrays, per-unit upper truncation (K_max), per-unit max obs
-  # (Y_max), and the family-specific lpdf function block. The
-  # arrays change with the data, so the resolution is deferred
-  # to here rather than baked into the family() constructor. A
+  # Closure-unit families (`nmix()` and its variants, `occ()` and the
+  # multi-response families) build their stanvars from the data. The
+  # stanvars hold the unit index arrays, the truncation `K_max` of each
+  # unit, its largest count `Y_max` and the family's lpdf. A
   # closure-unit family models its response alone, which
   # `resolve_observation_family()` has established.
   if (uses_closure_unit_layout(family)) {
@@ -166,12 +151,11 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # carries its data.
   families <- formula_families(obs_formula, family)
 
-  # Custom families (e.g. tweedie()) carry their own Stan function
-  # block + data stanvars in attr(family, "mvgam_stanvars"). They
-  # belong on the observation submodel only; the trend submodel
-  # uses gaussian() and reusing them there would duplicate the
-  # function block + the M data int and explode the final
-  # c.stanvars merge.
+  # A custom family such as `tweedie()` carries its function block and
+  # data as stanvars in `attr(family, "mvgam_stanvars")`. They belong
+  # to the observation model. The gaussian trend model takes the
+  # user's stanvars alone. A second copy would declare its functions
+  # and data twice.
   obs_stanvars <- attach_family_stanvars(stanvars, families)
   trend_stanvars_in <- stanvars
 
@@ -179,36 +163,32 @@ build_stan_components <- function(formula, data, family = gaussian(),
     mv_spec$trend_specs, trend_map, loadings_prior, data, data2
   )
 
-  # `n_lv` belongs to the trend that carries the factors, so it is
-  # written on the constructor inside `trend_formula`. Passed to
-  # `mvgam()` itself it lands in `...`, which is the pass-through to
-  # brms and Stan, and nothing there reads it: asked for one factor
-  # on two series, the fit came back with two and said nothing.
+  # `n_lv` belongs on the trend constructor inside `trend_formula`.
+  # Given to `mvgam()` it would land in `...`, which brms and Stan
+  # receive. Neither uses it.
   refuse_top_level_n_lv(list(...)$n_lv)
 
-  # Two cases need brms threading suppressed at the stancode level.
-  # Both rewrite the local `threads` so brms's downstream
-  # `partial_log_lik_lpmf` emission stays off; the compile-time
-  # `cpp_options$stan_threads` setting is enabled independently by
-  # `mvgam_single()` / `.compile_model_cmdstanr()`, so mvgam-emitted
-  # `reduce_sum` calls still parallelise.
-  #
-  # 1. brms-native + `trend_formula`: silent no-op of the user's
-  #    parallelism request; surface a one-time warning so they know.
-  # 2. closure-unit / multi-response: silent. mvgam ships its own
-  #    `partial_sum_<family>_lpmf` + `reduce_sum`; letting brms
-  #    nest a `partial_log_lik_lpmf` wrapper around them produces
-  #    an out-of-scope signature error on the transformed-data
-  #    args (`visit_idx`, `log_n_lookup`, etc.).
-  warn_threads_trend_brms_native(threads, family, mv_spec)
-  if (suppress_brms_threading(threads, family, mv_spec)) {
+  # brms writes its `partial_log_lik_lpmf` only for `threads > 1`.
+  # `brms_threading_case()` names the cases where that function breaks
+  # the program. The compiler's thread option is set apart from this.
+  # mvgam's own `reduce_sum` calls still run in parallel.
+  threading_case <- brms_threading_case(threads, family, mv_spec)
+  if (identical(threading_case, "trend_native")) {
+    insight::format_warning(c(
+      paste0("'threads' is not supported for a brms family with a ",
+             "'trend_formula'."),
+      x = "brms threads a likelihood that the latent trend has to join.",
+      i = "The model samples serially.",
+      i = "Closure-unit and multi-response families thread as requested."
+    ))
+  }
+  if (!identical(threading_case, "none")) {
     threads <- 1L
   }
 
-  # Setup observation model using lightweight brms.
-  # Simplex multi-response families (`diri`, `multi`, `categ`)
-  # impose a hard sum-to-zero constraint on the loadings matrix `Z`
-  # via Stan's `sum_to_zero_vector[K]`, so they need Stan >= 2.36.
+  # Simplex multi-response families (`diri`, `multi`, `categ`) hold
+  # the loadings `Z` to sum to zero with Stan's `sum_to_zero_vector`,
+  # which needs Stan 2.36.
   if (is_simplex_response_family(family)) {
     assert_stan_version(
       backend, "2.36.0",
@@ -223,17 +203,14 @@ build_stan_components <- function(formula, data, family = gaussian(),
       assert_com_binomial_trials(forms[[key]])
     }
   }
-  # Families whose brms fallback prior would be unsuitable carry an
-  # mvgam default; `response_default_priors()` is the one definition
-  # `get_prior()` also reports. `merge_default_priors()` drops any
-  # default the user named, so a user prior still wins.
+  # Families whose brms default prior is unsuitable carry an mvgam
+  # default. `response_default_priors()` defines them for `get_prior()`
+  # as well. `merge_default_priors()` drops any default the user named.
   prior <- merge_default_priors(
     response_default_priors(obs_formula, family), prior
   )
-
-  # Filter priors: only pass observation-related priors to observation setup
   obs_priors <- filter_priors_by_side(prior, "obs")
-  
+
   # What both submodels are built under. Named once, because the two
   # calls below differ only in their formula, data, family, priors and
   # stanvars, and an argument added to one and not the other builds the
@@ -281,18 +258,18 @@ build_stan_components <- function(formula, data, family = gaussian(),
     do.call(setup_brms_lightweight, c(
       list(
         formula = mv_spec$base_formula,
-        data = trend_data,  # Use reduced trend data
-        # Trends are gaussian processes per architecture
+        data = trend_data,
+        # The trend program is a gaussian model on a placeholder
+        # response
         family = gaussian(),
         prior = remove_trend_suffix_from_priors(
           trend_priors, mv_spec$trend_specs, mv_spec$base_formula,
           trend_data, codegen
         ),
         stanvars = trend_stanvars_in,
-        # Mark this as the trend invocation so
-        # setup_brms_lightweight() skips the empty-obs-formula
-        # placeholder injection (the injected pin assignment would
-        # be orphaned by mvgam's downstream trend-stancode rewriter).
+        # The trend program takes no placeholder for an empty
+        # observation formula. Its pin assignment would outlive the
+        # rename of the trend program's statements.
         is_trend_setup = TRUE
       ),
       shared_setup,
@@ -317,11 +294,9 @@ build_stan_components <- function(formula, data, family = gaussian(),
     obs_setup = obs_setup,
     trend_setup = trend_setup,
     trend_specs = mv_spec$trend_specs,
-    prior = trend_priors,
-    backend = backend
+    prior = trend_priors
   )
 
-  # Polish Stan code for consistent formatting and spacing
   combined_components$stancode <- paste(
     polish_generated_stan_code(combined_components$stancode),
     collapse = "\n"
@@ -341,26 +316,23 @@ build_stan_components <- function(formula, data, family = gaussian(),
     )
   }
 
-  # `save_model` writes the program mvgam assembles, not the brms
-  # program it starts from, since the assembled one is what gets
-  # compiled and is the only one that names the trend.
+  # The assembled program, the one compiled
   if (!is.null(save_model)) {
     write_stan_program(combined_components$stancode, save_model)
   }
-  
+
   # The two designs one likelihood sees together, checked once the
   # data is assembled.
   warn_confounded_design(combined_components$standata,
                          combined_components$stancode)
 
-  # Return all components needed for mvgam object creation
-  return(list(
+  list(
     combined_components = combined_components,
     obs_setup = obs_setup,
     trend_setup = trend_setup,
     mv_spec = mv_spec,
     trend_metadata = trend_metadata
-  ))
+  )
 }
 
 #' Generate the Stan components for an `mvgam_formula`
@@ -408,45 +380,53 @@ zmvn_scale_confounded <- function(mv_spec, family, n_series) {
 
 
 #' Warn once when a single-series ZMVN cannot split its scales
+#'
+#' @inheritParams zmvn_scale_confounded
+#' @return `NULL`, invisibly
 #' @noRd
 warn_zmvn_single_series <- function(mv_spec, family, n_series) {
-  if (!zmvn_scale_confounded(mv_spec, family, n_series)) return()
-  warn_once(
-    c(
-      "A 'ZMVN()' trend on one series shares its scale with 'sigma'.",
-      x = "The data identify only the sum of the two variances.",
-      x = "The priors set the split between 'sigma_trend' and 'sigma'.",
-      i = "Add series, or use a trend with temporal structure such as 'AR()'.",
-      i = "Or set a prior that pins one of the two scales."
-    ),
-    "mvgam_zmvn_single_series"
-  )
+  if (zmvn_scale_confounded(mv_spec, family, n_series)) {
+    warn_once(
+      c(
+        "A 'ZMVN()' trend on one series shares its scale with 'sigma'.",
+        x = "The data identify only the sum of the two variances.",
+        x = "The priors set the split between 'sigma_trend' and 'sigma'.",
+        i = paste0("Add series, or use a trend with temporal structure ",
+                   "such as 'AR()'."),
+        i = "Or set a prior that pins one of the two scales."
+      ),
+      "mvgam_zmvn_single_series"
+    )
+  }
+  invisible(NULL)
 }
 
-
-# Internal: the observation and trend designs stacked on one row per
-# observation.
-#
-# An observation's linear predictor takes its own design row together
-# with the trend design row at
-# `times_trend[obs_trend_time, obs_trend_series]`. Stacking the two
-# gives the columns one likelihood sees at once, and the rank of that
-# matrix settles whether their coefficients are separately
-# identified.
-#
-# Covered: the parametric designs, the smooth bases and the Gaussian
-# process bases, on both sides. A grouping random effect is left out.
-# brms passes it as a sparse expansion against its own index, and
-# partial pooling identifies it by shrinkage.
-#
-# A trend formula holding only an intercept has no design matrix, and
-# `trend_intercept` adds its column of ones.
-#
-# `NULL` where no comparison exists: a fit carrying one design alone,
-# a multivariate formula whose responses hold designs of their own,
-# and a `by = lv_axis()` trend whose second dimension counts factors.
-#'@noRd
+#' The observation and trend designs on one row per observation
+#'
+#' An observation's linear predictor takes its own design row with the
+#' trend design row at `times_trend[obs_trend_time, obs_trend_series]`.
+#' Stacked, the two give the columns one likelihood sees at once. The
+#' rank of that matrix settles whether their coefficients are
+#' separately identified.
+#'
+#' The parametric designs, the smooth bases and the Gaussian process
+#' bases of both sides enter. Of the observation designs only those of
+#' the mean enter. brms names a distributional parameter's designs
+#' after it, such as `X_sigma`. Those join a different predictor. A
+#' grouping effect stays out. brms passes it as a sparse expansion
+#' against its own index. Partial pooling identifies it by shrinkage.
+#' A trend formula holding only an intercept has no design matrix.
+#' `trend_intercept` adds its column of ones.
+#'
+#' @param sdata The assembled Stan data
+#' @param trend_intercept Whether the trend program declares
+#'   `Intercept_trend`
+#' @return A matrix, or NULL where no comparison exists: one design
+#'   alone, a multivariate formula whose responses hold their own
+#'   designs, a `by = lv_axis()` trend whose second axis counts factors
+#' @noRd
 stacked_design_matrix <- function(sdata, trend_intercept = FALSE) {
+  checkmate::assert_list(sdata)
   checkmate::assert_flag(trend_intercept)
   n <- sdata$N
   n_trend <- sdata$N_trend
@@ -469,7 +449,8 @@ stacked_design_matrix <- function(sdata, trend_intercept = FALSE) {
     grepl("_trend$", nm) && nrow(sdata[[nm]]) == n_trend
   }, nms)
   obs_nms <- Filter(function(nm) {
-    !grepl("_trend$", nm) && nrow(sdata[[nm]]) == n
+    !grepl("_trend$", nm) && !grepl("^[[:alpha:]]+_[[:alpha:]]", nm) &&
+      nrow(sdata[[nm]]) == n
   }, nms)
   # One observation design named `X`. A multivariate formula keys its
   # designs by response, and those belong to separate likelihoods.
@@ -503,20 +484,19 @@ stacked_design_matrix <- function(sdata, trend_intercept = FALSE) {
   cbind(obs_part, trend_part)
 }
 
-
-# Internal: the columns of a stacked design that repeat a direction
-# the others already span, or none.
-#
-# A column of zeros moves no fitted value and shares a direction with
-# nothing. The empty-observation placeholder is one, pinned at zero
-# by its prior. A rank taken on raw columns follows their scales, and
-# the observation design is centred where the trend design is not,
-# so each column is scaled to unit length first.
-#
-# @param m The matrix `stacked_design_matrix()` returns, or `NULL`
-# @return Character vector of column names
-#'@noRd
+#' The columns of a stacked design that repeat a direction of the others
+#'
+#' A column of zeros moves no fitted value and shares a direction with
+#' nothing. The empty-observation placeholder is one, pinned at zero
+#' by its prior. A rank taken on raw columns follows their scales. The
+#' observation design is centred. The trend design is left as it is.
+#' Each column is scaled to unit length first.
+#'
+#' @param m The matrix `stacked_design_matrix()` returns, or NULL
+#' @return Character vector of column names
+#' @noRd
 confounded_columns <- function(m) {
+  checkmate::assert_matrix(m, mode = "numeric", null.ok = TRUE)
   if (is.null(m)) {
     return(character(0L))
   }
@@ -532,20 +512,22 @@ confounded_columns <- function(m) {
   colnames(m)[q$pivot[seq.int(q$rank + 1L, ncol(m))]]
 }
 
-
-# Internal: warn once when the two designs share a direction.
-#
-# A term written into both formulas moves the same fitted values from
-# either side. The model still samples, and the priors alone set the
-# split between the two coefficients. `y ~ 1` with
-# `~ series + AR(p = 1)` is one such pairing and a reasonable model
-# to write. This names the columns involved and continues.
-#
-# @param sdata The assembled Stan data
-# @param stancode The assembled program, which declares any trend
-#   intercept
-#'@noRd
+#' Warn once when the two designs share a direction
+#'
+#' A term written into both formulas moves the same fitted values from
+#' either side. The model still samples. The priors alone set the split
+#' between the two coefficients. `y ~ 1` with `~ series + AR(p = 1)` is
+#' one such pairing and a reasonable model to write. The warning names
+#' the columns involved.
+#'
+#' @param sdata The assembled Stan data
+#' @param stancode The assembled program, which declares any trend
+#'   intercept
+#' @return `NULL`, invisibly
+#' @noRd
 warn_confounded_design <- function(sdata, stancode) {
+  checkmate::assert_list(sdata)
+  checkmate::assert_string(stancode)
   trend_intercept <- "Intercept_trend" %in% brms_declared_params(stancode)
   dependent <- confounded_columns(
     stacked_design_matrix(sdata, trend_intercept)
@@ -565,84 +547,51 @@ warn_confounded_design <- function(sdata, stancode) {
   )
 }
 
-# Internal: which case makes brms's `partial_log_lik_lpmf` emission
-# unwanted for the obs-side `setup_brms_lightweight()` call. Two cases
-# need the gate, and both are decided from the same three inputs, so
-# one classification serves the two questions asked of them.
-#
-#   1. **Closure-unit and multi-response families.** These ship their
-#      own `partial_sum_<family>_lpmf` + inner `reduce_sum` call via
-#      mvgam-side stanvars. brms's outer `partial_log_lik_lpmf` would
-#      nest a second wrapper around `nmix_lpmf` / `occ_lpmf` /
-#      simplex / mvn-style lpmfs, and the brms function signature
-#      cannot see transformed-data args (`visit_idx`, `log_n_lookup`,
-#      etc.), which fails Stan validation. The fit-time
-#      `cpp_options$stan_threads = TRUE` travels separately through
-#      `mvgam_single()` / `.compile_model_cmdstanr()`, and the inner
-#      `reduce_sum` still parallelises. Only brms's double-wrapping
-#      is stopped.
-#
-#   2. **brms-native families combined with a `trend_formula`.** brms
-#      moves both the `mu` declaration and every linpred assignment
-#      into `partial_log_lik_lpmf` inside `functions {}`, and mvgam's
-#      obs-side trend injector searches `model {}` alone, which leaves
-#      the assignment it splices the trend addition into out of reach.
-#      The combination compiles to a silent serial fit or crashes.
-#
-# Case 1 is silent, since mvgam's own threading still works. Case 2
-# warns, through `warn_threads_trend_brms_native()`.
-#'@noRd
+#' Which case makes brms's threaded likelihood unwanted
+#'
+#' With `threads > 1` brms wraps the likelihood in a
+#' `partial_log_lik_lpmf` function. Two cases break under it.
+#'
+#' A closure-unit family, the multi-response ones among them, writes
+#' its own `partial_sum_<family>_lpmf` and `reduce_sum` call. A brms wrapper
+#' around them cannot see the transformed data they take, such as
+#' `visit_idx`. The program then fails to parse. These families still
+#' run their own `reduce_sum` in parallel.
+#'
+#' A brms family with a `trend_formula` has its `mu` built inside the
+#' wrapper in the functions block. mvgam adds the trend to `mu` in the
+#' model block, where that statement is absent.
+#'
+#' @param threads Threads per chain
+#' @param family The observation family
+#' @param mv_spec The model specification, or NULL
+#' @return "none", "closure_unit" or "trend_native"
+#' @noRd
 brms_threading_case <- function(threads, family, mv_spec) {
-  if (!is.numeric(threads) || !isTRUE(threads > 1)) return("none")
-  if (uses_closure_unit_layout(family)) return("closure_unit")
-  if (is_multi_response_family(family)) return("multi_response")
-  if (!is.null(mv_spec) && isTRUE(mv_spec$has_trends)) {
-    return("trend_native")
+  checkmate::assert_list(mv_spec, null.ok = TRUE)
+  if (!is.numeric(threads) || !isTRUE(threads > 1)) {
+    return("none")
   }
-  "none"
-}
-
-#'@noRd
-suppress_brms_threading <- function(threads, family, mv_spec) {
-  !identical(brms_threading_case(threads, family, mv_spec), "none")
-}
-
-#'@noRd
-threads_no_op_for_trend_brms_native <- function(threads, family, mv_spec) {
-  identical(
-    brms_threading_case(threads, family, mv_spec), "trend_native"
-  )
-}
-
-#'@noRd
-warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
-  if (!threads_no_op_for_trend_brms_native(threads, family, mv_spec)) {
-    return()
+  if (uses_closure_unit_layout(family)) {
+    return("closure_unit")
   }
-  # This warning is raised on every fit. A batch script that re-fits
-  # after a config change keeps seeing it each time its threads
-  # request is dropped.
-  insight::format_warning(c(
-    "'threads' is not supported for a brms family with a 'trend_formula'.",
-    x = "brms threads a likelihood that the latent trend has to join.",
-    i = "The model samples serially.",
-    i = "Closure-unit and multi-response families thread as requested."
-  ))
+  if (isTRUE(mv_spec$has_trends)) "trend_native" else "none"
 }
 
 
-#' Generate Stan Model Code for mvgam Formula
+#' Stan code of an mvgam model
 #'
-#' Generate complete Stan model code for an \code{mvgam_formula} object before
-#' model fitting. This allows users to inspect the generated Stan code for
-#' debugging, understanding, or modification purposes.
+#' The Stan program `mvgam()` would compile for an \code{mvgam_formula},
+#' generated without fitting.
 #'
-#' @param object An \code{mvgam_formula} object created by \code{mvgam_formula()}.
+#' @param object An \code{mvgam_formula} object created by
+#'   \code{mvgam_formula()}.
 #' @param data A data frame containing all variables referenced in the formula.
 #' @inheritParams mvgam
 #' @param prior An optional \code{brmsprior} object containing custom prior
 #'   specifications. Can be created using \code{brms::prior()}.
-#' @param data2 Optional data frame for out-of-sample prediction points.
+#' @param data2 A named list of objects the model uses that are not
+#'   variables in \code{data}, as in \code{\link[brms]{brm}}.
 #' @param sample_prior Character string indicating whether to sample from priors
 #'   only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.
 #' @param knots Optional named list of knot positions for spline terms, passed
@@ -668,19 +617,9 @@ warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
 #'   Default is \code{TRUE}.
 #' @param ... Additional arguments passed to internal functions.
 #'
-#' @return A character string containing complete, polished Stan model code with data,
-#'   parameters, model, and generated quantities blocks for both observation
-#'   and trend components. The returned code is automatically polished for
-#'   consistent formatting and is identical to the code used internally by
-#'   \code{mvgam()} for model fitting.
-#'
-#' @details
-#' This function uses the shared Stan code generation infrastructure 
-#' (\code{generate_stan_components_mvgam_formula()}) to ensure identical output 
-#' to what \code{mvgam()} uses internally. The Stan code is automatically 
-#' polished for consistent formatting, with empty lines removed and whitespace 
-#' trimmed. This guarantees that \code{stancode()} produces exactly the same 
-#' model code that would be compiled and fit by \code{mvgam()}.
+#' @return A character string of the Stan program, observation and trend
+#'   together. \code{mvgam()} compiles the same program from the same
+#'   arguments.
 #'
 #' @seealso
 #' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
@@ -748,7 +687,8 @@ mvgam_formula_component <- function(component, object, data, family,
 #' call describes before generating the program. A call supplying no
 #' `trend_formula` delegates to \pkg{brms} unchanged.
 #'
-#' @param object A `formula` or `brmsformula`.
+#' @param object A `formula`, or a `brmsformula` or `mvbrmsformula`
+#'   (both of class `bform`).
 #' @param ... Arguments for \code{\link{stancode.mvgam_formula}} or for
 #'   \pkg{brms}, `data` and `family` among them.
 #'
@@ -770,7 +710,7 @@ stancode.formula <- function(object, ...) {
 
 #' @rdname trend_formula_generation
 #' @export
-stancode.brmsformula <- function(object, ...) {
+stancode.bform <- function(object, ...) {
   dots <- list(...)
   if (is.null(dots$trend_formula)) {
     return(NextMethod())
@@ -790,7 +730,7 @@ standata.formula <- function(object, ...) {
 
 #' @rdname trend_formula_generation
 #' @export
-standata.brmsformula <- function(object, ...) {
+standata.bform <- function(object, ...) {
   dots <- list(...)
   if (is.null(dots$trend_formula)) {
     return(NextMethod())
@@ -798,18 +738,19 @@ standata.brmsformula <- function(object, ...) {
   route_trend_formula(object, dots, standata)
 }
 
-#' Generate Stan Data for mvgam Formula
+#' Stan data of an mvgam model
 #'
-#' Generate complete Stan data list for an \code{mvgam_formula} object before
-#' model fitting. This allows users to inspect the generated data structure for
-#' debugging, understanding, or modification purposes.
+#' The data list `mvgam()` would pass to Stan for an
+#' \code{mvgam_formula}, generated without fitting.
 #'
-#' @param object An \code{mvgam_formula} object created by \code{mvgam_formula()}.
+#' @param object An \code{mvgam_formula} object created by
+#'   \code{mvgam_formula()}.
 #' @param data A data frame containing all variables referenced in the formula.
 #' @inheritParams mvgam
 #' @param prior An optional \code{brmsprior} object containing custom prior
 #'   specifications. Can be created using \code{brms::prior()}.
-#' @param data2 Optional data frame for out-of-sample prediction points.
+#' @param data2 A named list of objects the model uses that are not
+#'   variables in \code{data}, as in \code{\link[brms]{brm}}.
 #' @param sample_prior Character string indicating whether to sample from priors
 #'   only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.
 #' @param knots Optional named list of knot positions for spline terms, passed
@@ -833,17 +774,9 @@ standata.brmsformula <- function(object, ...) {
 #'   Default is \code{TRUE}.
 #' @param ... Additional arguments passed to internal functions.
 #'
-#' @return A named list containing all data for Stan model including observation
-#'   and trend data components. Structure matches exactly what would be passed to 
-#'   Stan during fitting by \code{mvgam()}. This data is generated using the same
-#'   shared infrastructure as \code{mvgam()}, ensuring consistency.
-#'
-#' @details
-#' This function uses the shared Stan data generation infrastructure
-#' (\code{generate_stan_components_mvgam_formula()}) to ensure identical output
-#' to what \code{mvgam()} uses internally. The returned data structure includes
-#' all observation data, trend mappings, dimensions, and stanvars needed for
-#' model compilation and fitting.
+#' @return A named list of the Stan data, observation and trend
+#'   together. \code{mvgam()} passes the same list to Stan from the same
+#'   arguments.
 #'
 #' @seealso
 #' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
@@ -866,7 +799,6 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
     save_model, silent, stanvars, validate, ...
   )
 
-  # Validate Stan data structure follows brms conventions
   if (!is.list(standata) || length(standata) == 0L) {
     stop_mvgam_fault(
       "The generated Stan data must be a non-empty list.",

@@ -318,18 +318,22 @@ VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,
 brms::VarCorr
 
 
-# Internal: the names brms gives the coefficients of one group-level
-# id, as `brms:::get_rnames()` builds them. A grouping with a `by`
-# factor, `gr(g, by = f)`, estimates each coefficient once per level
-# of `f`, and each cell is named `<coef>:<f><level>`, the coefficient
-# varying fastest.
-#
-# @param rows The rows of `mvgam_ranef_metadata()`'s table for one id.
-# @param col The column that names the coefficients: `coef_alias`
-#   for a parameter name, `coef` for a label.
-# @return Character vector, one name per cell.
-#'@noRd
+#' The names brms gives the coefficients of one group-level id
+#'
+#' Follows the internal brms function `get_rnames()`. A grouping with a
+#' `by` factor, `gr(g, by = f)`, estimates each coefficient once per
+#' level of `f`. Each cell is named `<coef>:<f><level>`, with the
+#' coefficient varying fastest.
+#'
+#' @param rows Data frame of the rows of the `mvgam_ranef_metadata()`
+#'   table for one id
+#' @param col Character name of the column naming the coefficients,
+#'   `"coef_alias"` for parameter names or `"coef"` for labels
+#' @return Character vector with one name per cell
+#' @noRd
 ranef_rnames <- function(rows, col = "coef_alias") {
+  checkmate::assert_data_frame(rows, min.rows = 1L)
+  checkmate::assert_choice(col, c("coef_alias", "coef"))
   by <- rows$by[1L]
   coefs <- rows[[col]]
   if (length(by) == 0L || is.na(by) || !nzchar(by)) {
@@ -340,13 +344,20 @@ ranef_rnames <- function(rows, col = "coef_alias") {
 }
 
 
-# Internal: the names of a group's correlations, in the order brms
-# packs them. brms's stancode writes `cor[choose(k - 1, 2) + j] =
-# Cor[j, k]` for j < k, the upper triangle column by column: for four
-# coefficients the pairs run (1,2), (1,3), (2,3), (1,4), (2,4), (3,4).
-# `assemble_cor_array()` unpacks them in the same order.
-#'@noRd
+#' The names of a group's correlations in the order brms stores them
+#'
+#' The brms Stan code assigns `cor[choose(k - 1, 2) + j] = Cor[j, k]`
+#' for `j < k`, filling the upper triangle column by column. Four
+#' coefficients give the pairs (1,2), (1,3), (2,3), (1,4), (2,4) and
+#' (3,4). `assemble_cor_array()` unpacks them in the same order.
+#'
+#' @param group Character name of the grouping factor
+#' @param coef_alias Character vector of at least two coefficient names
+#' @return Character vector of correlation parameter names
+#' @noRd
 ranef_cor_names <- function(group, coef_alias) {
+  checkmate::assert_string(group)
+  checkmate::assert_character(coef_alias, min.len = 2L)
   n <- length(coef_alias)
   ks <- rep(2:n, times = seq_len(n - 1L))
   js <- unlist(lapply(2:n, function(k) seq_len(k - 1L)))
@@ -354,13 +365,21 @@ ranef_cor_names <- function(group, coef_alias) {
 }
 
 
-# Internal: build [n_draws x size x size] symmetric correlation
-# arrays from the column-major upper-triangle flat-vector draws
-# in `cor_mat` (shape [n_draws x NC] with NC = size*(size-1)/2).
-# Diagonal is 1; off-diagonals follow brms's pack order via
-# `out[,j,i] = out[,i,j] = cor_mat[,k]` for k = choose(i-1, 2) + j.
-#'@noRd
+#' Per-draw correlation matrices from their packed draws
+#'
+#' The diagonal is 1. Column `k = choose(i - 1, 2) + j` of `cor_mat`
+#' fills cells `[j, i]` and `[i, j]`, following the brms packing order.
+#'
+#' @param cor_mat Numeric matrix of correlation draws with
+#'   `size * (size - 1) / 2` columns
+#' @param size Integer number of coefficients
+#' @param coef_names Character vector of coefficient names
+#' @return Numeric array with dimensions `[n_draws, size, size]`
+#' @noRd
 assemble_cor_array <- function(cor_mat, size, coef_names) {
+  checkmate::assert_matrix(cor_mat)
+  checkmate::assert_int(size, lower = 1L)
+  checkmate::assert_character(coef_names, len = size)
   n_draws <- nrow(cor_mat)
   out <- array(diag(1, size), dim = c(size, size, n_draws))
   out <- aperm(out, perm = c(3L, 1L, 2L))
@@ -376,13 +395,22 @@ assemble_cor_array <- function(cor_mat, size, coef_names) {
 }
 
 
-# Internal: build [n_draws x size x size] covariance arrays from
-# the per-draw `sd_mat` ([n_draws x size]) and correlation array
-# `cor_arr` ([n_draws x size x size]) via `cov = D %*% R %*% D`
-# where D = diag(sd). Implemented as an elementwise sweep so the
-# helper avoids one matrix multiply per draw.
-#'@noRd
+#' Per-draw covariance matrices from SDs and correlations
+#'
+#' Computes `D R D` with `D = diag(sd)` as an elementwise product over
+#' cells, avoiding one matrix product per draw.
+#'
+#' @param sd_mat Numeric matrix of SD draws with dimensions
+#'   `[n_draws, size]`
+#' @param cor_arr Numeric correlation array with dimensions
+#'   `[n_draws, size, size]`
+#' @param coef_names Character vector of coefficient names
+#' @return Numeric array with dimensions `[n_draws, size, size]`
+#' @noRd
 assemble_cov_array <- function(sd_mat, cor_arr, coef_names) {
+  checkmate::assert_matrix(sd_mat)
+  checkmate::assert_array(cor_arr, d = 3L)
+  checkmate::assert_character(coef_names, len = ncol(sd_mat))
   size <- ncol(sd_mat)
   out <- cor_arr
   for (i in seq_len(size)) {

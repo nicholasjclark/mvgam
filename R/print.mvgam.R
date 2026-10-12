@@ -86,25 +86,36 @@ print.mvgam_formula <- function(x, ...) {
   invisible(x)
 }
 
-# Internal: print a model formula as `summary()` shows it, one line
-# per response and per distributional parameter, without the
-# placeholder `format_model_formula()` strips or the environment
-# `print.formula()` appends.
+#' Print a model formula as `summary()` shows it
+#'
+#' Prints one line per response and per distributional parameter. The
+#' output omits the placeholder term `format_model_formula()` strips and
+#' the environment `print.formula()` appends.
+#'
+#' @param f Formula, `brmsformula` or `mvbrmsformula`
+#' @return `f`, invisibly
 #' @noRd
 print_model_formula <- function(f) {
+  checkmate::assert(
+    checkmate::check_formula(f),
+    checkmate::check_list(f)
+  )
   cat(format_model_formula(f), sep = "\n")
   invisible(f)
 }
 
 
-# Internal: the trend line `print()` shows.
-#
-# `trend_order_label()` renders the order a trend was fitted at:
-# `ARMA(1, 1)` for an AR with a moving-average term, `AR(3)` for three
-# lags, `PW(logistic)` for logistic growth. A model without a trend
-# prints `None`.
+#' The trend line `print()` shows
+#'
+#' Names the order a trend was fitted at, such as `ARMA(1, 1)` for an AR
+#' with a moving-average term, `AR(3)` for three lags or `PW(logistic)`
+#' for logistic growth. A model without a trend prints `None`.
+#'
+#' @param x Fitted `mvgam` object
+#' @return Character scalar trend label
 #' @noRd
 printed_trend_label <- function(x) {
+  checkmate::assert_class(x, "mvgam")
   label <- trend_order_label(x)
   if (nzchar(label)) label else get_trend_type(x)
 }
@@ -127,17 +138,18 @@ printed_axis_counts <- function(x) {
   )
 }
 
-# Internal: a family whose `$family` is the name mvgam records.
-#
-# `brms::custom_family()` writes the placeholder "custom" there, so
-# `family(fit)$family` answered "custom" for `occ()`, `nmix()`,
-# `tweedie()`, `com_binomial()` and `diri()` while `glance()`, which
-# runs the same object through `resolve_family_name()`, answered the
-# family's own name. `family()` is the accessor other packages call,
-# so it is the one that has to be right; the stored object keeps the
-# placeholder, which is what brms reads.
+#' A family whose `family` element holds the name mvgam records
+#'
+#' `brms::custom_family()` stores the placeholder `"custom"` in that
+#' element for `occ()`, `nmix()`, `tweedie()`, `com_binomial()` and
+#' `diri()`. Other packages call `family()` to learn the family name.
+#' The stored object keeps the placeholder brms expects.
+#'
+#' @param fam Family object, or `NULL`
+#' @return `fam` with `family` set by `resolve_family_name()`, or `NULL`
 #' @noRd
 named_family <- function(fam) {
+  checkmate::assert_list(fam, null.ok = TRUE)
   if (is.null(fam)) return(fam)
   fam$family <- resolve_family_name(fam)
   fam

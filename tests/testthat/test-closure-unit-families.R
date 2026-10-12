@@ -572,22 +572,15 @@ test_that("prepare_closure_unit_family() groups each family's rows by site", {
 })
 
 # ------------------------------------------------------------
-# Mode-1 Z-column sum-to-zero is enforced HARD via Stan's
-# `sum_to_zero_vector[K]` (Stan >= 2.36) in the parameters block.
-# `generate_matrix_z_parameters()` emits `Z_cols` plus a
-# transformed-parameters assembly to `Z` for simplex families, and
-# the plain free `matrix Z` for non-simplex families. The
-# `generate_factor_model()` model block carries NO soft sum-to-zero
-# prior; the constraint lives at the parameter declaration.
+# A simplex family declares each column of `Z` a Stan
+# `sum_to_zero_vector[K]` (Stan >= 2.36), assembled into `Z` in
+# transformed parameters. Other families sample a free `matrix Z`.
 # ------------------------------------------------------------
 
 
 test_that(
   "generate_matrix_z_parameters() emits sum_to_zero_vector for simplex", {
-  sv_simplex <- mvgam:::generate_matrix_z_parameters(
-    is_factor_model = TRUE, n_lv = 2L, n_series = 4L,
-    simplex = TRUE
-  )
+  sv_simplex <- mvgam:::generate_matrix_z_parameters(simplex = TRUE)
   param_sc <- extract_block_scode(sv_simplex, "parameters")
   tparam_sc <- extract_block_scode(sv_simplex, "tparameters")
   expect_match(
@@ -605,10 +598,7 @@ test_that(
 
 test_that(
   "generate_matrix_z_parameters() emits plain free Z for non-simplex", {
-  sv <- mvgam:::generate_matrix_z_parameters(
-    is_factor_model = TRUE, n_lv = 2L, n_series = 4L,
-    simplex = FALSE
-  )
+  sv <- mvgam:::generate_matrix_z_parameters(simplex = FALSE)
   param_sc <- extract_block_scode(sv, "parameters")
   expect_match(
     param_sc,
@@ -616,29 +606,6 @@ test_that(
     fixed = TRUE
   )
   expect_false(grepl("sum_to_zero_vector", param_sc, fixed = TRUE))
-  expect_false(grepl("Z_cols", param_sc, fixed = TRUE))
-})
-
-test_that("generate_factor_model() does not emit a soft Z-column constraint", {
-  for (fam in list(NULL, gaussian(), poisson(), nmix(), diri(),
-                   multi(), categ())) {
-    sv <- mvgam:::generate_factor_model(
-      is_factor_model = TRUE, n_lv = 2L, family = fam
-    )
-    sc <- extract_block_scode(sv, "model")
-    expect_false(
-      grepl("sum(Z[, l]) ~ normal(0, 0.01)", sc, fixed = TRUE)
-    )
-  }
-})
-
-test_that("generate_factor_model() rejects non-family objects on `family`", {
-  expect_error(
-    mvgam:::generate_factor_model(
-      is_factor_model = TRUE, n_lv = 2L, family = "diri"
-    ),
-    "family"
-  )
 })
 
 # ------------------------------------------------------------

@@ -458,12 +458,18 @@ normalise_obs_covs <- function(obs_covs, J, T_, K, multi_season) {
 }
 
 
-# Internal: error if any name in `nms` collides with the reserved
-# output column set. `arg_name` is the user-facing argument name to
-# put in the error.
-#
-# @noRd
+#' Refuse covariate names that match a reserved output column
+#'
+#' @param nms Character vector of covariate names, or `NULL`
+#' @param reserved Character vector of reserved output column names
+#' @param arg_name Character name of the user-facing argument, for the
+#'   message
+#' @return `TRUE`, invisibly, or an error
+#' @noRd
 assert_no_reserved_cols <- function(nms, reserved, arg_name) {
+  checkmate::assert_character(nms, null.ok = TRUE)
+  checkmate::assert_character(reserved)
+  checkmate::assert_string(arg_name)
   hits <- intersect(nms, reserved)
   if (length(hits)) {
     stop(insight::format_error(c(

@@ -18,15 +18,15 @@
 }
 \arguments{
 \item{object}{An \code{mvgam_forecast} object whose \code{type} is
-\code{"response"} or \code{"expected"} (so the held-out
-observations live on the same scale as the forecasts).}
+\code{"response"} or \code{"expected"}. The held-out observations are then
+on the scale of the forecasts.}
 
 \item{score}{Character; one of the names above.}
 
-\item{interval_width}{Central PI width behind the per-series
-\code{in_interval} indicator, and the SIS penalty width. Computed
-for \code{"crps"}, \code{"drps"} and \code{"sis"}; the other scores report
-\code{in_interval} as \code{NA}.}
+\item{interval_width}{Width of the central PI that sets the
+per-series \code{in_interval} indicator. It also sets the SIS penalty
+width. Computed for \code{"crps"}, \code{"drps"} and \code{"sis"}; the other
+scores report \code{in_interval} as \code{NA}.}
 
 \item{quantile_level}{Quantile the \code{"qs"} pinball loss is
 taken at. Defaults to \code{0.5}, the median. Unrelated to the
@@ -53,18 +53,18 @@ per-series weights for \code{"variogram"}.}
 A named \code{list} with one entry per series plus a
 trailing \code{all_series} summary. Per-series entries are
 \code{data.frame}s with columns \code{score}, \code{in_interval},
-\code{interval_width}, \code{eval_horizon}, and \code{score_type} (the
-last echoes the requested \code{score}; the \code{score} column is
-\code{NA} for the multivariate scorers' per-series rows -- they
-carry coverage diagnostics only, with the joint score
-sitting in \code{all_series}). The \code{all_series} entry holds the
-per-horizon aggregate: scores summed over the series at each
-forecast time for univariate scorers (with \code{score_type}
-prefixed \code{"sum_"}) or the multivariate per-horizon score
-itself. Series forecast at their own times, as \code{CAR()} allows,
-are summed at the times they share, and \code{eval_horizon} then
-counts the times any series is forecast at. A multivariate
-score needs every series at the same forecast times.
+\code{interval_width}, \code{eval_horizon} and \code{score_type}. The
+\code{score_type} column echoes the requested \code{score}. The
+multivariate scorers' per-series rows hold coverage diagnostics
+only, with \code{score} set to \code{NA}. The \code{all_series} entry holds the
+per-horizon aggregate. For univariate scorers it sums the scores
+over the series at each forecast time, with \code{score_type}
+prefixed \code{"sum_"}. For multivariate scorers it holds the joint
+per-horizon score. Series forecast at their own times, as
+\code{CAR()} allows, are summed at the times they share. The
+\code{eval_horizon} column then counts the times any series is
+forecast at. A multivariate score needs every series at the same
+forecast times.
 }
 \description{
 Compute one of eleven proper scoring rules on the held-out
@@ -109,10 +109,10 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 mod <- mvgam(
   y ~ s(x),
   trend_formula = ~ AR(p = 1),
-  data    = simdat$data_train,
+  data = simdat$data_train,
   newdata = simdat$data_test,
-  family  = poisson(),
-  chains  = 2, silent = 2
+  family = poisson(),
+  chains = 2, silent = 2
 )
 
 # Score requires a forecast object with held-out test draws.

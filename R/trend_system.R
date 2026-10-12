@@ -3,7 +3,7 @@
 # trend constructors (RW, AR, VAR, CAR, ZMVN, PW).
 
 # =============================================================================
-# SECTION 1: TREND REGISTRY
+# Trend registry
 # =============================================================================
 # Each trend type records its properties and its Stan generator here.
 # `get_trend_info()` and `trend_property()` return them.
@@ -819,50 +819,66 @@ generate_pw_monitor_params <- function(trend_spec) {
   )
 }
 
-# Internal: the constructor name a trend spec records, the key every
-# registry lookup takes. `NA` for no spec.
-#'@noRd
+#' The constructor name a trend specification records
+#'
+#' @param trend_spec A trend specification, a list of them, or NULL
+#' @return The name every registry lookup takes, or `NA` for no
+#'   specification
+#' @noRd
 get_trend_name <- function(trend_spec) {
   trend_spec_head(trend_spec)$trend %||% NA_character_
 }
 
-
-# Internal: the growth form of a PW model, from either carrier of
-# the fact. A `PW()` spec names the field `growth`, validated with
-# `match.arg()`. A fitted object's `trend_metadata` persists the same
-# value as `pw_growth`, which post-fit callers have in hand where the
-# spec is out of reach. Prophet's default form is linear.
-#'@noRd
+#' The growth form of a PW model
+#'
+#' A `PW()` specification names the field `growth`. A fit's
+#' `trend_metadata` stores it as `pw_growth`, which post-fit callers
+#' hold where the specification is out of reach. Prophet's default form
+#' is linear.
+#'
+#' @param x A `PW()` specification, a fit's `trend_metadata`, or NULL
+#' @return "linear" or "logistic"
+#' @noRd
 pw_growth <- function(x) {
-  if (is.null(x)) return("linear")
+  checkmate::assert_list(x, null.ok = TRUE)
   x$growth %||% x$pw_growth %||% "linear"
 }
 
-
-# Internal: whether a PW model uses the logistic form. The logistic
-# form needs a carrying capacity, and its `m_trend` offset positions
-# the curve along time. For the linear form, the observation formula
-# supplies the level.
-#'@noRd
+#' Does a PW model take the logistic form?
+#'
+#' The logistic form needs a carrying capacity. Its `m_trend` offset
+#' places the curve along time. The observation formula supplies the
+#' level of the linear form.
+#'
+#' @inheritParams pw_growth
+#' @return Logical scalar
+#' @noRd
 pw_is_logistic <- function(x) {
   identical(pw_growth(x), "logistic")
 }
 
-
-# Internal: how an AR trend shares its coefficients across series.
-# `AR()` records the mode on every spec it builds. The other trends
-# have no coefficients to share, and their specs carry no mode.
-#'@noRd
+#' How an AR trend shares its coefficients across series
+#'
+#' `AR()` records the mode on every specification it builds. The other
+#' trends have no coefficients to share.
+#'
+#' @param spec A trend specification
+#' @return "none", "shared" or "hierarchical"
+#' @noRd
 ar_coef_sharing <- function(spec) {
+  checkmate::assert_list(spec)
   spec$coef_sharing %||% "none"
 }
 
-
-# Internal: the column that holds a logistic PW model's carrying
-# capacity. `create_mvgam_trend()` records it on a `PW()` spec, as the
-# name the user gave or `"cap"`. The Stan data builder and the
-# forecast both take the name from here.
-#'@noRd
+#' The carrying-capacity column of a logistic PW model
+#'
+#' `create_mvgam_trend()` records it on a `PW()` specification: the
+#' name the user gave, or `"cap"`. The Stan data builder and the
+#' forecast both take the name from here.
+#'
+#' @param spec A trend specification, or a list of them
+#' @return Character scalar
+#' @noRd
 pw_cap_var <- function(spec) {
   cap_var <- spec_field(trend_spec_head(spec), "cap")
   if (!named_var(cap_var)) {
@@ -875,7 +891,7 @@ pw_cap_var <- function(spec) {
 }
 
 # =============================================================================
-# SECTION 2: THE MVGAM_TREND OBJECT
+# The mvgam_trend object
 # =============================================================================
 
 #' Fields of an mvgam_trend object
@@ -946,7 +962,7 @@ rule_requires_regular_intervals <- "requires_regular_intervals"
 
 
 # =============================================================================
-# SECTION 3: TREND FORMULA PARSING
+# Trend formula parsing
 # =============================================================================
 # Turns a `trend_formula` into its trend constructor and the brms terms
 # that build the trend's linear predictor.
@@ -1006,10 +1022,14 @@ parse_trend_formula <- function(trend_formula) {
 }
 
 
-# Internal: whether a term label is a call to a registered trend
-# constructor. A covariate whose name ends in a constructor's name,
-# such as `lagAR(x)`, is a regular term.
-#'@noRd
+#' Is a term label a call to a registered trend constructor?
+#'
+#' A covariate whose name ends in a constructor's name, such as
+#' `lagAR(x)`, is a regular term.
+#'
+#' @param label One term label of a trend formula
+#' @return Logical scalar
+#' @noRd
 is_trend_constructor_call <- function(label) {
   checkmate::assert_string(label)
   expr <- str2lang(label)
@@ -1077,7 +1097,7 @@ print.mvgam_trend <- function(x, ...) {
 }
 
 # =============================================================================
-# SECTION 4: TREND CONSTRUCTORS
+# Trend constructors
 # =============================================================================
 # The trend constructors are the user-facing API for trend
 # specifications. Each validates its arguments, sets defaults and
@@ -1088,9 +1108,8 @@ print.mvgam_trend <- function(x, ...) {
 #' Specify trend models for multivariate State-Space models in \pkg{mvgam}.
 #' These constructor functions create trend specifications for various temporal
 #' dynamics including random walks (RW), autoregressive models (AR, VAR, CAR),
-#' local linear trends (LLT) and piecewise trends (PW). These functions do not
-#' evaluate their arguments
-#' – they exist purely to help set up models with particular trend structures.
+#' local linear trends (LLT) and piecewise trends (PW). A constructor
+#' records its arguments. The model evaluates them against the data.
 #'
 #' @param df Degrees of freedom for the latent process innovations.
 #'   Defaults to \code{Inf}, which gives Gaussian innovations: a t with
@@ -1172,13 +1191,14 @@ print.mvgam_trend <- function(x, ...) {
 #'   trend needs this column even for a single series. Defaults to `series`.
 #'
 #' @details
-#' **Important**: Only ONE trend constructor is allowed per `trend_formula`.
-#' For complex temporal dynamics, use the parameter options of a single trend type:
+#' A `trend_formula` takes one trend constructor. The arguments of that
+#' constructor express richer dynamics:
 #' \itemize{
 #'   \item For seasonal patterns: `AR(p = c(1, 12))`. A sum such as
 #'     `RW() + AR(p = 12)` is refused
-#'   \item For multiple time scales: `AR(p = c(1, 7, 30))` for daily, weekly, monthly
-#'   \item For multivariate dynamics: `VAR(p = 2)` captures cross-series relationships
+#'   \item For several time scales: `AR(p = c(1, 7, 30))` for daily,
+#'     weekly and monthly lags
+#'   \item For cross-series dynamics: `VAR(p = 2)`
 #' }
 #'
 #' **Stationarity of `AR(p)`**: a consecutive lag set with
@@ -1240,14 +1260,15 @@ print.mvgam_trend <- function(x, ...) {
 #' one mixing scale per time, and the times of one series would
 #' change the trend of another.
 #'
-#' @note **VAR fits and `init = 0`**: VAR uses the Heaps-2023
-#'   stationary joint-distribution initialisation. Setting
-#'   `init = 0` in the call to [mvgam()] starts all parameters
-#'   at zero on the unconstrained scale, which collapses the
-#'   stationary covariance matrix and prevents the chain from
-#'   making any valid first step. Leave the sampler's `init`
-#'   argument at its default (random) for VAR fits. AR / RW /
-#'   CAR / ZMVN are unaffected.
+#' @note **VAR fits and `init = 0`**: the stationary map of Heaps
+#'   (2023) takes matrix square roots by eigendecomposition. The
+#'   gradient of an eigendecomposition divides by differences between
+#'   eigenvalues. `init = 0` in the call to [mvgam()] sets every raw
+#'   coefficient to zero and every innovation scale to one. Each matrix
+#'   the map decomposes is then the identity, with repeated eigenvalues,
+#'   and the first gradient is not finite. Leave `init` at its default
+#'   random draws for `VAR()` fits. `AR()`, `RW()`, `CAR()` and `ZMVN()`
+#'   are unaffected.
 #'
 #' @param gr An optional grouping variable, which must be a `factor` in the
 #'   supplied `data`, for setting up hierarchical residual correlation
@@ -1270,10 +1291,11 @@ print.mvgam_trend <- function(x, ...) {
 #'   within each level of `gr`. `cor` defaults to `TRUE` for such a
 #'   trend, and an explicit `cor = FALSE` is refused.
 #'
-#'   When used within a `VAR()` model, this essentially sets up a hierarchical
-#'   panel vector autoregression where both the autoregressive and correlation
-#'   matrices are learned hierarchically. If `gr` is supplied then `subgr`
-#'   *must* also be supplied.
+#'   Within a `VAR()` it sets up a hierarchical panel vector
+#'   autoregression. Each group learns its autoregressive, moving-average
+#'   and correlation matrices from shared hyperparameters. The groups do
+#'   not interact. Without `subgr`, the series column names the units
+#'   within each group.
 #'
 #'   Two constraints currently apply to hierarchical trend models:
 #'   \itemize{
@@ -1325,10 +1347,11 @@ print.mvgam_trend <- function(x, ...) {
 #' vary across the latent series. The three settings and the
 #' Stan parameters each declares are:
 #' \tabular{ll}{
-#'   \strong{coef_sharing}    \tab \strong{Stan parameters with priors} \cr
-#'   `"none"`                 \tab `ar{lag}{stem}_trend` per series \cr
-#'   `"shared"`               \tab `shared_ar{lag}{stem}_trend` (one per lag) \cr
-#'   `"hierarchical"`         \tab `mu_ar{lag}{stem}_trend`, `sigma_ar{lag}{stem}_trend` \cr
+#'   \strong{coef_sharing} \tab \strong{Stan parameters with priors} \cr
+#'   `"none"`         \tab `ar{lag}{stem}_trend` per series \cr
+#'   `"shared"`       \tab `shared_ar{lag}{stem}_trend` (one per lag) \cr
+#'   `"hierarchical"` \tab `mu_ar{lag}{stem}_trend`,
+#'     `sigma_ar{lag}{stem}_trend` \cr
 #' }
 #' `{stem}` is `_pacf` for a contiguous lag set of two or more
 #' lags, where the sampled quantity is a partial autocorrelation,
@@ -1364,7 +1387,7 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #'   For a worked example that interrogates a fitted `VAR()` trend
 #'   with `irf()`, `fevd()` and `stability()`, see
-#'   [https://nicholasjclark.github.io/mvgam/articles/var.html](https://nicholasjclark.github.io/mvgam/articles/var.html).
+#'   <https://nicholasjclark.github.io/mvgam/articles/var.html>.
 #'   For the `trend_map` shortcut used to fit dynamic factor models
 #'   with fewer latent processes than observed series, see
 #'   `vignette("dfm", package = "mvgam")`.
@@ -1395,11 +1418,11 @@ print.mvgam_trend <- function(x, ...) {
 #'     first.
 #'   \item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
 #'     \code{AR()} factors with \code{coef_sharing = "shared"}, are
-#'     unchanged by rotation when they carry no moving-average term. Following Heaps & Jermyn (2024),
-#'     generated quantities rotate each draw to lower-triangular
-#'     loadings `Z_tilde` with a non-negative diagonal, and rotate the
-#'     factor paths to `lv_trend_tilde`. A VAR factor model rotates
-#'     its coefficients to `Phi_trend_tilde`.
+#'     unchanged by rotation when they carry no moving-average term.
+#'     Following Heaps & Jermyn (2024), generated quantities rotate each
+#'     draw to lower-triangular loadings `Z_tilde` with a non-negative
+#'     diagonal. The factor paths rotate to `lv_trend_tilde`. A VAR
+#'     factor model rotates its coefficients to `Phi_trend_tilde`.
 #' }
 #' Post-fit methods use the identified loadings and factor paths.
 #' `shared_variation()` and `residual_cor()` are the same under every
@@ -1770,15 +1793,17 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' half-Student-t with 3 degrees of freedom. Its scale gives the
 #' trend's movement over the series from the slope shocks a standard
 #' deviation with prior median \eqn{s}, and the movement itself a 90th
-#' percentile near \eqn{2.8 s}. The scale accounts for the damping at the median of its
-#' prior. `init_slope_trend ~ normal(0, 2 / r)`, where \eqn{r = 1 +
-#' \phi + \dots + \phi^{N - 2}} is how far a unit initial slope moves the
-#' level by the end of the series, gives the initial slope \eqn{2 s} of
-#' growth over the series at one prior standard deviation. An undamped
+#' percentile near \eqn{2.8 s}. The scale accounts for the damping at
+#' the median of its prior. `init_slope_trend ~ normal(0, 2 / r)`,
+#' where \eqn{r = 1 + \phi + \dots + \phi^{N - 2}} is how far a unit
+#' initial slope moves the level by the end of the series, gives the
+#' initial slope \eqn{2 s} of growth over the series at one prior
+#' standard deviation. An undamped
 #' slope has \eqn{r = N - 1}. A factor model with every loading sampled
 #' measures both in units of its level's spread over the series,
-#' \eqn{\sqrt{N}}, and its loadings carry \eqn{s}. `ar1_slope_trend` takes `beta(18, 2)`, with median
-#' 0.91. `get_prior()` prints the resolved values.
+#' \eqn{\sqrt{N}}. Its loadings carry \eqn{s}. `ar1_slope_trend` takes
+#' `beta(18, 2)`, with median 0.91. `get_prior()` prints the resolved
+#' values.
 #'
 #' A smooth or linear function of time in either formula competes with
 #' the slope for the same variation, and `mvgam()` warns when the time
@@ -1863,14 +1888,14 @@ LLT <- function(time = NA, series = NA, damped = FALSE, cor = NULL,
 
 #' Specify piecewise linear or logistic trends in \pkg{mvgam} models
 #'
-#' Set up piecewise linear or logistic trend models in \code{mvgam}. These
-#' functions do not evaluate their arguments – they exist purely to help set up
-#' a model with particular piecewise trend models.
+#' Sets up a piecewise linear or logistic trend in \code{mvgam}. The
+#' constructor records its arguments. The model evaluates them against
+#' the data.
 #'
-#' @param cap The unquoted name of the variable in `data` that specifies the
-#'   carrying capacity for logistic growth models. Required when `growth = 'logistic'`.
-#'   This variable should be numeric and can vary by time and series if necessary.
-#'   Defaults to `cap` when not specified, with a warning for logistic models.
+#' @param cap The unquoted name of the variable in `data` that holds
+#'   the carrying capacity of a logistic model, on the response scale.
+#'   It is numeric and can vary by time and series. Defaults to `cap`. A
+#'   logistic model whose data lack the column is refused.
 #'
 #' @param n_changepoints A non-negative integer specifying the number of
 #'   potential changepoints. Potential changepoints are selected uniformly from
@@ -1886,9 +1911,10 @@ LLT <- function(time = NA, series = NA, damped = FALSE, cor = NULL,
 #'   For a series of `N` time points the prior on each per-step rate
 #'   change is `double_exponential(0, s * changepoint_scale / N)`,
 #'   where `s` is the factor [get_prior()] describes for linear growth
-#'   and 1 for logistic growth. Larger values give a more flexible trend. The default of `0.3`
-#'   gives the ten default changepoints a prior median movement of the
-#'   level of about half a unit over the series, the movement the
+#'   and 1 for logistic growth. Larger values give a more flexible
+#'   trend. The default of `0.3` gives the ten default changepoints a
+#'   prior median movement of the level of about half a unit over the
+#'   series, the movement the
 #'   [LLT()] slope prior allows. Prophet's own default of `0.05` holds a
 #'   link-scale trend close to a straight line.
 #'
@@ -1903,7 +1929,7 @@ LLT <- function(time = NA, series = NA, damped = FALSE, cor = NULL,
 #' @author Nicholas J Clark
 #'
 #' @references Taylor, Sean J., and Benjamin Letham. "Forecasting at scale."
-#'   The American Statistician 72.1 (2018): 37–45.
+#'   The American Statistician 72.1 (2018): 37-45.
 #'
 #' @seealso [LLT()] for a trend whose growth changes continuously,
 #'   [get_prior()] for the scale of the default priors
@@ -2013,8 +2039,8 @@ PW <- function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' Specify correlated residual processes in \pkg{mvgam}
 #'
 #' Set up latent correlated multivariate Gaussian residual processes in
-#' \pkg{mvgam}. This function does not evaluate its arguments – it exists
-#' purely to help set up a model with particular error processes
+#' \pkg{mvgam}. The constructor records its arguments. The model
+#' evaluates them against the data.
 #'
 #' @inheritParams AR
 #' @param time The unquoted name of the variable that represents the unit of
@@ -2148,7 +2174,7 @@ ZMVN <- function(time = NA, series = NA, gr = NA, subgr = NA,
 }
 
 # =============================================================================
-# SECTION 5: TREND CONSTRUCTOR HELPERS
+# Trend constructor helpers
 # =============================================================================
 # The defaults and checks every trend constructor shares.
 
@@ -2245,17 +2271,14 @@ create_mvgam_trend <- function(trend_type, ...,
 
   # Helper to process substituted arguments - handles both quoted and unquoted
   process_arg <- function(x) {
-    if (is.null(x)) return("NA")  # Return "NA" for missing arguments
+    # An unset constructor argument substitutes to its default, `NA`.
+    # A column the user names `gr` or `subgr` is a real column.
+    if (is.null(x)) return("NA")
     if (is.character(x)) return(x)
     deparsed <- deparse0(x)
     # Remove surrounding quotes if present (from quoted strings)
     if (grepl('^".*"$', deparsed)) {
       return(substr(deparsed, 2, nchar(deparsed) - 1))
-    }
-    # `substitute()` returns the argument's own name when the caller
-    # left it unset
-    if (deparsed %in% c("gr", "subgr", "time", "series", "cap")) {
-      return("NA")
     }
     deparsed
   }

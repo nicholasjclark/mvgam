@@ -1,8 +1,6 @@
-# Internal: exploratory plots of the observed time series carried
-# on a fitted `mvgam` object. Called by `plot.mvgam(x, type =
-# "series")`. The function is intentionally fit-only and not
-# exported; user-side EDA without a fit goes through plain
-# ggplot or `forecast::ggtsdisplay` / `feasts::gg_tsdisplay`.
+# Exploratory plots of the observed time series held on a fitted
+# `mvgam` object, drawn by `plot.mvgam(x, type = "series")`. Plots of
+# data before a fit go through `mvgam_data(plot = TRUE)`.
 
 #' Observed time series exploratory plot
 #'
@@ -99,23 +97,33 @@ plot_mvgam_series <- function(
 }
 
 
-# Internal: shared observed-series plot body. Builds the same
-# faceted multi-series plot (when `series = "all"`) or 4-panel
-# patchwork (when `series` resolves to one index) regardless of
-# whether the input comes from a fitted `mvgam` object
-# (`plot_mvgam_series()` / `plot.mvgam(type = "series")`) or a
-# raw long-format data frame (`mvgam_data()` pre-fit). Both
-# callers pass the long frame `series_long_df()` builds, so this
-# helper does no class dispatch.
-#
-# `labels` names what the y axis measures: one response column, or
-# one per series where each series is a different response. A panel
-# of one series takes its own; a facet over several responses takes
-# a label none of them can claim alone.
-#'@noRd
+#' A plot of observed series from their long data frame
+#'
+#' Draws a faceted plot of every series when `series` resolves to
+#' `"all"`. One series gets a four-panel grid of the time series,
+#' histogram, ACF and empirical CDF. `plot_mvgam_series()` and
+#' `mvgam_data()` both pass the frame `series_long_df()` builds.
+#'
+#' @param dat Data frame from `series_long_df()` holding `time`, `y`,
+#'   `series` and `data`
+#' @param labels Character response names for the y axis. A single name
+#'   covers every series. A named vector gives one per series when each
+#'   series is a different response. A facet over several responses
+#'   takes a generic label.
+#' @param series_levels Character vector of series levels
+#' @param series Series to plot, as `NULL`, `"all"`, a name or an index
+#' @param lines Logical flag. `TRUE` draws lines and `FALSE` draws
+#'   points.
+#' @param n_bins Integer histogram bin count, or `NULL`
+#' @param log_scale Logical flag to plot `log(y + 1)`
+#' @return A `ggplot` for several series, or a `patchwork` grid for one
+#' @noRd
 series_obs_plot <- function(dat, labels, series_levels, series = NULL,
                              lines = TRUE, n_bins = NULL,
                              log_scale = FALSE) {
+  checkmate::assert_data_frame(dat)
+  checkmate::assert_character(labels, min.len = 1L)
+  checkmate::assert_character(series_levels, min.len = 1L)
   checkmate::assert_flag(lines)
   checkmate::assert_flag(log_scale)
   checkmate::assert_integerish(n_bins, lower = 1L, len = 1L,
@@ -180,19 +188,18 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
 }
 
 
-# Internal: coerce the user-facing `series` arg to either the
-# literal string `"all"` or a 1-based integer index into the
-# series levels. `NULL` names every series on a multi-series fit,
-# and names its single series on a one-series fit.
-#
-# `resolve_series()` owns the grammar every series-aware surface
-# takes: `NULL`, `"all"`, a name and an index. This function once
-# received a count alone. A name had nothing to check against, and
-# this surface refused a series by name while the forecast plot and
-# `conditional_effects()` accepted it. A reader of the panel labels
-# then had no value to pass back.
-#'@noRd
+#' The series a series plot draws
+#'
+#' `NULL` selects every series of a multi-series fit and the single series
+#' of a one-series fit. Names and indices go through `resolve_series()`,
+#' the parser every series-aware function uses.
+#'
+#' @param series Series to plot, as `NULL`, `"all"`, a name or an index
+#' @param series_levels Character vector of series levels
+#' @return `"all"`, or the integer index of one series
+#' @noRd
 resolve_series_index <- function(series, series_levels) {
+  checkmate::assert_character(series_levels, min.len = 1L)
   n_series <- length(series_levels)
   if (is.null(series)) {
     return(if (n_series > 1L) "all" else 1L)
@@ -212,13 +219,29 @@ resolve_series_index <- function(series, series_levels) {
 }
 
 
-# Internal: one long `(time, y, series, data)` block from a training
-# or test frame. The caller says which column is the response and
-# which series each row is on, because that is a question about the
-# model rather than about the frame. Returns NULL when `df` is NULL so
-# callers can `rbind` it unconditionally.
-#'@noRd
+#' A training or test frame in the long form the series plots take
+#'
+#' The caller names the response column and the series of each row.
+#' Both depend on the model, which the frame alone cannot supply.
+#'
+#' @param df Data frame of training or test data, or `NULL`
+#' @param response Character name of the response column
+#' @param series Vector of series labels, one per row or a single label
+#' @param time_var Character name of the time column
+#' @param label Character tag for the `data` column, `"train"` or
+#'   `"validate"`
+#' @return Data frame holding `time`, `y`, `series` and `data`, or
+#'   `NULL` when `df` is `NULL`. `rbind()` drops a `NULL` block.
+#' @noRd
 series_long_df <- function(df, response, series, time_var, label) {
+  checkmate::assert(
+    checkmate::check_data_frame(df),
+    checkmate::check_list(df),
+    checkmate::check_null(df)
+  )
+  checkmate::assert_string(response)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(label)
   if (is.null(df)) {
     return(NULL)
   }
@@ -240,18 +263,27 @@ series_long_df <- function(df, response, series, time_var, label) {
 }
 
 
-# Internal: observed series over time. Training observations in the
-# active palette, test observations (when present) in black with a
-# dashed cut at the boundary. `facet` gives one panel per series; the
-# single-series grid calls it without one.
-#
-# An unobserved occasion is a missing `y`, which breaks the line where
-# it falls. One at the end of a series has nothing to break, and
-# ggplot2 then reports removing it on every render, so missing values
-# are dropped without that notice: the gap is the information and it
-# is already drawn.
-#'@noRd
+#' Observed series plotted over time
+#'
+#' Training observations take the active palette. Test observations
+#' are drawn in black after a dashed line at the boundary. A missing `y`
+#' breaks the line at an unobserved occasion. Missing values are dropped
+#' without the ggplot2 removal notice, which would repeat on every
+#' render for a gap at the end of a series.
+#'
+#' @param dat Data frame from `series_long_df()`
+#' @param ylab Character y-axis label
+#' @param lines Logical flag. `TRUE` draws lines and `FALSE` draws
+#'   points.
+#' @param facet Logical flag to draw one panel per series. The
+#'   single-series grid sets it to `FALSE`.
+#' @return A `ggplot` object
+#' @noRd
 series_time_plot <- function(dat, ylab, lines, facet = TRUE) {
+  checkmate::assert_data_frame(dat)
+  checkmate::assert_string(ylab)
+  checkmate::assert_flag(lines)
+  checkmate::assert_flag(facet)
   palette <- mvgam_palette()
   cut_t <- if (any(dat$data == "validate")) {
     min(dat$time[dat$data == "validate"], na.rm = TRUE)

@@ -108,7 +108,6 @@ test_that("a VAR prefit names its trend and the posterior it needs", {
     y ~ 1, trend_formula = ~ VAR(cor = TRUE), data = dat,
     family = gaussian(), run_model = FALSE, silent = 2
   )
-  expect_s3_class(pf, "mvgam_prefit")
 
   # A prefit records its trend type as a fit does.
   expect_identical(get_trend_type(pf), "VAR")

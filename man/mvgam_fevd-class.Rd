@@ -26,6 +26,13 @@ Dividing the orthogonalised responses \eqn{(\psi_{kj, 0}^2 +
 variance for \eqn{k} explained by an exogenous shock to \eqn{j},
 and that proportion is what these objects carry.
 
+The orthogonalisation takes the lower Cholesky factor of the
+innovation covariance. The decomposition then depends on the order
+of the series. The first series takes all of its own one-step
+forecast error variance. Each later series shares its one-step
+variance with the series before it. The order is that of the
+levels of the series factor.
+
 A decomposition is a \code{K} by \code{K} matrix per horizon per posterior
 draw, which on a wide panel runs to hundreds of megabytes for a
 quantity read as a median and an interval. \code{\link[=fevd]{fevd()}} therefore
@@ -51,7 +58,7 @@ Both forms take \code{ndraws} and \code{draw_ids}, so a subset of the
 posterior answers faster where the full one is not needed.
 }
 \references{
-Lütkepohl, H (2006). New Introduction to Multiple Time
+Lutkepohl, H (2006). New Introduction to Multiple Time
 Series Analysis. Springer, New York.
 }
 \seealso{

@@ -181,16 +181,20 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
 }
 
 
-# Internal: the model call an `update()` produced.
-#
-# Takes the call that built the original fit and overwrites the
-# arguments this `update()` names. Two of them are spelled
-# differently on the two sides -- `formula.` sets `formula` and
-# `newdata` sets `data` -- and `recompile` steers the refit rather
-# than the model, so it is not part of the call the model was built
-# from.
+#' The model call an `update()` produced
+#'
+#' Overwrites the arguments this `update()` names on the call that built
+#' the original fit. `formula.` sets `formula` and `newdata` sets
+#' `data`. `object` and `recompile` steer the refit and are dropped from
+#' the model call.
+#'
+#' @param original Call that built the original fit, or `NULL`
+#' @param update_call Matched call of the `update()`
+#' @return Call describing the refitted model
 #' @noRd
 restate_updated_call <- function(original, update_call) {
+  checkmate::assert_class(original, "call", null.ok = TRUE)
+  checkmate::assert_class(update_call, "call")
   if (is.null(original)) {
     return(update_call)
   }
@@ -208,12 +212,27 @@ restate_updated_call <- function(original, update_call) {
 }
 
 
-# Internal: the function and arguments a refit calls. A `jsdgam` fit
-# has class `jsdgam` and refits through `jsdgam()`,
-# which owns the factor structure, traits and phylogeny that
-# `mvgam()` has no arguments for.
-#'@noRd
+#' The function and arguments a refit calls
+#'
+#' A `jsdgam` fit refits through `jsdgam()`, which takes the factor
+#' structure, traits and phylogeny that `mvgam()` has no arguments for.
+#' Every other fit refits through `mvgam()`.
+#'
+#' @param object Fitted `mvgam` object
+#' @param formula. Formula update, or `NULL` to keep the fitted formula
+#' @param newdata Data frame of new training data, or `NULL`
+#' @param dots Named list of further arguments to `update()`
+#' @return List holding the fitting function `fn` and its `args`
+#' @noRd
 update_refit_plan <- function(object, formula., newdata, dots) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert(
+    checkmate::check_null(formula.),
+    checkmate::check_formula(formula.),
+    checkmate::check_list(formula.)
+  )
+  checkmate::assert_data_frame(newdata, null.ok = TRUE)
+  checkmate::assert_list(dots)
   if (inherits(object, "jsdgam")) {
     return(list(fn = jsdgam,
                 args = jsdgam_update_call(object, formula., newdata, dots)))
@@ -223,24 +242,36 @@ update_refit_plan <- function(object, formula., newdata, dots) {
 }
 
 
-# Internal: the stancode a refit plan would compile, from a prefit
-# built by the same function the refit calls.
-#'@noRd
+#' The Stan code a refit plan would compile
+#'
+#' Builds a prefit with the same function the refit calls.
+#'
+#' @param plan Refit plan from `update_refit_plan()`
+#' @return Character Stan code of the refitted model
+#' @noRd
 refit_stancode <- function(plan) {
+  checkmate::assert_list(plan)
+  checkmate::assert_function(plan$fn)
   args <- plan$args
   args$run_model <- FALSE
   do.call(plan$fn, args)$stancode
 }
 
 
-# Internal: normalise a stancode string to the code it compiles. Two
-# programs are the same model when their code matches. The head of an
-# mvgam program is a `// Generated with mvgam X.Y.Z using brms X.Y.Z`
-# comment whose versions drift across sessions, and the comments the
-# generators write change with their wording. Comments of both
-# spellings go, string literals stay, and each line is trimmed with
-# empty lines dropped.
+#' Stan code reduced to the statements it compiles
+#'
+#' Two programs are the same model when their code matches. The version
+#' header of an mvgam program changes across sessions. The generator
+#' comments change with their wording. Line and block comments are
+#' removed and string literals are kept. Each line is trimmed and empty
+#' lines are dropped.
+#'
+#' @param stancode Character Stan code, or `NULL`
+#' @return Character scalar of normalised code, or `character(0)` when
+#'   `stancode` is `NULL`
+#' @noRd
 mvgam_normalise_stancode <- function(stancode) {
+  checkmate::assert_character(stancode, null.ok = TRUE)
   if (is.null(stancode)) {
     return(character(0L))
   }
@@ -253,16 +284,11 @@ mvgam_normalise_stancode <- function(stancode) {
 }
 
 
-# Internal: argument table for update.mvgam slot inheritance.
-# Each row pairs an `mvgam()` argument name with the slot on the
-# fitted `mvgam` object that supplies its default when the user
-# does not override via `...`. Optional `normaliser` entries route
-# the inherited value through a converter so the user-facing form
-# matches what mvgam() accepts on a fresh call.
-#
-# Extending the inheritance to a new `mvgam()` argument is one new
-# entry here, no method changes.
-#'@noRd
+# Arguments a refit inherits from the fitted object. Each entry pairs an
+# `mvgam()` argument with the slot, or the getter, that supplies its
+# default when `...` leaves it unset. A `normaliser` converts the stored
+# value to the form `mvgam()` takes on a fresh call. A new inherited
+# argument needs one new entry here.
 mvgam_update_inheritance <- list(
   trend_formula = list(slot = "trend_call"),
   family = list(slot = "family"),
@@ -389,13 +415,18 @@ denormalise_loadings_prior <- function(spec) {
 }
 
 
-# Internal: extract chain / iter / warmup / thin from `object$fit`
-# in a backend-agnostic way. mvgam stores cmdstanr and rstan fits
-# as `stanfit`-class objects with a `@stan_args` slot; this helper
-# returns the original sampler dimensions so `update.mvgam` can
-# reuse them when the user does not override.
-#'@noRd
+#' The sampler settings a fit ran with
+#'
+#' mvgam stores fits from both backends as `stanfit` objects with a
+#' `stan_args` slot. A refit reuses these settings when the user leaves
+#' them unset.
+#'
+#' @param object Fitted `mvgam` object
+#' @return Named list holding any of `chains`, `iter`, `warmup`, `thin`
+#'   and `control`. The list is empty when the fit holds no `stanfit`.
+#' @noRd
 mvgam_sampler_inheritance <- function(object) {
+  checkmate::assert_list(object)
   out <- list()
   fit_obj <- object$fit
   if (!isS4(fit_obj) ||

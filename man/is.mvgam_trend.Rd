@@ -2,7 +2,7 @@
 % Please edit documentation in R/validations.R
 \name{is.mvgam_trend}
 \alias{is.mvgam_trend}
-\title{Check if object is a mvgam trend}
+\title{Whether an object is an mvgam trend}
 \usage{
 is.mvgam_trend(x)
 }

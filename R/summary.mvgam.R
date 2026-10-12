@@ -1,19 +1,21 @@
 # ==============================================================================
-# MVGAM SUMMARY METHODS
+# mvgam summary methods
 # ==============================================================================
 # Summary methods for mvgam fitted models following brms conventions.
-# Uses posterior package for all computation, organized by parameter category.
+# The posterior package computes every summary. The output is
+# organised by parameter category.
 
 #' Summary of mvgam model fits
 #'
 #' @description
-#' Provides posterior summary statistics for mvgam model parameters, organized
-#' by category (fixed effects, smooth terms, family parameters, trend parameters,
-#' and factor loadings).
+#' Provides posterior summary statistics for mvgam model parameters,
+#' organised by category (fixed effects, smooth terms, family
+#' parameters, trend parameters and factor loadings).
 #'
 #' @param object An object of class \code{mvgam}.
-#' @param probs Numeric vector of length 2 specifying quantile probabilities
-#'   for credible intervals. Default is \code{c(0.025, 0.975)} for 95% intervals.
+#' @param probs Numeric vector of length 2 specifying quantile
+#'   probabilities for credible intervals. Default is
+#'   \code{c(0.025, 0.975)} for 95% intervals.
 #' @param robust Logical; if \code{TRUE}, the median and MAD measure
 #'   central tendency and spread. The default \code{FALSE} uses the mean
 #'   and SD.
@@ -30,8 +32,8 @@
 #'
 #' @return An object of class \code{mvgam_summary}. Each block is a
 #'   data frame of the columns below, one row per parameter, named as
-#'   \pkg{brms} prints it, and is absent when the model has none. The
-#'   observation model's blocks are:
+#'   \pkg{brms} prints it. A block is absent when the model has no such
+#'   parameter. The observation model's blocks are:
 #' \describe{
 #'   \item{\code{smooth}}{Smoothing standard deviations, one row per
 #'     penalty of each smooth. The basis coefficients are available by
@@ -41,8 +43,8 @@
 #'     and length-scales.}
 #'   \item{\code{random}}{Group-level standard deviations and
 #'     correlations, as a list of tables named by grouping factor.
-#'     \code{ngrps} gives each factor's number of levels, and
-#'     \code{ranef()} the per-level effects.}
+#'     \code{ngrps} gives each factor's number of levels. \code{ranef()}
+#'     gives the per-level effects.}
 #'   \item{\code{fixed}}{Regression coefficients, those of every
 #'     distributional parameter given a formula among them.}
 #'   \item{\code{mo}}{The simplex of each monotonic effect.}
@@ -73,9 +75,9 @@
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
 #' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = poisson(),
-#'               chains  = 2, silent = 2)
+#'               data = simdat$data_train,
+#'               family = poisson(),
+#'               chains = 2, silent = 2)
 #'
 #' summary(mod)
 #' }
@@ -84,11 +86,10 @@
 summary.mvgam <- function(object, probs = c(0.025, 0.975),
                           robust = FALSE,
                           matrices = FALSE, ...) {
-  # Input validation
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_numeric(probs, len = 2, lower = 0, upper = 1)
   checkmate::assert_true(probs[1] < probs[2])
-  checkmate::assert_logical(robust, len = 1)
+  checkmate::assert_flag(robust)
   checkmate::assert_flag(matrices)
   reject_removed_args(
     list(...), fn = "summary",
@@ -100,21 +101,19 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 
   require_fitted_model(object, "summary")
 
-  # Compute summaries once for efficiency (then filter by category)
+  # Summarise every parameter once, then split the table by category
   all_summaries <- compute_all_summaries(
     object,
     probs = probs,
     robust = robust
   )
 
-  # Get all parameter names from rownames
   pars <- rownames(all_summaries)
 
-  # Drop the trend's own time-indexed states: one row per time point
-  # and series, which no summary block claims. Dropping them here
-  # spares the classifiers below that work. `hindcast(type = "trend")` returns them as a
-  # trajectory, and `as.data.frame(variable = "^trend\\[", regex =
-  # TRUE)` as draws.
+  # Drop the trend's own time-indexed states, one row per time point
+  # and series. No summary block claims them. `hindcast(type =
+  # "trend")` returns them as a trajectory. `as.data.frame(variable =
+  # "^trend\\[", regex = TRUE)` returns them as draws.
   pars_to_keep <- !is_trend_state_param(pars)
   all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
   pars <- rownames(all_summaries)
@@ -132,11 +131,11 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   }
 
   # Hide each raw form whose reported counterpart is in the same
-  # posterior: rotation- and sign-indeterminate factor parameters
-  # against their QR-identified forms (Heaps & Jermyn 2024), and
-  # broadcast shared-coefficient copies against the sampled scalar.
-  # The downstream convergence advisor and loadings table then work
-  # from the reported names.
+  # posterior. Rotation- and sign-indeterminate factor parameters give
+  # way to their QR-identified forms (Heaps & Jermyn 2024). Broadcast
+  # shared-coefficient copies give way to the sampled scalar. The
+  # convergence advisor and loadings table then use the reported
+  # names.
   identified <- filter_hidden_pars(pars)
   if (length(identified) < length(pars)) {
     all_summaries <- all_summaries[identified, , drop = FALSE]
@@ -217,11 +216,10 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   out$n_series <- counts$n_series
   out$n_timepoints <- counts$n_timepoints
 
-  # How many rows the model was given. `nobs()` counts these, and a
-  # reader takes "Number of observations" to mean them. The product of
-  # the two axes above exceeds the frame on a ragged design and
-  # counted units on a closure-unit family. The two standard
-  # accessors then gave 75 and 300 for one model.
+  # How many rows the model was given. `nobs()` counts these. A reader
+  # takes "Number of observations" to mean them. The product of the
+  # two axes above exceeds the frame on a ragged design. On a
+  # closure-unit family it counts units.
   out$nobs <- nobs(object)
 
   # Store data name (captured at top-level mvgam() call)
@@ -231,7 +229,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 }
 
 # ==============================================================================
-# CORE COMPUTATION FUNCTION (Internal Helper)
+# Core computation
 # ==============================================================================
 
 #' Compute posterior summaries for all parameters
@@ -250,16 +248,19 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 #'
 #' @noRd
 compute_all_summaries <- function(object, probs, robust) {
-  # The draws come from the fitted object, whose method gives every
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1)
+  checkmate::assert_flag(robust)
+  # The draws come from the fitted object. Its method gives every
   # parameter the name `mvgam_user_pars()` assigns: `b_x` for the
-  # positional `b[1]` of the raw Stan model, and brms's names for the
-  # smooth, Gaussian-process and group-level blocks.
+  # positional `b[1]` of the raw Stan model. The smooth,
+  # Gaussian-process and group-level blocks take brms's names.
   draws <- posterior::as_draws_df(object)
 
-  # Each element is named, which gives the column its name, and holds
+  # Each element is named, which gives the column its name. It holds
   # the function itself, which removes the lookup. An unnamed argument
-  # takes its column name from a deparse of what was passed, and for a
-  # function object that is the whole body; a bare string is looked up
+  # takes its column name from a deparse of what was passed. For a
+  # function object that is the whole body. A bare string is looked up
   # in the calling namespace, where a same-named function defined here
   # later would win.
   measures <- if (robust) {
@@ -276,10 +277,9 @@ compute_all_summaries <- function(object, probs, robust) {
     )
   )))
 
-  # Rename columns for display
   names(out) <- rename_summary_cols(names(out), probs, robust)
 
-  # Move parameter names from column to rownames for cleaner printing
+  # Parameter names move from the column to the row names
   out <- as.data.frame(out)
   rownames(out) <- out$variable
   out$variable <- NULL
@@ -288,7 +288,7 @@ compute_all_summaries <- function(object, probs, robust) {
 }
 
 # ==============================================================================
-# COLUMN RENAMING
+# Column renaming
 # ==============================================================================
 
 #' Rename summary columns for display
@@ -298,12 +298,15 @@ compute_all_summaries <- function(object, probs, robust) {
 #'
 #' @param col_names Character vector of column names
 #' @param probs Quantile probabilities used
-#' @param robust Whether robust estimation was used
+#' @param robust Logical. `TRUE` names the median and MAD columns
 #'
 #' @return Character vector with renamed columns
 #'
 #' @noRd
 rename_summary_cols <- function(col_names, probs, robust) {
+  checkmate::assert_character(col_names)
+  checkmate::assert_numeric(probs, len = 2L)
+  checkmate::assert_flag(robust)
   # Rename location and spread measures
   if (robust) {
     col_names[col_names == "median"] <- "Estimate"
@@ -338,7 +341,7 @@ rename_summary_cols <- function(col_names, probs, robust) {
 }
 
 # ==============================================================================
-# PARAMETER MATCHING FUNCTIONS (Pattern-Based)
+# Parameter matching
 # ==============================================================================
 
 #' The parameter blocks a summary reports for each side, in print order
@@ -349,9 +352,9 @@ rename_summary_cols <- function(col_names, probs, robust) {
 #' taxonomy kinds it holds. A distributional parameter's coefficients
 #' join the mean's, as brms reports `b_sigma_x` as `sigma_x`. The basis
 #' coefficients of a smooth or a Gaussian process and the per-level
-#' group-level effects have no meaning one at a time and no block
-#' holds them. `as_draws()` returns them by name, and
-#' `conditional_smooths()` and `ranef()` summarise them.
+#' group-level effects have no meaning one at a time. No block holds
+#' them. `as_draws()` returns them by name. `conditional_smooths()` and
+#' `ranef()` summarise them.
 #'
 #' `wrap` names a hyperparameter inside its class, as brms prints
 #' `sds(sx_1)`, `sdgp(gpx)` and `lscale(gpx)`. The group-level block
@@ -378,9 +381,10 @@ summary_blocks <- function() {
 
 #' A block's rows under the names brms prints
 #'
-#' The block's heading and side name the class and the side, and the
-#' class prefix and the trend suffix are dropped: `b_x`, `bs_sigma_sx_1`, `simo_moord1[1]` and
-#' `b_elev_trend` print as `x`, `sigma_sx_1`, `moord1[1]` and `elev`.
+#' The block's heading and side name the class and the side. The class
+#' prefix and the trend suffix are dropped: `b_x`, `bs_sigma_sx_1`,
+#' `simo_moord1[1]` and `b_elev_trend` print as `x`, `sigma_sx_1`,
+#' `moord1[1]` and `elev`.
 #' A hyperparameter keeps its class around the rest, as `sds(sx_1)`.
 #' A group-level block becomes one table per grouping factor, as
 #' `brms:::summary.brmsfit()` builds it: the rows of each factor are
@@ -397,6 +401,9 @@ summary_blocks <- function() {
 #'   block a list of such tables named by grouping factor
 #' @noRd
 summary_block_rows <- function(tab, block, groups = character()) {
+  checkmate::assert_data_frame(tab)
+  checkmate::assert_list(block)
+  checkmate::assert_character(groups)
   pars <- sub("_trend(\\[|$)", "\\1", rownames(tab))
   class <- sub("_.*$", "", pars)
   if (identical(block$key, "random")) {
@@ -431,6 +438,7 @@ summary_block_rows <- function(tab, block, groups = character()) {
 #'
 #' @noRd
 match_family_pars <- function(pars) {
+  checkmate::assert_character(pars)
   mvgam_par_kind(pars) == "family"
 }
 
@@ -447,15 +455,16 @@ match_family_pars <- function(pars) {
 #'
 #' @noRd
 match_trend_specific_pars <- function(pars) {
+  checkmate::assert_character(pars)
   mvgam_par_kind(pars) == "dynamics" & !is_hidden_par(pars)
 }
 
 #' Match factor loading parameter names
 #'
 #' @description
-#' Identifies the reported factor loadings: `Z_tilde\[i, j\]` in a
-#' fit identified by the QR rotation, and `Z\[i, j\]` in every other
-#' factor fit. `factor_loading_param_pattern()` makes the choice.
+#' Identifies the reported factor loadings. A fit identified by the QR
+#' rotation reports `Z_tilde\[i, j\]`. Every other factor fit reports
+#' `Z\[i, j\]`. `factor_loading_param_pattern()` makes the choice.
 #'
 #' @param pars Character vector of all parameter names
 #' @return Logical vector indicating which parameters are factor
@@ -463,20 +472,23 @@ match_trend_specific_pars <- function(pars) {
 #'
 #' @noRd
 match_z_loadings <- function(pars) {
+  checkmate::assert_character(pars)
   grepl(factor_loading_param_pattern(pars), pars)
 }
 
 #' The parameters whose draws are not all equal
 #'
 #' The identified loadings are lower triangular. Every draw holds the
-#' entries above the diagonal at zero, and a summary of them reports
-#' a constant with no convergence diagnostics.
+#' entries above the diagonal at zero. A summary of them reports a
+#' constant with no convergence diagnostics.
 #'
 #' @param draws A `draws` object holding `pars`.
 #' @param pars Character vector of parameter names.
 #' @return The subset of `pars` that varies across draws.
 #' @noRd
 varying_pars <- function(draws, pars) {
+  checkmate::assert_class(draws, "draws")
+  checkmate::assert_character(pars)
   pars[vapply(pars, function(p) {
     v <- as.numeric(posterior::extract_variable(draws, p))
     any(v != v[1L])
@@ -485,16 +497,16 @@ varying_pars <- function(draws, pars) {
 
 #' The trend's own time-indexed states
 #'
-#' A fit has one per time point and series, and summary output leaves
-#' them out. Elsewhere in the package `latent_state` names the
-#' closure-unit quantity, and the trend's own states take
-#' `trend_state`.
+#' A fit has one per time point and series. Summary output leaves them
+#' out. Elsewhere in the package `latent_state` names the closure-unit
+#' quantity. The trend's own states take `trend_state`.
 #'
 #' @param pars Character vector of parameter names
 #' @return Logical vector
 #'
 #' @noRd
 is_trend_state_param <- function(pars) {
+  checkmate::assert_character(pars)
   mvgam_par_kind(pars) == "state"
 }
 
@@ -502,34 +514,37 @@ is_trend_state_param <- function(pars) {
 #' The trend's per-cell matrix parameters
 #'
 #' A correlated or hierarchical trend estimates one entry per cell of
-#' a matrix, and a high-dimensional fit prints hundreds of those
-#' rows. `summary()` prints them with `matrices = TRUE`. `par_taxonomy.R`
-#' declares the names, which keeps one account of what each name
-#' means.
+#' a matrix. A high-dimensional fit would print hundreds of those
+#' rows. `summary()` prints them with `matrices = TRUE`.
+#' `par_taxonomy.R` declares the names, which keeps one account of
+#' what each name means.
 #'
 #' @param pars Character vector of parameter names
 #' @return Logical vector
 #'
 #' @noRd
 is_trend_matrix_param <- function(pars) {
+  checkmate::assert_character(pars)
   grepl(MVGAM_PAR_MATRIX_PATTERN, pars)
 }
 
 # ==============================================================================
-# HELPER FUNCTIONS FOR PRINT METHOD
+# Print method helpers
 # ==============================================================================
 
 #' Format a parameter table as brms prints one
 #'
 #' `brms:::print_format()` prints every column to `digits` places and
-#' the effective sample sizes as whole draws. Rounding instead printed
-#' an Rhat of 1.00 as `1` and an ESS as `1390.86`.
+#' the effective sample sizes as whole draws. An Rhat of 1.00 then
+#' prints as `1.00` and an ESS as a whole number.
 #'
 #' @param x Data frame of numeric columns, named by parameter
 #' @param digits Number of decimal places
 #' @return Character matrix with the row and column names of `x`
 #' @noRd
 format_param_table <- function(x, digits = 2) {
+  checkmate::assert_data_frame(x)
+  checkmate::assert_count(digits)
   out <- as.matrix(x)
   for (col in colnames(x)) {
     fmt <- if (col %in% c("Bulk_ESS", "Tail_ESS")) "%.0f" else {
@@ -549,8 +564,12 @@ format_param_table <- function(x, digits = 2) {
 #' @param header Character string for section header or NULL for no header
 #' @param digits Number of decimal places
 #'
+#' @return `NULL`, invisibly
 #' @noRd
 print_param_section <- function(table, header, digits = 2) {
+  checkmate::assert_data_frame(table, null.ok = TRUE)
+  checkmate::assert_string(header, null.ok = TRUE)
+  checkmate::assert_count(digits)
   if (!is.null(table) && nrow(table) > 0) {
     if (!is.null(header)) {
       cat(header, ":\n", sep = "")
@@ -558,10 +577,11 @@ print_param_section <- function(table, header, digits = 2) {
     print(format_param_table(table, digits), quote = FALSE, right = TRUE)
     cat("\n")
   }
+  invisible(NULL)
 }
 
 # ==============================================================================
-# PRINT METHOD
+# Print method
 # ==============================================================================
 
 #' Print a model's family and links, one line pair per response
@@ -575,6 +595,7 @@ print_param_section <- function(table, header, digits = 2) {
 #' @return The families `model_families()` gives, invisibly.
 #' @noRd
 print_family_links <- function(x) {
+  checkmate::assert_list(x)
   fams <- model_families(x)
   if (inherits(fams, "family")) {
     cat(" Family: ", resolve_family_name(fams), " \n", sep = "")
@@ -678,9 +699,12 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     print_param_section(x$loadings, "Factor Loadings", digits)
     print_param_section(x$loadings_prior, "Loadings Prior", digits)
   }
-  cat("Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS\n")
-  cat("and Tail_ESS are effective sample size measures, and Rhat is the potential\n")
-  cat("scale reduction factor on split chains (at convergence, Rhat = 1).\n")
+  cat("Draws were sampled using sampling(NUTS). For each parameter, ",
+      "Bulk_ESS\n", sep = "")
+  cat("and Tail_ESS are effective sample size measures, ",
+      "and Rhat is the potential\n", sep = "")
+  cat("scale reduction factor on split chains (at convergence, ",
+      "Rhat = 1).\n", sep = "")
 
   steps <- build_next_steps(x)
   cat("\nNext steps:\n")
@@ -693,17 +717,16 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
 
 #' How many draws a fit holds and how the sampler was run
 #'
-#' The sampler's own arguments are the record of what was asked for.
-#' `posterior::niterations()` counts the draws kept after warmup, and
-#' reporting it as `iter` understated the run: `print()` said 1000
-#' where `summary()` said 2000 for one fit. It is used only when the
-#' fit recorded no arguments.
+#' The sampler's own arguments record what was asked for.
+#' `posterior::niterations()` counts the draws kept after warmup. It
+#' gives `iter` only when the fit recorded no sampler arguments.
 #'
 #' @param object A fitted `mvgam` object
 #' @return List with `nchains`, `niter`, `nwarmup` (`NULL` when
 #'   unrecorded), `nthin` and `ndraws`
 #' @noRd
 draw_counts <- function(object) {
+  checkmate::assert_class(object, "mvgam")
   draws <- posterior::as_draws(object$fit)
   sampler <- mvgam_sampler_inheritance(object)
   list(
@@ -724,6 +747,7 @@ draw_counts <- function(object) {
 #' @return A single string spanning two lines
 #' @noRd
 format_draws_line <- function(x) {
+  checkmate::assert_list(x)
   paste0(
     "  Draws: ", x$nchains, " chains, each with iter = ", x$niter,
     "; warmup = ", x$nwarmup %||% "unrecorded",
@@ -741,14 +765,15 @@ format_draws_line <- function(x) {
 #' gives `AR` for a plain AR(1), for `AR(p = 3)` and for
 #' `AR(p = 1, ma = TRUE)` alike.
 #'
-#' A trend formula carrying only a constructor reduces to `~0`, and
-#' one with an intercept alone to `~1`. Neither names a predictor a
-#' reader acts on, and both are left out.
+#' A trend formula holding only a constructor reduces to `~0`. One with
+#' an intercept alone reduces to `~1`. Neither names a predictor a
+#' reader acts on. The line leaves both out.
 #'
 #' @param x An `mvgam_summary` object
 #' @return Character scalar, empty when the fit carries no trend
 #' @noRd
 format_trend_line <- function(x) {
+  checkmate::assert_list(x)
   if (is.null(x$trend_model)) {
     return("")
   }
@@ -767,14 +792,15 @@ format_trend_line <- function(x) {
 #' The trend formula as the user wrote it, less its trend constructor,
 #' which the trend line names. mvgam stores a rewritten copy for
 #' fitting, where `lv_axis()` becomes a data column and a `- 1` is
-#' added, and that copy is the fallback for a fit that records no
-#' user formula. A formula reduced to `~0` or `~1` names no predictor
-#' a reader acts on.
+#' added. A fit that records no user formula falls back to that copy.
+#' A formula reduced to `~0` or `~1` names no predictor a reader acts
+#' on.
 #'
 #' @param object An `mvgam` object
 #' @return A one-sided formula as a single string, or `NULL`
 #' @noRd
 trend_predictors <- function(object) {
+  checkmate::assert_list(object)
   trend_formula <- if (inherits(object$trend_call, "formula")) {
     parse_base_formula_safe(object$trend_call, mvgam_trend_registry())
   } else {
@@ -793,20 +819,25 @@ trend_predictors <- function(object) {
 }
 
 
-# Adaptive "Next steps" list for `print.summary.mvgam`. Builds a
-# candidate set, gated on what the fit can actually offer, then
-# caps the list at five entries by priority so the suggestion
-# block stays scannable. Universal entries (pp_check, loo) always
-# appear; model-specific entries (shared_variation, residual_cor,
-# conditional_effects) only appear when relevant.
-#'@noRd
+#' The "Next steps" list of `print.mvgam_summary()`
+#'
+#' Builds the candidate suggestions the fit supports, then keeps the
+#' first six by priority. `pp_check()` and a model comparison always
+#' appear. The suggestions specific to a model, such as
+#' `shared_variation()`, `residual_cor()` and `conditional_effects()`,
+#' appear only when relevant.
+#'
+#' @param x An `mvgam_summary` object
+#' @return Character vector of suggestions
+#' @noRd
 build_next_steps <- function(x) {
+  checkmate::assert_list(x)
   has_factors <- !is.null(x$loadings) || !is.null(x$loadings_prior)
   trend_model <- x$trend_model %||% ""
   has_cor_trend <- has_factors || isTRUE(x$trend_has_cor)
   # A covariate may enter either predictor. The observation side
-  # always holds an intercept row among its fixed effects, and the
-  # trend side holds none.
+  # always holds an intercept row among its fixed effects. The trend
+  # side holds none.
   covariate_blocks <- c("smooth", "gp", "mo", "trend_fixed",
                         "trend_smooth", "trend_gp", "trend_mo")
   has_covariates <- (!is.null(x$fixed) && nrow(x$fixed) > 1L) ||
@@ -814,17 +845,14 @@ build_next_steps <- function(x) {
   forecastable <- !grepl("^ZMVN", trend_model)
   # A detection process decides the closure-unit suggestions. `mvn()`,
   # `mvt()` and `diri()` share the closure-unit layout and model no
-  # detection. Testing the layout sent readers of their summaries to
-  # `pp_check(type = "fit_stat")`, which refuses them.
+  # detection. `pp_check(type = "fit_stat")` refuses them.
   is_cu <- !is.null(x$family) && is_closure_unit_family(x$family)
   has_latent_state <- "latent_state" %in% family_predict_types(x$family)
-  # Candidates in priority order; first five matching entries
-  # populate the printed list. Closure-unit (occ / nmix) fits get
-  # routed to the family-aware GOF + latent-state surfaces
-  # (chi-squared / Freeman-Tukey discrepancy, latent psi or N
-  # posterior, per-(series, time) ribbon plot) which are the
-  # ecologically meaningful next steps; non-closure-unit fits get
-  # the standard mvgam suggestion set.
+  # Candidates in priority order. A closure-unit fit (occ or nmix)
+  # takes the family-aware goodness-of-fit and latent-state
+  # suggestions: the chi-squared or Freeman-Tukey discrepancy, the
+  # posterior of latent psi or N and the per-(series, time) ribbon
+  # plot. Every other fit takes the standard mvgam suggestions.
   pp_text <- if (is_cu) {
     "`pp_check(fit, type = \"fit_stat\")`: closure-unit GOF p-value"
   } else {
@@ -852,7 +880,7 @@ build_next_steps <- function(x) {
     list(when = forecastable,
          text = "`forecast(fit, newdata = ...)`: out-of-sample forecasts"),
     # PSIS-LOO leaves out an observation the latent state was fitted
-    # to, and a fit with temporal dynamics is compared by refitting on
+    # to. A fit with temporal dynamics is compared by refitting on
     # shorter series.
     list(when = TRUE,
          text = if (nzchar(trend_model) && forecastable) {
@@ -875,7 +903,7 @@ build_next_steps <- function(x) {
 
 
 # ==============================================================================
-# MULTIPLE IMPUTATION SUMMARY METHOD
+# Multiple imputation summary method
 # ==============================================================================
 
 #' Summary method for multiple imputation mvgam models
@@ -919,17 +947,16 @@ build_next_steps <- function(x) {
 summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
                                   robust = FALSE,
                                   ...) {
-  # Input validation
   checkmate::assert_class(object, "mvgam_pooled")
   checkmate::assert_numeric(probs, len = 2, lower = 0, upper = 1)
   checkmate::assert_true(probs[1] < probs[2])
-  checkmate::assert_logical(robust, len = 1)
+  checkmate::assert_flag(robust)
 
   # Call parent method to get standard summary
   base_summary <- NextMethod("summary")
 
-  # `pool_mvgam_fits()` is the only constructor of this class and
-  # writes all three.
+  # `pool_mvgam_fits()` constructs this class and writes all three
+  # attributes.
   individual_fits <- attr(object, "individual_fits")
   n_imputations <- attr(object, "n_imputations")
   combination_method <- attr(object, "combination_method")
@@ -945,10 +972,10 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
     draws <- posterior::as_draws(individual_fits[[i]]$fit)
 
     # The worst R-hat and smallest ESS reported here are the numbers a
-    # reader attributes to a model parameter. Taking them over every
-    # saved variable lets one latent state at one occasion set both,
-    # and a trend carries thousands of those. `mvgam_user_pars()` is
-    # the projection every user-facing reader shares.
+    # reader attributes to a model parameter. Over every saved variable
+    # a single latent state at one occasion could set both. A trend
+    # holds thousands of those. `mvgam_user_pars()` is the projection
+    # every user-facing reader shares.
     keep <- intersect(
       unname(mvgam_user_pars(individual_fits[[i]])),
       posterior::variables(draws)
@@ -999,7 +1026,7 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
 }
 
 # ==============================================================================
-# MULTIPLE IMPUTATION PRINT METHOD
+# Multiple imputation print method
 # ==============================================================================
 
 #' Print method for multiple imputation summary objects
@@ -1034,7 +1061,6 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
 #'
 #' @export
 print.mvgam_pooled_summary <- function(x, digits = 2, ...) {
-  # Input validation
   checkmate::assert_class(x, "mvgam_pooled_summary")
   checkmate::assert_int(digits, lower = 0)
 

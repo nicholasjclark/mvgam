@@ -7,8 +7,7 @@
 #' @name stability.mvgam
 #'
 #' @param object \code{list} object of class \code{mvgam} resulting from a call
-#'   to [mvgam()] that used a Vector Autoregressive latent process model (either
-#'   as `VAR(cor = FALSE)` or `VAR(cor = TRUE)`)
+#'   to [mvgam()] that used a `VAR(p = 1)` latent process model
 #'
 #'@param ndraws Optional integer; the number of posterior draws to use.
 #'  Each draw costs a Lyapunov solve, so a wide panel is worth
@@ -90,13 +89,14 @@
 #'   process using \code{\link{irf}} for impulse response functions or
 #'   \code{\link{fevd}} for forecast error variance decompositions.
 #'
-#' @return A \code{data.frame} containing posterior draws for each stability
-#'   metric.
+#' @return A \code{data.frame} with the posterior median and interval of
+#'   each stability metric, or under `summary = FALSE` an object of class
+#'   `mvgam_stability` holding one row of metrics per posterior draw.
 #'
 #' @references
 #'   AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003). Estimating
 #'   community stability and ecological interactions from time-series data.
-#'   *Ecological Monographs*, 73, 301–330.
+#'   *Ecological Monographs*, 73, 301-330.
 #'
 #' @author Nicholas J Clark
 #'

@@ -24,15 +24,23 @@ assert_var_trend <- function(object, surface) {
   invisible(TRUE)
 }
 
-# Internal: walk a VAR posterior one draw at a time.
-#
-# `irf()` and `fevd()` ask different questions of the same object.
-# Each draw is one companion matrix and one innovation covariance,
-# assembled the same way, and only the kernel reading them differs.
-# Assembling the draw in both places let the two surfaces drift into
-# describing different draws by the same index.
+#' A kernel applied to each draw of a VAR posterior
+#'
+#' `irf()` and `fevd()` apply different kernels to the same draws. Each
+#' draw is assembled here once, as one set of transition matrices and
+#' one innovation covariance. Both functions then index the same draw by
+#' the same number.
+#'
+#' @param var_post VAR posterior from `extract_var_posterior()`, holding
+#'   `ndraws`, `K`, `labels`, `A`, `D` and `Sigma`
+#' @param kernel Function taking one assembled draw as a list
+#' @param future Logical flag to run the draws through `future`
+#' @return List of kernel outputs, one per draw
 #' @noRd
 var_draw_surfaces <- function(var_post, kernel, future) {
+  checkmate::assert_list(var_post)
+  checkmate::assert_function(kernel)
+  checkmate::assert_flag(future)
   mvgam_maybe_future_lapply(
     var_post$ndraws,
     function(draw) {

@@ -168,6 +168,53 @@ at their own times, with no rows added for the times a series
 lacks. `ZMVN()` has no time dynamics and accepts any spacing. `?CAR`
 gives a worked example.
 
+## Converting time series objects
+
+`series_to_mvgam()` builds the long frame from the objects other
+forecasting packages work with: a `ts`, `mts` or `msts` from base R
+and forecast, a `tsibble` from the tidyverts packages or a wide
+`data.frame` holding a date column and one column per series. Each
+column of an `mts` becomes a series, and `h` holds out the final
+time steps as test data:
+
+```{r series-to-mvgam-ts}
+deaths <- series_to_mvgam(cbind(male = mdeaths, female = fdeaths),
+                          h = 12L)
+head(deaths$data_train, 4)
+```
+
+The `season` column holds the month, taken from the frequency of
+the `ts`, for a cyclic smooth such as `s(season, bs = "cc")`. A
+`tsibble` supplies its series from its key and its time grid from
+its index. Because a regular `tsibble` is filled to its full grid,
+the months its index skips arrive as rows with a missing response.
+An irregular `tsibble` keeps its own times for `CAR()` or `ZMVN()`.
+Measured variables other than the response become covariates:
+
+```{r series-to-mvgam-tsibble, eval = isTRUE(knitr::opts_chunk$get("eval")) && requireNamespace("tsibble", quietly = TRUE)}
+library(tsibble)
+set.seed(2)
+visits <- tsibble(
+  month  = rep(yearmonth("2023 Jan") + c(0:5, 8:11), 2),
+  clinic = rep(c("north", "south"), each = 10),
+  visits = rpois(20, 30),
+  staff  = rpois(20, 6),
+  key = clinic, index = month
+)
+clinics <- series_to_mvgam(visits, response = "visits")
+clinics[clinics$time %in% 6:9, ]
+```
+
+Binding future rows from `tsibble::new_data()` to the observed rows
+before conversion continues the same `time` grid, which keeps the
+forecast frame aligned with the training frame.
+
+`freq` states seasonal periods in time steps, matching `frequency()`
+for a `ts` and `seasonal.periods` for an `msts`. A period above 1
+adds a column holding the position of each row within it, named
+`season` for a single period and `season_7`, `season_365.25` and so
+on for several.
+
 ## The response and family compatibility
 
 Each family has a support the response must lie in: non-negative
@@ -466,6 +513,8 @@ checks all five.
 - `?mvgam_data` for the inspector's full
   argument list.
 - `?check_newdata` for the check on forecast frames.
+- `?series_to_mvgam` for the conversion of a `ts`, a `tsibble` or a
+  wide frame.
 - `?brmsfamily` for the brms family library, plus `?tweedie`,
   `?beta_nb`, `?com_binomial`, `?nmix` and `?occ` for the
   response-shape rules of the families mvgam adds.

@@ -74,7 +74,7 @@
 #' the static-dpar and distributional cases work without any
 #' extra wiring. If the data display obvious heteroscedasticity
 #' (e.g. seasonal claim severity), prefer letting `mphi` vary
-#' via a sub-formula over the global default (Bürkner 2018, brms
+#' via a sub-formula over the global default (Burkner 2018, brms
 #' distributional regression vignette).
 #'
 #' The Stan likelihood is the compound Poisson-gamma
@@ -163,7 +163,7 @@
 #'   *Journal of the Royal Statistical Society: Series B*, 49,
 #'   127-162.
 #'
-#' Bürkner, P.-C. (2018). Advanced Bayesian multilevel modeling
+#' Burkner, P.-C. (2018). Advanced Bayesian multilevel modeling
 #'   with the R package brms. *The R Journal*, 10, 395-411.
 #'
 #' @examples
@@ -1585,45 +1585,51 @@ is_simplex_response_family <- function(family) {
 }
 
 
-# Internal: whether a family's response is 0/1 rather than a count.
-#
-# `occ()` and the Royle-Nichols `nmix()` score detections, so their
-# response is binary while the latent state is not. Read through an
-# accessor for the same reason its five sibling attributes are: a
-# bare `attr()` without `exact = TRUE` is a prefix match, and a
-# reader cannot tell a family's own record from an incidental
-# attribute.
+#' Whether a family's response is binary
+#'
+#' `occ()` and the Royle-Nichols `nmix()` score detections. Their
+#' response is binary while the latent state is a count or occupancy.
+#' `attr()` takes `exact = TRUE` here, as for the other family
+#' attributes. Without it `attr()` matches by prefix.
+#'
+#' @param family Family object, or `NULL`
+#' @return Logical scalar
 #' @noRd
 is_binary_response_family <- function(family) {
+  checkmate::assert_list(family, null.ok = TRUE)
   if (is.null(family)) return(FALSE)
   isTRUE(attr(family, "mvgam_binary_response", exact = TRUE))
 }
 
 
-# Internal: the `type` strings a family adds to `predict()` and
-# `conditional_effects()` beyond the shared set.
-#
-# Empty for a family that adds none, so a caller can bind the result
-# without checking for NULL first.
+#' The prediction types a family adds to the shared set
+#'
+#' Covers `predict()` and `conditional_effects()`. A family adding none
+#' returns an empty vector, which a caller can bind without a `NULL`
+#' check.
+#'
+#' @param family Family object, or `NULL`
+#' @return Character vector of prediction types
 #' @noRd
 family_predict_types <- function(family) {
+  checkmate::assert_list(family, null.ok = TRUE)
   if (is.null(family)) return(character(0L))
   attr(family, "mvgam_predict_types", exact = TRUE) %||% character(0L)
 }
 
 
-# Internal: refuse a closure-unit predict type the family does not
-# offer.
-#
-# Being a closure-unit family is the wire-format question and does
-# not settle this one: `mvn()`, `mvt()` and `diri()` share that
-# pipeline and expose no latent state. The registry is what knows,
-# and asking it here is what keeps every caller to one answer. A
-# caller that asked only whether the family was closure-unit let
-# those three through to a dispatcher with no branch for them, which
-# replied by naming a source file for the user to edit.
-#'@noRd
+#' Refuse a closure-unit prediction type the family lacks
+#'
+#' `mvn()`, `mvt()` and `diri()` use the closure-unit layout and expose
+#' no latent state. The family registry lists the types each family
+#' offers. Every caller checks it here.
+#'
+#' @param family Family object
+#' @param type Character prediction type
+#' @return `TRUE`, invisibly, or an error
+#' @noRd
 require_closure_unit_predict_type <- function(family, type) {
+  checkmate::assert_string(type)
   if (!uses_closure_unit_layout(family) ||
         !(type %in% family_predict_types(family))) {
     refuse_unsupported_predict_type(family, type)
@@ -1632,13 +1638,15 @@ require_closure_unit_predict_type <- function(family, type) {
 }
 
 
-# Internal: refuse a state only a fault in mvgam can reach.
-#
-# The caller wrote nothing wrong, and the one useful thing to tell them
-# is where to report it. A refusal naming a function or a source file
-# to change offers an action no user of the package can take. Every
-# refusal of this kind goes through here.
-#'@noRd
+#' Refuse a state only a fault in mvgam can reach
+#'
+#' The caller wrote nothing wrong. The message tells them where to
+#' report the fault. Every refusal of this kind goes through here.
+#'
+#' @param headline Character main line of the message
+#' @param detail Character detail line of the message
+#' @return Nothing. Always raises an error.
+#' @noRd
 stop_mvgam_fault <- function(headline, detail) {
   checkmate::assert_string(headline)
   checkmate::assert_string(detail)
@@ -1651,10 +1659,15 @@ stop_mvgam_fault <- function(headline, detail) {
 }
 
 
-# Internal: refuse an internal array whose shape differs from the one
-# its consumer needs. `got` and `expected` are dimension vectors.
-#'@noRd
+#' Refuse an internal array of the wrong shape
+#'
+#' @param what Character description of the array
+#' @param got Numeric dimension vector received
+#' @param expected Numeric dimension vector the consumer needs
+#' @return Nothing. Always raises an error.
+#' @noRd
 stop_shape_fault <- function(what, got, expected) {
+  checkmate::assert_string(what)
   stop_mvgam_fault(
     paste0(what, " has the wrong shape."),
     paste0("Got [", paste(got, collapse = " x "), "], expected [",
@@ -1663,9 +1676,14 @@ stop_shape_fault <- function(what, got, expected) {
 }
 
 
-# Internal: refuse an internal list missing fields its consumer uses.
-#'@noRd
+#' Refuse an internal list missing fields its consumer uses
+#'
+#' @param what Character description of the list
+#' @param missing Character vector of the missing field names
+#' @return Nothing. Always raises an error.
+#' @noRd
 stop_missing_fields <- function(what, missing) {
+  checkmate::assert_string(what)
   stop_mvgam_fault(
     paste0(what, " lacks required fields."),
     paste0("Missing: ", paste0("'", missing, "'", collapse = ", "), ".")
@@ -1673,9 +1691,16 @@ stop_missing_fields <- function(what, missing) {
 }
 
 
-# Internal: refuse an internal object of the wrong class.
-#'@noRd
+#' Refuse an internal object of the wrong class
+#'
+#' @param what Character description of the object
+#' @param object The object received
+#' @param expected Character description of the expected class
+#' @return Nothing. Always raises an error.
+#' @noRd
 stop_wrong_class <- function(what, object, expected) {
+  checkmate::assert_string(what)
+  checkmate::assert_string(expected)
   stop_mvgam_fault(
     paste0(what, " must be ", expected, "."),
     paste0("Got class '", paste(class(object), collapse = "', '"), "'.")
@@ -1683,10 +1708,14 @@ stop_wrong_class <- function(what, object, expected) {
 }
 
 
-# Internal: refuse a posterior that lacks draws a fitted model of its
-# kind always stores.
-#'@noRd
+#' Refuse a posterior missing draws its fit always stores
+#'
+#' @param what Character parameter name
+#' @param columns Character vector of the missing column names
+#' @return Nothing. Always raises an error.
+#' @noRd
 stop_missing_draws <- function(what, columns) {
+  checkmate::assert_string(what)
   stop_mvgam_fault(
     paste0("The posterior lacks the '", what, "' draws."),
     paste0("Missing columns: ", paste(utils::head(columns, 6L),
@@ -1696,11 +1725,15 @@ stop_missing_draws <- function(what, columns) {
 }
 
 
-# Internal: refuse a family the internal dispatch has no kernel for,
-# which means the family was registered without a kernel some method
-# needs.
-#'@noRd
+#' Refuse a family registered without a kernel some method needs
+#'
+#' @param family_name Character family name
+#' @param what Character description of the missing computation
+#' @return Nothing. Always raises an error.
+#' @noRd
 refuse_missing_family_dispatch <- function(family_name, what) {
+  checkmate::assert_string(family_name)
+  checkmate::assert_string(what)
   stop_mvgam_fault(
     paste0("mvgam cannot compute ", what, " for family '",
            family_name, "'."),
@@ -1880,10 +1913,16 @@ closure_unit_key_vars <- function(family, series_var = "series",
 }
 
 
-# Internal: the columns that key a fitted model's closure units. The
-# fit records the time and series columns its trend named.
-#'@noRd
+#' The columns that key a fitted model's closure units
+#'
+#' The fit records the time and series columns its trend named.
+#'
+#' @param object Fitted `mvgam` object
+#' @return Character vector of key columns, or `NULL` for a family
+#'   without closure units
+#' @noRd
 fit_closure_unit_keys <- function(object) {
+  checkmate::assert_list(object)
   vars <- axis_vars(object)
   closure_unit_key_vars(object$family, vars$series_var, vars$time_var)
 }
@@ -1910,53 +1949,44 @@ closure_unit_default_cap_buffer <- function(family) {
   as.integer(buf)
 }
 
-# Internal: the series axis a closure-unit fit was built on.
-#
-# For a multi-response family these levels are the response
-# components a unit holds one row of, the K species of a composition
-# or the K responses of a multivariate normal. For a detection family
-# they are the series whose `(series, time)` pairs are the units.
-#
-# The axis answers this, not the frame's own column. Which component
-# a row carries decides which entry of `Psi` it is scored against,
-# which is a question about the model: a frame whose series column
-# was superseded by a grouping, or which never saw one of the
-# components, re-factors into a different numbering while the fit's
-# own numbering stays put. `extract_mv_response_components()` pairs
-# rows with `Psi` through the same accessor, so a grid completed here
-# and a density taken there cannot disagree about which species a row
-# belongs to.
-#'@noRd
+#' The series levels of a closure-unit fit
+#'
+#' For a multi-response family the levels are the response components
+#' each unit holds one row of. For a detection family they are the
+#' series whose `(series, time)` pairs form the units. The levels come
+#' from the fit's axis. A frame's own series column can re-factor into
+#' another numbering, which would score a row against the wrong entry
+#' of `Psi`. `extract_mv_response_components()` uses the same levels.
+#'
+#' @param object Fitted `mvgam` object
+#' @return Character vector of series levels
+#' @noRd
 closure_unit_axis_levels <- function(object) {
+  checkmate::assert_list(object)
   levels(axis_row_series(object, object$data))
 }
 
 
-# Internal: does this frame already carry intact closure units?
-#
-# `marginaleffects` reaches `get_predict.mvgam()` with either the
-# frame the model was fitted on or a synthetic grid, and the two need
-# opposite treatment: a real frame is predicted as it stands, a grid
-# has to be given the unit structure its family needs. Different
-# evidence settles it at the two grains, because the two kinds of
-# frame carry different columns.
-#
-# A composition or a multivariate response keys its units by time
-# alone and fills each with one row per component, which is checkable
-# on the frame itself: every unit holds each component exactly once.
-# `datagrid()` pins the key at one typical value rather than dropping
-# it, so its rows fall into a single unit holding many rows of one
-# component. That fails the test whether or not the key is present,
-# which a test counting units does not.
-#
-# A detection unit is a `(series, time)` pair with repeat visits, and
-# no structural test separates one visit of each of three units from
-# three visits of one. `visit` settles it instead: no model formula
-# names that column, so `datagrid()` cannot invent it, and a frame
-# carrying it was either assembled by a caller who meant the units it
-# describes or replicated wholesale from the training data.
-#'@noRd
+#' Whether a frame holds intact closure units
+#'
+#' `marginaleffects` reaches `get_predict.mvgam()` with the training
+#' frame or a synthetic grid. A real frame is predicted unchanged. A
+#' grid needs the unit structure its family requires. A composition or
+#' multivariate response is intact when every unit holds each
+#' component once. `datagrid()` pins the key at one typical value,
+#' giving one unit with many rows of one component. A detection unit
+#' is a `(series, time)` pair with repeat visits, which no structural
+#' test separates. A detection frame holding a `visit` column counts as
+#' intact. No model formula names that column, so `datagrid()` cannot
+#' create it.
+#'
+#' @param object Fitted `mvgam` object
+#' @param newdata Data frame of prediction rows
+#' @return Logical scalar
+#' @noRd
 closure_units_are_intact <- function(object, newdata) {
+  checkmate::assert_list(object)
+  checkmate::assert_data_frame(newdata)
   key <- fit_closure_unit_keys(object)
   if (is.null(key) || !all(key %in% names(newdata))) {
     return(FALSE)
@@ -2022,36 +2052,32 @@ closure_unit_frame <- function(object, newdata = NULL) {
 }
 
 
-# Internal: complete a composition's prediction grid to whole sites.
-#
-# A softmax spans the K categories of a site, so a grid row carrying
-# one category is a simplex of width one, whose only probability is
-# 1 whatever the linear predictor holds. Every panel a composition
-# drew was therefore a flat line at one with a zero-width interval.
-# Each distinct covariate setting in the grid is completed to the K
-# category rows of one synthetic site, and the caller takes back the
-# rows the grid asked about.
-#
-# Grouping the grid's own rows into units is not enough, though it
-# looks like it should be. A main-effect grid holds the categories
-# together at its first covariate value and then one category across
-# the remaining values, so grouping leaves every later setting a
-# unit of one.
-#
-# Only a synthetic grid reaches here, which
-# `closure_units_are_intact()` decides, so the K-fold widening is
-# paid on a few hundred rows at most and a real frame is returned
-# untouched. A real frame needs no completion anyway: it already
-# carries the K rows of each site.
-#
-# @return `NULL` when the family needs no completion; otherwise a
-#   list with `data`, the completed grid, and `take`, one index per
-#   row of `newdata` into `data`.
-#'@noRd
+#' A composition's prediction grid completed to whole sites
+#'
+#' A softmax spans the K categories of a site. A grid row holding one
+#' category is a simplex of width one, with probability 1 whatever the
+#' linear predictor. Each distinct covariate setting is completed to
+#' the K category rows of one synthetic site. The caller takes back the
+#' rows the grid asked about. Grouping the grid's own rows is not
+#' enough. A main-effect grid holds every category at its first
+#' covariate value and one category at the rest. Only a synthetic grid
+#' reaches the completion, keeping the K-fold widening to a few hundred
+#' rows.
+#'
+#' @param object Fitted `mvgam` object
+#' @param newdata Data frame of prediction rows
+#' @param is_grid Logical flag for a synthetic grid
+#' @return `NULL` when the family needs no completion. Otherwise a list
+#'   holding the completed grid `data` and `take`, one index into
+#'   `data` per row of `newdata`.
+#' @noRd
 complete_simplex_grid <- function(object, newdata,
                                   is_grid = !closure_units_are_intact(
                                     object, newdata
                                   )) {
+  checkmate::assert_list(object)
+  checkmate::assert_data_frame(newdata)
+  checkmate::assert_flag(is_grid)
   if (!is_simplex_response_family(object$family) || !is_grid) {
     return(NULL)
   }
@@ -2205,22 +2231,29 @@ complete_closure_unit_newdata <- function(object, newdata,
 }
 
 
-# Internal: which closure unit each row belongs to.
-#
-# The grouping columns are integer-coded before they are pasted, so
-# columns of any type combine and the separator cannot collide: an
-# integer code never contains an underscore, while the values behind
-# it can.
-#
-# `response_var` is what separates a guard from a description. A
-# missing response is a visit that did not happen, and brms drops
-# those rows from the likelihood, so counts taken over the raw frame
-# describe a model that was never fitted. Naming the response makes
-# `n_rep` the observed visit count and leaves a unit with none at
-# zero.
+#' The closure unit each row belongs to
+#'
+#' The grouping columns are integer-coded before pasting. Columns of
+#' any type then combine. The separator cannot collide with a value. A
+#' missing response is a visit that did not happen. brms drops those
+#' rows from the likelihood. Naming `response_var` makes `n_rep` the
+#' observed visit count, leaving a unit with none at zero.
+#'
+#' @param data Data frame of visit rows
+#' @param unit_grouping_vars Character vector of key columns
+#' @param response_var Character response column, or `NULL` to count
+#'   every row
+#' @return List holding `unit`, `label`, `levels`, `observed` and
+#'   `n_rep`
 #' @noRd
 closure_unit_index <- function(data, unit_grouping_vars,
                                response_var = NULL) {
+  checkmate::assert(
+    checkmate::check_data_frame(data),
+    checkmate::check_list(data)
+  )
+  checkmate::assert_character(unit_grouping_vars, min.len = 1L)
+  checkmate::assert_string(response_var, null.ok = TRUE)
   codes <- lapply(unit_grouping_vars, function(col) {
     as.integer(as.factor(data[[col]]))
   })
@@ -2242,12 +2275,22 @@ closure_unit_index <- function(data, unit_grouping_vars,
 }
 
 
-# Internal: refuse closure-unit data missing a column the layout needs.
-# The response and the unit's key columns place every visit, and a
-# `cap` column bounds each unit's latent count where the family sets
-# no default. The fit and prediction paths share the message.
-#'@noRd
+#' Refuse closure-unit data missing a column the layout needs
+#'
+#' The response and the key columns place every visit. A `cap` column
+#' bounds each unit's latent count where the family sets no default.
+#' The fit and prediction paths share the message.
+#'
+#' @param data Data frame of visit rows
+#' @param columns Character vector of required columns
+#' @return `TRUE`, invisibly, or an error
+#' @noRd
 assert_closure_unit_columns <- function(data, columns) {
+  checkmate::assert(
+    checkmate::check_data_frame(data),
+    checkmate::check_list(data)
+  )
+  checkmate::assert_character(columns)
   missing <- setdiff(columns, names(data))
   if (!length(missing)) {
     return(invisible(TRUE))
@@ -6336,30 +6379,25 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   )
 }
 
-#' Per-visit expected count for an nmix() fit
+#' A closure unit's expectation at the visit grain
 #'
-#' Returns the per-visit expectation `lambda_g * p_{g, j}`. No
-#' Jensen correction is needed because both the Poisson and the
-#' Binomial are linear in their mean parameters at the per-draw
-#' level.
+#' The unit carries one latent state, an abundance for `nmix()` or an
+#' occupancy for `occ()`. Every visit of the unit takes that state,
+#' thinned by the visit's detection probability.
+#' `visit_to_unit_lookup()` inverts the first-visit column of
+#' `arrays$row_unit`.
 #'
-#' @param object Fitted `mvgam` object with a closure-unit family.
-#' @param newdata Long-format observation data; defaults to the
-#'   training data.
-#' @param draw_ids Optional vector of posterior draw indices.
-#' @return `[S x N_visit]` matrix of expected counts.
-#' @noRd
-# Internal: a closure unit's expectation, read at the visit grain.
-#
-# The unit carries one latent state -- an abundance for `nmix()`, an
-# occupancy for `occ()` -- and every visit of that unit reads the
-# same one, thinned by that visit's detection probability. The two
-# families differ in what the state means, not in how a visit reads
-# it, so the broadcast is written once. `visit_to_unit_lookup()`
-# inverts the first-visit column `arrays$row_unit` records.
+#' @param object Fitted `mvgam` object with a closure-unit family
+#' @param newdata Data frame of visit rows
+#' @param draw_ids Integer vector of draw indices, or `NULL`
+#' @param linpred Numeric linear predictor matrix, or `NULL`
+#' @return Numeric matrix with one row per draw and one column per
+#'   visit
 #' @noRd
 closure_unit_visit_epred <- function(object, newdata, draw_ids,
                                      linpred = NULL) {
+  checkmate::assert_list(object)
+  checkmate::assert_matrix(linpred, null.ok = TRUE)
   comp <- extract_closure_unit_components(object, newdata, draw_ids,
                                           linpred = linpred)
   unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
@@ -6430,22 +6468,30 @@ visit_to_unit_lookup <- function(arrays, n_visit) {
   out
 }
 
-# Internal: draw a closure-unit family's per-visit response.
-#
-# Four families walk the same way: a unit draws one latent state,
-# and every visit of that unit is an observation of that state
-# thinned by the visit's own detection probability. Only the two
-# draws differ, so they are the arguments and the walk is written
-# once.
-#
-# The RNG calls run in one order -- a unit's state, then its rows in
-# frame order -- which on a frame whose responses are all present is
-# the order the per-family versions of this walk used, so a seeded
-# draw from such a frame is unchanged.
+#' A closure-unit family's per-visit predictive draws
+#'
+#' A unit draws one latent state. Each visit of the unit observes that
+#' state, thinned by its detection probability. The RNG calls run in
+#' one order, a unit's state and then its rows in frame order.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family
+#' @param newdata Data frame of visit rows
+#' @param draw_ids Integer vector of draw indices, or `NULL`
+#' @param draw_state Function drawing a unit's state from its
+#'   per-draw parameter and the draw count
+#' @param draw_visit Function drawing a visit's response from the state,
+#'   the detection probability and the draw count
+#' @param linpred Numeric linear predictor matrix, or `NULL`
+#' @return Integer matrix with one row per draw and one column per
+#'   visit
 #' @noRd
 closure_unit_visit_draws <- function(object, newdata, draw_ids,
                                      draw_state, draw_visit,
                                      linpred = NULL) {
+  checkmate::assert_list(object)
+  checkmate::assert_function(draw_state)
+  checkmate::assert_function(draw_visit)
+  checkmate::assert_matrix(linpred, null.ok = TRUE)
   comp <- extract_closure_unit_components(object, newdata, draw_ids,
                                           linpred = linpred)
   arrays <- comp$arrays
@@ -6468,10 +6514,17 @@ closure_unit_visit_draws <- function(object, newdata, draw_ids,
 }
 
 
-# Internal: the latent abundance a unit draws under a Poisson state,
-# which all three `nmix()` parameterisations share.
+#' A unit's latent abundance under a Poisson state
+#'
+#' All three `nmix()` parametrisations use it.
+#'
+#' @param lambda_g Numeric Poisson mean, a scalar or one per draw
+#' @param ndraws Integer number of draws
+#' @return Integer vector of `ndraws` abundances
 #' @noRd
 draw_poisson_abundance <- function(lambda_g, ndraws) {
+  checkmate::assert_numeric(lambda_g, lower = 0)
+  checkmate::assert_int(ndraws, lower = 1L)
   stats::rpois(ndraws, lambda = lambda_g)
 }
 
@@ -7243,12 +7296,22 @@ posterior_predict_mvn <- function(object, newdata = NULL,
   )
 }
 
-# Internal: the shapes the 'mvn()' and 'mvt()' log-likelihoods need.
-# One response per column of `linpred`, a residual scale per draw and
-# row, and for 'mvt()' one degrees-of-freedom value per draw.
-#'@noRd
+#' Refuse `mvn()` or `mvt()` log-likelihood inputs of the wrong shape
+#'
+#' One response per column of `linpred`, a residual scale per draw and
+#' row and, for `mvt()`, one degrees-of-freedom value per draw.
+#'
+#' @param family Character family name, `"mvn"` or `"mvt"`
+#' @param linpred Numeric linear predictor matrix, one row per draw
+#' @param y Numeric responses, one per column of `linpred`
+#' @param Psi_row Numeric residual scale matrix shaped as `linpred`
+#' @param nu Numeric degrees of freedom, one per draw, or `NULL`
+#' @return `TRUE`, invisibly, or an error
+#' @noRd
 assert_mv_loglik_shapes <- function(family, linpred, y, Psi_row,
                                     nu = NULL) {
+  checkmate::assert_string(family)
+  checkmate::assert_matrix(linpred)
   expected <- dim(linpred)
   shapes <- c(
     y = length(y) == expected[2L],

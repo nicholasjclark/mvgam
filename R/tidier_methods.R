@@ -171,11 +171,21 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
 }
 
 
-# Internal: the per-block plan that tidy.mvgam walks. Each row is one
-# bucket of the parameter taxonomy, with the broom effects class it
-# belongs to.
-#'@noRd
+#' The parameter blocks `tidy.mvgam()` summarises
+#'
+#' Each row is one bucket of the parameter taxonomy with the broom
+#' effects class it belongs to. Each bucket holds only the parameters
+#' `variables()` shows a user.
+#'
+#' @param obj_vars Named list of parameter buckets from
+#'   `categorize_mvgam_parameters()`
+#' @param user_map Named character vector mapping user-facing names to
+#'   Stan names, from `mvgam_user_pars()`
+#' @return Tibble holding `type`, `effect` and the list column `params`
+#' @noRd
 tidy_spec <- function(obj_vars, user_map) {
+  checkmate::assert_list(obj_vars)
+  checkmate::assert_character(user_map)
   # Every bucket is narrowed to the parameters `variables()` shows a
   # user. brms writes a centred intercept beside the `b_Intercept` it
   # is back-transformed into, and the table reports the coefficient
@@ -251,11 +261,15 @@ tidy_spec <- function(obj_vars, user_map) {
 }
 
 
-# Internal: vectorised effects-class filter. Returns a logical
-# vector of the same length as `effect_col` indicating which
-# rows survive the user's `effects` choice.
-#'@noRd
+#' Which rows the `effects` choice of `tidy()` keeps
+#'
+#' @param effect_col Character vector of broom effects classes
+#' @param effects Character effects choice, `"all"` or one class
+#' @return Logical vector shaped as `effect_col`
+#' @noRd
 .effects_filter <- function(effect_col, effects) {
+  checkmate::assert_character(effect_col)
+  checkmate::assert_string(effects)
   if (effects == "all") {
     return(rep(TRUE, length(effect_col)))
   }
@@ -263,21 +277,40 @@ tidy_spec <- function(obj_vars, user_map) {
 }
 
 
-# Internal: summarise a named subset of parameters using broom
-# column conventions. Returns a tibble with columns
-#   term, type, estimate, std.error[, conf.low, conf.high]
-#   [, rhat, ess_bulk]
-#
-# All summaries are computed in a single `posterior::summarise_draws()`
-# pass over the subset, so the function walks the draws exactly
-# once regardless of which optional columns are requested.
-#'@noRd
+#' Broom-style summaries of one block of parameters
+#'
+#' One `posterior::summarise_draws()` pass computes every requested
+#' column.
+#'
+#' @param draws Draws object of the fit
+#' @param param_names Character vector of Stan parameter names
+#' @param type Character block label for the `type` column
+#' @param alias Character vector of user-facing names, one per
+#'   parameter, or `NULL` to keep the Stan names
+#' @param robust Logical flag to report the median and MAD
+#' @param conf.int Logical flag to report interval bounds
+#' @param conf.level Numeric interval probability
+#' @param rhat Logical flag to report Rhat
+#' @param ess Logical flag to report the bulk effective sample size
+#' @return Tibble holding `term`, `type`, `estimate` and `std.error`,
+#'   then any of `conf.low`, `conf.high`, `rhat` and `ess_bulk`
+#' @noRd
 summarise_param_block <- function(draws, param_names, type,
                                     alias = NULL,
                                     robust = FALSE,
                                     conf.int = TRUE,
                                     conf.level = 0.95,
                                     rhat = FALSE, ess = FALSE) {
+  checkmate::assert_class(draws, "draws")
+  checkmate::assert_character(param_names, min.len = 1L)
+  checkmate::assert_string(type)
+  checkmate::assert_character(alias, len = length(param_names),
+                              null.ok = TRUE)
+  checkmate::assert_flag(robust)
+  checkmate::assert_flag(conf.int)
+  checkmate::assert_number(conf.level, lower = 0, upper = 1)
+  checkmate::assert_flag(rhat)
+  checkmate::assert_flag(ess)
   sub <- posterior::subset_draws(draws, variable = param_names)
   summary_fns <- broom_summary_fns(
     robust = robust, conf.int = conf.int,
@@ -297,16 +330,27 @@ summarise_param_block <- function(draws, param_names, type,
 }
 
 
-# Internal: build the list of named summary functions
-# `posterior::summarise_draws()` will apply. Centralises the
-# robust / quantile / convergence choices so tidy.mvgam,
-# augment.mvgam and any future tidiers stay aligned on column
-# naming.
-#'@noRd
+#' The named summary functions the tidiers apply
+#'
+#' `posterior::summarise_draws()` applies them. One definition keeps
+#' the column names of `tidy()` and `augment()` in step.
+#'
+#' @param robust Logical flag to report the median and MAD
+#' @param conf.int Logical flag to report interval bounds
+#' @param conf.level Numeric interval probability
+#' @param rhat Logical flag to report Rhat
+#' @param ess Logical flag to report the bulk effective sample size
+#' @return Named list of summary functions
+#' @noRd
 broom_summary_fns <- function(robust = FALSE,
                                 conf.int = TRUE,
                                 conf.level = 0.95,
                                 rhat = FALSE, ess = FALSE) {
+  checkmate::assert_flag(robust)
+  checkmate::assert_flag(conf.int)
+  checkmate::assert_number(conf.level, lower = 0, upper = 1)
+  checkmate::assert_flag(rhat)
+  checkmate::assert_flag(ess)
   fns <- list(
     estimate  = if (robust) stats::median else mean,
     std.error = if (robust) stats::mad else stats::sd
@@ -614,11 +658,14 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
 }
 
 
-# Internal: Stan algorithm string ('sampling' / 'variational' /
-# 'optimizing' / 'fixed_param'), pulled from the underlying
-# stanfit when available, otherwise NA.
-#'@noRd
+#' The Stan algorithm a fit ran
+#'
+#' @param x Fitted `mvgam` object
+#' @return Character scalar such as `"sampling"`, or `NA` when the fit
+#'   holds no `stanfit`
+#' @noRd
 glance_algorithm <- function(x) {
+  checkmate::assert_class(x, "mvgam")
   fit <- x$fit
   if (inherits(fit, "stanfit") &&
         length(fit@stan_args) > 0L) {

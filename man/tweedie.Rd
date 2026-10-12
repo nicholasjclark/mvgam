@@ -68,7 +68,7 @@ lpdf has overloaded scalar and vector signatures so both
 the static-dpar and distributional cases work without any
 extra wiring. If the data display obvious heteroscedasticity
 (e.g. seasonal claim severity), prefer letting \code{mphi} vary
-via a sub-formula over the global default (Bürkner 2018, brms
+via a sub-formula over the global default (Burkner 2018, brms
 distributional regression vignette).
 
 The Stan likelihood is the compound Poisson-gamma
@@ -166,6 +166,6 @@ Jorgensen, B. (1987). Exponential dispersion models.
 \emph{Journal of the Royal Statistical Society: Series B}, 49,
 127-162.
 
-Bürkner, P.-C. (2018). Advanced Bayesian multilevel modeling
+Burkner, P.-C. (2018). Advanced Bayesian multilevel modeling
 with the R package brms. \emph{The R Journal}, 10, 395-411.
 }

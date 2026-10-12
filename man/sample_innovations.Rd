@@ -2,7 +2,7 @@
 % Please edit documentation in R/sample_innovations.R
 \name{sample_innovations}
 \alias{sample_innovations}
-\title{Process Error Innovation Sampling for Trend Models}
+\title{Process error innovation sampling for trend models}
 \description{
 Infrastructure for sampling process errors (innovations) from trend
 model distributions. All mvgam trend models use multivariate normal

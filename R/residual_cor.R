@@ -15,7 +15,7 @@
 #'     would drop whatever scale the latent columns carry, which
 #'     under multiplicative gamma shrinkage is the entire shrinkage.
 #'   \item Correlated process-error trends (`cor = TRUE` on `RW()` /
-#'     `AR()` / `ZMVN()`, or any `VAR()` / `VARMA()` trend).
+#'     `AR()` / `ZMVN()`, or any `VAR()` trend).
 #'   \item Hierarchical correlation structures (grouping variable on
 #'     the trend via `gr = ...`).
 #' }
@@ -66,35 +66,30 @@
 #'     `ZMVN(cor = TRUE)`) reconstruct
 #'     `Sigma = diag(sigma) %*% L_Omega %*% t(L_Omega) %*% diag(sigma)`
 #'     per draw.
-#'   \item Full-covariance trends (`VAR`, `VARMA`) read `Omega_trend`,
-#'     the stationary covariance the Stan model derives from
-#'     `Phi_trend` and `Sigma_trend`.
+#'   \item `VAR()` trends take the leading block of `Omega_trend`, the
+#'     stationary covariance the Stan model derives from `Phi_trend`,
+#'     `Sigma_trend` and, under `ma = TRUE`, `Theta_trend`.
 #' }
 #'
-#' The covariance summarised is the one the latent states settle at,
-#' not the covariance of a single innovation, because a residual
-#' correlation describes where the process sits rather than how far
-#' one step moves it. The two coincide only when nothing propagates
-#' the state between times. They differ for `VAR()` and `VARMA()`,
-#' where `Omega_trend` solves `Omega = A Omega A' + Sigma`, and for
-#' `AR(cor = TRUE)`, which takes the leading block of the same solve
-#' over the companion form of its lag set, a moving-average term
-#' included. At one lag that block is
-#' `Sigma[a, b] / (1 - ar_a * ar_b)`, which is also the covariance a
-#' `CAR(cor = TRUE)` trend holds at every time of an irregular grid.
-#' That covariance is the same whatever unit the times are recorded
-#' in. The correlation moves with the
-#' scales at every order and for every lag set. A sparse lag set such
-#' as `p = c(1, 12)` bounds its coefficients one at a time and admits
-#' a jointly explosive draw, which has no stationary covariance. Such a
-#' draw keeps its innovation covariance, and a warning gives the count
-#' once per session. For `ZMVN()` there is no
-#' propagation and for `RW()` no stationary distribution exists, so
-#' both report the innovation covariance itself. A grouping variable
-#' does not change which rule applies: a hierarchical `AR()` has its
-#' per-group scales lifted the same way before the global and
-#' per-group factors are mixed, while hierarchical `RW()` and
-#' `ZMVN()` are left alone.
+#' The covariance summarised is the stationary covariance of the latent
+#' states. A residual correlation describes the states over the whole
+#' series. An innovation covariance describes one step. The two
+#' coincide when the states keep no memory between times. An
+#' `AR(cor = TRUE)` trend takes the leading block of the stationary
+#' covariance of its companion state, a moving-average term included.
+#' At one lag that block is `Sigma[a, b] / (1 - ar_a * ar_b)`. A
+#' `CAR(cor = TRUE)` trend holds this covariance at every time of an
+#' irregular grid, whatever unit the times are recorded in. The
+#' correlation moves with the scales at every order and for every lag
+#' set. A sparse lag set such as `p = c(1, 12)` bounds its coefficients
+#' one at a time and admits a jointly explosive draw, which has no
+#' stationary covariance. Such a draw keeps its innovation covariance.
+#' A warning gives the count once per session. `ZMVN()` keeps no memory
+#' between times. `RW()` has no stationary distribution. Both report
+#' the innovation covariance. A hierarchical `AR()` lifts its per-group
+#' scales the same way before the global and per-group factors are
+#' mixed. Hierarchical `RW()` and `ZMVN()` report their innovation
+#' covariances.
 #'
 #' To ask the other question, what the *contemporaneous shocks* share,
 #' read `Sigma_trend` from the posterior and apply [stats::cov2cor()]
@@ -208,7 +203,7 @@ residual_cor.mvgam <- function(object,
 
 
 # ---------------------------------------------------------------------------
-# Internal: reconstruct per-draw correlation matrices and summarise.
+# Per-draw correlation matrices and their summaries
 # ---------------------------------------------------------------------------
 
 #' Compute residual correlation, covariance and partial-correlation
@@ -269,10 +264,10 @@ compute_residual_cor <- function(object, by_group, partial, summary,
     stop(insight::format_error(c(
       "The fitted trend has no correlation between series.",
       i = paste0(
-        "Correlated trends: 'VAR()', 'VARMA()', a constructor with ",
-        "'cor = TRUE' and a factor model with 'n_lv'."
+        "Correlated trends: 'VAR()', a constructor with 'cor = TRUE' and ",
+        "a factor model with 'n_lv'."
       )
-    )))
+    )), call. = FALSE)
   }
 
   # Hierarchical path: optionally return per-group list.
@@ -490,7 +485,7 @@ extract_cov_draws_flat <- function(cov_struct) {
            pattern, "'."),
     i = paste0("Supported patterns: full_covariance, ",
                "cholesky_scaled, diagonal.")
-  )))
+  )), call. = FALSE)
 }
 
 
@@ -700,7 +695,7 @@ summarise_correlation_array <- function(arr, robust, probs, series_names) {
   ess <- matrix(NA_real_, p, p)
 
   clip <- function(r) {
-    # eps = 1e-7 keeps atanh finite (atanh(±1) = ±Inf) while staying
+    # eps = 1e-7 keeps atanh finite (atanh(+/-1) = +/-Inf) while staying
     # within roundoff-magnitude distance of the true correlation
     # boundary, so the Fisher-z back-transform recovers values
     # indistinguishable from r at standard print precision.
@@ -929,7 +924,7 @@ summary.mvgam_residcor <- function(object, ...) {
     stop(insight::format_error(c(
       "Cannot summarise: object was built with summary = FALSE.",
       i = "Call residual_cor(..., summary = TRUE) to get a summary."
-    )))
+    )), call. = FALSE)
   }
 
   p <- object[["n_series"]]

@@ -1,11 +1,10 @@
 #' Combine forecasts from \pkg{mvgam} models into a weighted
 #' ensemble
 #'
-#' Build a single `mvgam_forecast` whose hindcast and forecast
-#' draws are a multinomially-resampled combination of two or more
-#' input `mvgam_forecast` objects. Defaults to even weighting, but
-#' a numeric vector of user-supplied per-model weights is also
-#' accepted (auto-normalised to sum to 1).
+#' Build a single `mvgam_forecast` from the hindcast and forecast
+#' draws of two or more `mvgam_forecast` objects. Each input supplies
+#' a share of the draws set by its weight. Weights are even by
+#' default.
 #'
 #' @name ensemble.mvgam_forecast
 #'
@@ -13,37 +12,34 @@
 #'   [forecast.mvgam()] or [hindcast.mvgam()].
 #' @param ... More `mvgam_forecast` objects to combine.
 #' @param weights Either `NULL` (the default, equivalent to even
-#'   weighting), or a numeric vector with one entry per supplied
-#'   forecast. Non-negative numeric weights are auto-normalised
-#'   so that they sum to 1. Strategy strings such as
-#'   `"stacking"` are intentionally not accepted here because
-#'   computing them requires the fitted models, not just the
-#'   forecast draws; pre-compute via
-#'   [loo::loo_model_weights()] / [loo_model_weights.mvgam()]
-#'   on the fits and pass the numeric result.
+#'   weighting), or a numeric vector with one non-negative entry per
+#'   supplied forecast. The weights are normalised to sum to 1.
+#'   Strategies such as stacking need the fitted models. Compute them
+#'   with [loo_model_weights.mvgam()] on the fits and pass the numeric
+#'   result.
 #' @param ndraws Positive integer giving the total number of
 #'   ensemble draws to return per series. Defaults to `5000`.
-#'   If `ndraws` exceeds the total number of input draws,
-#'   sampling is done with replacement.
+#'   A model allocated more draws than it holds is sampled with
+#'   replacement.
 #' @param seed Optional integer seed for reproducibility.
 #'
 #' @details Per-model weights are split into integer draw counts
-#'   that sum to `ndraws` using the largest-remainder rule
-#'   (largest-remainder rule, after `brms::round_largest_remainder()`),
-#'   then that
-#'   many rows are sampled (with replacement when a model has
-#'   fewer draws than its assigned share) from each input's
-#'   hindcasts and forecasts. The returned object inherits its
-#'   `series_names`, `family`, `trend_model`, training arms and
-#'   test arms from the first input. All forecast objects must
-#'   share matching `series_names`, hindcast / forecast counts,
-#'   forecast horizons and (when present) test observations.
+#'   that sum to `ndraws` by the largest-remainder rule, after
+#'   `brms::round_largest_remainder()`. Each model then gives one set
+#'   of sampled draws. Every series, in the hindcasts and in the
+#'   forecasts, takes that same set. The ensemble keeps the dependence
+#'   between series and the pairing of each hindcast with its forecast.
+#'
+#'   The returned object takes its series names, family, training data
+#'   and test data from the first input. All inputs must share the
+#'   series names, the hindcast lengths, the forecast horizons and, when
+#'   present, the test observations.
 #'
 #' @return An object of class `mvgam_forecast` containing the
 #'   ensembled hindcasts and forecasts. Suitable for
 #'   [plot.mvgam_forecast()] and [score.mvgam_forecast()].
-#'   Attribute `weights` records the per-model weights actually
-#'   used; attribute `ndraws_per_model` records the integer draw
+#'   Attribute `weights` records the per-model weights used.
+#'   Attribute `ndraws_per_model` records the integer draw
 #'   counts drawn from each input.
 #'
 #' @author Nicholas J Clark
@@ -80,7 +76,7 @@ ensemble.mvgam_forecast <- function(object, ..., weights = NULL,
         "Got named extra args: ",
         paste0("'", names(split$other), "'", collapse = ", "), "."
       )
-    )))
+    )), call. = FALSE)
   }
   models <- split$models
   n_models <- length(models)
@@ -93,48 +89,36 @@ ensemble.mvgam_forecast <- function(object, ..., weights = NULL,
   ndraws_per <- mvgam_round_largest_remainder(w * ndraws)
   names(w) <- names(ndraws_per) <- names(models)
 
-  # Sample `ndraws_per[m]` rows from model m once, then take
-  # those same rows for every series and for both hindcasts and
-  # forecasts, before row-binding across models into a single
-  # (ndraws x H) matrix per series.
-  #
-  # One selection, not one per series: a posterior draw is a
-  # joint object, and the dependence between series lives in
-  # which draws are taken together. Choosing rows separately per
-  # series pairs series 1's draw 40 with series 2's draw 900 and
-  # throws that dependence away. Two series identical on every
-  # draw came back correlated 0.05, and any joint score, energy
-  # or variogram, was then scoring an ensemble that had no
-  # cross-series structure left. Choosing separately per arm
-  # breaks the hindcast-to-forecast pairing the same way, so a
-  # per-draw trajectory through `plot()` was two unrelated
-  # halves.
-  series_names <- names(models[[1L]]$forecasts)
+  # A posterior draw is a joint object. Row r of every series, in
+  # both slots, comes from one draw. Taking rows separately per series
+  # or per slot would pair unrelated draws. Model m gives one set of
+  # `ndraws_per[m]` rows. Every series in both slots takes those rows.
   draw_idx <- resolve_ensemble_draws(models, ndraws_per)
-  ens_hcs <- combine_arm(models, "hindcasts", draw_idx)
-  ens_fcs <- combine_arm(models, "forecasts", draw_idx)
-  names(ens_hcs) <- series_names
-  names(ens_fcs) <- series_names
-
   out <- models[[1L]]
-  out$hindcasts <- ens_hcs
-  out$forecasts <- ens_fcs
+  # `[<-` keeps a NULL forecast slot. `$<-` would drop the element.
+  out["hindcasts"] <- list(combine_slot(models, "hindcasts", draw_idx))
+  out["forecasts"] <- list(combine_slot(models, "forecasts", draw_idx))
   attr(out, "weights") <- w
   attr(out, "ndraws_per_model") <- ndraws_per
   out
 }
 
 
-# Internal: check that every forecast in `models` agrees on the
-# slots an ensemble needs to align across (series, horizons,
-# test observations). Errors via `insight::format_error` on
-# first mismatch.
-#'@noRd
+#' Refuse forecasts an ensemble cannot align
+#'
+#' Every forecast must share the series names, the hindcast lengths,
+#' the forecast horizons and any test observations of the first. Within
+#' one forecast, every draw matrix must hold the same number of draws.
+#'
+#' @param models List of `mvgam_forecast` objects
+#' @return `NULL`, invisibly, or an error at the first mismatch
+#' @noRd
 validate_forecast_compatibility <- function(models) {
+  checkmate::assert_list(models)
   if (length(models) < 2L) {
     stop(insight::format_error(
       "Ensembling requires at least two 'mvgam_forecast' inputs."
-    ))
+    ), call. = FALSE)
   }
   ref <- models[[1L]]
   ref_series <- ref$series_names
@@ -149,6 +133,19 @@ validate_forecast_compatibility <- function(models) {
     function(x) ncol(x), integer(1L)
   )
   ref_test_obs <- ref$test_observations
+  for (i in seq_along(models)) {
+    n_rows <- unique(vapply(
+      c(models[[i]]$hindcasts, models[[i]]$forecasts), NROW, integer(1L)
+    ))
+    if (length(n_rows) != 1L) {
+      stop(insight::format_error(c(
+        "Every draw matrix of one forecast must hold the same draws.",
+        x = paste0("Input ", i, " holds ",
+                   paste(sort(n_rows), collapse = ", "), " draws."),
+        i = "Pass forecasts as 'forecast()' or 'hindcast()' returns them."
+      )), call. = FALSE)
+    }
+  }
   for (i in seq.int(2L, length(models))) {
     cand <- models[[i]]
     if (!identical(as.character(cand$series_names),
@@ -159,7 +156,7 @@ validate_forecast_compatibility <- function(models) {
           "Input ", i,
           " has different series than the first input."
         )
-      )))
+      )), call. = FALSE)
     }
     if (length(cand$hindcasts) != ref_n_hcs ||
           length(cand$forecasts) != ref_n_fcs) {
@@ -173,7 +170,7 @@ validate_forecast_compatibility <- function(models) {
           " hindcast series and ", length(cand$forecasts),
           " forecast series."
         )
-      )))
+      )), call. = FALSE)
     }
     cand_fc_horizons <- vapply(
       cand$forecasts, function(x) ncol(x), integer(1L)
@@ -188,7 +185,7 @@ validate_forecast_compatibility <- function(models) {
           "Input ", i, " forecast horizons differ from the ",
           "first input."
         )
-      )))
+      )), call. = FALSE)
     }
     if (!identical(cand_hc_lengths, ref_hc_lengths)) {
       stop(insight::format_error(c(
@@ -197,7 +194,7 @@ validate_forecast_compatibility <- function(models) {
           "Input ", i, " hindcast lengths differ from the ",
           "first input."
         )
-      )))
+      )), call. = FALSE)
     }
     if (!is.null(ref_test_obs) &&
           !is.null(cand$test_observations) &&
@@ -208,48 +205,59 @@ validate_forecast_compatibility <- function(models) {
           "Input ", i, " has different test observations than ",
           "the first input."
         )
-      )))
+      )), call. = FALSE)
     }
   }
   invisible(NULL)
 }
 
 
-# Internal: the rows to take from each model, drawn once so every
-# series and both arms are indexed by the same posterior draws.
-# Sampled with replacement when a model holds fewer rows than its
-# allocation. Returns a list of integer vectors, one per model.
+#' The draw rows an ensemble takes from each forecast
+#'
+#' Drawn once per model to index every series in both the hindcast and
+#' forecast slots by the same posterior draws. A model holding fewer
+#' rows than its allocation is sampled with replacement.
+#' `validate_forecast_compatibility()` has checked that every draw
+#' matrix of one model holds the same draws. The first gives the count.
+#'
+#' @param models List of `mvgam_forecast` objects
+#' @param ndraws_per Integer vector of draws to take from each model
+#' @return List of integer row vectors, one per model
 #' @noRd
 resolve_ensemble_draws <- function(models, ndraws_per) {
+  checkmate::assert_list(models, min.len = 1L)
+  checkmate::assert_integerish(ndraws_per, lower = 0,
+                               len = length(models))
   lapply(seq_along(models), function(m) {
     take <- ndraws_per[m]
     if (take == 0L) return(integer(0L))
-    n_avail <- NROW(models[[m]]$forecasts[[1L]])
+    n_avail <- NROW(c(models[[m]]$hindcasts, models[[m]]$forecasts)[[1L]])
     sample(seq_len(n_avail), take, replace = take > n_avail)
   })
 }
 
 
-# Internal: stack a per-series draw matrix arm (e.g. "forecasts"
-# or "hindcasts") across models, taking the rows `draw_idx[[m]]`
-# names from model m for every series. Returns an unnamed list of
-# (sum(lengths(draw_idx)) x H) matrices.
+#' One forecast slot stacked across models
+#'
+#' Takes the rows `draw_idx[[m]]` names from model `m` for every series
+#' and binds them by row.
+#'
+#' @param models List of `mvgam_forecast` objects
+#' @param slot Character slot name, `"hindcasts"` or `"forecasts"`
+#' @param draw_idx List of integer row vectors from
+#'   `resolve_ensemble_draws()`, one per model
+#' @return List of draw matrices named by series, one per series, or
+#'   `NULL` for a slot the first model leaves empty
 #' @noRd
-combine_arm <- function(models, arm, draw_idx) {
-  n_series <- length(models[[1L]][[arm]])
-  lapply(seq_len(n_series), function(s) {
-    pieces <- lapply(seq_along(models), function(m) {
-      idx <- draw_idx[[m]]
-      if (!length(idx)) return(NULL)
-      mat <- models[[m]][[arm]][[s]]
-      # An arm with fewer rows than the one the draws were
-      # chosen from cannot be indexed by them; wrap so the
-      # pairing stays as close as the shapes allow.
-      if (max(idx) > NROW(mat)) {
-        idx <- ((idx - 1L) %% NROW(mat)) + 1L
-      }
-      mat[idx, , drop = FALSE]
-    })
-    do.call(rbind, pieces[!vapply(pieces, is.null, logical(1L))])
+combine_slot <- function(models, slot, draw_idx) {
+  checkmate::assert_list(models, min.len = 1L)
+  checkmate::assert_choice(slot, c("hindcasts", "forecasts"))
+  checkmate::assert_list(draw_idx, len = length(models))
+  first <- models[[1L]][[slot]]
+  if (is.null(first)) return(NULL)
+  lapply(stats::setNames(seq_along(first), names(first)), function(s) {
+    do.call(rbind, lapply(seq_along(models), function(m) {
+      models[[m]][[slot]][[s]][draw_idx[[m]], , drop = FALSE]
+    }))
   })
 }

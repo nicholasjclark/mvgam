@@ -13,7 +13,7 @@ shape as the training data.}
 \item{data}{The training \code{data.frame} of the model, whose series
 levels define the valid set. A fitted model from \code{\link[=mvgam]{mvgam()}} or
 \code{\link[=jsdgam]{jsdgam()}} is also accepted. \code{newdata} is then checked against
-every column the fitted formulas use, and \code{trend_formula} is
+every column the fitted formulas use. \code{trend_formula} is then
 ignored.}
 
 \item{trend_formula}{The trend formula passed to \code{\link[=mvgam]{mvgam()}}, or
@@ -27,15 +27,15 @@ is returned with the columns that model predicts from.
 }
 \description{
 Runs the structural checks that \code{\link[=predict.mvgam]{predict.mvgam()}} and
-\code{\link[=forecast.mvgam]{forecast.mvgam()}} apply to a \code{newdata} frame, and refuses a
-misaligned frame before an expensive prediction. The trend constructor in
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} apply to a \code{newdata} frame. A misaligned frame is
+refused before an expensive prediction. The trend constructor in
 \code{trend_formula} names the time and series columns, \code{time} and
 \code{series} by default. Each of them the training \code{data} holds must
 also be in \code{newdata}. A hierarchical trend identifies its series by
-its \code{gr} and \code{subgr} columns, and those are required in their
-place. Series levels absent from the training data are refused, and
-the series column of \code{newdata} is coerced to the training levels.
-The prediction functions check the columns the formulas use.
+its \code{gr} and \code{subgr} columns. Those columns are then required. Series
+levels absent from the training data are refused. The series column
+of \code{newdata} is coerced to the training levels. The prediction
+functions check the columns the formulas use.
 }
 \examples{
 train <- data.frame(
@@ -43,15 +43,15 @@ train <- data.frame(
   week = rep(1:3, times = 2L),
   y = rnorm(6L)
 )
-future <- data.frame(
+test_weeks <- data.frame(
   species = factor(rep(c("a", "b"), each = 2L)),
   week = rep(4:5, times = 2L)
 )
-check_newdata(future, train, ~ AR(time = week, series = species))
+check_newdata(test_weeks, train, ~ AR(time = week, series = species))
 
 # A species the model never saw is refused.
-future$species <- factor(rep(c("a", "c"), each = 2L))
-try(check_newdata(future, train, ~ AR(time = week, series = species)))
+test_weeks$species <- factor(rep(c("a", "c"), each = 2L))
+try(check_newdata(test_weeks, train, ~ AR(time = week, series = species)))
 }
 \seealso{
 \code{\link[=predict.mvgam]{predict.mvgam()}}, \code{\link[=forecast.mvgam]{forecast.mvgam()}}

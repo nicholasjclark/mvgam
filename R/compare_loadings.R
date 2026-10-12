@@ -17,16 +17,16 @@
 #' `traits =` or `phylo =`, then plot the comparison to show how
 #' the trait or phylogeny similarity reshapes the latent positions.
 #'
-#' The comparison is of pattern, not of magnitude. Procrustes
-#' alignment is orthogonal, so it rotates and reflects without
-#' rescaling, and the plot reads each factor on its own axis. A
-#' column the model has shrunk to nothing therefore occupies as
-#' much of the picture as the column carrying the signal: on a
-#' ten-factor fit whose column scales run from 2.06 down to 0.013,
-#' every column's plotted norm sits near 41. Read the panel for
-#' which species sit together and how that arrangement moves
-#' between fits, and read [active_factors()] for how much each
-#' factor is actually doing.
+#' The comparison shows the pattern of the loadings. Procrustes
+#' alignment is orthogonal: it rotates and reflects the loadings with
+#' their scale unchanged. The plot gives each factor its own axis. A
+#' column the model has shrunk towards zero spans as much of the
+#' picture as the column that holds the signal. On a ten-factor fit
+#' whose column scales run from 2.06 down to 0.013, every column has
+#' a plotted norm near 41. The panel shows which species cluster
+#' together and how that arrangement moves between fits.
+#' [active_factors()] reports which factors carry signal under the
+#' loadings prior.
 #'
 #' @param fit_a,fit_b Two fitted `mvgam` / `jsdgam` objects, each
 #'   with `n_lv >= 2` and the same species set in the same factor
@@ -119,19 +119,19 @@ compare_loadings <- function(
   shift_rank <- rank(-shift, ties.method = "first")
   to_label <- switch(
     label_species,
-    all   = rep(TRUE, length(species_names)),
+    all = rep(TRUE, length(species_names)),
     shift = shift_rank <= 10L,
-    none  = rep(FALSE, length(species_names))
+    none = rep(FALSE, length(species_names))
   )
 
   df <- data.frame(
     species = rep(species_names, 2L),
-    fit     = factor(
+    fit = factor(
       rep(fit_levels, each = length(species_names)),
       levels = fit_levels
     ),
-    LV1   = c(z_a[, 1L], z_b[, 1L]),
-    LV2   = c(z_a[, 2L], z_b[, 2L]),
+    LV1 = c(z_a[, 1L], z_b[, 1L]),
+    LV2 = c(z_a[, 2L], z_b[, 2L]),
     label = rep(ifelse(to_label, species_names, ""), 2L),
     shift = rep(shift, 2L)
   )
@@ -204,24 +204,28 @@ compare_loadings <- function(
 }
 
 
-# Posterior-median identified loadings, [n_species x n_lv]. Errors
-# when the fit has no factor model.
-#'@noRd
+#' Posterior-median factor loadings of a fit
+#'
+#' @param object Fitted `mvgam` object with a latent factor model
+#' @return Numeric matrix with one row per species and one column per
+#'   latent factor, with species names as row names
+#' @noRd
 extract_median_Z <- function(object) {
+  checkmate::assert_class(object, "mvgam")
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv) || n_lv < 1L) {
     stop(insight::format_error(c(
-      "compare_loadings() requires a latent-factor fit (n_lv > 0).",
+      "'compare_loadings()' requires two latent-factor fits.",
       i = paste0(
-        "Refit with `n_lv > 0` (jsdgam(...) or mvgam(..., trend_map = ...))",
-        " or compare two existing factor-model fits."
+        "Fit each model with 'jsdgam(n_lv = )' or with 'n_lv' on the ",
+        "trend constructor, as 'trend_formula = ~ AR(n_lv = 2)'."
       )
-    )))
+    )), call. = FALSE)
   }
   n_series <- loading_series_count(object)
   draws_mat <- posterior::as_draws_matrix(object$fit)
-  # A fixed-Z fit holds its loadings as data, which the resolver
-  # broadcasts across draws
+  # A fixed-Z fit holds its loadings as data. The resolver repeats
+  # them for every draw.
   z_arr <- resolve_factor_loadings(
     object,
     draws_mat,
@@ -234,44 +238,63 @@ extract_median_Z <- function(object) {
 }
 
 
-# Cross-fit shape compatibility check. Errors when the two fits
-# have different species sets or insufficient factors for the
-# requested `which_lvs`.
-#'@noRd
+#' Refuse two loading matrices that cannot be compared
+#'
+#' The two fits must hold the same species in the same order. Each
+#' must have at least `max(which_lvs)` factors.
+#'
+#' @param z_a Numeric loading matrix of the first fit, species by
+#'   factor
+#' @param z_b Numeric loading matrix of the second fit, species by
+#'   factor
+#' @param which_lvs Integer vector of the two factors to plot
+#' @return `NULL`, invisibly, or an error
+#' @noRd
 validate_loadings_alignment <- function(z_a, z_b, which_lvs) {
+  checkmate::assert_matrix(z_a, mode = "numeric")
+  checkmate::assert_matrix(z_b, mode = "numeric")
+  checkmate::assert_integerish(which_lvs, lower = 1, min.len = 1L,
+                               any.missing = FALSE)
   if (!identical(rownames(z_a), rownames(z_b))) {
     stop(insight::format_error(c(
       "Species do not align between the two fits.",
       x = paste0(
         "fit_a species: ",
-        paste(head(rownames(z_a), 3), collapse = ", "), "..."
+        paste(utils::head(rownames(z_a), 3), collapse = ", "), "..."
       ),
       x = paste0(
         "fit_b species: ",
-        paste(head(rownames(z_b), 3), collapse = ", "), "..."
+        paste(utils::head(rownames(z_b), 3), collapse = ", "), "..."
       ),
       i = "Refit on the same species set in the same factor order."
-    )))
+    )), call. = FALSE)
   }
   n_lv_min <- min(ncol(z_a), ncol(z_b))
   if (max(which_lvs) > n_lv_min) {
     stop(insight::format_error(c(
-      "Both fits must have at least `max(which_lvs)` latent factors.",
+      "Each fit must have at least 'max(which_lvs)' latent factors.",
       x = sprintf(
         "fit_a n_lv = %d, fit_b n_lv = %d, requested max = %d.",
         ncol(z_a), ncol(z_b), max(which_lvs)
       ),
-      i = "Pick a smaller pair via `which_lvs` or refit with larger n_lv."
-    )))
+      i = "Choose a smaller pair in 'which_lvs' or refit with more factors."
+    )), call. = FALSE)
   }
   invisible(NULL)
 }
 
 
-# Orthogonal Procrustes rotation aligning `z_b` to `z_a`.
-# Returns the rotated `z_b` (NOT the rotation matrix).
-#'@noRd
+#' Rotate one loading matrix onto another by orthogonal Procrustes
+#'
+#' @param z_a Numeric target loading matrix
+#' @param z_b Numeric loading matrix to rotate, with the dimensions of
+#'   `z_a`
+#' @return The rotated `z_b`. The rotation matrix itself is discarded.
+#' @noRd
 procrustes_rotate <- function(z_a, z_b) {
+  checkmate::assert_matrix(z_a, mode = "numeric")
+  checkmate::assert_matrix(z_b, mode = "numeric", nrows = nrow(z_a),
+                           ncols = ncol(z_a))
   m <- crossprod(z_a, z_b)
   s <- svd(m)
   r <- s$u %*% t(s$v)

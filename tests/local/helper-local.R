@@ -123,45 +123,51 @@ with_warnings <- function(expr) {
 }
 
 
-# Ground truth for the stationary distribution of an AR() trend,
-# written from the definition.
+# Ground truth for the stationary distribution of an AR() or VAR()
+# trend, written from the definition.
 #
 # The companion state is `(y_t, ..., y_{t-p+1}[, eps_t])`, block i at
-# rows `(i - 1) m + 1` to `i m`, with diagonal coefficients. A
-# moving-average term adds the block holding `eps_t`, which enters
-# `y_{t+1}` through `theta`. The stationary covariance is the Neumann
-# sum `Omega = sum_k A^k Q A'^k`. It calls nothing from the package,
-# and every assertion taking it as ground truth tests the package
-# against the definition.
+# rows `(i - 1) m + 1` to `i m`. An AR() trend passes the diagonal of
+# each coefficient matrix as a vector. A VAR() trend passes the matrix
+# itself. A moving-average term adds the block holding `eps_t`, which
+# enters `y_{t+1}` through `theta`. The stationary covariance is the Neumann
+# sum `Omega = sum_k A^k Q A'^k`. It calls nothing from the package.
+# Every assertion taking it as ground truth tests the package against
+# the definition.
+#
+# Each doubling step adds `A^n S A'^n` to the partial sum `S` of the
+# first `n` terms and squares `A^n`. Sixty steps cover 2^60 terms. A
+# spectral radius of 1 - 1e-9 needs about 10^10 terms to settle, which
+# a plain sum cannot reach.
 #
 # @param Sigma Innovation covariance (m x m)
-# @param phi List of coefficient vectors, one per lag from 1 to p
-# @param theta Moving-average coefficient vector, or NULL
-# @param n_terms Terms of the sum. At a spectral radius of 0.99 the
-#   terms past 3000 total less than the precision a stored draw holds.
+# @param phi List of coefficient vectors or matrices, one per lag
+#   from 1 to p
+# @param theta Moving-average coefficient vector or matrix, or NULL
 # @return The covariance of the companion state, side `(p + q) m`
-neumann_omega <- function(Sigma, phi, theta = NULL, n_terms = 3000L) {
+neumann_omega <- function(Sigma, phi, theta = NULL) {
   m <- nrow(Sigma)
   p <- length(phi)
   n <- p + if (is.null(theta)) 0L else 1L
   d <- n * m
   blk <- function(i) ((i - 1L) * m + 1L):(i * m)
+  coef_matrix <- function(x) if (is.matrix(x)) x else diag(x, nrow = m)
   A <- matrix(0, d, d)
-  for (k in seq_len(p)) A[blk(1L), blk(k)] <- diag(phi[[k]], nrow = m)
+  for (k in seq_len(p)) A[blk(1L), blk(k)] <- coef_matrix(phi[[k]])
   for (i in seq_len(p)[-1L]) A[blk(i), blk(i - 1L)] <- diag(m)
   Q <- matrix(0, d, d)
   Q[blk(1L), blk(1L)] <- Sigma
   if (!is.null(theta)) {
-    A[blk(1L), blk(n)] <- diag(theta, nrow = m)
+    A[blk(1L), blk(n)] <- coef_matrix(theta)
     Q[blk(n), blk(n)] <- Sigma
     Q[blk(1L), blk(n)] <- Sigma
     Q[blk(n), blk(1L)] <- Sigma
   }
-  Omega <- matrix(0, d, d)
-  Ak <- diag(d)
-  for (k in 0:n_terms) {
-    Omega <- Omega + Ak %*% Q %*% t(Ak)
-    Ak <- Ak %*% A
+  Omega <- Q
+  An <- A
+  for (step in 1:60) {
+    Omega <- Omega + An %*% Omega %*% t(An)
+    An <- An %*% An
   }
   (Omega + t(Omega)) / 2
 }

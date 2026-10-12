@@ -123,7 +123,7 @@ k$estimates
 
 }
 \references{
-Bürkner P-C, Gabry J, Vehtari A (2020). Approximate
+Burkner P-C, Gabry J, Vehtari A (2020). Approximate
 leave-future-out cross-validation for Bayesian time series
 models. \emph{Journal of Statistical Computation and Simulation},
 90(14), 2499--2523. \doi{10.1080/00949655.2020.1783262}.

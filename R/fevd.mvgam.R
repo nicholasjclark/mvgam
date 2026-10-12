@@ -6,11 +6,10 @@
 #' @name fevd.mvgam
 #'
 #' @param object \code{list} object of class \code{mvgam} resulting from a call to [mvgam()]
-#' that used a Vector Autoregressive latent process model (either as `VAR(cor = FALSE)` or
-#' `VAR(cor = TRUE)`; see [VAR()] for details)
+#' that used a `VAR()` latent process model
 #'
 #' @param h Positive \code{integer} specifying the forecast horizon over which to calculate
-#' the IRF
+#' the decomposition
 #'
 #' @param ndraws Optional integer; the number of posterior draws to
 #'   summarise over. A decomposition is built from one transition
@@ -44,7 +43,7 @@
 #'   annual bird-count VAR, see
 #'   [https://nicholasjclark.github.io/mvgam/articles/var.html](https://nicholasjclark.github.io/mvgam/articles/var.html).
 #'
-#' @references Lütkepohl, H. (2007).
+#' @references Lutkepohl, H. (2007).
 #' New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
 #'
 #' @examples

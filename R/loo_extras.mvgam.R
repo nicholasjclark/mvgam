@@ -120,25 +120,28 @@
 NULL
 
 
-# Internal: relative effective sample size for a per-observation
-# log-likelihood matrix, using the chain layout of `x$fit`. Mirrors
-# brms's `r_eff_log_lik` helper. Shared by every method that builds a
-# PSIS object, so the chain bookkeeping lives in one place.
-#
-# `draw_ids` names the draws retained in `ll` when the caller
-# subsampled, indexing into the chain-major flattened draws.
-#
-# Reason: loo::relative_eff() reshapes the matrix into a draws x
-# chains array and so demands every chain contribute the same number
-# of rows. A subsampled or otherwise unbalanced set of draws breaks
-# that, and building the chain vector by recycling a fractional
-# count silently produces one shorter than the matrix. Where the
-# chain layout cannot be recovered exactly, report r_eff = 1, which
-# is loo's documented reading for draws that are not a contiguous
-# MCMC sample; a random subsample across chains is close to
-# independent, so the assumption costs little.
-#'@noRd
+#' Relative effective sample sizes of a log-likelihood matrix
+#'
+#' Ported from the internal brms function `r_eff_log_lik()`. Every
+#' method that builds a PSIS object calls it. `loo::relative_eff()`
+#' needs every chain to contribute the same number of rows. A
+#' subsampled or unbalanced set of draws breaks that requirement.
+#' Where the chain layout cannot be recovered exactly, every relative
+#' efficiency is 1. The loo documentation gives that value for
+#' independent draws. A random subsample across chains is close to
+#' independent.
+#'
+#' @param x Fitted `mvgam` object
+#' @param ll Numeric log-likelihood matrix, one row per draw
+#' @param draw_ids Integer indices of the retained draws into the
+#'   chain-major draws, or `NULL` when no subsample was taken
+#' @return Numeric vector with one relative efficiency per column of
+#'   `ll`
+#' @noRd
 mvgam_r_eff_log_lik <- function(x, ll, draw_ids = NULL) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_matrix(ll)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   n_obs <- NCOL(ll)
   chain_id <- mvgam_chain_id(
     posterior_chain_layout(x), NROW(ll), draw_ids
@@ -150,16 +153,19 @@ mvgam_r_eff_log_lik <- function(x, ll, draw_ids = NULL) {
 }
 
 
-# Internal: how a fit's posterior divides into chains, or NULL when
-# it has none to divide.
-#
-# Both facts come from one conversion, which is the expensive part,
-# so it is done once instead of once per fact. A `run_model = FALSE`
-# stub carries no posterior and is recognised by asking, rather than
-# by catching the error its conversion raises: catching would report
-# a broken posterior as a single-chain one.
-#'@noRd
+#' How a fit's posterior divides into chains
+#'
+#' One conversion of the posterior gives both counts. A
+#' `run_model = FALSE` fit holds no posterior and returns `NULL`
+#' without attempting the conversion. An error from a broken posterior
+#' is left to propagate.
+#'
+#' @param x Fitted `mvgam` object
+#' @return List holding the number of `chains` and the `total` number
+#'   of draws, or `NULL` for a fit without a posterior
+#' @noRd
 posterior_chain_layout <- function(x) {
+  checkmate::assert_class(x, "mvgam")
   if (is.null(x$fit)) {
     return(NULL)
   }
@@ -168,10 +174,18 @@ posterior_chain_layout <- function(x) {
 }
 
 
-# Internal: chain membership for each retained draw, or NULL when a
-# balanced chain layout cannot be recovered.
-#'@noRd
+#' The chain of each retained draw
+#'
+#' @param layout List from `posterior_chain_layout()`, or `NULL`
+#' @param n_draws Integer number of retained draws
+#' @param draw_ids Integer indices of the retained draws, or `NULL`
+#' @return Integer vector of chain indices grouped by chain, or `NULL`
+#'   when a balanced chain layout cannot be recovered
+#' @noRd
 mvgam_chain_id <- function(layout, n_draws, draw_ids = NULL) {
+  checkmate::assert_list(layout, null.ok = TRUE)
+  checkmate::assert_int(n_draws, lower = 0L)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   chains <- layout$chains
   if (!isTRUE(chains > 1L)) {
     return(NULL)
@@ -204,13 +218,25 @@ mvgam_chain_id <- function(layout, n_draws, draw_ids = NULL) {
 }
 
 
-# Internal: Bayesian LOO R^2 of Gelman et al. (2019), ported from
-# brms:::.loo_R2. Operates on the per-draw expected predictions
-# `epred` (S x N), log-likelihood matrix `ll` (S x N), and the
-# response `y` (length N). Returns a one-column matrix of LOO R^2
-# values (length S), clamped to [-1, 1].
-#'@noRd
+#' Bayesian LOO R-squared draws
+#'
+#' Follows Gelman et al. (2019), ported from the internal brms function
+#' `.loo_R2()`. Bayesian-bootstrap weights give one value per draw.
+#' Values are clamped to `[-1, 1]`.
+#'
+#' @param y Numeric vector of `N` observed responses
+#' @param epred Numeric matrix of expected predictions with dimensions
+#'   `[S, N]`
+#' @param ll Numeric log-likelihood matrix with dimensions `[S, N]`
+#' @param r_eff Numeric vector of relative efficiencies, one per
+#'   observation
+#' @return Numeric matrix with one column and `S` rows
+#' @noRd
 mvgam_loo_R2 <- function(y, epred, ll, r_eff) {
+  checkmate::assert_numeric(y)
+  checkmate::assert_matrix(epred, ncols = length(y))
+  checkmate::assert_matrix(ll, ncols = length(y))
+  checkmate::assert_numeric(r_eff)
   psis_obj <- loo::psis(log_ratios = -ll, r_eff = r_eff)
   yhat_loo <- loo::E_loo(epred, psis_obj, log_ratios = -ll)$value
   err <- yhat_loo - y
@@ -422,22 +448,28 @@ narrow_to_scored <- function(x, scored_from) {
 }
 
 
-# Internal: shared PSIS-weighting skeleton for `loo_predict`,
-# `loo_epred`, and `loo_linpred`. Builds a PSIS object (via
-# `loo(save_psis = TRUE)` if none supplied), computes posterior
-# predictions through `posterior_fn`, and returns the PSIS-
-# weighted expectation/quantile via `loo::E_loo`, with the
-# brms-parity output normalisation (column-labelled matrix; for
-# 3D multivariate prediction arrays, returns a 3D array with the
-# per-response slabs stacked along the last dimension).
-#
-# Weights and predictions are both taken conditional on the latent
-# state, so the two describe the same observation rather than two
-# draws of the trend. What remains stochastic is the observation
-# noise `posterior_predict()` draws, and the calls run under a
-# shared seed so a repeated call answers the same way; the user's
-# RNG state is snapshotted on entry and restored on exit.
-#'@noRd
+#' PSIS-weighted expectations of a prediction function
+#'
+#' `loo_predict()`, `loo_epred()` and `loo_linpred()` all call it. A
+#' PSIS object is built with `loo(save_psis = TRUE)` when none is
+#' supplied. The weights and the predictions are both conditional on
+#' the latent state, describing the same observation. The observation
+#' noise `posterior_predict()` draws is still random. Both calls run
+#' under one fixed seed, making a repeated call reproducible. The
+#' caller's RNG state is restored on exit.
+#'
+#' @param object Fitted `mvgam` object
+#' @param posterior_fn Prediction function, one of `posterior_predict`,
+#'   `posterior_epred` and `posterior_linpred`
+#' @param type Character expectation type, `"mean"`, `"var"` or
+#'   `"quantile"`
+#' @param probs Numeric quantile probabilities for `type = "quantile"`
+#' @param psis_object PSIS object, or `NULL` to compute one
+#' @param resp Character response name, or `NULL`
+#' @param ... Further arguments to the prediction and `loo()` calls
+#' @return Numeric matrix with one row per scored observation, or a
+#'   three-dimensional array stacking one such matrix per response
+#' @noRd
 mvgam_loo_E_loo <- function(object, posterior_fn,
                              type = c("mean", "var", "quantile"),
                              probs = 0.5, psis_object = NULL,
@@ -503,10 +535,15 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
 }
 
 
-# Internal: map the prediction function back to the exported wrapper
-# the caller actually typed, so the guard names a real function.
-#'@noRd
+#' The exported name of the LOO wrapper a prediction function serves
+#'
+#' Lets a refusal name the function the caller typed.
+#'
+#' @param posterior_fn Prediction function
+#' @return Character scalar such as `"loo_epred"`
+#' @noRd
 loo_fn_name <- function(posterior_fn) {
+  checkmate::assert_function(posterior_fn)
   for (nm in c("posterior_predict", "posterior_epred", "posterior_linpred")) {
     if (identical(posterior_fn, get(nm, envir = asNamespace("mvgam")))) {
       return(sub("^posterior_", "loo_", nm))
@@ -516,13 +553,25 @@ loo_fn_name <- function(posterior_fn) {
 }
 
 
-# Internal: per-slab normalisation that mirrors the brms helper
-# `E_loo_value`: wraps a vector into a 1-col matrix, transposes
-# the quantile matrix into observation-row layout, and assigns
-# column labels (`"mean"`, `"var"`, or `"q{prob*100}"`).
-#'@noRd
+#' One PSIS-weighted expectation shaped as a labelled matrix
+#'
+#' Follows the internal brms function `E_loo_value()`. A vector becomes
+#' a one-column matrix. A quantile matrix is transposed to one row per
+#' observation. Columns are labelled `"mean"`, `"var"` or `"q<prob>"`.
+#'
+#' @param preds Numeric matrix of predictions, one row per draw
+#' @param psis_object PSIS object
+#' @param type Character expectation type, `"mean"`, `"var"` or
+#'   `"quantile"`
+#' @param probs Numeric quantile probabilities
+#' @return Numeric matrix with one row per observation
+#' @noRd
 mvgam_E_loo_normalise <- function(preds, psis_object,
                                     type = "mean", probs = 0.5) {
+  checkmate::assert_matrix(preds)
+  checkmate::assert_class(psis_object, "psis")
+  checkmate::assert_choice(type, c("mean", "var", "quantile"))
+  checkmate::assert_numeric(probs, lower = 0, upper = 1)
   y <- loo::E_loo(preds, psis_object, type = type,
                    probs = probs)$value
   if (is.matrix(y) && ncol(preds) == ncol(y)) {

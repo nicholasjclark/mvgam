@@ -20,29 +20,26 @@
 \arguments{
 \item{object}{A fitted \link[=mvgam]{mvgam} object.}
 
-\item{newdata}{Optional \code{data.frame} with the same columns as
-the training data, containing the time / series cells at
-which forecasts are wanted. Rows with time values beyond
-the training grid drive the forecast horizon. When \code{NULL},
-the held-out data given to \code{mvgam(..., newdata = )} at fit
-time is used. A fit given no held-out data has no occasions
-to forecast at, and \code{forecast()} then refuses.
+\item{newdata}{Optional \code{data.frame} with the columns of the
+training data, holding the time and series cells to forecast.
+Rows with times beyond the training grid set the horizon. When
+\code{NULL}, \code{forecast()} uses the held-out data given to
+\code{mvgam(newdata = )}. A fit without held-out data needs \code{newdata}.
 
-For \code{AR()}, \code{RW()}, \code{VAR()} and \code{PW()} the forecast times
-must continue the training series without a gap and at its
-own spacing, and are refused otherwise. These trends advance
-one step per time point, so the horizon is the number of
-steps taken from the last observed state; asking for
-\code{t = 41:42} after training ends at \code{t = 30} would take two
-steps rather than twelve and report a two-step-ahead spread
-for a twelve-step-ahead question. Supply every intervening
-time, whether or not the response is observed there.
-\code{CAR()} and \code{ZMVN()} are exempt: \code{CAR()} carries the elapsed
-gap into its kernel, and \code{ZMVN()} has no temporal structure
-to step through. Under \code{CAR()} each series may have its own
-forecast times, all after the last fitted time.}
+Five trends step once per time point: AR(), RW(), VAR(), LLT()
+and PW(). Their forecast times must continue the training series
+at its own spacing, without a gap. After training ends at
+\code{t = 30}, a request for \code{t = 41:42} is refused: two rows would
+report a two-step spread for a twelve-step horizon. Supply every
+intervening time, whether or not the response is observed there.
+\code{CAR()} takes the elapsed gap into its kernel. Each series may
+have its own forecast times, all after the last fitted time.
+\code{ZMVN()} has no temporal dynamics and takes any later times.
+\code{ZMVN()} and \code{PW()} need one set of forecast times shared by
+every series.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. A misspelt argument would land here and is
+refused.}
 
 \item{type}{One of \code{"response"}, \code{"link"}, \code{"expected"},
 \code{"trend"}. \code{"response"} samples from the observation family
@@ -62,20 +59,17 @@ Passing the same \code{draw_ids} to another method, such as
 with the same iteration there.}
 
 \item{coef_uncertainty}{Logical. When \code{FALSE}, every forecast
-draw uses the first posterior draw of every coefficient in
-the observation and trend formulas: fixed effects, smooth
-bases, random effect levels and Hilbert-space \code{gp(x, k)}
-bases alike, not only the population-level \code{b}. Defaults to
-\code{TRUE}.}
+draw uses the first posterior draw of every coefficient in the
+observation and trend formulas: population-level effects, smooth
+bases, random effect levels and Hilbert-space \code{gp(x, k)} bases.
+Defaults to \code{TRUE}.}
 
-\item{trend_uncertainty}{Logical. When \code{FALSE}, every
-forecast draw uses the first posterior draw of all
-trend-side quantities: the trend dynamics parameters
-(\code{sigma}, AR / MA / VAR coefficients), the initial latent
-state (\code{last_state$trends}), and the trend-formula linpred
-(\code{mu_trend}). Fresh innovations are still drawn per
-forecast call so the resulting spread reflects innovation
-noise alone. Defaults to \code{TRUE}.}
+\item{trend_uncertainty}{Logical. When \code{FALSE}, every forecast
+draw uses the first posterior draw of the trend dynamics
+parameters (\code{sigma}, AR, MA and VAR coefficients), the last
+fitted state and the trend formula's predictor \code{mu_trend}. Each
+draw still takes fresh innovations. The spread then shows
+innovation noise alone. Defaults to \code{TRUE}.}
 
 \item{obs_uncertainty}{Logical. When \code{FALSE}, skips
 observation-family sampling for \code{type = "response"},
@@ -92,11 +86,10 @@ Hindcasts and forecasts are returned as named lists of
 \verb{[ndraws, n_times]} matrices, one per series.
 }
 \description{
-Draw posterior forecasts at user-supplied future time points,
-alongside posterior hindcasts at the training time points.
-The latent trend is propagated forward per draw using the
-fitted state-space dynamics; the observation family then
-maps the trajectory back to the response scale.
+Posterior forecasts at future time points, with posterior hindcasts
+at the training time points. Each draw propagates the fitted latent
+state through the trend's dynamics. The observation family then
+maps the trend to the response scale.
 }
 \examples{
 \dontrun{
@@ -121,11 +114,10 @@ plot(fc)
 
 }
 \seealso{
-\link[=mvgam]{mvgam_forecast-class}, \link{hindcast.mvgam},
-\link{posterior_predict.mvgam} and \link{posterior_epred.mvgam} for the
-alternative marginal-MC prediction surface that integrates
-over the trend's stochastic dynamics instead of extrapolating
-the fitted latent state. The online article
+\link[=mvgam]{mvgam_forecast-class}, \link{hindcast.mvgam}.
+\link{posterior_predict.mvgam} and \link{posterior_epred.mvgam} predict by
+integrating over the trend's stochastic dynamics. \code{forecast()}
+extrapolates the fitted latent state. The online article
 \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
 walks through \code{forecast()} together with \code{score()},
 \code{lfo_cv()} and \code{ensemble()} on a worked count-data example.

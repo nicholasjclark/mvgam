@@ -198,26 +198,36 @@ log_lik.mvgam <- function(object,
 }
 
 
-# Internal: the distributional parameters a multi-response family
-# reads, whichever of the two shapes it takes.
-#
-# `mvn` and `mvt` carry a per-row scale and, for the latter, degrees
-# of freedom; the simplex families carry a per-row softmax
-# probability, the closure-unit arrays naming which rows share a
-# unit, and a precision for `diri`. Which extractor answers, and
-# which optional parameter it is asked for, is the same decision for
-# the likelihood, the quantile residual and the predicted variance,
-# so it is taken here once. Reading them in one place is also what
-# keeps the residual describing the density `log_lik()` evaluates.
-#
-# The extractor's own list is returned whole rather than narrowed,
-# because the three callers want different parts of it and a
-# narrowing that suited one would send the next back to the
-# extractor.
-#'@noRd
+#' The distributional parameters of a multi-response family
+#'
+#' `mvn()` and `mvt()` take a per-row scale, with degrees of freedom for
+#' `mvt()`. The simplex families take a per-row softmax probability,
+#' the closure-unit arrays naming the rows of each unit and a precision
+#' for `diri()`. The likelihood, the quantile residual and the
+#' predicted variance all call it. One extractor keeps the residual
+#' standardising the density `log_lik()` evaluates. Each caller uses a
+#' different part of the extractor's list. The list is returned whole.
+#'
+#' @param object Fitted `mvgam` object
+#' @param newdata Data frame of the prediction rows
+#' @param linpred Numeric linear predictor matrix, or `NULL`
+#' @param family_obj Family object of the response
+#' @param family_name Character family name
+#' @param draw_ids Integer vector of draw indices, or `NULL`
+#' @param ndraws Integer number of draws, or `NULL`
+#' @return List of distributional parameters from
+#'   `extract_simplex_response_components()` or
+#'   `extract_mv_response_components()`
+#' @noRd
 mv_response_family_pars <- function(object, newdata, linpred,
                                     family_obj, family_name,
                                     draw_ids, ndraws = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_matrix(linpred, null.ok = TRUE)
+  checkmate::assert_list(family_obj)
+  checkmate::assert_string(family_name)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   if (is_simplex_response_family(family_obj)) {
     return(extract_simplex_response_components(
       object, newdata, draw_ids, ndraws = ndraws,
@@ -412,13 +422,18 @@ dispatch_log_lik <- function(family_name, link, linpred, y,
 # link string. Returns [ndraws x nobs] of log densities matching brms's
 # *_lpdf / *_lpmf parameterisations.
 
-# Internal: the joint density of several responses measured at the
-# same occasions. Each element is `[ndraws x nobs]` at one grain,
-# with an all-`NA` column wherever that response was not measured.
-# The joint is the sum over the responses that were, and is missing
-# only at an occasion where none of them was.
-#'@noRd
+#' The joint log-density of several responses at shared occasions
+#'
+#' Each element holds a missing column wherever its response was not
+#' measured. The joint sums the measured responses and is missing only
+#' at an occasion with none.
+#'
+#' @param per_resp List of numeric log-density matrices with dimensions
+#'   `[ndraws, nobs]`, one per response
+#' @return Numeric matrix with dimensions `[ndraws, nobs]`
+#' @noRd
 sum_measured_arms <- function(per_resp) {
+  checkmate::assert_list(per_resp, types = "matrix", min.len = 1L)
   measured <- lapply(per_resp, function(m) !is.na(m))
   n_measured <- Reduce(`+`, measured)
   filled <- Map(function(m, ok) {

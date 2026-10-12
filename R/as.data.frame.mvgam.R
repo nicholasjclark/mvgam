@@ -102,15 +102,17 @@ resolve_mvgam_keyword <- function(keyword, all_vars) {
 }
 
 
-# Internal: build the positional -> brms-style alias map for the
-# fixed-effects block. brms's `rename_pars` translates `b[k]` to
-# `b_<term>` post-fit, where `<term>` is the k-th non-Intercept
-# column of the design matrix (the Intercept is centred out into
-# its own scalar). For trend-formula fits the analogous map is
-# `b_trend[k]` -> `b_<term>_trend` over `standata$X_trend`. We
-# rebuild the map at draw-extraction time so every method routed
-# through `extract_mvgam_draws` sees the brms-native names.
-#'@noRd
+#' The brms names of the population-level coefficients
+#'
+#' After a fit, the internal brms function `rename_pars()` turns `b[k]`
+#' into `b_<term>`, with `<term>` the `k`th non-intercept column of the
+#' design matrix. A trend formula maps `b_trend[k]` to `b_<term>_trend`
+#' over `standata$X_trend`. Every method that goes through
+#' `extract_mvgam_draws()` then sees the brms names.
+#'
+#' @param x Fitted `mvgam` object
+#' @return Named character vector mapping brms names to Stan names
+#' @noRd
 mvgam_beta_aliases <- function(x) {
   checkmate::assert_class(x, "mvgam")
   # brms's stancode centres the design matrix whenever an Intercept
@@ -198,17 +200,19 @@ mvgam_beta_aliases <- function(x) {
 }
 
 
-# Internal: the alias map for the smoothing standard deviations and
-# basis coefficients. brms's stancode numbers each smooth object:
-# `sds<p>_<i>[k]` is the standard deviation of its k-th penalty and
-# `s<p>_<i>_<k>[m]` the m-th coefficient under that penalty.
-# `brms:::rename_sm()` then names the object by its label:
-# `sds<p>_<label>_<k>` and `s<p>_<label>_<k>[m]`. A trend-side name
-# takes `_trend` before its index, as the other aliases do.
-#
-# @param x A fitted `mvgam` object.
-# @param raw The raw Stan names the posterior carries.
-#'@noRd
+#' The brms names of the smoothing SDs and basis coefficients
+#'
+#' The brms Stan code numbers each smooth object. `sds<p>_<i>[k]` is the
+#' SD of its `k`th penalty and `s<p>_<i>_<k>[m]` the `m`th coefficient
+#' under that penalty. The internal brms function `rename_sm()` names
+#' the object by its label, as `sds<p>_<label>_<k>` and
+#' `s<p>_<label>_<k>[m]`. A trend-side name takes `_trend` before its
+#' index.
+#'
+#' @param x Fitted `mvgam` object
+#' @param raw Character vector of the Stan names in the posterior
+#' @return Named character vector mapping brms names to Stan names
+#' @noRd
 mvgam_smooth_aliases <- function(x, raw) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(raw)
@@ -237,23 +241,26 @@ mvgam_smooth_aliases <- function(x, raw) {
 }
 
 
-# Internal: the alias map for Gaussian-process and special terms.
-#
-# brms numbers these by position within each predictor `<p>`, and
-# `brms:::rename_gp()` and `brms:::rename_sp()` name them by term:
-#   `sdgp<p>_<i>[k]`       -> `sdgp<p>_<label k>`
-#   `lscale<p>_<i>[k, d]`  -> `lscale<p>_<label k><covariate d>`, or
-#                             `lscale<p>_<label k>` when isotropic
-#   `zgp<p>_<i>[_j][m]`    -> `zgp<p>_<label j>[m]`
-#   `bsp<p>[k]`            -> `bsp<p>_<term k>`
-#   `simo<p>_<i>[m]`       -> `simo<p>_<term><n>[m]`, one per `mo()`
-# A GP's label is `gp` and its covariates, then its `by` variable and
-# each level of a `by` factor. A trend-side name takes `_trend` before
-# its index, as the other aliases do.
-#
-# @param x A fitted `mvgam` object.
-# @param raw The raw Stan names the posterior carries.
-#'@noRd
+#' The brms names of Gaussian-process and special terms
+#'
+#' brms numbers these by position within each predictor `<p>`. The
+#' internal brms functions `rename_gp()` and `rename_sp()` name them by
+#' term.
+#' * `sdgp<p>_<i>[k]` becomes `sdgp<p>_<label k>`
+#' * `lscale<p>_<i>[k, d]` becomes `lscale<p>_<label k><covariate d>`,
+#'   or `lscale<p>_<label k>` when isotropic
+#' * `zgp<p>_<i>[_j][m]` becomes `zgp<p>_<label j>[m]`
+#' * `bsp<p>[k]` becomes `bsp<p>_<term k>`
+#' * `simo<p>_<i>[m]` becomes `simo<p>_<term><n>[m]`, one per `mo()`
+#'
+#' A GP label joins `gp`, its covariates, its `by` variable and each
+#' level of a `by` factor. A trend-side name takes `_trend` before its
+#' index.
+#'
+#' @param x Fitted `mvgam` object
+#' @param raw Character vector of the Stan names in the posterior
+#' @return Named character vector mapping brms names to Stan names
+#' @noRd
 mvgam_special_aliases <- function(x, raw) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(raw)
@@ -324,16 +331,19 @@ mvgam_special_aliases <- function(x, raw) {
 }
 
 
-# Internal: the label of each Gaussian process a `gp()` term fits.
-# `brms:::frame_gp()` writes `gp` and the covariates, appends the `by`
-# variable, and for a `by` factor fits one process per column of the
-# factor's cell-means design, labelled by its level.
-#
-# @param g The object `brms::gp()` returns for the term.
-# @param data The frame the model was fitted to.
-# @return Character vector, one label per process.
-#'@noRd
+#' The label of each Gaussian process a `gp()` term fits
+#'
+#' Follows the internal brms function `frame_gp()`. The label joins
+#' `gp`, the covariates and the `by` variable. A `by` factor fits one
+#' process per column of its cell-means design, labelled by level.
+#'
+#' @param g Object `brms::gp()` returns for the term
+#' @param data Data frame the model was fitted to
+#' @return Character vector with one label per process
+#' @noRd
 brms_gp_labels <- function(g, data) {
+  checkmate::assert_list(g)
+  checkmate::assert_data_frame(data)
   label <- paste0("gp", brms_rename(paste(g$term, collapse = "")))
   if (identical(g$by, "NA")) {
     return(label)
@@ -353,8 +363,11 @@ brms_gp_labels <- function(g, data) {
 }
 
 
-# Internal: the term labels of a component formula, or none.
-#'@noRd
+#' The term labels of a component formula
+#'
+#' @param form Formula, or any other object for none
+#' @return Character vector of term labels, empty for a non-formula
+#' @noRd
 formula_term_labels <- function(form) {
   if (!inherits(form, "formula")) {
     return(character(0L))
@@ -363,23 +376,30 @@ formula_term_labels <- function(form) {
 }
 
 
-# Internal: the index a Stan element name carries, `3` for `x[3]`.
-#'@noRd
+#' The index a Stan element name carries
+#'
+#' @param v Character vector of Stan element names, such as `"x[3]"`
+#' @return Character vector of indices, such as `"3"`
+#' @noRd
 stan_index <- function(v) {
+  checkmate::assert_character(v)
   sub("^.*\\[([0-9]+)\\]$", "\\1", v)
 }
 
 
-# Internal: the label brms gives each smooth object of one term.
-# `brms:::frame_sm()` joins the covariates and the `by` variable,
-# strips the punctuation `brms:::rename()` strips, prefixes the
-# smooth function and appends the object's `by` level: `s(time, by =
-# series)` labels its objects `stimeseriesDM`, `stimeseriesDO`.
-#
-# @param term One entry of `mvgam_smooth_terms()`.
-# @return Character vector, one label per smooth object of the term.
-#'@noRd
+#' The label brms gives each smooth object of one term
+#'
+#' Follows the internal brms function `frame_sm()`. The label joins the
+#' covariates with the `by` variable and strips the punctuation that
+#' `brms_rename()` strips. It then takes the smooth function as a prefix
+#' and the object's `by` level as a suffix. `s(time, by = series)`
+#' labels its objects `stimeseriesDM`, `stimeseriesDO` and onward.
+#'
+#' @param term One entry of `mvgam_smooth_terms()`
+#' @return Character vector with one label per smooth object
+#' @noRd
 brms_smooth_labels <- function(term) {
+  checkmate::assert_list(term)
   sfun <- sub("\\(.*$", "", term$term)
   vars <- c(term$covars, stats::na.omit(term$by_var))
   base <- paste0(sfun, brms_rename(paste(vars, collapse = "")))
@@ -390,10 +410,16 @@ brms_smooth_labels <- function(term) {
 }
 
 
-# Internal: the substitutions `brms:::rename()` applies by default
-# when it turns a term into part of a parameter name.
-#'@noRd
+#' A term rewritten for use in a parameter name
+#'
+#' Applies the default substitutions of the internal brms function
+#' `rename()`.
+#'
+#' @param x Character vector of terms
+#' @return Character vector of renamed terms
+#' @noRd
 brms_rename <- function(x) {
+  checkmate::assert_character(x)
   from <- c(" ", "(", ")", "[", "]", ",", "\"", "'", "?",
             "+", "-", "*", "/", "^", "=", "$")
   to <- c(rep("", 9L), "P", "M", "MU", "D", "E", "EQ", "USD")
@@ -404,13 +430,18 @@ brms_rename <- function(x) {
 }
 
 
-# Internal: replace positional Stan parameter names in `vars` with
-# their brms-native aliases. Each element of `alias_map` names the
-# alias and holds the positional Stan name, the shape every
-# `mvgam_*_aliases()` builder returns. Names not in the map pass
-# through unchanged.
-#'@noRd
+#' Stan parameter names replaced by their brms names
+#'
+#' Names absent from the map are unchanged.
+#'
+#' @param vars Character vector of Stan parameter names
+#' @param alias_map Named character vector mapping brms names to Stan
+#'   names, as the `mvgam_*_aliases()` builders return
+#' @return Character vector shaped as `vars`
+#' @noRd
 apply_mvgam_aliases <- function(vars, alias_map) {
+  checkmate::assert_character(vars)
+  checkmate::assert_character(alias_map)
   if (length(alias_map) == 0L) {
     return(vars)
   }
@@ -423,30 +454,28 @@ apply_mvgam_aliases <- function(vars, alias_map) {
 }
 
 
-# Internal: the user-facing projection of a fit's parameter names.
-# Returns a named character vector: each name is the name a user
-# sees and each value the raw Stan name it aliases. The
-# empty-observation placeholder is dropped, and unless `all` is set
-# so are the working arrays, the accumulators and the hidden forms.
-#
-# `variables.mvgam()`, `extract_mvgam_draws()`, `summary()` and
-# `tidy.mvgam()` all take their names from here. They agree about
-# which parameters exist and what they are called: `b_x` for the
-# positional `b[1]`, and the identified loadings in place of
-# `L_Omega_trend`.
-#
-# @param x A fitted `mvgam` object.
-# @param pars Optional raw Stan names to project. Defaults to every
-#   name in the posterior.
-# @param all Return every parameter under its user-facing name,
-#   skipping the exclusion list and the rotation-indeterminate
-#   filter. Only a caller that named a parameter explicitly should
-#   set this, since asking for one by name is how a user reaches a
-#   parameter the default view hides.
-#'@noRd
+#' The user-facing names of a fit's parameters
+#'
+#' `variables.mvgam()`, `extract_mvgam_draws()`, `summary()` and
+#' `tidy.mvgam()` all take their names from here. With one source they
+#' agree on which parameters exist and on their names, such as `b_x`
+#' for the positional `b[1]`. The empty-observation placeholder is
+#' dropped. Unless `all = TRUE`, the working arrays, the accumulators
+#' and the hidden forms are dropped too.
+#'
+#' @param x Fitted `mvgam` object
+#' @param pars Character vector of Stan names to project, or `NULL` for
+#'   every name in the posterior
+#' @param all Logical flag to keep every parameter, skipping the
+#'   exclusion list and the rotation-indeterminate filter. Only a caller
+#'   whose user named a parameter sets it.
+#' @return Named character vector mapping user-facing names to Stan
+#'   names
+#' @noRd
 mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_flag(all)
+  checkmate::assert_character(pars, null.ok = TRUE)
   raw <- pars %||% posterior::variables(posterior::as_draws(x$fit))
   user <- apply_mvgam_aliases(
     raw, c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x),
@@ -479,24 +508,23 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
 }
 
 
-# Internal: the brms group-level metadata for a fitted mvgam
-# object. Returns a list with `reframe` (the brmsfit `$ranef`
-# data.frame: one row per (group, coef) pair) and `group_levels`
-# (the named list of levels per grouping factor), or NULL when the
-# fit has no group-level effects.
-#
-# Each side stores a lightweight brmsfit holding this table, built
-# when the model was set up.
-#
-# `mvgam_ranef_aliases()`, `ranef.mvgam()` and `VarCorr.mvgam()` all
-# take the names they look up from here. Each row gains the three
-# name parts brms builds: `row_prefix`, the predictor it enters, as
-# `make_row_prefix()` gives it; `alias_key`, the group with that
-# prefix, as in `r_g__sigma_y1[a,Intercept]`; and `coef_alias`, the
-# coefficient with that prefix, as in `sd_g__sigma_y1_Intercept`.
-# `brms:::rename_re_levels()` writes each whitespace character of a
-# level as `.`, and so do the levels here.
-#'@noRd
+#' The brms group-level metadata of one side of a fit
+#'
+#' Each side stores a lightweight brmsfit holding the `ranef` table,
+#' built at model setup. `mvgam_ranef_aliases()`, `ranef.mvgam()` and
+#' `VarCorr.mvgam()` take their names from here. Each row gains the
+#' three name parts brms builds. `row_prefix` is the predictor the row
+#' enters, from `make_row_prefix()`. `alias_key` is the group with that
+#' prefix, as in `r_g__sigma_y1[a,Intercept]`. `coef_alias` is the
+#' coefficient with that prefix, as in `sd_g__sigma_y1_Intercept`.
+#' Whitespace in a level becomes `.`, as the internal brms function
+#' `rename_re_levels()` writes it.
+#'
+#' @param x Fitted `mvgam` object
+#' @param side Character side, `"observation"` or `"trend"`
+#' @return List holding the `reframe` table and the named list of
+#'   `group_levels`, or `NULL` for a side without group-level effects
+#' @noRd
 mvgam_ranef_metadata <- function(x,
                                  side = c("observation", "trend")) {
   checkmate::assert_class(x, "mvgam")
@@ -525,49 +553,41 @@ mvgam_ranef_metadata <- function(x,
 }
 
 
-# Internal: build alias map for random-effect parameters.
-# brms's stancode emits group-level parameters in positional form
-# (`r_<id>[<level_idx>,<coef_idx>]`, `sd_<id>[<coef_idx>]`,
-# `cor_<id>[<flat_off_diag>]`). brms's `rename_pars` then promotes
-# these to user-facing aliases keyed on the grouping factor name
-# and the coefficient name (`r_<group>[<level>,<coef>]`,
-# `sd_<group>__<coef>`, `cor_<group>__<coef1>__<coef2>`). mvgam
-# delegates Stan-code generation to brms and does not run
-# `rename_pars`. This helper rebuilds the same map.
-#
-# Returns a named character vector in the same shape as
-# `mvgam_beta_aliases`: names are the brms-native aliases, values
-# are the positional Stan names. An empty character vector is
-# returned when the fit has no group-level effects.
-#
-# Both sides are aliased. The observation and trend blocks reach
-# Stan under the same positional names, the trend's with `_trend`
-# after the id. `mvgam_ranef_metadata()` takes each side's table from
-# the lightweight brmsfit stored for it.
-#
-# The other brms group-level patterns come through the same
-# `$ranef` table and so need no special case here: multivariate
-# response (`bf(mvbind(y1, y2) ~ (1 | g))`), distributional
-# parameters (`bf(y ~ ..., sigma ~ (1 | g))`), nesting
-# (`(1 | g1/g2)`, expanded to `(1|g1) + (1|g1:g2)`) and by-factor
-# grouping (`gr(g, by = f)`).
-#'@noRd
+#' The brms names of the group-level parameters
+#'
+#' The brms Stan code names group-level parameters by position, as
+#' `r_<id>[<level>,<coef>]`, `sd_<id>[<coef>]` and `cor_<id>[<k>]`. The
+#' internal brms function `rename_pars()` names them by group and
+#' coefficient, as `r_<group>[<level>,<coef>]`, `sd_<group>__<coef>` and
+#' `cor_<group>__<coef1>__<coef2>`. mvgam does not call
+#' `rename_pars()`. This function builds the same map for both sides.
+#' Multivariate responses, distributional parameters, nesting and
+#' `gr(g, by = f)` all arrive through the same `ranef` table.
+#'
+#' @param x Fitted `mvgam` object
+#' @return Named character vector mapping brms names to Stan names,
+#'   empty for a fit without group-level effects
+#' @noRd
 mvgam_ranef_aliases <- function(x) {
+  checkmate::assert_class(x, "mvgam")
   c(mvgam_ranef_aliases_side(x, "observation"),
     mvgam_ranef_aliases_side(x, "trend"))
 }
 
 
-# Internal: the alias map for one side's group-level block.
-#
-# A random effect declared in `trend_formula` reaches Stan under the
-# same positional names the observation side uses, with `_trend`
-# after the id: `sd_1_trend[1]` where the observation side has
-# `sd_1[1]`. Its alias takes the `_trend` suffix the beta aliaser
-# applies to `b_trend[k]`: `sd_grp__Intercept_trend`.
-#'@noRd
+#' The brms names of one side's group-level parameters
+#'
+#' A trend-side random effect has the observation-side positional names
+#' with `_trend` after the id, as in `sd_1_trend[1]`. Its brms name
+#' takes the `_trend` suffix, as in `sd_grp__Intercept_trend`.
+#'
+#' @param x Fitted `mvgam` object
+#' @param side Character side, `"observation"` or `"trend"`
+#' @return Named character vector mapping brms names to Stan names
+#' @noRd
 mvgam_ranef_aliases_side <- function(x,
                                      side = c("observation", "trend")) {
+  checkmate::assert_class(x, "mvgam")
   side <- match.arg(side)
   meta <- mvgam_ranef_metadata(x, side)
   if (is.null(meta)) {
@@ -661,13 +681,22 @@ mvgam_ranef_aliases_side <- function(x,
 }
 
 
-# Internal: pull a `draws_array` from the stanfit slot, optionally
-# filtered by keyword / explicit names / regex. Public methods just
-# need to coerce the result to their target shape.
-#'@noRd
+#' The posterior draws of a fit under their user-facing names
+#'
+#' Every draws method calls it and converts the result to its own
+#' shape.
+#'
+#' @param x Fitted `mvgam` object
+#' @param variable Character vector of parameter names or regular
+#'   expressions, or `NULL` for the default set
+#' @param regex Logical flag to treat `variable` as regular expressions
+#' @param inc_warmup Logical flag to include warmup draws
+#' @return A `draws_array`
+#' @noRd
 extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
                                 inc_warmup = FALSE) {
   checkmate::assert_class(x, "mvgam")
+  checkmate::assert_character(variable, null.ok = TRUE)
   checkmate::assert_logical(regex, len = 1L)
   checkmate::assert_logical(inc_warmup, len = 1L)
   # Every draws method in the package calls this function, and the

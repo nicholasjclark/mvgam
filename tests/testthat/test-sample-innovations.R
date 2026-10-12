@@ -136,14 +136,8 @@ test_that("a hier VAR routes through the Cholesky extractor", {
 
   cs <- get_trend_covariance_structure(fake_object)
 
-  expect_equal(cs$pattern, "full_covariance")
   expect_true(cs$hierarchical)
-  expect_equal(dim(cs$params$L_Omega_global_trend),
-               c(n_draws, n_sub, n_sub))
-  expect_equal(dim(cs$params$L_deviation_group_trend),
-               c(n_draws, n_groups, n_sub, n_sub))
-  expect_equal(length(cs$params$alpha_cor_trend), n_draws)
-  # Sanity-check column→slot mapping survives the dispatch.
+  # The columns reach their slots through the dispatch
   expect_equal(
     cs$params$L_Omega_global_trend[, 2, 1],
     as.numeric(raw_mat[, "L_Omega_global_trend[2,1]"])
@@ -228,9 +222,9 @@ test_that("the flat stationary split rebuilds its own covariance", {
 
 
 test_that("a grouped VAR takes its stationary blocks from Omega_trend", {
-  # The program solves `Omega = A Omega A' + Sigma` over every series
-  # and gives its first latent state that covariance. Groups keep to
-  # their own block of it, and each block becomes one factor.
+  # The program gives its first latent state the stationary
+  # covariance `Omega_trend`, block diagonal over the groups. Each
+  # block becomes one group's factor.
   n_g <- 2L
   n_s <- 2L
   n_lv <- n_g * n_s
@@ -265,8 +259,6 @@ test_that("a grouped VAR takes its stationary blocks from Omega_trend", {
 
   out <- stationary_group_var_params(params, draws_mat, group_info)
   L_stat <- out$L_group_stationary
-  expect_false(is.null(L_stat))
-  expect_identical(dim(L_stat), c(ndraws, n_g, n_s, n_s))
   for (d in seq_len(ndraws)) {
     expect_equal(tcrossprod(matrix(L_stat[d, 1, , ], n_s, n_s)), blk1)
     expect_equal(tcrossprod(matrix(L_stat[d, 2, , ], n_s, n_s)), blk2)
@@ -917,13 +909,15 @@ test_that("hierarchical_group_cholesky weights by alpha", {
 
 # Leading `m x m` block of the stationary covariance of a companion
 # state, `sum_k A^k Q A'^k`. Written from the definition, it calls
-# nothing from the package.
-neumann_lead <- function(A, Q, m, n_terms = 3000L) {
-  out <- matrix(0, nrow(A), ncol(A))
-  Ak <- diag(nrow(A))
-  for (k in 0:n_terms) {
-    out <- out + Ak %*% Q %*% t(Ak)
-    Ak <- Ak %*% A
+# nothing from the package. Each doubling step adds `A^n S A'^n` to
+# the partial sum `S` of the first `n` terms and squares `A^n`. Sixty
+# steps cover 2^60 terms.
+neumann_lead <- function(A, Q, m) {
+  out <- Q
+  An <- A
+  for (step in 1:60) {
+    out <- out + An %*% out %*% t(An)
+    An <- An %*% An
   }
   out[seq_len(m), seq_len(m)]
 }

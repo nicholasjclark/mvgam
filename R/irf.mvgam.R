@@ -5,8 +5,7 @@
 #'
 #' @name irf.mvgam
 #' @param object \code{list} object of class \code{mvgam} resulting from a call to [mvgam()]
-#' that used a Vector Autoregressive latent process model (either as `VAR(cor = FALSE)` or
-#' `VAR(cor = TRUE)`; see [VAR()] for details)
+#' that used a `VAR()` latent process model
 #' @param h Positive \code{integer} specifying the forecast horizon over which to calculate
 #' the IRF
 #' @param ndraws Optional integer; the number of posterior draws to
@@ -122,7 +121,7 @@ irf.mvgam <- function(
 
 #' Calculate impulse response functions
 #'
-#' Orthogonalised (Sims 1980 / Lutkepohl 2007 §2.3.2) and
+#' Orthogonalised (Sims 1980 / Lutkepohl 2007 Section 2.3.2) and
 #' generalised (Pesaran-Shin 1998) impulse responses. Both share the
 #' MA representation of A but project it differently:
 #'

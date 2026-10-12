@@ -55,19 +55,17 @@ leading gradients. Use \code{alpha} to split the variance
 between site scores and loadings.}
 \item{\code{"varimax"}}{Orthogonal rotation maximising loading
 sparsity (each series loads strongly on one factor and
-near-zero on others). Use this when you want
-interpretable factor "names" rather than variance-
-ordered axes. Requires \code{n_lv >= 2}. \code{alpha} ignored.}
+near-zero on others). Use this to give each factor an
+interpretable name. The axes have no variance ordering.
+Requires \code{n_lv >= 2}. \code{alpha} ignored.}
 \item{\code{"promax"}}{Oblique extension of varimax that allows
 correlated rotated factors. \code{alpha} ignored.}
 \item{\code{"none"}}{Plot the centred posterior medians of the
 identified latent variables and loadings, as described
 in Details. \code{alpha} ignored.}
 }
-For varimax / promax the axes are NOT variance-ordered, so
-the choice of \code{which_lvs} matters in a different way than
-under SVD: any pair of rotated factors is a valid pair to
-plot.}
+Varimax and promax axes have no variance ordering. Any pair of
+rotated factors is then a valid choice for \code{which_lvs}.}
 
 \item{label_sites}{Logical. When \code{TRUE}, site scores are
 drawn as text labels (the training time values); when
@@ -123,17 +121,16 @@ ordered by the variance they explain. With \code{"varimax"} or
 \code{rotation = "none"} and \code{plot_factors()} show the identified
 factors themselves.
 
-A \code{trend_map} supplies the loading pattern as data, and any
-rotation other than \code{"none"} replaces it with one read off
-the fitted covariance. Each such call warns, naming the
-rotation it applied; \code{plot_factors(fit)} shows the loadings
-the map declared.
+A \code{trend_map} supplies the loading pattern as data. Any rotation
+other than \code{"none"} replaces that pattern with one derived from the
+fitted covariance. Each such call warns and names the rotation it
+applied. \code{plot_factors(fit)} shows the loadings the map declared.
 }
 \note{
 This method needs a fitted factor model. It uses the
-identified latent variables and their loadings: \code{lv_trend_tilde}
-and \code{Z_tilde} from a model identified by rotation, and
-\code{lv_trend} and \code{Z} from every other factor model.
+identified latent variables and their loadings. A model
+identified by rotation supplies \code{lv_trend_tilde} and \code{Z_tilde}.
+Every other factor model supplies \code{lv_trend} and \code{Z}.
 }
 \section{Known limitations}{
 
@@ -142,9 +139,9 @@ and \code{Z_tilde} from a model identified by rotation, and
 per-element medians of \code{lv_trend} and \code{Z}. Uncertainty in
 site scores and loading positions is not propagated to
 the biplot.
-\item Sign indeterminacy: SVD and varimax columns are sign-
-arbitrary, so comparing ordinations from independently-
-fit models may require a manual sign-flip alignment.
+\item Sign indeterminacy: SVD and varimax columns have arbitrary
+signs. Ordinations from independently fitted models may need a
+manual sign flip to align.
 }
 }
 
@@ -152,20 +149,20 @@ fit models may require a manual sign-flip alignment.
 \dontrun{
 set.seed(1)
 simdat <- sim_closure_unit_data(
-  family    = occ(),
+  family = occ(),
   n_species = 4L,
-  n_sites   = 50L,
-  n_visits  = 4L,
-  type      = 2L
+  n_sites = 50L,
+  n_visits = 4L,
+  type = 2L
 )
 mod <- jsdgam(
-  formula        = bf(y ~ env, p ~ tod_c),
+  formula = bf(y ~ env, p ~ tod_c),
   factor_formula = ~ -1,
-  data           = simdat$data_train,
-  family         = occ(),
-  n_lv           = 2L,
-  chains         = 2,
-  silent         = 2
+  data = simdat$data_train,
+  family = occ(),
+  n_lv = 2L,
+  chains = 2,
+  silent = 2
 )
 
 # SVD biplot of site + species scores in the two-factor space.

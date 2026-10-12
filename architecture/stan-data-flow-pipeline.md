@@ -116,19 +116,20 @@ the trend to each response's predictor. `resps` is `""` for a
 univariate model and the brms response keys for a multivariate one,
 and `<sfx>` below is `""` or `_<resp>`. For each response,
 `inject_trend_for_response()` adds
-`mu<sfx>[n] += trend[obs_trend_time<sfx>[n], obs_trend_series<sfx>[n]]`
-in a loop:
+`mu<sfx> += to_vector(trend)[obs_trend_idx<sfx>]`. Transformed data
+builds `obs_trend_idx<sfx>` from `obs_trend_time<sfx>` and
+`obs_trend_series<sfx>`:
 
 - A GLM likelihood on `Y<sfx>`: `rewrite_glm_for_trend()` declares
   `mu<sfx> = design * coefs`, adds the intercept and the trend and
   rewrites the call to take `to_matrix(mu<sfx>)` and `mu_ones<sfx>`.
   brms writes an offset model's GLM call with the declared `mu<sfx>`
   as its intercept, and that call takes the next path unchanged.
-- A built predictor: `add_trend_to_built_predictor()` places the loop
-  before the first statement that transforms `mu<sfx>` (an inverse
+- A built predictor: `add_trend_to_built_predictor()` places the
+  addition before the first statement that transforms `mu<sfx>` (an inverse
   link, or the skew-normal mean shift), outside any loop enclosing
-  it. Without a transform, the loop follows the last statement that
-  builds `mu<sfx>`.
+  it. Without a transform, the addition follows the last statement
+  that builds `mu<sfx>`.
 
 An unknown GLM family, or a model block with no single correct place
 for the trend, raises `stop_mvgam_fault()`.

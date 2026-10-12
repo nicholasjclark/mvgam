@@ -1,5 +1,5 @@
-# Tests for the input-array pivot helpers `pivot_detection_array()`
-# and `pivot_species_matrix()`. Three layers:
+# Tests for the data conversion helpers `pivot_detection_array()`,
+# `pivot_species_matrix()` and `series_to_mvgam()`. Four layers:
 #   1. Layout dispatch: 2D matrix, 3D array, 4D array (multi-season),
 #      and named list of matrices (unmarkedFrameOccuMulti) all produce
 #      a correctly-shaped long-format data.frame.
@@ -11,6 +11,8 @@
 #      mvgam's own validators (`build_closure_unit_arrays()`,
 #      `mvgam_formula()` parse, `stancode()` codegen with
 #      `family = occ()` / `family = nmix()`).
+#   4. Time series conversion: ts, msts, tsibble and wide data.frame
+#      inputs to the (series, time) layout.
 
 # 1. Layout dispatch ----------------------------------------------------
 
@@ -292,4 +294,68 @@ test_that("2D single-species pivot composes with mvgam(family = occ())", {
       mf, data = long, family = occ(), validate = FALSE
     )
   )
+})
+
+# 4. series_to_mvgam() --------------------------------------------------
+
+test_that("a ts converts with its cycle as the season", {
+  x <- window(AirPassengers, start = c(1950, 4))
+  out <- series_to_mvgam(x)
+  expect_identical(out$y, as.numeric(x))
+  expect_identical(out$season, as.integer(stats::cycle(x)))
+
+  # Each column of an mts is a series, rows ordered by time
+  m <- cbind(male = mdeaths, female = fdeaths)
+  out <- series_to_mvgam(m)
+  expect_identical(levels(out$series), c("male", "female"))
+  expect_identical(out$time, rep(1:72, each = 2L))
+  expect_identical(out$y[out$series == "female"], as.numeric(fdeaths))
+})
+
+test_that("an msts gives one season column per period", {
+  x <- stats::ts(rnorm(30), frequency = 7)
+  attr(x, "msts") <- c(7, 10.5)
+  out <- series_to_mvgam(x)
+  expect_identical(out$season_7, as.integer(stats::cycle(x)))
+  expect_identical(
+    out$season_10.5, as.integer(floor(round(stats::time(x) * 7) %% 10.5) + 1)
+  )
+})
+
+test_that("a tsibble fills its gaps and keeps keys and covariates", {
+  month <- tsibble::yearmonth("2020 Nov") + c(0:4, 7:9)
+  x <- tsibble::tsibble(
+    month = rep(month, 2L),
+    region = rep(c("north", "south"), each = 8L),
+    cases = 1:16, temp = 16:1,
+    key = "region", index = "month"
+  )
+  out <- series_to_mvgam(x, response = "cases")
+  # Two missing months per region become rows with a missing response
+  expect_identical(nrow(out), 20L)
+  expect_identical(out$time[is.na(out$cases)], c(6L, 6L, 7L, 7L))
+  expect_identical(
+    out$season, as.integer(format(as.Date(out$month), "%m"))
+  )
+  expect_identical(out$temp[out$time == 1L], c(16L, 8L))
+  expect_identical(levels(out$series), c("north", "south"))
+})
+
+test_that("a wide data.frame pivots with series in column order", {
+  wide <- data.frame(
+    date = as.Date("2024-01-01") + c(0:1, 4:9),
+    zeta = 1:8, alpha = 11:18
+  )
+  out <- series_to_mvgam(wide, h = 2L)
+  expect_identical(levels(out$data_train$series), c("zeta", "alpha"))
+  expect_identical(sum(is.na(out$data_train$y)), 4L)
+  expect_identical(unique(out$data_test$time), 9:10)
+})
+
+test_that("series_to_mvgam() refuses a calendar month held as a Date", {
+  x <- tsibble::tsibble(
+    date = seq(as.Date("2020-01-01"), by = "month", length.out = 6L),
+    y = 1:6, index = "date"
+  )
+  expect_error(series_to_mvgam(x), "yearmonth")
 })

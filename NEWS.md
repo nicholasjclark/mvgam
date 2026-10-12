@@ -17,6 +17,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * mvgam no longer re-exports `te()` and `ti()`
 * `mvgam_forecast` objects store `train_times` and `test_times` as per-series lists
 * Parameter names and `summary()` blocks follow 'brms', with smooths, Gaussian processes and monotonic effects named by term
+* `series_to_mvgam()` takes a `tsibble`, `ts`, `mts`, `msts` or wide data frame, fills gaps and returns one data frame unless `h` or `train_prop` is given. `xts` input has been removed
 
 ## New features
 * Families: `tweedie()`, `beta_nb()`, `com_binomial()`, `occ()`, `diri()`, `multi()`, `categ()`, `mvn()` and `mvt()`. `nmix()` gained Royle-Nichols, Poisson-Poisson and multi-season variants
@@ -37,6 +38,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * `posterior_epred()`, `posterior_predict()`, `posterior_linpred()` and `fitted()` default to `process_error = FALSE`, as `predict()` does
 * `fitted()` includes the fitted trend state for the training data, as `residuals()` does
 * Predictions with `incl_autocor = TRUE` and `log_lik()` refuse times outside the fitted times. Use `forecast()`
+* `ZMVN()` and `PW()` forecasts require every series to share one set of forecast times
 * `conditional_effects()` defaults to `type = "expected"`
 * Trend scale priors take the response's spread on the link scale as 'brms' defaults do. `LLT()` and `PW()` growth priors also scale with the series length
 * `PW()` `changepoint_scale` (default `0.3`) is a change in growth over the whole series
@@ -50,6 +52,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * `update()` works when a trend constructor argument came from a variable
 * `prior_summary()` reports the priors in the compiled Stan model
 * Closure-unit families and `com_binomial()` accept missing responses
+* `ensemble()` combines `hindcast()` results
 * `CAR()` process variance scales with the time lag (#107)
 * Fixes to forecast scores with one test observation, offsets with `gp()` terms, piecewise trend predictions, by-factor Gaussian Process predictions, the `max_treedepth` check in `summary()` and plots of residuals with missing values (thanks to @StefanoMezzini)
 
@@ -104,7 +107,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 
 ## Bug fixes
 * Added a new check to ensure that exception messages are only suppressed by the `silent` argument if the user's version of 'cmdstanr' is adequate
-* Updated dependency for 'brms' to version >= '2.21.0' so that `read_csv_as_stanfit` can be imported, which should future-proof the conversion of 'cmdstanr' models to `stanfit` objects (#70)
+* Updated dependency for 'brms' to version >= '2.21.0'. Its `read_csv_as_stanfit` now converts 'cmdstanr' models to `stanfit` objects (#70)
 
 # mvgam 1.1.2
 ## New functionalities
@@ -114,7 +117,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * Added an option to use `trend_model = 'None'` in State-Space models, increasing flexibility by ensuring the process error evolves as white noise (#51)
 * Added an option to use the non-centred parameterisation for some autoregressive trend models,
 which speeds up mixing most of the time
-* Updated support for multithreading so that all observation families (apart from `nmix()`) can now be modeled with multiple threads
+* Multithreading now supports all observation families apart from `nmix()`
 * Changed default priors on autoregressive coefficients (AR1, AR2, AR3) to enforce
 stationarity, which is a much more sensible prior in the majority of contexts
 

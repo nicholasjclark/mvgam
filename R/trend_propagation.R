@@ -1,17 +1,16 @@
 # One dispatch for forward-in-time trend simulation and forecasting.
 # `sim_mvgam()` starts from a burn-in and `forecast.mvgam()` from a
-# posterior draw's fitted state, and both advance by the same
-# recursion.
+# posterior draw's fitted state. Both advance by the same recursion.
 
 
 #' Propagate an `mvgam` trend forward in time
 #'
 #' Dispatches on the supplied `mvgam_trend` constructor to its
-#' propagator: the C++ kernel `trend_arma_recursC()` for RW, AR and
-#' VAR with or without a moving-average term, and R for CAR, LLT, PW
-#' and ZMVN. Draws innovations with the appropriate covariance
-#' structure, applies any burn-in needed when no explicit
-#' `last_state` is supplied, and returns the forward trajectory.
+#' propagator. The C++ kernel `trend_arma_recursC()` advances RW, AR
+#' and VAR, with or without a moving-average term. R code advances CAR,
+#' LLT, PW and ZMVN. Each propagator draws innovations with the trend's
+#' covariance structure. Without a `last_state`, a burn-in supplies the
+#' start.
 #'
 #' @param trend_model An `mvgam_trend` object built by one of the
 #'   trend constructors, or the string `"None"`.
@@ -22,10 +21,9 @@
 #' @param last_state Either `NULL` (default; the dispatcher
 #'   generates a 200-step burn-in from zero) or a list with
 #'   elements `trends` and `errors` as `extract_last_state()`
-#'   documents them. Forecast callers must populate `trends` with
-#'   posterior draws of the latent trend state, not observed
-#'   responses, and must centre them on the trend linear
-#'   predictor: the recursion advances a zero-mean process.
+#'   documents them. Forecast callers fill `trends` with posterior
+#'   draws of the latent trend state, centred on the trend linear
+#'   predictor. The recursion advances a zero-mean process.
 #' @param time Required only for `CAR()` trends; length-`h`
 #'   numeric vector of time gaps for the forecast steps.
 #' @param fc_times,training_times,cap,changepoint_range Required only
@@ -36,14 +34,13 @@
 #'
 #'   * **None**: no fields needed. Returns a zero matrix.
 #'   * **ZMVN**: `Sigma` (an `[n_series, n_series]` covariance
-#'     matrix) OR `sigma` (a length-`n_series` SD vector for a
-#'     diagonal covariance). One MVN(0, Σ) draw is returned per
-#'     timestep; there is no temporal recursion.
-#'   * **RW** (treated as AR(p=1) with coefficient = 1):
-#'     `sigma` (length `n_series` or scalar broadcast),
-#'     optional `drift` (length `n_series`), optional `theta`
-#'     (MA(1) coefficient) when `trend_model$ma`, optional
-#'     `Sigma` (innovation covariance) when `trend_model$cor`.
+#'     matrix) or `sigma` (a length-`n_series` SD vector for a
+#'     diagonal covariance). Each timestep takes one independent
+#'     multivariate normal draw.
+#'   * **RW** (an AR(1) with coefficient 1): `sigma`, optional
+#'     `drift` (length `n_series`), optional `theta` (MA(1)
+#'     coefficient) when `trend_model$ma`, optional `Sigma`
+#'     (innovation covariance) when `trend_model$cor`.
 #'   * **AR(p)**: `ar` (length `length(p)` scalar shared across
 #'     series, or `[length(p), n_series]` matrix), `sigma`,
 #'     optional `theta`, optional `Sigma`, optional `drift`.
@@ -52,18 +49,22 @@
 #'     covariance), optional `theta_cube`
 #'     (`[n_series, n_series, q]` MA matrices) when
 #'     `trend_model$ma`, optional `drift`.
-#'   * **CAR(1)**: `phi` (length `n_series` or scalar, must lie
-#'     in (0, 1) for stationary CAR), `sigma` (length
-#'     `n_series` or scalar, must be positive), optional `Sigma`
-#'     (innovation covariance over one unit of time) when
-#'     `trend_model$cor`. `time` argument is required.
+#'   * **CAR(1)**: `phi` (length `n_series` or scalar, inside
+#'     (0, 1)), `sigma`, optional `Sigma` (innovation covariance over
+#'     one unit of time). The `time` argument is required.
+#'   * **LLT**: `sigma` or `Sigma` for the level shocks. Optional
+#'     `sigma_slope` or `Sigma_slope` for the slope shocks.
+#'     `phi_slope` under `damped = TRUE`.
+#'   * **PW**: `k`, `m`, `delta` and `t_change` from the fit, with the
+#'     `fc_times`, `training_times`, `cap` and `changepoint_range`
+#'     arguments.
 #'
-#' Every stochastic trend also takes an optional `df`, the degrees of
-#' freedom of multivariate t innovations. `Inf` or absent gives
-#' Gaussian innovations.
+#' `sigma` is a scalar or one SD per series. Every stochastic trend also
+#' takes an optional `df`, the degrees of freedom of multivariate t
+#' innovations. `Inf` or absent gives Gaussian innovations.
 #'
 #' Defaults that apply if a field is missing: `sigma = 1`,
-#' `ar = 0.7` (AR/RW), `drift = 0`, `theta = 0`,
+#' `ar = 0.7` (AR), `drift = 0`, `theta = 0`,
 #' `phi = 0.7` (CAR), `Sigma = diag(sigma^2)`.
 #'
 #' @return Numeric matrix of shape `[h, n_series]`.
@@ -74,15 +75,15 @@
 #'
 #' @noRd
 propagate_trend <- function(trend_model,
-                             params = list(),
-                             h,
-                             n_series = 1L,
-                             last_state = NULL,
-                             time = NULL,
-                             fc_times = NULL,
-                             training_times = NULL,
-                             cap = NULL,
-                             changepoint_range = NULL) {
+                            params = list(),
+                            h,
+                            n_series = 1L,
+                            last_state = NULL,
+                            time = NULL,
+                            fc_times = NULL,
+                            training_times = NULL,
+                            cap = NULL,
+                            changepoint_range = NULL) {
   if (is.character(trend_model) && identical(trend_model, "None")) {
     return(matrix(0, nrow = h, ncol = n_series))
   }
@@ -93,8 +94,8 @@ propagate_trend <- function(trend_model,
   checkmate::assert_list(last_state, null.ok = TRUE)
 
   # A forecast supplies each draw's degrees of freedom. A simulation
-  # takes the value fixed on the constructor, and Gaussian innovations
-  # where the constructor asks for an estimate.
+  # takes the value fixed on the constructor. A constructor asking for
+  # an estimate gives Gaussian innovations.
   if (is.null(params$df)) {
     df <- trend_model$df %||% Inf
     params$df <- if (is.na(df)) Inf else df
@@ -111,29 +112,54 @@ propagate_trend <- function(trend_model,
   )
 }
 
-
-# ------------------------------------------------------------------
-# ZMVN: no temporal recursion; one MVN draw per timestep.
-# ------------------------------------------------------------------
-#'@noRd
-propagate_zmvn <- function(trend_model, params, h, n_series, last_state,
-                           context) {
-  Sigma <- params$Sigma
-  if (is.null(Sigma)) {
-    sigma_vec <- params$sigma %||% rep(1, n_series)
-    if (length(sigma_vec) == 1L) {
-      sigma_vec <- rep(sigma_vec, n_series)
-    }
-    Sigma <- diag(sigma_vec^2, nrow = n_series)
+#' The innovation covariance a propagator draws with
+#'
+#' @param params The dynamics parameters
+#' @param n_series Number of series
+#' @return `params$Sigma`, or the diagonal of `params$sigma^2` with a
+#'   scalar `sigma` given to every series. `sigma` defaults to 1.
+#' @noRd
+innovation_covariance <- function(params, n_series) {
+  checkmate::assert_list(params)
+  checkmate::assert_int(n_series, lower = 1L)
+  if (!is.null(params$Sigma)) {
+    return(params$Sigma)
   }
-  rmvn(h, mu = rep(0, n_series), Sigma = Sigma, df = params$df %||% Inf)
+  sigma <- as.numeric(params$sigma %||% 1)
+  if (length(sigma) == 1L) {
+    sigma <- rep(sigma, n_series)
+  }
+  checkmate::assert_numeric(sigma, len = n_series, lower = 0,
+                            any.missing = FALSE, .var.name = "sigma")
+  diag(sigma^2, nrow = n_series)
 }
 
+#' Propagate a ZMVN trend
+#'
+#' Each timestep takes one independent draw. Nothing carries over
+#' from one step to the next.
+#'
+#' @inheritParams propagate_trend
+#' @param context Unused, for the shared propagator signature
+#' @return Numeric matrix `[h, n_series]`
+#' @noRd
+propagate_zmvn <- function(trend_model, params, h, n_series, last_state,
+                           context) {
+  rmvn(h, mu = rep(0, n_series),
+       Sigma = innovation_covariance(params, n_series),
+       df = params$df %||% Inf)
+}
 
-# ------------------------------------------------------------------
-# CAR(1): continuous-time AR, one exact transition per gap.
-# ------------------------------------------------------------------
-#'@noRd
+#' Propagate a CAR trend
+#'
+#' One exact transition of the continuous-time process per gap. With
+#' no fitted state the path starts at the law the Stan program gives
+#' its first state.
+#'
+#' @inheritParams propagate_trend
+#' @param context List holding `time`, the gap before each step
+#' @return Numeric matrix `[h, n_series]`
+#' @noRd
 propagate_car <- function(trend_model, params, h, n_series, last_state,
                           context) {
   time <- context$time
@@ -145,9 +171,7 @@ propagate_car <- function(trend_model, params, h, n_series, last_state,
   }
   checkmate::assert_numeric(time, len = h, lower = 0)
   phi <- params$phi %||% 0.7
-  sigma <- params$sigma %||% 1
   if (length(phi) == 1L) phi <- rep(phi, n_series)
-  if (length(sigma) == 1L) sigma <- rep(sigma, n_series)
   if (any(phi <= 0 | phi >= 1)) {
     stop(insight::format_error(c(
       "CAR 'phi' must lie strictly between 0 and 1.",
@@ -156,25 +180,16 @@ propagate_car <- function(trend_model, params, h, n_series, last_state,
     )), call. = FALSE)
   }
   df <- params$df %||% Inf
-  Sigma <- params$Sigma
-  last_trend <- if (!is.null(last_state) &&
-                     !is.null(last_state$trends)) {
-    as.numeric(last_state$trends[nrow(last_state$trends), ])
-  } else {
-    # With no fitted state to continue, the path starts at the law the
-    # Stan program gives its first state.
-    start_cov <- car_stationary_cov(
-      phi, Sigma %||% diag(sigma^2, nrow = n_series)
-    )
-    as.numeric(rmvn(1L, mu = rep(0, n_series), Sigma = start_cov, df = df))
-  }
-  innovations <- draw_trend_innovations(h, n_series, df)
-  Sigma <- Sigma %||% diag(sigma^2, nrow = n_series)
+  Sigma <- innovation_covariance(params, n_series)
   checkmate::assert_matrix(Sigma, nrows = n_series, ncols = n_series,
                            any.missing = FALSE)
-  # Each gap takes its own covariance, the exact transition of the
-  # continuous-time process
   gamma <- car_stationary_cov(phi, Sigma)
+  last_trend <- if (!is.null(last_state$trends)) {
+    as.numeric(last_state$trends[nrow(last_state$trends), ])
+  } else {
+    as.numeric(rmvn(1L, mu = rep(0, n_series), Sigma = gamma, df = df))
+  }
+  innovations <- draw_trend_innovations(h, n_series, df)
   states <- matrix(NA_real_, nrow = h, ncol = n_series)
   for (step in seq_len(h)) {
     # The floor the Stan data applies
@@ -187,36 +202,53 @@ propagate_car <- function(trend_model, params, h, n_series, last_state,
   states
 }
 
-
-# Internal: the covariance a CAR state holds at every occasion.
-# `Sigma` is the innovation covariance over one unit of time, and
-# series `a` and `b` settle at `Sigma[a, b] / (1 - phi_a * phi_b)`.
-#'@noRd
+#' The covariance a CAR state holds at every occasion
+#'
+#' Series `a` and `b` settle at `Sigma[a, b] / (1 - phi_a * phi_b)`.
+#'
+#' @param phi Damping of each series over a unit gap
+#' @param Sigma Innovation covariance over a unit gap
+#' @return Covariance matrix
+#' @noRd
 car_stationary_cov <- function(phi, Sigma) {
+  checkmate::assert_numeric(phi, lower = 0, upper = 1, any.missing = FALSE)
+  checkmate::assert_matrix(Sigma, nrows = length(phi), ncols = length(phi))
   Sigma / (1 - tcrossprod(phi))
 }
 
-
-# Internal: the innovation covariance of a CAR state across one gap,
-# from the stationary covariance `gamma`. A gap of one returns the
-# unit-time covariance `Sigma`.
-#'@noRd
+#' The innovation covariance of a CAR state across one gap
+#'
+#' A gap of one returns the unit-gap covariance `Sigma`. `expm1()` keeps
+#' the digits a small gap would lose to `1 - x^gap`.
+#'
+#' @param phi Damping of each series over a unit gap
+#' @param gamma The stationary covariance from `car_stationary_cov()`
+#' @param gap Length of the gap
+#' @return Covariance matrix
+#' @noRd
 car_gap_cov <- function(phi, gamma, gap) {
-  # `expm1()` keeps the digits a small gap would lose to `1 - x^gap`
+  checkmate::assert_numeric(phi, lower = 0, upper = 1, any.missing = FALSE)
+  checkmate::assert_matrix(gamma, nrows = length(phi), ncols = length(phi))
+  checkmate::assert_number(gap, lower = 0)
   gamma * -expm1(gap * log(tcrossprod(phi)))
 }
 
-
-# ------------------------------------------------------------------
-# PW: Prophet-style piecewise linear or logistic. Deterministic
-# evaluation given (k, m, delta, t_change); per-draw posterior
-# uncertainty comes from sampling those parameters. Horizon-
-# changepoint sampling (Poisson(change_freq) count, Laplace(0,
-# median(|delta|)) magnitudes, uniform-in-horizon times) happens
-# here in R before invoking the C++ kernel so the kernel stays
-# deterministic and testable.
-# ------------------------------------------------------------------
-#'@noRd
+#' Propagate a PW trend
+#'
+#' The Prophet piecewise trend is a deterministic function of `k`, `m`,
+#' `delta` and the changepoints. `sample_horizon_changepoints()` adds
+#' the changepoints of the horizon. `pw_trendC()` then evaluates the
+#' trend.
+#'
+#' The capacity reaches here on the link scale, from
+#' `extract_pw_cap_matrix()`. A log link gives a cap below one a
+#' negative value.
+#'
+#' @inheritParams propagate_trend
+#' @param context List of `fc_times`, `training_times`, `cap` and
+#'   `changepoint_range`
+#' @return Numeric matrix `[h, n_series]`
+#' @noRd
 propagate_pw <- function(trend_model, params, h, n_series, last_state,
                          context) {
   fc_times <- context$fc_times
@@ -234,58 +266,41 @@ propagate_pw <- function(trend_model, params, h, n_series, last_state,
     )
   }
   if (identical(growth, "logistic")) {
-    if (is.null(cap) || !is.matrix(cap)) {
-      stop(insight::format_error(c(
-        "PW logistic requires 'cap' as a [h, n_series] matrix.",
-        i = paste0(
-          "Supply 'cap' via newdata for forecast.mvgam()."
-        )
-      )))
+    if (!is.matrix(cap) || !identical(dim(cap), c(as.integer(h),
+                                                  as.integer(n_series)))) {
+      stop_shape_fault("'cap'", dim(cap) %||% length(cap), c(h, n_series))
     }
-    if (any(!is.finite(cap)) || any(cap <= 0)) {
-      stop(insight::format_error(c(
-        "PW logistic 'cap' must be strictly positive and finite.",
-        x = paste0(
-          "Some entries are zero, negative, missing or infinite."
-        )
-      )))
+    if (any(!is.finite(cap))) {
+      stop_mvgam_fault(
+        "PW propagation needs a finite capacity.",
+        "The caller passed a 'cap' with non-finite entries."
+      )
     }
   }
-  # `params$delta` is the training-time per-series rate-change
-  # matrix [n_train_change, n_series]. `params$t_change` is the
-  # shared training-time changepoint vector. `params$k` is a
-  # length-n_series vector of base growth rates. `params$m` is the
-  # logistic form's offset, and zero for a linear fit.
+  # `params$delta` holds the training changes `[n_change, n_series]`
+  # at the shared times `params$t_change`. `params$k` is the base rate
+  # of each series. `params$m` is the logistic offset, zero for a
+  # linear fit.
   t_change_train <- as.numeric(params$t_change %||% numeric(0L))
-  delta_train <- params$delta
-  if (is.null(delta_train)) {
-    delta_train <- matrix(0, nrow = 0L, ncol = n_series)
-  }
+  delta_train <- params$delta %||% matrix(0, nrow = 0L, ncol = n_series)
   k_vec <- as.numeric(params$k)
   m_vec <- as.numeric(params$m)
-  checkmate::assert_numeric(k_vec, len = n_series,
-                              any.missing = FALSE,
-                              .var.name = "params$k")
-  checkmate::assert_numeric(m_vec, len = n_series,
-                              any.missing = FALSE,
-                              .var.name = "params$m")
+  checkmate::assert_numeric(k_vec, len = n_series, any.missing = FALSE,
+                            .var.name = "params$k")
+  checkmate::assert_numeric(m_vec, len = n_series, any.missing = FALSE,
+                            .var.name = "params$m")
 
-  # `hist_size` must match the value Stan saw at fit time. The
-  # PW Stan generator uses `floor(n_time_observed *
-  # changepoint_range)` (Prophet's convention from Taylor & Letham
-  # 2018), where `n_time_observed` counts the occasions carrying a
-  # response. Without `changepoint_range` the whole history counts.
+  # The share of the history the fit spread its changepoints over,
+  # `floor(n_time_observed * changepoint_range)` (Taylor & Letham 2018)
   full_span <- length(unique(training_times))
   hist_size <- if (!is.null(changepoint_range)) {
     floor(full_span * as.numeric(changepoint_range))
   } else {
     full_span
   }
-  if (hist_size < 1) hist_size <- 1
-  change_freq <- length(t_change_train) / hist_size
+  change_freq <- length(t_change_train) / max(hist_size, 1)
   fc_min <- min(fc_times)
   fc_max <- max(fc_times)
-  fc_horizon <- fc_max - fc_min + 1
 
   out <- matrix(NA_real_, nrow = h, ncol = n_series)
   for (s in seq_len(n_series)) {
@@ -295,94 +310,100 @@ propagate_pw <- function(trend_model, params, h, n_series, last_state,
       change_freq = change_freq,
       fc_min = fc_min,
       fc_max = fc_max,
-      fc_horizon = fc_horizon
+      fc_horizon = fc_max - fc_min + 1
     )
-    # Pack one column for pw_trendC, plus cap slice for logistic.
-    delta_mat <- matrix(sampled$delta, ncol = 1L)
-    cap_s <- if (identical(growth, "logistic")) {
-      cap[, s, drop = FALSE]
-    } else {
-      matrix(0, 0L, 0L)
-    }
-    fc <- pw_trendC(
+    out[, s] <- as.numeric(pw_trendC(
       t = as.numeric(fc_times),
       k = k_vec[s],
       m = m_vec[s],
-      delta = delta_mat,
+      delta = matrix(sampled$delta, ncol = 1L),
       t_change = sampled$t_change,
-      cap = cap_s,
+      cap = if (identical(growth, "logistic")) {
+        cap[, s, drop = FALSE]
+      } else {
+        matrix(0, 0L, 0L)
+      },
       growth_type = growth
-    )
-    out[, s] <- as.numeric(fc)
+    ))
   }
   out
 }
 
-
-# Inverse-CDF Laplace sampler. Avoids a Suggests dep on
-# `extraDistr`; the inverse CDF of Laplace(mu, sigma) is
-# mu - sigma * sign(u) * log(1 - 2 * abs(u)) for u ~ U(-1/2,
-# 1/2). Matches extraDistr::rlaplace exactly up to RNG-stream
-# differences in the underlying uniform draws.
-#'@noRd
+#' Laplace draws by the inverse CDF
+#'
+#' `mu - sigma * sign(u) * log(1 - 2 |u|)` for `u ~ U(-1/2, 1/2)`.
+#'
+#' @param n Number of draws
+#' @param mu Location
+#' @param sigma Scale
+#' @return Numeric vector of length `n`
+#' @noRd
 rlaplace_inverse_cdf <- function(n, mu = 0, sigma = 1) {
+  checkmate::assert_count(n)
+  checkmate::assert_number(mu)
+  checkmate::assert_number(sigma, lower = 0)
   u <- stats::runif(n, -0.5, 0.5)
   mu - sigma * sign(u) * log1p(-2 * abs(u))
 }
 
-
-# Sample horizon changepoints under the Prophet-style scheme:
-#   count ~ Poisson(change_freq * fc_horizon)
-#   magnitudes ~ Laplace(0, median(|train deltas|) + eps)
-#   times ~ uniform on [fc_min, fc_max]
-# Combines with the training-time changepoints + deltas and
-# sorts by time so the resulting (delta, t_change) pair fits
-# the pw_trendC kernel's contract.
-#'@noRd
-sample_horizon_changepoints <- function(delta_train_s,
-                                          t_change_train,
-                                          change_freq,
-                                          fc_min, fc_max,
-                                          fc_horizon) {
+#' Training and horizon changepoints of one series, in time order
+#'
+#' The horizon's changepoint count is Poisson at `change_freq` per
+#' step. Their magnitudes are Laplace on the median absolute training
+#' change. Their times are uniform over the horizon. A series without
+#' training changes takes none in the horizon.
+#'
+#' @param delta_train_s Training changes of the series
+#' @param t_change_train Training changepoint times
+#' @param change_freq Changepoints per step in the training history
+#' @param fc_min,fc_max First and last forecast times
+#' @param fc_horizon Number of steps the horizon spans
+#' @return List of `t_change` and `delta`, ordered by time
+#' @noRd
+sample_horizon_changepoints <- function(delta_train_s, t_change_train,
+                                        change_freq, fc_min, fc_max,
+                                        fc_horizon) {
+  checkmate::assert_numeric(delta_train_s, any.missing = FALSE)
+  checkmate::assert_numeric(t_change_train, any.missing = FALSE)
+  checkmate::assert_number(change_freq, lower = 0)
+  checkmate::assert_number(fc_min)
+  checkmate::assert_number(fc_max, lower = fc_min)
+  checkmate::assert_number(fc_horizon, lower = 0)
   n_new <- stats::rpois(1L, change_freq * fc_horizon)
-  if (n_new == 0L || length(delta_train_s) == 0L) {
-    delta_new <- numeric(0L)
-    t_change_new <- numeric(0L)
-  } else {
-    lambda <- stats::median(abs(delta_train_s)) + 1e-8
-    t_change_new <- sort(unique(
-      stats::runif(n_new, fc_min, fc_max)
-    ))
+  t_change_new <- numeric(0L)
+  delta_new <- numeric(0L)
+  if (n_new > 0L && length(delta_train_s) > 0L) {
+    t_change_new <- sort(unique(stats::runif(n_new, fc_min, fc_max)))
     delta_new <- rlaplace_inverse_cdf(
-      length(t_change_new), mu = 0, sigma = lambda
+      length(t_change_new), mu = 0,
+      sigma = stats::median(abs(delta_train_s)) + 1e-8
     )
   }
-  t_change_combined <- c(t_change_train, t_change_new)
-  delta_combined <- c(delta_train_s, delta_new)
-  ord <- order(t_change_combined)
-  list(
-    t_change = as.numeric(t_change_combined[ord]),
-    delta = as.numeric(delta_combined[ord])
-  )
+  t_change <- c(t_change_train, t_change_new)
+  ord <- order(t_change)
+  list(t_change = as.numeric(t_change[ord]),
+       delta = as.numeric(c(delta_train_s, delta_new)[ord]))
 }
 
-
-# ------------------------------------------------------------------
-# LLT: the level adds the last slope and a level shock, and the slope
-# its own Gaussian shock, damped by `phi_slope`. The fitted state
-# holds the level and the slope at the last occasion. A simulation
-# starts the level at zero and the slope at `normal(0, 2 / h)`. With no
-# slope scale given, `sigma * sqrt(3) / h` gives the slope and the
-# level shocks equal variance over the horizon.
-# ------------------------------------------------------------------
-#'@noRd
+#' Propagate an LLT trend
+#'
+#' The level adds the last slope and a level shock. The slope adds its
+#' own Gaussian shock, damped by `phi_slope`. The fitted state holds
+#' the level and the slope at the last occasion. A simulation starts
+#' the level at zero and the slope at `normal(0, 2 / h)`. With no slope
+#' scale given, `sigma * sqrt(3) / h` gives the slope and the level
+#' shocks equal variance over the horizon.
+#'
+#' @inheritParams propagate_trend
+#' @param context Unused, for the shared propagator signature
+#' @return Numeric matrix `[h, n_series]`
+#' @noRd
 propagate_llt <- function(trend_model, params, h, n_series, last_state,
                           context) {
   df <- params$df %||% Inf
   sigma <- rep_len(as.numeric(params$sigma %||% 1), n_series)
   Sigma <- params$Sigma %||% diag(sigma^2, nrow = n_series)
-  damped <- isTRUE(trend_model$damped)
-  phi <- if (damped) {
+  phi <- if (isTRUE(trend_model$damped)) {
     rep_len(as.numeric(params$phi_slope %||% 0.9), n_series)
   } else {
     rep(1, n_series)
@@ -412,13 +433,12 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
   out
 }
 
-
-# ------------------------------------------------------------------
-# RW / AR / ARMA / VAR / VARMA: one general kernel. A random walk is
-# an AR(1) with coefficient one, and a simulation without supplied
-# coefficients takes 0.7 at every AR lag.
-# ------------------------------------------------------------------
-#'@noRd
+#' Propagate a RW trend: an AR(1) with coefficient one
+#'
+#' @inheritParams propagate_trend
+#' @param context Unused, for the shared propagator signature
+#' @return Numeric matrix `[h, n_series]`
+#' @noRd
 propagate_rw <- function(trend_model, params, h, n_series, last_state,
                          context) {
   params$ar <- params$ar %||% 1
@@ -426,7 +446,14 @@ propagate_rw <- function(trend_model, params, h, n_series, last_state,
                  ar_lags = 1L)
 }
 
-#'@noRd
+#' Propagate an AR trend
+#'
+#' A simulation without supplied coefficients takes 0.7 at every lag.
+#'
+#' @inheritParams propagate_trend
+#' @param context Unused, for the shared propagator signature
+#' @return Numeric matrix `[h, n_series]`
+#' @noRd
 propagate_ar <- function(trend_model, params, h, n_series, last_state,
                          context) {
   ar_lags <- resolve_active_lags(trend_model$p %||% 1L)
@@ -435,79 +462,56 @@ propagate_ar <- function(trend_model, params, h, n_series, last_state,
                  ar_lags = ar_lags)
 }
 
-#'@noRd
+#' Propagate a VAR trend
+#'
+#' @inheritParams propagate_trend
+#' @param context Unused, for the shared propagator signature
+#' @return Numeric matrix `[h, n_series]`
+#' @noRd
 propagate_var <- function(trend_model, params, h, n_series, last_state,
                           context) {
   if (is.null(params$A)) {
     stop(insight::format_error(c(
-      "VAR propagation requires 'A' in params.",
-      i = "'A' must be an array of shape [n_series, n_series, length(p)]."
-    )))
+      "VAR propagation requires 'A' in 'params'.",
+      i = "'A' is an array of shape [n_series, n_series, length(p)]."
+    )), call. = FALSE)
   }
   propagate_arma(trend_model, params, h, n_series, last_state,
                  ar_lags = resolve_active_lags(trend_model$p %||% 1L))
 }
 
-# Builds the coefficient cubes from the supplied params, burns in a
-# start when `last_state` is NULL and calls `trend_arma_recursC()`.
-#'@noRd
+#' Propagate an ARMA or VARMA recursion with `trend_arma_recursC()`
+#'
+#' The coefficient cubes come from `params`. With no `last_state` a
+#' 200-step burn-in from zero draws the start. The trend's own
+#' predictor enters outside the recursion, at series scale, which also
+#' covers a factor model. The recursion runs zero-mean.
+#'
+#' @inheritParams propagate_trend
+#' @param ar_lags Active AR lags
+#' @return Numeric matrix `[h, n_series]`
+#' @noRd
 propagate_arma <- function(trend_model, params, h, n_series,
-                            last_state, ar_lags) {
-  has_ma <- isTRUE(trend_model$ma)
-  ma_lags <- if (has_ma) 1L else integer(0L)
-
-  m_b <- length(ma_lags)
+                           last_state, ar_lags) {
+  checkmate::assert_integerish(ar_lags, lower = 1L, min.len = 1L)
+  ma_lags <- if (isTRUE(trend_model$ma)) 1L else integer(0L)
   max_ar <- max(ar_lags)
-  max_ma <- if (m_b > 0L) max(ma_lags) else 0L
+  max_ma <- max(c(0L, ma_lags))
   max_lag <- max(max_ar, max_ma)
-  total <- h + max_lag
 
   A_cube <- build_arma_A(params, ar_lags, n_series)
-  B_cube <- build_arma_B(has_ma, params, m_b, n_series)
-  drift <- as.numeric(params$drift %||% rep(0, n_series))
+  B_cube <- build_arma_B(params, length(ma_lags), n_series)
+  drift <- as.numeric(params$drift %||% 0)
   if (length(drift) == 1L) drift <- rep(drift, n_series)
-
-  # Innovation covariance: explicit Sigma when supplied (VAR always
-  # has one; AR/RW use one only with cor = TRUE), else diagonal.
-  Sigma <- params$Sigma
-  if (is.null(Sigma)) {
-    sigma_vec <- as.numeric(params$sigma %||% rep(1, n_series))
-    if (length(sigma_vec) == 1L) {
-      sigma_vec <- rep(sigma_vec, n_series)
-    }
-    Sigma <- diag(sigma_vec^2, nrow = n_series)
-  }
+  Sigma <- innovation_covariance(params, n_series)
   df <- params$df %||% Inf
 
-  # `trend_arma_recursC()` carries a general time-varying-mean
-  # offset, but mvgam's programs put the trend linear predictor
-  # at series scale outside the recursion, where it also covers
-  # the factor case that an LV-grain offset cannot express. The
-  # recursion is therefore always run zero-mean and the caller
-  # adds the mean back.
-  linpreds_mat <- matrix(0, nrow = total, ncol = n_series)
-
-  # Initial state via burn-in if not supplied. Burn-in runs the
-  # kernel for 200 extra steps from zero so the trailing max_lag
-  # rows are a draw from the stationary distribution.
   if (is.null(last_state)) {
-    burn_in <- 200L
-    last_state <- run_burnin(
-      ar_lags, ma_lags, drift, A_cube, B_cube, Sigma,
-      n_series, burn_in, max_lag, df = df
-    )
+    last_state <- run_burnin(ar_lags, ma_lags, drift, A_cube, B_cube,
+                             Sigma, n_series, burn_in = 200L, max_lag,
+                             df = df)
   } else {
     validate_last_state(last_state, max_ar, max_ma, n_series)
-  }
-
-  innovations <- assemble_innovations(
-    last_state$errors, h, n_series, Sigma, max_lag, df = df
-  )
-
-  last_trends <- if (max_ar > 0L) {
-    tail(last_state$trends, max_ar)
-  } else {
-    matrix(0, nrow = 0L, ncol = n_series)
   }
 
   trend_arma_recursC(
@@ -516,18 +520,29 @@ propagate_arma <- function(trend_model, params, h, n_series,
     drift = drift,
     A = A_cube,
     B = B_cube,
-    innovations = innovations,
-    linpreds = linpreds_mat,
-    last_trends = last_trends,
+    innovations = assemble_innovations(last_state$errors, h, n_series,
+                                       Sigma, max_lag, df = df),
+    linpreds = matrix(0, nrow = h + max_lag, ncol = n_series),
+    last_trends = utils::tail(last_state$trends, max_ar),
     h = as.integer(h)
   )
 }
 
-
-# Build the AR coefficient cube: the full matrices `params$A` where
-# given, and otherwise a diagonal slice per lag from `params$ar`.
-#'@noRd
+#' The AR coefficient cube of a recursion
+#'
+#' The full matrices `params$A` where given. Otherwise one diagonal
+#' slice per lag from `params$ar`, a value per lag shared by every
+#' series or a `[lags, n_series]` matrix.
+#'
+#' @param params The dynamics parameters
+#' @param ar_lags Active AR lags
+#' @param n_series Number of series
+#' @return Array `[n_series, n_series, length(ar_lags)]`
+#' @noRd
 build_arma_A <- function(params, ar_lags, n_series) {
+  checkmate::assert_list(params)
+  checkmate::assert_integerish(ar_lags, lower = 1L, min.len = 1L)
+  checkmate::assert_int(n_series, lower = 1L)
   m_a <- length(ar_lags)
   if (!is.null(params$A)) {
     A_cube <- params$A
@@ -546,29 +561,31 @@ build_arma_A <- function(params, ar_lags, n_series) {
     if (length(ar_coefs) != m_a) {
       stop_shape_fault("'ar'", length(ar_coefs), m_a)
     }
-    ar_coefs <- matrix(
-      rep(ar_coefs, each = n_series), nrow = m_a, ncol = n_series,
-      byrow = TRUE
-    )
+    ar_coefs <- matrix(ar_coefs, nrow = m_a, ncol = n_series)
   }
   A_cube <- array(0, dim = c(n_series, n_series, m_a))
   for (k in seq_len(m_a)) {
-    slice <- matrix(0, n_series, n_series)
-    diag(slice) <- ar_coefs[k, ]
-    A_cube[, , k] <- slice
+    A_cube[, , k] <- diag(ar_coefs[k, ], nrow = n_series)
   }
   A_cube
 }
 
-
-# Build the MA coefficient cube. Empty if no MA terms.
-#'@noRd
-build_arma_B <- function(has_ma, params, m_b, n_series) {
-  if (!has_ma || m_b == 0L) {
-    return(array(0, dim = c(n_series, n_series, 0L)))
-  }
+#' The MA coefficient cube of a recursion
+#'
+#' `params$theta_cube` where given. Otherwise one diagonal slice per
+#' lag from `params$theta`, a scalar or one value per series.
+#'
+#' @param params The dynamics parameters
+#' @param m_b Number of MA lags
+#' @param n_series Number of series
+#' @return Array `[n_series, n_series, m_b]`
+#' @noRd
+build_arma_B <- function(params, m_b, n_series) {
+  checkmate::assert_list(params)
+  checkmate::assert_count(m_b)
+  checkmate::assert_int(n_series, lower = 1L)
   B_cube <- params$theta_cube
-  if (!is.null(B_cube)) {
+  if (m_b > 0L && !is.null(B_cube)) {
     checkmate::assert_array(B_cube, d = 3L)
     if (any(dim(B_cube) != c(n_series, n_series, m_b))) {
       stop_shape_fault("'theta_cube'", dim(B_cube),
@@ -576,34 +593,41 @@ build_arma_B <- function(has_ma, params, m_b, n_series) {
     }
     return(B_cube)
   }
-  # Default scalar theta per series (or shared).
-  theta <- params$theta %||% rep(0, n_series)
+  theta <- as.numeric(params$theta %||% 0)
   if (length(theta) == 1L) theta <- rep(theta, n_series)
+  checkmate::assert_numeric(theta, len = n_series, any.missing = FALSE,
+                            .var.name = "theta")
   B_cube <- array(0, dim = c(n_series, n_series, m_b))
   for (j in seq_len(m_b)) {
-    slice <- matrix(0, n_series, n_series)
-    diag(slice) <- theta
-    B_cube[, , j] <- slice
+    B_cube[, , j] <- diag(theta, nrow = n_series)
   }
   B_cube
 }
 
-
-# Burn in 200 zero-seed steps to draw a stationary initial state.
-# Returns a `last_state` list compatible with the propagate_arma
-# contract (trends, errors).
-#'@noRd
+#' A start for a recursion, from a burn-in
+#'
+#' The kernel runs `burn_in` steps from zero. The trailing `max_lag`
+#' rows are then a draw from the stationary law.
+#'
+#' @param ar_lags,ma_lags Active AR and MA lags
+#' @param drift Drift of each series
+#' @param A_cube,B_cube Coefficient cubes
+#' @param Sigma Innovation covariance
+#' @param n_series Number of series
+#' @param burn_in Number of steps to run
+#' @param max_lag The largest AR or MA lag
+#' @param df Degrees of freedom of the innovations
+#' @return List of `trends` and `errors`, each with `max_lag` rows
+#' @noRd
 run_burnin <- function(ar_lags, ma_lags, drift, A_cube, B_cube,
-                        Sigma, n_series, burn_in, max_lag, df = Inf) {
+                       Sigma, n_series, burn_in, max_lag, df = Inf) {
+  checkmate::assert_integerish(ar_lags, lower = 1L, min.len = 1L)
+  checkmate::assert_int(burn_in, lower = 1L)
+  checkmate::assert_int(max_lag, lower = 1L)
   total <- burn_in + max_lag
   innovations <- rmvn(total, mu = rep(0, n_series), Sigma = Sigma,
                       df = df)
-  bi_last_trends <- if (length(ar_lags) > 0L) {
-    matrix(0, nrow = max(ar_lags), ncol = n_series)
-  } else {
-    matrix(0, nrow = 0L, ncol = n_series)
-  }
-  bi_states <- trend_arma_recursC(
+  states <- trend_arma_recursC(
     ar_lags = as.integer(ar_lags),
     ma_lags = as.integer(ma_lags),
     drift = drift,
@@ -611,50 +635,60 @@ run_burnin <- function(ar_lags, ma_lags, drift, A_cube, B_cube,
     B = B_cube,
     innovations = innovations,
     linpreds = matrix(0, nrow = total, ncol = n_series),
-    last_trends = bi_last_trends,
+    last_trends = matrix(0, nrow = max(ar_lags), ncol = n_series),
     h = as.integer(burn_in)
   )
-  list(
-    trends = utils::tail(bi_states, max_lag),
-    errors = utils::tail(innovations, max_lag)
-  )
+  list(trends = utils::tail(states, max_lag),
+       errors = utils::tail(innovations, max_lag))
 }
 
-
-# Validate a caller-supplied last_state for arma propagation.
-#'@noRd
-validate_last_state <- function(last_state, max_ar, max_ma,
-                                  n_series) {
-  if (max_ar > 0L) {
-    checkmate::assert_matrix(
-      last_state$trends, nrows = max_ar, ncols = n_series
-    )
-  }
+#' Check a supplied start against the recursion it feeds
+#'
+#' @param last_state List of `trends` and `errors`
+#' @param max_ar,max_ma The largest AR and MA lags
+#' @param n_series Number of series
+#' @return `NULL`, invisibly
+#' @noRd
+validate_last_state <- function(last_state, max_ar, max_ma, n_series) {
+  checkmate::assert_list(last_state)
+  checkmate::assert_matrix(last_state$trends, nrows = max_ar,
+                           ncols = n_series)
   if (max_ma > 0L) {
-    checkmate::assert_matrix(
-      last_state$errors, nrows = max_ma, ncols = n_series
-    )
+    checkmate::assert_matrix(last_state$errors, nrows = max_ma,
+                             ncols = n_series)
   }
+  invisible(NULL)
 }
 
-
-# Build the full innovations matrix used by trend_arma_recursC.
-# The first `max_lag` rows hold the innovation history and the rest
-# hold the forecast-step innovations, drawn with covariance `Sigma`
-# from the innovation law `df` names.
-#
-# At its first step the kernel takes the lag-j innovation from
-# history row `max_lag - j + 1`, which makes the last history row
-# `e_T`. A fitted state carries `max_ma` rows and a burn-in carries
-# `max_lag`. Both end at `e_T`, and the rows supplied fill the end of
-# the history: an `AR(p = 2, ma = TRUE)` state places its one row at
-# the second of two.
-#'@noRd
+#' The innovation matrix `trend_arma_recursC()` takes
+#'
+#' The first `max_lag` rows hold the innovation history. The rest hold
+#' the forecast-step innovations, drawn with covariance `Sigma` from
+#' the law `df` names.
+#'
+#' At its first step the kernel takes the lag-j innovation from history
+#' row `max_lag - j + 1`, which makes the last history row `e_T`. A
+#' fitted state carries `max_ma` rows and a burn-in carries `max_lag`.
+#' Both end at `e_T`. The rows supplied fill the end of the history: an
+#' `AR(p = 2, ma = TRUE)` state places its one row at the second of
+#' two.
+#'
+#' @param last_errors Matrix of past innovations, or NULL
+#' @param h Forecast horizon
+#' @param n_series Number of series
+#' @param Sigma Innovation covariance
+#' @param max_lag The largest AR or MA lag
+#' @param df Degrees of freedom of the innovations
+#' @return Matrix `[h + max_lag, n_series]`
+#' @noRd
 assemble_innovations <- function(last_errors, h, n_series, Sigma,
-                                   max_lag, df = Inf) {
+                                 max_lag, df = Inf) {
+  checkmate::assert_matrix(last_errors, ncols = n_series, null.ok = TRUE)
+  checkmate::assert_int(h, lower = 0L)
+  checkmate::assert_int(max_lag, lower = 0L)
   total <- h + max_lag
   out <- matrix(0, nrow = total, ncol = n_series)
-  n_hist <- if (is.null(last_errors)) 0L else nrow(last_errors)
+  n_hist <- NROW(last_errors)
   if (n_hist > 0L) {
     checkmate::assert_int(n_hist, upper = max_lag)
     out[seq.int(max_lag - n_hist + 1L, max_lag), ] <- last_errors
@@ -667,13 +701,23 @@ assemble_innovations <- function(last_errors, h, n_series, Sigma,
   out
 }
 
-
-# Internal: mgcv-based multivariate sampler. Factor the scale matrix
-# via mgcv::mroot and apply it to standard variates. `df = Inf` gives
-# a multivariate normal. A finite `df` gives the multivariate t of
-# `draw_trend_innovations()`, whose scale matrix is `Sigma`.
-#'@noRd
+#' Multivariate normal or t draws
+#'
+#' `mgcv::mroot()` factors the scale matrix, which then multiplies
+#' standard variates. `df = Inf` gives a multivariate normal. A finite
+#' `df` gives the multivariate t of `draw_trend_innovations()`, whose
+#' scale matrix is `Sigma`.
+#'
+#' @param n Number of draws
+#' @param mu Mean vector
+#' @param Sigma Scale matrix
+#' @param df Degrees of freedom
+#' @return Matrix with one draw per row
+#' @noRd
 rmvn <- function(n, mu, Sigma, df = Inf) {
+  checkmate::assert_count(n)
+  checkmate::assert_numeric(mu, any.missing = FALSE)
+  checkmate::assert_matrix(Sigma, nrows = length(mu), ncols = length(mu))
   L <- mgcv::mroot(Sigma)
   m <- ncol(L)
   z <- if (is_gaussian_df(df)) {
@@ -684,47 +728,33 @@ rmvn <- function(n, mu, Sigma, df = Inf) {
   t(mu + L %*% z)
 }
 
-
-# ----------------------------------------------------------------
-# Fit-time trend metadata enrichment helpers
-# ----------------------------------------------------------------
-# These derive the kernel-relevant fields the forecasting surface
-# (extract_last_state, propagate_trend) needs at every per-draw
-# call. Computing them once at fit time and storing them on
-# `mvgam_fit$trend_metadata` avoids re-parsing the trend
-# constructor on every forecast call.
-
-
-# Internal: enrich trend_metadata with kernel-relevant extras
-# derived from the parsed trend constructor.
-#
-# Adds these fields to `trend_metadata` when a trend spec is
-# present:
-#   * `trend_type`  - character; one of "RW", "AR", "VAR", "CAR",
-#                     "ZMVN", "PW".
-#   * `ar_lags`     - integer vector of active AR lag indices.
-#                     `1` for RW / LLT / CAR, `seq_len(p)` for
-#                     `AR(p = k)` / `VAR(p = k)`, `as.integer(p)`
-#                     for sparse-lag `AR(p = c(...))`, empty for
-#                     ZMVN / PW.
-#   * `ma_lags`     - integer vector of active MA lag indices.
-#                     `1L` when `spec$ma == TRUE` (q = 1 is the
-#                     only order mvgam fits), empty otherwise.
-#   * `max_lag`     - cached max of ar_lags and ma_lags.
-#   * `has_cor`     - logical; `spec$cor`.
-#   * `n_lv`        - integer factor-model dimension (or NULL).
-#
-# Returns the (possibly enriched) `trend_metadata` list. Returns
-# NULL if `trend_metadata` is NULL on entry (no trend present in
-# the fit).
-#'@noRd
+#' Trend metadata with the fields every forecast draw uses
+#'
+#' Stored on the fit, they spare each forecast call a parse of the
+#' trend constructor:
+#' - `trend_type`, the constructor's name,
+#' - `ar_lags`, the active AR lags (`1` for RW, LLT and CAR, none for
+#'   ZMVN and PW),
+#' - `ma_lags`, `1` with `ma = TRUE`, the order every MA term takes,
+#' - `max_lag`, the larger of the two,
+#' - `has_cor`, `n_lv`, `df` and `fixed_Z` from the constructor,
+#' - for PW, `pw_changepoint_range` and `pw_growth`.
+#'
+#' @param trend_metadata The fit's trend metadata, or NULL
+#' @param trend_specs The parsed trend specifications, or NULL
+#' @return `trend_metadata` with the fields added, or NULL for a fit
+#'   with no trend
+#' @noRd
 enrich_trend_metadata <- function(trend_metadata, trend_specs) {
-  if (is.null(trend_metadata)) return(NULL)
-  if (is.null(trend_specs)) return(trend_metadata)
-
+  checkmate::assert_list(trend_metadata, null.ok = TRUE)
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
+  if (is.null(trend_metadata) || is.null(trend_specs)) {
+    return(trend_metadata)
+  }
   spec <- trend_spec_head(trend_specs)
-  if (is.null(spec) || is.null(spec$trend)) return(trend_metadata)
-
+  if (is.null(spec$trend)) {
+    return(trend_metadata)
+  }
   trend_metadata$trend_type <- spec$trend
   trend_metadata$ar_lags <- derive_ar_lags(spec)
   trend_metadata$ma_lags <- derive_ma_lags(spec)
@@ -733,115 +763,130 @@ enrich_trend_metadata <- function(trend_metadata, trend_specs) {
   )
   trend_metadata$has_cor <- isTRUE(spec$cor)
   trend_metadata$n_lv <- spec_n_lv(spec)
-  # Innovation degrees of freedom, so forecasts draw from the same
-  # distribution the model was fitted with rather than always normal.
+  # Forecasts draw from the innovation law the model was fitted with
   trend_metadata$df <- spec$df %||% Inf
-  # When the user supplied `trend_map`, the normaliser stashed
-  # the canonical numeric Z on `spec$fixed_Z` upstream. Persist
-  # it on the fit's trend_metadata so `resolve_factor_loadings()`
-  # can broadcast it across draws wherever Z is needed.
+  # The numeric loadings a `trend_map` gave, which
+  # `resolve_factor_loadings()` broadcasts across draws
   trend_metadata$fixed_Z <- spec$fixed_Z
   if (identical(spec$trend, "PW")) {
-    trend_metadata$pw_changepoint_range <-
-      spec$changepoint_range %||% 0.8
+    trend_metadata$pw_changepoint_range <- spec$changepoint_range %||% 0.8
     trend_metadata$pw_growth <- pw_growth(spec)
   }
   trend_metadata
 }
 
-
-# Internal: derive the active AR lag set from a parsed trend
-# constructor. See `enrich_trend_metadata` for the contract.
-#'@noRd
+#' The active AR lags of a parsed trend constructor
+#'
+#' @param spec A parsed trend specification
+#' @return Integer vector, empty for a trend without AR dynamics
+#' @noRd
 derive_ar_lags <- function(spec) {
+  checkmate::assert_list(spec)
+  checkmate::assert_string(spec$trend)
   switch(
     spec$trend,
-    "RW" = 1L,
-    "LLT" = 1L,
-    "AR" = ,
-    "VAR" = resolve_active_lags(spec$p),
-    "CAR" = 1L,
-    "ZMVN" = integer(0),
-    "PW" = integer(0),
+    RW = ,
+    LLT = ,
+    CAR = 1L,
+    AR = ,
+    VAR = resolve_active_lags(spec$p),
     integer(0)
   )
 }
 
-
-# Internal: turn an AR or VAR `p` argument into the integer
-# vector of active lag indices. Used by both the trend metadata
-# enrichment (above) and the Stan generators (R/stan_assembly.R).
-#
-# Scalar `p` (e.g. `2`) expands to consecutive lags 1..p:
-# `c(1L, 2L)`. Vector `p` (e.g. `c(2, 4)`) is treated as the
-# sparse lag set: `c(2L, 4L)`. NULL or zero-length `p` returns
-# `integer(0)` (trend has no AR dynamics).
-#'@noRd
+#' The active lags an AR or VAR `p` names
+#'
+#' A scalar `p` names the lags `1:p`. A vector names a sparse set:
+#' `c(2, 4)` gives `c(2L, 4L)`. NULL gives none.
+#'
+#' @param p The constructor's `p`
+#' @return Integer vector
+#' @noRd
 resolve_active_lags <- function(p) {
-  if (is.null(p) || length(p) == 0L) return(integer(0))
-  if (length(p) == 1L) return(seq_len(as.integer(p)))
+  checkmate::assert_integerish(p, lower = 1L, any.missing = FALSE,
+                               null.ok = TRUE)
+  if (length(p) == 0L) {
+    return(integer(0))
+  }
+  if (length(p) == 1L) {
+    return(seq_len(as.integer(p)))
+  }
   as.integer(p)
 }
 
-
-# Internal: is every lag from 1 to the maximum present? The companion
-# form then holds the whole autoregression in `max(lags)` states, and
-# the Levinson-Durbin recursion below can express the coefficient set.
-# A sparse set such as `c(1, 12)` fixes its intermediate coefficients
-# at zero.
-#'@noRd
+#' Is every lag from 1 to the largest present?
+#'
+#' The companion form then holds the whole autoregression in
+#' `max(lags)` states. A sparse set such as `c(1, 12)` fixes its
+#' intermediate coefficients at zero.
+#'
+#' @param ar_lags Active AR lags
+#' @return Logical scalar
+#' @noRd
 ar_lags_contiguous <- function(ar_lags) {
+  checkmate::assert_integerish(ar_lags, lower = 1L, any.missing = FALSE)
   lags <- as.integer(ar_lags)
   length(lags) > 0L && identical(lags, seq_len(max(lags)))
 }
 
-
-# Internal: does this lag set take the partial autocorrelation
-# parameterisation? For contiguous lags 1..p with p >= 2 the
-# Levinson-Durbin recursion returns exactly the stationary AR(p)
-# coefficients from partial autocorrelations each inside (-1, 1).
-# A single lag needs no recursion: the declared interval is
-# already the stationary region. A sparse lag set fixes its
-# intermediate coefficients at zero. The recursion cannot express
-# that constraint, and those lag sets keep the bounded
-# coefficients they declare.
-#'@noRd
+#' Does a lag set take the partial autocorrelation parameterisation?
+#'
+#' For the lags `1:p` with `p >= 2` the Levinson-Durbin recursion
+#' returns exactly the stationary AR(p) coefficients from partial
+#' autocorrelations inside (-1, 1). A single lag needs no recursion:
+#' its declared interval is the stationary region. A sparse set fixes
+#' its intermediate coefficients at zero, a constraint the recursion
+#' cannot express. Those sets keep the bounded coefficients they
+#' declare.
+#'
+#' @param ar_lags Active AR lags
+#' @return Logical scalar
+#' @noRd
 ar_lags_stationary <- function(ar_lags) {
   length(ar_lags) >= 2L && ar_lags_contiguous(ar_lags)
 }
 
-
-# Internal: the infix an AR coefficient name takes for this lag
-# set. A lag set on the partial autocorrelation parameterisation
-# spells its sampled parameters `ar{lag}_pacf_*`. One rule for the
-# Stan generator and for the prior surface.
-#'@noRd
+#' The infix of an AR coefficient name
+#'
+#' A lag set on the partial autocorrelation parameterisation spells its
+#' sampled parameters `ar{lag}_pacf_*`. The Stan generator and the prior
+#' surface share this rule.
+#'
+#' @param ar_lags Active AR lags
+#' @return `"_pacf"` or `""`
+#' @noRd
 ar_coef_stem <- function(ar_lags) {
   if (ar_lags_stationary(ar_lags)) "_pacf" else ""
 }
 
-
-# Internal: the scalar an `AR()` samples per lag under
-# `coef_sharing = "shared"`. The `_trend` suffix places the name on
-# the trend side for `is_trend_parameter()`, which the parameter
-# taxonomy, `tidy()` and the set of names mvgam intercepts before
-# brms sees them all consult. The prefix matches `mu_ar{lag}_trend`
-# and `sigma_ar{lag}_trend`, the hyperparameters the hierarchical
-# mode samples.
-#'@noRd
+#' The scalars an `AR()` samples per lag under `coef_sharing = "shared"`
+#'
+#' The `_trend` suffix places the name on the trend side for
+#' `is_trend_parameter()`. The prefix matches `mu_ar{lag}_trend` and
+#' `sigma_ar{lag}_trend`, the hyperparameters of the hierarchical mode.
+#'
+#' @param ar_lags Active AR lags
+#' @return Character vector
+#' @noRd
 ar_shared_coef_names <- function(ar_lags) {
   paste0("shared_ar", ar_lags, ar_coef_stem(ar_lags), "_trend")
 }
 
-
-# Internal: every AR coefficient parameter mvgam owns for this lag
-# set and sharing mode. `generate_monitor_params()` returns it to the
-# prior table and to the set of names mvgam withholds from brms. The
-# withheld set needs the per-series coefficient under every mode.
-# `generate_trend_priors_from_monitor_params()` narrows the list to
-# the rows a user can edit.
-#'@noRd
+#' Every AR coefficient parameter mvgam owns for a lag set
+#'
+#' `generate_monitor_params()` returns it to the prior table and to the
+#' set of names mvgam withholds from brms. The withheld set needs the
+#' per-series coefficient under every mode.
+#' `generate_trend_priors_from_monitor_params()` narrows the list to
+#' the rows a user can edit.
+#'
+#' @param ar_lags Active AR lags
+#' @param coef_sharing "none", "shared" or "hierarchical"
+#' @return Character vector
+#' @noRd
 ar_monitor_coef_names <- function(ar_lags, coef_sharing = "none") {
+  checkmate::assert_choice(coef_sharing,
+                           c("none", "shared", "hierarchical"))
   stem <- ar_coef_stem(ar_lags)
   coefs <- paste0("ar", ar_lags, stem, "_trend")
   switch(
@@ -856,14 +901,14 @@ ar_monitor_coef_names <- function(ar_lags, coef_sharing = "none") {
   )
 }
 
-
-# Internal: derive the active MA lag set. Every trend type that
-# allows an MA term fits q = 1, so the result is either `c(1L)` or
-# empty.
-#'@noRd
+#' The active MA lags of a parsed trend constructor
+#'
+#' Every trend that takes an MA term fits order one.
+#'
+#' @param spec A parsed trend specification
+#' @return `1L`, or an empty integer vector
+#' @noRd
 derive_ma_lags <- function(spec) {
+  checkmate::assert_list(spec)
   if (isTRUE(spec$ma)) 1L else integer(0)
 }
-
-
-# Note: `%||%` is defined package-wide at R/priors.R:1298.

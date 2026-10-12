@@ -1,37 +1,37 @@
-# Per-draw last-state extraction for forecast.mvgam. One
-# dispatcher with per-trend branches that pulls together the
-# structured `last_state` list AND the `params` list
-# `propagate_trend()` consumes.
+# Per-draw last-state extraction for forecast.mvgam. One dispatcher
+# calls a per-trend extractor. Each extractor returns the `params`
+# list `propagate_trend()` takes and the structured `last_state` list.
 #
 # Every trend defines `extract_<type>_state(one_draw, meta, n_series,
 # n_lv, fit, state_var)`, which returns for one draw:
 #   list(
-#     params     = <named list, see propagate_trend(@details)>,
+#     params = <named list, see propagate_trend(@details)>,
 #     last_state = list(
-#       trends   = matrix[max_lag, n_series],
-#       errors   = matrix[max_ma, n_series] | NULL
+#       trends = matrix[max_lag, n_series],
+#       errors = matrix[max_ma, n_series] | NULL
 #     )
 #   )
 # `n_series` is the dimension of the state stepped forward: the
 # factor count of a factor model, the series count otherwise.
 
 
-# Internal: pull the per-draw `(params, last_state)` pair for
-# one trend type. Returns NULL for fits with no trend.
-#
-# `fit`     fitted mvgam object
-# `draw_id` integer draw index (1-based) into `as_draws_df(fit)`
-#'@noRd
+#' The trend parameters and last state of one posterior draw
+#'
+#' @param fit Fitted `mvgam` object
+#' @param draw_id Integer draw index, starting at 1
+#' @param draws_mat Draws matrix of the fit, or `NULL` to build it.
+#'   Callers looping over draws build it once and pass it in.
+#' @return List holding `params` and `last_state` for the trend's
+#'   kernel, or `NULL` for a fit without a trend
+#' @noRd
 extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   checkmate::assert_class(fit, "mvgam")
   checkmate::assert_int(draw_id, lower = 1L)
+  checkmate::assert_matrix(draws_mat, null.ok = TRUE)
 
   meta <- fit$trend_metadata
   if (is.null(meta$trend_type)) return(NULL)
 
-  # Callers running a per-draw loop (forecast.mvgam) build the
-  # matrix once and pass it via `draws_mat` to skip the
-  # `as_draws_matrix` cost on every iteration.
   if (is.null(draws_mat)) {
     draws_mat <- posterior::as_draws_matrix(fit$fit)
   }
@@ -41,7 +41,7 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
       "'draw_id' exceeds the number of posterior draws.",
       x = paste0("Got draw_id = ", draw_id,
                  ", total draws = ", total_draws, ".")
-    )))
+    )), call. = FALSE)
   }
   # One draw as a plain one-row matrix, the shape
   # `read_draws_vector()` and `read_draws_matrix()` take.
@@ -51,20 +51,20 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   n_series <- as.integer(fit$standata$N_series_trend %||% 1L)
   n_lv <- as.integer(fit$standata$N_lv_trend %||% n_series)
 
-  # A factor model runs its recursion in n_lv-dimensional latent
-  # space, and a per-draw `[n_series, n_lv]` Z projects the
-  # propagated trajectory back to observed series scale. Every trend
-  # the registry marks as factor-capable extracts at that grain, and
-  # model building refuses a factor model on any other.
-  # `forecast.mvgam`:`propagate_one_draw` applies the
-  # projection once `propagate_trend()` returns.
+  # A factor model runs its recursion in the n_lv-dimensional latent
+  # space. A per-draw `[n_series, n_lv]` Z maps the propagated
+  # trajectory to the series scale. `propagate_one_draw()` in
+  # forecast.mvgam.R applies it as `fc_state %*% t(Z_slice)` after
+  # `propagate_trend()` returns. Every trend the registry marks as
+  # factor-capable extracts at the latent grain. Model building
+  # refuses a factor model on any other trend.
   #
-  # Comparing the two Stan dimensions cannot answer this. A factor
-  # fit reaches `n_lv = n_series` under an MGP loadings prior or a
-  # `by = lv_axis()` term, and a non-factor fit carries the same
-  # pair with an identity Z, so the comparison reads a genuine
-  # factor fit as series-grain and hands `ar1_trend[k]`, indexed by
-  # latent column, to the recursion for series k.
+  # The two Stan dimensions cannot identify a factor fit. A factor fit
+  # has `n_lv = n_series` under an MGP loadings prior or a
+  # `by = lv_axis()` term. A fit without factors has the same pair with
+  # an identity Z. A test on the dimensions would treat that factor
+  # fit as series-grain. The recursion for series k would then receive
+  # `ar1_trend[k]`, which is indexed by latent column.
   is_factor <- !is.null(detect_factor_n_lv(fit, n_series))
   if (n_lv > n_series) {
     stop_mvgam_fault(
@@ -72,20 +72,18 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
       paste0("Got n_lv = ", n_lv, ", n_series = ", n_series, ".")
     )
   }
-  # In factor mode extraction happens at the LV grain
-  # (`lv_trend[t, k]`, `sigma_trend[k]`, `ar_trend[k]`), and the
-  # caller projects the propagated `[h, n_lv]` trajectory back to
-  # series scale via Z; see `apply_factor_projection()` in
-  # forecast.mvgam.R.
+  # In factor mode the extractors take the latent-grain parameters
+  # (`lv_trend[t, k]`, `sigma_trend[k]`, `ar_trend[k]`).
+  # `propagate_one_draw()` in forecast.mvgam.R maps the propagated
+  # `[h, n_lv]` trajectory to the series scale as
+  # `fc_state %*% t(Z_slice)`.
   #
-  # A QR-identified fit also stores `lv_trend_tilde` alongside a
-  # rotated `Z_tilde`, and `Z lv` equals `Z_tilde lv_tilde`. Only
-  # the matching pair reconstructs the trend, so the whole
-  # forecast reads one basis. It is the model basis, because every
-  # other quantity the recursion consumes -- `ar<k>_trend`,
-  # `Phi_trend`, `sigma_trend`, `L_Omega_trend` -- is stated for the
-  # `Z` the model sampled, and rotating the state alone would
-  # leave those behind.
+  # A QR-identified fit also stores `lv_trend_tilde` with a rotated
+  # `Z_tilde`. The products `Z lv` and `Z_tilde lv_tilde` are equal.
+  # Only a matching pair reconstructs the trend. The forecast uses the
+  # model basis throughout. The other quantities the recursion uses
+  # (`ar<k>_trend`, `Phi_trend`, `sigma_trend`, `L_Omega_trend`) are
+  # stated for the sampled `Z`. A rotated state would mix two bases.
   state_dim <- if (is_factor) n_lv else n_series
   state_var <- if (is_factor) "lv_trend" else "trend"
 
@@ -98,9 +96,7 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   # Gaussian trend. Forecast innovations then follow the law the model
   # was fitted with.
   out$params$df <- extract_nu_trend_draws(one_draw, fit)
-  # Tag the state with the LV dimensionality when non-trivial
-  # so the caller knows to apply Z projection after
-  # propagation.
+  # The caller applies the Z projection when `n_lv_active` is set.
   if (is_factor) {
     out$n_lv_active <- n_lv
   }
@@ -110,34 +106,53 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
 
 # ----- per-trend extraction helpers -------------------------------
 
-# Internal: pull the last `max_lag` rows of the [N_time, N_series]
-# `trend[t, s]` posterior matrix for one draw, sliced to the first
-# `n_series` columns. This grid carries `mu_trend`, so the caller
-# subtracts the trend linear predictor to recover the zero-mean
-# latent state that the recursion advances.
-#'@noRd
+#' The last rows of one draw's latent trend
+#'
+#' The `trend[t, s]` grid includes `mu_trend`. The caller subtracts the
+#' trend linear predictor to recover the zero-mean state the recursion
+#' advances.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of latent factors
+#' @param max_lag Integer number of rows to return
+#' @param n_time Integer number of fitted time points
+#' @param state_var Character parameter name, `"trend"` for the series
+#'   grain or `"lv_trend"` for the factor grain
+#' @return Numeric matrix with `max_lag` rows and `n_series` columns
+#' @noRd
 extract_trend_history <- function(one_draw, n_series, n_lv, max_lag,
                                     n_time, state_var = "trend") {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_int(max_lag, lower = 0L)
+  checkmate::assert_int(n_time, lower = 1L)
+  checkmate::assert_string(state_var)
   if (max_lag == 0L) {
     return(matrix(0, nrow = 0L, ncol = n_series))
   }
-  # `state_var` selects the parameter grid this reads from:
-  # `"trend"` for the series-grain full-rank fits (default), or
-  # `"lv_trend"` when the caller is running a factor model and
-  # wants the LV-grain state that `propagate_trend()` will step
-  # forward before projecting back to series scale via Z.
   draw_block(one_draw, state_var, n_time, n_series,
              rows = seq.int(n_time - max_lag + 1L, n_time))
 }
 
 
-# Internal: build the diagonal AR-coefficient matrix per active
-# lag from a `one_draw` row. For each lag k in `ar_lags`, pulls
-# `ar<k>_trend[1..n_lv]` and constructs a length-`n_series`
-# vector (broadcasting the single-element `n_lv == 1` shared-AR
-# case to all series).
-#'@noRd
+#' One draw's AR coefficients at each active lag
+#'
+#' Takes `ar<k>_trend` for each lag `k`. A single shared coefficient is
+#' repeated over the series.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param ar_lags Integer vector of active AR lags
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients per lag
+#' @return Numeric matrix with one row per lag and one column per series
+#' @noRd
 extract_ar_coefs <- function(one_draw, ar_lags, n_series, n_lv) {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_integerish(ar_lags, lower = 1)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
   out <- matrix(0, nrow = length(ar_lags), ncol = n_series)
   for (k in seq_along(ar_lags)) {
     out[k, ] <- broadcast_to_series(
@@ -149,13 +164,19 @@ extract_ar_coefs <- function(one_draw, ar_lags, n_series, n_lv) {
 }
 
 
-# Internal: a parameter vector at the grain of the state being
-# stepped. One value is a coefficient shared across series and
-# repeats. A factor fit arrives with `n_series` set to its latent
-# count, and every other fit carries one value per series, which
-# leaves any other length a fault in the caller.
-#'@noRd
+#' A parameter vector at the grain of the state being stepped
+#'
+#' A single value is a coefficient shared across series and repeats. A
+#' factor fit passes its latent count as `n_series`. Any length other
+#' than 1 or `n_series` is an error.
+#'
+#' @param vec Numeric parameter vector
+#' @param n_series Integer number of state columns
+#' @return Numeric vector of length `n_series`
+#' @noRd
 broadcast_to_series <- function(vec, n_series) {
+  checkmate::assert_numeric(vec, min.len = 1L)
+  checkmate::assert_int(n_series, lower = 1L)
   if (length(vec) == n_series) return(vec)
   if (length(vec) == 1L) return(rep(vec, n_series))
   stop(insight::format_error(c(
@@ -166,53 +187,87 @@ broadcast_to_series <- function(vec, n_series) {
 }
 
 
-# Internal: one draw's vector parameter, `prefix[1..n]` or
-# `prefix[lead, 1..n]`, through the reader every draws consumer
-# shares. `one_draw` is a one-row draws matrix.
-#'@noRd
+#' One draw's vector parameter
+#'
+#' Extracts `prefix[1..n]` or `prefix[lead, 1..n]` with
+#' `read_draws_vector()`.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param prefix Character parameter name
+#' @param n Integer vector length
+#' @param lead Integer leading index, or `NULL`
+#' @return Numeric vector of length `n`
+#' @noRd
 draw_vector <- function(one_draw, prefix, n, lead = NULL) {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_string(prefix)
+  checkmate::assert_int(n, lower = 1L)
+  checkmate::assert_int(lead, null.ok = TRUE)
   as.numeric(read_draws_vector(one_draw, prefix, n, lead = lead))
 }
 
 
-# Internal: one draw's matrix parameter as a `length(rows) x n_col`
-# matrix. `lead` selects one slot of an array of matrices.
-#'@noRd
+#' One draw's matrix parameter
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param prefix Character parameter name
+#' @param n_row Integer number of stored rows
+#' @param n_col Integer number of columns
+#' @param lead Integer slot of an array of matrices, or `NULL`
+#' @param rows Integer vector of the rows to return
+#' @return Numeric matrix with `length(rows)` rows and `n_col` columns
+#' @noRd
 draw_block <- function(one_draw, prefix, n_row, n_col, lead = NULL,
                        rows = seq_len(n_row)) {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_string(prefix)
+  checkmate::assert_int(n_row, lower = 1L)
+  checkmate::assert_int(n_col, lower = 1L)
+  checkmate::assert_int(lead, null.ok = TRUE)
+  checkmate::assert_integerish(rows, lower = 1, upper = n_row)
   matrix(read_draws_matrix(one_draw, prefix, n_row, n_col, lead = lead,
                            rows = rows),
          nrow = length(rows), ncol = n_col)
 }
 
 
-# Internal: pull `sigma_trend` per series and (optionally) build
-# the innovation covariance `Sigma` from `L_Omega_trend`.
-#
-# A grouped trend carries neither of those. Its scales are
-# `sigma_group_trend[g, k]` and its correlations are a population
-# factor plus a per-group deviation, so it is read through the same
-# helper the innovation transform uses and assembled as one
-# block-diagonal covariance over the series, groups being independent.
-#'@noRd
+#' One draw's innovation scales and covariance
+#'
+#' Takes `sigma_trend`, then builds the covariance from `Sigma_trend`
+#' or `L_Omega_trend` when the trend is correlated. A grouped trend has
+#' neither parameter. Its scales are `sigma_group_trend[g, k]` and its
+#' correlations combine a population factor with a per-group deviation.
+#' Groups are independent, giving a block-diagonal covariance.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored scales
+#' @param has_cor Logical. `TRUE` for correlated innovations. `NULL`
+#'   counts as `FALSE`.
+#' @param standata Stan data list of the fit, or `NULL`
+#' @return List holding the scale vector `sigma` and the covariance
+#'   matrix `Sigma`
+#' @noRd
 extract_sigma_and_cov <- function(one_draw, n_series, n_lv,
                                     has_cor, standata = NULL) {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_flag(has_cor, null.ok = TRUE)
+  checkmate::assert_list(standata, null.ok = TRUE)
+  has_cor <- isTRUE(has_cor)
   group_info <- hierarchical_group_info(standata)
   if (!is.null(group_info)) {
-    # Hierarchical scales are indexed by observed series, so this
-    # branch cannot answer a latent-grain request. No generator
-    # emits that combination today; say so plainly if one ever
-    # does, rather than failing on a length assertion downstream.
+    # Hierarchical scales are indexed by observed series. A grouped
+    # factor model would request the latent grain. Model building
+    # refuses that combination.
     if (!identical(as.integer(n_series),
                      length(group_info$group_inds))) {
-      stop(insight::format_error(c(
-        "Grouped trend covariance requested at the wrong grain.",
-        x = paste0(
-          "Got n = ", n_series, ", group indices = ",
-          length(group_info$group_inds), "."
-        ),
-        i = "Hierarchical scales are indexed by observed series."
-      )))
+      stop_mvgam_fault(
+        "Grouped trend covariance was requested at the latent grain.",
+        paste0("Got n = ", n_series, ", group indices = ",
+               length(group_info$group_inds), ".")
+      )
     }
     return(extract_hierarchical_sigma_and_cov(
       one_draw, n_series, group_info
@@ -225,9 +280,8 @@ extract_sigma_and_cov <- function(one_draw, n_series, n_lv,
     draw_block(one_draw, "Sigma_trend", n_series, n_series)
   } else if (has_cor) {
     L <- draw_block(one_draw, "L_Omega_trend", n_series, n_series)
-    # `diag(x)` for a length-one x builds an x-by-x identity rather
-    # than a 1x1 matrix holding x, so the scaling is applied by row
-    # and column instead.
+    # `diag(x)` with a length-one x builds an x-by-x identity. The row
+    # and column products scale `L L'` for a vector of any length.
     sigma_vec * tcrossprod(L) * rep(sigma_vec, each = n_series)
   } else {
     diag(sigma_vec^2, nrow = n_series)
@@ -236,11 +290,16 @@ extract_sigma_and_cov <- function(one_draw, n_series, n_lv,
 }
 
 
-# Internal: the group structure of a hierarchical trend, or NULL when
-# the trend is not grouped. `standata` is the fit's Stan data, which is
-# where the group index of each series is recorded.
-#'@noRd
+#' The group structure of a hierarchical trend
+#'
+#' The Stan data records the group index of each series.
+#'
+#' @param standata Stan data list of the fit, or `NULL`
+#' @return Group information from `get_group_info()`, or `NULL` for a
+#'   trend without groups
+#' @noRd
 hierarchical_group_info <- function(standata) {
+  checkmate::assert_list(standata, null.ok = TRUE)
   if (is.null(standata) || is.null(standata$N_groups_trend)) {
     return(NULL)
   }
@@ -248,11 +307,19 @@ hierarchical_group_info <- function(standata) {
 }
 
 
-# Internal: per-series scales and the block-diagonal innovation
-# covariance of a grouped trend, for one posterior draw.
-#'@noRd
+#' One draw's scales and block-diagonal covariance of a grouped trend
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param n_series Integer number of series
+#' @param group_info Group information from `get_group_info()`
+#' @return List holding the scale vector `sigma` and the covariance
+#'   matrix `Sigma`
+#' @noRd
 extract_hierarchical_sigma_and_cov <- function(one_draw, n_series,
                                                 group_info) {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_list(group_info)
   n_groups <- as.integer(group_info$n_groups)
   n_sub <- as.integer(group_info$n_subgroups)
   group_inds <- as.integer(group_info$group_inds)
@@ -287,59 +354,114 @@ extract_hierarchical_sigma_and_cov <- function(one_draw, n_series,
 }
 
 
-# Internal: pull `theta1_trend` per series when the trend has an
-# MA component. Returns a length-`n_series` numeric vector.
-#'@noRd
+#' One draw's MA coefficient for each series
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients
+#' @return Numeric vector of length `n_series`
+#' @noRd
 extract_ma_coefs <- function(one_draw, n_series, n_lv) {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
   broadcast_to_series(draw_vector(one_draw, "theta1_trend", n_lv),
                       n_series)
 }
 
 
-# Internal: the last `max_ma` rows of the scaled innovation matrix
-# `scaled_innovations_trend[t, j]` from a single posterior draw.
-# The kernel uses these as the past `errors[t - j]` terms when
-# propagating forward, and each one is the innovation that draw
-# sampled at that occasion.
-#'@noRd
+#' The last innovations of one draw
+#'
+#' Takes the rows of `scaled_innovations_trend`, the innovations the
+#' draw sampled. The kernel multiplies them by the MA coefficient as
+#' past errors. `ma_innovations_trend` holds the moving average already
+#' formed and would apply the coefficient twice.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of latent factors
+#' @param max_ma Integer number of rows to return
+#' @param n_time Integer number of fitted time points
+#' @return Numeric matrix with `max_ma` rows and `n_series` columns, or
+#'   `NULL` when `max_ma` is 0
+#' @noRd
 extract_innovation_history <- function(one_draw, n_series, n_lv,
                                        max_ma, n_time) {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_int(max_ma, lower = 0L)
+  checkmate::assert_int(n_time, lower = 1L)
   if (max_ma == 0L) return(NULL)
-  # The kernel multiplies its MA coefficient by a past innovation,
-  # which is what `scaled_innovations_trend` holds.
-  # `ma_innovations_trend` holds the moving average already formed
-  # from it, and seeding with that would apply the coefficient twice.
   draw_block(one_draw, "scaled_innovations_trend", n_time, n_series,
              rows = seq.int(n_time - max_ma + 1L, n_time))
 }
 
 
-# RW / AR / ARMA share the same extraction skeleton: pull
-# sigma / Sigma / optional MA / trend history, optionally pull
-# AR coefficients per active lag. RW skips the AR pull because
-# the kernel hardcodes the coefficient at 1.
-#'@noRd
+#' One draw's random walk parameters and last state
+#'
+#' The kernel fixes the random walk coefficient at 1. This extractor
+#' skips the AR coefficients.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param meta Trend metadata list of the fit
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients per parameter
+#' @param fit Fitted `mvgam` object
+#' @param state_var Character parameter name of the state grid
+#' @return List holding `params` and `last_state`
+#' @noRd
 extract_rw_state <- function(one_draw, meta, n_series, n_lv, fit,
                               state_var = "trend") {
   extract_arma_state(one_draw, meta, n_series, n_lv, fit,
                       pull_ar = FALSE, state_var = state_var)
 }
 
-#'@noRd
+
+#' One draw's AR parameters and last state
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param meta Trend metadata list of the fit
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients per parameter
+#' @param fit Fitted `mvgam` object
+#' @param state_var Character parameter name of the state grid
+#' @return List holding `params` and `last_state`
+#' @noRd
 extract_ar_state <- function(one_draw, meta, n_series, n_lv, fit,
                               state_var = "trend") {
   extract_arma_state(one_draw, meta, n_series, n_lv, fit,
                       pull_ar = TRUE, state_var = state_var)
 }
 
-#'@noRd
+
+#' One draw's RW, AR or ARMA parameters and last state
+#'
+#' Takes the innovation scales, their covariance and the trend
+#' history. An ARMA trend adds its MA coefficient. In factor mode the
+#' caller passes the latent count as `n_series`. Every vector returned
+#' then has one entry per latent factor.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param meta Trend metadata list of the fit
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients per parameter
+#' @param fit Fitted `mvgam` object
+#' @param pull_ar Logical. `TRUE` adds the AR coefficient of each
+#'   active lag.
+#' @param state_var Character parameter name of the state grid
+#' @return List holding `params` and `last_state`
+#' @noRd
 extract_arma_state <- function(one_draw, meta, n_series, n_lv, fit,
                                 pull_ar, state_var = "trend") {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_list(meta)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_class(fit, "mvgam")
+  checkmate::assert_flag(pull_ar)
+  checkmate::assert_string(state_var)
   n_time <- as.integer(fit$standata$N_time_trend)
-  # In factor mode the caller passes `n_series = n_lv` so the LV-
-  # grain propagation is dimensionally consistent; the AR / sigma
-  # extractors and `broadcast_to_series()` therefore return
-  # length-n_lv vectors, which is what the kernel expects.
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
                                  meta$has_cor, fit$standata)
   params <- list(sigma = scov$sigma, Sigma = scov$Sigma)
@@ -364,21 +486,36 @@ extract_arma_state <- function(one_draw, meta, n_series, n_lv, fit,
 }
 
 
-# VAR(p) and VARMA(p, 1). Pulls the stationary coefficient matrix
-# `Phi_trend[lag, i, j]` of each lag, which the kernel uses as it is,
-# the sigma and Sigma pair, and the moving-average matrix
-# `Theta_trend[1, i, j]` when present.
-# VAR fits always have `cor = TRUE` (multivariate innovations).
-#'@noRd
+#' One draw's VAR or VARMA parameters and last state
+#'
+#' Takes the stationary coefficient matrix `Phi_trend[lag, i, j]` of
+#' each lag. The kernel uses these matrices unchanged. A VARMA(p, 1)
+#' trend adds the moving-average matrix `Theta_trend[1, i, j]`. VAR
+#' innovations are always correlated.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param meta Trend metadata list of the fit
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients per parameter
+#' @param fit Fitted `mvgam` object
+#' @param state_var Character parameter name of the state grid
+#' @return List holding `params` and `last_state`
+#' @noRd
 extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
                                 state_var = "trend") {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_list(meta)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_class(fit, "mvgam")
+  checkmate::assert_string(state_var)
   n_time <- as.integer(fit$standata$N_time_trend)
   m_a <- length(meta$ar_lags)
   # Stan declares Phi_trend as `array[N_lags_trend] matrix[N_lv,
-  # N_lv]`, and its draws are indexed `Phi_trend[lag, i, j]`: the
-  # array slot first, then the matrix row and column. We pack into an
-  # [n_series, n_series, n_lags] R cube matching the contract
-  # of `propagate_trend(..., params = list(A = ...))`.
+  # N_lv]`. Its draws are indexed `Phi_trend[lag, i, j]`: the array
+  # slot first, then the matrix row and column. The cube built here
+  # has dimensions [n_series, n_series, n_lags], the layout
+  # `propagate_trend(..., params = list(A = ...))` takes.
   A_cube <- array(0, dim = c(n_series, n_series, m_a))
   for (k in seq_len(m_a)) {
     A_cube[, , k] <- draw_block(one_draw, "Phi_trend", n_series, n_series,
@@ -392,7 +529,7 @@ extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
   errors <- NULL
   if (length(meta$ma_lags) > 0L) {
     # The program applies `Theta_trend`, the stationary transform of
-    # `D_trend`, and indexes it `Theta_trend[lag, i, j]` like
+    # `D_trend`. Its draws are indexed `Theta_trend[lag, i, j]` like
     # `Phi_trend`.
     m_b <- length(meta$ma_lags)
     B_cube <- array(0, dim = c(n_series, n_series, m_b))
@@ -416,20 +553,32 @@ extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
 }
 
 
-# Internal: the innovation at the last fitted occasion of a
-# VARMA(p, 1), which the first forecast step multiplies by `D`.
-#
-# The program never stores it. Its likelihood centres `lv_t` on
-#   mu_t = sum_i A_i lv_{t-i} + D e_{t-1},  e_t = lv_t - mu_t,
-# taking a state before the first occasion from `init_trend`. That
-# vector follows `Omega_trend`'s companion order, most recent first:
-# block `k <= p` holds `lv_{1-k}` and block `p + 1` holds `e_0`. The
-# same recursion run forward here gives `e_T`.
-#
-# @return A `1 x n` matrix holding `e_T`
-#'@noRd
+#' The innovation at the last fitted occasion of a VARMA(p, 1)
+#'
+#' The first forecast step multiplies this innovation by `D`. The Stan
+#' program never stores it. Its likelihood centres `lv_t` on
+#' `mu_t = sum_i A_i lv_{t-i} + D e_{t-1}`, with `e_t = lv_t - mu_t`.
+#' States before the first occasion come from `init_trend`, which
+#' follows the companion order of `Omega_trend` with the most recent
+#' first. Block `k <= p` holds `lv_{1-k}` and block `p + 1` holds
+#' `e_0`. Running the same recursion forward gives `e_T`.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param A_cube Numeric array of AR matrices, one slice per lag
+#' @param D Numeric MA matrix
+#' @param ar_lags Integer vector of active AR lags
+#' @param n Integer number of states
+#' @param n_time Integer number of fitted time points
+#' @return Numeric matrix with one row holding `e_T`
+#' @noRd
 varma_last_innovation <- function(one_draw, A_cube, D, ar_lags, n,
                                   n_time) {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_array(A_cube, d = 3L)
+  checkmate::assert_numeric(D)
+  checkmate::assert_integerish(ar_lags, lower = 1, min.len = 1L)
+  checkmate::assert_int(n, lower = 1L)
+  checkmate::assert_int(n_time, lower = 1L)
   p <- max(ar_lags)
   init <- draw_vector(one_draw, "init_trend", (p + 1L) * n)
   init_block <- function(k) init[((k - 1L) * n + 1L):(k * n)]
@@ -448,15 +597,30 @@ varma_last_innovation <- function(one_draw, A_cube, D, ar_lags, n,
 }
 
 
-# CAR(1): continuous-time AR(1). Pulls phi per series from
-# `ar1_trend[s]`, sigma per series from `sigma_trend[s]` and the last
-# latent state from the trailing row of `trend[t, s]`, at the last
-# occasion of the fitted grid. A fit with correlated innovations adds
-# `Sigma`, their covariance over a gap of one. The forecast measures
-# its gaps from that occasion, in `forecast_context_car()`.
-#'@noRd
+#' One draw's continuous-time AR(1) parameters and last state
+#'
+#' Takes `phi` from `ar1_trend[s]`, the scales from `sigma_trend[s]`
+#' and the state at the last occasion of the fitted grid. A fit with
+#' correlated innovations adds `Sigma`, their covariance over a gap of
+#' one. `forecast_context_car()` measures the forecast gaps from that
+#' last occasion.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param meta Trend metadata list of the fit
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients per parameter
+#' @param fit Fitted `mvgam` object
+#' @param state_var Character parameter name of the state grid
+#' @return List holding `params` and `last_state`
+#' @noRd
 extract_car_state <- function(one_draw, meta, n_series, n_lv, fit,
                               state_var = "trend") {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_list(meta)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_class(fit, "mvgam")
+  checkmate::assert_string(state_var)
   n_time <- as.integer(fit$standata$N_time_trend)
   phi <- broadcast_to_series(draw_vector(one_draw, "ar1_trend", n_lv),
                              n_series)
@@ -475,10 +639,18 @@ extract_car_state <- function(one_draw, meta, n_series, n_lv, fit,
 }
 
 
-# Internal: the last time each series was observed at, in the order
-# the trend numbers its columns. The axes record holds it.
-#'@noRd
+#' The last time each series was observed
+#'
+#' Taken from the axes record, in the order the trend numbers its
+#' columns.
+#'
+#' @param fit Fitted `mvgam` object
+#' @param n_series Integer number of trend series
+#' @return Numeric vector of length `n_series`
+#' @noRd
 extract_last_observed_times <- function(fit, n_series) {
+  checkmate::assert_class(fit, "mvgam")
+  checkmate::assert_int(n_series, lower = 1L)
   recorded <- mvgam_axes(fit)$series$last_time
   # One entry per trend column. Subsetting to `n_series` would pad
   # with `NA` or drop a series without saying which.
@@ -492,14 +664,30 @@ extract_last_observed_times <- function(fit, n_series) {
 }
 
 
-# LLT: the level and the slope at the last occasion, the level and
-# slope scales, and the slope damping. The slope shocks share the
-# level shocks' correlation, which `cov2cor()` recovers from the level
-# covariance, grouped or not. Sampled factor loadings give one slope
-# scale and one damping, broadcast to every factor.
-#'@noRd
+#' One draw's local linear trend parameters and last state
+#'
+#' Takes the level and the slope at the last occasion, the level and
+#' slope scales and the slope damping. The slope shocks share the
+#' correlation of the level shocks. `cov2cor()` recovers it from the
+#' level covariance, grouped or not. Sampled factor loadings give one
+#' slope scale and one damping, broadcast to every factor.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param meta Trend metadata list of the fit
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients per parameter
+#' @param fit Fitted `mvgam` object
+#' @param state_var Character parameter name of the state grid
+#' @return List holding `params` and `last_state`
+#' @noRd
 extract_llt_state <- function(one_draw, meta, n_series, n_lv, fit,
                               state_var = "trend") {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_list(meta)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_class(fit, "mvgam")
+  checkmate::assert_string(state_var)
   n_time <- as.integer(fit$standata$N_time_trend)
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv, meta$has_cor,
                                 fit$standata)
@@ -537,16 +725,31 @@ extract_llt_state <- function(one_draw, meta, n_series, n_lv, fit,
 }
 
 
-# ZMVN: no temporal recursion. Each forecast step is an
-# independent MVN draw, so the only params field is `Sigma`.
-# `last_state$trends` is a zero-row matrix (max_lag = 0).
-#
-# In factor mode `n_series` arrives as the LV count, so the same
-# read gives `sigma_trend[1..n_lv]` and the `n_lv` square
-# `L_Omega_trend` the latent draws are actually scaled by.
-#'@noRd
+#' One draw's zero-mean multivariate normal trend parameters
+#'
+#' The trend has no temporal recursion. Each forecast step is an
+#' independent multivariate normal draw with covariance `Sigma`.
+#' `last_state$trends` is a zero-row matrix. In factor mode `n_series`
+#' holds the latent count. The extractor then takes
+#' `sigma_trend[1..n_lv]` and the `n_lv` square `L_Omega_trend` that
+#' scale the latent draws.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param meta Trend metadata list of the fit
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients per parameter
+#' @param fit Fitted `mvgam` object
+#' @param state_var Character parameter name of the state grid
+#' @return List holding `params` and `last_state`
+#' @noRd
 extract_zmvn_state <- function(one_draw, meta, n_series, n_lv, fit,
                                state_var = "trend") {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_list(meta)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_class(fit, "mvgam")
+  checkmate::assert_string(state_var)
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
                                  has_cor = TRUE,
                                  standata = fit$standata)
@@ -560,17 +763,32 @@ extract_zmvn_state <- function(one_draw, meta, n_series, n_lv, fit,
 }
 
 
-# PW (piecewise linear / logistic): pulls the per-series
-# growth (`k_trend[s]`) and the changepoint-effect matrix
-# (`delta_trend[i, s]`) from the posterior, plus the fit-time
-# changepoint times `t_change_trend` from `standata`. The
-# latter is a fixed quantity, set at fit time on a regular
-# grid over the training history. A logistic fit adds the
-# `m_trend[s]` offset. A forecast takes the capacities of the new
-# times from `newdata`, in `forecast_context_pw()`.
-#'@noRd
+#' One draw's piecewise trend parameters
+#'
+#' Takes the growth rate `k_trend[s]` and the changepoint effects
+#' `delta_trend[i, s]` from the draw. The changepoint times
+#' `t_change_trend` come from the Stan data. Model building fixes them
+#' on a regular grid over the training history. A logistic fit adds
+#' the offset `m_trend[s]`. `forecast_context_pw()` takes the
+#' capacities of the new times from `newdata`.
+#'
+#' @param one_draw One-row draws matrix named by parameter
+#' @param meta Trend metadata list of the fit
+#' @param n_series Integer number of state columns
+#' @param n_lv Integer number of stored coefficients per parameter
+#' @param fit Fitted `mvgam` object
+#' @param state_var Character parameter name of the state grid. The
+#'   piecewise trend has no stored state and ignores it.
+#' @return List holding `params` and `last_state`
+#' @noRd
 extract_pw_state <- function(one_draw, meta, n_series, n_lv, fit,
                              state_var = "trend") {
+  checkmate::assert_matrix(one_draw, nrows = 1L)
+  checkmate::assert_list(meta)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_class(fit, "mvgam")
+  checkmate::assert_string(state_var)
   k_vec <- broadcast_to_series(draw_vector(one_draw, "k_trend", n_lv),
                                n_series)
   # The logistic form samples `m_trend`. For the linear form, the
@@ -582,9 +800,9 @@ extract_pw_state <- function(one_draw, meta, n_series, n_lv, fit,
     rep(0, n_series)
   }
 
-  # `delta_trend` is declared `matrix[N_change_trend, N_lv_trend]`
-  # in Stan, so the posterior names are `delta_trend[i, j]` with
-  # `i` the changepoint index and `j` the latent series.
+  # Stan declares `delta_trend` as `matrix[N_change_trend, N_lv_trend]`.
+  # Its draws are named `delta_trend[i, j]`, with `i` the changepoint
+  # index and `j` the latent series.
   n_change <- as.integer(fit$standata$N_change_trend %||% 0L)
   delta <- matrix(0, nrow = n_change, ncol = n_series)
   if (n_change > 0L) {

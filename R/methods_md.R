@@ -227,7 +227,7 @@ describe_predictors <- function(obj) {
     desc <- if (is.factor(col)) {
       paste0(
         "factor with ", nlevels(col), " levels (",
-        paste(head(levels(col), 4L), collapse = ", "),
+        paste(utils::head(levels(col), 4L), collapse = ", "),
         if (nlevels(col) > 4L) ", ..." else "",
         ")"
       )
@@ -954,10 +954,18 @@ model_glossary <- function(obj) {
   paste(c("where:", "", defs), collapse = "\n")
 }
 
-# Internal: the glossary entries for the trend's innovations, written
-# in the form `innovation_rows()` gives them.
+#' The glossary entries for a trend's innovations
+#'
+#' Written in the form `innovation_rows()` gives the innovations.
+#'
+#' @param obj Fitted `mvgam` object
+#' @param is_factor Logical flag for a factor model, whose innovations
+#'   drive the latent factors
+#' @return Character vector of Markdown glossary lines
 #' @noRd
 innovation_glossary <- function(obj, is_factor) {
+  checkmate::assert_class(obj, "mvgam")
+  checkmate::assert_flag(is_factor)
   tt <- obj$trend_metadata$trend_type
   if (identical(tt, "PW")) return(character(0L))
   sd <- innovation_sd(obj)
@@ -990,15 +998,16 @@ innovation_glossary <- function(obj, is_factor) {
   out
 }
 
-# Internal: whether a trend carries a moving-average part.
-#
-# `AR(ma = TRUE)` and `VAR(ma = TRUE)` are recorded under their base
-# trend type, so nothing ever stores the spelling "ARMA". The MA
-# lags are what say one is present, and asking for the spelling
-# instead meant an ARMA model was described as the AR model it is
-# built on, with its order and its coefficient both dropped.
+#' Whether a trend has a moving-average part
+#'
+#' `AR(ma = TRUE)` and `VAR(ma = TRUE)` are recorded under their base
+#' trend type. The stored MA lags mark the moving-average part.
+#'
+#' @param obj Fitted `mvgam` object
+#' @return Logical scalar
 #' @noRd
 trend_has_ma <- function(obj) {
+  checkmate::assert_class(obj, "mvgam")
   length(obj$trend_metadata$ma_lags %||% integer(0L)) > 0L
 }
 
@@ -1096,12 +1105,18 @@ glossary_ar <- function(obj) {
 }
 
 
-# Internal: the conventional label of a trend, such as `AR(2)` or
-# `ARMA(2, 1)`. A contiguous lag set is named by its order. A sparse
-# one lists its lags in braces, `AR({1, 12})`: no order expresses it,
-# and a bare list of lags would spell an ARIMA order.
+#' The conventional label of a trend
+#'
+#' Labels take forms such as `AR(2)` or `ARMA(2, 1)`. A contiguous lag
+#' set is named by its order. A sparse one lists its lags in braces, as
+#' in `AR({1, 12})`. No single order describes a sparse set. A bare list
+#' of lags would be mistaken for an ARIMA order.
+#'
+#' @param obj Fitted `mvgam` object
+#' @return Character scalar label, or `""` for a model without a trend
 #' @noRd
 trend_order_label <- function(obj) {
+  checkmate::assert_class(obj, "mvgam")
   tt <- obj$trend_metadata$trend_type
   if (is.null(tt)) return("")
   ar_lags <- obj$trend_metadata$ar_lags %||% integer(0L)

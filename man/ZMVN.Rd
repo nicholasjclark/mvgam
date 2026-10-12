@@ -136,8 +136,8 @@ arguments to be interpreted by the parsing functions in \pkg{mvgam}
 }
 \description{
 Set up latent correlated multivariate Gaussian residual processes in
-\pkg{mvgam}. This function does not evaluate its arguments – it exists
-purely to help set up a model with particular error processes
+\pkg{mvgam}. The constructor records its arguments. The model
+evaluates them against the data.
 }
 \section{Identification}{
 
@@ -156,11 +156,11 @@ Factors are numbered by the variance they explain, largest
 first.
 \item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
 \code{AR()} factors with \code{coef_sharing = "shared"}, are
-unchanged by rotation when they carry no moving-average term. Following Heaps & Jermyn (2024),
-generated quantities rotate each draw to lower-triangular
-loadings \code{Z_tilde} with a non-negative diagonal, and rotate the
-factor paths to \code{lv_trend_tilde}. A VAR factor model rotates
-its coefficients to \code{Phi_trend_tilde}.
+unchanged by rotation when they carry no moving-average term.
+Following Heaps & Jermyn (2024), generated quantities rotate each
+draw to lower-triangular loadings \code{Z_tilde} with a non-negative
+diagonal. The factor paths rotate to \code{lv_trend_tilde}. A VAR
+factor model rotates its coefficients to \code{Phi_trend_tilde}.
 }
 Post-fit methods use the identified loadings and factor paths.
 \code{shared_variation()} and \code{residual_cor()} are the same under every

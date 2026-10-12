@@ -225,6 +225,12 @@ test_that("grouping validation helper works correctly", {
   expect_equal(result_series_subgr$gr, "region")
   expect_equal(result_series_subgr$subgr, "series")
 
+  # subgr naming the series column without gr is the ungrouped default
+  expect_identical(
+    mvgam:::validate_grouping_arguments("NA", "series", "series"),
+    list(gr = NULL, subgr = NULL)
+  )
+
   # subgr without gr is still rejected since there is no main
   # grouping variable to nest within.
   expect_error(

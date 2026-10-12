@@ -19,16 +19,21 @@
 score <- function(object, ...) UseMethod("score")
 
 
-# The univariate scores that take `interval_width` and `log`. The
-# others score a transformed quantity (`brier` a binary outcome) or
-# carry thresholds on the untransformed scale (`twcrps`), so a log
-# transform of the draws alone would not mean what it says.
+#' The univariate scores that take `interval_width` and `log`
+#'
+#' The `brier` score grades a binary outcome. The `twcrps` score sets
+#' its thresholds on the untransformed scale. A log transform of the
+#' draws alone gives neither of them a defined meaning.
+#'
 #' @noRd
 scores_honouring_log <- c("crps", "drps", "sis")
 
 
-# The scores that grade every series jointly. `score()` returns each
-# as one `all_series` row and leaves the per-series scores `NA`.
+#' The scores that grade every series jointly
+#'
+#' `score()` returns each as one `all_series` row and leaves the
+#' per-series scores `NA`.
+#'
 #' @noRd
 joint_forecast_scores <- c("energy", "variogram", "twenergy")
 
@@ -66,13 +71,13 @@ joint_forecast_scores <- c("energy", "variogram", "twenergy")
 #' }
 #'
 #' @param object An `mvgam_forecast` object whose `type` is
-#'   `"response"` or `"expected"` (so the held-out
-#'   observations live on the same scale as the forecasts).
+#'   `"response"` or `"expected"`. The held-out observations are then
+#'   on the scale of the forecasts.
 #' @param score Character; one of the names above.
-#' @param interval_width Central PI width behind the per-series
-#'   `in_interval` indicator, and the SIS penalty width. Computed
-#'   for `"crps"`, `"drps"` and `"sis"`; the other scores report
-#'   `in_interval` as `NA`.
+#' @param interval_width Width of the central PI that sets the
+#'   per-series `in_interval` indicator. It also sets the SIS penalty
+#'   width. Computed for `"crps"`, `"drps"` and `"sis"`; the other
+#'   scores report `in_interval` as `NA`.
 #' @param quantile_level Quantile the `"qs"` pinball loss is
 #'   taken at. Defaults to `0.5`, the median. Unrelated to the
 #'   central interval the other scorers use, which
@@ -93,18 +98,18 @@ joint_forecast_scores <- c("energy", "variogram", "twenergy")
 #' @return A named `list` with one entry per series plus a
 #'   trailing `all_series` summary. Per-series entries are
 #'   `data.frame`s with columns `score`, `in_interval`,
-#'   `interval_width`, `eval_horizon`, and `score_type` (the
-#'   last echoes the requested `score`; the `score` column is
-#'   `NA` for the multivariate scorers' per-series rows -- they
-#'   carry coverage diagnostics only, with the joint score
-#'   sitting in `all_series`). The `all_series` entry holds the
-#'   per-horizon aggregate: scores summed over the series at each
-#'   forecast time for univariate scorers (with `score_type`
-#'   prefixed `"sum_"`) or the multivariate per-horizon score
-#'   itself. Series forecast at their own times, as `CAR()` allows,
-#'   are summed at the times they share, and `eval_horizon` then
-#'   counts the times any series is forecast at. A multivariate
-#'   score needs every series at the same forecast times.
+#'   `interval_width`, `eval_horizon` and `score_type`. The
+#'   `score_type` column echoes the requested `score`. The
+#'   multivariate scorers' per-series rows hold coverage diagnostics
+#'   only, with `score` set to `NA`. The `all_series` entry holds the
+#'   per-horizon aggregate. For univariate scorers it sums the scores
+#'   over the series at each forecast time, with `score_type`
+#'   prefixed `"sum_"`. For multivariate scorers it holds the joint
+#'   per-horizon score. Series forecast at their own times, as
+#'   `CAR()` allows, are summed at the times they share. The
+#'   `eval_horizon` column then counts the times any series is
+#'   forecast at. A multivariate score needs every series at the same
+#'   forecast times.
 #'
 #' @seealso [forecast.mvgam], [hindcast.mvgam],
 #'   [mvgam_forecast-class][mvgam]. The CRPS / DRPS / ELPD /
@@ -127,10 +132,10 @@ joint_forecast_scores <- c("energy", "variogram", "twenergy")
 #' mod <- mvgam(
 #'   y ~ s(x),
 #'   trend_formula = ~ AR(p = 1),
-#'   data    = simdat$data_train,
+#'   data = simdat$data_train,
 #'   newdata = simdat$data_test,
-#'   family  = poisson(),
-#'   chains  = 2, silent = 2
+#'   family = poisson(),
+#'   chains = 2, silent = 2
 #' )
 #'
 #' # Score requires a forecast object with held-out test draws.
@@ -152,13 +157,11 @@ score.mvgam_forecast <- function(object,
                                    weights = NULL,
                                    ...) {
   checkmate::assert_class(object, "mvgam_forecast")
-  # A fan-out wrapper holds one forecast per response. On a wide frame
-  # those responses are the series, so it is scored as one forecast
-  # over them; on a long frame each element spans every series and is
-  # scored as the answer for its response. Reading the wrapper's own
-  # `$forecasts`, which a wrapper does not have, refused the object
-  # `forecast()` had just returned and told the caller to pass the
-  # `newdata` they had passed.
+  # A fan-out wrapper holds one forecast per response and has no
+  # `$forecasts` element of its own. On a wide frame the responses are
+  # the series. The wrapper is then scored as one forecast over them.
+  # On a long frame each element spans every series. Each element is
+  # then scored for its own response.
   if (isTRUE(attr(object, "response_keyed"))) {
     object <- response_axis_forecast(object)
   } else if (isTRUE(attr(object, "mv_wrapper"))) {
@@ -179,12 +182,8 @@ score.mvgam_forecast <- function(object,
   checkmate::assert_number(upper)
   checkmate::assert_flag(log)
 
-  # `log` and `interval_width` reach three of the eight univariate
-  # scorers. The rest take neither, so a value passed with one of
-  # them governed nothing and the returned score was the untouched
-  # one, with the `interval_width` column still echoing the number
-  # the caller supplied. Refuse rather than answer a question that
-  # was not the one asked.
+  # `log` reaches three of the eight univariate scorers. With any
+  # other score the transform would have no effect on the result.
   if (isTRUE(log) && !score %in% scores_honouring_log) {
     stop(insight::format_error(c(
       paste0("'log = TRUE' does not apply to score '", score, "'."),
@@ -220,11 +219,20 @@ score.mvgam_forecast <- function(object,
 
 # ----- Validation -------------------------------------------------
 
-# Internal: shared validation for both score branches. Routes
-# the family / type guards (the `brier` / `elpd` / `type` rules
-# live here) and the empty-forecast guard.
-#'@noRd
+#' Refuse a forecast that cannot be scored
+#'
+#' Both score branches call it. A `trend` forecast is on the link scale
+#' of the latent state and cannot be scored against observations. A
+#' forecast needs held-out forecasts and observations. The `brier` score
+#' needs a Bernoulli family for every series.
+#'
+#' @param object Object of class `mvgam_forecast`
+#' @param score Character name of the score
+#' @return `NULL`, invisibly, or an error
+#' @noRd
 validate_scoreable_forecast <- function(object, score) {
+  checkmate::assert_list(object)
+  checkmate::assert_string(score)
   if (identical(object$type, "trend")) {
     stop(insight::format_error(c(
       "Cannot score a 'trend'-type forecast.",
@@ -234,19 +242,17 @@ validate_scoreable_forecast <- function(object, score) {
         "Re-run 'forecast()' with type = 'response' or ",
         "'expected'."
       )
-    )))
+    )), call. = FALSE)
   }
   if (is.null(object$forecasts) ||
       is.null(object$test_observations)) {
     stop(insight::format_error(c(
       "'object' contains no held-out forecasts to score.",
-      i = paste0(
-        "Pass 'newdata' covering held-out times to 'forecast()'."
-      )
-    )))
+      i = "Pass 'newdata' covering held-out times to 'forecast()'."
+    )), call. = FALSE)
   }
-  # One family per series on a forecast whose series are a wide fit's
-  # responses, so the rule is asked of every series being scored.
+  # A wide fit's forecast holds one family per series. Every scored
+  # series must be Bernoulli.
   families <- object$family
   if (identical(score, "brier") &&
       (!length(families) || !all(families == "bernoulli"))) {
@@ -264,13 +270,30 @@ validate_scoreable_forecast <- function(object, score) {
 
 # ----- Univariate branch ------------------------------------------
 
-# Internal: per-series univariate scoring. Builds the tidy
-# `data.frame` per series plus an `all_series` row-summed
-# aggregate.
-#'@noRd
+#' Univariate scores for each series and their sum over series
+#'
+#' @param object Object of class `mvgam_forecast`
+#' @param series_names Character vector of the series to score
+#' @param score Character name of a univariate score
+#' @param interval_width Numeric width of the central interval
+#' @param quantile_level Numeric quantile level of the `qs` score
+#' @param lower Numeric lower threshold of the `twcrps` score
+#' @param upper Numeric upper threshold of the `twcrps` score
+#' @param log Logical. `TRUE` scores on the log scale
+#' @return Named list of score data frames, one per series, followed by
+#'   the `all_series` sum
+#' @noRd
 score_univariate <- function(object, series_names, score,
                                interval_width, quantile_level, lower,
                                upper, log) {
+  checkmate::assert_list(object)
+  checkmate::assert_character(series_names)
+  checkmate::assert_string(score)
+  checkmate::assert_number(interval_width)
+  checkmate::assert_number(quantile_level)
+  checkmate::assert_number(lower)
+  checkmate::assert_number(upper)
+  checkmate::assert_flag(log)
   series_score <- lapply(series_names, function(lv) {
     truth <- object$test_observations[[lv]]
     fc <- object$forecasts[[lv]]
@@ -302,13 +325,13 @@ score_univariate <- function(object, series_names, score,
 }
 
 
-# Internal: empty per-series stub when a series has no held-out
-# data. The result shape stays uniform across series, which lets
-# callers rbind / map without special-casing. The univariate and
-# multivariate branches held two definitions of this one frame,
-# each taking a `score` and an `interval_width` that neither uses.
-# A zero-row frame carries no such value.
-#'@noRd
+#' An empty score data frame for a series without held-out data
+#'
+#' Keeps the result shape uniform across series for callers that bind
+#' or map over them.
+#'
+#' @return Zero-row data frame holding the score columns
+#' @noRd
 empty_score_df <- function() {
   data.frame(
     score = numeric(0L),
@@ -321,13 +344,21 @@ empty_score_df <- function() {
 }
 
 
-# Internal: sum the per-series scores at each forecast time into the
-# `all_series` data.frame. Horizon `k` is the `k`th time any series
-# is forecast at, and a series contributes at the times it holds.
-# Series forecast at their own times are summed at the times they
-# share.
-#'@noRd
+#' Per-series scores summed at each forecast time
+#'
+#' Horizon `k` is the `k`th time any series is forecast at. Each series
+#' adds its score at the times it holds. A series without recorded
+#' forecast times is summed by position.
+#'
+#' @param series_score Named list of per-series score data frames
+#' @param score Character name of the score
+#' @param test_times Named list of forecast times per series, or `NULL`
+#' @return Data frame holding `score`, `eval_horizon` and `score_type`
+#' @noRd
 sum_univariate_horizon <- function(series_score, score, test_times) {
+  checkmate::assert_list(series_score)
+  checkmate::assert_string(score)
+  checkmate::assert_list(test_times, null.ok = TRUE)
   scored <- names(series_score)[
     vapply(series_score, nrow, integer(1L)) > 0L
   ]
@@ -362,9 +393,13 @@ sum_univariate_horizon <- function(series_score, score, test_times) {
 }
 
 
-# Internal: whether the scored series are forecast at the same times.
-#'@noRd
+#' Whether the scored series share their forecast times
+#'
+#' @param test_times List of forecast times per series, or `NULL`
+#' @return Logical scalar
+#' @noRd
 shares_forecast_times <- function(test_times) {
+  checkmate::assert_list(test_times, null.ok = TRUE)
   if (length(test_times) == 0L) {
     return(TRUE)
   }
@@ -377,13 +412,35 @@ shares_forecast_times <- function(test_times) {
 
 # ----- Multivariate branch ----------------------------------------
 
-# Internal: multivariate scoring path. Per-series entries carry
-# the coverage indicator only (the score column stays NA); the
-# joint multivariate score lives in `all_series`.
-#'@noRd
+#' A joint multivariate score with per-series interval coverage
+#'
+#' Each per-series data frame records interval coverage and leaves its
+#' `score` column missing. The `all_series` element holds the joint
+#' score. Every scored series must share one forecast horizon.
+#'
+#' @param object Object of class `mvgam_forecast`
+#' @param series_names Character vector of the series to score
+#' @param score Character name of a multivariate score
+#' @param interval_width Numeric width of the central interval
+#' @param lower Numeric lower threshold of the `twenergy` score
+#' @param upper Numeric upper threshold of the `twenergy` score
+#' @param log Logical. `TRUE` scores on the log scale
+#' @param weights Numeric weight matrix of the `variogram` score, or
+#'   `NULL`
+#' @return Named list of per-series data frames, followed by the joint
+#'   `all_series` score
+#' @noRd
 score_multivariate <- function(object, series_names, score,
                                  interval_width, lower, upper,
                                  log, weights) {
+  checkmate::assert_list(object)
+  checkmate::assert_character(series_names)
+  checkmate::assert_string(score)
+  checkmate::assert_number(interval_width)
+  checkmate::assert_number(lower)
+  checkmate::assert_number(upper)
+  checkmate::assert_flag(log)
+  checkmate::assert_numeric(weights, null.ok = TRUE)
   truths_list <- lapply(series_names, function(lv) {
     object$test_observations[[lv]]
   })
@@ -398,7 +455,7 @@ score_multivariate <- function(object, series_names, score,
   if (!any(ok)) {
     stop(insight::format_error(
       "No held-out series available for multivariate scoring."
-    ))
+    ), call. = FALSE)
   }
   # A joint score is of one vector per time, with every series in it
   if (length(unique(vapply(fcs[ok], ncol, integer(1L)))) > 1L ||
@@ -408,7 +465,7 @@ score_multivariate <- function(object, series_names, score,
       i = "Give every series in 'newdata' the same forecast times.",
       i = paste0("'crps' and the other univariate scores take series ",
                  "at their own times.")
-    )))
+    )), call. = FALSE)
   }
 
   series_score <- lapply(series_names, function(lv) {
@@ -452,12 +509,31 @@ score_multivariate <- function(object, series_names, score,
 
 # ----- Per-score routing ------------------------------------------
 
-# Internal: route one of the univariate score names to its
-# kernel with only the args it consumes -- no unused-arg leakage.
-#'@noRd
+#' One univariate score computed by its kernel
+#'
+#' Each kernel receives the arguments it uses.
+#'
+#' @param score Character name of a univariate score
+#' @param truth Numeric vector of observed values over the horizon
+#' @param fc Numeric matrix of forecast draws, one column per horizon
+#' @param interval_width Numeric width of the central interval
+#' @param quantile_level Numeric quantile level of the `qs` score
+#' @param lower Numeric lower threshold of the `twcrps` score
+#' @param upper Numeric upper threshold of the `twcrps` score
+#' @param log Logical. `TRUE` scores on the log scale
+#' @return Numeric matrix holding the `score` and `in_interval` columns
+#' @noRd
 dispatch_univariate_score <- function(score, truth, fc,
                                         interval_width, quantile_level,
                                         lower, upper, log) {
+  checkmate::assert_string(score)
+  checkmate::assert_atomic_vector(truth)
+  checkmate::assert_matrix(fc)
+  checkmate::assert_number(interval_width)
+  checkmate::assert_number(quantile_level)
+  checkmate::assert_number(lower)
+  checkmate::assert_number(upper)
+  checkmate::assert_flag(log)
   switch(
     score,
     "crps" = crps_mcmc_object(
@@ -480,11 +556,28 @@ dispatch_univariate_score <- function(score, truth, fc,
 }
 
 
-# Internal: route one of the multivariate score names.
-#'@noRd
+#' One multivariate score computed by its kernel
+#'
+#' @param score Character name of a multivariate score
+#' @param truths Numeric matrix of observed values, one row per series
+#' @param fcs List of forecast draw matrices, one per series
+#' @param lower Numeric lower threshold of the `twenergy` score
+#' @param upper Numeric upper threshold of the `twenergy` score
+#' @param log Logical. `TRUE` scores on the log scale
+#' @param weights Numeric weight matrix of the `variogram` score, or
+#'   `NULL`
+#' @return Numeric vector of joint scores, one per horizon
+#' @noRd
 dispatch_multivariate_score <- function(score, truths, fcs,
                                           lower, upper, log,
                                           weights) {
+  checkmate::assert_string(score)
+  checkmate::assert_matrix(truths)
+  checkmate::assert_list(fcs)
+  checkmate::assert_number(lower)
+  checkmate::assert_number(upper)
+  checkmate::assert_flag(log)
+  checkmate::assert_numeric(weights, null.ok = TRUE)
   switch(
     score,
     "energy" = energy_mcmc_object(truths, fcs, log = log),

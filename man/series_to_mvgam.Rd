@@ -2,24 +2,109 @@
 % Please edit documentation in R/series_to_mvgam.R
 \name{series_to_mvgam}
 \alias{series_to_mvgam}
-\title{Convert timeseries object to format necessary for \pkg{mvgam} models}
+\title{Convert time series objects to mvgam long format}
 \usage{
-series_to_mvgam(series, freq, train_prop = 0.85)
+series_to_mvgam(
+  series,
+  freq = NULL,
+  response = NULL,
+  index = NULL,
+  h = NULL,
+  train_prop = NULL
+)
 }
 \arguments{
-\item{series}{\code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be
-converted to \code{\link{mvgam}} format}
+\item{series}{The data to convert. One of:
+\itemize{
+\item A \code{tsibble} (\code{tsibble::tsibble()}). Its key variables
+define the series and its index defines the time grid. Gaps in
+a regular \code{tsibble} become rows with a missing response, as
+\code{tsibble::fill_gaps(.full = TRUE)} builds them. Measured
+variables other than the response are carried over as
+covariates, and are missing on those rows. An irregular
+\code{tsibble} keeps its own times, for use with \code{CAR()} or
+\code{ZMVN()}.
+\item A \code{ts}, \code{mts} or \code{msts} object (\code{forecast::msts()}). Each
+column of an \code{mts} is a series.
+\item A wide \code{data.frame} holding one date column and one
+numeric column per series. Column names become the series
+levels, in column order.
+}}
 
-\item{freq}{\code{integer}. The seasonal frequency of the series}
+\item{freq}{Optional numeric vector of seasonal periods, in time
+steps. Each period above 1 adds a column giving the position of
+each row within that period. Defaults to the periods the object
+carries: \code{frequency()} of a \code{ts}, the \code{seasonal.periods} of an
+\code{msts}, or \code{tsibble::guess_frequency()} of the index.}
 
-\item{train_prop}{\code{numeric} stating the proportion of data to use for
-training. Should be between \code{0.25} and \code{0.95}}
+\item{response}{Name of the measured variable to use as the response
+of a \code{tsibble}. Optional when the \code{tsibble} has one measured
+variable. Ignored for other inputs, whose response column is \code{y}.}
+
+\item{index}{Name of the date column of a wide \code{data.frame}. Optional
+when exactly one column has class \code{Date}, \code{POSIXt}, \code{yearmonth},
+\code{yearquarter} or \code{yearweek}.}
+
+\item{h}{Optional number of final time steps to hold out as test
+data.}
+
+\item{train_prop}{Optional proportion of time steps to keep as
+training data, between 0 and 1. Only one of \code{h} and \code{train_prop}
+may be given.}
 }
 \value{
-A \code{list} object containing outputs needed for
-\code{\link{mvgam}}, including 'data_train' and 'data_test'
+A long \code{data.frame} with columns \code{series} (a factor), \code{time}
+(an integer for regular data), the response, the original index
+(\code{index} for a \code{ts}), any \code{tsibble} key and covariate columns, and
+one season column per period above 1. Rows are ordered by time,
+then series. With \code{h} or \code{train_prop}, a list holding \code{data_train}
+and \code{data_test} instead.
 }
 \description{
-This function converts univariate or multivariate time series (\code{xts} or
-\code{ts} objects) to the format necessary for \code{\link{mvgam}}.
+Convert a \code{tsibble}, a \code{ts}, \code{mts} or \code{msts} object, or a wide
+\code{data.frame} with a date column into the long \code{data.frame} that
+\code{\link[=mvgam]{mvgam()}} expects: one row per series and time, a \code{series} factor
+and a \code{time} column counting steps from the first index value.
+}
+\details{
+\code{time} counts steps from 1 at the first index value. The
+position within a seasonal period counts steps from the calendar
+origin of the index. A monthly index with \code{freq = 12} gives the
+month number, and a \code{ts} gives \code{cycle()}, whatever month the data
+start in. A single period produces a column named \code{season}. Several
+periods produce \verb{season_<period>} columns, such as \code{season_7} and
+\code{season_365.25}.
+
+Rows for future times with a missing response, built for example
+with \code{tsibble::new_data()} and bound to the observed data, receive
+\code{time} values that continue the grid. Converting observed and
+future rows together keeps the two aligned.
+
+Seasonal periods take the same numbers across packages. Monthly
+data carry \code{frequency = 12} in a \code{ts}, and a fable
+\code{season(period = "year")} on a monthly \code{tsibble} resolves to 12
+steps. Both take \code{freq = 12}. Daily data with
+\code{seasonal.periods = c(7, 365.25)} in an \code{msts} take
+\code{freq = c(7, 365.25)}.
+}
+\examples{
+# Monthly airline passengers, holding out the final year
+air <- series_to_mvgam(AirPassengers, h = 12)
+head(air$data_train)
+
+# Two series in one mts
+deaths <- series_to_mvgam(cbind(male = mdeaths, female = fdeaths))
+levels(deaths$series)
+
+# A wide data.frame with a date column
+wide <- data.frame(
+  date = seq(as.Date("2024-01-01"), by = "day", length.out = 28),
+  site_a = rpois(28, 5),
+  site_b = rpois(28, 8)
+)
+head(series_to_mvgam(wide))
+
+}
+\author{
+Nicholas J Clark
 }

@@ -1,5 +1,5 @@
-# CI unit tests for `compare_scores()`, `compare_elpds()` and
-# `print.mvgam_forecast()`. Same mock-object strategy as
+# CI unit tests for `compare_scores()`, `compare_elpds()`,
+# `ensemble()` and `print.mvgam_forecast()`. Same mock-object strategy as
 # test-score-mvgam-forecast.R: build tiny `mvgam_forecast` and
 # `mvgam_lfo` shells to pin the contract without any Stan
 # compilation.
@@ -75,8 +75,8 @@ test_that("compare_scores returns a tidy long-format frame for crps", {
   expect_named(out, c("model", "series", "eval_horizon",
                        "score", "in_interval"))
   expect_s3_class(out$model, "factor")
-  # Level order decides the legend and the colour assignment, and for
-  # `series` the order the panels are drawn in, with all_series last.
+  # Level order decides the legend and the colour assignment. For
+  # `series` it also sets the panel order, with all_series last.
   # Comparing the sets alone passed on a swap.
   expect_identical(levels(out$model), c("fc1", "fc2"))
   # 2 series + 1 all_series = 3; 5 horizons; 2 models = 30 rows.
@@ -99,9 +99,9 @@ test_that("compare_scores forwards score_args to score()", {
   # The default fixture puts every observation at the centre of its
   # own predictive distribution, where an interval of any width
   # contains it: 20 of 20 scored rows covered at both 0.9 and 0.5.
-  # A row count was all that remained to assert, and it is the same
-  # count the test above already makes. One SD of offset separates
-  # the two widths.
+  # A row count was all that remained to assert. The test above
+  # already checks that count. One SD of offset separates the two
+  # widths.
   fc1 <- make_mock_forecast(seed = 1L, obs_offset = 1)
   fc2 <- make_mock_forecast(seed = 2L, obs_offset = 1)
   wide <- compare_scores(fc1, fc2, score = "crps")
@@ -197,6 +197,38 @@ test_that("print.mvgam_forecast adds an ensemble bullet when weighted", {
 })
 
 
+test_that("ensemble takes one set of draws across series and slots", {
+  # Every cell in row r of each input equals r, in every series and
+  # slot. A draw chosen separately per series or per slot breaks the
+  # equality.
+  mk <- function(nd, fc = TRUE) {
+    draws <- list(s1 = matrix(seq_len(nd), nd, 4L),
+                  s2 = matrix(seq_len(nd), nd, 4L))
+    structure(list(series_names = factor(c("s1", "s2")),
+                   hindcasts = draws,
+                   forecasts = if (fc) lapply(draws, `[`, , 1:2)),
+              class = "mvgam_forecast")
+  }
+  fit_a <- mk(10L)
+  ens <- ensemble(fit_a, mk(20L), weights = c(1, 3), ndraws = 40L,
+                  seed = 1L)
+  expect_identical(attr(ens, "ndraws_per_model"),
+                   c(fit_a = 10L, `mk(20L)` = 30L))
+  expect_identical(ens$hindcasts$s1, ens$hindcasts$s2)
+  expect_identical(ens$hindcasts$s1[, 1:2], ens$forecasts$s2)
+
+  # A `hindcast()` result has no forecasts to combine
+  hc <- ensemble(mk(10L, fc = FALSE), mk(20L, fc = FALSE), ndraws = 8L)
+  expect_identical(dim(hc$hindcasts$s2), c(8L, 4L))
+  expect_null(hc$forecasts)
+
+  # Hindcasts and forecasts from different draws are refused
+  bad <- mk(10L)
+  bad$forecasts$s1 <- bad$forecasts$s1[1:5, ]
+  expect_error(ensemble(bad, mk(10L)), "Input 1 holds 5, 10 draws")
+})
+
+
 test_that("summary.mvgam_compare_scores joint -> wide horizon x model", {
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
@@ -204,8 +236,8 @@ test_that("summary.mvgam_compare_scores joint -> wide horizon x model", {
   s <- summary(out)
   expect_s3_class(s, "tbl_df")
   # Joint score: idvar = eval_horizon, one column per model. A reader
-  # compares across the columns in the order they are given, and the
-  # set alone passed on a reordering.
+  # compares across the columns in the order they are given. The set
+  # alone passed on a reordering.
   expect_identical(names(s), c("eval_horizon", "fc1", "fc2"))
   expect_identical(nrow(s), 5L)
 })
@@ -230,7 +262,8 @@ test_that("plot.mvgam_compare_scores returns ggplot for univariate", {
   out <- compare_scores(fc1, fc2, score = "crps")
   p <- plot(out)
   expect_s3_class(p, "ggplot")
-  # Default = facet by series, so plot$facet$params$facets is named.
+  # The default facets by series. `plot$facet$params$facets` then
+  # names `series`.
   expect_true("series" %in% names(p$facet$params$facets))
 })
 
@@ -261,7 +294,7 @@ test_that("plot.mvgam_compare_scores relative pivot drops the baseline", {
   out <- compare_scores(fc1, fc2, score = "crps")
   p <- plot(out, relative = "fc1")
   expect_s3_class(p, "ggplot")
-  # Baseline dropped, so only fc2 remains.
+  # The baseline is dropped. Only fc2 remains.
   expect_identical(levels(p$data$model), "fc2")
   # The Δ in the y-label confirms the relative branch was taken.
   expect_match(p$labels$y, "Δ")

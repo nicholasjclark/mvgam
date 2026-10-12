@@ -75,10 +75,23 @@
 NULL
 
 
-# Internal: posterior-mean / median / quantile summary for a draws
-# matrix, in brms-style column layout.
+#' Posterior summaries of each column of a draws matrix
+#'
+#' Columns follow the brms layout of `Estimate`, `Est.Error` and one
+#' quantile column per probability. A column holding a missing value
+#' gets missing quantiles.
+#'
+#' @param draws Numeric matrix of draws, one column per quantity
+#' @param robust Logical flag to report the median and MAD in place of
+#'   the mean and SD
+#' @param probs Numeric vector of quantile probabilities
+#' @return Numeric matrix with one row per column of `draws`
+#' @noRd
 mvgam_post_summary <- function(draws, robust = FALSE,
                                probs = c(0.025, 0.975)) {
+  checkmate::assert_matrix(draws)
+  checkmate::assert_flag(robust)
+  checkmate::assert_numeric(probs, lower = 0, upper = 1, min.len = 1L)
   if (isTRUE(robust)) {
     centre <- apply(draws, 2L, stats::median)
     spread <- apply(draws, 2L, stats::mad)
@@ -119,11 +132,19 @@ mvgam_post_summary <- function(draws, robust = FALSE,
 }
 
 
-# Internal: the posterior median and two quantiles of each column of a
-# draws matrix, named `<prefix>Q50`, `<prefix>Q<lower>` and
-# `<prefix>Q<upper>`. The forecast, impulse-response and
-# variance-decomposition summaries report these columns.
+#' The posterior median and two quantiles of each column of draws
+#'
+#' Columns are named `<prefix>Q50`, `<prefix>Q<lower>` and
+#' `<prefix>Q<upper>`. The forecast, impulse-response and
+#' variance-decomposition summaries report them.
+#'
+#' @param draws Numeric matrix of draws, one column per quantity
+#' @param probs Numeric vector of the two interval probabilities
+#' @param prefix Character prefix for the column names
+#' @return Data frame with one row per column of `draws`
+#' @noRd
 median_interval_cols <- function(draws, probs, prefix) {
+  checkmate::assert_string(prefix)
   checkmate::assert_matrix(draws, mode = "numeric")
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L,
                             any.missing = FALSE)
@@ -457,32 +478,25 @@ select_fixef_draws <- function(mat, pars) {
 }
 
 
-# Internal: detect the n_lv = n_series + iid-Z funnel pattern on a
-# fitted mvgam. Returns TRUE when the trend is a by_lv factor model
-# at the full-rank boundary, the loadings prior is the default iid
-# (no structured prior via MGP / features / distances), and AT
-# LEAST ONE of:
-#   * any divergent transition recorded in NUTS diagnostics; OR
-#   * at least one watched parameter has rank-normalised Rhat > 1.05.
-#
-# The rank-normalised Rhat estimator recommends 1.01 as the ceiling,
-# so 1.05 is the conservative middle ground between that
-# recommendation and the traditional 1.1 threshold. Divergent
-# transitions are a faster early signal than Rhat for the rotational
-# funnel; the structural pre-checks already constrain the call to a
-# narrow high-risk class, so divergence inside that class is nearly
-# pathology-specific. The watch-list covers the declared (`Phi_trend`,
-# `L_Omega_trend`) and transformed (`Sigma_trend`, `L_Sigma_trend`)
-# variance-block parameters plus the latent state and process
-# noise. A single parameter exceeding threshold is sufficient: the
-# funnel affects all rotation-orbit parameters jointly, so one hit
-# implies the others.
-#
-# Used by the post-fit advisor wired into `mvgam_core.R` to suggest
-# `loadings_prior = "mgp"` or a fixed-Z `trend_map` when convergence
-# breaks.
-#'@noRd
+#' Whether a factor fit shows the full-rank loading funnel
+#'
+#' The funnel arises in a `lv_axis()` factor model with as many factors
+#' as series under the default independent loadings prior. Any
+#' divergent transition then marks it, as does a rank-normalised Rhat
+#' above 1.05 on any watched parameter. The 1.05 cut is a compromise
+#' between the recommended 1.01 and the traditional 1.1. The structural
+#' checks confine the test to a narrow high-risk class of models. A
+#' divergence inside that class points to the funnel. The watched
+#' parameters are the variance-block parameters, the latent states and
+#' the process noise. The funnel moves every parameter of the rotation
+#' orbit together. One exceedance suffices. A fit without MCMC draws
+#' returns `FALSE`.
+#'
+#' @param mvgam_fit Fitted `mvgam` object
+#' @return Logical scalar
+#' @noRd
 flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
+  checkmate::assert_class(mvgam_fit, "mvgam")
   md <- mvgam_fit$trend_metadata
   if (!isTRUE(md$has_by_lv)) return(FALSE)
   if (md$n_lv_for_grain != md$axes$series$n) {
@@ -526,10 +540,16 @@ flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
 }
 
 
-# Internal: warn after a fit when `flag_by_lv_full_rank_funnel()` finds
-# the funnel.
-#'@noRd
+#' Warn once when a factor fit shows the full-rank loading funnel
+#'
+#' The warning suggests the MGP loadings prior or fixed loadings
+#' through `trend_map`.
+#'
+#' @param mvgam_fit Fitted `mvgam` object
+#' @return `NULL`, invisibly
+#' @noRd
 warn_by_lv_full_rank_funnel <- function(mvgam_fit) {
+  checkmate::assert_class(mvgam_fit, "mvgam")
   if (!flag_by_lv_full_rank_funnel(mvgam_fit)) return(invisible(NULL))
   warn_once(
     c(

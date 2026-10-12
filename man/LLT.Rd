@@ -61,10 +61,11 @@ A grouped trend estimates correlations among the \code{subgr} units
 within each level of \code{gr}. \code{cor} defaults to \code{TRUE} for such a
 trend, and an explicit \code{cor = FALSE} is refused.
 
-When used within a \code{VAR()} model, this essentially sets up a hierarchical
-panel vector autoregression where both the autoregressive and correlation
-matrices are learned hierarchically. If \code{gr} is supplied then \code{subgr}
-\emph{must} also be supplied.
+Within a \code{VAR()} it sets up a hierarchical panel vector
+autoregression. Each group learns its autoregressive, moving-average
+and correlation matrices from shared hyperparameters. The groups do
+not interact. Without \code{subgr}, the series column names the units
+within each group.
 
 Two constraints currently apply to hierarchical trend models:
 \itemize{
@@ -184,15 +185,17 @@ scales, as \code{\link[=get_prior]{get_prior()}} describes. \code{sigma_slope_tr
 half-Student-t with 3 degrees of freedom. Its scale gives the
 trend's movement over the series from the slope shocks a standard
 deviation with prior median \eqn{s}, and the movement itself a 90th
-percentile near \eqn{2.8 s}. The scale accounts for the damping at the median of its
-prior. \code{init_slope_trend ~ normal(0, 2 / r)}, where \eqn{r = 1 +
-\phi + \dots + \phi^{N - 2}} is how far a unit initial slope moves the
-level by the end of the series, gives the initial slope \eqn{2 s} of
-growth over the series at one prior standard deviation. An undamped
+percentile near \eqn{2.8 s}. The scale accounts for the damping at
+the median of its prior. \code{init_slope_trend ~ normal(0, 2 / r)},
+where \eqn{r = 1 + \phi + \dots + \phi^{N - 2}} is how far a unit
+initial slope moves the level by the end of the series, gives the
+initial slope \eqn{2 s} of growth over the series at one prior
+standard deviation. An undamped
 slope has \eqn{r = N - 1}. A factor model with every loading sampled
 measures both in units of its level's spread over the series,
-\eqn{\sqrt{N}}, and its loadings carry \eqn{s}. \code{ar1_slope_trend} takes \code{beta(18, 2)}, with median
-0.91. \code{get_prior()} prints the resolved values.
+\eqn{\sqrt{N}}. Its loadings carry \eqn{s}. \code{ar1_slope_trend} takes
+\code{beta(18, 2)}, with median 0.91. \code{get_prior()} prints the resolved
+values.
 
 A smooth or linear function of time in either formula competes with
 the slope for the same variation, and \code{mvgam()} warns when the time

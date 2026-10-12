@@ -2,7 +2,7 @@
 % Please edit documentation in R/make_stan.R
 \name{stancode.mvgam_formula}
 \alias{stancode.mvgam_formula}
-\title{Generate Stan Model Code for mvgam Formula}
+\title{Stan code of an mvgam model}
 \usage{
 \method{stancode}{mvgam_formula}(
   object,
@@ -24,7 +24,8 @@
 )
 }
 \arguments{
-\item{object}{An \code{mvgam_formula} object created by \code{mvgam_formula()}.}
+\item{object}{An \code{mvgam_formula} object created by
+\code{mvgam_formula()}.}
 
 \item{data}{A data frame containing all variables referenced in the formula.}
 
@@ -41,11 +42,11 @@ whose mean has to stay positive needs a link that keeps it there
 once a trend enters the linear predictor: pair \code{\link[stats:family]{stats::Gamma()}},
 \code{\link[brms:brmsfamily]{brms::weibull()}}, \code{\link[brms:brmsfamily]{brms::exponential()}}, \code{\link[brms:brmsfamily]{brms::frechet()}} and
 \code{\link[stats:family]{stats::inverse.gaussian()}} with \code{link = "log"}. Their default
-links leave the mean positive only where the predictor is, and a
+links leave the mean positive only where the predictor is. A
 latent trend is centred near zero and reaches negative values,
 where the likelihood is undefined. \code{mvgam()} warns before
-fitting. \code{\link[brms:brmsfamily]{brms::lognormal()}} is the exception, since its \code{mu} is
-a log-scale location that takes any sign.
+fitting. \code{\link[brms:brmsfamily]{brms::lognormal()}} is the exception: its \code{mu} is a
+log-scale location that takes any sign.
 
 A family written inside a univariate \code{\link[brms:brmsformula]{brms::bf()}} is the model's
 family, as in brms. In a multivariate model each response may take
@@ -56,13 +57,14 @@ belongs to the response that names it. A single family given here
 applies to every response that does not name one of its own.
 Closure-unit and multi-response families (\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}},
 \code{\link[=mvn]{mvn()}}, \code{\link[=mvt]{mvt()}}, \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}) lay their data
-out by unit, so each models its response alone and cannot be one
+out by unit. Each models its response alone and cannot be one
 response of a multivariate model.}
 
 \item{prior}{An optional \code{brmsprior} object containing custom prior
 specifications. Can be created using \code{brms::prior()}.}
 
-\item{data2}{Optional data frame for out-of-sample prediction points.}
+\item{data2}{A named list of objects the model uses that are not
+variables in \code{data}, as in \code{\link[brms]{brm}}.}
 
 \item{sample_prior}{Character string indicating whether to sample from priors
 only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.}
@@ -100,24 +102,13 @@ Default is \code{TRUE}.}
 \item{...}{Additional arguments passed to internal functions.}
 }
 \value{
-A character string containing complete, polished Stan model code with data,
-parameters, model, and generated quantities blocks for both observation
-and trend components. The returned code is automatically polished for
-consistent formatting and is identical to the code used internally by
-\code{mvgam()} for model fitting.
+A character string of the Stan program, observation and trend
+together. \code{mvgam()} compiles the same program from the same
+arguments.
 }
 \description{
-Generate complete Stan model code for an \code{mvgam_formula} object before
-model fitting. This allows users to inspect the generated Stan code for
-debugging, understanding, or modification purposes.
-}
-\details{
-This function uses the shared Stan code generation infrastructure
-(\code{generate_stan_components_mvgam_formula()}) to ensure identical output
-to what \code{mvgam()} uses internally. The Stan code is automatically
-polished for consistent formatting, with empty lines removed and whitespace
-trimmed. This guarantees that \code{stancode()} produces exactly the same
-model code that would be compiled and fit by \code{mvgam()}.
+The Stan program \code{mvgam()} would compile for an \code{mvgam_formula},
+generated without fitting.
 }
 \seealso{
 \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},

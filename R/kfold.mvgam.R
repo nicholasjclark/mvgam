@@ -93,7 +93,7 @@
 #'   `print.loo()` consume the result directly.
 #'
 #' @references
-#' Bürkner P-C, Gabry J, Vehtari A (2020). Approximate
+#' Burkner P-C, Gabry J, Vehtari A (2020). Approximate
 #'   leave-future-out cross-validation for Bayesian time series
 #'   models. *Journal of Statistical Computation and Simulation*,
 #'   90(14), 2499--2523. \doi{10.1080/00949655.2020.1783262}.
@@ -283,22 +283,24 @@ kfold.mvgam <- function(x,
 }
 
 
-# Internal: resolve user-supplied `group` arg into a per-row
-# character key. A closure-unit family keys by the unit its
-# likelihood is written over, so a fold holds out whole units;
-# otherwise each row gets a unique key (= row index) for pure
-# k-fold by row.
-#
-# The unit is read through `closure_unit_key_vars()` rather than
-# `closure_unit_grouping()`, which returns the raw attribute and so
-# answers `NULL` for every family that did not opt into
-# `multi_season`. Keying on that gave each visit its own fold, which
-# left every unit represented in the training data by its other
-# visits and made the score optimistic without saying so. The two
-# sibling call sites in this file already read the filled form.
-#
-# @noRd
+#' The fold key of each training row
+#'
+#' A closure-unit family keys by the unit its likelihood is written
+#' over, holding out whole units. `closure_unit_key_vars()` supplies
+#' the unit columns for every closure-unit family. Any other fit gives
+#' each row its own key.
+#'
+#' @param object Fitted `mvgam` object
+#' @param group Character vector of grouping columns, or `NULL`
+#' @param data Data frame of training data
+#' @return List holding the per-row character `key`, the number of
+#'   distinct keys in `n_groups` and the grouping columns in
+#'   `group_names`
+#' @noRd
 resolve_kfold_group <- function(object, group, data) {
+  checkmate::assert_list(object)
+  checkmate::assert_character(group, min.len = 1L, null.ok = TRUE)
+  checkmate::assert_data_frame(data)
   if (is.null(group)) {
     closure_cols <- fit_closure_unit_keys(object)
     if (!is.null(closure_cols)) {
@@ -331,14 +333,25 @@ resolve_kfold_group <- function(object, group, data) {
 }
 
 
-# Internal: build per-row fold IDs given a group key. Delegates
-# to `loo::kfold_split_grouped` / `_random` / `_stratified` so the
-# binning math is upstream-tested.
-#
-# @noRd
+#' The fold of each training row
+#'
+#' Binning goes through the `loo::kfold_split_*()` functions. Every row
+#' of a group lands in the same fold.
+#'
+#' @param group_key Character vector of per-row group keys
+#' @param K Integer number of folds, or `NULL` for a default
+#' @param folds Integer vector of user-supplied fold indices, or `NULL`
+#' @param fold_split Character split method, `"grouped"`,
+#'   `"stratified"` or `"random"`
+#' @return Integer vector of fold indices, one per row
+#' @noRd
 build_kfold_partition <- function(group_key, K = NULL,
                                   folds = NULL,
                                   fold_split = "grouped") {
+  checkmate::assert_character(group_key, min.len = 1L)
+  checkmate::assert_int(K, null.ok = TRUE)
+  checkmate::assert_integerish(folds, null.ok = TRUE)
+  checkmate::assert_choice(fold_split, c("grouped", "stratified", "random"))
   if (!is.null(folds)) {
     if (length(folds) != length(group_key)) {
       stop(insight::format_error(c(
@@ -383,20 +396,27 @@ build_kfold_partition <- function(group_key, K = NULL,
 }
 
 
-# Internal: map each log-lik column to its group label + fold ID.
-# The grain the columns are on is the family's, and
-# `loglik_col_values()` is what reads it, so this function is left
-# with the fold lookup alone.
-#
-# Returns:
-#   col_group     - character vector of length `loglik_ncol`,
-#                    each entry the group key for that column.
-#   group_to_fold - integer vector of length n_groups, fold ID
-#                    per unique group label.
-#
-# @noRd
+#' The group and fold of each log-likelihood column
+#'
+#' `loglik_col_values()` maps the per-row keys to the grain of the
+#' family's log-likelihood columns.
+#'
+#' @param object Fitted `mvgam` object
+#' @param data Data frame of training data
+#' @param group_key Character vector of per-row group keys
+#' @param fold_ids Integer vector of per-row fold indices
+#' @param loglik_ncol Integer number of log-likelihood columns
+#' @return List holding the group key of each column in `col_group`
+#'   with the fold of each distinct group, named by its key, in
+#'   `group_to_fold`
+#' @noRd
 map_loglik_cols_to_groups <- function(object, data, group_key,
                                        fold_ids, loglik_ncol) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(data)
+  checkmate::assert_character(group_key)
+  checkmate::assert_integerish(fold_ids, len = length(group_key))
+  checkmate::assert_int(loglik_ncol, lower = 0L)
   col_group <- loglik_col_values(object, data, group_key, loglik_ncol)
   unique_groups <- unique(col_group)
   # For each unique group, look up its fold via the first row
@@ -412,14 +432,19 @@ map_loglik_cols_to_groups <- function(object, data, group_key,
 }
 
 
-# Internal: collapse a [draws x n_cols] log-lik matrix into
-# [draws x n_groups] by summing within each group (rows of a
-# group are independent given the model, so log-densities add).
-# Handles the single-group case directly (stats::model.matrix
-# refuses to build contrasts for a 1-level factor).
-#
-# @noRd
+#' Log-likelihood columns summed within each group
+#'
+#' Rows of a group are independent given the model, making their
+#' log-densities additive. A single group is summed directly. The
+#' `stats::model.matrix()` indicator refuses a one-level factor.
+#'
+#' @param loglik Numeric log-likelihood matrix, one row per draw
+#' @param col_group Character vector of the group of each column
+#' @return Numeric matrix with one column per group, named by group
+#' @noRd
 aggregate_loglik_by_group <- function(loglik, col_group) {
+  checkmate::assert_matrix(loglik)
+  checkmate::assert_character(col_group, len = ncol(loglik))
   group_levels <- unique(col_group)
   if (length(group_levels) == 1L) {
     agg <- matrix(rowSums(loglik), ncol = 1L)
@@ -434,15 +459,31 @@ aggregate_loglik_by_group <- function(loglik, col_group) {
 }
 
 
-# Internal: per-fold refit. Calls update.mvgam(object, newdata =
-# train) WITHOUT a `prior` arg so the parent's pinned prior table
-# is inherited, preserving stancode and the compiled binary
-# across refits. Returns per-group ELPD contributions for the
-# held-out fold.
-#
-# @noRd
+#' The held-out ELPD of each group in one refitted fold
+#'
+#' The refit goes through `update()` without a `prior` argument. The
+#' refit then inherits the parent's prior table, keeping the Stan code
+#' and the compiled model. Held-out rows are scored with
+#' `re_formula = NA`, dropping group-level effects for levels the refit
+#' never saw.
+#'
+#' @param object Fitted `mvgam` object
+#' @param data Data frame of training data
+#' @param fold_ids Integer vector of per-row fold indices
+#' @param group_key Character vector of per-row group keys
+#' @param fold_id Integer index of the fold to hold out
+#' @param silent Integer verbosity level
+#' @return Named numeric vector of ELPD contributions, one per held-out
+#'   group
+#' @noRd
 refit_score_one_fold <- function(object, data, fold_ids,
                                  group_key, fold_id, silent) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(data)
+  checkmate::assert_integerish(fold_ids, len = nrow(data))
+  checkmate::assert_character(group_key, len = nrow(data))
+  checkmate::assert_int(fold_id)
+  checkmate::assert_int(silent, lower = 0L)
   held_rows <- which(fold_ids == fold_id)
   train_data <- mask_heldout_response(object, data, held_rows)
   held_data <- data[held_rows, , drop = FALSE]
@@ -490,25 +531,25 @@ refit_score_one_fold <- function(object, data, fold_ids,
 }
 
 
-# Internal: the training frame for one fold.
-#
-# A held-out observation is a missing response, not a missing
-# occasion. Deleting its row instead handed `update()` a frame with
-# a hole in the timeline, and the refit rebuilt the trend axis from
-# that frame rather than inheriting the parent's: an AR trend then
-# refused the gap it saw, a CAR trend refused a grid its series no
-# longer shared, and which of the two a caller met depended on
-# where the random split happened to fall. Every state-space fit in
-# the package was unable to be cross-validated for that reason.
-#
-# Masking the response is the distinction `mvgam()` already draws
-# for a gap: `generate_obs_trend_mapping()` builds the likelihood
-# over non-missing rows while `N_time_trend` comes from the full
-# frame, so the density shrinks by exactly the fold and the grid
-# does not move.
-#
-# @noRd
+#' The training frame for one fold
+#'
+#' A held-out observation is a missing response on an occasion that
+#' stays in the frame. Deleting the row would open a gap in the time
+#' axis. AR and CAR trends refuse such gaps. Masking the response
+#' follows how `mvgam()` treats any gap. The likelihood covers the
+#' non-missing rows. `N_time_trend` comes from the full frame, leaving
+#' the time grid unchanged. Every response is masked. A response left
+#' unmasked would keep held-out rows in the likelihood.
+#'
+#' @param object Fitted `mvgam` object
+#' @param data Data frame of training data
+#' @param held_rows Integer vector of held-out row indices
+#' @return `data` with every response set to `NA` on `held_rows`
+#' @noRd
 mask_heldout_response <- function(object, data, held_rows) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(data)
+  checkmate::assert_integerish(held_rows, lower = 1)
   if (!length(held_rows)) {
     return(data)
   }
@@ -533,18 +574,29 @@ mask_heldout_response <- function(object, data, held_rows) {
 }
 
 
-# Internal: refit the named folds and splice their held-out ELPDs
-# into `pointwise`, keyed by group label.
-#
-# Exact mode passes every fold and hybrid mode passes the ones whose
-# Pareto-k crossed the threshold, which is the only thing that ever
-# differed between them: the two wrappers this replaces held the
-# same loop and the same splice, and a change to one would have
-# left the other behind.
-#
-# @noRd
+#' Pointwise ELPDs with the named folds refitted
+#'
+#' Exact mode passes every fold. Hybrid mode passes the folds holding a
+#' group whose Pareto-k crossed the threshold.
+#'
+#' @param object Fitted `mvgam` object
+#' @param data Data frame of training data
+#' @param fold_ids Integer vector of per-row fold indices
+#' @param group_key Character vector of per-row group keys
+#' @param refit_fold_ids Integer vector of the folds to refit
+#' @param pointwise Named numeric vector of per-group ELPDs
+#' @param silent Integer verbosity level
+#' @return `pointwise` with the refitted groups replaced
+#' @noRd
 kfold_refit_folds <- function(object, data, fold_ids, group_key,
                               refit_fold_ids, pointwise, silent) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(data)
+  checkmate::assert_integerish(fold_ids)
+  checkmate::assert_character(group_key)
+  checkmate::assert_integerish(refit_fold_ids)
+  checkmate::assert_numeric(pointwise)
+  checkmate::assert_int(silent, lower = 0L)
   if (silent < 2L) {
     cat("kfold: refitting", length(refit_fold_ids),
         "fold(s) ...\n")
@@ -832,17 +884,41 @@ plot.mvgam_kfold <- function(x, ...) {
 }
 
 
-# Internal: build the `mvgam_kfold` return object. Inherits from
-# the `loo` and `kfold` classes so `loo_compare()`, `print.loo`,
-# and `loo_model_weights()` work without further glue code.
-#
-# @noRd
+#' The `mvgam_kfold` object `kfold()` returns
+#'
+#' Inherits from the `kfold` and `loo` classes for `loo_compare()`,
+#' `print.loo()` and `loo_model_weights()`.
+#'
+#' @param pointwise Named numeric vector of per-group ELPDs
+#' @param pointwise_psis Named numeric vector of the PSIS estimates
+#'   before refitting, or `NULL`
+#' @param pareto_k Named numeric vector of per-group Pareto-k values
+#' @param refit_groups Character vector of the refitted groups
+#' @param K Integer number of folds
+#' @param group Character vector of grouping columns, or `NULL`
+#' @param n_refit_folds Integer number of refitted folds
+#' @param pareto_k_threshold Numeric Pareto-k threshold applied
+#' @param pareto_k_threshold_adaptive Logical flag for a threshold
+#'   derived from the draw count
+#' @param exact Logical flag for exact mode, which refits every fold
+#' @return Object of class `c("mvgam_kfold", "kfold", "loo")`
+#' @noRd
 build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
                               pareto_k, refit_groups,
                               K, group, n_refit_folds,
                               pareto_k_threshold,
                               pareto_k_threshold_adaptive = FALSE,
                               exact) {
+  checkmate::assert_numeric(pointwise, min.len = 1L)
+  checkmate::assert_numeric(pointwise_psis, null.ok = TRUE)
+  checkmate::assert_numeric(pareto_k)
+  checkmate::assert_character(refit_groups, null.ok = TRUE)
+  checkmate::assert_int(K, lower = 1L)
+  checkmate::assert_character(group, null.ok = TRUE)
+  checkmate::assert_int(n_refit_folds, lower = 0L)
+  checkmate::assert_number(pareto_k_threshold)
+  checkmate::assert_flag(pareto_k_threshold_adaptive)
+  checkmate::assert_flag(exact)
   elpd <- sum(pointwise)
   se_elpd <- sqrt(length(pointwise) * stats::var(pointwise))
 

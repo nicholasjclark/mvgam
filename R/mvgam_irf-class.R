@@ -42,7 +42,7 @@
 #'
 #' @references PH Pesaran & Shin Yongcheol (1998).
 #'   Generalized impulse response analysis in linear multivariate models.
-#'   Economics Letters 58: 17–29.
+#'   Economics Letters 58: 17-29.
 #'
 #' @author Nicholas J Clark
 #'

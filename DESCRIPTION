@@ -61,20 +61,19 @@ Suggests:
     ggpp,
     ggrepel,
     knitr,
-    lubridate,
     matrixStats,
     mvabund,
     rmarkdown,
     scoringRules,
     testthat,
     tidyr,
+    tsibble,
     tweedie,
     usethis,
     V8,
     WDI,
     withr,
-    wrswoR,
-    xts
+    wrswoR
 Enhances:
     gratia (>= 0.9.0)
 SystemRequirements: Stan (>= 2.36.0 for simplex multi-response

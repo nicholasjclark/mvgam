@@ -1,15 +1,17 @@
 # ==============================================================================
-# MVGAM CORE: Model Fitting and Multiple Imputation Support
+# mvgam core: model fitting and multiple imputation
 # ==============================================================================
 # `mvgam()` fits one data frame, or a list of imputed frames through
-# `mvgam_multiple()`, and returns an `mvgam` object for the post-fit
+# `mvgam_multiple()`. It returns an `mvgam` object for the post-fit
 # methods.
 
-# Arguments mvgam 1.x took that 2.0 does not, each paired with the
-# 2.0 way of asking for the same thing. They are refused rather than
-# ignored because every one names a modelling choice: left in `...`
-# they reach brms, which drops what it does not recognise, and the
-# model that comes back is not the model that was asked for.
+#' Arguments of mvgam 1.x that 2.0 refuses
+#'
+#' Each is paired with the 2.0 spelling of the same request. Every one
+#' names a modelling choice. Left in `...` it would reach brms, which
+#' drops what it does not recognise and fits a different model.
+#'
+#' @noRd
 mvgam_removed_args <- c(
   share_obs_params = paste0(
     "a distributional formula such as 'bf(y ~ x, sigma ~ series)' ",
@@ -20,8 +22,8 @@ mvgam_removed_args <- c(
     "'trend_formula = ~ AR(p = 1)'"
   ),
   trend_knots = paste0(
-    "knot values are named by covariate, and 'knots' is the one ",
-    "argument for the model"
+    "knot values are named by covariate in 'knots', one argument ",
+    "for the whole model"
   ),
   use_lv = paste0(
     "a dynamic factor model is requested with 'n_lv' on the trend ",
@@ -37,7 +39,7 @@ mvgam_removed_args <- c(
   parallel = "use 'cores', which brms passes to the backend",
   sparse = paste0(
     "a sparse design matrix is requested on the formula, as in ",
-    "'bf(y ~ x, sparse = TRUE)', which is where brms reads it"
+    "'bf(y ~ x, sparse = TRUE)'"
   ),
   stan_funs = paste0(
     "extra Stan code is supplied through 'stanvars', as in ",
@@ -45,28 +47,44 @@ mvgam_removed_args <- c(
   )
 )
 
-# The NUTS settings both backends read under one spelling. rstan
-# takes them inside `control`; the cmdstanr path flattens `control`
-# into `model$sample()`, which declares each of these as a formal.
+#' The NUTS settings both backends take under one spelling
+#'
+#' rstan takes them inside `control`. The cmdstanr path flattens
+#' `control` into `model$sample()`, which declares each of these as a
+#' formal.
+#'
+#' @noRd
 mvgam_nuts_control_args <- c(
   "adapt_delta", "max_treedepth", "adapt_engaged", "metric", "stepsize"
 )
 
-# The fit settings `mvgam_single()` takes from its dots and passes to
-# `fit_model()` by name. With the code generator's formals and the
-# NUTS settings, they are the dots withheld from the sampler.
+#' The fit settings `mvgam_single()` takes from its dots
+#'
+#' `mvgam_single()` passes them to `fit_model()` by name. With the code
+#' generator's formals and the NUTS settings, they are the dots
+#' withheld from the sampler.
+#'
+#' @noRd
 mvgam_fit_settings <- c(
   "algorithm", "iter", "warmup", "thin", "chains", "cores", "threads",
   "opencl", "init", "seed", "control", "silent", "future",
   "cpp_options", "stanc_options"
 )
 
-# Reason: rstan takes the NUTS settings only inside `control`. A bare
-# `adapt_delta = 0.99` once sampled at delta 0.8 on a poisson AR(1),
-# while `control = list(adapt_delta = 0.99)` sampled at 0.99. The bare
-# spelling moves into `control`, which both backends accept and
-# `control_params()` reports.
+#' Move bare NUTS settings into `control`
+#'
+#' rstan takes the NUTS settings only inside `control`. A bare
+#' `adapt_delta = 0.99` would sample at the default delta of 0.8. The
+#' bare spelling moves into `control`, which both backends accept and
+#' `control_params()` reports.
+#'
+#' @param dots List of the call's dots
+#' @param control List of sampler control settings, or `NULL`
+#' @return The control list with the bare settings added
+#' @noRd
 lift_sampler_control <- function(dots, control = NULL) {
+  checkmate::assert_list(dots)
+  checkmate::assert_list(control, null.ok = TRUE)
   bare <- intersect(names(dots), mvgam_nuts_control_args)
   if (!length(bare)) {
     return(control)
@@ -85,11 +103,21 @@ lift_sampler_control <- function(dots, control = NULL) {
   c(control, dots[bare])
 }
 
-# Reason: called on the dots of every entry point that reaches the
-# code generator, so an argument mvgam no longer takes is named
-# wherever it is written rather than disappearing into `...`.
+#' Refuse arguments mvgam 2.0 removed
+#'
+#' Every entry point that reaches the code generator calls this on its
+#' dots. A removed argument is named where it is written. In `...` it
+#' would pass to brms without effect.
+#'
+#' @param dots List of the call's dots
+#' @param fn Name of the calling function, for the message
+#' @param removed Named character vector of removed arguments and their
+#'   replacements
+#' @return `NULL`, invisibly, or an error
+#' @noRd
 reject_removed_args <- function(dots, fn = "mvgam",
                                 removed = mvgam_removed_args) {
+  checkmate::assert_list(dots)
   checkmate::assert_string(fn, min.chars = 1)
   checkmate::assert_character(removed, names = "named")
   found <- intersect(names(removed), names(dots))
@@ -108,36 +136,34 @@ reject_removed_args <- function(dots, fn = "mvgam",
       paste0("For '", found, "', ", removed[found], "."),
       rep("i", length(found))
     )
-  )))
+  )), call. = FALSE)
 }
 
-# Internal: translate the deprecated `samples` / `burnin` argument
-# pair (`samples` for post-warmup draws, `burnin` for warmup draws)
-# to the brms-style `iter` / `warmup` pair that the brms integration
-# pipeline (`R/backends.R:493-494`) reads (`iter` total iterations,
-# `warmup` the warmup portion). Without this translation, both
-# deprecated names would silently disappear into `...` and every fit
-# would get cmdstanr's `iter = 2000, warmup = 1000` default. Called
-# from `mvgam()` before dispatching to inner fitting machinery.
-#
-# Returns the `dots` list with `iter` and `warmup` set from the
-# deprecated names (defaulting to 1000 each when only one of the
-# pair was supplied) and the deprecated names removed. Attaches an
-# attribute `translated = TRUE` so the caller knows to re-dispatch
-# with the corrected names; `translated = FALSE` if neither
-# deprecated name was present.
-#
-# Errors when the user supplies both the deprecated pair and the
-# brms-style pair on the same call, since they configure the same
-# sampler budget and the intent would be ambiguous.
-#
-# Related: `mvgam_use_alias()` (R/mvgam_model_helpers.R) handles
-# the simpler single-argument deprecated-alias case where one name
-# maps to another without arithmetic on the value. Kept separate
-# because the pair-with-arithmetic mapping here (`iter =
-# samples + burnin`, `warmup = burnin`) does not fit that shape.
-#'@noRd
+#' Translate the deprecated `samples` / `burnin` pair to `iter` / `warmup`
+#'
+#' `samples` counts post-warmup draws and `burnin` warmup draws. The
+#' backends take `iter`, the total iterations, and `warmup`. In `...`
+#' the deprecated names would reach no consumer. Every fit would then
+#' take cmdstanr's `iter = 2000, warmup = 1000` default. `mvgam()`
+#' calls this before dispatching.
+#'
+#' A user supplying both pairs on one call is refused. They set the
+#' same sampler budget.
+#'
+#' `mvgam_use_alias()` (R/mvgam_model_helpers.R) handles a
+#' single-argument alias that maps one name to another without
+#' arithmetic. This pair needs arithmetic (`iter = samples + burnin`,
+#' `warmup = burnin`).
+#'
+#' @param dots List of the call's dots
+#' @return `dots` with `iter` and `warmup` set from the deprecated names
+#'   (each 1000 when only one of the pair was given) and those names
+#'   removed. The attribute `translated` is `TRUE` when a deprecated
+#'   name was present. The caller then dispatches again with the new
+#'   names.
+#' @noRd
 translate_samples_burnin <- function(dots) {
+  checkmate::assert_list(dots)
   has_deprecated <- any(c("samples", "burnin") %in% names(dots))
   if (!has_deprecated) {
     attr(dots, "translated") <- FALSE
@@ -151,7 +177,7 @@ translate_samples_burnin <- function(dots) {
         "'samples' and 'burnin' are deprecated in favour of 'iter' and ",
         "'warmup'."
       )
-    )))
+    )), call. = FALSE)
   }
   warn_once(
     c(
@@ -164,21 +190,23 @@ translate_samples_burnin <- function(dots) {
     "mvgam_samples_burnin_deprecated"
   )
   samples <- dots$samples %||% 1000L
-  burnin  <- dots$burnin  %||% 1000L
-  dots$iter    <- samples + burnin
-  dots$warmup  <- burnin
+  burnin <- dots$burnin %||% 1000L
+  dots$iter <- samples + burnin
+  dots$warmup <- burnin
   dots$samples <- NULL
-  dots$burnin  <- NULL
+  dots$burnin <- NULL
   attr(dots, "translated") <- TRUE
   dots
 }
 
-# The `mvgam()` formals a per-imputation fit needs. They are formals
-# rather than dots, so a forwarding call reaches them only by name.
-# `data` and `combine` are supplied by the call itself, and everything
-# a user passes through `...` travels on its own.
-# `tests/testthat/test-mvgam-core.R` asserts this covers every formal
-# the single-dataset path would have used.
+#' The `mvgam()` formals a per-imputation fit needs
+#'
+#' A forwarding call reaches a formal only by name. The call itself
+#' supplies `data` and `combine`. Everything a user passes through
+#' `...` travels on its own. `tests/testthat/test-mvgam-core.R`
+#' asserts this covers every formal the single-dataset path uses.
+#'
+#' @noRd
 mvgam_imputation_forwarded <- c(
   "formula", "trend_formula", "newdata", "trend_map", "loadings_prior",
   "backend", "family", "threads", "save_pars", "run_model"
@@ -197,26 +225,26 @@ mvgam_imputation_forwarded <- c(
 #' @param formula Main observation model formula (supports brms syntax).
 #'   Smooth specials `s()`, `t2()`, `gp()`, varying intercepts and
 #'   slopes, monotonic `mo()`, measurement-error `me()`, distributional
-#'   `dpar` sub-formulas, and `offset()` are all available. `gp()`
+#'   `dpar` sub-formulas and `offset()` are all available. `gp()`
 #'   accepts both the approximate Hilbert-space form
 #'   (`gp(x, k = 20)`) and the exact full-covariance form
 #'   (`gp(x)`, no `k`). Prediction at `newdata` requires the
 #'   approximate form. An exact `gp()` term fits and scores
-#'   in-sample, and `mvgam()` says so once per session.
+#'   in-sample. `mvgam()` says so once per session.
 #' @param trend_formula A one-sided formula for the latent process:
-#'   a trend constructor such as `AR()`, and any predictors of the
+#'   a trend constructor such as `AR()` with any predictors of the
 #'   latent state. Write [lv_axis()] in a term to vary its effect by
 #'   latent factor, or by series in a model without factors, as in
 #'   `~ x:lv_axis() + AR()`. The series column itself is not
 #'   supported in a term of this formula. An exact `gp()` term here
-#'   also predicts in-sample alone, and forecasting a model that
-#'   holds one requires the approximate form.
+#'   also predicts in-sample alone. Forecasting a model that holds one
+#'   requires the approximate form.
 #' @param data Data frame or list of multiply imputed datasets
 #' @param newdata Optional held-out `data.frame`, stored on the fit
 #'   as `object$test_data`. `forecast()` forecasts to it when called
-#'   without `newdata`, and `plot(fit, type = "series")` overlays it.
+#'   without `newdata`. `plot(fit, type = "series")` overlays it.
 #'   The fit itself draws no forecasts. `forecast()` propagates the
-#'   fitted latent state forward in time per posterior draw, and
+#'   fitted latent state forward in time per posterior draw.
 #'   `posterior_predict(mod, newdata = mod$test_data)` marginalises
 #'   over the trend's stochastic dynamics at the supplied design
 #'   points. Use `forecast()` for time-series forecasting and
@@ -246,9 +274,9 @@ mvgam_imputation_forwarded <- c(
 #' @param loadings_prior Optional named list specifying a
 #'   structured prior on the unconstrained factor loadings
 #'   matrix following Heaps & Jermyn (2024). The loadings belong
-#'   to a trend carrying latent factors, and the argument
-#'   requires a `trend_formula`. Supplying it without one is an
-#'   error. When supplied, the
+#'   to a trend with latent factors. The argument requires a
+#'   `trend_formula`. Supplying it without one is an error. When
+#'   supplied, the
 #'   default iid `to_vector(Z) ~ student_t(3, 0, 0.5)` prior is
 #'   replaced with a per-column matrix-normal prior of the form
 #'   `Z[, i] ~ multi_normal_cholesky(0, L_Phi)`, where the
@@ -281,13 +309,13 @@ mvgam_imputation_forwarded <- c(
 #'       or `"mgp"` (multiplicative-gamma-process increasing
 #'       shrinkage of Bhattacharya & Dunson 2011, used in
 #'       Heaps Eq. (9)). `"mgp"` applies its column scale through
-#'       the shared innovation scale, so it is available for
-#'       `AR()`, `RW()` and `ZMVN()` trends. `VAR()` builds its
-#'       own innovation covariance and has nowhere to put it;
-#'       pair a `VAR()` factor model with `"iid"` instead.
+#'       the shared innovation scale. It is available for `AR()`,
+#'       `RW()` and `ZMVN()` trends. `VAR()` builds its own innovation
+#'       covariance and has no shared scale for it; pair a `VAR()`
+#'       factor model with `"iid"` instead.
 #'     \item `mgp_a1`, `mgp_a2`: numeric MGP hyperparameters,
 #'       only used when `column_shrinkage = "mgp"`. Default
-#'       `(2, 4)` sits within the `a2 in [3, 5]` range
+#'       `(2, 4)` lies within the `a2 in [3, 5]` range
 #'       recommended for moderate-n ecology / community panels
 #'       by Legramanti, Durante and Dunson (2020, JRSS-B) and
 #'       Schiavon, Canale and Dunson (2022, Biometrics 78:995).
@@ -298,9 +326,9 @@ mvgam_imputation_forwarded <- c(
 #'   }
 #'
 #'   Length-scales receive a `lognormal(0, 1)` prior in the
-#'   model block. This prior lives on the standardised distance
-#'   scale: pairwise distance matrices are rescaled to
-#'   `max(d) = 1` inside the normaliser, so a length-scale of 1
+#'   model block. This prior is set on the standardised distance
+#'   scale. Pairwise distance matrices are rescaled to
+#'   `max(d) = 1` inside the normaliser. A length-scale of 1 then
 #'   corresponds to correlation `exp(-1)` between the two most
 #'   distant series. Heaps' Finnish-birds application (Sect.
 #'   6.2.2) used the wider `lognormal(0, sqrt(10))` instead;
@@ -321,21 +349,20 @@ mvgam_imputation_forwarded <- c(
 #'
 #'   Compatibility with `trend_map`:
 #'   \itemize{
-#'     \item `trend_map = NULL` (default): COMPATIBLE. `n_lv` alone
-#'       triggers the free-Z factor model; `loadings_prior` wires
-#'       onto the sampled `Z` column-wise.
+#'     \item `trend_map = NULL` (default): compatible. `n_lv` alone
+#'       triggers the free-Z factor model; `loadings_prior` applies
+#'       to the sampled `Z` column-wise.
 #'     \item `trend_map = matrix(NA_real_, n_series, n_lv)`
-#'       (all-NA mask, used internally by `jsdgam()`): COMPATIBLE.
+#'       (all-NA mask, used internally by `jsdgam()`): compatible.
 #'       Treated as a free-Z trigger upstream; `loadings_prior`
 #'       applies as if `trend_map` were `NULL`.
 #'     \item `trend_map` with a mix of fixed entries and `NA`s:
-#'       INCOMPATIBLE. Partial-Z parameterises the free entries
+#'       incompatible. Partial-Z parameterises the free entries
 #'       as a vector under an iid `student_t(3, 0, 1)` prior,
 #'       which would overlap with the matrix-normal structure
 #'       and double-count regularisation.
-#'     \item Fully-fixed `trend_map` (no `NA`s): INCOMPATIBLE.
-#'       No free parameters left for the structured prior to act
-#'       on.
+#'     \item Fully-fixed `trend_map` (no `NA`s): incompatible.
+#'       The structured prior has no free parameters to act on.
 #'   }
 #' @param backend Stan backend (defaults to "cmdstanr")
 #' @param combine Logical, pool multiple imputation results (default TRUE)
@@ -352,11 +379,11 @@ mvgam_imputation_forwarded <- c(
 #'   once a trend enters the linear predictor: pair [stats::Gamma()],
 #'   [brms::weibull()], [brms::exponential()], [brms::frechet()] and
 #'   [stats::inverse.gaussian()] with `link = "log"`. Their default
-#'   links leave the mean positive only where the predictor is, and a
+#'   links leave the mean positive only where the predictor is. A
 #'   latent trend is centred near zero and reaches negative values,
 #'   where the likelihood is undefined. `mvgam()` warns before
-#'   fitting. [brms::lognormal()] is the exception, since its `mu` is
-#'   a log-scale location that takes any sign.
+#'   fitting. [brms::lognormal()] is the exception: its `mu` is a
+#'   log-scale location that takes any sign.
 #'
 #'   A family written inside a univariate [brms::bf()] is the model's
 #'   family, as in brms. In a multivariate model each response may take
@@ -368,7 +395,7 @@ mvgam_imputation_forwarded <- c(
 #'   applies to every response that does not name one of its own.
 #'   Closure-unit and multi-response families ([occ()], [nmix()],
 #'   [mvn()], [mvt()], [diri()], [multi()], [categ()]) lay their data
-#'   out by unit, so each models its response alone and cannot be one
+#'   out by unit. Each models its response alone and cannot be one
 #'   response of a multivariate model.
 #' @param threads Positive integer or `NULL`. When non-NULL the
 #'   model is compiled with `cpp_options$stan_threads = TRUE` and
@@ -385,13 +412,13 @@ mvgam_imputation_forwarded <- c(
 #'   is auto-tuned to ~8 chunks regardless of `threads`.
 #'
 #'   A brms-native family with a `trend_formula` samples serially
-#'   whatever `threads` says. brms moves the `mu` assignment inside
-#'   `partial_log_lik_lpmf` when it threads, where mvgam cannot add
-#'   the trend to it, so the program is built without threading.
-#'   This holds for every trend model under a brms-native family:
+#'   whatever `threads` says. When it threads, brms moves the `mu`
+#'   assignment inside `partial_log_lik_lpmf`, where mvgam cannot add
+#'   the trend to it. The program is then built without threading.
+#'   This applies to every trend model under a brms-native family:
 #'   `RW()`, `AR()`, `VAR()`, `LLT()`, `ZMVN()`, `CAR()` and
-#'   `PW()`. Each fit that drops the request warns, so a batch
-#'   script that fits repeatedly shows it every time.
+#'   `PW()`. Each fit that drops the request warns. A batch script
+#'   that fits repeatedly shows it every time.
 #' @param run_model Logical. Setting `run_model = FALSE` stops before
 #'   Stan parse, compile and sampling and returns a stub `mvgam`
 #'   object whose `$stancode` and `$standata` slots are populated but
@@ -409,45 +436,43 @@ mvgam_imputation_forwarded <- c(
 #'   deviates a group-level block is scaled from, the unscaled
 #'   coefficients a shrinkage prior scales, the ordered intercepts a
 #'   mixture is identified by. Those are left out by default, as brms
-#'   leaves them out. `save_pars(all = TRUE)` keeps every one, `group`
+#'   leaves them out. `save_pars(all = TRUE)` keeps every one. `group`
 #'   and `latent` keep the per-level deviations and the latent values
-#'   of a `me()` covariate, and `manual` names individual parameters
-#'   to keep.
+#'   of a `me()` covariate. `manual` names individual parameters to
+#'   keep.
 #' @param ... Additional arguments passed to Stan fitting. Two are worth
 #'   calling out. `algorithm` selects how the posterior is explored and
 #'   accepts `"sampling"` (the default), `"meanfield"`, `"fullrank"` or
 #'   `"fixed_param"` on either backend, plus `"pathfinder"` and
 #'   `"laplace"` when `backend = "cmdstanr"`. `init` sets the starting
 #'   values and accepts `"random"` (the default), `"0"`, a numeric
-#'   value, a list or a function, and additionally `"pathfinder"` when
-#'   `backend = "cmdstanr"`. The `"pathfinder"` keyword runs Stan's
+#'   value, a list or a function. With `backend = "cmdstanr"` it also
+#'   accepts `"pathfinder"`. The `"pathfinder"` keyword runs Stan's
 #'   Pathfinder approximation on the compiled model and draws one
-#'   starting value per chain from it. The posterior is still explored
-#'   by the algorithm you asked for, so the fit remains exact.
+#'   starting value per chain from it. The algorithm you asked for
+#'   still explores the posterior. The fit remains exact.
 #'
-#'   Treat `init = "pathfinder"` as a recovery option rather than a
-#'   speedup. On models that already warm up cleanly it is slower, not
-#'   faster: across random walk, autoregressive, correlated
-#'   autoregressive and dynamic factor trends carrying 60 to 750 latent
-#'   states, it added roughly a second of wall time, left warmup
-#'   duration essentially unchanged, and returned 15 to 25 percent
-#'   fewer effective samples per second. Its value is on models that
-#'   struggle to leave a poor starting point at all, where the extra
-#'   second buys a warmup that would otherwise stall or fill with
-#'   divergences.
+#'   `init = "pathfinder"` is a recovery option. On models that already
+#'   warm up cleanly it is slower: across random walk, autoregressive,
+#'   correlated autoregressive and dynamic factor trends with 60 to 750
+#'   latent states, it added roughly a second of wall time. Warmup
+#'   duration was essentially unchanged. Effective samples per second
+#'   fell by 15 to 25 percent. It pays off on models that struggle to
+#'   leave a poor starting point at all. There the extra second buys a
+#'   warmup that would otherwise stall or fill with divergences.
 #'
-#'   Four arguments shape the Stan program rather than the sampler, and
-#'   are passed on to brms unchanged. `knots` gives knot positions by
-#'   covariate name and reaches the basis constructors for the
-#'   observation and trend formulas alike. `drop_unused_levels` decides
-#'   whether a factor level with no observations still earns a
-#'   coefficient. `sample_prior` takes `"no"`, `"yes"` or `"only"`, and
-#'   under `"only"` the observation likelihood drops out while the
-#'   latent process keeps its own prior, so the draws describe the
-#'   model before it sees the response. `normalize` decides whether the
-#'   sampling statements carry their normalising constants; dropping
-#'   them is faster and leaves the posterior unchanged. `save_model`
-#'   names a file to write the assembled Stan program to.
+#'   Four arguments shape the Stan program. brms receives them
+#'   unchanged. `knots` gives knot positions by covariate name and
+#'   reaches the basis constructors for the observation and trend
+#'   formulas alike. `drop_unused_levels` decides whether a factor
+#'   level with no observations still earns a coefficient.
+#'   `sample_prior` takes `"no"`, `"yes"` or `"only"`. Under `"only"`
+#'   the observation likelihood drops out while the latent process
+#'   keeps its own prior. The draws then describe the model before it
+#'   sees the response. `normalize` decides whether the sampling
+#'   statements carry their normalising constants; dropping them is
+#'   faster and leaves the posterior unchanged. `save_model` names a
+#'   file to write the assembled Stan program to.
 #' @return An object of class `mvgam`.
 #'
 #' @examples
@@ -472,7 +497,7 @@ mvgam_imputation_forwarded <- c(
 #' # ---- Positive continuous response with a trend ----
 #' # A mean that must stay positive needs `link = "log"` once a trend
 #' # enters the linear predictor. `stats::Gamma()` supplies the
-#' # `inverse` link instead, and a trend reaching negative values
+#' # `inverse` link by default. A trend reaching negative values then
 #' # leaves the likelihood undefined. mvgam warns on that pairing.
 #' set.seed(3)
 #' gamdat <- sim_mvgam(family = Gamma(link = "log"))
@@ -488,16 +513,16 @@ mvgam_imputation_forwarded <- c(
 #'
 #' # ---- Multivariate VAR(1) with intercept suppression + custom priors ----
 #' # Three correlated series, no observation intercept (`y ~ 0`),
-#' # per-series smooth on the trend side, and tighter custom
+#' # a per-series smooth on the trend side and tighter custom
 #' # priors on the regression coefficients and trend innovation
 #' # scale. Mirrors the workflow used in the README's Portal VAR
 #' # example.
 #' set.seed(2)
 #' vardat <- sim_mvgam(
-#'   family       = poisson(),
-#'   n_series     = 3L,
+#'   family = poisson(),
+#'   n_series = 3L,
 #'   n_timepoints = 120L,
-#'   trend_model  = VAR(cor = TRUE)
+#'   trend_model = VAR(cor = TRUE)
 #' )
 #'
 #' # Inspect the default priors before fitting. Wrap the formula
@@ -506,24 +531,24 @@ mvgam_imputation_forwarded <- c(
 #' # `class` and `coef`; pass a modified subset back via
 #' # `priors = c(prior(...), ...)` to override.
 #' mf <- mvgam_formula(
-#'   formula       = y ~ 0,
+#'   formula = y ~ 0,
 #'   trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR()
 #' )
 #' get_prior(mf, data = vardat$data_train, family = poisson())
 #'
 #' var_mod <- mvgam(
-#'   formula       = y ~ 0,
+#'   formula = y ~ 0,
 #'   trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR(),
-#'   data          = vardat$data_train,
-#'   family        = poisson(),
-#'   priors        = c(
+#'   data = vardat$data_train,
+#'   family = poisson(),
+#'   priors = c(
 #'     prior(normal(0, 2), class = b),
 #'     prior(exponential(2.5), class = sigma_trend)
 #'   ),
-#'   chains        = 2,
-#'   iter          = 1000,
-#'   warmup        = 500,
-#'   silent        = 2
+#'   chains = 2,
+#'   iter = 1000,
+#'   warmup = 500,
+#'   silent = 2
 #' )
 #' summary(var_mod)
 #'
@@ -567,12 +592,12 @@ mvgam_imputation_forwarded <- c(
 #'
 #' tv_mod <- mvgam(
 #'   y ~ 0 + s(time, by = x, k = 6),
-#'   data     = tvdat,
-#'   family   = gaussian(),
-#'   chains   = 2,
-#'   iter     = 1000,
-#'   warmup   = 500,
-#'   silent   = 2
+#'   data = tvdat,
+#'   family = gaussian(),
+#'   chains = 2,
+#'   iter = 1000,
+#'   warmup = 500,
+#'   silent = 2
 #' )
 #' # `conditional_effects()` shows the two-way surface: the
 #' # slope on x visibly steepens as time progresses.
@@ -642,9 +667,8 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            run_model = TRUE, ...) {
 
   # Translate the deprecated `samples` / `burnin` argument pair to
-  # the brms-style `iter` / `warmup` pair the backends actually
-  # consume. See `translate_samples_burnin()` for the mapping and
-  # deprecation rationale.
+  # the `iter` / `warmup` pair the backends take. See
+  # `translate_samples_burnin()` for the mapping.
   dots <- translate_samples_burnin(list(...))
   reject_removed_args(dots)
   if (attr(dots, "translated", exact = TRUE)) {
@@ -653,18 +677,18 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
       mvgam,
       c(
         list(
-          formula        = formula,
-          trend_formula  = trend_formula,
-          data           = data,
-          newdata        = newdata,
-          trend_map      = trend_map,
+          formula = formula,
+          trend_formula = trend_formula,
+          data = data,
+          newdata = newdata,
+          trend_map = trend_map,
           loadings_prior = loadings_prior,
-          backend        = backend,
-          combine        = combine,
-          family         = family,
-          threads        = threads,
-          save_pars      = save_pars,
-          run_model      = run_model
+          backend = backend,
+          combine = combine,
+          family = family,
+          threads = threads,
+          save_pars = save_pars,
+          run_model = run_model
         ),
         dots
       )
@@ -700,7 +724,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 
   # Response-shape guard. brms reports a family's support from
   # `data_response.brmsframe()`, which names neither the column nor
-  # the values that broke it, and states only the bound it reached
+  # the values that broke it. It states only the bound it reached
   # first. Checking here names both and gives the whole constraint.
   validate_response_shapes(data, formula, family)
   if (!is.null(newdata)) {
@@ -709,8 +733,8 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     # the family the same way the training response does.
     validate_response_shapes(newdata, formula, family)
   }
-  checkmate::assert_character(backend, len = 1)
-  checkmate::assert_logical(combine, len = 1)
+  checkmate::assert_string(backend)
+  checkmate::assert_flag(combine)
   checkmate::assert_class(save_pars, "save_pars")
   checkmate::assert_flag(run_model)
   # `threads` is forwarded as-is. The inner pipeline (mvgam_single,
@@ -726,18 +750,17 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
       .var.name = "threads"
     )
   }
-  # Capture data name from user's call (before passing to internal
-  # functions). `deparse()` of a literal data frame expression (e.g.
+  # Capture the data name from the user's call. `deparse()` of a
+  # literal data frame expression (e.g.
   # `mvgam(data = as.data.frame(long_dat))` or a `do.call(mvgam, ...)`
-  # call that resolved `data` to an inline structure) returns the
-  # full expansion, which then bleeds into summary() output. Collapse
-  # any multi-line deparse and fall back to a short placeholder when
-  # the captured name is longer than a typical symbol identifier.
-  # The call the user wrote, captured here because this is the last
-  # frame that still holds their symbols: every step below reaches
-  # the pipeline through `do.call()`, which substitutes each
-  # argument's value, so a call captured deeper inlines the whole
-  # data frame and the family object.
+  # call that resolved `data` to an inline structure) returns the full
+  # expansion. That expansion would appear in summary() output. A
+  # multi-line deparse is collapsed. A name longer than a typical
+  # identifier becomes a short placeholder.
+  # This is the last frame that holds the user's symbols. Every step
+  # below reaches the pipeline through `do.call()`, which substitutes
+  # each argument's value. A call captured deeper would inline the
+  # whole data frame and the family object.
   user_call <- match.call()
   data_name <- paste(deparse(user_call$data), collapse = " ")
   if (nchar(data_name) > 80L) {
@@ -747,15 +770,15 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # Handle multiple imputation input
   if (is.list(data) && !is.data.frame(data)) {
     # `family`, `trend_map`, `loadings_prior`, `threads` and
-    # `run_model` are formals rather than dots, so they reach neither
-    # this call nor `...` unless named. Left out, every imputation was
-    # fitted under the default family.
+    # `run_model` are formals. A forwarding call reaches them only by
+    # name. Without them every imputation would take the default
+    # family.
     forwarded <- mget(
       setdiff(mvgam_imputation_forwarded, "threads"),
       envir = environment()
     )
-    # `threads = NULL` trips the integer assertion downstream, so it
-    # goes only when the user set it.
+    # `threads = NULL` would fail the integer assertion downstream. It
+    # is forwarded only when the user set it.
     if (!is.null(threads)) forwarded$threads <- threads
     return(do.call(
       mvgam_multiple,
@@ -768,9 +791,9 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   }
 
   # A positive mean under a link that admits zero needs the linear
-  # predictor to stay positive, which a latent trend does not
-  # guarantee. The imputation branch returns before this point, and
-  # `mvgam_multiple()` raises the same notice once for a whole list.
+  # predictor to stay positive. A latent trend does not guarantee it.
+  # The imputation branch returns earlier. `mvgam_multiple()` raises
+  # the same notice once for a whole list.
   warn_positive_mean_link_with_trend(formula, family, trend_formula)
 
   # Single dataset processing. `threads` is forwarded only when the
@@ -802,9 +825,10 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # Post-fit advisor: a by_lv factor model at the full-rank boundary
   # with the default iid Z prior is rotationally unidentified. When
   # Rhat on init_trend / lv_trend / sigma_trend / Sigma_trend /
-  # L_Sigma_trend exceeds 1.1, point users at the MGP prior or a
-  # pinned trend_map. The helper short-circuits for non-factor fits,
-  # MGP-prior fits, n_lv != n_series fits, and clean Rhats.
+  # L_Sigma_trend exceeds 1.1, the advisor points users at the MGP
+  # prior or a pinned trend_map. The helper returns early for fits
+  # without factors, MGP-prior fits, n_lv != n_series fits and clean
+  # Rhats.
   if (isTRUE(run_model) && inherits(mvgam_object, "mvgam") &&
       !is.null(mvgam_object$fit)) {
     warn_by_lv_full_rank_funnel(mvgam_object)
@@ -817,22 +841,22 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 #' Validate `newdata` against the training data of an \pkg{mvgam} model
 #'
 #' Runs the structural checks that [predict.mvgam()] and
-#' [forecast.mvgam()] apply to a `newdata` frame, and refuses a
-#' misaligned frame before an expensive prediction. The trend constructor in
+#' [forecast.mvgam()] apply to a `newdata` frame. A misaligned frame is
+#' refused before an expensive prediction. The trend constructor in
 #' `trend_formula` names the time and series columns, `time` and
 #' `series` by default. Each of them the training `data` holds must
 #' also be in `newdata`. A hierarchical trend identifies its series by
-#' its `gr` and `subgr` columns, and those are required in their
-#' place. Series levels absent from the training data are refused, and
-#' the series column of `newdata` is coerced to the training levels.
-#' The prediction functions check the columns the formulas use.
+#' its `gr` and `subgr` columns. Those columns are then required. Series
+#' levels absent from the training data are refused. The series column
+#' of `newdata` is coerced to the training levels. The prediction
+#' functions check the columns the formulas use.
 #'
 #' @param newdata A `data.frame` of prediction covariates in the same
 #'   shape as the training data.
 #' @param data The training `data.frame` of the model, whose series
 #'   levels define the valid set. A fitted model from [mvgam()] or
 #'   [jsdgam()] is also accepted. `newdata` is then checked against
-#'   every column the fitted formulas use, and `trend_formula` is
+#'   every column the fitted formulas use. `trend_formula` is then
 #'   ignored.
 #' @param trend_formula The trend formula passed to [mvgam()], or
 #'   `NULL` for a model without a trend.
@@ -847,19 +871,24 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 #'   week = rep(1:3, times = 2L),
 #'   y = rnorm(6L)
 #' )
-#' future <- data.frame(
+#' test_weeks <- data.frame(
 #'   species = factor(rep(c("a", "b"), each = 2L)),
 #'   week = rep(4:5, times = 2L)
 #' )
-#' check_newdata(future, train, ~ AR(time = week, series = species))
+#' check_newdata(test_weeks, train, ~ AR(time = week, series = species))
 #'
 #' # A species the model never saw is refused.
-#' future$species <- factor(rep(c("a", "c"), each = 2L))
-#' try(check_newdata(future, train, ~ AR(time = week, series = species)))
+#' test_weeks$species <- factor(rep(c("a", "c"), each = 2L))
+#' try(check_newdata(test_weeks, train, ~ AR(time = week, series = species)))
 #' @export
 check_newdata <- function(newdata, data, trend_formula = NULL) {
   if (is.null(newdata)) return(invisible(NULL))
   checkmate::assert_data_frame(newdata)
+  checkmate::assert(
+    checkmate::check_data_frame(data),
+    checkmate::check_class(data, "mvgam"),
+    .var.name = "data"
+  )
   if (inherits(data, "mvgam")) {
     newdata <- prediction_frame(data, newdata)
     validate_newdata_complete(newdata, data)
@@ -894,17 +923,23 @@ check_newdata <- function(newdata, data, trend_formula = NULL) {
 }
 
 # ------------------------------------------------------------------------------
-# SINGLE DATASET PROCESSING
+# Single dataset processing
 # ------------------------------------------------------------------------------
-# Core processing pipeline for single datasets using the two-stage Stan
-# assembly system with brms ecosystem integration.
+# The processing pipeline for one dataset, through the two-stage Stan
+# assembly with brms.
 
-#' Process Single Dataset
+#' Process a single dataset
 #' @param formula Main formula
 #' @param trend_formula Trend formula
 #' @param data Single data frame
 #' @param backend Stan backend
 #' @param family Family specification
+#' @param data_name Name of the data in the user's call, or `NULL`
+#' @param newdata Held-out data frame to store on the fit, or `NULL`
+#' @param trend_map Fixed factor-loading specification, or `NULL`
+#' @param loadings_prior Structured loadings prior, or `NULL`
+#' @param save_pars A [brms::save_pars()] object
+#' @param run_model Logical. `FALSE` returns an unfitted stub.
 #' @param ... Additional arguments
 #' @return mvgam object
 #' @noRd
@@ -913,25 +948,29 @@ mvgam_single <- function(formula, trend_formula, data, backend,
                         trend_map = NULL, loadings_prior = NULL,
                         save_pars = brms::save_pars(),
                         run_model = TRUE, ...) {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(backend)
+  checkmate::assert_string(data_name, null.ok = TRUE)
+  checkmate::assert_data_frame(newdata, null.ok = TRUE)
+  checkmate::assert_class(save_pars, "save_pars")
+  checkmate::assert_flag(run_model)
 
-  # Create mvgam_formula object for shared processing
   mvgam_formula_obj <- mvgam_formula(formula, trend_formula)
 
-  # Reason: brms uses 'prior' (singular), historic mvgam / jsdgam
-  # docs use 'priors'. Without aliasing, the plural form falls
-  # into `...` and is silently dropped by every consumer downstream
-  # that takes `prior = NULL`.
+  # Reason: brms takes 'prior' (singular). mvgam and jsdgam also accept
+  # 'priors'. Without the alias the plural form would fall into `...`,
+  # where every consumer that takes `prior = NULL` ignores it.
   forward_dots <- normalise_prior_arg_alias(list(...))
 
-  # Check the sampler dimensions before any code generation, since an
-  # impossible iteration count cannot be salvaged later and the user
+  # The sampler dimensions are checked before any code generation. An
+  # impossible iteration count cannot be salvaged later. The user
   # should not wait through a compile to hear about it.
   validate_sampler_iterations(
     iter = forward_dots$iter %||% 2000,
     warmup = forward_dots$warmup
   )
 
-  # Use existing shared infrastructure (same as stancode())
+  # The shared infrastructure `stancode()` also uses
   stan_components <- do.call(
     generate_stan_components_mvgam_formula,
     c(
@@ -947,10 +986,9 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     )
   )
 
-
-  # `run_model = FALSE`: stop before parse, compile and fit so a
-  # caller can read the generated stancode and standata without
-  # paying for Stan codegen and sampling.
+  # `run_model = FALSE`: stop before parse, compile and fit. A caller
+  # can then inspect the generated stancode and standata without
+  # paying for Stan code generation and sampling.
   if (isFALSE(run_model)) {
     return(create_mvgam_stub_from_stan_components(
       stan_components = stan_components,
@@ -966,12 +1004,11 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     ))
   }
 
-  # Fit the combined model using backend functions directly.
-  # Reuse the alias-normalised list captured above so the singular /
-  # plural prior alias survives the fitting branch too.
+  # The alias-normalised list carries the prior through the fitting
+  # branch as well.
   dots <- forward_dots
 
-  # Extract fitting parameters with defaults
+  # Fitting parameters with defaults
   algorithm <- dots$algorithm %||% "sampling"
   iter <- dots$iter %||% 2000
   warmup <- dots$warmup %||% (iter %/% 2)
@@ -979,10 +1016,10 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   chains <- dots$chains %||% 4
   checkmate::assert_number(chains)
   # A request for the program without a posterior has its own
-  # spelling, and `chains = 0` reached a branch inherited from brms
-  # for parameter-free models: it compiled, sampled one chain of two
-  # draws and blanked the simulation slot, leaving a posterior a
-  # reader could summarise and diagnostics that could not be computed.
+  # spelling, `run_model = FALSE`. A `chains = 0` request would take a
+  # brms branch for parameter-free models. That branch samples one
+  # chain of two draws and blanks the simulation slot, leaving a
+  # posterior without computable diagnostics.
   if (chains < 1) {
     stop(insight::format_error(c(
       "'chains' must be at least 1.",
@@ -1015,31 +1052,29 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   # stanc_options accepts the stanc3 optimisation level
   # (e.g. `"O1"`) and other stanc-level flags. Both forward
   # directly to `cmdstanr::cmdstan_model()`.
-  cpp_options   <- dots$cpp_options   %||% NULL
+  cpp_options <- dots$cpp_options %||% NULL
   stanc_options <- dots$stanc_options %||% NULL
-  
-  # Validate and normalize parameters
+
   silent <- validate_silent(silent)
   threads <- validate_threads(threads)
   opencl <- validate_opencl(opencl)
   algorithm <- validate_algorithm(algorithm, backend)
   init <- validate_init(init, backend)
-  
-  # Parse/validate Stan code
+
   validated_code <- parse_model(
     model = stan_components$combined_components$stancode,
     backend = backend,
     silent = silent
   )
-  
+
   compile_args <- list(
-    model         = validated_code,
-    backend       = backend,
-    threads       = threads,
-    opencl        = opencl,
-    silent        = silent
+    model = validated_code,
+    backend = backend,
+    threads = threads,
+    opencl = opencl,
+    silent = silent
   )
-  if (!is.null(cpp_options))   compile_args$cpp_options   <- cpp_options
+  if (!is.null(cpp_options)) compile_args$cpp_options <- cpp_options
   if (!is.null(stanc_options)) compile_args$stanc_options <- stanc_options
   compiled_model <- do.call(compile_model, compile_args)
 
@@ -1078,23 +1113,23 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     ),
     sampler_dots
   ))
-  
+
   check_chains_finished(combined_fit, chains, algorithm)
 
-  # Store backend information for later use. `init` is kept as the user
-  # wrote it because Stan records only the resolved value, which for
-  # list-valued and Pathfinder starts is a temporary file path that
-  # cannot be replayed on another machine.
+  # Backend information for later use. `init` is kept as the user wrote
+  # it. Stan records only the resolved value, which for list-valued and
+  # Pathfinder starts is a session file path that cannot be replayed
+  # on another machine.
   attr(combined_fit, "backend") <- backend
   attr(combined_fit, "init") <- init
   attr(combined_fit, "algorithm") <- algorithm
   attr(combined_fit, "mvgam_version") <- utils::packageVersion("mvgam")
   attr(combined_fit, "fit_time") <- Sys.time()
 
-  # Enrich trend_metadata with kernel-relevant extras (ar_lags,
-  # ma_lags, max_lag, has_cor, n_lv, trend_type). Persisting these
-  # at fit time means the forecasting surface doesn't have to
-  # re-derive them on every per-draw call.
+  # Kernel-relevant extras for trend_metadata (ar_lags, ma_lags,
+  # max_lag, has_cor, n_lv, trend_type). Recorded at fit time, the
+  # forecasting code need not derive them again on every per-draw
+  # call.
   enriched_trend_metadata <- enrich_trend_metadata(
     stan_components$trend_metadata,
     stan_components$mv_spec$trend_specs
@@ -1110,12 +1145,11 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     combined_stancode = stan_components$combined_components$stancode,
     combined_standata = stan_components$combined_components$standata,
     user_trend_formula = trend_formula,
-    # The user's full `prior` / `priors` arg (already aliased to
-    # `prior` by `normalise_prior_arg_alias` at the top of `mvgam()`).
-    # Plumbed through so `create_mvgam_from_combined_fit()` can mark
-    # mvgam-managed trend overrides (sigma_trend, ar1_trend, etc.) as
-    # `source = "user"` on the stored prior table; the brms-side path
-    # only marks rows brms itself knows about.
+    # The user's full `prior` / `priors` argument, aliased to `prior`
+    # by `normalise_prior_arg_alias()`. With it the stored prior table
+    # marks mvgam-managed trend overrides (sigma_trend, ar1_trend,
+    # etc.) as `source = "user"`. The brms-side path marks only the
+    # rows of the brms model.
     user_prior = dots$prior,
     newdata = newdata,
     save_pars = save_pars,
@@ -1125,19 +1159,12 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   return(mvgam_object)
 }
 
-# ------------------------------------------------------------------------------
-# MODEL FITTING
-# ------------------------------------------------------------------------------
-# Orchestrates the actual Stan model fitting using the appropriate backend
-# while maintaining compatibility with both rstan and cmdstanr.
-
 
 # ==============================================================================
-# MVGAM OBJECT CREATION FROM COMBINED FIT
+# mvgam object creation from the combined fit
 # ==============================================================================
-# Creates mvgam object from combined Stan fit with full parameter map.
 
-#' Create mvgam Object from Combined Stan Fit
+#' Create an mvgam object from the combined Stan fit
 #'
 #' @param combined_fit Stan fit object from combined model
 #' @param obs_setup Observation model setup components (must include brmsfit)
@@ -1145,6 +1172,13 @@ mvgam_single <- function(formula, trend_formula, data, backend,
 #' @param mv_spec Multivariate trend specification
 #' @param trend_metadata Trend metadata for prediction
 #' @param data_name Optional name for the dataset
+#' @param combined_stancode The assembled Stan code, or `NULL`
+#' @param combined_standata The assembled Stan data, or `NULL`
+#' @param user_trend_formula The trend formula as the user wrote it
+#' @param user_prior The user's `prior` argument, or `NULL`
+#' @param newdata Held-out data frame to store on the fit, or `NULL`
+#' @param save_pars A [brms::save_pars()] object
+#' @param silent The verbosity the fit ran under
 #' @return mvgam object with stored brmsfit objects for prediction workflows
 #' @noRd
 create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
@@ -1164,6 +1198,10 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   checkmate::assert_list(trend_setup, names = "named", null.ok = TRUE)
   checkmate::assert_list(mv_spec, names = "named", null.ok = TRUE)
   checkmate::assert_list(trend_metadata, names = "named", null.ok = TRUE)
+  checkmate::assert_character(combined_stancode, null.ok = TRUE)
+  checkmate::assert_list(combined_standata, null.ok = TRUE)
+  checkmate::assert_class(save_pars, "save_pars")
+  checkmate::assert_number(silent)
 
   # Predictions evaluate each side through its mock brmsfit
   if (!"brmsfit" %in% names(obs_setup)) {
@@ -1188,49 +1226,42 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       fit = combined_fit,
       formula = obs_setup$formula,
       trend_formula = if (!is.null(trend_setup)) trend_setup$formula else NULL,
-      # Original user-supplied trend_formula (with trend constructors
-      # like AR(p = 1) intact); preserved verbatim so update.mvgam
-      # can round-trip the fit without trying to reconstruct the
-      # constructor call from parsed `mv_spec$trend_specs`.
+      # The user-supplied trend_formula, with its trend constructors
+      # such as AR(p = 1) intact. update.mvgam takes it verbatim and
+      # need not rebuild the constructor call from
+      # `mv_spec$trend_specs`.
       trend_call = user_trend_formula,
       family = obs_setup$family,
-      # Combine obs + trend prior tables before lifting stanvar rows so
-      # the fit stores every user-supplied row (not just the obs subset).
-      # Passing `obs_setup$prior` alone here would silently drop any
-      # `prior(..., class = sigma_trend)` / `class = ar1_trend` /
-      # `class = b_trend` overrides the user supplied via `priors = `
-      # from `$prior` (Stan still applies them either way).
-      # The trend setup carries brms's own class names (e.g. `sigma`,
-      # `b`, `sds`, `ar1`); re-suffix them so the combined table uses
-      # the same `<class>_trend` convention as
-      # `get_prior.mvgam_formula()` and the rest of the package.
-      # Then layer any mvgam-managed user trend priors back on (those
-      # are stripped from the brms pipeline by
-      # `remove_trend_suffix_from_priors()`, but Stan still applies
-      # them via the mvgam stanvar substitution path).
+      # The obs and trend prior tables are combined before the stanvar
+      # rows are added. The fit then stores every user-supplied row.
+      # The trend setup has brms's own class names (e.g. `sigma`, `b`,
+      # `sds`, `ar1`). They are re-suffixed to the `<class>_trend`
+      # convention of `get_prior.mvgam_formula()`. The mvgam-managed
+      # user trend priors are then layered back on.
+      # `remove_trend_suffix_from_priors()` strips them from the brms
+      # pipeline. Stan applies them through the mvgam stanvars.
       prior = assemble_stored_prior_table(
-        obs_priors      = obs_setup$prior,
-        trend_priors    = trend_setup$prior,
-        user_prior      = user_prior,
+        obs_priors = obs_setup$prior,
+        trend_priors = trend_setup$prior,
+        user_prior = user_prior,
         combined_stancode = combined_stancode %||% obs_setup$stancode,
-        trend_stancode  = trend_setup$stancode
+        trend_stancode = trend_setup$stancode
       ),
       # The frame the user supplied. `mvgam()` adds a placeholder
-      # column when the observation formula has no terms, and brms
-      # was given that; the column is taken back out here so a
-      # reader of `fit$data` sees their own frame, and stamped back
-      # on by `ensure_obs_placeholder()` wherever one reaches brms.
+      # column when the observation formula has no terms. brms received
+      # that column. It is removed here. `fit$data` then holds the
+      # user's own frame. `ensure_obs_placeholder()` restores the
+      # column wherever the frame reaches brms.
       data = drop_obs_placeholder(obs_setup$data),
       test_data = newdata,
       data.name = data_name,
-      # The brms code-generation options the fit was built under, kept
-      # verbatim so a refit rebuilds the same program rather than
-      # falling back to the defaults. Everything else in this object
-      # records what the generator produced; this records what it was
-      # asked for.
+      # The brms code-generation options the fit was built under. A
+      # refit then rebuilds the same program. Everything else in this
+      # object records what the generator produced; this records what
+      # it was asked for.
       codegen = obs_setup$codegen,
-      # The verbosity the fit ran under, so `update()` is as quiet as
-      # the call it rebuilds rather than reverting to the default.
+      # The verbosity the fit ran under. `update()` is then as quiet as
+      # the call it rebuilds.
       silent = silent,
       stancode = combined_stancode %||% obs_setup$stancode,
       standata = combined_standata %||% obs_setup$standata,
@@ -1254,11 +1285,9 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   mvgam_object <- prune_stored_formula_envs(mvgam_object)
 
   mvgam_object$criteria <- list()
-  # `$call` is stamped by the user-facing entry point that built
-  # this, which is the only frame holding the symbols the user
-  # typed. Recording it here instead captured a `do.call()` frame:
-  # the head was the function object rather than its name, and
-  # every argument had already resolved to its value.
+  # The user-facing entry point stamps `$call`. That frame holds the
+  # symbols the user typed. A `do.call()` frame here would hold the
+  # function object and the resolved argument values.
 
   # Factors with their own coefficients are relabelled to one
   # ordering and orientation. See `R/factor_alignment.R`.
@@ -1268,14 +1297,18 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
 }
 
 
-# A formula records the environment it was written in, and `saveRDS`
-# serialises an unnamed environment by value. A model fitted inside a
-# function then writes that function's locals into the file: measured
-# at 15.23 MB against 0.60 MB for the same model written at top
-# level. The expression still resolves the names it uses, which are
-# copied into a fresh environment whose parent is the first named
-# ancestor. A named environment is serialised by reference and is
-# returned unchanged.
+#' A formula with its environment reduced to the names it uses
+#'
+#' A formula records the environment it was written in. `saveRDS`
+#' serialises an unnamed environment by value. A model fitted inside a
+#' function would then write that function's locals into the file:
+#' 15.23 MB against 0.60 MB for the same model written at top level.
+#' The names the expression uses are copied into a fresh environment
+#' whose parent is the first named ancestor. A named environment is
+#' serialised by reference and is returned unchanged.
+#'
+#' @param f A formula, or any other object to return unchanged
+#' @return `f` with its environment pruned
 #' @noRd
 prune_formula_env <- function(f) {
   if (!inherits(f, "formula")) {
@@ -1310,25 +1343,31 @@ prune_formula_env <- function(f) {
 }
 
 
-# Nine formulas are reachable on a fitted object, each keeping its own
-# environment: the three named slots, four within `mv_spec`, and the
-# main formula of each stored brmsfit. Pruning the named slots leaves
-# the other six pointing at the calling frame, and one reference
-# writes that frame into the file. `utils::object.size()` does not
-# follow an environment and reports none of this; the size of the
-# saved file does.
+#' Prune the environment of every formula a fit stores
+#'
+#' Nine formulas are reachable on a fitted object, each keeping its own
+#' environment: the three named slots, four within `mv_spec` and the
+#' main formula of each stored brmsfit. One unpruned reference would
+#' write the calling frame into the file. `utils::object.size()` does
+#' not follow an environment and reports none of this. The size of the
+#' saved file shows it.
+#'
+#' @param x Object to walk
+#' @param depth Integer recursion depth
+#' @return `x` with every reachable formula pruned
 #' @noRd
 prune_stored_formula_envs <- function(x, depth = 0L) {
+  checkmate::assert_int(depth, lower = 0L)
   if (inherits(x, "formula")) {
     return(prune_formula_env(x))
   }
   if (depth > 6L) {
     return(x)
   }
-  # A model frame keeps its `terms` attribute, and a terms object
-  # records the environment the formula was evaluated in. brms builds
-  # those frames while the model is being set up, giving each one a
-  # reference to the caller that no formula slot shares.
+  # A model frame keeps its `terms` attribute. A terms object records
+  # the environment the formula was evaluated in. brms builds those
+  # frames while the model is set up, giving each one a reference to
+  # the caller that no formula slot shares.
   at <- attributes(x)
   for (nm in names(at)) {
     if (inherits(at[[nm]], "formula")) {
@@ -1341,8 +1380,8 @@ prune_stored_formula_envs <- function(x, depth = 0L) {
   attrs <- attributes(x)
   y <- unclass(x)
   for (i in seq_along(y)) {
-    # Assigning NULL back into a list deletes the element, and a slot
-    # a fit legitimately leaves empty has to survive the walk.
+    # Assigning NULL back into a list deletes the element. A slot a fit
+    # leaves empty has to survive the walk.
     if (is.null(y[[i]])) {
       next
     }
@@ -1353,14 +1392,28 @@ prune_stored_formula_envs <- function(x, depth = 0L) {
 }
 
 
-# Build a no-fit mvgam stub from generated stan_components. Used by
-# the `run_model = FALSE` path: callers get an mvgam-shaped
-# list with `stancode`, `standata`, `data`, `trend_metadata` and
-# friends populated, but `fit` is left NULL because no sampling
-# happened. The stub is an `mvgam` first, and every method dispatches
-# to the `mvgam` one; `print()`, `stancode()`, `standata()` and
-# `methods_md()` answer on it. The `mvgam_prefit` class records that
-# no sampling happened.
+#' An unfitted mvgam stub from generated Stan components
+#'
+#' Serves the `run_model = FALSE` path. The stub is an `mvgam` with
+#' `stancode`, `standata`, `data`, `trend_metadata` and the other slots
+#' populated. Its `fit` is `NULL`. Every method dispatches to the
+#' `mvgam` one. `print()`, `stancode()`, `standata()` and `methods_md()`
+#' work on it. The `mvgam_prefit` class records that no sampling
+#' happened.
+#'
+#' @param stan_components List from
+#'   `generate_stan_components_mvgam_formula()`
+#' @param formula Observation formula
+#' @param trend_formula Trend formula as the user wrote it
+#' @param family Family specification
+#' @param data Training data frame
+#' @param data_name Name of the data in the user's call, or `NULL`
+#' @param newdata Held-out data frame, or `NULL`
+#' @param backend Stan backend
+#' @param save_pars A [brms::save_pars()] object
+#' @param user_prior The user's `prior` argument, or `NULL`
+#' @return An object of class `c("mvgam", "mvgam_prefit")`
+#' @noRd
 create_mvgam_stub_from_stan_components <- function(
   stan_components,
   formula,
@@ -1373,6 +1426,10 @@ create_mvgam_stub_from_stan_components <- function(
   save_pars = brms::save_pars(),
   user_prior = NULL
 ) {
+  checkmate::assert_list(stan_components)
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(backend)
+  checkmate::assert_class(save_pars, "save_pars")
   obs_setup <- stan_components$obs_setup
   trend_setup <- stan_components$trend_setup
   mv_spec <- stan_components$mv_spec
@@ -1388,16 +1445,16 @@ create_mvgam_stub_from_stan_components <- function(
       trend_call = trend_formula,
       family = obs_setup$family %||% family,
       # The same table a fitted object stores, built by the same
-      # assembler: the stub is read for what the model will be, so a
-      # prior table missing the trend rows, the user's overrides or
-      # the placeholder filter would describe a different model from
+      # assembler. The stub describes the model a fit would produce. A
+      # prior table missing the trend rows, the user's overrides or the
+      # placeholder filter would describe a different model from
       # the one `run_model = TRUE` produces.
       prior = assemble_stored_prior_table(
-        obs_priors      = obs_setup$prior,
-        trend_priors    = trend_setup$prior,
-        user_prior      = user_prior,
+        obs_priors = obs_setup$prior,
+        trend_priors = trend_setup$prior,
+        user_prior = user_prior,
         combined_stancode = stan_components$combined_components$stancode,
-        trend_stancode  = trend_setup$stancode
+        trend_stancode = trend_setup$stancode
       ),
       data = drop_obs_placeholder(obs_setup$data %||% data),
       test_data = newdata,
@@ -1423,20 +1480,17 @@ create_mvgam_stub_from_stan_components <- function(
 }
 
 
-
 # ==============================================================================
-# MULTIPLE IMPUTATION SUPPORT: RUBIN'S RULES POOLING
+# Multiple imputation
 # ==============================================================================
-# Provides multiple imputation support using Rubin's rules for
-# proper uncertainty quantification when dealing with missing data in State-
-# Space models, ensuring valid statistical inference.
+# Fits the model to each imputed dataset and pools the draws.
 
-#' Fit mvgam Models to Multiple Imputation Datasets
+#' Fit mvgam models to multiply imputed datasets
 #'
 #' @description
 #' Fits Bayesian state-space models to multiply imputed datasets,
-#' combining posteriors across imputations for proper uncertainty
-#' quantification when dealing with missing data.
+#' combining posteriors across imputations to carry the imputation
+#' uncertainty into the estimates.
 #'
 #' @details
 #' This function processes multiple imputed datasets in two modes:
@@ -1453,24 +1507,22 @@ create_mvgam_stub_from_stan_components <- function(
 #' allowing manual posterior combination or separate analysis.
 #'
 #' **Posterior Combination Approach**:
-#' Uses `rstan::sflist2stanfit()` (validated brms pattern) to
-#' concatenate draws from all imputations at the Stan level,
-#' properly accounting for between-imputation and
-#' within-imputation variance. This approach ensures valid
-#' uncertainty quantification following proper multiple imputation
-#' principles.
+#' Uses `rstan::sflist2stanfit()`, as `brms::brm_multiple()` does, to
+#' concatenate draws from all imputations at the Stan level. The pooled
+#' draws then hold both the between-imputation and within-imputation
+#' variance.
 #'
 #' **MI Diagnostics**:
 #' Pooled objects include convergence diagnostics per imputation
 #' (Rhat, ESS) accessible via `summary()`. The print method
-#' displays MI diagnostics including total draws,
-#' draws per imputation, and convergence summaries.
+#' displays MI diagnostics: total draws, draws per imputation and
+#' convergence summaries.
 #'
 #' @param formula Model formula (observation model). Supports brms
 #'   formula syntax including smooths and random effects.
 #' @param trend_formula Optional trend formula specifying
-#'   state-space dynamics. Can be response-specific in multivariate
-#'   models.
+#'   state-space dynamics. One trend formula applies to every response
+#'   of a multivariate model.
 #' @param data_list List of imputed data frames. Each element must
 #'   have identical structure (same variables, same ordering).
 #'   Alternatively, a `mids` object from the mice package.
@@ -1484,8 +1536,8 @@ create_mvgam_stub_from_stan_components <- function(
 #'   consistency across imputations (same column names, types,
 #'   rows).
 #' @param newdata Optional held-out `data.frame` persisted on
-#'   every imputation fit, so later plot / forecast methods can
-#'   reach it through any one of them. Defaults to `NULL`.
+#'   every imputation fit. Later plot and forecast methods can reach
+#'   it through any one of them. Defaults to `NULL`.
 #' @param ... Additional arguments passed to `mvgam()` for each
 #'   imputation (e.g., chains, iter, family, priors).
 #'
@@ -1557,16 +1609,16 @@ mvgam_multiple <- function(formula,
                            check_data = TRUE,
                            newdata = NULL,
                            ...) {
-  # Input validation
   checkmate::assert_list(data_list, min.len = 2)
-  checkmate::assert_character(backend, len = 1, any.missing = FALSE)
-  checkmate::assert_logical(combine, len = 1, any.missing = FALSE)
-  checkmate::assert_logical(check_data, len = 1, any.missing = FALSE)
+  checkmate::assert_string(backend)
+  checkmate::assert_flag(combine)
+  checkmate::assert_flag(check_data)
+  checkmate::assert_data_frame(newdata, null.ok = TRUE)
 
-  # This function is exported and reaches a fit without passing
-  # through `mvgam()`, which is why the notice is raised here too.
-  # `family` arrives through `...`. Raising it once covers the whole
-  # list, where the per-imputation fit would repeat it per dataset.
+  # This exported function reaches a fit without passing through
+  # `mvgam()`. It raises the notice itself. `family` arrives through
+  # `...`. Raising it once covers the whole list. The per-imputation
+  # fit would repeat it per dataset.
   warn_positive_mean_link_with_trend(formula, list(...)$family,
                                      trend_formula)
 
@@ -1590,7 +1642,7 @@ mvgam_multiple <- function(formula,
 
   # A request for the program without a posterior is met from the
   # first dataset, before any imputation is fitted. Pooling needs
-  # draws, and a stub has none. `brms::brm_multiple()` returns one
+  # draws. A stub has none. `brms::brm_multiple()` returns one
   # unfitted model the same way under its `chains = 0` spelling.
   if (isFALSE(list(...)$run_model)) {
     return(mvgam_single(
@@ -1626,13 +1678,11 @@ mvgam_multiple <- function(formula,
 }
 
 # ------------------------------------------------------------------------------
-# DATASET VALIDATION
+# Dataset validation
 # ------------------------------------------------------------------------------
-# Ensures that multiple imputation datasets meet requirements for valid
-# statistical inference, including structural consistency and proper handling
-# of time series identifiers.
+# Checks that the imputed datasets share one structure.
 
-#' Validate Multiple Imputation Datasets
+#' Validate multiply imputed datasets
 #' @param data_list List of imputed datasets
 #' @return Invisible TRUE if valid, stops with error if invalid
 #' @noRd
@@ -1653,7 +1703,7 @@ validate_multiple_imputation_datasets <- function(data_list) {
       stop(insight::format_error(c(
         paste("Dataset", i, "has different column names than dataset 1."),
         x = "All imputed datasets must have identical structure."
-      )))
+      )), call. = FALSE)
     }
 
     # Check number of rows match
@@ -1662,23 +1712,22 @@ validate_multiple_imputation_datasets <- function(data_list) {
         paste("Dataset", i, "has", nrow(current_data), "rows, expected",
              ref_nrow),
         x = "All imputed datasets must have same number of observations."
-      )))
+      )), call. = FALSE)
     }
   }
-  # Whether the imputations share a time and series axis is asked of
-  # the fits, by `pool_mvgam_fits()`: the columns naming the axis are
-  # the model's to resolve, and need not be called `time` or `series`.
+  # `pool_mvgam_fits()` checks that the imputations share a time and
+  # series axis. The model resolves the columns naming the axis. They
+  # need not be called `time` or `series`.
 
   invisible(TRUE)
 }
 
 # ------------------------------------------------------------------------------
-# INDIVIDUAL MODEL FITTING
+# Fitting each imputed dataset
 # ------------------------------------------------------------------------------
-# Fits separate mvgam models to each imputed dataset using consistent
-# specifications to enable proper pooling of results.
+# Fits the same model specification to each imputed dataset.
 
-#' Fit Models to Multiple Imputation Datasets
+#' Fit models to multiply imputed datasets
 #' @param formula Main formula
 #' @param trend_formula Trend formula
 #' @param data_list List of datasets
@@ -1688,14 +1737,16 @@ validate_multiple_imputation_datasets <- function(data_list) {
 #' @noRd
 fit_multiple_imputation_models <- function(formula, trend_formula, data_list,
                                           backend, ...) {
+  checkmate::assert_list(data_list, types = "data.frame", min.len = 1L)
+  checkmate::assert_string(backend)
   n_datasets <- length(data_list)
 
   # Fit individual models
   fits <- vector("list", n_datasets)
   names(fits) <- paste0("imputation_", seq_len(n_datasets))
 
-  # `brms::brm_multiple()` reports each imputed fit as it starts and
-  # gates it the same way, so this follows both.
+  # `brms::brm_multiple()` reports each imputed fit as it starts,
+  # under the same `silent` setting.
   silent <- list(...)$silent %||% 1L
   for (i in seq_len(n_datasets)) {
     if (silent < 2) {
@@ -1723,12 +1774,12 @@ fit_multiple_imputation_models <- function(formula, trend_formula, data_list,
 
 
 # ------------------------------------------------------------------------------
-# POSTERIOR COMBINATION
+# Posterior combination
 # ------------------------------------------------------------------------------
-# Combines posterior samples from multiple imputation fits using Stan-level
-# combination. Follows brms pattern using rstan::sflist2stanfit().
+# Combines the draws of the imputed fits at the Stan level with
+# `rstan::sflist2stanfit()`, as brms does.
 
-#' Pool mvgam Fits Using Stan-Level Combination
+#' Pool mvgam fits by Stan-level combination
 #' @param fits List of individual mvgam fits
 #' @return mvgam_pooled object with combined posteriors
 #' @noRd
@@ -1747,7 +1798,7 @@ pool_mvgam_fits <- function(fits) {
         x = paste0("Pooled trend draws would mix different occasions or ",
                    "series under one label."),
         i = "Impute only the response and covariates."
-      )))
+      )), call. = FALSE)
     }
   }
 
@@ -1763,7 +1814,7 @@ pool_mvgam_fits <- function(fits) {
                                        setdiff(current_vars, ref_vars)),
                                      5L), collapse = ", "), "."),
         i = "Fit the same model to every imputed dataset."
-      )))
+      )), call. = FALSE)
     }
   }
 

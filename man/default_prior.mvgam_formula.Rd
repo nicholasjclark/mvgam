@@ -10,11 +10,12 @@
 \item{object}{An object of class \code{mvgam_formula} created by
 \code{\link{mvgam_formula}}}
 
-\item{data}{A data frame containing the variables in the model (required)}
+\item{data}{A data frame containing the variables in the model
+(required)}
 
-\item{family}{A description of the response distribution and link function.
-Default is \code{gaussian()}. Not required if formula contains embedded
-families via \code{bf()} specifications.}
+\item{family}{A description of the response distribution and link
+function. Default is \code{gaussian()}. Not required if formula
+contains embedded families via \code{bf()} specifications.}
 
 \item{...}{Additional arguments passed to \code{brms::get_prior}}
 }

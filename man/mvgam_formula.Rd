@@ -2,7 +2,7 @@
 % Please edit documentation in R/priors.R
 \name{mvgam_formula}
 \alias{mvgam_formula}
-\title{Create an mvgam Formula Object}
+\title{Create an mvgam formula object}
 \usage{
 mvgam_formula(formula, trend_formula = NULL)
 }
@@ -22,17 +22,17 @@ base_class is the class of the input formula, containing:
 }
 }
 \description{
-Constructs a lightweight mvgam formula object that combines observation and
-trend model formulas. This provides a clean interface for model specification
-that can be used with inspection functions like \code{get_prior()},
-\code{stancode()}, and \code{standata()}.
+Constructs a lightweight mvgam formula object that combines
+observation and trend model formulas. The inspection functions
+\code{get_prior()}, \code{stancode()} and \code{standata()} take it.
 }
 \details{
 The mvgam_formula object is a minimal container that pairs an observation
 formula with an optional trend formula. Data, family, and other model
 specifications are provided when calling inspection or fitting functions:
 
-\code{get_prior(mvgam_formula(y ~ x, ~ AR()), data = dat, family = poisson())}
+\code{get_prior(mvgam_formula(y ~ x, ~ AR()), data = dat,
+  family = poisson())}
 
 When \code{trend_formula = NULL}, the model reduces to a pure brms
 observation model. When specified, the trend_formula can include:
@@ -45,7 +45,7 @@ observation model. When specified, the trend_formula can include:
 \item Gaussian processes: \code{gp()}
 }
 }
-\section{Trend Formula Restrictions}{
+\section{Trend formula restrictions}{
 
 The trend_formula has specific restrictions to maintain compatibility with
 State-Space dynamics and prevent conflicts between observation-level and
@@ -65,10 +65,10 @@ trend-level modeling:
 
 \strong{Rationale:}
 Addition terms change the observation model, through weights,
-censoring or exposure, and belong in the observation formula.
+censoring or exposure. They belong in the observation formula.
 Autocorrelation terms conflict with the trend's state-space
 dynamics. brms imputes a \code{mi()} predictor as a response of the
-model, and a trend formula holds no response.
+model. A trend formula holds no response.
 }
 
 \section{Multivariate models, single shared trend type}{
@@ -83,7 +83,7 @@ parameters; mixing trend types per response would require parallel
 dynamics machinery throughout the codegen, sampling, and prediction
 pipelines.
 
-What multivariate models DO support:
+What multivariate models support:
 \itemize{
 \item Different observation families per response (e.g.
 \code{bf(count ~ x, family = poisson()) +
@@ -94,7 +94,7 @@ the observation formulas.
 the (single) trend constructor.
 }
 
-If you need genuinely different dynamics per response, fit
+If you need different dynamics per response, fit
 independent univariate \code{mvgam()} models for each response.
 
 \strong{Examples:}

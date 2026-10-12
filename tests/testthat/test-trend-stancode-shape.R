@@ -18,15 +18,9 @@
 # generated Stan source.
 
 
-# Whitespace-tolerant literal substring matcher. Tests assert
-# that a specific Stan declaration or dynamics expression is
-# present; brackets / angle brackets / parentheses come along
-# verbatim. Stripping whitespace from both sides handles
-# formatter differences; `fixed = TRUE` sidesteps regex
-# escaping entirely.
+# A literal snippet of Stan code, whitespace ignored
 stan_has <- function(code, snippet) {
-  remove_ws <- function(text) gsub("\\s+", "", text)
-  grepl(remove_ws(snippet), remove_ws(code), fixed = TRUE)
+  stan_pattern(snippet, code, fixed = TRUE)
 }
 
 
@@ -63,9 +57,9 @@ test_that("AR(p = 2) declares ar1_trend AND ar2_trend", {
   expect_true(stan_has(code, "[N_lv_trend] ar1_trend;"))
   expect_true(stan_has(code, "[N_lv_trend] ar2_trend;"))
   expect_false(stan_has(code, "ar3_trend"))
-  # Dynamics must reference both lag-1 AND lag-2 of lv_trend.
-  expect_true(stan_has(code, "lv_trend[i - 1, j]"))
-  expect_true(stan_has(code, "lv_trend[i - 2, j]"))
+  # Each coefficient multiplies the state at its own lag
+  expect_true(stan_has(code, "ar1_trend[j] * lv_trend[i - 1, j]"))
+  expect_true(stan_has(code, "ar2_trend[j] * lv_trend[i - 2, j]"))
 })
 
 test_that("AR(p = 3) declares ar1_trend, ar2_trend, ar3_trend", {
@@ -73,7 +67,7 @@ test_that("AR(p = 3) declares ar1_trend, ar2_trend, ar3_trend", {
   expect_true(stan_has(code, "[N_lv_trend] ar1_trend;"))
   expect_true(stan_has(code, "[N_lv_trend] ar2_trend;"))
   expect_true(stan_has(code, "[N_lv_trend] ar3_trend;"))
-  expect_true(stan_has(code, "lv_trend[i - 3, j]"))
+  expect_true(stan_has(code, "ar3_trend[j] * lv_trend[i - 3, j]"))
 })
 
 
@@ -85,49 +79,43 @@ test_that("AR(p = c(2, 4)) declares ar2_trend and ar4_trend only", {
   expect_true(stan_has(code, "[N_lv_trend] ar4_trend;"))
   expect_false(stan_has(code, "ar1_trend"))
   expect_false(stan_has(code, "ar3_trend"))
-  expect_true(stan_has(code, "lv_trend[i - 2, j]"))
-  expect_true(stan_has(code, "lv_trend[i - 4, j]"))
+  expect_true(stan_has(code, "ar2_trend[j] * lv_trend[i - 2, j]"))
+  expect_true(stan_has(code, "ar4_trend[j] * lv_trend[i - 4, j]"))
 })
 
 
-# ----- initial_joint_var() out-of-bounds guard ------------------
+# ----- VAR stationary start ---------------------------------------
 
-test_that("initial_joint_var guards the q=0 (pure VAR) case", {
-  # Pure VAR (no MA) has q = 0. The companion_var matrix is then
-  # sized (p + q) * m = p * m, so the MA-block writes at indices
-  # (p * m + 1):((p + 1) * m) are out of bounds. The Stan
-  # function must wrap those writes in `if (q > 0)`. Without this
-  # guard every pure VAR fit crashed at runtime with an
-  # 'accessing element out of range' exception.
-  code <- get_trend_stancode(~ VAR(p = 1))
-  expect_true(stan_has(code, "if (q > 0)"))
-  expect_true(stan_has(code, "companion_var[1:m, 1:m] = Sigma;"))
+test_that("a VAR takes its start covariance from its autocovariances", {
+  # The Lyapunov solve has side (p m)^2 at every gradient. The map
+  # that gives the coefficients also gives the autocovariances. Only
+  # a VARMA, whose MA term changes the autocovariances, needs the solve.
+  code <- get_trend_stancode(~ VAR(p = 2))
+  expect_true(stan_has(
+    code, "Omega_trend = var_stationary_joint(result_var[2]);"
+  ))
+  expect_false(stan_has(code, "varma_autocov("))
 })
 
 
 # ----- VAR scalar p (intended: CONSECUTIVE lags 1..p) ------------
 
-test_that("VAR(p = 1) declares array[1] A_trend", {
-  code <- get_trend_stancode(~ VAR(p = 1))
-  expect_true(stan_has(
-    code, "array[1] matrix[N_lv_trend, N_lv_trend] A_trend"
-  ))
-  expect_true(stan_has(code, "[N_lv_trend] sigma_trend;"))
-})
-
-test_that("VAR(p = 2) declares array[2] A_trend", {
+test_that("VAR(p = 2) declares a matrix for each of lags 1 and 2", {
   code <- get_trend_stancode(~ VAR(p = 2))
   expect_true(stan_has(
-    code, "array[2] matrix[N_lv_trend, N_lv_trend] A_trend"
+    code, "array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] A_trend"
   ))
+  sd <- standata(mvgam_formula(y ~ x, trend_formula = ~ VAR(p = 2)),
+                 data = build_test_data(), family = poisson())
+  expect_identical(as.integer(sd$N_lags_trend), 2L)
 })
 
 
-# ----- VAR sparse-lag p (currently rejected) --------------------
+# ----- VAR sparse-lag p (refused) -------------------------------
 
 test_that("VAR(p = c(2, 4)) errors with an informative message", {
   # The Heaps (2023) stationary initialisation is defined on the
-  # companion form of consecutive lags, and a sparse lag set has no
+  # companion form of consecutive lags. A sparse lag set has no
   # companion form with the same stationary covariance. The
   # constructor refuses a vector 'p' and points to AR(p = c(...)).
   expect_error(
@@ -154,8 +142,8 @@ tdf_code <- function(tf) {
 }
 
 test_that("is_gaussian_df() treats Inf and NULL as Gaussian", {
-  # A t with infinite degrees of freedom is a normal, so Inf is the
-  # exact spelling of the default rather than a sentinel value.
+  # A t with infinite degrees of freedom is a normal. Inf spells the
+  # default exactly.
   expect_true(mvgam:::is_gaussian_df(Inf))
   expect_true(mvgam:::is_gaussian_df(NULL))
   expect_false(mvgam:::is_gaussian_df(NA))
@@ -173,9 +161,9 @@ test_that("innovation_sampling_code() emits normal or multivariate t", {
   fixed <- paste(mvgam:::innovation_sampling_code("N_lv_trend", 7),
                  collapse = "\n")
   expect_true(grepl("multi_student_t_cholesky(7,", fixed, fixed = TRUE))
-  # The identity scale is deliberate: the correlation transform stays in
-  # transformed parameters, and a linear map of a multivariate t is a
-  # multivariate t with the mapped scale matrix.
+  # The correlation transform stays in transformed parameters. A
+  # linear map of a multivariate t is a multivariate t with the mapped
+  # scale matrix, which makes the identity scale here exact.
   expect_true(grepl("identity_matrix(", est, fixed = TRUE))
 })
 
@@ -218,9 +206,9 @@ test_that("a fixed df needs no estimated parameter", {
 })
 
 test_that("nu_trend is monitored exactly when the Stan code declares it", {
-  # get_prior() reads the monitor list while stancode() reads the
-  # stanvar generator. Were the two to disagree, get_prior() would
-  # offer a prior for a parameter the model never declares.
+  # get_prior() takes the monitor list. stancode() takes the stanvar
+  # generator. A disagreement would have get_prior() offer a prior
+  # for a parameter the model never declares.
   cases <- list(
     list(tf = ~ AR(p = 1), spec = AR(p = 1)),
     list(tf = ~ AR(p = 1, df = NA), spec = AR(p = 1, df = NA)),
@@ -237,8 +225,8 @@ test_that("nu_trend is monitored exactly when the Stan code declares it", {
 })
 
 test_that("one registry entry drives both stancode and get_prior", {
-  # Two independent copies of the default would drift apart without any
-  # test noticing, so pin both surfaces to the registry string itself.
+  # stancode() and get_prior() both take the registry's default
+  # string
   default <- mvgam:::common_trend_priors$nu_trend$default
   expect_true(grepl(stan_prior_line("nu_trend", default),
                       tdf_code(~ AR(p = 1, df = NA)), fixed = TRUE))
@@ -250,12 +238,9 @@ test_that("one registry entry drives both stancode and get_prior", {
 })
 
 test_that("a reported bound is the bound Stan declares", {
-  # A bound is stated in the registry, in the type fallback and in
-  # any per-trend resolver, and nothing held those in step: the
-  # autoregressive resolver reported (-0.99, 0.99) against a
-  # declaration of [-1, 1], so the table understated the support the
-  # model samples on. Compare the whole table rather than one
-  # parameter, since the next drift will be somewhere else.
+  # A bound is stated in the registry, in the type fallback and in any
+  # per-trend resolver. The whole table is compared with the
+  # declarations, every parameter of every form.
   declared_bounds <- function(code) {
     lines <- unlist(strsplit(code, "\n"))
     pat <- paste0("^\\s*(vector|real|array[^ ]*)\\s*",
@@ -311,8 +296,8 @@ test_that("assert_trend_df() rejects values with no finite variance", {
 })
 
 test_that("trend types without innovations do not accept df", {
-  # VAR samples its states directly and piecewise trends are
-  # deterministic, so neither has innovations to make heavy-tailed.
+  # VAR samples its states directly. A piecewise trend is
+  # deterministic. Neither has innovations to make heavy-tailed.
   expect_error(VAR(df = 5), "unused argument")
   expect_error(PW(df = 5), "unused argument")
 })
@@ -326,7 +311,7 @@ test_that("draw_trend_innovations() matches the Stan innovation distribution", {
   # variance of a standard t is df / (df - 2)
   expect_equal(var(t5[, 1]), 5 / 3, tolerance = 0.15)
 
-  # Series are uncorrelated but share the mixing value, so a shock
+  # Series are uncorrelated but share the mixing value. A shock then
   # reaches all of them at once. Element-wise student_t() would leave
   # the absolute values independent.
   expect_equal(cor(t5[, 1], t5[, 2]), 0, tolerance = 0.05)
@@ -343,8 +328,8 @@ test_that("draw_trend_innovations() validates its arguments", {
 # ----- writing a prior statement ----------------------------------
 
 test_that("stan_prior_statement writes both spellings", {
-  # Stan drops the normalising constant from the tilde form, so a
-  # normalised program has to spell the density call out.
+  # Stan drops the normalising constant from the tilde form. A
+  # normalised program spells the density call out.
   expect_identical(
     stan_prior_statement("sigma_trend", "exponential(2)"),
     "target += exponential_lpdf(sigma_trend | 2);"
@@ -368,7 +353,7 @@ test_that("stan_prior_statement handles the awkward shapes", {
     stan_prior_statement("Amu_trend[lag]", "normal(0, sqrt(0.455))"),
     "target += normal_lpdf(Amu_trend[lag] | 0, sqrt(0.455));"
   )
-  # A slice, and a transpose, pass through verbatim.
+  # A slice passes through verbatim. So does a transpose.
   expect_identical(
     stan_prior_statement("varrho_inv[2:N_lv_trend]",
                            "inv_gamma(mgp_a2, 1)"),
@@ -387,16 +372,16 @@ test_that("stan_prior_statement refuses a distribution it cannot parse", {
   expect_error(stan_prior_statement("sigma_trend", ""),
                  "at least 1 characters")
   expect_error(stan_prior_statement("sigma_trend", "exponential"),
-                 "distribution\\(arguments\\)")
+               "must be a Stan distribution call")
   expect_error(stan_prior_statement("sigma_trend", "normal(0, 1"),
-                 "distribution\\(arguments\\)")
+               "must be a Stan distribution call")
 })
 
 
 test_that("the normaliser leaves comments and brms lines alone", {
   prog <- paste(
     "model {",
-    "  // bf(y ~ s(x)) is a formula, not a statement",
+    "  // bf(y ~ s(x)) names a formula inside a comment",
     "  sigma_trend ~ exponential(2);",
     "  lprior += student_t_lpdf(Intercept | 3, 0, 2.5);",
     "  target += lprior;",

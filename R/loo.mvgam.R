@@ -75,7 +75,7 @@
 #' and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
 #' \doi{10.1007/s11222-016-9696-4}
 #'
-#' Bürkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
+#' Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
 #' leave-future-out cross-validation for Bayesian time series
 #' models. \emph{Journal of Statistical Computation and
 #' Simulation}, 90(14):2499-2523.

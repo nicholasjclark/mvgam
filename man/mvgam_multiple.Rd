@@ -2,7 +2,7 @@
 % Please edit documentation in R/mvgam_core.R
 \name{mvgam_multiple}
 \alias{mvgam_multiple}
-\title{Fit mvgam Models to Multiple Imputation Datasets}
+\title{Fit mvgam models to multiply imputed datasets}
 \usage{
 mvgam_multiple(
   formula,
@@ -20,8 +20,8 @@ mvgam_multiple(
 formula syntax including smooths and random effects.}
 
 \item{trend_formula}{Optional trend formula specifying
-state-space dynamics. Can be response-specific in multivariate
-models.}
+state-space dynamics. One trend formula applies to every response
+of a multivariate model.}
 
 \item{data_list}{List of imputed data frames. Each element must
 have identical structure (same variables, same ordering).
@@ -40,8 +40,8 @@ consistency across imputations (same column names, types,
 rows).}
 
 \item{newdata}{Optional held-out \code{data.frame} persisted on
-every imputation fit, so later plot / forecast methods can
-reach it through any one of them. Defaults to \code{NULL}.}
+every imputation fit. Later plot and forecast methods can reach
+it through any one of them. Defaults to \code{NULL}.}
 
 \item{...}{Additional arguments passed to \code{mvgam()} for each
 imputation (e.g., chains, iter, family, priors).}
@@ -65,8 +65,8 @@ stub does not have.
 }
 \description{
 Fits Bayesian state-space models to multiply imputed datasets,
-combining posteriors across imputations for proper uncertainty
-quantification when dealing with missing data.
+combining posteriors across imputations to carry the imputation
+uncertainty into the estimates.
 }
 \details{
 This function processes multiple imputed datasets in two modes:
@@ -83,18 +83,16 @@ Returns a list of individual mvgam fits, one per imputation,
 allowing manual posterior combination or separate analysis.
 
 \strong{Posterior Combination Approach}:
-Uses \code{rstan::sflist2stanfit()} (validated brms pattern) to
-concatenate draws from all imputations at the Stan level,
-properly accounting for between-imputation and
-within-imputation variance. This approach ensures valid
-uncertainty quantification following proper multiple imputation
-principles.
+Uses \code{rstan::sflist2stanfit()}, as \code{brms::brm_multiple()} does, to
+concatenate draws from all imputations at the Stan level. The pooled
+draws then hold both the between-imputation and within-imputation
+variance.
 
 \strong{MI Diagnostics}:
 Pooled objects include convergence diagnostics per imputation
 (Rhat, ESS) accessible via \code{summary()}. The print method
-displays MI diagnostics including total draws,
-draws per imputation, and convergence summaries.
+displays MI diagnostics: total draws, draws per imputation and
+convergence summaries.
 }
 \examples{
 \dontrun{

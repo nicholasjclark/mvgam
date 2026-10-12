@@ -249,30 +249,31 @@ transformed parameters {
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += X_trend * b_trend;
   matrix[N_time_trend, N_lv_trend] lv_trend;   // the latent dynamics
-  matrix[N_time_trend, N_series_trend] trend;
-  for (i in 1:N_time_trend) {
-    for (s in 1:N_series_trend) {
-      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :])
-                    + mu_trend[times_trend[i, s]];
-    }
+  matrix[N_time_trend, N_series_trend] trend = lv_trend * Z';
+  for (s in 1:N_series_trend) {
+    trend[ : , s] += mu_trend[times_trend[ : , s]];
   }
 }
 ```
 
+`generate_trend_computation_tparameters()` drops the product when
+`Z` is the identity. It drops the loop when the trend formula has no
+terms, which leaves `mu_trend` at zero.
+
 The observation program then adds the trend to each observation it
-scores, through two index arrays that map an observation onto the
-trend matrix:
+scores. The data arrays `obs_trend_time` and `obs_trend_series` map
+an observation onto the trend matrix. Transformed data combines them
+into the column-major cell index `obs_trend_idx`. One gather adds the
+trend:
 
 ```stan
-for (n in 1:N) {
-  mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
-}
+mu += to_vector(trend)[obs_trend_idx];
 ```
 
-A multivariate model follows the brms naming: each response has its
-own `mu_<resp>` and its own mapping arrays, `obs_trend_time_<resp>`
-and `obs_trend_series_<resp>`. The dynamics parameters are shared
-across responses.
+A multivariate model follows the brms naming. Each response has its
+own `mu_<resp>` and `obs_trend_idx_<resp>`, built from its mapping
+arrays `obs_trend_time_<resp>` and `obs_trend_series_<resp>`. The
+dynamics parameters are shared across responses.
 
 mvgam keeps the brms optimisations of the observation model. A GLM
 likelihood is rewritten to take `to_matrix(mu)`, which keeps the GLM
@@ -578,9 +579,17 @@ give `Gamma[a, b] = Sigma[a, b] * sum_j psi_a,j psi_b,j`, exact for
 contiguous and sparse lag sets with or without a moving-average term.
 A draw close to a unit root takes an exact companion solve. `VAR()`
 takes `Omega_trend`, the stationary joint variance its Stan model
-computes. The registry's `stationary_source` records which of these
-applies: `"lift"` for AR and CAR, `"omega"` for VAR and `"none"` for
-the rest.
+computes. The map of Heaps (2023) that gives a VAR its coefficients
+also gives the stationary autocovariances at lags 0 to `p - 1`. The
+program places them in a block Toeplitz matrix. A moving-average term
+changes the autocovariances. The program then solves the Lyapunov
+equation of `p` consecutive states, a linear system of side
+`(p m)^2`, once per group in a grouped trend. The MA error enters
+that equation through its noise covariance alone. The start holds the
+error too, with the innovation covariance as its covariance with the
+first state and with itself. The registry's `stationary_source`
+records which of these applies: `"lift"` for AR and CAR, `"omega"`
+for VAR and `"none"` for the rest.
 
 The Stan program starts every contiguous `AR()` at the same law: the
 scalar closed forms at one lag, `ar_stationary_init()` for

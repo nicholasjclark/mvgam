@@ -75,13 +75,13 @@ test_that("mvgam_round_largest_remainder preserves the total", {
   # Standard non-integer split: 30/30/40
   expect_identical(
     mvgam_round_largest_remainder(c(0.3, 0.3, 0.4) * 100),
-    c(30, 30, 40)
+    c(30L, 30L, 40L)
   )
   # Tied fractional parts must still sum to the requested total.
   out <- mvgam_round_largest_remainder(c(0.333, 0.333, 0.334) * 99)
-  expect_identical(sum(out), 99)
+  expect_identical(sum(out), 99L)
   # Single weight: identity.
-  expect_identical(mvgam_round_largest_remainder(7), 7)
+  expect_identical(mvgam_round_largest_remainder(7), 7L)
 })
 
 

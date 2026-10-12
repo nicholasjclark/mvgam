@@ -1,14 +1,21 @@
-# Internal: draw one unit's worth of responses from a `K`-vector of
-# linear predictors.
-#
-# Families whose components are drawn independently go to
-# `sim_family_rng()`, which already covers every such family mvgam
-# fits. The branches here are the ones a per-row sampler cannot
-# express: `mvn()` and `mvt()` add a per-species residual to a shared
-# unit, and the composition families draw the K components together
-# from one softmax.
-#'@noRd
+#' One unit's simulated responses from a vector of linear predictors
+#'
+#' Families with independently drawn components go to `sim_family_rng()`.
+#' The branches here cover the families a per-row sampler cannot
+#' express. `mvn()` and `mvt()` add a per-species residual to a shared
+#' unit. The composition families draw all `K` components together from
+#' one softmax.
+#'
+#' @param eta Numeric vector of `K` linear predictors, one per species
+#' @param family Family object of the simulated model
+#' @param pars Named list of family parameters, such as `Psi`, `nu`,
+#'   `phi` or `unit_total`
+#' @return Numeric vector of length `K` holding the unit's responses
+#' @noRd
 sim_jsdm_draw <- function(eta, family, pars = list()) {
+  checkmate::assert_numeric(eta, min.len = 1L)
+  checkmate::assert_list(family)
+  checkmate::assert_list(pars)
   K <- length(eta)
   switch(
     resolve_family_name(family),

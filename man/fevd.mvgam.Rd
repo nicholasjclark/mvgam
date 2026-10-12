@@ -20,13 +20,12 @@ fevd(object, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
-that used a Vector Autoregressive latent process model (either as \code{VAR(cor = FALSE)} or
-\code{VAR(cor = TRUE)}; see \code{\link[=VAR]{VAR()}} for details)}
+that used a \code{VAR()} latent process model}
 
 \item{...}{Unused. Anything passed here is refused.}
 
 \item{h}{Positive \code{integer} specifying the forecast horizon over which to calculate
-the IRF}
+the decomposition}
 
 \item{ndraws}{Optional integer; the number of posterior draws to
 summarise over. A decomposition is built from one transition
@@ -69,7 +68,7 @@ plot(fevd_obj)
 
 }
 \references{
-Lütkepohl, H. (2007).
+Lutkepohl, H. (2007).
 New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
 }
 \seealso{

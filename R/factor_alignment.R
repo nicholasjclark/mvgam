@@ -240,10 +240,18 @@ align_factor_draws <- function(Z, lp, template = NULL, path_var = NULL) {
 }
 
 
-# Internal: the variance over time of each factor path in every draw
-# of a chain, `[draws, factors]`.
-#'@noRd
+#' The variance over time of each factor path in every draw of a chain
+#'
+#' @param chain Draws of one chain, holding the `lv_trend[t, k]` columns
+#' @param n_lv Integer number of latent factors
+#' @return Numeric matrix with dimensions `[draws, factors]`
+#' @noRd
 factor_path_variance <- function(chain, n_lv) {
+  checkmate::assert(
+    checkmate::check_data_frame(chain),
+    checkmate::check_list(chain)
+  )
+  checkmate::assert_int(n_lv, lower = 1L)
   vapply(seq_len(n_lv), function(k) {
     path <- as.matrix(chain[grepl(
       sprintf("^lv_trend\\[[0-9]+,%d\\]$", k), names(chain)
@@ -253,10 +261,19 @@ factor_path_variance <- function(chain, n_lv) {
 }
 
 
-# Internal: the loadings of factor `j` in every draw under an
-# alignment, `[draws, series]`.
-#'@noRd
+#' The loadings of one factor in every draw under an alignment
+#'
+#' @param Z Numeric loading array with dimensions
+#'   `[draws, series, factors]`
+#' @param alignment List holding the `perm` and `sign` matrices, each
+#'   with dimensions `[draws, factors]`
+#' @param j Integer index of the aligned factor
+#' @return Numeric matrix with dimensions `[draws, series]`
+#' @noRd
 aligned_factor <- function(Z, alignment, j) {
+  checkmate::assert_array(Z, d = 3L)
+  checkmate::assert_list(alignment)
+  checkmate::assert_int(j, lower = 1L)
   n_draws <- dim(Z)[1L]
   n_series <- dim(Z)[2L]
   index <- cbind(rep(seq_len(n_draws), n_series),
@@ -304,9 +321,13 @@ best_assignment <- function(score) {
 }
 
 
-# Internal: every ordering of `1:m`, one per row.
-#'@noRd
+#' Every ordering of `1:m`
+#'
+#' @param m Positive integer
+#' @return Integer matrix with one ordering per row and `m` columns
+#' @noRd
 all_orderings <- function(m) {
+  checkmate::assert_int(m, lower = 1L)
   if (m == 1L) {
     return(matrix(1L, 1L, 1L))
   }

@@ -211,14 +211,28 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 }
 
 
-# Internal: combine the per-draw obs and trend deterministic linpreds
-# and optionally add the marginal trend-noise sample. Single helper
-# shared by the univariate and multivariate branches of
-# `get_combined_linpred`. Validates shapes and emits a contextual
-# message for the multivariate response when `resp_name` is supplied.
-#'@noRd
+#' The observation and trend linear predictors summed per draw
+#'
+#' Adds the marginal trend-noise sample when one is supplied. The
+#' univariate and multivariate branches of `get_combined_linpred()` both
+#' call it. A shape mismatch names the response when `resp_name` is set.
+#'
+#' @param obs_mat Numeric draws-by-observations matrix of the
+#'   observation linear predictor
+#' @param trend_mat Numeric matrix of the trend linear predictor, shaped
+#'   as `obs_mat`
+#' @param trend_noise Numeric matrix of trend noise shaped as `obs_mat`,
+#'   or `NULL`
+#' @param resp_name Character response name for the error message, or
+#'   `NULL`
+#' @return Numeric matrix shaped as `obs_mat`
+#' @noRd
 compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
                                         resp_name = NULL) {
+  checkmate::assert_matrix(obs_mat)
+  checkmate::assert_matrix(trend_mat)
+  checkmate::assert_matrix(trend_noise, null.ok = TRUE)
+  checkmate::assert_string(resp_name, null.ok = TRUE)
   what <- if (is.null(resp_name)) "" else paste0(" of '", resp_name, "'")
   if (!identical(dim(trend_mat), dim(obs_mat))) {
     stop_shape_fault(paste0("The trend predictor", what), dim(trend_mat),

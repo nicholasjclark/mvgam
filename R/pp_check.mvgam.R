@@ -479,12 +479,12 @@ pp_check.mvgam <- function(
   #
   # Non-grouped resid plots use empirical PIT residuals: ndraws
   # below ~50 makes the PIT support underflow for observations in
-  # the predictive tail, producing apparent ±8 extreme values
+  # the predictive tail, producing apparent +/-8 extreme values
   # that are floating-point clamp artefacts rather than model
   # misfit. Default to 500 and warn if the user passes < 50.
   #
   # Grouped resid plots route through bayesplot facets that put
-  # one panel per draw × group. With ndraws much above ~12 the
+  # one panel per draw x group. With ndraws much above ~12 the
   # panels collapse to invisible at typical canvas sizes. Default
   # to 8 and warn if the user passes > 12.
   resid_nongrouped <- c("resid_hist", "resid_ribbon")
@@ -817,15 +817,24 @@ pp_check.mvgam <- function(
 }
 
 
-# Internal: the rows of one series in the frame residuals are
-# computed on, in time order.
-#
-# Returns a list of `rows` (indices into `data`), `label` (the series
-# name, or NULL for a fit that records no series axis) and `n_series`.
-# A fit that records no series axis, a response-keyed frame among
-# them, keeps every row.
-#'@noRd
+#' The rows of one series in the residual frame, in time order
+#'
+#' A fit without a series axis keeps every row. A response-keyed frame
+#' is one such fit.
+#'
+#' @param object Fitted `mvgam` object
+#' @param data Data frame the residuals are computed on
+#' @param series Series name or index, or `NULL` for the first series
+#' @return List holding the row indices in `rows`, the series name in
+#'   `label` and the number of series in `n_series`. `label` is `NULL`
+#'   for a fit without a series axis.
+#' @noRd
 resid_series_rows <- function(object, data, series = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert(
+    checkmate::check_data_frame(data),
+    checkmate::check_list(data)
+  )
   row_series <- axis_row_series(object, data)
   levs <- if (is.null(row_series)) character(0L) else levels(row_series)
   if (length(levs) == 0L) {
@@ -862,10 +871,17 @@ resid_series_rows <- function(object, data, series = NULL) {
 }
 
 
-# Internal: name the series a residual plot shows, where the fit has
-# more than one to choose from.
-#'@noRd
+#' A residual plot subtitled with the series it shows
+#'
+#' Only fits with more than one series get the subtitle.
+#'
+#' @param p A `ggplot` object
+#' @param series_sel List from `resid_series_rows()`, or `NULL`
+#' @return `p`, with a subtitle when the fit has several series
+#' @noRd
 label_resid_series <- function(p, series_sel) {
+  checkmate::assert_class(p, "ggplot")
+  checkmate::assert_list(series_sel, null.ok = TRUE)
   if (is.null(series_sel$label) || series_sel$n_series < 2L) {
     return(p)
   }
@@ -910,27 +926,31 @@ pp_check_mv_category <- function(object, newdata) {
 }
 
 
-# Internal: collapse a closure-unit fit's observations and
-# replicates from the visit grain to the unit grain.
-#
-# A closure unit's visits share one latent state, so the unit is
-# what a posterior predictive check compares. The observed value of
-# a unit is the sum over the visits that were made, which is the
-# sufficient statistic for that state.
-#
-# The residual types are the exception: `residuals.mvgam()` has
-# already aggregated, so the replicates arrive per unit and only the
-# observed side needs a length to match. Those plots put the
-# residual on the x axis and read `y` as zero, so zeros of the right
-# length are what they need.
-#
-# Returns a list `(y, yrep, arrays, first_visits)`. The
-# `first_visits` lookup is used by the caller to dedup any
-# `group` / `x` covariate the user supplied so bayesplot sees
-# one covariate value per closure unit.
-#'@noRd
+#' Observations and replicates of a closure-unit fit at the unit grain
+#'
+#' A closure unit's visits share one latent state, making the unit the
+#' grain a posterior predictive check compares. A unit's observed value
+#' is the sum over its visits, the sufficient statistic for that state.
+#' Residual types arrive already aggregated by `residuals.mvgam()`.
+#' Those plots treat `y` as zero. The observed side then needs only
+#' zeros of unit length.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family
+#' @param newdata Data frame of the prediction rows
+#' @param yrep Numeric matrix of replicates, one row per draw
+#' @param type Character `pp_check()` plot type
+#' @return List holding `y`, `yrep`, `arrays` and `first_visits`. The
+#'   caller uses `first_visits` to keep one covariate value per unit.
+#' @noRd
 closure_unit_pp_check_setup <- function(object, newdata, yrep,
                                           type) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert(
+    checkmate::check_data_frame(newdata),
+    checkmate::check_list(newdata)
+  )
+  checkmate::assert_matrix(yrep)
+  checkmate::assert_string(type)
   # Multi-season families return `c("series", "site", "time")` here;
   # single-season families return NULL and fall back to the 2-axis
   # default inside `build_closure_unit_arrays()`.
@@ -955,13 +975,22 @@ closure_unit_pp_check_setup <- function(object, newdata, yrep,
 }
 
 
-# Internal: assert that a per-visit covariate is constant within
-# every closure unit. Used by the closure-unit pp_check setup to
-# guard the `group` and `x` ppc_* arguments before they get
-# remapped to the per-unit grain.
-#'@noRd
+#' Refuse a covariate that varies within a closure unit
+#'
+#' Guards the `group` and `x` arguments of `pp_check()` before they
+#' map to the unit grain.
+#'
+#' @param values Vector of covariate values, one per visit row
+#' @param arrays Closure-unit arrays holding `N_unit`, `n_rep` and
+#'   `visit_row`
+#' @param var_name Character name of the covariate, for the message
+#' @return `NULL`, invisibly, or an error
+#' @noRd
 check_closure_unit_var_unit_constant <- function(values, arrays,
                                                    var_name) {
+  checkmate::assert_atomic_vector(values)
+  checkmate::assert_list(arrays)
+  checkmate::assert_string(var_name)
   for (g in seq_len(arrays$N_unit)) {
     idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     if (length(unique(values[idx])) > 1L) {
@@ -978,18 +1007,22 @@ check_closure_unit_var_unit_constant <- function(values, arrays,
 }
 
 
-# Internal: ACF / pACF panel for DS residual draws.
-# `resid_draws` is `[ndraws x nobs]`; computes per-draw ACF (or
-# pACF) via stats::acf / stats::pacf, then summarises across
-# draws with nested quantile segments at each integer lag.
-# Bands are drawn as `geom_segment` instead of the time-axis
-# ribbons in P0 because the x-axis is discrete lag positions,
-# not continuous time. The dashed band shows the asymptotic
-# 95% white-noise interval `+/- 1.96 / sqrt(n)`.
-#'@noRd
+#' An ACF or pACF panel of residual draws
+#'
+#' Computes the ACF or pACF of each draw, then summarises across draws
+#' with nested quantile segments at each integer lag. Segments mark the
+#' discrete lags. The dashed band is the asymptotic 95% white-noise
+#' interval `+/- 1.96 / sqrt(n)`.
+#'
+#' @param resid_draws Numeric residual matrix with dimensions
+#'   `[ndraws, nobs]`
+#' @param lag_type Character panel type, `"acf"` or `"pacf"`
+#' @return A `ggplot` object
+#' @noRd
 build_resid_lag_panel <- function(
   resid_draws, lag_type = c("acf", "pacf")
 ) {
+  checkmate::assert_matrix(resid_draws)
   lag_type <- match.arg(lag_type)
   acf_fn <- if (lag_type == "acf") stats::acf else stats::pacf
   ndraws <- nrow(resid_draws)
@@ -1058,11 +1091,15 @@ build_resid_lag_panel <- function(
 }
 
 
-# Internal: Q-Q panel for DS residual draws. Pools all draws,
-# overlays a single reference line and double-plots points
-# (white outline + dark fill) for the mvgam point overlay style.
-#'@noRd
+#' A normal Q-Q panel of residual draws
+#'
+#' Pools every draw under one reference line.
+#'
+#' @param resid_draws Numeric residual matrix, one row per draw
+#' @return A `ggplot` object
+#' @noRd
 build_resid_qq_panel <- function(resid_draws) {
+  checkmate::assert_numeric(resid_draws)
   palette <- mvgam_palette()
   df <- data.frame(resids = as.numeric(resid_draws))
   ggplot2::ggplot(df, ggplot2::aes(sample = resids)) +
@@ -1082,19 +1119,25 @@ build_resid_qq_panel <- function(resid_draws) {
 }
 
 
-# Internal: Resids-vs-fitted panel. `per_obs = TRUE` (the default
-# at the call site in `pp_check.mvgam`) collapses each
-# observation to its posterior median for both fitted and
-# residual: one point per observation, matching the
-# `plot.lm` convention. `per_obs = FALSE` retains the pooled
-# (draw x obs) scatter that exposes the per-draw spread of
-# discrete-PIT residuals at low fitted values. The thin-plate
-# gam smoother ribbon highlights any systematic mean trend in
-# either view.
-#'@noRd
+#' A residuals-against-fitted panel of residual draws
+#'
+#' With `per_obs = TRUE` each observation is its posterior median on
+#' both axes, one point per observation as in `plot.lm()`. With
+#' `per_obs = FALSE` every draw of every observation is plotted. That
+#' view shows the per-draw spread of discrete-PIT residuals at low
+#' fitted values. A thin-plate GAM smooth traces any trend in the mean.
+#'
+#' @param resid_draws Numeric residual matrix, one row per draw
+#' @param fitted_draws Numeric fitted matrix shaped as `resid_draws`
+#' @param per_obs Logical flag to plot one median point per observation
+#' @return A `ggplot` object
+#' @noRd
 build_resid_vs_fitted_panel <- function(
   resid_draws, fitted_draws, per_obs = TRUE
 ) {
+  checkmate::assert_matrix(resid_draws)
+  checkmate::assert_matrix(fitted_draws)
+  checkmate::assert_flag(per_obs)
   palette <- mvgam_palette()
   if (per_obs) {
     df <- data.frame(
@@ -1135,19 +1178,37 @@ build_resid_vs_fitted_panel <- function(
 }
 
 
-# Internal: closure-unit chi-squared / Freeman-Tukey discrepancy
-# GOF (Gelman et al. 1996). For each posterior draw s:
-#   T_obs_s = D(y_obs, E[y|theta_s]),  T_rep_s = D(y_rep_s, E[y|theta_s])
-# with D either chi-squared (sum((y - e)^2 / (e + eps))) or
-# Freeman-Tukey (sum((sqrt(y) - sqrt(e))^2)). Per-visit yrep + epred
-# are aggregated to the closure-unit grain via the shared
-# `aggregate_closure_unit_visits()` helper. An optional `group =`
-# vector of unit-constant covariate columns further sums per group
-# level before applying D. Bayesian p-value is the posterior
-# probability P(T_rep >= T_obs).
-#'@noRd
+#' A discrepancy check of a closure-unit fit
+#'
+#' Follows Gelman et al. (1996). For each draw `s` the observed
+#' discrepancy is `D(y_obs, E[y | theta_s])`. The replicated
+#' discrepancy is `D(y_rep_s, E[y | theta_s])`. `D` is the
+#' chi-squared statistic `sum((y - e)^2 / (e + eps))` or the
+#' Freeman-Tukey statistic `sum((sqrt(y) - sqrt(e))^2)`. Replicates and
+#' expectations are summed to the unit grain with
+#' `aggregate_closure_unit_visits()`. A `group` column of unit-constant
+#' values sums them further by level. The Bayesian p-value is the
+#' posterior probability of `T_rep >= T_obs`.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family
+#' @param newdata Data frame of new data, or `NULL` for the training
+#'   data
+#' @param stat Character statistic, `"chi_squared"` or
+#'   `"freeman_tukey"`
+#' @param group Character name of a unit-constant grouping column, or
+#'   `NULL`
+#' @param ndraws Integer number of draws, or `NULL`
+#' @param draw_ids Integer vector of draw indices, or `NULL`
+#' @return A `ggplot` object
+#' @noRd
 closure_unit_fit_stat_ppc <- function(object, newdata, stat,
                                         group, ndraws, draw_ids) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(newdata, null.ok = TRUE)
+  checkmate::assert_string(stat)
+  checkmate::assert_string(group, null.ok = TRUE)
+  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   stat <- match.arg(stat, c("chi_squared", "freeman_tukey"))
   newdata <- prediction_frame(object, newdata)
 
@@ -1306,15 +1367,28 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
 }
 
 
-# Internal: residual diagnostic patchwork for one series, called by
-# `plot.mvgam(x, type = "residuals")`. Residuals against fitted
-# values, the Q-Q plot, the ACF and the pACF, all from one set of
-# posterior draws. A closure-unit family has one residual per closure
-# unit, and its residuals are shown in the Q-Q panel alone.
-#'@noRd
+#' The residual diagnostic grid of one series
+#'
+#' `plot.mvgam(x, type = "residuals")` calls it. The grid shows
+#' residuals against fitted values, the Q-Q plot, the ACF and the pACF,
+#' all from one set of draws. A closure-unit family has one residual per
+#' unit and shows the Q-Q panel alone.
+#'
+#' @param object Fitted `mvgam` object
+#' @param series Series name or index, or `NULL`
+#' @param newdata Data frame of new data, or `NULL`
+#' @param ndraws Integer number of draws
+#' @param resp Character response name, or `NULL`
+#' @param ... Refused if supplied
+#' @return A `patchwork` object
+#' @noRd
 mvgam_resid_panel <- function(
   object, series = NULL, newdata = NULL, ndraws = 100L, resp = NULL, ...
 ) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(newdata, null.ok = TRUE)
+  checkmate::assert_int(ndraws, lower = 1L)
+  checkmate::assert_string(resp, null.ok = TRUE)
   # The panels are built from this function's own arguments, so
   # nothing here reads `...`. It is refused instead of being handed
   # on, since `plot.mvgam(type = "residuals")` reaches this and an

@@ -410,11 +410,25 @@ summary.mvgam_compare_scores <- function(object, ...) {
 }
 
 
-# Internal: a label for each compared object. `model_names` wins,
-# then the name an object was passed under, then its expression in
-# the call.
-#'@noRd
+#' A label for each compared object
+#'
+#' `model_names` takes precedence. Each object without one takes the
+#' name it was passed under, then its expression in the call.
+#'
+#' @param objects List of the compared objects
+#' @param exprs List or pairlist of the unevaluated argument
+#'   expressions, one per object
+#' @param model_names Character vector of labels, one per object, or
+#'   `NULL`
+#' @return Character vector of labels, one per object
+#' @noRd
 compared_object_names <- function(objects, exprs, model_names = NULL) {
+  checkmate::assert_list(objects)
+  checkmate::assert(
+    checkmate::check_list(exprs),
+    checkmate::check_class(exprs, "pairlist"),
+    checkmate::check_null(exprs)
+  )
   if (!is.null(model_names)) {
     checkmate::assert_character(model_names, len = length(objects),
                                 any.missing = FALSE)
@@ -425,10 +439,21 @@ compared_object_names <- function(objects, exprs, model_names = NULL) {
 }
 
 
-# Internal: the objects a comparison takes, at least `min_n` of one
-# class. Weighting takes one model, which receives all the weight.
-#'@noRd
+#' Refuse a comparison without enough objects of one class
+#'
+#' Weighting accepts `min_n = 1`, giving one model all the weight.
+#'
+#' @param objects List of the compared objects
+#' @param cls Character class every object must inherit from
+#' @param fn Character name of the calling function, for the message
+#' @param min_n Integer minimum number of objects
+#' @return `TRUE`, invisibly, or an error
+#' @noRd
 assert_compared_objects <- function(objects, cls, fn, min_n = 2L) {
+  checkmate::assert_list(objects)
+  checkmate::assert_string(cls)
+  checkmate::assert_string(fn)
+  checkmate::assert_int(min_n, lower = 1L)
   if (length(objects) < min_n) {
     stop(insight::format_error(c(
       paste0("'", fn, "()' compares at least ", min_n, " '", cls,

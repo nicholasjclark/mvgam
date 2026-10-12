@@ -443,7 +443,7 @@ test_that("propagate_pw errors on mismatched k / m lengths", {
 })
 
 
-test_that("propagate_pw rejects logistic growth without cap", {
+test_that("propagate_pw needs a cap and takes one below zero", {
   spec <- structure(
     list(trend = "PW", growth = "logistic"),
     class = "mvgam_trend"
@@ -460,4 +460,12 @@ test_that("propagate_pw rejects logistic growth without cap", {
     ),
     "cap"
   )
+  # A log link puts a response-scale cap below one at a negative
+  # link-scale value, which propagates to a negative trend
+  out <- propagate_trend(
+    spec, params, h = 5L, n_series = 1L,
+    fc_times = 11:15, training_times = 1:10,
+    cap = matrix(log(0.5), 5L, 1L)
+  )
+  expect_true(all(out < 0))
 })

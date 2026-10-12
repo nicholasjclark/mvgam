@@ -9,8 +9,9 @@
 \arguments{
 \item{object}{An object of class \code{mvgam}.}
 
-\item{probs}{Numeric vector of length 2 specifying quantile probabilities
-for credible intervals. Default is \code{c(0.025, 0.975)} for 95\% intervals.}
+\item{probs}{Numeric vector of length 2 specifying quantile
+probabilities for credible intervals. Default is
+\code{c(0.025, 0.975)} for 95\% intervals.}
 
 \item{robust}{Logical; if \code{TRUE}, the median and MAD measure
 central tendency and spread. The default \code{FALSE} uses the mean
@@ -31,8 +32,8 @@ sampled parameters alone, among them \code{sigma_trend},
 \value{
 An object of class \code{mvgam_summary}. Each block is a
 data frame of the columns below, one row per parameter, named as
-\pkg{brms} prints it, and is absent when the model has none. The
-observation model's blocks are:
+\pkg{brms} prints it. A block is absent when the model has no such
+parameter. The observation model's blocks are:
 \describe{
 \item{\code{smooth}}{Smoothing standard deviations, one row per
 penalty of each smooth. The basis coefficients are available by
@@ -42,8 +43,8 @@ name from \code{as_draws(object, variable = "^s_", regex =
 and length-scales.}
 \item{\code{random}}{Group-level standard deviations and
 correlations, as a list of tables named by grouping factor.
-\code{ngrps} gives each factor's number of levels, and
-\code{ranef()} the per-level effects.}
+\code{ngrps} gives each factor's number of levels. \code{ranef()}
+gives the per-level effects.}
 \item{\code{fixed}}{Regression coefficients, those of every
 distributional parameter given a formula among them.}
 \item{\code{mo}}{The simplex of each monotonic effect.}
@@ -58,9 +59,9 @@ formula, family, draw counts and data dimensions are stored with
 them.
 }
 \description{
-Provides posterior summary statistics for mvgam model parameters, organized
-by category (fixed effects, smooth terms, family parameters, trend parameters,
-and factor loadings).
+Provides posterior summary statistics for mvgam model parameters,
+organised by category (fixed effects, smooth terms, family
+parameters, trend parameters and factor loadings).
 }
 \details{
 The summary includes the following columns:
@@ -79,9 +80,9 @@ set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-              data    = simdat$data_train,
-              family  = poisson(),
-              chains  = 2, silent = 2)
+              data = simdat$data_train,
+              family = poisson(),
+              chains = 2, silent = 2)
 
 summary(mod)
 }

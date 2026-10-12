@@ -280,8 +280,7 @@ MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "sd", "cor", "sdgp", "lscale")
 # vector is a different parameter, which is aliased and kept.
 #'@noRd
 MVGAM_PAR_INTERNAL_PATTERN <- paste0(
-  "^(P_var|result_var|P_ma|result_ma|",
-  "ma_innovations_trend|A_trend|A_group_trend|D_trend|",
+  "^(ma_innovations_trend|A_trend|A_group_trend|D_trend|D_group_trend|",
   "L_Omega_trend|L_Sigma_trend|L_Omega_global_trend|",
   "L_Omega_group_trend|L_deviation_group_trend|L_group_trend|",
   "Z_cols|varrho_inv|Phi_loadings|L_Phi_loadings|",

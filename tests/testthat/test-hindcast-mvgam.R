@@ -220,17 +220,20 @@ test_that("ndraws subset yields the requested rows", {
     `as_draws_matrix` = function(...) draws,
     .package = "posterior"
   )
+  # Each extraction returns the rows it is asked for
   testthat::local_mocked_bindings(
-    extract_trend_latent_states = function(...) {
-      matrix(0, nrow = 5L, ncol = 8L)
+    extract_trend_latent_states = function(mvgam_fit, newdata,
+                                           full_draws, ...) {
+      matrix(0, nrow = nrow(full_draws), ncol = nrow(newdata))
     },
-    extract_component_linpred = function(mvgam_fit, newdata,
-                                           component, ...) {
-      matrix(0, nrow = 5L, ncol = nrow(newdata))
+    extract_component_linpred = function(mvgam_fit, newdata, component,
+                                         resp = NULL, draw_ids = NULL,
+                                         ...) {
+      matrix(0, nrow = length(draw_ids %||% 1:5), ncol = nrow(newdata))
     },
     draw_observations = function(object, linpred, newdata, draw_ids,
                                  resp = NULL) {
-      matrix(seq_len(5L * 8L), nrow = nrow(linpred), ncol = 8L)
+      linpred
     }
   )
   hc <- hindcast(fit, type = "response", ndraws = 2L)

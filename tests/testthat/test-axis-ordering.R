@@ -563,15 +563,16 @@ expect_axes_sound <- function(prefit, resp_names, lab, frame,
     grepl("matrix\\[N_series_trend, N_lv_trend\\] Z(;| =)", code),
     label = paste(lab, "loadings on the series axis")
   )
+  flat <- gsub("\\s+", " ", code)
   for (r in resp_names %||% "") {
-    suffix <- if (nzchar(r)) paste0("_", r) else ""
+    sfx <- if (nzchar(r)) paste0("_", r) else ""
     expect_true(
       grepl(
-        paste0("trend[obs_trend_time", suffix,
-               "[n], obs_trend_series", suffix, "[n]]"),
-        code, fixed = TRUE
+        paste0("obs_trend_idx", sfx, "[n] = (obs_trend_series", sfx,
+               "[n] - 1) * N_time_trend + obs_trend_time", sfx, "[n];"),
+        flat, fixed = TRUE
       ),
-      label = paste(lab, r, "trend read on both axes")
+      label = paste(lab, r, "trend cell indexed on both axes")
     )
   }
 
@@ -1631,7 +1632,6 @@ test_that("a frame the fit has never seen lands on the right cells", {
 })
 
 
-
 test_that("one frame gives one axis, whichever route reads it", {
   # `mvgam()` names its series in a column and `jsdgam()` names the
   # same column as its species. They are two doors into one model, so
@@ -1909,9 +1909,6 @@ test_that("a PW cap follows the series the axis holds", {
   expect_identical(dim(sd$cap_trend), c(12L, 2L))
   expect_equal(as.numeric(sd$cap_trend[1L, ]), log(c(40, 80)))
 })
-
-
-
 
 
 # The trend assembly indexes `mu_trend[times_trend[i, s]]`.

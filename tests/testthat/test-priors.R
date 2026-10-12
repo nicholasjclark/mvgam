@@ -168,10 +168,13 @@ test_that("all trend types generate correct prior structures", {
         test_spec$brms_equivalent, data = test_data, family = gaussian()
       )
 
-      # Extract trend components from mvgam (identified by _trend suffix)
-      mvgam_trend_priors <- mvgam_priors[
-        grepl("_trend$", mvgam_priors$class), , drop = FALSE
-      ]
+      # Extract trend components from mvgam (identified by _trend
+      # suffix). The table names the trend's axis 'lv_axis()', which
+      # brms labels with the series column.
+      mvgam_trend_priors <- mvgam:::translate_lv_axis_labels(
+        mvgam_priors[grepl("_trend$", mvgam_priors$class), , drop = FALSE],
+        "series", to = "brms"
+      )
 
       # Test equivalence: every brms prior (except Intercept) should
       # appear with a _trend suffix
@@ -1223,6 +1226,28 @@ test_that("add_trend_suffix_to_priors leaves other classes alone", {
   # A row already suffixed is not suffixed twice.
   already <- brms::prior_string("exponential(2)", class = "sigma_trend")
   expect_equal(add_trend_suffix_to_priors(already)$class, "sigma_trend")
+})
+
+
+test_that("trend priors name the trend's axis as lv_axis()", {
+  # brms labels the term with the column that replaced 'lv_axis()',
+  # a column the user is refused in 'trend_formula'. A second smooth
+  # keeps the class-wide default in use.
+  dat <- create_test_data(n = 20, n_series = 3)
+  f <- mvgam_formula(
+    y ~ 1, trend_formula = ~ s(x, k = 4, by = lv_axis()) + s(x1, k = 4) + RW()
+  )
+  coef <- "s(x, k = 4, by = lv_axis())"
+  expect_true(coef %in% get_prior(f, data = dat, family = gaussian())$coef)
+  code <- stancode(
+    f, data = dat, family = gaussian(),
+    prior = brms::set_prior("inv_gamma(2, 1)", class = "sds_trend",
+                            coef = coef)
+  )
+  # The prior reaches the smooth of each of the three series
+  expect_equal(lengths(regmatches(code, gregexpr(
+    "inv_gamma_lpdf\\(sds_[0-9]_trend", code
+  ))), 3L)
 })
 
 

@@ -130,18 +130,18 @@ plot.mvgam <- function(
 }
 
 
-# Internal: collapse the named list returned by
-# `conditional_effects.mvgam` / `conditional_smooths.mvgam` into
-# a single renderable plot object.
-#
-# `conditional_effects.mvgam` returns an `mvgam_conditional_effects`
-# whose `plot()` method already yields a list of ggplots;
-# `conditional_smooths.mvgam` returns an `mvgam_conditional_smooths`
-# whose `plot()` method yields the same shape. We call `plot(...,
-# plot = FALSE)` and let S3 dispatch do the right thing for each
-# input class, then stack multi-panel results with patchwork.
-#'@noRd
+#' Conditional effects or smooths combined into one plot
+#'
+#' The `plot()` methods of both input classes return a list of ggplots
+#' when called with `plot = FALSE`. Several panels are combined with
+#' patchwork.
+#'
+#' @param eff_list Object from `conditional_effects()` or
+#'   `conditional_smooths()`
+#' @return A `ggplot` for one panel, or a `patchwork` for several
+#' @noRd
 wrap_effects_list <- function(eff_list) {
+  checkmate::assert_list(eff_list)
   if (length(eff_list) == 0L) {
     stop(insight::format_error(c(
       "No effects to plot.",

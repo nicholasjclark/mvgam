@@ -4,17 +4,17 @@
 #' approximation. Uses spectral power density computation with 
 #' kernel-specific dispatch for accurate brms compatibility.
 #'
-#' @param Xgp Matrix (N × k) of basis function evaluations at
+#' @param Xgp Matrix (N x k) of basis function evaluations at
 #'   prediction points
-#' @param slambda Array (k × dims) or (k × dims × 1) of eigenvalues
+#' @param slambda Array (k x dims) or (k x dims x 1) of eigenvalues
 #'   for spectral basis functions
-#' @param zgp Matrix (ndraws × k) of standard normal draws
+#' @param zgp Matrix (ndraws x k) of standard normal draws
 #' @param sdgp Vector (ndraws) of marginal standard deviations
-#' @param lscale Matrix (ndraws × dims) of length-scale parameters
+#' @param lscale Matrix (ndraws x dims) of length-scale parameters
 #' @param kernel Character string specifying kernel type: "exp_quad", 
 #'   "matern32", or "matern52"
 #'
-#' @return Matrix (ndraws × N) of GP contributions to add to linear
+#' @return Matrix (ndraws x N) of GP contributions to add to linear
 #'   predictor
 #'
 #' @details
@@ -517,10 +517,9 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     newdata <- derived_series_column(mvgam_fit, newdata)
   }
 
-  # A trend shared by every response is a model with one response.
-  use_resp <- if (!is_trend || brms::is.mvbrmsformula(brms_model$formula)) {
-    resp
-  }
+  # The trend's brms model has one response, shared by every response
+  # of the observation model.
+  use_resp <- if (!is_trend) resp
   dpar <- if (!component %in% c("obs", "trend")) component
   prep <- prepare_linpred_data(
     draws = component_draws,

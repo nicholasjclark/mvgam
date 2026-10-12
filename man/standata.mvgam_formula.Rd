@@ -2,7 +2,7 @@
 % Please edit documentation in R/make_stan.R
 \name{standata.mvgam_formula}
 \alias{standata.mvgam_formula}
-\title{Generate Stan Data for mvgam Formula}
+\title{Stan data of an mvgam model}
 \usage{
 \method{standata}{mvgam_formula}(
   object,
@@ -24,7 +24,8 @@
 )
 }
 \arguments{
-\item{object}{An \code{mvgam_formula} object created by \code{mvgam_formula()}.}
+\item{object}{An \code{mvgam_formula} object created by
+\code{mvgam_formula()}.}
 
 \item{data}{A data frame containing all variables referenced in the formula.}
 
@@ -41,11 +42,11 @@ whose mean has to stay positive needs a link that keeps it there
 once a trend enters the linear predictor: pair \code{\link[stats:family]{stats::Gamma()}},
 \code{\link[brms:brmsfamily]{brms::weibull()}}, \code{\link[brms:brmsfamily]{brms::exponential()}}, \code{\link[brms:brmsfamily]{brms::frechet()}} and
 \code{\link[stats:family]{stats::inverse.gaussian()}} with \code{link = "log"}. Their default
-links leave the mean positive only where the predictor is, and a
+links leave the mean positive only where the predictor is. A
 latent trend is centred near zero and reaches negative values,
 where the likelihood is undefined. \code{mvgam()} warns before
-fitting. \code{\link[brms:brmsfamily]{brms::lognormal()}} is the exception, since its \code{mu} is
-a log-scale location that takes any sign.
+fitting. \code{\link[brms:brmsfamily]{brms::lognormal()}} is the exception: its \code{mu} is a
+log-scale location that takes any sign.
 
 A family written inside a univariate \code{\link[brms:brmsformula]{brms::bf()}} is the model's
 family, as in brms. In a multivariate model each response may take
@@ -56,13 +57,14 @@ belongs to the response that names it. A single family given here
 applies to every response that does not name one of its own.
 Closure-unit and multi-response families (\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}},
 \code{\link[=mvn]{mvn()}}, \code{\link[=mvt]{mvt()}}, \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}) lay their data
-out by unit, so each models its response alone and cannot be one
+out by unit. Each models its response alone and cannot be one
 response of a multivariate model.}
 
 \item{prior}{An optional \code{brmsprior} object containing custom prior
 specifications. Can be created using \code{brms::prior()}.}
 
-\item{data2}{Optional data frame for out-of-sample prediction points.}
+\item{data2}{A named list of objects the model uses that are not
+variables in \code{data}, as in \code{\link[brms]{brm}}.}
 
 \item{sample_prior}{Character string indicating whether to sample from priors
 only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.}
@@ -98,22 +100,13 @@ Default is \code{TRUE}.}
 \item{...}{Additional arguments passed to internal functions.}
 }
 \value{
-A named list containing all data for Stan model including observation
-and trend data components. Structure matches exactly what would be passed to
-Stan during fitting by \code{mvgam()}. This data is generated using the same
-shared infrastructure as \code{mvgam()}, ensuring consistency.
+A named list of the Stan data, observation and trend
+together. \code{mvgam()} passes the same list to Stan from the same
+arguments.
 }
 \description{
-Generate complete Stan data list for an \code{mvgam_formula} object before
-model fitting. This allows users to inspect the generated data structure for
-debugging, understanding, or modification purposes.
-}
-\details{
-This function uses the shared Stan data generation infrastructure
-(\code{generate_stan_components_mvgam_formula()}) to ensure identical output
-to what \code{mvgam()} uses internally. The returned data structure includes
-all observation data, trend mappings, dimensions, and stanvars needed for
-model compilation and fitting.
+The data list \code{mvgam()} would pass to Stan for an
+\code{mvgam_formula}, generated without fitting.
 }
 \seealso{
 \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},

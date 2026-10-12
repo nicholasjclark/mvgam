@@ -24,10 +24,10 @@ PW(
 names each row's series. Its levels fix the order of the series. A
 trend needs this column even for a single series. Defaults to \code{series}.}
 
-\item{cap}{The unquoted name of the variable in \code{data} that specifies the
-carrying capacity for logistic growth models. Required when \code{growth = 'logistic'}.
-This variable should be numeric and can vary by time and series if necessary.
-Defaults to \code{cap} when not specified, with a warning for logistic models.}
+\item{cap}{The unquoted name of the variable in \code{data} that holds
+the carrying capacity of a logistic model, on the response scale.
+It is numeric and can vary by time and series. Defaults to \code{cap}. A
+logistic model whose data lack the column is refused.}
 
 \item{n_changepoints}{A non-negative integer specifying the number of
 potential changepoints. Potential changepoints are selected uniformly from
@@ -43,9 +43,10 @@ link units for linear growth and in logits for logistic growth.
 For a series of \code{N} time points the prior on each per-step rate
 change is \code{double_exponential(0, s * changepoint_scale / N)},
 where \code{s} is the factor \code{\link[=get_prior]{get_prior()}} describes for linear growth
-and 1 for logistic growth. Larger values give a more flexible trend. The default of \code{0.3}
-gives the ten default changepoints a prior median movement of the
-level of about half a unit over the series, the movement the
+and 1 for logistic growth. Larger values give a more flexible
+trend. The default of \code{0.3} gives the ten default changepoints a
+prior median movement of the level of about half a unit over the
+series, the movement the
 \code{\link[=LLT]{LLT()}} slope prior allows. Prophet's own default of \code{0.05} holds a
 link-scale trend close to a straight line.}
 
@@ -71,9 +72,9 @@ An object of class \code{mvgam_trend}, which contains a list of
 arguments to be interpreted by the parsing functions in \code{mvgam}.
 }
 \description{
-Set up piecewise linear or logistic trend models in \code{mvgam}. These
-functions do not evaluate their arguments – they exist purely to help set up
-a model with particular piecewise trend models.
+Sets up a piecewise linear or logistic trend in \code{mvgam}. The
+constructor records its arguments. The model evaluates them against
+the data.
 }
 \details{
 \emph{Offsets and intercepts}:
@@ -140,7 +141,7 @@ mcmc_plot(mod, variable = "trend_params", type = "intervals")
 }
 \references{
 Taylor, Sean J., and Benjamin Letham. "Forecasting at scale."
-The American Statistician 72.1 (2018): 37–45.
+The American Statistician 72.1 (2018): 37-45.
 }
 \seealso{
 \code{\link[=LLT]{LLT()}} for a trend whose growth changes continuously,

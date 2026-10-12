@@ -2,7 +2,7 @@
 % Please edit documentation in R/priors.R
 \name{get_prior.mvgam_formula}
 \alias{get_prior.mvgam_formula}
-\title{Extract Prior Specifications for mvgam Formula Objects}
+\title{Extract prior specifications for mvgam formula objects}
 \usage{
 \method{get_prior}{mvgam_formula}(
   object,
@@ -18,25 +18,25 @@
 \item{object}{An object of class \code{mvgam_formula} created by
 \code{\link{mvgam_formula}}}
 
-\item{data}{A data frame containing the variables in the model (required)}
+\item{data}{A data frame containing the variables in the model
+(required)}
 
-\item{family}{A description of the response distribution and link function.
-Default is \code{gaussian()}. Not required if formula contains embedded
-families via \code{bf()} specifications.}
+\item{family}{A description of the response distribution and link
+function. Default is \code{gaussian()}. Not required if formula
+contains embedded families via \code{bf()} specifications.}
 
 \item{loadings_prior}{Optional structured prior on the factor
 loadings, in the form \code{\link{mvgam}} accepts. The prior
-reported for \code{Z} depends on it, so pass the same value here
-that the fit will use.}
+reported for \code{Z} depends on it. Pass the value the fit will
+use.}
 
 \item{data2}{Optional named list holding objects a
 \code{loadings_prior} refers to by name, matching the argument
 \code{\link{mvgam}} takes.}
 
-\item{trend_map}{Not supported. Fixed and partial loadings change
-which parameters the model has, so the free-loadings table this
-returns cannot describe them; supplying it is an error that points
-at \code{\link[brms]{stancode}}, which does take it.}
+\item{trend_map}{Optional fixed or partial factor loadings, in the
+form \code{\link{mvgam}} accepts. The table then lists the
+loadings the map leaves free.}
 
 \item{...}{Additional arguments passed to \code{brms::get_prior}}
 }
@@ -47,9 +47,9 @@ priors, usable with \code{brms::set_prior()} and
 suffix.
 }
 \description{
-Extracts and combines prior specifications for both observation and trend
-components of an mvgam model. This method provides a single interface
-for prior inspection before model fitting. When
+Extracts and combines prior specifications for both observation and
+trend components of an mvgam model. One interface serves prior
+inspection before model fitting. With
 \code{trend_formula = NULL}, this function behaves identically to
 \code{brms::get_prior} for observation-only models.
 }
@@ -77,7 +77,7 @@ link:
 of a linear \code{\link{PW}()} also scale with the number of
 time points. Their help pages give the forms.
 }
-A count model on the log link rarely spreads past 2.5, and its
+A count model on the log link rarely spreads past 2.5. Its
 defaults keep their link-scale values. Coefficients without
 units keep fixed priors: autoregressive and damping coefficients,
 correlations and degrees of freedom. The table this returns holds
@@ -85,10 +85,11 @@ the resolved values for the data given.
 
 A shrinkage prior on a trend-side class is written without
 autoscaling. \code{horseshoe()} and \code{R2D2()} scale their global
-parameter by the family's residual standard deviation, and the
-trend's own scale is \code{sigma_trend}, one per latent series, so
-\code{autoscale = FALSE} is set for those rows. Writing
-\code{autoscale = TRUE} on a trend-side class is refused.
+parameter by the family's residual standard deviation. The trend's
+own scale is \code{sigma_trend}, one per latent series. A family's
+residual scale has no meaning on the trend side. Those rows take
+\code{autoscale = FALSE}. Writing \code{autoscale = TRUE} on a
+trend-side class is refused.
 }
 \examples{
 \dontrun{
@@ -96,17 +97,17 @@ trend's own scale is \code{sigma_trend}, one per latent series, so
 # then pass the result back to `mvgam()`.
 set.seed(1)
 dat <- sim_mvgam(
-  family       = poisson(),
-  n_series     = 2L,
+  family = poisson(),
+  n_series = 2L,
   n_timepoints = 120L,
-  trend_model  = AR()
+  trend_model = AR()
 )$data_train
 
 # Wrap the formula pair in `mvgam_formula()` so this S3 method
 # dispatches; the returned `brmsprior` data frame lists every
 # adjustable row keyed by `class` and `coef`.
 mf <- mvgam_formula(
-  formula       = y ~ s(x, k = 5),
+  formula = y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1)
 )
 get_prior(mf, data = dat, family = poisson())
@@ -116,26 +117,27 @@ get_prior(mf, data = dat, family = poisson())
 # `_trend` suffix so they do not collide with obs-side classes
 # of the same name (e.g. `b` vs `b_trend`).
 my_priors <- c(
-  prior(normal(0, 1),    class = b),
-  prior(exponential(2),  class = sigma_trend),
-  prior(normal(0, 0.5),  class = ar1_trend)
+  prior(normal(0, 1), class = b),
+  prior(exponential(2), class = sigma_trend),
+  prior(normal(0, 0.5), class = ar1_trend)
 )
 
 mod <- mvgam(
-  formula       = y ~ s(x, k = 5),
+  formula = y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
-  data          = dat,
-  family        = poisson(),
-  priors        = my_priors,
-  chains        = 2,
-  iter          = 750,
-  warmup        = 500,
-  silent        = 2
+  data = dat,
+  family = poisson(),
+  priors = my_priors,
+  chains = 2,
+  iter = 750,
+  warmup = 500,
+  silent = 2
 )
 
 # Inspect the posterior to confirm the overrides took effect. The
-# `ar1_trend` and `sigma_trend` rows should sit on the scale set
-# by their custom priors rather than the flat defaults.
+# `ar1_trend` and `sigma_trend` estimates follow the scale their
+# custom priors set.
+# priors set.
 summary(mod)
 }
 

@@ -20,7 +20,8 @@
 #' response takes `X` and `b`. A grouping index is named by the response
 #' alone, as `J_1_y1`.
 #'
-#' @param resp The response's key on a model with several, or `NULL`
+#' @param resp The response's key on a model with several, or `NULL` or
+#'   `""` for a model with one
 #' @param dpar The distributional parameter, or `NULL` for the mean
 #' @param nlpar The non-linear parameter, or `NULL`
 #' @return `""`, or the suffix with its leading underscore
@@ -30,6 +31,7 @@ predictor_suffix <- function(resp = NULL, dpar = NULL, nlpar = NULL) {
   checkmate::assert_string(dpar, null.ok = TRUE)
   checkmate::assert_string(nlpar, null.ok = TRUE)
   parts <- c(if (!identical(dpar %||% "mu", "mu")) dpar, resp, nlpar)
+  parts <- parts[nzchar(parts)]
   if (length(parts) == 0L) {
     return("")
   }

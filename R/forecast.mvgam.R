@@ -1,69 +1,35 @@
-# forecast.mvgam: posterior forecasts for every state-space trend
-# mvgam fits, series-grain and factor alike: RW, AR at
-# consecutive or sparse lags, ARMA, VAR, CAR, ZMVN and PW.
-#
-# Per-draw loop wiring:
-#   1. extract_last_state(fit, d, draws_mat = cached) for the
-#      (params, last_state) tuple the kernel consumes.
-#   2. trend_linpred_grid() for the trend-formula linear
-#      predictor over the training tail and the forecast
-#      horizon, at series scale.
-#   3. propagate_trend() to forward the zero-mean latent state
-#      on the link scale by `h` steps.
-#   4. Combine with the obs-side linpred for the same draw, map
-#      through the family link, and optionally sample
-#      observation-family noise -- all batched after the loop.
-#
-# Uncertainty-toggle semantics:
-#   * `coef_uncertainty = FALSE`  -> every forecast draw uses
-#     row 1 of the cached obs and trend-submodel linpred
-#     matrices, fixing every coefficient that feeds either
-#     linear predictor (fixed effects, smooths, REs,
-#     Hilbert-space GP bases).
-#   * `trend_uncertainty = FALSE` -> every forecast draw uses
-#     draw 1 of both `extract_last_state` (trend dynamics
-#     params + initial state) AND the trend-submodel linpred,
-#     so all trend-side quantities are jointly fixed. Fresh
-#     innovations are still drawn per propagate call, so the
-#     result reflects innovation noise alone.
-#   * `obs_uncertainty = FALSE`   -> skip the family sampling
-#     and return the family mean for `type = "response"`.
-#
-# The returned `mvgam_forecast` object follows the contract
-# documented in R/mvgam_forecast-class.R.
+# forecast.mvgam: posterior forecasts that propagate the fitted latent
+# state of every trend type, series-grain and factor alike.
+# `build_forecast_arms()` and `propagate_one_draw()` give the steps.
 
 
 #' Posterior forecasts for an mvgam state-space model
 #'
-#' Draw posterior forecasts at user-supplied future time points,
-#' alongside posterior hindcasts at the training time points.
-#' The latent trend is propagated forward per draw using the
-#' fitted state-space dynamics; the observation family then
-#' maps the trajectory back to the response scale.
+#' Posterior forecasts at future time points, with posterior hindcasts
+#' at the training time points. Each draw propagates the fitted latent
+#' state through the trend's dynamics. The observation family then
+#' maps the trend to the response scale.
 #'
 #' @param object A fitted [mvgam][mvgam::mvgam] object.
-#' @param newdata Optional `data.frame` with the same columns as
-#'   the training data, containing the time / series cells at
-#'   which forecasts are wanted. Rows with time values beyond
-#'   the training grid drive the forecast horizon. When `NULL`,
-#'   the held-out data given to `mvgam(..., newdata = )` at fit
-#'   time is used. A fit given no held-out data has no occasions
-#'   to forecast at, and `forecast()` then refuses.
+#' @param newdata Optional `data.frame` with the columns of the
+#'   training data, holding the time and series cells to forecast.
+#'   Rows with times beyond the training grid set the horizon. When
+#'   `NULL`, `forecast()` uses the held-out data given to
+#'   `mvgam(newdata = )`. A fit without held-out data needs `newdata`.
 #'
-#'   For `AR()`, `RW()`, `VAR()` and `PW()` the forecast times
-#'   must continue the training series without a gap and at its
-#'   own spacing, and are refused otherwise. These trends advance
-#'   one step per time point, so the horizon is the number of
-#'   steps taken from the last observed state; asking for
-#'   `t = 41:42` after training ends at `t = 30` would take two
-#'   steps rather than twelve and report a two-step-ahead spread
-#'   for a twelve-step-ahead question. Supply every intervening
-#'   time, whether or not the response is observed there.
-#'   `CAR()` and `ZMVN()` are exempt: `CAR()` carries the elapsed
-#'   gap into its kernel, and `ZMVN()` has no temporal structure
-#'   to step through. Under `CAR()` each series may have its own
-#'   forecast times, all after the last fitted time.
-#' @param ... Currently unused.
+#'   Five trends step once per time point: AR(), RW(), VAR(), LLT()
+#'   and PW(). Their forecast times must continue the training series
+#'   at its own spacing, without a gap. After training ends at
+#'   `t = 30`, a request for `t = 41:42` is refused: two rows would
+#'   report a two-step spread for a twelve-step horizon. Supply every
+#'   intervening time, whether or not the response is observed there.
+#'   `CAR()` takes the elapsed gap into its kernel. Each series may
+#'   have its own forecast times, all after the last fitted time.
+#'   `ZMVN()` has no temporal dynamics and takes any later times.
+#'   `ZMVN()` and `PW()` need one set of forecast times shared by
+#'   every series.
+#' @param ... Unused. A misspelt argument would land here and is
+#'   refused.
 #' @param type One of `"response"`, `"link"`, `"expected"`,
 #'   `"trend"`. `"response"` samples from the observation family
 #'   (the default); `"expected"` returns the family's mean, which
@@ -79,19 +45,16 @@
 #'   `posterior_predict()` or `stability()`, pairs each forecast draw
 #'   with the same iteration there.
 #' @param coef_uncertainty Logical. When `FALSE`, every forecast
-#'   draw uses the first posterior draw of every coefficient in
-#'   the observation and trend formulas: fixed effects, smooth
-#'   bases, random effect levels and Hilbert-space `gp(x, k)`
-#'   bases alike, not only the population-level `b`. Defaults to
-#'   `TRUE`.
-#' @param trend_uncertainty Logical. When `FALSE`, every
-#'   forecast draw uses the first posterior draw of all
-#'   trend-side quantities: the trend dynamics parameters
-#'   (`sigma`, AR / MA / VAR coefficients), the initial latent
-#'   state (`last_state$trends`), and the trend-formula linpred
-#'   (`mu_trend`). Fresh innovations are still drawn per
-#'   forecast call so the resulting spread reflects innovation
-#'   noise alone. Defaults to `TRUE`.
+#'   draw uses the first posterior draw of every coefficient in the
+#'   observation and trend formulas: population-level effects, smooth
+#'   bases, random effect levels and Hilbert-space `gp(x, k)` bases.
+#'   Defaults to `TRUE`.
+#' @param trend_uncertainty Logical. When `FALSE`, every forecast
+#'   draw uses the first posterior draw of the trend dynamics
+#'   parameters (`sigma`, AR, MA and VAR coefficients), the last
+#'   fitted state and the trend formula's predictor `mu_trend`. Each
+#'   draw still takes fresh innovations. The spread then shows
+#'   innovation noise alone. Defaults to `TRUE`.
 #' @param obs_uncertainty Logical. When `FALSE`, skips
 #'   observation-family sampling for `type = "response"`,
 #'   returning the family mean instead.
@@ -104,11 +67,10 @@
 #'   Hindcasts and forecasts are returned as named lists of
 #'   `[ndraws, n_times]` matrices, one per series.
 #'
-#' @seealso [mvgam_forecast-class][mvgam], [hindcast.mvgam],
-#'   [posterior_predict.mvgam] and [posterior_epred.mvgam] for the
-#'   alternative marginal-MC prediction surface that integrates
-#'   over the trend's stochastic dynamics instead of extrapolating
-#'   the fitted latent state. The online article
+#' @seealso [mvgam_forecast-class][mvgam], [hindcast.mvgam].
+#'   [posterior_predict.mvgam] and [posterior_epred.mvgam] predict by
+#'   integrating over the trend's stochastic dynamics. `forecast()`
+#'   extrapolates the fitted latent state. The online article
 #'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
 #'   walks through `forecast()` together with `score()`,
 #'   `lfo_cv()` and `ensemble()` on a worked count-data example.
@@ -137,23 +99,20 @@
 #' @method forecast mvgam
 #' @export
 forecast.mvgam <- function(object,
-                            newdata = NULL,
-                            ...,
-                            type = c("response", "link",
-                                       "expected", "trend"),
-                            ndraws = NULL,
-                            draw_ids = NULL,
-                            coef_uncertainty = TRUE,
-                            trend_uncertainty = TRUE,
-                            obs_uncertainty = TRUE,
-                            resp = NULL) {
+                           newdata = NULL,
+                           ...,
+                           type = c("response", "link",
+                                    "expected", "trend"),
+                           ndraws = NULL,
+                           draw_ids = NULL,
+                           coef_uncertainty = TRUE,
+                           trend_uncertainty = TRUE,
+                           obs_uncertainty = TRUE,
+                           resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   require_fitted_model(object, "forecast")
-  # Both methods take every argument by name after `...`, so a
-  # misspelling lands in `...` and the method proceeds on the default
-  # it was trying to override. That is how `incl_autocor` went
-  # unnoticed on `posterior_predict()`, and it is silent by
-  # construction, so refuse what nothing reads.
+  # Every argument after `...` is named. A misspelt one would land in
+  # `...` and leave its default in force.
   rlang::check_dots_empty()
   type <- match.arg(type)
   validate_draw_selectors(ndraws, draw_ids)
@@ -170,33 +129,23 @@ forecast.mvgam <- function(object,
   )
 
   trend_specs <- object$mv_spec$trend_specs
-  # Trendless fits forecast by projecting the obs-side linear
-  # predictor onto `newdata`: no latent state propagation, just a
-  # deterministic prediction at the held-out cells. The hindcast
-  # branch already handles trendless fits via
-  # `extract_trend_latent_states()` returning NULL; the forecast
-  # branch below delegates to a posterior_predict / posterior_epred
-  # pass on `fc_grid$data`. `type = "trend"` is undefined for
-  # trendless fits (there is no latent state to extract); reject
-  # up front so the hindcast and forecast branches both see a
-  # valid `type` argument.
+  # A trendless fit forecasts its observation predictor at the new
+  # occasions. With no latent state, `type = "trend"` names nothing.
   is_trendless <- is.null(trend_specs)
   if (is_trendless && identical(type, "trend")) {
     stop(insight::format_error(c(
       "'type = \"trend\"' is not defined for trendless fits.",
       i = paste0("Use 'type = \"link\"', 'type = \"expected\"' ",
                  "or 'type = \"response\"' (the default).")
-    )))
+    )), call. = FALSE)
   }
   # The trend-type guard below refuses anything unsupported
   trend_model <- if (is_trendless) NULL else trend_spec_head(trend_specs)
   meta <- if (is_trendless) NULL else object$trend_metadata
 
-  # A forecast needs occasions to forecast at, and a fit cannot
-  # invent them. The horizon is whatever the caller's frame, or the
-  # held-out data stored at fit time, reaches past the training
-  # grid, and any covariate the model uses has to be supplied there
-  # too.
+  # The horizon comes from the caller's frame or the held-out data
+  # stored at fit time. A fit cannot invent occasions. Every
+  # covariate the model uses must be in that frame.
   if (is.null(newdata)) {
     stop(insight::format_error(c(
       "'newdata' is required to forecast.",
@@ -218,10 +167,9 @@ forecast.mvgam <- function(object,
   fc_grid <- resolve_forecast_grid(object, newdata, training,
                                      series_levels, resp = resp)
 
-  # A discrete-time trend takes one step per forecast row, so the
-  # rows have to be the times it would step to. Checked here
-  # rather than left to the propagator, which cannot tell a gap
-  # from a shorter horizon and would answer for the wrong one.
+  # A discrete-time trend takes one step per forecast row. The
+  # propagator cannot tell a gap from a shorter horizon. The rows
+  # are checked here.
   if (!is.null(fc_grid)) {
     assert_forecast_times_steppable(fc_grid$times, object)
   }
@@ -283,27 +231,38 @@ forecast.mvgam <- function(object,
 
 # ----- Series / training / forecast grids -------------------------
 
-# Internal: the series an answer scoped to `resp` reports.
-#
-# A wide frame's series are its responses, so an answer for one
-# response covers one series. Reporting every series from inside a
-# per-response call ran the response loop twice: each element of the
-# fan-out held every arm, all but its own under another response's
-# name.
-#'@noRd
+#' The series a result scoped to `resp` reports
+#'
+#' A wide frame's series are its responses. A result for one response
+#' covers its own series.
+#'
+#' @param object A fitted `mvgam` object
+#' @param resp A response name, or NULL
+#' @param series_levels The fitted series
+#' @return Character vector of series
+#' @noRd
 reported_series <- function(object, resp, series_levels) {
+  checkmate::assert_string(resp, null.ok = TRUE)
   if (!is.null(resp) && is_response_keyed(object)) resp else series_levels
 }
 
 
-# Internal: the `mvgam_forecast` record a hindcast or forecast returns.
-#
-# Both methods return the same record and each built it by hand, so
-# the two could disagree about what a field held, and both stamped it
-# with the fit's top-level family, which on a multivariate fit is a
-# placeholder shared by every arm. Built here once, cut to the series
-# the answer reports and naming the family of the response it is for.
-#'@noRd
+#' The `mvgam_forecast` record a hindcast or forecast returns
+#'
+#' Cut to the series the result reports. The record names the family
+#' of the response it is for. A multivariate fit's top-level family is
+#' a placeholder every response shares.
+#'
+#' @param object A fitted `mvgam` object
+#' @param type The prediction type
+#' @param resp A response name, or NULL
+#' @param reported The series the result reports
+#' @param training The training data from `build_training_arms()`
+#' @param hindcasts,forecasts Lists of draws matrices, one per series
+#' @param fc_grid The forecast grid, or NULL
+#' @param family_pars Family parameter draws for `type = "link"`
+#' @return An `mvgam_forecast`
+#' @noRd
 new_mvgam_forecast <- function(object, type, resp, reported, training,
                                hindcasts, forecasts = NULL,
                                fc_grid = NULL, family_pars = NULL) {
@@ -328,25 +287,22 @@ new_mvgam_forecast <- function(object, type, resp, reported, training,
 }
 
 
-# Internal: a wide fit's fan-out, read as one forecast over its
-# responses.
-#
-# On a wide frame the responses are the series, so each element of
-# the fan-out holds one series' arm and together they are a forecast
-# over the whole axis. Drawing and scoring want that single object:
-# drawn element by element the wrapper took its first element as
-# standing for all of them, which is right only where every response
-# reads one shared state, and scored as it stands it offered no
-# `$forecasts` to read. The family is kept per series, since each
-# response brought its own.
-#'@noRd
+#' A wide fit's per-response forecasts as one forecast
+#'
+#' On a wide frame the responses are the series. Each element of the
+#' per-response list holds one series. Plotting and scoring take them
+#' as one forecast over the whole axis. Each series keeps the family
+#' of its own response.
+#'
+#' @param x An `mvgam_forecast` holding one element per response
+#' @return An `mvgam_forecast` over every series
+#' @noRd
 response_axis_forecast <- function(x) {
   checkmate::assert_class(x, "mvgam_forecast")
   levs <- unlist(lapply(x, function(el) as.character(el$series_names)),
                  use.names = FALSE)
-  # Unnamed before combining: `c()` over a named list prefixes each
-  # element's own names with the list's, so `count` came back as
-  # `count.count` and matched nothing below.
+  # `c()` over a named list prefixes each element's names with the
+  # list's. Unnamed elements keep the series names.
   arms <- function(field) {
     out <- do.call(c, unname(lapply(unclass(x), `[[`, field)))
     if (is.null(out)) NULL else out[levs]
@@ -371,50 +327,52 @@ response_axis_forecast <- function(x) {
 }
 
 
-# Internal: per-series training observations + unique times,
-# plus the cached time / series variable names and the obs data
-# frame the downstream linpred calls subset.
-#'@noRd
+#' The training data of each series
+#'
+#' Each series' rows, observations and times, in time order, with the
+#' frame and its time and series column names.
+#'
+#' On a long frame a series is the rows labelled with it. The label is
+#' the derived one: a fit whose series came from a `gr` and `subgr`
+#' pair takes its names from that pair. On a wide frame the responses
+#' are the series. A series there is the occasions where its own
+#' column was measured.
+#'
+#' @param object A fitted `mvgam` object
+#' @param series_levels The series to cut
+#' @param resp A response name, or NULL
+#' @param data The frame to cut. Defaults to the fit's own. `lfo_cv()`
+#'   passes a window of it.
+#' @return List of `data`, `time_var`, `series_var`, `response_keyed`,
+#'   `series_labels`, `series_rows`, `observations`, `times` (each
+#'   occasion once) and `row_times` (one per row)
+#' @noRd
 build_training_arms <- function(object, series_levels, resp = NULL,
-                                  data = NULL) {
-  # The fit's own frame by default. `lfo_cv()` passes a window of it
-  # instead, so the arms it scores are cut by the same rule the
-  # hindcast arms are, rather than by a second one written beside it.
+                                data = NULL) {
+  checkmate::assert_atomic(series_levels, min.len = 1L)
+  checkmate::assert_string(resp, null.ok = TRUE)
+  checkmate::assert_data_frame(data, null.ok = TRUE)
   d <- data %||% object$data
   meta_vars <- axis_vars(object)
   time_var <- meta_vars$time_var
   series_var <- meta_vars$series_var
 
-  # Which rows belong to a series, answered once. Everything a series
-  # needs is a cut of the training frame, so deciding the membership
-  # here and reading it three times keeps the observations, the times
-  # and the rows the linpred is called on describing one thing.
-  #
-  # Two frames answer it differently. Where a series is a stretch of
-  # rows, membership is the rows carrying that label, and the label
-  # has to be the derived one: reading the raw column instead splits
-  # a fit whose series came from a `gr` / `subgr` pair, because the
-  # names come from the derived identity and the subset from the
-  # column it superseded. Where the responses are the series, every
-  # row carries every response, so a series is a column rather than a
-  # stretch of rows and its membership is the occasions on which that
-  # column was measured.
   response_keyed <- is_response_keyed(object)
   series_labels <- if (response_keyed) {
     NULL
   } else {
     as.character(training_series_labels(object, d))
   }
-  # A response-keyed series reads its own response's column; otherwise
-  # every series reads the one response in scope. The series level is
-  # brms's key for the response, which is not the column once the
-  # column carries a `.` or an `_`.
+  # A wide frame's series takes its own response's column. Every other
+  # series takes the one response in scope. `response_column()` maps
+  # brms's key for a response to its column, which can differ by a `.`
+  # or an `_`.
   column_of <- function(lv) {
     response_column(object, if (response_keyed) lv else resp)
   }
 
-  # Each series' rows are held in time order. The observations, the
-  # row times and the hindcast columns all take that order from here.
+  # The observations, the row times and the hindcast columns all take
+  # this time order
   series_rows <- lapply(series_levels, function(lv) {
     rows <- if (response_keyed) {
       which(!is.na(d[[column_of(lv)]]))
@@ -431,16 +389,10 @@ build_training_arms <- function(object, series_levels, resp = NULL,
     as.numeric(d[[column_of(lv)]][rows])
   })
   names(observations) <- series_levels
-  # The occasions as the user supplied them. Truncating to an
-  # integer here is what left every continuous grid unforecastable:
-  # a fit trained at 4.590626 reported a training time of 4, so the
-  # frame beside it matched nothing and the horizon came back empty,
-  # while the panels drew one axis to 91 and its neighbour to 91.953
-  # under the same label.
-  # A closure-unit family has several rows per occasion, one per
-  # visit, and its `expected` and `response` hindcasts have one column
-  # per row. `row_times` labels those columns; `times` holds each
-  # occasion once, which every other surface has one column for.
+  # The occasions as the user supplied them, continuous ones included.
+  # A closure-unit family has one row per visit. Its `expected` and
+  # `response` hindcasts take one column per row, which `row_times`
+  # labels. `times` holds each occasion once, for every other surface.
   row_times <- lapply(series_rows, function(rows) d[[time_var]][rows])
   times <- lapply(row_times, function(t) sort(unique(t)))
 
@@ -458,14 +410,21 @@ build_training_arms <- function(object, series_levels, resp = NULL,
 }
 
 
-# Internal: the time of each column of a hindcast matrix.
-#
-# `build_hindcast_arms()` predicts a closure-unit family's `expected`
-# and `response` surfaces per visit row, and every other surface per
-# occasion. An `mvgam_forecast` labels each column with its time, and
-# `plot()` and `summary()` pair the two by position.
-#'@noRd
+#' The time of each column of a hindcast matrix
+#'
+#' `build_hindcast_arms()` predicts a closure-unit family's `expected`
+#' and `response` predictions per visit row. Every other type takes one
+#' column per occasion. `plot()` and `summary()` pair each column with
+#' its time by position.
+#'
+#' @param object A fitted `mvgam` object
+#' @param type The prediction type
+#' @param resp A response name, or NULL
+#' @param training The training data from `build_training_arms()`
+#' @return List of times, one vector per series
+#' @noRd
 hindcast_column_times <- function(object, type, resp, training) {
+  checkmate::assert_list(training)
   if (hindcast_per_row(object, type, resp)) {
     training$row_times
   } else {
@@ -474,54 +433,60 @@ hindcast_column_times <- function(object, type, resp, training) {
 }
 
 
-# Internal: whether a hindcast has one column per row of the frame.
-#
-# A closure-unit family ships one row per visit, and its detection-
-# marginalised `expected` and `response` surfaces vary by visit.
-# `trend` and `link` belong to the occasion. The family consulted is
-# the response's own: a multivariate fit's top-level family is a
-# placeholder shared by every response.
-#'@noRd
+#' Does a hindcast take one column per row of the frame?
+#'
+#' A closure-unit family has one row per visit. Its detection-
+#' marginalised `expected` and `response` predictions vary by visit.
+#' `trend` and `link` belong to the occasion. The response's own family
+#' decides: a multivariate fit's top-level family is a placeholder.
+#'
+#' @param object A fitted `mvgam` object
+#' @param type The prediction type
+#' @param resp A response name, or NULL
+#' @return Logical scalar
+#' @noRd
 hindcast_per_row <- function(object, type, resp) {
+  checkmate::assert_string(type)
   type %in% c("expected", "response") &&
     uses_closure_unit_layout(model_families(object, resp))
 }
 
 
-# Internal: the occasions of `candidate` a series has yet to reach.
-#
-# A horizon is what lies beyond the last occasion a series was
-# observed at. Asking instead which occasions are absent from the
-# training grid -- `setdiff(candidate, training_times)` -- answers
-# the same on a frame that runs past the end and differently on an
-# occasion sitting inside the grid unobserved, which was then
-# forecast backwards: the step count went negative and the call
-# ended on an assertion naming an internal vector.
-#
-# `last_time` is `NA` for a series the fit never observed, which has
-# no origin to forecast from and so contributes no horizon.
-#'@noRd
+#' The occasions of `candidate` a series has yet to reach
+#'
+#' A horizon lies after the last occasion a series was observed at.
+#' An unobserved occasion inside the training grid stays out of it.
+#'
+#' @param candidate Occasions the new frame supplies
+#' @param last_time The series' last observed occasion. `NA` for a
+#'   series the fit never observed, which has no origin to forecast
+#'   from.
+#' @return The occasions after `last_time`, sorted
+#' @noRd
 horizon_beyond <- function(candidate, last_time) {
+  checkmate::assert_atomic_vector(candidate)
+  checkmate::assert_atomic_vector(last_time, len = 1L)
   if (is.na(last_time)) return(candidate[0L])
   sort(unique(candidate[candidate > last_time]))
 }
 
 
-# Internal: refuse a frame that names no occasion any series has yet
-# to reach.
-#
-# An all-interior frame used to return an `mvgam_forecast` of the
-# right class holding nothing, so a caller looping over the arms
-# saw a result and read no numbers out of it. The occasions the
-# frame supplied and the last one each series was seen at are what
-# a caller needs to fix the call, so both are named.
-#'@noRd
+#' Refuse a frame whose occasions every series has passed
+#'
+#' The message names the occasions the frame supplied and the last one
+#' each series was observed at. Both are what a caller needs to fix
+#' the call.
+#'
+#' @param newdata The new frame
+#' @param candidate Occasions the frame supplies
+#' @param last_times Last observed occasion of each series, named
+#' @param time_var Name of the time column
+#' @return Raises an error
+#' @noRd
 refuse_empty_horizon <- function(newdata, candidate, last_times,
                                  time_var) {
+  checkmate::assert_string(time_var)
   origin <- last_times[!is.na(last_times)]
-  # A series the fit never observed has no origin to name, and where
-  # that is true of every series the sentence would read "Last
-  # observed: at ." Saying nothing beats naming nothing.
   observed_line <- if (length(origin)) {
     paste0(
       "Last observed: ",
@@ -546,49 +511,40 @@ refuse_empty_horizon <- function(newdata, candidate, last_times,
 }
 
 
-# Internal: forecast horizon resolved from newdata. Returns NULL
-# when newdata is NULL. Otherwise returns the per-series forecast
-# times / observations and the forecast-only subset of newdata for
-# downstream linpred calls, refusing a frame that reaches past
-# nothing.
-#'@noRd
+#' The forecast horizon a new frame describes
+#'
+#' The forecast times and observations of each series, with the rows
+#' of the frame inside the horizon for the linear predictor calls. A
+#' frame whose occasions every series has passed is refused.
+#'
+#' @param object A fitted `mvgam` object
+#' @param newdata The new frame, or NULL
+#' @param training The training data from `build_training_arms()`
+#' @param series_levels The fitted series
+#' @param resp A response name, or NULL
+#' @return NULL for no frame. Otherwise a list of `data`, `times`,
+#'   `observations` and `time_var`.
+#' @noRd
 resolve_forecast_grid <- function(object, newdata, training,
-                                    series_levels, resp = NULL) {
+                                  series_levels, resp = NULL) {
   if (is.null(newdata)) return(NULL)
   checkmate::assert_data_frame(newdata, min.rows = 1L)
+  checkmate::assert_list(training)
   time_var <- training$time_var
-  # Only the time is demanded here. Which columns name the series is
-  # a question `axis_row_series()` answers from the record, and a
-  # grouping names them without any `series` column at all: asking
-  # for one refused a hierarchical fit the very frame it was fitted
-  # on, at a layer that had no need to ask.
+  # `axis_row_series()` places the rows on the series. A grouping
+  # names the series without a `series` column.
   assert_axis_column(newdata, time_var, "time")
-  # A horizon is a comparison against the last observed occasion, and
-  # `NA > last_time` is `NA`, which the subset and the sort then
-  # drop. The row leaves the grid, and a later layer treats the
-  # remaining occasions as discontinuous, naming an internal vector
-  # in its message.
+  # `NA > last_time` is `NA`, which would drop the row from the grid
   refuse_missing_times(newdata[[time_var]], time_var)
-
-  # A series the fit never had is refused by the validator that owns
-  # that fact, so a user meets one message wherever the frame
-  # entered. Refusing it again here would give the same condition a
-  # second wording, and the wording it had named the superseded
-  # column: a hierarchical frame was told its unknown level was
-  # `north.sp_a`, a series the model does have, spelled the way the
-  # column it does not read spells it. An object carrying no record
-  # has nothing to validate against, and the guard below covers it.
+  # The validator that owns unknown levels gives one message for every
+  # route a frame takes
   validate_prediction_factor_levels(
     newdata, object$trend_metadata,
     series_label = series_column_label(object)
   )
 
-  # Where the responses are the series, every row carries all of
-  # them: a wide frame holds one row per time and one column per
-  # response, so each series is forecast at every occasion the frame
-  # supplies. Asking for a per-row series here is asking a question
-  # the frame cannot answer, and demanding a `series` column left
-  # every `mvbf()` and `jsdgam()` fit unable to forecast at all.
+  # A wide frame holds one row per time and one column per response.
+  # Each series takes every occasion the frame supplies.
   last_times <- stats::setNames(
     extract_last_observed_times(object, length(series_levels)),
     series_levels
@@ -602,8 +558,9 @@ resolve_forecast_grid <- function(object, newdata, training,
     if (all(lengths(fc_times) == 0L)) {
       refuse_empty_horizon(newdata, nt, last_times, time_var)
     }
-    # Each response's truths come from its own column, so a frame
-    # supplying some of them and not others scores what it can.
+    # Each response's observed values come from its own column. A
+    # frame holding some response columns gives observations for
+    # those alone.
     fc_observations <- stats::setNames(lapply(series_levels, function(lv) {
       column <- response_column(object, lv)
       if (!column %in% names(newdata)) return(NULL)
@@ -622,10 +579,8 @@ resolve_forecast_grid <- function(object, newdata, training,
                 time_var = time_var))
   }
 
-  # A frame whose series column was superseded by a grouping carries
-  # the supplanted spelling, so factoring the raw column against the
-  # trend's own levels matches nothing and reads as unknown series.
-  # The rows are identified the way the fit identified them.
+  # The rows take their series as the fit placed them. A grouping
+  # defines the series of a hierarchical frame.
   row_ids <- as.character(axis_row_series(object, newdata, required = TRUE))
   refuse_unseen_levels("Series", unique(row_ids), series_levels)
   series_fac <- factor(row_ids, levels = series_levels)
@@ -642,13 +597,9 @@ resolve_forecast_grid <- function(object, newdata, training,
                          last_times, time_var)
   }
 
-  # `fc_times` is sorted, so the truths and the rows the linear
-  # predictor is built from have to be sorted the same way. Taking
-  # them in the order `newdata` happened to arrive in permuted the
-  # observations and the forecast columns independently, and
-  # `score()` then paired each truth with a horizon it did not
-  # belong to, without complaint. `build_training_tail_data()`
-  # sorts its own block for the same reason.
+  # The truths and the rows of the linear predictor take the sorted
+  # order of `fc_times`. `score()` pairs each truth with its horizon by
+  # position.
   column <- response_column(object, resp)
   fc_observations <- lapply(series_levels, function(lv) {
     idx <- series_fac == lv &
@@ -682,36 +633,28 @@ resolve_forecast_grid <- function(object, newdata, training,
 }
 
 
-# Internal: per-series training-tail rows of length up to
-# `max_lag`, the rows `extract_component_linpred()` needs to
-# give `mu_trend` over the stored state's window.
-#
-# Each per-series block must be sorted by time before stacking.
-# `propagate_one_draw()` centres the stored state row by row
-# against this grid, so a tail block with reversed or shuffled
-# times would offset the centring by
-# `mu_trend[T] - mu_trend[T-1]` and inject a spurious jump at
-# the first forecast step.
-#'@noRd
+#' The last `max_lag` training rows of each series
+#'
+#' `extract_component_linpred()` takes these rows to give `mu_trend`
+#' over the window of the stored state. Each block is sorted by time.
+#' `propagate_one_draw()` centres the stored state row by row against
+#' this grid.
+#'
+#' A wide frame's rows hold every series. Its tail is the last
+#' occasions of the fit's recorded time axis. Each response's own rows
+#' hold its observed occasions alone, which can stop short of the axis.
+#'
+#' @param object A fitted `mvgam` object
+#' @param training The training data from `build_training_arms()`
+#' @param max_lag The largest AR or MA lag
+#' @return A data frame, or NULL without lags
+#' @noRd
 build_training_tail_data <- function(object, training, max_lag) {
-  if (max_lag <= 0L) return(NULL)
+  checkmate::assert_list(training)
+  checkmate::assert_int(max_lag, lower = 0L)
+  if (max_lag == 0L) return(NULL)
   series_levels <- names(training$observations)
   time_var <- training$time_var
-
-  # Where the responses are the series, a row belongs to all of
-  # them at once, so the tail is the last occasions of the one
-  # shared grid rather than a block per series. Cutting it by a
-  # `series` column instead compared against a column the frame
-  # does not have, which is `logical(0)`: every block came back
-  # empty, the frames were bound into nothing, and the caller was
-  # handed a tail with no rows. Asking whether the frame has a
-  # series column answered the same for a grouping with none, so
-  # the arms say which kind of axis they were cut from.
-  #
-  # The grid is the fit's recorded axis. On such a frame each
-  # response's training rows hold its observed occasions alone. A
-  # frame padded at the end gives a union that stops short of the
-  # grid, which placed the tail before the stored state it centres.
   if (training$response_keyed) {
     tail_ts <- tail(mvgam_axes(object)$time$values, max_lag)
     sub <- training$data[
@@ -720,13 +663,7 @@ build_training_tail_data <- function(object, training, max_lag) {
     return(sub[order(sub[[time_var]]), , drop = FALSE])
   }
 
-  # Which rows belong to a series is settled once, where the arms
-  # were built, and read here. Re-cutting the frame by its `series`
-  # column asked a different question of a hierarchical fit, whose
-  # column was superseded by the grouping: the comparison matched
-  # nothing and the tail arrived empty. `build_training_arms()` and
-  # `build_hindcast_arms()` already read `series_rows`; this was the
-  # one that was not brought along.
+  # The rows of each series as `build_training_arms()` placed them
   rows <- lapply(series_levels, function(lv) {
     tail_ts <- tail(training$times[[lv]], max_lag)
     block <- training$data[training$series_rows[[lv]], , drop = FALSE]
@@ -737,55 +674,52 @@ build_training_tail_data <- function(object, training, max_lag) {
 }
 
 
-# ----- Hindcast arm -----------------------------------------------
+# ----- Hindcasts --------------------------------------------------
 
-# Internal: per-series hindcast matrices. Delegates to the
-# existing posterior_predict / posterior_epred / component-
-# linpred infrastructure so dpar / trials / family handling stays
-# centralised. Slices to the chosen draws.
-#
-# `process_error` controls the latent-state pathway:
-# FALSE uses the Stan-fitted `trend[t, s]`, the latent states plus
-# `mu_trend`, directly (deterministic-state hindcast); TRUE draws fresh
-# innovations from the trend's covariance and adds them on top via
-# posterior_epred / posterior_predict's marginal MC pathway.
-# Hindcasts default to FALSE so a
-# perfectly-fit trend (e.g. RW with sigma -> 0) returns response
-# draws that hug the training values, surfacing
-# overfit-versus-predict gaps directly.
-#'@noRd
+#' The hindcast draws of each series
+#'
+#' `posterior_predict()`, `posterior_epred()` and the component linear
+#' predictors give the draws, cut to `draw_idx`.
+#'
+#' With `process_error = FALSE` the hindcast takes the fitted
+#' `trend[t, s]`, the latent states plus `mu_trend`. Response draws of
+#' a closely fitted trend then follow the training values. With `TRUE`
+#' the marginal prediction draws fresh innovations from the trend's
+#' covariance.
+#'
+#' @param object A fitted `mvgam` object
+#' @param training The training data from `build_training_arms()`
+#' @param type The prediction type
+#' @param draw_idx Indices of the draws to keep
+#' @param obs_uncertainty Whether `type = "response"` samples the
+#'   family
+#' @param process_error Whether to draw fresh trend innovations
+#' @param resp A response name, or NULL
+#' @param series_levels The series to report
+#' @return Named list of draws matrices, one per series
+#' @noRd
 build_hindcast_arms <- function(object, training, type, draw_idx,
-                                  obs_uncertainty,
-                                  process_error = FALSE,
-                                  resp = NULL,
-                                  series_levels =
-                                    names(training$observations)) {
+                                obs_uncertainty,
+                                process_error = FALSE,
+                                resp = NULL,
+                                series_levels =
+                                  names(training$observations)) {
+  checkmate::assert_list(training)
+  checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
+  checkmate::assert_flag(obs_uncertainty)
+  checkmate::assert_flag(process_error)
   time_var <- training$time_var
-  # On a wide frame a series is a response, so each arm is predicted
-  # as its own response. Handing every arm the caller's one `resp`
-  # read that response's state and family into all of them; handing
-  # them none, as a caller asking for every arm at once does, left
-  # no arm able to say which trend column it reads.
+  # On a wide frame each series is predicted as its own response
   keyed <- is_response_keyed(object)
   arm_resp <- function(lv) if (keyed) lv else resp
-
-  # `build_training_arms()` settles which rows each series covers and
-  # holds them in time order, and both paths below take them as given.
   arm_rows <- training$series_rows[series_levels]
 
-  # A simplex family's expectation is a softmax across the K rows of
-  # a closure unit, and its unit is a site whose rows are the series
-  # (`closure_unit_key_vars()` keys it on the time alone). Cutting
-  # the frame to one series before predicting therefore leaves one
-  # row per unit, and a softmax of width one is 1 whatever the
-  # linear predictor held: every arm came back a flat vector of ones,
-  # identical to every other arm. Those two surfaces are predicted
-  # once over the whole frame and sliced afterwards, which is also
-  # one linpred call in place of K.
-  #
-  # `trend` and `link` are per-row linear predictors that read no
-  # sibling row, so they take the per-series cut like any other
-  # family.
+  # A simplex family's expectation is a softmax across the rows of a
+  # closure unit, whose rows are the series. One series alone gives a
+  # softmax of width one, which is 1 whatever the predictor. The
+  # `expected` and `response` draws come from the whole frame, cut
+  # afterwards. `trend` and `link` are per-row linear predictors and
+  # take the per-series cut.
   if (type %in% c("expected", "response") &&
         is_simplex_response_family(model_families(object, resp))) {
     full <- hindcast_one_series(
@@ -805,9 +739,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
       next
     }
     sub <- training$data[arm_rows[[lv]], , drop = FALSE]
-    # One row per occasion unless the surface varies by visit. Every
-    # family but a closure-unit one already has a single row per
-    # occasion, and the cut leaves it unchanged.
+    # One row per occasion unless the prediction varies by visit
     if (!hindcast_per_row(object, type, arm_resp(lv))) {
       sub <- sub[!duplicated(sub[[time_var]]), , drop = FALSE]
     }
@@ -820,117 +752,102 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 }
 
 
-# Internal: dispatch on `type` for a single series's hindcast.
-#
-# For every family, `extract_trend_latent_states()` takes the
-# per-draw conditional `trend[t, s]` that Stan composes in
-# transformed parameters, and the observation predictor is added to
-# it. That gives the `trend` and `link` hindcast of any fit. A fit
-# without a trend contributes a zero matrix. A closure-unit family's `expected` and `response`
-# marginalise over the latent state of each closure unit, which
-# `posterior_epred()` and `posterior_predict()` do per visit row.
-# `process_error` reaches only that branch; elsewhere the fitted
-# state supplies the trajectory.
-#'@noRd
+#' The hindcast draws of one series
+#'
+#' `extract_trend_latent_states()` gives the fitted `trend[t, s]` of
+#' each draw. The observation predictor added to it gives the `link`
+#' hindcast. A fit without a trend takes a zero trend. A closure-unit
+#' family's `expected` and `response` marginalise over the latent state
+#' of each unit. `posterior_epred()` and `posterior_predict()` give
+#' those per visit row. `process_error` applies to them alone.
+#'
+#' @inheritParams build_hindcast_arms
+#' @param sub_data The series' rows of the training frame
+#' @return Draws matrix, one column per row of `sub_data` or occasion
+#' @noRd
 hindcast_one_series <- function(object, sub_data, type, draw_idx,
-                                  obs_uncertainty,
-                                  process_error = FALSE,
-                                  resp = NULL) {
+                                obs_uncertainty,
+                                process_error = FALSE,
+                                resp = NULL) {
+  checkmate::assert_data_frame(sub_data)
+  checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
+  sample_family <- type == "response" && obs_uncertainty
   if (hindcast_per_row(object, type, resp)) {
-    full <- if (type == "response" && isTRUE(obs_uncertainty)) {
-      posterior_predict(
-        object, newdata = sub_data, ndraws = NULL,
-        process_error = process_error, resp = resp
-      )
-    } else {
-      posterior_epred(
-        object, newdata = sub_data, ndraws = NULL,
-        process_error = process_error, resp = resp
-      )
-    }
-  } else {
-    draws_mat <- posterior::as_draws_matrix(object$fit)
-    fitted_states <- extract_trend_latent_states(
-      mvgam_fit = object, newdata = sub_data, full_draws = draws_mat,
-      resp = resp
+    predictor <- if (sample_family) posterior_predict else posterior_epred
+    full <- predictor(
+      object, newdata = sub_data, draw_ids = draw_idx,
+      process_error = process_error, resp = resp
     )
-    if (is.null(fitted_states)) {
-      fitted_states <- matrix(0, nrow = nrow(draws_mat),
-                               ncol = nrow(sub_data))
-    }
+  } else {
+    fitted_states <- extract_trend_latent_states(
+      mvgam_fit = object, newdata = sub_data,
+      full_draws = subset_draws_rows(
+        posterior::as_draws_matrix(object$fit), draw_ids = draw_idx
+      ),
+      resp = resp
+    ) %||% matrix(0, nrow = length(draw_idx), ncol = nrow(sub_data))
     obs_linpred <- extract_component_linpred(
       mvgam_fit = object, newdata = sub_data,
-      component = "obs", resp = resp
+      component = "obs", resp = resp, draw_ids = draw_idx
     )
     assert_one_response_draws(obs_linpred, "The observation predictor")
     linpred <- obs_linpred + fitted_states
-    full <- switch(
-      type,
-      "trend" = fitted_states,
-      "link" = linpred,
-      "expected" = expected_from_linpred(
-        object, linpred, newdata = sub_data, resp = resp
-      ),
-      "response" = if (isTRUE(obs_uncertainty)) {
-        draw_observations(object, linpred, sub_data, draw_ids = NULL,
-                          resp = resp)
-      } else {
-        expected_from_linpred(
-          object, linpred, newdata = sub_data, resp = resp
-        )
-      }
-    )
+    full <- if (type == "trend") {
+      fitted_states
+    } else if (type == "link") {
+      linpred
+    } else if (sample_family) {
+      draw_observations(object, linpred, sub_data, draw_ids = draw_idx,
+                        resp = resp)
+    } else {
+      expected_from_linpred(object, linpred, newdata = sub_data,
+                            draw_ids = draw_idx, resp = resp)
+    }
   }
-
   assert_one_response_draws(full, "The hindcast")
-  full[draw_idx, , drop = FALSE]
+  full
 }
 
 
-# ----- Forecast arm -----------------------------------------------
+# ----- Forecasts --------------------------------------------------
 
-# Internal: trendless-forecast arm. When the fit has no
-# `trend_formula`, forecasting reduces to evaluating the obs-side
-# linear predictor on the held-out newdata; no latent-state
-# propagation runs. Returns per-series `[ndraws, n_times]` matrices
-# in the same shape `build_forecast_arms()` would, so the downstream
-# `mvgam_forecast` slot semantics and `plot.mvgam_forecast` are
-# unchanged.
-#
-# Passes `draw_ids` through to the posterior_* dispatcher so the
-# subset is materialised once (no all-draws fetch followed by a
-# slice).
-#'@noRd
+#' The forecast draws of each series of a trendless fit
+#'
+#' The observation predictor at the new occasions, with no state to
+#' propagate. The draws take the shape `build_forecast_arms()` gives.
+#'
+#' @param object A fitted `mvgam` object
+#' @param fc_grid The forecast grid
+#' @param type "link", "expected" or "response". `forecast.mvgam()`
+#'   refuses "trend" for a trendless fit.
+#' @param draw_idx Indices of the draws to keep
+#' @param obs_uncertainty Whether `type = "response"` samples the
+#'   family
+#' @param series_levels The series to report
+#' @param resp A response name, or NULL
+#' @return Named list of draws matrices, one per series
+#' @noRd
 build_trendless_forecast_arms <- function(object, fc_grid, type,
-                                            draw_idx,
-                                            obs_uncertainty,
-                                            series_levels,
-                                            resp = NULL) {
-  # `type = "trend"` is rejected at the top of `forecast.mvgam()`
-  # before any work runs; the switch below is total over the
-  # remaining three types.
+                                          draw_idx,
+                                          obs_uncertainty,
+                                          series_levels,
+                                          resp = NULL) {
+  checkmate::assert_choice(type, c("link", "expected", "response"))
+  checkmate::assert_list(fc_grid)
   fc_data <- fc_grid$data
-  predictor <- switch(
-    type,
-    "link"     = posterior_linpred,
-    "expected" = posterior_epred,
-    "response" = if (isTRUE(obs_uncertainty)) {
-      posterior_predict
-    } else {
-      posterior_epred
-    }
-  )
-  # Scoped to the response this call is for. A multivariate fit asked
-  # for no response answers with one matrix per response, and a list
-  # indexed as a matrix below is not a forecast of any of them.
+  predictor <- if (type == "link") {
+    posterior_linpred
+  } else if (type == "response" && obs_uncertainty) {
+    posterior_predict
+  } else {
+    posterior_epred
+  }
+  # Scoped to one response, which gives one draws matrix
   full <- predictor(object, newdata = fc_data, draw_ids = draw_idx,
                     resp = resp)
 
-  # Placed the way the fit places a row, so a frame whose `series`
-  # column was superseded by a grouping is cut into the series the
-  # model has. Reading the column matched nothing there and handed
-  # back an arm of zero columns per series. On a wide frame every row
-  # carries the response this call is for, so every row is its arm.
+  # The rows take their series as the fit placed them. On a wide frame
+  # every row belongs to the response this call is for.
   series_fac <- if (is_response_keyed(object)) {
     factor(rep(resp, nrow(fc_data)), levels = series_levels)
   } else {
@@ -940,110 +857,89 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
         levels = series_levels
       )
   }
-  out <- vector("list", length(series_levels))
-  names(out) <- series_levels
-  for (s in seq_along(series_levels)) {
-    cols <- which(series_fac == series_levels[s])
-    out[[s]] <- if (length(cols) == 0L) {
-      matrix(NA_real_, nrow = length(draw_idx), ncol = 0L)
-    } else {
-      full[, cols, drop = FALSE]
-    }
-  }
-  out
+  lapply(stats::setNames(nm = series_levels), function(lv) {
+    full[, which(series_fac == lv), drop = FALSE]
+  })
 }
 
 
-# Internal: per-series forecast matrices. Two passes:
-#   1. Per-draw kernel loop: propagate the latent trend forward
-#      `h_max` steps for each chosen draw. Cheap row slices of
-#      pre-computed caches; only the C++ kernel runs per draw.
-#   2. Batched obs-side + family pass: combine the [ndraws_use,
-#      nobs_fc] trend matrix with the cached obs linpred and
-#      apply `linkinv` / `sample_from_family` once across all
-#      draws.
-#'@noRd
+#' The forecast draws of each series
+#'
+#' Two passes. The first propagates the latent trend `h_max` steps for
+#' each draw, from row slices of linear predictors computed once. The
+#' second combines the trend draws with the observation predictor and
+#' applies the family to every draw at once.
+#'
+#' A correlated or VAR state moves all of its columns together at each
+#' step. The trend advances over every fitted series for that reason.
+#' The draws returned cover the `reported` series.
+#'
+#' @inheritParams build_hindcast_arms
+#' @param trend_model The trend specification
+#' @param meta The fit's trend metadata
+#' @param fc_grid The forecast grid
+#' @param draws_mat The fit's draws matrix
+#' @param coef_uncertainty,trend_uncertainty Whether coefficients and
+#'   trend quantities vary over draws
+#' @param series_levels Every fitted series
+#' @param reported The series to report
+#' @return Named list of draws matrices, one per reported series
+#' @noRd
 build_forecast_arms <- function(object, trend_model, meta,
-                                  training, fc_grid, type,
-                                  draws_mat, draw_idx,
-                                  coef_uncertainty,
-                                  trend_uncertainty,
-                                  obs_uncertainty,
-                                  series_levels,
-                                  resp = NULL,
-                                  reported = series_levels) {
-  # Two sets, and they differ on a wide frame. The trend is
-  # propagated over every series the fit has, since a correlated or
-  # VAR state advances its columns together; the arms returned are
-  # the ones this answer reports, which for one response of a wide
-  # frame is that response alone.
+                                training, fc_grid, type,
+                                draws_mat, draw_idx,
+                                coef_uncertainty,
+                                trend_uncertainty,
+                                obs_uncertainty,
+                                series_levels,
+                                resp = NULL,
+                                reported = series_levels) {
+  checkmate::assert_list(fc_grid)
+  checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
+  checkmate::assert_flag(coef_uncertainty)
+  checkmate::assert_flag(trend_uncertainty)
+  checkmate::assert_flag(obs_uncertainty)
   n_series <- length(series_levels)
   ndraws_use <- length(draw_idx)
-  per_series_h <- vapply(fc_grid$times, length, integer(1L))
-  h_max <- max(per_series_h)
 
   max_lag <- as.integer(meta$max_lag %||% 0L)
   tail_data <- build_training_tail_data(object, training, max_lag)
   obs_struct_fc <- get_observation_structure(object,
-                                               newdata = fc_grid$data,
-                                               resp = resp)
-  obs_struct_tail <- if (is.null(tail_data)) NULL else
-    get_observation_structure(object, newdata = tail_data,
-                              resp = resp)
+                                             newdata = fc_grid$data,
+                                             resp = resp)
+  obs_struct_tail <- if (!is.null(tail_data)) {
+    get_observation_structure(object, newdata = tail_data, resp = resp)
+  }
   nobs_fc <- length(obs_struct_fc$time)
+  # One step per occasion of the forecast grid. Series forecast at
+  # their own times make the union longer than any one series.
+  h_max <- length(obs_struct_fc$unique_times)
   arms_of <- function(mat) {
     slice_per_series(mat, fc_grid, obs_struct_fc, ndraws_use, reported)
   }
 
-  # Pre-compute trend-formula linpred matrices for the past
-  # tail and the forecast grid. extract_component_linpred is the
-  # expensive call; do it ONCE per matrix, then slice rows per
-  # draw inside the loop.
-  has_trend_lp <- !is.null(object$trend_model)
-  trend_lp_fc <- if (has_trend_lp) {
-    extract_component_linpred(
-      mvgam_fit = object, newdata = fc_grid$data, component = "trend"
-    )
-  } else {
-    NULL
+  # The linear predictors are computed once, over every draw, and the
+  # loop below takes a row of each per draw. Without
+  # `coef_uncertainty` every row repeats the first draw.
+  pin_coefs <- function(lp) {
+    if (coef_uncertainty || is.null(lp)) {
+      return(lp)
+    }
+    matrix(lp[1L, ], nrow = nrow(lp), ncol = ncol(lp), byrow = TRUE)
   }
-  trend_lp_tail <- if (has_trend_lp && !is.null(tail_data)) {
-    extract_component_linpred(
+  trend_lp_fc <- pin_coefs(extract_component_linpred(
+    mvgam_fit = object, newdata = fc_grid$data, component = "trend"
+  ))
+  trend_lp_tail <- if (!is.null(tail_data)) {
+    pin_coefs(extract_component_linpred(
       mvgam_fit = object, newdata = tail_data, component = "trend"
-    )
-  } else {
-    NULL
-  }
-  if (is.list(trend_lp_fc) && !is.matrix(trend_lp_fc)) {
-    stop(insight::format_error(
-      "Multivariate response forecasts are not supported."
     ))
   }
-
-  # Pre-compute the obs-formula linpred for the forecast grid;
-  # this and the trend caches above receive the
-  # `coef_uncertainty` toggle (collapsed to row 1 when FALSE).
-  obs_full <- if (type %in% c("link", "response", "expected")) {
-    extract_component_linpred(
+  obs_full <- if (type != "trend") {
+    pin_coefs(extract_component_linpred(
       mvgam_fit = object, newdata = fc_grid$data,
       component = "obs", resp = resp
-    )
-  } else {
-    NULL
-  }
-  if (isTRUE(!coef_uncertainty)) {
-    if (!is.null(obs_full)) obs_full <- matrix(
-      obs_full[1L, ], nrow = nrow(obs_full), ncol = ncol(obs_full),
-      byrow = TRUE
-    )
-    if (!is.null(trend_lp_fc)) trend_lp_fc <- matrix(
-      trend_lp_fc[1L, ], nrow = nrow(trend_lp_fc),
-      ncol = ncol(trend_lp_fc), byrow = TRUE
-    )
-    if (!is.null(trend_lp_tail)) trend_lp_tail <- matrix(
-      trend_lp_tail[1L, ], nrow = nrow(trend_lp_tail),
-      ncol = ncol(trend_lp_tail), byrow = TRUE
-    )
+    ))
   }
 
   # What the trend's kernel takes from the new times, the same in
@@ -1051,26 +947,12 @@ build_forecast_arms <- function(object, trend_model, meta,
   context <- trend_method(
     meta$trend_type, trend_method_optional_templates[["forecast_context"]]
   )(object, training, fc_grid, series_levels)
-  # One step per time of the union, which exceeds a single series'
-  # count when the series are forecast at their own times
-  if (!is.null(context$time)) {
-    h_max <- length(context$time)
-  }
 
-  # Factor-model precompute: when the fit is a latent-factor model
-  # the trend recursion runs in n_lv-dimensional LV space and a
-  # per-draw Z projects the propagated `[h, n_lv]` LV trajectory
-  # back to `[h, n_series]`. `resolve_factor_loadings()` returns
-  # the whole `[ndraws, n_series, n_lv]` array once and the inner
-  # loop slices it per draw. NULL for full-rank fits.
-  #
-  # `detect_factor_n_lv()` is asked rather than the two Stan
-  # dimensions compared, because a factor fit reaches
-  # `n_lv = n_series` under an MGP loadings prior or a
-  # `by = lv_axis()` term and a non-factor fit carries that same
-  # pair with an identity Z. Comparing them skips the projection on
-  # a fit that sampled a free Z, and `extract_last_state()` asks
-  # the same way so the two cannot disagree about the grain.
+  # A factor fit propagates its `n_lv` latent factors. Each draw's
+  # loadings `Z` project the `[h, n_lv]` path onto the series. A factor
+  # fit can have `n_lv = n_series`, under an MGP loadings prior or a
+  # `by = lv_axis()` term. `detect_factor_n_lv()` tells the two kinds
+  # of fit apart here and in `extract_last_state()`.
   n_lv_trend <- as.integer(
     object$standata$N_lv_trend %||% n_series
   )
@@ -1082,43 +964,25 @@ build_forecast_arms <- function(object, trend_model, meta,
     NULL
   }
 
-  # Per-draw kernel loop. `trend_flat[i, j]` holds the trend
-  # value at draw `draw_idx[i]`, observation row j of the
-  # forecast grid (obs_struct_fc ordering).
-  trend_flat <- matrix(NA_real_, nrow = ndraws_use,
-                         ncol = nobs_fc)
+  # `trend_flat[i, j]` is the trend of draw `draw_idx[i]` at row `j`
+  # of the forecast grid, in the order of `obs_struct_fc`.
+  trend_flat <- matrix(NA_real_, nrow = ndraws_use, ncol = nobs_fc)
   for (i in seq_len(ndraws_use)) {
-    # When `trend_uncertainty = FALSE` we pin every trend-side
-    # quantity to draw 1: the dynamics params + initial state
-    # (`d_state`) AND the trend-submodel linpred (`d_lin`).
-    # Pinning only `d_state` would leave the centred-convention
-    # `mu_trend` varying across draws, producing a mixture that
-    # neither marginalises trend-parameter uncertainty cleanly
-    # nor matches the "innovation-noise only" intent of the
-    # toggle.
-    d_state <- if (isTRUE(trend_uncertainty)) draw_idx[i] else 1L
-    d_lin <- d_state
-    Z_slice_d <- if (is.null(Z_arr)) {
-      NULL
-    } else {
-      # `drop = TRUE` on a [1, n_series, n_lv] slice returns a
-      # matrix when n_lv > 1 but collapses to a length-n_series
-      # vector when n_lv == 1 (the `trend_map = "shared"` case);
-      # reshape explicitly so `apply_factor_projection()` always
-      # sees an [n_series, n_lv] matrix.
-      matrix(
-        Z_arr[d_state, , , drop = FALSE][1L, , , drop = TRUE],
-        nrow = n_series,
-        ncol = n_lv_trend
-      )
+    # Without `trend_uncertainty`, the dynamics, the last state and
+    # the trend's mean all come from the first draw. The innovations
+    # alone vary.
+    d <- if (trend_uncertainty) draw_idx[i] else 1L
+    # A single factor drops `Z[d, , ]` to a vector. The reshape keeps
+    # it an `[n_series, n_lv]` matrix.
+    Z_slice <- if (!is.null(Z_arr)) {
+      matrix(Z_arr[d, , ], nrow = n_series, ncol = n_lv_trend)
     }
-    fc_link_d <- propagate_one_draw(
+    fc_trend <- propagate_one_draw(
       object = object,
       trend_model = trend_model,
       meta = meta,
       draws_mat = draws_mat,
-      d_state = d_state,
-      d_lin = d_lin,
+      d = d,
       h_max = h_max,
       n_series = n_series,
       trend_lp_tail = trend_lp_tail,
@@ -1126,13 +990,11 @@ build_forecast_arms <- function(object, trend_model, meta,
       obs_struct_tail = obs_struct_tail,
       obs_struct_fc = obs_struct_fc,
       context = context,
-      Z_slice = Z_slice_d
+      Z_slice = Z_slice
     )
-    trend_flat[i, ] <- flatten_grid_to_obs_order(fc_link_d,
-                                                    obs_struct_fc)
+    trend_flat[i, ] <- flatten_grid_to_obs_order(fc_trend, obs_struct_fc)
   }
 
-  # Batched obs combination + family pass.
   if (type == "trend") {
     return(arms_of(trend_flat))
   }
@@ -1140,10 +1002,9 @@ build_forecast_arms <- function(object, trend_model, meta,
   if (type == "link") {
     return(arms_of(eta_full))
   }
-  # `eta_full` is already sliced to `draw_idx`, and the parameters a
-  # family's mean or draw needs are read at those same iterations.
-  # Resolved independently, they came from a second subsample of the
-  # same size and paired `mu` with a `zi` or `shape` from an unrelated
+  # `eta_full` holds the rows of `draw_idx`. The family's mean and
+  # draw take their parameters at those same draws. A second
+  # subsample would pair `mu` with a `zi` or `shape` from another
   # draw.
   if (type == "expected" || isTRUE(!obs_uncertainty)) {
     return(arms_of(expected_from_linpred(
@@ -1157,158 +1018,176 @@ build_forecast_arms <- function(object, trend_model, meta,
 }
 
 
-# Internal: one-draw propagation pipeline. Returns a `[h_max,
-# n_series]` link-scale trajectory. In factor mode (Z_slice is
-# non-NULL) the recursion runs in n_lv-dimensional latent space
-# and the returned matrix is projected back to `n_series`
-# columns via `X %*% t(Z_slice)`.
-#'@noRd
-propagate_one_draw <- function(object, trend_model, meta,
-                                 draws_mat, d_state, d_lin,
-                                 h_max, n_series,
-                                 trend_lp_tail, trend_lp_fc,
-                                 obs_struct_tail, obs_struct_fc,
-                                 context = list(), Z_slice = NULL) {
-  ls_d <- extract_last_state(object, d_state,
-                                draws_mat = draws_mat)
+#' The forecast trend of one draw
+#'
+#' Every generated program builds the trend as
+#' `trend[t, s] = Z[s, ] . lv_trend[t, ] + mu_trend[t, s]`. The state
+#' advances with mean zero. The trend formula's predictor `mu_trend`
+#' adds at the series grain after the loadings project the state. A
+#' `by = lv_axis()` fit puts its mean inside the projection.
+#' `extract_component_linpred()` returns that mean projected. The sum
+#' is linear, which makes the two orders equal.
+#'
+#' @param object A fitted `mvgam` object
+#' @param trend_model The trend specification
+#' @param meta The fit's trend metadata
+#' @param draws_mat The fit's draws matrix
+#' @param d The draw to propagate
+#' @param h_max Number of steps
+#' @param n_series Number of fitted series
+#' @param trend_lp_tail,trend_lp_fc The trend's predictor over the
+#'   training tail and the forecast grid, one row per draw. The tail is
+#'   NULL without lags.
+#' @param obs_struct_tail,obs_struct_fc Their observation structures
+#' @param context What the kernel takes from the forecast times
+#' @param Z_slice The draw's `[n_series, n_lv]` loadings, or NULL
+#' @return Numeric matrix `[h_max, n_series]`
+#' @noRd
+propagate_one_draw <- function(object, trend_model, meta, draws_mat, d,
+                               h_max, n_series,
+                               trend_lp_tail, trend_lp_fc,
+                               obs_struct_tail, obs_struct_fc,
+                               context = list(), Z_slice = NULL) {
+  checkmate::assert_int(d, lower = 1L)
+  checkmate::assert_int(h_max, lower = 1L)
+  checkmate::assert_matrix(Z_slice, nrows = n_series, null.ok = TRUE)
+  ls_d <- extract_last_state(object, d, draws_mat = draws_mat)
   max_lag <- as.integer(meta$max_lag %||% 0L)
-
-  # Generated programs build the series-scale trend as
-  #
-  #   trend[t, s] = Z[s, ] . lv_trend[t, ] + mu_trend[t, s]
-  #
-  # so the dynamics are zero-mean and the trend-formula linear
-  # predictor enters once, at series scale, after the loadings
-  # projection. A `by = lv_axis()` fit puts its mean inside the
-  # projection instead, but linearity makes the two equivalent
-  # and `extract_component_linpred()` returns that fit's mean
-  # already projected, so the addition below is right for both.
-  # Each grid is built at series scale because `mu_trend` is
-  # indexed by series rather than by latent variable, and a
-  # trend formula carrying no covariates gives an all-zero grid,
-  # so both are applied unconditionally.
-  lp_history <- trend_linpred_grid(
-    trend_lp_tail, obs_struct_tail, d_lin, max_lag, n_series
-  )
   lp_forecast <- trend_linpred_grid(
-    trend_lp_fc, obs_struct_fc, d_lin, h_max, n_series
+    trend_lp_fc, obs_struct_fc, d, h_max, n_series
   )
 
-  # Factor mode: propagate at the LV grain `extract_last_state()`
-  # returned (n_lv columns instead of n_series), then project
-  # back to series scale with `apply_factor_projection()`.
-  in_factor_mode <- !is.null(Z_slice) &&
-    !is.null(ls_d$n_lv_active)
-  n_prop <- if (in_factor_mode) ls_d$n_lv_active else n_series
-
-  # Factor fits store the zero-mean `lv_trend`, but series-grain
-  # fits store `trend[t, s]`, which already carries `mu_trend`.
-  # Centring the latter leaves every path advancing the same
-  # quantity.
+  # A factor fit stores the zero-mean `lv_trend` and advances its
+  # `n_lv` columns. Every other fit stores `trend[t, s]`, which holds
+  # `mu_trend`. Subtracting it leaves both advancing a zero-mean
+  # state.
+  in_factor_mode <- !is.null(Z_slice) && !is.null(ls_d$n_lv_active)
   if (!in_factor_mode && max_lag > 0L) {
-    ls_d$last_state$trends <- ls_d$last_state$trends - lp_history
+    ls_d$last_state$trends <- ls_d$last_state$trends -
+      trend_linpred_grid(trend_lp_tail, obs_struct_tail, d, max_lag,
+                         n_series)
   }
 
-  fc_lv <- do.call(propagate_trend, c(
+  fc_state <- do.call(propagate_trend, c(
     list(trend_model = trend_model, params = ls_d$params, h = h_max,
-         n_series = n_prop, last_state = ls_d$last_state),
+         n_series = if (in_factor_mode) ls_d$n_lv_active else n_series,
+         last_state = ls_d$last_state),
     context
   ))
-  fc_series <- if (in_factor_mode) {
-    apply_factor_projection(fc_lv, Z_slice, n_series)
-  } else {
-    fc_lv
+  if (in_factor_mode) {
+    fc_state <- fc_state %*% t(Z_slice)
   }
-  fc_series + lp_forecast
+  fc_state + lp_forecast
 }
 
 
-# Internal: the trend-formula linear predictor for one draw, as a
-# `[n_rows, n_series]` grid aligned with the propagation window.
-# `mu_trend` is indexed by series in every generated program, so
-# this is always built at series scale even when propagation runs
-# at the latent-variable grain. Returns zeros when the fit has no
-# trend formula, which is what a covariate-free trend contributes.
-#'@noRd
-trend_linpred_grid <- function(lp_mat, obs_struct, draw_row,
-                                 n_rows, n_series) {
-  checkmate::assert_matrix(lp_mat, null.ok = TRUE)
+#' The trend's predictor of one draw as a time-by-series grid
+#'
+#' `mu_trend` is indexed by series in every generated program. The grid
+#' is at the series grain for factor fits too.
+#'
+#' @param lp_mat The trend's predictor, one row per draw
+#' @param obs_struct Observation structure of the rows of `lp_mat`
+#' @param draw_row The draw to take
+#' @param n_rows Number of occasions to keep, the last ones of the grid
+#' @param n_series Number of fitted series
+#' @return Numeric matrix `[n_rows, n_series]`
+#' @noRd
+trend_linpred_grid <- function(lp_mat, obs_struct, draw_row, n_rows,
+                               n_series) {
+  checkmate::assert_matrix(lp_mat)
   checkmate::assert_int(draw_row, lower = 1L)
-  checkmate::assert_int(n_rows, lower = 0L)
+  checkmate::assert_int(n_rows, lower = 1L)
   checkmate::assert_int(n_series, lower = 1L)
-  if (n_rows == 0L) {
-    return(matrix(0, nrow = 0L, ncol = n_series))
-  }
-  if (is.null(lp_mat)) {
-    return(matrix(0, nrow = n_rows, ncol = n_series))
-  }
   grid <- reshape_linpred_to_grid(lp_mat[draw_row, ], obs_struct)
-  # `reshape_linpred_to_grid()` sizes its columns from the
-  # observation structure, so a newdata whose series column has
-  # dropped levels returns a grid narrower than the trend it must
-  # line up with. Name the two that disagree rather than letting
-  # the sum fail as non-conformable arrays.
   if (ncol(grid) != n_series) {
     stop(insight::format_error(c(
-      "Trend linear predictor does not span every series.",
-      x = paste0(
-        "Got ", ncol(grid), " series in the linear predictor, ",
-        "expected ", n_series, "."
-      ),
+      "The trend's linear predictor must span every fitted series.",
+      x = paste0("The predictor spans ", ncol(grid), " of ", n_series,
+                 " series."),
       i = paste0("Give the series column of 'newdata' every series ",
                  "level of the training data.")
-    )))
+    )), call. = FALSE)
   }
-  pad_or_trim_rows(grid, n_rows)
+  # A CAR history holds each series' last observed occasions. Series
+  # observed at their own times give more occasions than lags.
+  if (nrow(grid) < n_rows) {
+    stop_shape_fault("The trend's predictor grid", nrow(grid), n_rows)
+  }
+  grid[seq.int(nrow(grid) - n_rows + 1L, nrow(grid)), , drop = FALSE]
 }
 
 
-# Internal: project an `[h, n_lv]` LV-scale forecast trajectory
-# back to `[h, n_series]` observation scale via a `[n_series,
-# n_lv]` per-draw loadings slice. One place to change if the
-# loading convention ever shifts, and a single call site to
-# assert dimensions on.
-#'@noRd
-apply_factor_projection <- function(lv_traj, Z_slice, n_series) {
-  checkmate::assert_matrix(lv_traj, min.rows = 0L)
-  checkmate::assert_matrix(Z_slice, nrows = n_series)
-  lv_traj %*% t(Z_slice)
-}
-
-
-# Internal: the one value every forecast series shares. The CAR and
-# PW kernels evaluate a single horizon for all series. Each non-empty
-# entry of `per_series` has to agree, and an empty entry is a series
-# with nothing to forecast.
-#'@noRd
-shared_across_series <- function(per_series, trend) {
+#' The forecast times every series shares
+#'
+#' Refuses series forecast at different times. Only `CAR()` steps each
+#' series to its own times. An empty entry is a series with nothing to
+#' forecast.
+#'
+#' @param fc_grid The forecast grid
+#' @param series_levels Every fitted series
+#' @param trend The trend's name, for the message
+#' @return The sorted shared times, or `numeric(0)` without any
+#' @noRd
+shared_forecast_times <- function(fc_grid, series_levels, trend) {
+  checkmate::assert_list(fc_grid)
+  checkmate::assert_string(trend)
+  per_series <- lapply(fc_grid$times[series_levels], function(t) {
+    sort(unique(as.numeric(t)))
+  })
   filled <- Filter(length, per_series)
   if (length(filled) == 0L) {
     return(numeric(0L))
   }
-  agree <- vapply(filled, function(v) isTRUE(all.equal(v, filled[[1L]])),
-                  logical(1L))
-  if (!all(agree)) {
+  differs <- !vapply(filled, function(v) {
+    isTRUE(all.equal(v, filled[[1L]]))
+  }, logical(1L))
+  if (any(differs)) {
     stop(insight::format_error(c(
-      paste0(trend, " forecasts require all series to share one time grid."),
-      x = paste0("The ", trend, " kernel evaluates one horizon for all ",
-                 "series."),
-      i = "Give every series in 'newdata' the same forecast times."
+      paste0("'", trend, "()' forecasts require every series to share ",
+             "one set of forecast times."),
+      x = paste0("Series '", names(filled)[1L], "' and '",
+                 names(filled)[which(differs)[1L]],
+                 "' have different times in 'newdata'."),
+      i = "Only 'CAR()' forecasts series at their own times."
     )), call. = FALSE)
   }
   filled[[1L]]
 }
 
 
-# Internal: the per-step time gaps of a CAR forecast, as `time`, in
-# the unit the fit measured its own gaps in. Every series is stepped
-# together over the union of the forecast times, from its state at the
-# last occasion of the fitted grid, and each series is then reported
-# at its own times. A series whose last responses are missing has a
-# state at the last occasion too.
-#'@noRd
+#' The forecast context of a ZMVN trend
+#'
+#' Correlated innovations pair the series at one time. The draws are
+#' independent over time and need no context.
+#'
+#' @inheritParams forecast_context_car
+#' @return An empty list
+#' @noRd
+forecast_context_zmvn <- function(object, training, fc_grid,
+                                  series_levels) {
+  shared_forecast_times(fc_grid, series_levels, "ZMVN")
+  list()
+}
+
+
+#' The time gaps of each step of a CAR forecast
+#'
+#' Every series steps from its state at the last occasion of the fitted
+#' grid, over the union of the forecast times. Each series reports its
+#' own times. The gaps are in the unit the fit measured its own gaps
+#' in. A series whose last responses are missing has a state at the
+#' last occasion too.
+#'
+#' @param object A fitted `mvgam` object
+#' @param training The training data, unused here
+#' @param fc_grid The forecast grid
+#' @param series_levels Every fitted series
+#' @return List holding `time`, one gap per step
+#' @noRd
 forecast_context_car <- function(object, training, fc_grid,
                                  series_levels) {
+  checkmate::assert_list(fc_grid)
   time_axis <- mvgam_axes(object)$time
   origin <- max(time_axis$values)
   for (lv in series_levels) {
@@ -1332,23 +1211,23 @@ forecast_context_car <- function(object, training, fc_grid,
 }
 
 
-# Internal: what the PW kernel evaluates its closed form at:
-#   * `fc_times`: shared horizon time vector (one per step).
-#   * `training_times`: training time vector (drives the
-#     Prophet-style horizon-changepoint frequency).
-#   * `cap`: forecast-horizon carrying capacities [h, n_series]
-#     for the logistic growth path; NULL for linear.
-#   * `changepoint_range`: the share of the history that holds
-#     changepoints.
-#'@noRd
+#' What the PW kernel evaluates its closed form at
+#'
+#' @param object A fitted `mvgam` object
+#' @param training The training data from `build_training_arms()`
+#' @param fc_grid The forecast grid
+#' @param series_levels Every fitted series
+#' @return List of `fc_times`, the shared forecast times on the time
+#'   index; `training_times`, the observed occasions on that index,
+#'   which set the rate of new changepoints; `cap`, the `[h, n_series]`
+#'   link-scale capacities of a logistic trend or NULL; and
+#'   `changepoint_range`, the share of the history holding changepoints
+#' @noRd
 forecast_context_pw <- function(object, training, fc_grid,
                                 series_levels) {
-  fc_times <- shared_across_series(
-    lapply(series_levels, function(lv) {
-      sort(unique(as.numeric(fc_grid$times[[lv]])))
-    }),
-    "PW"
-  )
+  checkmate::assert_list(training)
+  checkmate::assert_list(fc_grid)
+  fc_times <- shared_forecast_times(fc_grid, series_levels, "PW")
 
   # Stan fits the piecewise trend on the time index, 1 to N_time, and
   # places its changepoints there. The forecast is evaluated on the
@@ -1362,16 +1241,14 @@ forecast_context_pw <- function(object, training, fc_grid,
   # `changepoint_range` is a proportion of at fit time
   training_times <- to_index(sort(unique(unlist(training$times))))
 
-  # Logistic PW needs a cap matrix [h, n_series] from newdata.
-  # `first_trend_spec()` resolves the spec for every caller, and a
-  # linear PW leaves cap NULL.
+  # A logistic PW takes an `[h, n_series]` capacity matrix from
+  # newdata. A linear PW has none.
   spec <- first_trend_spec(object)
   cap <- if (pw_is_logistic(spec)) {
-    extract_pw_cap_matrix(object, fc_grid, spec, fc_times,
-                            series_levels,
-                            family = pw_cap_link_family(
-                              formula_families(object, object$family)
-                            ))
+    extract_pw_cap_matrix(
+      object, fc_grid, spec, fc_times, series_levels,
+      family = pw_cap_link_family(formula_families(object, object$family))
+    )
   } else {
     NULL
   }
@@ -1383,49 +1260,40 @@ forecast_context_pw <- function(object, training, fc_grid,
 }
 
 
-# Internal: build the `[h, n_series]` cap matrix for PW
-# logistic from the forecast newdata. `pw_cap_var()` names the cap
-# column.
-#
-# User-supplied cap is on the RESPONSE scale (e.g. "carrying
-# capacity of 100 individuals"); the C++ kernel expects cap on
-# the LINK scale because the logistic formula evaluates
-# `cap * inv_logit(...)` as the trend's contribution to eta.
-# Apply the family's link function to bring cap to the link
-# scale. Together with the PW convention of fitting on a
-# zero-intercept observation formula (`y ~ -1`), this gives
-# `E[Y]` saturating at exactly the user-stated cap.
-#
-# Cells without an observed cap row error rather than silently
-# substituting -- propagating an unknown cap into the
-# inverse-logit would produce a meaningless forecast.
-#'@noRd
+#' The capacity matrix of a logistic PW trend over a forecast
+#'
+#' The `cap` column of `newdata` at each forecast time and series, as an
+#' `[h, n_series]` matrix. The cap is on the response scale.
+#' `transform_pw_cap_to_link()` puts it on the link scale, where the
+#' kernel evaluates `cap * inv_logit(...)`. With the zero-intercept
+#' observation formula of a logistic PW fit, `E[Y]` then saturates at
+#' the stated cap.
+#'
+#' @param object A fitted `mvgam` object
+#' @param fc_grid The forecast grid, holding `data` and `time_var`
+#' @param spec The `PW()` trend specification
+#' @param fc_times Forecast times, one per row of the result
+#' @param series_levels Series of the trend, one per column
+#' @param family Family whose link the capacity takes
+#' @return Numeric matrix on the link scale
+#' @noRd
 extract_pw_cap_matrix <- function(object, fc_grid, spec, fc_times,
-                                    series_levels, family) {
+                                  series_levels, family) {
+  checkmate::assert_list(fc_grid, names = "named")
+  checkmate::assert_vector(fc_times, min.len = 1L, any.missing = FALSE)
+  checkmate::assert_vector(series_levels, min.len = 1L)
   cap_var <- pw_cap_var(spec)
   d <- fc_grid$data
   if (!(cap_var %in% names(d))) {
     stop(insight::format_error(c(
-      paste0(
-        "PW logistic requires a '", cap_var,
-        "' column in 'newdata' for the forecast cells."
-      ),
-      i = paste0(
-        "Each (time, series) forecast cell needs a cap value."
-      )
-    )))
+      paste0("A logistic 'PW()' forecast requires a '", cap_var,
+             "' column in 'newdata'."),
+      i = "The capacity at each forecast time sets the trend's ceiling."
+    )), call. = FALSE)
   }
-  # The grid names the column its horizon was cut from, so the
-  # occasions compared below are the same doubles rather than two
-  # readings of one. Reading `attr(d, "time_var")` asked a frame
-  # that had just been subset, and a subset does not carry the
-  # attribute reliably; the fallback then read a column named
-  # "time" on a fit whose time column is called something else.
+  # The grid's own time column matches the forecast times exactly.
+  # The series come from the axes the fit placed each row on.
   time_var <- fc_grid$time_var
-  # Placed the way the fit places a row, so a hierarchical frame
-  # whose `series` column was superseded by its grouping is cut
-  # into the series the model has. Comparing the raw column there
-  # matched nothing and refused a cap the user did supply.
   series_ids <- axis_row_series(object, d)
   row_series <- if (is.null(series_ids)) {
     as.character(d[[axis_vars(object)$series_var]])
@@ -1433,61 +1301,62 @@ extract_pw_cap_matrix <- function(object, fc_grid, spec, fc_times,
     as.character(series_ids)
   }
   cap_mat <- matrix(NA_real_, nrow = length(fc_times),
-                      ncol = length(series_levels))
+                    ncol = length(series_levels))
   for (s in seq_along(series_levels)) {
-    lv <- series_levels[s]
     for (k in seq_along(fc_times)) {
-      ix <- which(row_series == lv & d[[time_var]] == fc_times[k])
-      if (length(ix) == 0L) next
-      cap_mat[k, s] <- as.numeric(d[[cap_var]][ix[1L]])
+      ix <- which(row_series == series_levels[s] &
+                    d[[time_var]] == fc_times[k])
+      if (length(ix) > 0L) {
+        cap_mat[k, s] <- as.numeric(d[[cap_var]][ix[1L]])
+      }
     }
   }
-  if (any(is.na(cap_mat))) {
+  if (anyNA(cap_mat)) {
     stop(insight::format_error(c(
-      paste0(
-        "PW logistic: missing 'cap' values for some forecast ",
-        "cells in 'newdata'."
-      ),
-      i = paste0("Supply 'cap' for every (time, series) cell.")
-    )))
+      paste0("A logistic 'PW()' forecast needs '", cap_var,
+             "' for every series at every forecast time."),
+      i = paste0("Add the missing '", cap_var, "' values to 'newdata'.")
+    )), call. = FALSE)
   }
   transform_pw_cap_to_link(cap_mat, family, cap_var)
 }
 
-
-# Internal: apply the observation family's link function to a
-# response-scale cap matrix, at fit time and at forecast time
-# alike. An identity link passes the cap through unchanged; log /
-# logit / probit transform as expected. Errors if the result has
-# any non-finite cells (e.g. user supplied `cap = 0` to a log-link
-# family).
-#'@noRd
+#' A response-scale capacity on the link scale
+#'
+#' Applies the family's link to the capacity matrix, at fit time and at
+#' forecast time.
+#'
+#' @param cap_mat Numeric matrix of capacities on the response scale
+#' @param family Family whose link the capacity takes
+#' @param cap_var Name of the capacity column, for the message
+#' @return `cap_mat` on the link scale
+#' @noRd
 transform_pw_cap_to_link <- function(cap_mat, family, cap_var = "cap") {
-  checkmate::assert_function(family$linkfun)
+  checkmate::assert_matrix(cap_mat, mode = "numeric")
+  checkmate::assert_function(family$linkfun, .var.name = "family$linkfun")
+  checkmate::assert_string(cap_var, min.chars = 1L)
   out <- family$linkfun(cap_mat)
   if (any(!is.finite(out))) {
     stop(insight::format_error(c(
-      paste0(
-        "PW logistic: cap values are not finite after applying ",
-        "the '", family$link, "' link transform."
-      ),
-      i = paste0("A log link needs strictly positive '", cap_var,
-                 "' values.")
-    )))
+      paste0("The '", family$link, "' link maps some '", cap_var,
+             "' values to infinity."),
+      i = paste0("Give '", cap_var, "' values inside the range of the ",
+                 "response.")
+    )), call. = FALSE)
   }
   out
 }
 
-
-# Internal: the family whose link puts a logistic trend's capacity
-# on the trend's scale.
-#
-# The one latent trend enters every response's linear predictor,
-# so the capacity, given on the response scale, reaches it through
-# a link. Responses whose families link differently would put that
-# one trend on different scales, which no single capacity
-# describes.
-#'@noRd
+#' The family whose link puts a logistic PW capacity on the trend scale
+#'
+#' The one latent trend enters every response's linear predictor. The
+#' capacity, given on the response scale, reaches it through a link.
+#' Responses on different links would put the trend on different
+#' scales, which no single capacity describes.
+#'
+#' @param families List of the observation families
+#' @return The first family, once every link is shown to agree
+#' @noRd
 pw_cap_link_family <- function(families) {
   checkmate::assert_list(families, min.len = 1L)
   links <- unique(vapply(families, function(f) f$link, character(1L)))
@@ -1496,7 +1365,7 @@ pw_cap_link_family <- function(families) {
       "A logistic 'PW()' trend needs every response on one link.",
       x = paste0("The responses use the links ",
                  paste0("'", links, "'", collapse = ", "), "."),
-      x = paste0("The capacity is on the response scale and enters ",
+      i = paste0("The capacity is on the response scale and enters ",
                  "the shared trend through the link."),
       i = paste0("Give the responses families with one link or use a ",
                  "linear 'PW()' trend.")
@@ -1506,106 +1375,61 @@ pw_cap_link_family <- function(families) {
 }
 
 
-# Internal: pad or trim a [n_rows, n_series] grid to exactly
-# `target_rows`. Pads short grids by repeating the final row;
-# trims long ones from the head. Only kicks in when per-series
-# horizons differ from `target_rows`; callers slice each series
-# back to its own horizon afterwards so the padding never
-# pollutes returned forecasts.
-#
-# Note: for ARMA models with a very short training series
-# (n_time < max_lag) the padding repeats the final available
-# `mu_trend` row, while `assemble_innovations` zeros the
-# corresponding MA seed entries. This produces a small
-# asymmetry at the first forecast step. Genuine short-series
-# fits are rare in practice; the asymmetry vanishes as
-# n_time grows past max_lag.
-#'@noRd
-pad_or_trim_rows <- function(grid, target_rows) {
-  if (nrow(grid) == target_rows) return(grid)
-  if (nrow(grid) == 0L) {
-    return(matrix(0, nrow = target_rows, ncol = ncol(grid)))
-  }
-  if (nrow(grid) > target_rows) {
-    return(grid[seq.int(nrow(grid) - target_rows + 1L,
-                          nrow(grid)), , drop = FALSE])
-  }
-  out <- matrix(0, nrow = target_rows, ncol = ncol(grid))
-  out[seq_len(nrow(grid)), ] <- grid
-  last_row <- grid[nrow(grid), , drop = FALSE]
-  for (k in (nrow(grid) + 1L):target_rows) {
-    out[k, ] <- last_row
-  }
-  out
-}
-
-
-# Internal: project a `[ndraws_use, nobs_fc]` matrix (obs_struct
-# row order) into a per-series list of `[ndraws_use, h_s]`
-# matrices, where `h_s` is the per-series forecast horizon. Each
-# (raw_time, series) cell is looked up directly from obs_struct.
-#
-# `obs_struct$time` values are positional within the unique
-# time grid of the forecast newdata; the raw time labels live
-# on `names(obs_struct$time)` per `ensure_mvgam_variables`.
-# Compare raw times here so the per-series slice picks the
-# right cell when the user passes future times like 41:45.
-#'@noRd
+#' Forecast draws cut into one matrix per series
+#'
+#' @param mat Draws matrix `[ndraws_use, nobs_fc]`, one column per row
+#'   of the forecast grid in the order of `obs_struct`
+#' @param fc_grid The forecast grid
+#' @param obs_struct Observation structure of the forecast grid
+#' @param ndraws_use Number of draws
+#' @param series_levels The series to report
+#' @return Named list of `[ndraws_use, h_s]` matrices, one column per
+#'   forecast time of each series
+#' @noRd
 slice_per_series <- function(mat, fc_grid, obs_struct,
-                               ndraws_use, series_levels) {
-  # The occasions as the frame holds them, not as they print.
-  # `names(obs_struct$time)` are labels, so reading them back with
-  # `as.numeric()` is a round trip through a decimal rendering: an
-  # occasion computed as 91.953 + 2.3 + 3.1 came back 1.4e-14 away
-  # from itself and the exact comparison below missed. That column
-  # of the forecast was then left as it was initialised, so one
-  # horizon of a continuous grid returned `NA` for every draw while
-  # its neighbours returned numbers. Both sides now come from the
-  # one column, so they are the same doubles.
+                             ndraws_use, series_levels) {
+  checkmate::assert_matrix(mat, nrows = ndraws_use)
+  # The forecast times come from this column too. Both sides hold the
+  # same doubles. Labels printed from them lose digits.
   raw_times <- as.numeric(fc_grid$data[[fc_grid$time_var]])
-
-  out <- vector("list", length(series_levels))
-  names(out) <- series_levels
-  for (s in seq_along(series_levels)) {
-    lv <- series_levels[s]
+  out <- lapply(series_levels, function(lv) {
     ts <- fc_grid$times[[lv]]
-    if (length(ts) == 0L) {
-      out[[s]] <- matrix(NA_real_, nrow = ndraws_use, ncol = 0L)
-      next
+    # Found by name on the fit's axis. A forecast of one response of
+    # a wide frame reports fewer series than the axis holds.
+    rows <- which(
+      obs_struct$series_int == match(lv, obs_struct$series_levels)
+    )
+    cells <- rows[match(as.numeric(ts), raw_times[rows])]
+    if (anyNA(cells)) {
+      stop_mvgam_fault(
+        "Every forecast occasion needs a row in the forecast grid.",
+        paste0("Series '", lv, "' at ",
+               format(ts[is.na(cells)][1L], trim = TRUE),
+               " is absent from the grid.")
+      )
     }
-    # The trend column this series reads, found by name on the fit's
-    # own axis rather than by its position in `series_levels`. The two
-    # agree when every series is asked for and part company when an
-    # answer reports fewer, which an answer scoped to one response of
-    # a wide frame does.
-    col <- match(lv, obs_struct$series_levels)
-    sm <- matrix(NA_real_, nrow = ndraws_use, ncol = length(ts))
-    for (k in seq_along(ts)) {
-      cell_j <- which(raw_times == ts[k] & obs_struct$series_int == col)
-      if (length(cell_j) == 0L) {
-        stop_mvgam_fault(
-          "Every forecast occasion needs a row in the forecast grid.",
-          paste0("Series '", lv, "' at ", format(ts[k], trim = TRUE),
-                 " matched no row.")
-        )
-      }
-      sm[, k] <- mat[, cell_j[1L]]
-    }
-    out[[s]] <- sm
-  }
+    mat[, cells, drop = FALSE]
+  })
+  names(out) <- series_levels
   out
 }
 
 
-# Internal: family-specific dpar draws for `type = "link"`
-# output. Picks the chosen draws from the precomputed
-# `draws_mat` so the returned `family_pars` slot lines up with
-# the `[ndraws_use, ...]` rows in `hindcasts` / `forecasts`.
-#'@noRd
+#' The family's parameter draws of a `type = "link"` forecast
+#'
+#' The rows follow `draw_idx`, the rows of the hindcasts and forecasts.
+#'
+#' @param object A fitted `mvgam` object
+#' @param draws_mat The fit's draws matrix
+#' @param draw_idx Indices of the draws to keep
+#' @param resp A response name, or NULL
+#' @return Named list of draws matrices, one per sampled parameter
+#' @noRd
 extract_family_pars_for_draws <- function(object, draws_mat,
-                                            draw_idx, resp = NULL) {
-  # A multivariate fit gives each response its own family, and the
-  # dpars looked up are that response's.
+                                          draw_idx, resp = NULL) {
+  checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
+  # Each response of a multivariate fit has its own family and
+  # distributional parameters
   fam_name <- resolve_family_name(model_families(object, resp))
   dpar_names <- get_family_dpars(fam_name)
   if (length(dpar_names) == 0L) return(list())
@@ -1617,14 +1441,9 @@ extract_family_pars_for_draws <- function(object, draws_mat,
     pat <- paste0("^", nm, suffix, "(\\[|$)")
     cols <- grep(pat, colnames(draws_mat), value = TRUE)
     if (length(cols) == 0L) next
-    # An indexed parameter is read back in the order its index
-    # counts, not the order the names sort in: `sigma[10]` precedes
-    # `sigma[2]` lexically and would put one observation's value on
-    # another's row.
-    indexed <- grepl("\\[[0-9]+\\]$", cols)
-    if (all(indexed)) {
-      cols <- cols[order(as.integer(sub("^.*\\[([0-9]+)\\]$", "\\1",
-                                        cols)))]
+    # Ordered by index. `sigma[10]` sorts before `sigma[2]` by name.
+    if (all(grepl("\\[[0-9]+\\]$", cols))) {
+      cols <- cols[order(as.integer(stan_index(cols)))]
     }
     out[[nm]] <- draws_mat[draw_idx, cols, drop = FALSE]
   }
@@ -1632,10 +1451,16 @@ extract_family_pars_for_draws <- function(object, draws_mat,
 }
 
 
-# Internal: a hindcast scoped to one response holds one draws matrix.
-# A list of matrices here means the response scope was lost upstream.
-#'@noRd
+#' Fault on draws that span several responses
+#'
+#' A hindcast scoped to one response holds one draws matrix.
+#'
+#' @param draws The draws to check
+#' @param what What the draws are, for the message
+#' @return `TRUE`, invisibly
+#' @noRd
 assert_one_response_draws <- function(draws, what) {
+  checkmate::assert_string(what)
   if (is.list(draws) && !is.matrix(draws)) {
     stop_mvgam_fault(
       paste0(what, " must be one draws matrix."),

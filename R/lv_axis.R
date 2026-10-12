@@ -206,11 +206,18 @@ detect_and_rewrite_by_lv <- function(formula, target = ".trend",
   )
 }
 
-# Internal: refuse a trend formula whose terms name the series
-# column. The trend data holds the resolved axis as `series` whatever
-# the user's column is called, and both names are refused.
-#'@noRd
+#' Refuse a trend formula whose terms name the series column
+#'
+#' The trend data stores the resolved axis as `series` whatever the
+#' user's column is called. Both names are refused.
+#'
+#' @param rhs Right-hand side of the trend formula, as a language object
+#' @param series_var Character name of the trend's series column, or
+#'   `NULL` to refuse nothing
+#' @return `TRUE`, invisibly, or an error
+#' @noRd
 refuse_series_terms <- function(rhs, series_var) {
+  checkmate::assert_string(series_var, null.ok = TRUE)
   if (is.null(series_var)) {
     return(invisible(TRUE))
   }
@@ -229,10 +236,20 @@ refuse_series_terms <- function(rhs, series_var) {
   )), call. = FALSE)
 }
 
-# Internal: the recursion of `detect_and_rewrite_by_lv()`. `state`
-# counts the replacements.
-#'@noRd
+#' An expression with each `lv_axis()` replaced by its data column
+#'
+#' The recursion of `detect_and_rewrite_by_lv()`. A smooth's
+#' `by = trend` is replaced the same way.
+#'
+#' @param expr Language object to rewrite
+#' @param state Environment holding the `target` symbol and the counters
+#'   `n_by_lv` and `deprecated_trend_seen`, updated in place
+#' @param depth Integer recursion depth, capped at 50
+#' @return The rewritten language object
+#' @noRd
 walk_by_lv <- function(expr, state, depth = 0L) {
+  checkmate::assert_environment(state)
+  checkmate::assert_int(depth, lower = 0L)
   if (depth > 50L) {
     stop(insight::format_error(c(
       "Formula nesting too deep (>50 levels).",
@@ -257,12 +274,56 @@ walk_by_lv <- function(expr, state, depth = 0L) {
   rlang::call2(args[[1L]], !!!tail)
 }
 
-# Internal: the columns `detect_and_rewrite_by_lv()` writes in place
-# of `lv_axis()`. `.trend` is the factor axis and `series` the axis a
-# trend derives from a grouping or from the responses. A fit whose
-# data names its series passes that column as well.
-#'@noRd
+#' Name the trend's axis in prior labels as the user wrote it
+#'
+#' brms labels the trend formula's coefficients and groups with the
+#' column that replaced `lv_axis()`, such as
+#' `s(month, by = series)`. A user writes `lv_axis()` in the formula
+#' and is refused the series column there. The prior table names the
+#' term the same way. `to = "user"` writes `lv_axis()` in place of the
+#' column. `to = "brms"` writes the column in place of `lv_axis()`.
+#' A label holding the column only as part of a longer name, such as
+#' the factor level `seriesGreens`, is left alone.
+#'
+#' @param priors A `brmsprior` of trend rows.
+#' @param target The column that replaced `lv_axis()`, or `NULL`
+#'   when the formula has none.
+#' @param to `"user"` or `"brms"`.
+#' @return `priors` with its `coef` and `group` labels translated.
+#' @noRd
+translate_lv_axis_labels <- function(priors, target, to = c("user", "brms")) {
+  to <- match.arg(to)
+  if (is.null(target) || is.null(priors) || nrow(priors) == 0L) {
+    return(priors)
+  }
+  checkmate::assert_string(target, min.chars = 1L)
+  name_chars <- "[:alnum:]._"
+  token <- if (to == "user") {
+    gsub("([.])", "\\\\\\1", target)
+  } else {
+    "lv_axis\\(\\)"
+  }
+  pattern <- paste0("(?<![", name_chars, "])", token,
+                    "(?![", name_chars, "(])")
+  replacement <- if (to == "user") "lv_axis()" else target
+  for (col in intersect(c("coef", "group"), names(priors))) {
+    priors[[col]] <- gsub(pattern, replacement, priors[[col]], perl = TRUE)
+  }
+  priors
+}
+
+#' The columns `detect_and_rewrite_by_lv()` writes for `lv_axis()`
+#'
+#' `.trend` is the factor axis. `series` is the axis a trend derives
+#' from a grouping or from the responses. A fit whose data names its
+#' series passes that column too.
+#'
+#' @param series_var Character name of the fit's series column, or
+#'   `NULL`
+#' @return Character vector of column names
+#' @noRd
 by_lv_rewrite_tokens <- function(series_var = NULL) {
+  checkmate::assert_string(series_var, null.ok = TRUE)
   unique(c(".trend", "series", series_var))
 }
 

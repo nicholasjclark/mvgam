@@ -6,12 +6,20 @@
 # exported equivalents per CRAN policy.
 
 
-# Internal: variadic capture of mvgam fits (or, with `class =
-# "mvgam_forecast"`, of forecast objects) passed as `x, ...`.
-# Returns `list(models = <named list>, other = <named list of
-# remaining args>)`. Non-model `...` entries must be named or
-# the call errors.
-#'@noRd
+#' Model objects separated from the other arguments of a call
+#'
+#' Collects every object of `class` passed as `x, ...`. Each `...` entry
+#' of another class must be named.
+#'
+#' @param x First model object
+#' @param ... Further model objects and named arguments
+#' @param model_names Character vector of labels, one per model, or
+#'   `NULL`
+#' @param class Character class the model objects inherit from, such as
+#'   `"mvgam"` or `"mvgam_forecast"`
+#' @return List holding the named list of `models` and the named list of
+#'   `other` arguments
+#' @noRd
 mvgam_split_models <- function(x, ..., model_names = NULL,
                                 class = "mvgam") {
   checkmate::assert_string(class)
@@ -33,7 +41,13 @@ mvgam_split_models <- function(x, ..., model_names = NULL,
     )))
   }
   models <- c(list(x), dots[is_model_dot])
-  dot_call <- as.list(substitute(list(x, ...), env = parent.frame()))[-1L]
+  # `substitute(x)` names the caller's own argument, `object` in
+  # `ensemble()`. Substituting that in the caller's frame gives the
+  # expression the user passed.
+  dot_call <- c(
+    list(do.call(substitute, list(substitute(x)), envir = parent.frame())),
+    as.list(substitute(list(...), env = parent.frame()))[-1L]
+  )
   names(models) <- compared_object_names(
     models, dot_call[c(TRUE, is_model_dot)], model_names
   )
@@ -44,12 +58,15 @@ mvgam_split_models <- function(x, ..., model_names = NULL,
 }
 
 
-# Internal: check that all fits in `models` agree on the response
-# variable(s): both the name(s) and the numeric values.
-# Mirrors brms's `match_response`/`hash_response` (the latter
-# hashes standata$Y; we use direct equality on the response
-# columns extracted from `$data`). Returns TRUE/FALSE.
-#'@noRd
+#' Whether fits share one response
+#'
+#' Compares the response names and their values in each fit's `data`
+#' by direct equality. The brms equivalent compares hashes of the Stan
+#' data.
+#'
+#' @param models List of `mvgam` fits
+#' @return Logical scalar
+#' @noRd
 mvgam_match_response <- function(models) {
   checkmate::assert_list(models, min.len = 1L, types = "mvgam")
   if (length(models) < 2L) {
@@ -76,12 +93,16 @@ mvgam_match_response <- function(models) {
 }
 
 
-# Internal: numeric-weight validation + normalisation. Shared
-# between `mvgam_validate_weights` (model averaging) and
-# `ensemble.mvgam_forecast` (forecast ensembling). Errors with
-# `insight::format_error` if `weights` is not finite,
-# non-negative, length `n_models`, with positive total.
-#'@noRd
+#' Numeric model weights checked and scaled to sum to one
+#'
+#' Model averaging and forecast ensembles both call it. The weights must
+#' be finite and non-negative with a positive total and one entry per
+#' model.
+#'
+#' @param weights Numeric vector of weights
+#' @param n_models Integer number of models
+#' @return Numeric vector of weights summing to one
+#' @noRd
 mvgam_normalize_weights <- function(weights, n_models) {
   checkmate::assert_numeric(weights)
   checkmate::assert_integerish(n_models, lower = 1L, len = 1L)
@@ -108,15 +129,20 @@ mvgam_normalize_weights <- function(weights, n_models) {
 }
 
 
-# Internal: validate / compute model-averaging weights. Accepts
-# either a numeric vector (length == length(models), non-negative,
-# auto-normalised to sum to 1) or one of the named strategies
-# `"stacking"`, `"pseudobma"`, `"pseudobma+"`, `"loo"`, `"waic"`.
-# Stacking / pseudobma delegate to `loo::loo_model_weights`;
-# `"loo"` / `"waic"` compute information criteria via the
-# existing mvgam S3 methods and convert to weights using
-# `w_i = exp(-0.5 * dIC_i) / sum(exp(-0.5 * dIC_i))`.
-#'@noRd
+#' Model-averaging weights from a vector or a named strategy
+#'
+#' A numeric vector is checked and scaled to sum to one. The stacking
+#' and pseudo-BMA strategies call `loo::loo_model_weights()`. The
+#' `"loo"` and `"waic"` strategies weight each model by
+#' `exp(-0.5 * dIC)`, normalised over the models.
+#'
+#' @param weights Numeric vector of weights, or one of `"stacking"`,
+#'   `"pseudobma"`, `"pseudobma+"`, `"loo"` and `"waic"`
+#' @param models List of `mvgam` fits
+#' @param control Named list of further arguments to
+#'   `loo::loo_model_weights()`
+#' @return Numeric vector of weights, one per model
+#' @noRd
 mvgam_validate_weights <- function(weights, models,
                                     control = list()) {
   checkmate::assert_list(models, min.len = 1L, types = "mvgam")
@@ -171,11 +197,16 @@ mvgam_validate_weights <- function(weights, models,
 }
 
 
-# Internal: deterministic rounding of fractional draw counts to
-# integers that preserve the input total. Verbatim port of
-# brms's `round_largest_remainder`.
-#'@noRd
+#' Fractional draw counts rounded to integers with the same total
+#'
+#' Uses largest-remainder rounding, ported from the internal brms
+#' function `round_largest_remainder()`.
+#'
+#' @param x Non-negative numeric vector of fractional counts
+#' @return Integer vector of counts summing to `round(sum(x))`
+#' @noRd
 mvgam_round_largest_remainder <- function(x) {
+  checkmate::assert_numeric(x, lower = 0, any.missing = FALSE)
   x <- as.numeric(x)
   total <- round(sum(x))
   out <- floor(x)
@@ -183,14 +214,19 @@ mvgam_round_largest_remainder <- function(x) {
   J <- order(diff, decreasing = TRUE)
   I <- seq_len(total - floor(sum(out)))
   out[J[I]] <- out[J[I]] + 1L
-  out
+  as.integer(out)
 }
 
 
-# Internal: normalise the `method` argument of `pp_average.mvgam`
-# / future combined-forecasting methods.
-#'@noRd
+#' The prediction method `pp_average()` applies
+#'
+#' @param method Character name of the prediction function, matched
+#'   against `"posterior_predict"`, `"posterior_epred"` and
+#'   `"posterior_linpred"`
+#' @return Character scalar naming the prediction function
+#' @noRd
 mvgam_validate_pp_method <- function(method) {
+  checkmate::assert_character(method, min.len = 1L)
   match.arg(
     method,
     c("posterior_predict", "posterior_epred", "posterior_linpred")
@@ -198,10 +234,14 @@ mvgam_validate_pp_method <- function(method) {
 }
 
 
-# Internal: brms-style deprecated-alias handler. Returns `alias`
-# if it was supplied (non-NULL); otherwise returns `x`. Errors
-# if both `x` and `alias` are supplied.
-#'@noRd
+#' An argument value resolved against its deprecated alias
+#'
+#' Supplying both the argument and its alias is an error.
+#'
+#' @param x Value of the current argument, or `NULL`
+#' @param alias Value of the deprecated alias, or `NULL`
+#' @return `alias` when supplied, otherwise `x`
+#' @noRd
 mvgam_use_alias <- function(x, alias = NULL) {
   if (!is.null(alias)) {
     if (!is.null(x)) {

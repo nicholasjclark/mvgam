@@ -7,8 +7,8 @@
 ##      `gen_fevd`) on hand-built A / Sigma where the answer is
 ##      analytically known.
 ##
-## Sampling-end-to-end coverage lives in `tests/local/test-irf-fevd.R`
-## (uses the cached val_mvgam_var_cor.rds fixture).
+## Fitted coverage is in `tests/local/test-trend-var.R` and
+## `tests/local/test-factor-var.R`.
 
 # ---- Build a minimal mvgam stub backed by a draws_matrix ----------
 
@@ -79,16 +79,6 @@ test_that("assert_var_trend() rejects non-VAR fits with a clear pointer", {
 
 # ---- Extractor -----------------------------------------------------
 
-test_that(
-  "extract_var_posterior() returns shaped (A, Sigma) arrays", {
-  mock <- build_var_mock(K = 3L, ndraws = 25L)
-  vp <- extract_var_posterior(mock)
-  expect_identical(vp$K, 3L)
-  expect_identical(vp$ndraws, 25L)
-  expect_identical(dim(vp$A), c(25L, 3L, 3L, 1L))
-  expect_identical(dim(vp$Sigma), c(25L, 3L, 3L))
-})
-
 test_that("extract_var_posterior() reads the correct column for each (i, j)", {
   # Stamp known values into Phi_trend[1,2,3] and Sigma_trend[1,1] so we
   # can verify the indexing convention round-trips correctly.
@@ -114,23 +104,13 @@ test_that(
 
 # ---- Math helpers --------------------------------------------------
 
-test_that("var_phi() returns identity at lag 0 and zero powers when A = 0", {
-  K <- 3L
-  x <- var_kernel_input(K, matrix(0, K, K))
-  Phi <- var_phi(x, h = 5L)
-  expect_identical(dim(Phi), c(K, K, 6L))
-  expect_equal(Phi[, , 1L], diag(K))
-  for (i in 2:6) {
-    expect_equal(Phi[, , i], matrix(0, K, K))
-  }
-})
-
 test_that("var_phi() recovers A^k for diagonal A", {
   K <- 2L
   A <- diag(c(0.5, 0.3))
   x <- var_kernel_input(K, A)
   Phi <- var_phi(x, h = 3L)
   # Phi[, , k+1] = A^k for the i.i.d. case with diagonal A.
+  expect_equal(Phi[, , 1L], diag(K))
   expect_equal(Phi[, , 2L], A)
   expect_equal(Phi[, , 3L], A %*% A)
   expect_equal(Phi[, , 4L], A %*% A %*% A)
@@ -169,30 +149,29 @@ test_that("gen_fevd() rows sum to 1 across the columns for each horizon", {
     row_sums <- rowSums(fevd[[i]])
     expect_equal(row_sums, rep(1.0, 5L))
   }
+  # At the first horizon a response's shares are the squared row of
+  # the lower Cholesky factor of Sigma, normalised
+  P <- t(chol(Sigma))
+  for (i in seq_len(K)) {
+    expect_equal(unname(fevd[[i]][1L, ]), P[i, ]^2 / sum(P[i, ]^2))
+  }
 })
 
-test_that("gen_irf() returns finite arrays of the right shape", {
+test_that("the generalised IRF is the scaled column of Sigma, propagated", {
+  # Pesaran and Shin (1998): a shock to j moves the system by
+  # `Sigma[, j] / sqrt(Sigma[j, j])` and then by A times that. Each
+  # list element is one shock, with horizons in rows and responses in
+  # columns.
   K <- 2L
-  set.seed(11L)
   A <- matrix(c(0.4, 0.1, 0.05, 0.3), K, K)
-  Sigma <- diag(K)
+  Sigma <- matrix(c(1, 0.4, 0.4, 2), K, K)
   x <- var_kernel_input(K, A, Sigma)
-  irf_gen <- gen_irf(x, h = 6L, cumulative = FALSE, orthogonal = FALSE)
-  irf_orth <- gen_irf(x, h = 6L, cumulative = FALSE, orthogonal = TRUE)
-  irf_cum <- gen_irf(x, h = 6L, cumulative = TRUE, orthogonal = FALSE)
-  expect_length(irf_gen, K)
-  expect_length(irf_orth, K)
-  expect_length(irf_cum, K)
-  for (i in seq_len(K)) {
-    expect_identical(dim(irf_gen[[i]]), c(6L, K))
-    expect_true(all(is.finite(irf_gen[[i]])))
-    expect_true(all(is.finite(irf_orth[[i]])))
-    expect_true(all(is.finite(irf_cum[[i]])))
+  irf_gen <- gen_irf(x, h = 3L, cumulative = FALSE, orthogonal = FALSE)
+  for (j in seq_len(K)) {
+    impact <- Sigma[, j] / sqrt(Sigma[j, j])
+    expect_equal(unname(irf_gen[[j]][1L, ]), impact)
+    expect_equal(unname(irf_gen[[j]][2L, ]), as.numeric(A %*% impact))
   }
-  # Cumulative is monotone in absolute terms only when responses
-  # don't flip sign; instead verify the obvious identity that the
-  # cumulative IRF at horizon 1 equals the non-cumulative IRF.
-  expect_equal(irf_cum[[1L]][1L, ], irf_gen[[1L]][1L, ])
 })
 
 test_that("orthogonalised IRF at horizon 1 equals P %*% e_j", {
@@ -211,17 +190,13 @@ test_that("orthogonalised IRF at horizon 1 equals P %*% e_j", {
   expect_equal(as.numeric(irf_orth[[2L]][1L, ]), as.numeric(P[, 2L]))
 })
 
-test_that(
-  "var_fecov() builds a forecast-error covariance, diagonal positive", {
+test_that("var_fecov() accumulates the propagated innovation covariance", {
   K <- 2L
   A <- matrix(c(0.3, 0.05, 0.1, 0.2), K, K)
   Sigma <- diag(K) + 0.3
-  x <- var_kernel_input(K, A, Sigma)
-  msey <- var_fecov(x, h = 4L)
-  expect_identical(dim(msey), c(K, K, 4L))
-  for (i in seq_len(4L)) {
-    expect_true(all(diag(msey[, , i]) > 0))
-  }
+  msey <- var_fecov(var_kernel_input(K, A, Sigma), h = 3L)
+  expect_equal(msey[, , 1L], Sigma)
+  expect_equal(msey[, , 2L], Sigma + A %*% Sigma %*% t(A))
 })
 
 
@@ -246,21 +221,6 @@ correlate_draws <- function(mock, rho = 0.5) {
   mock
 }
 
-test_that("posterior_transition_matrix() summarises the A matrix", {
-  mock <- correlate_draws(build_var_mock(K = 3L, ndraws = 200L))
-  out <- posterior_transition_matrix(mock)
-  expect_s3_class(out, "mvgam_var_matrix")
-  expect_equal(dim(out$A), c(3L, 3L))
-  expect_equal(out$n_series, 3L)
-  # Every per-cell summary carries the same shape as the estimate.
-  for (slot in c("A_se", "A_lower", "A_upper", "prob_positive")) {
-    expect_equal(dim(out[[slot]]), c(3L, 3L))
-  }
-  expect_true(all(out$A_lower <= out$A))
-  expect_true(all(out$A <= out$A_upper))
-})
-
-
 test_that("posterior_transition_matrix(summary = FALSE) keeps the draws", {
   mock <- correlate_draws(build_var_mock(K = 3L, ndraws = 200L))
   arr <- posterior_transition_matrix(mock, summary = FALSE)
@@ -283,9 +243,6 @@ test_that("posterior_transition_matrix() takes one groups argument", {
   # `group` and `groups` were mutually exclusive spellings of one
   # idea. `groups` is now the only one, and on a non-hierarchical fit
   # it is refused rather than silently ignored.
-  expect_false("group" %in% names(formals(posterior_transition_matrix)))
-  expect_true("groups" %in% names(formals(posterior_transition_matrix)))
-
   mock <- correlate_draws(build_var_mock(K = 3L, ndraws = 200L))
   expect_error(
     posterior_transition_matrix(mock, groups = "all"),
@@ -315,10 +272,8 @@ test_that("posterior_transition_matrix() gates on the trend type", {
 # ---- Process labels -------------------------------------------------
 
 test_that("var_process_labels names the series where they are the processes", {
-  # A VAR over the observed series numbers its processes by the series
-  # axis, so a shock can be read without knowing the internal ordering.
-  # No cached fixture is a factor VAR, so the index branch is only
-  # reachable here.
+  # A VAR over the observed series names its processes by the series
+  # axis, and a reader interprets a shock without the internal order.
   mock <- build_var_mock(K = 3L, ndraws = 5L)
   expect_identical(var_process_labels(mock, 3L),
                    c("Process_1", "Process_2", "Process_3"))

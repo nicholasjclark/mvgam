@@ -91,8 +91,8 @@ stan_match_count <- function(code, pattern) {
 
 # Stan code and Stan data from one
 # `generate_stan_components_mvgam_formula()` call. `stancode()` and
-# `standata()` each run the whole pipeline, and each starts a V8
-# isolate to polish the code. A test needing both calls this once.
+# `standata()` each run the whole pipeline. Each starts a V8 isolate
+# to polish the code. A test needing both calls this once.
 mvgam_stan_setup <- function(formula, data, family = gaussian(), ...) {
   cc <- mvgam:::generate_stan_components_mvgam_formula(
     formula = formula, data = data, family = family, ...
@@ -103,24 +103,22 @@ mvgam_stan_setup <- function(formula, data, family = gaussian(), ...) {
 }
 
 
-# The statement an emitter writes for one prior. Assertions build
-# their expected text through the package's own writer, so a test
-# cannot drift from the form the program actually carries. The
-# writer itself is pinned directly in `test-stancode-standata.R`,
-# and by the generated programs `stanc` compiles, so the agreement
-# is not circular.
+# The statement an emitter writes for one prior, built by the
+# package's own writer. Assertions then match the form the program
+# holds. `test-stancode-standata.R` pins the writer's output
+# directly. `stanc` compiles the programs it writes.
 stan_prior_line <- function(param, dist, normalize = TRUE) {
   mvgam:::stan_prior_statement(param, dist, normalize = normalize)
 }
 
 
-# The prior an assembled program places on one parameter, read out
-# of the program rather than matched against a spelling of it. A
-# normalised program writes `target += dist_lpdf(x | args);` where
-# an emitter wrote `x ~ dist(args);`, so a negative assertion built
-# on the tilde passes whether or not the prior is there. Returns an
-# empty vector when the parameter carries no prior, which is the
-# answer for a brms-owned coefficient left at its flat default.
+# The prior an assembled program places on one parameter, parsed
+# from the program. A normalised program writes
+# `target += dist_lpdf(x | args);` where an emitter wrote
+# `x ~ dist(args);`. A negative assertion matching the tilde would
+# pass whether or not the prior is there. Returns an empty vector for
+# a parameter without a prior, such as a brms coefficient left at its
+# flat default.
 stan_prior_on <- function(code, param) {
   rows <- mvgam:::mvgam_stancode_prior_rows(
     paste(as.character(code), collapse = "\n")
@@ -140,23 +138,19 @@ mock_axis_record <- function(data) {
   mvgam:::trendless_trend_metadata(data, "time", "series")
 }
 
-# One factor-fit mock, shared by every test that reads the loadings.
-# `residual_cor()` and `shared_variation()` are two views of the same
-# `Z Sigma Z'`, so a mock defined in one file and copied into the
-# other is two accounts of the quantity the assertions exist to pin.
-# Helper to build a fake mvgam fit carrying just enough state for the
-# factor-loadings branch: an n_lv on the trend spec, plus a fit slot
-# that returns the requested Z[i,j] columns when handed to
-# posterior::as_draws_matrix(), and the series levels on the axes
-# record.
+# One factor-fit mock, shared by every test of the loadings.
+# `residual_cor()` and `shared_variation()` are two views of one
+# `Z Sigma Z'`. The mock holds an `n_lv` on the trend spec and the
+# series levels on the axes record. Its fit slot gives the `Z[i,j]`
+# and `sigma_trend` draws through `posterior::as_draws_matrix()`.
 mk_factor_obj <- function(n_series = 3L, n_lv = 2L, ndraws = 50L,
                           Z_target = NULL, sigma_target = NULL) {
   if (is.null(Z_target)) {
     Z_target <- matrix(c(0.8, 0.1, -0.3,
                          0.2, 0.5, 0.7), nrow = n_series, ncol = n_lv)
   }
-  # Unequal latent scales, so a formula that drops them cannot
-  # accidentally agree with one that keeps them.
+  # Unequal latent scales. A formula that drops them then disagrees
+  # with one that keeps them.
   if (is.null(sigma_target)) {
     sigma_target <- c(2.0, 0.25)[seq_len(n_lv)]
   }
@@ -200,4 +194,84 @@ mk_factor_obj <- function(n_series = 3L, n_lv = 2L, ndraws = 50L,
     Z_target = Z_target,
     sigma_target = sigma_target
   )
+}
+
+
+#' Match a pattern against generated Stan code
+#'
+#' Whitespace is stripped from the pattern and the program. An
+#' assertion then names the tokens a generator emits, whatever layout
+#' the polish step gives them. Either spelling of a sampling statement
+#' matches.
+#'
+#' @param pattern Regular expression, or a literal when the caller
+#'   passes `fixed = TRUE`. Must escape its own `(`, `[` and `|`
+#'   otherwise.
+#' @param x Character vector where matches are sought
+#' @param ignore.case Logical. If TRUE, case is ignored (default FALSE)
+#' @param ... Additional arguments passed to grepl(), `fixed = TRUE`
+#'   among them
+#'
+#' @return Logical vector indicating matches
+#' @noRd
+stan_pattern <- function(pattern, x, ignore.case = FALSE, ...) {
+  remove_whitespace <- function(text) {
+    gsub("\\s+", "", text)
+  }
+
+  # With whitespace gone from both sides, `\\s*` between two tokens
+  # is redundant and `\\s+` never matches
+  x_no_space <- remove_whitespace(x)
+
+  # A regular expression naming Stan syntax escapes its own
+  # metacharacters. A literal needs `fixed = TRUE`.
+  pattern_final <- remove_whitespace(pattern)
+
+  # An emitter writes `lhs ~ dist(args);`. A normalised program holds
+  # `target += dist_lpdf(lhs | args);`. A pattern naming one spelling
+  # matches the other. The alternation is a regular expression and is
+  # built for regular-expression patterns alone.
+  dots <- list(...)
+  if (!isTRUE(dots$fixed)) {
+    alt <- tilde_pattern_as_lpdf(pattern_final)
+    if (!is.na(alt)) {
+      pattern_final <- paste0("(", pattern_final, ")|(", alt, ")")
+    }
+  }
+
+  grepl(pattern_final, x_no_space, ignore.case = ignore.case, ...)
+}
+
+
+# The density-call spelling of a whitespace-free `lhs~dist(args)`
+# pattern, or NA for a pattern naming no sampling statement
+tilde_pattern_as_lpdf <- function(pattern) {
+  if (!grepl("~", pattern, fixed = TRUE)) return(NA_character_)
+  # `strsplit()` drops a trailing empty field. The two sides are taken
+  # with `sub()`.
+  lhs <- sub("~.*$", "", pattern)
+  rhs <- sub("^[^~]*~", "", pattern)
+  if (!nzchar(lhs)) return(NA_character_)
+  # A pattern naming no distribution asserts only that the
+  # parameter is sampled. The density call and any container
+  # wrapping the parameter, such as `diagonal(...)`, are left open.
+  if (!nzchar(rhs)) {
+    # The parameter must be the density's first operand. The trend
+    # equation names it among the arguments. A looser pattern would
+    # match there with the prior deleted.
+    return(paste0("_lpdf\\((?:[a-z_]*\\()?", lhs, "[|)]"))
+  }
+  open <- regexpr("\\\\?\\(", rhs)
+  if (open > 0L) {
+    dist <- substr(rhs, 1L, open - 1L)
+    args <- substr(rhs, open, nchar(rhs))
+    args <- sub("^\\\\?\\(", "", args)
+    args <- sub("\\\\?\\);?$", "", args)
+    if (!nzchar(args)) {
+      return(paste0("target\\+=", dist, "_lpdf\\(", lhs, "\\)"))
+    }
+    paste0("target\\+=", dist, "_lpdf\\(", lhs, "\\|", args, "\\)")
+  } else {
+    paste0("target\\+=", rhs, "_lpdf\\(", lhs, "\\|")
+  }
 }

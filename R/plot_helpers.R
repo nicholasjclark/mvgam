@@ -3,15 +3,19 @@
 # observation overlays, faceting, and label-repel wrappers.
 # Nothing in this file is exported.
 
-#' Return the active bayesplot colour scheme as an ordered vector.
+#' The colours of a bayesplot scheme as an ordered vector
 #'
-#' Resolves to bayesplot's currently-active scheme by default so
-#' user-side `bayesplot::color_scheme_set()` calls compose. Pass a
-#' named scheme (e.g. `"red"`, `"blue"`) to override without
-#' touching global state.
+#' Defaults to the active scheme. A user's
+#' `bayesplot::color_scheme_set()` call then applies to mvgam figures.
+#' A named scheme such as `"red"` or `"blue"` leaves the global state
+#' unchanged.
 #'
+#' @param scheme Character scheme name, or `NULL` for the active
+#'   scheme
+#' @return Character vector of six colours
 #' @noRd
 mvgam_palette <- function(scheme = NULL) {
+  checkmate::assert_string(scheme, null.ok = TRUE)
   if (is.null(scheme)) {
     cs <- bayesplot::color_scheme_get()
   } else {
@@ -20,12 +24,11 @@ mvgam_palette <- function(scheme = NULL) {
   unname(unlist(cs))
 }
 
-#' One colour of the active bayesplot scheme, by the role it plays
-#' rather than its position. Reading a scheme entry through this is
-#' what lets every mvgam figure follow a user's
-#' `bayesplot::color_scheme_set()`; a hex written at the call site
-#' pins that one panel to whatever scheme was current when it was
-#' written, and the package then draws two schemes at once.
+#' One colour of a bayesplot scheme, selected by its role
+#'
+#' Every mvgam figure takes its colours through this helper. Each
+#' figure then follows a user's `bayesplot::color_scheme_set()`. A hex
+#' code written at the call site would fix that panel to one scheme.
 #'
 #' @param role One of the six bayesplot scheme roles: `light`,
 #'   `light_highlight`, `mid`, `mid_highlight`, `dark`,
@@ -38,6 +41,7 @@ mvgam_colour <- function(role, scheme = NULL) {
   roles <- c("light", "light_highlight", "mid", "mid_highlight",
              "dark", "dark_highlight")
   checkmate::assert_choice(role, roles)
+  checkmate::assert_string(scheme, null.ok = TRUE)
   cs <- if (is.null(scheme)) {
     bayesplot::color_scheme_get()
   } else {
@@ -50,15 +54,15 @@ mvgam_colour <- function(role, scheme = NULL) {
 #' Put back a scheme `color_scheme_get()` returned
 #'
 #' `color_scheme_set()` takes a scheme name or six colours. A scheme
-#' built from six colours is named "custom", and passing "custom"
-#' back raises `'arg' should be one of "blue", ...`. The colours
-#' restore that case. The name restores every other. A user who
-#' calls `bayesplot::color_scheme_set(c(...))` met that error from
-#' every mvgam figure.
+#' built from six colours is named "custom". Passing "custom" back
+#' raises `'arg' should be one of "blue", ...`. A custom scheme is
+#' restored from its colours. Every other scheme is restored by name.
 #'
 #' @param cs A scheme as `bayesplot::color_scheme_get()` returns it.
+#' @return `NULL`, invisibly
 #' @noRd
 restore_color_scheme <- function(cs) {
+  checkmate::assert_list(cs)
   nm <- attr(cs, "scheme_name")
   if (is.null(nm) || identical(nm, "custom")) {
     bayesplot::color_scheme_set(unname(unlist(cs)))
@@ -69,26 +73,37 @@ restore_color_scheme <- function(cs) {
 }
 
 
-#' Run an expression under a different bayesplot colour scheme,
-#' putting the prior scheme back on exit. Suits short call-style
+#' Evaluate an expression under another bayesplot colour scheme
+#'
+#' The prior scheme is restored on exit. Suits short call-style
 #' wrappers (`with_color_scheme("red", do.call(...))`).
 #'
+#' @param scheme Character scheme name
+#' @param expr Expression to evaluate
+#' @return The value of `expr`
 #' @noRd
 with_color_scheme <- function(scheme, expr) {
+  checkmate::assert_string(scheme)
   prior <- bayesplot::color_scheme_get()
   bayesplot::color_scheme_set(scheme)
   on.exit(restore_color_scheme(prior), add = TRUE)
   force(expr)
 }
 
-#' Set a temporary bayesplot colour scheme that is restored when
-#' the calling function returns. Mirrors the `rlang::local_*`
-#' family. Use when the body is too long to wrap in
-#' `with_color_scheme(...)`. Adds an `on.exit(..., add = TRUE)`
-#' to `envir`, defaulting to the caller's frame.
+#' Set a bayesplot colour scheme until the calling function returns
 #'
+#' Mirrors the `rlang::local_*` family. Use it when the body is too
+#' long to wrap in `with_color_scheme(...)`. Adds an
+#' `on.exit(..., add = TRUE)` to `envir`.
+#'
+#' @param scheme Character scheme name
+#' @param envir Environment whose exit restores the prior scheme.
+#'   Defaults to the caller's frame.
+#' @return `NULL`, invisibly
 #' @noRd
 set_color_scheme_local <- function(scheme, envir = parent.frame()) {
+  checkmate::assert_string(scheme)
+  checkmate::assert_environment(envir)
   prior <- bayesplot::color_scheme_get()
   bayesplot::color_scheme_set(scheme)
   do.call(
@@ -105,16 +120,14 @@ set_color_scheme_local <- function(scheme, envir = parent.frame()) {
 #' The ggplot theme mvgam draws with
 #'
 #' @description
-#' Every figure the package draws uses this theme, which is built on
-#' [ggplot2::theme_classic()] so it composes with the bayesplot
-#' family. Apply it to a plot of your own to sit alongside mvgam
-#' output without the two looking like they came from different
-#' packages.
+#' Every figure the package draws uses this theme. It extends
+#' [ggplot2::theme_classic()] and matches the bayesplot figures. Apply
+#' it to a plot of your own to give it the look of mvgam output.
 #'
-#' Colours are a separate question and come from the active
-#' bayesplot scheme, so [bayesplot::color_scheme_set()] moves mvgam's
-#' figures and yours together, and
-#' [bayesplot::color_scheme_get()] reads the current one.
+#' Colours come from the active bayesplot scheme.
+#' [bayesplot::color_scheme_set()] changes the colours of mvgam's
+#' figures and yours together. [bayesplot::color_scheme_get()] returns
+#' the current scheme.
 #'
 #' @param base_size Base font size in points. Defaults to `11`,
 #'   matching [ggplot2::theme_classic()].
@@ -138,9 +151,9 @@ mvgam_theme <- function(base_size = 11, base_family = "") {
     base_size = base_size, base_family = base_family
   ) +
     ggplot2::theme(
-      # Grey strip bar + thin border so faceted plots (lfo, kfold,
-      # pp_check residual panels, conditional_smooths) read as
-      # distinct panels rather than blending into the canvas.
+      # A grey strip bar with a thin border separates the panels of
+      # faceted plots (lfo, kfold, pp_check residual panels,
+      # conditional_smooths) from the canvas.
       strip.background = ggplot2::element_rect(
         fill = "grey85", colour = "grey60"
       ),
@@ -150,15 +163,14 @@ mvgam_theme <- function(base_size = 11, base_family = "") {
     )
 }
 
-#' Okabe-Ito 8-colour qualitative palette, color-blind safe.
-#' Source: Okabe & Ito 2008
-#' (https://jfly.uni-koeln.de/color/), the standard go-to for
-#' categorical groupings in scientific figures. Use it anywhere
-#' the package needs to distinguish small numbers (~2-8) of
-#' discrete groups; for sequential posterior bands of a single
-#' quantity, prefer `mvgam_palette()` (bayesplot single-hue
-#' scheme).
+#' The Okabe-Ito eight-colour qualitative palette
 #'
+#' A colour-blind safe palette from Okabe and Ito (2008,
+#' https://jfly.uni-koeln.de/color/). Use it to distinguish two to
+#' eight discrete groups. Sequential posterior bands of one quantity
+#' use `mvgam_palette()`, a bayesplot single-hue scheme.
+#'
+#' @return Character vector of eight hex colours
 #' @noRd
 okabe_ito_palette <- function() {
   c(
@@ -168,27 +180,39 @@ okabe_ito_palette <- function() {
 }
 
 
-#' Pick the first `n` colours from the Okabe-Ito categorical
-#' palette, recycling if `n` exceeds palette length.
+#' The first `n` colours of the Okabe-Ito palette
 #'
+#' The palette recycles when `n` exceeds eight.
+#'
+#' @param n Integer number of colours
+#' @return Character vector of `n` hex colours
 #' @noRd
 mvgam_categorical_palette <- function(n) {
+  checkmate::assert_count(n)
   rep_len(okabe_ito_palette(), n)
 }
 
 
-#' Shared `scale_colour_manual` for plots that overlay several
-#' groups (compare_scores and compare_elpds models, the levels of a
-#' conditional effect's second variable). Up to three models take
-#' the dark, mid and light shades of the active bayesplot scheme,
-#' matching the forecast and residual figures. A single-hue scheme
-#' holds three distinguishable line shades, and more models than
-#' that take the Okabe-Ito hues.
+#' A colour scale for plots that overlay several groups
 #'
+#' Serves the models of `compare_scores()` and `compare_elpds()` and
+#' the levels of a conditional effect's second variable. Up to three
+#' groups take the dark, mid and light shades of the active bayesplot
+#' scheme, matching the forecast and residual figures. A single-hue
+#' scheme has three distinguishable line shades. More groups take the
+#' Okabe-Ito hues.
+#'
+#' @param n Integer number of groups
+#' @param name Legend title, or `NULL`
+#' @param aesthetics Character vector of aesthetics the scale applies
+#'   to
+#' @param ... Further arguments to [ggplot2::scale_colour_manual()]
+#' @return A ggplot2 scale
 #' @noRd
 mvgam_model_colour_scale <- function(n, name = NULL,
                                      aesthetics = "colour", ...) {
   checkmate::assert_count(n, positive = TRUE)
+  checkmate::assert_character(aesthetics, min.len = 1L)
   values <- if (n <= 3L) {
     vapply(c("dark", "mid", "light_highlight")[seq_len(n)],
            mvgam_colour, character(1L), USE.NAMES = FALSE)
@@ -199,13 +223,17 @@ mvgam_model_colour_scale <- function(n, name = NULL,
                                aesthetics = aesthetics, ...)
 }
 
-#' Light-to-dark fills for `n` symmetric quantile bands. Picks
-#' from the leading entries of the active palette so the outer
-#' (widest) band gets the lightest colour and the inner
-#' (narrowest) band gets the darkest.
+#' Light-to-dark fills for `n` symmetric quantile bands
 #'
+#' Takes the leading entries of the palette. The widest band gets the
+#' lightest colour and the narrowest band the darkest.
+#'
+#' @param n Integer number of bands
+#' @param palette Character vector of colours, light to dark
+#' @return Character vector of `n` colours
 #' @noRd
 mvgam_band_fills <- function(n, palette = mvgam_palette()) {
+  checkmate::assert_character(palette, min.len = 1L)
   checkmate::assert_integerish(
     n, lower = 1L, upper = length(palette), len = 1L
   )
@@ -214,16 +242,18 @@ mvgam_band_fills <- function(n, palette = mvgam_palette()) {
 
 #' An x axis of whole steps
 #'
-#' A horizon counts steps, and so does an evaluation time on a
-#' regular grid. The default breaks labelled a twelve-step axis at
-#' 2.5, 5.0 and 7.5. An irregular `CAR()` grid keeps its fractional
-#' times, and `whole = FALSE` leaves those breaks alone.
+#' A horizon counts steps. An evaluation time on a regular grid also
+#' counts steps. The scale keeps the whole-number breaks of
+#' `pretty()`. An irregular `CAR()` grid has fractional times. With
+#' `whole = FALSE` the scale keeps the default breaks for it.
 #'
 #' @param name Axis title
 #' @param whole Whether every value on the axis is a whole number
 #' @return A ggplot2 scale
 #' @noRd
 scale_x_steps <- function(name = "Horizon", whole = TRUE) {
+  checkmate::assert_string(name)
+  checkmate::assert_flag(whole)
   if (!isTRUE(whole)) return(ggplot2::scale_x_continuous(name = name))
   ggplot2::scale_x_continuous(
     name = name,
@@ -237,21 +267,22 @@ scale_x_steps <- function(name = "Horizon", whole = TRUE) {
 #' Whether a prediction type shares the observations' scale
 #'
 #' `response` and `expected` do. `link`, `trend`, `variance`,
-#' `latent_state` and `detection` each name another scale, and
-#' observations drawn over one of those flatten the band against an
+#' `latent_state` and `detection` each name another scale.
+#' Observations drawn over one of those flatten the band against an
 #' axis. Every observation overlay in the package calls this.
 #'
 #' @param type A prediction type
 #' @return A single logical
 #' @noRd
 on_observation_scale <- function(type) {
+  checkmate::assert_string(type, null.ok = TRUE)
   isTRUE(type %in% c("response", "expected"))
 }
 
 #' A posterior quantile at each occasion
 #'
-#' A closure-unit hindcast has one column per visit, and several
-#' visits share an occasion. Their draws are pooled, which gives the
+#' A closure-unit hindcast has one column per visit. Several visits
+#' can share an occasion. Their draws are pooled, giving the
 #' predictive for a visit chosen at random on that occasion. Every
 #' other matrix has one column per occasion and is summarised column
 #' by column.
@@ -267,6 +298,7 @@ quantile_by_time <- function(draws_mat, times, prob) {
   checkmate::assert_numeric(
     times, len = ncol(draws_mat), any.missing = FALSE
   )
+  checkmate::assert_number(prob, lower = 0, upper = 1)
   vapply(sort(unique(times)), function(t) {
     stats::quantile(draws_mat[, times == t], probs = prob, na.rm = TRUE,
                     names = FALSE)
@@ -279,12 +311,14 @@ quantile_by_time <- function(draws_mat, times, prob) {
 #' @param times The time of each column
 #' @param probs The quantiles to take, one column `q1`, `q2`, ... each
 #' @param group `NULL`, one panel label, or one label per column.
-#'   Each label is its own panel over the same times, and its columns
-#'   are summarised apart from the others.
+#'   Each label is its own panel over the same times. The columns of
+#'   each label are summarised separately.
 #' @return Data frame with `time`, the quantile columns and, when
 #'   `group` is given, `series`
 #' @noRd
 occasion_quantiles <- function(draws_mat, times, probs, group = NULL) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_numeric(probs, lower = 0, upper = 1, min.len = 1L)
   per_col <- length(group) > 1L
   if (per_col) checkmate::assert_true(length(group) == ncol(draws_mat))
   blocks <- if (per_col) {
@@ -303,13 +337,21 @@ occasion_quantiles <- function(draws_mat, times, probs, group = NULL) {
   }))
 }
 
-#' Multi-quantile ribbon stack for a `(ndraws x n_time)` matrix.
+#' Nested quantile ribbons for a `(ndraws x n_time)` matrix
 #'
-#' Returns a list of `geom_ribbon` layers (outer first, inner
-#' last) suitable for `+`-composition. Quantile bounds are
-#' computed per occasion by `quantile_by_time()`. Inner bands
-#' plot on top of outer bands.
+#' Returns a list of `geom_ribbon` layers, widest first, for adding to
+#' a ggplot. `quantile_by_time()` computes the bounds at each
+#' occasion. The narrowest band is drawn last and covers the wider
+#' ones.
 #'
+#' @param draws_mat A `(ndraws x n_col)` matrix
+#' @param times The time of each column
+#' @param probs Numeric vector of central interval widths
+#' @param palette Character vector of colours, light to dark
+#' @param group `NULL`, one panel label, or one label per column
+#' @param fill A single fill colour for every band, or `NULL` to take
+#'   the fills from `palette`
+#' @return List of ggplot2 ribbon layers
 #' @noRd
 mvgam_band_layer <- function(
   draws_mat,
@@ -322,18 +364,18 @@ mvgam_band_layer <- function(
   checkmate::assert_numeric(
     probs, lower = 0, upper = 1, min.len = 1L, any.missing = FALSE
   )
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_character(palette, min.len = 1L)
+  checkmate::assert_string(fill, null.ok = TRUE)
   if (any(duplicated(probs))) {
     stop(insight::format_error(
       "'probs' must be unique."
-    ))
+    ), call. = FALSE)
   }
-  # Sort outer-to-inner so the narrowest band is plotted last
-  # (on top).
+  # Widest first. The narrowest band is drawn last.
   probs <- sort(probs, decreasing = TRUE)
-  # A single flat fill is what a panel wants when its bands are not
-  # the subject, as the hindcast arm of a forecast plot does with its
-  # one grey interval behind the forecast's own.
-  checkmate::assert_string(fill, null.ok = TRUE)
+  # A single fill suits a secondary band, such as the grey hindcast
+  # interval that precedes a forecast.
   fills <- if (is.null(fill)) {
     mvgam_band_fills(length(probs), palette = palette)
   } else {
@@ -354,9 +396,15 @@ mvgam_band_layer <- function(
   })
 }
 
-#' Median line for a `(ndraws x n_time)` matrix. Colour defaults
-#' to the palette's `dark` entry (slot 5 in a bayesplot scheme).
+#' Median line for a `(ndraws x n_time)` matrix
 #'
+#' @param draws_mat A `(ndraws x n_col)` matrix
+#' @param times The time of each column
+#' @param colour Line colour, or `NULL` for the `dark` entry of the
+#'   active scheme (slot 5)
+#' @param linewidth Numeric line width
+#' @param group `NULL`, one panel label, or one label per column
+#' @return A ggplot2 line layer
 #' @noRd
 mvgam_median_layer <- function(
   draws_mat,
@@ -365,6 +413,9 @@ mvgam_median_layer <- function(
   linewidth = 1,
   group = NULL
 ) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_string(colour, null.ok = TRUE)
+  checkmate::assert_number(linewidth, lower = 0)
   if (is.null(colour)) {
     colour <- mvgam_palette()[5L]
   }
@@ -379,11 +430,19 @@ mvgam_median_layer <- function(
   )
 }
 
-#' Observation overlay (double-plotted points, white outline +
-#' coloured fill). NAs are dropped silently. Returns a length-2
-#' list of `geom_point` layers; returns an empty list when there
-#' are no plottable points.
+#' Observation overlay of outlined points
 #'
+#' Each point is drawn twice: a larger point in the outline colour,
+#' then the point itself. Missing values are dropped.
+#'
+#' @param times Vector of observation times
+#' @param y Numeric vector of observed values
+#' @param colour Point colour
+#' @param outline Outline colour
+#' @param size Numeric point size
+#' @param group `NULL`, or a panel label for each observation
+#' @return List of two `geom_point` layers, or an empty list when every
+#'   point is missing
 #' @noRd
 mvgam_obs_layer <- function(
   times,
@@ -393,6 +452,11 @@ mvgam_obs_layer <- function(
   size = 1.5,
   group = NULL
 ) {
+  checkmate::assert_numeric(y)
+  checkmate::assert_atomic_vector(times, len = length(y))
+  checkmate::assert_string(colour)
+  checkmate::assert_string(outline)
+  checkmate::assert_number(size, lower = 0)
   ok <- !is.na(y) & !is.na(times)
   if (!any(ok)) {
     return(list())
@@ -419,16 +483,22 @@ mvgam_obs_layer <- function(
   )
 }
 
-#' Dashed vertical cut at the training / forecast boundary.
-#' Returns `NULL` (a no-op when added to a ggplot) when there is
-#' no cut to draw.
+#' Dashed vertical line at the training and forecast boundary
 #'
+#' @param t_cut Time of the boundary, or `NULL`
+#' @param linetype Line type
+#' @param colour Line colour
+#' @return A ggplot2 layer, or `NULL` when there is no boundary. Adding
+#'   `NULL` to a ggplot leaves it unchanged.
 #' @noRd
 mvgam_cut_layer <- function(
   t_cut,
   linetype = "dashed",
   colour = "black"
 ) {
+  checkmate::assert_atomic(t_cut)
+  checkmate::assert_string(linetype)
+  checkmate::assert_string(colour)
   if (is.null(t_cut) || length(t_cut) == 0L || all(is.na(t_cut))) {
     return(NULL)
   }
@@ -441,11 +511,10 @@ mvgam_cut_layer <- function(
 
 #' One figure from one plot per response
 #'
-#' A multivariate fit answers a plotting method once per response.
-#' Handed back as a list, the plots print one after another under
-#' `$name` headers, and a reader gets a console listing where a figure
-#' was asked for. Stacked, each keeps its own scales and is titled by
-#' the response it draws.
+#' A plotting method returns one plot per response of a multivariate
+#' fit. A list of plots prints one after another under `$name`
+#' headers. The stacked figure keeps each plot's own scales and titles
+#' each plot with its response.
 #'
 #' @param plots A named list of `ggplot` or `patchwork` objects
 #' @return A single `patchwork`
@@ -458,19 +527,29 @@ stack_response_plots <- function(plots) {
   patchwork::wrap_plots(titled, ncol = 1L)
 }
 
-#' `facet_wrap(~series)` wrapper with uniform defaults across
-#' every faceted plot in the package.
+#' `facet_wrap(~series)` with the defaults of every faceted plot
 #'
+#' @param scales Character scales argument of
+#'   [ggplot2::facet_wrap()]
+#' @param ncol Integer number of facet columns, or `NULL`
+#' @return A ggplot2 facet
 #' @noRd
 mvgam_facet_series <- function(scales = "free_y", ncol = NULL) {
+  checkmate::assert_string(scales)
+  checkmate::assert_count(ncol, positive = TRUE, null.ok = TRUE)
   ggplot2::facet_wrap(~series, scales = scales, ncol = ncol)
 }
 
-#' Thin ggrepel wrapper for label-heavy plots (the ordination
-#' surface in particular). Falls back to plain `geom_text` /
-#' `geom_label` when ggrepel is not installed so the function
-#' degrades gracefully.
+#' Repelled text or label layer for label-heavy plots
 #'
+#' Serves the ordination plots. Uses ggrepel when it is installed and
+#' plain `geom_text()` or `geom_label()` otherwise.
+#'
+#' @param data Data frame of the labels
+#' @param mapping Aesthetic mapping from [ggplot2::aes()]
+#' @param type Either `"text"` or `"label"`
+#' @param ... Further arguments to the geom
+#' @return A ggplot2 layer
 #' @noRd
 mvgam_repel_layer <- function(
   data,
@@ -478,6 +557,8 @@ mvgam_repel_layer <- function(
   type = c("text", "label"),
   ...
 ) {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_class(mapping, "uneval")
   type <- match.arg(type)
   has_repel <- requireNamespace("ggrepel", quietly = TRUE)
   fn <- if (has_repel && type == "text") {
@@ -493,19 +574,20 @@ mvgam_repel_layer <- function(
 }
 
 
-#' Diverging fill scale for correlation / precision heatmaps.
+#' Diverging fill scale for correlation and precision heatmaps
 #'
-#' Symmetric `scale_fill_gradient2` centred at zero with the
-#' canonical sign convention: cool blue for large-negative
-#' associations, grey at zero, warm red for large-positive ones.
-#' Sign conventions for correlation heatmaps are independent of
-#' the active bayesplot single-hue scheme (diverging plots need
-#' both warm and cool ends), so the colours are read from the
-#' fixed bayesplot `"red"` and `"blue"` schemes regardless of
-#' the caller's `color_scheme_set`. Defaults to the `[-1, 1]`
-#' correlation range; pass `limits = c(-L, L)` to widen for
-#' precision matrices.
+#' A `scale_fill_gradient2()` centred at zero: blue for negative
+#' associations, grey at zero and red for positive ones. A diverging
+#' scale needs a warm and a cool end. The colours come from the fixed
+#' bayesplot `"red"` and `"blue"` schemes for any active scheme.
 #'
+#' @param name Legend title
+#' @param limits Numeric range of the scale. Defaults to the
+#'   correlation range `[-1, 1]`. A precision matrix passes
+#'   `c(-L, L)`.
+#' @param breaks Numeric legend breaks
+#' @param na.value Fill colour of missing cells
+#' @return A ggplot2 fill scale
 #' @noRd
 mvgam_diverging_scale <- function(
   name = "correlation",
@@ -513,6 +595,10 @@ mvgam_diverging_scale <- function(
   breaks = pretty_symmetric_breaks(limits),
   na.value = "transparent"
 ) {
+  checkmate::assert_string(name)
+  checkmate::assert_numeric(limits, len = 2L, any.missing = FALSE)
+  checkmate::assert_numeric(breaks)
+  checkmate::assert_string(na.value)
   warm <- mvgam_palette("red")[5L]
   cool <- mvgam_palette("blue")[5L]
   ggplot2::scale_fill_gradient2(
@@ -526,12 +612,11 @@ mvgam_diverging_scale <- function(
 }
 
 
-#' Five evenly spaced legend breaks across a symmetric range,
-#' rounded to something a reader can take in. The arithmetic
-#' sequence is exact and unreadable once the limits come from the
-#' data rather than from the unit interval: a precision heatmap
-#' scaled to its own entries labelled its legend to seven decimal
-#' places.
+#' Five evenly spaced legend breaks across a symmetric range
+#'
+#' Limits taken from the data give breaks with many decimal places.
+#' The breaks are rounded to two significant digits of the
+#' half-range.
 #'
 #' @param limits Numeric length-2 range, symmetric about zero.
 #' @return Numeric vector of breaks.
@@ -547,12 +632,11 @@ pretty_symmetric_breaks <- function(limits) {
 }
 
 
-#' Long-format lower triangle of an estimate matrix, ready for a
-#' heatmap.
+#' Long-format lower triangle of an estimate matrix for a heatmap
 #'
-#' The upper triangle and the diagonal are not returned at all: a
-#' symmetric matrix says everything once, and the diagonal is 1 for
-#' any correlation.
+#' The result omits the upper triangle and the diagonal. A symmetric
+#' matrix repeats each entry in its upper triangle. The diagonal of a
+#' correlation matrix is 1.
 #'
 #' @param estimate Symmetric matrix of posterior point estimates.
 #' @param cluster Reorder by `cluster_cormat()`.
@@ -560,9 +644,8 @@ pretty_symmetric_breaks <- function(limits) {
 #'
 #' @noRd
 residcor_panel_data <- function(estimate, cluster = FALSE) {
-  # A single series has no off-diagonal entry, so the lower triangle
-  # is empty and there is no panel to draw. Refusing here names the
-  # reason, where the empty frame would fail further downstream.
+  # A single series has no off-diagonal entry. The assertion names
+  # that cause before an empty frame fails in ggplot2.
   checkmate::assert_matrix(estimate, mode = "numeric", min.rows = 2L)
   checkmate::assert_flag(cluster)
   if (isTRUE(cluster)) {
@@ -577,18 +660,22 @@ residcor_panel_data <- function(estimate, cluster = FALSE) {
 }
 
 
-#' Melt a symmetric matrix into a long data.frame keyed by
-#' `Var1` / `Var2` with the numeric entries in a single `value`
-#' column. By default the upper triangle and the diagonal are
-#' set to `NA` before melting so the heatmap shows only the
-#' lower triangle of off-diagonal entries (suits a correlation
-#' matrix where the diagonal is uninformative). Toggle
-#' `drop_diag` / `drop_upper` to keep both for use cases like
-#' a covariance matrix where the diagonal carries inferential
-#' signal or the symmetric upper triangle helps readability.
+#' A matrix in long format with `Var1`, `Var2` and `value` columns
 #'
+#' By default the upper triangle and the diagonal are set to `NA`.
+#' The heatmap then shows the off-diagonal lower triangle, which suits
+#' a correlation matrix. A covariance or coefficient matrix keeps both
+#' with `drop_diag = FALSE` and `drop_upper = FALSE`.
+#'
+#' @param mat Numeric matrix
+#' @param drop_diag Logical. `TRUE` sets the diagonal to `NA`.
+#' @param drop_upper Logical. `TRUE` sets the upper triangle to `NA`.
+#' @return Data frame with `Var1`, `Var2` and `value`
 #' @noRd
 gather_matrix <- function(mat, drop_diag = TRUE, drop_upper = TRUE) {
+  checkmate::assert_matrix(mat)
+  checkmate::assert_flag(drop_diag)
+  checkmate::assert_flag(drop_upper)
   if (drop_upper) mat[upper.tri(mat)] <- NA
   if (drop_diag) diag(mat) <- NA
   if (is.null(dimnames(mat))) {
@@ -602,21 +689,24 @@ gather_matrix <- function(mat, drop_diag = TRUE, drop_upper = TRUE) {
 }
 
 
-#' Reorder a symmetric correlation matrix using approximate
-#' Robinson ordering (Gruvaeus & Wainer 1972), so visually
-#' coherent positive and negative clusters sit adjacent in the
-#' heatmap. Distances use `1 - cormat`, a valid non-negative
-#' metric where r = 1 → d = 0, r = 0 → d = 1, r = -1 → d = 2,
-#' which preserves sign by treating large-negative correlations
-#' as maximally distant from large-positive ones. Linkage is
-#' `"average"` (UPGMA), which produces more interpretable
-#' species groupings than complete linkage for correlation
-#' distances. Credit for `reorder_clusters` goes to the
-#' maintainers of the `gclus` R package.
+#' An approximate Robinson ordering of a correlation matrix
 #'
+#' Follows Gruvaeus and Wainer (1972). The ordering places clusters of
+#' positive and negative correlation next to each other in the
+#' heatmap. Distances are `1 - cormat`: r = 1 gives d = 0, r = 0 gives
+#' d = 1 and r = -1 gives d = 2. Strong negative correlations are then
+#' furthest from strong positive ones. Linkage is `"average"` (UPGMA).
+#' For correlation distances it gives more interpretable species
+#' groupings than complete linkage. `reorder_clusters()` comes from
+#' the `gclus` R package.
+#'
+#' @param cormat Numeric correlation matrix
+#' @param ... Further arguments to [stats::hclust()]
+#' @return Integer vector of the row order
 #' @importFrom stats hclust as.dist
 #' @noRd
 cluster_cormat <- function(cormat, ...) {
+  checkmate::assert_matrix(cormat, mode = "numeric")
   dis <- 1 - cormat
   dis_d <- stats::as.dist(dis)
   n <- NROW(dis)
@@ -629,8 +719,17 @@ cluster_cormat <- function(cormat, ...) {
 }
 
 
-#'@noRd
+#' Reorder the leaves of a clustering by endpoint distance
+#'
+#' At each merge the two subtrees are flipped to put their closest
+#' endpoints together. Adapted from the `gclus` R package.
+#'
+#' @param x An `hclust` object
+#' @param dis Distance matrix, or a `dist` object
+#' @return The `hclust` object with reordered `merge` and `order`
+#' @noRd
 reorder_clusters <- function(x, dis) {
+  checkmate::assert_class(x, "hclust")
   if (!is.matrix(dis)) {
     dis <- as.matrix(dis)
   }
@@ -758,10 +857,10 @@ reorder_clusters <- function(x, dis) {
 #'   `n_lv` are required in this style. `draw_innovation_grid()`
 #'   uses it with draws it has already extracted.
 #'
-#' A fully populated `fixed_Z` is broadcast across draws. Otherwise
-#' `extract_Z_loadings()` extracts the draws: `Z_tilde[i, j]` from a
-#' fit identified by the QR rotation, and `Z[i, j]` from every other
-#' factor fit.
+#' A fully populated `fixed_Z` is repeated for every draw. Otherwise
+#' `extract_Z_loadings()` extracts the draws. A fit identified by the
+#' QR rotation stores `Z_tilde[i, j]`. Every other factor fit stores
+#' `Z[i, j]`.
 #'
 #' @param object Fitted mvgam object (object-style entry).
 #'   Required when callers omit `n_series`/`n_lv`.
@@ -789,6 +888,8 @@ resolve_factor_loadings <- function(object = NULL,
                                     n_series = NULL,
                                     basis = c("identified", "model")) {
   basis <- match.arg(basis)
+  checkmate::assert_matrix(draws_mat, null.ok = TRUE)
+  checkmate::assert_matrix(fixed_Z, null.ok = TRUE)
   if (!is.null(object)) {
     checkmate::assert_class(object, "mvgam")
     if (is.null(fixed_Z)) {
@@ -806,14 +907,14 @@ resolve_factor_loadings <- function(object = NULL,
   checkmate::assert_int(n_lv, lower = 1L)
   checkmate::assert_int(n_series, lower = 1L)
 
-  # Partial Z (some entries NA = sampled): the free entries are
-  # saved as `Z[i, j]` in the posterior alongside the fixed
-  # entries, so fall through to the column-major draws parser.
+  # A partial Z marks its sampled entries with NA. The posterior
+  # stores every entry as `Z[i, j]`. The draws parser below handles
+  # that case.
   fully_fixed <- !is.null(fixed_Z) && !anyNA(fixed_Z)
   if (fully_fixed) {
-    # Reason: fixed-Z fits store Z in standata, so there are no
-    # `Z[i, j]` posterior columns to read. Broadcast the matrix
-    # across ndraws to match the sampled-Z return shape.
+    # A fixed-Z fit stores Z in the Stan data. The posterior has no
+    # `Z[i, j]` columns. The matrix is repeated for every draw to
+    # match the sampled-Z return shape.
     ndraws <- if (!is.null(draws_mat)) {
       nrow(draws_mat)
     } else if (!is.null(object)) {

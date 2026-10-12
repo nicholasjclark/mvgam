@@ -1,48 +1,61 @@
-#' Stan Backend Management for mvgam
+#' Stan backend management for mvgam
 #'
 #' @description
-#' This file contains Stan backend abstraction functions adapted from the brms package.
-#' These functions provide a common interface for Stan model parsing, compilation, and fitting
-#' across different Stan backends (rstan, cmdstanr, mock).
+#' Stan backend functions adapted from the brms package. They give one
+#' interface for parsing, compiling and fitting Stan models with the
+#' rstan, cmdstanr and mock backends.
 #'
 #' @section Attribution:
-#' The functions in this file are adapted from the brms package (https://paul-buerkner.github.io/brms/)
-#' developed by Paul-Christian Bürkner and the brms development team. Original implementations
-#' are used with gratitude and appropriate attribution under the GPL-2 license.
+#' The functions in this file are adapted from the brms package
+#' (https://paul-buerkner.github.io/brms/), developed by
+#' Paul-Christian Burkner and the brms development team. The original
+#' implementations are used with gratitude under the GPL-2 license.
 #'
 #' Key contributors to the original brms backend system:
-#' - Paul-Christian Bürkner (maintainer and primary developer)
+#' - Paul-Christian Burkner (maintainer and primary developer)
 #' - The brms development team and community contributors
 #'
-#' Original source: https://github.com/paul-buerkner/brms/blob/master/R/backends.R
+#' Original source: `R/backends.R` in
+#' https://github.com/paul-buerkner/brms
 #'
 #' @section Modifications for mvgam:
-#' Functions have been adapted for integration with mvgam's architecture while maintaining
-#' compatibility with the original brms design patterns. Key adaptations include:
+#' The functions are adapted to mvgam's architecture and keep the brms
+#' design patterns. Key adaptations:
 #' - Integration with mvgam's validation systems
 #' - Compatibility with mvgam object structures
-#' - Preservation of all original functionality for backend switching
+#' - Every original backend-switching feature
 #'
-#' @author Paul-Christian Bürkner (original brms implementation)
+#' @author Paul-Christian Burkner (original brms implementation)
 #' @author mvgam development team (adaptations for mvgam)
 
 # =============================================================================
-# MINIMAL UTILITY FUNCTIONS
+# Utility functions
 # =============================================================================
-# Essential functions for Stan backend compatibility following mvgam standards
 
-#' Object type checkers for mvgam compatibility
+#' Whether an object is an `mvgam` fit
+#'
+#' @param x Object to test
+#' @return A single logical
 #' @noRd
 is.mvgam <- function(x) {
   inherits(x, "mvgam")
 }
 
+#' Whether an object is a `stanfit`
+#'
+#' @param x Object to test
+#' @return A single logical
 #' @noRd
 is.stanfit <- function(x) {
   inherits(x, "stanfit")
 }
 
-#' Named list creation utility
+#' A list named by its arguments
+#'
+#' Unnamed arguments take the deparsed argument expression as name.
+#'
+#' @param ... Objects to collect
+#' @return A named list
 #' @noRd
 nlist <- function(...) {
   m <- match.call()
@@ -59,43 +72,50 @@ nlist <- function(...) {
   dots
 }
 
-#' Concatenation replacement function
+#' Append to an object in place
+#'
+#' @param x Object to extend
+#' @param value Elements to append
+#' @return `c(x, value)`
 #' @noRd
 `c<-` <- function(x, value) {
   c(x, value)
 }
 
 # =============================================================================
-# STAN MODEL PARSING
+# Stan model parsing
 # =============================================================================
 
-#' Parse Stan Model Code
+#' Parse Stan model code
 #'
 #' @description
 #' Validates and parses Stan model code using the specified backend.
 #' Adapted from brms backend system.
 #'
 #' @param model Character string containing Stan model code
-#' @param backend Character string specifying backend ("rstan", "cmdstanr", "mock")
+#' @param backend Character string specifying backend ("rstan",
+#'   "cmdstanr", "mock")
 #' @param ... Additional arguments passed to backend-specific parsers
 #' @return Character string with validated Stan model code
 #' @noRd
 parse_model <- function(model, backend, ...) {
+  checkmate::assert_string(model)
   checkmate::assert_string(backend)
   .parse_model <- get(paste0(".parse_model_", backend), mode = "function")
   .parse_model(model, ...)
 }
 
-#' Parse Stan Model Code with rstan Backend
+#' Parse Stan model code with the rstan backend
 #' @description
 #' Internal function to parse Stan model code using the rstan backend.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param model Character string containing Stan model code
 #' @param silent Integer controlling verbosity (0=verbose, 1=moderate, 2=silent)
 #' @param ... Additional arguments passed to rstan::stanc
 #' @return Character string with validated Stan model code
 #' @noRd
 .parse_model_rstan <- function(model, silent = 1, ...) {
+  checkmate::assert_string(model)
   out <- eval_silent(
     rstan::stanc(model_code = model, ...),
     type = "message", silent = silent
@@ -103,21 +123,19 @@ parse_model <- function(model, backend, ...) {
   out$model_code
 }
 
-#' Parse Stan Model Code with cmdstanr Backend
+#' Parse Stan model code with the cmdstanr backend
 #' @description
 #' Internal function to parse Stan model code using the cmdstanr backend.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param model Character string containing Stan model code
 #' @param silent Integer controlling verbosity (0=verbose, 1=moderate, 2=silent)
 #' @param ... Additional arguments passed to cmdstanr functions
 #' @return Character string with validated Stan model code
 #' @noRd
 .parse_model_cmdstanr <- function(model, silent = 1, ...) {
+  checkmate::assert_string(model)
   require_package("cmdstanr")
   temp_file <- cmdstanr::write_stan_file(model)
-  # if (cmdstanr::cmdstan_version() >= "2.29.0") {
-  #   .canonicalize_stan_model(temp_file, overwrite_file = TRUE)
-  # }
   out <- eval_silent(
     cmdstanr::cmdstan_model(temp_file, compile = FALSE, ...),
     type = "message", silent = silent
@@ -126,27 +144,31 @@ parse_model <- function(model, backend, ...) {
   paste(out$code(), collapse = "\n")
 }
 
-#' Parse Stan Model Code with Mock Backend
+#' Parse Stan model code with the mock backend
 #' @description
 #' Internal function to parse Stan model code using a mock backend for testing.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param model Character string containing Stan model code
 #' @param silent Logical controlling verbosity
 #' @param parse_error Optional error message to simulate parsing failure
-#' @param parse_check Backend to use for actual parsing ("rstan", "cmdstanr", or NULL)
+#' @param parse_check Backend to use for actual parsing ("rstan",
+#'   "cmdstanr", or NULL)
 #' @param ... Additional arguments passed to parsing functions
 #' @return Character string with mock or validated Stan model code
 #' @noRd
 .parse_model_mock <- function(model, silent = TRUE, parse_error = NULL,
                               parse_check = "rstan", ...) {
+  checkmate::assert_string(model)
+  checkmate::assert_string(parse_error, null.ok = TRUE)
+  checkmate::assert_string(parse_check, null.ok = TRUE)
   if (!is.null(parse_error)) {
     stop(insight::format_error(parse_error), call. = FALSE)
+  } else if (is.null(parse_check)) {
+    out <- "mock_code"
   } else if (parse_check == "rstan") {
     out <- .parse_model_rstan(model, silent = silent, ...)
   } else if (parse_check == "cmdstanr") {
     out <- .parse_model_cmdstanr(model, silent = silent, ...)
-  } else if (is.null(parse_check)) {
-    out <- "mock_code"
   } else {
     stop(insight::format_error("Unknown 'parse_check' value."), call. = FALSE)
   }
@@ -154,30 +176,32 @@ parse_model <- function(model, backend, ...) {
 }
 
 # =============================================================================
-# STAN MODEL COMPILATION
+# Stan model compilation
 # =============================================================================
 
-#' Compile Stan Model
+#' Compile a Stan model
 #'
 #' @description
 #' Compiles Stan model using the specified backend.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #'
 #' @param model Character string containing Stan model code
-#' @param backend Character string specifying backend ("rstan", "cmdstanr", "mock")
+#' @param backend Character string specifying backend ("rstan",
+#'   "cmdstanr", "mock")
 #' @param ... Additional arguments passed to backend-specific compilers
 #' @return Compiled Stan model object (backend-specific type)
 #' @noRd
 compile_model <- function(model, backend, ...) {
+  checkmate::assert_string(model)
   checkmate::assert_string(backend)
   .compile_model <- get(paste0(".compile_model_", backend), mode = "function")
   .compile_model(model, ...)
 }
 
-#' Compile Stan Model with rstan Backend
+#' Compile a Stan model with the rstan backend
 #' @description
 #' Internal function to compile Stan model using the rstan backend.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param model Character string containing Stan model code
 #' @param threads Threading configuration object
 #' @param opencl OpenCL configuration object
@@ -186,30 +210,17 @@ compile_model <- function(model, backend, ...) {
 #' @return Compiled rstan model object
 #' @noRd
 .compile_model_rstan <- function(model, threads, opencl, silent = 1, ...) {
+  checkmate::assert_string(model)
+  checkmate::assert_number(silent)
   args <- list(...)
   args$model_code <- model
   if (silent < 2) {
     rlang::inform("Compiling Stan program...")
   }
-  if (use_threading(threads, force = TRUE)) {
-    if (utils::packageVersion("rstan") >= "2.26") {
-      threads_per_chain_def <- rstan::rstan_options("threads_per_chain")
-      on.exit(rstan::rstan_options(threads_per_chain = threads_per_chain_def))
-      rstan::rstan_options(threads_per_chain = threads$threads)
-    } else {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Threading is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
-        )
-      ), call. = FALSE)
-    }
-  }
-  if (use_opencl(opencl)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "OpenCL is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
-      )
-    ), call. = FALSE)
+  old_threads <- set_rstan_threads(threads, opencl)
+  if (!is.null(old_threads)) {
+    on.exit(rstan::rstan_options(threads_per_chain = old_threads),
+            add = TRUE)
   }
   eval_silent(
     brms::do_call(rstan::stan_model, args),
@@ -217,10 +228,45 @@ compile_model <- function(model, backend, ...) {
   )
 }
 
-#' Compile Stan Model with cmdstanr Backend
+#' Set rstan's threads per chain, refusing what rstan cannot run
+#'
+#' Threading needs rstan 2.26 or later. rstan runs no OpenCL.
+#'
+#' @param threads Threading configuration object
+#' @param opencl OpenCL configuration object
+#' @return The previous `threads_per_chain` option, for the caller to
+#'   restore, or NULL when threading is off
+#' @noRd
+set_rstan_threads <- function(threads, opencl) {
+  if (use_opencl(opencl)) {
+    stop(insight::format_error(
+      cli::format_inline(
+        "OpenCL is not supported by backend 'rstan' version ",
+        "{utils::packageVersion('rstan')}."
+      )
+    ), call. = FALSE)
+  }
+  if (!use_threading(threads, force = TRUE)) {
+    return(NULL)
+  }
+  if (utils::packageVersion("rstan") < "2.26") {
+    stop(insight::format_error(
+      cli::format_inline(
+        "Threading is not supported by backend 'rstan' version ",
+        "{utils::packageVersion('rstan')}."
+      )
+    ), call. = FALSE)
+  }
+  old <- rstan::rstan_options("threads_per_chain")
+  rstan::rstan_options(threads_per_chain = threads$threads)
+  old
+}
+
+
+#' Compile a Stan model with the cmdstanr backend
 #' @description
 #' Internal function to compile Stan model using the cmdstanr backend.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param model Character string containing Stan model code
 #' @param threads Threading configuration object
 #' @param opencl OpenCL configuration object
@@ -229,12 +275,11 @@ compile_model <- function(model, backend, ...) {
 #' @return Compiled cmdstanr model object
 #' @noRd
 .compile_model_cmdstanr <- function(model, threads, opencl, silent = 1, ...) {
+  checkmate::assert_string(model)
+  checkmate::assert_number(silent)
   require_package("cmdstanr")
   args <- list(...)
   args$stan_file <- cmdstanr::write_stan_file(model)
-  # if (cmdstanr::cmdstan_version() >= "2.29.0") {
-  #   .canonicalize_stan_model(args$stan_file, overwrite_file = TRUE)
-  # }
   if (use_threading(threads, force = TRUE)) {
     args$cpp_options$stan_threads <- TRUE
   }
@@ -247,29 +292,34 @@ compile_model <- function(model, backend, ...) {
   )
 }
 
-#' Compile Stan Model with Mock Backend
+#' Compile a Stan model with the mock backend
 #' @description
 #' Internal function to compile Stan model using a mock backend for testing.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param model Character string containing Stan model code
 #' @param threads Threading configuration object
 #' @param opencl OpenCL configuration object
-#' @param compile_check Backend to use for actual compilation ("rstan", "cmdstanr", or NULL)
+#' @param compile_check Backend to use for actual compilation ("rstan",
+#'   "cmdstanr", or NULL)
 #' @param compile_error Optional error message to simulate compilation failure
 #' @param silent Integer controlling verbosity (0=verbose, 1=moderate, 2=silent)
 #' @param ... Additional arguments passed to compilation functions
 #' @return Mock compiled model object or parsed code
 #' @noRd
-.compile_model_mock <- function(model, threads, opencl, compile_check = "rstan",
+.compile_model_mock <- function(model, threads, opencl,
+                                compile_check = "rstan",
                                 compile_error = NULL, silent = 1, ...) {
+  checkmate::assert_string(model)
+  checkmate::assert_string(compile_check, null.ok = TRUE)
+  checkmate::assert_string(compile_error, null.ok = TRUE)
   if (!is.null(compile_error)) {
     stop(insight::format_error(compile_error), call. = FALSE)
+  } else if (is.null(compile_check)) {
+    out <- list()
   } else if (compile_check == "rstan") {
     out <- .parse_model_rstan(model, silent = silent, ...)
   } else if (compile_check == "cmdstanr") {
     out <- .parse_model_cmdstanr(model, silent = silent, ...)
-  } else if (is.null(compile_check)) {
-    out <- list()
   } else {
     stop(insight::format_error("Unknown 'compile_check' value."), call. = FALSE)
   }
@@ -277,19 +327,23 @@ compile_model <- function(model, backend, ...) {
 }
 
 # =============================================================================
-# STAN MODEL FITTING
+# Stan model fitting
 # =============================================================================
 
-#' Fit Stan Model
+#' Fit a Stan model
 #'
 #' @description
-#' Fits Stan model using the specified backend, dispatching to backend-specific handlers.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Fits Stan model using the specified backend, dispatching to
+#' backend-specific handlers.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #'
 #' @param model Compiled Stan model object
-#' @param backend Character string specifying backend ("rstan", "cmdstanr", "mock")
-#' @param ... Additional arguments passed to backend-specific fitting functions
-#' @return Fitted Stan model object (stanfit for rstan, CmdStanMCMC for cmdstanr)
+#' @param backend Character string specifying backend ("rstan",
+#'   "cmdstanr", "mock")
+#' @param ... Additional arguments passed to backend-specific fitting
+#'   functions
+#' @return Fitted Stan model object (stanfit for rstan, CmdStanMCMC for
+#'   cmdstanr)
 #' @noRd
 fit_model <- function(model, backend, ...) {
   checkmate::assert_string(backend)
@@ -297,14 +351,16 @@ fit_model <- function(model, backend, ...) {
   .fit_model(model, ...)
 }
 
-#' Fit Stan Model with rstan Backend
+#' Fit a Stan model with the rstan backend
 #' @description
 #' Internal function to fit Stan model using the rstan backend, handling
-#' parameters for MCMC, variational inference, and future processing.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' parameters for MCMC, variational inference and parallel chains
+#' through the future package.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param model Compiled Stan model object from rstan
 #' @param sdata Named list of Stan data
-#' @param algorithm Sampling algorithm ("sampling", "meanfield", "fullrank", "fixed_param")
+#' @param algorithm Sampling algorithm ("sampling", "meanfield",
+#'   "fullrank", "fixed_param")
 #' @param iter Number of iterations per chain
 #' @param warmup Number of warmup iterations
 #' @param thin Thinning interval
@@ -317,7 +373,8 @@ fit_model <- function(model, backend, ...) {
 #' @param seed Random seed for reproducibility
 #' @param control Stan control parameters list
 #' @param silent Integer controlling verbosity level
-#' @param future Logical; use future processing for parallel chains?
+#' @param future Logical; run chains in parallel with the future
+#'   package?
 #' @param ... Additional arguments passed to Stan sampling functions
 #' @return Fitted stanfit object
 #' @noRd
@@ -325,26 +382,21 @@ fit_model <- function(model, backend, ...) {
                              chains, cores, threads, opencl, init, exclude,
                              seed, control, silent, future, ...) {
 
-  # some input checks and housekeeping
-  if (use_threading(threads, force = TRUE)) {
-    if (utils::packageVersion("rstan") >= "2.26") {
-      threads_per_chain_def <- rstan::rstan_options("threads_per_chain")
-      on.exit(rstan::rstan_options(threads_per_chain = threads_per_chain_def))
-      rstan::rstan_options(threads_per_chain = threads$threads)
-    } else {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Threading is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
-        )
-      ), call. = FALSE)
-    }
-  }
-  if (use_opencl(opencl)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "OpenCL is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
-      )
-    ), call. = FALSE)
+  checkmate::assert_list(sdata)
+  checkmate::assert_string(algorithm)
+  checkmate::assert_count(iter, positive = TRUE)
+  checkmate::assert_count(warmup)
+  checkmate::assert_count(thin, positive = TRUE)
+  checkmate::assert_count(chains, positive = TRUE)
+  checkmate::assert_count(cores, positive = TRUE)
+  checkmate::assert_list(control, null.ok = TRUE)
+  checkmate::assert_number(silent)
+  checkmate::assert_flag(future)
+  # Input checks and housekeeping
+  old_threads <- set_rstan_threads(threads, opencl)
+  if (!is.null(old_threads)) {
+    on.exit(rstan::rstan_options(threads_per_chain = old_threads),
+            add = TRUE)
   }
   if (is.null(init)) {
     init <- "random"
@@ -359,7 +411,7 @@ fit_model <- function(model, backend, ...) {
   dots <- list(...)
   args[names(dots)] <- dots
 
-  # do the actual sampling
+  # Run the sampler
   if (silent < 2) {
     rlang::inform("Start sampling")
   }
@@ -375,7 +427,9 @@ fit_model <- function(model, backend, ...) {
         out <- brms::do_call(rstan::sampling, args)
       } else {
         if (cores > 1L) {
-          insight::format_warning("Argument 'cores' is ignored when using 'future'.")
+          insight::format_warning(
+            "Argument 'cores' is ignored when using 'future'."
+          )
         }
         args$chains <- 1L
         out <- futures <- vector("list", chains)
@@ -401,7 +455,7 @@ fit_model <- function(model, backend, ...) {
       out <- brms::do_call(rstan::sampling, args)
     }
   } else if (algorithm %in% c("fullrank", "meanfield")) {
-    # vb does not support parallel execution
+    # rstan::vb() runs a single chain
     c(args) <- nlist(algorithm)
     out <- brms::do_call(rstan::vb, args)
   } else {
@@ -410,20 +464,20 @@ fit_model <- function(model, backend, ...) {
     ), call. = FALSE)
   }
   # 'pathfinder' and 'laplace' are CmdStan algorithms with no rstan
-  # equivalent, so they are reachable only through the cmdstanr
-  # backend.
+  # equivalent. Only the cmdstanr backend reaches them.
   out <- repair_stanfit(out)
   out
 }
 
-#' Fit Stan Model with cmdstanr Backend
+#' Fit a Stan model with the cmdstanr backend
 #' @description
 #' Internal function to fit Stan model using the cmdstanr backend, handling
 #' parameters for MCMC, variational inference, pathfinder, and laplace.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param model Compiled Stan model object from cmdstanr
 #' @param sdata Named list of Stan data
-#' @param algorithm Sampling algorithm ("sampling", "meanfield", "fullrank", "pathfinder", "laplace", "fixed_param")
+#' @param algorithm Sampling algorithm ("sampling", "meanfield",
+#'   "fullrank", "pathfinder", "laplace", "fixed_param")
 #' @param iter Number of iterations per chain
 #' @param warmup Number of warmup iterations
 #' @param thin Thinning interval
@@ -436,7 +490,8 @@ fit_model <- function(model, backend, ...) {
 #' @param seed Random seed for reproducibility
 #' @param control Stan control parameters list
 #' @param silent Integer controlling verbosity level
-#' @param future Logical; use future processing for parallel chains?
+#' @param future Logical; run chains in parallel with the future
+#'   package?
 #' @param ... Additional arguments passed to Stan sampling functions
 #' @return Fitted stanfit object (converted from cmdstanr output)
 #' @noRd
@@ -444,6 +499,16 @@ fit_model <- function(model, backend, ...) {
                                 chains, cores, threads, opencl, init, exclude,
                                 seed, control, silent, future, ...) {
 
+  checkmate::assert_list(sdata)
+  checkmate::assert_string(algorithm)
+  checkmate::assert_count(iter, positive = TRUE)
+  checkmate::assert_count(warmup)
+  checkmate::assert_count(thin, positive = TRUE)
+  checkmate::assert_count(chains, positive = TRUE)
+  checkmate::assert_count(cores, positive = TRUE)
+  checkmate::assert_list(control, null.ok = TRUE)
+  checkmate::assert_number(silent)
+  checkmate::assert_flag(future)
   require_package("cmdstanr")
   # mvgam's own starting values set only the parameters that need one.
   # cmdstanr reports every partial init list, which here says nothing
@@ -452,14 +517,14 @@ fit_model <- function(model, backend, ...) {
     old_warn <- options(cmdstanr_warn_inits = FALSE)
     on.exit(options(old_warn), add = TRUE)
   }
-  # some input checks and housekeeping
+  # Input checks and housekeeping
   class(sdata) <- "list"
   if (is_NA(seed)) {
     seed <- NULL
   }
-  # The "pathfinder" keyword names a strategy rather than a value, and
-  # can only be resolved once the model is compiled. Blank it here so
-  # the keyword never reaches Stan, and record the request separately.
+  # The "pathfinder" keyword names a strategy. Its value exists only
+  # once the model is compiled. Stan never receives the keyword: `init`
+  # is blanked here and `pathfinder_init` records the request.
   pathfinder_init <- is_equal(init, "pathfinder")
   if (is_equal(init, "random") || pathfinder_init) {
     init <- NULL
@@ -467,7 +532,7 @@ fit_model <- function(model, backend, ...) {
     init <- 0
   }
   future <- future && algorithm %in% "sampling"
-  # Every cmdstanr method takes the two output settings, and `silent`
+  # Every cmdstanr method takes the two output settings. `silent`
   # governs them for each algorithm alike.
   args <- nlist(data = sdata, seed, init,
                 show_messages = silent < 2, show_exceptions = silent == 0)
@@ -479,9 +544,8 @@ fit_model <- function(model, backend, ...) {
   args[names(dots)] <- dots
   args[names(control)] <- control
 
-  checkmate::assert_number(chains)
 
-  # do the actual sampling
+  # Run the sampler
   if (silent < 2) {
     rlang::inform("Start sampling")
   }
@@ -489,10 +553,10 @@ fit_model <- function(model, backend, ...) {
 
   # Starting values from Pathfinder. Passing the approximation back as
   # `init` lets cmdstanr draw one starting value per chain from the
-  # approximate posterior instead of from U(-2, 2) on the unconstrained
-  # scale. Reason: a state-space model declares one innovation per time
-  # point and latent variable, so random starts place hundreds of
-  # correlated parameters far from the typical set.
+  # approximate posterior. The default draws from U(-2, 2) on the
+  # unconstrained scale. Reason: a state-space model declares one
+  # innovation per time point and latent variable. Random starts place
+  # hundreds of correlated parameters far from the typical set.
   if (pathfinder_init) {
     require_package("cmdstanr", version = "0.8.1")
     if (silent < 2) {
@@ -519,16 +583,17 @@ fit_model <- function(model, backend, ...) {
         out <- brms::do_call(model$sample, args)
       } else {
         if (cores > 1L) {
-          insight::format_warning("Argument 'cores' is ignored when using 'future'.")
+          insight::format_warning(
+            "Argument 'cores' is ignored when using 'future'."
+          )
         }
         args$chains <- 1L
         out <- futures <- vector("list", chains)
         for (i in seq_len(chains)) {
           args$chain_ids <- i
           # Only list inits are split per chain. A Pathfinder init is
-          # an R6 fit object rather than a list, and cmdstanr resamples
-          # one starting value per chain from it internally, so it must
-          # reach every chain whole.
+          # an R6 fit object. cmdstanr resamples one starting value per
+          # chain from it internally. Every chain receives it whole.
           if (is.list(init)) {
             args$init <- init[i]
           }
@@ -566,12 +631,12 @@ fit_model <- function(model, backend, ...) {
   }
 
   # `$metadata()` and `$output_files()` below assume a chain produced
-  # output. A run where none did reaches them and fails inside
-  # cmdstanr with "Unable to retrieve the metadata", which names
-  # neither the model nor the cause. The pathfinder branch checks its
-  # return codes already; the sampler is given the same check here.
-  # A run that kept some chains stays on this path, and
-  # `check_chains_finished()` names the shortfall after the fit.
+  # output. A run where none did fails inside cmdstanr with "Unable to
+  # retrieve the metadata", which names neither the model nor the
+  # cause. The pathfinder branch checks its return codes already. The
+  # sampler takes the same check here. A run that kept some chains
+  # continues. `check_chains_finished()` names the shortfall after the
+  # fit.
   if (algorithm %in% c("sampling", "fixed_param")) {
     codes <- if (future) {
       ulapply(out, function(x) x$return_codes())
@@ -608,11 +673,11 @@ fit_model <- function(model, backend, ...) {
   out
 }
 
-#' Fit Stan Model with Mock Backend
+#' Fit a Stan model with the mock backend
 #' @description
 #' Internal function to fit Stan model using a mock backend for testing.
 #' Returns mock fitted objects for testing purposes without actual computation.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param model Mock compiled Stan model object
 #' @param sdata Named list of Stan data (ignored in mock)
 #' @param algorithm Sampling algorithm (ignored in mock)
@@ -628,7 +693,7 @@ fit_model <- function(model, backend, ...) {
 #' @param seed Random seed (ignored in mock)
 #' @param control Stan control parameters (ignored in mock)
 #' @param silent Verbosity level (ignored in mock)
-#' @param future Future processing flag (ignored in mock)
+#' @param future Parallel chains setting (ignored in mock)
 #' @param mock_fit Mock fitted object or function returning one
 #' @param ... Additional arguments (ignored in mock)
 #' @return Mock fitted stanfit object
@@ -645,20 +710,20 @@ fit_model <- function(model, backend, ...) {
 }
 
 # =============================================================================
-# BACKEND UTILITY FUNCTIONS
+# Backend utility functions
 # =============================================================================
 
-#' Extract Compiled Stan Model
+#' Extract the compiled Stan model of a fit
 #'
 #' @description
 #' Extracts the compiled Stan model from a fitted object.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #'
 #' @param x Fitted model object (brmsfit or mvgam)
 #' @return Compiled Stan model object
 #' @noRd
 compiled_model <- function(x) {
-  stopifnot(is.mvgam(x))
+  checkmate::assert_class(x, "mvgam")
   backend <- x$backend
   checkmate::assert_choice(backend, backend_choices(),
                            .var.name = "x$backend")
@@ -667,16 +732,18 @@ compiled_model <- function(x) {
   } else if (backend == "cmdstanr") {
     out <- attributes(x$fit)$CmdStanModel
   } else if (backend == "mock") {
-    stop(insight::format_error("'compiled_model' is not supported in the mock backend."), call. = FALSE)
+    stop(insight::format_error(
+      "'compiled_model' is not supported in the mock backend."
+    ), call. = FALSE)
   }
   out
 }
 
-#' Supported Stan Backends
+#' Supported Stan backends
 #'
 #' @description
 #' Returns vector of supported Stan backends.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #'
 #' @return Character vector of backend names
 #' @noRd
@@ -686,13 +753,14 @@ backend_choices <- function() {
 
 #' The Stan version a backend compiles with in this session
 #'
-#' The version of Stan itself, not of the R package that calls it:
-#' rstan 2.32.7 ships Stan 2.32.2. A fit records this when it is
-#' built, since the session that later describes it may have another.
+#' The version of Stan itself. An R package version can differ: rstan
+#' 2.32.7 ships Stan 2.32.2. A fit records this version when it is
+#' built. The session that later describes it may have another.
 #'
 #' @param backend One of `backend_choices()`.
-#' @return A character string, or `NA` for the `"mock"` backend, which
-#'   runs no compiler, and for cmdstanr with no CmdStan installed.
+#' @return A character string, or `NA` for the `"mock"` backend and for
+#'   cmdstanr with no CmdStan installed. The mock backend runs no
+#'   compiler.
 #' @noRd
 live_stan_version <- function(backend) {
   checkmate::assert_choice(backend, backend_choices())
@@ -711,19 +779,17 @@ live_stan_version <- function(backend) {
 #'
 #' Returns the underlying engine version reported by the live backend
 #' (`rstan::stan_version()` for `"rstan"`,
-#' `cmdstanr::cmdstan_version()` for `"cmdstanr"`) and errors with an
-#' upgrade hint when it falls below `min_version`. Used to gate
-#' features that need recent Stan compiler additions (initially
-#' `sum_to_zero_vector[K]` for the simplex families, but reusable for
-#' any future Stan-version dependency).
+#' `cmdstanr::cmdstan_version()` for `"cmdstanr"`). Errors with an
+#' upgrade hint when it falls below `min_version`. Guards features that
+#' need recent Stan compiler additions, such as `sum_to_zero_vector[K]`
+#' for the simplex families.
 #'
 #' @param backend One of `"rstan"` or `"cmdstanr"`. The `"mock"`
 #'   backend is rejected because it does not run a real Stan compiler.
 #' @param min_version Minimum Stan engine version required (e.g.
 #'   `"2.36.0"`). Compared via `numeric_version()`.
-#' @param feature Optional short description of the feature being
-#'   gated; surfaces in the error message so the user knows what they
-#'   need the newer Stan for.
+#' @param feature Optional short description of the feature that needs
+#'   the version. The error message names it.
 #' @return Invisible NULL; errors if the engine version is too old.
 #' @noRd
 assert_stan_version <- function(backend, min_version, feature = NULL) {
@@ -736,7 +802,7 @@ assert_stan_version <- function(backend, min_version, feature = NULL) {
     stop(insight::format_error(c(
       "CmdStan is not installed.",
       i = "Install it with `cmdstanr::install_cmdstan()`."
-    )))
+    )), call. = FALSE)
   }
   stan_v <- numeric_version(live)
   if (stan_v >= required) return(invisible(NULL))
@@ -763,29 +829,29 @@ assert_stan_version <- function(backend, min_version, feature = NULL) {
     ),
     x = paste0("Detected Stan ", stan_v, " via backend '", backend, "'."),
     i = upgrade
-  )))
+  )), call. = FALSE)
 }
 
-#' Supported Stan Algorithms
+#' Supported Stan algorithms
 #'
 #' @description
 #' Returns vector of supported Stan sampling algorithms.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #'
 #' @return Character vector of algorithm names
 #' @noRd
 algorithm_choices <- function() {
-  c("sampling", "meanfield", "fullrank", "pathfinder", "laplace", "fixed_param")
+  c("sampling", "meanfield", "fullrank", "pathfinder", "laplace",
+    "fixed_param")
 }
 
-#' Algorithms Implemented by a Given Backend
+#' Algorithms implemented by a backend
 #'
 #' @description
-#' Records which entries of `algorithm_choices()` a backend can actually
-#' run, so that `validate_algorithm()` and `validate_init()` agree.
-#' `rstan` exposes no Pathfinder or Laplace method, and requests for
-#' either must be refused during setup rather than after the model has
-#' been parsed and compiled.
+#' Records which entries of `algorithm_choices()` a backend can run.
+#' `validate_algorithm()` and `validate_init()` both use it. `rstan`
+#' has no Pathfinder or Laplace method. Setup refuses a request for
+#' either, before the model is parsed and compiled.
 #'
 #' @param backend One of `backend_choices()`
 #' @return Character vector of algorithm names
@@ -798,7 +864,7 @@ backend_algorithms <- function(backend) {
   algorithm_choices()
 }
 
-#' Validate the Requested Sampling Algorithm
+#' Validate the requested sampling algorithm
 #'
 #' @param algorithm Requested algorithm name
 #' @param backend One of `backend_choices()`
@@ -821,10 +887,10 @@ validate_algorithm <- function(algorithm, backend) {
     } else {
       "See '?mvgam' for the algorithms mvgam can pass to Stan."
     }
-  )))
+  )), call. = FALSE)
 }
 
-#' Check if Object is brmsthreads
+#' Whether an object is a brmsthreads object
 #' @description
 #' Tests if an object has class brmsthreads.
 #' Adapted from brms backend system.
@@ -835,10 +901,10 @@ is.brmsthreads <- function(x) {
   inherits(x, "brmsthreads")
 }
 
-#' Validate Threading Argument
+#' Validate the threading argument
 #' @description
 #' Validates and normalizes the threads argument for Stan threading.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param threads NULL, numeric, or brmsthreads object
 #' @return Validated brmsthreads object
 #' @noRd
@@ -850,31 +916,34 @@ validate_threads <- function(threads) {
     threads <- brms::threading(threads)
   } else if (!is.brmsthreads(threads)) {
     stop(insight::format_error(
-      "Argument 'threads' needs to be numeric or specified via the 'threading' function."
+      paste0("Argument 'threads' needs to be numeric or specified via ",
+             "the 'threading' function.")
     ), call. = FALSE)
   }
   threads
 }
 
-#' Check if Threading is Activated
+#' Whether Stan threading is active
 #' @description
 #' Determines whether Stan threading should be used based on configuration.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param threads Threading configuration object
-#' @param force Logical; force threading even if force flag is set?
+#' @param force Logical; use threading even when the threads object
+#'   sets `force`?
 #' @return Logical indicating if threading should be used
 #' @noRd
 use_threading <- function(threads, force = FALSE) {
+  checkmate::assert_flag(force)
   threads <- validate_threads(threads)
   out <- isTRUE(threads$threads > 0)
   if (!force) {
-    # Stan code will only be altered in non-forced mode
+    # Stan code changes only in non-forced mode
     out <- out && !isTRUE(threads$force)
   }
   out
 }
 
-#' Check if Object is brmsopencl
+#' Whether an object is a brmsopencl object
 #' @description
 #' Tests if an object has class brmsopencl.
 #' Adapted from brms backend system.
@@ -885,10 +954,10 @@ is.brmsopencl <- function(x) {
   inherits(x, "brmsopencl")
 }
 
-#' Validate OpenCL Argument
+#' Validate the OpenCL argument
 #' @description
 #' Validates and normalizes the opencl argument for Stan OpenCL support.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param opencl NULL, numeric, or brmsopencl object
 #' @return Validated brmsopencl object
 #' @noRd
@@ -899,16 +968,17 @@ validate_opencl <- function(opencl) {
     opencl <- brms::opencl(opencl)
   } else if (!is.brmsopencl(opencl)) {
     stop(insight::format_error(
-      "Argument 'opencl' needs to an integer vector or specified via the 'opencl' function."
+      paste0("Argument 'opencl' needs to be an integer vector or ",
+             "specified via the 'opencl' function.")
     ), call. = FALSE)
   }
   opencl
 }
 
-#' Check if OpenCL is Activated
+#' Whether Stan OpenCL is active
 #' @description
 #' Determines whether Stan OpenCL should be used based on configuration.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param opencl OpenCL configuration object
 #' @return Logical indicating if OpenCL should be used
 #' @noRd
@@ -916,10 +986,10 @@ use_opencl <- function(opencl) {
   !is.null(validate_opencl(opencl)$ids)
 }
 
-#' Validate Silent Argument
+#' Validate the silent argument
 #' @description
 #' Validates the silent argument for controlling output verbosity.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param silent Integer from 0 to 2 controlling verbosity level
 #' @return Validated silent value
 #' @noRd
@@ -932,18 +1002,21 @@ validate_silent <- function(silent) {
 #'
 #' cmdstanr 0.9.0 writes a `path__` column to Pathfinder output and
 #' lists it among `$metadata()$stan_variables`. brms 2.23.0 knows the
-#' `lp__` and `lp_approx__` columns of each algorithm and not this one.
-#' Passed through as a variable, `path__` makes `read_cmdstan_csv()`
-#' stop. Left out, cmdstanr returns the column in the draws anyway,
-#' and brms names it in `fnames_oi` with no dimension entry, which
-#' shifts every name after it. The column records which path a draw
-#' came from. It is removed at both points.
+#' `lp__` and `lp_approx__` columns of each algorithm. It lacks this
+#' one. Passed through as a variable, `path__` makes
+#' `read_cmdstan_csv()` stop. Left out, cmdstanr still returns the
+#' column in the draws. brms then names it in `fnames_oi` with no
+#' dimension entry, which shifts every name after it. The column
+#' records which path a draw came from. It is removed at both points.
 #'
 #' @inheritParams brms::read_csv_as_stanfit
 #' @return A `stanfit` object.
 #' @noRd
 read_cmdstan_stanfit <- function(files, variables, model, exclude,
                                  algorithm) {
+  checkmate::assert_character(files, min.len = 1L)
+  checkmate::assert_character(variables)
+  checkmate::assert_string(algorithm)
   out <- brms::read_csv_as_stanfit(
     files, variables = setdiff(variables, "path__"),
     model = model, exclude = exclude, algorithm = algorithm
@@ -975,6 +1048,8 @@ read_cmdstan_stanfit <- function(files, variables, model, exclude,
 #' @return `NULL`, invisibly.
 #' @noRd
 refuse_unknown_cmdstanr_args <- function(model, algorithm, arg_names) {
+  checkmate::assert_string(algorithm)
+  checkmate::assert_character(arg_names, null.ok = TRUE)
   method <- switch(algorithm,
     sampling = , fixed_param = "sample",
     meanfield = , fullrank = "variational",
@@ -993,10 +1068,10 @@ refuse_unknown_cmdstanr_args <- function(model, algorithm, arg_names) {
 }
 
 
-#' Run Stan's Pathfinder on a Compiled cmdstanr Model
+#' Run Stan's Pathfinder on a compiled cmdstanr model
 #' @description
 #' Shared by the `algorithm = "pathfinder"` fitting branch and the
-#' `init = "pathfinder"` starting-value branch, so both reach Stan with
+#' `init = "pathfinder"` starting-value branch. Both reach Stan with
 #' the same argument set.
 #' @param model Compiled `CmdStanModel` object
 #' @param args Argument list already assembled for the sampler; entries
@@ -1009,6 +1084,9 @@ refuse_unknown_cmdstanr_args <- function(model, algorithm, arg_names) {
 #' @noRd
 run_pathfinder <- function(model, args, chains, threading_on, threads,
                            starts = FALSE) {
+  checkmate::assert_list(args)
+  checkmate::assert_count(chains, positive = TRUE)
+  checkmate::assert_flag(threading_on)
   checkmate::assert_flag(starts)
   defaults <- list(num_paths = chains)
   # Starting values take draws from the approximation itself. An
@@ -1020,10 +1098,9 @@ run_pathfinder <- function(model, args, chains, threading_on, threads,
   if (threading_on) {
     defaults$num_threads <- threads$threads
   }
-  # Fill in only the names the caller did not already supply, so a value
-  # passed through `...` still wins. Appending instead would leave the
-  # name in `args` twice, which `do_call()` rejects outright rather than
-  # resolving to either value.
+  # Fill in only the names the caller did not already supply. A value
+  # passed through `...` then wins. `do_call()` rejects a name that
+  # appears twice in `args`.
   missing_names <- setdiff(names(defaults), names(args))
   args[missing_names] <- defaults[missing_names]
   # A Pathfinder start receives the arguments assembled for
@@ -1035,13 +1112,13 @@ run_pathfinder <- function(model, args, chains, threading_on, threads,
   }
   # Start the quasi-Newton search in a tight ball around the
   # unconstrained origin unless the caller asked for something else.
-  # Reason: neither extreme is safe. From Stan's default U(-2, 2), a
-  # few hundred non-centred innovations put the initial log density
-  # near -1e11 and the line search fails before it can move; from
-  # exactly zero, the VAR coefficient matrix and its correlation
-  # factor start on a flat surface and fail the same way. Across four
-  # trend types and three seeds each, U(-2, 2) and 0 both converged
-  # 9 times in 12, while every jitter from 0.1 to 1 converged 12 in 12.
+  # Reason: from Stan's default U(-2, 2), a few hundred non-centred
+  # innovations put the initial log density near -1e11. The line
+  # search then fails before it can move. From exactly zero, the VAR
+  # coefficient matrix and its correlation factor start on a flat
+  # surface and fail the same way. Across four trend types and three
+  # seeds each, U(-2, 2) and 0 both converged 9 times in 12. Every
+  # jitter from 0.1 to 1 converged 12 in 12.
   if (is.null(args$init)) {
     args$init <- 0.2
   }
@@ -1054,17 +1131,17 @@ run_pathfinder <- function(model, args, chains, threading_on, threads,
         "Try a different 'seed', supply 'init' explicitly or fit with ",
         "'init = \"random\"'."
       )
-    )))
+    )), call. = FALSE)
   }
   out
 }
 
-#' Validate the Requested Iteration Counts
+#' Validate the requested iteration counts
 #' @description
-#' `iter` counts warmup and sampling together, so a `warmup` at or above
-#' it leaves nothing to sample. Left unchecked the backend computes a
-#' negative sampling count and fails inside cmdstanr with a message that
-#' names neither argument.
+#' `iter` counts warmup and sampling together. A `warmup` at or above
+#' it leaves nothing to sample. The backend would compute a negative
+#' sampling count and fail inside cmdstanr with a message that names
+#' neither argument.
 #' @param iter Total iterations per chain
 #' @param warmup Warmup iterations per chain, or `NULL` to accept the
 #'   `iter %/% 2` default
@@ -1091,11 +1168,11 @@ validate_sampler_iterations <- function(iter, warmup = NULL) {
 #'
 #' A contiguous lag set is sampled as partial autocorrelations, which
 #' keeps every draw stationary. A sparse set such as `p = c(1, 12)` is
-#' bounded one coefficient at a time, and a random start can place a
-#' chain on an explosive recursion. Its latent path then grows
-#' without limit, and the chain stays at that start. The coefficients
-#' and their hierarchical means start near zero here, and Stan draws
-#' every other parameter as it would.
+#' bounded one coefficient at a time. A random start can place a chain
+#' on an explosive recursion. Its latent path then grows without
+#' limit. The chain stays at that start. The coefficients and their
+#' hierarchical means start near zero here. Stan draws every other
+#' parameter as it would.
 #'
 #' @param stancode The assembled Stan program
 #' @param standata The Stan data, which sizes the coefficient vectors
@@ -1105,13 +1182,17 @@ validate_sampler_iterations <- function(iter, warmup = NULL) {
 #'   `NULL` when the model has no sparse lag set
 #' @noRd
 sparse_ar_inits <- function(stancode, standata, chains, seed) {
+  checkmate::assert_string(stancode)
+  checkmate::assert_list(standata)
+  checkmate::assert_count(chains, positive = TRUE)
   pars <- grep("^(shared_|mu_)?ar[0-9]+_trend$",
                brms_declared_params(stancode), value = TRUE)
   lags <- sort(unique(as.integer(sub("^\\D*ar([0-9]+)_trend$", "\\1",
                                      pars))))
   if (length(lags) < 2L || ar_lags_contiguous(lags)) return(NULL)
-  # A hierarchical mean is one value, a shared coefficient a length-one
-  # vector, and every other coefficient one value per process.
+  # A hierarchical mean is one value and a shared coefficient a
+  # length-one vector. Every other coefficient has one value per
+  # process.
   sizes <- ifelse(startsWith(pars, "mu_"), NA_integer_,
                   ifelse(startsWith(pars, "shared_"), 1L,
                          as.integer(standata$N_lv_trend)))
@@ -1127,17 +1208,18 @@ sparse_ar_inits <- function(stancode, standata, chains, seed) {
   out
 }
 
-#' Validate Initial Value Specification
+#' Validate the initial value specification
 #' @description
 #' Checks the `init` argument against the capabilities of the chosen
-#' backend. Only the `"pathfinder"` keyword is backend-specific; every
-#' other value is passed through untouched so that the numeric, list and
-#' function forms inherited from brms keep working.
+#' backend. Only the `"pathfinder"` keyword is backend-specific. Every
+#' other value passes through untouched. The numeric, list and function
+#' forms inherited from brms then keep working.
 #' @param init Initial value specification supplied by the user
 #' @param backend One of `"rstan"`, `"cmdstanr"` or `"mock"`
 #' @return The validated `init`, unchanged
 #' @noRd
 validate_init <- function(init, backend) {
+  checkmate::assert_choice(backend, backend_choices())
   if (!is_equal(init, "pathfinder")) {
     return(init)
   }
@@ -1149,30 +1231,30 @@ validate_init <- function(init, backend) {
         "Set 'backend = \"cmdstanr\"', or supply 'init' as \"random\", ",
         "\"0\", a numeric value, a list or a function."
       )
-    )))
+    )), call. = FALSE)
   }
   init
 }
 
-#' Repair Parameter Names in stanfit Objects
+#' Repair parameter names in stanfit objects
 #' @description
 #' Ensures parameter names in stanfit objects are unique and properly formatted
 #' for compatibility with the posterior package.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
+#' Adapted from brms backend system by Paul-Christian Burkner.
 #' @param x stanfit object to repair
 #' @return stanfit object with repaired parameter names
 #' @noRd
 repair_stanfit <- function(x) {
-  stopifnot(is.stanfit(x))
+  checkmate::assert_class(x, "stanfit")
   if (!length(x@sim$fnames_oi)) {
-    # nothing to rename
+    # Nothing to rename
     return(x)
   }
-  # the posterior package cannot deal with non-unique parameter names
-  # this case happens rarely but might happen when sample_prior = "yes"
+  # The posterior package requires unique parameter names. Duplicates
+  # are rare. `sample_prior = "yes"` can produce them.
   x@sim$fnames_oi <- make.unique(as.character(x@sim$fnames_oi), "__")
   for (i in seq_along(x@sim$samples)) {
-    # stanfit may have renamed dimension suffixes
+    # stanfit may rename dimension suffixes
     if (length(x@sim$samples[[i]]) == length(x@sim$fnames_oi)) {
       names(x@sim$samples[[i]]) <- x@sim$fnames_oi
     }
@@ -1190,10 +1272,9 @@ repair_stanfit <- function(x) {
 #' computed from. The draws are the fallback for a fit carrying no
 #' `stan_args`, such as a stub built from a draws array.
 #'
-#' `stan_args` has precedence because it costs constant time, where
-#' counting chains from draws materialises the whole posterior. Both
-#' count the chains that finished, and they agree on every cached
-#' fixture.
+#' `stan_args` has precedence because it costs constant time. Counting
+#' chains from draws materialises the whole posterior. Both count the
+#' chains that finished. They agree on every cached fixture.
 #'
 #' @param fit A fitted Stan model, or a draws object
 #' @return Integer count of chains, or `NA_integer_` when neither
@@ -1215,14 +1296,12 @@ realised_chain_count <- function(fit) {
 
 #' Say when fewer chains finished than were requested
 #'
-#' Stan hands back the chains that finished, and the requested count
-#' is recorded nowhere on the fit. A chain lost to a failed start or
-#' an exception produces a smaller posterior with nothing said, and
-#' every later summary is computed from the smaller number without
-#' marking that it differs from the request. The notice is raised
-#' once per call and `silent` does not suppress it: a quiet fit is a
-#' request about progress output, not about part of the posterior
-#' going missing.
+#' Stan hands back the chains that finished. The fit records no
+#' requested count. A chain lost to a failed start or an exception
+#' leaves a smaller posterior without a message. Every later summary
+#' uses the smaller number. The notice is raised once per call.
+#' `silent` leaves it in place: a quiet fit is a request about progress
+#' output. A lost part of the posterior is a different matter.
 #'
 #' @param fit The fitted Stan model the backend returned
 #' @param requested Chain count the caller asked for
@@ -1230,10 +1309,12 @@ realised_chain_count <- function(fit) {
 #' @return `invisible(TRUE)`
 #' @noRd
 check_chains_finished <- function(fit, requested, algorithm) {
+  checkmate::assert_count(requested, positive = TRUE)
+  checkmate::assert_string(algorithm)
   # `fixed_param` runs chains in the ordinary way and holds only the
-  # parameters still, which is why it counts here. The approximations
-  # carry no chains, and "pathfinder" spends the same argument on its
-  # number of paths.
+  # parameters still. Its chains count here. The approximations have
+  # no chains. "pathfinder" spends the same argument on its number of
+  # paths.
   if (!algorithm %in% c("sampling", "fixed_param")) {
     return(invisible(TRUE))
   }
@@ -1256,7 +1337,7 @@ check_chains_finished <- function(fit, requested, algorithm) {
 }
 
 
-#' Unlist lapply Output
+#' Unlisted `lapply()` output
 #' @description
 #' Convenience function to unlist lapply results.
 #' Adapted from brms backend system.
@@ -1268,18 +1349,21 @@ check_chains_finished <- function(fit, requested, algorithm) {
 #' @return Unlisted result of lapply
 #' @noRd
 ulapply <- function(X, FUN, ..., recursive = TRUE, use.names = TRUE) {
+  checkmate::assert_function(FUN)
   unlist(lapply(X, FUN, ...), recursive, use.names)
 }
 
-#' Check if Package is Installed
+#' Refuse a missing or outdated package
 #' @description
-#' Validates that a required package is installed with optional version check.
+#' Validates that a required package is installed with optional version
+#' check.
 #' Adapted from brms backend system for mvgam compatibility.
 #' @param package Character string with package name
 #' @param version Optional minimum version requirement
 #' @return Invisible TRUE if package requirements met
 #' @noRd
 require_package <- function(package, version = NULL) {
+  checkmate::assert_string(package)
   if (!requireNamespace(package, quietly = TRUE)) {
     stop(insight::format_error(
       cli::format_inline("Please install the '{package}' package.")
@@ -1298,7 +1382,7 @@ require_package <- function(package, version = NULL) {
   invisible(TRUE)
 }
 
-#' Check Equality with Tolerance
+#' Equality with tolerance
 #' @description
 #' Tests for equality using all.equal with default tolerance.
 #' Adapted from brms backend system.
@@ -1312,7 +1396,7 @@ is_equal <- function(x, y, check.attributes = FALSE, ...) {
   isTRUE(all.equal(x, y, check.attributes = check.attributes, ...))
 }
 
-#' Check for Single NA Value
+#' Whether an object is a single NA value
 #' @description
 #' Tests if an object is a single NA value.
 #' Adapted from brms backend system.
@@ -1324,9 +1408,12 @@ is_NA <- function(x) {
 }
 
 
-# Internal: say once per session that `future = TRUE` needs the future
-# package. Both backends then run their chains through 'cores'.
-#'@noRd
+#' Report once per session that `future = TRUE` needs the future package
+#'
+#' Both backends then run their chains through `cores`.
+#'
+#' @return `NULL`, invisibly
+#' @noRd
 inform_future_missing <- function() {
   inform_once(
     "'future = TRUE' requires the 'future' package.",

@@ -366,18 +366,24 @@ terms.mvgam <- function(x, ...) {
 
 
 
-# Internal: keep the meta variables that take more than one value in
-# the training data.
-#
-# Reason: time, series and the grouping columns are surfaced so
-# `marginaleffects::datagrid()` can address them, but the same list
-# is what `slopes()` and `comparisons()` iterate over when the caller
-# names no variables. A column holding a single value supports
-# neither a slope nor a contrast, and asking for one aborts the whole
-# call, so a single-series fit could not be handed to `avg_slopes()`
-# at all. A meta variable that genuinely varies is still reported.
-#'@noRd
+#' The meta variables that vary in the training data
+#'
+#' Time, series and the grouping columns are reported for
+#' `marginaleffects::datagrid()` to address. `slopes()` and
+#' `comparisons()` iterate over the same list when the caller names no
+#' variables. A column with a single value supports neither a slope nor
+#' a contrast. Requesting one aborts the call. Dropping such columns
+#' lets a single-series fit reach `avg_slopes()`. A column absent from
+#' the training data is kept.
+#'
+#' @param vars Character vector of candidate meta variable names, or
+#'   `NULL`
+#' @param x Fitted `mvgam` object
+#' @return Character vector of the names that vary
+#' @noRd
 varying_meta_vars <- function(vars, x) {
+  checkmate::assert_character(vars, null.ok = TRUE)
+  checkmate::assert_class(x, "mvgam")
   vars <- vars[!is.na(vars) & nzchar(vars)]
   if (!length(vars)) return(character(0))
   dat <- x$data

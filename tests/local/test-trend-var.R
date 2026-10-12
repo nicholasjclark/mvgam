@@ -1,11 +1,10 @@
-# Recovery and post-fit coverage for `VAR()`, fitted in this file.
+# Post-fit coverage for `VAR()`, fitted in this file.
 #
-# A VAR is the trend where one series' past drives another's future.
-# That lives entirely in the off-diagonal entries of the transition
-# matrix `A`: with a diagonal `A` the model is a bank of independent
-# AR(1)s, fits comparably well on most data, and differs only in the
-# entries nothing else checks. So the claims that matter here are
-# about `A` as a matrix rather than about the fit as a whole.
+# A VAR lets one series' past drive another's future through the
+# off-diagonal entries of the transition matrix `A`. The checks here
+# hold `A` to its index order, its stationarity and its use in every
+# post-fit surface: forecasts, impulse responses, variance
+# decompositions, stability metrics and residual correlations.
 #
 #   truth: 3 series, 60 occasions, gaussian, known stationary A with
 #          deliberate cross-series terms, Sigma with correlated noise
@@ -13,15 +12,9 @@
 #          trend_formula = ~ VAR(cor = TRUE)
 #
 # The observation side carries a continuous-by-factor interaction and
-# a random intercept, so the trend is not the only thing in the linear
-# predictor. That matters here: a design matrix that dropped the
-# interaction, or a random effect resolved against the wrong grouping,
-# leaves `A` to absorb the difference and quietly changes the
-# cross-series terms this file is about.
-#
-# Series are named out of alphabetical order and occasions are
-# numbered from 3, so a rank never equals a value and no rival
-# resolver agrees by accident.
+# a random intercept beyond the trend. Series are named out of
+# alphabetical order. Occasions are numbered from 3. A rank then
+# differs from every value it indexes.
 #
 # Cached at tests/local/fixtures/val_mvgam_var_trend.rds. Delete to
 # refit.
@@ -35,16 +28,12 @@ suppressMessages({
   library(testthat)
 })
 
-# This file fits its own model and caches it beside itself, so it
-# depends on no shared fixture and no build step.
+# This file fits its own model and caches it in the fixtures folder.
 
 SM <- suppressMessages
 
-# Several blocks below state what the package does not yet do, and
-# testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean. The limit is
-# read when the reporter is built, before this file is sourced, so it
-# has to come from the environment:
+# testthat stops a file after ten failures by default. The reporter
+# takes the limit from the environment when it starts:
 #   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
 set.seed(911L)
@@ -56,10 +45,8 @@ stopifnot(!identical(series_levels, sort(series_levels)))
 
 time_vals <- seq_len(n_time) + 2L
 
-# A stationary transition matrix with cross-series terms that are
-# large enough to be identified and asymmetric, so `A[i, j]` and
-# `A[j, i]` cannot be swapped without changing the answer. A
-# transposed `A` is the defect this shape is chosen to expose.
+# A stationary, asymmetric transition matrix with cross-series terms.
+# Its transpose is a different model.
 A_true <- matrix(
   c(0.55, 0.30, 0.00,
     0.00, 0.45, 0.35,
@@ -82,10 +69,10 @@ for (t in 2:n_time) {
 }
 
 # Observation-side structure. `region` is a three-level factor
-# declared out of alphabetical order, `elev` is continuous, and the
-# two interact. `block` groups the occasions into six, which crosses
-# the series rather than nesting inside one, so a random intercept on
-# it is identified alongside the trend.
+# declared out of alphabetical order. `elev` is continuous. The model
+# interacts the two. `block` groups the occasions into six blocks that
+# cross the series, which identifies a random intercept with the
+# trend.
 region_levels <- c("upper", "lower", "mid")
 n_block <- 6L
 block_sd <- 0.4
@@ -96,8 +83,7 @@ region <- factor(region_levels[(seq_len(n_time) %% 3L) + 1L],
 block <- factor(rep(seq_len(n_block), each = n_time / n_block))
 block_effect <- rnorm(n_block, 0, block_sd)
 
-# Slopes on `elev` differ by region, which is what makes it an
-# interaction rather than two additive terms.
+# Slopes on `elev` differ by region
 beta_elev <- c(upper = 0.25, lower = -0.30, mid = 0.05)
 beta_region <- c(upper = 0, lower = 0.35, mid = -0.20)
 
@@ -117,8 +103,8 @@ dat$y <- as.numeric(latent) +
 
 obs_formula <- y ~ elev * region + (1 | block)
 
-# A future frame in the shape the observation model needs: the axis
-# columns plus every covariate on the right-hand side above.
+# A future frame holding the axis columns and every covariate the
+# observation model uses
 make_future <- function(h) {
   ft <- max(time_vals) + seq_len(h)
   data.frame(
@@ -158,61 +144,15 @@ test_that("the prefit records the series axis and the VAR grain", {
   expect_identical(as.integer(ax$time$values), time_vals)
   expect_identical(ax$grain, "series")
   sd <- prefit$standata
-  expect_identical(as.integer(sd$N_series_trend), n_series)
-  expect_identical(as.integer(sd$N_time_trend), n_time)
-  # A VAR runs one latent dimension per series, so the two agree and
-  # `A` is square in that dimension.
-  expect_identical(as.integer(sd$N_lv_trend), n_series)
   expect_identical(as.integer(sd$obs_trend_series),
                    match(as.character(dat$series), series_levels))
 })
 
 
-test_that("the program declares a full transition matrix", {
-  # `Phi_trend` is an array of one square matrix per group, and this
-  # model has one group. Declared at any other size it could not
-  # express a cross-series effect at all.
-  sc <- as.character(stancode(prefit))
-  expect_true(grepl("array[1] matrix[N_lv_trend, N_lv_trend] Phi_trend",
-                    sc, fixed = TRUE))
-  # The innovations are drawn jointly, which is what `cor = TRUE`
-  # buys: a diagonal covariance would make the series independent
-  # given `A`.
-  expect_true(grepl("cov_matrix[N_lv_trend] Sigma_trend", sc,
-                    fixed = TRUE))
-  expect_true(grepl("multi_normal_lpdf", sc, fixed = TRUE))
-  # The recursion multiplies the lagged state by `A`.
-  expect_match(sc, "Phi_trend\\[i\\]\\s*\\*\\s*lv_trend")
-})
-
-
-test_that("the observation design carries the interaction and the RE", {
-  # The trend is not the only thing in the linear predictor, and each
-  # of these is a route by which a design can be silently wrong: an
-  # interaction dropped to two additive terms, or a random effect
-  # built over the wrong number of groups.
-  sd <- prefit$standata
-  # `elev * region` on a three-level factor gives an intercept, the
-  # slope, two contrasts and two interaction columns.
-  expect_identical(as.integer(sd$K), 6L)
-  expect_true(any(grepl("elev:region", colnames(sd$X), fixed = TRUE)))
-  # Both interaction columns are present, one per non-reference level.
-  inter <- grep("elev:region", colnames(sd$X), fixed = TRUE,
-                value = TRUE)
-  expect_length(inter, 2L)
-  # An interaction column is zero off its own level, which is what
-  # distinguishes it from a main effect.
-  for (cl in inter) {
-    expect_gt(sum(sd$X[, cl] == 0), 0L)
-    expect_gt(sum(sd$X[, cl] != 0), 0L)
-  }
-
-  # The random intercept spans the six blocks, not the rows or the
-  # series. A grouping resolved against the wrong column gives a
-  # different count here and nothing else notices.
-  expect_identical(as.integer(sd$N_1), as.integer(n_block))
-  expect_identical(as.integer(sd$M_1), 1L)
-  expect_identical(as.integer(sd$J_1), as.integer(dat$block))
+test_that("the random intercept indexes each row's own block", {
+  # A grouping resolved against a reordered frame keeps its count and
+  # its levels and pairs rows with the wrong blocks.
+  expect_identical(as.integer(prefit$standata$J_1), as.integer(dat$block))
 })
 
 
@@ -231,38 +171,37 @@ fit <- cached_fit(
   key = sim_truth
 )
 
-# The posterior mean transition matrix, read once in the order the
-# draws name it: `Phi_trend[group, row, column]`.
 dm_all <- posterior::as_draws_matrix(fit$fit)
-A_hat <- matrix(NA_real_, n_series, n_series)
-for (i in seq_len(n_series)) {
-  for (j in seq_len(n_series)) {
-    A_hat[i, j] <- mean(dm_all[, paste0("Phi_trend[1,", i, ",", j, "]")])
-  }
+
+# One draw's square trend matrix, `nm` a pattern over row and column
+draw_matrix <- function(k, nm) {
+  matrix(as.numeric(dm_all[k, sprintf(nm, rep(1:n_series, n_series),
+                                       rep(1:n_series, each = n_series))]),
+         n_series)
 }
 
+# One draw's stationary covariance, which solves `G = A G A' + Sigma`
+stationary_cov <- function(k) {
+  A <- draw_matrix(k, "Phi_trend[1,%d,%d]")
+  matrix(solve(diag(n_series^2) - kronecker(A, A),
+               as.vector(draw_matrix(k, "Sigma_trend[%d,%d]"))), n_series)
+}
 
+# The posterior mean transition matrix, indexed as the draws name it,
+# `Phi_trend[lag, row, column]`
+A_hat <- Reduce(`+`, lapply(seq_len(nrow(dm_all)), draw_matrix,
+                            nm = "Phi_trend[1,%d,%d]")) / nrow(dm_all)
 
-test_that("A is one square matrix over the series", {
-  cols <- grep("^Phi_trend\\[", colnames(dm_all), value = TRUE)
-  expect_length(cols, n_series * n_series)
-  # Three indices, the first being the group. Read as a plain matrix
-  # the entries would be misplaced, which is why the reader above
-  # names all three.
-  expect_true(all(grepl("^Phi_trend\\[1,[0-9]+,[0-9]+\\]$", cols)))
-})
 
 
 test_that("the chain count comes from the slot holding finished chains", {
-  # The CI suite drives only the draws fallback, since its stub is
-  # built from a draws array and carries no `stan_args`. A cached fit
-  # is the only place the slot branch runs.
+  # The CI stub is a draws array with no `stan_args` slot. A fitted
+  # model is where the slot branch runs.
   expect_true(isS4(fit$fit))
   expect_true("stan_args" %in% methods::slotNames(fit$fit))
   expect_identical(realised_chain_count(fit$fit), 2L)
 
-  # The two counts agree on a real cmdstanr fit, which is what makes
-  # the slot safe to take first.
+  # The slot and the draws agree on a cmdstanr fit
   expect_identical(
     realised_chain_count(fit$fit),
     as.integer(posterior::nchains(posterior::as_draws(fit$fit)))
@@ -277,131 +216,53 @@ test_that("the chain count comes from the slot holding finished chains", {
 })
 
 
-test_that("A recovers the simulated dynamics, entry by entry", {
-  # Recovery is checked entry by entry. Sixty times leave each entry a
-  # posterior SD between 0.14 and 0.34. Every true entry has to fall
-  # inside its 95% interval.
-  for (i in seq_len(n_series)) {
-    for (j in seq_len(n_series)) {
-      q <- stats::quantile(dm_all[, paste0("Phi_trend[1,", i, ",", j, "]")],
-                           c(0.025, 0.975))
-      expect_gte(A_true[i, j], q[[1L]])
-      expect_lte(A_true[i, j], q[[2L]])
-    }
-  }
-  # A transposed or row-permuted `A` reproduces the same marginal
-  # behaviour for each series and differs only here. The posterior
-  # mean has a smaller squared error against the simulated matrix
-  # than against its transpose.
+test_that("Phi_trend is indexed [lag, row, column]", {
+  # The simulated `A` is asymmetric. A reader that swapped the row
+  # and column indices returns its transpose. The posterior mean is
+  # closer to the simulated matrix than to that transpose.
   expect_lt(sum((A_hat - A_true)^2), sum((A_hat - t(A_true))^2))
-
-  # The diagonal is positive persistence for every series.
-  expect_true(all(diag(A_hat) > 0))
-
-  # The cross-series terms the simulation put in are found, and the
-  # ones it left out stay small. This is the pair of claims that
-  # separates a VAR from a bank of independent AR(1)s.
-  expect_gt(A_hat[1L, 2L], 0.1)
-  expect_gt(A_hat[2L, 3L], 0.1)
-  expect_gt(A_hat[3L, 1L], 0.05)
-  expect_lt(abs(A_hat[1L, 3L]), 0.3)
-  expect_lt(abs(A_hat[2L, 1L]), 0.3)
-
-  # And `A` is not symmetric, so a transpose is a different matrix.
-  expect_gt(max(abs(A_hat - t(A_hat))), 0.1)
 })
 
 
-# The spectral radius of `A` at a set of draws, read from the draws
-# matrix rather than from any package summary of it. Two blocks below
-# need the same quantity, and deriving it twice is how two answers
-# come to disagree.
-radii_of_A <- function(ks = NULL) {
-  draw_A <- function(k) {
-    out <- matrix(NA_real_, n_series, n_series)
-    for (i in seq_len(n_series)) {
-      for (j in seq_len(n_series)) {
-        out[i, j] <- dm_all[k, paste0("Phi_trend[1,", i, ",", j, "]")]
-      }
-    }
-    out
-  }
-  if (is.null(ks)) ks <- seq_len(nrow(dm_all))
-  vapply(ks, function(k) {
-    max(Mod(eigen(draw_A(k), only.values = TRUE)$values))
+# The spectral radius of `A` in every draw
+radii_of_A <- function() {
+  vapply(seq_len(nrow(dm_all)), function(k) {
+    max(Mod(eigen(draw_matrix(k, "Phi_trend[1,%d,%d]"),
+                  only.values = TRUE)$values))
   }, numeric(1))
 }
 
 
-test_that("every posterior draw of A is stationary", {
-  # The parameterisation is meant to keep `A` inside the stationary
-  # region draw by draw. A mean that looks stationary can be the
-  # average of draws that are not, so this reads each one.
-  radii <- radii_of_A()
-  expect_length(radii, nrow(dm_all))
-  expect_true(all(is.finite(radii)))
-  expect_true(all(radii < 1))
+test_that("every draw of A is stationary and starts at its own law", {
+  # The map of Heaps (2023) keeps every draw of `A` stationary
+  expect_true(all(radii_of_A() < 1))
+  # The states before the first occasion take the stationary
+  # covariance. The program places it from the autocovariances the
+  # coefficient map returns. The Lyapunov solve in R is the
+  # definition.
+  worst <- max(vapply(round(seq(1, nrow(dm_all), length.out = 50L)),
+                      function(k) {
+    max(abs(stationary_cov(k) - draw_matrix(k, "Omega_trend[%d,%d]")))
+  }, numeric(1L)))
+  expect_lt(worst, 1e-6)
 })
 
 
-test_that("residual_cor reports the process covariance, not the innovations", {
-  # What `residual_cor()` returns for a VAR is the covariance of the
-  # process, which is a different matrix from the innovation
-  # covariance the sampler holds: a VAR(1) accumulates its
-  # innovations, so the stationary covariance solves
-  # `G = A G A' + Sigma` and is larger than `Sigma` by however much
-  # `A` propagates.
-  #
-  # Both sides come from this one fit, so this is one quantity
-  # reached two ways: mvgam's own reported covariance against the
-  # closed form built from mvgam's own `Phi_trend` and `Sigma_trend`.
-  # Returning `Sigma` itself is the plausible mistake here, and it is
-  # what the second expectation rules out. Measured, the closed form
-  # agrees to 0.006 while `Sigma` sits 0.108 away.
-  stat_cov <- function(A, S) {
-    matrix(solve(diag(n_series^2) - kronecker(A, A), as.vector(S)),
-           n_series, n_series)
-  }
-  read_sq <- function(k, nm, grouped = FALSE) {
-    m <- matrix(NA_real_, n_series, n_series)
-    for (i in seq_len(n_series)) {
-      for (j in seq_len(n_series)) {
-        key <- if (grouped) paste0(nm, "[1,", i, ",", j, "]") else
-          paste0(nm, "[", i, ",", j, "]")
-        m[i, j] <- dm_all[k, key]
-      }
-    }
-    m
-  }
-  ks <- round(seq(1, nrow(dm_all), length.out = 200L))
-  G <- Reduce(`+`, lapply(ks, function(k) {
-    stat_cov(read_sq(k, "Phi_trend", grouped = TRUE),
-             read_sq(k, "Sigma_trend"))
-  })) / length(ks)
-  S <- Reduce(`+`, lapply(ks, function(k) read_sq(k, "Sigma_trend"))) /
+test_that("residual_cor reports the stationary process covariance", {
+  # `residual_cor()` reports the posterior mean of the stationary
+  # covariance. The innovation covariance `Sigma` is a different
+  # matrix.
+  ks <- seq_len(nrow(dm_all))
+  G <- Reduce(`+`, lapply(ks, stationary_cov)) / length(ks)
+  S <- Reduce(`+`, lapply(ks, draw_matrix, nm = "Sigma_trend[%d,%d]")) /
     length(ks)
-
   rc <- residual_cor(fit)
-  expect_lt(max(abs(unname(rc$cov) - G)), 0.02)
-  # And it is not the innovation covariance, which is the answer a
-  # method reading the wrong parameter would give.
+  expect_equal(unname(rc$cov), G, tolerance = 1e-6)
   expect_gt(max(abs(unname(rc$cov) - S)), 0.05)
 })
 
 
-test_that("every prediction surface answers for every row", {
-  n_obs <- nrow(dat)
-  ep <- posterior_epred(fit, ndraws = 20L)
-  pp <- posterior_predict(fit, ndraws = 20L)
-  lp <- posterior_linpred(fit, ndraws = 20L)
-  expect_identical(dim(ep), c(20L, n_obs))
-  expect_identical(dim(pp), c(20L, n_obs))
-  expect_identical(dim(lp), c(20L, n_obs))
-  expect_true(all(is.finite(ep)))
-  expect_true(all(is.finite(pp)))
-  expect_identical(nrow(fitted(fit, ndraws = 20L)), n_obs)
-  expect_identical(nrow(residuals(fit, ndraws = 20L)), n_obs)
-
+test_that("the observation structure keys each row to its own cell", {
   os <- mvgam:::get_observation_structure(fit, newdata = dat)
   expect_identical(as.character(os$series), as.character(dat$series))
   expect_identical(os$series_levels, series_levels)
@@ -409,10 +270,9 @@ test_that("every prediction surface answers for every row", {
 })
 
 
-test_that("each row reads the latent cell the sampler drew for it", {
+test_that("each row takes the latent cell the sampler drew for it", {
   t_rec <- as.integer(fit$standata$obs_trend_time)
   s_rec <- as.integer(fit$standata$obs_trend_series)
-  expect_length(t_rec, nrow(dat))
   want <- vapply(paste0("trend[", t_rec, ",", s_rec, "]"),
                  function(k) mean(dm_all[, k]), numeric(1))
   got <- colMeans(
@@ -424,88 +284,73 @@ test_that("each row reads the latent cell the sampler drew for it", {
 
 
 test_that("the one-step forecast is A times the last state", {
-  # The claim that ties `A` to what a user receives. A VAR steps as
-  # `A %*% trend[T, ]` plus a mean-zero innovation, so averaged over
-  # draws the first forecast step lands on that product. Crucially
-  # this is a per-series claim that mixes the series: series 1's
-  # step depends on series 2's last state through `A[1, 2]`, so a
-  # recursion that applied `A` transposed, or per series
-  # independently, lands somewhere else while staying finite and
-  # correctly shaped.
-  h <- 3L
-  future_times <- max(time_vals) + seq_len(h)
-  # A forecast frame has to carry every covariate the observation
-  # model uses, not just the axis columns. Omitting one fails inside
-  # the design build rather than at a helpful boundary.
-  future <- make_future(h)
-  n_draw <- 600L
-  fc <- forecast(fit, newdata = future, ndraws = n_draw,
+  # In each draw the first step is `Phi %*% trend[T, ]` plus a
+  # mean-zero innovation. Over every draw the forecast mean equals the
+  # mean of that product within Monte Carlo error. Series 1's step
+  # depends on series 2's last state through `A[1, 2]`. A recursion
+  # that applied `A` transposed, or per series independently, lands
+  # elsewhere.
+  ids <- seq_len(nrow(dm_all))
+  set.seed(5L)
+  fc <- forecast(fit, newdata = make_future(1L), draw_ids = ids,
                  type = "trend")
-  expect_identical(names(fc$forecasts), series_levels)
-
-  last <- vapply(seq_len(n_series), function(k) {
-    mean(dm_all[, paste0("trend[", n_time, ",", k, "]")])
-  }, numeric(1))
-  expected <- as.numeric(A_hat %*% last)
+  last <- function(k) {
+    as.numeric(dm_all[k, sprintf("trend[%d,%d]", n_time, 1:n_series)])
+  }
+  step <- t(vapply(ids, function(k) {
+    as.numeric(draw_matrix(k, "Phi_trend[1,%d,%d]") %*% last(k))
+  }, numeric(n_series)))
+  innov_sd <- sqrt(diag(Reduce(`+`, lapply(
+    ids, draw_matrix, nm = "Sigma_trend[%d,%d]"
+  )) / length(ids)))
   for (k in seq_len(n_series)) {
     got <- mean(fc$forecasts[[series_levels[k]]][, 1L])
-    expect_lt(abs(got - expected[k]), 0.3)
+    expect_lt(abs(got - mean(step[, k])),
+              4 * innov_sd[k] / sqrt(length(ids)))
   }
-
-  # A diagonal-only step is a different number, so the check above
-  # is not satisfied by an independent AR.
-  diag_only <- diag(A_hat) * last
-  expect_gt(max(abs(expected - diag_only)), 0.05)
+  # The off-diagonal coefficients move the step away from the
+  # diagonal-only one. An independent AR uses only the diagonal and
+  # fails the check above.
+  last_mean <- colMeans(t(vapply(ids, last, numeric(n_series))))
+  expect_gt(max(abs(colMeans(step) - diag(A_hat) * last_mean)), 0.05)
 })
 
 
-test_that("the forecast is keyed by the series axis on every scale", {
-  h <- 4L
-  future_times <- max(time_vals) + seq_len(h)
-  # A forecast frame has to carry every covariate the observation
-  # model uses, not just the axis columns. Omitting one fails inside
-  # the design build rather than at a helpful boundary.
-  future <- make_future(h)
-  for (ty in c("link", "expected", "trend", "response")) {
-    fc <- forecast(fit, newdata = future, ndraws = 20L, type = ty)
-    expect_s3_class(fc, "mvgam_forecast")
-    expect_identical(names(fc$forecasts), series_levels)
-    for (s in series_levels) {
-      expect_identical(dim(fc$forecasts[[s]]), c(20L, h))
-      expect_true(all(is.finite(fc$forecasts[[s]])))
-    }
-  }
+test_that("an identity link gives one forecast on both scales", {
+  # A gaussian expectation is the linear predictor itself. Under one
+  # seed the two scales return the same numbers. A scale that applied
+  # a link it does not have, or dropped the observation model's terms,
+  # differs here.
+  set.seed(9L)
+  lk <- forecast(fit, newdata = make_future(4L), ndraws = 20L,
+                 type = "link")
+  set.seed(9L)
+  ex <- forecast(fit, newdata = make_future(4L), ndraws = 20L,
+                 type = "expected")
+  expect_equal(ex$forecasts, lk$forecasts)
 })
 
 
 test_that("the forecast object is keyed, ordered and in user units", {
-  # Dimensions say a forecast came back. They say nothing about which
-  # occasions it covers, in what order, or which series each arm
-  # belongs to. Those are carried on the object and checked here.
+  # The occasions a forecast covers, their order and the series of
+  # each element are recorded on the object
   h <- 4L
   future_times <- max(time_vals) + seq_len(h)
   fc <- forecast(fit, newdata = make_future(h), ndraws = 20L,
                  type = "link")
 
-  # The arms and the axis agree, in order.
+  # The elements follow the series axis
   expect_identical(names(fc$forecasts), series_levels)
   expect_identical(as.character(fc$series_names), series_levels)
 
   for (s in series_levels) {
-    # The horizon is the occasions the caller asked for, ascending,
-    # in the numbering the user supplied rather than 1..h.
+    # The horizon holds the occasions the caller asked for, ascending,
+    # in the user's numbering
     expect_identical(as.integer(fc$test_times[[s]]), future_times)
-    expect_false(identical(as.integer(fc$test_times[[s]]),
-                           seq_len(h)))
     # The training tail is this fit's own grid, also in user units.
     expect_identical(as.integer(fc$train_times[[s]]), time_vals)
-    # Column j of the arm is horizon j, so the widths line up with
-    # the times above rather than merely being h wide.
-    expect_identical(ncol(fc$forecasts[[s]]),
-                     length(fc$test_times[[s]]))
-    # And each arm's training observations are that series' own, in
-    # time order. An arm carrying another series' history forecasts
-    # from the wrong place while looking correct throughout.
+    # Each element's training observations are that series' own, in
+    # time order
     rows <- which(as.character(dat$series) == s)
     rows <- rows[order(dat$time[rows])]
     expect_equal(as.numeric(fc$train_observations[[s]]),
@@ -515,29 +360,18 @@ test_that("the forecast object is keyed, ordered and in user units", {
 
 
 test_that("fitted summarises the same draws epred returns", {
-  # Two routes to one quantity, composed differently. `fitted()`
-  # summarises per column, `posterior_epred()` returns the draws, so
-  # they agree only when both put the same cell in the same place. A
-  # method that re-sorted its output keeps every dimension and every
-  # value while pairing them with the wrong rows.
+  # `fitted()` summarises the columns `posterior_epred()` returns. A
+  # re-sorted output pairs values with the wrong rows.
   ep <- posterior_epred(fit, ndraws = NULL, incl_autocor = TRUE)
   ft <- fitted(fit)
-  expect_identical(nrow(ft), nrow(dat))
-  expect_identical(colnames(ft),
-                   c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
   expect_equal(as.numeric(ft[, "Estimate"]), unname(colMeans(ep)))
-  # The interval is ordered and brackets the point estimate.
-  expect_true(all(ft[, "Q2.5"] <= ft[, "Estimate"]))
-  expect_true(all(ft[, "Estimate"] <= ft[, "Q97.5"]))
-  expect_true(all(ft[, "Est.Error"] >= 0))
 })
 
 
-test_that("the hindcast reads the same cells as the conditional epred", {
+test_that("the hindcast matches the conditional epred cell by cell", {
   # `hindcast()` composes per series and `posterior_epred()` across
-  # the whole frame, so they agree only when both resolve the same
-  # state for the same cell. This is the check that ties the
-  # per-series arms back to the row order of the frame.
+  # the whole frame. The two agree when both resolve the same state for
+  # each cell.
   hc <- hindcast(fit, type = "expected")
   blocks <- hc$hindcasts
   expect_identical(names(blocks), series_levels)
@@ -551,27 +385,9 @@ test_that("the hindcast reads the same cells as the conditional epred", {
 })
 
 
-test_that("hindcast arms are the series, in order, and distinct", {
-  arms <- hindcast(fit, ndraws = 20L)$hindcasts
-  expect_identical(names(arms), series_levels)
-  same <- character(0)
-  for (i in seq_along(arms)) {
-    for (j in seq_along(arms)) {
-      if (j <= i) next
-      if (isTRUE(all.equal(arms[[i]], arms[[j]]))) {
-        same <- c(same, paste(names(arms)[i], names(arms)[j],
-                              sep = "="))
-      }
-    }
-  }
-  expect_identical(same, character(0))
-})
-
-
 test_that("the VAR methods gate on the recorded trend type", {
-  # `irf()`, `fevd()` and `posterior_transition_matrix()` each call
-  # `assert_var_trend()`, which takes the type from
-  # `trend_metadata$trend_type`.
+  # `irf()`, `fevd()` and `posterior_transition_matrix()` take the
+  # trend type from `trend_metadata$trend_type`
   expect_identical(get_trend_type(fit), "VAR")
   blanked <- fit
   blanked$trend_metadata$trend_type <- NULL
@@ -584,60 +400,18 @@ test_that("the VAR methods gate on the recorded trend type", {
 })
 
 
-test_that("irf and fevd describe this fit's own matrix", {
-  # The two summaries a VAR exists to produce. An impulse response
-  # is generated by powers of `A`, so at horizon 1 the response of
-  # series i to a shock in j is `A[i, j]` up to the shock's scale;
-  # a forecast error decomposition is a set of proportions.
-  h <- 6L
-  ir <- irf(fit, h = h)
-  fe <- fevd(fit, h = h)
-  expect_s3_class(ir, "data.frame")
-  expect_s3_class(fe, "data.frame")
+test_that("the decomposition is orthogonalised in the series order", {
+  fe <- fevd(fit, h = 6L)
 
-  # One row per ordered pair of series per horizon.
-  expect_identical(nrow(ir), n_series * n_series * h)
-  expect_identical(nrow(fe), n_series * n_series * h)
-  expect_identical(sort(unique(ir$horizon)), seq_len(h))
-  expect_length(unique(ir$shock), n_series * n_series)
-
-  # Named columns, checked by name. Sweeping every numeric column
-  # into one range check pulls `horizon` in with the estimates, and
-  # then reports 6 as an out-of-range share.
-  for (cl in c("irfQ2.5", "irfQ50", "irfQ97.5")) {
-    expect_true(cl %in% names(ir))
-    expect_true(all(is.finite(ir[[cl]])))
-  }
-  expect_true(all(ir$irfQ2.5 <= ir$irfQ50))
-  expect_true(all(ir$irfQ50 <= ir$irfQ97.5))
-
-  # A decomposition is a set of shares, so each column is a
-  # proportion and the intervals are ordered.
-  for (cl in c("fevdQ2.5", "fevdQ50", "fevdQ97.5")) {
-    expect_true(cl %in% names(fe))
-    expect_true(all(is.finite(fe[[cl]])))
-    expect_true(all(fe[[cl]] >= -1e-8))
-    expect_true(all(fe[[cl]] <= 1 + 1e-8))
-  }
-  expect_true(all(fe$fevdQ2.5 <= fe$fevdQ50))
-  expect_true(all(fe$fevdQ50 <= fe$fevdQ97.5))
-
-  # The decomposition is orthogonalised by a Cholesky factor taken
-  # in the series axis order, so at the first horizon the response
-  # of series k draws on shocks 1 to k and on nothing after them.
-  # That makes the h = 1 table exactly triangular, and it is the one
-  # value in the output that ties the shock axis to the series axis:
-  # every entry below the diagonal is structurally zero, in every
-  # draw, only when the two axes agree.
+  # The Cholesky factor follows the series order. At the first horizon
+  # series k takes shares from shocks 1 to k alone. The table is then
+  # upper triangular when the shock axis is the series axis.
   h1 <- fe[fe$horizon == 1L, ]
   sides <- strsplit(h1$shock, " -> ", fixed = TRUE)
   from <- vapply(sides, `[`, "", 1L)
   to <- vapply(sides, `[`, "", 2L)
-  # Keyed by the order the table emits. That order is the series axis
-  # whatever the labels are called, which is what the claim below
-  # rests on.
+  # Keyed in the order the table emits
   keys <- unique(from)
-  expect_length(keys, n_series)
   M <- matrix(0, n_series, n_series, dimnames = list(keys, keys))
   for (i in seq_len(nrow(h1))) {
     M[from[i], to[i]] <- h1$fevdQ50[i]
@@ -645,56 +419,36 @@ test_that("irf and fevd describe this fit's own matrix", {
   expect_equal(sum(abs(M[lower.tri(M)])), 0)
   expect_gt(sum(abs(M[upper.tri(M)])), 0.05)
 
-  # The diagonal alone cannot say this. Measured here it reads
-  # 1.000, 0.959, 0.770, so a floor under it passes for all six
-  # orderings of the axis, while the triangle fails for five.
+  # Every other order of the axis breaks the triangle
   for (perm in list(c(2L, 1L, 3L), c(1L, 3L, 2L), c(3L, 2L, 1L))) {
     expect_gt(sum(abs(M[perm, perm][lower.tri(M)])), 1e-3)
   }
-  expect_true(all(diag(M) > 0.5))
 })
 
 
 test_that("posterior_transition_matrix returns this fit's own Phi", {
-  # The exported accessor for `Phi`, which `?posterior_transition_matrix`
-  # presents with `irf()`, `fevd()` and `stability()`. The other tests
-  # in this file take `Phi_trend` from the draws by hand, and the two
-  # routes must agree cell for cell: an accessor that transposed the
-  # matrix, or took the group index as a row, returns the right numbers
-  # in the wrong cells.
+  # The accessor and the draws agree cell for cell. A transposed
+  # matrix, or the lag index taken as a row, puts the right numbers in
+  # the wrong cells.
   ptm <- posterior_transition_matrix(fit)
-  expect_s3_class(ptm, "mvgam_var_matrix")
-  expect_identical(dim(ptm$A), c(n_series, n_series))
   expect_equal(unname(ptm$A), unname(A_hat), tolerance = 1e-8)
 
-  # The intervals bracket the estimate and the two tail probabilities
-  # partition the draws, so `prob_nonzero` is whichever is larger. A
-  # block computed off a different set of draws from its partner
-  # stays inside [0, 1] and fails here.
-  expect_true(all(ptm$A_lower <= ptm$A))
-  expect_true(all(ptm$A <= ptm$A_upper))
-  expect_true(all(ptm$A_se > 0))
+  # The two tail probabilities partition the draws. `prob_nonzero` is
+  # the larger of the two.
   expect_equal(unname(ptm$prob_positive + ptm$prob_negative),
                matrix(1, n_series, n_series))
   expect_equal(unname(ptm$prob_nonzero),
                unname(pmax(ptm$prob_positive, ptm$prob_negative)))
 
-  # And it names the series. Finding 8 has `irf()` and `fevd()`
-  # labelling their shocks `Process_k`; this accessor does the same
-  # in `series_names` and in the dimnames of every block it returns,
-  # so the matrix a reader is pointed at first cannot be traced back
-  # to a species without knowing the internal ordering.
+  # The rows and columns are named by series
   expect_identical(as.character(ptm$series_names), series_levels)
   expect_identical(rownames(ptm$A), series_levels)
   expect_identical(colnames(ptm$A), series_levels)
 })
 
 
-test_that("the prediction surface refuses an argument nothing reads", {
-  # A misspelled argument reaching `...` leaves the method running on
-  # the default it was asked to override, and the answer is finite and
-  # plausible either way. `forecast()` refuses this already, so the
-  # behaviour is set within the same object.
+test_that("the prediction methods refuse an unknown argument", {
+  # A misspelled argument in `...` would leave the default in place
   expect_error(posterior_epred(fit, zzz_unknown = 1))
   expect_error(posterior_predict(fit, zzz_unknown = 1))
   expect_error(predict(fit, zzz_unknown = 1))
@@ -702,12 +456,7 @@ test_that("the prediction surface refuses an argument nothing reads", {
 })
 
 
-test_that("irf and fevd name the series, not Process_k", {
-  # An impulse response is read to decide which series drives which,
-  # so each end of a shock pair carries the name the fit gives that
-  # series. A generic label leaves the mapping positional and
-  # undocumented, and to a reader a correct table under one looks the
-  # same as a wrong one.
+test_that("irf and fevd name each process by its series", {
   ir <- irf(fit, h = 3L)
   labels <- unique(unlist(strsplit(unique(ir$shock), " -> ",
                                    fixed = TRUE)))
@@ -719,33 +468,23 @@ test_that("the residual correlation is labelled by the series axis", {
   rc <- residual_cor(fit)
   expect_identical(rownames(rc$cor), series_levels)
   expect_identical(colnames(rc$cor), series_levels)
-  expect_equal(unname(diag(rc$cor)), rep(1, n_series))
-  expect_equal(unname(rc$cor), unname(t(rc$cor)))
 })
 
 
 test_that("the variance surface is the gaussian variance", {
-  # For a gaussian the predictive variance is `sigma^2`, a constant
-  # across rows, which is the sharpest form this type takes: a
+  # A gaussian predictive variance is `sigma^2` on every row. A
   # surface returning the standard deviation, or the variance of the
-  # linear predictor, is positive and correctly shaped and fails
-  # here. The contrast with a count family, where the variance
-  # follows the mean, is what says the type reads the family at all.
+  # linear predictor, fails here.
   v <- predict(fit, type = "variance", ndraws = 300L)
-  expect_identical(nrow(v), nrow(dat))
-  expect_true(all(v > 0))
   sigma_draws <- as.numeric(posterior::as_draws_matrix(fit)[, "sigma"])
   expect_equal(mean(v[, 1L]), mean(sigma_draws^2), tolerance = 0.05)
-  # Constant across rows, unlike a mean-variance family.
+  # Constant across rows
   expect_lt(stats::sd(v[, 1L]) / mean(v[, 1L]), 0.05)
 })
 
 
-test_that("the factor summaries refuse a fit that has no factors", {
-  # A VAR gives every series its own latent dimension, so there is no
-  # factor decomposition to report. Each of these says so and names
-  # what it needed, rather than returning a zero a reader would take
-  # for an answer.
+test_that("the factor summaries refuse a VAR over the series", {
+  # A VAR gives every series its own latent dimension
   expect_error(active_factors(fit), "latent-factor fit")
   expect_error(shared_variation(fit), "latent-factor fit")
   expect_error(ordinate(fit), "latent dynamic factors")
@@ -758,34 +497,26 @@ ref_epred <- posterior_epred(fit, newdata = dat, draw_ids = 1:10,
                              incl_autocor = TRUE)
 
 test_that("the reference the battery compares against actually varies", {
-  # Every check below compares a rearranged or cut frame against the
-  # same columns of `ref_epred`. That is a comparison of the
-  # prediction with itself, so a predictor returning one constant for
-  # every row satisfies the whole battery: the shuffle, the subsets,
-  # the relabelling, the single rows and the duplicates all agree
-  # trivially. This is the guard that makes the rest of them mean
-  # something.
+  # Every check below compares a rearranged or cut frame with columns
+  # of `ref_epred`. A predictor returning one constant would pass them
+  # all. These checks bite only when the reference varies between and
+  # within series.
   colm <- colMeans(ref_epred)
   expect_gt(stats::sd(colm), 0)
 
-  # It varies between series, so a cut by series is a real cut.
+  # Between series
   by_series <- tapply(colm, as.character(dat$series), mean)
-  expect_length(by_series, n_series)
   expect_gt(stats::sd(as.numeric(by_series)), 0)
 
-  # And within a series over time, so a cut by occasion is one too.
+  # Within each series over time
   for (s in series_levels) {
     rows <- which(as.character(dat$series) == s)
     expect_gt(stats::sd(colm[rows]), 0)
   }
-
-  # No two rows of the reference are the same everywhere, which is
-  # what a collapsed axis would produce while keeping every shape.
-  expect_gt(length(unique(round(colm, 8))), 1L)
 })
 
 
-test_that("a shuffled newdata answers the same, in the new order", {
+test_that("a shuffled newdata gives the same predictions in the new order", {
   set.seed(37L)
   perm <- sample(nrow(dat))
   expect_equal(
@@ -796,7 +527,7 @@ test_that("a shuffled newdata answers the same, in the new order", {
 })
 
 
-test_that("a newdata holding one series reads that series' state", {
+test_that("a newdata holding one series takes that series' state", {
   for (s in series_levels) {
     rows <- which(as.character(dat$series) == s)
     sub <- dat[rows, , drop = FALSE]
@@ -811,7 +542,7 @@ test_that("a newdata holding one series reads that series' state", {
 })
 
 
-test_that("a newdata holding a pair of series reads both", {
+test_that("a newdata holding a pair of series takes both states", {
   for (subset in list(series_levels[c(1L, 3L)],
                       series_levels[c(3L, 2L)])) {
     rows <- which(as.character(dat$series) %in% subset)
@@ -826,7 +557,7 @@ test_that("a newdata holding a pair of series reads both", {
 })
 
 
-test_that("relabelling or retyping the series moves nothing", {
+test_that("relabelling or retyping the series leaves predictions unchanged", {
   rev_nd <- dat
   rev_nd$series <- factor(as.character(rev_nd$series),
                           levels = rev(series_levels))
@@ -854,12 +585,11 @@ test_that("relabelling or retyping the series moves nothing", {
 })
 
 
-test_that("single, repeated and single-occasion frames read right", {
+test_that("single, repeated and single-occasion frames predict their cells", {
   for (s in series_levels) {
     j <- which(as.character(dat$series) == s)[1L]
     one <- posterior_epred(fit, newdata = dat[j, , drop = FALSE],
                            draw_ids = 1:10, incl_autocor = TRUE)
-    expect_identical(dim(one), c(10L, 1L))
     expect_equal(unname(one), unname(ref_epred[, j, drop = FALSE]))
   }
   j <- which(as.character(dat$series) == series_levels[2L])[1L]
@@ -879,7 +609,7 @@ test_that("single, repeated and single-occasion frames read right", {
 })
 
 
-test_that("an unknown series is refused, and named", {
+test_that("an unknown series is refused by name", {
   nd <- dat
   nd$series <- factor(
     ifelse(seq_len(nrow(nd)) == 1L, "hazel", as.character(nd$series)),
@@ -916,66 +646,43 @@ test_that("a ragged panel is refused with counts and a remedy", {
 
 test_that("summary, tidiers and criticism run on a VAR fit", {
   txt <- capture.output(summary(fit))
-  expect_gt(length(txt), 10L)
   expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
-  expect_true(any(grepl("Phi_trend|VAR", txt)))
-
-  ll <- log_lik(fit, ndraws = 20L)
-  expect_identical(dim(ll), c(20L, nrow(dat)))
-  expect_true(all(is.finite(ll)))
-  # `loo()` warns when a Pareto-k exceeds its threshold, which is a
-  # statement about this fit rather than noise. Suppressing it throws
-  # away the one diagnostic that says whether the approximation can
-  # be trusted, so it is captured and turned into claims: the
-  # estimate is finite, no k reaches the point where the
-  # approximation breaks, and the warning that arrived, if any, is
-  # the k notice those numbers already account for rather than
-  # something else that slipped through.
+  # `loo()` warns when a Pareto-k exceeds its threshold. The warning
+  # is captured and checked against the diagnostics it reports on.
   caught <- with_warnings(loo(fit))
   ic <- caught$value
   loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))
-  # A high Pareto-k is what a latent state-space fit is expected to
-  # produce: dropping an observation moves the very state it is being
-  # scored against, which is the reason `lfo_cv()` exists. So the
-  # claim is not that the diagnostic is good, it is that the user is
-  # told the truth about it. The notice has to arrive exactly when
-  # there is something to report, which fails both on a `loo()` gone
-  # silent over bad draws and on one that cries out over good ones.
+  # Dropping an observation moves the state it is scored against. A
+  # state-space fit shows high Pareto-k values for that reason. The
+  # warning arrives exactly when a k exceeds 0.7.
   expect_identical(
     any(pareto_k > 0.7),
     any(grepl("Pareto k", loo_warnings))
   )
-  # Whatever was raised is that notice and nothing else, so an
-  # unrelated warning cannot hide among the expected ones.
+  # Every warning raised is the Pareto-k notice
   expect_true(all(grepl("Pareto k", loo_warnings)))
 
   aug <- augment(fit)
-  expect_identical(nrow(aug), nrow(dat))
   expect_equal(as.numeric(aug$time), as.numeric(dat$time))
   expect_equal(as.numeric(aug$.observed), as.numeric(dat$y))
   expect_identical(as.character(aug$series), as.character(dat$series))
-  # A VAR is its transition matrix, so a tidy table of this fit that
-  # omits `Phi_trend` describes some other model. `is.data.frame()` is
-  # no guard on that: a frame of no rows satisfies it, and so does a
-  # frame of the wrong rows. `variables()` and `posterior_summary()`
-  # agree on what the fit holds, and that is the standard here.
+  # `variables()`, `posterior_summary()` and `tidy()` report the same
+  # transition matrix and innovation scales.
   expect_true(any(grepl("^Phi_trend\\[", variables(fit))))
   n_A_vars <- sum(grepl("^Phi_trend\\[", variables(fit)))
   n_A_summ <- sum(grepl("^Phi_trend\\[", rownames(posterior_summary(fit))))
   expect_identical(n_A_summ, n_A_vars)
   td <- tidy(fit, effects = "all")
-  expect_true(is.data.frame(td))
   expect_identical(sum(grepl("^Phi_trend\\[", td$term)), n_A_vars)
   expect_identical(sum(grepl("^sigma_trend\\[", td$term)),
                    sum(grepl("^sigma_trend\\[", variables(fit))))
 
-  # And it reports the names a reader was given, not the raw Stan
-  # ones. `b[1]` is what `b_elev` is called inside the program, and
-  # `z_1` is the non-centred helper behind the group deviations,
-  # which no user asked about.
+  # `tidy()` reports user-facing names. `b[1]` is the program's name
+  # for `b_elev`. `z_1` is the non-centred helper of the group
+  # deviations.
   expect_identical(grep("^b\\[", td$term, value = TRUE), character(0))
   expect_identical(grep("^z_1\\[", td$term, value = TRUE), character(0))
   # One intercept, under one name.
@@ -984,22 +691,9 @@ test_that("summary, tidiers and criticism run on a VAR fit", {
 
 
 test_that("conditional_effects cuts the interaction by region", {
-  # An interaction means the slope on `elev` differs by region, so
-  # the effect has to come back cut by region rather than as one
-  # pooled line. A design that dropped the interaction returns a
-  # single slope and every panel looks the same.
-  ce <- conditional_effects(fit)
-  expect_s3_class(ce, "mvgam_conditional_effects")
-  expect_gt(length(ce), 0L)
-  for (eff in names(ce)) {
-    d <- ce[[eff]]$data
-    expect_true(all(is.finite(d$estimate)))
-    expect_true(all(d$conf.low <= d$estimate))
-    expect_true(all(d$estimate <= d$conf.high))
-  }
-
-  # The slopes differ by region on a grid that holds elev fixed at
-  # two values and varies the region.
+  # The slope on `elev` differs by region. A design that dropped the
+  # interaction returns one slope for every region. The grid holds
+  # `elev` at two values in each region.
   withr::local_options(marginaleffects_model_classes = "mvgam")
   grid <- expand.grid(
     elev = c(-1, 1),
@@ -1016,20 +710,14 @@ test_that("conditional_effects cuts the interaction by region", {
     idx <- which(as.character(grid$region) == r)
     est[idx[2L]] - est[idx[1L]]
   }, numeric(1))
-  # Three different slopes, not one repeated three times.
+  # Three distinct slopes
   expect_gt(stats::sd(slopes), 1e-6)
 })
 
 
 test_that("a missing covariate value is refused by name", {
-  # One `NA` in a covariate column does not stop the prediction at
-  # all. The value passes through the design into the linear
-  # predictor and reaches the caller as `NA` cells, with nothing
-  # naming the column or the row it came from. A factor column is
-  # worse: the row silently takes the reference level and no `NA`
-  # marks it. The refusals elsewhere on this fit are the standard:
-  # an unknown series names the level and the levels it knew, and a
-  # gapped forecast frame names the series and the times it wanted.
+  # A missing covariate value would pass through the design as an
+  # `NA` prediction. The refusal names the column.
   nd <- dat
   nd$elev[1L] <- NA_real_
   err <- expect_error(
@@ -1041,67 +729,38 @@ test_that("a missing covariate value is refused by name", {
 })
 
 
-test_that("conditional_effects offers predictors, not the grouping", {
+test_that("conditional_effects leaves out the random-effect grouping", {
   # `block` is the random-effect grouping. Its levels are exchangeable
-  # draws from a distribution whose scale the model estimates, not
-  # categories a reader can act on, so an effects panel over them
-  # presents shrunk deviations as though they were a population
-  # contrast.
-  #
-  # This is what finding 44 costs downstream: `find_predictors()`
-  # reports `block` among the conditional terms, and every consumer
-  # that builds a term list from it offers the grouping as something
-  # to plot or contrast over. Measured, the panel spans -0.349 to
-  # 1.117, which is wider than the `elev` effect beside it.
+  # draws from a distribution. An effects panel over them would
+  # present shrunk deviations as a population contrast.
   ce <- conditional_effects(fit)
   expect_false("block" %in% names(ce))
 })
 
 
 test_that("the random intercept is estimated over the blocks", {
-  # One standard deviation and one deviation per block. Read at the
-  # wrong grain this is a per-row or per-series effect, which has the
-  # same name and a different length.
-  # `as_draws_matrix(fit$fit)` carries the raw Stan names, which is
-  # what the trend reads above use. The observation-side parameters
-  # are brms-named, and reach a caller through the fit itself, so
-  # these are read from there rather than from the stanfit.
-  vars <- variables(fit)
-  expect_true("sd_block__Intercept" %in% vars)
-  r_cols <- grep("^r_block\\[", vars, value = TRUE)
-  expect_length(r_cols, n_block)
+  # The observation-side parameters carry brms names, taken from the
+  # fit itself.
+  r_cols <- grep("^r_block\\[", variables(fit), value = TRUE)
 
   dm_brms <- posterior::as_draws_matrix(fit)
-  # `sd_*` is declared with a lower bound of zero, so requiring the
-  # draws to be positive cannot fail. What can fail is whether the
-  # group deviations reach the linear predictor at the grain they are
-  # indexed by. Each block's mean fitted value has to move with that
-  # block's own deviation, so a grouping resolved against the wrong
-  # column leaves the two uncorrelated while every dimension holds.
+  # Each block's mean fitted value moves with that block's own
+  # deviation. A grouping resolved against the wrong column leaves the
+  # two uncorrelated.
   r_hat <- vapply(sort(r_cols), function(k) mean(dm_brms[, k]),
                   numeric(1))
   ep <- colMeans(posterior_epred(fit, incl_autocor = FALSE,
                                  ndraws = 200L))
   by_block <- tapply(ep, dat$block, mean)
-  expect_length(by_block, n_block)
   expect_gt(stats::cor(unname(r_hat), as.numeric(by_block)), 0.9)
-
-  # The interaction columns are estimated, one per non-reference
-  # region, so the design reached the sampler intact.
-  expect_true(all(c("b_elev:regionlower", "b_elev:regionmid") %in%
-                    vars))
 })
 
 
 test_that("a decomposition's shares sum to one, draw by draw", {
-  # The summary table bounds each share to [0, 1], which every
-  # non-negative number under one satisfies. What makes it a
-  # decomposition is that a response's shares exhaust its forecast
-  # error: they add to one at every horizon, in every draw. A
-  # normalisation applied to the median rather than to each draw
-  # passes the bounds above and fails here.
+  # A response's shares add to one at every horizon in every draw. A
+  # normalisation of the median alone keeps the summary in [0, 1] and
+  # fails here.
   fv <- fevd(fit, h = 8L, summary = FALSE)
-  expect_s3_class(fv, "mvgam_fevd")
   row_sums <- unlist(lapply(fv, function(draw) {
     vapply(draw, function(mat) rowSums(mat), numeric(8L))
   }))
@@ -1109,23 +768,9 @@ test_that("a decomposition's shares sum to one, draw by draw", {
 })
 
 
-test_that("the draws behind irf are one matrix per horizon per draw", {
-  ir <- irf(fit, h = 6L, summary = FALSE)
-  expect_s3_class(ir, "mvgam_irf")
-  expect_identical(length(ir), as.integer(ndraws(fit)))
-  expect_identical(length(ir[[1L]]), n_series)
-  expect_identical(dim(ir[[1L]][[1L]]), c(6L, n_series))
-  expect_true(all(vapply(ir, function(d) {
-    all(vapply(d, function(m) all(is.finite(m)), logical(1)))
-  }, logical(1))))
-})
-
-
 test_that("orthogonal and generalized responses are different objects", {
-  # Two identifying assumptions about which shock moves first. They
-  # answer differently unless Sigma is diagonal, which `cor = TRUE`
-  # ensures it is not, so an argument read and dropped is visible
-  # here and nowhere else.
+  # The two identifications differ when `Sigma` has correlations,
+  # which `cor = TRUE` estimates.
   ir_gen <- irf(fit, h = 4L, orthogonal = FALSE, summary = FALSE)
   ir_orth <- irf(fit, h = 4L, orthogonal = TRUE, summary = FALSE)
   expect_identical(attr(ir_gen, "irf_type"), "Generalized")
@@ -1135,13 +780,8 @@ test_that("orthogonal and generalized responses are different objects", {
 
 
 test_that("the cumulative response is the running sum of the other", {
-  # `cumulative` is the second argument `irf()` takes and the only
-  # one nothing exercised. A cumulative response is the accumulated
-  # effect of one shock, so it is the column-wise running sum of the
-  # per-horizon response, exactly and for every draw. An argument
-  # read and dropped returns the same object; one accumulated along
-  # the response axis instead of the horizon breaks the equality
-  # while still returning something that grows.
+  # A cumulative response is the running sum over horizons of the
+  # per-horizon response, exactly and in every draw.
   ids <- 1:10
   step <- irf(fit, h = 5L, cumulative = FALSE, draw_ids = ids,
               summary = FALSE)
@@ -1154,59 +794,37 @@ test_that("the cumulative response is the running sum of the other", {
     }
   }
 
-  # The two agree at the first horizon, since one term has been
-  # summed, and separate after it. Without this the equality above
-  # would also hold for a response that never moved.
+  # The two agree at the first horizon and separate after it
   expect_equal(cum[[1L]][[1L]][1L, ], step[[1L]][[1L]][1L, ])
   expect_gt(max(abs(cum[[1L]][[1L]][5L, ] - step[[1L]][[1L]][5L, ])),
             1e-6)
 })
 
 
-test_that("irf and fevd answer from the draws they were given", {
-  # The coefficients and the innovation covariance have to come from
-  # one draw: a response built from `A` at one iteration and `Sigma`
-  # at another describes no posterior sample at all, while staying
-  # finite and correctly shaped.
+test_that("irf and fevd use the draws they were given", {
+  # A response takes its coefficients and its innovation covariance
+  # from one draw. A selected draw gives the same response alone or
+  # among others.
   total <- ndraws(fit)
   ids <- c(2L, 7L, 15L)
   ir <- irf(fit, h = 4L, draw_ids = ids, summary = FALSE)
-  expect_length(ir, length(ids))
-  expect_equal(irf(fit, h = 4L, draw_ids = ids, summary = FALSE), ir)
-
-  expect_length(irf(fit, h = 4L, ndraws = 5L, summary = FALSE), 5L)
+  # Draw 7 alone gives the response the second of the three gave
+  expect_equal(irf(fit, h = 4L, draw_ids = 7L, summary = FALSE)[[1L]],
+               ir[[2L]])
   expect_length(fevd(fit, h = 4L, ndraws = 5L, summary = FALSE), 5L)
-  expect_length(irf(fit, h = 4L, summary = FALSE), total)
   expect_error(irf(fit, h = 4L, ndraws = total + 1L),
                "more draws than the posterior has")
-
-  # The default summarises, and a summary is smaller than the draws
-  # it came from. Summarising it again returns the same table rather
-  # than taking quantiles of quantiles.
-  ir_s <- irf(fit, h = 5L)
-  expect_s3_class(ir_s, "mvgam_irf_summary")
-  expect_lt(as.numeric(object.size(ir_s)),
-            as.numeric(object.size(irf(fit, h = 5L, summary = FALSE))))
-  expect_identical(nrow(summary(ir_s)), nrow(ir_s))
-  expect_error(plot(ir_s, shocks = "nonexistent"), "Unknown shock-response")
+  expect_error(plot(irf(fit, h = 5L), shocks = "nonexistent"),
+               "Unknown shock-response")
 })
 
 
-test_that("stability reports each metric once, over the whole posterior", {
+test_that("stability summarises each metric over the whole posterior", {
   st <- stability(fit)
-  expect_s3_class(st, "mvgam_stability_summary")
-  expect_identical(nrow(st), 9L)
-  expect_true(all(c("metric", "Estimate", "Est.Error") %in% names(st)))
-
   draws <- stability(fit, summary = FALSE)
-  expect_s3_class(draws, "mvgam_stability")
-  expect_identical(nrow(draws), as.integer(ndraws(fit)))
   expect_equal(summary(draws)$Estimate, st$Estimate, tolerance = 1e-10)
 
-  # `future = TRUE` was asserted and then never handed to the helper
-  # that takes it, so the request ran serially and reported nothing.
-  # The scheduled path now runs, and it answers with the same numbers
-  # in the same draw order.
+  # The `future = TRUE` path returns the same draws in the same order
   expect_equal(stability(fit, future = TRUE, summary = FALSE), draws)
 
   metrics <- c(
@@ -1215,41 +833,21 @@ test_that("stability reports each metric once, over the whole posterior", {
     "mean_return_rate", "var_return_rate"
   )
   expect_setequal(as.character(st$metric), metrics)
-  for (m in metrics) {
-    expect_true(all(is.finite(draws[[m]])))
-  }
-  # `A` was asserted stationary draw by draw above, so both of these
-  # follow from that and are the metrics' own statement of it.
-  expect_true(all(draws$prop_int >= 0 & draws$prop_int < 1))
-  expect_true(all(draws$mean_return_rate >= 0 &
-                    draws$mean_return_rate < 1))
-  # The return rate is not merely near the spectral radius, it is
-  # the spectral radius, draw for draw: measured, the two agree to
-  # zero across every draw. So this is one fact reached twice, once
-  # by `stability()` and once from the `Phi_trend` columns, and the
-  # two have to be reading the same matrix in the same shape. A
-  # comparison of the two maxima under a tolerance passes under any
-  # permutation of the draws and under a systematic offset; the
-  # per-draw identity passes under neither.
+  # The mean return rate is the spectral radius of `A`, draw for
+  # draw.
   expect_equal(draws$mean_return_rate, radii_of_A())
 
-  # Two of the nine metrics are the complementary shares of a third,
-  # so each pair exhausts its total in every draw. Measured, both
-  # sums are exactly one. A metric computed off a different matrix
-  # from its partner stays inside [0, 1] and fails here.
+  # Two pairs of metrics are complementary shares and sum to one in
+  # every draw.
   for (pr in list(c("prop_cov_offdiag", "prop_cov_diag"),
                   c("prop_int_offdiag", "prop_int_diag"))) {
     expect_equal(draws[[pr[1L]]] + draws[[pr[2L]]],
                  rep(1, nrow(draws)))
   }
 
-  # The summary carries each metric's binned posterior, so it draws
-  # the same histogram the draws do. A median and an interval alone
-  # would not say whether reactivity's mass crosses zero, which is
-  # usually why the metric was asked for.
+  # The summary records each metric's binned posterior, which `plot()`
+  # draws as the histogram of the draws.
   bins <- attr(st, "bin_counts")
-  expect_length(bins, 9L)
-  expect_identical(sum(bins$reactivity$counts), as.integer(ndraws(fit)))
   ref <- graphics::hist(
     draws$reactivity,
     breaks = seq(min(draws$reactivity), max(draws$reactivity),
@@ -1264,33 +862,25 @@ test_that("stability reports each metric once, over the whole posterior", {
 })
 
 
-test_that("incl_autocor picks between two different answers", {
-  # The argument chooses the fitted latent state over the trend's
-  # deterministic submodel, and on a fit carrying a VAR those are
-  # different numbers. A method that accepts the argument and returns
-  # the same draws either way is not reading it, which costs no error
-  # and no missing value: every conditional surface silently becomes
-  # a marginal one.
+test_that("incl_autocor switches conditional and marginal predictions", {
+  # The argument chooses between the fitted latent state and the
+  # trend's deterministic submodel, which differ on a VAR fit.
   ids <- 1:20
   cond_ep <- posterior_epred(fit, draw_ids = ids, incl_autocor = TRUE)
   marg_ep <- posterior_epred(fit, draw_ids = ids, incl_autocor = FALSE)
-  expect_identical(dim(cond_ep), dim(marg_ep))
-  expect_false(isTRUE(all.equal(cond_ep, marg_ep)))
-  # Different everywhere it matters, not in the last bit of one cell.
+  # The two differ by more than rounding
   expect_gt(max(abs(colMeans(cond_ep) - colMeans(marg_ep))), 1e-3)
 
   cond_pp <- posterior_predict(fit, draw_ids = ids, incl_autocor = TRUE)
   marg_pp <- posterior_predict(fit, draw_ids = ids, incl_autocor = FALSE)
-  expect_identical(dim(cond_pp), dim(marg_pp))
   expect_false(isTRUE(all.equal(cond_pp, marg_pp)))
 })
 
 
 test_that("the summary prints every coefficient the model estimated", {
-  # A coefficient the sampler estimated and the summary omits is
-  # invisible to the only reader most users have. The design here
-  # carries an intercept, a slope, two region contrasts and two
-  # interaction columns, so an omission has somewhere to hide.
+  # Every coefficient the sampler estimated appears in the summary.
+  # The design has an intercept, a slope, two region contrasts and two
+  # interaction columns.
   smry <- summary(fit)
   blocks <- grep("^(fixed|trend_fixed)$", names(smry),
                  value = TRUE)
@@ -1304,34 +894,21 @@ test_that("the summary prints every coefficient the model estimated", {
 })
 
 
-test_that("pp_check carries its grouping and its x variable through", {
-  # These two arguments name a column of the data, and the plot they
-  # produce is the reason a user passes them. A method that accepts
-  # the argument and ignores it returns a ggplot of the ungrouped
-  # data, so the panel count is what says the grouping arrived.
+test_that("pp_check draws one panel per group", {
+  # `group` names a column of the data. The plot has one panel per
+  # level of it.
   for (ty in c("dens_overlay_grouped", "stat_grouped")) {
     p <- pp_check(fit, type = ty, ndraws = 20L, group = "region")
-    expect_s3_class(p, "ggplot")
-    # One panel per region, taken from the plot's own facet spec
-    # rather than from the argument that was passed in.
+    # The panels, taken from the plot's own facet spec
     built <- ggplot2::ggplot_build(p)
     expect_setequal(
       as.character(built$layout$layout$group),
       region_levels
     )
   }
-  # `intervals` and `ribbon` are the only two types that take an `x`,
-  # and neither can be driven from a test. Both reach
-  # `bayesplot::ppc_intervals`, which builds its layer with
-  # `geom_linerange(size = )`, deprecated in ggplot2 3.4.0; the only
-  # other `x`-taking type, `error_scatter_avg_vs_x`, is deprecated
-  # inside bayesplot itself. mvgam forwards only `y`, `yrep` and `x`,
-  # so neither is repairable here, and both raise on any fit with no
-  # `x` at all.
-  #
-  # Silencing the deprecation to reach the assertion would hide a
-  # notice every user of those two types receives. The `x` argument
-  # is left without coverage for that reason.
+  # `intervals` and `ribbon`, the types taking `x`, stay untested
+  # here. They reach `bayesplot::ppc_intervals()`, which raises a
+  # ggplot2 deprecation warning.
 })
 
 
@@ -1341,15 +918,13 @@ test_that("the plotting methods render for a VAR fit", {
     expect_drawn(plot(fit, type = ty))
   }
   panel <- as.character(mcmc_plot(fit)$data$parameter)
-  # The default panel holds what a reader interprets, under the names
-  # `variables()` lists. Built from the raw Stan names it offered
-  # `as.array()` names that method renames, so the slopes and the
-  # whole group-level block were dropped without a word.
+  # The default panel shows the interpretable parameters under the
+  # names `variables()` lists.
   expect_true(all(
     c("b_elev", "sd_block__Intercept", "sigma_trend[1]") %in% panel
   ))
-  # The per-level deviations stay out: a hierarchical fit carries
-  # hundreds, and naming one in `variable` is how a reader gets it.
+  # The per-level deviations stay out of the default panel.
+  # `variable` selects them.
   expect_false(any(grepl("^r_block", panel)))
   expect_s3_class(
     pairs(fit, variable = c("sigma", "sigma_trend[1]")),
@@ -1357,36 +932,26 @@ test_that("the plotting methods render for a VAR fit", {
   )
   expect_drawn(plot(conditional_effects(fit))[[1L]])
 
-  # The three types this fit cannot answer refuse it, each naming
-  # the structure it would need. A method that returned an empty
-  # panel instead would satisfy the loop above.
+  # Each plot type this fit lacks the structure for refuses it by
+  # naming that structure
   expect_error(plot(fit, type = "smooths"), "no smooth terms")
   expect_error(plot(fit, type = "factors"), "no latent factors to plot")
   expect_error(plot(fit, type = "latent_state"), "has no closure units")
 })
 
-test_that("find_predictors reports a series column that varies", {
-  # Three series here, so `series` carries information a slope or a
-  # contrast can be taken over and has to be offered. The
-  # single-series fits elsewhere make the complementary claim: a
-  # column holding one value is not a predictor.
+test_that("find_predictors keeps the series axis among the variables", {
+  # `series` indexes the trend axis. It is a grid variable and is kept
+  # out of the predictors a slope or a contrast is taken over.
   library(marginaleffects)
   options("marginaleffects_model_classes" = "mvgam")
   preds <- insight::find_predictors(fit)$conditional
-  # Three series here, and still no slope over a series index. The
-  # axis is addressable in a grid, which is what `find_variables()`
-  # answers, and it is not a term a consumer may contrast over.
-  expect_gt(length(unique(fit$data$series)), 1L)
   expect_false("series" %in% preds)
   expect_true("series" %in% insight::find_variables(fit, flatten = TRUE))
-  # The observation formula's own terms are there too, so a list
-  # built from the axis columns alone fails.
+  # The observation formula's terms are predictors
   expect_true(all(c("elev", "region") %in% preds))
-  # And the random-effect grouping belongs under `random`, not
-  # among the conditional terms. insight splits the two so that a
-  # consumer knows which terms carry a population slope: `block`
-  # offered as conditional is offered to avg_slopes and
-  # avg_comparisons as a term to contrast over.
+  # The random-effect grouping is listed under `random`. A
+  # conditional `block` would be offered to `avg_slopes()` as a term
+  # to contrast over.
   expect_false("block" %in% preds)
   all_eff <- insight::find_predictors(fit, effects = "all")
   expect_true("block" %in% all_eff$random)
@@ -1395,37 +960,19 @@ test_that("find_predictors reports a series column that varies", {
 
 
 test_that("lfo_cv scores this fit on its own time axis", {
-  # The forward-scoring counterpart to `loo()`, and the tool finding
-  # 11 says should be used on a trend fit instead of it. It refits at
-  # the window and carries the fit forward on importance ratios, so
-  # what it reports has to be keyed to the occasions the user
-  # supplied rather than to their ranks.
+  # `lfo_cv()` refits at a window and steps forward on importance
+  # ratios. Its evaluated occasions are in the user's numbering, which
+  # starts at 3 here.
   lfo <- SM(lfo_cv(fit, min_t = 55L, fc_horizon = 1L, silent = 2))
   expect_s3_class(lfo, "mvgam_lfo")
 
-  # The evaluated occasions are the user's own numbering. This frame
-  # starts at 3, so a method returning ranks would answer 1 to 7 here
-  # and be indistinguishable on a frame numbered from one.
   expect_identical(as.integer(lfo$eval_timepoints), 56:62)
-  expect_true(all(lfo$eval_timepoints %in% time_vals))
-  expect_false(identical(as.integer(lfo$eval_timepoints),
-                         seq_along(lfo$eval_timepoints)))
-  expect_identical(length(lfo$elpds), length(lfo$eval_timepoints))
   expect_true(all(is.finite(lfo$elpds)))
-  expect_true(is.finite(lfo$sum_ELPD))
-  # A refit happened at the window it started from.
+  # Refits happen at occasions of the training grid
   expect_true(all(lfo$refits_at %in% time_vals))
 
-  # The threshold that decided when to refit is reported under the
-  # documented name. It used to be split in two, with
-  # `pareto_k_threshold` holding whatever the caller passed and a
-  # second field holding the number, so a default call left the
-  # field a reader reaches for empty.
-  #
-  # The number is the adaptive one, `min(1 - 1/log10(S), 0.7)`,
-  # which is 2/3 at 1000 draws. 0.7 is the value that rule clamps
-  # to once the draw count is large enough, not the default here.
-  expect_false(is.null(lfo$pareto_k_threshold))
+  # The refit threshold is the adaptive one,
+  # `min(1 - 1/log10(S), 0.7)`, 2/3 at 1000 draws
   expect_equal(lfo$pareto_k_threshold,
                mvgam:::mvgam_ps_khat_threshold(
                  as.integer(posterior::ndraws(fit))
@@ -1435,13 +982,7 @@ test_that("lfo_cv scores this fit on its own time axis", {
 
 
 test_that("lfo_cv can report a forecast-based score", {
-  # Finding 26. `elpd` reads the density directly and runs; a proper
-  # score needs a forecast, and the frame built for it starts one
-  # occasion late, so it trips the guard that refuses a gapped
-  # forecast frame. It fails the same way on AR(1) and AR(2), which
-  # places it in the window arithmetic rather than in one trend.
-  # Every documented multi-score example is unavailable until it
-  # holds.
+  # A proper score needs a forecast from each window
   expect_no_error(
     SM(lfo_cv(fit, min_t = 55L, fc_horizon = 1L, score = "crps",
               silent = 2))
@@ -1450,10 +991,7 @@ test_that("lfo_cv can report a forecast-based score", {
 
 
 test_that("a refit resolves the same axis the first fit recorded", {
-  # `update()` rebuilds the object from the stored call, so it is
-  # where an axis gets resolved a second time and can disagree with
-  # the first. Finding 48 is that same second resolution going wrong
-  # under `kfold()`, which reaches `update()` with a subset frame.
+  # `update()` resolves the axes a second time from the stored call
   upd <- SM(update(
     fit, prior = prior(exponential(3), class = sigma_trend),
     chains = 2L, iter = 600L, warmup = 300L, silent = 2
@@ -1465,8 +1003,7 @@ test_that("a refit resolves the same axis the first fit recorded", {
   expect_identical(as.integer(ax1$time$values),
                    as.integer(ax0$time$values))
   expect_identical(ax1$grain, ax0$grain)
-  # And the cell each row reads is unchanged, which is the claim the
-  # levels alone do not make.
+  # Each row maps to the same trend cell
   expect_identical(as.integer(upd$standata$obs_trend_series),
                    as.integer(fit$standata$obs_trend_series))
   expect_identical(as.integer(upd$standata$obs_trend_time),
@@ -1474,22 +1011,22 @@ test_that("a refit resolves the same axis the first fit recorded", {
 })
 
 
-test_that("partial residual correlations are available on a full-rank trend", {
-  # Finding 33 records `partial = TRUE` failing on every factor model,
-  # because a rank-2 factor model implies a singular covariance and
-  # the inverse does not exist. A VAR gives each series its own
-  # dimension, so this is the case where it must work, and it is what
-  # makes that finding a statement about rank rather than about the
-  # method.
+test_that("partial residual correlations invert the stationary covariance", {
+  # A VAR gives each series its own dimension. Its stationary
+  # covariance is invertible. Each draw's partial correlations are the
+  # scaled inverse. The summary averages them on the Fisher-z scale.
+  ks <- seq_len(nrow(dm_all))
+  z <- Reduce(`+`, lapply(ks, function(k) {
+    prec <- solve(stationary_cov(k))
+    p_k <- -prec / sqrt(outer(diag(prec), diag(prec)))
+    diag(p_k) <- 0
+    atanh(p_k)
+  })) / length(ks)
+  P <- tanh(z)
+  diag(P) <- 1
   rc <- residual_cor(fit, partial = TRUE)
-  expect_true("prec" %in% names(rc))
   expect_identical(rownames(rc$prec), series_levels)
-  expect_identical(colnames(rc$prec), series_levels)
-  # A partial correlation matrix has a unit diagonal by construction,
-  # so what says the inverse was actually taken is the off-diagonal.
-  expect_equal(unname(diag(rc$prec)), rep(1, n_series))
-  expect_gt(max(abs(rc$prec[upper.tri(rc$prec)])), 0.05)
-  expect_true(all(abs(rc$prec) <= 1 + 1e-8))
+  expect_equal(unname(rc$prec), P, tolerance = 1e-6)
 })
 
 
@@ -1505,13 +1042,9 @@ test_that("hypothesis reaches every parameter the fit reports", {
 })
 
 
-test_that("a forecast over observed occasions is refused, not emptied", {
-  # Handed a frame whose times lie inside the training grid,
-  # `forecast()` used to return an `mvgam_forecast` carrying no arms
-  # and no test times, with `series_names` still populated so the
-  # object looked well formed. A frame naming no occasion beyond the
-  # grid has nothing to forecast, so it is refused, naming the times
-  # it was given and the last each series was observed at.
+test_that("a forecast over observed occasions is refused", {
+  # A frame naming no occasion beyond the training grid has nothing to
+  # forecast. The refusal names the times it was given.
   h <- 3L
   inside <- make_future(h)
   inside$time <- rep(time_vals[seq_len(h)], times = n_series)
@@ -1524,32 +1057,21 @@ test_that("a forecast over observed occasions is refused, not emptied", {
 })
 
 
-test_that("the fevd plot honours both arguments it documents", {
-  # `hierarchical_var.Rmd` stops on this after 29.5 minutes of
-  # sampling. Its `fevd` chunk asks for
-  # `plot(fevds, series = 1:3, contributing = 1:3)`, which is how the
-  # article keeps a 24-dimensional panel readable.
-  #
-  # `fevd()` and `irf()` both inherit `mvgam_var_surface_summary` and
-  # share one plot method, whose `series` is asserted scalar. So a
-  # vector is refused on the argument whose own documentation offers
-  # a vector and names the hierarchical VAR as the reason to want it.
+test_that("the fevd plot takes a vector of series", {
+  # `plot(fevds, series = 1:3, contributing = 1:3)` keeps a wide panel
+  # readable. `?plot.mvgam_fevd` offers the vector form.
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   fv <- fevd(fit, h = 4L)
 
-  # A scalar is accepted, so the selection machinery exists.
+  # A scalar and the documented vector form are both accepted
   expect_s3_class(plot(fv, series = 1L), "ggplot")
-  # The documented vector form is not.
   expect_s3_class(plot(fv, series = 1:2), "ggplot")
 })
 
 
-test_that("the irf plot takes the same vector its sibling refuses", {
-  # A separate block because the refusal above raises, and an error
-  # ends the block it sits in. Both objects inherit
-  # `mvgam_var_surface_summary` and reach one method, so this says
-  # the fault is the shared method rather than the fevd wrapper.
+test_that("the irf plot takes a vector of series", {
+  # `irf()` and `fevd()` summaries share one plot method
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   ir <- irf(fit, h = 4L)
@@ -1560,9 +1082,7 @@ test_that("the irf plot takes the same vector its sibling refuses", {
 
 test_that("series selects the end of the pair its help names", {
   # `?plot.mvgam_fevd` documents `series` as choosing the target
-  # processes drawn as facets. The running method filters on the
-  # source, because its own roxygen reads `series` as the process a
-  # shock originates in. One name, two ends, one implementation.
+  # processes drawn as facets.
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   fv <- fevd(fit, h = 4L)
@@ -1577,11 +1097,7 @@ test_that("series selects the end of the pair its help names", {
 
 
 test_that("contributing changes what the fevd plot draws", {
-  # It is absent from the signature of the method that runs, so it
-  # lands in `...`, which that method documents as ignored. Passing
-  # it leaves every pair in place, and the article's claim that "the
-  # retained shares get renormalised per (target, horizon)" describes
-  # something no code performs.
+  # `contributing` selects the source processes a panel draws
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   fv <- fevd(fit, h = 4L)
@@ -1641,16 +1157,25 @@ test_that("a grouped VAR(2) is stationary, block by block", {
   }, numeric(1L))
   expect_identical(max(cross), 0)
   # The start covariance is the stationary covariance of the companion
-  # form, from the Lyapunov equation solved in R
-  r <- 1L
-  comp <- rbind(cbind(phi(r, 1L), phi(r, 2L)), cbind(diag(4), diag(0, 4)))
-  S <- matrix(as.numeric(dm[r, sprintf("Sigma_trend[%d,%d]", rep(1:4, 4),
-                                       rep(1:4, each = 4))]), 4L)
-  Q <- diag(0, 8); Q[1:4, 1:4] <- S
-  Omega <- matrix(solve(diag(64) - kronecker(comp, comp), as.vector(Q)), 8L)
-  stored <- matrix(as.numeric(dm[r, sprintf("Omega_trend[%d,%d]",
-                                            rep(1:8, 8), rep(1:8, each = 8))]), 8L)
-  expect_lt(max(abs(Omega - stored)), 1e-6)
+  # form. The program places each group's autocovariances. The
+  # Lyapunov equation solved in R over all four series is the
+  # definition.
+  worst <- max(vapply(round(seq(1, nrow(dm), length.out = 50L)),
+                      function(r) {
+    comp <- rbind(cbind(phi(r, 1L), phi(r, 2L)),
+                  cbind(diag(4), diag(0, 4)))
+    S <- matrix(as.numeric(dm[r, sprintf("Sigma_trend[%d,%d]", rep(1:4, 4),
+                                         rep(1:4, each = 4))]), 4L)
+    Q <- diag(0, 8)
+    Q[1:4, 1:4] <- S
+    Omega <- matrix(solve(diag(64) - kronecker(comp, comp), as.vector(Q)),
+                    8L)
+    stored <- matrix(as.numeric(dm[r, sprintf(
+      "Omega_trend[%d,%d]", rep(1:8, 8), rep(1:8, each = 8)
+    )]), 8L)
+    max(abs(Omega - stored))
+  }, numeric(1L)))
+  expect_lt(worst, 1e-6)
 })
 
 

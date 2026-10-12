@@ -287,7 +287,7 @@ build_glm_call_on_mu <- function(glm_line, glm_type, glm_params,
 #' @noRd
 glm_mu_names <- function(resp_name) {
   checkmate::assert_string(resp_name)
-  suffix <- if (nzchar(resp_name)) paste0("_", resp_name) else ""
+  suffix <- predictor_suffix(resp_name)
   c(mu = paste0("mu", suffix), ones = paste0("mu_ones", suffix))
 }
 
@@ -308,7 +308,7 @@ glm_mu_names <- function(resp_name) {
 glm_takes_declared_mu <- function(stan_code, resp_name) {
   checkmate::assert_string(stan_code)
   checkmate::assert_string(resp_name)
-  y_var <- if (nzchar(resp_name)) paste0("Y_", resp_name) else "Y"
+  y_var <- paste0("Y", predictor_suffix(resp_name))
   code_lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
   glm_lines <- grep(
     paste0(stan_density_call_pattern("_glm"), "\\(", y_var, " \\|"),

@@ -258,9 +258,9 @@ test_that("VAR pulls Heaps-transformed Phi_trend with lag-first indexing", {
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
   res <- extract_last_state(fit, 1L)
-  expect_named(res$params, c("A", "sigma", "Sigma"))
-  expect_identical(dim(res$params$A), c(2L, 2L, 1L))
   expect_equal(res$params$A[, , 1], A1)
+  # Unit scales leave the innovation covariance at L L'
+  expect_equal(unname(res$params$Sigma), tcrossprod(L))
 })
 
 

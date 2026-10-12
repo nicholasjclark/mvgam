@@ -519,21 +519,33 @@ lfo_cv.mvgam <- function(object,
 }
 
 
-# Internal: extract the per-draw log-density matrix for the
-# observations in `window_times` from the full-data loglik
-# matrix, resampling draw rows by the PSIS weights when present.
-# Returns an n_draws x n_window_obs matrix at draws representative
-# of the LFO-adjusted posterior, ready for column-bind into a
-# cumulative log-density store that `loo::loo_model_weights()`
-# can stack on.
-#
-# When `psis_log_weights` is NULL the caller is at a fresh refit,
-# so the full-data loglik IS the LFO loglik and no resampling
-# is needed.
-#'@noRd
+#' Held-out log-densities of one window under the LFO posterior
+#'
+#' With PSIS weights the draw rows are resampled by weight, giving
+#' draws representative of the LFO-adjusted posterior. Without weights
+#' the caller is at a fresh refit, where the full-data log-likelihood
+#' is already the LFO one. Columns holding a missing value are dropped.
+#' The stacking optimiser of `loo::loo_model_weights()` refuses them.
+#'
+#' @param loglik Numeric log-likelihood matrix of the full data, one row
+#'   per draw
+#' @param all_data Data frame of the full data
+#' @param time_var Character name of the time column
+#' @param window_times Vector of the time values in the window
+#' @param psis_log_weights Numeric vector of PSIS log weights, one per
+#'   draw, or `NULL`
+#' @return Numeric matrix with one row per draw and one column per
+#'   scored observation in the window
+#' @noRd
 lfo_collect_fold_loglik <- function(loglik, all_data, time_var,
                                       window_times,
                                       psis_log_weights) {
+  checkmate::assert_matrix(loglik)
+  checkmate::assert_data_frame(all_data)
+  checkmate::assert_string(time_var)
+  checkmate::assert_atomic_vector(window_times)
+  checkmate::assert_numeric(psis_log_weights, len = nrow(loglik),
+                            null.ok = TRUE)
   fc_idx <- rows_at_times(all_data, time_var, window_times)
   if (length(fc_idx) == 0L) {
     return(matrix(NA_real_, nrow = nrow(loglik), ncol = 0L))
@@ -558,27 +570,41 @@ lfo_collect_fold_loglik <- function(loglik, all_data, time_var,
 }
 
 
-# Internal: compute the requested scores at one evaluation window
-# (rows of `all_data` whose time is in `window_times`). Writes
-# into `elpds[eval_idx]` and `score_arrays[[s]][eval_idx]` and
-# returns the updated containers.
-#
-# `window_times` is the explicit vector of time values to score,
-# resolved by the caller from `all_unique_times[k:(k+fc_horizon-1)]`
-# so the same code path handles regular and irregular grids
-# uniformly.
-#
-# When `psis_log_weights` is supplied (PSIS-approximate step), the
-# ELPD uses the log-sum-exp formula with the weights, and the
-# non-ELPD scores resample forecast draw rows by `exp(lw)` to
-# produce a forecast distribution under the PSIS-weighted
-# posterior.
-#'@noRd
+#' The requested scores at one evaluation window
+#'
+#' The caller resolves `window_times` from the ordered unique times,
+#' covering regular and irregular grids alike. With PSIS weights the
+#' ELPD is the weighted log-sum-exp. The other scores then resample the
+#' predictive draw rows by weight.
+#'
+#' @param fit Refitted `mvgam` object
+#' @param all_data Data frame of the full data
+#' @param time_var Character name of the time column
+#' @param window_times Vector of the time values in the window
+#' @param score_names Character vector of the scores to compute
+#' @param elpds Numeric vector of per-window ELPDs
+#' @param score_arrays Named list of per-window score vectors
+#' @param eval_idx Integer index of this window
+#' @param loglik Numeric log-likelihood matrix of the full data
+#' @param psis_log_weights Numeric vector of PSIS log weights, or
+#'   `NULL`
+#' @return List holding the updated `elpds` and `score_arrays`
+#' @noRd
 scores_at_window <- function(fit, all_data, time_var,
                               window_times,
                               score_names,
                               elpds, score_arrays, eval_idx,
                               loglik, psis_log_weights) {
+  checkmate::assert_class(fit, "mvgam")
+  checkmate::assert_data_frame(all_data)
+  checkmate::assert_string(time_var)
+  checkmate::assert_atomic_vector(window_times)
+  checkmate::assert_character(score_names, min.len = 1L)
+  checkmate::assert_numeric(elpds, null.ok = TRUE)
+  checkmate::assert_list(score_arrays, null.ok = TRUE)
+  checkmate::assert_int(eval_idx, lower = 1L)
+  checkmate::assert_matrix(loglik)
+  checkmate::assert_numeric(psis_log_weights, null.ok = TRUE)
   fc_idx <- rows_at_times(all_data, time_var, window_times)
   if (length(fc_idx) == 0L) {
     return(list(elpds = elpds, score_arrays = score_arrays))
@@ -633,13 +659,18 @@ scores_at_window <- function(fit, all_data, time_var,
 }
 
 
-# Internal: extract a single scalar per-fold score from the
-# score.mvgam_forecast return shape. score() yields a per-series
-# data.frame with rows per horizon plus an `all_series` summary;
-# we report the all_series sum for univariate-score outputs and
-# the all_series row for multivariate (energy / variogram).
-#'@noRd
+#' One scalar score per fold from the output of `score()`
+#'
+#' Reports the `all_series` sum. Without one, the per-series scores are
+#' summed.
+#'
+#' @param s_out List returned by `score()`, or `NULL`
+#' @param sc Character name of the score
+#' @return Numeric scalar score
+#' @noRd
 lfo_aggregate_score <- function(s_out, sc) {
+  checkmate::assert_list(s_out, null.ok = TRUE)
+  checkmate::assert_string(sc)
   if (is.null(s_out)) return(NA_real_)
   if ("all_series" %in% names(s_out)) {
     all_df <- s_out$all_series
@@ -659,57 +690,38 @@ lfo_aggregate_score <- function(s_out, sc) {
 }
 
 
-# Internal: the frame a window ending at `last_train` is refit on.
-# Every occasion after it is held out by masking its response rather
-# than by deleting its rows, which is what makes the score an LFO
-# score at all.
-#
-# Deleting the rows shortens the trend grid, so the refit estimates
-# no latent state past `last_train` and `log_lik()` falls back on the
-# per-series training mean for every held-out row. The density that
-# comes back is then `p(y_k | z_bar)` rather than
-# `p(y_k | y_{1:k-1})`, and the same columns build the PSIS ratios,
-# so the estimate and the refit gate share the fault.
-#
-# Masking keeps `N_time_trend` at the full grid, so a held-out
-# occasion carries a state driven only by the kernel running forward
-# from the last observed one. What a refit at `m` delivers is
-# `p(z_{m+h} | y_{1:m})`, the h-step-ahead state; only `h = 1` is a
-# one-step density, and the sequential conditioning that turns the
-# rest into `p(y_k | y_{1:k-1})` comes from the PSIS weights rather
-# than from the fit, which is what the refit gate is for. Measured on
-# an AR(1) of 30 observed and 10 held-out occasions, the state decays
-# toward the process level (-0.301, -0.183, -0.113, -0.072 at
-# horizons 1, 3, 5 and 10) while its SD grows (0.706, 0.846, 0.876,
-# 0.931), which is the kernel running forward rather than a level
-# standing still.
-#
-# The deletion path is what that replaces, and its signature was a
-# predictive far too narrow: at horizon 10 it returned a log density
-# of +0.49, which for a gaussian needs a predictive SD no wider than
-# 0.244 against a state SD of 0.93 before observation noise.
-#
-# The loo vignette this algorithm comes from deletes the rows
-# instead (`df_past <- df[past, ]`), and is right to: every model it
-# demonstrates is observation-driven, `y_i = eta_i + sum phi_k
-# y_{i-k} + e_i`, so what a future point is conditioned on sits in
-# the data and brms marks the held-out rows with its own `oos`
-# argument. Here the conditioning information is a parameter rather
-# than a column, so deleting the rows deletes it. Masking is the
-# state-space reading of the same step: the held-out responses
-# contribute no likelihood term, and the posterior for the
-# parameters is unmoved by it. Measured on the frame above,
-# `sigma_trend` reads 0.525 masked against 0.535 deleted, `ar1` 0.757
-# against 0.755 and the intercept 2.724 against 2.702, each well
-# inside its own posterior SD.
-#
-# `last_train` is a time VALUE and must be present in the data.
-# Membership is tested against the ordered unique times so the
-# function is correct on an irregular CAR grid as well as a regular
-# one.
-#'@noRd
+#' The frame a window ending at `last_train` is refitted on
+#'
+#' Every occasion after `last_train` is held out by masking its
+#' response with `mask_heldout_response()`. The occasions stay in the
+#' frame. Deleting the rows would shorten the trend grid. The refit
+#' would then estimate no latent state past `last_train`. `log_lik()`
+#' would score the held-out rows against the training mean. Masking
+#' keeps `N_time_trend` at the full grid. Each held-out occasion then
+#' carries a state the trend kernel runs forward from the last observed
+#' one. A refit at `m` gives the `h`-step forecast state
+#' `p(z_{m+h} | y_{1:m})`. The PSIS weights supply the sequential
+#' conditioning that turns these into `p(y_k | y_{1:k-1})`.
+#'
+#' The loo vignette deletes the rows. Its models are
+#' observation-driven, with the conditioning information in the data.
+#' Here the conditioning information is a latent parameter. The
+#' held-out responses contribute no likelihood term, leaving the
+#' parameter posterior unchanged.
+#'
+#' @param object Fitted `mvgam` object
+#' @param data Data frame of the full data
+#' @param last_train Time value of the last training occasion. Matching
+#'   against the ordered unique times handles irregular CAR grids.
+#' @param time_var Character name of the time column
+#' @return `data` with every response after `last_train` set to `NA`
+#' @noRd
 lfo_training_frame <- function(object, data, last_train,
                                 time_var = "time") {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(data)
+  checkmate::assert_atomic_vector(last_train, len = 1L)
+  checkmate::assert_string(time_var)
   t_vec <- data[[time_var]]
   unique_times <- sort(unique(t_vec))
   idx_last <- match(last_train, unique_times)
@@ -722,34 +734,39 @@ lfo_training_frame <- function(object, data, last_train,
 }
 
 
-# Internal: the rows of `data` observed at any of `times`.
-#
-# Written once because three places asked it and each truncated the
-# column to an integer first, which on a continuous grid matched
-# 4.590626 against 4 and selected rows belonging to another
-# occasion. The window times come from the frame's own column, so
-# the comparison is between values of one kind.
-#'@noRd
+#' The rows of a data frame observed at any of a set of times
+#'
+#' Compares the time values without truncation. A continuous time grid
+#' needs exact matches.
+#'
+#' @param data Data frame holding the time column
+#' @param time_var Character name of the time column
+#' @param times Vector of time values
+#' @return Integer vector of row indices
+#' @noRd
 rows_at_times <- function(data, time_var, times) {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(time_var)
+  checkmate::assert_atomic_vector(times)
   which(data[[time_var]] %in% times)
 }
 
 
-# Internal: per-draw sum across observations. One entry per draw,
-# whatever the window holds.
-#
-# The single-column case used to strip its `NA` draws, which changes
-# the length rather than the values. The caller then added a
-# 1000-draw weight vector to a 998-draw density and R recycled, so
-# every draw was paired with another draw's weight. A gap in the
-# response is exactly when that happens, and a one-column window is
-# what `fc_horizon = 1` on a single series gives.
-#
-# A window whose every draw is missing has no density to report,
-# which is `NA`. Summing it to zero would read as a log-density of
-# zero, meaning probability one.
-#'@noRd
+#' The per-draw sum of log-densities across observations
+#'
+#' Returns one entry per draw for any window width. The caller adds
+#' the sum to a weight vector of the same length. A draw whose every
+#' value is missing gets `NA`. A sum of zero would mean a probability
+#' of one.
+#'
+#' @param x Numeric matrix of log-densities, one row per draw
+#' @return Numeric vector with one value per draw
+#' @noRd
 lfo_sum_rows <- function(x) {
+  checkmate::assert(
+    checkmate::check_matrix(x),
+    checkmate::check_numeric(x)
+  )
   x <- as.matrix(x)
   out <- rowSums(x, na.rm = TRUE)
   out[rowSums(!is.na(x)) == 0L] <- NA_real_
@@ -1091,13 +1108,20 @@ loo_model_weights.mvgam_lfo <- function(x, ...,
 }
 
 
-# Internal: log-score stacking on a list of mvgam_lfo objects.
-# Requires each $log_lik to be present (populated by lfo_cv with
-# save_log_lik = TRUE) and identically shaped (same number of
-# held-out evaluation observations across models). Delegates the
-# convex optimisation to loo::loo_model_weights().
-#'@noRd
+#' Log-score stacking weights for LFO results
+#'
+#' Each result needs the `log_lik` matrix that
+#' `lfo_cv(save_log_lik = TRUE)` stores. Every matrix must have the
+#' same number of held-out observations. `loo::loo_model_weights()`
+#' solves the stacking problem.
+#'
+#' @param models List of `mvgam_lfo` objects
+#' @param model_names Character vector of labels, one per model
+#' @return Stacking weights from `loo::loo_model_weights()`
+#' @noRd
 stack_mvgam_lfo <- function(models, model_names) {
+  checkmate::assert_list(models, min.len = 1L)
+  checkmate::assert_character(model_names, len = length(models))
   ll_list <- lapply(seq_along(models), function(i) {
     ll <- models[[i]]$log_lik
     if (is.null(ll) || !is.matrix(ll) || ncol(ll) == 0L) {
@@ -1240,11 +1264,16 @@ window_predictive <- function(fit, fc_data) {
 }
 
 
-# Internal: LFO results compared or weighted together must share one
-# evaluation grid. A paired difference across two grids pairs ELPDs
-# from different occasions.
-#'@noRd
+#' Refuse LFO results evaluated on different grids
+#'
+#' A paired difference across two grids would pair ELPDs from different
+#' occasions.
+#'
+#' @param models List of `mvgam_lfo` objects
+#' @return `TRUE`, invisibly, or an error
+#' @noRd
 assert_aligned_lfo <- function(models) {
+  checkmate::assert_list(models, min.len = 1L)
   ref <- models[[1L]]
   for (i in seq_along(models)[-1L]) {
     same <- c(

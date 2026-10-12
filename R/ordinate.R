@@ -11,9 +11,9 @@
 #' arrows are rendered as tapered loadings.
 #'
 #' @note This method needs a fitted factor model. It uses the
-#'   identified latent variables and their loadings: `lv_trend_tilde`
-#'   and `Z_tilde` from a model identified by rotation, and
-#'   `lv_trend` and `Z` from every other factor model.
+#'   identified latent variables and their loadings. A model
+#'   identified by rotation supplies `lv_trend_tilde` and `Z_tilde`.
+#'   Every other factor model supplies `lv_trend` and `Z`.
 #'
 #' @name ordinate
 #'
@@ -46,19 +46,17 @@
 #'       between site scores and loadings.}
 #'     \item{`"varimax"`}{Orthogonal rotation maximising loading
 #'       sparsity (each series loads strongly on one factor and
-#'       near-zero on others). Use this when you want
-#'       interpretable factor "names" rather than variance-
-#'       ordered axes. Requires `n_lv >= 2`. `alpha` ignored.}
+#'       near-zero on others). Use this to give each factor an
+#'       interpretable name. The axes have no variance ordering.
+#'       Requires `n_lv >= 2`. `alpha` ignored.}
 #'     \item{`"promax"`}{Oblique extension of varimax that allows
 #'       correlated rotated factors. `alpha` ignored.}
 #'     \item{`"none"`}{Plot the centred posterior medians of the
 #'       identified latent variables and loadings, as described
 #'       in Details. `alpha` ignored.}
 #'   }
-#'   For varimax / promax the axes are NOT variance-ordered, so
-#'   the choice of `which_lvs` matters in a different way than
-#'   under SVD: any pair of rotated factors is a valid pair to
-#'   plot.
+#'   Varimax and promax axes have no variance ordering. Any pair of
+#'   rotated factors is then a valid choice for `which_lvs`.
 #' @param label_sites Logical. When `TRUE`, site scores are
 #'   drawn as text labels (the training time values); when
 #'   `FALSE`, as points only.
@@ -100,11 +98,10 @@
 #' `rotation = "none"` and `plot_factors()` show the identified
 #' factors themselves.
 #'
-#' A `trend_map` supplies the loading pattern as data, and any
-#' rotation other than `"none"` replaces it with one read off
-#' the fitted covariance. Each such call warns, naming the
-#' rotation it applied; `plot_factors(fit)` shows the loadings
-#' the map declared.
+#' A `trend_map` supplies the loading pattern as data. Any rotation
+#' other than `"none"` replaces that pattern with one derived from the
+#' fitted covariance. Each such call warns and names the rotation it
+#' applied. `plot_factors(fit)` shows the loadings the map declared.
 #'
 #' @section Known limitations:
 #' \itemize{
@@ -112,9 +109,9 @@
 #'     per-element medians of `lv_trend` and `Z`. Uncertainty in
 #'     site scores and loading positions is not propagated to
 #'     the biplot.
-#'   \item Sign indeterminacy: SVD and varimax columns are sign-
-#'     arbitrary, so comparing ordinations from independently-
-#'     fit models may require a manual sign-flip alignment.
+#'   \item Sign indeterminacy: SVD and varimax columns have arbitrary
+#'     signs. Ordinations from independently fitted models may need a
+#'     manual sign flip to align.
 #' }
 #'
 #' @author Nicholas J Clark
@@ -127,20 +124,20 @@
 #' \dontrun{
 #' set.seed(1)
 #' simdat <- sim_closure_unit_data(
-#'   family    = occ(),
+#'   family = occ(),
 #'   n_species = 4L,
-#'   n_sites   = 50L,
-#'   n_visits  = 4L,
-#'   type      = 2L
+#'   n_sites = 50L,
+#'   n_visits = 4L,
+#'   type = 2L
 #' )
 #' mod <- jsdgam(
-#'   formula        = bf(y ~ env, p ~ tod_c),
+#'   formula = bf(y ~ env, p ~ tod_c),
 #'   factor_formula = ~ -1,
-#'   data           = simdat$data_train,
-#'   family         = occ(),
-#'   n_lv           = 2L,
-#'   chains         = 2,
-#'   silent         = 2
+#'   data = simdat$data_train,
+#'   family = occ(),
+#'   n_lv = 2L,
+#'   chains = 2,
+#'   silent = 2
 #' )
 #'
 #' # SVD biplot of site + species scores in the two-factor space.
@@ -152,18 +149,20 @@ ordinate <- function(object, ...) {
   UseMethod("ordinate", object)
 }
 
-#' Internal: posterior-median LV trends and Z loadings from a
-#' fitted LV-factor `mvgam` / `jsdgam`. Errors if the fit has no
-#' latent factors or no Z reachable from the posterior.
+#' Posterior medians of the factor paths and loadings of a fit
 #'
+#' @param object Fitted `mvgam` or `jsdgam` factor model
+#' @return List holding `lv_estimates` (`[n_time, n_lv]`), `lv_coefs`
+#'   (`[n_series, n_lv]`) and `n_lv`
 #' @noRd
 ordinate_extract_medians <- function(object) {
+  checkmate::assert_class(object, "mvgam")
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv)) {
     stop(insight::format_error(c(
       "Object does not contain any latent dynamic factors.",
       i = "Ordination requires an LV-factor mvgam / jsdgam fit."
-    )))
+    )), call. = FALSE)
   }
   per_lv <- extract_lv_trend_matrices(object, n_lv)
   lv_estimates <- do.call(cbind, lapply(per_lv, function(mat) {
@@ -174,11 +173,10 @@ ordinate_extract_medians <- function(object) {
     stop(insight::format_error(c(
       "Could not extract Z loadings from the posterior.",
       i = paste0(
-        "Ordination requires either sampled `Z_tilde[i, k]` ",
-        "or `Z[i, k]` in the Stan posterior, or a fixed-",
-        "loadings matrix attached to the fitted object."
+        "Ordination requires draws of 'Z_tilde[i, k]' or 'Z[i, k]' ",
+        "or a fixed loadings matrix on the fit."
       )
-    )))
+    )), call. = FALSE)
   }
   lv_coefs <- apply(Z_arr, c(2L, 3L), stats::median, na.rm = TRUE)
   list(lv_estimates = lv_estimates, lv_coefs = lv_coefs,
@@ -186,16 +184,7 @@ ordinate_extract_medians <- function(object) {
 }
 
 
-#' Internal: rotation dispatcher for ordinate methods.
-#'
-#' Returns `list(scores, loadings, n_lv, rotation, rotmat)` where:
-#' - `scores` is `[n_time, n_lv]` site scores in the rotated basis
-#' - `loadings` is `[n_series, n_lv]` series loadings in the same
-#'   rotated basis
-#' - `rotmat` is the rotation matrix used (NULL for `"svd"` and
-#'   `"none"` since those don't apply a single rotation matrix to
-#'   the input arrays). For varimax / promax `rotmat` is the
-#'   `stats::varimax()`/`stats::promax()` rotation.
+#' Site scores and series loadings in the requested rotated basis
 #'
 #' Branches:
 #' - `"svd"`: BORAL (Hui 2016) re-rotation. SVD of the
@@ -204,14 +193,23 @@ ordinate_extract_medians <- function(object) {
 #'   Axes are variance-ordered; `which_lvs = c(1, 2)` picks the
 #'   most informative pair.
 #' - `"varimax"`: orthogonal rotation maximising loading sparsity.
-#'   `alpha` is ignored. Rotation invariance of `LV %*% t(Z)` is
-#'   preserved (apply R to Z and R to LV; for orthogonal R,
-#'   `R^{-T} = R`).
+#'   `alpha` is ignored. Rotating Z and LV by the same orthogonal R
+#'   keeps `LV %*% t(Z)` unchanged, since `R^{-T} = R`.
 #' - `"promax"`: oblique extension of varimax. `alpha` ignored.
-#' - `"none"`: pass through unrotated medians. `alpha` ignored.
+#' - `"none"`: centred, unrotated medians. `alpha` ignored.
 #'
+#' @param object Fitted `mvgam` or `jsdgam` factor model
+#' @param alpha Numeric share of the singular values given to the site
+#'   scores
+#' @param rotation One of `"svd"`, `"varimax"`, `"promax"` or `"none"`
+#' @return List holding `scores` (`[n_time, n_lv]`), `loadings`
+#'   (`[n_series, n_lv]`), `rotmat`, `n_lv` and `rotation`. `rotmat`
+#'   is the `stats::varimax()` or `stats::promax()` rotation matrix,
+#'   or `NULL` for `"svd"` and `"none"`.
 #' @noRd
 ordinate_factor_components <- function(object, alpha, rotation) {
+  checkmate::assert_number(alpha, lower = 0, upper = 1)
+  checkmate::assert_choice(rotation, c("svd", "varimax", "promax", "none"))
   medians <- ordinate_extract_medians(object)
   lv_estimates <- medians$lv_estimates
   lv_coefs <- medians$lv_coefs
@@ -238,12 +236,23 @@ ordinate_factor_components <- function(object, alpha, rotation) {
 }
 
 
-#' Internal: BORAL SVD rotation branch. See
-#' `ordinate_factor_components()` for the broader contract.
+#' SVD rotation of the factor medians
 #'
+#' @param lv_estimates Numeric matrix of factor path medians,
+#'   `[n_time, n_lv]`
+#' @param lv_coefs Numeric matrix of loading medians,
+#'   `[n_series, n_lv]`
+#' @param alpha Numeric share of the singular values given to the site
+#'   scores
+#' @param n_lv Integer number of latent factors
+#' @return List holding `scores`, `loadings` and a `NULL` `rotmat`
 #' @noRd
 ordinate_svd_rotate <- function(lv_estimates, lv_coefs, alpha,
                                   n_lv) {
+  checkmate::assert_matrix(lv_estimates, mode = "numeric")
+  checkmate::assert_matrix(lv_coefs, mode = "numeric")
+  checkmate::assert_number(alpha, lower = 0, upper = 1)
+  checkmate::assert_int(n_lv, lower = 1L)
   testcov <- tcrossprod(lv_estimates, lv_coefs)
   do_svd <- svd(testcov, n_lv, n_lv)
   scores <- scale(
@@ -270,24 +279,34 @@ ordinate_svd_rotate <- function(lv_estimates, lv_coefs, alpha,
 }
 
 
-#' Internal: varimax / promax rotation branch. Applies the
-#' rotation matrix returned by `stats::varimax()` / `stats::promax()`
-#' to both the loadings AND the latent paths, preserving the
-#' fitted `LV %*% t(Z)` product. For orthogonal varimax,
-#' `R^{-T} = R`. For oblique promax, the inverse-transpose is
-#' computed explicitly so the product invariance holds.
+#' Varimax or promax rotation of the factor medians
 #'
+#' Applies the rotation matrix of `stats::varimax()` or
+#' `stats::promax()` to the loadings and the factor paths. The fitted
+#' `LV %*% t(Z)` product is unchanged. For orthogonal varimax,
+#' `R^{-T} = R`. For oblique promax the inverse-transpose is computed
+#' explicitly.
+#'
+#' @param lv_estimates Numeric matrix of factor path medians,
+#'   `[n_time, n_lv]`
+#' @param lv_coefs Numeric matrix of loading medians,
+#'   `[n_series, n_lv]`
+#' @param n_lv Integer number of latent factors
+#' @param method Either `"varimax"` or `"promax"`
+#' @return List holding `scores`, `loadings` and `rotmat`
 #' @noRd
 ordinate_orth_rotate <- function(lv_estimates, lv_coefs, n_lv,
                                    method) {
+  checkmate::assert_matrix(lv_estimates, mode = "numeric")
+  checkmate::assert_matrix(lv_coefs, mode = "numeric")
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_choice(method, c("varimax", "promax"))
   if (n_lv < 2L) {
     stop(insight::format_error(c(
       paste0("Rotation '", method, "' requires at least 2 factors."),
       x = paste0("Got n_lv = ", n_lv, "."),
-      i = paste0(
-        "Refit with n_lv >= 2, or use rotation = 'none' / 'svd'."
-      )
-    )))
+      i = "Refit with n_lv >= 2 or use rotation = 'none' / 'svd'."
+    )), call. = FALSE)
   }
   rot <- switch(
     method,
@@ -312,14 +331,17 @@ ordinate_orth_rotate <- function(lv_estimates, lv_coefs, n_lv,
 }
 
 
-#' Internal: try to pull the trait frame the user passed to
-#' `jsdgam(traits = ...)` back off the fitted object. Searches a
-#' short list of known persistence paths and returns the first
-#' non-NULL match; returns `NULL` when the fit wasn't trait-
-#' informed (no `loadings_prior$features` payload anywhere).
+#' The trait frame a trait-informed fit stores
 #'
+#' Searches the trend specifications for the `features` of a
+#' `loadings_prior`, as `jsdgam(traits = ...)` records them.
+#'
+#' @param object Fitted `mvgam` object, or a list holding `mv_spec`
+#' @return The first trait frame found, or `NULL` for a fit without
+#'   traits
 #' @noRd
 ordinate_extract_fit_traits <- function(object) {
+  checkmate::assert_list(object)
   ts <- object$mv_spec$trend_specs
   # Single-trend (typical jsdgam ZMVN) shape: trend_specs is one
   # mvgam_trend object with the loadings_prior attached directly.
@@ -339,30 +361,39 @@ ordinate_extract_fit_traits <- function(object) {
 }
 
 
-#' Internal: per-trait arrow coordinates in the rotated LV space.
+#' Trait arrow coordinates in the rotated factor space
+#'
 #' Each numeric trait column is regressed on the species' rotated
-#' loadings for `which_lvs`; the slope pair `(b_lv1, b_lv2)` is
-#' the trait's direction in the biplot. Arrow lengths are rescaled
-#' so the longest trait arrow matches `arrow_scale` times the
-#' longest species-loading radius, keeping both layers visually
-#' comparable. Returns `NULL` when `traits` is `NULL`, when no
-#' numeric columns remain, or when the alignment fails.
+#' loadings for `which_lvs`. The slope pair `(b_lv1, b_lv2)` is the
+#' trait's direction in the biplot. Arrow lengths are rescaled to
+#' make the longest trait arrow `arrow_scale` times the longest
+#' species-loading radius.
 #'
-#' The same regression-on-loadings recipe works whether the fit
-#' was trait-informed (`jsdgam(traits = ...)`) or not. For trait-
-#' informed fits the arrows visualise the trait gradient already
-#' encoded in `factor_formula`; for naive fits they are a post-hoc
-#' overlay showing which direction each trait grows in LV space.
+#' The regression applies to any factor fit. For a fit with
+#' `jsdgam(traits = ...)` the arrows show the trait gradient the
+#' loadings prior encodes. For any other fit they show the direction
+#' in which each trait increases in the factor space.
 #'
+#' @param traits Data frame or matrix with one row per species, or
+#'   `NULL`
+#' @param loadings_2d Numeric matrix of the two plotted loading
+#'   columns, one row per species
+#' @param species_names Character vector of species labels
+#' @param arrow_scale Positive number scaling the arrow lengths
+#' @return Data frame holding `x`, `y` and `trait_name`, or `NULL`
+#'   when `traits` is `NULL` or holds no usable numeric column
 #' @noRd
 ordinate_trait_arrows <- function(traits, loadings_2d,
                                   species_names, arrow_scale) {
+  checkmate::assert_matrix(loadings_2d, mode = "numeric", ncols = 2L)
+  checkmate::assert_character(species_names, min.len = 1L)
+  checkmate::assert_number(arrow_scale, lower = 0)
   if (is.null(traits)) return(NULL)
   if (!is.data.frame(traits) && !is.matrix(traits)) {
     stop(insight::format_error(c(
       "Argument 'traits' must be a data.frame or matrix.",
       i = "Give one row per species, named by 'rownames(traits)'."
-    )))
+    )), call. = FALSE)
   }
   traits <- as.data.frame(traits)
   if (!is.null(rownames(traits)) &&
@@ -378,7 +409,7 @@ ordinate_trait_arrows <- function(traits, loadings_2d,
           if (length(missing_sp) > 5L) ", ..." else ""
         ),
         i = "Supply a trait row for every species in the fit."
-      )))
+      )), call. = FALSE)
     }
     traits <- traits[species_names, , drop = FALSE]
   }
@@ -394,7 +425,7 @@ ordinate_trait_arrows <- function(traits, loadings_2d,
         "one row per species in the same order as the fit's ",
         "series levels."
       )
-    )))
+    )), call. = FALSE)
   }
   numeric_cols <- vapply(traits, is.numeric, logical(1L))
   if (!any(numeric_cols)) return(NULL)
@@ -430,13 +461,19 @@ ordinate_trait_arrows <- function(traits, loadings_2d,
 }
 
 
-#' Internal: trait-arrow plot layers (segment + repel label).
-#' Drawn in steelblue to differentiate from species-loading
-#' darkred arrows. Returns `NULL` (an empty layer list) when
-#' `trait_dat` is `NULL` so `+ NULL` is a safe no-op in the build.
+#' Trait arrow layers of an ordination biplot
 #'
+#' Draws a steelblue segment and label for each trait. The species
+#' loading arrows are dark red.
+#'
+#' @param trait_dat Data frame from `ordinate_trait_arrows()`, or
+#'   `NULL`
+#' @return List of a segment layer and a label layer, or `NULL` when
+#'   `trait_dat` is empty. Adding `NULL` to a ggplot leaves it
+#'   unchanged.
 #' @noRd
 ordinate_trait_layers <- function(trait_dat) {
+  checkmate::assert_data_frame(trait_dat, null.ok = TRUE)
   if (is.null(trait_dat) || NROW(trait_dat) == 0L) return(NULL)
   list(
     ggplot2::geom_segment(
@@ -458,19 +495,34 @@ ordinate_trait_layers <- function(trait_dat) {
 }
 
 
-#' Internal: build the ordination biplot from the SVD components
-#' and caller-supplied site / species labels. Every ordinate.*
-#' method ends here so the layered ggplot output is identical
-#' across object classes. When `traits` is non-NULL, per-trait
-#' regression on the rotated loadings yields arrows overlaid on
-#' the same biplot in a contrasting colour.
+#' The ordination biplot
 #'
+#' Every `ordinate()` method builds its plot here. A non-`NULL`
+#' `traits` adds the trait arrows in a contrasting colour.
+#'
+#' @param svd_comp List from `ordinate_factor_components()`
+#' @param which_lvs Integer vector of the two factors to plot
+#' @param biplot Logical. `TRUE` adds the series loading arrows.
+#' @param label_sites Logical. `TRUE` labels the site scores.
+#' @param site_names Vector of site labels, one per score row
+#' @param species_names Character vector of series labels
+#' @param traits Data frame or matrix of traits, or `NULL`
+#' @param trait_arrow_scale Positive number scaling the trait arrows
+#' @return A `ggplot` object with a `"rotation"` attribute
 #' @noRd
 ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
                                  label_sites, site_names,
                                  species_names,
                                  traits = NULL,
                                  trait_arrow_scale = 1) {
+  checkmate::assert_list(svd_comp)
+  checkmate::assert_integerish(which_lvs, len = 2L, lower = 1L,
+                               any.missing = FALSE)
+  checkmate::assert_flag(biplot)
+  checkmate::assert_flag(label_sites)
+  checkmate::assert_atomic_vector(site_names)
+  checkmate::assert_character(species_names, min.len = 1L)
+  checkmate::assert_number(trait_arrow_scale, lower = 0)
   if (any(which_lvs > svd_comp$n_lv)) {
     stop(insight::format_error(c(
       "Selected latent variables exceed the model's `n_lv`.",
@@ -481,7 +533,7 @@ ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
       i = if (svd_comp$n_lv == 1L) {
         "A one-factor model plots with 'plot_factors()'."
       }
-    )))
+    )), call. = FALSE)
   }
   if (length(site_names) != NROW(svd_comp$scores)) {
     stop(insight::format_error(c(
@@ -568,6 +620,7 @@ ordinate.mvgam <- function(
   trait_arrow_scale = 1,
   ...
 ) {
+  checkmate::assert_class(object, "mvgam")
   checkmate::assert_integerish(
     which_lvs, len = 2L, lower = 1L, any.missing = FALSE
   )
@@ -584,10 +637,10 @@ ordinate.mvgam <- function(
   rotation <- match.arg(rotation)
 
   # A trend_map supplies the loading pattern as data. Every rotation
-  # but "none" replaces it with one read off the fitted covariance,
-  # so the axes drawn carry none of the structure that pattern
-  # declared. The notice describes the plot being returned, so it is
-  # raised on each call rather than once per session.
+  # but "none" replaces it with a pattern derived from the fitted
+  # covariance. The plotted axes then lose the declared structure.
+  # The warning describes the returned plot and is raised on every
+  # call.
   if (!is.null(object$trend_metadata$fixed_Z) && rotation != "none") {
     insight::format_warning(c(
       paste0(
@@ -604,10 +657,8 @@ ordinate.mvgam <- function(
   svd_comp <- ordinate_factor_components(object, alpha, rotation)
   species_names <- fitted_series_levels(object)
   # The score rows are the rows of `lv_trend`, one per time on the
-  # fit's own axis, and the axis labels them. A column named `time`
-  # taken from the frame numbered the sites 1 to n on any fit whose
-  # time column had another name. A fit recording no time axis
-  # labels them by position.
+  # fit's time axis. The recorded time values label them. A fit
+  # without a recorded time axis labels them by position.
   site_names <- mvgam_axes(object)$time$values %||%
     seq_len(NROW(svd_comp$scores))
   traits <- resolve_auto_traits(traits, object)
@@ -619,14 +670,18 @@ ordinate.mvgam <- function(
 }
 
 
-#' Internal: resolve `traits = "auto"` to the trait frame stored
-#' on a trait-informed fit, warning if none is found. Returns
-#' the input unchanged when it is `NULL` or already a frame /
-#' matrix, so the downstream `ordinate_trait_arrows()` validator
-#' handles the structural checks.
+#' Resolve `traits = "auto"` to the trait frame of the fit
 #'
+#' Warns when the fit stores no traits. A `NULL`, data frame or matrix
+#' input is returned unchanged. `ordinate_trait_arrows()` checks its
+#' structure.
+#'
+#' @param traits `NULL`, the string `"auto"`, or a data frame or matrix
+#' @param object Fitted `mvgam` object, or a list holding `mv_spec`
+#' @return The trait frame, or `NULL`
 #' @noRd
 resolve_auto_traits <- function(traits, object) {
+  checkmate::assert_list(object)
   if (is.null(traits)) return(NULL)
   if (!is.character(traits)) return(traits)
   if (!identical(traits, "auto")) {
@@ -634,11 +689,11 @@ resolve_auto_traits <- function(traits, object) {
       "Argument 'traits' string value must be 'auto'.",
       x = paste0("Got '", traits[1L], "'."),
       i = "Use traits = NULL, traits = 'auto' or a data.frame."
-    )))
+    )), call. = FALSE)
   }
   found <- ordinate_extract_fit_traits(object)
-  # The overlay the caller asked for is absent from the plot being
-  # returned, so the notice belongs to the call and not the session.
+  # The warning describes the returned plot and is raised on every
+  # call.
   if (is.null(found)) {
     insight::format_warning(c(
       "Argument 'traits = \"auto\"' requires a fit built with traits.",
@@ -651,12 +706,20 @@ resolve_auto_traits <- function(traits, object) {
 }
 
 
-# Internal: species-loading arrow layers for the biplot mode.
-# Prefers `ggarrow::geom_arrow` (tapered arrows weighted by
-# loading magnitude) when `ggarrow` + `ggpp` are installed;
-# falls back to plain `geom_segment` arrows otherwise.
-#'@noRd
+#' Species-loading arrow layers for an ordination biplot
+#'
+#' Draws tapered arrows weighted by loading magnitude with
+#' `ggarrow::geom_arrow()` when ggarrow and ggpp are installed. Plain
+#' `ggplot2::geom_segment()` arrows are drawn otherwise.
+#'
+#' @param sp_dat Data frame of species loadings holding `x` and `y`
+#' @param sp_names Character vector of species labels, one per row of
+#'   `sp_dat`
+#' @return List of ggplot2 layers
+#' @noRd
 ordinate_biplot_layers <- function(sp_dat, sp_names) {
+  checkmate::assert_data_frame(sp_dat)
+  checkmate::assert_character(sp_names, min.len = 1L)
   has_arrow <- requireNamespace("ggarrow", quietly = TRUE) &&
     requireNamespace("ggpp", quietly = TRUE)
   if (has_arrow) {

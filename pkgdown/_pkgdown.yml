@@ -114,8 +114,6 @@ reference:
   contents:
   - get_prior
   - get_prior.default
-  - get_prior.formula
-  - get_prior.brmsformula
   - get_prior.mvgam
   - get_prior.mvgam_formula
   - default_prior.mvgam

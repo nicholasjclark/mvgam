@@ -2,21 +2,22 @@
 % Please edit documentation in R/make_stan.R
 \name{stancode.formula}
 \alias{stancode.formula}
-\alias{stancode.brmsformula}
+\alias{stancode.bform}
 \alias{standata.formula}
-\alias{standata.brmsformula}
+\alias{standata.bform}
 \title{Stan program and data from a formula carrying a \code{trend_formula}}
 \usage{
 \method{stancode}{formula}(object, ...)
 
-\method{stancode}{brmsformula}(object, ...)
+\method{stancode}{bform}(object, ...)
 
 \method{standata}{formula}(object, ...)
 
-\method{standata}{brmsformula}(object, ...)
+\method{standata}{bform}(object, ...)
 }
 \arguments{
-\item{object}{A \code{formula} or \code{brmsformula}.}
+\item{object}{A \code{formula}, or a \code{brmsformula} or \code{mvbrmsformula}
+(both of class \code{bform}).}
 
 \item{...}{Arguments for \code{\link{stancode.mvgam_formula}} or for
 \pkg{brms}, \code{data} and \code{family} among them.}

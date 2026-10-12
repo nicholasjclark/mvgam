@@ -318,7 +318,7 @@ test_that("S3 dispatch works correctly and doesn't mask brms methods", {
   brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
   expect_s3_class(brms_result, "brmsprior")
 
-  # get_prior on regular formula should delegate to brms (via get_prior.formula)
+  # get_prior on regular formula should delegate to brms (via get_prior.default)
   regular_result <- get_prior(y ~ x, family = gaussian(), data = test_data)
   expect_s3_class(regular_result, "brmsprior")
   expect_identical(regular_result, brms_result)
@@ -326,6 +326,27 @@ test_that("S3 dispatch works correctly and doesn't mask brms methods", {
   # Verify that brms methods are not masked for regular formulas
   expect_identical(get_prior(y ~ x, family = gaussian(), data = test_data),
                    brms::get_prior(y ~ x, family = gaussian(), data = test_data))
+})
+
+test_that("a multi-response formula routes its trend_formula to mvgam", {
+  set.seed(4)
+  d <- data.frame(
+    time = rep(1:10, each = 2L), series = factor(rep(c("a", "b"), 10L)),
+    count = rpois(20L, 5), biomass = rnorm(20L)
+  )
+  f <- brms::bf(count ~ 1, family = poisson()) +
+    brms::bf(biomass ~ 1, family = gaussian()) + brms::set_rescor(FALSE)
+  # Without a method for the mvbrmsformula class the call reached brms,
+  # which dropped the trend
+  expect_identical(
+    as.character(stancode(f, trend_formula = ~ RW(), data = d,
+                          validate = FALSE)),
+    as.character(stancode(mvgam_formula(f, trend_formula = ~ RW()),
+                          data = d, validate = FALSE))
+  )
+  expect_identical(
+    standata(f, trend_formula = ~ RW(), data = d)$N_series_trend, 2L
+  )
 })
 
 test_that("embedded families work correctly with bf() formulas", {

@@ -19,8 +19,7 @@ stability(object, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call
-to \code{\link[=mvgam]{mvgam()}} that used a Vector Autoregressive latent process model (either
-as \code{VAR(cor = FALSE)} or \code{VAR(cor = TRUE)})}
+to \code{\link[=mvgam]{mvgam()}} that used a \code{VAR(p = 1)} latent process model}
 
 \item{...}{Unused. Anything passed here is refused.}
 
@@ -46,8 +45,9 @@ see \code{\link[=irf]{irf()}} for details. Requires the \code{future} package
 (mvgam Suggests).}
 }
 \value{
-A \code{data.frame} containing posterior draws for each stability
-metric.
+A \code{data.frame} with the posterior median and interval of
+each stability metric, or under \code{summary = FALSE} an object of class
+\code{mvgam_stability} holding one row of metrics per posterior draw.
 }
 \description{
 Compute reactivity, return rates and contributions of interactions to
@@ -131,7 +131,7 @@ head(stability(var_mod)[, c("reactivity", "mean_return_rate")])
 \references{
 AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003). Estimating
 community stability and ecological interactions from time-series data.
-\emph{Ecological Monographs}, 73, 301–330.
+\emph{Ecological Monographs}, 73, 301-330.
 }
 \seealso{
 \code{\link{VAR}}, \code{\link{irf}}, \code{\link{fevd}},

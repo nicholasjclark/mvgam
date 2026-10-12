@@ -154,7 +154,7 @@ conservative.
 The PIT u is clamped to \verb{[.Machine$double.eps, 1 - .Machine$double.eps]} before \code{qnorm} so the residual
 stays finite even when an observation lies in the extreme
 floating-point tail of the predictive distribution. This
-bound corresponds to \verb{|qnorm(u)| ≈ 8.13}.
+bound corresponds to \verb{|qnorm(u)| ~= 8.13}.
 
 \emph{ndraws sensitivity.} The two routes react differently to
 the posterior draw count:
@@ -164,7 +164,7 @@ on individual posterior draws whose \verb{(mu_d, dpar_d)}
 happen to place the observed \code{y_i} more than ~38 SDs
 from the predictive mean -- \code{pnorm} underflows to exactly
 0 or 1 and the clamp triggers. These look like extreme
-\verb{±8.13} residuals in the per-draw matrix but are a
+\verb{+/-8.13} residuals in the per-draw matrix but are a
 property of the posterior, not a misfit signal. They get
 proportionally rarer with more draws but never vanish.
 \item The empirical route needs enough simulations for the
@@ -172,7 +172,7 @@ empirical predictive CDF to cover the data. With small
 \code{ndraws} many observations land outside the simulated
 range entirely, so \code{u} is exactly 0 or 1 deterministically
 and the clamp turns every draw for that observation into
-\verb{±8.13}. Setting \code{ndraws >= 500} resolves the empirical
+\verb{+/-8.13}. Setting \code{ndraws >= 500} resolves the empirical
 PIT well enough that this artefact disappears in
 typical cases.
 }
@@ -250,7 +250,7 @@ The empirical PIT randomises uniformly across the discrete
 support, so per-unit residuals on fits with small \code{n_rep}
 (~ 2-4 visits) have heavier QQ-tails than analytic
 \code{qnorm(N(0, 1))} lines under a correctly-specified model
-(Dunn & Smyth 1996 §3; Hartig 2024 DHARMa vignette). A
+(Dunn & Smyth 1996 Section 3; Hartig 2024 DHARMa vignette). A
 one-time warning fires when any closure unit has 4 or
 fewer visits; interpret QQ-plots against simulated N(0, 1)
 envelopes rather than the analytic line in that regime.
