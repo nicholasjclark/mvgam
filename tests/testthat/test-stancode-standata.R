@@ -544,7 +544,11 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
     "mu_init_trend = rep_vector(0.0, (N_lags_trend + 1) * N_lv_trend);",
     code_with_trend, fixed = TRUE
   ))
-  expect_true(stan_pattern("init_trend ~ multi_normal\\(mu_init_trend, Omega_trend\\);", code_with_trend))
+  expect_true(stan_pattern(
+    paste0("target += multi_normal_cholesky_lpdf(init_trend | ",
+           "mu_init_trend, cholesky_decompose(Omega_trend));"),
+    code_with_trend, fixed = TRUE
+  ))
   # `Omega_trend` orders `init_trend` most recent first, which puts the
   # lag-i state at occasion t <= i in block i - t + 1. An index ignoring
   # t hands the likelihood one block for two occasions once p >= 2.

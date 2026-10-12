@@ -4050,7 +4050,9 @@ var_heaps_functions_stanvar <- function() {
        * Square root of a symmetric positive definite matrix, by its
        * eigendecomposition. The eigenvalues are the diagonal of
        * V' A V, which takes one decomposition where a call for the
-       * values takes a second.
+       * values takes a second. The test for definiteness is relative to
+       * the largest eigenvalue. A covariance in small data units has
+       * every eigenvalue small and stays well conditioned.
        * @param A Symmetric positive definite matrix (m x m)
        * @return The symmetric square root of A
        */
@@ -4058,7 +4060,7 @@ var_heaps_functions_stanvar <- function() {
         int m = rows(A);
         matrix[m, m] evecs = eigenvectors_sym(A);
         vector[m] eigenvals = diagonal(quad_form(A, evecs));
-        if (min(eigenvals) <= 1e-12) {
+        if (min(eigenvals) <= 1e-12 * max(eigenvals)) {
           reject(\"sqrtm needs a positive definite matrix\");
         }
         return tcrossprod(diag_post_multiply(evecs,
@@ -4227,12 +4229,12 @@ var_coef_prior_scode <- function(coef, mu, omega, lag, indent) {
 #' block-diagonal matrices over the groups.
 #'
 #' The cost of a gradient grows with the series. A VAR takes
-#' `Omega_trend` from the autocovariances the map returns, where a
-#' VARMA solves a Lyapunov equation of side `(p m)^2`. A grouped VARMA
-#' solves one per group, at side `(p s)^2` for `s` series. The conditional
-#' means of a VAR are one matrix product per lag. The density of every
-#' state is one triangular solve against `L_Sigma_trend`, which every
-#' path declares.
+#' `Omega_trend` from the autocovariances the map returns. A VARMA
+#' solves a Lyapunov equation of side `(p m)^2`. A grouped VARMA solves
+#' one per group, at side `(p s)^2` for `s` series. The conditional
+#' means are one matrix product per lag. The states' density is one
+#' triangular solve against `L_Sigma_trend`. Sampled loadings make the
+#' innovations standard normal. Their density takes no solve.
 #'
 #' @param trend_specs Trend specification from `VAR()`
 #' @param data_info Data information list
@@ -4379,7 +4381,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info,
           "rep_matrix(0, N_lv_trend, N_lv_trend), ", ma_lags, ");\n"
         )
       },
-      "      cov_matrix[", init_dim_expr, "] Omega_trend;\n",
+      "      matrix[", init_dim_expr, ", ", init_dim_expr, "] Omega_trend;\n",
       "      {\n",
       "        array[N_lags_trend] matrix[N_lv_trend, N_lv_trend]\n",
       "          Gamma_trend = ", zero_lags, ";\n",
@@ -4399,9 +4401,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info,
           "                           Sigma_group_trend[g_idx]);\n",
           "        Theta_trend[1][members, members] = -result_ma[1, 1];\n",
           "        array[N_lags_trend]\n",
-          "          matrix[N_subgroups_trend, N_subgroups_trend] gamma_group\n",
-          "          = varma_autocov(Sigma_group_trend[g_idx], result_group[1],\n",
-          "                          -result_ma[1, 1]);\n"
+          "          matrix[N_subgroups_trend, N_subgroups_trend]\n",
+          "          gamma_group = varma_autocov(Sigma_group_trend[g_idx],\n",
+          "                          result_group[1], -result_ma[1, 1]);\n"
         )
       },
       "        for (lag in 1:N_lags_trend) {\n",
@@ -4422,17 +4424,28 @@ generate_var_trend_stanvars <- function(trend_specs, data_info,
           "identity_matrix(N_lv_trend);\n\n"
         )
       },
-      "      matrix[N_lv_trend, N_lv_trend] L_Sigma_trend\n",
-      "        = diag_pre_multiply(sigma_trend, L_Omega_trend);\n",
-      "      cov_matrix[N_lv_trend] Sigma_trend\n",
-      "        = multiply_lower_tri_self_transpose(L_Sigma_trend);\n\n",
+      if (unit_factors) {
+        paste0(
+          "      matrix[N_lv_trend, N_lv_trend] L_Sigma_trend\n",
+          "        = identity_matrix(N_lv_trend);\n",
+          "      cov_matrix[N_lv_trend] Sigma_trend",
+          " = identity_matrix(N_lv_trend);\n\n"
+        )
+      } else {
+        paste0(
+          "      matrix[N_lv_trend, N_lv_trend] L_Sigma_trend\n",
+          "        = diag_pre_multiply(sigma_trend, L_Omega_trend);\n",
+          "      cov_matrix[N_lv_trend] Sigma_trend\n",
+          "        = multiply_lower_tri_self_transpose(L_Sigma_trend);\n\n"
+        )
+      },
       "      // Stationary coefficients from the partial autocorrelations\n",
       "      array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] Phi_trend;\n",
       if (is_varma) {
         paste0("      array[", ma_lags, "] matrix[N_lv_trend, N_lv_trend] ",
                "Theta_trend;\n")
       },
-      "      cov_matrix[", init_dim_expr, "] Omega_trend;\n",
+      "      matrix[", init_dim_expr, ", ", init_dim_expr, "] Omega_trend;\n",
       "      {\n",
       "        array[2, N_lags_trend]\n",
       "          matrix[N_lv_trend, N_lv_trend] result_var\n",
@@ -4567,25 +4580,35 @@ generate_var_trend_stanvars <- function(trend_specs, data_info,
   var_hyperpriors <- var_hyperprior_statements(
     prior, "Amu_trend", "Aomega_trend"
   )
-  
+
+  # Each state's multivariate normal density given its conditional mean,
+  # summed over the occasions. Unit factors have independent standard
+  # normal innovations. Correlated innovations take one triangular solve.
+  state_density <- if (unit_factors) {
+    "target += std_normal_lpdf(to_vector(lv_trend - mu_lv_trend));"
+  } else {
+    paste0(
+      "target += std_normal_lpdf(to_vector(mdivide_left_tri_low(\n",
+      "                  L_Sigma_trend, (lv_trend - mu_lv_trend)')))\n",
+      "                - N_time_trend * sum(log(diagonal(L_Sigma_trend)));"
+    )
+  }
+
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
     scode = glue::glue("
       // The states before the first occasion, at their joint
       // stationary law
-      vector[{init_dim_expr}] mu_init_trend = rep_vector(0.0, {init_dim_expr});
-      init_trend ~ multi_normal(mu_init_trend, Omega_trend);
+      init_trend ~ multi_normal_cholesky(mu_init_trend,
+                                         cholesky_decompose(Omega_trend));
 
       // The conditional mean of every state
       matrix[N_time_trend, N_lv_trend] mu_lv_trend
         = rep_matrix(0.0, N_time_trend, N_lv_trend);
 {var_mean_scode}
 
-      // Each state's multivariate normal density given its conditional
-      // mean, summed over the occasions through one triangular solve
-      target += std_normal_lpdf(to_vector(mdivide_left_tri_low(
-                  L_Sigma_trend, (lv_trend - mu_lv_trend)')))
-                - N_time_trend * sum(log(diagonal(L_Sigma_trend)));
+      // Each state's density given its conditional mean
+      {state_density}
 
       {var_priors_block}
 
@@ -4630,6 +4653,14 @@ generate_var_trend_stanvars <- function(trend_specs, data_info,
     scale_innovations = FALSE
   )
 
+  # The stationary law of the first states has mean zero
+  var_tdata_stanvar <- brms::stanvar(
+    name = "var_tdata",
+    scode = paste0("vector[", init_dim_expr, "] mu_init_trend = ",
+                   "rep_vector(0.0, ", init_dim_expr, ");"),
+    block = "tdata"
+  )
+
   # A VAR samples its states directly, as parameters.
   lv_trend_stanvar <- brms::stanvar(
     name = "lv_trend",
@@ -4639,7 +4670,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info,
   components <- list(
     matrix_z, var_heaps_functions_stanvar(),
     stationary_joint_functions_stanvar(if (is_varma) "varma" else "var"),
-    var_data_stanvar, var_parameters_stanvar,
+    var_data_stanvar, var_tdata_stanvar, var_parameters_stanvar,
     var_ma_parameters_stanvar,
     lv_trend_stanvar, hierarchical, var_tparameters_stanvar,
     var_model_stanvar, trend_computation

@@ -258,6 +258,14 @@ test_that("a VAR or VARMA start covariance holds the companion's law", {
       tolerance = tol_k
     )
   }
+  # Every eigenvalue of a covariance in small data units lies below
+  # 1e-12. The map scales its autocovariances with the covariance. Its
+  # square roots test definiteness against the largest eigenvalue.
+  P <- list(pacf_matrix(matrix(c(0.3, 0.1, -0.2, 0.4), 2L)),
+            pacf_matrix(matrix(c(-0.2, 0.3, 0.1, 0.2), 2L)))
+  Sigma <- matrix(c(1, 0.5, 0.5, 1), 2L)
+  expect_equal(rev_mapping(P, 1e-14 * Sigma)[[2]][[1]],
+               1e-14 * rev_mapping(P, Sigma)[[2]][[1]], tolerance = tol)
 })
 
 

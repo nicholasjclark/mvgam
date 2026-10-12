@@ -157,8 +157,11 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     for (block in summary_blocks()) {
       idx <- kind %in% block$kinds & on_side
       if (any(idx)) {
+        # A side without group-level terms has no metadata. Its
+        # `ngrps` is then an unnamed empty vector.
         out[[paste0(prefix, block$key)]] <- summary_block_rows(
-          all_summaries[idx, , drop = FALSE], block, names(ngrps)
+          all_summaries[idx, , drop = FALSE], block,
+          names(ngrps) %||% character()
         )
       }
     }
