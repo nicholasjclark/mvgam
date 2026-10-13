@@ -23,590 +23,630 @@ knitr::opts_chunk$set(
   out.width = "85%", fig.align = "center"
 )
 library(mvgam)
-library(brms)
-library(dplyr)
 library(ggplot2)
 theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 ```
 
-Vector autoregressions describe how a small collection of time
-series move together over time by letting each series depend on
-its own recent past and on the recent past of every other series
+Do the plankton of a lake regulate one another from month to month,
+or do they rise and fall with the same seasons and nutrients? A
+vector autoregression (VAR) separates the two. It lets the state of
+each taxon this month depend on the state of every taxon last month.
+The coefficients of that dependence form a matrix $A$. Its
+off-diagonal cells are the lagged interactions between taxa
 (Lütkepohl [2005](https://doi.org/10.1007/978-3-540-27752-1)).
-The version implemented in mvgam adds a state-space layer on
-top. The observed counts sit above a latent vector autoregression
-whose innovations may be correlated across series (Heaps
-[2023](https://doi.org/10.1080/10618600.2022.2079648); Auger-Méthé
-et al. [2021](https://doi.org/10.1002/ecm.1470)). The payoff for
-that extra machinery is what the posterior over the transition
-matrix $A$ and the innovation covariance $\Sigma$ then supports.
-Lagged interactions can be read cell by cell, impulse responses
-trace how a shock at one series moves the others, forecast error
-variance decompositions apportion predictive uncertainty across
-its sources, and community stability metrics such as reactivity
-and return rate say whether the system amplifies or absorbs
-perturbations. This article works through each of them on an
-annual kestrel abundance dataset shipped with the MARSS package.
+
+mvgam fits the VAR to latent states. Because each measurement
+carries observation error of its own (Auger-Méthé et al.
+[2021](https://doi.org/10.1002/ecm.1470)), a separate observation
+model links those states to the data. This article fits that
+model to five plankton taxa from Lake Washington, then works through
+what a fitted VAR offers: the interactions in $A$, the correlation
+of the taxa's shocks, impulse responses, variance decompositions,
+stability metrics and forecasts.
 
 ## The data
 
-American kestrel (*Falco sparverius*) abundance was surveyed by
-the North American Breeding Bird Survey across three adjacent
-Canadian regions (British Columbia, Alberta, Saskatchewan) from
-1969 to 2008. Detection-adjusted annual counts are distributed
-with the MARSS package (Holmes et al.
-[2012](https://doi.org/10.32614/RJ-2012-002)); we invert the log
-transform inside the raw file so the response sits on the natural
-count scale, then reshape to long form with a `series` factor
-and a `time` column.
+The MARSS package (Holmes et al.
+[2012](https://doi.org/10.32614/RJ-2012-002)) distributes monthly
+plankton densities and water conditions for Lake Washington from
+1962 to 1994, drawn from the long-term monitoring of W. T. Edmondson.
+In the transformed version each density is log-transformed and then
+z-scored over the whole record, with zero counts recorded as missing.
+
+We use the fifteen years from 1980 to 1994. That window is long
+enough to estimate monthly interactions and short enough to fit in
+minutes. We use five taxa. Four are
+groups of phytoplankton: diatoms, green algae, unicellular algae and
+the cryptophyte *Cryptomonas*. The fifth is *Daphnia*, a grazing
+zooplankter that eats them. Two water conditions enter as
+covariates. Temperature has a strong seasonal cycle. Because a smooth
+of month describes that cycle, the covariate is the temperature
+anomaly, each month's temperature less the mean for its calendar
+month. Phosphorus income controlled the growth of algae in
+Lake Washington (Edmondson and Lehman
+[1981](https://doi.org/10.4319/lo.1981.26.1.0001)). Total
+phosphorus averaged over the twelve months to each month measures
+that nutrient loading.
 
 ```{r data}
-load(url("https://github.com/atsa-es/MARSS/raw/master/data/kestrel.rda"))
-regions <- c("BC", "Alb", "Sask")
-model_data <- do.call(rbind, lapply(seq_along(regions), function(x) {
+load(url("https://github.com/atsa-es/MARSS/raw/master/data/lakeWAplankton.rda"))
+lake <- as.data.frame(lakeWAplanktonTrans)
+lake$TP_annual <- as.numeric(
+  stats::filter(lake$TP, rep(1 / 12, 12), sides = 1)
+)
+lake <- lake[lake$Year >= 1980, ]
+lake$time <- seq_len(nrow(lake))
+lake$temp_anom <- lake$Temp - ave(lake$Temp, lake$Month)
+
+taxa <- c("Diatoms", "Greens", "Unicells", "Cryptomonas", "Daphnia")
+plankton <- do.call(rbind, lapply(taxa, function(taxon) {
   data.frame(
-    year = kestrel[, 1],
-    adj_count = exp(kestrel[, 1 + x]),
-    region = regions[x]
+    y = lake[[taxon]], time = lake$time, year = lake$Year,
+    month = lake$Month, temp_anom = lake$temp_anom,
+    TP_annual = lake$TP_annual, series = taxon
   )
-})) |>
-  dplyr::mutate(series = as.factor(region), time = year) |>
-  as.data.frame()
+}))
+plankton$series <- factor(plankton$series, levels = taxa)
 ```
 
-A quick look at the observed series with `mvgam_data()`, holding
-the last five years out for forecast scoring:
+The data are in long format, one row per taxon and month. `series`
+names the taxon and `time` counts the months. The order of the
+levels of `series` fixes the order of the taxa in every output
+below. We hold 1994 out to score forecasts against:
 
-```{r train-test}
-train <- model_data[model_data$year < 2004, ]
-test  <- model_data[model_data$year >= 2004, ]
+```{r split}
+train <- plankton[plankton$year < 1994, ]
+test <- plankton[plankton$year == 1994, ]
 ```
 
-```{r plot-observed, fig.cap = "Annual detection-adjusted kestrel counts across the three regions. The last five years are held out."}
-mvgam_data(train, y = "adj_count", family = Gamma(link = "log"),
-           newdata = test)
+`mvgam_data()` checks the data against the model's requirements and
+plots each series, with the held-out months marked:
+
+```{r plot-data, fig.asp = 0.75, fig.cap = "Monthly log densities of the five taxa, z-scored over 1962 to 1994. The final year is held out."}
+mvgam_data(train, family = gaussian(), newdata = test)
 ```
 
-Counts sit in a similar range across regions and tick along
-without a strong long-run trend. They also share the kind of
-annual excursions that a vector autoregression is designed to
-describe (a good year in British Columbia tends to line up with
-a reasonable year in Alberta, and so on).
+Each taxon cycles through the seasons. The unicellular algae also
+decline from 1980 until about 1988 and then level off, with two
+brief collapses near the end of the decline. A seasonal model alone
+would miss that decline.
 
-## Building a state-space VAR(1)
+## The model
 
-The observed part of the model is a Gamma likelihood; because
-the response is stacked with `series` as a factor and one
-family covers all rows, mvgam fits a single shared shape
-parameter by default. The latent part is a first-order vector
-autoregression with correlated innovations, `VAR(cor = TRUE)`,
-driven by a region intercept:
+The model has two layers. The observation layer says that each
+log density $y_{s,t}$ measures a latent state $x_{s,t}$ with
+observation error, whose standard deviation $\sigma_s$ differs by
+taxon:
+
+$$
+y_{s,t} \sim \mathrm{Normal}(x_{s,t},\ \sigma_s).
+$$
+
+The latent state is a mean set by the covariates plus a deviation
+$z_{s,t}$ that follows the VAR:
 
 $$
 \begin{aligned}
-y_{r, t}  \;&\sim\; \mathrm{Gamma}\!\left(\mathrm{shape},\; \mu_{r, t}\right) \\
-1 / \mu_{r, t} \;&=\; z_{r, t} \\
-\mathbf{z}_t \;&\sim\; \mathrm{MVN}\!\left(\alpha_{\mathrm{region}} + A\,\mathbf{z}_{t-1},\; \Sigma\right).
+x_{s,t} &= \alpha_s + \beta_s\,\mathrm{TP}_t
+  + \gamma_s\,\mathrm{temp}_t + f_s(\mathrm{month}_t) + z_{s,t}, \\
+\mathbf{z}_t &\sim \mathrm{MVN}(A\,\mathbf{z}_{t-1},\ \Sigma).
 \end{aligned}
 $$
 
-Priors for the region intercepts and the innovation SD are pulled
-in tighter than the defaults so the sampler does not have to
-learn scale from three dozen observations per region. A latent
-state per region per year is a lot of correlated parameters for
-a series this short, so the fit runs four chains at
-`adapt_delta = 0.99` rather than the defaults; at two chains and
-a looser target the individual states mix too poorly to support
-the intervals reported below.
+Each taxon has its own level $\alpha_s$ and seasonal smooth $f_s$,
+with its own slopes on phosphorus loading and on the temperature
+anomaly. $A$ holds the lagged effects among the deviations. $\Sigma$
+holds the covariance of the monthly shocks. The VAR describes how
+taxa push one another away from their seasonal and nutrient-driven
+means. Seasonality itself stays out of $A$.
 
-```{r fit-code}
-varmod <- mvgam(
-  formula       = adj_count ~ -1,
-  trend_formula = ~ region + VAR(cor = TRUE),
-  priors        = c(
-    prior(std_normal(), class = b_trend),
-    prior(exponential(2.5), class = sigma_trend)
-  ),
-  data          = train,
-  newdata       = test,
-  family        = Gamma(link = "log"),
-  control       = list(adapt_delta = 0.99),
-  chains        = 4,
-  iter          = 3000,
-  warmup        = 1500,
-  silent        = 2
+mvgam's `VAR()` keeps the process stationary: after a disturbance,
+every deviation returns towards zero. The prior on $A$ enforces this
+(Heaps [2023](https://doi.org/10.1080/10618600.2022.2079648)). A
+stationary VAR cannot absorb a slow drift in a taxon's mean. When we
+fitted the model without phosphorus, the four chains disagreed about
+the level of the unicellular algae, whose decline nothing in that
+model explained.
+The phosphorus slope gives the drift a cause outside the VAR.
+
+The observation and process variances both describe scatter around
+the same latent state. Fourteen years of data from one lake separate
+them poorly: a month's departure could be observation error or real
+change. The prior on $\log\sigma_s$ supplies the missing
+information. We centred it on $\log 0.25$ with a standard deviation
+of $0.2$, which places observation error near a quarter of a standard
+deviation of log density, below the change in the populations from
+month to month. The data still move each taxon's observation standard
+deviation away from that prior.
+
+In mvgam the trend formula holds the latent model. `lv_axis()` gives
+a term a separate effect for each taxon. `bf()` gives the
+observation standard deviation a formula of its own. With
+`sigma ~ 0 + series`, it takes one value per taxon. The observation
+formula `y ~ -1` adds nothing to the latent state.
+
+```{r fit}
+fit <- mvgam(
+  formula = bf(y ~ -1, sigma ~ 0 + series),
+  trend_formula = ~ lv_axis() + TP_annual:lv_axis() +
+    temp_anom:lv_axis() + s(month, by = lv_axis(), bs = "cc", k = 5) +
+    VAR(cor = TRUE),
+  family = gaussian(),
+  data = train,
+  newdata = test,
+  knots = list(month = c(0.5, 12.5)),
+  priors = prior(normal(-1.4, 0.2), class = b, dpar = sigma),
+  chains = 4,
+  iter = 1500,
+  warmup = 750,
+  control = list(adapt_delta = 0.95),
+  seed = 1980,
+  silent = 2
 )
 ```
 
-If instead you want each region to carry its own shape
-parameter, express that through the brms distributional
-formula. `mvgam_formula()` accepts a `brmsformula` on the
-observation side, so `bf(adj_count ~ 0, shape ~ series - 1)`
-would give one shape per region, at the cost of tying up more
-parameters on a modest dataset.
+`bs = "cc"` makes each seasonal smooth cyclic. December then joins
+January, at the boundary that `knots` places between them.
+`cor = TRUE` estimates the correlations among the shocks in
+$\Sigma$. Passing `newdata` stores the held-out year on the model
+for forecasting. `seed` makes the sampling reproducible.
 
-```{r region-order, include = FALSE}
-# The latent processes are ordered by the levels of the series
-# factor, which is alphabetical and not the order the regions were
-# assembled in. Everything downstream labels itself from this.
-region_order <- levels(train$series)
-n_reg <- length(region_order)
+```{r helpers, include = FALSE}
+# Format an estimate with its interval for inline reporting
+ci <- function(est, lo, hi, digits = 2) {
+  # A value that rounds to zero prints without a minus sign
+  f <- function(v) sub("^-(0\\.0+)$", "\\1",
+                       formatC(v, format = "f", digits = digits))
+  paste0(f(est), " [", f(lo), ", ", f(hi), "]")
+}
 ```
 
-## Model summary
+## Checking the fit
 
-`summary()` on a VAR fit splits the parameter table between the
-observation model (here a single shared shape) and the trend
-model (the region intercepts, the innovation SDs and the
-hyperparameters of the Heaps prior on the transition matrix).
-`matrices = TRUE` adds a row for every cell of the transition
-matrix `Phi_trend` and the innovation covariance `Sigma_trend`.
+We first checked that the model reproduces the data. `pp_check()`
+draws replicate data sets from the posterior and overlays their
+densities on the observed one, here separately for each taxon:
 
-```{r summary}
-summary(varmod)
+```{r ppc, fig.asp = 0.75, fig.cap = "Density of the observed values (dark line) and of 50 replicate data sets drawn from the posterior (light lines), one panel per taxon."}
+pp_check(fit, type = "dens_overlay_grouped", group = "series",
+         ndraws = 50)
 ```
 
-The three region intercepts sit close to zero on the
-inverse link scale, and the VAR self-coefficients on the diagonal
-of $A$ (`Phi_trend[1,i,i]`, plotted below) are all positive and bounded
-well below one, so the Heaps
-([2023](https://doi.org/10.1080/10618600.2022.2079648)) prior
-that guarantees stationarity is not pushing against the data.
+The simulated densities bracket the observed density of every taxon.
+They reproduce the two peaks of *Daphnia*, which spends winter scarce
+and summer abundant.
 
-## Inspecting the transition matrix
+## What sets the means
 
-The lagged dependence structure lives in the $3 \times 3$
-matrix $A$. `mcmc_plot()` with `variable = "Phi_trend"` and
-`type = "hist"` shows the posterior for every cell. Passing
-`facet_args = list(dir = "v")` walks the facets column-first, so
-row $i$, column $j$ (the effect of process $j$'s state at time
-$t-1$ on process $i$ at time $t$) sits where you would draw it
-by hand.
+The covariates and seasonal smooths give each taxon's expected log
+density when no taxon deviates from its mean. `fixef()` with
+`trend_effects = TRUE` reports the coefficients of the trend formula:
 
-```{r plot-A, fig.cap = "Posterior histograms for each cell of the VAR transition matrix A. Diagonals capture self-lag; off-diagonals capture lagged cross-region effects."}
-mcmc_plot(
-  varmod,
-  variable    = "Phi_trend",
-  regex       = TRUE,
-  type        = "hist",
-  facet_args  = list(dir = "v")
+```{r fixef}
+round(fixef(fit, trend_effects = TRUE), 2)
+```
+
+```{r fixef-numbers, include = FALSE}
+fe <- fixef(fit, trend_effects = TRUE)
+fx <- function(term) {
+  row <- paste0(term, "_trend")
+  ci(fe[row, "Estimate"], fe[row, "Q2.5"], fe[row, "Q97.5"])
+}
+fe_tp_uni <- fx("seriesUnicells:TP_annual")
+fe_temp_dia <- fx("seriesDiatoms:temp_anom")
+```
+
+Because total phosphorus fell across the record, the positive slope
+of the unicellular algae on phosphorus predicts the decline the first
+figure shows. Their slope is `r fe_tp_uni` standard deviations of log
+density per unit of phosphorus. The intervals of the other four phosphorus slopes span
+zero.
+
+mvgam computes effects on the outcome scale through the
+marginaleffects package (Arel-Bundock et al.
+[2024](https://doi.org/10.18637/jss.v111.i09)). Every call here
+passes `type = "expected"`, which predicts the expected log density
+$E[y]$ and leaves observation error out of the interval drawn around
+it. The marginaleffects default, `type = "response"`, draws new
+observations with their observation error. A contrast between two
+such predictions carries that error twice. Slopes and comparisons
+come from the expected log density under either setting.
+`avg_slopes()` averages the
+slope of the expected log density over the data, here separately for
+each taxon:
+
+```{r slopes}
+marginaleffects::avg_slopes(fit, variables = "TP_annual",
+                            by = "series", type = "expected")
+```
+
+In a Gaussian model with an identity link, each slope has the
+posterior of its coefficient. The table reports medians, where
+`fixef()` reports means. Under a nonlinear link they differ. `avg_slopes()`
+then reports the change on the outcome scale, which the coefficients
+do not give directly. `conditional_effects()` draws each effect with
+the other covariates held at their means:
+
+```{r ce-tp, fig.asp = 0.75, fig.cap = "Expected log density against twelve-month total phosphorus for each taxon, with 95% credible intervals."}
+conditional_effects(fit, effects = "TP_annual", type = "expected")
+```
+
+The seasonal smooths carry the cycle that dominated the data plot:
+
+```{r ce-month, fig.asp = 0.75, fig.cap = "Seasonal smooths of expected log density by calendar month, with 95% credible intervals."}
+conditional_effects(fit, effects = "month", type = "expected")
+```
+
+Diatoms peak in spring and reach their low in autumn. Green algae and
+*Daphnia* peak in mid-summer. *Cryptomonas* peaks in April. The
+temperature anomaly adds little once season is in the model. Its
+largest slope, for the diatoms, is `r fe_temp_dia`.
+
+## Interactions among the taxa
+
+`posterior_transition_matrix()` summarises the transition matrix
+cell by cell. Row $i$, column $j$ is the effect of taxon $j$'s deviation last
+month on taxon $i$'s deviation this month:
+
+```{r A}
+A <- posterior_transition_matrix(fit)
+A
+```
+
+```{r A-numbers, include = FALSE}
+cell <- function(i, j) ci(A$A[i, j], A$A_lower[i, j], A$A_upper[i, j])
+fe_a_dc <- cell("Cryptomonas", "Daphnia")
+fe_a_cd <- cell("Daphnia", "Cryptomonas")
+fe_a_dia <- cell("Diatoms", "Cryptomonas")
+fe_a_cd_pos <- sprintf("%.0f%%",
+                       100 * A$prob_positive["Daphnia", "Cryptomonas"])
+fe_a_diag <- sprintf("%.2f", range(diag(A$A)))
+clear <- A$A_lower > 0 | A$A_upper < 0
+diag(clear) <- FALSE
+# The prose below names two clear cells
+stopifnot(sum(clear) == 2L, clear["Cryptomonas", "Daphnia"],
+          clear["Diatoms", "Cryptomonas"])
+```
+
+The diagonal describes persistence. Each taxon's deviation carries a
+coefficient between `r fe_a_diag[1]` and `r fe_a_diag[2]` into the
+next month. The heatmap outlines each cell whose
+95% interval excludes zero:
+
+```{r plot-A, fig.width = 6, fig.asp = 0.8, fig.cap = "Posterior mean of the transition matrix. Rows are the taxa at month t and columns the taxa at month t - 1. Outlined cells have 95% credible intervals that exclude zero."}
+plot(A)
+```
+
+Two of the twenty off-diagonal cells clear zero. The first is
+grazing. A month with more *Daphnia* than expected is followed by
+fewer *Cryptomonas*, with a coefficient of `r fe_a_dc`. The effect of
+*Cryptomonas* on *Daphnia* is `r fe_a_cd`. It is positive in
+`r fe_a_cd_pos` of the posterior draws, which suggests that more food
+in one month brings more grazers in the next. Fourteen years of
+monthly data do not settle that effect.
+
+The second cell links *Cryptomonas* to the diatoms. A month with more
+*Cryptomonas* than expected is followed by more diatoms, with a
+coefficient of `r fe_a_dia`. Because no feeding link runs between
+two phytoplankton groups, the likelier source is a driver the model
+omits, such as a change in mixing that favours one group before the
+other. A coefficient in $A$ records that one deviation predicts
+another without naming a mechanism.
+
+## Shocks and states
+
+The transition matrix describes how taxa push one another over time.
+The innovation covariance $\Sigma$ describes which taxa receive the
+same unmodelled push in the same month. A change in light or mixing
+that the covariates miss would appear as a correlation between the
+shocks of the taxa it affects. `residual_cor()` with
+`covariance = "innovation"` reports these correlations:
+
+```{r rc-innov}
+rc_innov <- residual_cor(fit, covariance = "innovation")
+summary(rc_innov)
+```
+
+```{r rc-numbers, include = FALSE}
+pair <- function(rc, a, b) {
+  s <- summary(rc)
+  r <- s[(s$series_1 == a & s$series_2 == b) |
+           (s$series_1 == b & s$series_2 == a), ]
+  ci(r$Estimate, r$Q_lower, r$Q_upper)
+}
+fe_i_uc <- pair(rc_innov, "Unicells", "Cryptomonas")
+fe_i_cd <- pair(rc_innov, "Cryptomonas", "Daphnia")
+```
+
+The shocks of the unicellular algae and *Cryptomonas* correlate most
+strongly, at `r fe_i_uc`. The model holds no covariate that would explain the shared rise.
+
+The default, `covariance = "stationary"`, correlates the deviations
+themselves. Each deviation accumulates the shocks of many months,
+passed through $A$:
+
+```{r rc-stat, fig.width = 6, fig.asp = 0.8, fig.cap = "Posterior mean correlations among the deviations of the five taxa. Outlined pairs have 95% credible intervals that exclude zero."}
+rc <- residual_cor(fit)
+plot(rc)
+```
+
+```{r rc-stat-numbers, include = FALSE}
+fe_s_uc <- pair(rc, "Unicells", "Cryptomonas")
+fe_s_cd <- pair(rc, "Cryptomonas", "Daphnia")
+# The prose below says grazing weakens the Cryptomonas-Daphnia
+# correlation and that the Unicells-Cryptomonas pair agrees
+est <- function(rc, a, b) rc$cor[a, b]
+stopifnot(
+  est(rc, "Cryptomonas", "Daphnia") <
+    est(rc_innov, "Cryptomonas", "Daphnia"),
+  abs(est(rc, "Unicells", "Cryptomonas") -
+        est(rc_innov, "Unicells", "Cryptomonas")) < 0.05
 )
 ```
 
-```{r a-numbers, include = FALSE}
-A_post <- as.matrix(varmod, variable = "^Phi_trend\\[", regex = TRUE)
-a_cell <- function(i, j) A_post[, sprintf("Phi_trend[1,%d,%d]", i, j)]
-a_diag_min <- min(vapply(seq_len(n_reg),
-                         function(i) mean(a_cell(i, i) > 0), numeric(1)))
-off <- expand.grid(i = seq_len(n_reg), j = seq_len(n_reg))
-off <- off[off$i != off$j, ]
-off$p_pos <- apply(off, 1L, function(r) mean(a_cell(r[["i"]], r[["j"]]) > 0))
-best <- off[which.max(off$p_pos), ]
-fe_a_diag <- sprintf("%.2f", a_diag_min)
-fe_a_best <- sprintf("%s on %s", region_order[best$j], region_order[best$i])
-fe_a_best_p <- sprintf("%.2f", best$p_pos)
+The two correlations differ where $A$ couples the taxa. The shocks of
+*Cryptomonas* and *Daphnia* correlate at `r fe_i_cd`. Their
+deviations correlate at `r fe_s_cd`. Grazing pulls the two deviations
+apart over the following months, which weakens the correlation the
+shared shocks create. $A$ barely couples the unicellular algae and
+*Cryptomonas*. Their correlations agree: `r fe_i_uc` for the shocks
+and `r fe_s_uc` for the deviations.
+
+## Impulse responses
+
+An impulse response gives the expected path of every taxon after a
+single shock to one of them (Lütkepohl
+[2005](https://doi.org/10.1007/978-3-540-27752-1)). `irf()` computes
+the generalised impulse response by default (Pesaran and Shin
+[1998](https://doi.org/10.1016/S0165-1765(97)00214-0)). The shock to
+one taxon brings with it the shocks that its correlated taxa receive
+in the same month, in the proportions $\Sigma$ implies. Horizon 1 is
+the month of the shock.
+
+```{r irf}
+irfs <- irf(fit, h = 12)
 ```
 
-The diagonal carries the clearest signal. Each region's own state
-at $t-1$ raises its state at $t$, with at least
-`r fe_a_diag` of the posterior above zero for all three, so a
-good year tends to be followed by another. The off-diagonals are
-weaker and none of them separates from zero. The strongest is the
-effect of `r fe_a_best`, at `r fe_a_best_p` of the posterior
-above zero, which is suggestive and no more. Note the index
-order: `Phi_trend[1,i,j]` is the effect of process $j$ on process
-$i$, and the processes follow the levels of the series factor, so
-`region_order` above is what names them.
+`plot()` with `series = 5` draws the responses to a shock in the
+fifth taxon, *Daphnia*:
 
-## Inspecting the innovation covariance
-
-The innovation covariance $\Sigma$ says which regions take the
-same shock in the same year, the common weather or
-detection-effort excursion that nudges several surveys at once.
-`Sigma_trend` is saved directly, so `cov2cor()` on each draw puts
-it on a correlation scale, labelled by `region_order` rather than
-by hand.
-
-```{r sigma-cor}
-Sig_post <- as.matrix(varmod, variable = "^Sigma_trend\\[", regex = TRUE)
-cor_draws <- t(apply(Sig_post, 1, function(v) {
-  as.numeric(cov2cor(matrix(v, n_reg, n_reg)))
-}))
-med_cor <- matrix(apply(cor_draws, 2, median), n_reg, n_reg)
-dimnames(med_cor) <- list(region_order, region_order)
-round(med_cor, 2)
+```{r plot-irf, fig.asp = 0.75, fig.cap = "Generalised impulse responses of each taxon to a one standard deviation shock in Daphnia, with 95% credible intervals. Horizon 1 is the month of the shock."}
+plot(irfs, series = 5)
 ```
-
-```{r sigma-numbers, include = FALSE}
-inn <- function(a, b) {
-  i <- match(a, region_order)
-  j <- match(b, region_order)
-  z <- cor_draws[, (j - 1) * n_reg + i]
-  sprintf("%.2f (%.2f to %.2f)", median(z),
-          quantile(z, 0.05), quantile(z, 0.95))
-}
-fe_alb_bc <- inn("Alb", "BC")
-fe_alb_sask <- inn("Alb", "Sask")
-fe_bc_sask <- inn("BC", "Sask")
-```
-
-Read those against the map before reading anything into them.
-British Columbia and Saskatchewan sit at either end of the
-transect with Alberta between them, so adjacency would predict
-the two neighbouring pairs correlating and the far pair not.
-That is not the pattern. Alberta and British Columbia sit at
-`r fe_alb_bc`, the two non-adjacent provinces at `r fe_bc_sask`,
-and the other adjacent pair, Alberta and Saskatchewan, at
-`r fe_alb_sask`. Every one of those intervals covers zero, so the
-honest summary is that 35 years of annual counts do not resolve
-the contemporaneous correlations at all, and geography is not
-waiting inside them to be found.
-
-The correlation between the *states*, rather than between the
-shocks, is a different question and a better answered one.
-`residual_cor()` reports it, reading the stationary covariance
-the model derives from $A$ and $\Sigma$ together, so it describes
-where the latent processes settle rather than how far a single
-year moves them:
-
-```{r resid-cor}
-rc <- residual_cor(varmod)
-round(rc$cor, 2)
-```
-
-```{r resid-cor-numbers, include = FALSE}
-sta <- function(a, b) {
-  i <- match(a, rownames(rc$cor))
-  j <- match(b, colnames(rc$cor))
-  sprintf("%.2f (%.2f to %.2f)", rc$cor[i, j],
-          rc$cor_lower[i, j], rc$cor_upper[i, j])
-}
-fe_s_alb_bc <- sta("Alb", "BC")
-fe_s_bc_sask <- sta("BC", "Sask")
-```
-
-These are larger and two of the three exclude zero: Alberta with
-British Columbia at `r fe_s_alb_bc`, and British Columbia with
-Saskatchewan at `r fe_s_bc_sask`. Accumulating shocks through
-$A$ year after year is what builds the shared variation; any one
-year's shocks barely share anything. Which of the two matrices
-answers your question is worth settling before reading either.
-Neither restores the geography.
-
-## Forecasts
-
-Passing `newdata = test` at fit time stored the held-out slice
-on the fitted object, so `forecast()` extends the VAR five years
-into the future without any extra arguments. The plot draws the
-hindcast (grey) up to the dashed vertical, then the forecast
-posterior (red) over the five held-out years.
-
-```{r plot-forecast, fig.cap = "Hindcast (grey) and five-year posterior forecast (red) from the correlated-innovation VAR. The mean count trajectory stays close to the historical average, with the ribbon widening as the horizon lengthens."}
-plot(forecast(varmod, newdata = test))
-```
-
-Forecasts fan out gradually as the VAR is integrated forward.
-Because the diagonal of $A$ is safely below one, the mean
-converges to the region intercept while the ribbon spreads
-according to the stationary covariance implied by
-$(A, \Sigma)$.
-
-## Impulse response functions
-
-An impulse response function asks the following counterfactual:
-if a shock of one standard deviation hit region $j$ at time
-zero, how would the other regions be expected to move over the
-next $h$ years? (Lütkepohl
-[2005](https://doi.org/10.1007/978-3-540-27752-1)). `irf()`
-computes the generalized IRF for every source and target pair;
-`plot(irfs, series = j)` fixes the shock at region $j$ and draws
-one panel per target region.
-
-```{r irf-fit}
-irfs <- irf(varmod, h = 12)
-```
-
-`plot()` takes the shocked process by position, so `series = 1`
-is the first level of `region_order` rather than the first region
-named when the data were assembled.
 
 ```{r irf-numbers, include = FALSE}
 ir <- as.data.frame(irfs)
-ir_sides <- strsplit(ir$shock, " -> ", fixed = TRUE)
-ir$src <- vapply(ir_sides, `[`, character(1), 1L)
-ir$tgt <- vapply(ir_sides, `[`, character(1), 2L)
-self_pk <- max(abs(ir$irfQ50[ir$src == ir$tgt]))
-cross_pk <- max(abs(ir$irfQ50[ir$src != ir$tgt]))
-cross <- ir[ir$src != ir$tgt, ]
-cross_resolved <- sum(sign(cross$irfQ2.5) == sign(cross$irfQ97.5))
-fe_self_pk <- sprintf("%.2f", self_pk)
-fe_cross_pk <- sprintf("%.2f", cross_pk)
+resp <- function(shock, h) {
+  r <- ir[ir$shock == shock & ir$horizon == h, ]
+  ci(r$irfQ50, r$irfQ2.5, r$irfQ97.5)
+}
+fe_ir_dd1 <- resp("Daphnia -> Daphnia", 1)
+fe_ir_dc1 <- resp("Daphnia -> Cryptomonas", 1)
+fe_ir_dc3 <- resp("Daphnia -> Cryptomonas", 3)
+fe_ir_du2 <- resp("Daphnia -> Unicells", 2)
+# The prose below names each of these signs and decays
+med <- function(shock, h) ir$irfQ50[ir$shock == shock & ir$horizon == h]
+from_daphnia <- ir[startsWith(ir$shock, "Daphnia ->"), ]
+stopifnot(
+  med("Daphnia -> Cryptomonas", 1) > 0,
+  med("Daphnia -> Cryptomonas", 3) < 0,
+  med("Daphnia -> Unicells", 2) < 0,
+  abs(med("Daphnia -> Daphnia", 4)) < 0.05,
+  all(abs(from_daphnia$irfQ50[from_daphnia$horizon >= 8]) < 0.01)
+)
 ```
 
-```{r plot-irf1, fig.cap = "Generalized impulse responses to a positive shock in the first region of `region_order`. Each panel shows how the process for the target region is expected to respond over the next 12 years."}
-plot(irfs, series = 1)
-```
+A shock raises *Daphnia* by `r fe_ir_dd1` in its first month. The
+rise decays within four months. Because the shocks of *Daphnia* and
+*Cryptomonas* are positively correlated, *Cryptomonas* first rises
+with *Daphnia*, by `r fe_ir_dc1`. Grazing then takes over. In the
+third month *Cryptomonas* is below its expected level, at
+`r fe_ir_dc3`. The unicellular algae fall in the second month, by
+`r fe_ir_du2`. Every response returns to zero within eight months.
 
-The self-response is the one that shows. A shock to
-`r region_order[1]` lifts its own process by
-`r fe_self_pk` on the inverse-link scale in the first year and
-decays from there; the responses in the other two regions peak in
-year two at a fraction of that.
+## Variance decompositions
 
-```{r plot-irf2, fig.cap = "Impulse responses to a shock in the second region of `region_order`. The self-response decays smoothly and the two cross-region responses peak a year later at a fraction of its size."}
-plot(irfs, series = 2)
-```
+A forecast error variance decomposition (FEVD) splits the variance of
+each taxon's forecast among the taxa whose shocks generate it, at
+each horizon. `fevd()` splits the variance with the Cholesky factor
+of $\Sigma$, taken in the order of the levels of `series`. Where the
+shocks of two taxa correlate, the factor assigns the shared part to
+whichever taxon comes first. The diatoms come first and keep all of
+their own shock.
 
-The same shape repeats for a shock to `r region_order[2]`: a
-first-year self-response, then small positive movements
-elsewhere that peak a year later.
-
-```{r plot-irf3, fig.cap = "Impulse responses to a shock in the third region of `region_order`. The self-response dominates the panel and the cross-region responses stay close to zero throughout."}
-plot(irfs, series = 3)
-```
-
-Across all three panels the largest cross-region response is
-`r fe_cross_pk` against a largest self-response of
-`r fe_self_pk`. The number of cross-region responses with an
-interval clear of zero at any horizon is `r cross_resolved`.
-Read the medians and the intervals together. The medians trace
-a tidy story of shocks spreading between provinces, and the
-magnitudes say that whatever spreads is a small fraction of
-what each region does to itself.
-
-## Forecast error variance decomposition
-
-The forecast error variance decomposition (FEVD) turns the same
-quantities around. Rather than tracing one shock outward, it asks
-how much of the forecast uncertainty for region $i$ at horizon
-$h$ was generated by shocks originating in each region. `fevd()`
-reports the posterior median share and an interval for each
-source, keeping the draws behind `summary = FALSE`;
-`plot(fevds)` renders one stacked-bar panel per target region,
-the bar heights showing the median share attributed to each
-source over increasing horizons.
-
-```{r fevd-fit}
-fevds <- fevd(varmod, h = 12)
-```
-
-```{r plot-fevd, fig.cap = "Forecast error variance decomposition. Each panel is a target region; each bar breaks down that region's forecast uncertainty at a given horizon into contributions from own shocks and shocks originating in the other two regions."}
+```{r fevd, fig.width = 8, fig.asp = 0.6, fig.cap = "Median share of each taxon's forecast error variance that each source of shocks generates, by forecast horizon. Panels are the taxa forecast. Colours are the taxa whose shocks generate the variance."}
+fevds <- fevd(fit, h = 12)
 plot(fevds)
 ```
 
 ```{r fevd-numbers, include = FALSE}
 fv <- as.data.frame(fevds)
-fv_sides <- strsplit(fv$shock, " -> ", fixed = TRUE)
-fv$src <- vapply(fv_sides, `[`, character(1), 1L)
-fv$tgt <- vapply(fv_sides, `[`, character(1), 2L)
-f12 <- fv[fv$horizon == 12, ]
-sh <- function(a, b) sprintf("%.0f%%", 100 *
-  f12$fevdQ50[f12$src == a & f12$tgt == b])
-fe_ab <- sh("Alb", "BC")
-fe_as <- sh("Alb", "Sask")
-fe_own_min <- sprintf("%.0f%%", 100 * min(
-  f12$fevdQ50[f12$src == f12$tgt]))
+share <- function(shock, h) {
+  r <- fv[fv$shock == shock & fv$horizon == h, ]
+  sprintf("%.0f%%", 100 * r$fevdQ50)
+}
+fe_fv_uc1 <- share("Unicells -> Cryptomonas", 1)
+fe_fv_uc12 <- share("Unicells -> Cryptomonas", 12)
+fe_fv_cd12 <- share("Cryptomonas -> Daphnia", 12)
+own <- vapply(strsplit(fv$shock, " -> ", fixed = TRUE),
+              function(s) s[1] == s[2], logical(1))
+others <- own & fv$horizon == 12 &
+  fv$shock != "Cryptomonas -> Cryptomonas"
+fe_fv_own <- sprintf("%.0f%%", 100 * range(fv$fevdQ50[others]))
 ```
 
-Own-region shocks dominate at short horizons for every region,
-the darker slice at the bottom of each bar, which is what the
-strong diagonal in $A$ implies. The cross-region shares grow with
-the horizon without ever taking over: by year 12 Alberta accounts
-for `r fe_ab` of the forecast variance in British Columbia and
-`r fe_as` of it in Saskatchewan, while every region still owns at
-least `r fe_own_min` of its own. Read this beside the impulse
-responses rather than instead of them. A variance share is a
-point estimate of a ratio and carries no statement about whether
-the underlying effect is distinguishable from zero, and the
-intervals above say these ones are not.
+For every taxon but *Cryptomonas*, its own shocks generate most of
+its forecast variance. At twelve months those own shares run from
+`r fe_fv_own[1]` to `r fe_fv_own[2]`. For *Cryptomonas*, the unicellular
+algae generate `r fe_fv_uc1` of its forecast variance in the first
+month and `r fe_fv_uc12` by month twelve. Most of that share comes
+from the correlation of the two taxa's shocks. The ordering assigns
+it to the unicellular algae because they come first. The coupling of
+the two taxa appears in the *Daphnia* panel, where *Cryptomonas* shocks generate
+`r fe_fv_cd12` of the twelve-month forecast variance. Reordering the
+levels of `series` and refitting would move the shared part of each
+correlated pair to the other taxon. The generalised impulse responses
+above are the same in any order.
 
-## Community stability metrics
+## Stability of the community
 
-The transition matrix and innovation covariance also determine
-whether the system as a whole would amplify or absorb small
-shocks around the stationary distribution. `stability()`
-reports three interpretable dynamic-stability metrics, each
-summarised to a median and an interval with the draws available
-under `summary = FALSE` (Ives et al.
-[2003](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2);
-Neubert & Caswell
-[1997](https://doi.org/10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2)):
+`stability()` summarises the dynamics in $A$ as community stability
+metrics (Ives et al.
+[2003](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2)).
+Reactivity is the log of the largest singular value of $A$. Above
+zero, some perturbation grows in the month after it occurs before the
+community returns towards its means (Neubert et al.
+[2009](https://doi.org/10.1890/08-2014.1)). The mean return rate is
+the largest modulus of the eigenvalues of $A$. Once the slowest mode
+dominates, the distance from the means shrinks by about this factor
+each month. The variance return rate is its square. It describes how
+fast the forecast variance settles.
 
-- Reactivity, the log of the largest singular value of $A$.
-  Positive reactivity means small perturbations grow immediately
-  after the shock before eventually decaying; negative
-  reactivity means the perturbation shrinks straight away.
-- Mean return rate, the modulus of the largest eigenvalue
-  of $A$. Values closer to one imply a slower return of the
-  mean to its stationary distribution after a shock.
-- Variance return rate, the analogous quantity for $A
-  \otimes A$, describing how quickly forecast variance decays
-  back to its stationary level.
-
-`plot()` on the returned `mvgam_stability` object renders each
-metric as a posterior histogram with a dashed reference at zero
-(the reactivity threshold).
-
-```{r plot-stability, fig.width = 8, fig.asp = 0.45, fig.cap = "Posterior distributions of three community-stability metrics for the fitted VAR. The dashed line marks zero, the reactivity threshold above which small shocks would be amplified rather than absorbed."}
-stab <- stability(varmod)
+```{r stability, fig.width = 8, fig.asp = 0.4, fig.cap = "Posterior distributions of reactivity and of the mean and variance return rates. The dashed line marks zero reactivity."}
+stab <- stability(fit)
 plot(stab)
 ```
 
 ```{r stability-numbers, include = FALSE}
-st_tab <- as.data.frame(stab)
-st_val <- function(m) st_tab$Estimate[st_tab$metric == m]
-st_draws <- stability(varmod, summary = FALSE)
-react <- if (is.list(st_draws)) st_draws$reactivity else
-  st_draws[, "reactivity"]
-fe_react <- sprintf("%.2f", stats::median(react))
-fe_react_lo <- sprintf("%.2f", stats::quantile(react, 0.05))
-fe_react_hi <- sprintf("%.2f", stats::quantile(react, 0.95))
-fe_react_pos <- sprintf("%.0f%%", 100 * mean(react > 0))
-fe_mrr <- sprintf("%.2f", st_val("mean_return_rate"))
-fe_vrr <- sprintf("%.2f", st_val("var_return_rate"))
+st <- function(m) {
+  r <- stab[stab$metric == m, ]
+  ci(r$Estimate, r$Q2.5, r$Q97.5)
+}
+fe_react <- st("reactivity")
+fe_react_neg <- sprintf(
+  "%.0f%%",
+  100 * mean(stability(fit, summary = FALSE)$reactivity < 0)
+)
+fe_mrr <- st("mean_return_rate")
+mrr <- stab$Estimate[stab$metric == "mean_return_rate"]
+fe_half <- sprintf("%.1f", log(0.5) / log(mrr))
 ```
 
-Reactivity is centred near zero, with a median of `r fe_react`
-and a 90% interval from `r fe_react_lo` to `r fe_react_hi`, and
-`r fe_react_pos` of the posterior sitting above the dashed line.
-The data do not settle whether this system amplifies a small
-perturbation before absorbing it, though they do bound how much
-it could amplify by. Mean and variance return rates of
-`r fe_mrr` and `r fe_vrr` describe a stable system that takes
-several years to relax back to its stationary distribution.
+Reactivity is `r fe_react`, with `r fe_react_neg` of the posterior
+below zero. The data favour a community that damps every
+perturbation from the first month. They do not exclude one that
+briefly amplifies some perturbations. The mean return rate is
+`r fe_mrr`. At the median, a deviation halves in about `r fe_half`
+months. The plankton community returns to its seasonal and
+nutrient-driven means within a season.
 
-## Take-aways
+## Forecasting the held-out year
 
-Once a VAR is fitted in mvgam, the same handful of accessors
-work end to end for any observation family and any correlated
-innovation structure:
+Passing `newdata` at fitting stored 1994 on the model. `forecast()`
+projects the fitted states forward through those twelve months and
+adds observation error:
 
-- `mcmc_plot(mod, variable = "Phi_trend", ...)` shows the lagged
-  dependence structure per cell of the transition matrix.
-- `residual_cor(mod)` turns the innovation covariance into
-  correlations with intervals and evidence, telling you which
-  series share contemporaneous shocks.
-- `irf()` + `plot(irfs, series = j)` traces how a shock at a
-  focal series is expected to move each other series over a
-  chosen horizon.
-- `fevd()` + `plot(fevds)` decomposes the forecast variance for
-  each series into contributions from each source of shocks.
-- `stability()` + `plot(stab)` summarises the dynamic-stability
-  posterior in the units ecologists use (reactivity, return
-  rates).
+```{r forecast, fig.width = 8, fig.asp = 0.6, fig.cap = "Fitted values to the end of 1993 and forecasts for 1994 (right of the dashed line), with observations as points."}
+fc <- forecast(fit)
+plot(fc)
+```
 
-Every one of these views draws on the same posterior for
-$(A, \Sigma)$, differing only in which question they put to that
-joint object. Each returns a summary by default and the draws
-under `summary = FALSE`, so a figure costs a call rather than a
-refit.
+`score()` compares the forecast distributions with the 1994
+observations. The continuous ranked probability score (CRPS) measures
+the distance between a forecast distribution and the observation, in
+the units of the data. Lower is better. `in_interval` records whether
+the observation fell inside the 90% forecast interval:
 
-## Further reading
+```{r score}
+sc <- score(fc, score = "crps")
+data.frame(
+  taxon = taxa,
+  mean_crps = vapply(taxa, function(t) mean(sc[[t]]$score, na.rm = TRUE),
+                     numeric(1)),
+  coverage = vapply(taxa, function(t) mean(sc[[t]]$in_interval,
+                                           na.rm = TRUE), numeric(1)),
+  row.names = NULL
+)
+```
 
-Complementary in-package tools:
+```{r score-numbers, include = FALSE}
+inside <- sum(vapply(taxa, function(t) sum(sc[[t]]$in_interval,
+                                           na.rm = TRUE), numeric(1)))
+scored <- sum(vapply(taxa, function(t) sum(!is.na(sc[[t]]$score)),
+                     numeric(1)))
+```
 
-- `?VAR` for the trend-side constructor. Hierarchical panel VAR
-  support is available via the `gr` and `subgr` arguments.
-- `?forecast.mvgam`, `?score` and `?ensemble` for the forecast
-  scoring and averaging surface layered on top of any fitted
-  mvgam VAR.
-- `?how_to_cite` and `?methods_md` for citation-ready methods
-  paragraphs that describe the Heaps stationary prior and the
-  sampler configuration in place.
+Of the `r scored` observations in 1994, `r inside` fell inside their
+90% intervals, close to the coverage the intervals claim. The CRPS
+compares models scored on the same data, such as this VAR against an
+independent autoregression for each taxon. The
+[forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+works through that comparison with leave-future-out
+cross-validation.
 
-Sibling articles in this series:
+The plankton of Lake Washington rise and fall mostly with the seasons
+and with phosphorus. Two of the twenty lagged interactions among the
+taxa separate from zero, grazing of *Cryptomonas* by *Daphnia* among
+them. The community damps a perturbation within a season. The
+forecasts for the held-out year keep close to their stated
+coverage.
 
-- The
-  [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
-  runs the same forecast / score machinery on a longer Portal
-  rodent time series.
-- The
-  [hierarchical VAR article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
-  scales the same model to a panel of units, giving each its own
-  $(A, \Sigma)$ and shrinking both toward a global mean.
-- The
-  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
-  covers the different case where several outcomes on different
-  families share one latent process via a multivariate
-  observation formula.
-- The
-  [dynamic factor vignette](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
-  covers the case where the number of latent processes is
-  deliberately smaller than the number of observed series.
+## Where to next
 
-## Acknowledgements
+Each function used here has a help page, such as `?irf` or
+`?residual_cor`, with its arguments and output. `how_to_cite()`
+writes a methods paragraph for a fitted model, with its references.
 
-The kestrel dataset was compiled from the North American
-Breeding Bird Survey and is redistributed with MARSS (Holmes et
-al. [2012](https://doi.org/10.32614/RJ-2012-002)). The stationary
-Heaps prior on the VAR coefficients follows Heaps
-([2023](https://doi.org/10.1080/10618600.2022.2079648)). The
-state-space framing follows the review by Auger-Méthé and
-colleagues ([2021](https://doi.org/10.1002/ecm.1470)) and the
-dynamic generalised additive model perspective in Clark & Wells
-([2023](https://doi.org/10.1111/2041-210X.13974)). Community
-stability metrics follow Ives et al.
-([2003](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2))
-and Neubert & Caswell
-([1997](https://doi.org/10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2)).
-Impulse response function and forecast error variance
-decomposition definitions follow Lütkepohl
-([2005](https://doi.org/10.1007/978-3-540-27752-1)). Formulas
-rely on mgcv smooths (Wood
-[2017](https://doi.org/10.1201/9781315370279)) and brms's
-multilevel apparatus (Bürkner
-[2017](https://doi.org/10.18637/jss.v080.i01)); sampling is
-performed with Stan (Carpenter et al.
-[2017](https://doi.org/10.18637/jss.v076.i01)).
+Related articles:
+
+- [Hierarchical VARs](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
+  fit one VAR per group of series, such as one per lake. Each group's
+  $A$ and $\Sigma$ are drawn towards a shared mean.
+- [Dynamic factor models](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+  describe many series with fewer latent processes than series.
+- [Forecast evaluation](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+  covers scoring rules and leave-future-out cross-validation.
+- [mvgam overview](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+  introduces the observation and trend formulas.
+- [Formatting data](https://nicholasjclark.github.io/mvgam/articles/data.html)
+  covers the long data format and `mvgam_data()`.
+
+Chapter 8 of the
+[Applied Time Series Analysis](https://atsa-es.github.io/atsa-labs/chap-msscov.html)
+lab book fits multivariate autoregressive state-space models to the
+same Lake Washington plankton with MARSS.
 
 ## References
 
+Arel-Bundock V, Greifer N and Heiss A (2024). How to interpret
+statistical models using marginaleffects for R and Python. *Journal
+of Statistical Software* 111(9), 1-32.
+[doi:10.18637/jss.v111.i09](https://doi.org/10.18637/jss.v111.i09)
+
 Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA,
-Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G and Thomas
-L (2021). A guide to state-space modeling of ecological time
-series. *Ecological Monographs* 91(4), e01470.
+Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G and Thomas L
+(2021). A guide to state-space modeling of ecological time series.
+*Ecological Monographs* 91(4), e01470.
 [doi:10.1002/ecm.1470](https://doi.org/10.1002/ecm.1470)
 
-Bürkner PC (2017). brms: An R package for Bayesian multilevel
-models using Stan. *Journal of Statistical Software* 80(1),
-1-28.
-[doi:10.18637/jss.v080.i01](https://doi.org/10.18637/jss.v080.i01)
+Edmondson WT and Lehman JT (1981). The effect of changes in the
+nutrient income on the condition of Lake Washington. *Limnology and
+Oceanography* 26(1), 1-29.
+[doi:10.4319/lo.1981.26.1.0001](https://doi.org/10.4319/lo.1981.26.1.0001)
 
-Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt
-M, Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A
-probabilistic programming language. *Journal of Statistical
-Software* 76(1), 1-32.
-[doi:10.18637/jss.v076.i01](https://doi.org/10.18637/jss.v076.i01)
-
-Clark NJ and Wells K (2023). Dynamic Generalized Additive Models
-(DGAMs) for forecasting discrete ecological time series.
-*Methods in Ecology and Evolution* 14, 771-784.
-[doi:10.1111/2041-210X.13974](https://doi.org/10.1111/2041-210X.13974)
-
-Heaps SE (2023). Enforcing stationarity through the prior in
-vector autoregressions. *Journal of Computational and Graphical
-Statistics* 32(1), 74-83.
+Heaps SE (2023). Enforcing stationarity through the prior in vector
+autoregressions. *Journal of Computational and Graphical Statistics*
+32(1), 74-83.
 [doi:10.1080/10618600.2022.2079648](https://doi.org/10.1080/10618600.2022.2079648)
 
 Holmes EE, Ward EJ and Wills K (2012). MARSS: Multivariate
-Autoregressive State-space Models for Analyzing Time-series
-Data. *The R Journal* 4(1), 11-19.
+autoregressive state-space models for analyzing time-series data.
+*The R Journal* 4(1), 11-19.
 [doi:10.32614/RJ-2012-002](https://doi.org/10.32614/RJ-2012-002)
 
-Ives AR, Dennis B, Cottingham KL and Carpenter SR (2003).
-Estimating community stability and ecological interactions from
-time-series data. *Ecological Monographs* 73(2), 301-330.
+Ives AR, Dennis B, Cottingham KL and Carpenter SR (2003). Estimating
+community stability and ecological interactions from time-series
+data. *Ecological Monographs* 73(2), 301-330.
 [doi:10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2)
 
 Lütkepohl H (2005). *New Introduction to Multiple Time Series
 Analysis*. Springer, Berlin.
 [doi:10.1007/978-3-540-27752-1](https://doi.org/10.1007/978-3-540-27752-1)
 
-Neubert MG and Caswell H (1997). Alternatives to resilience for
-measuring the responses of ecological systems to perturbations.
-*Ecology* 78(3), 653-665.
-[doi:10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2](https://doi.org/10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2)
+Neubert MG, Caswell H and Solow AR (2009). Detecting reactivity.
+*Ecology* 90(10), 2683-2688.
+[doi:10.1890/08-2014.1](https://doi.org/10.1890/08-2014.1)
 
-Wood SN (2017). *Generalized Additive Models: An Introduction
-with R* (2nd edition). Chapman and Hall/CRC.
-[doi:10.1201/9781315370279](https://doi.org/10.1201/9781315370279)
+Pesaran HH and Shin Y (1998). Generalized impulse response analysis
+in linear multivariate models. *Economics Letters* 58(1), 17-29.
+[doi:10.1016/S0165-1765(97)00214-0](https://doi.org/10.1016/S0165-1765(97)00214-0)
