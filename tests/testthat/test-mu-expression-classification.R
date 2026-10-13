@@ -34,14 +34,6 @@ test_that("mu statements come with the variables they use", {
 
 # GLM detection and trend injection ----
 
-test_that("glm_calls_present names the GLM likelihoods a program calls", {
-  glm <- "model {\n  target += poisson_log_glm_lpmf(Y | X, alpha, beta);\n}"
-  plain <- "model {\n  target += normal_lpdf(Y | mu, sigma);\n}"
-  present <- mvgam:::glm_calls_present(glm)
-  expect_identical(names(present)[present], "poisson_log_glm")
-  expect_false(any(mvgam:::glm_calls_present(plain)))
-})
-
 stan_program <- function(...) paste(c(...), collapse = "\n")
 
 test_that("the trend joins a built predictor after its last term", {
@@ -108,16 +100,15 @@ test_that("a GLM likelihood is rewritten to take the trend", {
     mvgam:::inject_trend_into_linear_predictors(code, ""),
     stan_program(
       "model {",
-      "  vector[N] mu = Xc * b;",
-      "  mu += Intercept + to_vector(trend)[obs_trend_idx];",
-      "  target += poisson_log_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones);",
+      paste0("  target += poisson_log_glm_lpmf(Y | Xc, Intercept + ",
+             "to_vector(trend)[obs_trend_idx], b);"),
       "}"
     )
   )
 })
 
 test_that("an unplaceable trend is reported as an mvgam fault", {
-  # A GLM family without a layout would leave the trend computed and
+  # A GLM family without argument roles would leave the trend computed and
   # never added to the predictor.
   unknown_glm <- stan_program(
     "model {",

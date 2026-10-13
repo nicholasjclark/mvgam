@@ -5,6 +5,6 @@
 \title{GLM likelihood detection and trend injection}
 \description{
 brms folds the linear predictor into its GLM likelihood calls. The
-functions here find those calls and rewrite each one to take a named
-predictor that a trend can be added to.
+functions here find those calls and decide how the trend joins each
+one.
 }

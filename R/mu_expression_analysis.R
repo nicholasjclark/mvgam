@@ -54,9 +54,8 @@ extract_mu_assignment_lines <- function(model_block) {
 #' brms passes the design matrix and coefficients of a gaussian model
 #' to `normal_id_glm_lpdf()`. No statement adds them to `mu`. The
 #' trend program is gaussian. Its `mu_trend` takes them as the
-#' statement `mu += Xc * b;`, after the intercept the call names. With
-#' group-level effects brms passes `mu` itself as the intercept, which
-#' needs no statement.
+#' statement `mu += Xc * b;`. A program that writes statements on `mu`
+#' passes `mu` itself as the GLM intercept, which needs no statement.
 #'
 #' @param mu_lines Statements on `mu` from the model block
 #' @param stancode The brms program
@@ -65,28 +64,20 @@ extract_mu_assignment_lines <- function(model_block) {
 add_glm_hidden_fixed_effects <- function(mu_lines, stancode) {
   checkmate::assert_character(mu_lines)
   checkmate::assert_string(stancode)
-  if (!"normal_id_glm" %in% detect_glm_usage(stancode)) {
+  glm_call <- response_glm_call(
+    strsplit(stancode, "\n", fixed = TRUE)[[1L]], ""
+  )
+  if (is.null(glm_call)) {
     return(mu_lines)
   }
-  params <- parse_glm_parameters_single(stancode, "normal_id_glm")
-  if (is.null(params) || !nzchar(params$design_matrix %||% "") ||
-      !nzchar(params$coefficients %||% "")) {
-    return(mu_lines)
+  if (!identical(glm_call$route, "declared")) {
+    stop_mvgam_fault(
+      "The trend program's GLM call must take its declared 'mu'.",
+      "brms passes 'mu' as the GLM intercept once it writes statements on it."
+    )
   }
-  fixed_effects <- paste0("mu += ", params$design_matrix, " * ",
-                          params$coefficients, ";")
-  written <- paste0("\\bmu\\s*\\+=\\s*", params$design_matrix,
-                    "\\s*\\*\\s*", params$coefficients, "\\b")
-  if (any(grepl(written, mu_lines, perl = TRUE))) {
-    return(mu_lines)
-  }
-  intercept <- params$intercept %||% ""
-  needs_intercept <- nzchar(intercept) &&
-    !intercept %in% c("0", "0.0", "0.00", "mu") &&
-    !any(grepl(paste0("\\bmu\\s*\\+=\\s*", intercept, "\\s*;"), mu_lines,
-               perl = TRUE))
-  c(mu_lines, if (needs_intercept) paste0("mu += ", intercept, ";"),
-    fixed_effects)
+  c(mu_lines, paste0("mu += ", glm_call$params$design_matrix, " * ",
+                     glm_call$params$coefficients, ";"))
 }
 
 #' The variables the statements on `mu` use

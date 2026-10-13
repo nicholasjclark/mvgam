@@ -229,10 +229,10 @@ trend_skeleton_lines <- function(resp, grain = "series") {
     paste0("array[N", suffixes, "] int<lower=1, upper=N_series_trend> ",
            "obs_trend_series", suffixes, ";"),
     paste0("array[N", suffixes, "] int obs_trend_idx", suffixes, ";"),
-    # A univariate predictor takes the trend at its own row's cell,
-    # added alone or with the intercept a GLM call held
+    # A univariate predictor takes the trend at its own row's cell, in
+    # a statement on `mu` or inside the intercept of a GLM call
     if (is.null(resp)) {
-      "to_vector(trend)[obs_trend_idx];"
+      "to_vector(trend)[obs_trend_idx]"
     }
   )
 }
@@ -266,9 +266,11 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   # brms-generated dispersion parameter should be excluded
   expect_false(grepl("real<lower=0> sigma;", code_with_trend, fixed = TRUE))
 
-  # GLM optimization enabled (fixed effects present)
-  expect_true(stan_pattern("poisson_log_glm_lpmf", code_with_trend, fixed = TRUE))
-  expect_true(stan_pattern("vector[1] mu_ones;", code_with_trend, fixed = TRUE))
+  # The GLM likelihood takes the trend inside its intercept argument
+  expect_true(stan_pattern(paste0(
+    "poisson_log_glm_lpmf(Y | Xc, Intercept + ",
+    "to_vector(trend)[obs_trend_idx], b);"
+  ), code_with_trend, fixed = TRUE))
 
   # Factor loading matrix for non-factor models
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix", code_with_trend))
@@ -282,10 +284,6 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   # Random walk state evolution
   expect_true(stan_pattern("lv_trend\\[1,\\s*:\\s*\\] = scaled_innovations_trend\\[1,\\s*:\\s*\\]", code_with_trend))
   expect_true(stan_pattern("lv_trend\\[i, : \\] = lv_trend\\[i - 1, : \\] \\+ scaled_innovations_trend\\[i, : \\]", code_with_trend))
-
-  # mu_trend should be just zeros for RW model (no trend predictors)
-  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
-  expect_false(grepl("mu_trend \\+= Intercept_trend", code_with_trend))
 })
 
 test_that("stancode uses GLM optimization with fixed effects + random effects", {
@@ -405,9 +403,11 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
   # AR coefficients' blocks
   expect_true(grepl("// MA coefficient prior", code_with_trend, fixed = TRUE))
 
-  # GLM optimization should still be present
-  expect_true(stan_pattern("poisson_log_glm_lpmf", code_with_trend, fixed = TRUE))
-  expect_true(stan_pattern("vector\\[1\\] mu_ones", code_with_trend))
+  # The GLM likelihood takes the trend inside its intercept argument
+  expect_true(stan_pattern(paste0(
+    "poisson_log_glm_lpmf(Y | Xc, Intercept + ",
+    "to_vector(trend)[obs_trend_idx], b);"
+  ), code_with_trend, fixed = TRUE))
 })
 
 test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with tensor product smooths and presence covariate", {
@@ -609,7 +609,6 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   # Should NOT have GLM optimization (splines prevent this)
   expect_false(grepl("_glm_lpdf", code_with_trend))
   expect_false(grepl("_glm_lpmf", code_with_trend))
-  expect_false(grepl("mu_ones", code_with_trend))
 
   # Should NOT have simple RW dynamics
   expect_false(grepl("lv_trend\\[i, :\\] = lv_trend\\[i-1, :\\] \\+ scaled_innovations_trend", code_with_trend))
@@ -664,10 +663,6 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("matrix\\[N_presence, K_presence\\] X_presence;", code_with_trend))
   expect_true(stan_pattern("matrix\\[N_biomass, K_biomass\\] X_biomass;", code_with_trend))
 
-  # GLM compatibility vectors for discrete families only
-  expect_true(stan_pattern("vector\\[1\\] mu_ones_count;", code_with_trend))
-  expect_true(stan_pattern("vector\\[1\\] mu_ones_presence;", code_with_trend))
-
   # Centered design matrices in transformed data
   expect_true(stan_pattern("matrix\\[N_count, Kc_count\\] Xc_count;", code_with_trend))
   expect_true(stan_pattern("matrix\\[N_presence, Kc_presence\\] Xc_presence;", code_with_trend))
@@ -717,24 +712,24 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     "+ scaled_innovations_trend[i, j];"
   ), code_with_trend, fixed = TRUE))
 
-  # Zero trend mean vector (for ~ -1 specification)
-  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
-
-  # Family-specific linear predictors
-  expect_true(stan_pattern("vector\\[N_count\\] mu_count = Xc_count \\* b_count;", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_presence\\] mu_presence = Xc_presence \\* b_presence;", code_with_trend))
+  # Biomass builds its own predictor. The GLM responses declare none.
   expect_true(stan_pattern("vector\\[N_biomass\\] mu_biomass = rep_vector\\(0\\.0, N_biomass\\);", code_with_trend))
   expect_true(stan_pattern("mu_biomass \\+= Intercept_biomass \\+ Xc_biomass \\* b_biomass;", code_with_trend))
+  expect_false(grepl("vector[N_count] mu_count", code_with_trend,
+                     fixed = TRUE))
+  expect_false(grepl("vector[N_presence] mu_presence", code_with_trend,
+                     fixed = TRUE))
 
-  # Trend injection for all three families. The GLM rewrites add the
-  # intercept with the trend. Biomass adds it before its log link.
-  expect_true(stan_pattern(
-    "mu_count += Intercept_count + to_vector(trend)[obs_trend_idx_count];",
-    code_with_trend, fixed = TRUE
-  ))
+  # The trend joins each GLM call's intercept. Biomass adds it before
+  # its log link.
   expect_true(stan_pattern(paste0(
-    "mu_presence += Intercept_presence + ",
-    "to_vector(trend)[obs_trend_idx_presence];"
+    "target += poisson_log_glm_lpmf(Y_count | Xc_count, Intercept_count + ",
+    "to_vector(trend)[obs_trend_idx_count], b_count);"
+  ), code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern(paste0(
+    "target += bernoulli_logit_glm_lpmf(Y_presence | Xc_presence, ",
+    "Intercept_presence + to_vector(trend)[obs_trend_idx_presence], ",
+    "b_presence);"
   ), code_with_trend, fixed = TRUE))
   expect_true(stan_pattern(paste0(
     "mu_biomass += to_vector(trend)[obs_trend_idx_biomass];",
@@ -744,9 +739,6 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   # Gamma log link: the mean is positive whatever the trend does
   expect_true(stan_pattern("mu_biomass = exp\\(mu_biomass\\);", code_with_trend))
 
-  # Three-family likelihoods with GLM optimization for discrete families
-  expect_true(stan_pattern("target \\+= poisson_log_glm_lpmf\\(Y_count \\| to_matrix\\(mu_count\\), 0\\.0, mu_ones_count\\);", code_with_trend))
-  expect_true(stan_pattern("target \\+= bernoulli_logit_glm_lpmf\\(Y_presence \\| to_matrix\\(mu_presence\\), 0\\.0, mu_ones_presence\\);", code_with_trend))
   expect_true(stan_pattern("target \\+= gamma_lpdf\\(Y_biomass \\| shape_biomass, shape_biomass \\./", code_with_trend))
 
   # Trend parameter priors (existence, not specific distributions)
@@ -784,8 +776,6 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   # Should NOT have correlation parameter without structure (uses Cholesky factor)
   expect_false(grepl("corr_matrix.*Omega_trend", code_with_trend))
 
-  # Should NOT have mu_ones for biomass (Gamma doesn't use GLM optimization)
-  expect_false(grepl("mu_ones_biomass", code_with_trend))
 
   # Should NOT have vector ar1 coefficients without bounds
   expect_false(grepl("vector\\[N_lv_trend\\] ar1_trend;", code_with_trend))
@@ -853,7 +843,6 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
   # Lognormal likelihood (not GLM optimized)
   expect_true(stan_pattern("target \\+= lognormal_lpdf\\(Y \\| mu, sigma\\);", code_with_trend))
   expect_false(grepl("lognormal.*glm", code_with_trend))
-  expect_false(grepl("mu_ones", code_with_trend))
 
   # Observation model likelihood structure (brms pattern)
   expect_true(stan_pattern("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
@@ -968,7 +957,6 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   # Lognormal likelihood (not GLM optimized)
   expect_true(stan_pattern("target \\+= lognormal_lpdf\\(Y \\| mu, sigma\\);", code_with_trend))
   expect_false(grepl("lognormal.*glm", code_with_trend))
-  expect_false(grepl("mu_ones", code_with_trend))
 
   # Observation model likelihood structure (brms pattern)
   expect_true(stan_pattern("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
@@ -1947,16 +1935,17 @@ test_that("CAR(cor = TRUE) correlates the diffusion and scales its gaps", {
 })
 
 test_that("stancode handles different observation families", {
-  # Each family's GLM likelihood takes the predictor the trend joins
+  # Each family's GLM likelihood takes the trend in its intercept
   data <- setup_stan_test_data()$univariate
   mf <- mvgam_formula(y ~ x, trend_formula = ~ RW())
+  alpha <- "Xc, Intercept + to_vector(trend)[obs_trend_idx], b"
   cases <- list(
     list(family = poisson(), y = data$y,
-         call = "poisson_log_glm_lpmf(Y | to_matrix(mu)"),
+         call = paste0("poisson_log_glm_lpmf(Y | ", alpha, ");")),
     list(family = gaussian(), y = rnorm(nrow(data)),
-         call = "normal_id_glm_lpdf(Y | to_matrix(mu)"),
+         call = paste0("normal_id_glm_lpdf(Y | ", alpha, ", sigma);")),
     list(family = bernoulli(), y = rbinom(nrow(data), size = 1, prob = 0.3),
-         call = "bernoulli_logit_glm_lpmf(Y | to_matrix(mu)")
+         call = paste0("bernoulli_logit_glm_lpmf(Y | ", alpha, ");"))
   )
   for (case in cases) {
     test_data <- data
@@ -1999,7 +1988,6 @@ test_that("stancode generates correct Stan blocks", {
 
   # Required variable declarations should be present
   expect_true(stan_pattern("vector\\[N\\]\\s*mu", code))
-  expect_true(stan_pattern("vector\\[.*\\]\\s*mu_trend", code))
 
   # Trend parameters should be declared in parameters block
   expect_true(stan_pattern("real.*ar1_trend", code))
@@ -2105,9 +2093,9 @@ test_that("a trend term is computed once per iteration", {
 
 test_that("an offset keeps the GLM's own coefficients, response by response", {
   # An offset makes brms pass its declared `mu` as the GLM intercept.
-  # The trend adds to that vector and `X * b` stays in the call. mvgam
-  # rewrites the call of a response without an offset to take the
-  # predictor it builds, and only that call takes `mu_ones`.
+  # The trend adds to that vector and `X * b` stays in the call. The
+  # call of a response without an offset takes the trend in its
+  # intercept argument.
   uni_data <- setup_stan_test_data()$univariate
   uni_data$off <- log(runif(nrow(uni_data), 1, 3))
   uni <- stancode(
@@ -2116,7 +2104,6 @@ test_that("an offset keeps the GLM's own coefficients, response by response", {
   )
   expect_true(stan_pattern("poisson_log_glm_lpmf(Y | Xc, mu, b)", uni,
                            fixed = TRUE))
-  expect_false(grepl("mu_ones", uni, fixed = TRUE))
 
   data <- setup_stan_test_data()$multivariate
   data$off <- log(runif(nrow(data), 1, 3))
@@ -2133,12 +2120,9 @@ test_that("an offset keeps the GLM's own coefficients, response by response", {
     fixed = TRUE
   ))
   expect_true(stan_pattern(paste0(
-    "normal_id_glm_lpdf(Y_biomass | to_matrix(mu_biomass), 0.0, ",
-    "mu_ones_biomass, sigma_biomass)"
+    "normal_id_glm_lpdf(Y_biomass | Xc_biomass, Intercept_biomass + ",
+    "to_vector(trend)[obs_trend_idx_biomass], b_biomass, sigma_biomass)"
   ), mixed, fixed = TRUE))
-  expect_true(stan_pattern("vector[1] mu_ones_biomass;", mixed,
-                           fixed = TRUE))
-  expect_false(grepl("mu_ones_count", mixed, fixed = TRUE))
 })
 
 test_that("a shared correlated RW enters every response with its offset", {
@@ -2150,12 +2134,9 @@ test_that("a shared correlated RW enters every response with its offset", {
     fixed = TRUE
   ))
 
-  # `~ RW(cor = TRUE)` contributes no population-level term. The trend
-  # carries no intercept at all and `mu_trend` stays at zero.
-  expect_true(stan_pattern(
-    "vector[N_trend] mu_trend = rep_vector(0.0, N_trend);", code_shared,
-    fixed = TRUE
-  ))
+  # `~ RW(cor = TRUE)` contributes no population-level term. The
+  # program declares no intercept and no `mu_trend`.
+  expect_false(grepl("mu_trend", code_shared, fixed = TRUE))
   expect_false(grepl("Intercept_trend", code_shared, fixed = TRUE))
 
   # One Cholesky factor gives both the reported covariance and the
@@ -2211,7 +2192,6 @@ test_that("a shared correlated RW enters every response with its offset", {
            "b_biomass, sigma_biomass)"),
     code_shared, fixed = TRUE
   ))
-  expect_false(grepl("mu_ones", code_shared, fixed = TRUE))
 
   # Trend priors
   expect_equal(stan_prior_on(code_shared, "sigma_trend"), "exponential(2)")
@@ -2507,7 +2487,6 @@ test_that("stancode handles distributional regression models correctly", {
   expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;", code_distributional))
 
   # 6. Transformed Parameters - RW dynamics
-  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_distributional))
   expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] scaled_innovations_trend;", code_distributional))
   expect_true(stan_pattern("scaled_innovations_trend = diag_post_multiply(innovations_trend, sigma_trend);", code_distributional, fixed = TRUE))
 
@@ -4622,57 +4601,6 @@ test_that("a knots fit carries its basis into newdata predictions", {
   expect_false(isTRUE(all.equal(regen(with_knots), regen(without))))
 })
 
-test_that("normalize = FALSE survives the GLM path", {
-  # brms writes a `*_glm_lupmf` call under `normalize = FALSE`, and
-  # mvgam's GLM detection recognised only the normalised spelling, so
-  # the trend injector could not find the likelihood and the assembly
-  # aborted. An intercept-only formula hides this: brms emits a plain
-  # `poisson_log_lpmf` and never reaches the GLM path at all, so the
-  # fixture needs a predictor.
-  dat <- codegen_test_data()
-  dat$z <- rnorm(nrow(dat))
-  dat$bin <- rbinom(nrow(dat), 1L, 0.5)
-  dat$cont <- rnorm(nrow(dat))
-
-  cases <- list(
-    list(resp = "y", family = poisson()),
-    list(resp = "y", family = brms::negbinomial()),
-    list(resp = "cont", family = gaussian()),
-    list(resp = "bin", family = brms::bernoulli())
-  )
-  for (case in cases) {
-    mf <- mvgam_formula(
-      stats::as.formula(paste0(case$resp, " ~ elev + z")),
-      trend_formula = ~ AR(p = 1)
-    )
-    code <- stancode(mf, data = dat, family = case$family,
-                     normalize = FALSE, silent = 2L)
-    expect_true(grepl("_glm_lu?p[dm]f", code),
-                label = paste("GLM call kept for", case$family$family))
-    # The rewritten call keeps the spelling it replaced, so turning the
-    # constants off is not quietly undone.
-    expect_true(grepl("_glm_lup[dm]f", code),
-                label = paste("unnormalised kept for", case$family$family))
-  }
-})
-
-test_that("stan_density_suffix reports the spelling a program used", {
-  expect_identical(
-    mvgam:::stan_density_suffix("target += poisson_log_glm_lpmf(Y | Xc);",
-                                "poisson_log_glm"),
-    "_lpmf"
-  )
-  expect_identical(
-    mvgam:::stan_density_suffix("target += normal_id_glm_lupdf(Y | Xc);",
-                                "normal_id_glm"),
-    "_lupdf"
-  )
-  expect_null(
-    mvgam:::stan_density_suffix("target += normal_lpdf(y | 0, 1);",
-                                "poisson_log_glm")
-  )
-})
-
 test_that("the generator option sets stay pinned to the options list", {
   # A fifth option added to `mvgam_codegen_options()` and forgotten in
   # either set would be dropped on its way to brms without a word, so
@@ -4781,20 +4709,24 @@ test_that("a shrinkage prior on the trend keeps its own scale", {
 })
 
 test_that("normalize = FALSE still injects the trend into the GLM call", {
-  # The GLM path recognised only the normalised `_lpmf` / `_lpdf`
-  # spelling when deciding which family a likelihood line called, so
-  # under `normalize = FALSE` it identified none, returned the line
-  # untouched, and the emitted program computed the latent states and
-  # then never used them. The model fitted as though it had no trend,
-  # and it compiled and sampled, so nothing complained.
+  # Under `normalize = FALSE` brms writes `*_glm_lupmf` calls. GLM
+  # detection once recognised only the normalised spelling. The trend
+  # was then computed and never used, or the assembly aborted. Each
+  # formula holds a predictor. brms writes an intercept-only formula as
+  # a plain density.
   dat <- codegen_test_data()
   dat$z <- rnorm(nrow(dat))
+  dat$bin <- rbinom(nrow(dat), 1L, 0.5)
   dat$cont <- rnorm(nrow(dat))
 
   cases <- list(
     list(resp = "y", family = poisson(), density = "poisson_log_glm_lupmf"),
+    list(resp = "y", family = brms::negbinomial(),
+         density = "neg_binomial_2_log_glm_lupmf"),
     list(resp = "cont", family = gaussian(),
-         density = "normal_id_glm_lupdf")
+         density = "normal_id_glm_lupdf"),
+    list(resp = "bin", family = brms::bernoulli(),
+         density = "bernoulli_logit_glm_lupmf")
   )
   for (case in cases) {
     mf <- mvgam_formula(
@@ -4803,29 +4735,23 @@ test_that("normalize = FALSE still injects the trend into the GLM call", {
     )
     code <- stancode(mf, data = dat, family = case$family,
                      normalize = FALSE, silent = 2L)
-    lab <- case$family$family
-
-    # The trend has to reach mu, and mu has to reach the likelihood.
-    expect_true(grepl(
-      "mu \\+= (Intercept \\+ )?to_vector\\(trend\\)\\[obs_trend_idx\\]",
-      code
-    ), label = paste("trend added to mu for", lab))
-    expect_true(grepl("to_matrix\\(mu\\)", code),
-                label = paste("likelihood reads mu for", lab))
-    # And the unnormalised spelling survives the rewrite, or turning
-    # the constants off would be quietly undone.
-    expect_true(grepl(case$density, code, fixed = TRUE),
-                label = paste("unnormalised density kept for", lab))
+    # The rewritten call keeps the unnormalised spelling and takes the
+    # trend in its intercept. A normalised spelling would quietly undo
+    # `normalize = FALSE`.
+    expect_true(stan_pattern(paste0(
+      case$density, "(Y | Xc, Intercept + to_vector(trend)[obs_trend_idx]"
+    ), code, fixed = TRUE), label = paste("trend in the call for",
+                                           case$family$family))
   }
 })
 
 test_that("an ordinal GLM keeps its own argument layout", {
   # `ordered_logistic_glm` takes `(x, beta, cutpoints)` and carries no
-  # scalar intercept. Rewriting it on the `(x, alpha, beta)` layout the
-  # other families use multiplies the design matrix by the cutpoints
-  # and hands Stan a real where it wants a vector, so the program does
-  # not parse. `stancode()` parses what it emits, and the assertions
-  # below pin down which argument ends up where.
+  # intercept for the trend to join. The program builds `mu` with the
+  # trend and scores it with the vectorised `ordered_logistic`. A
+  # parser applying the `(x, alpha, beta)` layout of the other families
+  # would multiply the design matrix by the cutpoints. `stancode()`
+  # parses what it emits. The assertions fix each argument's place.
   dat <- codegen_test_data()
   dat$z <- rnorm(nrow(dat))
   dat$ord <- factor(sample(1:3, nrow(dat), replace = TRUE), ordered = TRUE)
@@ -4833,33 +4759,15 @@ test_that("an ordinal GLM keeps its own argument layout", {
 
   code <- stancode(mf, data = dat, family = brms::cumulative(), silent = 2L)
 
-  # The cutpoints stay in the likelihood, where the ordinal density
-  # reads them, and the coefficients stay in the linear predictor.
-  expect_true(grepl(
-    "ordered_logistic_glm_lpmf(Y | to_matrix(mu), mu_ones, Intercept)",
-    code, fixed = TRUE
-  ))
+  # The cutpoints stay in the likelihood call. The coefficients move
+  # to the predictor the program builds.
+  expect_true(grepl("ordered_logistic_lpmf(Y | mu, Intercept)", code,
+                    fixed = TRUE))
+  expect_false(grepl("_glm_", code, fixed = TRUE))
   expect_true(grepl("vector[N] mu = Xc * b;", code, fixed = TRUE))
   expect_false(grepl("Intercept + to_vector(trend)", code, fixed = TRUE))
   expect_true(grepl("mu += to_vector(trend)[obs_trend_idx];", code,
                     fixed = TRUE))
-})
-
-test_that("the GLM family list is stated once", {
-  # Detection, the transformation gate and the per-line type lookup all
-  # read the argument-layout table, so a sixth form cannot reach one
-  # and miss the others.
-  fams <- mvgam:::mvgam_glm_families
-  expect_length(fams, 5L)
-  expect_true(all(grepl("_glm$", fams)))
-  expect_named(mvgam:::glm_call_layout, fams)
-
-  present <- mvgam:::glm_calls_present(
-    "target += poisson_log_glm_lupmf(Y | Xc, Intercept, b);"
-  )
-  expect_named(present, fams)
-  expect_true(present[["poisson_log_glm"]])
-  expect_false(present[["normal_id_glm"]])
 })
 
 # One series of forty occasions, with a Gaussian partner response.
@@ -5182,41 +5090,37 @@ test_that("the wide-frame trend design is indexed at time level", {
   )
 })
 
-test_that("every response's GLM likelihood reads the predictor its trend joins", {
+test_that("every response's GLM likelihood takes its trend", {
   # brms folds a response's predictor into its GLM call. The trend
-  # reaches the likelihood only once that call is rewritten to read
-  # `mu_<resp>`. The rewrite once matched response keys of letters
-  # alone: `y1` and `y2` kept their original calls, and the model
-  # compiled and sampled with the trend computed and never used. An
-  # arm written without an intercept was assumed to carry one, and the
-  # program did not compile.
+  # reaches the likelihood only once that call is rewritten. The
+  # rewrite once matched response keys of letters alone: `y1` and `y2`
+  # kept their original calls. The model then compiled and sampled with
+  # the trend computed and never used. A response formula without an
+  # intercept passes the trend alone as the intercept argument.
   set.seed(5)
   T_ <- 20L
   dat <- data.frame(
     time = seq_len(T_), x = rnorm(T_),
     y1 = rpois(T_, 5), y2 = rpois(T_, 3)
   )
+  gather <- function(r) paste0("to_vector(trend)[obs_trend_idx_", r, "]")
+  y1_call <- paste0("poisson_log_glm_lpmf(Y_y1 | Xc_y1, Intercept_y1 + ",
+                    gather("y1"), ", b_y1);")
   forms <- list(
-    both_intercepts = brms::mvbf(y1 ~ x, y2 ~ x, rescor = FALSE),
-    one_without = brms::mvbf(y1 ~ x, y2 ~ 0 + x, rescor = FALSE)
+    list(f = brms::mvbf(y1 ~ x, y2 ~ x, rescor = FALSE),
+         y2_call = paste0("poisson_log_glm_lpmf(Y_y2 | Xc_y2, ",
+                          "Intercept_y2 + ", gather("y2"), ", b_y2);")),
+    list(f = brms::mvbf(y1 ~ x, y2 ~ 0 + x, rescor = FALSE),
+         y2_call = paste0("poisson_log_glm_lpmf(Y_y2 | X_y2, ",
+                          gather("y2"), ", b_y2);"))
   )
-  for (f in forms) {
-    pf <- mvgam(f, trend_formula = ~ AR(p = 1), data = dat,
+  for (form in forms) {
+    pf <- mvgam(form$f, trend_formula = ~ AR(p = 1), data = dat,
                 family = poisson(), run_model = FALSE)
-    # Stan's formatter wraps a long statement. Statements are read with
-    # their whitespace collapsed.
-    code <- gsub("\\s+", " ", stancode(pf))
-    for (r in c("y1", "y2")) {
-      call <- regmatches(code, gregexpr(
-        paste0("poisson_log_glm_lpmf\\(Y_", r, " \\|[^;]*;"), code
-      ))[[1L]]
-      expect_length(call, 1L)
-      expect_match(call, paste0("to_matrix(mu_", r, ")"), fixed = TRUE)
-      expect_match(code, paste0(
-        "mu_", r, " \\+= [^;]*to_vector\\(trend\\)\\[obs_trend_idx_", r,
-        "\\]"
-      ))
-    }
+    code <- stancode(pf)
+    expect_true(stan_pattern(y1_call, code, fixed = TRUE))
+    expect_true(stan_pattern(form$y2_call, code, fixed = TRUE))
+    expect_identical(stan_match_count(code, "_glm_lpmf"), 2L)
   }
 })
 

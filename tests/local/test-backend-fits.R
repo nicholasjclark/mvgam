@@ -80,7 +80,8 @@ test_that("a Pathfinder start keeps the sampler's own arguments", {
 
 
 test_that("a trend with no design stores no mu_trend", {
-  # Every draw of it is zero, and its R-hat is undefined.
+  # A trend formula without terms leaves `mu_trend` at zero. The
+  # program declares none. Every stored R-hat is then defined.
   fit <- suppressMessages(fit_ar(refresh = 0, silent = 2L))
   stored <- posterior::variables(posterior::as_draws(fit$fit))
   expect_false(any(grepl("^mu_trend\\[", stored)))

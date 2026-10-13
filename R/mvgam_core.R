@@ -1038,8 +1038,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     obs_model = stan_components$obs_setup$brmsfit,
     trend_model = stan_components$trend_setup$brmsfit,
     standata = stan_components$combined_components$standata,
-    save_pars = save_pars,
-    stancode = stan_components$combined_components$stancode
+    save_pars = save_pars
   )
   seed <- dots$seed %||% sample.int(.Machine$integer.max, 1)
   control <- lift_sampler_control(dots, dots$control %||% NULL)

@@ -99,9 +99,7 @@ program's `Y`, `prior_only` and `N` never enter.
 `create_times_trend_matrix()` builds `times_trend`, the
 `[N_time_trend, N_series_trend]` array of rows of the trend data.
 The mapping arrays from step 4 become data stanvars with a response
-suffix. `detect_glm_usage()` inspects the observation program, and
-a GLM likelihood gets a `mu_ones` data stanvar for the rewritten
-call. `generate_trend_specific_stanvars()` adds the dimension
+suffix. `generate_trend_specific_stanvars()` adds the dimension
 stanvars (`N_trend`, `N_time_trend`, `N_series_trend`,
 `N_lv_trend`), the shared innovations and the trend's own Stan code
 from its registered generator.
@@ -113,29 +111,32 @@ writes the observation program with the trend stanvars included.
 
 `inject_trend_into_linear_predictors(base_stancode, resps)` then adds
 the trend to each response's predictor. `resps` is `""` for a
-univariate model and the brms response keys for a multivariate one,
-and `<sfx>` below is `""` or `_<resp>`. For each response,
+univariate model and the brms response keys for a multivariate one.
+Below, `<sfx>` is `""` or `_<resp>`. For each response,
 `inject_trend_for_response()` adds
-`mu<sfx> += to_vector(trend)[obs_trend_idx<sfx>]`. Transformed data
-builds `obs_trend_idx<sfx>` from `obs_trend_time<sfx>` and
-`obs_trend_series<sfx>`:
+`to_vector(trend)[obs_trend_idx<sfx>]` to the predictor. Transformed
+data builds `obs_trend_idx<sfx>` from `obs_trend_time<sfx>` and
+`obs_trend_series<sfx>`. `response_glm_call()` chooses one of three
+places for the addition:
 
-- A GLM likelihood on `Y<sfx>`: `rewrite_glm_for_trend()` declares
-  `mu<sfx> = design * coefs`, adds the intercept and the trend and
-  rewrites the call to take `to_matrix(mu<sfx>)` and `mu_ones<sfx>`.
-  brms writes an offset model's GLM call with the declared `mu<sfx>`
-  as its intercept, and that call takes the next path unchanged.
+- A GLM likelihood with an intercept on `Y<sfx>`:
+  `rewrite_glm_for_trend()` adds the trend to the intercept argument
+  of the call. The program declares no `mu<sfx>`.
+- The ordinal GLM likelihood: `rewrite_glm_for_trend()` declares
+  `mu<sfx> = design * coefs` and adds the trend. The call becomes the
+  vectorised `ordered_logistic` density on `mu<sfx>`.
 - A built predictor: `add_trend_to_built_predictor()` places the
-  addition before the first statement that transforms `mu<sfx>` (an inverse
-  link, or the skew-normal mean shift), outside any loop enclosing
-  it. Without a transform, the addition follows the last statement
-  that builds `mu<sfx>`.
+  addition before the first statement that transforms `mu<sfx>` (an
+  inverse link, or the skew-normal mean shift), outside any loop
+  enclosing it. Without a transform, the addition follows the last
+  statement that builds `mu<sfx>`. An offset model takes this path.
+  brms declares its `mu<sfx>` and passes it as the GLM intercept.
 
 An unknown GLM family, or a model block with no single correct place
 for the trend, raises `stop_mvgam_fault()`.
 
 `deduplicate_stan_functions()` removes function definitions that the
-two programs both brought, and `generate_base_brms_standata()`
+two programs both brought. `generate_base_brms_standata()` then
 builds the Stan data with the stanvar data merged in.
 
 ### 7. Polishing and checks
@@ -149,14 +150,18 @@ not separately identified.
 
 ## GLM likelihoods
 
-brms writes a GLM likelihood for several families, and mvgam keeps
-it. `glm_call_layout` (`R/glm_analysis.R`) records the argument roles
+brms writes a GLM likelihood for several families.
+`glm_call_roles` (`R/glm_analysis.R`) records the argument roles
 of `normal_id_glm`, `poisson_log_glm`, `neg_binomial_2_log_glm`,
 `bernoulli_logit_glm` and `ordered_logistic_glm`.
 `categorical_logit_glm` has no entry because mvgam refuses
 `brms::categorical()`. `parse_glm_parameters_from_line()` maps each
-argument of a call to its role. The rewritten call computes the
-predictor as `Xc * b` in one matrix product, adds the intercept and
-the trend in one loop and passes the result as a design matrix of
-one column with `mu_ones` as its coefficient, which keeps Stan's GLM
-implementation.
+argument of a call to its role. Stan's GLM densities take the
+intercept as a vector. The first four families keep their GLM call
+and take the trend in the intercept argument. The design matrix and
+coefficients stay inside the call. The ordinal GLM has no intercept.
+Its call becomes the vectorised `ordered_logistic` density on the
+predictor built with the trend. `rewrite_glm_call()` writes the new
+argument list in both cases. The argument parser ends a call at its
+first `)`. mvgam parses only the program brms wrote, before any call
+holds a trend term.

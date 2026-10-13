@@ -258,7 +258,7 @@ transformed parameters {
 
 `generate_trend_computation_tparameters()` drops the product when
 `Z` is the identity. It drops the loop when the trend formula has no
-terms, which leaves `mu_trend` at zero.
+terms. The program then declares no `mu_trend`.
 
 The observation program then adds the trend to each observation it
 scores. The data arrays `obs_trend_time` and `obs_trend_series` map
@@ -270,38 +270,41 @@ trend:
 mu += to_vector(trend)[obs_trend_idx];
 ```
 
-A multivariate model follows the brms naming. Each response has its
-own `mu_<resp>` and `obs_trend_idx_<resp>`, built from its mapping
-arrays `obs_trend_time_<resp>` and `obs_trend_series_<resp>`. The
-dynamics parameters are shared across responses.
+A multivariate model follows the brms naming. Each response takes
+the gather through its own `obs_trend_idx_<resp>`, built from its
+mapping arrays `obs_trend_time_<resp>` and `obs_trend_series_<resp>`.
+The dynamics parameters are shared across responses.
 
 mvgam keeps the brms optimisations of the observation model. A GLM
-likelihood is rewritten to take `to_matrix(mu)`, which keeps the GLM
-call. Threading has two paths. The closure-unit families (`nmix()`
+likelihood keeps its call, with the gather added to the intercept
+argument. The ordinal GLM has no intercept. The vectorised
+`ordered_logistic` density scores the predictor with the trend.
+
+Threading has two paths. The closure-unit families (`nmix()`
 variants and `occ()`) and the multi-response families (`diri()`,
 `mvn()`, `mvt()`, `multi()` and `categ()`) emit their own
-`partial_sum_<family>_lpmf` and `reduce_sum` call. brms places the
-`mu` declaration and every linear predictor assignment of a native
-family inside `partial_log_lik_lpmf` when it threads, where the trend
-injector cannot reach them. For a native family with a trend, and for
-the families that emit their own `reduce_sum`,
-`suppress_brms_threading()` (`R/make_stan.R`) hands brms
-`threads = 1`. The user's `threads` still reaches
-`cpp_options$stan_threads` through `mvgam_single()`, and the mvgam
-`reduce_sum` parallelises where the family has one. A native family
-with a trend has none, and it warns on every call that the threads
-request has no effect. Lifting that case needs the injector to splice
-the trend into the `partial_log_lik_lpmf` body and to pass the
-mapping arrays through its signature.
+`partial_sum_<family>_lpmf` and `reduce_sum` call. When brms threads
+a native family, it places the `mu` declaration and every linear
+predictor assignment inside `partial_log_lik_lpmf`. The trend
+injector cannot reach them there. `suppress_brms_threading()`
+(`R/make_stan.R`) hands brms `threads = 1` for a native family with a
+trend and for the families that emit their own `reduce_sum`. The
+user's `threads` still reaches `cpp_options$stan_threads` through
+`mvgam_single()`. The mvgam `reduce_sum` parallelises where the
+family has one. A native family with a trend has none. Each such
+call warns that the threads request has no effect. Lifting that case
+needs the injector to splice the trend into the
+`partial_log_lik_lpmf` body and to pass the mapping arrays through
+its signature.
 
 ## 5. Data axes and validation
 
 mvgam never modifies the user's data. `ensure_mvgam_variables()`
-(`R/validations.R`) records each row's time and series as attributes,
+(`R/validations.R`) records each row's time and series as attributes.
 `get_time_for_grouping()` and `get_series_for_grouping()` return
-them and `remove_mvgam_variables()` clears them. `mvgam_time` holds a
-sequential index over the unique times, and `mvgam_original_time`
-keeps the user's values for the CAR distances.
+them. `remove_mvgam_variables()` clears them. `mvgam_time` holds a
+sequential index over the unique times. `mvgam_original_time` keeps
+the user's values for the CAR distances.
 
 A trend model's data names each row's series in one of three ways,
 even for a single series. `assert_axis_column()` refuses an absent

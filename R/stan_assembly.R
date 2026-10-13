@@ -130,30 +130,6 @@ stan_density_call_pattern <- function(stem = "") {
   paste0(stem, "_", stan_density_call_rx)
 }
 
-#' The density-call suffix a Stan program actually used
-#'
-#' Rewriting a call has to put back the spelling it replaced. Writing
-#' `_lpdf` over a `_lupdf` would quietly restore the normalising
-#' constants a user turned off with `normalize = FALSE`.
-#'
-#' @param stan_code Character vector of Stan source.
-#' @param stem Distribution name to look for.
-#' @return `"_lpdf"`, `"_lupdf"`, `"_lpmf"` or `"_lupmf"`, or NULL when
-#'   the program never calls that density.
-#' @noRd
-stan_density_suffix <- function(stan_code, stem) {
-  checkmate::assert_character(stan_code, min.len = 1)
-  checkmate::assert_string(stem, min.chars = 1)
-  joined <- paste(stan_code, collapse = "\n")
-  hit <- regmatches(
-    joined, regexpr(stan_density_call_pattern(stem), joined)
-  )
-  if (!length(hit) || !nzchar(hit[1L])) {
-    return(NULL)
-  }
-  sub(paste0("^\\Q", stem, "\\E"), "", hit[1L], perl = TRUE)
-}
-
 #' Write one prior as a Stan sampling statement
 #'
 #' Stan drops the normalising constant from `x ~ dist(args);`. The
@@ -411,8 +387,7 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars) {
 #' The stanvars a trend adds to the brms observation program: the
 #' trend-formula parameters renamed with a `_trend` suffix, the arrays
 #' mapping each observation to its trend cell, the trend generator's
-#' own stanvars and, for a GLM likelihood mvgam rewrites, the unit
-#' coefficient `mu_ones`.
+#' own stanvars.
 #'
 #' @param trend_setup List containing trend model setup
 #' @param trend_specs Trend specification. Its `dimensions` field,
@@ -476,16 +451,17 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
 
   # `extract_and_rename_trend_parameters()` creates `mu_trend` from
   # the trend formula. The trend generators use it without assigning
-  # to it. A trend formula without terms leaves it at zero. The trend
-  # assembly then skips adding it.
+  # to it. A trend formula without terms declares no `mu_trend`. The
+  # trend assembly then adds no predictor.
   brms_stanvars <- extract_and_rename_trend_parameters(
     trend_setup = trend_setup,
     dimensions = dimensions,
     suffix = "_trend"
   )
-  data_info$mu_trend_zero <- mu_trend_is_zero(
+  data_info$mu_trend_zero <- !any(grepl(
+    "vector\\[[^]]*\\]\\s+mu_trend\\b",
     vapply(brms_stanvars, `[[`, character(1L), "scode")
-  )
+  ))
 
   # A multivariate model without a chosen response maps every
   # response, each under its own suffix. Otherwise the chosen
@@ -513,29 +489,8 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
     trend_specs, data_info, prior = prior
   )
 
-  # A GLM likelihood that mvgam rewrites to take `to_matrix(mu)` needs
-  # the unit coefficient `mu_ones`. A call taking brms's declared mu
-  # keeps its own coefficients.
-  glm_stanvars <- NULL
-  if (!is.null(obs_setup$stancode)) {
-    if (shared_mapping) {
-      usage <- detect_glm_usage(obs_setup$stancode, names(mappings))
-      glm_stanvars <- do.call(combine_stanvars, lapply(
-        names(usage), function(resp) {
-          if (isTRUE(usage[[resp]]) &&
-              !glm_takes_declared_mu(obs_setup$stancode, resp)) {
-            mu_ones_stanvar(paste0("mu_ones_", resp))
-          }
-        }
-      ))
-    } else if (length(detect_glm_usage(obs_setup$stancode)) > 0L &&
-               !glm_takes_declared_mu(obs_setup$stancode, "")) {
-      glm_stanvars <- mu_ones_stanvar("mu_ones")
-    }
-  }
-
   combine_stanvars(trend_setup$stanvars, brms_stanvars, mapping_stanvars,
-                   trend_stanvars, glm_stanvars)
+                   trend_stanvars)
 }
 
 #' Stanvars mapping each observation to its trend cell
@@ -589,62 +544,6 @@ trend_mapping_stanvars <- function(mapping, suffix, label) {
   )
   do.call(combine_stanvars, c(arrays, list(linear_index)))
 }
-
-#' Data stanvar holding the unit GLM coefficient
-#'
-#' @param name Name of the Stan variable
-#' @return A stanvar
-#' @noRd
-mu_ones_stanvar <- function(name) {
-  checkmate::assert_string(name)
-  brms::stanvar(x = 1, name = name, scode = paste0("vector[1] ", name, ";"))
-}
-
-#' The GLM likelihoods a Stan program calls
-#'
-#' @param stan_code Character string containing Stan code
-#' @param response_names Response names, or NULL
-#' @return Without `response_names`, the GLM families the program
-#'   calls. With them, a named list giving each response's GLM use.
-#' @noRd
-detect_glm_usage <- function(stan_code, response_names = NULL) {
-  checkmate::assert_character(stan_code, min.len = 1)
-  checkmate::assert_character(response_names, null.ok = TRUE)
-  if (is.null(response_names)) {
-    detected <- glm_calls_present(paste(stan_code, collapse = "\n"))
-    return(names(detected)[detected])
-  }
-  map_responses_to_glm(unlist(strsplit(stan_code, "\n", fixed = TRUE)),
-                       response_names)
-}
-
-#' The arguments of the first call to one GLM likelihood
-#'
-#' @param stan_code Character string containing Stan code
-#' @param glm_type Family name including the `_glm` suffix
-#' @return List naming each argument by the role its family gives it,
-#'   or NULL when the program never calls that density
-#' @noRd
-parse_glm_parameters_single <- function(stan_code, glm_type) {
-  checkmate::assert_character(stan_code, min.len = 1)
-  checkmate::assert_string(glm_type)
-
-  code_lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
-  glm_pattern <- stan_density_call_pattern(glm_type)
-  glm_line_idx <- grep(glm_pattern, code_lines)[1]
-
-  if (is.na(glm_line_idx)) {
-    return(NULL)
-  }
-
-  glm_line <- code_lines[glm_line_idx]
-  if (!grepl(paste0(glm_pattern, "\\([^)]+\\)"), glm_line)) {
-    return(NULL)
-  }
-
-  parse_glm_parameters_from_line(glm_line, glm_type)
-}
-
 
 #' Line bounds of a Stan program block
 #'
@@ -729,9 +628,6 @@ find_prior_only_insertion_point <- function(code_lines, model_block_info) {
 inject_trend_into_linear_predictors <- function(base_stancode, resps) {
   checkmate::assert_string(base_stancode, min.chars = 1)
   checkmate::assert_character(resps, min.len = 1, any.missing = FALSE)
-  # A GLM likelihood whose family has no layout is refused before any
-  # line is rewritten
-  glm_calls_present(base_stancode)
   code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
   for (resp in resps) {
     code_lines <- inject_trend_for_response(code_lines, resp)
@@ -742,12 +638,9 @@ inject_trend_into_linear_predictors <- function(base_stancode, resps) {
 
 #' Add the latent trend to one response's linear predictor
 #'
-#' brms folds the predictor into a GLM likelihood where it can, as in
-#' `poisson_log_glm_lpmf(Y | Xc, Intercept, b)`. That call names no
-#' `mu` for a trend to reach. It is rewritten to take one. A GLM call
-#' that already takes the `mu` brms declared, which an offset
-#' produces, is left as written. Every other predictor is a `mu` the
-#' program builds. The trend is added once it is built.
+#' A response whose likelihood brms wrote as a GLM call takes the
+#' trend as `response_glm_call()` decides. Every other predictor is a
+#' `mu` the program builds. The trend is added once it is built.
 #'
 #' @param code_lines Character vector of Stan source lines
 #' @param resp The response key, or `""` for a univariate program
@@ -756,7 +649,6 @@ inject_trend_into_linear_predictors <- function(base_stancode, resps) {
 inject_trend_for_response <- function(code_lines, resp) {
   checkmate::assert_character(code_lines, min.len = 1)
   checkmate::assert_string(resp)
-  sfx <- predictor_suffix(resp)
   model <- find_stan_block(code_lines, "model")
   if (is.null(model)) {
     stop_mvgam_fault(
@@ -764,15 +656,21 @@ inject_trend_for_response <- function(code_lines, resp) {
       "The trend is added to the predictor that block builds."
     )
   }
-  model_range <- seq.int(model$start_idx, model$end_idx)
-  glm_pattern <- paste0(stan_density_call_pattern("_glm"),
-                        "\\(Y", sfx, " \\|")
-  glm_lines <- model_range[grepl(glm_pattern, code_lines[model_range])]
-  if (length(glm_lines) &&
-      !glm_takes_declared_mu(paste(code_lines, collapse = "\n"), resp)) {
-    return(rewrite_glm_for_trend(code_lines, model, glm_lines, resp))
+  glm_call <- response_glm_call(code_lines, resp)
+  if (!is.null(glm_call) && !identical(glm_call$route, "declared")) {
+    return(rewrite_glm_for_trend(code_lines, model, resp, glm_call))
   }
   add_trend_to_built_predictor(code_lines, model, resp)
+}
+
+
+#' The trend cell of every observation of one response
+#'
+#' @param resp The response key, or `""` for a univariate program
+#' @return A Stan expression for an `N`-vector
+#' @noRd
+trend_gather <- function(resp) {
+  paste0("to_vector(trend)[obs_trend_idx", predictor_suffix(resp), "]")
 }
 
 
@@ -780,59 +678,62 @@ inject_trend_for_response <- function(code_lines, resp) {
 #'
 #' @param resp The response key, or `""` for a univariate program
 #' @param indent Leading whitespace for the statement
-#' @param extra A term added to the predictor with the trend, or `""`
 #' @return One Stan line
 #' @noRd
-trend_addition_lines <- function(resp, indent, extra = "") {
+trend_addition_lines <- function(resp, indent) {
   checkmate::assert_string(indent)
-  checkmate::assert_string(extra)
-  sfx <- predictor_suffix(resp)
-  mu_var <- glm_mu_names(resp)[["mu"]]
-  paste0(indent, mu_var, " += ", extra, "to_vector(trend)[obs_trend_idx",
-         sfx, "];")
+  paste0(indent, response_mu(resp), " += ", trend_gather(resp), ";")
 }
 
 
-#' Rewrite a response's GLM likelihood to take a predictor with the trend
+#' Put the trend into a response's GLM likelihood
 #'
-#' The design matrix and coefficients of the call build `mu`. The
-#' intercept and the trend are added per row. The call is rewritten to
-#' take `to_matrix(mu)` with unit coefficients. A family whose GLM
-#' carries no intercept, the ordinal one, passes its cutpoints through
-#' unchanged.
+#' On the `"alpha"` route the trend joins the intercept argument,
+#' which Stan's GLM densities take as a vector. On the `"density"`
+#' route, for a GLM without an intercept, the program builds
+#' `mu = X * b` plus the trend. The call then becomes the family's
+#' vectorised density on `mu`, as in
+#' `ordered_logistic_lpmf(Y | mu, Intercept)`.
 #'
 #' @param code_lines Character vector of Stan source lines
 #' @param model List with the model block's `start_idx` and `end_idx`
-#' @param glm_lines Line indices of the response's GLM calls
 #' @param resp The response key, or `""` for a univariate program
-#' @return `code_lines` with the call rewritten and `mu` declared
+#' @param glm_call The response's GLM call from `response_glm_call()`,
+#'   on the `"alpha"` or `"density"` route
+#' @return `code_lines` with the call rewritten
 #' @noRd
-rewrite_glm_for_trend <- function(code_lines, model, glm_lines, resp) {
-  params <- NULL
-  for (i in glm_lines) {
-    glm_type <- glm_family_of_line(code_lines[i])
-    params <- parse_glm_parameters_from_line(code_lines[i], glm_type)
-    code_lines[i] <- transform_single_glm_call(code_lines[i], glm_type,
-                                               params)
+rewrite_glm_for_trend <- function(code_lines, model, resp, glm_call) {
+  checkmate::assert_choice(glm_call$route, c("alpha", "density"))
+  at <- glm_call$at
+  glm_type <- glm_call$glm_type
+  params <- glm_call$params
+  arguments <- unlist(params[glm_roles_for(glm_type)])
+  if (identical(glm_call$route, "alpha")) {
+    # brms writes the intercept `0` for a formula without one
+    arguments[["intercept"]] <- if (identical(params$intercept, "0")) {
+      trend_gather(resp)
+    } else {
+      paste0(params$intercept, " + ", trend_gather(resp))
+    }
+    code_lines[at] <- rewrite_glm_call(code_lines[at], glm_type,
+                                       params$y_var, unname(arguments))
+    return(code_lines)
   }
-  sfx <- predictor_suffix(resp)
-  mu_var <- glm_mu_names(resp)[["mu"]]
-  intercept <- params$intercept
-  extra <- if (is.null(intercept) || identical(intercept, "0")) {
-    ""
-  } else {
-    paste0(intercept, " + ")
-  }
+  mu_var <- response_mu(resp)
+  code_lines[at] <- rewrite_glm_call(
+    code_lines[at], glm_type, params$y_var,
+    c(mu_var, params$cutpoints), glm = FALSE
+  )
   # A prior-only run carries no trend addition. The lines go inside
   # the `if (!prior_only)` guard where brms wrote one.
-  at <- find_prior_only_insertion_point(code_lines, model)
-  indent <- stan_line_indent(code_lines[glm_lines[1L]])
+  indent <- stan_line_indent(code_lines[at])
   addition <- c(
-    paste0(indent, "vector[N", sfx, "] ", mu_var, " = ",
-           params$design_matrix, " * ", params$coefficients, ";"),
-    trend_addition_lines(resp, indent, extra)
+    paste0(indent, "vector[N", predictor_suffix(resp), "] ", mu_var,
+           " = ", params$design_matrix, " * ", params$coefficients, ";"),
+    trend_addition_lines(resp, indent)
   )
-  append(code_lines, addition, after = at)
+  append(code_lines, addition,
+         after = find_prior_only_insertion_point(code_lines, model))
 }
 
 
@@ -854,7 +755,7 @@ rewrite_glm_for_trend <- function(code_lines, model, glm_lines, resp) {
 #' @return `code_lines` with the trend addition inserted
 #' @noRd
 add_trend_to_built_predictor <- function(code_lines, model, resp) {
-  mu_var <- glm_mu_names(resp)[["mu"]]
+  mu_var <- response_mu(resp)
   model_range <- seq.int(model$start_idx, model$end_idx)
   # A statement assigning into `mu`, possibly declaring it or indexing
   # it, with the loop header brms sometimes writes on the same line
@@ -5466,32 +5367,31 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping) {
 
   mu_name <- paste0("mu", suffix)
   extracted_mu_lines <- character(0)
-  mu_declared <- grepl(paste0("vector\\[[^]]*\\]\\s+", mu_name, "\\b"),
-                       stancode, perl = TRUE)
-  if (!mu_declared) {
-    time_param <- paste0("N", suffix)
-    mu_result <- extract_mu_construction(stancode)
-    if (length(mu_result$mu_construction) > 0L) {
-      # The statements and the declarations they use leave the model
-      # block together
-      extracted_mu_lines <- c(mu_result$mu_construction,
-                              mu_result$supporting_declarations)
-      mapping <- map_mu_references(stancode, mu_result$referenced_variables,
-                                   mapping, suffix)
-      mu_code <- paste(reconstruct_mu_trend_with_renamed_vars(
-        mu_construction = mu_result$mu_construction,
-        supporting_declarations = mu_result$supporting_declarations,
-        variable_mapping = mapping$original_to_renamed,
-        suffix = suffix
-      ), collapse = "\n")
-    } else {
-      mu_code <- mu_from_declarations(stancode, suffix, time_param)
-    }
+  mu_result <- extract_mu_construction(stancode)
+  if (length(mu_result$mu_construction) > 0L) {
+    # The statements and the declarations they use leave the model
+    # block together
+    extracted_mu_lines <- c(mu_result$mu_construction,
+                            mu_result$supporting_declarations)
+    mapping <- map_mu_references(stancode, mu_result$referenced_variables,
+                                 mapping, suffix)
+    mu_code <- paste(reconstruct_mu_trend_with_renamed_vars(
+      mu_construction = mu_result$mu_construction,
+      supporting_declarations = mu_result$supporting_declarations,
+      variable_mapping = mapping$original_to_renamed,
+      suffix = suffix
+    ), collapse = "\n")
+  } else {
+    mu_code <- mu_from_declarations(stancode, suffix, paste0("N", suffix))
+  }
+  # A trend formula without terms leaves `mu_trend` at zero. The
+  # program then declares no `mu_trend`. The trend is the states alone.
+  if (!mu_is_zero(mu_code, mu_name)) {
     stanvar_list$trend_model_mu_creation <- block_stanvar(mu_code,
                                                           "tparameters")
-    mapping$original_to_renamed$mu <- mu_name
-    mapping$renamed_to_original[[mu_name]] <- "mu"
   }
+  mapping$original_to_renamed$mu <- mu_name
+  mapping$renamed_to_original[[mu_name]] <- "mu"
 
   # brms declares a group-level effect and a smooth coefficient here and
   # assigns each below its declaration. `mu_trend` takes both. A
@@ -5603,6 +5503,32 @@ mu_from_declarations <- function(stancode, suffix, time_param) {
   }
   paste0(mu_decl, " = rep_vector(", intercept %||% "0.0", ", ",
          time_param, ");")
+}
+
+#' Do the statements building a predictor leave it at zero?
+#'
+#' A trend formula with no terms gives `mu_trend` no design. Its
+#' statement declares it as `rep_vector(0.0, N_trend)` and never
+#' assigns to it again.
+#'
+#' @param mu_code The Stan statements that build the predictor
+#' @param mu_name The predictor's name, such as `"mu_trend"`
+#' @return `TRUE` when the statements declare the predictor at zero
+#'   and never assign to it afterwards
+#' @noRd
+mu_is_zero <- function(mu_code, mu_name) {
+  checkmate::assert_string(mu_code)
+  checkmate::assert_string(mu_name, min.chars = 1L)
+  code <- stan_line_code(strsplit(mu_code, "\n", fixed = TRUE)[[1L]])
+  zero_start <- grepl(paste0(
+    "\\b", mu_name, "\\s*=\\s*rep_vector\\(\\s*0(\\.0*)?\\s*,"
+  ), code)
+  assigned <- grepl(
+    paste0("\\b", mu_name, "\\b(\\s*\\[[^]]*\\])?\\s*[-+*/]?=(?!=)"),
+    code, perl = TRUE
+  )
+  sum(zero_start) == 1L && sum(assigned) == 1L &&
+    identical(which(zero_start), which(assigned))
 }
 
 #' Does a supporting declaration compute a value?

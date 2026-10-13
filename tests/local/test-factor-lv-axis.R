@@ -516,11 +516,13 @@ test_that("the axis record names the series column as the axis", {
 })
 
 
-test_that("the by-lv program folds mu_factor into the latent states", {
+test_that("the by-lv program folds the predictor into the latent states", {
   sc <- as.character(stancode(prefit_by_lv))
-  expect_true(grepl("row_vector[N_lv_trend] mu_factor", sc,
+  # Each factor's predictor joins its state before the loadings
+  flat <- gsub("\\s+", "", sc)
+  expect_true(grepl("lv_mu_trend[:,k]+=mu_trend[times_trend[:,k]];", flat,
                     fixed = TRUE))
-  expect_match(sc, "lv_trend\\[i,\\s*:\\s*\\]\\s*\\+\\s*mu_factor")
+  expect_true(grepl("trend=lv_mu_trend*Z';", flat, fixed = TRUE))
   expect_true(grepl("array[N_time_trend, N_lv_trend] int times_trend",
                     sc, fixed = TRUE))
   # A free `Z` alongside a factor-axis design would need the QR
@@ -531,7 +533,7 @@ test_that("the by-lv program folds mu_factor into the latent states", {
   sp <- as.character(stancode(prefit_plain))
   expect_true(grepl("array[N_time_trend, N_series_trend] int times_trend",
                     sp, fixed = TRUE))
-  expect_false(grepl("mu_factor", sp, fixed = TRUE))
+  expect_false(grepl("lv_mu_trend", sp, fixed = TRUE))
 })
 
 

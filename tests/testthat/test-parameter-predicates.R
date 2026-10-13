@@ -44,10 +44,10 @@ test_that("a fit keeps the parameters brms keeps", {
 })
 
 
-test_that("a trend with no design leaves its zero mu_trend unstored", {
-  # Every draw of a `mu_trend` the program never assigns to is zero,
-  # and its R-hat and effective sample size are undefined. A trend
-  # formula with terms writes to it, and the draws vary.
+test_that("a trend with no design declares no mu_trend", {
+  # A trend formula without terms leaves `mu_trend` at zero. Declared,
+  # it cost an allocation per gradient and stored zeros whose R-hat is
+  # undefined. A trend formula with terms builds it and adds it.
   set.seed(3L)
   dat <- data.frame(
     y = rpois(60L, 4), x = rnorm(60L), time = rep(1:30, 2L),
@@ -59,23 +59,13 @@ test_that("a trend with no design leaves its zero mu_trend unstored", {
   }
   zero <- list(~ RW(), ~ AR(p = 2), ~ VAR(), ~ -1 + AR(cor = TRUE))
   for (trend in zero) {
-    expect_true(mu_trend_is_zero(code_of(trend)))
+    expect_false(grepl("\\bmu_trend\\b", code_of(trend)))
   }
   designed <- list(~ x + RW(), ~ s(x, k = 4) + AR())
   for (trend in designed) {
-    expect_false(mu_trend_is_zero(code_of(trend)))
+    expect_true(stan_pattern("trend[ : , s] += mu_trend[times_trend[ : , s]];",
+                             code_of(trend), fixed = TRUE))
   }
-  expect_false(mu_trend_is_zero(NULL))
-
-  # The exclusion follows `save_pars()` as brms's own do
-  code <- code_of(~ RW())
-  expect_true("mu_trend" %in% mvgam_excluded_pars(NULL, stancode = code))
-  expect_false("mu_trend" %in% mvgam_excluded_pars(
-    NULL, stancode = code, save_pars = brms::save_pars(all = TRUE)
-  ))
-  expect_false("mu_trend" %in% mvgam_excluded_pars(
-    NULL, stancode = code, save_pars = brms::save_pars(manual = "mu_trend")
-  ))
 })
 
 
