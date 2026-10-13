@@ -3077,8 +3077,8 @@ z_column_prior_row <- function(has_kernel) {
 #' @noRd
 kernel_assembly_rows <- function(spec) {
   # Phi = (prod_d exp(-d / theta_d)) * gp_exponential(features;
-  # theta_features). Per R/stan_assembly.R:3241-3268; one factor
-  # per supplied distance matrix, plus the features GP factor
+  # theta_features), as the generated Stan code builds it. One
+  # factor per supplied distance matrix, plus the features GP factor
   # when N_features_trend > 0.
   has_features <- loadings_spec_traits(spec)$features
   dnames <- names(spec$distance_mats) %||% character(0L)

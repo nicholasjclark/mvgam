@@ -1221,6 +1221,26 @@ detect_factor_n_lv <- function(object, n_series = NULL) {
 }
 
 
+#' The number of latent factors, or an error naming the caller
+#'
+#' @param object A fitted `mvgam` object
+#' @param caller The function that needs a factor model, for the message
+#' @return Integer number of factors
+#' @noRd
+require_factor_n_lv <- function(object, caller) {
+  checkmate::assert_string(caller)
+  n_lv <- detect_factor_n_lv(object)
+  if (is.null(n_lv)) {
+    stop(insight::format_error(c(
+      paste0("'", caller, "' requires a latent factor model."),
+      i = paste0("Fit with 'n_lv' in 'jsdgam()' or in the trend ",
+                 "constructor, e.g. '~ AR(n_lv = 2)'.")
+    )), call. = FALSE)
+  }
+  n_lv
+}
+
+
 #' Refuse more factors than series
 #'
 #' `jsdgam()` and `mvgam()` both call this. The marginal `Z Z'` has

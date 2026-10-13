@@ -212,16 +212,7 @@ compare_loadings <- function(
 #' @noRd
 extract_median_Z <- function(object) {
   checkmate::assert_class(object, "mvgam")
-  n_lv <- detect_factor_n_lv(object)
-  if (is.null(n_lv) || n_lv < 1L) {
-    stop(insight::format_error(c(
-      "'compare_loadings()' requires two latent-factor fits.",
-      i = paste0(
-        "Fit each model with 'jsdgam(n_lv = )' or with 'n_lv' on the ",
-        "trend constructor, as 'trend_formula = ~ AR(n_lv = 2)'."
-      )
-    )), call. = FALSE)
-  }
+  n_lv <- require_factor_n_lv(object, "compare_loadings()")
   n_series <- loading_series_count(object)
   draws_mat <- posterior::as_draws_matrix(object$fit)
   # A fixed-Z fit holds its loadings as data. The resolver repeats

@@ -157,13 +157,7 @@ ordinate <- function(object, ...) {
 #' @noRd
 ordinate_extract_medians <- function(object) {
   checkmate::assert_class(object, "mvgam")
-  n_lv <- detect_factor_n_lv(object)
-  if (is.null(n_lv)) {
-    stop(insight::format_error(c(
-      "Object does not contain any latent dynamic factors.",
-      i = "Ordination requires an LV-factor mvgam / jsdgam fit."
-    )), call. = FALSE)
-  }
+  n_lv <- require_factor_n_lv(object, "ordinate()")
   per_lv <- extract_lv_trend_matrices(object, n_lv)
   lv_estimates <- do.call(cbind, lapply(per_lv, function(mat) {
     apply(mat, 2L, stats::median, na.rm = TRUE)

@@ -236,6 +236,19 @@ test_that("posterior_transition_matrix(summary = FALSE) keeps the draws", {
   # [0, 1] bound on a mean of indicators excludes no result.
   expect_equal(out$prob_positive, apply(arr > 0, c(2, 3), mean),
                ignore_attr = TRUE)
+
+  # The heatmap puts the lagged process (column) across and outlines
+  # the one cell whose interval excludes zero, row 1 and column 2.
+  out$A_lower[] <- -1
+  out$A_upper[] <- 1
+  out$A_lower[1L, 2L] <- 0.1
+  p <- plot(out)
+  expect_identical(rlang::as_label(p$mapping$x), "Var2")
+  outlined <- p$layers[[2L]]$data
+  expect_identical(
+    as.character(c(outlined$Var1, outlined$Var2)),
+    c(rownames(out$A)[1L], colnames(out$A)[2L])
+  )
 })
 
 
@@ -332,6 +345,26 @@ test_that("the variance decomposition plot keeps the processes in order", {
 })
 
 
+test_that("impulse response draws and summary keep the processes in order", {
+  # The draws plot sorted its panels alphabetically and titled them
+  # with an arrow of its own. Both forms now follow the fit's order
+  # and label a pair as the summary does.
+  labels <- c("zeta", "alpha", "mu")
+  draws <- lapply(1:2, function(i) {
+    gen_irf(var_kernel_input(3L, matrix(0.1 * i, 3L, 3L),
+                             labels = labels),
+            h = 2L, cumulative = FALSE, orthogonal = FALSE)
+  })
+  class(draws) <- "mvgam_irf"
+  attr(draws, "irf_type") <- "Generalized"
+  pairs <- paste0("alpha -> ", labels)
+  p <- plot(draws, series = 2L)
+  expect_identical(levels(p$layers[[1L]]$data$series), pairs)
+  expect_identical(p$labels$y, "Generalized impulse response")
+  expect_identical(unique(summary(draws)$shock)[4:6], pairs)
+})
+
+
 test_that("a stability metric that is not there is refused by name", {
   # A misspelt metric is refused by name. Drawing the metrics that
   # exist would drop it from the plot without a word.
@@ -344,4 +377,10 @@ test_that("a stability metric that is not there is refused by name", {
   p <- plot(x, variables = c("var_return_rate", "reactivity"))
   expect_identical(levels(p$data$metric),
                    c("var_return_rate", "reactivity"))
+  # Panels carry display names
+  strips <- p$facet$params$labeller(
+    data.frame(metric = c("var_return_rate", "reactivity"))
+  )
+  expect_identical(unname(strips[[1L]]),
+                   c("Variance return rate", "Reactivity"))
 })

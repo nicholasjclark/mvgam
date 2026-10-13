@@ -16,22 +16,20 @@
 \item{x}{A \code{mvgam_residcor} object returned by
 \code{residual_cor(..., summary = TRUE)}.}
 
-\item{type}{Character. Which surface to plot. \code{"correlation"}
-(the default) reads \code{x$cor}; \code{"precision"} reads \code{x$prec}
-(the partial correlations, Ovaskainen et al. 2016), which
-\code{residual_cor()} populates only under \code{partial = TRUE}.}
+\item{type}{Character. Which matrix to plot. \code{"correlation"} (the
+default) draws \code{x$cor}. \code{"precision"} draws \code{x$prec}, the partial
+correlations (Ovaskainen et al. 2016). \code{residual_cor()} computes
+them under \code{partial = TRUE}.}
 
-\item{cluster}{Logical. When \code{TRUE}, the matrix is reordered
-by an approximate Robinson ordering (Gruvaeus & Wainer
-1972; average linkage on the \code{1 - cormat} distance) so
-visually coherent positive and negative clusters sit
-adjacent. Defaults to \code{FALSE}.}
+\item{cluster}{Logical. When \code{TRUE}, the matrix is reordered by an
+approximate Robinson ordering (Gruvaeus & Wainer 1972; average
+linkage on the \code{1 - cormat} distance). Clusters of positive and
+negative correlations then lie adjacent. Defaults to \code{FALSE}.}
 
-\item{rescale}{Logical. Colour spans \verb{[-1, 1]} by default, the
-full range a correlation can take, so panels from different
-fits are directly comparable and a correlation of 0.4 does
-not look like one of 1. Set \code{TRUE} to scale colour to the
-entries actually present, which reads better on a fit whose
+\item{rescale}{Logical. By default colour spans \verb{[-1, 1]}, the full
+range of a correlation. Panels from different fits are then
+comparable. A correlation of 0.4 looks unlike one of 1. Set
+\code{TRUE} to scale colour to the entries present, for a fit whose
 correlations are all small. Defaults to \code{FALSE}.}
 
 \item{...}{Unused. Anything passed here is refused.}
@@ -48,8 +46,9 @@ factor (\code{mvgam}) model.
 Only the lower triangle of off-diagonal entries is
 drawn; a symmetric matrix says everything once and the
 diagonal is \code{1} for any correlation. Fill shows the posterior
-median. \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} reports each pair's
-interval and \code{prob_nonzero}.
+point estimate. A black outline marks each pair whose credible
+interval excludes zero. \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} reports each
+pair's interval and \code{prob_nonzero}.
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}}

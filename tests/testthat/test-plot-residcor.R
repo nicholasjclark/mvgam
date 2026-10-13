@@ -71,7 +71,8 @@ test_that("type = 'precision' works when the partial surface is present", {
   ), nrow = 3L, byrow = TRUE,
      dimnames = list(letters[1:3], letters[1:3]))
   p <- plot(rc, type = "precision")
-  expect_ggplot(p)
+  # The panel draws the partial correlations. The correlations are all 0.
+  expect_setequal(p$data$value, c(0.3, -0.1, 0.2))
 })
 
 
@@ -87,10 +88,17 @@ test_that("the panel draws the estimate, not the thresholded matrix", {
      dimnames = list(letters[1:3], letters[1:3]))
   rc <- .make_residcor(cor_mat)
   rc$sig_cor[] <- 0
+  # Only the pair c-b has an interval clear of zero
+  rc$cor_lower <- cor_mat - 0.5
+  rc$cor_upper <- cor_mat + 0.5
+  rc$cor_lower["c", "b"] <- 0.1
   p <- plot(rc)
-  # Only the lower triangle is drawn, and every estimate survives.
+  # The panel holds the lower triangle with every estimate in it
   expect_equal(nrow(p$data), 3L)
   expect_setequal(round(p$data$value, 2), c(0.40, 0.18, 0.58))
+  outlined <- p$layers[[2L]]$data
+  expect_identical(as.character(c(outlined$Var1, outlined$Var2)),
+                   c("c", "b"))
 })
 
 

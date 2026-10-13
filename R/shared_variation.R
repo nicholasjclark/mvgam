@@ -128,12 +128,7 @@ shared_variation.mvgam <- function(object,
   checkmate::assert_flag(robust)
   rlang::check_dots_empty()
 
-  n_lv <- detect_factor_n_lv(object)
-  if (is.null(n_lv)) {
-    stop(insight::format_error(
-      "shared_variation() requires a latent-factor fit."
-    ))
-  }
+  n_lv <- require_factor_n_lv(object, "shared_variation()")
 
   series_names <- fitted_series_levels(object)
   # `factor_implied_cov_draws()` owns the per-draw `Z Sigma Z'`,
@@ -230,32 +225,17 @@ plot.mvgam_shared_variation <- function(x,
   rlang::check_dots_empty()
   mat <- switch(type, point = x$delta, uncertainty = x$delta_se)
   rng <- max(abs(range(mat, na.rm = TRUE, finite = TRUE)))
-  if (type == "point") {
-    limits <- c(-rng, rng)
-    scale_name <- "Posterior\nDelta"
+  fill_scale <- if (type == "point") {
+    mvgam_diverging_scale(name = "Posterior\nDelta", limits = c(-rng, rng))
   } else {
-    limits <- c(0, rng)
-    scale_name <- "Posterior\nspread"
-  }
-  long <- gather_matrix(mat, drop_diag = FALSE, drop_upper = FALSE)
-  p <- ggplot2::ggplot(
-    data = long,
-    mapping = ggplot2::aes(x = Var1, y = Var2, fill = value)
-  ) +
-    ggplot2::geom_tile(colour = "grey50")
-  if (type == "point") {
-    p <- p + mvgam_diverging_scale(name = scale_name, limits = limits)
-  } else {
-    warm <- mvgam_palette("red")[5L]
-    p <- p + ggplot2::scale_fill_gradient(
-      name = scale_name,
-      low = "grey95", high = warm,
-      limits = limits, na.value = "grey30"
+    ggplot2::scale_fill_gradient(
+      name = "Posterior\nspread",
+      low = "grey95", high = mvgam_palette("red")[5L],
+      limits = c(0, rng), na.value = "grey30"
     )
   }
-  p +
-    ggplot2::labs(x = "", y = "") +
-    ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(angle = 45)) +
-    ggplot2::scale_y_discrete(limits = rev) +
-    mvgam_theme()
+  matrix_heatmap(
+    gather_matrix(mat, drop_diag = FALSE, drop_upper = FALSE),
+    fill_scale
+  )
 }

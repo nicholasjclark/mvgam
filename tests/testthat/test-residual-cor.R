@@ -9,6 +9,15 @@ build_fake_mvgam <- function() {
   structure(list(), class = "mvgam")
 }
 
+# Hand `residual_cor()` a fixed covariance structure for the calling
+# test
+mock_cov_struct <- function(cov_struct, env = parent.frame()) {
+  testthat::local_mocked_bindings(
+    get_trend_covariance_structure = function(object, ...) cov_struct,
+    .package = "mvgam", .env = env
+  )
+}
+
 # Cov struct mocks: full_covariance (VAR-like) with a known Sigma.
 mk_full_cov_struct <- function(Sigma) {
   ndraws <- 100L
@@ -56,12 +65,7 @@ test_that("residual_cor projects the latent covariance through Z", {
     .package = "posterior"
   )
   res <- residual_cor(case$obj)
-  expect_s3_class(res, "mvgam_residcor")
   expect_equal(res$pattern, "factor_loadings")
-  expect_equal(res$n_series, 3L)
-  # Cor invariants
-  expect_true(all(diag(res$cor) == 1))
-  expect_true(isSymmetric(unname(res$cor), tol = 1e-8))
   # A factor model writes `trend[t, s] = Z[s, ] . lv[t, ]`, so the
   # covariance between series is `Z Omega Z'`, not `Z Z'`. Dropping
   # `Omega` discards whatever scale the latent columns carry, which
@@ -197,58 +201,56 @@ test_that("residual_cor reconstructs cor from a known VAR-style Sigma", {
   Sigma <- matrix(c(2.0, 0.6, 0.6,
                     0.6, 1.5, 0.2,
                     0.6, 0.2, 1.0), 3, 3)
-  cov_struct <- mk_full_cov_struct(Sigma)
+  mock_cov_struct(mk_full_cov_struct(Sigma))
+  res <- residual_cor(build_fake_mvgam(), summary = TRUE)
+  expect_equal(unname(res[["cor"]]), cov2cor(Sigma), tolerance = 1e-8)
+  expect_equal(unname(res[["cov"]]), Sigma, tolerance = 1e-8)
+})
+
+
+test_that("covariance chooses the stationary or the innovation covariance", {
+  # The stationary covariance lifts the innovation covariance through
+  # the dynamics. The mock returns a different covariance for each
+  # request. The summary must come from the one asked for.
+  stat <- matrix(c(2.0, 1.2, 1.2, 1.5), 2, 2)
+  innov <- matrix(c(1.0, -0.3, -0.3, 0.8), 2, 2)
   testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
+    get_trend_covariance_structure = function(object, stationary = TRUE,
+                                              ...) {
+      mk_full_cov_struct(if (stationary) stat else innov)
+    },
     .package = "mvgam"
   )
-  res <- residual_cor(build_fake_mvgam(), summary = TRUE)
-  expect_s3_class(res, "mvgam_residcor")
-  # Strip dimnames before comparison so the test does not depend on
-  # the labelling convention applied by the summariser.
-  cor_actual <- res[["cor"]]; dimnames(cor_actual) <- NULL
-  cov_actual <- res[["cov"]]; dimnames(cov_actual) <- NULL
-  expect_equal(cor_actual, cov2cor(Sigma), tolerance = 1e-8)
-  expect_equal(cov_actual, Sigma, tolerance = 1e-8)
-  expect_true(all(diag(res[["cor"]]) == 1))
-  expect_true(all(res[["cor_lower"]] <= res[["cor"]]))
-  expect_true(all(res[["cor_upper"]] >= res[["cor"]]))
+  default <- residual_cor(build_fake_mvgam())
+  shocks <- residual_cor(build_fake_mvgam(), covariance = "innovation")
+  expect_equal(unname(default$cov), stat, tolerance = 1e-8)
+  expect_equal(unname(shocks$cov), innov, tolerance = 1e-8)
+  expect_output(print(shocks), "Covariance : innovation", fixed = TRUE)
 })
 
 
 test_that("residual_cor returns raw draws when summary = FALSE", {
   Sigma <- diag(c(2, 3)) + matrix(0.5, 2, 2) - diag(0.5, 2)
-  cov_struct <- mk_full_cov_struct(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(mk_full_cov_struct(Sigma))
   res <- residual_cor(build_fake_mvgam(), summary = FALSE)
-  expect_s3_class(res, "mvgam_residcor")
-  expect_equal(dim(res[["cor_draws"]]), c(100L, 2L, 2L))
+  # One matrix per draw, each the covariance and its correlation
   expect_equal(dim(res[["cov_draws"]]), c(100L, 2L, 2L))
+  expect_equal(res[["cov_draws"]][37L, , ], Sigma)
+  expect_equal(res[["cor_draws"]][37L, , ], cov2cor(Sigma))
   expect_null(res[["prec_draws"]])
-  expect_null(res[["cor"]])
 })
 
 
-test_that("residual_cor(partial = TRUE) populates prec fields", {
+test_that("residual_cor(partial = TRUE) gives the partial correlations", {
   Sigma <- matrix(c(2.0, 0.6, 0.3,
                     0.6, 1.5, 0.1,
                     0.3, 0.1, 1.0), 3, 3)
-  cov_struct <- mk_full_cov_struct(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(mk_full_cov_struct(Sigma))
   res <- residual_cor(build_fake_mvgam(), partial = TRUE)
-  expect_s3_class(res, "mvgam_residcor")
-  expect_true(!is.null(res$prec))
-  expect_equal(dim(res$prec), c(3L, 3L))
-  expect_true(!is.null(res$prec_lower))
-  expect_true(!is.null(res$prec_upper))
-  expect_true(!is.null(res$prec_ess))
-  expect_equal(dim(res$prec_ess), c(3L, 3L))
+  # The partial correlation is the negated, rescaled precision
+  expected <- -cov2cor(solve(Sigma))
+  diag(expected) <- 1
+  expect_equal(unname(res$prec), expected, tolerance = 1e-8)
 })
 
 
@@ -260,25 +262,19 @@ test_that("the partial surface mirrors the correlation one", {
   Sigma <- matrix(c(2.0, 0.6, 0.3,
                     0.6, 1.5, 0.1,
                     0.3, 0.1, 1.0), 3, 3)
-  cov_struct <- mk_full_cov_struct(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(mk_full_cov_struct(Sigma))
   res <- residual_cor(build_fake_mvgam(), partial = TRUE)
   # The correlation surface prefixes its moments with `cor_` and
   # leaves its probabilities bare, being the only ones until now.
   mirrored <- c(se = "cor_se", lower = "cor_lower", upper = "cor_upper",
                 ess = "cor_ess", prob_positive = "prob_positive",
                 prob_negative = "prob_negative",
-                prob_nonzero = "prob_nonzero")
+                prob_nonzero = "prob_nonzero", sig = "sig_cor")
   for (field in names(mirrored)) {
-    prec <- res[[paste0("prec_", field)]]
-    expect_true(!is.null(prec))
+    prec <- res[[if (field == "sig") "sig_prec" else
+      paste0("prec_", field)]]
     expect_equal(dim(prec), dim(res[[mirrored[[field]]]]))
   }
-  expect_true(!is.null(res$sig_prec))
-  expect_equal(dim(res$sig_prec), dim(res$sig_cor))
   # The thresholding rule is the correlation surface's own, so an
   # entry survives in exactly the cases its probability clears.
   keeps <- res$prec_prob_nonzero > res$prob_threshold
@@ -287,12 +283,7 @@ test_that("the partial surface mirrors the correlation one", {
 
 
 test_that("the partial surface is absent unless it was asked for", {
-  Sigma <- diag(3)
-  cov_struct <- mk_full_cov_struct(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(mk_full_cov_struct(diag(3)))
   res <- residual_cor(build_fake_mvgam())
   expect_null(res$sig_prec)
   expect_null(res$prec)
@@ -332,25 +323,19 @@ test_that("residual_cor populates cor_ess / cov_ess per off-diagonal entry", {
                     0.6, 1.0, 0.4,
                     0.2, 0.4, 1.0), 3, 3)
   cov_struct <- mk_full_cov_struct_jittered(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(cov_struct)
   res <- residual_cor(build_fake_mvgam())
 
-  expect_true(!is.null(res$cor_ess))
-  expect_equal(dim(res$cor_ess), c(3L, 3L))
   # Diagonal entries are NA (correlation diagonal is fixed at 1).
   expect_true(all(is.na(diag(res$cor_ess))))
-  # Off-diagonal entries are finite, positive, and bounded above by
-  # the number of draws.
-  off_diag <- res$cor_ess[upper.tri(res$cor_ess)]
-  expect_true(all(is.finite(off_diag)))
-  expect_true(all(off_diag > 0))
-  expect_true(all(off_diag <= cov_struct$ndraws))
-
-  expect_true(!is.null(res$cov_ess))
-  expect_equal(dim(res$cov_ess), c(3L, 3L))
+  # Each off-diagonal entry is the effective sample size of its
+  # Fisher-z draws
+  z <- atanh(cov_struct$params$Sigma_trend[, 1L, 2L] /
+               sqrt(cov_struct$params$Sigma_trend[, 1L, 1L] *
+                      cov_struct$params$Sigma_trend[, 2L, 2L]))
+  expect_equal(res$cor_ess[1L, 2L], posterior::ess_basic(z))
+  expect_equal(res$cov_ess[1L, 2L],
+               posterior::ess_basic(cov_struct$params$Sigma_trend[, 1L, 2L]))
 })
 
 
@@ -362,28 +347,18 @@ test_that("residual_cor reconstructs cor from sigma + L_Omega", {
                     0.4, 1.0, 0.3,
                     0.2, 0.3, 1.0), 3, 3)
   L_Omega <- t(chol(Omega))
-  cov_struct <- mk_chol_cov_struct(sigma, L_Omega)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(mk_chol_cov_struct(sigma, L_Omega))
   res <- residual_cor(build_fake_mvgam())
-  # Expected Sigma = diag(sigma) %*% L %*% t(L) %*% diag(sigma).
-  L_scaled <- L_Omega * sigma
-  Sigma_expected <- tcrossprod(L_scaled)
-  cor_actual <- res[["cor"]]; dimnames(cor_actual) <- NULL
-  expect_equal(cor_actual, cov2cor(Sigma_expected), tolerance = 1e-8)
+  # The covariance is diag(sigma) L L' diag(sigma)
+  expect_equal(unname(res[["cov"]]), tcrossprod(L_Omega * sigma),
+               tolerance = 1e-8)
 })
 
 
 # ---- hierarchical path ------------------------------------------------
 
 test_that("hierarchical residcor falls back when factor lookup fails", {
-  cov_struct <- mk_hier_cov_struct()
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(mk_hier_cov_struct())
   # Trend spec gr/subgr point at columns that do not exist in the
   # fit's data. Resolver must drop back to "group_<i>" / "subgroup_<i>"
   # rather than error.
@@ -406,26 +381,18 @@ test_that("hierarchical residcor falls back when factor lookup fails", {
 
 test_that("residual_cor hierarchical default returns global cor only", {
   cov_struct <- mk_hier_cov_struct()
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(cov_struct)
   res <- residual_cor(build_fake_mvgam())
-  expect_s3_class(res, "mvgam_residcor")
   expect_identical(res[["group_label"]], "_global")
   # Global cor = tcrossprod(L_global) (which is already a valid cor mat).
   L_global <- cov_struct$params$L_Omega_global_trend[1, , ]
-  cor_actual <- res[["cor"]]; dimnames(cor_actual) <- NULL
-  expect_equal(cor_actual, tcrossprod(L_global), tolerance = 1e-8)
+  expect_equal(unname(res[["cor"]]), tcrossprod(L_global), tolerance = 1e-8)
 })
 
 
 test_that("residual_cor hierarchical with by_group = TRUE returns list", {
   cov_struct <- mk_hier_cov_struct()
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(cov_struct)
   # The group labels come from the training levels on the axes
   # record, sized to match cov_struct (2 groups, 3 subgroups).
   obj <- structure(
@@ -435,10 +402,12 @@ test_that("residual_cor hierarchical with by_group = TRUE returns list", {
     class = "mvgam"
   )
   res <- residual_cor(obj, by_group = TRUE)
-  expect_type(res, "list")
-  expect_true("_global" %in% names(res))
-  expect_true(all(c("g1", "g2") %in% names(res)))
-  for (k in names(res)) expect_s3_class(res[[k]], "mvgam_residcor")
+  expect_identical(names(res), c("_global", "g1", "g2"))
+  # Each group mixes the global and its own correlation by alpha, here
+  # 0.7 of the global and an identity deviation
+  glob <- tcrossprod(cov_struct$params$L_Omega_global_trend[1L, , ])
+  expect_equal(unname(res$g2$cor), 0.7 * glob + 0.3 * diag(3),
+               tolerance = 1e-8)
 })
 
 
@@ -457,22 +426,12 @@ test_that("residual_cor.jsdgam errors when called on an unfitted object", {
 # ---- Fisher-z CI behaviour -------------------------------------------
 
 test_that("Fisher-z CIs stay strictly inside (-1, 1)", {
-  # Build a Sigma whose true correlation is near +/- 1 to stress-test
-  # the boundary behaviour. Cor(1,2) ~ 0.99.
-  Sigma <- matrix(c(1.0, 0.99, 0.99, 1.0), 2, 2)
-  cov_struct <- mk_full_cov_struct(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  # A correlation of exactly 1 has an infinite Fisher z. The clip
+  # keeps the bounds finite and just below 1.
+  mock_cov_struct(mk_full_cov_struct(matrix(1, 2, 2)))
   res <- residual_cor(build_fake_mvgam())
-  off_mask <- !diag(TRUE, nrow = 2L)
-  expect_true(all(res[["cor_lower"]][off_mask] > -1 &
-                  res[["cor_lower"]][off_mask] < 1))
-  expect_true(all(res[["cor_upper"]][off_mask] > -1 &
-                  res[["cor_upper"]][off_mask] < 1))
-  # Off-diagonal lower CI strictly less than 1 even at r = 0.99
-  expect_lt(res[["cor_lower"]][1, 2], 1)
+  expect_lt(res[["cor_upper"]][1, 2], 1)
+  expect_gt(res[["cor_lower"]][1, 2], 1 - 1e-6)
 })
 
 
@@ -482,11 +441,7 @@ test_that("prob_nonzero and sig_cor reflect off-zero pairs", {
   # Constant Sigma across draws => prob_positive == 1 for positive
   # off-diagonal pairs.
   Sigma <- matrix(c(1.0, 0.6, 0.6, 1.0), 2, 2)
-  cov_struct <- mk_full_cov_struct(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(mk_full_cov_struct(Sigma))
   res <- residual_cor(build_fake_mvgam())
   expect_equal(res$prob_positive[1, 2], 1)
   expect_equal(res$prob_negative[1, 2], 0)
@@ -501,23 +456,10 @@ test_that("summary.mvgam_residcor returns tidy tibble sorted by prob_nonzero", {
   Sigma <- matrix(c(1.0, 0.8, 0.1,
                     0.8, 1.0, 0.5,
                     0.1, 0.5, 1.0), 3, 3)
-  cov_struct <- mk_full_cov_struct_jittered(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+  mock_cov_struct(mk_full_cov_struct_jittered(Sigma))
   res <- residual_cor(build_fake_mvgam())
   s <- summary(res)
-  expect_s3_class(s, "tbl_df")
   expect_equal(nrow(s), 3L)  # 3-choose-2 unique pairs
-  expect_setequal(
-    colnames(s),
-    c("series_1", "series_2", "Estimate", "Est.Error",
-      "Q_lower", "Q_upper", "ESS",
-      "prob_positive", "prob_negative", "prob_nonzero", "sig")
-  )
-  expect_true(all(is.finite(s$ESS)))
-  expect_true(all(s$ESS > 0))
   # The strongest off-diagonal (0.8) is recovered as the largest
   # absolute estimate; tiebreaker order (0.8 / 0.5 / 0.1) holds
   # despite small posterior jitter.
@@ -527,31 +469,25 @@ test_that("summary.mvgam_residcor returns tidy tibble sorted by prob_nonzero", {
 })
 
 
-test_that("summary.mvgam_residcor errors when summary = FALSE was used", {
-  Sigma <- matrix(c(1.0, 0.4, 0.4, 1.0), 2, 2)
-  cov_struct <- mk_full_cov_struct(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
-  res <- residual_cor(build_fake_mvgam(), summary = FALSE)
+test_that("summary and plot refuse the draws of summary = FALSE", {
+  mock_cov_struct(mk_full_cov_struct(matrix(c(1, 0.4, 0.4, 1), 2, 2)))
+  res <- residual_cor(build_fake_mvgam(), summary = FALSE, partial = TRUE)
   expect_error(summary(res), "summary = FALSE")
+  # `x$cor` and `x$prec` matched `cor_draws` and `prec_draws`
+  # partially. The plot then failed on an array assertion.
+  expect_error(plot(res), "summary = FALSE")
+  expect_error(plot(res, type = "precision"), "summary = FALSE")
 })
 
 
 # ---- print.mvgam_residcor --------------------------------------------
 
-test_that("print.mvgam_residcor returns the object invisibly", {
-  Sigma <- matrix(c(1.0, 0.4, 0.4, 1.0), 2, 2)
-  cov_struct <- mk_full_cov_struct(Sigma)
-  testthat::local_mocked_bindings(
-    get_trend_covariance_structure = function(object) cov_struct,
-    .package = "mvgam"
-  )
+test_that("print.mvgam_residcor counts the pairs clear of zero", {
+  mock_cov_struct(mk_full_cov_struct(matrix(c(1, 0.4, 0.4, 1), 2, 2)))
   res <- residual_cor(build_fake_mvgam())
-  out <- capture.output(invisible(print(res)))
-  expect_true(any(grepl("Residual correlations", out)))
-  expect_true(any(grepl("Pattern", out)))
+  expect_output(print(res), "Pairs with prob_nonzero > 0.95: 1 / 1",
+                fixed = TRUE)
+  expect_invisible(print(res))
 })
 
 
@@ -569,10 +505,7 @@ test_that("residual_cor refuses a trend with independent series", {
     )
   )
   for (cov_struct in structs) {
-    testthat::local_mocked_bindings(
-      get_trend_covariance_structure = function(object) cov_struct,
-      .package = "mvgam"
-    )
+    mock_cov_struct(cov_struct)
     expect_error(residual_cor(build_fake_mvgam()),
                  "no correlation between series")
   }

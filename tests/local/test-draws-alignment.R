@@ -438,27 +438,34 @@ test_that("model.frame returns the model's variables and no others", {
 
 
 test_that("avg_slopes reports one slope per predictor", {
-  out <- avg_slopes(fit_plain)
+  out <- avg_slopes(fit_plain, type = "expected")
+  # The default type samples the observation family. A slope of those
+  # draws divided independent noise by the finite-difference step. On
+  # `"response"` a slope is taken of E[y], the same posterior exactly.
+  expect_identical(avg_slopes(fit_plain)$estimate, out$estimate)
+  # Comparisons on `"response"` contrast E[y] too
+  expect_identical(
+    avg_comparisons(fit_plain, variables = "x")$estimate,
+    avg_comparisons(fit_plain, variables = "x", type = "expected")$estimate
+  )
   # "It returned rows" is satisfied by a single row for the wrong
   # term. The terms are the model's own predictors, one slope each.
   preds <- insight::find_predictors(fit_plain)$conditional
   expect_setequal(as.character(out$term), preds)
   expect_identical(nrow(out), length(preds))
-  expect_true(all(is.finite(out$estimate)))
-  expect_true(all(out$conf.low <= out$estimate))
-  expect_true(all(out$estimate <= out$conf.high))
 
-  # The reported estimate is the median of the draws the same call
-  # attached, exactly. Comparing it against a separately computed
-  # slope would compare two independent stochastic draws, since the
-  # default type samples the observation family; comparing it with
-  # its own draws is exact and still fails a summary taken over the
-  # wrong margin.
-  dr <- marginaleffects::posterior_draws(out, shape = "DxP")
-  expect_identical(ncol(dr), nrow(out))
-  for (j in seq_len(ncol(dr))) {
-    expect_equal(out$estimate[j], stats::median(dr[, j]))
-  }
+  # On a log link the slope of E[y] at a row is `exp(eta) * b_x`. The
+  # average over rows, draw by draw, gives the posterior the call
+  # summarised.
+  b <- fixef(fit_plain, summary = FALSE)
+  b0 <- as.numeric(b[, "Intercept"])
+  bx <- as.numeric(b[, "x"])
+  x <- fit_plain$data$x
+  exact <- vapply(seq_along(bx), function(d) {
+    mean(exp(b0[d] + bx[d] * x) * bx[d])
+  }, numeric(1))
+  expect_equal(out$estimate[out$term == "x"], stats::median(exact),
+               tolerance = 1e-3)
 })
 
 

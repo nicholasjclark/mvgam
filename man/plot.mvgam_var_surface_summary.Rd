@@ -16,20 +16,18 @@
 \arguments{
 \item{x}{A \code{mvgam_irf_summary} or \code{mvgam_fevd_summary}}
 
-\item{series}{Integer vector of processes to keep, read at the end
-of the pair the surface is about: the process a shock originates
-in on an impulse response, the target whose forecast error is
-decomposed on a variance decomposition. Default keeps every
-process.}
+\item{series}{Integer vector of processes to keep. On an impulse
+response these are the processes a shock originates in. On a
+variance decomposition they are the targets whose forecast error
+is decomposed. Default keeps every process.}
 
 \item{responses}{Impulse responses only. Integer vector of the
 processes whose response to the shock is drawn. Default keeps
 every process.}
 
 \item{contributing}{Variance decompositions only. Integer vector of
-the source processes whose contributions are drawn. Each share was
-computed before the surface was summarised, so a selection here
-chooses the pairs drawn and leaves every share at its value.}
+the source processes stacked in each bar. The shares of the
+sources drawn are renormalised to sum to one.}
 
 \item{shocks}{Optional character vector naming shock-response pairs
 directly, for a selection the index arguments cannot express.}
@@ -40,8 +38,8 @@ directly, for a selection the index arguments cannot express.}
 A \code{ggplot} object
 }
 \description{
-Draws the posterior median and interval of each shock-response pair
-against the forecast horizon. Plotting the summary rather than the
-draws costs nothing in fidelity: the bands a draws plot builds are
-these same quantiles.
+An impulse response draws the posterior median and interval of each
+shock-response pair against the forecast horizon, with a dashed
+line at zero. A variance decomposition stacks the median shares of
+its sources in one panel per target, as \code{\link[=plot.mvgam_fevd]{plot.mvgam_fevd()}} does.
 }

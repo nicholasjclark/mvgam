@@ -19,13 +19,13 @@ fevd(object, ...)
 )
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
-that used a \code{VAR()} latent process model}
+\item{object}{An object of class \code{mvgam} fitted with a \code{VAR()}
+latent process model}
 
 \item{...}{Unused. Anything passed here is refused.}
 
-\item{h}{Positive \code{integer} specifying the forecast horizon over which to calculate
-the decomposition}
+\item{h}{Positive integer. The number of forecast horizons to
+decompose.}
 
 \item{ndraws}{Optional integer; the number of posterior draws to
 summarise over. A decomposition is built from one transition
@@ -49,8 +49,8 @@ see \code{\link[=irf]{irf()}} for details. Requires the \code{future} package
 (mvgam Suggests).}
 }
 \value{
-See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
-computed and returned by this function, along with key references.
+See \code{\link{mvgam_fevd-class}} for the quantities
+computed and returned, with references.
 }
 \description{
 Compute forecast error variance decompositions from
@@ -58,27 +58,24 @@ Compute forecast error variance decompositions from
 }
 \examples{
 \dontrun{
-# See `?trend_constructors` for a runnable end-to-end VAR
-# example that exercises `fevd()` alongside `irf()`,
-# `stability()` and `residual_cor()` on the same fit. The
-# shape below summarises the API.
+# `var_mod` is any mvgam fit with a VAR trend
 fevd_obj <- fevd(var_mod, h = 8L)
 plot(fevd_obj)
 }
 
 }
 \references{
-Lutkepohl, H. (2007).
-New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
+Lutkepohl H (2005). New Introduction to Multiple Time Series
+Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 }
 \seealso{
 \code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}},
 \code{\link{mvgam_fevd-class}}, \code{\link[=plot.mvgam_fevd]{plot.mvgam_fevd()}},
 \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=plot.mvgam_stability]{plot.mvgam_stability()}},
 \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}.
-For a worked article that runs \code{fevd()} end to end on an
-annual bird-count VAR, see
-\url{https://nicholasjclark.github.io/mvgam/articles/var.html}.
+The article at
+\url{https://nicholasjclark.github.io/mvgam/articles/var.html}
+runs \code{fevd()} on a plankton community.
 }
 \author{
 Nicholas J Clark

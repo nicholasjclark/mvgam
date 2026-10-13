@@ -16,11 +16,10 @@ the \verb{_global} reference correlation as one panel.}
 \item{ncol}{Optional integer. Number of facet columns; defaults
 to \code{ceiling(sqrt(n_panels))}.}
 
-\item{rescale}{Logical. Colour spans \verb{[-1, 1]} by default, the
-full range a correlation can take, so panels from different
-fits are directly comparable and a correlation of 0.4 does
-not look like one of 1. Set \code{TRUE} to scale colour to the
-entries actually present, which reads better on a fit whose
+\item{rescale}{Logical. By default colour spans \verb{[-1, 1]}, the full
+range of a correlation. Panels from different fits are then
+comparable. A correlation of 0.4 looks unlike one of 1. Set
+\code{TRUE} to scale colour to the entries present, for a fit whose
 correlations are all small. Defaults to \code{FALSE}.}
 
 \item{...}{Unused. Anything passed here is refused.}
@@ -31,12 +30,12 @@ A \link[ggplot2:ggplot]{ggplot2::ggplot} object.
 \description{
 Faceted heatmap panel across the per-group correlation
 matrices returned by \code{residual_cor(mod, by_group = TRUE)} on a
-hierarchical VAR or factor fit. Reads exactly as
-\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} does, one panel per group, with fill
-showing the posterior median. Colour
-limits are shared across facets so the eye can compare panels
-directly. The \verb{_global} reference matrix is included by default;
-drop it with \code{include_global = FALSE}.
+hierarchical trend fit. Each panel is drawn as by
+\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}}, one per group, with fill showing the
+posterior point estimate and an outline on each pair whose interval
+excludes zero. The facets share colour limits. Panels are then
+directly comparable. The \verb{_global} reference matrix is included by
+default. Drop it with \code{include_global = FALSE}.
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}},

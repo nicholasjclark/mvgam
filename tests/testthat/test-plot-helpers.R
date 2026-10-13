@@ -303,9 +303,11 @@ test_that("legend breaks stay readable when limits come from data", {
     mvgam:::pretty_symmetric_breaks(c(-1, 1)),
     c(-1, -0.5, 0, 0.5, 1)
   )
+  # The endpoints stay inside the limits. ggplot2 dropped a 0.58
+  # rounded past them, which left three breaks on the legend.
   expect_equal(
     mvgam:::pretty_symmetric_breaks(c(-0.5764995, 0.5764995)),
-    c(-0.58, -0.29, 0, 0.29, 0.58)
+    c(-0.57, -0.29, 0, 0.29, 0.57)
   )
   # A wide range keeps its magnitude rather than collapsing to zero.
   expect_equal(

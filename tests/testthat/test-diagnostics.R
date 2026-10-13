@@ -232,6 +232,24 @@ test_that("fixef.mvgam refuses a 'pars' entry the model does not have", {
   expect_identical(rownames(fixef(stub, pars = "x")), "x")
 })
 
+test_that("trend_effects reports the trend formula's coefficients", {
+  # A model with its covariates in `trend_formula` had no route to
+  # their table through `fixef()`, `coef()` or `vcov()`.
+  stub <- make_mvgam_stub(c("b_Intercept", "b_x", "b_x_trend", "lp__"))
+  expect_error(fixef(stub, trend_effects = TRUE), "'trend_formula'")
+  stub$trend_formula <- ~ x
+  # The stub's one trend coefficient, against which each accessor's
+  # numbers are checked
+  draws <- as.vector(posterior::subset_draws(stub$fit, "b_x_trend"))
+  fe <- fixef(stub, trend_effects = TRUE)
+  expect_identical(rownames(fe), "x_trend")
+  expect_equal(unname(fe[, "Estimate"]), mean(draws))
+  expect_equal(unname(coef(stub, trend_effects = TRUE)), mean(draws))
+  expect_equal(vcov(stub, trend_effects = TRUE),
+               matrix(var(draws), 1, 1,
+                      dimnames = list("x_trend", "x_trend")))
+})
+
 test_that("rhat.mvgam returns a named numeric vector", {
   stub <- make_mvgam_stub()
   out <- rhat(stub)

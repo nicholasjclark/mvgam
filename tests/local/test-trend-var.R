@@ -248,10 +248,10 @@ test_that("every draw of A is stationary and starts at its own law", {
 })
 
 
-test_that("residual_cor reports the stationary process covariance", {
-  # `residual_cor()` reports the posterior mean of the stationary
-  # covariance. The innovation covariance `Sigma` is a different
-  # matrix.
+test_that("residual_cor reports the stationary or the innovation covariance", {
+  # By default `residual_cor()` reports the posterior mean of the
+  # stationary covariance. `covariance = "innovation"` reports that of
+  # the innovation covariance `Sigma`, a different matrix.
   ks <- seq_len(nrow(dm_all))
   G <- Reduce(`+`, lapply(ks, stationary_cov)) / length(ks)
   S <- Reduce(`+`, lapply(ks, draw_matrix, nm = "Sigma_trend[%d,%d]")) /
@@ -259,6 +259,13 @@ test_that("residual_cor reports the stationary process covariance", {
   rc <- residual_cor(fit)
   expect_equal(unname(rc$cov), G, tolerance = 1e-6)
   expect_gt(max(abs(unname(rc$cov) - S)), 0.05)
+  shocks <- residual_cor(fit, covariance = "innovation")
+  expect_equal(unname(shocks$cov), S, tolerance = 1e-6)
+  # `draw_ids` keeps the named draws, in the order named
+  sub <- residual_cor(fit, covariance = "innovation", summary = FALSE,
+                      draw_ids = c(7L, 2L))$cov_draws
+  expect_equal(unname(sub[1L, , ]), draw_matrix(7L, "Sigma_trend[%d,%d]"))
+  expect_equal(unname(sub[2L, , ]), draw_matrix(2L, "Sigma_trend[%d,%d]"))
 })
 
 
@@ -485,9 +492,9 @@ test_that("the variance surface is the gaussian variance", {
 
 test_that("the factor summaries refuse a VAR over the series", {
   # A VAR gives every series its own latent dimension
-  expect_error(active_factors(fit), "latent-factor fit")
-  expect_error(shared_variation(fit), "latent-factor fit")
-  expect_error(ordinate(fit), "latent dynamic factors")
+  expect_error(active_factors(fit), "requires a latent factor model")
+  expect_error(shared_variation(fit), "requires a latent factor model")
+  expect_error(ordinate(fit), "requires a latent factor model")
 })
 
 
@@ -837,12 +844,16 @@ test_that("stability summarises each metric over the whole posterior", {
   # draw.
   expect_equal(draws$mean_return_rate, radii_of_A())
 
-  # Two pairs of metrics are complementary shares and sum to one in
-  # every draw.
-  for (pr in list(c("prop_cov_offdiag", "prop_cov_diag"),
-                  c("prop_int_offdiag", "prop_int_diag"))) {
-    expect_equal(draws[[pr[1L]]] + draws[[pr[2L]]],
-                 rep(1, nrow(draws)))
+  # The interaction metrics, recomputed from one draw's `A`. Every
+  # off-diagonal sensitivity counts. Averaging the lower triangle
+  # alone missed half of an asymmetric `A`.
+  for (k in c(1L, 250L)) {
+    A <- draw_matrix(k, "Phi_trend[1,%d,%d]")
+    sens <- abs(2 * det(A) * t(solve(A)))
+    off <- mean(sens[row(A) != col(A)])
+    expect_equal(draws$prop_int[k], det(A)^2)
+    expect_equal(draws$prop_int_offdiag[k], off / (off + mean(diag(sens))))
+    expect_equal(draws$reactivity[k], log(max(svd(A)$d)))
   }
 
   # The summary records each metric's binned posterior, which `plot()`
@@ -858,6 +869,9 @@ test_that("stability summarises each metric over the whole posterior", {
 
   expect_error(stability(fit, ndraws = ndraws(fit) + 1L),
                "more draws than the posterior has")
+  # `probs` in either order, as `residual_cor()` takes them
+  expect_equal(stability(fit, probs = c(0.9, 0.1)),
+               stability(fit, probs = c(0.1, 0.9)))
   expect_identical(nrow(stability(fit, ndraws = 5L, summary = FALSE)), 5L)
 })
 
@@ -935,7 +949,7 @@ test_that("the plotting methods render for a VAR fit", {
   # Each plot type this fit lacks the structure for refuses it by
   # naming that structure
   expect_error(plot(fit, type = "smooths"), "no smooth terms")
-  expect_error(plot(fit, type = "factors"), "no latent factors to plot")
+  expect_error(plot(fit, type = "factors"), "requires a latent factor model")
   expect_error(plot(fit, type = "latent_state"), "has no closure units")
 })
 
@@ -1075,8 +1089,14 @@ test_that("the irf plot takes a vector of series", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   ir <- irf(fit, h = 4L)
-  expect_s3_class(plot(ir, series = 1L), "ggplot")
-  expect_s3_class(plot(ir, series = 1:2), "ggplot")
+  # The panels are the shocks to the processes named, in the order the
+  # VAR numbers its processes. A character facet sorted them
+  # alphabetically.
+  labs <- attr(ir, "process_labels")
+  drawn <- ggplot2::ggplot_build(plot(ir, series = 1:2))$plot$data$shock
+  expect_identical(levels(drawn),
+                   c(paste0(labs[1L], " -> ", labs),
+                     paste0(labs[2L], " -> ", labs)))
 })
 
 
@@ -1086,13 +1106,10 @@ test_that("series selects the end of the pair its help names", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   fv <- fevd(fit, h = 4L)
-  drawn <- as.character(ggplot2::ggplot_build(
-    plot(fv, series = 1L)
-  )$plot$data$shock)
-  ends <- strsplit(unique(drawn), " -> ", fixed = TRUE)
-  targets <- unique(vapply(ends, `[`, character(1L), 2L))
-  # Selecting one target should leave one target.
-  expect_length(targets, 1L)
+  drawn <- ggplot2::ggplot_build(plot(fv, series = 1L))$plot$data
+  # Selecting one target leaves one panel
+  expect_identical(levels(droplevels(drawn$target)),
+                   attr(fv, "process_labels")[1L])
 })
 
 
@@ -1101,13 +1118,13 @@ test_that("contributing changes what the fevd plot draws", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   fv <- fevd(fit, h = 4L)
-  all_pairs <- unique(as.character(ggplot2::ggplot_build(
-    plot(fv)
-  )$plot$data$shock))
-  one_source <- unique(as.character(ggplot2::ggplot_build(
+  one_source <- ggplot2::ggplot_build(
     plot(fv, contributing = 1L)
-  )$plot$data$shock))
-  expect_lt(length(one_source), length(all_pairs))
+  )$plot$data
+  expect_identical(unique(as.character(one_source$Series)),
+                   attr(fv, "process_labels")[1L])
+  # The one source drawn takes the whole of each bar
+  expect_equal(unique(one_source$share), 1)
 })
 
 

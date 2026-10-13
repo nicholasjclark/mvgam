@@ -72,11 +72,11 @@ The extractor dispatches on whether the fit is hierarchical
 \itemize{
 \item On a \strong{single-panel VAR} the routine reads the fitted
 \code{Phi_trend} array.
-\item On a \strong{hierarchical VAR} with \verb{group = <int>} or
-\verb{group = <name>} it reads the panel-specific matrix
-\code{Phi_group_trend[c, l, , ]}, i.e. the transition matrix for
-the requested country / patch / hospital.
-\item On a \strong{hierarchical VAR} with \code{group = NULL} it synthesises
+\item On a \strong{hierarchical VAR} with \verb{groups = <int>} or
+\verb{groups = <name>} it returns the panel-specific matrix
+\code{Phi_group_trend[c, l, , ]}, the transition matrix of the
+requested panel.
+\item On a \strong{hierarchical VAR} with \code{groups = NULL} it synthesises
 the shrinkage target from the hyperparameters:
 diagonal cells take \code{Amu_trend[1, l]}, off-diagonal cells
 take \code{Amu_trend[2, l]}. This is the mean the sampler pulls

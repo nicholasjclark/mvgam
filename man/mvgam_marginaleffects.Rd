@@ -20,9 +20,16 @@ the quantity most classes reach through \code{"response"}; \code{"response"}
 here is the outcome scale, carrying observation noise, and returns
 integers for a count family. \code{"link"} is the linear predictor.
 marginaleffects orders \code{"response"} first and takes its default
-from that, so pass \code{type = "expected"} when the expectation is what
-is wanted. Results are summarised by the posterior median, which
-for a skewed predictive sits below the mean.
+from that. Pass \code{type = "expected"} when the expectation is wanted.
+\code{comparisons()} and \code{slopes()} on \code{"response"} return the contrast
+or slope of \code{E[Y]}, as \code{"expected"} does. Each contrasts two
+predictions. Observation noise in each prediction would widen the
+contrast. A slope also divides it by a small step and swamps the
+covariate effect. marginaleffects still labels the result
+\code{"response"}. \code{predictions()} on \code{"response"} keeps the observation
+noise. Results are
+summarised by the posterior median, which for a skewed predictive
+is below the mean.
 }
 
 \section{The latent trend}{

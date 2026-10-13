@@ -274,6 +274,15 @@ test_that("residual_cor reports the correlation the states settle at", {
   # The summarised matrix keeps the series the sampler was given.
   rc <- residual_cor(fit)
   expect_identical(rownames(rc$cor), series_levels)
+
+  # The innovation covariance skips the lift. Each draw is the
+  # covariance the sampler stored.
+  innov <- residual_cor(fit, covariance = "innovation",
+                        summary = FALSE)$cov_draws
+  for (k in check_draws) {
+    expect_equal(unname(matrix(innov[k, , ], n_series, n_series)),
+                 unname(draw_sigma(dm, k, n_series)), tolerance = 1e-6)
+  }
 })
 
 
@@ -388,7 +397,7 @@ test_that("the factor plot refuses a fit whose latents are its series", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   expect_error(plot(fit, type = "factors"),
-               "has no latent factors to plot")
+               "requires a latent factor model")
   for (ty in c("trend", "series", "residuals")) {
     expect_s3_class(plot(fit, type = ty), "ggplot")
   }

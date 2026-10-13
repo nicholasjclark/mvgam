@@ -11,10 +11,10 @@ available methods.
 \details{
 Generalized or Orthogonalized Impulse Response Functions
 are computed from the posterior estimates of Vector Autoregressive
-parameters. \code{\link[=irf]{irf()}} applies a positive shock to one process at
-time \code{t = 0} and calculates how each of the remaining processes in
-the latent VAR responds over the horizon \code{h}, for every process in
-turn. To inspect community-level metrics of stability from the
+parameters. \code{\link[=irf]{irf()}} applies a positive shock of one standard
+deviation to one process and calculates how each process in the
+latent VAR responds over \code{h} horizons, for every process in turn.
+Horizon 1 is the time step of the shock. To inspect community-level metrics of stability from the
 same parameters, use \code{\link[=stability]{stability()}}.
 
 A shock response is a \code{K} by \code{K} matrix per horizon per posterior
@@ -28,8 +28,8 @@ shock-response pair per horizon. \code{shock} names the pair as
 \code{"<from> -> <to>"}, taking the model's own series names where
 the latent processes are the series and \code{"Process_k"} where a
 factor VAR's processes are latent factors instead. \code{horizon}
-is the step ahead, and
-three further columns carry the posterior median and the
+counts from 1, the time step of the shock. Three further
+columns hold the posterior median and the
 interval bounds, named for the percentiles asked for:
 \code{irfQ50}, and by default \code{irfQ2.5} and \code{irfQ97.5}. An
 \code{irf_type} attribute records whether the responses are
@@ -44,9 +44,9 @@ Both forms take \code{ndraws} and \code{draw_ids}, so a subset of the
 posterior answers faster where the full one is not needed.
 }
 \references{
-PH Pesaran & Shin Yongcheol (1998).
-Generalized impulse response analysis in linear multivariate models.
-Economics Letters 58: 17-29.
+Pesaran HH and Shin Y (1998). Generalized impulse
+response analysis in linear multivariate models. Economics Letters
+58, 17-29. \doi{10.1016/S0165-1765(97)00214-0}
 }
 \seealso{
 \link{mvgam}, \link{VAR}, \link{irf}, \link{stability}

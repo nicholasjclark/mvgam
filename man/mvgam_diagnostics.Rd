@@ -19,7 +19,7 @@
 \alias{vcov.mvgam}
 \title{Diagnostic quantities for mvgam models}
 \usage{
-\method{coef}{mvgam}(object, summary = TRUE, ...)
+\method{coef}{mvgam}(object, summary = TRUE, trend_effects = FALSE, ...)
 
 \method{nuts_params}{mvgam}(object, pars = NULL, ...)
 
@@ -35,6 +35,7 @@
   robust = FALSE,
   probs = c(0.025, 0.975),
   pars = NULL,
+  trend_effects = FALSE,
   ...
 )
 
@@ -68,7 +69,7 @@
 
 \method{getCall}{mvgam}(x, ...)
 
-\method{vcov}{mvgam}(object, correlation = FALSE, pars = NULL, ...)
+\method{vcov}{mvgam}(object, correlation = FALSE, pars = NULL, trend_effects = FALSE, ...)
 }
 \arguments{
 \item{object, x}{A fitted \code{mvgam} object.}
@@ -77,6 +78,11 @@
 are returned; if \code{FALSE}, the raw posterior draws are returned.
 \code{coef} summarises to posterior means rather than to the
 Estimate / Est.Error / quantile matrix its siblings return.}
+
+\item{trend_effects}{Logical. \code{coef()}, \code{fixef()} and \code{vcov()}
+report the coefficients of the observation formula by default.
+\code{TRUE} reports those of the \code{trend_formula} instead. Their names
+end in \verb{_trend}.}
 
 \item{...}{Unused by these methods, and refused, except on
 \code{nuts_params()} and \code{log_posterior()}, which forward what they

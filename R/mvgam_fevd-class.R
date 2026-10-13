@@ -18,8 +18,8 @@
 #'   Dividing the orthogonalised responses \eqn{(\psi_{kj, 0}^2 +
 #'   \ldots + \psi_{kj, h-1}^2)} by the forecast error variance
 #'   \eqn{\sigma_k^2(h)} gives the proportion of the forecast error
-#'   variance for \eqn{k} explained by an exogenous shock to \eqn{j},
-#'   and that proportion is what these objects carry.
+#'   variance for \eqn{k} explained by an exogenous shock to \eqn{j}.
+#'   These objects hold that proportion.
 #'
 #'   The orthogonalisation takes the lower Cholesky factor of the
 #'   innovation covariance. The decomposition then depends on the order
@@ -29,9 +29,9 @@
 #'   levels of the series factor.
 #'
 #'   A decomposition is a `K` by `K` matrix per horizon per posterior
-#'   draw, which on a wide panel runs to hundreds of megabytes for a
-#'   quantity read as a median and an interval. [fevd()] therefore
-#'   returns the summary, and the two forms carry different classes:
+#'   draw, which on a wide panel runs to hundreds of megabytes. A reader
+#'   needs only a median and an interval from them. [fevd()] returns
+#'   that summary. The two forms have different classes:
 #'
 #'   - `mvgam_fevd_summary`, the default. A long-format `tibble`
 #'     inheriting from `mvgam_var_surface_summary`, with one row per
@@ -39,23 +39,23 @@
 #'     `"<from> -> <to>"`, taking the model's own series names where
 #'     the latent processes are the series and `"Process_k"` where a
 #'     factor VAR's processes are latent factors instead. `horizon`
-#'     is the step ahead, and
-#'     three further columns carry the posterior median and the
-#'     interval bounds, named for the percentiles asked for:
-#'     `fevdQ50`, and by default `fevdQ2.5` and `fevdQ97.5`.
+#'     counts the steps from the forecast origin. Three columns hold
+#'     the posterior median and the interval bounds, named for the
+#'     percentiles asked for: `fevdQ50`, `fevdQ2.5` and `fevdQ97.5` by
+#'     default.
 #'
 #'   - `mvgam_fevd`, returned under `summary = FALSE`. A `list` with
 #'     one element per posterior draw, each holding the decomposition
 #'     matrices for that draw. Pass it to `summary()` to reach the form
 #'     above.
 #'
-#'   Both forms take `ndraws` and `draw_ids`, so a subset of the
-#'   posterior answers faster where the full one is not needed.
+#'   Both forms take `ndraws` and `draw_ids`. A subset of the posterior
+#'   computes faster.
 #'
 #' @seealso [mvgam()], [VAR()], [fevd()], [irf()]
 #'
-#' @references Lutkepohl, H (2006). New Introduction to Multiple Time
-#'   Series Analysis. Springer, New York.
+#' @references Lutkepohl H (2005). New Introduction to Multiple Time Series
+#'   Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 #'
 #' @author Nicholas J Clark
 #'
@@ -113,12 +113,10 @@ summary.mvgam_fevd <- function(object, probs = c(0.025, 0.975), ...) {
 #'  hierarchical VAR fits where the raw K x K panel would run to
 #'  dozens of panels. Defaults to all processes.
 #'@param contributing Optional integer vector selecting which
-#'  source processes should appear as stacked contributions to
-#'  each target. Sources not in this set are dropped before
-#'  computing shares, so the bars re-normalise across the
-#'  retained sources; this makes it easy to zoom in on
-#'  within-country dependencies on hierarchical VARs. Defaults to
-#'  all processes.
+#'  source processes appear as stacked contributions to each target.
+#'  The shares of the sources drawn are renormalised to sum to one. On
+#'  a hierarchical VAR this isolates the dependencies within one group.
+#'  Defaults to all processes.
 #'
 #'@param ... Unused. Anything passed here is refused.
 #'
@@ -135,64 +133,66 @@ summary.mvgam_fevd <- function(object, probs = c(0.025, 0.975), ...) {
 plot.mvgam_fevd <- function(x, series = NULL, contributing = NULL, ...) {
   checkmate::assert_class(x, "mvgam_fevd")
   rlang::check_dots_empty()
-  # Calculate posterior median error variance contributions
   ynames <- names(x[[1]])
   n_proc <- length(ynames)
   target_keep <- validate_var_plot_ids(series, n_proc, "series")
   source_keep <- validate_var_plot_ids(
     contributing, n_proc, "contributing"
   )
-  target_names <- ynames[target_keep]
-  source_names <- ynames[source_keep]
-
   surface <- fevd_draws(x)
-  surface$keys$mean_evd <- apply(surface$draws, 2L, stats::median)
-  surface$keys %>%
-    dplyr::filter(
-      target %in% target_names,
-      Series %in% source_names
-    ) %>%
-    # When `contributing` drops sources, the retained shares no
-    # longer sum to 1; re-normalise per (target, horizon) so the
-    # stacked bars still read as a proper variance decomposition.
-    dplyr::group_by(target, horizon) %>%
-    dplyr::mutate(
-      mean_evd = mean_evd / sum(mean_evd)
-    ) %>%
-    dplyr::ungroup() -> mean_evds
+  shares <- surface$keys
+  shares$share <- apply(surface$draws, 2L, stats::median)
+  plot_fevd_shares(shares, ynames[target_keep], ynames[source_keep])
+}
 
-  # The processes keep the order the object gives them, which is the
-  # fit's series axis. Sorting the labels ordered the legend, the
-  # colours and the panels alphabetically instead.
-  mean_evds$Series <- factor(mean_evds$Series, levels = source_names)
-  mean_evds$target <- factor(mean_evds$target, levels = target_names)
+#' Stacked median shares of forecast error variance, a panel per target
+#'
+#' The shares of the sources drawn are renormalised within each target
+#' and horizon. The stack of each bar then sums to one when
+#' `contributing` drops sources. The processes keep the order the VAR
+#' numbers them in, which is the fit's series axis.
+#'
+#' @param shares Frame of `horizon`, the source `Series`, the `target`
+#'   and `share`, the median share of each pair
+#' @param target_names Targets drawn as panels, in the VAR's order
+#' @param source_names Sources stacked in each bar, in the VAR's order
+#' @return A `ggplot` object
+#' @noRd
+plot_fevd_shares <- function(shares, target_names, source_names) {
+  checkmate::assert_data_frame(shares)
+  checkmate::assert_names(names(shares),
+                          must.include = c("horizon", "Series", "target",
+                                           "share"))
+  shares <- shares[shares$target %in% target_names &
+                     shares$Series %in% source_names, , drop = FALSE]
+  shares$share <- shares$share /
+    stats::ave(shares$share, shares$target, shares$horizon, FUN = sum)
+  shares$Series <- factor(shares$Series, levels = source_names)
+  shares$target <- factor(shares$target, levels = target_names)
 
-  # FEVD bars encode a categorical partition (which series
-  # contributed how much of the forecast variance), so use the
-  # colour-blind-safe Okabe-Ito qualitative palette rather than
-  # the single-hue bayesplot scheme used for the ribbon plots.
-  # `mvgam_categorical_palette()` recycles when N > 8.
+  # The bars partition a variance among sources, a categorical split.
+  # They take the colour-blind-safe Okabe-Ito palette.
   fill_values <- mvgam_categorical_palette(length(source_names))
   names(fill_values) <- source_names
-
   ggplot2::ggplot(
-    mean_evds,
-    ggplot2::aes(fill = Series, y = mean_evd, x = horizon)
+    shares,
+    ggplot2::aes(fill = .data$Series, y = .data$share, x = .data$horizon)
   ) +
     ggplot2::geom_bar(position = "stack", stat = "identity") +
     ggplot2::scale_fill_manual(values = fill_values) +
-    ggplot2::facet_wrap(~target) +
+    ggplot2::facet_wrap(~ target) +
     mvgam_theme() +
     scale_x_steps("Forecast horizon") +
-    ggplot2::labs(y = "Median contribution to forecast variance")
+    ggplot2::labs(y = "Median contribution to forecast variance",
+                  fill = "Source")
 }
 
 #' The draws of every variance share, one column per cell
 #'
 #' @param x An `mvgam_fevd` object
-#' @return List with `keys`, a frame naming each cell's `horizon`,
-#'   source `Series` and `target`, and `draws`, an
-#'   `(ndraws x n_cells)` matrix of shares in the same order
+#' @return List of two elements. `keys` is a frame naming each cell's
+#'   `horizon`, source `Series` and `target`. `draws` is an
+#'   `(ndraws x n_cells)` matrix of shares in the same order.
 #' @noRd
 fevd_draws <- function(x) {
   # Each target's shares are an `(h x K)` matrix, horizons down the

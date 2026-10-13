@@ -154,10 +154,14 @@ conditional_effects.mvgam <- function(x,
   }
   if (!obs_scale) rug <- FALSE
 
+  detected <- detect_conditional_effects(x)
   cond_labs <- if (is.null(effects)) {
-    detect_conditional_effects(x)
+    detected
   } else {
-    lapply(as.character(effects), function(e) strsplit(e, ":")[[1L]])
+    lapply(as.character(effects), function(e) {
+      with_series_grouping(strsplit(e, ":")[[1L]], detected,
+                           axis_vars(x)$series_var)
+    })
   }
 
   if (any(lengths(cond_labs) > 3L)) {
@@ -461,6 +465,34 @@ as.data.frame.mvgam_conditional_effects <- function(x,
 # reference the conditioning grid gives it.
 detect_conditional_effects <- function(x) {
   mvgam_term_list(x)$groupings
+}
+
+
+#' A named effect, paired with the series where the model pairs it
+#'
+#' An effect that varies by series, such as `x:lv_axis()`, groups with
+#' the series in the model's own term list. Naming the effect alone
+#' drew it at the reference series. The grouping the model detects
+#' takes its place. The panels then facet by series, as the default
+#' call draws them.
+#'
+#' @param cond Character vector of the variables the caller named
+#' @param detected The groupings `detect_conditional_effects()` returns
+#' @param series_var The name of the series variable
+#' @return `cond`, or the detected grouping that adds the series to it
+#' @noRd
+with_series_grouping <- function(cond, detected, series_var) {
+  checkmate::assert_character(cond, min.len = 1L)
+  if (series_var %in% cond) {
+    return(cond)
+  }
+  for (grouping in detected) {
+    if (series_var %in% grouping &&
+        setequal(setdiff(grouping, series_var), cond)) {
+      return(grouping)
+    }
+  }
+  cond
 }
 
 

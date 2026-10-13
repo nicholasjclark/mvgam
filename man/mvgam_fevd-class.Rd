@@ -23,8 +23,8 @@ h-step forecast error variance of series \eqn{k}:
 Dividing the orthogonalised responses \eqn{(\psi_{kj, 0}^2 +
   \ldots + \psi_{kj, h-1}^2)} by the forecast error variance
 \eqn{\sigma_k^2(h)} gives the proportion of the forecast error
-variance for \eqn{k} explained by an exogenous shock to \eqn{j},
-and that proportion is what these objects carry.
+variance for \eqn{k} explained by an exogenous shock to \eqn{j}.
+These objects hold that proportion.
 
 The orthogonalisation takes the lower Cholesky factor of the
 innovation covariance. The decomposition then depends on the order
@@ -34,9 +34,9 @@ variance with the series before it. The order is that of the
 levels of the series factor.
 
 A decomposition is a \code{K} by \code{K} matrix per horizon per posterior
-draw, which on a wide panel runs to hundreds of megabytes for a
-quantity read as a median and an interval. \code{\link[=fevd]{fevd()}} therefore
-returns the summary, and the two forms carry different classes:
+draw, which on a wide panel runs to hundreds of megabytes. A reader
+needs only a median and an interval from them. \code{\link[=fevd]{fevd()}} returns
+that summary. The two forms have different classes:
 \itemize{
 \item \code{mvgam_fevd_summary}, the default. A long-format \code{tibble}
 inheriting from \code{mvgam_var_surface_summary}, with one row per
@@ -44,22 +44,22 @@ shock-response pair per horizon. \code{shock} names the pair as
 \code{"<from> -> <to>"}, taking the model's own series names where
 the latent processes are the series and \code{"Process_k"} where a
 factor VAR's processes are latent factors instead. \code{horizon}
-is the step ahead, and
-three further columns carry the posterior median and the
-interval bounds, named for the percentiles asked for:
-\code{fevdQ50}, and by default \code{fevdQ2.5} and \code{fevdQ97.5}.
+counts the steps from the forecast origin. Three columns hold
+the posterior median and the interval bounds, named for the
+percentiles asked for: \code{fevdQ50}, \code{fevdQ2.5} and \code{fevdQ97.5} by
+default.
 \item \code{mvgam_fevd}, returned under \code{summary = FALSE}. A \code{list} with
 one element per posterior draw, each holding the decomposition
 matrices for that draw. Pass it to \code{summary()} to reach the form
 above.
 }
 
-Both forms take \code{ndraws} and \code{draw_ids}, so a subset of the
-posterior answers faster where the full one is not needed.
+Both forms take \code{ndraws} and \code{draw_ids}. A subset of the posterior
+computes faster.
 }
 \references{
-Lutkepohl, H (2006). New Introduction to Multiple Time
-Series Analysis. Springer, New York.
+Lutkepohl H (2005). New Introduction to Multiple Time Series
+Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 }
 \seealso{
 \code{\link[=mvgam]{mvgam()}}, \code{\link[=VAR]{VAR()}}, \code{\link[=fevd]{fevd()}}, \code{\link[=irf]{irf()}}

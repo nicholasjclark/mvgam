@@ -69,12 +69,7 @@ plot_factors <- function(
   checkmate::assert_flag(label_contribution)
   rlang::check_dots_empty()
 
-  n_lv <- detect_factor_n_lv(object)
-  if (is.null(n_lv)) {
-    stop(insight::format_error(
-      "The model has no latent factors to plot."
-    ), call. = FALSE)
-  }
+  n_lv <- require_factor_n_lv(object, 'plot(type = "factors")')
 
   per_lv <- extract_lv_trend_matrices(object, n_lv)
   n_time <- ncol(per_lv[[1L]])

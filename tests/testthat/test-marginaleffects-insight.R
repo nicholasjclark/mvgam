@@ -307,6 +307,25 @@ test_that("a smooth's covariates are read off its call", {
   )
 })
 
+test_that("an effect varying by series puts the series second", {
+  # The first variable of a grouping is the x axis of its panel. A
+  # slope written after the series level arrived as `series:x`, which
+  # drew the series on the x axis and `x` as colours.
+  stub <- structure(
+    list(formula = y ~ series + series:x + s(z, by = series),
+         trend_formula = NULL),
+    class = "mvgam"
+  )
+  detected <- mvgam:::detect_conditional_effects(stub)
+  expect_equal(detected, list("series", c("x", "series"), c("z", "series")))
+  # Naming `effects = "x"` drew the slope at the reference series. The
+  # named effect takes the series grouping the model detects.
+  expect_identical(mvgam:::with_series_grouping("x", detected, "series"),
+                   c("x", "series"))
+  expect_identical(mvgam:::with_series_grouping("w", detected, "series"),
+                   "w")
+})
+
 test_that("conditional_effects.mvgam signature has expected args", {
   fmls <- names(formals(getS3method("conditional_effects", "mvgam")))
   expect_true("x" %in% fmls)

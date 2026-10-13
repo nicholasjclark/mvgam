@@ -6,10 +6,10 @@
 #'
 #' @details Generalized or Orthogonalized Impulse Response Functions
 #'   are computed from the posterior estimates of Vector Autoregressive
-#'   parameters. [irf()] applies a positive shock to one process at
-#'   time `t = 0` and calculates how each of the remaining processes in
-#'   the latent VAR responds over the horizon `h`, for every process in
-#'   turn. To inspect community-level metrics of stability from the
+#'   parameters. [irf()] applies a positive shock of one standard
+#'   deviation to one process and calculates how each process in the
+#'   latent VAR responds over `h` horizons, for every process in turn.
+#'   Horizon 1 is the time step of the shock. To inspect community-level metrics of stability from the
 #'   same parameters, use [stability()].
 #'
 #'   A shock response is a `K` by `K` matrix per horizon per posterior
@@ -23,8 +23,8 @@
 #'     `"<from> -> <to>"`, taking the model's own series names where
 #'     the latent processes are the series and `"Process_k"` where a
 #'     factor VAR's processes are latent factors instead. `horizon`
-#'     is the step ahead, and
-#'     three further columns carry the posterior median and the
+#'     counts from 1, the time step of the shock. Three further
+#'     columns hold the posterior median and the
 #'     interval bounds, named for the percentiles asked for:
 #'     `irfQ50`, and by default `irfQ2.5` and `irfQ97.5`. An
 #'     `irf_type` attribute records whether the responses are
@@ -40,9 +40,9 @@
 #'
 #' @seealso [mvgam], [VAR], [irf], [stability]
 #'
-#' @references PH Pesaran & Shin Yongcheol (1998).
-#'   Generalized impulse response analysis in linear multivariate models.
-#'   Economics Letters 58: 17-29.
+#' @references Pesaran HH and Shin Y (1998). Generalized impulse
+#'   response analysis in linear multivariate models. Economics Letters
+#'   58, 17-29. \doi{10.1016/S0165-1765(97)00214-0}
 #'
 #' @author Nicholas J Clark
 #'
@@ -90,7 +90,7 @@ summary.mvgam_irf <- function(object, probs = c(0.025, 0.975), ...) {
         irf_draws(object, series, seq_len(n_processes)), probs, "irf"
       )
     )
-    out[order(out$shock, out$horizon, method = "radix"), ]
+    out
   }))
 }
 
@@ -151,29 +151,18 @@ plot.mvgam_irf <- function(x, series = 1, responses = NULL, ...) {
       i = paste0(
         "The fitted VAR has ", n_processes, " latent processes."
       )
-    )))
+    )), call. = FALSE)
   }
   resp_ids <- validate_var_plot_ids(responses, n_processes, "responses")
   h <- dim(x[[1]][[1]])[1]
-  ndraws <- length(x)
 
-  # Pack the (ndraws x h) draws matrix for each response process
-  # side-by-side, tagged with a faceting key. `mvgam_band_layer`
-  # and `mvgam_median_layer` then handle quantile-band + median
-  # construction per panel via their `group` arg.
-  # These are the model's own series names, and the facet strips parse
-  # as plotmath. `deparse()` writes each one as an R string literal, so
-  # a name carrying a quote, a backslash or a space still parses.
+  # One panel per response, labelled as `summary()` labels the pair and
+  # ordered as the VAR numbers its processes
   labels <- names(x[[1]])
-  as_literal <- function(v) {
-    vapply(v, deparse, character(1L), USE.NAMES = FALSE)
-  }
-  resp_keys <- paste0(
-    as_literal(labels[series]), " %->% ", as_literal(labels[resp_ids])
-  )
+  resp_keys <- paste0(labels[series], " -> ", labels[resp_ids])
   draws_mat <- irf_draws(x, series, resp_ids)
   times <- rep(seq_len(h), times = length(resp_ids))
-  group <- rep(resp_keys, each = h)
+  group <- factor(rep(resp_keys, each = h), levels = resp_keys)
 
   band_probs <- c(0.2, 0.4, 0.6, 0.8)
   ggplot2::ggplot() +
@@ -184,12 +173,19 @@ plot.mvgam_irf <- function(x, series = 1, responses = NULL, ...) {
     ggplot2::geom_hline(
       yintercept = 0, linetype = "dashed", colour = "black"
     ) +
-    ggplot2::facet_wrap(
-      ~series, scales = "free_y", labeller = ggplot2::label_parsed
-    ) +
+    ggplot2::facet_wrap(~series, scales = "free_y") +
     scale_x_steps() +
-    ggplot2::labs(
-      y = paste0(attr(x, "irf_type"), " impulse response")
-    ) +
+    ggplot2::labs(y = irf_axis_label(attr(x, "irf_type"))) +
     mvgam_theme()
+}
+
+#' Axis title of an impulse response plot
+#'
+#' @param type The `irf_type` attribute, `"Generalized"` or
+#'   `"Orthogonalized"`, or `NULL`
+#' @return Character string
+#' @noRd
+irf_axis_label <- function(type) {
+  checkmate::assert_string(type, null.ok = TRUE)
+  if (is.null(type)) "Impulse response" else paste(type, "impulse response")
 }

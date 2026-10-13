@@ -15,12 +15,10 @@ hierarchical VAR fits where the raw K x K panel would run to
 dozens of panels. Defaults to all processes.}
 
 \item{contributing}{Optional integer vector selecting which
-source processes should appear as stacked contributions to
-each target. Sources not in this set are dropped before
-computing shares, so the bars re-normalise across the
-retained sources; this makes it easy to zoom in on
-within-country dependencies on hierarchical VARs. Defaults to
-all processes.}
+source processes appear as stacked contributions to each target.
+The shares of the sources drawn are renormalised to sum to one. On
+a hierarchical VAR this isolates the dependencies within one group.
+Defaults to all processes.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

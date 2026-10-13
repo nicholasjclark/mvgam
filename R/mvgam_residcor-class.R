@@ -1,94 +1,81 @@
 #' `mvgam_residcor` object description
 #'
 #' A \code{mvgam_residcor} object returned by function [residual_cor()].
-#' Run `methods(class = "mvgam_residcor")` to see an overview of available methods.
-#' @return Objects of this class are structured as a `list` with the following components:
+#' Run `methods(class = "mvgam_residcor")` to see the available
+#' methods.
+#'
+#' @return Objects of this class are structured as a `list` with the
+#'   following components:
 #'
 #'  \item{cor, cor_se, cor_lower, cor_upper}{Posterior summaries of
-#'  the \eqn{p \times p} correlation matrix: median (or mean), standard
-#'  error, and lower / upper limits of the credible intervals at the
-#'  `probs` levels.}
+#'  the \eqn{p \times p} correlation matrix: the posterior mean (the
+#'  median under `robust = TRUE`), the standard error and the limits of
+#'  the credible interval at the `probs` levels.}
 #'  \item{cor_ess}{\eqn{p \times p} matrix of per-entry effective
-#'  sample sizes for the correlation draws (computed on the Fisher-z
-#'  scale via [posterior::ess_basic()]). Diagonal entries are `NA`
-#'  because the diagonal is fixed at 1. Use this to flag
-#'  correlations that are nominally precise but poorly resolved by
-#'  the MCMC chains.}
+#'  sample sizes of the correlation draws, computed on the Fisher-z
+#'  scale with [posterior::ess_basic()]. The diagonal is `NA`, being
+#'  fixed at 1. A low value marks a correlation the chains sampled
+#'  poorly, however narrow its interval.}
 #'  \item{prob_positive, prob_negative, prob_nonzero}{\eqn{p \times p}
 #'  matrices of `Pr(r > 0)`, `Pr(r < 0)` and the larger of the two for
-#'  every off-diagonal entry. Use these for a sign-determinability
-#'  filter rather than the binary "CI does not contain zero" rule.}
-#'  \item{sig_cor}{A \eqn{p \times p} correlation matrix containing
-#'  only those correlations whose credible interval excludes zero. All
-#'  other entries are set to zero. [plot.mvgam_residcor()] draws `cor`
-#'  rather than this, since a hard cut renders a correlation the data
-#'  merely leave uncertain identically to one estimated at zero.}
+#'  every off-diagonal entry. Each measures how well the data
+#'  determine the sign of a correlation.}
+#'  \item{sig_cor}{The correlation matrix with every entry set to zero
+#'  where `prob_nonzero` is at most `prob_threshold`.
+#'  [plot.mvgam_residcor()] draws `cor`. A hard cut would draw a
+#'  correlation the data leave uncertain the same as one estimated at
+#'  zero.}
 #'  \item{cov, cov_se, cov_lower, cov_upper, cov_ess}{Posterior
-#'  summaries of the residual covariance matrix, with per-entry ESS
-#'  matching the correlation surface.}
+#'  summaries of the residual covariance matrix, with per-entry ESS.}
 #'  \item{mean_abs_offdiag}{A `list` of `point`, `lower` and `upper`
 #'  summarising the mean absolute off-diagonal correlation. The mean is
-#'  taken within each draw and then summarised across draws, so the
-#'  interval describes overall correlation strength rather than being
-#'  read off a single summary matrix.}
+#'  taken within each draw and then summarised across draws. The
+#'  interval then describes the overall strength of correlation.}
 #'  \item{n_series, series_names}{Dimensions of the matrix and the
 #'  series labels.}
-#'  \item{pattern, hierarchical, group_label}{Bookkeeping fields
-#'  recording the residual structure that was summarised.}
-#'  \item{probs, prob_threshold}{The credible interval and threshold
-#'  used by `residual_cor()` to populate `sig_cor`.}
+#'  \item{pattern, hierarchical, group_label}{The residual structure
+#'  that was summarised.}
+#'  \item{covariance}{`"stationary"` for the covariance of the latent
+#'  states, or `"innovation"` for that of one step's shocks, as
+#'  `residual_cor()` was asked.}
+#'  \item{probs, prob_threshold}{The credible interval levels and the
+#'  `prob_nonzero` threshold of `sig_cor`.}
 #'
 #' Passing `partial = TRUE` to `residual_cor()` adds the partial
-#' correlation surface, which mirrors the correlation one entry for
-#' entry: `prec`, `prec_se`, `prec_lower`, `prec_upper`, `prec_ess`,
+#' correlations, with one field for each correlation field: `prec`,
+#' `prec_se`, `prec_lower`, `prec_upper`, `prec_ess`,
 #' `prec_prob_positive`, `prec_prob_negative`, `prec_prob_nonzero`
 #' and the thresholded `sig_prec`. Partial correlations are bounded
-#' the way correlations are, so they are summarised on the same
-#' Fisher-z scale. Without `partial = TRUE` none of these are
-#' present, and [plot.mvgam_residcor()] with `type = "precision"`
-#' says so.
+#' like correlations. They are summarised on the same Fisher-z scale.
+#' [plot.mvgam_residcor()] with `type = "precision"` requires them.
 #'
 #' @details
-#' Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
-#' is heavily paraphrased from his associated \pkg{boral} package.
+#' In a latent factor model the residual covariance between series is
+#' \eqn{\Sigma = Z \Omega Z'}, where \eqn{Z} holds the factor
+#' loadings and \eqn{\Omega} is the covariance of the latent states.
+#' A strong residual correlation between two species can reflect a
+#' species interaction (facilitation or competition), a missing
+#' covariate, or any other association the predictors in `formula`
+#' leave unexplained (Hui 2016).
 #'
-#' In latent factor models, the residual covariance matrix is calculated
-#' based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance
-#' matrix \eqn{\Sigma = \Theta\Theta'}. A strong residual covariance/correlation matrix
-#' between two species can be interpreted as evidence of species interactions (e.g.,
-#' facilitation or competition),
-#' missing covariates, as well as any additional species correlation not accounted for by shared
-#' environmental captured in `formula`.
+#' The partial correlation between two series conditions on every
+#' other series (Ovaskainen et al. 2016). It is computed from the
+#' inverse of the correlation matrix, with the diagonal set to 1. Two
+#' species with a partial correlation near zero can still be
+#' correlated. They are then conditionally independent given the other
+#' species. Their association runs *through* those species. A larger
+#' partial correlation suggests a more direct association.
 #'
-#' The residual precision matrix (also known as partial correlation matrix, Ovaskainen et al., 2016)
-#' is defined as the inverse of the residual correlation matrix. The precision matrix is often used to
-#' identify direct or causal relationships between two species e.g., two species can have a zero
-#' precision but still be correlated, which can be interpreted as saying that two species are not
-#' directly associated, but they are still correlated *through* other species. In other words, they
-#' are conditionally independent given the other species. It is important that the precision matrix
-#' does not exhibit the exact same properties of the correlation e.g., the diagonal elements are
-#' not equal to 1. Nevertheless, relatively larger values of precision may imply stronger
-#' direct relationships between two species.
-#'
-#' In addition to the residual correlation and precision matrices, the median or mean point estimator
-#' of trace of the residual covariance matrix is returned,
-#' \eqn{\sum\limits_{j=1}^p [\Theta\Theta']_{jj}}. Often used in other areas of multivariate
-#' statistics, the trace may be interpreted as the amount of covariation explained by the latent factors.
-#' One situation where the trace may be useful is when comparing a pure latent factor model
-#' (where no terms are suppled to `formula`) versus a model with latent
-#' factors and some additional predictors in `formula` -- the proportional difference in trace
-#' between these two models may be interpreted as the proportion of covariation between species explained
-#' by the predictors in `formula`. Of course, the trace itself is random due to the MCMC sampling, and so it
-#' is not always guaranteed to produce sensible answers.
-#' @author Nicholas J Clark
 #' @references
-#' Francis KC Hui (2016). BORAL - Bayesian ordination and regression analysis of
-#' multivariate abundance data in R. Methods in Ecology and Evolution. 7, 744-750.
+#' Francis KC Hui (2016). BORAL - Bayesian ordination and regression
+#' analysis of multivariate abundance data in R. Methods in Ecology and
+#' Evolution. 7, 744-750.
 #' \cr
 #' \cr
-#' Otso Ovaskainen et al. (2016). Using latent variable models to identify large networks of
-#' species-to-species associations at different spatial scales. Methods in Ecology and Evolution,
-#' 7, 549-555.
+#' Otso Ovaskainen et al. (2016). Using latent variable models to
+#' identify large networks of species-to-species associations at
+#' different spatial scales. Methods in Ecology and Evolution, 7,
+#' 549-555.
 #' @seealso `jsdgam()`, [residual_cor()]
 #' @author Nicholas J Clark
 #' @name mvgam_residcor-class
@@ -102,28 +89,27 @@ NULL
 #'
 #' @param x A `mvgam_residcor` object returned by
 #'   `residual_cor(..., summary = TRUE)`.
-#' @param type Character. Which surface to plot. `"correlation"`
-#'   (the default) reads `x$cor`; `"precision"` reads `x$prec`
-#'   (the partial correlations, Ovaskainen et al. 2016), which
-#'   `residual_cor()` populates only under `partial = TRUE`.
-#' @param cluster Logical. When `TRUE`, the matrix is reordered
-#'   by an approximate Robinson ordering (Gruvaeus & Wainer
-#'   1972; average linkage on the `1 - cormat` distance) so
-#'   visually coherent positive and negative clusters sit
-#'   adjacent. Defaults to `FALSE`.
-#' @param rescale Logical. Colour spans `[-1, 1]` by default, the
-#'   full range a correlation can take, so panels from different
-#'   fits are directly comparable and a correlation of 0.4 does
-#'   not look like one of 1. Set `TRUE` to scale colour to the
-#'   entries actually present, which reads better on a fit whose
+#' @param type Character. Which matrix to plot. `"correlation"` (the
+#'   default) draws `x$cor`. `"precision"` draws `x$prec`, the partial
+#'   correlations (Ovaskainen et al. 2016). `residual_cor()` computes
+#'   them under `partial = TRUE`.
+#' @param cluster Logical. When `TRUE`, the matrix is reordered by an
+#'   approximate Robinson ordering (Gruvaeus & Wainer 1972; average
+#'   linkage on the `1 - cormat` distance). Clusters of positive and
+#'   negative correlations then lie adjacent. Defaults to `FALSE`.
+#' @param rescale Logical. By default colour spans `[-1, 1]`, the full
+#'   range of a correlation. Panels from different fits are then
+#'   comparable. A correlation of 0.4 looks unlike one of 1. Set
+#'   `TRUE` to scale colour to the entries present, for a fit whose
 #'   correlations are all small. Defaults to `FALSE`.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @details Only the lower triangle of off-diagonal entries is
 #'   drawn; a symmetric matrix says everything once and the
 #'   diagonal is `1` for any correlation. Fill shows the posterior
-#'   median. [summary.mvgam_residcor()] reports each pair's
-#'   interval and `prob_nonzero`.
+#'   point estimate. A black outline marks each pair whose credible
+#'   interval excludes zero. [summary.mvgam_residcor()] reports each
+#'   pair's interval and `prob_nonzero`.
 #'
 #' @return A `ggplot` object.
 #'
@@ -146,40 +132,53 @@ plot.mvgam_residcor <- function(
   rlang::check_dots_empty()
   set_color_scheme_local("red")
 
-  if (type == "correlation") {
-    estimate <- x$cor
-    scale_name <- "Posterior\ncorrelation"
+  scale_name <- if (type == "correlation") {
+    "Posterior\ncorrelation"
   } else {
-    estimate <- x$prec %||% stop(insight::format_error(c(
-      "The `mvgam_residcor` object does not contain a precision matrix.",
-      i = paste0(
-        "Pass `partial = TRUE` to `residual_cor()` to populate ",
-        "the partial correlation surface."
-      )
-    )))
-    scale_name <- "Posterior\nprecision"
+    "Posterior\npartial\ncorrelation"
   }
+  residcor_heatmap(residcor_panel(x, type, cluster), scale_name, rescale)
+}
 
-  panel <- residcor_panel_data(estimate, cluster = cluster)
-  lim <- if (rescale) {
-    max(abs(panel$value), na.rm = TRUE)
-  } else {
-    1
-  }
 
-  ggplot2::ggplot(panel, ggplot2::aes(x = Var1, y = Var2)) +
-    ggplot2::geom_tile(
-      mapping = ggplot2::aes(fill = value), colour = "grey50"
-    ) +
-    mvgam_diverging_scale(name = scale_name, limits = c(-lim, lim)) +
-    ggplot2::labs(x = "", y = "") +
-    # Dropping the upper triangle takes one level off each axis, so
-    # both are held open to keep the panel square.
-    ggplot2::scale_x_discrete(
-      guide = ggplot2::guide_axis(angle = 45), drop = FALSE
-    ) +
-    ggplot2::scale_y_discrete(drop = FALSE) +
-    mvgam_theme()
+#' The lower triangle of a summarised residual correlation, with the
+#' pairs whose interval excludes zero marked
+#'
+#' @param x A summarised `mvgam_residcor`
+#' @param type `"correlation"` or `"precision"`
+#' @param cluster Reorder by `cluster_cormat()`
+#' @return Frame from `residcor_panel_data()`
+#' @noRd
+residcor_panel <- function(x, type = "correlation", cluster = FALSE) {
+  assert_residcor_summarised(x)
+  field <- if (type == "correlation") "cor" else "prec"
+  estimate <- x[[field]] %||% stop(insight::format_error(c(
+    "The 'mvgam_residcor' object holds no partial correlations.",
+    i = "Pass 'partial = TRUE' to 'residual_cor()' to compute them."
+  )), call. = FALSE)
+  residcor_panel_data(
+    estimate, cluster = cluster,
+    clear = interval_excludes_zero(x[[paste0(field, "_lower")]],
+                                   x[[paste0(field, "_upper")]])
+  )
+}
+
+
+#' Heatmap of one or more residual correlation panels
+#'
+#' @param panel Frame from `residcor_panel()`, optionally with `group`
+#' @param scale_name Legend title
+#' @param rescale Scale colour to the entries present
+#' @param ncol Facet columns when `panel` has a `group` column
+#' @return A `ggplot` object
+#' @noRd
+residcor_heatmap <- function(panel, scale_name, rescale, ncol = NULL) {
+  lim <- if (rescale) max(abs(panel$value), na.rm = TRUE) else 1
+  matrix_heatmap(
+    panel,
+    mvgam_diverging_scale(name = scale_name, limits = c(-lim, lim)),
+    layout = "triangle", ncol = ncol
+  )
 }
 
 
@@ -187,12 +186,12 @@ plot.mvgam_residcor <- function(
 #'
 #' Faceted heatmap panel across the per-group correlation
 #' matrices returned by `residual_cor(mod, by_group = TRUE)` on a
-#' hierarchical VAR or factor fit. Reads exactly as
-#' [plot.mvgam_residcor()] does, one panel per group, with fill
-#' showing the posterior median. Colour
-#' limits are shared across facets so the eye can compare panels
-#' directly. The `_global` reference matrix is included by default;
-#' drop it with `include_global = FALSE`.
+#' hierarchical trend fit. Each panel is drawn as by
+#' [plot.mvgam_residcor()], one per group, with fill showing the
+#' posterior point estimate and an outline on each pair whose interval
+#' excludes zero. The facets share colour limits. Panels are then
+#' directly comparable. The `_global` reference matrix is included by
+#' default. Drop it with `include_global = FALSE`.
 #'
 #' @param x An `mvgam_residcor_list` returned by
 #'   `residual_cor(mod, by_group = TRUE)`.
@@ -219,23 +218,9 @@ plot.mvgam_residcor_list <- function(x, include_global = TRUE,
   keep <- if (isTRUE(include_global)) names(x) else
     setdiff(names(x), "_global")
   panel <- do.call(rbind, lapply(keep, function(g) {
-    df <- residcor_panel_data(x[[g]]$cor)
+    df <- residcor_panel(x[[g]])
     df$group <- g
     df
   }))
-  lim <- if (rescale) max(abs(panel$value), na.rm = TRUE) else 1
-  ncol <- ncol %||% ceiling(sqrt(length(keep)))
-  ggplot2::ggplot(panel, ggplot2::aes(x = Var1, y = Var2)) +
-    ggplot2::geom_tile(
-      mapping = ggplot2::aes(fill = value), colour = "grey60"
-    ) +
-    mvgam_diverging_scale(name = "Posterior\ncorrelation",
-                          limits = c(-lim, lim)) +
-    ggplot2::facet_wrap(~ group, ncol = ncol) +
-    ggplot2::scale_x_discrete(
-      guide = ggplot2::guide_axis(angle = 45), drop = FALSE
-    ) +
-    ggplot2::scale_y_discrete(drop = FALSE) +
-    ggplot2::labs(x = "", y = "") +
-    mvgam_theme()
+  residcor_heatmap(panel, "Posterior\ncorrelation", rescale, ncol)
 }

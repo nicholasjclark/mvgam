@@ -5,11 +5,11 @@
 #'
 #' @name fevd.mvgam
 #'
-#' @param object \code{list} object of class \code{mvgam} resulting from a call to [mvgam()]
-#' that used a `VAR()` latent process model
+#' @param object An object of class \code{mvgam} fitted with a `VAR()`
+#'   latent process model
 #'
-#' @param h Positive \code{integer} specifying the forecast horizon over which to calculate
-#' the decomposition
+#' @param h Positive integer. The number of forecast horizons to
+#'   decompose.
 #'
 #' @param ndraws Optional integer; the number of posterior draws to
 #'   summarise over. A decomposition is built from one transition
@@ -30,8 +30,8 @@
 #'
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
-#' computed and returned by this function, along with key references.
+#' @return See \code{\link{mvgam_fevd-class}} for the quantities
+#'   computed and returned, with references.
 #'
 #' @author Nicholas J Clark
 #'
@@ -39,19 +39,16 @@
 #'   \code{\link{mvgam_fevd-class}}, [plot.mvgam_fevd()],
 #'   [plot.mvgam_irf()], [plot.mvgam_stability()],
 #'   [plot.mvgam_forecast()].
-#'   For a worked article that runs `fevd()` end to end on an
-#'   annual bird-count VAR, see
-#'   [https://nicholasjclark.github.io/mvgam/articles/var.html](https://nicholasjclark.github.io/mvgam/articles/var.html).
+#'   The article at
+#'   <https://nicholasjclark.github.io/mvgam/articles/var.html>
+#'   runs `fevd()` on a plankton community.
 #'
-#' @references Lutkepohl, H. (2007).
-#' New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
+#' @references Lutkepohl H (2005). New Introduction to Multiple Time Series
+#'   Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 #'
 #' @examples
 #' \dontrun{
-#' # See `?trend_constructors` for a runnable end-to-end VAR
-#' # example that exercises `fevd()` alongside `irf()`,
-#' # `stability()` and `residual_cor()` on the same fit. The
-#' # shape below summarises the API.
+#' # `var_mod` is any mvgam fit with a VAR trend
 #' fevd_obj <- fevd(var_mod, h = 8L)
 #' plot(fevd_obj)
 #' }
@@ -68,9 +65,8 @@ fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
                        summary = TRUE, probs = c(0.025, 0.975),
                        future = FALSE, ...) {
   checkmate::assert_int(h, lower = 1)
-  validate_draw_selectors(ndraws, draw_ids)
-  checkmate::assert_flag(summary)
-  checkmate::assert_flag(future)
+  probs <- assert_var_surface_args(ndraws, draw_ids, summary, probs,
+                                   future)
   rlang::check_dots_empty()
   require_fitted_model(object, "fevd")
   assert_var_trend(object, surface = "fevd()")
@@ -103,10 +99,8 @@ gen_fevd <- function(x, h = 6) {
   Psi <- var_psi(x, h = h)
   mse <- matrix(NA, nrow = h, ncol = K)
   Omega <- array(0, dim = c(h, K, K))
-  # Precompute the squared MA weights so the per-horizon numerator
-  # is a cumulative sum along the h dimension. The earlier
-  # triple-nested scalar loop cost O(h^2 * K^2) per draw; the
-  # cumulative-sum form is O(h * K^2).
+  # The numerator at each horizon is a cumulative sum of the squared
+  # orthogonalised weights, O(h * K^2) per draw.
   psi_sq <- Psi^2
   temp_cum <- matrix(0, K, K)
   for (i in 1:h) {
@@ -129,25 +123,22 @@ gen_fevd <- function(x, h = 6) {
 
 #' Forecast error covariance matrix
 #'
-#' Computes the cumulative h-step forecast error covariance for a
-#' VAR(1) as
+#' Computes the cumulative h-step forecast error covariance
 #' \deqn{\Sigma_y(h) = \sum_{k=0}^{h-1} \Phi_k \, \Sigma_u \, \Phi_k'}
-#' where \eqn{\Phi_0 = I} and \eqn{\Phi_k = A^k} are the MA
-#' coefficients returned by `var_phi` and \eqn{\Sigma_u} is the
-#' innovation covariance (`x$Sigma`). The diagonal of
-#' \eqn{\Sigma_y(h)} is the FEVD denominator used in `gen_fevd`;
-#' the matching numerator is built from `var_psi`, which absorbs
-#' the Cholesky factor of \eqn{\Sigma_u} into the MA representation
-#' so the two halves partition each response's variance.
+#' where \eqn{\Phi_k} are the moving-average weights `var_phi()`
+#' returns for a VAR(p) or VARMA, with \eqn{\Phi_0 = I}.
+#' \eqn{\Sigma_u} is the innovation covariance (`x$Sigma`). The
+#' diagonal of \eqn{\Sigma_y(h)} is the FEVD denominator in
+#' `gen_fevd()`. Its numerator comes from `var_psi()`, which absorbs
+#' the Cholesky factor of \eqn{\Sigma_u} into the weights. The two
+#' then partition each response's variance.
 #'
 #' @noRd
 var_fecov <- function(x, h) {
   Phi <- var_phi(x, h = h)
   Sigma_u <- x$Sigma
-  # Compute each term `Phi_k Sigma_u Phi_k'` exactly once, then
-  # take the cumulative sum along the horizon dimension. The
-  # earlier form re-summed products 2..i inside a horizon loop,
-  # costing O(h^2 * K^3) per draw; this version is O(h * K^3).
+  # Each term `Phi_k Sigma_u Phi_k'` once, then a cumulative sum along
+  # the horizons, O(h * K^3) per draw
   terms <- array(0, dim = c(x$K, x$K, h))
   for (k in seq_len(h)) {
     terms[,, k] <- Phi[,, k] %*% Sigma_u %*% t(Phi[,, k])

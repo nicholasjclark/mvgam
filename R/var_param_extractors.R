@@ -19,9 +19,27 @@ assert_var_trend <- function(object, surface) {
       i = paste0(
         "Refit with 'trend_formula = ~ VAR()' to use '", surface, "'."
       )
-    )))
+    )), call. = FALSE)
   }
   invisible(TRUE)
+}
+
+#' Validate the arguments `irf()`, `fevd()` and `stability()` share
+#'
+#' @param ndraws,draw_ids The posterior draws to use
+#' @param summary Whether to summarise the draws
+#' @param probs Lower and upper percentiles of the summary
+#' @param future Whether to run the draws under a `future` plan
+#' @return `probs`, sorted, or an error
+#' @noRd
+assert_var_surface_args <- function(ndraws, draw_ids, summary, probs,
+                                    future) {
+  validate_draw_selectors(ndraws, draw_ids)
+  checkmate::assert_flag(summary)
+  checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
+                            any.missing = FALSE, unique = TRUE)
+  checkmate::assert_flag(future)
+  sort(probs)
 }
 
 #' A kernel applied to each draw of a VAR posterior
@@ -137,11 +155,8 @@ extract_var_posterior <- function(object, ndraws = NULL,
 #' Optionally parallelise a per-draw VAR post-processing lapply
 #'
 #' Internal helper shared by `irf.mvgam()`, `fevd.mvgam()` and
-#' `stability.mvgam()` so their per-draw compute loops can run under
-#' a caller-configured `future` plan without duplicating the
-#' opt-in check. Mirrors the pattern used inside `.fit_model_rstan`
-#' (`R/backends.R:390-406`), so a session already using `future` for
-#' chain fitting gets the same behaviour for VAR post-processing.
+#' `stability.mvgam()`. Their per-draw loops run under the `future`
+#' plan the caller set, as chain fitting does.
 #'
 #' When `future = FALSE` (the default) the loop reduces to base
 #' `lapply()`, so there is no `future` dependency needed and no
@@ -171,10 +186,6 @@ mvgam_maybe_future_lapply <- function(n, fn, future = FALSE) {
   if (!future) {
     return(lapply(seq_len(n), fn))
   }
-  # Matches the `require_package("future")` pattern the fit
-  # backends use for optional runtime dependencies
-  # (`R/backends.R:969`) so the error message is consistent
-  # across mvgam functions that share a Suggests dependency.
   require_package("future")
   futures <- vector("list", n)
   for (i in seq_len(n)) {
@@ -247,11 +258,11 @@ var_process_labels <- function(object, K) {
 #'
 #' * On a **single-panel VAR** the routine reads the fitted
 #'   `Phi_trend` array.
-#' * On a **hierarchical VAR** with `group = <int>` or
-#'   `group = <name>` it reads the panel-specific matrix
-#'   `Phi_group_trend[c, l, , ]`, i.e. the transition matrix for
-#'   the requested country / patch / hospital.
-#' * On a **hierarchical VAR** with `group = NULL` it synthesises
+#' * On a **hierarchical VAR** with `groups = <int>` or
+#'   `groups = <name>` it returns the panel-specific matrix
+#'   `Phi_group_trend[c, l, , ]`, the transition matrix of the
+#'   requested panel.
+#' * On a **hierarchical VAR** with `groups = NULL` it synthesises
 #'   the shrinkage target from the hyperparameters:
 #'   diagonal cells take `Amu_trend[1, l]`, off-diagonal cells
 #'   take `Amu_trend[2, l]`. This is the mean the sampler pulls
@@ -368,7 +379,7 @@ posterior_transition_matrix <- function(object, groups = NULL,
     stop(insight::format_error(c(
       "'groups' only applies to hierarchical VAR fits.",
       i = "Leave 'groups' at NULL on a non-hierarchical fit."
-    )))
+    )), call. = FALSE)
   }
 
   target_names <- resolve_transition_matrix_groups(object, groups)
@@ -389,8 +400,7 @@ posterior_transition_matrix <- function(object, groups = NULL,
 #' to a character vector of group names.
 #' @noRd
 resolve_transition_matrix_groups <- function(object, groups) {
-  all_levels <- group_labels(object,
-                             object$standata$N_groups_trend %||% 1L)
+  all_levels <- group_labels(object, var_dim(object, "N_groups_trend"))
   if (identical(groups, "all")) return(all_levels)
   if (is.numeric(groups)) {
     checkmate::assert_integerish(
@@ -407,7 +417,7 @@ resolve_transition_matrix_groups <- function(object, groups) {
       paste0("Group '", bad[1L], "' not found."),
       i = paste0("Available: ",
                  paste(all_levels, collapse = ", "), ".")
-    )))
+    )), call. = FALSE)
   }
   groups
 }
@@ -425,7 +435,7 @@ extract_transition_matrix_draws <- function(object, group, lag) {
 
   if (is_hier && is.null(group)) {
     K <- var_dim(object, "N_subgroups_trend")
-    labs <- subgroup_labels(object, K, prefix = "outcome")
+    labs <- subgroup_labels(object, K)
     # `Amu_trend[1, lag]` is the population mean of the diagonal and
     # `Amu_trend[2, lag]` of the off-diagonal entries.
     amu <- read_draws_matrix(
@@ -447,17 +457,18 @@ extract_transition_matrix_draws <- function(object, group, lag) {
   }
 
   if (is_hier) {
-    group_int <- resolve_group_index(object, group)
+    # `resolve_transition_matrix_groups()` validated the name
+    group_int <- match(group, group_labels(
+      object, var_dim(object, "N_groups_trend")
+    ))
     K <- var_dim(object, "N_subgroups_trend")
     out <- extract_indexed_array_2d(
       draws_mat, "Phi_group_trend", K, K,
       prefix_ids   = c(group_int, lag),
-      labels       = subgroup_labels(object, K, prefix = "outcome"),
+      labels       = subgroup_labels(object, K),
       required_for = "a per-group VAR transition matrix"
     )
-    attr(out, "group_label") <- group_labels(
-      object, var_dim(object, "N_groups_trend")
-    )[group_int]
+    attr(out, "group_label") <- group
     return(out)
   }
 
@@ -488,20 +499,7 @@ finalise_transition_matrix <- function(arr, group_label,
   stats <- summarise_unconstrained_array(
     arr, robust = robust, probs = probs, series_names = series_names
   )
-  p <- dim(arr)[2L]
-  prob_pos <- matrix(0, p, p)
-  prob_neg <- matrix(0, p, p)
-  for (i in seq_len(p)) {
-    for (j in seq_len(p)) {
-      x <- arr[, i, j]
-      prob_pos[i, j] <- mean(x > 0)
-      prob_neg[i, j] <- mean(x < 0)
-    }
-  }
-  prob_nz <- pmax(prob_pos, prob_neg)
-  rownames(prob_pos) <- colnames(prob_pos) <- series_names
-  rownames(prob_neg) <- colnames(prob_neg) <- series_names
-  rownames(prob_nz)  <- colnames(prob_nz)  <- series_names
+  signs <- sign_probabilities(arr, series_names)
   structure(
     list(
       A             = stats$point,
@@ -509,10 +507,10 @@ finalise_transition_matrix <- function(arr, group_label,
       A_lower       = stats$lower,
       A_upper       = stats$upper,
       A_ess         = stats$ess,
-      prob_positive = prob_pos,
-      prob_negative = prob_neg,
-      prob_nonzero  = prob_nz,
-      n_series      = p,
+      prob_positive = signs$prob_positive,
+      prob_negative = signs$prob_negative,
+      prob_nonzero  = signs$prob_nonzero,
+      n_series      = dim(arr)[2L],
       series_names  = series_names,
       group_label   = group_label,
       probs         = probs,
@@ -570,13 +568,12 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
 
 #' Plot method for `mvgam_var_matrix`
 #'
-#' Renders the point-estimate transition matrix as a diverging
-#' heatmap. Uses the same `mvgam_diverging_scale()` palette and
-#' `mvgam_theme()` as [plot.mvgam_residcor()], so a reader
-#' switching between the correlation panel and the transition
-#' matrix sees a consistent visual identity. Symmetric limits
-#' are chosen from the largest observed absolute cell so a
-#' mostly-positive matrix does not wash out the negative entries.
+#' Draws the point estimate of the transition matrix as a heatmap.
+#' Row \eqn{i}, column \eqn{j} is the effect of process \eqn{j} at
+#' time \eqn{t - 1} on process \eqn{i} at time \eqn{t}. A black
+#' outline marks each cell whose credible interval excludes zero. The
+#' colour scale is symmetric about zero and spans the largest absolute
+#' cell.
 #'
 #' @param x An `mvgam_var_matrix` object returned by
 #'   [posterior_transition_matrix()].
@@ -597,26 +594,45 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
 plot.mvgam_var_matrix <- function(x, cluster = FALSE, ...) {
   checkmate::assert_flag(cluster)
   rlang::check_dots_empty()
-  mat <- x$A
-  if (cluster) {
-    idx <- cluster_cormat(mat)
-    mat <- mat[idx, idx]
-  }
-  long <- gather_matrix(mat, drop_diag = FALSE, drop_upper = FALSE)
-  rng <- max(abs(range(long$value, na.rm = TRUE, finite = TRUE)))
-  limits <- c(-rng, rng)
-  ggplot2::ggplot(
-    data = long,
-    mapping = ggplot2::aes(x = Var2, y = Var1, fill = value)
-  ) +
-    ggplot2::geom_tile(colour = "grey50") +
-    mvgam_diverging_scale(name = "Posterior\nA", limits = limits) +
-    ggplot2::labs(x = "", y = "") +
-    ggplot2::scale_x_discrete(
-      guide = ggplot2::guide_axis(angle = 45)
-    ) +
-    ggplot2::scale_y_discrete(limits = rev) +
-    mvgam_theme()
+  idx <- if (cluster) cluster_cormat(x$A) else seq_len(x$n_series)
+  panel <- var_matrix_panel(x, idx)
+  var_matrix_heatmap(panel)
+}
+
+#' One transition matrix in long format, with its clear cells
+#'
+#' @param x An `mvgam_var_matrix`
+#' @param idx Order of the processes
+#' @return Frame of `Var1`, `Var2`, `value` and `clear`
+#' @noRd
+var_matrix_panel <- function(x, idx = seq_len(x$n_series)) {
+  long <- gather_matrix(x$A[idx, idx, drop = FALSE],
+                        drop_diag = FALSE, drop_upper = FALSE)
+  clear <- interval_excludes_zero(x$A_lower, x$A_upper)
+  long$clear <- as.vector(clear[idx, idx, drop = FALSE])
+  long
+}
+
+#' Heatmap of transition matrices, rows responding to columns
+#'
+#' Fill limits are symmetric about the largest absolute cell. A
+#' mostly positive matrix then keeps its negative cells visible.
+#'
+#' @param panel Frame from `var_matrix_panel()`, optionally with a
+#'   `group` column
+#' @param ncol Facet columns when `panel` has a `group` column
+#' @return A `ggplot` object
+#' @noRd
+var_matrix_heatmap <- function(panel, ncol = NULL) {
+  rng <- max(abs(range(panel$value, na.rm = TRUE, finite = TRUE)))
+  matrix_heatmap(
+    panel,
+    mvgam_diverging_scale(name = "Posterior\nA", limits = c(-rng, rng)),
+    layout = "matrix",
+    x_lab = "Process at t - 1",
+    y_lab = "Process at t",
+    ncol = ncol
+  )
 }
 
 #' Print method for `mvgam_var_matrix_list`
@@ -658,9 +674,8 @@ print.mvgam_var_matrix_list <- function(x, ...) {
 #' Faceted view across the panels stored in the list. Two
 #' orientations are available:
 #'
-#' * `type = "heatmap"` (default): one diverging heatmap per
-#'   group in a grid, with symmetric fill limits shared across
-#'   facets so the eye can compare cell magnitudes directly.
+#' * `type = "heatmap"` (default): one heatmap per group, drawn as
+#'   by [plot.mvgam_var_matrix()]. The facets share fill limits.
 #' * `type = "diagonal"`: self-persistence pointrange with one
 #'   point per group per outcome (dodged by outcome), using the
 #'   Okabe-Ito categorical palette so outcomes match the fevd
@@ -696,32 +711,16 @@ plot.mvgam_var_matrix_list <- function(x, type = c("heatmap",
   plot_var_matrix_list_diagonal(x)
 }
 
-#' Faceted heatmap panel of per-group transition matrices. Uses
-#' `gather_matrix()` on each `A` matrix, binds into one long
-#' frame, then facets with symmetric diverging fills that share
-#' limits across facets so the eye can compare magnitudes.
+#' Faceted heatmap of per-group transition matrices. The facets share
+#' fill limits. Cell magnitudes then compare across groups.
 #' @noRd
 plot_var_matrix_list_heatmap <- function(x, ncol) {
-  long <- do.call(rbind, lapply(seq_along(x), function(g) {
-    df <- gather_matrix(x[[g]]$A,
-                        drop_diag = FALSE, drop_upper = FALSE)
-    df$group <- names(x)[g]
+  panel <- do.call(rbind, lapply(names(x), function(g) {
+    df <- var_matrix_panel(x[[g]])
+    df$group <- g
     df
   }))
-  rng <- max(abs(range(long$value, na.rm = TRUE, finite = TRUE)))
-  ncol <- ncol %||% ceiling(sqrt(length(x)))
-  ggplot2::ggplot(long,
-                  ggplot2::aes(x = Var2, y = Var1, fill = value)) +
-    ggplot2::geom_tile(colour = "grey60") +
-    mvgam_diverging_scale(name = "Posterior\nA",
-                          limits = c(-rng, rng)) +
-    ggplot2::facet_wrap(~ group, ncol = ncol) +
-    ggplot2::scale_x_discrete(
-      guide = ggplot2::guide_axis(angle = 45)
-    ) +
-    ggplot2::scale_y_discrete(limits = rev) +
-    ggplot2::labs(x = "", y = "") +
-    mvgam_theme()
+  var_matrix_heatmap(panel, ncol)
 }
 
 #' Per-outcome self-persistence pointrange: one facet per
@@ -754,8 +753,8 @@ plot_var_matrix_list_diagonal <- function(x) {
     ) +
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed") +
     ggplot2::scale_colour_manual(values = fill_values) +
-    ggplot2::labs(x = "self-persistence coefficient",
-                  y = NULL, colour = "outcome") +
+    ggplot2::labs(x = "Self-persistence coefficient",
+                  y = NULL, colour = "Outcome") +
     mvgam_theme()
 }
 
@@ -780,32 +779,5 @@ var_dim <- function(object, standata_slot) {
   K <- as.integer(K)
   checkmate::assert_int(K, lower = 1L, .var.name = standata_slot)
   K
-}
-
-#' Resolve a `group` argument to an integer index
-#'
-#' Names match against `group_labels()`, the labels `residual_cor()`
-#' reports for the same fit.
-#'
-#' @param object A hierarchical `mvgam` fit
-#' @param group A group name or index
-#' @return Integer index
-#' @noRd
-resolve_group_index <- function(object, group) {
-  n_groups <- var_dim(object, "N_groups_trend")
-  if (is.character(group)) {
-    gr_labels <- group_labels(object, n_groups)
-    idx <- match(group, gr_labels)
-    if (is.na(idx)) {
-      stop(insight::format_error(c(
-        paste0("Group '", group, "' not found."),
-        i = paste0("Available: ",
-                   paste(gr_labels, collapse = ", "), ".")
-      )))
-    }
-    return(as.integer(idx))
-  }
-  checkmate::assert_int(group, lower = 1L, upper = n_groups)
-  as.integer(group)
 }
 

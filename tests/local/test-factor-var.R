@@ -17,8 +17,8 @@
 #   model: y ~ x, trend_formula = ~ -1 + VAR(cor = TRUE, n_lv = 2)
 #
 # `y ~ x` carries an intercept. A trend intercept added to it would be
-# unidentified. The trend formula drops it with `-1`. `mu_trend` is
-# then zero and the loadings identity holds exactly.
+# unidentified. The trend formula drops it with `-1`. The program then
+# declares no `mu_trend`. The loadings identity holds exactly.
 #
 # Cached at tests/local/fixtures/val_mvgam_factor_var.rds. Delete to
 # refit.
@@ -127,8 +127,8 @@ test_that("the loadings are sampled parameters", {
 
 
 test_that("dropping the trend intercept removes it from the program", {
-  # The loadings identity below requires `mu_trend` at zero. The `-1`
-  # removes the trend intercept that would set it.
+  # The loadings identity below requires a trend without `mu_trend`.
+  # The `-1` removes the trend intercept that would set it.
   code <- paste(as.character(stancode(prefit)), collapse = "\n")
   expect_false(grepl("Intercept_trend", code, fixed = TRUE))
 })
@@ -214,6 +214,27 @@ test_that("two factors give the series correlation rank two", {
   rc <- residual_cor(fit)
   ev <- eigen(rc$cor, only.values = TRUE)$values
   expect_true(sum(ev > 1e-6) <= N_lv)
+
+  # Sampled loadings fix the factor shocks at unit variance with no
+  # correlation. The series' innovation covariance is then `Z Z'`
+  # draw by draw.
+  innov <- residual_cor(fit, covariance = "innovation",
+                        summary = FALSE)$cov_draws
+  for (k in unique(round(seq(1, nrow(dm), length.out = 5L)))) {
+    Zk <- matrix(NA_real_, n_series, N_lv)
+    for (a in seq_len(n_series)) {
+      for (b in seq_len(N_lv)) {
+        Zk[a, b] <- dm[k, sprintf("Z[%d,%d]", a, b)]
+      }
+    }
+    expect_equal(unname(matrix(innov[k, , ], n_series, n_series)),
+                 tcrossprod(Zk), tolerance = 1e-6)
+  }
+  # A draw subset takes the loadings from the same draws as the latent
+  # covariance
+  sub <- residual_cor(fit, covariance = "innovation", summary = FALSE,
+                      draw_ids = c(9L, 3L))$cov_draws
+  expect_equal(sub, innov[c(9L, 3L), , , drop = FALSE])
 })
 
 

@@ -27,9 +27,8 @@ orientations are available:
 }
 \details{
 \itemize{
-\item \code{type = "heatmap"} (default): one diverging heatmap per
-group in a grid, with symmetric fill limits shared across
-facets so the eye can compare cell magnitudes directly.
+\item \code{type = "heatmap"} (default): one heatmap per group, drawn as
+by \code{\link[=plot.mvgam_var_matrix]{plot.mvgam_var_matrix()}}. The facets share fill limits.
 \item \code{type = "diagonal"}: self-persistence pointrange with one
 point per group per outcome (dodged by outcome), using the
 Okabe-Ito categorical palette so outcomes match the fevd

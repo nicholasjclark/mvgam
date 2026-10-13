@@ -7,7 +7,7 @@ test_that("shared_variation() errors on non-factor mvgam fits", {
   )
   expect_error(
     shared_variation(fake_fit),
-    "requires a latent-factor fit"
+    "requires a latent factor model"
   )
 })
 

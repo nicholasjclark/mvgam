@@ -21,13 +21,12 @@ A \link[ggplot2:ggplot]{ggplot2::ggplot} object, which can be further
 customised with the \pkg{ggplot2} API.
 }
 \description{
-Renders the point-estimate transition matrix as a diverging
-heatmap. Uses the same \code{mvgam_diverging_scale()} palette and
-\code{mvgam_theme()} as \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}}, so a reader
-switching between the correlation panel and the transition
-matrix sees a consistent visual identity. Symmetric limits
-are chosen from the largest observed absolute cell so a
-mostly-positive matrix does not wash out the negative entries.
+Draws the point estimate of the transition matrix as a heatmap.
+Row \eqn{i}, column \eqn{j} is the effect of process \eqn{j} at
+time \eqn{t - 1} on process \eqn{i} at time \eqn{t}. A black
+outline marks each cell whose credible interval excludes zero. The
+colour scale is symmetric about zero and spans the largest absolute
+cell.
 }
 \seealso{
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}},

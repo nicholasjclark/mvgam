@@ -55,76 +55,72 @@ stationary forecast variance from \pkg{mvgam} models with Vector
 Autoregressive dynamics.
 }
 \details{
-These measures of stability can be used to assess how important
-inter-series dependencies are to the variability of a multivariate system
-and to ask how systems are expected to respond to environmental
-perturbations. Using the formula for a latent VAR(1) as:
+These measures describe how much the lagged interactions
+among the series contribute to the variability of the system. They
+also describe how the system responds to a perturbation (Ives et
+al. 2003). For a latent VAR(1)
 
 \deqn{
-  \mu_t \sim \text{MVNormal}(A(\mu_{t - 1}), \Sigma)
+  x_t \sim \text{MVNormal}(A x_{t - 1}, \Sigma)
   }
 
-this function will calculate the long-term stationary forecast distribution
-of the system, which has mean \eqn{\mu_{\infty}} and variance
-\eqn{\Sigma_{\infty}}, to then calculate the following quantities:
+the stationary covariance \eqn{\Sigma_{\infty}} solves
+\eqn{\Sigma_{\infty} = A \Sigma_{\infty} A^\top + \Sigma}. Each
+posterior draw of \eqn{A} and \eqn{\Sigma} gives one draw of every
+metric:
 
 \itemize{
-\item \code{prop_int}: Proportion of the volume of the stationary forecast
-distribution that is attributable to lagged interactions:
-\deqn{ det(A)^2 }
+\item \code{prop_int}: the proportion of the volume of the stationary
+distribution that the lagged interactions generate,
+\eqn{\det(A)^2}.
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{\\item `prop_int_adj`: Same as `prop_int` but scaled by the number of
-series \eqn{p}:
-\deqn{ det(A)^{2/p} }
+\if{html}{\out{<div class="sourceCode">}}\preformatted{\\item `prop_int_adj`: `prop_int` scaled by the number of series
+\eqn{p}, \eqn{|\det(A)|^{2/p}}. It compares across systems of
+different size.
 
-\\item `prop_int_offdiag`: Sensitivity of `prop_int` to inter-series
-interactions (off-diagonals of \eqn{A}):
-\deqn{ [2~det(A) (A^{-1})^T] }
+\\item `prop_int_offdiag`, `prop_int_diag`: the sensitivity of
+`prop_int` to each cell of \eqn{A} is
+\eqn{2 \det(A) (A^{-1})^\top}. `prop_int_offdiag` is the mean
+absolute sensitivity of the off-diagonal cells (interactions
+between series) as a share of that mean plus the mean absolute
+sensitivity of the diagonal cells (self-regulation).
+`prop_int_diag` is the remaining share.
 
-\\item `prop_int_diag`: Sensitivity of `prop_int` to intra-series
-interactions (diagonals of \eqn{A}):
-\deqn{ [2~det(A) (A^{-1})^T] }
+\\item `prop_cov_offdiag`, `prop_cov_diag`: the same split for the
+sensitivity of \eqn{\det(\Sigma_{\infty})} to each cell of
+\eqn{\Sigma_{\infty}}, \eqn{\det(\Sigma_{\infty})
+    (\Sigma_{\infty}^{-1})^\top}. Off-diagonal cells are counted
+where \eqn{\Sigma} is estimated.
 
-\\item `prop_cov_offdiag`: Sensitivity of \eqn{\Sigma_{\infty}} to
-inter-series error correlations:
-\deqn{ [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] }
+\\item `reactivity`: the log of the largest singular value of
+\eqn{A}, \eqn{\log \sigma_{max}(A)} (Neubert et al. 2009). A
+positive value means some perturbation grows in the step after
+it occurs, before the system returns to equilibrium.
 
-\\item `prop_cov_diag`: Sensitivity of \eqn{\Sigma_{\infty}} to error
-variances:
-\deqn{ [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] }
+\\item `mean_return_rate`: the largest modulus of the eigenvalues
+of \eqn{A}. The distance of the mean from its stationary value
+shrinks by this factor each step, asymptotically. A value nearer
+1 means a slower return.
 
-\\item `reactivity`: Degree to which the system moves away from a stable
-equilibrium following a perturbation. If \eqn{\sigma_{max}(A)} is the
-largest singular value of \eqn{A}:
-\deqn{ \log\sigma_{max}(A) }
-
-\\item `mean_return_rate`: Asymptotic return rate of the mean of the
-transition distribution to the stationary mean:
-\deqn{ \max(\lambda_{A}) }
-
-\\item `var_return_rate`: Asymptotic return rate of the variance of the
-transition distribution to the stationary variance:
-\deqn{ \max(\lambda_{A \otimes A}) }
+\\item `var_return_rate`: the same factor for the variance, the
+largest modulus of the eigenvalues of \eqn{A \otimes A}, which
+is `mean_return_rate` squared.
 }\if{html}{\out{</div>}}
 
 }
 
-Major advantages of using \pkg{mvgam} to compute these metrics are that
-well-calibrated uncertainties are available and that VAR processes are
-forced to be stationary. These properties make it simple and insightful to
-calculate and inspect aspects of both long-term and short-term stability.
+The prior on \eqn{A} keeps every draw stationary (Heaps 2023).
+\eqn{\Sigma_{\infty}} and every metric then exist in every draw.
 
-You can also inspect interactions among the time series in a latent VAR
-process using \code{\link{irf}} for impulse response functions or
-\code{\link{fevd}} for forecast error variance decompositions.
+\code{\link[=irf]{irf()}} and \code{\link[=fevd]{fevd()}} describe the same dynamics as responses to
+shocks.
 }
 \examples{
 \dontrun{
-# See `?trend_constructors` for a runnable end-to-end VAR
-# example that exercises `stability()` alongside `irf()`,
-# `fevd()` and `residual_cor()` on the same fit. The shape
-# below summarises the API.
-head(stability(var_mod)[, c("reactivity", "mean_return_rate")])
+# `var_mod` is any mvgam fit with a VAR(1) trend
+stab <- stability(var_mod)
+stab[stab$metric \%in\% c("reactivity", "mean_return_rate"), ]
+plot(stab)
 }
 
 }
@@ -132,6 +128,13 @@ head(stability(var_mod)[, c("reactivity", "mean_return_rate")])
 AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003). Estimating
 community stability and ecological interactions from time-series data.
 \emph{Ecological Monographs}, 73, 301-330.
+
+MG Neubert, H Caswell & AR Solow (2009). Detecting reactivity.
+\emph{Ecology}, 90, 2683-2688.
+
+SE Heaps (2023). Enforcing stationarity through the prior in vector
+autoregressions. \emph{Journal of Computational and Graphical
+Statistics}, 32, 74-83.
 }
 \seealso{
 \code{\link{VAR}}, \code{\link{irf}}, \code{\link{fevd}},
@@ -139,9 +142,9 @@ community stability and ecological interactions from time-series data.
 \code{\link{plot.mvgam_irf}},
 \code{\link{plot.mvgam_fevd}},
 \code{\link{plot.mvgam_forecast}}.
-For a worked article that runs \code{stability()} end to end
-on an annual bird-count VAR, see
-\url{https://nicholasjclark.github.io/mvgam/articles/var.html}.
+The article at
+\url{https://nicholasjclark.github.io/mvgam/articles/var.html}
+runs \code{stability()} on a plankton community.
 }
 \author{
 Nicholas J Clark

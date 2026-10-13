@@ -149,12 +149,7 @@ active_factors.mvgam <- function(object,
     upper = 1 - .Machine$double.eps
   )
   rlang::check_dots_empty()
-  n_lv <- detect_factor_n_lv(object)
-  if (is.null(n_lv) || n_lv < 1L) {
-    stop(insight::format_error(
-      "active_factors() requires a latent-factor fit (n_lv > 0)."
-    ))
-  }
+  n_lv <- require_factor_n_lv(object, "active_factors()")
   n_series <- loading_series_count(object)
   draws_mat <- posterior::as_draws_matrix(object$fit)
   # A fixed-Z fit gets column norms constant across draws.

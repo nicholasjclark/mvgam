@@ -4,10 +4,10 @@
 #' \code{mvgam} models with Vector Autoregressive dynamics
 #'
 #' @name irf.mvgam
-#' @param object \code{list} object of class \code{mvgam} resulting from a call to [mvgam()]
-#' that used a `VAR()` latent process model
-#' @param h Positive \code{integer} specifying the forecast horizon over which to calculate
-#' the IRF
+#' @param object An object of class \code{mvgam} fitted with a `VAR()`
+#'   latent process model
+#' @param h Positive integer. The number of horizons to compute. Horizon
+#'   1 is the time step of the shock.
 #' @param ndraws Optional integer; the number of posterior draws to
 #'   summarise over. A response is built from one transition matrix per
 #'   draw, so a wide panel is worth answering from a subset. Default
@@ -20,9 +20,12 @@
 #'   a wide panel runs to hundreds of megabytes.
 #' @param probs The lower and upper percentiles to report alongside the
 #'   median when `summary = TRUE`.
-#' @param cumulative \code{Logical} flag indicating whether the IRF should be cumulative
-#' @param orthogonal \code{Logical} flag indicating whether orthogonalized IRFs should be
-#' calculated. Note that the order of the variables matters when calculating these
+#' @param cumulative Logical. `TRUE` accumulates each response over the
+#'   horizons.
+#' @param orthogonal Logical. `TRUE` computes orthogonalised responses
+#'   from the lower Cholesky factor of the innovation covariance. These
+#'   depend on the order of the levels of the series factor. The
+#'   default generalised responses do not (Pesaran and Shin 1998).
 #' @param future \code{Logical}. When `TRUE`, per-draw IRF
 #'   computation runs under whatever
 #'   \code{\link[future:plan]{future::plan()}} the caller has set
@@ -32,26 +35,28 @@
 #'   \code{future} package (mvgam Suggests).
 #' @param ... Unused. Anything passed here is refused.
 #' @details
-#' See \code{\link{mvgam_irf-class}} for a full description of the quantities that are
-#' computed and returned by this function, along with key references.
-#' @return An object of \code{\link{mvgam_irf-class}} containing the posterior IRFs. This
-#' object can be used with the supplied S3 functions [plot.mvgam_irf()]
-#' and [summary.mvgam_irf()]
+#' See \code{\link{mvgam_irf-class}} for the quantities computed and
+#' returned, with references.
+#' @return An object of \code{\link{mvgam_irf-class}}. [plot.mvgam_irf()]
+#'   and [summary.mvgam_irf()] take it.
 #' @author Nicholas J Clark
+#' @references Lutkepohl H (2005). New Introduction to Multiple Time Series
+#'   Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
+#'
+#'   Pesaran HH and Shin Y (1998). Generalized impulse response analysis
+#'   in linear multivariate models. Economics Letters 58, 17-29.
+#'   \doi{10.1016/S0165-1765(97)00214-0}
 #' @seealso \code{\link{mvgam_irf-class}}, [VAR()],
 #'   [plot.mvgam_irf()], [stability()], [fevd()],
 #'   [plot.mvgam_stability()], [plot.mvgam_fevd()],
 #'   [plot.mvgam_forecast()].
-#'   For a worked article that runs `irf()` end to end on an
-#'   annual bird-count VAR, see
-#'   [https://nicholasjclark.github.io/mvgam/articles/var.html](https://nicholasjclark.github.io/mvgam/articles/var.html).
+#'   The article at
+#'   <https://nicholasjclark.github.io/mvgam/articles/var.html>
+#'   runs `irf()` on a plankton community.
 #'
 #' @examples
 #' \dontrun{
-#' # See `?trend_constructors` for a runnable end-to-end VAR
-#' # example that exercises `irf()` alongside `fevd()`,
-#' # `stability()` and `residual_cor()` on the same fit. The
-#' # shape below summarises the API.
+#' # `var_mod` is any mvgam fit with a VAR trend
 #' irf_obj <- irf(var_mod, h = 8L)
 #' plot(irf_obj, series = 1)
 #' }
@@ -77,11 +82,10 @@ irf.mvgam <- function(
   ...
 ) {
   checkmate::assert_int(h, lower = 1)
-  checkmate::assert_logical(cumulative, len = 1L)
-  checkmate::assert_logical(orthogonal, len = 1L)
-  validate_draw_selectors(ndraws, draw_ids)
-  checkmate::assert_flag(summary)
-  checkmate::assert_flag(future)
+  checkmate::assert_flag(cumulative)
+  checkmate::assert_flag(orthogonal)
+  probs <- assert_var_surface_args(ndraws, draw_ids, summary, probs,
+                                   future)
   rlang::check_dots_empty()
   require_fitted_model(object, "irf")
   assert_var_trend(object, surface = "irf()")
@@ -121,7 +125,7 @@ irf.mvgam <- function(
 
 #' Calculate impulse response functions
 #'
-#' Orthogonalised (Sims 1980 / Lutkepohl 2007 Section 2.3.2) and
+#' Orthogonalised (Sims 1980; Lutkepohl 2005, Section 2.3.2) and
 #' generalised (Pesaran-Shin 1998) impulse responses. Both share the
 #' MA representation of A but project it differently:
 #'
@@ -169,14 +173,9 @@ gen_irf <- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {
     irs[[ii]] <- matrix(irf_array[1:(h), impulse, impulse[ii]], nrow = h)
     colnames(irs[[ii]]) <- impulse
     if (cumulative) {
-      if (length(impulse) > 1) {
-        irs[[ii]] <- apply(irs[[ii]], 2, cumsum)
-      }
-      if (length(impulse) == 1) {
-        tmp <- matrix(cumsum(irs[[ii]]))
-        colnames(tmp) <- impulse
-        irs[[ii]] <- tmp
-      }
+      # `apply()` drops a one-row or one-column result to a vector
+      irs[[ii]] <- matrix(apply(irs[[ii]], 2L, cumsum), nrow = h,
+                          dimnames = list(NULL, impulse))
     }
   }
   names(irs) <- impulse

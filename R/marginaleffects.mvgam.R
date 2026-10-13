@@ -15,9 +15,16 @@
 #' here is the outcome scale, carrying observation noise, and returns
 #' integers for a count family. `"link"` is the linear predictor.
 #' marginaleffects orders `"response"` first and takes its default
-#' from that, so pass `type = "expected"` when the expectation is what
-#' is wanted. Results are summarised by the posterior median, which
-#' for a skewed predictive sits below the mean.
+#' from that. Pass `type = "expected"` when the expectation is wanted.
+#' `comparisons()` and `slopes()` on `"response"` return the contrast
+#' or slope of `E[Y]`, as `"expected"` does. Each contrasts two
+#' predictions. Observation noise in each prediction would widen the
+#' contrast. A slope also divides it by a small step and swamps the
+#' covariate effect. marginaleffects still labels the result
+#' `"response"`. `predictions()` on `"response"` keeps the observation
+#' noise. Results are
+#' summarised by the posterior median, which for a skewed predictive
+#' is below the mean.
 #'
 #' @section The latent trend:
 #' `process_error = FALSE`, the default, leaves the trend at its
@@ -126,6 +133,15 @@ get_predict.mvgam <- function(model,
     c("response", "link", "expected", "detection",
       "latent_N", "latent_state")
   )
+  # marginaleffects resolves the default `type` from its own dictionary
+  # before this hook runs. `"response"` is first there for mvgam. A
+  # contrast or slope differences two predictions. On `"response"` each
+  # prediction carries independent observation noise, which the
+  # difference doubles. A slope divides it by a small step as well. The
+  # contrast of the response is the contrast of its expectation.
+  if (identical(type, "response") && called_from_comparisons()) {
+    type <- "expected"
+  }
 
   # Default process_error = FALSE leaves the latent process out, so a
   # slope or comparison reads the covariate structure of both
@@ -261,28 +277,30 @@ get_predict.mvgam <- function(model,
 }
 
 
+#' Whether `marginaleffects::comparisons()` is on the call stack
+#'
+#' The `comparisons()` and `slopes()` families, `avg_` and `plot_`
+#' forms included, all evaluate through `comparisons()`. Each frame's
+#' function is compared with it, whatever name the caller used.
+#'
+#' @return Logical
+#' @noRd
+called_from_comparisons <- function() {
+  comparisons_fn <- marginaleffects::comparisons
+  for (i in seq_len(sys.nframe())) {
+    if (identical(sys.function(i), comparisons_fn)) {
+      return(TRUE)
+    }
+  }
+  FALSE
+}
+
+
 #' @importFrom marginaleffects get_coef
 #' @export
 get_coef.mvgam <- function(model, trend_effects = FALSE, ...) {
   checkmate::assert_class(model, "mvgam")
-  checkmate::assert_logical(trend_effects, len = 1L)
-
-  if (trend_effects && is.null(model$trend_formula)) {
-    stop(insight::format_error(
-      "'trend_effects = TRUE' needs a model fitted with a 'trend_formula'."
-    ))
-  }
-
-  # Read the population block through the same `betas` /
-  # `trend_betas` keywords `coef()`, `fixef()` and `vcov()` use, so
-  # the four accessors cannot disagree about which coefficients
-  # belong to which side. Reading the raw stanfit with a `^b_`
-  # pattern of its own returned `b_Intercept` alone on every model
-  # carrying a slope, because brms writes the population block as
-  # the indexed array `b[k]` and only the intercept is spelled out.
-  draws <- as_draws_matrix(
-    model, variable = if (trend_effects) "trend_betas" else "betas"
-  )
+  draws <- population_draws(model, trend_effects)
   if (ncol(draws) == 0L) {
     return(setNames(numeric(0L), character(0L)))
   }

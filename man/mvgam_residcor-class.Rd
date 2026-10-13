@@ -4,97 +4,83 @@
 \alias{mvgam_residcor-class}
 \title{\code{mvgam_residcor} object description}
 \value{
-Objects of this class are structured as a \code{list} with the following components:
+Objects of this class are structured as a \code{list} with the
+following components:
 
 \item{cor, cor_se, cor_lower, cor_upper}{Posterior summaries of
-the \eqn{p \times p} correlation matrix: median (or mean), standard
-error, and lower / upper limits of the credible intervals at the
-\code{probs} levels.}
+the \eqn{p \times p} correlation matrix: the posterior mean (the
+median under \code{robust = TRUE}), the standard error and the limits of
+the credible interval at the \code{probs} levels.}
 \item{cor_ess}{\eqn{p \times p} matrix of per-entry effective
-sample sizes for the correlation draws (computed on the Fisher-z
-scale via \code{\link[posterior:ess_basic]{posterior::ess_basic()}}). Diagonal entries are \code{NA}
-because the diagonal is fixed at 1. Use this to flag
-correlations that are nominally precise but poorly resolved by
-the MCMC chains.}
+sample sizes of the correlation draws, computed on the Fisher-z
+scale with \code{\link[posterior:ess_basic]{posterior::ess_basic()}}. The diagonal is \code{NA}, being
+fixed at 1. A low value marks a correlation the chains sampled
+poorly, however narrow its interval.}
 \item{prob_positive, prob_negative, prob_nonzero}{\eqn{p \times p}
 matrices of \code{Pr(r > 0)}, \code{Pr(r < 0)} and the larger of the two for
-every off-diagonal entry. Use these for a sign-determinability
-filter rather than the binary "CI does not contain zero" rule.}
-\item{sig_cor}{A \eqn{p \times p} correlation matrix containing
-only those correlations whose credible interval excludes zero. All
-other entries are set to zero. \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} draws \code{cor}
-rather than this, since a hard cut renders a correlation the data
-merely leave uncertain identically to one estimated at zero.}
+every off-diagonal entry. Each measures how well the data
+determine the sign of a correlation.}
+\item{sig_cor}{The correlation matrix with every entry set to zero
+where \code{prob_nonzero} is at most \code{prob_threshold}.
+\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} draws \code{cor}. A hard cut would draw a
+correlation the data leave uncertain the same as one estimated at
+zero.}
 \item{cov, cov_se, cov_lower, cov_upper, cov_ess}{Posterior
-summaries of the residual covariance matrix, with per-entry ESS
-matching the correlation surface.}
+summaries of the residual covariance matrix, with per-entry ESS.}
 \item{mean_abs_offdiag}{A \code{list} of \code{point}, \code{lower} and \code{upper}
 summarising the mean absolute off-diagonal correlation. The mean is
-taken within each draw and then summarised across draws, so the
-interval describes overall correlation strength rather than being
-read off a single summary matrix.}
+taken within each draw and then summarised across draws. The
+interval then describes the overall strength of correlation.}
 \item{n_series, series_names}{Dimensions of the matrix and the
 series labels.}
-\item{pattern, hierarchical, group_label}{Bookkeeping fields
-recording the residual structure that was summarised.}
-\item{probs, prob_threshold}{The credible interval and threshold
-used by \code{residual_cor()} to populate \code{sig_cor}.}
+\item{pattern, hierarchical, group_label}{The residual structure
+that was summarised.}
+\item{covariance}{\code{"stationary"} for the covariance of the latent
+states, or \code{"innovation"} for that of one step's shocks, as
+\code{residual_cor()} was asked.}
+\item{probs, prob_threshold}{The credible interval levels and the
+\code{prob_nonzero} threshold of \code{sig_cor}.}
 
 Passing \code{partial = TRUE} to \code{residual_cor()} adds the partial
-correlation surface, which mirrors the correlation one entry for
-entry: \code{prec}, \code{prec_se}, \code{prec_lower}, \code{prec_upper}, \code{prec_ess},
+correlations, with one field for each correlation field: \code{prec},
+\code{prec_se}, \code{prec_lower}, \code{prec_upper}, \code{prec_ess},
 \code{prec_prob_positive}, \code{prec_prob_negative}, \code{prec_prob_nonzero}
 and the thresholded \code{sig_prec}. Partial correlations are bounded
-the way correlations are, so they are summarised on the same
-Fisher-z scale. Without \code{partial = TRUE} none of these are
-present, and \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} with \code{type = "precision"}
-says so.
+like correlations. They are summarised on the same Fisher-z scale.
+\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} with \code{type = "precision"} requires them.
 }
 \description{
 A \code{mvgam_residcor} object returned by function \code{\link[=residual_cor]{residual_cor()}}.
-Run \code{methods(class = "mvgam_residcor")} to see an overview of available methods.
+Run \code{methods(class = "mvgam_residcor")} to see the available
+methods.
 }
 \details{
-Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
-is heavily paraphrased from his associated \pkg{boral} package.
+In a latent factor model the residual covariance between series is
+\eqn{\Sigma = Z \Omega Z'}, where \eqn{Z} holds the factor
+loadings and \eqn{\Omega} is the covariance of the latent states.
+A strong residual correlation between two species can reflect a
+species interaction (facilitation or competition), a missing
+covariate, or any other association the predictors in \code{formula}
+leave unexplained (Hui 2016).
 
-In latent factor models, the residual covariance matrix is calculated
-based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance
-matrix \eqn{\Sigma = \Theta\Theta'}. A strong residual covariance/correlation matrix
-between two species can be interpreted as evidence of species interactions (e.g.,
-facilitation or competition),
-missing covariates, as well as any additional species correlation not accounted for by shared
-environmental captured in \code{formula}.
-
-The residual precision matrix (also known as partial correlation matrix, Ovaskainen et al., 2016)
-is defined as the inverse of the residual correlation matrix. The precision matrix is often used to
-identify direct or causal relationships between two species e.g., two species can have a zero
-precision but still be correlated, which can be interpreted as saying that two species are not
-directly associated, but they are still correlated \emph{through} other species. In other words, they
-are conditionally independent given the other species. It is important that the precision matrix
-does not exhibit the exact same properties of the correlation e.g., the diagonal elements are
-not equal to 1. Nevertheless, relatively larger values of precision may imply stronger
-direct relationships between two species.
-
-In addition to the residual correlation and precision matrices, the median or mean point estimator
-of trace of the residual covariance matrix is returned,
-\eqn{\sum\limits_{j=1}^p [\Theta\Theta']_{jj}}. Often used in other areas of multivariate
-statistics, the trace may be interpreted as the amount of covariation explained by the latent factors.
-One situation where the trace may be useful is when comparing a pure latent factor model
-(where no terms are suppled to \code{formula}) versus a model with latent
-factors and some additional predictors in \code{formula} -- the proportional difference in trace
-between these two models may be interpreted as the proportion of covariation between species explained
-by the predictors in \code{formula}. Of course, the trace itself is random due to the MCMC sampling, and so it
-is not always guaranteed to produce sensible answers.
+The partial correlation between two series conditions on every
+other series (Ovaskainen et al. 2016). It is computed from the
+inverse of the correlation matrix, with the diagonal set to 1. Two
+species with a partial correlation near zero can still be
+correlated. They are then conditionally independent given the other
+species. Their association runs \emph{through} those species. A larger
+partial correlation suggests a more direct association.
 }
 \references{
-Francis KC Hui (2016). BORAL - Bayesian ordination and regression analysis of
-multivariate abundance data in R. Methods in Ecology and Evolution. 7, 744-750.
+Francis KC Hui (2016). BORAL - Bayesian ordination and regression
+analysis of multivariate abundance data in R. Methods in Ecology and
+Evolution. 7, 744-750.
 \cr
 \cr
-Otso Ovaskainen et al. (2016). Using latent variable models to identify large networks of
-species-to-species associations at different spatial scales. Methods in Ecology and Evolution,
-7, 549-555.
+Otso Ovaskainen et al. (2016). Using latent variable models to
+identify large networks of species-to-species associations at
+different spatial scales. Methods in Ecology and Evolution, 7,
+549-555.
 }
 \seealso{
 \code{jsdgam()}, \code{\link[=residual_cor]{residual_cor()}}

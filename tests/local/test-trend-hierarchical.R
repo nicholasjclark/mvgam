@@ -547,7 +547,7 @@ test_that("summary, residual_cor and shared_variation name the axis", {
   # This fit has no latent factors, so the shared-variation
   # decomposition has nothing to decompose and says so rather than
   # returning a zero it would be read as a result.
-  expect_error(shared_variation(fit), "requires a latent-factor fit")
+  expect_error(shared_variation(fit), "requires a latent factor model")
 })
 
 
@@ -734,11 +734,13 @@ test_that("kfold refits a fold without rebuilding the time grid", {
   # with the rows deleted met a grid with holes, and the AR trend
   # refused it.
   # At the default `silent = 1` the refit count is the whole of the
-  # output. The refits printed every sampler iteration line.
-  out <- capture.output(
-    expect_no_message(kf <- kfold(fit, K = 2L, exact = TRUE))
+  # output. The refits printed every sampler iteration line. A
+  # divergence notice from a refit is a diagnostic the user is owed.
+  msgs <- capture_messages(
+    out <- capture.output(kf <- kfold(fit, K = 2L, exact = TRUE))
   )
   expect_identical(out, "kfold: refitting 2 fold(s) ...")
+  expect_false(any(grepl("Iteration:|^Chain [0-9]", msgs)))
   expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
 })
 
@@ -1275,6 +1277,20 @@ test_that("a grouped AR(1) settles at the joint stationary covariance", {
     M
   }
 
+  # `residual_cor()` reports each group's block from the same draws.
+  # Its stationary block is the lifted covariance and its innovation
+  # block the stored one.
+  rc_stat <- residual_cor(fit, by_group = TRUE, summary = FALSE)
+  rc_innov <- residual_cor(fit, covariance = "innovation",
+                           by_group = TRUE, summary = FALSE)
+  # `draw_ids` keeps the named draws of every group, in the order named
+  sub <- residual_cor(fit, by_group = TRUE, summary = FALSE,
+                      draw_ids = c(9L, 4L))
+  for (g in names(rc_stat)) {
+    expect_equal(sub[[g]]$cov_draws,
+                 rc_stat[[g]]$cov_draws[c(9L, 4L), , , drop = FALSE])
+  }
+
   # A handful of draws spread across the chain. The claim is an
   # identity per draw, which an average over draws would blur.
   draws <- unique(round(seq(1, dim(L_stat)[1L], length.out = 12L)))
@@ -1306,6 +1322,10 @@ test_that("a grouped AR(1) settles at the joint stationary covariance", {
       # would satisfy the identity above with every coefficient at
       # zero and fail here.
       expect_gt(max(abs(got - innov)), 1e-6)
+      expect_equal(unname(rc_stat[[g + 1L]]$cov_draws[d, , ]), got,
+                   tolerance = 1e-10)
+      expect_equal(unname(rc_innov[[g + 1L]]$cov_draws[d, , ]), innov,
+                   tolerance = 1e-6)
     }
   }
 })

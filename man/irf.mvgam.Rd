@@ -21,18 +21,21 @@ irf(object, ...)
 )
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
-that used a \code{VAR()} latent process model}
+\item{object}{An object of class \code{mvgam} fitted with a \code{VAR()}
+latent process model}
 
 \item{...}{Unused. Anything passed here is refused.}
 
-\item{h}{Positive \code{integer} specifying the forecast horizon over which to calculate
-the IRF}
+\item{h}{Positive integer. The number of horizons to compute. Horizon
+1 is the time step of the shock.}
 
-\item{cumulative}{\code{Logical} flag indicating whether the IRF should be cumulative}
+\item{cumulative}{Logical. \code{TRUE} accumulates each response over the
+horizons.}
 
-\item{orthogonal}{\code{Logical} flag indicating whether orthogonalized IRFs should be
-calculated. Note that the order of the variables matters when calculating these}
+\item{orthogonal}{Logical. \code{TRUE} computes orthogonalised responses
+from the lower Cholesky factor of the innovation covariance. These
+depend on the order of the levels of the series factor. The
+default generalised responses do not (Pesaran and Shin 1998).}
 
 \item{ndraws}{Optional integer; the number of posterior draws to
 summarise over. A response is built from one transition matrix per
@@ -59,37 +62,41 @@ splits draws across \code{N} R processes). Requires the
 \code{future} package (mvgam Suggests).}
 }
 \value{
-An object of \code{\link{mvgam_irf-class}} containing the posterior IRFs. This
-object can be used with the supplied S3 functions \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}
-and \code{\link[=summary.mvgam_irf]{summary.mvgam_irf()}}
+An object of \code{\link{mvgam_irf-class}}. \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}
+and \code{\link[=summary.mvgam_irf]{summary.mvgam_irf()}} take it.
 }
 \description{
 Compute Generalized or Orthogonalized Impulse Response Functions (IRFs) from
 \code{mvgam} models with Vector Autoregressive dynamics
 }
 \details{
-See \code{\link{mvgam_irf-class}} for a full description of the quantities that are
-computed and returned by this function, along with key references.
+See \code{\link{mvgam_irf-class}} for the quantities computed and
+returned, with references.
 }
 \examples{
 \dontrun{
-# See `?trend_constructors` for a runnable end-to-end VAR
-# example that exercises `irf()` alongside `fevd()`,
-# `stability()` and `residual_cor()` on the same fit. The
-# shape below summarises the API.
+# `var_mod` is any mvgam fit with a VAR trend
 irf_obj <- irf(var_mod, h = 8L)
 plot(irf_obj, series = 1)
 }
 
+}
+\references{
+Lutkepohl H (2005). New Introduction to Multiple Time Series
+Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
+
+Pesaran HH and Shin Y (1998). Generalized impulse response analysis
+in linear multivariate models. Economics Letters 58, 17-29.
+\doi{10.1016/S0165-1765(97)00214-0}
 }
 \seealso{
 \code{\link{mvgam_irf-class}}, \code{\link[=VAR]{VAR()}},
 \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=stability]{stability()}}, \code{\link[=fevd]{fevd()}},
 \code{\link[=plot.mvgam_stability]{plot.mvgam_stability()}}, \code{\link[=plot.mvgam_fevd]{plot.mvgam_fevd()}},
 \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}.
-For a worked article that runs \code{irf()} end to end on an
-annual bird-count VAR, see
-\url{https://nicholasjclark.github.io/mvgam/articles/var.html}.
+The article at
+\url{https://nicholasjclark.github.io/mvgam/articles/var.html}
+runs \code{irf()} on a plankton community.
 }
 \author{
 Nicholas J Clark

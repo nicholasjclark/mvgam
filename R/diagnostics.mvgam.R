@@ -28,6 +28,10 @@
 #'   `c(0.025, 0.975)` (95% CI).
 #' @param resp Character. Response name for multivariate models.
 #'   Ignored for univariate fits.
+#' @param trend_effects Logical. `coef()`, `fixef()` and `vcov()`
+#'   report the coefficients of the observation formula by default.
+#'   `TRUE` reports those of the `trend_formula` instead. Their names
+#'   end in `_trend`.
 #' @param ... Unused by these methods, and refused, except on
 #'   `nuts_params()` and `log_posterior()`, which forward what they
 #'   are given to \pkg{bayesplot}.
@@ -160,13 +164,12 @@ median_interval_cols <- function(draws, probs, prefix) {
 #' @rdname mvgam_diagnostics
 #' @method coef mvgam
 #' @export
-coef.mvgam <- function(object, summary = TRUE, ...) {
+coef.mvgam <- function(object, summary = TRUE, trend_effects = FALSE,
+                       ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_logical(summary, len = 1L)
   rlang::check_dots_empty()
-  # Reuse the `betas` keyword so the b_trend[*] block is filtered
-  # consistently with as.matrix(object, variable = "betas").
-  draws_mat <- as_draws_matrix(object, variable = "betas")
+  draws_mat <- population_draws(object, trend_effects)
   if (ncol(draws_mat) == 0L) {
     return(if (isTRUE(summary)) numeric() else matrix(0, 0, 0))
   }
@@ -259,17 +262,14 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
 #' @method fixef mvgam
 #' @export
 fixef.mvgam <- function(object, summary = TRUE, robust = FALSE,
-                         probs = c(0.025, 0.975), pars = NULL, ...) {
+                         probs = c(0.025, 0.975), pars = NULL,
+                         trend_effects = FALSE, ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_logical(summary, len = 1L)
   checkmate::assert_logical(robust, len = 1L)
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L)
   rlang::check_dots_empty()
-  # The `betas` keyword is the set `brms::fixef()` reports, and
-  # `coef()`, `vcov()` and `get_coef()` take the same one.
-  mat <- select_fixef_draws(
-    as_draws_matrix(object, variable = "betas"), pars
-  )
+  mat <- select_fixef_draws(population_draws(object, trend_effects), pars)
   if (ncol(mat) == 0L) {
     return(matrix(0, 0, 0))
   }
@@ -425,21 +425,43 @@ getCall.mvgam <- function(x, ...) {
 #'   matrix. Defaults to `FALSE`.
 #' @method vcov mvgam
 #' @export
-vcov.mvgam <- function(object, correlation = FALSE, pars = NULL, ...) {
+vcov.mvgam <- function(object, correlation = FALSE, pars = NULL,
+                       trend_effects = FALSE, ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_logical(correlation, len = 1L)
   checkmate::assert_character(pars, null.ok = TRUE)
   rlang::check_dots_empty()
-  # Reuse the `betas` keyword so the `b_trend[*]` filter matches
-  # `coef.mvgam` / `fixef.mvgam` exactly.
-  mat <- select_fixef_draws(
-    as_draws_matrix(object, variable = "betas"), pars
-  )
+  mat <- select_fixef_draws(population_draws(object, trend_effects), pars)
   if (ncol(mat) == 0L) {
     return(matrix(0, 0, 0))
   }
   colnames(mat) <- fixef_name(colnames(mat))
   if (isTRUE(correlation)) stats::cor(mat) else stats::cov(mat)
+}
+
+
+#' Draws of the population-level coefficients of one formula
+#'
+#' The `betas` keyword is the set `brms::fixef()` reports for the
+#' observation formula. `trend_betas` is the same set for the trend
+#' formula. `coef()`, `fixef()`, `vcov()` and `get_coef()` all take
+#' their draws from this function and agree on which coefficients
+#' belong to which formula.
+#'
+#' @param object A fitted `mvgam` object
+#' @param trend_effects Logical. `TRUE` selects the trend formula.
+#' @return A draws matrix
+#' @noRd
+population_draws <- function(object, trend_effects = FALSE) {
+  checkmate::assert_flag(trend_effects)
+  if (trend_effects && is.null(object$trend_formula)) {
+    stop(insight::format_error(
+      "'trend_effects = TRUE' needs a model fitted with a 'trend_formula'."
+    ), call. = FALSE)
+  }
+  as_draws_matrix(
+    object, variable = if (trend_effects) "trend_betas" else "betas"
+  )
 }
 
 

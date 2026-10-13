@@ -626,9 +626,14 @@ pretty_symmetric_breaks <- function(limits) {
   checkmate::assert_numeric(limits, len = 2L, any.missing = FALSE)
   raw <- seq(limits[1L], limits[2L], length.out = 5L)
   # Two significant digits on the half-range keeps the endpoints
-  # distinct without carrying the full float.
+  # distinct without carrying the full float. ggplot2 drops from the
+  # legend a break rounded outward past the limits. Such an endpoint
+  # steps back one unit of the last digit.
   digits <- max(1L, 2L - ceiling(log10(max(abs(limits), 1e-8))))
-  unique(round(raw, digits))
+  breaks <- round(raw, digits)
+  outside <- breaks < limits[1L] | breaks > limits[2L]
+  breaks[outside] <- breaks[outside] - sign(breaks[outside]) * 10^-digits
+  unique(breaks)
 }
 
 
@@ -640,23 +645,109 @@ pretty_symmetric_breaks <- function(limits) {
 #'
 #' @param estimate Symmetric matrix of posterior point estimates.
 #' @param cluster Reorder by `cluster_cormat()`.
-#' @return Data frame with `Var1`, `Var2` and `value`.
+#' @param clear Optional logical matrix, `TRUE` where the interval of
+#'   an entry excludes zero. Reordered with `estimate`.
+#' @return Data frame with `Var1`, `Var2`, `value` and `clear`.
 #'
 #' @noRd
-residcor_panel_data <- function(estimate, cluster = FALSE) {
+residcor_panel_data <- function(estimate, cluster = FALSE, clear = NULL) {
   # A single series has no off-diagonal entry. The assertion names
   # that cause before an empty frame fails in ggplot2.
   checkmate::assert_matrix(estimate, mode = "numeric", min.rows = 2L)
   checkmate::assert_flag(cluster)
+  clear <- clear %||% matrix(FALSE, nrow(estimate), ncol(estimate))
+  checkmate::assert_matrix(clear, mode = "logical",
+                           nrows = nrow(estimate), ncols = ncol(estimate))
   if (isTRUE(cluster)) {
     idx <- cluster_cormat(estimate)
     estimate <- estimate[idx, idx]
+    clear <- clear[idx, idx]
   }
   keep <- lower.tri(estimate)
   out <- expand.grid(dimnames(estimate))
   colnames(out) <- c("Var1", "Var2")
   out$value <- as.vector(estimate)
+  out$clear <- as.vector(clear)
   out[as.vector(keep), , drop = FALSE]
+}
+
+
+#' Which entries of a summarised matrix have an interval clear of zero
+#'
+#' @param lower,upper Matrices of interval bounds, or `NULL`
+#' @return Logical matrix, or `NULL` when either bound is missing
+#' @noRd
+interval_excludes_zero <- function(lower, upper) {
+  if (is.null(lower) || is.null(upper)) {
+    return(NULL)
+  }
+  out <- lower > 0 | upper < 0
+  out[is.na(out)] <- FALSE
+  out
+}
+
+
+#' Heatmap of matrices in long format
+#'
+#' Draws one tile per entry, filled by `value`. Entries whose `clear`
+#' column is `TRUE` take a black outline. A `group` column draws one
+#' facet per group, in the order the groups first appear.
+#'
+#' `layout = "matrix"` draws rows down and columns across, as the
+#' matrix is written. `layout = "triangle"` draws the lower triangle
+#' of a symmetric matrix with both axes held open, which keeps the
+#' panel square.
+#'
+#' @param panel Frame of `Var1` (row), `Var2` (column) and `value`,
+#'   with optional `clear` and `group` columns
+#' @param fill_scale A ggplot2 fill scale
+#' @param layout `"matrix"` or `"triangle"`
+#' @param x_lab,y_lab Axis titles
+#' @param ncol Facet columns when `panel` has a `group` column
+#' @return A `ggplot` object
+#' @noRd
+matrix_heatmap <- function(panel, fill_scale,
+                           layout = c("matrix", "triangle"),
+                           x_lab = NULL, y_lab = NULL, ncol = NULL) {
+  checkmate::assert_data_frame(panel)
+  checkmate::assert_names(names(panel),
+                          must.include = c("Var1", "Var2", "value"))
+  layout <- match.arg(layout)
+  checkmate::assert_string(x_lab, null.ok = TRUE)
+  checkmate::assert_string(y_lab, null.ok = TRUE)
+  checkmate::assert_count(ncol, positive = TRUE, null.ok = TRUE)
+  is_matrix <- layout == "matrix"
+  position <- if (is_matrix) {
+    ggplot2::aes(x = .data$Var2, y = .data$Var1)
+  } else {
+    ggplot2::aes(x = .data$Var1, y = .data$Var2)
+  }
+  y_scale <- if (is_matrix) {
+    ggplot2::scale_y_discrete(limits = rev)
+  } else {
+    ggplot2::scale_y_discrete(drop = FALSE)
+  }
+  if (!is.null(panel$group)) {
+    panel$group <- factor(panel$group, levels = unique(panel$group))
+  }
+  clear <- panel[panel$clear %in% TRUE, , drop = FALSE]
+  p <- ggplot2::ggplot(panel, position) +
+    ggplot2::geom_tile(ggplot2::aes(fill = .data$value), colour = "grey60") +
+    ggplot2::geom_tile(data = clear, fill = NA, colour = "black",
+                       linewidth = 0.9) +
+    fill_scale +
+    ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(angle = 45),
+                              drop = FALSE) +
+    y_scale +
+    ggplot2::labs(x = x_lab, y = y_lab) +
+    mvgam_theme()
+  if (!is.null(panel$group)) {
+    p <- p +
+      ggplot2::facet_wrap(
+        ~ group, ncol = ncol %||% ceiling(sqrt(nlevels(panel$group)))
+      )
+  }
+  p
 }
 
 

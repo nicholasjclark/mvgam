@@ -9,11 +9,14 @@ residual_cor(object, ...)
 
 \method{residual_cor}{mvgam}(
   object,
+  covariance = c("stationary", "innovation"),
   by_group = FALSE,
   partial = FALSE,
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
+  ndraws = NULL,
+  draw_ids = NULL,
   ...
 )
 }
@@ -21,6 +24,12 @@ residual_cor(object, ...)
 \item{object}{A fitted [mvgam][mvgam::mvgam] object.}
 
 \item{...}{Unused. Anything passed here is refused.}
+
+\item{covariance}{Which covariance to summarise. \code{"stationary"}
+(default) gives the covariance of the latent states over the whole
+series. \code{"innovation"} gives the covariance of one time step's
+shocks, the quantity \code{cor = TRUE} estimates directly. The two
+coincide for a trend whose states keep no memory between times.}
 
 \item{by_group}{Logical. Only relevant for hierarchical trends
 (\code{gr = ...} supplied to the trend constructor). When \code{FALSE}
@@ -35,10 +44,9 @@ partial correlation matrix per draw via the inverse-correlation
 identity \verb{P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)}. This
 is \code{O(p^3)} per draw and is omitted by default. Required if you
 want the \verb{prec*} fields populated. A factor fit with fewer
-factors than series implies a covariance of rank \code{n_lv}, which
-has no inverse, and the call is refused with that stated;
-\code{\link[=shared_variation]{shared_variation()}} answers what such a fit has to say about
-what the series share.}
+factors than series implies a singular covariance of rank \code{n_lv}.
+The call then stops with an error. \code{\link[=shared_variation]{shared_variation()}} reports
+the variation such a fit's series share.}
 
 \item{summary}{Logical. When \code{TRUE} (default) per-element summaries
 (point estimate, posterior SD, quantile CI, posterior probability
@@ -52,6 +60,12 @@ Only relevant when \code{summary = TRUE}.}
 \item{probs}{Length-2 numeric vector giving the lower and upper
 probabilities for the quantile-based credible interval. Default
 \code{c(0.025, 0.975)}.}
+
+\item{ndraws}{Optional number of posterior draws to use. Default
+\code{NULL} uses every draw.}
+
+\item{draw_ids}{Optional integer vector naming the posterior draws
+to use, in place of \code{ndraws}.}
 }
 \value{
 An [mvgam_residcor-class] object when \code{summary = TRUE} and
@@ -76,9 +90,9 @@ draw, where \code{Omega} is the covariance of the latent states,
 using the posterior loadings \code{Z} for the default sampled-Z
 factor model, or the user-supplied loadings broadcast across
 draws when \code{trend_map = ...} fixes Z (see \code{\link[=mvgam]{mvgam()}} /
-\code{\link[=AR]{AR()}} / \code{\link[=VAR]{VAR()}} / \code{\link[=RW]{RW()}} / \code{\link[=LLT]{LLT()}} / \code{\link[=ZMVN]{ZMVN()}}). Taking \verb{Z Z^T} instead
-would drop whatever scale the latent columns carry, which
-under multiplicative gamma shrinkage is the entire shrinkage.
+\code{\link[=AR]{AR()}} / \code{\link[=VAR]{VAR()}} / \code{\link[=RW]{RW()}} / \code{\link[=LLT]{LLT()}} / \code{\link[=ZMVN]{ZMVN()}}). \verb{Z Z^T} alone
+would drop the scale of each latent column. Under multiplicative
+gamma shrinkage that scale holds the whole shrinkage.
 \item Correlated process-error trends (\code{cor = TRUE} on \code{RW()} /
 \code{AR()} / \code{ZMVN()}, or any \code{VAR()} trend).
 \item Hierarchical correlation structures (grouping variable on
@@ -97,10 +111,10 @@ stationary covariance the Stan model derives from \code{Phi_trend},
 \code{Sigma_trend} and, under \code{ma = TRUE}, \code{Theta_trend}.
 }
 
-The covariance summarised is the stationary covariance of the latent
-states. A residual correlation describes the states over the whole
-series. An innovation covariance describes one step. The two
-coincide when the states keep no memory between times. An
+By default the covariance summarised is the stationary covariance of
+the latent states. A residual correlation describes the states over
+the whole series. An innovation covariance describes one step. The
+two coincide when the states keep no memory between times. An
 \code{AR(cor = TRUE)} trend takes the leading block of the stationary
 covariance of its companion state, a moving-average term included.
 At one lag that block is \code{Sigma[a, b] / (1 - ar_a * ar_b)}. A
@@ -117,28 +131,27 @@ scales the same way before the global and per-group factors are
 mixed. Hierarchical \code{RW()} and \code{ZMVN()} report their innovation
 covariances.
 
-To ask the other question, what the \emph{contemporaneous shocks} share,
-read \code{Sigma_trend} from the posterior and apply \code{\link[stats:cor]{stats::cov2cor()}}
-per draw. On a fitted \code{VAR()} the two can differ substantially,
-since \code{A} redistributes each shock across series at every step.
+\code{covariance = "innovation"} skips that lift and summarises the
+\emph{contemporaneous shocks}. A \code{VAR()} transition matrix \code{A}
+redistributes each shock across series at every step. On a fitted
+\code{VAR()} the two correlations can then differ substantially.
 For hierarchical trends, per-group correlations combine the global
 Cholesky factor and per-group deviations via
 \verb{alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])}.
 
 Credible intervals and posterior SDs for correlations are computed
 on the Fisher z-transformed scale (\code{atanh(r)}) and back-transformed
-for display, which keeps the intervals well-behaved for
-correlations near \verb{+/- 1}. Summarising on that scale means the
-reported matrix is an elementwise posterior summary rather than a
-draw from the posterior, so it need not be positive
-semi-definite. The gap shows up where the implied correlation is
-close to degenerate, as when a handful of factors drive many
-series: a four-series fit on two factors can return a smallest
-eigenvalue near \code{-0.01}. That is harmless for reading, plotting
-and testing individual correlations, and unsuitable for anything
-that factorises the matrix, such as \code{\link[=chol]{chol()}} or a simulation that
-treats it as a covariance. For those, take \code{summary = FALSE} and
-work per draw, where every matrix is a valid correlation matrix.
+for display. The intervals then stay inside \verb{(-1, 1)} for
+correlations near the bounds. The reported matrix summarises each
+element separately. It is no single posterior draw and need not be
+positive semi-definite. The gap appears where the implied
+correlation is close to degenerate, as when a few factors drive
+many series. A four-series fit on two factors can return a smallest
+eigenvalue near \code{-0.01}. Individual correlations can still be
+printed, plotted and tested. A function that factorises the matrix,
+such as \code{\link[=chol]{chol()}}, or a simulation that treats it as a covariance,
+needs \code{summary = FALSE}. Every per-draw matrix is a valid
+correlation matrix.
 Posterior probabilities
 (\code{prob_positive}, \code{prob_negative}) are computed on the native
 scale. \code{prob_nonzero = pmax(prob_positive, prob_negative)}
@@ -148,17 +161,14 @@ threshold is exposed via the returned object's
 \code{prob_threshold} metadata field).
 
 Joint species distribution models (\code{jsdgam} fits) inherit this
-method directly. The \code{jsdgam()} wrapper triggers the same free-Z
-factor model the standalone \code{mvgam()} factor path uses, so the
-factor-loadings branch (\code{compute_residual_cor()} -> \code{n_lv > 0})
-fires identically on the inherited class and reconstructs
-\verb{Sigma = Z Z'} per draw on the species axis.
+method. \code{jsdgam()} fits the same sampled-loadings factor model as
+\code{mvgam()}. The species covariance is \verb{Z Omega Z^T} per draw, as for
+any factor fit.
 }
 \examples{
 \dontrun{
-# Multi-species occupancy factor model -- the Z Z' product gives
-# the species-by-species residual covariance after fixed effects
-# are accounted for.
+# Multi-species occupancy factor model. The loadings give the
+# species-by-species residual covariance after the fixed effects.
 set.seed(1)
 simdat <- sim_closure_unit_data(
   family    = occ(),
@@ -191,6 +201,6 @@ Regression Analysis of Multivariate Abundance Data in R.
 \seealso{
 [mvgam_residcor-class], \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}},
 \code{\link[=print.mvgam_residcor]{print.mvgam_residcor()}}, \code{\link[=ordinate]{ordinate()}} for a biplot view of
-the same Z Z' surface, \code{\link[=plot.mvgam]{plot.mvgam()}} with \code{type = "factors"}
+the same loadings, \code{\link[=plot.mvgam]{plot.mvgam()}} with \code{type = "factors"}
 for per-factor posterior ribbons.
 }

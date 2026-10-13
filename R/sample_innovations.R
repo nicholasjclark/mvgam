@@ -431,6 +431,9 @@ extract_nu_trend_draws <- function(draws_mat, object) {
 #'   Mutually exclusive with draw_ids.
 #' @param draw_ids Specific draw indices to use. Mutually exclusive
 #'   with ndraws.
+#' @param stationary `TRUE` lifts the innovation covariance to the
+#'   stationary covariance of the states, for every kernel that has
+#'   one. `FALSE` keeps the covariance of one step's shocks.
 #'
 #' @return List with components:
 #'   \itemize{
@@ -448,8 +451,10 @@ extract_nu_trend_draws <- function(draws_mat, object) {
 #'   }
 #' @noRd
 get_trend_covariance_structure <- function(object, ndraws = NULL,
-                                           draw_ids = NULL) {
+                                           draw_ids = NULL,
+                                           stationary = TRUE) {
   validate_covariance_inputs(object, ndraws, draw_ids)
+  checkmate::assert_flag(stationary)
 
   metadata <- object$trend_metadata
   if (is.null(metadata)) {
@@ -536,10 +541,12 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   # A marginal prediction integrates over the spread of the state. The
   # transforms then take the stationary covariance wherever the kernel
   # settles.
-  params <- rescale_params_to_stationary(
-    params = params, object = object, draws_mat = draws_mat,
-    group_info = group_info
-  )
+  if (stationary) {
+    params <- rescale_params_to_stationary(
+      params = params, object = object, draws_mat = draws_mat,
+      group_info = group_info
+    )
+  }
 
   list(
     pattern = pattern,

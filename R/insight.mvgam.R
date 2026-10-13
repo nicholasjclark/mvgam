@@ -233,9 +233,10 @@ mvgam_term_list <- function(x) {
   trend <- mvgam_side_terms(x$trend_formula)
   keep <- function(v) mvgam_keep_data_columns(unique(v), x)
 
-  # The axis and the groupings it is built on. jsdgam aliases the
-  # user's species column to `series`, and the original name is kept
-  # so a grid can still be addressed in the user's own terms.
+  # The axis columns and the grouping columns that define them.
+  # jsdgam aliases the user's species column to `series`. The original
+  # name stays in the list. A grid can then name species the way the
+  # user does.
   jsdgam_meta <- jsdgam_axis_names(x)
   index <- varying_meta_vars(
     c(unlist(mvgam_axes(x)$vars, use.names = FALSE),
@@ -245,20 +246,33 @@ mvgam_term_list <- function(x) {
   index <- keep(index)
 
   # A column a formula names is a term of the model, whatever else it
-  # also is. `series` names the axis, and a model written
-  # `y ~ series` asks for a per-series effect as well: the axis entry
-  # is what a grid addresses, and the formula is what makes it a term.
-  # Only the axis columns no formula mentions are grid-only.
+  # also is. `series` names the axis. A model written `y ~ series`
+  # also asks for a per-series effect. The axis entry makes the column
+  # addressable in a grid. The formula makes it a term. Only the axis
+  # columns no formula mentions are grid-only.
   conditional <- keep(c(obs$conditional, trend$conditional))
 
   # The same terms, grouped as they are drawn. `conditional_effects()`
-  # plots one panel per grouping, so an interaction is one entry over
-  # two columns and a three-way smooth is its three pairwise margins.
+  # plots one panel per grouping. An interaction is one entry over two
+  # columns. A three-way smooth is its three pairwise margins.
   groupings <- unlist(
     lapply(unique(c(obs$labels, trend$labels)), split_term_labels),
     recursive = FALSE
   )
-  groupings <- lapply(groupings, function(g) keep(g))
+  # A grouping's first variable is the x axis of its panel. Its second
+  # splits the panel. `terms()` orders an interaction by first
+  # appearance. `~ lv_axis() + x:lv_axis()` then gave `series:x`, a
+  # panel over the series with `x` as colours. Placing the series
+  # second draws a slope per series, as a smooth per series is drawn.
+  series_var <- axis_vars(x)$series_var
+  groupings <- lapply(groupings, function(g) {
+    g <- keep(g)
+    if (length(g) > 1L && series_var %in% g) {
+      rest <- setdiff(g, series_var)
+      g <- c(rest[1L], series_var, rest[-1L])
+    }
+    g
+  })
   groupings <- groupings[lengths(groupings) > 0L]
   groupings <- groupings[!duplicated(vapply(
     groupings, paste, character(1L), collapse = ":"

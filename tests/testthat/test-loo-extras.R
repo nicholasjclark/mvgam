@@ -63,7 +63,7 @@ test_that("every Tier-3 method has an S3 method on `mvgam`", {
 
 test_that("Tier-3 method signatures match brms / loo reference", {
   expected <- list(
-    vcov = c("object", "correlation", "pars", "..."),
+    vcov = c("object", "correlation", "pars", "trend_effects", "..."),
     LOO = c(
       "x", "...", "compare", "resp", "pointwise",
       "moment_match", "reloo", "k_threshold", "save_psis",
