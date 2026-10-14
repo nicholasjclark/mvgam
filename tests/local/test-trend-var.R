@@ -1079,8 +1079,8 @@ test_that("the fevd plot takes a vector of series", {
   fv <- fevd(fit, h = 4L)
 
   # A scalar and the documented vector form are both accepted
-  expect_s3_class(plot(fv, series = 1L), "ggplot")
-  expect_s3_class(plot(fv, series = 1:2), "ggplot")
+  expect_drawn(plot(fv, series = 1L))
+  expect_drawn(plot(fv, series = 1:2))
 })
 
 

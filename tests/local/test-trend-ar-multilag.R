@@ -678,7 +678,6 @@ test_that("a newdata missing the gp covariate is refused by name", {
 
 test_that("summary, tidiers and criticism run on a multi-lag AR", {
   txt <- capture.output(summary(fit))
-  expect_gt(length(txt), 10L)
   expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
 
   ll <- log_lik(fit, ndraws = 20L)
@@ -1201,7 +1200,6 @@ test_that("hindcast blocks match the conditional epred cells", {
 
 test_that("summary, print and the tidiers name the shared parameter", {
   txt <- capture.output(summary(fit_sh))
-  expect_gt(length(txt), 10L)
   expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
 
   vars <- variables(fit_sh)

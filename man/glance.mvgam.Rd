@@ -2,7 +2,7 @@
 % Please edit documentation in R/tidier_methods.R
 \name{glance.mvgam}
 \alias{glance.mvgam}
-\title{One-row model summary for an \code{mvgam} fit}
+\title{Model summary for an \code{mvgam} fit}
 \usage{
 \method{glance}{mvgam}(x, looic = FALSE, resp = NULL, ...)
 }
@@ -21,7 +21,8 @@ name of a single response variable to return results for.
 \item{...}{Forwarded to \code{\link[=loo.mvgam]{loo.mvgam()}} when \code{looic = TRUE}.}
 }
 \value{
-A one-row tibble with columns:
+A tibble with one row, or on a multivariate fit given no
+\code{resp} one row per response with a \code{resp} column. Columns:
 \itemize{
 \item \code{algorithm} -- the Stan algorithm used.
 \item \code{pss} -- post-warmup sample size summed across chains.
@@ -34,7 +35,7 @@ A one-row tibble with columns:
 }
 }
 \description{
-broom-style one-row summary of an \code{mvgam} fit. Reports the
+broom-style summary of an \code{mvgam} fit, one row per response. Reports the
 Stan algorithm, post-warmup sample size, training-observation
 count, response family, link function and (optionally) \code{loo}
 criteria. Mirrors \code{broom.mixed::glance.brmsfit()}.
@@ -49,9 +50,9 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# `glance()` returns a one-row tibble summarising the fit's
-# sampling configuration and data dimensions; pass
-# `looic = TRUE` to add an out-of-sample fit score (slower).
+# `glance()` summarises the fit's sampling configuration and
+# data dimensions in one row. `looic = TRUE` adds an
+# out-of-sample fit score, which takes longer.
 glance(mod)
 glance(mod, looic = TRUE)
 }

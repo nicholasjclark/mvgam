@@ -96,40 +96,44 @@ convergence summaries.
 }
 \examples{
 \dontrun{
-# Create pseudo-imputed data (3 imputations)
-base_data <- data.frame(
-  time = 1:24,
-  series = factor(rep("series1", 24)),
-  y = rnorm(24, mean = 3, sd = 1),
-  season = 1:24
-)
-
+# A covariate with ten missing values, filled three ways. An
+# imputation model would draw the fills. This example draws them
+# from a normal distribution.
+set.seed(1)
+dat <- sim_mvgam(family = gaussian(), n_series = 1L,
+                 n_timepoints = 60L, trend_model = AR())$data_train
+missing_x <- sample(nrow(dat), 10L)
+dat$x[missing_x] <- NA
 imputed_list <- lapply(1:3, function(i) {
-  data_copy <- base_data
-  data_copy$y <- data_copy$y + rnorm(nrow(data_copy), 0, 0.1)
-  data_copy
+  filled <- dat
+  filled$x[missing_x] <- rnorm(10L, mean(dat$x, na.rm = TRUE),
+                               sd(dat$x, na.rm = TRUE))
+  filled
 })
 
-# Fit with combined posteriors (recommended)
+# One fit per imputation, with the posteriors pooled
 fit_pooled <- mvgam_multiple(
-  formula = y ~ s(season, bs = "cc", k = 5),
-  trend_formula = ~ 1,
+  formula = y ~ x,
+  trend_formula = ~ AR(p = 1),
   data_list = imputed_list,
   family = gaussian(),
-  combine = TRUE
+  chains = 2,
+  silent = 2
 )
 
-# Check MI diagnostics
+# The pooled summary reports how much of each parameter's variance
+# comes from the imputations
 summary(fit_pooled)
-print(fit_pooled)
 
-# Fit separately (for finer control)
+# `combine = FALSE` keeps the fits separate
 fit_list <- mvgam_multiple(
-  formula = y ~ s(season, bs = "cc", k = 5),
-  trend_formula = ~ 1,
+  formula = y ~ x,
+  trend_formula = ~ AR(p = 1),
   data_list = imputed_list,
   family = gaussian(),
-  combine = FALSE
+  combine = FALSE,
+  chains = 2,
+  silent = 2
 )
 }
 

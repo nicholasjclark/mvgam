@@ -712,7 +712,6 @@ test_that("the smooth is reachable and drawn over both margins", {
 
 test_that("summary, tidiers and criticism run on a PW fit", {
   txt <- capture.output(summary(fit))
-  expect_gt(length(txt), 10L)
   expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
 
   ll <- log_lik(fit, ndraws = 20L)

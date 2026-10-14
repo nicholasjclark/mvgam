@@ -399,9 +399,9 @@ test_that("the factor plot refuses a fit whose latents are its series", {
   expect_error(plot(fit, type = "factors"),
                "requires a latent factor model")
   for (ty in c("trend", "series", "residuals")) {
-    expect_s3_class(plot(fit, type = ty), "ggplot")
+    expect_drawn(plot(fit, type = ty))
   }
-  expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
+  expect_drawn(pp_check(fit, ndraws = 20L))
 })
 
 

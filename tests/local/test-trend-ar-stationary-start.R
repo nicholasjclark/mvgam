@@ -433,9 +433,9 @@ test_that("every prediction and summary surface returns on each fit", {
       expect_true(all(is.finite(rc$cor)))
     }
     for (ty in c("trend", "series", "residuals")) {
-      expect_s3_class(plot(fx$fit, type = ty), "ggplot")
+      expect_drawn(plot(fx$fit, type = ty))
     }
-    expect_s3_class(pp_check(fx$fit, ndraws = 10L), "ggplot")
+    expect_drawn(pp_check(fx$fit, ndraws = 10L))
   }
 })
 

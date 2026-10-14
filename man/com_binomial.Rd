@@ -134,14 +134,10 @@ of the Royal Statistical Society Series C}, 54:127-142.
 Conway, R. W. and Maxwell, W. L. (1962). A queuing model with state
 dependent service rates. \emph{Journal of Industrial Engineering},
 12:132-136.
-
-Bogomolovas, J. (2026). COM-Binomial solver in TMB and glmmTMB.
-R-side mathematics adapted from
-\url{https://github.com/jbogomolovas2/mvgam/tree/fix-fc-trials-alignment}.
 }
 \seealso{
 \code{\link[brms]{custom_family}}, \code{\link{tweedie}}
 }
 \author{
-Nicholas J Clark, Julius Bogomolovas
+Nicholas J Clark, Julijus Bogomolovas
 }

@@ -347,10 +347,11 @@ test_that("summary.mvgam_sim resolves trend label from constructor", {
 test_that("print.mvgam_sim_summary prints header and parameters", {
   sim <- sim_mvgam(type = 2L, n_series = 2L, n_timepoints = 25L,
                     seed = 5L)
-  out <- capture.output(invisible(print(summary(sim))))
+  smry <- summary(sim)
+  out <- capture.output(invisible(print(smry)))
   expect_true(any(grepl("Simulated mvgam dataset", out)))
-  expect_true(any(grepl("Family", out)))
-  expect_true(any(grepl("Trend", out)))
+  expect_true(paste0("  Family       : ", smry$family) %in% out)
+  expect_true(paste0("  Trend        : ", smry$trend) %in% out)
   expect_true(any(grepl("True generative parameters", out)))
 })
 

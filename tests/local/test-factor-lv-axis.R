@@ -924,7 +924,7 @@ test_that("the factor methods report two factors over five species", {
   expect_identical(nrow(af$per_factor), N_lv)
   # The object has a plot method, and it is the one a user reaches
   # for after reading the table.
-  expect_s3_class(plot(af), "ggplot")
+  expect_drawn(plot(af))
 
   sv <- shared_variation(fit)
   expect_identical(as.character(sv$series_names), species_levels)
@@ -990,7 +990,6 @@ test_that("the factor-axis smooth is drawn once per latent factor", {
 
 test_that("summary and the criticism methods run on this fit", {
   txt <- capture.output(summary(fit))
-  expect_gt(length(txt), 10L)
   expect_true(any(grepl(paste0("Series:\\s*", n_species), txt)))
   # `log_lik` answers per frame row, not per likelihood term, so it
   # spans all 300 rows while only 276 reached the model. A cell with

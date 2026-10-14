@@ -4848,10 +4848,10 @@ generate_car_trend_stanvars <- function(trend_specs, data_info,
     brms::stanvar(
       name = "car_parameters",
       scode = paste0(
-        "// CAR AR1 damping\n",
-        "vector<lower=0.001,upper=0.999>[N_lv_trend] ar1_trend;\n",
         "vector<lower=0>[N_lv_trend] sigma_trend;\n",
-        "matrix[N_time_trend, N_lv_trend] innovations_trend;"
+        "matrix[N_time_trend, N_lv_trend] innovations_trend;\n",
+        "// CAR AR1 damping\n",
+        "vector<lower=0.001,upper=0.999>[N_lv_trend] ar1_trend;"
       ),
       block = "parameters"
     ),
@@ -4861,7 +4861,7 @@ generate_car_trend_stanvars <- function(trend_specs, data_info,
       car_independent_dynamics_stanvars()
     },
     generate_trend_priors_stanvar(
-      param_names = c("ar1_trend", "sigma_trend",
+      param_names = c("sigma_trend", "ar1_trend",
                       if (has_cor) "L_Omega_trend"),
       prior = prior,
       stanvar_name = "car_model",

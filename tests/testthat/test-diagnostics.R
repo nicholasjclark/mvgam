@@ -546,7 +546,7 @@ test_that("lift keeps every latent state out of the prior table", {
   # a guard rather than a reader remembering to extend it.
   sc <- paste(
     "model {",
-    paste0("  ", mvgam:::mvgam_state_params, " ~ normal(0, 1);",
+    paste0("  ", mvgam:::MVGAM_STATE_PARAMS, " ~ normal(0, 1);",
            collapse = "\n"),
     "}",
     sep = "\n"

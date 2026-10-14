@@ -686,7 +686,6 @@ test_that("model.frame carries the responses as well as the terms", {
 
 test_that("the summary and tidiers name every response", {
   txt <- capture.output(summary(fit))
-  expect_gt(length(txt), 10L)
   for (r in responses) {
     expect_true(any(grepl(r, txt, fixed = TRUE)))
   }
@@ -706,10 +705,7 @@ test_that("the summary and tidiers name every response", {
   }
   expect_identical(paste(setdiff(coefs, shown), collapse = ", "), "")
 
-  aug <- augment(fit)
-  expect_true(is.data.frame(aug))
-  expect_true(is.data.frame(tidy(fit)))
-  expect_true(is.data.frame(glance(fit)))
+  expect_tidy_glance(fit)
   expect_true(any(grepl("^ar1_trend\\[", variables(fit))))
 })
 

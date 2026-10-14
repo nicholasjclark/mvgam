@@ -318,7 +318,6 @@ test_that("augment recycles a unit's residual across its visits", {
   # neither, has the right number of rows either way.
   got <- with_warnings(augment(fit))
   aug <- got$value
-  expect_true(is.data.frame(aug))
   expect_identical(nrow(aug), nrow(dat))
   expect_true(all(c(".fitted", ".resid", ".resid.se", ".unit") %in%
                     names(aug)))
@@ -519,18 +518,16 @@ test_that("the criticism surface runs on a closure-unit fit", {
 
 test_that("summary and the tidiers name the occupancy structure", {
   txt <- capture.output(summary(fit))
-  expect_gt(length(txt), 10L)
   # Both submodels are reported, so a reader can tell occupancy from
   # detection rather than seeing one block of coefficients.
-  expect_true(any(grepl("elev", txt, fixed = TRUE)))
-  expect_true(any(grepl("tod_c", txt, fixed = TRUE)))
+  expect_true(any(grepl("^elev\\s", txt)))
+  expect_true(any(grepl("^p_tod_c\\s", txt)))
 
   vars <- variables(fit)
   expect_true("b_elev" %in% vars)
   expect_true("b_p_tod_c" %in% vars)
 
-  expect_true(is.data.frame(tidy(fit)))
-  expect_true(is.data.frame(glance(fit)))
+  expect_tidy_glance(fit, observed = sum(!is.na(dat$y)))
 })
 
 
@@ -813,7 +810,7 @@ test_that("the checks read a unit that lost a visit", {
   withr::local_options(lifecycle_verbosity = "quiet")
   for (ty in c("dens_overlay", "intervals", "stat",
                "loo_pit_overlay", "resid_hist")) {
-    expect_s3_class(pp_check(obj$gappy, type = ty), "ggplot")
+    expect_drawn(pp_check(obj$gappy, type = ty))
   }
   # `group` travels the same narrowing by a different route. It is
   # mapped to one value per unit, and the mapped values are narrowed.

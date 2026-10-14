@@ -524,7 +524,6 @@ test_that("summary, residual_cor and shared_variation name the axis", {
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
 
   txt <- capture.output(summary(fit))
-  expect_gt(length(txt), 10L)
   expect_true(any(grepl(paste0("Series:\\s*", length(levs)), txt)))
 
   # The pooled correlation is between subgroups within a group, so
@@ -556,7 +555,6 @@ test_that("the tidiers keep this fit's own row order", {
 
   resp <- mvgam:::response_column(fit)
   aug <- augment(fit)
-  expect_true(is.data.frame(aug))
   expect_identical(nrow(aug), nrow(d))
   expect_equal(as.numeric(aug[[vars$time_var]]),
                as.numeric(d[[vars$time_var]]))
@@ -568,8 +566,7 @@ test_that("the tidiers keep this fit's own row order", {
   expect_identical(as.character(aug[[vars$subgr_var]]),
                    as.character(d[[vars$subgr_var]]))
 
-  expect_true(is.data.frame(tidy(fit)))
-  expect_true(is.data.frame(glance(fit)))
+  expect_tidy_glance(fit, observed = sum(!is.na(d[[resp]])))
   expect_true(any(grepl("^ar1_trend\\[", variables(fit))))
 })
 

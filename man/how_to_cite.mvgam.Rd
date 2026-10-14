@@ -17,9 +17,9 @@ how_to_cite(object, ...)
 \value{
 An object of class \code{how_to_cite} carrying a
 \code{methods_text} skeleton, the matched \code{citations}, a
-curated \code{other_citations} block, and a \code{bibtex} list
+curated \code{other_citations} block and a \code{bibtex} list
 keyed by reference handle. Use \code{bibtex(x)} to extract the
-BibTeX entries; the default \code{print()} method renders all
+BibTeX entries. The default \code{print()} method renders all
 sections together.
 }
 \description{

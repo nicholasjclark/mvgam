@@ -186,15 +186,14 @@ the posterior distribution of the number of active columns.
 
 \examples{
 \dontrun{
-# Simulate four correlated Gaussian series. ZMVN treats each time
-# point as an independent multivariate normal draw, which leaves
-# the cross-series covariance as the structure it recovers.
+# Simulate counts of four series whose latent effects are correlated
+# at each time point but independent over time.
 set.seed(2)
 simdat <- sim_mvgam(
-  family       = gaussian(),
+  family       = poisson(),
   n_series     = 4L,
   n_timepoints = 120L,
-  trend_model  = VAR(),
+  trend_model  = ZMVN(),
   prop_trend   = 0.9
 )
 
@@ -202,17 +201,18 @@ mod <- mvgam(
   y ~ 1,
   trend_formula = ~ ZMVN(),
   data          = simdat$data_train,
-  family        = gaussian(),
+  family        = poisson(),
   chains        = 2,
   silent        = 2
 )
 summary(mod)
 
-# All trend-side latent dynamics in one summary view. For ZMVN
-# the meaningful entries are sigma_trend (per-series SDs),
-# L_Omega_trend (Cholesky of the correlation matrix) and
-# Sigma_trend (the implied covariance).
-mcmc_plot(mod, variable = "trend_params", type = "intervals")
+# The per-series latent SDs
+mcmc_plot(mod, variable = "sigma_trend", regex = TRUE,
+          type = "intervals")
+
+# The correlations among the series that ZMVN() estimates
+residual_cor(mod)
 }
 
 }

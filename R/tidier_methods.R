@@ -552,9 +552,9 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 }
 
 
-#' One-row model summary for an `mvgam` fit
+#' Model summary for an `mvgam` fit
 #'
-#' broom-style one-row summary of an `mvgam` fit. Reports the
+#' broom-style summary of an `mvgam` fit, one row per response. Reports the
 #' Stan algorithm, post-warmup sample size, training-observation
 #' count, response family, link function and (optionally) `loo`
 #' criteria. Mirrors `broom.mixed::glance.brmsfit()`.
@@ -567,7 +567,8 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 #' @inheritParams forecast.mvgam
 #' @param ... Forwarded to [loo.mvgam()] when `looic = TRUE`.
 #'
-#' @return A one-row tibble with columns:
+#' @return A tibble with one row, or on a multivariate fit given no
+#'   `resp` one row per response with a `resp` column. Columns:
 #'
 #'   * `algorithm` -- the Stan algorithm used.
 #'   * `pss` -- post-warmup sample size summed across chains.
@@ -591,9 +592,9 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # `glance()` returns a one-row tibble summarising the fit's
-#' # sampling configuration and data dimensions; pass
-#' # `looic = TRUE` to add an out-of-sample fit score (slower).
+#' # `glance()` summarises the fit's sampling configuration and
+#' # data dimensions in one row. `looic = TRUE` adds an
+#' # out-of-sample fit score, which takes longer.
 #' glance(mod)
 #' glance(mod, looic = TRUE)
 #' }

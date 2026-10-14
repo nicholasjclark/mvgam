@@ -269,10 +269,10 @@ test_that("every method needing draws refuses a prefit the same way", {
     expect_match(conditionMessage(err), "run_model", fixed = TRUE)
   }
 
-  # Reading the program and its data is why the mode exists, so both
-  # answer rather than refusing.
-  expect_true(nchar(as.character(stancode(prefit))) > 0L)
-  expect_true(is.list(standata(prefit)))
+  # A prefit exists to return the program and its data. Both describe
+  # this model.
+  expect_match(as.character(stancode(prefit)), "lv_trend", fixed = TRUE)
+  expect_identical(as.integer(standata(prefit)$N), sum(!is.na(dat$y)))
 })
 
 
@@ -517,13 +517,13 @@ test_that("criticism and plotting run on a fixed-Z fit", {
 
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
-  expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
+  expect_drawn(pp_check(fit, ndraws = 20L))
   for (ty in c("residuals", "trend", "factors")) {
-    expect_s3_class(plot(fit, type = ty), "ggplot")
+    expect_drawn(plot(fit, type = ty))
   }
-  expect_s3_class(mcmc_plot(fit), "ggplot")
+  expect_drawn(mcmc_plot(fit))
 
-  expect_true(is.data.frame(tidy(fit)))
+  expect_tidy_glance(fit, observed = sum(!is.na(dat$y)))
   aug <- augment(fit)
   expect_identical(nrow(aug), nrow(dat))
   expect_identical(as.character(aug$series), as.character(dat$series))

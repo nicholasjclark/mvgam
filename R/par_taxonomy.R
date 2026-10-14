@@ -288,11 +288,24 @@ MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\["
 )
 
+# The trend's latent states and the variates they are built from.
+# Their sampling statements are the trend equation and its
+# non-centred reparameterisation. A user sets no prior on them. No
+# summary block reports them. `init_trend` is the vector of states
+# before the first observed time. `init_innovations_trend` is the
+# vector of standard variates an ARMA start scales to its stationary
+# law.
+#'@noRd
+MVGAM_STATE_PARAMS <- c(
+  "trend", "lv_trend", "lv_trend_tilde", "innovations_trend",
+  "scaled_innovations_trend", "init_trend", "init_innovations_trend",
+  "mu_trend", "slope_trend", "slope_trend_tilde",
+  "innovations_slope_trend"
+)
+
 #'@noRd
 MVGAM_PAR_STATE_PATTERN <- paste0(
-  "^(trend|lv_trend|lv_trend_tilde|innovations_trend|",
-  "scaled_innovations_trend|init_trend|mu_trend|slope_trend|",
-  "slope_trend_tilde|innovations_slope_trend)\\["
+  "^(", paste(MVGAM_STATE_PARAMS, collapse = "|"), ")\\["
 )
 
 # The per-cell matrix arrays a correlated or hierarchical trend

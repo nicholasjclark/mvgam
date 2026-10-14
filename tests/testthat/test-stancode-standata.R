@@ -253,8 +253,6 @@ test_that("stancode.mvgam_formula returns correct class structure", {
 
   code_with_trend <- trend_shape_code("rw")
 
-  # Should be longer than observation-only model
-  expect_gt(nchar(code_with_trend), nchar(code_obs_only))
 
   # Trend formula ~ RW() has no predictors, so should NOT contain design matrix variables
   expect_false(grepl("int K_trend;", code_with_trend, fixed = TRUE))

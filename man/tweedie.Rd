@@ -128,9 +128,20 @@ mod <- mvgam(
 )
 summary(mod)
 
-# Posterior intervals for the AR dynamics. The observation-side
-# dpars (`mphi`, `mtheta`) are picked up under "obs_params".
-mcmc_plot(mod, variable = "trend_params", type = "intervals")
+# The dispersion and power parameters
+mcmc_plot(mod, variable = c("mphi", "mtheta"), type = "hist")
+
+# The dispersion can vary with a covariate. Its predictor is on the
+# log scale.
+mod_phi <- mvgam(
+  bf(y ~ 1, mphi ~ x),
+  trend_formula = ~ AR(p = 1),
+  data          = simdat$data_train,
+  family        = tweedie(),
+  chains        = 2,
+  silent        = 2
+)
+summary(mod_phi)
 }
 
 }
@@ -152,19 +163,20 @@ the AIMS implementation and the Stan code shipped here.
 
 Dunn, P. K., & Smyth, G. K. (2005). Series evaluation of
 Tweedie exponential dispersion model densities.
-\emph{Statistics and Computing}, 15, 267-280.
+\emph{Statistics and Computing}, 15(4), 267-280.
 \doi{10.1007/s11222-005-4070-y}. Convergence analysis of
 the series truncation \code{M} used here.
 
 Dunn, P. K., & Smyth, G. K. (2008). Evaluation of Tweedie
 exponential dispersion model densities by Fourier inversion.
-\emph{Statistics and Computing}, 18, 73-86.
+\emph{Statistics and Computing}, 18(1), 73-86.
 \doi{10.1007/s11222-007-9039-6}.
 
 Jorgensen, B. (1987). Exponential dispersion models.
-\emph{Journal of the Royal Statistical Society: Series B}, 49,
-127-162.
+\emph{Journal of the Royal Statistical Society: Series B}, 49(2),
+127-162. \doi{10.1111/j.2517-6161.1987.tb01685.x}
 
 Burkner, P.-C. (2018). Advanced Bayesian multilevel modeling
-with the R package brms. \emph{The R Journal}, 10, 395-411.
+with the R package brms. \emph{The R Journal}, 10(1), 395-411.
+\doi{10.32614/RJ-2018-017}
 }

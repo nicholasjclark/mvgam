@@ -447,7 +447,8 @@ mcmc_plot(mod, variable = "trend_params", type = "intervals")
 residual_cor(mod)
 plot(irf(mod, h = 8L), series = 1)
 plot(fevd(mod, h = 8L))
-head(stability(mod)[, c("reactivity", "mean_return_rate")])
+stab <- stability(mod)
+stab[stab$metric \%in\% c("reactivity", "mean_return_rate"), ]
 
 # Forecast the held-out cells. `forecast()` propagates
 # uncertainty through the VAR; `plot(fc, series = i)` overlays

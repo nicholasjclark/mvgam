@@ -467,8 +467,8 @@ test_that("how_to_cite reports the sampler settings this fit used", {
   expect_match(txt, paste("We ran 2 Hamiltonian Monte Carlo chains for",
                           "500 warmup iterations and 500 sampling",
                           "iterations."), fixed = TRUE)
-  # The family's own reference is cited.
-  expect_match(txt, "Bogomolovas (2024)", fixed = TRUE)
+  # The family's own peer-reviewed reference is cited.
+  expect_match(txt, "Shmueli et al. 2005", fixed = TRUE)
 })
 
 

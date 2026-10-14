@@ -149,21 +149,22 @@
 #'
 #' Dunn, P. K., & Smyth, G. K. (2005). Series evaluation of
 #'   Tweedie exponential dispersion model densities.
-#'   *Statistics and Computing*, 15, 267-280.
+#'   *Statistics and Computing*, 15(4), 267-280.
 #'   \doi{10.1007/s11222-005-4070-y}. Convergence analysis of
 #'   the series truncation `M` used here.
 #'
 #' Dunn, P. K., & Smyth, G. K. (2008). Evaluation of Tweedie
 #'   exponential dispersion model densities by Fourier inversion.
-#'   *Statistics and Computing*, 18, 73-86.
+#'   *Statistics and Computing*, 18(1), 73-86.
 #'   \doi{10.1007/s11222-007-9039-6}.
 #'
 #' Jorgensen, B. (1987). Exponential dispersion models.
-#'   *Journal of the Royal Statistical Society: Series B*, 49,
-#'   127-162.
+#'   *Journal of the Royal Statistical Society: Series B*, 49(2),
+#'   127-162. \doi{10.1111/j.2517-6161.1987.tb01685.x}
 #'
 #' Burkner, P.-C. (2018). Advanced Bayesian multilevel modeling
-#'   with the R package brms. *The R Journal*, 10, 395-411.
+#'   with the R package brms. *The R Journal*, 10(1), 395-411.
+#'   \doi{10.32614/RJ-2018-017}
 #'
 #' @examples
 #' \dontrun{
@@ -184,9 +185,20 @@
 #' )
 #' summary(mod)
 #'
-#' # Posterior intervals for the AR dynamics. The observation-side
-#' # dpars (`mphi`, `mtheta`) are picked up under "obs_params".
-#' mcmc_plot(mod, variable = "trend_params", type = "intervals")
+#' # The dispersion and power parameters
+#' mcmc_plot(mod, variable = c("mphi", "mtheta"), type = "hist")
+#'
+#' # The dispersion can vary with a covariate. Its predictor is on the
+#' # log scale.
+#' mod_phi <- mvgam(
+#'   bf(y ~ 1, mphi ~ x),
+#'   trend_formula = ~ AR(p = 1),
+#'   data          = simdat$data_train,
+#'   family        = tweedie(),
+#'   chains        = 2,
+#'   silent        = 2
+#' )
+#' summary(mod_phi)
 #' }
 #'
 #' @export
@@ -969,12 +981,8 @@ beta_nb_stan_funs <- function() {
 #' dependent service rates. \emph{Journal of Industrial Engineering},
 #' 12:132-136.
 #'
-#' Bogomolovas, J. (2026). COM-Binomial solver in TMB and glmmTMB.
-#' R-side mathematics adapted from
-#' \url{https://github.com/jbogomolovas2/mvgam/tree/fix-fc-trials-alignment}.
-#'
 #' @seealso \code{\link[brms]{custom_family}}, \code{\link{tweedie}}
-#' @author Nicholas J Clark, Julius Bogomolovas
+#' @author Nicholas J Clark, Julijus Bogomolovas
 #' @examples
 #' \dontrun{
 #' # Simulate an under-dispersed COM-Binomial series via

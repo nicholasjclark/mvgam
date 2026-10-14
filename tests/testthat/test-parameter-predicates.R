@@ -135,8 +135,8 @@ test_that("one taxonomy answers for every consumer of a name", {
     "sds_1_trend[1]", "sd_g__Intercept_trend",
     "trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
     "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
-    "init_trend[1,1]", "ma_innovations_trend[1,1]",
-    "z_1[1,1]",
+    "init_trend[1,1]", "init_innovations_trend[1]",
+    "ma_innovations_trend[1,1]", "z_1[1,1]",
     "L_Omega_trend[1,1]", "A_trend[1,1,1]",
     "Phi_trend[1,1,1]", "Sigma_trend[1,1]",
     "lscale_1[1]", "zs_1_1[1]", "Z[1,1]", "Z_tilde[1,1]"
@@ -151,7 +151,7 @@ test_that("one taxonomy answers for every consumer of a name", {
     pars[kind == "state"],
     c("trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
       "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
-      "init_trend[1,1]")
+      "init_trend[1,1]", "init_innovations_trend[1]")
   )
   # Stan saves every variable declared at the top level of
   # transformed parameters. The working arrays among them carry no

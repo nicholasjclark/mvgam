@@ -313,12 +313,12 @@ test_that("the forecast object is keyed, ordered and in user units", {
 test_that("every plot draws with per-series panels in series order", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
-  expect_s3_class(plot(irf(fit, h = 4L), series = 1L), "ggplot")
-  expect_s3_class(plot(fevd(fit, h = 4L)), "ggplot")
+  expect_drawn(plot(irf(fit, h = 4L), series = 1L))
+  expect_drawn(plot(fevd(fit, h = 4L)))
   for (ty in c("trend", "series", "factors")) {
-    expect_s3_class(plot(fit, type = ty), "ggplot")
+    expect_drawn(plot(fit, type = ty))
   }
-  expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
+  expect_drawn(pp_check(fit, ndraws = 20L))
 
   expect_identical(panel_order(plot(fit, type = "series")), series_levels)
   expect_identical(panel_order(plot(fit, type = "trend")), series_levels)

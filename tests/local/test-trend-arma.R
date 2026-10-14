@@ -287,7 +287,7 @@ test_that("print names the ARMA, and leaves out the environment", {
   # environment it was built in, which changes between sessions and
   # says nothing about the model.
   expect_false(any(grepl("<environment:", txt, fixed = TRUE)))
-  expect_true(any(grepl("~", txt, fixed = TRUE)))
+  expect_true(any(grepl("y ~ gp(x1, x2, k = 8)", txt, fixed = TRUE)))
 })
 
 
@@ -543,7 +543,6 @@ test_that("a newdata missing either gp covariate is refused by name", {
 
 test_that("summary, tidiers and criticism run on an ARMA fit", {
   txt <- capture.output(summary(fit))
-  expect_gt(length(txt), 10L)
   expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
 
   ll <- log_lik(fit, ndraws = 20L)

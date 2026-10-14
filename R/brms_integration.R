@@ -761,24 +761,6 @@ apply_trend_class_suffix <- function(class) {
 }
 
 
-#' The latent state parameters
-#'
-#' Their sampling statements are the trend equation and its non-centred
-#' reparameterisation. A user cannot set them as priors. `init_trend`
-#' is the vector of states before the first observed time, drawn from
-#' the stationary distribution of the autoregression. Its statement is
-#' a density built from `Phi_trend` and `Sigma_trend`. It has no prior
-#' of its own. `init_innovations_trend` contains the standard variates
-#' an ARMA start scales to its stationary law.
-#'
-#' @noRd
-mvgam_state_params <- c(
-  "trend", "lv_trend", "lv_trend_tilde",
-  "innovations_trend", "scaled_innovations_trend", "init_trend",
-  "init_innovations_trend", "slope_trend", "innovations_slope_trend"
-)
-
-
 #' The bounds each parameter is declared with, keyed by name
 #'
 #' A Stan declaration carries the parameter's support in the same
@@ -839,7 +821,7 @@ mvgam_stancode_prior_rows <- function(sc) {
   # The shared predicate, less the latent states. Their sampling
   # statements are the trend equation.
   is_mvgam_param <- function(nm) {
-    is_mvgam_managed_class(nm) & !nm %in% mvgam_state_params
+    is_mvgam_managed_class(nm) & !nm %in% MVGAM_STATE_PARAMS
   }
   # Each parameter's support is declared in the same program as its
   # prior. Without the bounds an autoregressive coefficient held inside

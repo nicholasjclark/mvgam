@@ -129,7 +129,7 @@ test_that("summary prints non-degenerate detection-rate diagnostic", {
   smry <- summary(s)
   expect_s3_class(smry, "mvgam_sim_closure_unit_summary")
   out <- capture.output(print(smry))
-  expect_true(any(grepl("Family", out)))
+  expect_true(paste0("  Family       : ", smry$family) %in% out)
   expect_true(any(grepl("Non-zero observation fraction", out)))
   # Detection fraction in (0, 1) -- not all-zeros, not all-ones.
   expect_gt(smry$non_zero_fraction, 0)

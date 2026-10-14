@@ -83,6 +83,36 @@ expect_drawn <- function(p) {
 }
 
 
+# `tidy()` and `glance()` held to what they report. Each tidy row is
+# a parameter's posterior mean and standard deviation. Each glance
+# row counts the responses the likelihood used.
+#
+# @param fit A fitted mvgam object
+# @param observed Number of non-missing responses, or `NULL` to skip
+#   the count for a fit with several responses
+# @return The tidy table, invisibly
+expect_tidy_glance <- function(fit, observed = NULL) {
+  td <- tidy(fit)
+  dm <- posterior::as_draws_matrix(fit)
+  testthat::expect_identical(setdiff(td$term, colnames(dm)), character(0))
+  draws <- dm[, td$term, drop = FALSE]
+  testthat::expect_equal(td$estimate, unname(colMeans(draws)))
+  testthat::expect_equal(td$std.error, unname(apply(draws, 2L, stats::sd)))
+  gl <- glance(fit)
+  # A multivariate fit has one row per response.
+  n_resp <- if (inherits(fit$formula, "mvbrmsformula")) {
+    length(mvgam:::response_columns(fit))
+  } else {
+    1L
+  }
+  testthat::expect_identical(nrow(gl), n_resp)
+  if (!is.null(observed)) {
+    testthat::expect_identical(as.integer(gl$nobs), as.integer(observed))
+  }
+  invisible(td)
+}
+
+
 # The range of x a plot draws over, from its built layers.
 #
 # @param p A ggplot

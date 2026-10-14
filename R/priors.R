@@ -1737,7 +1737,6 @@ get_prior.mvgam <- function(object, ...) {
 #' # Inspect the posterior to confirm the overrides took effect. The
 #' # `ar1_trend` and `sigma_trend` estimates follow the scale their
 #' # custom priors set.
-#' # priors set.
 #' summary(mod)
 #' }
 #'

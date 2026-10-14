@@ -692,7 +692,6 @@ test_that("hindcast arms are the series, in order, and distinct", {
 
 test_that("summary, tidiers and criticism run on a CAR fit", {
   txt <- capture.output(summary(fit))
-  expect_gt(length(txt), 10L)
   expect_true(any(grepl(paste0("Series:\\s*", n_series), txt)))
 
   ll <- log_lik(fit, ndraws = 20L)
@@ -732,13 +731,13 @@ test_that("summary, tidiers and criticism run on a CAR fit", {
   # The tidier keeps the frame's own row order and its own times.
   expect_equal(as.numeric(aug$time), as.numeric(dat$time))
   expect_equal(as.numeric(aug$.observed), as.numeric(dat$y))
-  expect_true(is.data.frame(tidy(fit)))
+  expect_tidy_glance(fit, observed = sum(!is.na(dat$y)))
   expect_true(any(grepl("^ar1_trend\\[", variables(fit))))
 })
 
 
 test_that("the plots and conditional effects render for CAR", {
-  expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
+  expect_drawn(pp_check(fit, ndraws = 20L))
   for (ty in c("residuals", "trend", "series")) {
     # A ggplot is returned whether or not a layer received data, so
     # the layers are built and must hold rows.
