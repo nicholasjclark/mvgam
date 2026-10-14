@@ -34,7 +34,6 @@ test_that("beta_nb() returns a customfamily with the documented contract", {
 
 test_that("beta_nb() attaches linkinv / linkfun for the epred dispatcher", {
   fam <- beta_nb()
-  expect_true(is.function(fam$linkinv))
   expect_equal(fam$linkinv(log(7)), 7)
   expect_equal(fam$linkfun(7), log(7))
 })
@@ -70,7 +69,8 @@ test_that("beta_nb() emits its functions and bounded dpars into stancode", {
   mf <- mvgam_formula(y ~ x)
   sc <- paste(unlist(stancode(mf, data = dat, family = beta_nb(),
                               backend = "cmdstanr")), collapse = "\n")
-  expect_true(grepl("beta_nb_lpmf", sc, fixed = TRUE))
+  expect_true(grepl("target += beta_nb_lpmf(Y[n] | mu[n], shape, mtail);",
+                    sc, fixed = TRUE))
   expect_true(grepl("real<lower=0> shape", sc, fixed = TRUE))
   expect_true(grepl("real<lower=0> mtail", sc, fixed = TRUE))
 })
@@ -107,10 +107,13 @@ test_that("beta_nb() supports distributional regression on mtail", {
   mf <- mvgam_formula(brms::bf(y ~ 1, mtail ~ site))
   sc <- paste(unlist(stancode(mf, data = dat, family = beta_nb(),
                               backend = "cmdstanr")), collapse = "\n")
-  expect_true(grepl("b_mtail", sc, fixed = TRUE))
-  expect_true(grepl("X_mtail", sc, fixed = TRUE))
-  sd <- standata(mf, data = dat, family = beta_nb(), backend = "cmdstanr")
-  expect_true(all(c("K_mtail", "X_mtail") %in% names(sd)))
+  expect_true(grepl("mtail = exp(mtail);", sc, fixed = TRUE))
+  expect_true(grepl("target += beta_nb_lpmf(Y[n] | mu[n], shape, mtail[n]);",
+                    sc, fixed = TRUE))
+  # The regressed intercept takes the brms intercept default in place
+  # of the flat prior brms gives a custom family's dpar.
+  expect_true(grepl("lprior += student_t_lpdf(Intercept_mtail | 3, 0, 2.5);",
+                    sc, fixed = TRUE))
 })
 
 test_that("cens() and trunc() reach the distribution function", {

@@ -102,6 +102,10 @@ the fit never saw integrates over the trend dynamics instead. The
 cover, because their importance weights come from the likelihood,
 which reads it too.
 
+The residual histograms and ribbons take their residuals from 500
+draws by default. \code{resid_hist} and \code{resid_hist_grouped} draw one
+histogram per draw and show the first eight.
+
 For a detailed explanation of each of the ppc functions,
 see the \code{\link[bayesplot:PPC-overview]{PPC}} documentation of the
 \pkg{\link[bayesplot:bayesplot-package]{bayesplot}} package. LOO-PIT

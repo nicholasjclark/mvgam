@@ -21,6 +21,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 
 ## New features
 * Families: `tweedie()`, `beta_nb()`, `com_binomial()`, `occ()`, `diri()`, `multi()`, `categ()`, `mvn()` and `mvt()`. `nmix()` gained Royle-Nichols, Poisson-Poisson and multi-season variants
+* @jbogomolovas2 contributed the `com_binomial()` mathematics and tested the bounded count families
 * Multivariate responses through `mvbind()` and `mvbf()`
 * `mvgam_formula()`, `mvgam_data()` and `check_newdata()` check a model and its data before fitting or prediction
 * Moving average terms in `AR()` and `VAR()`, coefficient pooling in `AR()` and partially fixed `trend_map`
@@ -44,11 +45,16 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * `PW()` `changepoint_scale` (default `0.3`) is a change in growth over the whole series
 * `CAR()` keeps its autoregressive parameter inside `(0, 1)` and measures time in median observation gaps
 * The `com_binomial()` prior on `nu` is now `normal(1, 1)`
+* A distributional regression on a `tweedie()`, `beta_nb()` or other custom family's parameter gives its intercept a `student_t(3, 0, 2.5)` prior, as 'brms' does for its own families
 
 ## Deprecations
 * `samples` and `burnin` (use `iter` and `warmup`), `lfo_cv(data = )` (use `newdata`), `incl_dynamics` (use `incl_autocor`) and `by = trend` (use `by = lv_axis()`)
 
 ## Bug fixes
+* Binomial predictions with varying trial counts stay within each observation's total (thanks to @jbogomolovas2)
+* `com_binomial()` and `tweedie()` residuals accept missing responses (thanks to @jbogomolovas2)
+* `tweedie()` models `mphi ~ x` on the log scale
+* A sub-formula on the `tweedie()` power parameter `mtheta` is refused
 * `update()` works when a trend constructor argument came from a variable
 * `prior_summary()` reports the priors in the compiled Stan model
 * Closure-unit families and `com_binomial()` accept missing responses

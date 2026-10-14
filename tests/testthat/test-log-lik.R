@@ -407,6 +407,43 @@ test_that("a family with no quantile function samples by rejection", {
 })
 
 
+test_that("a package distribution function passes a missing value through", {
+  # The stats functions return NA for a missing value. The COM-binomial
+  # distribution function and the Tweedie density raised an error
+  # instead. One missing response then stopped every residual of a fit.
+  args <- list(
+    bbinom = list(size = 5, alpha = 2, beta = 2),
+    cmb = list(mu = 0.4, nu = 1.5, size = 5),
+    beta_nb = list(mu = 2, shape = 2, mtail = 3),
+    tweedie = list(power = 1.5, mu = 2, phi = 1)
+  )
+  for (dist in names(args)) {
+    for (kind in c("d", "p")) {
+      out <- do.call(mvgam:::dist_fun(dist, kind),
+                     c(list(c(NA, 1)), args[[dist]]))
+      expect_identical(is.na(out), c(TRUE, FALSE))
+    }
+  }
+})
+
+
+test_that("the COM-binomial distribution function is the binomial at nu = 1", {
+  # The quantiles cover no mass, a missing value, the full support and
+  # beyond it. Every tail and scale has to match `pbinom()`.
+  q <- c(-1, NA, 0, 2, 5, 7)
+  mu <- seq(0.2, 0.8, length.out = length(q))
+  for (lower_tail in c(TRUE, FALSE)) {
+    for (log_p in c(TRUE, FALSE)) {
+      expect_equal(
+        mvgam:::pcmb(q, mu, nu = 1, size = 5,
+                     lower.tail = lower_tail, log.p = log_p),
+        stats::pbinom(q, 5, mu, lower.tail = lower_tail, log.p = log_p)
+      )
+    }
+  }
+})
+
+
 test_that("addition-term keys are read per response", {
   sdata <- list(weights = rep(2, 4L), weights_y1 = rep(5, 4L))
   obj <- structure(list(standata = sdata), class = "mvgam")

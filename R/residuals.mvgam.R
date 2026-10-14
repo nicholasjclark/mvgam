@@ -452,6 +452,22 @@ residuals_pred_args <- function(pp_args, resp) {
 }
 
 
+#' Whether a family's quantile residuals use analytic PIT bounds
+#'
+#' An ordinal family takes its bounds from its category
+#' probabilities. Any other family needs a distribution spec. A
+#' family with neither takes the empirical PIT over
+#' `posterior_predict()` draws.
+#'
+#' @param family_obj A response's family object
+#' @return Logical scalar
+#' @noRd
+has_analytic_pit <- function(family_obj) {
+  is_ordinal_family(family_obj) ||
+    family_has_dist_spec(resolve_family_name(family_obj), family_obj$link)
+}
+
+
 #' The per-draw PIT bounds an analytic family supplies
 #'
 #' `family_dist_spec()` defines how each family is parametrised.
@@ -487,11 +503,10 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
   family_obj <- model_families(object, resp)
   family_name <- resolve_family_name(family_obj)
   ordinal <- is_ordinal_family(family_obj)
-  # Whether a family has a spec depends on its name alone, so it is
-  # settled before the predictor is computed: a family without one
-  # takes the empirical route and must not pay for a prediction it
-  # will not use.
-  if (!ordinal && !family_has_dist_spec(family_name, family_obj$link)) {
+  # Settled before the predictor is computed. A family without
+  # analytic bounds takes the empirical route and skips a prediction
+  # it would not use.
+  if (!has_analytic_pit(family_obj)) {
     return(NULL)
   }
   # The spec applies the family's own inverse link, so it takes the
@@ -665,7 +680,6 @@ randomised_quantile_residuals <- function(lower, upper, y) {
 compute_quantile_residuals_empirical <- function(y, yrep) {
   checkmate::assert_numeric(y)
   checkmate::assert_matrix(yrep, ncols = length(y))
-  ndraws_used <- nrow(yrep)
   nobs <- length(y)
   bound <- function(cmp) {
     vapply(seq_len(nobs), function(i) {
@@ -673,12 +687,9 @@ compute_quantile_residuals_empirical <- function(y, yrep) {
       mean(cmp(yrep[, i], y[i]), na.rm = TRUE)
     }, numeric(1L))
   }
-  as_draw_matrix <- function(v) {
-    matrix(rep(v, each = ndraws_used), nrow = ndraws_used)
-  }
   randomised_quantile_residuals(
-    as_draw_matrix(bound(`<`)),
-    as_draw_matrix(bound(`<=`)),
+    data2draws(bound(`<`), dim(yrep)),
+    data2draws(bound(`<=`), dim(yrep)),
     y
   )
 }

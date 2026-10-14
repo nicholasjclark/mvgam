@@ -202,6 +202,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
     if (is_com_binomial_family(families[[key]])) {
       assert_com_binomial_trials(forms[[key]])
     }
+    assert_modelled_dpar_links(forms[[key]], families[[key]])
   }
   # Families whose brms default prior is unsuitable carry an mvgam
   # default. `response_default_priors()` defines them for `get_prior()`

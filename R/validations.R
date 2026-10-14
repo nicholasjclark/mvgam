@@ -4790,6 +4790,39 @@ assert_com_binomial_trials <- function(formula) {
 }
 
 
+#' Refuse a sub-formula on a dpar whose link cannot respect its bounds
+#'
+#' A custom family bounds a scalar dpar through its declaration. A
+#' sub-formula replaces the scalar with a linear predictor, which only
+#' a link maps into the bounds. An identity link on a dpar bounded on
+#' both sides leaves the predictor free to cross them. The likelihood
+#' then rejects most of the parameter space.
+#'
+#' @param formula One response's observation formula
+#' @param family That response's family object
+#' @return `NULL`, invisibly. Raises an error for an unusable dpar.
+#' @noRd
+assert_modelled_dpar_links <- function(formula, family) {
+  for (dp in modelled_dpars(formula, family)) {
+    lb <- as.numeric(family$lb[[dp]] %||% NA)
+    ub <- as.numeric(family$ub[[dp]] %||% NA)
+    link <- family[[paste0("link_", dp)]] %||% "identity"
+    if (identical(link, "identity") && is.finite(lb) && is.finite(ub)) {
+      stop(insight::format_error(c(
+        paste0("A sub-formula on '", dp, "' is not supported for family '",
+               resolve_family_name(family), "'."),
+        x = paste0("'", dp, "' must stay in [", lb, ", ", ub, "]."),
+        x = paste0("An identity link on '", dp, "' lets a linear ",
+                   "predictor leave that range."),
+        i = paste0("Remove '", dp, " ~ ...' to estimate one '", dp,
+                   "' per response.")
+      )), call. = FALSE)
+    }
+  }
+  invisible(NULL)
+}
+
+
 #' Every call to one function in an expression
 #'
 #' Walks the parse tree. A bare symbol sharing the function's name is

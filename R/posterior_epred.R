@@ -44,17 +44,7 @@ compute_family_epred <- function(linpred, family, trials = NULL,
   family_name <- resolve_family_name(family)
   checkmate::assert_string(family_name)
 
-  # Validate trials when provided
-  if (!is.null(trials)) {
-    checkmate::assert_numeric(trials, min.len = 1)
-    if (length(trials) != 1 && length(trials) != ncol(linpred)) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "{.field trials} must be length 1 or match number of observations ({ncol(linpred)})."
-        )
-      ))
-    }
-  }
+  checkmate::assert_numeric(trials, lower = 0, min.len = 1, null.ok = TRUE)
 
   # A family named in `epred_extra_dpars()` has a mean that is not the
   # inverse link of its predictor, and a kernel that says what it is
@@ -93,13 +83,7 @@ compute_family_epred <- function(linpred, family, trials = NULL,
           )
         ))
       }
-      prob <- family$linkinv(linpred)
-      # Column-wise multiplication: each column by its trial count
-      if (length(trials) == 1) {
-        prob * trials
-      } else {
-        sweep(prob, 2, trials, `*`)
-      }
+      family$linkinv(linpred) * data2draws(trials, dim(linpred))
     },
 
 
@@ -243,15 +227,9 @@ compute_family_variance <- function(mu, family, sigma = NULL,
           "binomial_variance_zero_trials"
         )
       }
-      if (length(trials) == 1L) {
-        p <- mu / trials
-        p * (1 - p) * trials
-      } else {
-        trials_mat <- matrix(trials, nrow = nrow(mu), ncol = ncol(mu),
-                             byrow = TRUE)
-        p <- mu / trials_mat
-        p * (1 - p) * trials_mat
-      }
+      trials_mat <- data2draws(trials, dim(mu))
+      p <- mu / trials_mat
+      p * (1 - p) * trials_mat
     },
     "negbinomial" = {
       k <- require_dpar(shape, "shape")
@@ -882,11 +860,7 @@ data2draws <- function(x, dim) {
     # Expand vector to matrix: each draw (row) gets same data values
     # dim[1] = ndraws, dim[2] = nobs
     if (!length(x) %in% c(1, dim[2])) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Length of {.field x} must be 1 or {dim[2]}, not {length(x)}."
-        )
-      ))
+      stop_shape_fault("Observation data", length(x), dim[2])
     }
     matrix(x, nrow = dim[1], ncol = dim[2], byrow = TRUE)
   } else {

@@ -57,6 +57,10 @@
 #' cover, because their importance weights come from the likelihood,
 #' which reads it too.
 #'
+#' The residual histograms and ribbons take their residuals from 500
+#' draws by default. `resid_hist` and `resid_hist_grouped` draw one
+#' histogram per draw and show the first eight.
+#'
 #' For a detailed explanation of each of the ppc functions,
 #'   see the \code{\link[bayesplot:PPC-overview]{PPC}} documentation of the
 #'   \pkg{\link[bayesplot:bayesplot-package]{bayesplot}} package. LOO-PIT
@@ -475,20 +479,18 @@ pp_check.mvgam <- function(
     }
   }
   for_pred <- names(dots) %in% pred_formals
-  # Type-specific draw count defaults + warnings.
-  #
-  # Non-grouped resid plots use empirical PIT residuals: ndraws
-  # below ~50 makes the PIT support underflow for observations in
-  # the predictive tail, producing apparent +/-8 extreme values
-  # that are floating-point clamp artefacts rather than model
-  # misfit. Default to 500 and warn if the user passes < 50.
-  #
-  # Grouped resid plots route through bayesplot facets that put
-  # one panel per draw x group. With ndraws much above ~12 the
-  # panels collapse to invisible at typical canvas sizes. Default
-  # to 8 and warn if the user passes > 12.
-  resid_nongrouped <- c("resid_hist", "resid_ribbon")
-  resid_grouped <- c("resid_hist_grouped", "resid_ribbon_grouped")
+  # Draw counts for the residual types. A family without a
+  # distribution spec takes its residuals from the empirical PIT,
+  # which needs about 50 draws or more. With fewer, observations in
+  # the predictive tail underflow the PIT support and clamp near
+  # +/-8, which looks like misfit. The ribbons and histograms default
+  # to 500 draws. A histogram draws one panel per draw and shows the
+  # first eight.
+  resid_hist_panels <- 8L
+  resid_pooled <- c(
+    "resid_hist", "resid_hist_grouped",
+    "resid_ribbon", "resid_ribbon_grouped"
+  )
   resid_diagnostic <- c(
     "resid_acf", "resid_pacf", "resid_qq", "resid_vs_fitted"
   )
@@ -521,38 +523,26 @@ pp_check.mvgam <- function(
     # the chosen value is recoverable from the returned object.
     if (type %in% aps_types) {
       ndraws <- NULL
-    } else if (type %in% resid_nongrouped) {
+    } else if (type %in% resid_pooled) {
       ndraws <- 500L
-    } else if (type %in% resid_grouped) {
-      ndraws <- 8L
     } else if (type %in% resid_diagnostic) {
       ndraws <- 100L
     } else {
       ndraws <- 10
     }
-  } else {
-    if (type %in% resid_nongrouped && !is.null(ndraws) &&
-          ndraws < 50L) {
+  } else if (type %in% resid_pooled &&
+               !has_analytic_pit(model_families(object, resp))) {
+    n_used <- if (is.null(draw_ids)) ndraws else length(draw_ids)
+    if (!is.null(n_used) && n_used < 50L) {
       warn_once(
-        paste0(
-          "ndraws < 50 for '", type, "' may produce apparent ",
-          "extreme residuals from PIT support underflow on ",
-          "observations in the predictive tail. Consider ",
-          "ndraws >= 500 for a stable empirical PIT."
+        c(
+          paste0("'", type, "' from fewer than 50 draws may show ",
+                 "spurious extreme residuals."),
+          x = paste0("An empirical PIT from few draws underflows in ",
+                     "the predictive tail."),
+          i = "Use ndraws = 500 for a stable PIT."
         ),
         "mvgam_pp_check_resid_low_ndraws"
-      )
-    }
-    if (type %in% resid_grouped && !is.null(ndraws) &&
-          ndraws > 12L) {
-      warn_once(
-        paste0(
-          "ndraws > 12 for '", type, "' may collapse the ",
-          "bayesplot facet panels (one panel per draw x group) ",
-          "to invisible at typical canvas sizes. Consider ",
-          "ndraws <= 8."
-        ),
-        "mvgam_pp_check_resid_grouped_high_ndraws"
       )
     }
   }
@@ -601,6 +591,10 @@ pp_check.mvgam <- function(
       series_sel <- resid_series_rows(object, newdata, series)
       y <- y[series_sel$rows]
       yrep <- yrep[, series_sel$rows, drop = FALSE]
+    }
+    if (type %in% c("resid_hist", "resid_hist_grouped")) {
+      yrep <- yrep[seq_len(min(nrow(yrep), resid_hist_panels)), ,
+                   drop = FALSE]
     }
   } else {
     pred_args <- c(

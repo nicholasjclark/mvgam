@@ -233,8 +233,8 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
   if (length(lb) == 1) lb <- rep(lb, nobs)
   if (length(ub) == 1) ub <- rep(ub, nobs)
 
-  lb_mat <- matrix(lb, nrow = nrow(samples), ncol = nobs, byrow = TRUE)
-  ub_mat <- matrix(ub, nrow = nrow(samples), ncol = nobs, byrow = TRUE)
+  lb_mat <- data2draws(lb, dim(samples))
+  ub_mat <- data2draws(ub, dim(samples))
   outside <- function(x) !is.na(x) & (x < lb_mat | x > ub_mat)
 
   invalid <- outside(samples)
@@ -317,7 +317,7 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
 #' it agreeing with `dbeta_binomial()` and with the Stan likelihood.
 #'
 #' @param n Number of variates
-#' @param size Trial counts
+#' @param size Trial counts, one per variate or a single count
 #' @param mu Per-trial probability
 #' @param phi Precision
 #' @return Integer vector of length `n`
@@ -352,7 +352,7 @@ rbeta_binomial_draws <- function(n, size, mu, phi) {
 #'   Required for: student
 #' @param trials Optional vector of trial counts (length 1 or nobs).
 #'   Required for: binomial, beta_binomial, zero_inflated_binomial,
-#'   zero_inflated_beta_binomial
+#'   zero_inflated_beta_binomial, com_binomial
 #' @param hu Optional matrix `\\[ndraws x nobs\\]` of hurdle probability.
 #'   Required for: hurdle_poisson, hurdle_negbinomial, hurdle_gamma,
 #'   hurdle_lognormal
@@ -411,6 +411,11 @@ sample_from_family <- function(family_name, ndraws, epred,
 
   has_truncation <- !is.null(lb) || !is.null(ub)
   nobs <- ncol(epred)
+  # `rbinom()` recycles `size` along `epred` flattened by column, one
+  # observation's draws after another. A vector of one trial count per
+  # observation would pair those draws with other observations' totals.
+  # `data2draws()` gives every draw its own observation's count.
+  trial_draws <- if (is.null(trials)) NULL else data2draws(trials, dim(epred))
 
   # Named so truncation can ask the same family for another draw
   # rather than reaching for a second account of what the family is.
@@ -618,21 +623,7 @@ sample_from_family <- function(family_name, ndraws, epred,
       checkmate::assert_numeric(trials, min.len = 1)
       # epred from linkinv is probability (0-1), use directly as prob
       # (matches brms behavior in posterior_predict_binomial)
-      if (length(trials) == 1) {
-        stats::rbinom(length(epred), size = trials, prob = epred)
-      } else {
-        # Different trial counts per observation: sample column-by-column
-        nobs <- ncol(epred)
-        result <- matrix(NA_integer_, nrow = ndraws, ncol = nobs)
-        for (j in seq_len(nobs)) {
-          result[, j] <- stats::rbinom(
-            ndraws,
-            size = trials[j],
-            prob = epred[, j]
-          )
-        }
-        result
-      }
+      stats::rbinom(length(epred), size = trial_draws, prob = epred)
     },
 
     "beta_binomial" = {
@@ -641,7 +632,7 @@ sample_from_family <- function(family_name, ndraws, epred,
       # `epred` is the inverse link of the predictor, so it is already
       # the per-trial probability the sampler wants, as it is for the
       # plain binomial above.
-      rbeta_binomial_draws(length(epred), size = trials, mu = epred,
+      rbeta_binomial_draws(length(epred), size = trial_draws, mu = epred,
                            phi = phi)
     },
 
@@ -669,14 +660,14 @@ sample_from_family <- function(family_name, ndraws, epred,
       checkmate::assert_matrix(zi, nrows = ndraws, ncols = ncol(epred))
       tmp <- stats::runif(length(epred))
       ifelse(tmp < zi, 0L,
-             stats::rbinom(length(epred), size = trials, prob = epred))
+             stats::rbinom(length(epred), size = trial_draws, prob = epred))
     },
 
     "zero_inflated_beta_binomial" = {
       checkmate::assert_numeric(trials, min.len = 1)
       checkmate::assert_matrix(zi, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
-      draws <- rbeta_binomial_draws(length(epred), size = trials,
+      draws <- rbeta_binomial_draws(length(epred), size = trial_draws,
                                     mu = epred, phi = phi)
       tmp <- stats::runif(length(epred))
       draws[tmp < zi] <- 0L

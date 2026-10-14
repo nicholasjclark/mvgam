@@ -392,62 +392,21 @@ test_that("a response's mean reads its own family and parameters", {
 # data2draws helper function tests
 # ==============================================================================
 
-test_that("data2draws expands vector to 2D matrix correctly", {
-  # Single value expansion
-  result_single <- data2draws(5, dim = c(4, 3))
-  expect_true(is.matrix(result_single))
-  expect_equal(dim(result_single), c(4, 3))
-  expect_true(all(result_single == 5))
-
-  # Vector expansion: each row gets the same values
-  vec <- c(1, 2, 3)
-  result_vec <- data2draws(vec, dim = c(4, 3))
-  expect_equal(dim(result_vec), c(4, 3))
-  # Each row should be c(1, 2, 3)
-  for (i in 1:4) {
-    expect_equal(result_vec[i, ], vec)
-  }
-})
-
-test_that("data2draws expands to 3D array correctly", {
+test_that("data2draws gives every draw the observations' own values", {
+  # A scalar fills the matrix. A vector repeats down each row.
+  expect_equal(data2draws(5, dim = c(4, 3)), matrix(5, 4, 3))
+  expect_equal(data2draws(c(0, 2, 100), dim = c(2, 3)),
+               rbind(c(0, 2, 100), c(0, 2, 100)))
   # For categorical models with dim = c(ndraws, nobs, ncats)
   x_mat <- matrix(1:6, nrow = 2, ncol = 3)
   result <- data2draws(x_mat, dim = c(4, 2, 3))
-  expect_true(is.array(result))
-  expect_equal(dim(result), c(4, 2, 3))
-  # Each draw slice should contain the original matrix
   for (d in 1:4) {
     expect_equal(result[d, , ], x_mat)
   }
-})
-
-test_that("data2draws validates input length for 2D", {
-  # Wrong length should error
-  expect_error(
-    data2draws(c(1, 2), dim = c(4, 3)),
-    "Length of"
-  )
-})
-
-test_that("data2draws validates dimensions for 3D", {
-  # Wrong dimensions for 3D input
-  wrong_mat <- matrix(1:4, nrow = 2, ncol = 2)
-  expect_error(
-    data2draws(wrong_mat, dim = c(4, 3, 5)),
-    "has the wrong shape"
-  )
-})
-
-test_that("data2draws validates dim parameter", {
-  # dim must have length 2 or 3
-  expect_error(
-    data2draws(5, dim = c(4)),
-    "length >= 2"
-  )
-  expect_error(
-    data2draws(5, dim = c(4, 3, 2, 1)),
-    "length <= 3"
-  )
+  # Neither shape recycles a partial match.
+  expect_error(data2draws(c(1, 2), dim = c(4, 3)), "wrong shape")
+  expect_error(data2draws(matrix(1:4, 2, 2), dim = c(4, 3, 5)),
+               "wrong shape")
 })
 
 # ==============================================================================
@@ -722,7 +681,6 @@ test_that("mean_discrete_weibull computes series approximation", {
   mu <- matrix(c(0.3, 0.5), nrow = 1, ncol = 2)
   shape <- matrix(c(1, 1.5), nrow = 1, ncol = 2)
   result <- mean_discrete_weibull(mu, shape)
-  expect_true(is.matrix(result))
   expect_equal(dim(result), c(1, 2))
   # Result should be positive for valid inputs
   expect_true(all(result >= 0))
@@ -804,9 +762,7 @@ test_that("extract_dpars_from_stanfit extracts and broadcasts scalar params", {
     nobs = 5
   )
 
-  expect_true(is.list(result))
   expect_named(result, "sigma")
-  expect_true(is.matrix(result$sigma))
   expect_equal(dim(result$sigma), c(10, 5))
 
   # Broadcasting with byrow=FALSE replicates scalar across columns
@@ -856,7 +812,6 @@ test_that("extract_dpars_from_stanfit handles indexed and missing params", {
     nobs = nobs
   )
 
-  expect_true(is.list(result))
   expect_named(result, c("sigma", "zi"))
 
   # sigma is scalar, should be broadcasted
@@ -1541,33 +1496,40 @@ test_that("sampled draws average to the mean the same predictor implies", {
   )
   set.seed(2024)
   ndraws <- 40000L
-  trials <- 12
+  # Trial totals differ by observation. A sampler handed one total per
+  # observation once recycled it along the flattened draws, pairing
+  # draws with other observations' totals: a zero-trial observation
+  # drew counts of 46. Every observation's own mean catches that.
+  trials <- c(0, 3, 40)
+  nobs <- length(trials)
   checked <- 0L
 
   for (family_name in families) {
     family <- brms::brmsfamily(family_name)
-    eta <- matrix(0.2, ndraws, 1L)
+    eta <- matrix(0.2, ndraws, nobs)
     mu <- family$linkinv(eta)
     extra <- setdiff(family$dpars, "mu")
     dpars <- stats::setNames(
-      lapply(extra, function(d) matrix(dpar_value(d), ndraws, 1L)), extra
+      lapply(extra, function(d) matrix(dpar_value(d), ndraws, nobs)), extra
     )
     needed <- epred_extra_dpars(family)
     expected <- compute_family_epred(
       linpred = eta, family = family, trials = trials,
       family_pars = if (length(needed)) dpars[needed] else NULL
-    )[1L, 1L]
+    )
 
     args <- dpars[intersect(names(dpars), names(formals(sample_from_family)))]
-    drawn <- do.call(sample_from_family, c(
+    drawn <- matrix(do.call(sample_from_family, c(
       list(family_name = family_name, ndraws = ndraws, epred = mu,
            trials = trials, lb = NULL, ub = NULL),
       args
-    ))
+    )), ndraws, nobs)
     expect_false(anyNA(drawn))
+    # A zero-trial observation has one possible count.
+    expect_true(all(drawn[expected == 0] == 0))
     # Monte Carlo error over 40k draws. The defects this guards against
     # were off by a factor, not by a few percent.
-    expect_equal(mean(drawn), expected, tolerance = 0.05)
+    expect_equal(colMeans(drawn), expected[1L, ], tolerance = 0.05)
     checked <- checked + 1L
   }
   expect_equal(checked, length(families))

@@ -41,8 +41,8 @@
 #' Parameterised with three distributional parameters:
 #' \describe{
 #'   \item{`mu`}{positive mean (log link, fixed; see below)}
-#'   \item{`mphi`}{positive dispersion (identity link, lower
-#'     bound `1e-8`)}
+#'   \item{`mphi`}{positive dispersion (log link, lower bound
+#'     `1e-8`)}
 #'   \item{`mtheta`}{power parameter (identity link, bounded
 #'     `[1.001, 1.999]`)}
 #' }
@@ -57,10 +57,11 @@
 #' By default `mu` is the only dpar tied to the linear predictor
 #' (and therefore to the latent state-space trend in mvgam); the
 #' dispersion `mphi` and power `mtheta` are estimated as global
-#' scalars shared across all observations. brms distributional
-#' regression is fully supported: write a `brms::bf()` formula
-#' with `mphi ~ covs` and / or `mtheta ~ covs` to give either
-#' parameter its own per-observation linear predictor. For
+#' scalars shared across all observations. Write a `brms::bf()`
+#' formula with `mphi ~ covs` to give the dispersion its own
+#' per-observation linear predictor on the log scale. Its
+#' intercept takes `student_t(3, 0, 2.5)` by default. `mtheta`
+#' must stay in `(1, 2)` and takes no sub-formula. For
 #' example,
 #'
 #' ```r
@@ -68,11 +69,9 @@
 #' ```
 #'
 #' fits a Tweedie with site-varying dispersion. brms generates
-#' the `b_mphi_Intercept` / `b_mphi_*` parameters and the
-#' associated design matrix automatically; the Tweedie Stan
-#' lpdf has overloaded scalar and vector signatures so both
-#' the static-dpar and distributional cases work without any
-#' extra wiring. If the data display obvious heteroscedasticity
+#' the `b_mphi_Intercept` and `b_mphi_*` parameters and their
+#' design matrix. The Tweedie Stan lpdf has scalar and vector
+#' signatures for both cases. If the data display obvious heteroscedasticity
 #' (e.g. seasonal claim severity), prefer letting `mphi` vary
 #' via a sub-formula over the global default (Burkner 2018, brms
 #' distributional regression vignette).
@@ -199,7 +198,7 @@ tweedie <- function(M = 30L) {
   fam <- brms::custom_family(
     name = "tweedie",
     dpars = c("mu", "mphi", "mtheta"),
-    links = c("log", "identity", "identity"),
+    links = c("log", "log", "identity"),
     lb = c(NA, 1e-8, 1.001),
     ub = c(NA, NA, 1.999),
     type = "real",
@@ -1145,6 +1144,20 @@ response_default_priors <- function(formula, family) {
   do.call(c, unname(rows))
 }
 
+#' The distributional parameters a formula gives a sub-formula
+#'
+#' A `brmsformula` keeps dpar and non-linear sub-formulas together in
+#' `$pforms`. The family's own dpars pick out the first kind.
+#'
+#' @param formula One response's observation formula
+#' @param family That response's family object
+#' @return Character vector of dpar names, possibly empty
+#' @noRd
+modelled_dpars <- function(formula, family) {
+  if (!inherits(formula, "brmsformula")) return(character(0))
+  intersect(names(formula$pforms %||% list()), family$dpars)
+}
+
 #' Re-aim injected dpar priors when the user models that dpar
 #'
 #' mvgam injects class-level defaults for family-specific
@@ -1157,43 +1170,54 @@ response_default_priors <- function(formula, family) {
 #' Where the dpar uses an identity link its intercept is on the same
 #' scale as the scalar was, so the default moves across intact. That
 #' matters for `nu`, whose name brms already associates with the
-#' Student-t degrees of freedom: without the move brms falls back to a
+#' Student-t degrees of freedom. Without the move brms falls back to a
 #' positive-only `gamma(2, 0.1)` on a parameter that is free to go
-#' negative, and warns about it. Under any other link the intercept
-#' lives on a different scale and the default cannot be carried over,
-#' so it is dropped and brms's own intercept default applies.
+#' negative. brms also warns about it. Under any other link the scalar
+#' default describes the wrong scale and is dropped.
 #'
-#' @param prior A `brmsprior` of injected defaults
+#' brms gives the intercept of a modelled dpar `student_t(3, 0, 2.5)`
+#' on its link scale for its own families. A custom family's intercept
+#' gets no prior at all. Every modelled dpar of a custom family without a
+#' carried-over default gets the brms intercept default. A user prior
+#' on `class = "Intercept", dpar = <name>` replaces either.
+#'
+#' @param prior A `brmsprior` of injected defaults, or `NULL`
 #' @param formula The observation formula, possibly a `brmsformula`
 #'   carrying dpar sub-formulas in `$pforms`
 #' @param family The family object, consulted for each dpar's link
-#' @return `prior`, with rows for modelled dpars re-aimed or removed
+#' @return `prior`, with rows for modelled dpars re-aimed, removed or
+#'   added, or `NULL` when no row remains
 #' @noRd
 adjust_modelled_dpar_priors <- function(prior, formula, family) {
-  if (is.null(prior) || nrow(prior) == 0L) return(prior)
-  modelled <- if (inherits(formula, "brmsformula")) {
-    names(formula$pforms %||% list())
-  } else {
-    character(0)
-  }
+  modelled <- modelled_dpars(formula, family)
   if (!length(modelled)) return(prior)
 
-  hit <- prior$class %in% modelled
-  if (!any(hit)) return(prior)
-  identity_link <- vapply(prior$class[hit], function(dp) {
-    identical(family[[paste0("link_", dp)]], "identity")
-  }, logical(1))
+  if (!is.null(prior) && nrow(prior) > 0L) {
+    hit <- prior$class %in% modelled
+    identity_link <- vapply(prior$class[hit], function(dp) {
+      identical(family[[paste0("link_", dp)]], "identity")
+    }, logical(1))
+    moved <- which(hit)[identity_link]
+    if (length(moved)) {
+      prior$dpar[moved] <- prior$class[moved]
+      prior$class[moved] <- "Intercept"
+    }
+    dropped <- which(hit)[!identity_link]
+    if (length(dropped)) {
+      prior <- prior[-dropped, , drop = FALSE]
+    }
+  }
 
-  moved <- which(hit)[identity_link]
-  if (length(moved)) {
-    prior$dpar[moved] <- prior$class[moved]
-    prior$class[moved] <- "Intercept"
+  if (identical(family$family, "custom")) {
+    covered <- if (is.null(prior)) character(0) else
+      prior$dpar[prior$class == "Intercept"]
+    for (dp in setdiff(modelled, covered)) {
+      row <- brms::prior_string("student_t(3, 0, 2.5)",
+                                class = "Intercept", dpar = dp)
+      prior <- if (is.null(prior)) row else c(prior, row)
+    }
   }
-  dropped <- which(hit)[!identity_link]
-  if (length(dropped)) {
-    prior <- prior[-dropped, , drop = FALSE]
-  }
-  prior
+  if (!is.null(prior) && nrow(prior) == 0L) NULL else prior
 }
 
 #' Default population priors mvgam injects for a family
@@ -5859,16 +5883,17 @@ rcmb_vec <- function(mu, nu, T) {
 }
 
 
-#' COM-Binomial CDF `P(X <= q)` for randomised quantile residuals
+#' COM-Binomial CDF `P(X <= q)`, one element per observation
 #'
-#' Per-observation kernel. Handles the `q = -1` lower-bound edge
-#' case at `y = 0` (`floor(-1 + 1e-9) = -1`, return 0) so the
-#' Dunn-Smyth residual lower interval is `[0, P(Y = 0)]` and not
-#' a degenerate window. This is the off-by-one the contributor's
-#' `a1c6ddf` commit fixed.
+#' A quantile below zero has no mass. The randomised quantile
+#' residual of `y = 0` asks for `P(X <= -1)` as its lower bound and
+#' gets 0, giving the interval `[0, P(Y = 0)]`. A missing quantile
+#' gives a missing probability, as the distribution functions in
+#' stats do. A missing response then leaves its residual missing.
 #' @noRd
 .cmb_cdf <- function(q, mu, nu, size) {
   vapply(seq_along(q), function(i) {
+    if (is.na(q[i])) return(NA_real_)
     kk <- floor(q[i] + 1e-9)
     if (kk < 0) return(0)
     if (kk >= size[i]) return(1)
@@ -5930,10 +5955,17 @@ ptweedie_cpg <- function(q, power, mu, phi, lower.tail = TRUE,
 #' @noRd
 dtweedie_cpg <- function(x, power, mu, phi, log = FALSE) {
   n <- max(length(x), length(power), length(mu), length(phi))
-  ld <- mgcv::ldTweedie(
-    y = rep_len(x, n), mu = rep_len(mu, n),
-    p = rep_len(power, n), phi = rep_len(phi, n)
-  )[, 1L]
+  x <- rep_len(x, n)
+  # `mgcv::ldTweedie()` fails on a missing value. A missing value
+  # gives a missing density, as the density functions in stats do.
+  ok <- !is.na(x)
+  ld <- rep(NA_real_, n)
+  if (any(ok)) {
+    ld[ok] <- mgcv::ldTweedie(
+      y = x[ok], mu = rep_len(mu, n)[ok],
+      p = rep_len(power, n)[ok], phi = rep_len(phi, n)[ok]
+    )[, 1L]
+  }
   if (log) ld else exp(ld)
 }
 
@@ -5996,7 +6028,7 @@ posterior_predict_com_binomial <- function(linpred, link,
   nobs <- ncol(linpred)
   mu_flat <- as.numeric(inv_link(linpred, link))
   nu_flat <- as.numeric(nu)
-  T_flat <- rep(trials, each = ndraws)
+  T_flat <- as.numeric(data2draws(trials, dim(linpred)))
   out_flat <- rcmb_vec(mu_flat, nu_flat, T_flat)
   matrix(as.integer(out_flat), nrow = ndraws, ncol = nobs)
 }

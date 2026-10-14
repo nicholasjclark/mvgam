@@ -356,27 +356,21 @@ test_that("the hindcast is the fitted series on the outcome scale", {
 
 
 test_that("quantile residuals carry posterior spread", {
-  # FAILS TODAY -- finding 21, left standing so the sweep shows it.
+  # `residuals()` defaults to `type = "quantile"` and evaluates the
+  # Tweedie distribution function at each draw's own parameters. The
+  # residual of every observation moves with those parameters. The
+  # empirical PIT pools `yrep` over all draws into one bound per
+  # observation. On a continuous response it returned 54 of 60
+  # columns constant, with `Est.Error` 0.
   #
-  # `residuals()` defaults to `type = "quantile"`. The families with
-  # an analytic CDF evaluate it per draw, so the residual moves with
-  # that draw's parameters. Tweedie has no entry in that table and
-  # falls through to the empirical PIT, which pools `yrep` over all
-  # draws to make one bound per observation and then repeats it down
-  # every row wherever the bounds coincide. For a continuous response
-  # they always coincide, so only the rows at the zero atom vary: 54
-  # of 60 columns come back constant and `Est.Error` is 0 there.
-  #
-  # The per-draw matrix is the documented hand-off to
-  # `DHARMa::createDHARMa()` and the roxygen says it carries the full
-  # posterior uncertainty, so this asserts what is documented.
+  # The roxygen documents the per-draw matrix as the hand-off to
+  # `DHARMa::createDHARMa()`, carrying the full posterior uncertainty.
   per_draw <- residuals(fit, summary = FALSE)
   expect_identical(ncol(per_draw), nrow(dat))
   spread <- apply(per_draw, 2L, sd)
   expect_true(all(spread > 0))
 
-  # `type = "ordinary"` is unaffected, which locates the fault in the
-  # quantile path rather than in the fit or the draws.
+  # The ordinary residuals vary by draw as well.
   ord <- residuals(fit, type = "ordinary", summary = FALSE)
   expect_true(all(apply(ord, 2L, sd) > 0))
 })

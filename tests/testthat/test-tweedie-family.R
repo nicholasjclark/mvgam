@@ -14,7 +14,7 @@ test_that("tweedie() returns a customfamily with mu/mphi/mtheta dpars", {
   expect_identical(fam$name, "tweedie")
   expect_identical(fam$dpars, c("mu", "mphi", "mtheta"))
   expect_identical(fam$link, "log")
-  expect_identical(fam$link_mphi, "identity")
+  expect_identical(fam$link_mphi, "log")
   expect_identical(fam$link_mtheta, "identity")
   # Strict positivity / open interval bounds (must avoid the
   # mtheta -> 1 and mtheta -> 2 boundary singularities).
@@ -50,13 +50,10 @@ test_that("mvgam(family = tweedie()) auto-injects the Stan function block + M da
   mf <- mvgam_formula(y ~ x)
   sc <- paste(unlist(stancode(mf, data = dat, family = tweedie())),
               collapse = "\n")
-  # Function-block helpers.
-  expect_true(grepl("tweedie_lpdf", sc))
-  expect_true(grepl("check_tweedie", sc))
-  expect_true(grepl("num_non_zero_fun", sc))
-  expect_true(grepl("non_zero_index_fun", sc))
-  expect_true(grepl("zero_index_fun", sc))
-  expect_true(grepl("log_sum_exp", sc))
+  # The likelihood takes the response-scale mean and both dpars.
+  expect_true(grepl("mu = exp(mu);", sc, fixed = TRUE))
+  expect_true(grepl("target += tweedie_lpdf(Y | mu, mphi, mtheta, M);",
+                    sc, fixed = TRUE))
   # Strict positivity guards (the AIMS reference accepted mu/mphi
   # >= 0; mvgam tightens to strict > 0).
   # check_tweedie now operates per-element (vector dpars) so the
@@ -276,14 +273,34 @@ test_that("tweedie() supports brms distributional regression on mphi", {
   mf <- mvgam_formula(brms::bf(y ~ 1, mphi ~ site))
   sc <- paste(unlist(stancode(mf, data = dat, family = tweedie())),
               collapse = "\n")
-  expect_true(grepl("\\bb_mphi\\b", sc))
-  expect_true(grepl("X_mphi", sc))
-  expect_true(grepl(
-    "mphi\\s*\\+=\\s*Intercept_mphi\\s*\\+\\s*Xc_mphi\\s*\\*\\s*b_mphi", sc
-  ))
-  expect_true(grepl("tweedie_lpdf", sc))
-  sd <- standata(mf, data = dat, family = tweedie())
-  expect_true(all(c("K_mphi", "X_mphi") %in% names(sd)))
+  # The dispersion predictor is on the log scale. The program
+  # exponentiates it before the likelihood. On an identity link the
+  # positivity check in `tweedie_lpdf` rejected every negative value.
+  expect_true(grepl("mphi += Intercept_mphi + Xc_mphi * b_mphi;", sc,
+                    fixed = TRUE))
+  expect_true(grepl("mphi = exp(mphi);", sc, fixed = TRUE))
+  expect_true(grepl("target += tweedie_lpdf(Y | mu, mphi, mtheta, M);",
+                    sc, fixed = TRUE))
+  # brms leaves a custom family's dpar intercept flat. mvgam gives it
+  # the intercept default brms uses for its own families.
+  expect_true(grepl("lprior += student_t_lpdf(Intercept_mphi | 3, 0, 2.5);",
+                    sc, fixed = TRUE))
+  # A user prior on that intercept replaces the default.
+  own <- paste(unlist(stancode(
+    mf, data = dat, family = tweedie(),
+    prior = brms::prior(normal(0, 1), class = Intercept, dpar = mphi)
+  )), collapse = "\n")
+  expect_true(grepl("lprior += normal_lpdf(Intercept_mphi | 0, 1);", own,
+                    fixed = TRUE))
+  expect_false(grepl("student_t_lpdf(Intercept_mphi", own, fixed = TRUE))
+
+  # The power parameter must stay in (1, 2). An identity link lets a
+  # linear predictor leave that range. A sub-formula on it is refused.
+  expect_error(
+    stancode(mvgam_formula(brms::bf(y ~ 1, mtheta ~ site)), data = dat,
+             family = tweedie()),
+    "'mtheta' must stay in [1.001, 1.999]", fixed = TRUE
+  )
 })
 
 

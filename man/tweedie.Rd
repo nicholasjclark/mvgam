@@ -36,8 +36,8 @@ continuous case with a point mass at zero.
 Parameterised with three distributional parameters:
 \describe{
 \item{\code{mu}}{positive mean (log link, fixed; see below)}
-\item{\code{mphi}}{positive dispersion (identity link, lower
-bound \code{1e-8})}
+\item{\code{mphi}}{positive dispersion (log link, lower bound
+\code{1e-8})}
 \item{\code{mtheta}}{power parameter (identity link, bounded
 \verb{[1.001, 1.999]})}
 }
@@ -52,21 +52,20 @@ open an issue.
 By default \code{mu} is the only dpar tied to the linear predictor
 (and therefore to the latent state-space trend in mvgam); the
 dispersion \code{mphi} and power \code{mtheta} are estimated as global
-scalars shared across all observations. brms distributional
-regression is fully supported: write a \code{brms::bf()} formula
-with \code{mphi ~ covs} and / or \code{mtheta ~ covs} to give either
-parameter its own per-observation linear predictor. For
+scalars shared across all observations. Write a \code{brms::bf()}
+formula with \code{mphi ~ covs} to give the dispersion its own
+per-observation linear predictor on the log scale. Its
+intercept takes \code{student_t(3, 0, 2.5)} by default. \code{mtheta}
+must stay in \verb{(1, 2)} and takes no sub-formula. For
 example,
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(bf(y ~ x, mphi ~ site), family = tweedie(), ...)
 }\if{html}{\out{</div>}}
 
 fits a Tweedie with site-varying dispersion. brms generates
-the \code{b_mphi_Intercept} / \verb{b_mphi_*} parameters and the
-associated design matrix automatically; the Tweedie Stan
-lpdf has overloaded scalar and vector signatures so both
-the static-dpar and distributional cases work without any
-extra wiring. If the data display obvious heteroscedasticity
+the \code{b_mphi_Intercept} and \verb{b_mphi_*} parameters and their
+design matrix. The Tweedie Stan lpdf has scalar and vector
+signatures for both cases. If the data display obvious heteroscedasticity
 (e.g. seasonal claim severity), prefer letting \code{mphi} vary
 via a sub-formula over the global default (Burkner 2018, brms
 distributional regression vignette).

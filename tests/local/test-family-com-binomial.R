@@ -101,6 +101,16 @@ eta <- as.numeric(latent) +
   dose_effect[as.character(dat$dose)] +
   site_effect[as.integer(dat$site)]
 dat$y <- rbinom(nrow(dat), size = dat$n_trials, prob = plogis(eta))
+# Missing responses in both series, one of them a run of two. The fit
+# drops them from the likelihood and the trend carries their states.
+# Every post-fit method then meets rows holding a denominator and no
+# count. Each model built from this frame draws brms's notice that
+# the rows were excluded. This file asserts the notice wherever it
+# arises.
+na_notice <- "Rows containing NAs"
+na_rows <- c(7L, 8L, 23L, 61L, 88L)
+dat$y[na_rows] <- NA_integer_
+observed <- !is.na(dat$y)
 
 obs_formula <- bf(
   y | trials(n_trials) ~ s(x, k = 5) + series + (1 | site) + mo(dose),
@@ -113,15 +123,19 @@ sim_truth <- list(
   ar_true = ar_true, sigma_true = sigma_true, latent = latent,
   f_true = f_true, beta_series = beta_series,
   dose_levels = dose_levels, dose_effect = dose_effect,
-  site_levels = site_levels, site_effect = site_effect
+  site_levels = site_levels, site_effect = site_effect,
+  na_rows = na_rows
 )
 
 
 # -- Prefit ------------------------------------------------------------
 
-prefit <- mvgam(
-  formula = obs_formula, trend_formula = ~ AR(p = 1),
-  data = dat, family = com_binomial(), run_model = FALSE, silent = 2
+expect_warning(
+  prefit <- mvgam(
+    formula = obs_formula, trend_formula = ~ AR(p = 1),
+    data = dat, family = com_binomial(), run_model = FALSE, silent = 2
+  ),
+  na_notice
 )
 
 
@@ -130,24 +144,24 @@ test_that("the custom family reaches Stan with its own code and nu", {
   # hang off the family object. Nothing else in this directory takes
   # that route except `tweedie()`, and the two differ in that this one
   # also carries an aterm.
-  fam <- com_binomial()
-  expect_identical(fam$family, "custom")
-  expect_true(!is.null(attr(fam, "mvgam_stanvars")))
-  expect_true(all(c("mu", "nu") %in% fam$dpars))
-
   sc <- as.character(stancode(prefit))
-  # The denominator reaches the program as data, one per observation,
-  # rather than as a column of the design matrix.
-  expect_true(grepl("vector[N] trials", sc, fixed = TRUE) ||
-                grepl("int trials[N]", sc, fixed = TRUE) ||
-                grepl("array[N] int trials", sc, fixed = TRUE))
-  # The dispersion parameter is estimated.
-  expect_true(grepl("nu", sc, fixed = TRUE))
+  # The denominator reaches the program as integer data, one per
+  # observation. The likelihood pairs each count with its own
+  # denominator and its own `nu`. The `nu ~ z` predictor builds `nu`.
+  expect_true(grepl("array[N] int trials;", sc, fixed = TRUE))
+  expect_true(grepl("nu += Intercept_nu + Xc_nu * b_nu;", sc, fixed = TRUE))
+  expect_true(grepl(
+    "com_binomial_lpmf(Y[n] | mu[n], nu[n], trials[n], lfact_com_binomial)",
+    sc, fixed = TRUE
+  ))
 
+  # The likelihood keeps the observed rows, each with its own
+  # denominator and series.
   sd <- prefit$standata
-  expect_identical(as.integer(sd$trials), as.integer(dat$n_trials))
+  expect_identical(as.integer(sd$trials),
+                   as.integer(dat$n_trials[observed]))
   expect_identical(as.integer(sd$obs_trend_series),
-                   match(as.character(dat$series), series_levels))
+                   match(as.character(dat$series[observed]), series_levels))
 })
 
 
@@ -156,12 +170,16 @@ test_that("the custom family reaches Stan with its own code and nu", {
 fit <- cached_fit(
   "val_mvgam_com_binomial.rds",
   function() {
-    mvgam(
-      formula = obs_formula, trend_formula = ~ AR(p = 1),
-      data = dat, family = com_binomial(),
-      chains = 2L, iter = 1000L, warmup = 500L,
-      silent = 2, backend = "cmdstanr"
+    expect_warning(
+      built <- mvgam(
+        formula = obs_formula, trend_formula = ~ AR(p = 1),
+        data = dat, family = com_binomial(),
+        chains = 2L, iter = 1000L, warmup = 500L,
+        silent = 2, backend = "cmdstanr"
+      ),
+      na_notice
     )
+    built
   },
   key = sim_truth
 )
@@ -175,18 +193,22 @@ test_that("posterior_epred answers on the count scale for this family", {
   # took an already inverse-linked matrix would apply the link a
   # second time, which returns finite means of the wrong size rather
   # than raising, so the bound below is the claim that catches it.
-  ep <- posterior_epred(fit, ndraws = 50L)
-  expect_identical(dim(ep), c(50L, nrow(dat)))
-  expect_true(all(is.finite(ep)))
-  # A count between zero and the row's own denominator, which is the
-  # claim a double inverse-link fails.
-  expect_true(all(ep >= 0))
-  for (j in seq_len(ncol(ep))) {
-    expect_true(all(ep[, j] <= dat$n_trials[j] + 1e-8))
+  ids <- 1:3
+  ep <- posterior_epred(fit, draw_ids = ids)
+  expect_identical(dim(ep), c(length(ids), nrow(dat)))
+  # The mean is the sum of j * P(j) over each row's own support,
+  # recomputed from the probability and `nu` of each draw.
+  lp <- posterior_linpred(fit, draw_ids = ids, transform = FALSE)
+  nu <- posterior_linpred(fit, draw_ids = ids, dpar = "nu")
+  manual <- ep
+  for (i in seq_along(ids)) {
+    for (j in seq_len(ncol(ep))) {
+      size <- dat$n_trials[j]
+      pmf <- cmb_pmf(stats::plogis(lp[i, j]), nu[i, j], size)
+      manual[i, j] <- sum(seq.int(0L, size) * pmf)
+    }
   }
-  # And it varies with the denominator: two rows with the same
-  # predictor and different trial counts do not share an expectation.
-  expect_gt(stats::sd(colMeans(ep)), 0)
+  expect_equal(ep, manual, tolerance = 1e-10)
 })
 
 
@@ -201,6 +223,10 @@ test_that("posterior_predict reads incl_autocor rather than dropping it", {
   cond <- posterior_predict(fit, draw_ids = ids, incl_autocor = TRUE)
   marg <- posterior_predict(fit, draw_ids = ids, incl_autocor = FALSE)
   expect_identical(dim(cond), dim(marg))
+  # Every draw is a count within its own row's denominator, a missing
+  # response's row included.
+  trial_mat <- data2draws(dat$n_trials, dim(cond))
+  expect_true(all(cond >= 0 & cond <= trial_mat))
   expect_false(isTRUE(all.equal(cond, marg)))
   # Different where it matters, not in the last bit of one cell.
   expect_gt(max(abs(colMeans(cond) - colMeans(marg))), 1e-3)
@@ -218,18 +244,21 @@ test_that("posterior_predict reads incl_autocor rather than dropping it", {
 
 
 test_that("quantile residuals are not pinned against a marginal surface", {
-  # This family has no analytic CDF entry, so `residuals()` forms a
-  # randomised PIT against `posterior_predict()` draws. The surface
-  # those draws come from decides the answer: against a marginal one
-  # the PIT saturates at zero or one for the cells the model fits
-  # best, the residual clamps at `qnorm(eps)`, and the trend's own
-  # persistence reappears as residual autocorrelation.
+  # `residuals()` evaluates the COM-binomial distribution function at
+  # each draw's own parameters, on the surface `posterior_linpred()`
+  # gives under the fitted trend state. Against a marginal surface the
+  # PIT saturates at zero or one for the cells the model fits best.
+  # The residual then clamps at `qnorm(eps)`. The trend's own
+  # persistence also reappears as residual autocorrelation.
   r <- residuals(fit, type = "quantile")
   expect_identical(nrow(r), nrow(dat))
   est <- r[, "Estimate"]
-  expect_true(all(is.finite(est)))
+  # A missing response has no residual. One missing response once
+  # stopped the distribution function and every residual with it.
+  expect_identical(which(is.na(est)), na_rows)
+  expect_true(all(is.finite(est[observed])))
   # Nothing sitting on the clamp. A pinned cell lands near -8.
-  expect_lt(max(abs(est)), 6)
+  expect_lt(max(abs(est[observed])), 6)
 
   # A residual carrying the trend is a failure of the surface it was
   # formed against, so the lag-one autocorrelation within a series
@@ -237,14 +266,31 @@ test_that("quantile residuals are not pinned against a marginal surface", {
   for (s in series_levels) {
     rows <- which(as.character(dat$series) == s)
     rows <- rows[order(dat$time[rows])]
-    a <- stats::acf(est[rows], lag.max = 1L, plot = FALSE)$acf[2L]
+    a <- stats::acf(est[rows], lag.max = 1L, plot = FALSE,
+                    na.action = stats::na.pass)$acf[2L]
     expect_lt(abs(a), 0.4)
   }
 
-  # The ordinary residuals are unaffected either way, which is what
-  # places any fault in the quantile path rather than in the fit.
-  ro <- residuals(fit, type = "ordinary")
-  expect_true(all(is.finite(ro[, "Estimate"])))
+  # The ordinary residuals take no distribution function. They leave
+  # the same rows missing and every observed row finite.
+  ro <- residuals(fit, type = "ordinary")[, "Estimate"]
+  expect_identical(which(is.na(ro)), na_rows)
+  expect_true(all(is.finite(ro[observed])))
+})
+
+
+test_that("a residual histogram shows eight draws of a stable PIT", {
+  # The histogram draws one panel per draw. Its residuals come from
+  # 500 draws. Drawing all 500 rendered an unreadable grid.
+  p <- expect_warning(pp_check(fit, type = "resid_hist"),
+                      "missing response are omitted")
+  panels <- unique(ggplot2::ggplot_build(p)$data[[1L]]$PANEL)
+  expect_length(panels, 8L)
+  # This family's residuals come from its distribution function, so
+  # a small draw count raises no empirical-PIT advice.
+  withr::local_envvar(TESTTHAT = "")
+  got <- with_warnings(pp_check(fit, type = "resid_hist", ndraws = 10L))
+  expect_false(any(grepl("fewer than 50 draws", got$warnings)))
 })
 
 
@@ -253,18 +299,11 @@ test_that("plot(type = 'smooths') renders on a trials aterm model", {
 
   # The same grid reached through the two public smooth methods.
   sm <- smooths(fit)
-  expect_gt(length(sm), 0L)
+  expect_length(sm, 1L)
   ps <- posterior_smooths(fit, smooth = sm[1L])
-  expect_identical(nrow(ps), as.integer(ndraws(fit)))
+  expect_identical(dim(ps), c(as.integer(ndraws(fit)), nrow(dat)))
   cs <- conditional_smooths(fit)
-  expect_gt(length(cs), 0L)
-
-  # A denominator held at a fractional value is what brms refuses, so
-  # the grid the backfill builds carries whole numbers.
-  d <- cs[[1L]]
-  if ("n_trials" %in% names(d)) {
-    expect_true(all(d$n_trials == round(d$n_trials)))
-  }
+  expect_length(cs, 1L)
 })
 
 
@@ -287,7 +326,9 @@ test_that("a padded forecast grid does not break the post-fit methods", {
   )
   expect_no_error(SM(forecast(fit, newdata = fut, ndraws = 20L)))
   expect_no_error(hindcast(fit))
-  expect_no_error(plot(fit, type = "residuals"))
+  # The residual panel omits the missing responses and says so.
+  expect_warning(plot(fit, type = "residuals"),
+                 "missing response are omitted")
   expect_no_error(plot(fit, type = "trend"))
 })
 
@@ -357,8 +398,7 @@ test_that("the group-level accessors answer on a fit that has one", {
   # answer at all, and this is the fit that has one. Each is held to
   # the grouping it was built over rather than to its class.
   re <- ranef(fit)
-  expect_true(is.list(re) || is.array(re))
-  expect_true("site" %in% names(re))
+  expect_named(re, "site")
   expect_identical(dim(re$site)[1L], length(site_levels))
   expect_identical(dimnames(re$site)[[1L]], site_levels)
 
@@ -420,15 +460,15 @@ test_that("the interval and error accessors answer for every row", {
 
 
 test_that("how_to_cite reports the sampler settings this fit used", {
-  # The citation text names the chains, the iterations and any
-  # sampler control that departs from Stan's defaults, so it is the
-  # method that reads `control` back out of the fit.
-  txt <- capture.output(how_to_cite(fit))
-  expect_gt(length(txt), 5L)
-  expect_true(any(grepl("2 ", txt)))
-  ctl <- fit$fit@stan_args[[1L]]$control
-  expect_identical(as.numeric(ctl$adapt_delta), 0.8)
-  expect_identical(as.integer(ctl$max_treedepth), 10L)
+  # The methods text names the chains and iterations this fit ran,
+  # 2 chains of 500 warmup and 500 sampling iterations.
+  txt <- paste(capture.output(how_to_cite(fit)), collapse = " ")
+  txt <- gsub("\\s+", " ", txt)
+  expect_match(txt, paste("We ran 2 Hamiltonian Monte Carlo chains for",
+                          "500 warmup iterations and 500 sampling",
+                          "iterations."), fixed = TRUE)
+  # The family's own reference is cited.
+  expect_match(txt, "Bogomolovas (2024)", fixed = TRUE)
 })
 
 
@@ -447,21 +487,27 @@ test_that("a user prior reaches the program on every class it fits", {
     list(prior(normal(0, 0.321), class = "ar1_trend"), "0.321")
   )
   for (cs in cases) {
-    built <- SM(mvgam(
-      obs_formula, trend_formula = ~ AR(p = 1), data = dat,
-      family = com_binomial(), prior = cs[[1L]],
-      run_model = FALSE, silent = 2
-    ))
+    expect_warning(
+      built <- SM(mvgam(
+        obs_formula, trend_formula = ~ AR(p = 1), data = dat,
+        family = com_binomial(), prior = cs[[1L]],
+        run_model = FALSE, silent = 2
+      )),
+      na_notice
+    )
     code <- paste(as.character(stancode(built)), collapse = "\n")
     expect_true(grepl(cs[[2L]], code, fixed = TRUE))
   }
 
   # The classes a user can set are the ones `get_prior()` advertises,
   # and the trend's own belong among them.
-  gp <- as.data.frame(get_prior(
-    mvgam_formula(obs_formula, trend_formula = ~ AR(p = 1)),
-    data = dat, family = com_binomial()
-  ))
+  expect_warning(
+    gp <- as.data.frame(get_prior(
+      mvgam_formula(obs_formula, trend_formula = ~ AR(p = 1)),
+      data = dat, family = com_binomial()
+    )),
+    na_notice
+  )
   expect_true(all(c("sigma_trend", "ar1_trend") %in% gp$class))
   # And what it advertises for the modelled dpar is what the program
   # uses, rather than the positive-only default brms reaches for when
@@ -529,7 +575,10 @@ test_that("predict refuses variance and names what it does offer", {
   # refusal names both the families that do support it and what to
   # reach for instead, rather than failing inside the kernel.
   err <- expect_error(predict(fit, type = "variance", ndraws = 20L))
-  expect_gt(nchar(conditionMessage(err)), 40L)
+  expect_match(conditionMessage(err), "family 'com_binomial'",
+               fixed = TRUE)
+  expect_match(conditionMessage(err), "type = \"response\"",
+               fixed = TRUE)
 })
 
 

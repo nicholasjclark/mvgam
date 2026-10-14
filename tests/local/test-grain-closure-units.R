@@ -277,10 +277,8 @@ test_that("the saturation table names its units", {
   # 3, 4 and 5, so a reader has no way from the table back to a site
   # or a date, and the mapping is positional and undocumented.
   #
-  # Fails today. It is the same fault as the `Process_k` shock
-  # labels, in a table a reader is more likely to act on, since a
-  # saturated unit is one whose survey effort was insufficient.
-  # Recorded as finding 19.
+  # A reader acts on this table. A saturated unit is one whose survey
+  # effort was insufficient. The label names the site to revisit.
   sat <- latent_N_saturation(fit)
   labs <- as.character(sat$label)
   expect_true(any(grepl(site_levels[1L], labs, fixed = TRUE)))
@@ -378,10 +376,9 @@ test_that("the checks that read a unit's count all render", {
              "dens_overlay", "stat_2d", "resid_hist", "resid_qq"),
            function(ty) pp_check(fit, type = ty, ndraws = 100L))
   })
-  for (p in got$value) expect_s3_class(p, "ggplot")
-  expect_s3_class(
-    pp_check(fit, type = "stat", stat = function(x) mean(x == 0)),
-    "ggplot"
+  for (p in got$value) expect_drawn(p)
+  expect_drawn(
+    pp_check(fit, type = "stat", stat = function(x) mean(x == 0))
   )
   # The coarse-PIT notice is owed once per session, and nothing else
   # is owed at all.
@@ -401,12 +398,12 @@ test_that("too few draws for a residual histogram is called out", {
   withr::local_envvar(TESTTHAT = "")
   got <- with_warnings(pp_check(fit, type = "resid_hist", ndraws = 8L))
   expect_s3_class(got$value, "ggplot")
-  expect_true(any(grepl("PIT support underflow", got$warnings)))
+  expect_true(any(grepl("fewer than 50 draws", got$warnings)))
 
   # And the advice stops once the count is adequate.
   ample <- with_warnings(pp_check(fit, type = "resid_hist",
                                   ndraws = 100L))
-  expect_false(any(grepl("PIT support underflow", ample$warnings)))
+  expect_false(any(grepl("fewer than 50 draws", ample$warnings)))
 })
 
 
@@ -672,7 +669,7 @@ test_that("the unit grid keeps the kernel's own ordering", {
 
 
 test_that("the abundance ceiling is reported against real labels", {
-  # The same table finding 19 covers for occupancy. Here the ceiling
+  # The same table the occupancy block covers. Here the ceiling
   # is an estimated count rather than one, so the label is what tells
   # a reader which site to revisit.
   sat <- latent_N_saturation(nmix_fit)
@@ -1640,9 +1637,8 @@ test_that("multi-season: the five draws formats hold one posterior", {
 test_that("multi-season: the fit describes its own specification", {
   sim <- sim_multi_season()
   fit <- fit_multi_season()
-  # The introspection hooks other packages read. `family()` is the
-  # one finding 4 turns on: a family misreported here is what sends
-  # a fit down a code path written for another.
+  # Other packages call these introspection hooks. A family misreported
+  # by `family()` sends a fit down a code path written for another.
   # Measured, `family()` answers "custom" here while `summary()`
   # prints "Family: occ" and `glance()` reports "occ". The accessor
   # every downstream package reaches for is the one that does not
