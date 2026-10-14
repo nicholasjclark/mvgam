@@ -200,8 +200,8 @@ message_sites <- function(path) {
   do.call(rbind, out)
 }
 
-# Which spelling raises each kind of condition. Entry 129 asks for one
-# spelling per kind, and this counts the distance from that. Parse data
+# Which spelling raises each kind of condition. The package uses one
+# spelling per kind. This function counts the departures. Parse data
 # separates a raiser from a formatter nested inside it, and
 # `.frequency` separates the once-per-session warning from the per-call
 # one.

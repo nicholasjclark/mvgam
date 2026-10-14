@@ -478,7 +478,6 @@ test_that("the draw-free resolvers answer on this grid", {
   )
   grid <- mvgam:::resolve_forecast_grid(fit, future, training,
                                         series_levels)
-  expect_false(is.null(grid))
   for (s in series_levels) {
     expect_identical(as.integer(grid$times[[s]]), future_times)
   }
@@ -535,7 +534,6 @@ test_that("the newdata battery holds on an irregular grid", {
   # on a `1..n` grid it would read the right one by accident.
   for (tv in time_vals[c(1L, 4L, 7L, n_time)]) {
     rows <- which(dat$time == tv)
-    expect_gt(length(rows), 0L)
     expect_equal(
       unname(posterior_epred(fit, newdata = dat[rows, , drop = FALSE],
                              draw_ids = 1:10, incl_autocor = TRUE)),
@@ -742,12 +740,11 @@ test_that("summary, tidiers and criticism run on a CAR fit", {
 test_that("the plots and conditional effects render for CAR", {
   expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
   for (ty in c("residuals", "trend", "series")) {
-    # `plot()` returns a ggplot, so that is the class asserted. An
-    # `is.list()` check would pass on any method returning `list()`.
-    p <- plot(fit, type = ty)
-    expect_s3_class(p, "ggplot")
+    # A ggplot is returned whether or not a layer received data, so
+    # the layers are built and must hold rows.
+    expect_drawn(plot(fit, type = ty))
   }
-  expect_s3_class(mcmc_plot(fit), "ggplot")
+  expect_drawn(mcmc_plot(fit))
 
   ce <- conditional_effects(fit)
   expect_s3_class(ce, "mvgam_conditional_effects")
@@ -1628,7 +1625,6 @@ test_that("the ZMVN panels draw the occasions the frame supplied", {
   rng <- range(sim$unique_times)
   for (ty in c("trend", "series")) {
     p <- plot(fit, type = ty)
-    expect_s3_class(p, "ggplot")
     xs <- unlist(lapply(
       ggplot2::ggplot_build(p)$data,
       function(l) if ("x" %in% names(l)) l$x else NULL

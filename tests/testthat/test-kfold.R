@@ -175,7 +175,6 @@ test_that("plot.mvgam_kfold() returns a ggplot with two facets", {
     pareto_k_threshold = 0.7, exact = FALSE
   )
   p <- plot(out)
-  expect_s3_class(p, "ggplot")
   # Two facets: ELPD + Pareto k. ggplot2 layout returns one row
   # per facet * panel; here facet_wrap with two levels yields two.
   built <- ggplot2::ggplot_build(p)

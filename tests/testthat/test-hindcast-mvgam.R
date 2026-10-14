@@ -265,7 +265,6 @@ test_that("mv fan-out wrapper is classed and plot dispatches", {
   attr(wrapper, "mv_wrapper") <- TRUE
 
   p <- plot(wrapper)
-  expect_s3_class(p, "ggplot")
   # No obs point layer overlaid on trend-scale ribbon.
   has_point <- vapply(p$layers,
     function(l) inherits(l$geom, "GeomPoint"),

@@ -487,7 +487,10 @@ test_that("print.mvgam_residcor counts the pairs clear of zero", {
   res <- residual_cor(build_fake_mvgam())
   expect_output(print(res), "Pairs with prob_nonzero > 0.95: 1 / 1",
                 fixed = TRUE)
-  expect_invisible(print(res))
+  # The method returns the object invisibly, as print methods do.
+  capture.output(shown <- withVisible(print(res)))
+  expect_false(shown$visible)
+  expect_identical(shown$value, res)
 })
 
 

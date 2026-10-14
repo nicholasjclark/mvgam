@@ -279,7 +279,7 @@ SPECS <- list(
 # call's locals, among them the fit itself and the contents of the
 # previous file: the six reached 1.5 GB against 11 MB for the jsdgam
 # fixture in `test-grain-closure-units.R`, which builds its fit at the
-# top level. Entry 130 records the fit-side defect.
+# top level.
 JSDM_FORMULA <- y ~ env * series
 JSDM_FACTOR_FORMULA <- ~ -1
 
@@ -561,7 +561,6 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     )
     future$env <- 0
     grid <- mvgam:::resolve_forecast_grid(fit, future, training, lev)
-    expect_false(is.null(grid))
     expect_identical(names(grid$times), lev)
     for (s in lev) {
       expect_identical(as.integer(grid$times[[s]]), future_times)
@@ -1022,9 +1021,10 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
       # A zero-width interval means the draws were collapsed before
       # the panel was built.
       expect_gt(max(cd$conf.high - cd$conf.low), 0)
-      # Where a panel is cut by species it is cut by the model's axis.
-      if ("series" %in% names(cd)) {
-        expect_true(all(as.character(unique(cd$series)) %in% lev))
+      # A panel whose effect names the series is cut by every level of
+      # the model's axis.
+      if (grepl("series", eff, fixed = TRUE)) {
+        expect_setequal(as.character(unique(cd$series)), lev)
       }
       if (!is.null(spec$ce_response_ok)) {
         expect_true(spec$ce_response_ok(cd$estimate))

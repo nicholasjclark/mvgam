@@ -26,7 +26,6 @@ test_that("occ() returns a customfamily with mu/p dpars and logit links", {
   # logit scale internally for stable inverse-link forms.
   expect_identical(fam$lb, list(mu = "0", p = "0"))
   expect_identical(fam$ub, list(mu = "1", p = "1"))
-  expect_true(is.function(fam$linkinv))
   expect_equal(fam$linkinv(0), 0.5)
 })
 

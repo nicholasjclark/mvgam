@@ -130,7 +130,6 @@ test_that("simplified RW constructor works correctly", {
 test_that("helper functions work correctly", {
   # Test get_mvgam_trend_defaults
   defaults <- get_mvgam_trend_defaults()
-  expect_type(defaults, "list")
   expect_equal(defaults$time, "time")
   expect_equal(defaults$series, "series")
   expect_equal(defaults$gr, "NA")

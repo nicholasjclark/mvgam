@@ -118,7 +118,6 @@ prefit <- mvgam(
 test_that("Z reaches Stan as data, sized by the axis it is read on", {
   sd <- prefit$standata
   z_data <- sd$Z %||% sd$Z_template
-  expect_false(is.null(z_data))
   expect_identical(dim(z_data), c(n_series, n_lv))
   expect_identical(as.integer(sd$N_series_trend), n_series)
   expect_identical(as.integer(sd$N_lv_trend), n_lv)
@@ -368,7 +367,6 @@ test_that("Z is not a posterior parameter on the fixed route", {
   expect_length(grep("^Z\\[", colnames(dm)), 0L)
   # And the record keeps the matrix the user supplied, so post-fit
   # can project without rebuilding it.
-  expect_false(is.null(fit$trend_metadata$fixed_Z))
   expect_equal(unname(fit$trend_metadata$fixed_Z), unname(Z_true),
                tolerance = 1e-12)
   expect_identical(as.integer(fit$trend_metadata$n_lv), n_lv)
@@ -596,9 +594,9 @@ test_that("every plot draws the occasions the user supplied", {
   # reasonable: this frame is numbered from three, so the axis runs
   # 1..50 instead of 3..52.
   #
-  # `type = "factors"` fails today while `trend`, `series` and the
-  # hindcast all pass, which is what isolates it. Recorded as
-  # finding 17.
+  # `trend`, `series` and the hindcast share the time axis with
+  # `type = "factors"`. A failure on the factors panel alone places
+  # the fault in that panel.
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   want <- as.numeric(range(time_vals))
@@ -634,8 +632,9 @@ test_that("a hindcast summarises to one row per cell, in user units", {
 
 
 test_that("a forecast is scored per series, and named by them", {
-  # A per-series score under permuted names is finding 8 in the place
-  # a user is most likely to act on it, so the keying is the claim.
+  # A user acts on a per-series score. A score filed under another
+  # series' name sends that action to the wrong series. The keying is
+  # the claim.
   # Scoring needs a truth to score against, so the future frame
   # carries held-out observations rather than `NA`.
   h <- 4L

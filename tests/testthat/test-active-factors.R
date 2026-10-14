@@ -16,7 +16,6 @@ test_that("plot.mvgam_active_factors returns a ggplot", {
     class = "mvgam_active_factors"
   )
   p <- plot(af)
-  expect_s3_class(p, "ggplot")
   # Title carries the n_lv ceiling so the reader sees the truncation.
   expect_match(p$labels$title, "n_lv ceiling = 5")
   # Subtitle reports the median + CI from the count slot.

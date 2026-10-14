@@ -596,7 +596,6 @@ test_that("compose_linpred_with_noise adds the trend and its noise", {
   trend <- matrix(2, ndraws, nobs)
   noise <- matrix(0.1, ndraws, nobs)
   out <- compose_linpred_with_noise(obs, trend, noise)
-  expect_true(is.matrix(out))
   expect_equal(dim(out), c(ndraws, nobs))
   expect_equal(out, obs + trend + noise)
 })

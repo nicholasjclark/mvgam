@@ -114,7 +114,6 @@ test_that("Tier-3 method signatures match brms / loo reference", {
 test_that("vcov.mvgam returns square covariance over fixed effects", {
   stub <- make_loo_extras_stub()
   v <- vcov(stub)
-  expect_true(is.matrix(v))
   expect_identical(dim(v), c(2L, 2L))
   expect_identical(colnames(v), c("Intercept", "x"))
   # Symmetric.

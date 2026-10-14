@@ -261,7 +261,6 @@ test_that("plot.mvgam_compare_scores returns ggplot for univariate", {
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
   p <- plot(out)
-  expect_s3_class(p, "ggplot")
   # The default facets by series. `plot$facet$params$facets` then
   # names `series`.
   expect_true("series" %in% names(p$facet$params$facets))
@@ -273,7 +272,6 @@ test_that("plot.mvgam_compare_scores joint score gets one panel", {
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "energy")
   p <- plot(out)
-  expect_s3_class(p, "ggplot")
   # Joint scores drop facet; FacetNull params have no `facets`.
   expect_length(p$facet$params$facets, 0L)
 })
@@ -293,7 +291,6 @@ test_that("plot.mvgam_compare_scores relative pivot drops the baseline", {
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
   p <- plot(out, relative = "fc1")
-  expect_s3_class(p, "ggplot")
   # The baseline is dropped. Only fc2 remains.
   expect_identical(levels(p$data$model), "fc2")
   # The Δ in the y-label confirms the relative branch was taken.
@@ -314,7 +311,6 @@ test_that("plot.mvgam_compare_elpds returns ggplot + cumulative arg works", {
   m2 <- make_mock_lfo(c(-3, -4, -5))
   out <- compare_elpds(m1, m2)
   p <- plot(out)
-  expect_s3_class(p, "ggplot")
   p_cum <- plot(out, cumulative = TRUE)
   expect_match(p_cum$labels$y, "Cumulative")
   # m1 cumulative is c(-1, -3, -6); confirm last value matches.

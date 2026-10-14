@@ -393,7 +393,6 @@ test_that("a wide fit forecasts every response over the horizon", {
     # response, which is one series.
     expect_identical(as.character(fc[[r]]$series_names), r)
     arm <- fc[[r]]$forecasts[[r]]
-    expect_false(is.null(arm))
     expect_identical(ncol(arm), h)
     expect_false(all(is.na(arm)))
     # The occasions are the ones asked for, in the user's own
@@ -570,12 +569,12 @@ test_that("pp_check refuses an argument nothing reads", {
     p <- pp_check(fit, resp = "count", ndraws = 10L, alpha = 0.5),
     "missing response are omitted"
   )
-  expect_s3_class(p, "ggplot")
+  expect_drawn(p)
   expect_warning(
     p <- pp_check(fit, resp = "count", ndraws = 10L, process_error = FALSE),
     "missing response are omitted"
   )
-  expect_s3_class(p, "ggplot")
+  expect_drawn(p)
 })
 
 
@@ -700,7 +699,12 @@ test_that("the summary and tidiers name every response", {
     grep("fixed", names(smry), value = TRUE),
     function(k) rownames(smry[[k]])
   ))
-  expect_gt(length(shown), 0L)
+  coefs <- sub("^b_", "", grep("^b_", variables(fit), value = TRUE))
+  coefs <- coefs[!grepl("_trend$", coefs)]
+  for (r in responses) {
+    expect_true(any(startsWith(coefs, paste0(r, "_"))))
+  }
+  expect_identical(paste(setdiff(coefs, shown), collapse = ", "), "")
 
   aug <- augment(fit)
   expect_true(is.data.frame(aug))

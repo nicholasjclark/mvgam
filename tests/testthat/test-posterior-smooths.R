@@ -349,7 +349,6 @@ test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
   )
   names(cs) <- attr(df, "response")
   ggs <- plot(cs, plot = FALSE)
-  expect_type(ggs, "list")
   expect_length(ggs, 1L)
   expect_s3_class(ggs[[1L]], "ggplot")
   # Ribbon should not be a flat line at zero: the estimate at the
@@ -400,7 +399,6 @@ test_that("a factor smooth draws one interval per level", {
   attr(df, "surface") <- FALSE
 
   p <- mvgam:::build_mvgam_smooth_plot(df, "s(series)")
-  expect_s3_class(p, "ggplot")
   geoms <- vapply(p$layers, function(l) class(l$geom)[1L], character(1))
   expect_true("GeomPointrange" %in% geoms)
   # The geoms that cannot draw a single point per group are the ones

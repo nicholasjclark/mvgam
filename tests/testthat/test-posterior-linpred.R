@@ -45,7 +45,6 @@ test_that("get_combined_linpred adds obs and trend in univariate case", {
   )
   out <- get_combined_linpred(stub_obj(), newdata = NULL,
                               process_error = TRUE)
-  expect_true(is.matrix(out))
   expect_equal(dim(out), c(4L, 3L))
   expect_equal(out, matrix(1.5, 4, 3))
 })
@@ -69,7 +68,6 @@ test_that("get_combined_linpred handles list obs + matrix shared trend", {
   )
   out <- get_combined_linpred(stub_obj(), newdata = NULL,
                               process_error = TRUE)
-  expect_type(out, "list")
   expect_named(out, c("y1", "y2"))
   expect_equal(out$y1, matrix(1.25, 5, 4))
   expect_equal(out$y2, matrix(10.25, 5, 4))
@@ -99,7 +97,6 @@ test_that("get_combined_linpred handles list obs + list per-response trend", {
   )
   out <- get_combined_linpred(stub_obj(), newdata = NULL,
                               process_error = TRUE)
-  expect_type(out, "list")
   expect_named(out, c("y1", "y2"))
   expect_equal(out$y1, matrix(1.1, 5, 4))
   expect_equal(out$y2, matrix(12.0, 5, 4))

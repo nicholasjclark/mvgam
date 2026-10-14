@@ -709,8 +709,8 @@ test_that("loo_epred and loo_linpred part at a non-identity link", {
   ep <- colMeans(posterior_epred(fit_plain))
   expect_false(isTRUE(all.equal(as.numeric(e), unname(ep))))
   # How closely it still tracks the posterior expectation is not
-  # asserted here. Measured, the two correlate at 0.31 on this fit,
-  # which is finding 11: dropping an observation moves the latent
+  # asserted here. Measured, the two correlate at 0.31 on this fit.
+  # Dropping an observation moves the latent
   # state it was scored against, the importance ratios have no
   # finite variance, and the reweighting is dominated by single
   # draws. Pinning a number here would enshrine that regime rather

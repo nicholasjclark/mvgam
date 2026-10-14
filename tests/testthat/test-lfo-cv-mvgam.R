@@ -121,7 +121,6 @@ test_that("Return object has all documented mvgam_lfo slots", {
   # gate applied. It used to hold whatever the caller passed, so on
   # a default call the documented name was empty and the number sat
   # under a second one.
-  expect_type(out$pareto_k_threshold, "double")
   expect_lte(out$pareto_k_threshold, 0.7)
   expect_true(out$pareto_k_threshold_adaptive)
   expect_true(min_t_in_refits <- 30L %in% out$refits_at)
@@ -164,7 +163,6 @@ test_that("Non-ELPD score adds named entries to scores list", {
   )
   out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
                  score = c("elpd", "crps"), silent = 2L)
-  expect_true(is.list(out$scores))
   expect_true("crps" %in% names(out$scores))
   # One score per evaluation point, which is the contract this mock
   # can speak to. `score()` is stubbed here, so its value says
@@ -452,7 +450,6 @@ test_that("plot.mvgam_lfo keeps an unfittable Pareto k off the floor", {
   # evaluations loo could not fit at all as the most reliable ones.
   all_inf <- mk_mvgam_lfo(c(-2, -2.5, -3), pareto_ks = rep(Inf, 3L))
   g <- plot(all_inf)
-  expect_s3_class(g, "ggplot")
   ks <- g$data$value[g$data$facet == "Pareto K"]
   expect_false(any(ks == -Inf))
   expect_true(all(is.infinite(ks) & ks > 0))

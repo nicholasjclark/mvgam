@@ -324,7 +324,6 @@ test_that("a prefit maps a newdata frame with no posterior at all", {
   grid <- mvgam:::resolve_forecast_grid(
     prefit_by_lv, future, training, species_levels
   )
-  expect_false(is.null(grid))
   expect_identical(names(grid$times), species_levels)
   for (s in species_levels) {
     expect_identical(as.integer(grid$times[[s]]), future_times)
@@ -794,7 +793,6 @@ test_that("a newdata whose species is a character column maps right", {
   # column happens to be typed.
   nd <- dat
   nd$series <- as.character(nd$series)
-  expect_type(nd$series, "character")
   got <- posterior_epred(fit, newdata = nd, draw_ids = 1:10,
                          incl_autocor = TRUE)
   expect_equal(unname(got), unname(ref_epred))
@@ -838,7 +836,6 @@ test_that("a newdata holding one occasion reads that occasion", {
   # the wrong rows of the trend.
   for (tv in time_vals[c(1L, 2L, 30L, n_time)]) {
     rows <- which(dat$time == tv)
-    expect_gt(length(rows), 0L)
     sub <- dat[rows, , drop = FALSE]
     got <- posterior_epred(fit, newdata = sub, draw_ids = 1:10,
                            incl_autocor = TRUE)

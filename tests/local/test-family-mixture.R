@@ -891,11 +891,9 @@ test_that("the entry points reach the mixture, not the count alone", {
 
 
 test_that("a distributional covariate is offered as a term", {
-  # `hu ~ z` puts `z` in the model, and finding 20 recorded the
-  # default effect list omitting it. The claim here is the one
-  # marginaleffects acts on: `z` has to be reachable as a term with
-  # a slope of its own, and that slope has to move the zeros rather
-  # than the counts.
+  # `hu ~ z` puts `z` in the model. The default effect list once
+  # omitted it. marginaleffects needs `z` as a term with a slope of
+  # its own. That slope moves the probability of a zero.
   library(marginaleffects)
   options("marginaleffects_model_classes" = "mvgam")
   preds <- insight::find_predictors(fit2)$conditional
@@ -910,8 +908,8 @@ test_that("a distributional covariate is offered as a term", {
   # claim about direction rather than about magnitude.
   #
   # Read through the aliased draws rather than the raw stanfit: brms
-  # writes the block as `b_hu[1]` and the alias pass is what turns it
-  # into `b_hu_z`, which is finding 29's cause reaching this file.
+  # writes the block as `b_hu[1]`. The alias pass turns it into
+  # `b_hu_z`.
   dm <- posterior::as_draws_matrix(fit2)
   b_hu <- as.numeric(dm[, "b_hu_z"])
   expect_gt(mean(b_hu), 0)
@@ -937,7 +935,7 @@ test_that("a mixture's quantile residuals are standard normal", {
   for (f in list(fit, fit3)) {
     r <- residuals(f, type = "quantile", summary = FALSE, ndraws = 200L)
     expect_lt(abs(stats::sd(r, na.rm = TRUE) - 1), 0.25)
-    # And no column is pinned, which is finding 21's continuous half.
+    # And every column varies across draws.
     constant <- apply(r, 2L, function(z) {
       length(unique(z[!is.na(z)])) <= 1L
     })

@@ -29,7 +29,6 @@ test_that("methods_md returns mvgam_methods_md and prints", {
   mod <- make_methods_md_prefit(y ~ x)
   out <- methods_md(mod)
   expect_s3_class(out, "mvgam_methods_md")
-  expect_type(out, "character")
   expect_true(grepl("## Data", out))
   expect_true(grepl("## Model", out))
   expect_true(grepl("## Priors", out))

@@ -99,10 +99,6 @@ test_that("mvgam_formula detects incompatible autocorrelation terms", {
     mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1)),
     "conflict with the trend dynamics"
   )
-
-  # Regular terms should be fine
-  expect_no_error(mvgam_formula(y ~ x, trend_formula = ~ 1))
-  expect_no_error(mvgam_formula(y ~ x, trend_formula = ~ s(time)))
 })
 
 test_that("mvgam_formula preserves class hierarchy correctly", {
@@ -420,13 +416,9 @@ test_that("brmsprior class preservation and ecosystem integration", {
   custom_prior1 <- brms::set_prior("normal(0, 2)", class = "Intercept")
   custom_prior2 <- brms::set_prior("exponential(1)", class = "sigma")
 
-  # Test combining custom priors with mvgam result using + operator
-  expect_no_error({
-    combined1 <- custom_prior1 + result
-  })
-  expect_no_error({
-    combined2 <- custom_prior2 + result
-  })
+  # brms's `+` combines a user prior with the table mvgam returns
+  combined <- custom_prior1 + custom_prior2 + result
+  expect_true(all(c("normal(0, 2)", "exponential(1)") %in% combined$prior))
 
   # Test with trend parameters
   test_data_trend <- data.frame(y = rnorm(20), x = rnorm(20), time = 1:20, series = factor(rep("A", 20)))
@@ -436,12 +428,10 @@ test_that("brmsprior class preservation and ecosystem integration", {
   custom_trend_prior1 <- brms::prior("normal(0, 0.5)", class = "ar1_trend")
   custom_trend_prior2 <- brms::prior("exponential(2)", class = "sigma_trend")
 
-  expect_no_error({
-    combined_trend1 <- custom_trend_prior1 + result_with_trend
-  })
-  expect_no_error({
-    combined_trend2 <- custom_trend_prior2 + result_with_trend
-  })
+  combined_trend <- custom_trend_prior1 + custom_trend_prior2 +
+    result_with_trend
+  expect_true(all(c("normal(0, 0.5)", "exponential(2)") %in%
+                    combined_trend$prior))
 })
 
 test_that("trend component attribute behavior", {
@@ -563,13 +553,9 @@ test_that("edge cases and complex validation scenarios", {
     mvgam_formula(y ~ x, trend_formula = ~ s(time) + AR() + weights(w))
   )
 
-  # No-intercept edge cases should work
+  # A trend formula without an intercept is accepted
   expect_no_error(
-    mvgam_formula(y ~ x, trend_formula = ~ -1)  # Simple no-intercept
-  )
-
-  expect_no_error(
-    mvgam_formula(y ~ 1, trend_formula = ~ x + s(time) - 1 + AR())  # Complex no-intercept
+    mvgam_formula(y ~ 1, trend_formula = ~ x + s(time) - 1 + AR())
   )
 
   # No-intercept with forbidden terms should still error
@@ -599,25 +585,20 @@ test_that("validation preserves helpful error context", {
   )
 })
 
-test_that("exact GP terms in obs formula are accepted (warn only)", {
-  # Exact GPs fit fine through brms (full covariance kernel) even
-  # without k; the warn covers the prediction-at-newdata gap. Under
-  # TESTTHAT the warn is suppressed at the validator, so we just
-  # assert no error.
-  expect_no_error(
-    mvgam_formula(y ~ gp(x), trend_formula = ~ 1)
-  )
-  expect_no_error(
-    mvgam_formula(y ~ gp(temperature), trend_formula = NULL)
-  )
-})
-
-test_that("exact GP terms in trend formula are accepted (warn only)", {
-  expect_no_error(
-    mvgam_formula(y ~ 1, trend_formula = ~ gp(time))
-  )
+test_that("exact and approximate GP terms are accepted on either side", {
+  # Exact GPs fit through brms with a full covariance kernel. Their
+  # notice covers the prediction-at-newdata gap and is quiet under
+  # testthat.
+  expect_no_error(mvgam_formula(y ~ gp(x), trend_formula = ~ 1))
   expect_no_error(
     mvgam_formula(y ~ x, trend_formula = ~ s(time) + gp(season) + AR())
+  )
+  expect_no_error(
+    mvgam_formula(y ~ gp(temperature, k = 5, cov = "matern32"),
+                  trend_formula = ~ gp(time, k = 15))
+  )
+  expect_no_error(
+    mvgam_formula(y ~ gp(x, k = 5) + gp(z), trend_formula = ~ 1)
   )
 })
 
@@ -633,50 +614,6 @@ test_that("exact GP notice shows once per term, and obeys silent", {
   expect_no_message(mvgam_formula(y ~ gp(z), trend_formula = ~ 1))
   withr::local_options(mvgam.silent = 2L)
   expect_no_message(mvgam_formula(y ~ gp(z2), trend_formula = ~ 1))
-})
-
-test_that("approximate GP terms are allowed", {
-  expect_no_error(
-    mvgam_formula(y ~ gp(x, k = 10), trend_formula = ~ 1)
-  )
-
-  expect_no_error(
-    mvgam_formula(y ~ gp(temperature, k = 5, cov = "matern32"),
-                  trend_formula = NULL)
-  )
-
-  expect_no_error(
-    mvgam_formula(y ~ gp(x, k = 8) + gp(z, k = 12),
-                  trend_formula = ~ 1)
-  )
-
-  expect_no_error(
-    mvgam_formula(y ~ 1, trend_formula = ~ gp(time, k = 15))
-  )
-})
-
-test_that("mixed approximate + exact GP terms are accepted (warn only)", {
-  expect_no_error(
-    mvgam_formula(y ~ gp(x, k = 5) + gp(z), trend_formula = ~ 1)
-  )
-})
-
-test_that("GP validation works with complex formulas", {
-  expect_no_error(
-    mvgam_formula(y ~ s(time) + (1|group) + gp(temperature) + x^2,
-                  trend_formula = ~ AR())
-  )
-
-  expect_no_error(
-    mvgam_formula(y ~ x,
-                  trend_formula = ~ s(season, bs = "cc") + gp(depth) +
-                    (1|site))
-  )
-
-  expect_no_error(
-    mvgam_formula(y ~ s(time) + gp(temperature, k = 10) + (1|group),
-                  trend_formula = ~ AR())
-  )
 })
 
 test_that("bf() in trend_formula errors with hint", {

@@ -104,7 +104,6 @@ test_that("ngrps.mvgam returns NULL on a no-RE fit", {
 test_that("posterior_interval.mvgam respects pars / variable / prob", {
   stub <- make_wrapper_stub()
   pi_default <- posterior_interval(stub)
-  expect_true(is.matrix(pi_default))
   expect_identical(ncol(pi_default), 2L)
   # Default brms prob = 0.95 -> columns are 2.5% / 97.5%.
   expect_identical(colnames(pi_default), c("2.5%", "97.5%"))

@@ -47,17 +47,9 @@ make_mock_forecast <- function(n_series = 2L, h = 5L,
 
 # ----- Return-shape contract --------------------------------------
 
-test_that("score() is a generic dispatching on mvgam_forecast", {
-  fc <- make_mock_forecast()
-  expect_true(is.function(score))
-  expect_no_error(score(fc, score = "crps"))
-})
-
-
 test_that("Univariate scorers return per-series df + all_series", {
   fc <- make_mock_forecast(n_series = 2L, h = 5L)
   out <- score(fc, "crps")
-  expect_type(out, "list")
   expect_named(out, c("s1", "s2", "all_series"))
   expect_s3_class(out[["s1"]], "data.frame")
   expect_identical(

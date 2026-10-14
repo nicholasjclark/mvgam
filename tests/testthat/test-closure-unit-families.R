@@ -32,9 +32,8 @@ test_that("nmix() returns a customfamily with mu/p dpars and logit/log links", {
   # linkinv / linkfun helpers are attached so downstream
   # dispatchers (compute_family_epred etc.) don't have to
   # branch on customfamily.
-  expect_true(is.function(fam$linkinv))
-  expect_true(is.function(fam$linkfun))
   expect_equal(fam$linkinv(0), 1)
+  expect_equal(fam$linkfun(1), 0)
 })
 
 test_that("nmix() tags closure-unit and predict-type attributes", {

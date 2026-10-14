@@ -2260,9 +2260,7 @@ test_that("standata.mvgam_formula returns proper list structure", {
 
   standata_result <- standata(mf, data = data, family = poisson())
 
-  # Should be a named list
-  expect_type(standata_result, "list")
-  expect_gt(length(standata_result), 0)
+  # Every element is named
   expect_true(all(names(standata_result) != ""))
 
   # The response, one entry per observation
@@ -2723,7 +2721,6 @@ test_that("trend formula with covariate on multi-series univariate produces X_tr
   # X_trend dims must match N_trend. Before the layout split this was
   # 20 vs 5, causing "dims declared=(5,1); dims found=(20,1)" at Stan
   # init.
-  expect_true(is.matrix(sd$X_trend))
   expect_equal(nrow(sd$X_trend), sd$N_trend)
   expect_equal(ncol(sd$X_trend), 1L)
 
@@ -3408,7 +3405,6 @@ test_that("make_stancode / make_standata dispatch on mvgam_formula without brms:
   expect_true(grepl("ar1_trend", as.character(sc)))
 
   sd <- make_standata(mf, data = dat)
-  expect_type(sd, "list")
   expect_true(all(c("N", "Y", "N_trend") %in% names(sd)))
 })
 
@@ -3475,7 +3471,6 @@ test_that("brms helper batch re-exports work via mvgam without library(brms)", {
     stanvar(x = 5L, name = "K", scode = "int K;"),
     "stanvars"
   )
-  expect_true(is.list(constant(1)) || is.function(constant))
 })
 
 test_that("control_params.mvgam / inits.mvgam read from the stanfit slot", {
@@ -3497,7 +3492,6 @@ test_that("control_params.mvgam / inits.mvgam read from the stanfit slot", {
     class = "mvgam"
   )
   cp <- control_params(stub)
-  expect_type(cp, "list")
   expect_identical(cp$adapt_delta, 0.95)
   expect_identical(cp$max_treedepth, 12)
   ii <- inits(stub)
@@ -3539,10 +3533,7 @@ test_that("run_model = FALSE populates stancode + standata slots", {
     y ~ x, data = data, family = poisson(), run_model = FALSE
   )
   expect_true(!is.null(mod$stancode))
-  expect_true(!is.null(mod$standata))
   # standata should carry the brms-flavoured slots from codegen.
-  expect_true(is.list(mod$standata))
-  expect_true("N" %in% names(mod$standata))
   expect_equal(mod$standata$N, nrow(data))
 })
 
@@ -3577,7 +3568,6 @@ test_that("run_model = FALSE threads through jsdgam() too", {
   expect_s3_class(mod, "jsdgam")
   expect_s3_class(mod, "mvgam")
   expect_null(mod$fit)
-  expect_true(!is.null(mod$standata))
   expect_equal(mod$standata$N_lv_trend, 2L)
 })
 

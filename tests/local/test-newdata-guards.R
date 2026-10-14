@@ -65,7 +65,6 @@ train <- fit$data
 
 test_that("a complete frame predicts", {
   ep <- posterior_epred(fit, newdata = train)
-  expect_true(is.matrix(ep))
   expect_identical(ncol(ep), nrow(train))
   expect_false(anyNA(ep))
 })

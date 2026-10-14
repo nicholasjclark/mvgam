@@ -151,8 +151,6 @@ test_that("trend registry works correctly", {
 
   # Test basic registry functionality
   choices <- mvgam:::mvgam_trend_registry()
-  expect_type(choices, "character")
-  expect_true(length(choices) > 0)
   expect_true("RW" %in% choices)
   expect_true("AR" %in% choices)
   expect_true("VAR" %in% choices)
@@ -1002,7 +1000,6 @@ test_that("piecewise trends integrate correctly with registry system", {
   # three times under three comments about PW variants, with "PW" as
   # the argument each time.
   pw_info <- mvgam:::get_trend_info("PW")
-  expect_type(pw_info, "list")
   expect_false(pw_info$supports_factors)
   expect_type(pw_info$generator, "closure")
   # A factor-incompatible entry stores the reason shown to a user.

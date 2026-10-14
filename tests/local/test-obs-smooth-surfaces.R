@@ -277,8 +277,8 @@ test_that("s(z, by = grp) gives each of the three levels a curve", {
     expect_gt(mean(d$upper__[d$grp == lev[k]] -
                      d$lower__[d$grp == lev[k]]), 0)
   }
-  # The levels differ from one another, which is what `by =` asks
-  # for and what finding 35 records failing on the factor grain.
+  # The levels differ from one another. A smooth whose coefficients
+  # never reach the grid draws every level as one flat curve.
   expect_false(isTRUE(all.equal(curves[[1L]], curves[[2L]])))
   expect_false(isTRUE(all.equal(curves[[2L]], curves[[3L]])))
 })

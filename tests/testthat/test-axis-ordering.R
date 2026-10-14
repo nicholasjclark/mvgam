@@ -625,8 +625,6 @@ expect_axes_sound <- function(prefit, resp_names, lab, frame,
       expect_null(sd$Z_template, label = paste(lab, "templates none"))
     } else {
       z_data <- sd$Z %||% sd$Z_template
-      expect_false(is.null(z_data),
-                   label = paste(lab, "Z reaches Stan as data"))
       expect_identical(
         dim(z_data), c(n_series, n_lv),
         label = paste(lab, "Z is sized by the axis it is read on")

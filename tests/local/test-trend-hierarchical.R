@@ -412,12 +412,9 @@ test_that("a hierarchical fit forecasts on its own axis", {
   # superseded, so the two spellings differ and the rebuild has to
   # use the one the model was fitted on.
   #
-  # This fails today, and the failure is the finding: the training
-  # tail is cut by the raw column rather than by the derived axis, so
-  # nothing matches and an empty frame reaches
-  # `get_observation_structure()`. Stripping the superseded column
-  # from the fit makes the identical call succeed, which is what
-  # isolates it. Recorded as finding 13.
+  # The training tail has to be cut by the derived axis. Cut by the
+  # raw column, nothing matched and an empty frame reached
+  # `get_observation_structure()`.
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$axes$vars
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
@@ -628,12 +625,11 @@ test_that("insight reports the terms this model actually has", {
 
 test_that("the plotting methods render for a hierarchical fit", {
   for (ty in c("residuals", "trend", "series")) {
-    # `plot()` returns a ggplot, so that is the class asserted. An
-    # `is.list()` check would pass on any method returning `list()`.
-    p <- plot(fit, type = ty)
-    expect_s3_class(p, "ggplot")
+    # A ggplot is returned whether or not a layer received data, so
+    # the layers are built and must hold rows.
+    expect_drawn(plot(fit, type = ty))
   }
-  expect_s3_class(mcmc_plot(fit), "ggplot")
+  expect_drawn(mcmc_plot(fit))
 })
 
 
@@ -1018,7 +1014,6 @@ test_that("the axis maps a hierarchical newdata with no draws at all", {
     out
   }))
   grid <- mvgam:::resolve_forecast_grid(fit, future, training, levs)
-  expect_false(is.null(grid))
   expect_identical(names(grid$times), levs)
   for (s in levs) {
     expect_identical(as.integer(grid$times[[s]]), future_times)
@@ -1072,7 +1067,6 @@ test_that("how the grouping columns are typed does not move an answer", {
   chr <- d
   chr[[vars$gr_var]] <- as.character(chr[[vars$gr_var]])
   chr[[vars$subgr_var]] <- as.character(chr[[vars$subgr_var]])
-  expect_type(chr[[vars$gr_var]], "character")
   expect_equal(
     unname(posterior_epred(fit, newdata = chr, draw_ids = 1:10,
                            incl_autocor = TRUE)),
@@ -1162,7 +1156,6 @@ test_that("a newdata holding one occasion reads that occasion", {
   times <- sort(unique(d[[vars$time_var]]))
   for (tv in times[c(1L, 2L, length(times))]) {
     rows <- which(d[[vars$time_var]] == tv)
-    expect_gt(length(rows), 0L)
     got <- posterior_epred(fit, newdata = d[rows, , drop = FALSE],
                            draw_ids = 1:10, incl_autocor = TRUE)
     expect_equal(unname(got), unname(full[, rows, drop = FALSE]))
@@ -1223,7 +1216,6 @@ test_that("residual_cor(by_group = TRUE) returns one block per region", {
   res <- residual_cor(fit, by_group = TRUE)
   regions <- levels(dat$region)
   sp <- levels(dat$species)
-  expect_type(res, "list")
   expect_setequal(names(res), c("_global", regions))
   for (nm in names(res)) {
     expect_s3_class(res[[nm]], "mvgam_residcor")

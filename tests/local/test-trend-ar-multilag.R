@@ -765,9 +765,8 @@ test_that("the trend-side smooth is drawn as a curve that moves", {
   # `conditional_smooths()` is the drawn view of the same term
   # `posterior_smooths()` evaluates. A smooth the data did not
   # support shrinks toward zero and keeps its posterior width; one
-  # whose coefficients never reach the grid has no width at all,
-  # which is the signature finding 35 records on a factor-grain
-  # smooth. Measured here the curve has sd 0.75 and spans -1.06 to
+  # whose coefficients never reach the grid has no width at all.
+  # Measured here the curve has sd 0.75 and spans -1.06 to
   # 0.91, so a curve pinned flat fails.
   cs <- conditional_smooths(fit)
   expect_length(cs, 1L)
