@@ -174,6 +174,19 @@ test_that("Non-ELPD score adds named entries to scores list", {
 })
 
 
+test_that("a fold's score sums its responses and its observed horizons", {
+  one <- function(v) list(all_series = data.frame(score = v))
+  expect_identical(lfo_aggregate_score(one(c(0.5, NA, 1))), 1.5)
+  # A fold with no observation has no score
+  expect_identical(lfo_aggregate_score(one(c(NA_real_, NA_real_))),
+                   NA_real_)
+  # A long-frame multivariate forecast scores each response
+  expect_identical(
+    lfo_aggregate_score(list(count = one(1), pa = one(c(2, NA)))), 3
+  )
+})
+
+
 # ----- summary / print methods -----------------------------------
 
 test_that("summary.mvgam_lfo returns a tibble with one row per fold", {

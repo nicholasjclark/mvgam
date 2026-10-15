@@ -7,9 +7,9 @@
 Minimum surface that \code{marginaleffects} and \code{insight} need to build
 prediction grids and walk formula structure. mvgam keeps its
 observation submodel formula in \code{x$formula} (a \code{brmsformula}) and
-its trend submodel formula in \code{x$trend_formula}; these methods
-stitch both into the structures insight expects rather than
-relying on the default formula walker, which chokes on the
-combined obs + trend representation.
+its trend submodel formula in \code{x$trend_formula}. These methods
+combine both into the structures insight expects. The default
+formula walker fails on the combined observation and trend
+representation.
 }
 \keyword{internal}

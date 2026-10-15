@@ -1,19 +1,9 @@
-# Unit tests for `hindcast.mvgam()` in `R/hindcast.mvgam.R`. The
-# method is a thin wrapper over `build_hindcast_arms()` (already
-# covered by tests in `test-forecast-mvgam.R`), so these tests
-# focus on:
-#   * mvgam_forecast class shape (10 fields; test_* / forecasts
-#     slots NULL).
-#   * type dispatch (response / link / expected / trend).
-#   * obs_uncertainty toggle for `type = "response"`.
-#   * ndraws validation + subset behaviour.
+# CI tests for `hindcast.mvgam()` and the `mvgam_forecast` methods on
+# mock fits: the object's slots, the dispatch by `type`, the
+# `obs_uncertainty` toggle, draw selection and multivariate forecasts.
 
 
-# Reuse `make_mock_mvgam` and `make_draws_mat` from the forecast
-# test file; they are defined in that file's source-only top
-# section and become available once testthat::test_dir() loads
-# both files in the same session. To keep this file independently
-# runnable, re-define minimal versions here.
+# A mock fit holding the slots `hindcast()` uses
 make_hindcast_mock <- function(series_levels = "s1",
                                n_time = 8L,
                                trend_type = "AR") {
@@ -114,8 +104,8 @@ test_that("hindcast.mvgam type dispatch flows through expected helpers", {
   # Standard families: trend pulled per-draw from stanfit via
   # extract_trend_latent_states; obs linpred via
   # extract_component_linpred(component = 'obs'); response sampled
-  # via draw_observations. Distinct constants per arm so we
-  # can confirm the right helper was hit.
+  # via draw_observations. Each helper returns its own constant,
+  # which identifies the helper that ran.
   testthat::local_mocked_bindings(
     extract_trend_latent_states = function(...) {
       matrix(7, nrow = 2L, ncol = 8L)
@@ -241,46 +231,59 @@ test_that("ndraws subset yields the requested rows", {
 })
 
 
-test_that("mv fan-out wrapper is classed and plot dispatches", {
-  # Simulate an mvbf hindcast wrapper: outer list keyed by resp,
-  # each element itself an mvgam_forecast. The outer list needs its
-  # own class so plot(hc) dispatches to plot.mvgam_forecast
-  # (single-panel trend view) instead of falling through to
-  # graphics::plot.default.
-  make_arm <- function(type_slot) {
-    hc_mat <- matrix(rnorm(30L), nrow = 3L, ncol = 10L)
+test_that("every forecast method takes a multivariate forecast", {
+  # A multivariate fit's hindcast holds one `mvgam_forecast` per
+  # response. On a long frame each element spans the series. On a
+  # wide frame each element is one response's series.
+  make_part <- function(type, series = "s1", shift = 0) {
     structure(list(
-      family = "gaussian", family_pars = NULL,
-      type = type_slot,
-      series_names = "s1",
-      train_observations = list(s1 = seq_len(10L)),
-      train_times = list(s1 = seq_len(10L)),
+      family = "gaussian", family_pars = NULL, type = type,
+      series_names = factor(series),
+      train_observations = stats::setNames(list(seq_len(10L)), series),
+      train_times = stats::setNames(list(seq_len(10L)), series),
       test_observations = NULL, test_times = NULL,
-      hindcasts = list(s1 = hc_mat),
+      hindcasts = stats::setNames(
+        list(matrix(seq_len(30L) + shift, nrow = 3L)), series
+      ),
       forecasts = NULL
     ), class = "mvgam_forecast")
   }
-  wrapper <- list(count = make_arm("trend"), pa = make_arm("trend"))
-  class(wrapper) <- "mvgam_forecast"
-  attr(wrapper, "mv_wrapper") <- TRUE
+  wrap <- function(parts, keyed = FALSE) {
+    structure(parts, class = "mvgam_forecast", mv_wrapper = TRUE,
+              response_keyed = keyed)
+  }
+  resps <- c("count", "pa")
 
-  p <- plot(wrapper)
-  # No obs point layer overlaid on trend-scale ribbon.
-  has_point <- vapply(p$layers,
-    function(l) inherits(l$geom, "GeomPoint"),
-    logical(1L))
-  expect_false(any(has_point))
+  # A trend-scale forecast repeats one state per response. It is drawn
+  # once, without observations.
+  trend <- wrap(list(count = make_part("trend"), pa = make_part("trend")))
+  layers <- plot(trend)$layers
+  expect_false(any(vapply(layers, function(l) inherits(l$geom, "GeomPoint"),
+                          logical(1L))))
 
-  # Response-scale wrapper renders one panel per response.
-  wrapper2 <- list(count = make_arm("response"),
-                   pa    = make_arm("response"))
-  class(wrapper2) <- "mvgam_forecast"
-  attr(wrapper2, "mv_wrapper") <- TRUE
-  p2 <- plot(wrapper2)
-  # patchwork stacks the per-arm plots when available; if not,
-  # we get the last per-arm ggplot back invisibly.
-  expect_true(inherits(p2, "ggplot") ||
-                inherits(p2, "patchwork"))
+  long <- wrap(list(count = make_part("response"),
+                    pa = make_part("response", shift = 100)))
+  expect_s3_class(plot(long), "patchwork")
+  expect_output(print(long), "Response 'pa'")
+  sm <- summary(long)
+  expect_identical(sm$resp, rep(resps, each = 10L))
+  expect_equal(sm$truth, rep(1:10, 2L))
+  # Both responses of an ensemble take the same draw rows
+  ens <- ensemble(long, long, ndraws = 6L, seed = 1L)
+  expect_identical(names(ens), resps)
+  expect_equal(ens$pa$hindcasts$s1 - 100, ens$count$hindcasts$s1)
+  expect_error(ensemble(long, make_part("response")),
+               "same responses")
+
+  # A wide forecast becomes one forecast whose series are the responses
+  wide <- wrap(list(count = make_part("response", "count"),
+                    pa = make_part("response", "pa", shift = 100)),
+               keyed = TRUE)
+  expect_identical(levels(summary(wide)$series), resps)
+  expect_length(grep("family:", capture.output(print(wide))), 1L)
+  ens_wide <- ensemble(wide, wide, ndraws = 6L, seed = 1L)
+  expect_identical(as.character(ens_wide$series_names), resps)
+  expect_equal(ens_wide$hindcasts$pa - 100, ens_wide$hindcasts$count)
 })
 
 
@@ -302,7 +305,7 @@ test_that("Multi-series hindcast returns one matrix per series", {
       matrix(0, nrow = 2L, ncol = nrow(newdata))
     },
     # Each cell is keyed to the series and the time of the row it
-    # was built from, and the two series have different keys.
+    # was built from. The two series have different keys.
     draw_observations = function(object, linpred, newdata, draw_ids,
                                  resp = NULL) {
       key <- 100L * match(as.character(newdata$series), c("a", "b")) +

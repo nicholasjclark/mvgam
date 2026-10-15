@@ -1,22 +1,16 @@
 # Numeric scoring kernels for posterior forecast evaluation.
 #
-# Six scorers, organised into two groups:
-#   Univariate per-(time) cell : CRPS, DRPS, SIS, Brier
-#   Multivariate per-horizon   : Energy, Variogram
+# Eleven scorers in two groups:
+#   Univariate, one cell per time : CRPS, DRPS, SIS, Brier, log score,
+#                                   DSS, quantile score, twCRPS
+#   Multivariate, one per horizon : energy, variogram, twenergy
 #
-# Every per-cell scorer wraps a `(truth, fc_col, ...)` ->
-# `c(score, in_interval)` kernel via apply_univariate_score(),
-# which handles the NA guard, the output shape, and column
-# naming. Multivariate scorers wrap a `(truth_at_h, fc_at_h,
-# ...)` -> scalar kernel via apply_multivariate_score(), which
-# stacks the per-series forecasts at each horizon and dispatches.
-#
-# CRPS uses scoringRules::crps_sample under the EDF method;
-# energy uses scoringRules::es_sample. Variogram is kept in-tree
-# because scoringRules::vs_sample uses a mean pairwise sqrt-
-# difference, whereas the established mvgam choice is the median
-# (more robust to skewed forecast distributions).
-
+# Each univariate scorer wraps a `(truth, fc_col, ...)` ->
+# `c(score, in_interval)` kernel in apply_univariate_score(). The
+# wrapper guards NA truths, shapes the output and names its columns.
+# Each multivariate scorer wraps a `(truth_at_h, fc_at_h, ...)` ->
+# scalar kernel in apply_multivariate_score(). That wrapper stacks the
+# per-series forecasts at each horizon.
 
 # ----- Shared utilities -------------------------------------------
 
@@ -153,13 +147,16 @@ sis_cell <- function(truth, fc, interval_width = 0.9,
 }
 
 
-# Brier-style mean squared error of the forecast draws against
-# the truth. Coverage cell is NA because the canonical Brier
-# score targets binary outcomes, where a central PI is
-# ill-defined.
+# Brier score: squared error of the forecast probability against a
+# 0/1 truth. The mean of the draws estimates that probability from
+# 0/1 response draws and from expected-value draws alike. The mean of
+# the per-draw squared errors equals P(draw != truth) on 0/1 draws.
+# That quantity is linear in the probability and rewards a forecast
+# pushed to 0 or 1. The coverage cell is NA. A central interval of a
+# binary outcome has no useful width.
 #'@noRd
 brier_cell <- function(truth, fc, ...) {
-  c(mean((truth - fc)^2), NA_real_)
+  c((truth - mean(fc))^2, NA_real_)
 }
 
 
@@ -187,11 +184,9 @@ dss_cell <- function(truth, fc, ...) {
 }
 
 
-# Quantile (pinball) score at level `alpha`. Strictly proper
-# for the alpha-quantile functional. Targets one quantile;
-# CRPS integrates this across all alpha, so the per-cell
-# pinball lets users evaluate asymmetric / tail-focused
-# horizons directly.
+# Quantile (pinball) score at level `alpha`. It is strictly proper
+# for the alpha-quantile. The CRPS integrates it over every alpha.
+# One level scores a single tail of the forecast.
 #'@noRd
 qs_cell <- function(truth, fc, alpha = 0.5, ...) {
   s <- scoringRules::qs_sample(
@@ -219,11 +214,11 @@ twcrps_cell <- function(truth, fc, lower = -Inf, upper = Inf,
 
 # ----- Per-horizon multivariate kernels ---------------------------
 
-#' Forecast draws prepared for an energy score
+#' Forecast draws prepared for a multivariate score
 #'
 #' Drops every draw column holding a missing value and applies the log
-#' offset when `log = TRUE`. The energy and threshold-weighted energy
-#' score cells both call it.
+#' offset when `log = TRUE`. The energy, threshold-weighted energy and
+#' variogram score cells call it.
 #'
 #' @param truth Numeric vector of observed values, one per series
 #' @param fc Numeric matrix of forecast draws, one row per series
@@ -274,41 +269,20 @@ twenergy_cell <- function(truth, fc, lower = -Inf, upper = Inf,
 }
 
 
-# Variogram score with the median pairwise sqrt-difference
-# across forecast draws (more robust than the mean for skewed
-# predictives, which is the established mvgam choice over
-# scoringRules::vs_sample).
-#
-# Vectorised via outer() for the truth-side pairwise structure;
-# the forecast-side median is filled into the upper triangle
-# only (the lower triangle is implied by symmetry and never
-# read again because the final sum runs over upper.tri()).
+# Variogram score of order 0.5 via scoringRules (Scheuerer and Hamill
+# 2015). `weights` gives each pair of series the mean of their weights.
 #'@noRd
-variogram_cell <- function(truth, fc, log = FALSE,
-                             weights = NULL) {
-  if (log) {
-    truth <- log_offset(truth)
-    fc <- log_offset(fc)
-  }
-  n <- length(truth)
-  W <- if (is.null(weights)) {
-    matrix(1, n, n)
-  } else {
+variogram_cell <- function(truth, fc, log = FALSE, weights = NULL) {
+  insight::check_if_installed(
+    "scoringRules",
+    reason = "to calculate variogram scores"
+  )
+  cleaned <- clean_fc_for_es(truth, fc, log = log)
+  w_vs <- if (!is.null(weights)) {
     outer(weights, weights, function(x, y) (x + y) / 2)
   }
-  Vd <- outer(truth, truth, function(x, y) abs(x - y)^0.5)
-  Vfc <- matrix(0, n, n)
-  if (n >= 2L) {
-    for (i in seq_len(n - 1L)) {
-      for (j in (i + 1L):n) {
-        Vfc[i, j] <- stats::quantile(
-          abs(fc[i, ] - fc[j, ])^0.5, 0.5, na.rm = TRUE
-        )
-      }
-    }
-  }
-  pair_sq <- W * (Vd - Vfc)^2
-  sum(pair_sq[upper.tri(pair_sq)])
+  scoringRules::vs_sample(y = cleaned$truth, dat = cleaned$fc,
+                          w_vs = w_vs, p = 0.5)
 }
 
 

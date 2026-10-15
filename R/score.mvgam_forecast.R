@@ -55,8 +55,9 @@ joint_forecast_scores <- c("energy", "variogram", "twenergy")
 #'   \item{`"sis"`}{Scaled Interval Score; width of the central
 #'     PI plus a penalty for misses scaled by its miscoverage
 #'     rate, `1 - interval_width`.}
-#'   \item{`"brier"`}{Mean squared error of draws against
-#'     truth; canonical for binary outcomes.}
+#'   \item{`"brier"`}{Brier score for a binary outcome: the squared
+#'     difference between the observation and the mean of the draws,
+#'     which estimates the forecast probability.}
 #'   \item{`"logs"`}{Logarithmic score `-log f(y)` via a kernel
 #'     density estimate; bridges to ELPD / LOO.}
 #'   \item{`"dss"`}{Dawid-Sebastiani score: cheap moment-based
@@ -65,8 +66,8 @@ joint_forecast_scores <- c("energy", "variogram", "twenergy")
 #'   \item{`"twcrps"`}{Threshold-weighted CRPS focusing scoring
 #'     on the `[lower, upper]` region.}
 #'   \item{`"energy"`}{Multivariate Energy score across series.}
-#'   \item{`"variogram"`}{Variogram score with median pairwise
-#'     sqrt-differences across forecast draws.}
+#'   \item{`"variogram"`}{Variogram score of order 0.5 across
+#'     series (Scheuerer & Hamill, 2015).}
 #'   \item{`"twenergy"`}{Threshold-weighted Energy score.}
 #' }
 #'
@@ -122,6 +123,10 @@ joint_forecast_scores <- c("energy", "variogram", "twenergy")
 #'   *Journal of the American Statistical Association*,
 #'   102(477), 359-378.
 #'
+#'   Scheuerer, M. and Hamill, T. M. (2015). Variogram-based proper
+#'   scoring rules for probabilistic forecasts of multivariate
+#'   quantities. *Monthly Weather Review*, 143(4), 1321-1334.
+#'
 #' @examples
 #' \dontrun{
 #' set.seed(11)
@@ -157,16 +162,11 @@ score.mvgam_forecast <- function(object,
                                    weights = NULL,
                                    ...) {
   checkmate::assert_class(object, "mvgam_forecast")
-  # A fan-out wrapper holds one forecast per response and has no
-  # `$forecasts` element of its own. On a wide frame the responses are
-  # the series. The wrapper is then scored as one forecast over them.
-  # On a long frame each element spans every series. Each element is
-  # then scored for its own response.
-  if (isTRUE(attr(object, "response_keyed"))) {
-    object <- response_axis_forecast(object)
-  } else if (isTRUE(attr(object, "mv_wrapper"))) {
+  # A long-frame wrapper is scored per response
+  object <- forecast_parts(object)
+  if (is_forecast_list(object)) {
     return(lapply(
-      unclass(object), score.mvgam_forecast,
+      object, score.mvgam_forecast,
       score = score, interval_width = interval_width,
       quantile_level = quantile_level, lower = lower, upper = upper,
       log = log, weights = weights, ...
@@ -376,17 +376,14 @@ sum_univariate_horizon <- function(series_score, score, test_times) {
     }
     as.numeric(test_times[[lv]])[seq_len(n)]
   })
-  horizon <- sort(unique(unlist(times, use.names = FALSE)))
-  total <- numeric(length(horizon))
-  for (i in seq_along(scored)) {
-    at <- match(times[[i]], horizon)
-    value <- series_score[[scored[i]]]$score
-    held <- !is.na(value)
-    total[at[held]] <- total[at[held]] + value[held]
-  }
+  time <- unlist(times, use.names = FALSE)
+  value <- unlist(lapply(scored, function(lv) series_score[[lv]]$score),
+                  use.names = FALSE)
+  total <- tapply(value, factor(time, levels = sort(unique(time))),
+                  sum_measured)
   data.frame(
-    score = total,
-    eval_horizon = seq_along(horizon),
+    score = as.numeric(total),
+    eval_horizon = seq_along(total),
     score_type = paste0("sum_", score),
     stringsAsFactors = FALSE
   )
@@ -425,7 +422,7 @@ shares_forecast_times <- function(test_times) {
 #' @param lower Numeric lower threshold of the `twenergy` score
 #' @param upper Numeric upper threshold of the `twenergy` score
 #' @param log Logical. `TRUE` scores on the log scale
-#' @param weights Numeric weight matrix of the `variogram` score, or
+#' @param weights Numeric per-series weights of the `variogram` score, or
 #'   `NULL`
 #' @return Named list of per-series data frames, followed by the joint
 #'   `all_series` score
@@ -564,7 +561,7 @@ dispatch_univariate_score <- function(score, truth, fc,
 #' @param lower Numeric lower threshold of the `twenergy` score
 #' @param upper Numeric upper threshold of the `twenergy` score
 #' @param log Logical. `TRUE` scores on the log scale
-#' @param weights Numeric weight matrix of the `variogram` score, or
+#' @param weights Numeric per-series weights of the `variogram` score, or
 #'   `NULL`
 #' @return Numeric vector of joint scores, one per horizon
 #' @noRd

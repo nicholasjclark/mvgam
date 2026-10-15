@@ -42,6 +42,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * Predictions with `incl_autocor = TRUE` and `log_lik()` refuse times outside the fitted times. Use `forecast()`
 * `ZMVN()` and `PW()` forecasts require every series to share one set of forecast times
 * `conditional_effects()` defaults to `type = "expected"`
+* `pp_check()` draws bars for a bernoulli or ordinal response
 * Trend scale priors take the response's spread on the link scale as 'brms' defaults do. `LLT()` and `PW()` growth priors also scale with the series length
 * `PW()` `changepoint_scale` (default `0.3`) is a change in growth over the whole series
 * `CAR()` keeps its autoregressive parameter inside `(0, 1)` and measures time in median observation gaps
@@ -61,6 +62,10 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * Closure-unit families and `com_binomial()` accept missing responses
 * `ensemble()` combines `hindcast()` results
 * `CAR()` process variance scales with the time lag (#107)
+* `score(score = "brier")` scores the forecast probability, the mean of the draws
+* `score(score = "variogram")` follows Scheuerer and Hamill (2015) through `scoringRules::vs_sample()`
+* Every `mvgam_forecast` method takes the forecasts of a multivariate model
+* `methods_md()` writes offsets into the linear predictor
 * Fixes to forecast scores with one test observation, offsets with `gp()` terms, piecewise trend predictions, by-factor Gaussian Process predictions, the `max_treedepth` check in `summary()` and plots of residuals with missing values (thanks to @StefanoMezzini)
 
 # mvgam 1.1.51

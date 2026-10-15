@@ -30,18 +30,18 @@
 #' @param rug Logical. If `TRUE`, rug tick marks are drawn along the
 #'   axes, on the same scales the points overlay applies to.
 #' @param process_error Logical. Passed to `plot_predictions()` /
-#'   `get_predict.mvgam`. Defaults to `FALSE`, so the trend
-#'   contributes its deterministic submodel and the panel shows the
-#'   covariate effect with the latent process held out. Set `TRUE` to
-#'   integrate over the trend's dynamics, which widens the band by the
-#'   latent state's own spread.
+#'   `get_predict.mvgam`. With the default `FALSE` the trend
+#'   contributes its deterministic submodel. The panel then shows the
+#'   covariate effect with the latent process held out. `TRUE`
+#'   integrates over the trend's dynamics, which widens the band by
+#'   the latent state's own spread.
 #' @param series Which series the panels show. `NULL` (the default)
 #'   draws one panel per effect at the reference series, as brms does
 #'   for a grouping factor. A factor model whose `trend_formula` uses
-#'   [lv_axis()] gives each series its own effect, and `NULL` then
-#'   draws a panel per series. `"all"` draws a panel per series for
-#'   any model. A single integer or character value picks one series
-#'   and filters the prediction grid to its observations.
+#'   [lv_axis()] gives each series its own effect. `NULL` then draws a
+#'   panel per series. `"all"` draws a panel per series for any model.
+#'   A single integer or character value picks one series and filters
+#'   the prediction grid to its observations.
 #' @inheritParams forecast.mvgam
 #' @param ... Additional arguments forwarded to
 #'   [marginaleffects::plot_predictions()].
@@ -101,22 +101,30 @@ conditional_effects.mvgam <- function(x,
   require_fitted_model(x, "conditional_effects")
   checkmate::assert_character(effects, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1L)
-  # `resp` is the per-response selector for multivariate fits
-  # (mvbind / mvbrmsformula). NULL on a mv fit fans out across
-  # responses and returns a named list of `brms_conditional_effects`
-  # objects; a single response name scopes the result. Univariate
-  # fits ignore the arg.
+  # `resp` selects one response of a multivariate fit. Univariate fits
+  # ignore it.
   checkmate::assert_string(resp, null.ok = TRUE)
 
-  # Multivariate fan-out: build one effects list per response and
-  # return a named list, mirroring residuals.mvgam / pp_check.mvgam.
-  # We tag the outer wrapper as `mvgam_conditional_effects` so
-  # `plot()` / `print()` dispatch is uniform whether the fit is
-  # uni- or multivariate; extraction via
-  # `as.data.frame.mvgam_conditional_effects()` also relies on
-  # the class marker to recognise the fan-out shape.
+  # `resp = NULL` on a multivariate fit returns a named list with one
+  # `mvgam_conditional_effects` per response, as residuals.mvgam and
+  # pp_check.mvgam do. The wrapper takes the same class. `plot()`,
+  # `print()` and `as.data.frame()` then accept either shape.
   fan <- mv_resp_fan_out(x, resp, class = "mvgam_conditional_effects")
   if (!is.null(fan)) {
+    # Each response draws the effects its own formula and the trend
+    # formula hold. A response with no such effect is left out.
+    kept <- lengths(fan) > 0L
+    if (!any(kept) && !is.null(effects)) {
+      stop(insight::format_error(c(
+        "The named effects appear in none of the model's formulas.",
+        x = paste0("Named: ", paste(effects, collapse = ", "), "."),
+        i = "'conditional_effects(fit)' draws every effect of each response."
+      )), call. = FALSE)
+    }
+    attrs <- attributes(fan)
+    fan <- fan[kept]
+    attributes(fan) <- c(attributes(fan),
+                         attrs[setdiff(names(attrs), "names")])
     return(fan)
   }
   type <- match.arg(
@@ -125,11 +133,10 @@ conditional_effects.mvgam <- function(x,
       "variance", "latent_state", "detection")
   )
   # Family-specific types are valid only for the families that
-  # register them on `attr(family, "mvgam_predict_types")`. Defer
-  # the deeper check to predict.mvgam (which surfaces a typed error
-  # listing the family's exposed types), but reject the
-  # non-closure-unit case here so the user gets the error early
-  # rather than via a generic marginaleffects failure.
+  # register them on `attr(family, "mvgam_predict_types")`.
+  # predict.mvgam lists a family's types when it refuses one. A family
+  # without closure units is refused here, before marginaleffects
+  # reports the failure in its own words.
   if (type %in% c("latent_state", "detection")) {
     require_closure_unit_predict_type(x$family, type)
   }
@@ -154,7 +161,9 @@ conditional_effects.mvgam <- function(x,
   }
   if (!obs_scale) rug <- FALSE
 
-  detected <- detect_conditional_effects(x)
+  # Each response of a multivariate fit offers the effects of its own
+  # formula and of the shared trend formula
+  detected <- detect_conditional_effects(x, resp = resp)
   cond_labs <- if (is.null(effects)) {
     detected
   } else {
@@ -162,6 +171,16 @@ conditional_effects.mvgam <- function(x,
       with_series_grouping(strsplit(e, ":")[[1L]], detected,
                            axis_vars(x)$series_var)
     })
+  }
+  # One response of a multivariate fit draws the named effects its own
+  # formula and the trend formula hold. An effect it lacks would draw
+  # a flat line at the response's mean.
+  if (!is.null(effects) && !is.null(resp)) {
+    own_vars <- c(unlist(detected, use.names = FALSE),
+                  axis_vars(x)$series_var)
+    cond_labs <- cond_labs[vapply(cond_labs, function(g) {
+      all(g %in% own_vars)
+    }, logical(1L))]
   }
 
   if (any(lengths(cond_labs) > 3L)) {
@@ -180,9 +199,8 @@ conditional_effects.mvgam <- function(x,
     return(out)
   }
 
-  # Pre-check the four-way facet case before the dispatch loop:
-  # marginaleffects caps `condition` at three variables, and `series`
-  # facetting would push a 3-var effect to 4.
+  # marginaleffects caps `condition` at three variables. Faceting by
+  # series adds a fourth to a three-variable effect.
   if (identical(series_mode$kind, "all") &&
         any(lengths(cond_labs) >= 3L)) {
     stop(insight::format_error(c(
@@ -211,9 +229,9 @@ conditional_effects.mvgam <- function(x,
     )))
   }
 
-  # The collision check above owns the names mvgam sets itself. What
-  # remains of `...` reaches `marginaleffects::plot_predictions`,
-  # which drops a name it does not read, so a misspelling drew the
+  # The collision check above covers the names mvgam sets itself. The
+  # rest of `...` goes to `marginaleffects::plot_predictions`, which
+  # drops a name it does not use. A misspelt argument then drew the
   # panel on the default the caller meant to override.
   refuse_unread_dots(
     list(...),
@@ -259,7 +277,7 @@ conditional_effects.mvgam <- function(x,
       # marginaleffects validates `condition` against the model's own
       # variables. A column added to the frame here never reaches it.
       # A fit deriving its series from `gr` and `subgr` has no such
-      # variable, and the refusal names that.
+      # variable. The refusal names that cause.
       if (!series_var %in% names(x$data)) {
         stop(insight::format_error(c(
           "Faceting by series needs a series column in the data.",
@@ -286,17 +304,15 @@ conditional_effects.mvgam <- function(x,
               c(list(model), pp_args, list(...))),
       pp_args$condition, series_var
     )
-    # marginaleffects defaults the y-axis label to the model's
-    # first response name. For multi-response fits we know which
-    # arm we are plotting (`resp`); overwrite so the user sees
-    # the correct response on the y-axis.
+    # marginaleffects labels the y axis with the model's first
+    # response. On a multivariate fit the label names `resp`.
     if (!is.null(resp)) {
       p <- p + ggplot2::labs(y = resp)
       # The overlay inside `plot_predictions()` takes the
       # observation column from `insight::find_response()`, which
-      # names every response on a wide fit. One column is what it
-      # needs. `resp` names that one, and the layer goes on here
-      # against the frame the panel was given.
+      # names every response on a wide fit. `resp` names the one
+      # column the overlay needs. The layer is added here, on the
+      # frame the panel was given.
       if (points_alpha > 0) {
         pts <- pp_args$newdata %||% x$data
         p <- p + ggplot2::geom_point(
@@ -390,10 +406,9 @@ print.mvgam_conditional_effects <- function(x, ...) plot(x, ...)
 #' point, per effect, per response). Columns are `resp` (present only
 #' when the fit is multivariate), `effect` (the primary conditioning
 #' variable name), `estimate__`, `lower__`, `upper__`, followed by
-#' whichever additional grid columns marginaleffects populated. Those
-#' three are brms's names for them, and [conditional_smooths.mvgam()]
-#' answers with the same three, so one frame can be read the way the
-#' other is.
+#' whichever additional grid columns marginaleffects populated. The
+#' three estimate columns take brms's names, as in the frame
+#' [conditional_smooths.mvgam()] returns.
 #'
 #' Use this to reach the raw numbers when you want to build a custom
 #' plot, overlay several fits, or compare against a known truth. It
@@ -422,10 +437,9 @@ as.data.frame.mvgam_conditional_effects <- function(x,
       if (is.null(d) || nrow(d) == 0L) return(data.frame())
       d$rowid <- NULL
       # brms names the estimate and its interval with a trailing
-      # underscore in both drawn views, and
-      # `conditional_smooths.mvgam()` already answers that way. The
-      # ggplot itself keeps marginaleffects' own names, which its
-      # layers map to aesthetics.
+      # double underscore, as `conditional_smooths.mvgam()` does. The
+      # ggplot keeps marginaleffects' own names, which its layers map
+      # to aesthetics.
       spellings <- c(estimate = "estimate__", conf.low = "lower__",
                      conf.high = "upper__")
       hit <- intersect(names(spellings), names(d))
@@ -453,18 +467,16 @@ as.data.frame.mvgam_conditional_effects <- function(x,
 }
 
 
-# Enumerate the conditional-effects term labels for an mvgam fit:
-# walks the observation formula plus the trend formula (when
-# present), splits smooth / interaction terms, and returns a list of
-# unique up-to-3-way variable groupings.
+# The variable groupings `conditional_effects()` draws, one panel
+# each, from the observation formula and the trend formula. `resp`
+# limits the observation terms to one response of a multivariate fit.
 #
-# An offset needs no exclusion here: `stats::terms()` records it
-# under the "offset" attribute rather than in "term.labels", so it
-# never reaches this list, which is also how brms arrives at the
-# same set. Its value still enters the prediction, held at the
-# reference the conditioning grid gives it.
-detect_conditional_effects <- function(x) {
-  mvgam_term_list(x)$groupings
+# `stats::terms()` records an offset under the "offset" attribute,
+# outside "term.labels". The offset reaches no grouping, as in brms.
+# Its value still enters the prediction, held at the reference the
+# conditioning grid gives it.
+detect_conditional_effects <- function(x, resp = NULL) {
+  mvgam_term_list(x, resp = resp)$groupings
 }
 
 
@@ -507,14 +519,13 @@ split_term_labels <- function(lab) {
   }
   # A label `terms()` wrote always parses.
   expr <- rlang::parse_expr(lab)
-  # A `*` reaching here is part of an expression, not a separator
-  # between two effects. `terms()` expands a genuine `a * b` into its
-  # main effects and `a:b` before this is called. The only labels
-  # still carrying one are calls such as `exp(b2 * x)`, which name a
-  # single covariate. Splitting those on the text gave `exp(b2 ` and
-  # ` x)`, neither of which is a column: the term was dropped and the
-  # model offered no effects at all. Anything else falls through to
-  # `all.vars()` below, which reads `x` out of the call.
+  # `terms()` expands a formula's `a * b` into its main effects and
+  # `a:b` before the label arrives here. A `*` that remains belongs to
+  # an expression such as `exp(b2 * x)`, which names one covariate.
+  # Splitting that label on the text gave `exp(b2 ` and ` x)`, neither
+  # of them a column. The term was dropped and the model offered no
+  # effects at all. Other calls go to `all.vars()` below, which
+  # returns `x` from the call.
   if (is.call(expr) && identical(expr[[1L]], as.name("*"))) {
     return(list(vapply(as.list(expr)[-1L], deparse, character(1L))))
   }
@@ -523,11 +534,12 @@ split_term_labels <- function(lab) {
     return(list(all.vars(expr)))
   }
   # A smooth names its covariates as unnamed arguments and its
-  # grouping as `by`; every other argument is a setting. All three are
-  # read off the call. Evaluating the call needed every setting to
-  # resolve: `k = kk` failed and fell back to reporting `kk` as a
-  # covariate. It also returned `by` as deparsed text, and
-  # `by = interaction(a, b)` offered a column named after the call.
+  # grouping as `by`; every other argument is a setting. The function
+  # takes both from the unevaluated call. Evaluating the call needed
+  # every setting to resolve: `k = kk` failed and reported `kk` as a
+  # covariate. Evaluation also returned `by` as deparsed text.
+  # `by = interaction(a, b)` then offered a column named after the
+  # call.
   args <- as.list(expr)[-1L]
   arg_names <- names(args) %||% character(length(args))
   by_vars <- if ("by" %in% arg_names) all.vars(args[["by"]]) else NULL
@@ -552,8 +564,8 @@ resolve_series_arg <- function(series, x) {
     return(list(kind = "none", level = NA_character_))
   }
   # The axis record names the series. A fit whose series comes from
-  # `gr` and `subgr` carries no series column, and this function
-  # refused four series the record names.
+  # `gr` and `subgr` has no series column. The record holds its
+  # series all the same.
   series_levels <- mvgam_axes(x)$series$levels
   if (!length(series_levels)) {
     stop(insight::format_error(c(
@@ -639,8 +651,8 @@ style_effect_panel <- function(p, condition, series_var) {
   }
   if (by_series) {
     # marginaleffects labels the colour and fill it mapped. The facet
-    # strips name the series now, and a label with no mapping left to
-    # carry it draws a notice.
+    # strips name the series instead. A label without a mapping draws
+    # a notice.
     p$labels[c("colour", "fill")] <- NULL
     return(p + ggplot2::facet_wrap(ggplot2::vars(.data[[series_var]]),
                                    scales = "free_y") +
@@ -656,12 +668,12 @@ style_effect_panel <- function(p, condition, series_var) {
 }
 
 
-# Tidy ggplot legend labels: keep integers untouched, round numeric
-# values to the minimum precision needed across the label set so
-# legends don't carry 8+ digit floating-point noise.
+# Legend labels for a numeric grouping. Integers print as they are.
+# Other values round to the fewest decimals, at most four, that tell
+# the labels apart. Floating-point noise then stays out of the legend.
 round_legend_labels <- function(x) {
-  numeric_x <- suppressWarnings(as.numeric(x))
-  if (all(is.na(numeric_x))) {
+  numeric_x <- utils::type.convert(as.character(x), as.is = TRUE)
+  if (!is.numeric(numeric_x)) {
     return(x)
   }
   decimals <- vapply(numeric_x, function(v) {

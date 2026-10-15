@@ -68,7 +68,6 @@ reference:
   - control_params.mvgam
   - mvgam_use_cases
   - mvgam-package
-  - startup
 
 - title: Formula and trend specification
   desc: >

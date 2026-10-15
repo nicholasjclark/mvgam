@@ -172,16 +172,10 @@ log_lik.mvgam <- function(object,
       if (length(per_resp) == 1L) {
         return(per_resp[[1L]])
       }
-      # A response that was not measured at this occasion has no
-      # density, and `.apply_log_density()` leaves its column `NA`
-      # so `clean_ll()` can drop it. That contract holds for one
-      # response and breaks the moment the arms are summed: a plain
-      # `Reduce("+")` propagates one arm's `NA` across the whole
-      # occasion, so a frame whose responses have disjoint gaps
-      # loses the densities it did measure. Sum the arms that were
-      # measured, and keep the occasion missing only when none of
-      # them was.
-      return(sum_measured_arms(per_resp))
+      # A response not measured at an occasion has an `NA` density.
+      # The joint sums the measured responses. It is missing only at
+      # an occasion where no response was measured.
+      return(sum_measured(simplify2array(per_resp), dims = 2L))
     }
   }
 
@@ -421,30 +415,6 @@ dispatch_log_lik <- function(family_name, link, linpred, y,
 # [ndraws x nobs] matrices, the `trials` vector for binomial-family, and the
 # link string. Returns [ndraws x nobs] of log densities matching brms's
 # *_lpdf / *_lpmf parameterisations.
-
-#' The joint log-density of several responses at shared occasions
-#'
-#' Each element holds a missing column wherever its response was not
-#' measured. The joint sums the measured responses and is missing only
-#' at an occasion with none.
-#'
-#' @param per_resp List of numeric log-density matrices with dimensions
-#'   `[ndraws, nobs]`, one per response
-#' @return Numeric matrix with dimensions `[ndraws, nobs]`
-#' @noRd
-sum_measured_arms <- function(per_resp) {
-  checkmate::assert_list(per_resp, types = "matrix", min.len = 1L)
-  measured <- lapply(per_resp, function(m) !is.na(m))
-  n_measured <- Reduce(`+`, measured)
-  filled <- Map(function(m, ok) {
-    m[!ok] <- 0
-    m
-  }, per_resp, measured)
-  out <- Reduce(`+`, filled)
-  out[n_measured == 0L] <- NA_real_
-  out
-}
-
 
 # Wrap a per-observation function call to keep return shape [ndraws x nobs]
 # regardless of the underlying density signature.

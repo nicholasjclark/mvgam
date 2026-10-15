@@ -175,6 +175,11 @@ test_that("pp_check(type = 'fit_stat') is refused where no unit aggregates", {
   for (fam in list(occ(), nmix())) {
     expect_true(is_closure_unit_family(fam))
   }
+  # Custom families without the flag and built-in families
+  for (fam in list(tweedie(), beta_nb(), com_binomial(), poisson(),
+                   bernoulli(), brms::negbinomial())) {
+    expect_false(is_closure_unit_family(fam))
+  }
 })
 
 test_that("mvgam_ppc_fit_stat print + plot methods produce expected output", {

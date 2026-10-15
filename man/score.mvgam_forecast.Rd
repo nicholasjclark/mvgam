@@ -83,8 +83,9 @@ specialised to count outcomes.}
 \item{\code{"sis"}}{Scaled Interval Score; width of the central
 PI plus a penalty for misses scaled by its miscoverage
 rate, \code{1 - interval_width}.}
-\item{\code{"brier"}}{Mean squared error of draws against
-truth; canonical for binary outcomes.}
+\item{\code{"brier"}}{Brier score for a binary outcome: the squared
+difference between the observation and the mean of the draws,
+which estimates the forecast probability.}
 \item{\code{"logs"}}{Logarithmic score \verb{-log f(y)} via a kernel
 density estimate; bridges to ELPD / LOO.}
 \item{\code{"dss"}}{Dawid-Sebastiani score: cheap moment-based
@@ -93,8 +94,8 @@ proper score depending only on predictive mean / SD.}
 \item{\code{"twcrps"}}{Threshold-weighted CRPS focusing scoring
 on the \verb{[lower, upper]} region.}
 \item{\code{"energy"}}{Multivariate Energy score across series.}
-\item{\code{"variogram"}}{Variogram score with median pairwise
-sqrt-differences across forecast draws.}
+\item{\code{"variogram"}}{Variogram score of order 0.5 across
+series (Scheuerer & Hamill, 2015).}
 \item{\code{"twenergy"}}{Threshold-weighted Energy score.}
 }
 }
@@ -127,6 +128,10 @@ Gneiting, T. and Raftery, A. E. (2007). Strictly
 Proper Scoring Rules, Prediction, and Estimation.
 \emph{Journal of the American Statistical Association},
 102(477), 359-378.
+
+Scheuerer, M. and Hamill, T. M. (2015). Variogram-based proper
+scoring rules for probabilistic forecasts of multivariate
+quantities. \emph{Monthly Weather Review}, 143(4), 1321-1334.
 }
 \seealso{
 \link{forecast.mvgam}, \link{hindcast.mvgam},

@@ -1,28 +1,24 @@
-# Structure and post-fit coverage for a wide `mvbf()` frame, fitted
-# in this file.
+# Structure and post-fit coverage for a wide `mvbf()` frame.
 #
-# A wide frame holds one row per occasion and one column per
-# response, so the series an observation sits on is a property of the
-# `(row, response)` pair rather than of the row. That is the one
-# shape a data-frame attribute cannot express, and the defect it
-# produced was a frame cut into a row-block per response: each
-# response owned a stretch of the timeline instead of a series, and
-# every count, dimension and bound stayed correct.
+# A wide frame holds one row per occasion and one column per response.
+# The series of an observation is a property of the (row, response)
+# pair. A frame cut into one block of rows per response gives each
+# response a stretch of the timeline in place of a series, with every
+# count, dimension and bound still correct. The tests compare values
+# for that reason.
 #
-# It is also the cheapest place to hold several families side by
-# side. Three responses with three different likelihoods share one
-# trend, so a claim about how a family reaches a surface is made
-# three times by one fit.
+# Three responses with three likelihoods share one trend. Each claim
+# about how a family reaches a surface is then made three times by one
+# fit.
 #
 #   truth: 3 responses on 60 shared occasions, one latent AR per
-#          response with correlated innovations, and a disjoint set
-#          of unobserved occasions per response
+#          response with correlated innovations; each response
+#          misses its own disjoint set of occasions
 #   model: mvbf(count ~ x, seen ~ x, mass ~ x) with poisson,
-#          bernoulli and gaussian arms, trend_formula = ~ AR(cor)
+#          bernoulli and gaussian responses, trend_formula = ~ AR(cor)
 #
-# Responses are named out of alphabetical order and occasions are
-# numbered from 3, so neither the axis nor the time index can be
-# recovered by sorting.
+# The responses run against alphabetical order and the occasions start
+# at 3. Sorting recovers neither the axis nor the time index.
 #
 # Run with:
 #   testthat::test_file("tests/local/test-grain-mvbf-wide.R")
@@ -33,23 +29,12 @@ suppressMessages({
   library(testthat)
 })
 
-# Several blocks below state what the package does not yet do, and
-# testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean. The limit is
-# read when the reporter is built, before this file is sourced, so it
-# has to come from the environment:
-#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
-
-# This file fits its own models and caches them beside itself, so it
-# depends on no shared fixture and no build step.
-
 set.seed(5150L)
 
 n_time <- 60L
 time_vals <- seq_len(n_time) + 2L
 
-# Formula order, which is the axis. Alphabetical order is mass,
-# count, seen, so an axis rebuilt by sorting differs from this one.
+# Formula order is the axis. Alphabetical order is mass, count, seen.
 responses <- c("count", "seen", "mass")
 stopifnot(!identical(responses, sort(responses)))
 n_resp <- length(responses)
@@ -75,11 +60,9 @@ dat$seen <- rbinom(n_time, 1L,
                    plogis(0.2 + 0.8 * x + latent[, 2L]))
 dat$mass <- 1.5 + 0.6 * x + latent[, 3L] + rnorm(n_time, 0, 0.3)
 
-# Disjoint gaps, of three different sizes, so no response's occasions
-# can be recovered from another's and a swapped pair of arms shows up
-# in the lengths alone. `mass` stops before the other two do, so the
-# per-response last-observed times differ: a frame whose responses
-# end together cannot tell a permuted record from the right one.
+# Disjoint gaps of three sizes. Swapping two responses changes their
+# lengths. `mass` stops four occasions early. Each response then ends
+# at its own last observed time, which exposes a permuted record.
 na_rows <- list(
   count = c(4L, 5L, 19L),
   seen = c(11L, 33L),
@@ -96,10 +79,9 @@ obs_formula <- bf(count ~ x, family = poisson()) +
   bf(mass ~ x, family = gaussian()) +
   set_rescor(FALSE)
 
-# The support each response's draws have to land in. This is the
-# claim that a shared trend has not flattened three likelihoods into
-# one: a wide fit that applied the first response's family to all of
-# them returns counts everywhere and passes every shape check.
+# The support each response's draws must land in. A wide fit that
+# applied the first response's family to all three returns counts
+# everywhere and passes every shape check.
 support_ok <- list(
   count = function(v) all(v >= 0) && all(v == floor(v)),
   seen = function(v) all(v %in% c(0, 1)),
@@ -111,8 +93,24 @@ sim_truth <- list(
   ar_true = ar_true, latent = latent, x = x, na_rows = na_rows
 )
 
-# A future frame in the wide shape: one row per occasion, every
-# response left missing, and every covariate the model reads.
+# marginaleffects warns that `resp` is not known to be supported for
+# this class. Its `sanity_dots()` hard-codes the accepted names per
+# class, outside mvgam's control. The helper asserts that this notice
+# is the only warning.
+predictions_resp <- function(...) {
+  got <- with_warnings(marginaleffects::predictions(...))
+  expect_true(all(grepl("not known to be supported", got$warnings)))
+  got$value
+}
+
+# The titles of a patchwork's panels, in drawing order
+panel_titles <- function(pw) {
+  vapply(c(pw$patches$plots, list(pw)),
+         function(p) p$labels$title %||% NA_character_, character(1L))
+}
+
+# A future frame in the wide shape. Each row holds one occasion, the
+# covariate `x` and a missing value for every response.
 make_future <- function(h, x_future = 0) {
   data.frame(
     time = max(time_vals) + seq_len(h),
@@ -133,17 +131,11 @@ built <- with_warnings(mvgam(
 prefit <- built$value
 
 
-test_that("the dropped occasions are reported once per response", {
+test_that("the dropped occasions are reported once for the frame", {
   # brms drops a row whose response is missing and says so once for
-  # the frame, whichever arm the gap was in. The count is the claim:
-  # assembling a model runs the code generator more than once over
-  # the same frame, so a notice raised per internal pass is a defect
-  # this package has had before, and a notice that stops arriving
-  # means rows leave the likelihood in silence.
-  #
-  # One notice for three arms with disjoint gaps cannot say which
-  # response lost what, which is recorded rather than asserted: the
-  # count below is the contract as it stands.
+  # the frame. Building a model runs the code generator more than once
+  # over the same frame. A notice per internal pass repeats it. A
+  # missing notice drops rows from the likelihood in silence.
   na_notice <- grep("Rows containing NAs", built$warnings, value = TRUE)
   expect_length(na_notice, 1L)
   expect_identical(setdiff(built$warnings, na_notice), character(0))
@@ -154,66 +146,44 @@ test_that("the series axis is the responses, in formula order", {
   ax <- mvgam:::mvgam_axes(prefit)
   expect_identical(as.character(ax$series$levels), responses)
   expect_identical(as.integer(ax$series$n), n_resp)
-  # How the axis was arrived at, not merely what it holds. A wide
-  # frame that decided its axis was explicit would have read a column
-  # that is not there.
+  # An axis recorded as explicit would look for a series column that a
+  # wide frame lacks
   expect_identical(ax$series$source, "multivariate")
   expect_identical(as.integer(ax$time$values), time_vals)
   expect_identical(as.integer(ax$time$n), n_time)
 })
 
 
-test_that("a wide frame has no per-row series to answer with", {
-  # `axis_row_series()` asks which series a row belongs to. On a wide
-  # frame that question has no answer: a row carries every response,
-  # so it sits on every series at once. Returning `NULL` is the
-  # contract, and this is the only shape that exercises the branch.
-  # A function that answered with the first series instead would give
-  # each row a plausible label and place every observation on one
+test_that("a wide frame gives no per-row series", {
+  # `axis_row_series()` returns the series of each row. A row of a wide
+  # frame carries every response and belongs to every series.
+  # Returning the first series would place every observation in one
   # column.
   expect_null(mvgam:::axis_row_series(prefit, dat))
 })
 
 
-test_that("each response owns a column, and they cover the axis", {
+test_that("each response indexes its own column of the latent grid", {
   sd <- prefit$standata
   expect_identical(as.integer(sd$N_series_trend), n_resp)
   expect_identical(as.integer(sd$N_time_trend), n_time)
 
-  columns <- vapply(responses, function(r) {
-    idx <- unique(as.integer(sd[[paste0("obs_trend_series_", r)]]))
-    if (length(idx) == 1L) idx else NA_integer_
-  }, integer(1), USE.NAMES = FALSE)
-  # A response spread over two columns is the row-block defect: it
-  # owned a stretch of the timeline rather than a series.
-  expect_false(anyNA(columns))
-  expect_identical(columns, seq_len(n_resp))
-})
-
-
-test_that("each arm is as long as its own response, not the frame", {
-  # The row-block split gave every response the same number of rows,
-  # so equal arm lengths is exactly what it produced. The gaps here
-  # are three different sizes for that reason.
-  sd <- prefit$standata
-  for (i in seq_along(responses)) {
-    r <- responses[i]
-    expect_identical(as.integer(sd[[paste0("N_", r)]]),
-                     length(observed_rows[[r]]))
-    expect_length(as.integer(sd[[paste0("obs_trend_series_", r)]]),
-                  length(observed_rows[[r]]))
-    # And the occasions it reads are the ones it was measured on,
-    # ranked against the shared grid. A block of the timeline handed
-    # to one response has the right length and the wrong entries.
-    expect_identical(
-      as.integer(sd[[paste0("obs_trend_time_", r)]]),
-      as.integer(observed_rows[[r]])
-    )
+  # Each response indexes one column at its own observed occasions,
+  # ranked against the shared grid. A block of rows cut per response
+  # spreads a response over columns and gives it the wrong times.
+  for (k in seq_along(responses)) {
+    r <- responses[k]
+    obs <- observed_rows[[r]]
+    expect_identical(as.integer(sd[[paste0("N_", r)]]), length(obs))
+    expect_identical(as.integer(sd[[paste0("obs_trend_series_", r)]]),
+                     rep(k, length(obs)))
+    expect_identical(as.integer(sd[[paste0("obs_trend_time_", r)]]),
+                     as.integer(obs))
   }
 })
 
 
-test_that("the program reads the trend on both axes, per response", {
+test_that("the program indexes the trend by series and time", {
   sc <- paste(as.character(stancode(prefit)), collapse = "\n")
   flat <- gsub("\\s+", " ", sc)
   for (r in responses) {
@@ -223,45 +193,17 @@ test_that("the program reads the trend on both axes, per response", {
       flat, fixed = TRUE
     ))
   }
-  # One latent dimension per response, and the innovations are drawn
-  # jointly, which is what `cor = TRUE` buys.
+  # `cor = TRUE` draws the innovations of the three latent dimensions
+  # jointly
   expect_true(grepl("cov_matrix[N_lv_trend] Sigma_trend", sc,
                     fixed = TRUE))
 })
 
 
-test_that("only the closure-unit families are classified as such", {
-  # A question about the family table rather than about this fit.
-  # `occ()` and `nmix()` model a detection process over repeat visits
-  # to a closed unit; every other family mvgam offers does not. The
-  # misclassification this catches sent `mvn()` fits into a
-  # `pp_check` type their own family refuses and made `augment()`
-  # demand a `cap` column that has no meaning for them.
-  closure <- c("occ", "nmix")
-  others <- c("tweedie", "mvn", "mvt", "diri", "beta_nb",
-              "com_binomial")
-  for (nm in closure) {
-    fam <- do.call(nm, list())
-    expect_true(mvgam:::is_closure_unit_family(fam),
-                label = paste(nm, "is a closure-unit family"))
-  }
-  for (nm in others) {
-    fam <- do.call(nm, list())
-    expect_false(mvgam:::is_closure_unit_family(fam),
-                 label = paste(nm, "is not a closure-unit family"))
-  }
-  for (fam in list(gaussian(), poisson(), bernoulli(), Gamma(),
-                   brms::negbinomial(), brms::Beta())) {
-    expect_false(mvgam:::is_closure_unit_family(fam))
-  }
-})
-
-
 # -- Fit --------------------------------------------------------------
 
-# The build runs only on a cache miss and captures its warnings
-# without asserting them. The same claim is made unconditionally on
-# the prefit.
+# The build runs only on a cache miss. It captures its warnings
+# without asserting them. The prefit block asserts them on every run.
 fit <- cached_fit(
   "val_mvgam_mvbf_wide.rds",
   function() {
@@ -284,53 +226,40 @@ test_that("the fitted object keeps the response axis", {
 })
 
 
+# The sampler's posterior mean latent state, one column per response,
+# by occasion. Later blocks compare what a method reports against it.
+sampler_draws <- posterior::as_draws_matrix(fit$fit)
+sampler_state <- vapply(seq_len(n_resp), function(k) {
+  vapply(seq_len(n_time), function(t) {
+    mean(sampler_draws[, paste0("trend[", t, ",", k, "]")])
+  }, numeric(1L))
+}, numeric(n_time))
+colnames(sampler_state) <- responses
+
+
 test_that("each response holds a latent state of its own", {
-  # Two responses sharing one column is the shape the defect took,
-  # and it survives every check that counts rather than compares.
-  dm <- posterior::as_draws_matrix(fit$fit)
-  state_of <- function(k) {
-    vapply(seq_len(n_time), function(t) {
-      mean(dm[, paste0("trend[", t, ",", k, "]")])
-    }, numeric(1))
-  }
-  states <- lapply(seq_len(n_resp), state_of)
-  for (i in seq_len(n_resp)) {
-    for (j in seq_len(n_resp)) {
-      if (j <= i) next
-      expect_false(isTRUE(all.equal(states[[i]], states[[j]])))
-    }
-  }
+  # Two responses sharing one column pass every check that counts
+  expect_gt(min(stats::dist(t(sampler_state), method = "maximum")), 0.1)
 })
 
 
-test_that("posterior_predict respects each response's own family", {
-  # The claim that says three likelihoods survived being given one
-  # trend. A fit that applied the first arm's family throughout
-  # returns counts for all three and passes every dimension check.
+test_that("posterior_predict draws from each response's own family", {
   for (r in responses) {
     pp <- posterior_predict(fit, resp = r, ndraws = 50L)
     expect_identical(nrow(pp), 50L)
-    v <- as.numeric(pp)
-    v <- v[!is.na(v)]
-    expect_true(length(v) > 0L)
-    expect_true(support_ok[[r]](v),
+    expect_true(support_ok[[r]](pp[!is.na(pp)]),
                 label = paste(r, "draws land in its family's support"))
   }
 })
 
 
-test_that("every prediction surface answers per response", {
+test_that("each response's expectation applies its own inverse link", {
+  inv_link <- list(count = exp, seen = stats::plogis, mass = identity)
   for (r in responses) {
-    ep <- posterior_epred(fit, resp = r, ndraws = 20L)
-    lp <- posterior_linpred(fit, resp = r, ndraws = 20L)
+    ep <- posterior_epred(fit, resp = r, draw_ids = 1:20)
+    lp <- posterior_linpred(fit, resp = r, draw_ids = 1:20)
     expect_identical(nrow(ep), 20L)
-    expect_identical(dim(ep), dim(lp))
-    expect_true(all(is.finite(ep)))
-    # The expectation is on the response scale and the predictor is
-    # not, so on the two non-identity arms they have to differ.
-    if (r != "mass") {
-      expect_false(isTRUE(all.equal(unname(ep), unname(lp))))
-    }
+    expect_equal(unname(ep), unname(inv_link[[r]](lp)), tolerance = 1e-8)
     expect_identical(nrow(fitted(fit, resp = r, ndraws = 20L)),
                      ncol(ep))
     expect_identical(nrow(residuals(fit, resp = r, ndraws = 20L)),
@@ -339,46 +268,32 @@ test_that("every prediction surface answers per response", {
 })
 
 
-test_that("log_lik is per response, and the joint is their sum", {
-  # brms's own contract, and the one place a wide fit's arms are
-  # combined into a single number. A joint density that dropped an
-  # arm is finite, correctly shaped and wrong.
-  per <- lapply(responses, function(r) {
+test_that("the joint log_lik sums the per-response densities", {
+  # A joint density that dropped a response is finite, correctly shaped
+  # and wrong
+  per <- lapply(stats::setNames(responses, responses), function(r) {
     log_lik(fit, resp = r, draw_ids = 1:10)
   })
-  names(per) <- responses
   for (r in responses) {
-    expect_identical(nrow(per[[r]]), 10L)
-    expect_identical(ncol(per[[r]]), n_time)
-    # Finite where the response was measured, and missing exactly
-    # where it was not. Asserting finiteness everywhere would demand
-    # a density for an observation that does not exist; asserting it
-    # nowhere would pass a column of `NA`. The gaps differ per
-    # response, so this also places each arm's missingness on its own
-    # occasions rather than on another arm's.
-    obs <- observed_rows[[r]]
-    gaps <- na_rows[[r]]
-    expect_true(all(is.finite(per[[r]][, obs, drop = FALSE])))
-    expect_true(all(is.na(per[[r]][, gaps, drop = FALSE])))
+    expect_identical(dim(per[[r]]), c(10L, n_time))
+    # Finite where the response was measured and missing exactly where
+    # it was not. The gaps differ per response, which places each
+    # response's missing values on its own occasions.
+    expect_true(all(is.finite(per[[r]][, observed_rows[[r]]])))
+    expect_true(all(is.na(per[[r]][, na_rows[[r]]])))
   }
+
+  # The gaps are disjoint. Every occasion holds at least one observed
+  # response. The joint density then covers all sixty occasions.
+  # `loo()` uses these numbers.
   joint <- log_lik(fit, draw_ids = 1:10)
-  expect_identical(nrow(joint), 10L)
-
-  # An occasion is missing from the joint only where every arm is
-  # missing. Here the three sets of gaps are disjoint, so no occasion
-  # qualifies and the joint owes a density at all sixty. Marking an
-  # occasion missing whenever any one arm was dropped the arms that
-  # were observed there with it, and `loo()` is computed from exactly
-  # these numbers.
-  all_missing <- Reduce(intersect, na_rows)
-  expect_length(all_missing, 0L)
-  joint_missing <- which(apply(joint, 2L, function(col) all(is.na(col))))
-  expect_length(joint_missing, 0L)
-
-  expect_equal(
-    as.numeric(rowSums(joint, na.rm = TRUE)),
-    as.numeric(Reduce(`+`, lapply(per, rowSums, na.rm = TRUE)))
-  )
+  stopifnot(length(Reduce(intersect, na_rows)) == 0L)
+  expect_false(anyNA(joint))
+  expect_equal(unname(joint),
+               unname(Reduce(`+`, lapply(per, function(m) {
+                 m[is.na(m)] <- 0
+                 m
+               }))))
 })
 
 
@@ -389,38 +304,25 @@ test_that("a wide fit forecasts every response over the horizon", {
   expect_identical(names(fc), responses)
 
   for (r in responses) {
-    # The answer for one response of a wide frame covers that
-    # response, which is one series.
+    # Each response of a wide frame is one series
     expect_identical(as.character(fc[[r]]$series_names), r)
-    arm <- fc[[r]]$forecasts[[r]]
-    expect_identical(ncol(arm), h)
-    expect_false(all(is.na(arm)))
-    # The occasions are the ones asked for, in the user's own
-    # numbering rather than 1..h.
+    draws <- fc[[r]]$forecasts[[r]]
+    expect_identical(ncol(draws), h)
+    expect_false(anyNA(draws))
+    # The horizon keeps the user's own time numbering
     expect_identical(as.integer(fc[[r]]$test_times[[r]]),
                      as.integer(future$time))
-  }
-})
-
-
-test_that("each forecast arm carries its own response's history", {
-  # The training tail a forecast extends. Each response stops being
-  # observed at a different occasion here, so an arm carrying
-  # another's history is visible in the length alone.
-  fc <- forecast(fit, newdata = make_future(2L), type = "link")
-  for (r in responses) {
-    train <- fc[[r]]$train_observations[[r]]
-    expect_equal(as.numeric(train),
+    # The training history is this response's own observations
+    expect_equal(as.numeric(fc[[r]]$train_observations[[r]]),
                  as.numeric(dat[[r]][observed_rows[[r]]]))
   }
 })
 
 
 test_that("a forecast responds to the covariate it is given", {
-  # Past the training grid there is no state to read, so the
-  # observation predictor has to be evaluated at what the caller
-  # supplied. A forecast that ignored `x`, or took it from the
-  # training frame, returns the same numbers whatever is asked for.
+  # The forecast evaluates the observation predictor at the supplied
+  # `x`. A forecast that ignored `x`, or took it from the training
+  # frame, returns the same numbers for both frames.
   lo <- forecast(fit, newdata = make_future(3L, x_future = -1.5),
                  ndraws = 200L, type = "expected")
   hi <- forecast(fit, newdata = make_future(3L, x_future = 1.5),
@@ -433,33 +335,23 @@ test_that("a forecast responds to the covariate it is given", {
 })
 
 
-test_that("forecast and hindcast agree about what can be drawn", {
-  # One quantity reached over the training grid and over its
-  # extension. If one of them refuses a family the other draws from,
-  # exactly one of the two is wrong.
+test_that("hindcast and forecast draw from each response's family", {
   hc <- hindcast(fit, type = "response", ndraws = 20L)
-  expect_identical(names(hc), responses)
   fc <- forecast(fit, newdata = make_future(2L), type = "response",
                  ndraws = 20L)
+  expect_identical(names(hc), responses)
   expect_identical(names(fc), responses)
   for (r in responses) {
-    expect_false(is.null(hc[[r]]$hindcasts[[r]]))
-    expect_false(is.null(fc[[r]]$forecasts[[r]]))
-    # And a response-scale draw is in that response's support on
-    # both sides of the training boundary.
     for (m in list(hc[[r]]$hindcasts[[r]], fc[[r]]$forecasts[[r]])) {
-      v <- as.numeric(m)
-      v <- v[!is.na(v)]
-      expect_true(support_ok[[r]](v))
+      expect_true(support_ok[[r]](m[!is.na(m)]))
     }
   }
 })
 
 
 test_that("a horizon the trend cannot step to is refused", {
-  # A discrete-time trend steps one occasion at a time along a grid
-  # every response shares, so a frame that skips occasions is turned
-  # away rather than forecast as though the gap were not there.
+  # A discrete-time trend steps one occasion at a time along the shared
+  # grid. A frame that skips occasions is refused.
   future <- make_future(1L)
   future$time <- max(time_vals) + 10L
   expect_error(
@@ -469,168 +361,99 @@ test_that("a horizon the trend cannot step to is refused", {
 })
 
 
-test_that("each prediction type answers with the quantity it names", {
-  # mvgam separates the two things brms and marginaleffects both
-  # spell `"response"`. Here `"expected"` is the family's mean and
-  # `"response"` samples from the observation family, summarised by
-  # its median, so on a count or a binary arm it lands on a whole
-  # number by contract rather than by accident.
-  #
-  # Pinning all three together is what makes this bite: a type that
-  # quietly answered with another's quantity satisfies any check made
-  # on one type alone, and the arms here differ enough that no two
-  # types can be confused for one another.
-  withr::local_options(marginaleffects_model_classes = "mvgam")
-  # The outcome-scale estimate is sampled afresh on each call, and the
-  # median of a fresh sample moves between runs. A pinned seed holds
-  # every draw below fixed, which keeps this comparison reproducible.
+test_that("each prediction type gives the quantity it names", {
+  # `"expected"` is the family's mean. `"response"` samples from the
+  # observation family, summarised by its median. A count or binary
+  # response then gives a whole number.
+  # The response-scale estimate draws a fresh sample on each call
   withr::local_seed(2027L)
   grid <- dat[seq(1L, n_time, length.out = 6L), , drop = FALSE]
 
   for (r in responses) {
-    # marginaleffects keeps a whitelist of arguments it knows a model
-    # class accepts, and mvgam has not registered `resp` on it, so
-    # every multivariate user meets this notice. Captured and named
-    # so it neither leaks nor hides an unrelated one.
     ask <- function(ty) {
-      got <- with_warnings(marginaleffects::predictions(
-        fit, newdata = grid, type = ty, resp = r
-      ))
-      expect_true(all(grepl("not known to be supported", got$warnings)))
-      as.numeric(got$value$estimate)
+      as.numeric(predictions_resp(fit, newdata = grid, type = ty,
+                                  resp = r)$estimate)
     }
-
-    # marginaleffects summarises a Bayesian posterior by its median,
-    # so the comparison is made against the median of the same draws
-    # rather than their mean. Against the mean the two agree only to
-    # about 0.04 on the bernoulli arm, whose logit-scale posterior is
-    # the most skewed of the three, and a tolerance wide enough to
-    # absorb that is wide enough to hide a wrong arm.
-    ep <- apply(posterior_epred(fit, newdata = grid, resp = r),
-                2L, stats::median)
-    lp <- apply(posterior_linpred(fit, newdata = grid, resp = r),
-                2L, stats::median)
-    pp <- posterior_predict(fit, newdata = grid, resp = r,
-                            ndraws = 400L)
-    med <- apply(pp, 2L, stats::median)
-
-    # Every draw is shared, so these are the same number twice.
-    expect_equal(ask("expected"), as.numeric(ep), tolerance = 1e-8)
-    expect_equal(ask("link"), as.numeric(lp), tolerance = 1e-8)
-    # A median of draws from a discrete family moves in whole units,
-    # so two estimates of it from different draws differ by one at
-    # the granularity of the family rather than by a small fraction.
-    # The continuous arm has no such floor and is held tightly.
+    # marginaleffects summarises a Bayesian posterior by its median.
+    # Each estimate equals the median of the same draws.
+    expect_equal(ask("expected"),
+                 apply(posterior_epred(fit, newdata = grid, resp = r),
+                       2L, stats::median), ignore_attr = TRUE,
+                 tolerance = 1e-8)
+    expect_equal(ask("link"),
+                 apply(posterior_linpred(fit, newdata = grid, resp = r),
+                       2L, stats::median), ignore_attr = TRUE,
+                 tolerance = 1e-8)
+    # The median of a discrete sample moves in whole units. Two samples
+    # of a count or binary response differ by up to one.
+    pp <- posterior_predict(fit, newdata = grid, resp = r, ndraws = 400L)
     tol_response <- if (r == "mass") 0.1 else 1.0
-    # One sample, used twice. Two calls would produce two different
-    # samples and compare them against one another.
     resp_est <- ask("response")
-    expect_lte(max(abs(resp_est - as.numeric(med))), tol_response)
-
-    # And the outcome-scale estimate satisfies the family's support
-    # check, confirming the type reached this response's own
-    # likelihood and skipped the first response's.
+    expect_lte(max(abs(resp_est - apply(pp, 2L, stats::median))),
+               tol_response)
     expect_true(support_ok[[r]](resp_est))
-
-    # The three are distinct wherever the link is not the identity,
-    # so a type collapsed onto another cannot pass unnoticed.
-    if (r != "mass") {
-      expect_false(isTRUE(all.equal(ask("expected"), ask("link"))))
-    }
   }
 })
 
 
-test_that("a wide fit refuses an argument nothing reads", {
-  # `resp` is the argument these methods do take, so a neighbour of it
-  # that nothing reads is the one most likely to be mistyped here.
-  expect_error(posterior_epred(fit, zzz_unknown = 1))
-  expect_error(posterior_predict(fit, zzz_unknown = 1))
-  expect_error(fitted(fit, zzz_unknown = 1))
-  expect_error(log_lik(fit, zzz_unknown = 1))
-})
-
-
-test_that("pp_check refuses an argument nothing reads", {
+test_that("the prediction methods refuse an unused argument by name", {
+  for (method in list(posterior_epred, posterior_predict, fitted,
+                      log_lik)) {
+    expect_error(method(fit, zzz_unknown = 1), "zzz_unknown",
+                 fixed = TRUE)
+  }
   # The name belongs to neither the prediction method nor the
-  # bayesplot kernel. It used to reach bayesplot, which named it in a
-  # warning and then used the default the caller meant to override.
-  # That notice depended on the route to bayesplot staying as it is.
-  # mvgam owns the refusal now.
-  err <- expect_error(
-    pp_check(fit, resp = "count", ndraws = 10L, zzz_unknown = 1)
-  )
-  expect_match(conditionMessage(err), "zzz_unknown", fixed = TRUE)
+  # bayesplot kernel. bayesplot named it in a warning and then used the
+  # default the caller meant to override.
+  expect_error(pp_check(fit, resp = "count", ndraws = 10L, zzz_unknown = 1),
+               "zzz_unknown", fixed = TRUE)
 
-  # Both audiences it does read still reach their own side: `alpha`
-  # is the kernel's and `process_error` is the prediction method's.
-  # The count response has gaps, which the plot omits and says so.
-  expect_warning(
-    p <- pp_check(fit, resp = "count", ndraws = 10L, alpha = 0.5),
-    "missing response are omitted"
+  # `alpha` reaches the kernel. `process_error` reaches the prediction
+  # method.
+  expect_drawn(pp_check(fit, resp = "count", ndraws = 10L, alpha = 0.5))
+  expect_drawn(
+    pp_check(fit, resp = "count", ndraws = 10L, process_error = FALSE)
   )
-  expect_drawn(p)
-  expect_warning(
-    p <- pp_check(fit, resp = "count", ndraws = 10L, process_error = FALSE),
-    "missing response are omitted"
-  )
-  expect_drawn(p)
 })
 
 
-test_that("nobs counts the design where standata counts one response", {
-  # `standata$N` is a different quantity from the frame's row count,
-  # and on a wide frame it is one response's count rather than the
-  # model's. `nobs()` fell through to it whenever the data slot was
-  # empty, so one function reported either quantity depending on
-  # which slot the object carried. Stated as the identity it is
-  # rather than as fixed numbers, so regenerating the fixture keeps
-  # the claim.
-  per_resp <- vapply(responses, function(r) {
-    as.integer(fit$standata[[paste0("N_", r)]])
-  }, integer(1L))
-  expect_true(as.integer(fit$standata$N) %in% per_resp)
-  expect_false(
-    identical(as.integer(nobs(fit)), as.integer(fit$standata$N))
-  )
-  # One derivation of the design count, reached two ways.
-  expect_identical(as.integer(nobs(fit)), nrow(model.frame(fit)))
+test_that("nobs counts the frame's rows", {
+  # On a wide frame `standata$N` counts one response's observations.
+  # `nobs()` once fell back to it when the data slot was empty.
+  expect_identical(as.integer(nobs(fit)), n_time)
+  expect_identical(nrow(model.frame(fit)), n_time)
 })
 
 
 test_that("pp_check names the response it is asked for", {
-  # A wide fit has one set of observations per response, so a check
-  # of observed against replicated has to be told which. Answering
-  # without being told would plot one arm and label it as the fit.
-  # Named, one arm at a time. Each arm has unobserved occasions of
-  # its own, so each owes exactly one notice about them, and a check
-  # told to draw `seen` must not report `mass`'s gaps.
+  # Each response has unobserved occasions. The check omits them and
+  # says so once per session.
+  withr::local_envvar(TESTTHAT = "")
+  rlang::reset_message_verbosity("mvgam_pp_check_missing_response")
+  expect_message(
+    expect_s3_class(pp_check(fit, resp = "count", ndraws = 20L), "ggplot"),
+    "missing response are omitted"
+  )
+  # Each check draws its own response's observed rows
   for (r in responses) {
-    one <- with_warnings(pp_check(fit, resp = r, ndraws = 20L))
-    expect_s3_class(one$value, "ggplot")
-    miss_one <- grep("missing response", one$warnings, value = TRUE)
-    expect_length(miss_one, 1L)
-    expect_identical(setdiff(one$warnings, miss_one), character(0))
+    expect_no_warning(
+      one <- pp_check(fit, type = "dens_overlay", resp = r, ndraws = 20L)
+    )
+    expect_equal(one$data$value[one$data$is_y],
+                 dat[[r]][observed_rows[[r]]])
   }
-  # Naming none answers for every arm rather than picking one, in one
-  # figure with a panel per response titled by that response. Handed
-  # back as a list the panels printed as a console listing, and
-  # silently drawing the first arm would label one arm as the fit.
-  all_arms <- with_warnings(pp_check(fit, ndraws = 20L))
-  expect_s3_class(all_arms$value, "patchwork")
-  panels <- all_arms$value$patches$plots
-  panels <- c(panels, list(all_arms$value))
-  titles <- vapply(panels, function(p) p$labels$title %||% NA_character_,
-                   character(1L))
-  expect_identical(titles, responses)
-  # Drawing every arm draws every arm's unobserved occasions, so the
-  # notice is owed once per response and nothing else is owed at all.
-  miss <- grep("missing response", all_arms$warnings, value = TRUE)
-  expect_length(miss, n_resp)
-  expect_identical(setdiff(all_arms$warnings, miss), character(0))
+  # A binary response defaults to bars, a count to a density overlay
+  geom_of <- function(p) class(p$layers[[1L]]$geom)[1L]
+  expect_identical(geom_of(pp_check(fit, resp = "seen", ndraws = 20L)),
+                   "GeomCol")
+  expect_identical(geom_of(pp_check(fit, resp = "count", ndraws = 20L)),
+                   "GeomLine")
+  # Without `resp` the check draws one figure with a panel per
+  # response, titled by that response
+  expect_no_warning(all_resp <- pp_check(fit, ndraws = 20L))
+  expect_identical(panel_titles(all_resp), responses)
 
-  # A response the fit never had is refused, and the refusal names
-  # the ones that would have worked.
+  # The refusal of an unknown response names the valid ones
   err <- expect_error(pp_check(fit, resp = "gravity", ndraws = 20L),
                       "must be a response of this model")
   for (r in responses) {
@@ -639,48 +462,25 @@ test_that("pp_check names the response it is asked for", {
 })
 
 
-test_that("the fit reports the family of every arm it was given", {
-  # Three responses, three likelihoods. `family()` is what other
-  # packages call to decide how to treat a fit, so one answer for
-  # three arms sends every one of them down the same path.
-  fams <- family(fit)
-  reported <- if (is.list(fams) && !inherits(fams, "family")) {
-    vapply(fams, function(f) f$family, character(1L))
-  } else {
-    fams$family
+test_that("family reports each response's family", {
+  # Other packages call `family()` to decide how to treat a fit
+  families <- c(count = "poisson", seen = "bernoulli", mass = "gaussian")
+  expect_identical(vapply(family(fit), `[[`, character(1L), "family"),
+                   families)
+  for (r in responses) {
+    expect_identical(family(fit, resp = r)$family, families[[r]])
   }
-  expect_length(reported, n_resp)
-  expect_setequal(as.character(reported),
-                  c("poisson", "bernoulli", "gaussian"))
-
-  # `glance()` reads the formula and gets all three, so the answer is
-  # on the object and this is the accessor that loses it.
-  expect_setequal(as.character(glance(fit)$family),
-                  c("poisson", "bernoulli", "gaussian"))
-
-  # Naming a response has to answer about that response.
-  per_resp <- vapply(responses, function(r) {
-    f <- family(fit, resp = r)
-    if (is.list(f) && !inherits(f, "family")) NA_character_ else f$family
-  }, character(1L))
-  expect_identical(unname(per_resp),
-                   c("poisson", "bernoulli", "gaussian"))
+  expect_setequal(as.character(glance(fit)$family), families)
 })
 
 
-test_that("model.frame carries the responses as well as the terms", {
-  # `model.frame()` is the standard route to a fitted model's data. A
-  # frame holding the predictors and none of the responses cannot be
-  # used for anything it is normally reached for, and the response
-  # names are on the formula the whole time.
+test_that("model.frame and terms hold the responses and the terms", {
   mf <- model.frame(fit)
-  expect_true(all(responses %in% names(mf)))
-  expect_true(all(c("x", "time") %in% names(mf)))
-
-  # The two accessors a caller pairs, on the multivariate shape:
-  # `terms()` builds a `cbind()` left-hand side from the three
-  # responses.
-  expect_true(inherits(terms(fit), "terms"))
+  expect_true(all(c(responses, "x", "time") %in% names(mf)))
+  # `terms()` builds a `cbind()` left-hand side from the three responses
+  tt <- terms(fit)
+  expect_identical(deparse(tt[[2L]]), "cbind(count, seen, mass)")
+  expect_identical(attr(tt, "term.labels"), "x")
 })
 
 
@@ -691,8 +491,8 @@ test_that("the summary and tidiers name every response", {
   }
 
   # Every coefficient the sampler estimated reaches the printed
-  # summary. On a wide fit the blocks are per response, so an arm
-  # omitted entirely is what this catches.
+  # summary. The blocks of a wide fit are per response. A response
+  # omitted entirely fails here.
   smry <- summary(fit)
   shown <- unlist(lapply(
     grep("fixed", names(smry), value = TRUE),
@@ -710,48 +510,37 @@ test_that("the summary and tidiers name every response", {
 })
 
 
-test_that("conditional_effects answers per response, on its own scale", {
-  # A wide fit has one effect per response, so the result is keyed by
-  # response first and by covariate within. Returning a single set
-  # would give one curve for three likelihoods.
-  # conditional_effects() gives each response to get_predict.mvgam on
-  # its own copy of the model. marginaleffects then has no argument to
-  # warn about.
+test_that("conditional_effects gives each response its own curve", {
+  # The result is keyed by response, then by covariate. Each response
+  # reaches get_predict.mvgam on its own copy of the model. marginaleffects
+  # then receives no `resp` argument to warn about.
   expect_no_warning(ce <- conditional_effects(fit))
   expect_identical(names(ce), responses)
-  # Drawn, the panels come back as one flat list of ggplots, as brms
-  # returns them.
+  # The drawn panels form one flat list of ggplots, as in brms
   expect_identical(names(plot(ce, plot = FALSE)),
                    paste0(responses, ".x"))
 
   for (r in responses) {
-    expect_s3_class(ce[[r]], "mvgam_conditional_effects")
     expect_identical(names(ce[[r]]), "x")
     d <- ce[[r]][["x"]]$data
-    expect_true(all(is.finite(d$estimate)))
-    expect_true(all(d$conf.low <= d$estimate))
-    expect_true(all(d$estimate <= d$conf.high))
+    expect_true(all(d$conf.low <= d$estimate & d$estimate <= d$conf.high))
     expect_gt(stats::sd(d$estimate), 0)
-    # Drawn over the covariate's own range rather than over a rank.
+    # The x axis spans the covariate's own range
     expect_equal(range(d$x), range(dat$x), tolerance = 1e-6)
   }
 
-  # Each curve is on its own family's scale, which is what says the
-  # response-specific inverse link was applied rather than the first
-  # arm's. A binary arm reported on a count scale, or a count arm on
-  # a probability scale, is a wrong curve that is finite, ordered
-  # and correctly shaped throughout.
-  expect_true(all(ce[["count"]][["x"]]$data$estimate > 0))
+  # Each curve takes its own family's inverse link. A binary response
+  # drawn on a count scale is finite, ordered and correctly shaped.
+  count_est <- ce[["count"]][["x"]]$data$estimate
   seen_est <- ce[["seen"]][["x"]]$data$estimate
+  expect_true(all(count_est > 0))
+  expect_gt(max(count_est), 1)
   expect_true(all(seen_est > 0 & seen_est < 1))
-  expect_gt(max(ce[["count"]][["x"]]$data$estimate), 1)
 })
 
 
 test_that("a wide fit draws its observations for every response", {
-  # The fan-out leaves one response in scope. That response names
-  # the column the observations come from, which lets a request for
-  # points and a rug reach the panel.
+  # Each response names the column its points and rug come from
   for (r in responses) {
     got <- with_warnings(
       conditional_effects(fit, resp = r, points = TRUE, rug = TRUE)
@@ -765,77 +554,47 @@ test_that("a wide fit draws its observations for every response", {
 })
 
 
-test_that("the criticism surface runs on a wide fit", {
+test_that("loo warns about Pareto k exactly when a value is high", {
   caught <- with_warnings(loo(fit))
   ic <- caught$value
-  loo_warnings <- caught$warnings
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))
-  # A high Pareto-k is what a latent state-space fit is expected to
-  # produce. The claim is that the user is told the truth about it:
-  # the notice arrives exactly when there is something to report.
-  expect_identical(
-    any(pareto_k > 0.7),
-    any(grepl("Pareto k", loo_warnings))
-  )
-  expect_true(all(grepl("Pareto k", loo_warnings)))
+  # A latent state-space fit often gives high Pareto k values
+  expect_identical(any(pareto_k > 0.7),
+                   any(grepl("Pareto k", caught$warnings)))
+  expect_true(all(grepl("Pareto k", caught$warnings)))
 })
 
 
-test_that("quantile residuals sit on the scale they are defined on", {
-  # A randomised quantile residual is standard normal by construction,
-  # so the claim is about a known distribution rather than about this
-  # fit. Each arm is checked on its own family, since a scale error
-  # that reached every arm equally would be a different fault.
+test_that("quantile residuals of every response are standard normal", {
+  # A randomised quantile residual is standard normal under the model
   rq <- residuals(fit, type = "quantile", ndraws = 200L,
                   summary = FALSE)
   for (r in responses) {
     v <- as.numeric(rq[[r]])
     v <- v[is.finite(v)]
-    expect_gt(length(v), 0L)
-    # Half again either way is generous for 200 draws over ~57 rows.
     expect_gt(stats::sd(v), 0.6)
     expect_lt(stats::sd(v), 1.6)
-    # A standard normal puts 0.27 per cent beyond three.
+    # A standard normal puts 0.27 per cent beyond three
     expect_lt(mean(abs(v) > 3), 0.02)
   }
 })
 
 
-# The sampler's own latent state, one column per response, by
-# occasion. The claims below compare what a surface reports against
-# this, which is the posterior itself rather than anything a package
-# function derived from it.
-sampler_state <- local({
-  dm <- posterior::as_draws_matrix(fit$fit)
-  n_t <- fit$standata$N_time_trend
-  st <- vapply(seq_len(n_resp), function(k) {
-    vapply(seq_len(n_t), function(t) {
-      mean(dm[, paste0("trend[", t, ",", k, "]")])
-    }, numeric(1L))
-  }, numeric(n_t))
-  dimnames(st) <- list(NULL, responses)
-  st
-})
-
-
 test_that("a wide hindcast holds each response's own state, once", {
-  # A wide frame's series are its responses, so the answer for one
-  # response covers one series. The per-response fan-out and the
-  # per-series loop inside it are then the same loop run twice, and
-  # every element came back holding three arms that were all its own
-  # response's state, two of them under another response's name.
+  # Each response of a wide frame is one series. The per-response loop
+  # and the per-series loop inside it once returned three copies of
+  # each response's state, two under other responses' names.
   hc <- hindcast(fit, type = "trend")
   expect_identical(names(hc), responses)
   for (r in responses) {
     expect_identical(names(hc[[r]]$hindcasts), r)
     expect_identical(as.character(hc[[r]]$series_names), r)
-    arm <- colMeans(hc[[r]]$hindcasts[[r]])
+    state <- colMeans(hc[[r]]$hindcasts[[r]])
     rows <- match(hc[[r]]$train_times[[r]], time_vals)
-    # Its own column, to sampling precision, and not any other.
     gap <- vapply(responses, function(k) {
-      max(abs(arm - sampler_state[rows, k]))
+      max(abs(state - sampler_state[rows, k]))
     }, numeric(1L))
     expect_lt(gap[[r]], 1e-8)
     expect_gt(min(gap[setdiff(responses, r)]), 0.1)
@@ -844,33 +603,24 @@ test_that("a wide hindcast holds each response's own state, once", {
 
 
 test_that("each response is forecast from its own latent state", {
-  # A forecast steps each response's latent state forward, so its
-  # first step is that response's AR coefficient times its last state,
-  # plus an innovation. Every response was instead stepped from the
-  # first response's state, because the forecast grid read the row's
-  # series index, which on a wide frame is one constant standing in
-  # for all three. Each forecast differed from the others through its
-  # intercept and slope, which is all the check above could see.
-  #
-  # Compared draw by draw, so the claim rests on which state each
-  # forecast moves with rather than on a mean near zero.
-  dm <- posterior::as_draws_matrix(fit$fit)
-  n_t <- fit$standata$N_time_trend
+  # The first forecast step is the response's AR coefficient times its
+  # last state, plus an innovation. A forecast grid holding one series
+  # index for all three responses stepped each from the first
+  # response's state. The comparison runs draw by draw.
   step_mean <- vapply(seq_len(n_resp), function(k) {
-    as.numeric(dm[, paste0("ar1_trend[", k, "]")]) *
-      as.numeric(dm[, paste0("trend[", n_t, ",", k, "]")])
-  }, numeric(nrow(dm)))
+    as.numeric(sampler_draws[, paste0("ar1_trend[", k, "]")]) *
+      as.numeric(sampler_draws[, paste0("trend[", n_time, ",", k, "]")])
+  }, numeric(nrow(sampler_draws)))
   colnames(step_mean) <- responses
-  # The premise: the three conditional means are not one quantity.
+  # The three conditional means differ
   expect_lt(max(abs(stats::cor(step_mean)[upper.tri(diag(n_resp))])),
             0.9)
 
   fc <- forecast(fit, newdata = make_future(2L), type = "trend")
   for (r in responses) {
     first_step <- fc[[r]]$forecasts[[r]][, 1L]
-    # One row per posterior draw, in the posterior's own order, which
-    # is what pairs a forecast draw with the state it stepped from.
-    expect_identical(length(first_step), nrow(dm))
+    # One row per posterior draw, in the posterior's order
+    expect_identical(length(first_step), nrow(sampler_draws))
     tracks <- vapply(responses, function(k) {
       stats::cor(first_step, step_mean[, k])
     }, numeric(1L))
@@ -882,11 +632,8 @@ test_that("each response is forecast from its own latent state", {
 
 test_that("process noise is each response's own, drawn jointly", {
   # A marginal prediction adds a draw of each response's process
-  # noise. One draw was taken and added to all three, so every
-  # response carried the first one's scale and the three moved
-  # together perfectly, where the fit estimates their innovations to
-  # be nearly independent for one pair and negatively related for
-  # another.
+  # noise. A single draw added to all three gave every response the
+  # first one's scale. The three then moved in lockstep.
   ids <- 1:200
   on <- posterior_linpred(fit, newdata = dat, draw_ids = ids,
                           process_error = TRUE, incl_autocor = FALSE)
@@ -895,16 +642,15 @@ test_that("process noise is each response's own, drawn jointly", {
   noise <- lapply(stats::setNames(responses, responses), function(r) {
     as.numeric(on[[r]] - off[[r]])
   })
-  dm <- posterior::as_draws_matrix(fit$fit)
-  sigma <- colMeans(dm[, paste0("sigma_trend[", seq_len(n_resp), "]")])
+  sigma <- colMeans(
+    sampler_draws[, paste0("sigma_trend[", seq_len(n_resp), "]")]
+  )
   names(sigma) <- responses
-  # Each response keeps its own scale: `mass` carries the smallest
-  # innovation scale by a wide margin, so its noise has to be the
-  # quietest of the three.
+  # `mass` has the smallest innovation scale by a wide margin. Its
+  # noise must then be the quietest of the three.
   expect_lt(sigma[["mass"]], 0.75 * sigma[["count"]])
   expect_lt(stats::sd(noise$mass), 0.85 * stats::sd(noise$count))
-  # And drawn jointly: not one draw repeated, and no pair tied
-  # perfectly together.
+  # The noise is drawn jointly. No pair moves in lockstep.
   for (pair in list(c("count", "seen"), c("count", "mass"),
                     c("seen", "mass"))) {
     expect_lt(abs(stats::cor(noise[[pair[1L]]], noise[[pair[2L]]])),
@@ -913,35 +659,25 @@ test_that("process noise is each response's own, drawn jointly", {
 })
 
 
-test_that("a wide forecast draws, and every arm it holds has values", {
-  # An arm is a response's draws over its horizon. Arms left at zero
-  # columns beside a non-empty list of horizon times are what
-  # `plot()` refused, with an assertion on a vector the caller never
-  # named.
+test_that("a wide forecast plots one panel per response", {
+  # Each response's draws span its horizon. Draws with zero columns
+  # paired with a list of horizon times made `plot()` fail.
   fc <- forecast(fit, newdata = make_future(3L), type = "response",
                  ndraws = 50L)
   for (r in responses) {
-    for (a in names(fc[[r]]$forecasts)) {
-      expect_identical(ncol(fc[[r]]$forecasts[[a]]),
-                       length(fc[[r]]$test_times[[a]]))
-      expect_gt(ncol(fc[[r]]$forecasts[[a]]), 0L)
-    }
+    expect_identical(ncol(fc[[r]]$forecasts[[r]]), 3L)
   }
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
-  drawn <- plot(fc)
-  layers <- ggplot2::ggplot_build(
-    if (inherits(drawn, "ggplot")) drawn else drawn[[1L]]
-  )$data
-  expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+  b <- ggplot2::ggplot_build(plot(fc))
+  expect_identical(as.character(b$layout$layout$series), responses)
+  expect_gt(sum(vapply(b$data, nrow, integer(1L))), 0L)
 })
 
 
 test_that("a wide forecast can be scored as forecast returns it", {
-  # `forecast()` on a wide fit returns one answer per response, and
-  # `score()` has to take that object as it comes. It read `$forecasts`
-  # off the wrapper, which a wrapper does not have, and told the caller
-  # to pass the `newdata` they had passed.
+  # `forecast()` on a wide fit returns one forecast per response.
+  # `score()` takes that object whole.
   held_out <- make_future(4L)
   held_out$count <- c(9L, 12L, 7L, 11L)
   held_out$seen <- c(1L, 0L, 1L, 1L)
@@ -952,104 +688,65 @@ test_that("a wide forecast can be scored as forecast returns it", {
   for (r in responses) {
     expect_identical(nrow(sc[[r]]), 4L)
     expect_true(all(is.finite(sc[[r]]$score)))
-    # Scoring the whole answer gives what scoring each response's own
-    # forecast gives, draw for draw.
+    # The whole object scores each response as its own forecast does
     expect_equal(sc[[r]]$score, score(fc[[r]], score = "crps")[[r]]$score)
   }
-  # Each response keeps its own family. A Brier score is defined for
-  # the bernoulli response alone, and asked of the whole answer it is
-  # refused by naming the families that are not bernoulli.
-  expect_identical(fc[["seen"]]$family, "bernoulli")
-  expect_true(all(is.finite(
-    score(fc[["seen"]], score = "brier")[["seen"]]$score
-  )))
+  # The Brier score needs a bernoulli response. The refusal for the
+  # whole object names the other families.
+  seen_fc <- fc[["seen"]]
+  expect_identical(seen_fc$family, "bernoulli")
+  expect_equal(score(seen_fc, score = "brier")[["seen"]]$score,
+               (held_out$seen - colMeans(seen_fc$forecasts$seen))^2)
   expect_error(score(fc, score = "brier"), "poisson")
 })
 
 
 test_that("each trend panel draws its own response's latent state", {
-  # The sampler holds one latent column per response and they differ.
-  # Three panels drawn from one of them is the failure this file
-  # exists for: every strip correct, every panel the right width, one
-  # trajectory repeated three times.
-  dm <- posterior::as_draws_matrix(fit$fit)
-  n_t <- fit$standata$N_time_trend
-  drawn_state <- lapply(seq_len(n_resp), function(k) {
-    vapply(seq_len(n_t),
-           function(t) mean(dm[, paste0("trend[", t, ",", k, "]")]),
-           numeric(1L))
-  })
-  # The premise: the states the sampler drew are not one state.
-  for (i in seq_len(n_resp)) {
-    for (j in seq_len(n_resp)) {
-      if (j <= i) next
-      expect_gt(max(abs(drawn_state[[i]] - drawn_state[[j]])), 1e-6)
-    }
-  }
-
+  # Three panels drawn from one latent column keep every strip and
+  # every width correct
   p <- plot(fit, type = "trend")
   b <- ggplot2::ggplot_build(p)
   lay <- b$layout$layout
-  strip_col <- intersect(c("series", "trend"), names(lay))[1L]
-  expect_false(is.na(strip_col))
+  # Panels follow the order the responses were declared in
+  expect_identical(as.character(lay$series), responses)
 
-  # Panels follow the order the responses were declared in.
-  expect_identical(as.character(lay[[strip_col]]), responses)
-
-  # The line each panel draws, keyed by the occasion it sits at.
   line_layers <- which(vapply(
     p$layers, function(l) inherits(l$geom, "GeomLine"), logical(1L)
   ))
   expect_gt(length(line_layers), 0L)
-  per_panel <- list()
-  for (i in line_layers) {
-    dd <- b$data[[i]]
-    for (pn in unique(as.integer(dd$PANEL))) {
-      v <- dd[as.integer(dd$PANEL) == pn, c("x", "y"), drop = FALSE]
-      key <- as.character(pn)
-      per_panel[[key]] <- rbind(per_panel[[key]], v)
-    }
-  }
-  expect_identical(length(per_panel), as.integer(n_resp))
-
-  # Two panels drawing one series agree wherever they overlap, so the
-  # claim is that they disagree somewhere.
-  keys <- names(per_panel)
-  for (i in seq_along(keys)) {
-    for (j in seq_along(keys)) {
-      if (j <= i) next
-      shared <- merge(per_panel[[keys[i]]], per_panel[[keys[j]]],
-                      by = "x")
-      expect_gt(nrow(shared), 0L)
-      expect_gt(max(abs(shared$y.x - shared$y.y)), 1e-6)
-    }
+  for (k in seq_len(n_resp)) {
+    panel <- do.call(rbind, lapply(line_layers, function(i) {
+      dd <- b$data[[i]]
+      dd[as.integer(dd$PANEL) == k, c("x", "y")]
+    }))
+    # The median line tracks the sampler's own column more closely
+    # than any other column
+    rows <- match(panel$x, time_vals)
+    gap <- vapply(responses, function(r) {
+      mean(abs(panel$y - sampler_state[rows, r]))
+    }, numeric(1L))
+    expect_identical(names(which.min(gap)), responses[k])
   }
 })
 
 
-test_that("the series plot draws every response, and names them", {
-  # One panel labelled NA leaves two responses undrawn and the third
-  # unnamed.
+test_that("the series plot labels and draws every response", {
   p <- plot(fit, type = "series")
   b <- ggplot2::ggplot_build(p)
   lay <- b$layout$layout
-  strip_col <- intersect(c("series", "trend"), names(lay))[1L]
-  expect_identical(nrow(lay), as.integer(n_resp))
-  expect_identical(as.character(lay[[strip_col]]), responses)
-  # Each panel holds its own response's observations, in time order.
-  # A panel drawing another response's column is named correctly and
-  # wrong everywhere else.
+  expect_identical(as.character(lay$series), responses)
+  # Each panel holds its own response's observations in time order
   drawn <- b$data[[1L]]
   for (k in seq_len(nrow(lay))) {
-    r <- as.character(lay[[strip_col]][k])
+    r <- as.character(lay$series[k])
     got <- drawn[as.integer(drawn$PANEL) == as.integer(lay$PANEL[k]), ]
     got <- got[order(got$x), ]
     expect_equal(got$x, time_vals)
     expect_equal(got$y, dat[[r]])
   }
 
-  # Naming a response draws that response's series alone, as the
-  # single-series grid whose first panel is the series itself.
+  # Naming a response draws the single-series grid. Its first panel is
+  # the series itself.
   one <- plot(fit, type = "series", resp = "seen")
   expect_s3_class(one, "patchwork")
   ts <- ggplot2::ggplot_build(one[[1L]])$data[[1L]]
@@ -1061,23 +758,11 @@ test_that("the plotting methods render for a wide fit", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
 
-  # Which plots answer per response and which answer once is the
-  # claim. `residuals` compares observations against fitted values,
-  # and a wide fit has a set of each per response, so it returns one
-  # figure holding a residual grid per arm, each titled by its
-  # response. `trend` and `series` describe the latent process and
-  # answer once. A method that folded three arms into one panel
-  # returns a plottable object either way.
+  # The residual plot draws one grid per response, titled by that
+  # response. The trend and series plots draw one faceted figure.
   drawn <- list()
   drawn$residuals <- with_warnings(plot(fit, type = "residuals"))
-  expect_s3_class(drawn$residuals$value, "patchwork")
-  grids <- c(drawn$residuals$value$patches$plots,
-             list(drawn$residuals$value))
-  expect_identical(
-    vapply(grids, function(g) g$labels$title %||% NA_character_,
-           character(1L)),
-    responses
-  )
+  expect_identical(panel_titles(drawn$residuals$value), responses)
 
   for (ty in c("trend", "series")) {
     drawn[[ty]] <- with_warnings(plot(fit, type = ty))
@@ -1086,20 +771,9 @@ test_that("the plotting methods render for a wide fit", {
   drawn$mcmc <- with_warnings(mcmc_plot(fit))
   expect_s3_class(drawn$mcmc$value, "ggplot")
 
-  # Every arm has unobserved occasions, so a plot drawing
-  # observations owes a notice about them, once per arm it drew.
-  # Counted rather than silenced, and the plots that draw none owe
-  # nothing.
-  miss <- function(w) grep("missing response", w, value = TRUE)
-  expect_length(miss(drawn$residuals$warnings), n_resp)
-  expect_identical(miss(drawn$trend$warnings), character(0))
-  expect_identical(miss(drawn$series$warnings), character(0))
-  expect_identical(miss(drawn$mcmc$warnings), character(0))
+  # The omitted occasions are reported by a once-per-session message
   for (nm in names(drawn)) {
-    expect_identical(
-      setdiff(drawn[[nm]]$warnings, miss(drawn[[nm]]$warnings)),
-      character(0)
-    )
+    expect_identical(drawn[[nm]]$warnings, character(0))
   }
 })
 
@@ -1109,19 +783,14 @@ test_that("the plotting methods render for a wide fit", {
 ref_epred <- posterior_epred(fit, newdata = dat, resp = responses[1L],
                              draw_ids = 1:10, incl_autocor = TRUE)
 
-test_that("the reference the battery compares against actually varies", {
-  # Every check below compares a rearranged or cut frame against the
-  # same columns of `ref_epred`. That is a comparison of the
-  # prediction with itself, so a predictor returning one constant for
-  # every row satisfies all of it. This is the guard that makes the
-  # rest mean something.
-  colm <- colMeans(ref_epred)
-  expect_gt(stats::sd(colm), 0)
-  expect_gt(length(unique(round(colm, 8))), 1L)
+test_that("the battery's reference prediction varies by row", {
+  # The checks below compare rearranged frames against `ref_epred`. A
+  # predictor returning one constant for every row passes all of them.
+  expect_gt(stats::sd(colMeans(ref_epred)), 0.1)
 })
 
 
-test_that("a shuffled newdata answers the same, in the new order", {
+test_that("a shuffled newdata gives the same predictions, reordered", {
   set.seed(88L)
   perm <- sample(nrow(dat))
   expect_equal(
@@ -1133,7 +802,7 @@ test_that("a shuffled newdata answers the same, in the new order", {
 })
 
 
-test_that("single, repeated and cut frames read the right occasions", {
+test_that("single, repeated and cut frames predict at their occasions", {
   for (j in c(1L, 25L, n_time)) {
     one <- posterior_epred(fit, newdata = dat[j, , drop = FALSE],
                            resp = responses[1L], draw_ids = 1:10,
@@ -1167,154 +836,68 @@ test_that("feeding the training frame back as newdata is a no-op", {
 
 # -- The marginaleffects backend on a wide frame ----------------------
 
-library(marginaleffects)
-options("marginaleffects_model_classes" = "mvgam")
-
-
 test_that("get_predict refuses a wide fit that names no response", {
-  # A wide fit has one predictive surface per response, so a call
-  # that names none has no answer to give. Returning the first arm
-  # would be well formed and silently wrong, and the refusal has to
-  # say what is missing rather than fail later on a dimension.
+  # A wide fit has one predictive surface per response. The first
+  # response's surface would be well formed and wrong.
   err <- expect_error(
-    get_predict(fit, newdata = dat, type = "response"),
-    regexp = "requires"
+    marginaleffects::get_predict(fit, newdata = dat, type = "response"),
+    "requires"
   )
   expect_match(conditionMessage(err), "resp", fixed = TRUE)
 })
 
 
-test_that("each arm answers on its own rows and its own draws", {
+test_that("get_predict returns each response's own draws", {
   for (r in responses) {
-    out <- get_predict(fit, newdata = dat, type = "expected", resp = r)
-    expect_identical(nrow(out), nrow(dat))
+    out <- marginaleffects::get_predict(fit, newdata = dat,
+                                        type = "expected", resp = r)
     draws <- attr(out, "posterior_draws")
-    # marginaleffects stores draws as [nobs x ndraws], the transpose
-    # of mvgam's layout, so both margins are the claim.
-    expect_identical(dim(draws),
-                     c(nrow(dat), as.integer(ndraws(fit))))
-    expect_equal(out$estimate, unname(apply(draws, 1L, stats::median)))
-    # The draws are this response's own, not the first arm's repeated
-    # under three names. Compared against the public method for the
-    # same arm, they agree exactly.
+    # marginaleffects stores draws as [nobs x ndraws], the transpose of
+    # mvgam's layout
     expect_equal(draws, t(posterior_epred(fit, newdata = dat, resp = r)),
                  ignore_attr = TRUE)
+    expect_equal(out$estimate, unname(apply(draws, 1L, stats::median)))
   }
 })
 
 
-test_that("each arm predicts on the support its own family has", {
-  # The three arms carry a poisson, a bernoulli and a gaussian, so
-  # their expectations occupy three different sets. An arm answered
-  # under another's family keeps every dimension and lands in the
-  # wrong one. Stated as membership rather than as a comparison
-  # between arms, so the claim does not depend on which values this
-  # particular simulation happened to draw.
-  #
-  # Naming a response raises a marginaleffects notice saying `resp`
-  # is not known to be supported for this class. Its `sanity_dots()`
-  # carries the per-class list of accepted names as a literal in its
-  # own body, keyed on `class(model)[1]`, which leaves the notice
-  # outside mvgam's control. Asserting its absence pinned on
-  # marginaleffects a claim only marginaleffects can satisfy. What
-  # mvgam owns is that the value is honoured, which the support
-  # checks below state.
-  est <- lapply(responses, function(r) {
-    withCallingHandlers(
-      predictions(fit, newdata = dat, type = "expected", resp = r),
-      warning = function(w) {
-        if (grepl("not known to be supported", conditionMessage(w))) {
-          invokeRestart("muffleWarning")
-        }
-      }
-    )
-  })
-  names(est) <- responses
-
-  # A bernoulli expectation is a probability, bounds included. A
-  # prediction that escaped to the link scale keeps every dimension
-  # and leaves the unit interval.
-  seen <- est[["seen"]]
-  expect_true(all(seen$estimate > 0 & seen$estimate < 1))
+test_that("predictions gives each response's expectation in order", {
+  # The interval of a bernoulli expectation stays in the unit interval.
+  # A prediction left on the link scale leaves it.
+  seen <- predictions_resp(fit, newdata = dat, type = "expected",
+                           resp = "seen")
   expect_true(all(seen$conf.low > 0 & seen$conf.high < 1))
-  expect_true(all(seen$conf.low <= seen$estimate))
-  expect_true(all(seen$estimate <= seen$conf.high))
-  # One row of the frame is one row of the output, in order, so a
-  # prediction placed by position rather than by content fails.
+  expect_true(all(seen$conf.low <= seen$estimate &
+                    seen$estimate <= seen$conf.high))
+  # Row k of the output is row k of the frame
   expect_equal(as.numeric(seen$x), as.numeric(dat$x))
-
-  # A poisson expectation is a positive rate and is not confined to
-  # the unit interval on this frame, whose counts run in the tens.
-  count <- est[["count"]]
+  count <- predictions_resp(fit, newdata = dat, type = "expected",
+                            resp = "count")
   expect_true(all(count$estimate > 0))
   expect_gt(max(count$estimate), 1)
-  # A gaussian expectation is bounded on neither side by the family,
-  # which is what separates it from the other two.
-  mass <- est[["mass"]]
-  expect_true(all(is.finite(mass$estimate)))
-  # And no two arms are the same numbers under different names.
-  for (pair in list(c("count", "seen"), c("count", "mass"),
-                    c("seen", "mass"))) {
-    expect_false(isTRUE(all.equal(est[[pair[1L]]]$estimate,
-                                  est[[pair[2L]]]$estimate)))
-  }
 })
 
 
-test_that("a wide fit can be scored by leaving future occasions out", {
-  # A wide frame has no series column: the series is the response,
-  # which is why the axis record answers `multivariate` and lists
-  # the three names. `lfo_cv()` asked the frame for a column it
-  # cannot have, and once that demand went it split the frame by a
-  # row-series that a response-keyed axis has no answer for, leaving
-  # a factor of no rows.
-  #
-  # Every row of a wide frame carries every response, so the
-  # responses cannot disagree about the time grid and there is
-  # nothing to split. What the call has to produce is a score at
-  # each occasion it rolled over.
-  lfo <- lfo_cv(fit, min_t = 45, silent = 2)
+test_that("lfo_cv scores a wide fit by elpd and CRPS", {
+  # A wide frame has no series column. Its responses share one time
+  # grid. `lfo_cv()` once asked the frame for a series column.
+  lfo <- lfo_cv(fit, min_t = 45, score = c("elpd", "crps"), silent = 2)
   expect_s3_class(lfo, "mvgam_lfo")
-  expect_gt(length(lfo$eval_timepoints), 0L)
-  # The occasions evaluated are occasions the frame holds, not ranks
-  # standing in for them.
-  expect_true(all(lfo$eval_timepoints %in% sort(unique(dat$time))))
+  # The evaluated occasions are the frame's own times past `min_t`
+  expect_true(all(lfo$eval_timepoints %in% dat$time))
   expect_true(all(lfo$eval_timepoints > 45))
+  expect_gt(length(lfo$eval_timepoints), 0L)
   expect_identical(length(lfo$elpds), length(lfo$eval_timepoints))
   expect_true(all(is.finite(lfo$elpds)))
-  # A log density is negative, and a sum of them over seventeen
-  # occasions of three responses is well away from zero.
   expect_lt(sum(lfo$elpds), 0)
-})
-
-
-test_that("a proper score runs beside the elpd", {
-  # `elpd` used to be the only rule `lfo_cv()` could report. Every
-  # other score needs predictive draws rather than a density, and
-  # those were fetched with `forecast()`, which extends the grid past
-  # the last observed occasion. A fold is held out by masking, so the
-  # window sits inside the grid and the call was refused; a
-  # `tryCatch()` turned the refusal into a silent `NA`.
-  #
-  # The draws now come from the state the fold was scored on, so the
-  # two scores describe one predictive.
-  lfo <- lfo_cv(fit, min_t = 45, score = c("elpd", "crps"),
-                silent = 2)
-  expect_true("crps" %in% names(lfo$scores))
-  expect_identical(length(lfo$scores$crps),
-                   length(lfo$eval_timepoints))
-  # A CRPS is a non-negative loss, and one that came back as `NA`
-  # per fold is what the swallowed refusal looked like.
-  expect_false(anyNA(lfo$scores$crps))
-  expect_true(all(lfo$scores$crps >= 0))
-  expect_true(all(is.finite(lfo$scores$crps)))
-  # The two rules are scored on one predictive, so a fold the model
-  # found surprising should cost on both. Rank agreement is the
-  # claim that survives their different scales.
-  expect_gt(
-    stats::cor(lfo$elpds, -lfo$scores$crps, method = "spearman"),
-    0
-  )
+  # The CRPS draws come from the state each fold was scored on. A
+  # forecast past the grid once refused the masked fold. A caught
+  # error then left the score NA.
+  expect_identical(length(lfo$scores$crps), length(lfo$eval_timepoints))
+  expect_true(all(is.finite(lfo$scores$crps) & lfo$scores$crps >= 0))
+  # Both rules score one predictive. A surprising fold costs on both.
+  expect_gt(stats::cor(lfo$elpds, -lfo$scores$crps, method = "spearman"),
+            0)
 })
 
 

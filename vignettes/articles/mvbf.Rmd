@@ -1,5 +1,5 @@
 ---
-title: "One shared process, many sensors: multi-response mvgam"
+title: "One latent process, several observation models"
 author: "Nicholas J Clark"
 date: "`r Sys.Date()`"
 output:
@@ -23,493 +23,264 @@ knitr::opts_chunk$set(
   out.width = "85%", fig.align = "center"
 )
 library(mvgam)
-library(brms)
 library(ggplot2)
 library(patchwork)
 theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 ```
 
-Field monitoring rarely produces a single response variable. An
-ecologist counting animals along a transect typically also
-operates a baited trap and runs a camera array. Each survey
-delivers a noisy, partial view of the same underlying ecological
-quantity. Standard methods for time series data either fit each
-response separately, throwing away the information sitting in
-the other methods' columns, or force every column into the same
-Gaussian observation model, which is wrong for counts, for
-biomass and for detection records. This article walks through
-the mvgam alternative: one shared latent dynamic process linked
-to many response variables, each with its own observation family
-and per-outcome covariates. The latent state is informed jointly
-by every response through the likelihood. We demonstrate this on
-a simulated three-method monitoring scenario where we know the
-truth and can verify recovery directly.
+Monitoring programmes often measure one quantity with several methods.
+A population might be counted along transects, weighed in traps and
+detected by cameras in the same months. Each method measures the same
+abundance through an observation process of its own. Fitted
+separately, each method estimates abundance from its own data alone.
+Fitted jointly, every method informs one estimate of the shared
+abundance. Integrated population models combine data sources in this
+way (Schaub and Abadi
+[2011](https://doi.org/10.1007/s10336-010-0632-7)).
+
+mvgam fits such a model as a multivariate formula: one `bf()` per
+response, each with its own family and covariates. A single
+`trend_formula` describes the latent process they share. This article
+simulates three methods observing one population. We fit the joint
+model and the three separate models, then compare how closely each
+recovers the simulated abundance.
 
 ## The data
 
-We simulate a single hypothetical animal population observed over
-80 monthly time points by three parallel survey methods. The
-underlying latent state `x[t]` follows a stationary AR(1) with
-`phi = 0.7` and `sigma = 0.4`. Each method observes that state
-through a different measurement process:
+The latent abundance $z_t$, on the log scale, follows a stationary
+AR(1) over 80 months:
 
-- `count`: visual transect counts (Poisson, log link). Survey
-  effort is logged each month and enters the linear predictor as
-  an offset.
-- `biomass`: trap-collected biomass per unit night (Gamma, log
-  link). A cyclic seasonal smooth captures the natural seasonal
-  rhythm in biomass independent of survey effort.
-- `camera`: camera-trap presence/absence (Bernoulli, logit link).
-  The number of deployment days enters as a linear slope.
+$$
+z_t \sim \mathrm{Normal}(0.7\, z_{t-1},\ 0.4).
+$$
 
-The camera array is operated on a sparser schedule than the other
-two: only 60 of the 80 months carry camera observations. mvgam
-keeps the camera outcome on its own non-NA rows so the shared
-latent state is still informed during the 20 months without a
-camera by counts and biomass alone.
+Three methods observe it. Transect counts (`count`) are Poisson with a
+log link. Survey effort varies by month and enters as an offset. Trap
+biomass (`biomass`) is Gamma with a log link and shape 2. A seasonal
+cycle in month adds to the latent state. Camera detections (`camera`)
+are Bernoulli with a logit link. Detection rises by 0.05 on the logit
+scale with each day the camera is deployed. The cameras run in only 60
+of the 80 months.
 
 ```{r simulate}
 set.seed(2024)
-
-T_ <- 80L
-phi <- 0.7
-sigma_proc <- 0.4
-
-# One latent abundance trajectory under a stationary AR(1).
-x <- numeric(T_)
-x[1L] <- rnorm(1L, mean = 0, sd = sigma_proc / sqrt(1 - phi^2))
-for (t in 2L:T_) {
-  x[t] <- phi * x[t - 1L] + rnorm(1L, 0, sigma_proc)
+n_time <- 80
+z <- numeric(n_time)
+z[1] <- rnorm(1, 0, 0.4 / sqrt(1 - 0.7^2))
+for (t in 2:n_time) {
+  z[t] <- 0.7 * z[t - 1] + rnorm(1, 0, 0.4)
 }
 
-# Per-arm intercepts, covariate effects and the Gamma shape.
-a_count <- 1.5
-a_biomass <- 0.5
-a_camera <- -0.5
-b_deploy <- 0.05
-nu <- 2.0
-
-month_idx <- ((seq_len(T_) - 1L) %% 12L) + 1L
-log_effort_count <- log(runif(T_, min = 0.8, max = 1.2))
-deploy_days <- runif(T_, min = 5, max = 20)
-f_season <- sin(2 * pi * month_idx / 12)
-
-count <- rpois(T_, exp(a_count + log_effort_count + x))
-mu_biomass <- exp(a_biomass + f_season + x)
-biomass <- rgamma(T_, shape = nu, rate = nu / mu_biomass)
-p_camera <- plogis(a_camera + b_deploy * deploy_days + x)
-camera_full <- rbinom(T_, size = 1L, prob = p_camera)
-
-# The camera runs on a sparser schedule, missing at random with
-# respect to the latent state.
-camera <- rep(NA_integer_, T_)
-camera_keep <- sort(sample.int(T_, size = 60L))
-camera[camera_keep] <- camera_full[camera_keep]
+month <- (seq_len(n_time) - 1) %% 12 + 1
+log_effort <- log(runif(n_time, 0.8, 1.2))
+deploy_days <- runif(n_time, 5, 20)
+mu_biomass <- exp(0.5 + sin(2 * pi * month / 12) + z)
 
 mv_data <- data.frame(
-  time = seq_len(T_),
-  series = factor(rep("pop1", T_)),
-  month = month_idx,
-  log_effort = log_effort_count,
+  time = seq_len(n_time),
+  series = factor("pop1"),
+  month = month,
+  log_effort = log_effort,
   deploy_days = deploy_days,
-  count = count,
-  biomass = biomass,
-  camera = camera
+  count = rpois(n_time, exp(1.5 + log_effort + z)),
+  biomass = rgamma(n_time, shape = 2, rate = 2 / mu_biomass),
+  camera = rbinom(n_time, 1, plogis(-0.5 + 0.05 * deploy_days + z))
 )
-truth <- list(x = x, phi = phi, sigma = sigma_proc, nu = nu)
-str(mv_data, give.attr = FALSE)
+mv_data$camera[-sort(sample.int(n_time, 60))] <- NA
 ```
 
-```{r truth-summary}
-cat("True phi      =", truth$phi,   "\n")
-cat("True sigma    =", truth$sigma, "\n")
-cat("True nu       =", truth$nu,    "(Gamma shape)\n")
-cat("camera obs    =", sum(!is.na(mv_data$camera)), "/", nrow(mv_data), "\n")
+```{r plot-data, fig.asp = 0.8, fig.cap = "The three simulated monitoring records. The camera record has gaps in the months the cameras did not run."}
+observed <- do.call(rbind, lapply(c("count", "biomass", "camera"), function(r) {
+  data.frame(time = mv_data$time, value = mv_data[[r]], response = r)
+}))
+observed$response <- factor(observed$response,
+                            levels = c("count", "biomass", "camera"))
+ggplot(observed, aes(time, value)) +
+  geom_line(data = ~ subset(.x, response != "camera"), colour = "#A25050") +
+  geom_point(size = 1, na.rm = TRUE) +
+  facet_wrap(~ response, ncol = 1, scales = "free_y") +
+  labs(x = "Month", y = NULL)
 ```
 
-A scatter of the three response columns by time shows what each
-method records and where the camera outcome is missing.
+## The joint model
 
-```{r plot-data, fig.asp = 0.7, fig.width = 8, out.width = "95%"}
-long <- with(mv_data, rbind(
-  data.frame(time = time, value = count,   resp = "count"),
-  data.frame(time = time, value = biomass, resp = "biomass"),
-  data.frame(time = time, value = camera,  resp = "camera")
-))
-ggplot(long, aes(x = time, y = value)) +
-  geom_line(colour = bayesplot::color_scheme_get()$dark, alpha = 0.6) +
-  geom_point(size = 1.2, na.rm = TRUE) +
-  facet_wrap(~ resp, ncol = 1L, scales = "free_y") +
-  labs(x = "Time (month)", y = "Observed value")
-```
-
-## Three univariate baselines
-
-To see how much the shared-process model gains over the
-default that fits each method alone, we first run three
-independent fits with the same AR(1) latent dynamics.
-
-```{r uni-fits}
-mod_uni_count <- mvgam(
-  count ~ 1 + offset(log_effort),
-  trend_formula = ~ AR(p = 1),
-  family = poisson(), data = mv_data,
-  chains = 2L, iter = 2000L, warmup = 1000L, silent = 2L
-)
-mod_uni_biomass <- mvgam(
-  biomass ~ 1 + s(month, bs = "cc", k = 8),
-  trend_formula = ~ AR(p = 1),
-  family = Gamma(link = "log"), data = mv_data,
-  knots = list(month = c(0.5, 12.5)),
-  chains = 2L, iter = 2000L, warmup = 1000L, silent = 2L
-)
-mod_uni_camera <- mvgam(
-  camera ~ 1 + deploy_days,
-  trend_formula = ~ AR(p = 1),
-  family = bernoulli(link = "logit"), data = mv_data,
-  chains = 2L, iter = 2000L, warmup = 1000L, silent = 2L
-)
-```
-
-Each fit converges (max R-hat below 1.05) but the camera outcome
-carries very little information by itself. The Bernoulli observations
-above provide only one bit per time point, so its AR(1) estimate
-of `x[t]` is correspondingly diffuse.
-
-## A joint fit: one process, three observation families
-
-The joint fit lives in one `mvgam()` call. We chain three `bf()`
-outcomes with the `+` operator (a brms idiom that mvgam re-exports).
-Each outcome gets its own family and its own predictors. Every
-outcome shares the same `trend_formula = ~ AR(p = 1)`: one latent
-state feeding three observation models.
+Each response enters through its own `bf()`, combined with `+`,
+carrying its family and its covariates. `set_rescor(FALSE)` declares that the responses
+share no residual correlation beyond the latent state. A cyclic smooth
+of month captures the seasonal cycle in biomass:
 
 ```{r joint-fit}
 joint_formula <-
-  bf(count   ~ 1 + offset(log_effort), family = poisson()) +
-  bf(biomass ~ 1 + s(month, bs = "cc", k = 8),
-     family = Gamma(link = "log")) +
-  bf(camera  ~ 1 + deploy_days,
-     family = bernoulli(link = "logit"))
+  bf(count ~ 1 + offset(log_effort), family = poisson()) +
+  bf(biomass ~ 1 + s(month, bs = "cc", k = 8), family = Gamma(link = "log")) +
+  bf(camera ~ 1 + deploy_days, family = bernoulli()) +
+  set_rescor(FALSE)
 
 mod_joint <- mvgam(
   joint_formula,
   trend_formula = ~ AR(p = 1),
-  data  = mv_data,
+  data = mv_data,
   knots = list(month = c(0.5, 12.5)),
-  chains = 2L, iter = 2000L, warmup = 1000L, silent = 2L
+  chains = 4, seed = 2024, silent = 2
 )
 ```
 
-mvgam handles the bookkeeping. brms's default `mvbf` would
-drop those 20 rows from every outcome via listwise deletion.
-mvgam instead expands the standata so each outcome keeps its own
-non-NA rows. The Stan model then evaluates the count likelihood at all
-80 time points, the biomass likelihood at all 80 and the camera
-likelihood at the 60 observed months, all contributing to a
-single shared AR(1) state.
+The latent state $z_t$ enters the linear predictor of every response.
+Because a response with no record drops out of the likelihood, a month
+without a camera record informs the state through the count and
+biomass likelihoods alone.
 
-`summary()` returns a classed object whose `spec` slot holds the
-distributional parameters each family contributes, so the Gamma
-shape belonging to the biomass arm can be read on its own.
-`posterior_summary()` then pulls the intercepts, the covariate
-slope and the trend parameters into one table for the recovery
-check.
+## Checking each response
 
-```{r joint-summary}
-s <- summary(mod_joint)
-print(s$spec)
+`pp_check()` compares draws from the posterior predictive distribution
+with the data. Without `resp` it draws one panel per response:
+
+```{r ppc, fig.asp = 1, fig.cap = "Posterior predictive checks for each response: density overlays for the count and biomass records, and the share of each outcome for the camera record."}
+pp_check(mod_joint, ndraws = 50)
 ```
 
-```{r joint-pars}
-ps <- posterior_summary(mod_joint)
-# `Intercept_<resp>` is the intercept at the covariate mean and
-# `b_<resp>_Intercept` the intercept at zero, so the two part
-# company on any arm whose covariate is not centred. The
-# simulation defines each arm's intercept at zero, so that is the
-# spelling to read against it.
-keep <- grep("^b_.*_Intercept$|deploy_days|shape_|ar1|sigma_trend",
-              rownames(ps))
-round(ps[keep, c("Estimate", "Q2.5", "Q97.5")], 3)
+`conditional_effects()` draws each response's covariate effects on
+that response's scale, with the latent process held out. Biomass peaks
+early in the year, as the simulated cycle does:
+
+```{r effects, fig.asp = 0.45, fig.width = 8, fig.cap = "Expected biomass by month and camera detection probability by deployment days, with 95% credible intervals."}
+ce <- conditional_effects(mod_joint)
+wrap_plots(plot(ce, plot = FALSE), ncol = 2)
 ```
 
-Every generating value defined at the top of this article falls
-inside its own 95% interval: the three arm intercepts, the
-deployment slope, the AR coefficient, the innovation SD and the
-Gamma shape. The camera arm is the loosest of them, which is
-what one bit of information per month buys.
-
-## Posterior-predictive checks
-
-Each outcome gets its own posterior-predictive check via the
-standard `pp_check()` interface, scoped with the `resp` argument.
-For the Bernoulli camera outcome the `"bars"` type is more
-informative than the default density overlay (which is built for
-continuous responses).
-
-```{r pp-count, fig.asp = 0.55}
-pp_check(mod_joint, resp = "count", ndraws = 50L) +
-  labs(title = "PPC: visual transect counts")
+```{r slope-numbers, include = FALSE}
+slope <- as.numeric(as_draws_matrix(
+  mod_joint, variable = "b_camera_deploy_days"
+))
+fe_slope <- sprintf("%.2f [%.2f, %.2f]", mean(slope),
+                    quantile(slope, 0.025), quantile(slope, 0.975))
+stopifnot(quantile(slope, 0.025) < 0.05, quantile(slope, 0.975) > 0.05)
+# The prose below says the biomass curve peaks in the first quarter
+bm <- ce[["biomass"]][["month"]]$data
+stopifnot(bm$month[which.max(bm$estimate)] < 4)
 ```
 
-```{r pp-biomass, fig.asp = 0.55}
-pp_check(mod_joint, resp = "biomass", ndraws = 50L) +
-  labs(title = "PPC: trap biomass")
-```
+The deployment slope is `r fe_slope` on the logit scale, against the
+0.05 used to simulate the data. Sixty binary records estimate it
+loosely.
 
-```{r pp-camera, fig.asp = 0.55, fig.width = 5}
-pp_check(mod_joint, resp = "camera", type = "bars", ndraws = 50L) +
-  labs(title = "PPC: camera detections")
-```
+## What the joint model gains
 
-The replicate distributions cover the observed marginals for
-every outcome. Calibration is sound on all three.
+To compare, we fit each method on its own, with the same AR(1) state:
 
-## Conditional effects
-
-`conditional_effects()` returns one list per response, faceted
-internally by predictor. The plot for each outcome now carries the
-correct response on its y-axis.
-
-```{r ce-biomass, fig.asp = 0.55}
-ce <- mvgam::conditional_effects(mod_joint)
-plot(ce[["biomass"]])[[1L]]
-```
-
-The biomass outcome picks up the seasonal sinusoid that drove the
-simulation: a clear peak in early months and a trough in late
-summer. The cyclic smooth penalisation is doing its job, and the
-posterior median follows the truth even though we never told the
-model that month was seasonal.
-
-```{r ce-camera, fig.asp = 0.55}
-plot(ce[["camera"]])[[2L]]
-```
-
-The camera outcome's detection probability rises with deploy days,
-consistent with the simulated effect of 0.05 log-odds per day.
-The CI is wide because Bernoulli observations carry little
-information per row.
-
-## Residual diagnostics
-
-`plot(mod, type = "residuals", resp = X)` returns a four panel
-diagnostic of the Dunn-Smyth residuals for one outcome. The
-panels show residuals against fitted values, a Normal quantile
-plot, ACF and partial ACF. When the model is doing its job the
-residuals will sit horizontally around zero with no trend across
-the fitted range, will fall close to the quantile line and will
-show no autocorrelation lags reaching beyond the dashed bands.
-
-```{r resid-count, fig.asp = 0.7, fig.width = 8}
-plot(mod_joint, type = "residuals", resp = "count", ndraws = 100L)
-```
-
-```{r resid-biomass, fig.asp = 0.7, fig.width = 8}
-plot(mod_joint, type = "residuals", resp = "biomass", ndraws = 100L)
-```
-
-```{r resid-camera, fig.asp = 0.7, fig.width = 8}
-plot(mod_joint, type = "residuals", resp = "camera", ndraws = 100L)
-```
-
-The count and camera quantile plots track the diagonal almost
-exactly. The biomass plot shows a mild deviation in the upper
-tail, marking one or two large biomass values the Gamma is
-slightly undershooting. None of the three outcomes show
-residual autocorrelation outside the lag-1 confidence band,
-which is the diagnostic the shared AR(1) latent state was put
-in place to absorb.
-
-## State recovery: joint vs baselines
-
-The point of the joint fit is the latent state itself. We pull
-the per-draw latent trajectory out of each fit with
-`hindcast(fit, type = "trend")`. The resulting `mvgam_forecast`
-plots with the package's standard ribbon and median style. A
-`geom_point()` layer adds the simulated truth on top so recovery
-is read off directly.
-
-```{r recovery-plot, fig.asp = 0.62, fig.width = 9, out.width = "95%"}
-fits <- list(
-  "Joint (3 families)" = mod_joint,
-  "Counts only"        = mod_uni_count,
-  "Biomass only"       = mod_uni_biomass,
-  "Camera only"        = mod_uni_camera
-)
-truth_pts <- data.frame(
-  time = seq_along(truth$x), trend = truth$x
-)
-
-plot_recovery <- function(fit, label) {
-  # `hindcast(fit, type = "trend")` returns an `mvgam_forecast`
-  # object whose `plot()` method already skips the response-scale
-  # observation overlay for trend hindcasts. We only need to
-  # overlay the simulated truth vector as ×-marks.
-  plot(hindcast(fit, type = "trend")) +
-    geom_point(
-      data = truth_pts,
-      aes(x = time, y = trend),
-      shape = 4, size = 1.2, colour = "black"
-    ) +
-    labs(title = label, y = "Latent state")
+```{r separate-fits}
+fit_one <- function(formula, family) {
+  mvgam(formula, trend_formula = ~ AR(p = 1), family = family,
+        data = mv_data, knots = list(month = c(0.5, 12.5)),
+        chains = 4, seed = 2024, silent = 2)
 }
-
-patchwork::wrap_plots(
-  lapply(names(fits), function(n) plot_recovery(fits[[n]], n)),
-  ncol = 2L
-)
+mod_count <- fit_one(count ~ 1 + offset(log_effort), poisson())
+mod_biomass <- fit_one(biomass ~ 1 + s(month, bs = "cc", k = 8),
+                       Gamma(link = "log"))
+mod_camera <- fit_one(camera ~ 1 + deploy_days, bernoulli())
 ```
 
-Two simple numbers back this up: the root mean squared error
-between the posterior median and the simulated truth at each
-time point, and the average posterior SD across time points.
-The first captures how close the median is to the truth; the
-second captures how tight the ribbon is.
+`hindcast(type = "trend")` returns each model's posterior for the
+latent state:
+
+```{r recovery-plot, fig.width = 9, fig.asp = 0.62, out.width = "95%", fig.cap = "Posterior medians and 95% credible intervals of the latent state from the joint model and from each method alone. Crosses mark the simulated state."}
+fits <- list(
+  "Joint" = mod_joint,
+  "Counts alone" = mod_count,
+  "Biomass alone" = mod_biomass,
+  "Camera alone" = mod_camera
+)
+truth <- data.frame(time = seq_len(n_time), z = z)
+wrap_plots(lapply(names(fits), function(nm) {
+  plot(hindcast(fits[[nm]], type = "trend")) +
+    geom_point(aes(time, z), data = truth, shape = 4, size = 1) +
+    labs(title = nm, y = "Latent state")
+}), ncol = 2)
+```
 
 ```{r recovery-table}
-recovery_summary <- function(fit) {
-  hc <- hindcast(fit, type = "trend")
-  # Multi-response fits return the fan-out wrapper; every arm
-  # carries the same shared trend, so peel any one for the
-  # posterior matrix.
-  if (isTRUE(attr(hc, "mv_wrapper"))) hc <- hc[[1L]]
-  m <- hc$hindcasts[[1L]]
-  med <- apply(m, 2L, median)
-  c(RMSE     = sqrt(mean((med - truth$x)^2)),
-    `Mean SD` = mean(apply(m, 2L, sd)))
-}
-recovery <- t(sapply(fits, recovery_summary))
-round(recovery, 3)
+recovery <- t(vapply(fits, function(fit) {
+  s <- summary(hindcast(fit, type = "trend"))
+  c(RMSE = sqrt(mean((s$predQ50 - z)^2)),
+    `Interval width` = mean(s$predQ97.5 - s$predQ2.5))
+}, numeric(2)))
+round(recovery, 2)
 ```
 
-The joint fit posts the smallest RMSE and the tightest mean SD;
-the camera-only fit is the outlier on both, because a single
-Bernoulli observation per time point carries little information.
-The joint fit borrows strength wherever any of the methods
-reported.
-
-## Per-outcome posterior forecasts
-
-The same `forecast()` interface that handles univariate fits now
-works on a multi-response fit: it fans out per response and
-returns one `mvgam_forecast` per outcome. We extend the time grid
-by 5 months and let mvgam propagate the shared latent state
-forward, then map back through each outcome's observation family.
-
-```{r forecast-multi, fig.asp = 1.0, fig.width = 7, out.width = "85%"}
-T_ <- max(mv_data$time)
-new <- data.frame(
-  time = (T_ + 1L):(T_ + 5L),
-  series = factor(rep("pop1", 5L), levels = levels(mv_data$series)),
-  month = ((T_ + 0L:4L) %% 12L) + 1L,
-  log_effort = log(rep(1, 5L)),
-  deploy_days = rep(15, 5L),
-  count = NA_integer_, biomass = NA_real_, camera = NA_integer_
-)
-fc <- forecast(mod_joint, newdata = new)
-patchwork::wrap_plots(
-  lapply(names(fc), function(n) plot(fc[[n]]) + labs(title = n)),
-  ncol = 1L
-)
+```{r recovery-numbers, include = FALSE}
+fe_rmse <- sprintf("%.2f", recovery[, "RMSE"])
+names(fe_rmse) <- rownames(recovery)
+# The prose below orders the four fits by error and says the joint
+# model has the narrowest intervals and the camera alone the widest
+stopifnot(identical(order(recovery[, "RMSE"]), 1:4),
+          which.min(recovery[, "Interval width"]) == 1,
+          which.max(recovery[, "Interval width"]) == 4)
 ```
 
-Each panel shows that outcome's posterior-predictive ribbon
-through the 80 training months and the 5 forecast months ahead.
-The same forecast objects feed straight into `score()`; see the
-[forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
-for the scoring rules and rolling-origin tools that pair with
-`forecast()` here.
+The joint model recovers the latent state most closely, with a root
+mean squared error of `r fe_rmse[["Joint"]]` and the narrowest
+intervals. Counts alone come next at `r fe_rmse[["Counts alone"]]` and
+biomass alone at `r fe_rmse[["Biomass alone"]]`. Because a single
+binary record per month constrains abundance weakly, the camera alone
+recovers the state worst, at `r fe_rmse[["Camera alone"]]`, with the
+widest intervals of the four.
 
-## Take-aways
+## Forecasts
 
-A multi-response mvgam fit lets each measurement model keep its
-proper observation family while sharing the dynamics that drive
-every series. The recipe is small: write one `bf()` block per
-response with its own family and predictors, combine the blocks
-with `+`, and pass the combined formula to `mvgam()` with a
-single shared `trend_formula = ~ ...`. Every post-fit method
-(`summary()`, `pp_check()`, `conditional_effects()`,
-`residuals()`, `posterior_predict()`, `forecast()`, `loo()`)
-either operates directly on the joint fit or accepts a `resp`
-argument that scopes the call to a single outcome. Outcomes
-with NA values keep their own non-NA rows, so the shared latent
-state is still informed at every time point any method actually
-reported.
+`forecast()` extends the latent state past the last month and passes
+it through each response's observation model. The new data hold unit
+survey effort, the calendar month of each future time point and 15
+deployment days for the camera. `type = "expected"` returns the
+expected count, the expected biomass and the detection probability:
 
-This is the data integration idea applied to time series rather
-than to population vital rates: several noisy measurement
-processes pool into a single shared latent state, and every
-post-fit method downstream dispatches on that state with the
-`resp` argument to scope back to a single outcome.
+```{r forecast, fig.asp = 1, fig.cap = "Expected values for each response over the training months and a six-month forecast. Points are the observations."}
+newdata <- data.frame(
+  time = n_time + 1:6,
+  series = factor("pop1"),
+  month = (n_time + 0:5) %% 12 + 1,
+  log_effort = 0,
+  deploy_days = 15,
+  count = NA, biomass = NA, camera = NA
+)
+fc <- forecast(mod_joint, newdata = newdata, type = "expected")
+plot(fc)
+```
 
-## Further reading
+The forecast object also feeds `score()` once the held-out
+observations arrive.
 
-The natural next functions to explore on the same fit are:
+The joint model recovers the simulated abundance more closely than any
+method fitted on its own, with the narrowest intervals of the four.
+Because a single binary outcome per month constrains the state weakly,
+the camera record gains the most from being fitted with the others. A
+monitoring programme that measures one population by several methods
+can fit them to one latent process and let each method inform the
+rest.
 
-- `score()` and `ensemble()` for proper scoring rules and
-  stacked weights on per-outcome forecasts.
-- `lfo_cv()` for rolling-origin Bayesian leave-future-out
-  cross-validation when the question is "how would this model
-  have performed in production".
-- `loo()`, `kfold.mvgam()` and `posterior_average()` for
-  in-sample model comparison and posterior-weighted predictions.
-- `irf()`, `fevd()` and `stability()` for impulse response,
-  forecast-error variance decomposition and stationarity
-  diagnostics when the latent dynamics are a VAR.
-- `methods_md()` for a citation-ready methods paragraph naming
-  the architecture pieces the fit actually used.
+## Where to next
 
-Sibling articles in this series carry the workflow further:
+Each function used here has a help page, such as `?pp_check` or
+`?forecast.mvgam`, with its arguments and output. `how_to_cite()`
+writes a methods paragraph for a fitted model. `methods_md()` writes
+out its equations.
 
-- The [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
-  walks through `forecast()`, `score()`, `lfo_cv()` and
-  `ensemble()` on a single count outcome and the multivariate
-  scoring rules that pair with them.
-- The [integrated distribution article](https://nicholasjclark.github.io/mvgam/articles/idm.html)
-  takes the same architecture into species distribution
-  modelling, where the streams are survey protocols and the
-  shared state is a log-intensity.
-- The [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
-  shows the joint-species variant where many response columns
-  share a latent factor structure with informed priors via
-  `jsdgam()`.
-- For grouped trend dynamics (one transition matrix and
-  innovation covariance per group, shrunk toward a global mean),
-  see the `gr` and `subgr` arguments in `?VAR` and the
-  [hierarchical VAR article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html).
+Related articles:
 
-## Acknowledgements
-
-The data integration framing draws on Schaub & Abadi
-([2011](https://doi.org/10.1007/s10336-010-0632-7)). The
-latent dynamic perspective follows the review by Auger-Méthé and
-colleagues ([2021](https://doi.org/10.1002/ecm.1470)). The
-probabilistic backend is Stan (Carpenter et al.
-[2017](https://doi.org/10.18637/jss.v076.i01)) accessed through
-brms (Bürkner
-[2017](https://doi.org/10.18637/jss.v080.i01)).
+- [Integrated distribution models](https://nicholasjclark.github.io/mvgam/articles/idm.html)
+  combine survey protocols that share one log-intensity.
+- [Joint species distribution models](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+  share latent factors among many species.
+- [State-space VARs](https://nicholasjclark.github.io/mvgam/articles/var.html)
+  give each series its own latent state, with lagged effects between
+  them.
+- [Forecast evaluation](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+  covers scoring rules and leave-future-out cross-validation.
+- [mvgam overview](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+  introduces the observation and trend formulas.
 
 ## References
 
-Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA,
-Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G and Thomas
-L (2021). A guide to state-space modeling of ecological time
-series. *Ecological Monographs* 91(4), e01470.
-[doi:10.1002/ecm.1470](https://doi.org/10.1002/ecm.1470)
-
-Bürkner P-C (2017). brms: An R Package for Bayesian Multilevel
-Models Using Stan. *Journal of Statistical Software* 80(1),
-1-28.
-[doi:10.18637/jss.v080.i01](https://doi.org/10.18637/jss.v080.i01)
-
-Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt
-M, Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A
-Probabilistic Programming Language. *Journal of Statistical
-Software* 76(1), 1-32.
-[doi:10.18637/jss.v076.i01](https://doi.org/10.18637/jss.v076.i01)
-
-Schaub M and Abadi F (2011). Integrated population models: a
-novel analysis framework for deeper insights into population
-dynamics. *Journal of Ornithology* 152(Suppl 1), S227-S237.
+Schaub M and Abadi F (2011). Integrated population models: a novel
+analysis framework for deeper insights into population dynamics.
+*Journal of Ornithology* 152(Suppl 1), S227-S237.
 [doi:10.1007/s10336-010-0632-7](https://doi.org/10.1007/s10336-010-0632-7)

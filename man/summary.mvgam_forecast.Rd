@@ -18,8 +18,9 @@ the median.}
 \value{
 A long-format \code{tibble} with one row per series and time,
 holding the posterior median and the two quantiles of the
-predictions, the observed value for \code{type = 'response'}, and the
-prediction type.
+predictions, the observed value for \code{type = 'response'} and the
+prediction type. A multivariate fit on a long frame adds a leading
+\code{resp} column naming the response.
 }
 \description{
 Posterior medians and quantiles of the hindcast and

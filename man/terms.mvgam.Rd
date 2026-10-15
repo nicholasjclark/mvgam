@@ -15,11 +15,10 @@
 An object of class \code{terms}.
 }
 \description{
-\code{terms()} is how a caller discovers a model's structure without
-knowing its class, and it is the accessor \code{model.frame()} is
-normally paired with. The object is built from the terms the model
-has: its responses on the left, the covariates of both submodels on
-the right. Group-level terms are not among them, since the bar
-syntax has no meaning to \code{stats::terms()}; read them with
-\code{\link[insight:find_random]{insight::find_random()}}.
+\code{terms()} reports a model's structure to a caller that does not know
+its class. \code{model.frame()} is the accessor usually paired with it.
+The object holds the model's responses on the left and the
+covariates of both submodels on the right. \code{stats::terms()} has no
+meaning for the bar syntax of group-level terms.
+\code{\link[insight:find_random]{insight::find_random()}} returns those.
 }

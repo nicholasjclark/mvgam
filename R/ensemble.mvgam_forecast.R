@@ -35,6 +35,11 @@
 #'   series names, the hindcast lengths, the forecast horizons and, when
 #'   present, the test observations.
 #'
+#'   A multivariate fit on a wide frame gives one forecast whose series
+#'   are its responses. The ensemble is a forecast over those series. On
+#'   a long frame the ensemble keeps one forecast per response. Every
+#'   response takes the same draws.
+#'
 #' @return An object of class `mvgam_forecast` containing the
 #'   ensembled hindcasts and forecasts. Suitable for
 #'   [plot.mvgam_forecast()] and [score.mvgam_forecast()].
@@ -78,9 +83,8 @@ ensemble.mvgam_forecast <- function(object, ..., weights = NULL,
       )
     )), call. = FALSE)
   }
-  models <- split$models
+  models <- lapply(split$models, forecast_parts)
   n_models <- length(models)
-  validate_forecast_compatibility(models)
   w <- if (is.null(weights)) {
     rep(1 / n_models, n_models)
   } else {
@@ -89,11 +93,54 @@ ensemble.mvgam_forecast <- function(object, ..., weights = NULL,
   ndraws_per <- mvgam_round_largest_remainder(w * ndraws)
   names(w) <- names(ndraws_per) <- names(models)
 
+  # A long-frame multivariate forecast holds one forecast per response.
+  # Every response takes the same draw rows. The ensemble then keeps
+  # the dependence between responses.
+  per_response <- vapply(models, is_forecast_list, logical(1L))
+  if (any(per_response)) {
+    resps <- names(models[[1L]])
+    if (!all(per_response) ||
+          !all(vapply(models, function(m) identical(names(m), resps),
+                      logical(1L)))) {
+      stop(insight::format_error(c(
+        "Every forecast must hold the same responses.",
+        i = paste0("Ensemble forecasts of fits that share their ",
+                   "response formulas.")
+      )), call. = FALSE)
+    }
+    by_resp <- lapply(stats::setNames(resps, resps), function(r) {
+      lapply(models, `[[`, r)
+    })
+    lapply(by_resp, validate_forecast_compatibility)
+    draw_idx <- resolve_ensemble_draws(by_resp[[1L]], ndraws_per)
+    out <- split$models[[1L]]
+    for (r in resps) {
+      out[[r]] <- ensemble_slots(by_resp[[r]], draw_idx, w, ndraws_per)
+    }
+    return(out)
+  }
+  validate_forecast_compatibility(models)
   # A posterior draw is a joint object. Row r of every series, in
   # both slots, comes from one draw. Taking rows separately per series
   # or per slot would pair unrelated draws. Model m gives one set of
   # `ndraws_per[m]` rows. Every series in both slots takes those rows.
   draw_idx <- resolve_ensemble_draws(models, ndraws_per)
+  ensemble_slots(models, draw_idx, w, ndraws_per)
+}
+
+
+#' One ensembled forecast from the draw rows of each input
+#'
+#' @param models List of `mvgam_forecast` objects
+#' @param draw_idx List of integer row vectors from
+#'   `resolve_ensemble_draws()`, one per model
+#' @param w Named numeric vector of normalised weights
+#' @param ndraws_per Named integer vector of draws taken per model
+#' @return The first model with its hindcast and forecast slots
+#'   replaced by the stacked draws, carrying `weights` and
+#'   `ndraws_per_model` attributes
+#' @noRd
+ensemble_slots <- function(models, draw_idx, w, ndraws_per) {
   out <- models[[1L]]
   # `[<-` keeps a NULL forecast slot. `$<-` would drop the element.
   out["hindcasts"] <- list(combine_slot(models, "hindcasts", draw_idx))

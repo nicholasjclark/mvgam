@@ -872,6 +872,13 @@ term_glossary <- function(obj) {
       "matrix $", sym[["Omega"]], "$"
     ))
   }
+  offsets <- obs_offset_symbols(obj)
+  if (length(offsets)) {
+    defs <- c(defs, paste0(
+      "- $", offsets, "$: offset `", names(offsets),
+      "`, with its coefficient fixed at one"
+    ))
+  }
   defs
 }
 
@@ -1740,7 +1747,8 @@ linear_predictor_rhs <- function(obj, notation) {
   if (length(classes$re) > 0L) {
     parts <- c(parts, render_re_inline(classes$re, obj))
   }
-  parts <- c(parts, trend_linpred_terms(obj))
+  parts <- c(parts, unname(obs_offset_symbols(obj)),
+             trend_linpred_terms(obj))
 
   if (length(parts) == 0L) {
     return("0")
@@ -1801,12 +1809,7 @@ obs_fixed_terms_from_prior <- function(obj) {
 #' @noRd
 obs_term_coef_kinds <- function(obj, coefs) {
   out <- rep(NA_character_, length(coefs))
-  # The brms model's formula carries its family, which brms needs to
-  # parse a family's own distributional parameters.
-  for (lp in model_predictors(side_model(obj, "obs")$formula)) {
-    if (!is.null(lp$dpar) || !is.null(lp$nlpar)) next
-    if (!is.null(obj$methods_md_resp) &&
-          !identical(lp$resp, obj$methods_md_resp)) next
+  for (lp in obs_mean_predictors(obj)) {
     sp <- formula_term_labels(lp$pred[["sp"]])
     kind <- ifelse(grepl("\\bmo\\(", sp), "mo",
                    ifelse(grepl("\\bme\\(", sp), "me", "mi"))
@@ -1822,6 +1825,49 @@ obs_term_coef_kinds <- function(obj, coefs) {
     }
   }
   out
+}
+
+#' The parsed predictors of the observation mean a view describes
+#'
+#' The brms model's formula carries its family, which brms needs to
+#' parse a family's own distributional parameters. A view of one
+#' response keeps that response's predictor.
+#'
+#' @param obj An `mvgam` object or a view of one response
+#' @return List of predictors as `model_predictors()` returns them
+#' @noRd
+obs_mean_predictors <- function(obj) {
+  Filter(function(lp) {
+    is.null(lp$dpar) && is.null(lp$nlpar) &&
+      (is.null(obj$methods_md_resp) ||
+         identical(lp$resp, obj$methods_md_resp))
+  }, model_predictors(side_model(obj, "obs")$formula))
+}
+
+#' The offsets of the observation mean, with their symbols
+#'
+#' An offset that names a column takes the column's symbol. Any other
+#' expression takes `o`, indexed when there are several.
+#'
+#' @param obj An `mvgam` object or a view of one response
+#' @return Named character vector of symbols, named by the offset
+#'   expression as written
+#' @noRd
+obs_offset_symbols <- function(obj) {
+  exprs <- unique(unlist(lapply(obs_mean_predictors(obj), function(lp) {
+    off <- lp$pred[["offset"]]
+    if (is.null(off)) return(NULL)
+    vapply(formula_calls(off[[2L]], "offset"),
+           function(e) formula_arg_text(e[[2L]]), character(1L))
+  }), use.names = FALSE))
+  if (!length(exprs)) return(character(0L))
+  named <- vapply(exprs, function(e) is.name(str2lang(e)), logical(1L))
+  sym <- paste0(escape_math_text(exprs), "_{i,t}")
+  other <- which(!named)
+  sym[other] <- if (length(other) == 1L) "o_{i,t}" else {
+    paste0("o^{(", seq_along(other), ")}_{i,t}")
+  }
+  stats::setNames(sym, exprs)
 }
 
 #' @noRd
@@ -3333,10 +3379,14 @@ render_implementation_section <- function(ctx) {
   if (!is.null(trend)) {
     call_lines <- c(call_lines, paste0("  trend_formula = ", trend))
   }
+  # Each response of a multivariate formula names its family in its
+  # own `bf()`. The `family` argument then plays no part.
   call_lines <- c(
     call_lines,
     paste0("  data          = ", data_name),
-    paste0("  family        = ", fam),
+    if (!inherits(obj$formula, "mvbrmsformula")) {
+      paste0("  family        = ", fam)
+    },
     paste0("  backend       = \"", info$backend, "\"")
   )
   if (!is.na(info$chains)) {
@@ -3578,10 +3628,13 @@ family_call_text <- function(family) {
     nmix = "log",
     "identity"
   )
+  # brms names these families in lower case. Their constructors are
+  # `Gamma()` and `Beta()`. `gamma()` is the mathematical function.
+  ctor <- switch(fam, gamma = "Gamma", beta = "Beta", fam)
   if (identical(link, default_link)) {
-    paste0(fam, "()")
+    paste0(ctor, "()")
   } else {
-    paste0(fam, "(link = \"", link, "\")")
+    paste0(ctor, "(link = \"", link, "\")")
   }
 }
 
@@ -3823,6 +3876,12 @@ format_prior_distribution <- function(prior_str, symbols = NULL) {
     # An argument naming a sampled hyperparameter takes its symbol.
     # Any other literal `_` is escaped, as a bare `mgp_a1` would
     # render `mgp` subscript `a1`.
+    # brms writes a default location computed with an offset at full
+    # precision. Three significant digits describe it on the page.
+    numeric_arg <- grepl("^-?[0-9]*\\.?[0-9]+(e-?[0-9]+)?$", args)
+    args[numeric_arg] <- vapply(as.numeric(args[numeric_arg]), function(v) {
+      format(signif(v, 3L), drop0trailing = TRUE)
+    }, character(1L))
     args <- vapply(args, function(a) {
       if (a %in% names(symbols)) symbols[[a]] else escape_math_text(a)
     }, character(1L))

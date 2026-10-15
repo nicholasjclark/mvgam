@@ -1,25 +1,19 @@
-# Conway-Maxwell binomial, and what a `trials()` aterm reaches.
+# Conway-Maxwell binomial with a `trials()` denominator.
 #
-# `com_binomial()` is a custom brms family: it carries its own Stan
-# code on `attr(fam, "mvgam_stanvars")`, declares a second
-# distributional parameter `nu` for over and under dispersion, and
-# takes its denominator through a `trials()` aterm rather than as a
-# predictor.
+# `com_binomial()` is a `brms::custom_family()`. The family object
+# holds its Stan functions on `attr(fam, "mvgam_stanvars")`. Its second
+# distributional parameter `nu` sets over or under dispersion. The
+# denominator enters through a `trials()` aterm.
 #
-# That aterm is what makes this fit worth having. A trial count is a
-# denominator rather than a predictor, so `find_predictors()` leaves
-# it out of the term list, and every route that builds a frame from
-# that list has no denominator to put in it. Three do: the smooth
-# grid, the marginaleffects grid and the padded forecast grid.
+# `find_predictors()` leaves a denominator out of the term list. Three
+# routes build a frame from that list and must still supply the
+# denominator: the smooth grid, the marginaleffects grid and the padded
+# forecast grid.
 #
-# The observation side carries more than the family needs, because
-# each term reaches a surface nothing else here drives. `mo(dose)` is
-# the only monotonic effect in the directory. `(1 | site)` is the only
-# group-level effect outside the VAR fit, and it is what makes
-# `ranef()`, `VarCorr()` and `ngrps()` answerable at all. `nu ~ z`
-# puts a sub-formula on the second distributional parameter of a
-# custom family, where the only other dpar coverage is `hu` on a
-# built-in one.
+# The observation formula carries terms the family itself does not
+# need. `mo(dose)` exercises a monotonic effect. `(1 | site)` gives
+# `ranef()`, `VarCorr()` and `ngrps()` a grouping to report. `nu ~ z`
+# puts a sub-formula on the second parameter of a custom family.
 #
 #   truth: 2 series over 50 occasions, a logit-scale smooth in `x`,
 #          a latent AR(1), trials varying per row
@@ -27,9 +21,9 @@
 #             (1 | site) + mo(dose), nu ~ z) with an AR(1) trend,
 #          family = com_binomial()
 #
-# Series are named out of alphabetical order and occasions numbered
-# from 3, so a rank is never a time and a sorted axis is not the
-# model's.
+# The series levels run against alphabetical order and the occasions
+# start at 3. A method that sorts the series or uses a rank as a time
+# then fails here.
 #
 # Run with:
 #   testthat::test_file("tests/local/test-family-com-binomial.R")
@@ -39,13 +33,6 @@ suppressMessages({
   library(posterior)
   library(testthat)
 })
-
-# Several blocks below state what the package does not yet do, and
-# testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean. The limit is
-# read when the reporter is built, before this file is sourced, so it
-# has to come from the environment:
-#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
 SM <- suppressMessages
 
@@ -58,7 +45,7 @@ series_levels <- c("upper", "lower")
 stopifnot(!identical(series_levels, sort(series_levels)))
 time_vals <- seq_len(n_time) + 2L
 
-# A latent AR(1) on the logit scale, so conditioning on it moves the
+# A latent AR(1) on the logit scale. Conditioning on it moves the
 # predictions by more than Monte Carlo noise.
 ar_true <- 0.7
 sigma_true <- 0.5
@@ -76,8 +63,8 @@ beta_series <- c(upper = 0, lower = -0.6)
 
 dose_levels <- c("none", "low", "mid", "high")
 site_levels <- paste0("st", 1:5)
-# A monotone increasing effect of dose, which is what `mo()` is for:
-# ordered categories whose spacing the model estimates.
+# A monotone increasing effect over ordered categories. `mo()`
+# estimates the spacing between them.
 dose_effect <- c(none = 0, low = 0.25, mid = 0.55, high = 1.1)
 
 dat <- data.frame(
@@ -92,8 +79,8 @@ dat <- data.frame(
                 levels = dose_levels, ordered = TRUE)
 )
 site_effect <- rnorm(length(site_levels), 0, 0.4)
-# A denominator that varies per row, so a grid holding it at one
-# value is visibly not the frame's own.
+# The denominator varies per row. A grid holding it at one value then
+# differs from the frame.
 dat$n_trials <- as.integer(sample(20:60, nrow(dat), replace = TRUE))
 eta <- as.numeric(latent) +
   rep(f_true, times = n_series) +
@@ -140,14 +127,10 @@ expect_warning(
 
 
 test_that("the custom family reaches Stan with its own code and nu", {
-  # `com_binomial()` is a `brms::custom_family()` whose Stan functions
-  # hang off the family object. Nothing else in this directory takes
-  # that route except `tweedie()`, and the two differ in that this one
-  # also carries an aterm.
-  sc <- as.character(stancode(prefit))
   # The denominator reaches the program as integer data, one per
   # observation. The likelihood pairs each count with its own
   # denominator and its own `nu`. The `nu ~ z` predictor builds `nu`.
+  sc <- as.character(stancode(prefit))
   expect_true(grepl("array[N] int trials;", sc, fixed = TRUE))
   expect_true(grepl("nu += Intercept_nu + Xc_nu * b_nu;", sc, fixed = TRUE))
   expect_true(grepl(
@@ -185,19 +168,15 @@ fit <- cached_fit(
 )
 
 
-test_that("posterior_epred answers on the count scale for this family", {
-  # The expectation of a Conway-Maxwell binomial is not `trials * mu`,
-  # so it is reached through the family's own kernel rather than by
-  # inverting the link. The kernel is handed a prep list and reads
-  # `mu`, `nu` and the trial counts out of it. A kernel that instead
-  # took an already inverse-linked matrix would apply the link a
-  # second time, which returns finite means of the wrong size rather
-  # than raising, so the bound below is the claim that catches it.
+test_that("posterior_epred gives the mean over each row's support", {
+  # The mean of a Conway-Maxwell binomial differs from `trials * mu`.
+  # The family's kernel takes `mu`, `nu` and the trial counts from a
+  # prep list. A kernel handed an inverse-linked matrix applies the
+  # link twice and returns finite means of the wrong size. The exact
+  # recomputation below catches that.
   ids <- 1:3
   ep <- posterior_epred(fit, draw_ids = ids)
   expect_identical(dim(ep), c(length(ids), nrow(dat)))
-  # The mean is the sum of j * P(j) over each row's own support,
-  # recomputed from the probability and `nu` of each draw.
   lp <- posterior_linpred(fit, draw_ids = ids, transform = FALSE)
   nu <- posterior_linpred(fit, draw_ids = ids, dpar = "nu")
   manual <- ep
@@ -212,13 +191,10 @@ test_that("posterior_epred answers on the count scale for this family", {
 })
 
 
-test_that("posterior_predict reads incl_autocor rather than dropping it", {
-  # `posterior_predict()` composes its draws through
-  # `posterior_linpred()`, which is the sibling method that takes
-  # `incl_autocor` and derives the trend state from it. The argument
-  # has to reach that call under its own name: anything passed
-  # alongside it lands in `...` and every draw comes back marginal,
-  # which is finite, correctly shaped and conditioned on nothing.
+test_that("posterior_predict conditions on the trend under incl_autocor", {
+  # `posterior_predict()` passes `incl_autocor` to `posterior_linpred()`
+  # by name. Lost in `...`, it leaves every draw marginal: finite,
+  # correctly shaped and conditioned on nothing.
   ids <- 1:100
   cond <- posterior_predict(fit, draw_ids = ids, incl_autocor = TRUE)
   marg <- posterior_predict(fit, draw_ids = ids, incl_autocor = FALSE)
@@ -227,12 +203,9 @@ test_that("posterior_predict reads incl_autocor rather than dropping it", {
   # response's row included.
   trial_mat <- data2draws(dat$n_trials, dim(cond))
   expect_true(all(cond >= 0 & cond <= trial_mat))
-  expect_false(isTRUE(all.equal(cond, marg)))
-  # Different where it matters, not in the last bit of one cell.
   expect_gt(max(abs(colMeans(cond) - colMeans(marg))), 1e-3)
 
-  # Conditioned on the fitted state, the draws describe the same
-  # surface the hindcast reports, so the two track each other closely.
+  # The conditioned draws describe the surface the hindcast reports
   hc <- hindcast(fit, type = "expected")
   cells <- unlist(lapply(names(hc$hindcasts), function(s) {
     rows <- which(as.character(dat$series) == s)
@@ -243,13 +216,12 @@ test_that("posterior_predict reads incl_autocor rather than dropping it", {
 })
 
 
-test_that("quantile residuals are not pinned against a marginal surface", {
+test_that("quantile residuals use the surface conditioned on the trend", {
   # `residuals()` evaluates the COM-binomial distribution function at
-  # each draw's own parameters, on the surface `posterior_linpred()`
-  # gives under the fitted trend state. Against a marginal surface the
-  # PIT saturates at zero or one for the cells the model fits best.
-  # The residual then clamps at `qnorm(eps)`. The trend's own
-  # persistence also reappears as residual autocorrelation.
+  # each draw's parameters under the fitted trend state. A marginal
+  # surface saturates the PIT at zero or one for the best-fitted cells.
+  # The residual then clamps at `qnorm(eps)`. The trend's persistence
+  # also reappears as residual autocorrelation.
   r <- residuals(fit, type = "quantile")
   expect_identical(nrow(r), nrow(dat))
   est <- r[, "Estimate"]
@@ -257,12 +229,11 @@ test_that("quantile residuals are not pinned against a marginal surface", {
   # stopped the distribution function and every residual with it.
   expect_identical(which(is.na(est)), na_rows)
   expect_true(all(is.finite(est[observed])))
-  # Nothing sitting on the clamp. A pinned cell lands near -8.
+  # A clamped cell lands near -8
   expect_lt(max(abs(est[observed])), 6)
 
-  # A residual carrying the trend is a failure of the surface it was
-  # formed against, so the lag-one autocorrelation within a series
-  # stays well below the trend's own persistence.
+  # The lag-one autocorrelation within a series stays well below the
+  # trend's own persistence of 0.7
   for (s in series_levels) {
     rows <- which(as.character(dat$series) == s)
     rows <- rows[order(dat$time[rows])]
@@ -271,7 +242,7 @@ test_that("quantile residuals are not pinned against a marginal surface", {
     expect_lt(abs(a), 0.4)
   }
 
-  # The ordinary residuals take no distribution function. They leave
+  # The ordinary residuals need no distribution function. They leave
   # the same rows missing and every observed row finite.
   ro <- residuals(fit, type = "ordinary")[, "Estimate"]
   expect_identical(which(is.na(ro)), na_rows)
@@ -280,14 +251,13 @@ test_that("quantile residuals are not pinned against a marginal surface", {
 
 
 test_that("a residual histogram shows eight draws of a stable PIT", {
-  # The histogram draws one panel per draw. Its residuals come from
-  # 500 draws. Drawing all 500 rendered an unreadable grid.
-  p <- expect_warning(pp_check(fit, type = "resid_hist"),
-                      "missing response are omitted")
+  # The histogram draws one panel per draw. Drawing all 500 draws
+  # rendered an unreadable grid.
+  p <- pp_check(fit, type = "resid_hist")
   panels <- unique(ggplot2::ggplot_build(p)$data[[1L]]$PANEL)
   expect_length(panels, 8L)
-  # This family's residuals come from its distribution function, so
-  # a small draw count raises no empirical-PIT advice.
+  # This family's residuals come from its distribution function. A
+  # small draw count then raises no empirical-PIT advice.
   withr::local_envvar(TESTTHAT = "")
   got <- with_warnings(pp_check(fit, type = "resid_hist", ndraws = 10L))
   expect_false(any(grepl("fewer than 50 draws", got$warnings)))
@@ -297,22 +267,19 @@ test_that("a residual histogram shows eight draws of a stable PIT", {
 test_that("plot(type = 'smooths') renders on a trials aterm model", {
   expect_drawn(plot(fit, type = "smooths"))
 
-  # The same grid reached through the two public smooth methods.
+  # The same grid reached through the two public smooth methods
   sm <- smooths(fit)
   expect_length(sm, 1L)
   ps <- posterior_smooths(fit, smooth = sm[1L])
   expect_identical(dim(ps), c(as.integer(ndraws(fit)), nrow(dat)))
-  cs <- conditional_smooths(fit)
-  expect_length(cs, 1L)
+  expect_length(conditional_smooths(fit), 1L)
 })
 
 
-test_that("a padded forecast grid does not break the post-fit methods", {
-  # A trend needs a rectangular grid, so a forecast frame pads the
-  # occasions a series was not observed on. The denominator has to be
-  # padded too, and a zero there cannot carry any response paired
-  # with it, so every method that reads the padded rows refuses with
-  # "Number of trials is smaller than the number of events".
+test_that("post-fit methods accept a forecast frame with zero trials", {
+  # A future occasion has no count yet. Its denominator of zero pairs
+  # with a missing response. brms once refused such rows with "Number
+  # of trials is smaller than the number of events".
   h <- 5L
   fut <- data.frame(
     time = rep(max(time_vals) + seq_len(h), times = n_series),
@@ -326,158 +293,113 @@ test_that("a padded forecast grid does not break the post-fit methods", {
   )
   expect_no_error(SM(forecast(fit, newdata = fut, ndraws = 20L)))
   expect_no_error(hindcast(fit))
-  # The residual panel omits the missing responses and says so.
-  expect_warning(plot(fit, type = "residuals"),
+  # The residual panel omits the missing responses and says so once
+  withr::local_envvar(TESTTHAT = "")
+  rlang::reset_message_verbosity("mvgam_pp_check_missing_response")
+  expect_message(plot(fit, type = "residuals"),
                  "missing response are omitted")
   expect_no_error(plot(fit, type = "trend"))
 })
 
 
-test_that("conditional_effects offers a grid the denominator reaches", {
-  # `datagrid()` builds from `find_predictors()`, which leaves a
-  # denominator out because it is not a predictor. The column then
-  # never reaches the grid and brms refuses the prediction for want
-  # of it. Naming the column in a hand-built grid works, and
-  # `conditional_effects()` builds its own and refuses a supplied
-  # one, so the grid has to carry aterm columns at a representative
-  # value the way it carries a covariate at its mean.
-  withr::local_options(marginaleffects_model_classes = "mvgam")
-  expect_no_error(conditional_effects(fit))
-})
-
-
-test_that("a random effect over the series draws a visible panel", {
-  # A panel holding one point per level draws nothing if its layer is
-  # a line, since a line needs two points to show. The row count is
-  # what says a mark was placed.
+test_that("conditional_effects builds a grid holding the denominator", {
+  # `datagrid()` builds from `find_predictors()`, which omits the
+  # denominator. brms refuses a prediction whose grid lacks it.
+  # `conditional_effects()` sets each aterm column at a representative
+  # value, as it sets a covariate at its mean.
   ce <- conditional_effects(fit)
-  nms <- names(ce)
-  expect_true("series" %in% nms)
-  b <- ggplot2::ggplot_build(plot(ce)[[which(nms == "series")]])
+  # `z` drives `nu` alone. A term list built from the mean's formula
+  # omits it.
+  expect_true(all(c("series", "z") %in% names(ce)))
+  # The series panel holds one point per level. A line layer needs two
+  # points and draws nothing. A positive row count shows a mark.
+  b <- ggplot2::ggplot_build(plot(ce)[["series"]])
   expect_gt(sum(vapply(b$data, nrow, integer(1L))), 0L)
 })
 
 
 test_that("the monotonic effect orders its categories", {
-  # `mo()` estimates the spacing between ordered categories rather
-  # than fitting a slope on their codes, so what it produces is a
-  # simplex of increments and one scale. Nothing else in this
-  # directory fits one.
+  # `mo()` estimates a simplex of increments between ordered categories
+  # and one scale `bsp`
   vars <- variables(fit)
-  # The coefficient is reported as `bsp[1]`, carrying no term name,
-  # while every other population coefficient on this fit is aliased
-  # and `prior_summary()` knows the term as `modose`. With one
-  # monotonic term the index is readable; with two it is the only
-  # handle a reader has.
-  expect_true(any(grepl("^bsp", vars)))
-  expect_true(any(grepl("dose", vars, fixed = TRUE)))
-  simo <- grep("^simo_", vars, value = TRUE)
-  # One increment per step between the four levels.
-  expect_length(simo, length(dose_levels) - 1L)
+  expect_true("bsp_modose" %in% vars)
+  simo <- paste0("simo_modose1[", seq_len(length(dose_levels) - 1L), "]")
+  expect_true(all(simo %in% vars))
 
   dm <- posterior::as_draws_matrix(fit)
-  # The increments are a simplex, so they sum to one in every draw.
   sums <- rowSums(as.matrix(dm[, simo, drop = FALSE]))
   expect_equal(unname(sums), rep(1, nrow(dm)), tolerance = 1e-8)
 
-  # The fitted effect is monotone across the categories, which is the
-  # constraint `mo()` exists to impose. Read from a grid that holds
-  # every other column fixed and varies dose alone.
+  # A grid that varies dose alone. The fitted effect climbs across the
+  # categories, as the simulated effect does.
   grid <- dat[rep(1L, length(dose_levels)), , drop = FALSE]
   grid$dose <- factor(dose_levels, levels = dose_levels, ordered = TRUE)
   grid$y <- NA_integer_
   lp <- colMeans(posterior_linpred(fit, newdata = grid, ndraws = 200L))
-  expect_length(lp, length(dose_levels))
-  expect_false(isTRUE(all.equal(max(lp) - min(lp), 0)))
-  expect_true(all(diff(lp) >= -1e-8) || all(diff(lp) <= 1e-8))
+  expect_true(all(diff(lp) > 0))
+  expect_gt(lp[4L] - lp[1L], 0.3)
 })
 
 
-test_that("the group-level accessors answer on a fit that has one", {
-  # `ranef()`, `VarCorr()` and `ngrps()` need a group-level effect to
-  # answer at all, and this is the fit that has one. Each is held to
-  # the grouping it was built over rather than to its class.
+test_that("the group-level accessors report the site grouping", {
   re <- ranef(fit)
   expect_named(re, "site")
-  expect_identical(dim(re$site)[1L], length(site_levels))
   expect_identical(dimnames(re$site)[[1L]], site_levels)
+  expect_true("site" %in% names(VarCorr(fit)))
+  expect_identical(as.integer(ngrps(fit)[["site"]]), length(site_levels))
 
-  vc <- VarCorr(fit)
-  expect_true("site" %in% names(vc))
-
-  ng <- ngrps(fit)
-  expect_identical(as.integer(ng[["site"]]), length(site_levels))
-
-  # The grouping belongs under `random` rather than among the terms a
-  # consumer would take a population slope over.
+  # The grouping is reported under `random`. A consumer takes no
+  # population slope over it.
   expect_identical(insight::find_random(fit)$random, "site")
   expect_false("site" %in% insight::find_predictors(fit)$conditional)
 })
 
 
-test_that("the second distributional parameter carries its own formula", {
-  # `nu ~ z` puts a linear predictor on the dispersion, so `nu` moves
-  # with `z` instead of holding one value. A sub-formula accepted and
-  # dropped leaves a scalar, which is finite and correctly shaped.
+test_that("nu varies with its own covariate", {
+  # `nu ~ z` puts a linear predictor on the dispersion. A sub-formula
+  # accepted and dropped leaves a finite, correctly shaped scalar.
   vars <- variables(fit)
-  expect_true("b_nu_z" %in% vars)
-  expect_true(any(grepl("^b_nu_Intercept$", vars)))
-
-  # The parameter varies across rows, on its own scale.
+  expect_true(all(c("b_nu_Intercept", "b_nu_z") %in% vars))
   nu_draws <- posterior_linpred(fit, dpar = "nu", ndraws = 100L)
   expect_identical(ncol(nu_draws), nrow(dat))
   expect_gt(stats::sd(colMeans(nu_draws)), 1e-6)
-
-  # And the covariate that drives it is offered as an effect, which a
-  # term list built from the mean's formula alone would omit.
-  ce <- conditional_effects(fit)
-  expect_true("z" %in% names(ce))
 })
 
 
-test_that("the interval and error accessors answer for every row", {
-  # Four accessors that need a posterior and are reachable on any
-  # fit. Each is tied to the draws it summarises rather than to its
-  # shape, so a method reading a different surface fails here.
+test_that("the interval and error accessors cover every row", {
   pe <- predictive_error(fit, ndraws = 50L)
   expect_identical(dim(pe), c(50L, nrow(dat)))
 
   pi <- predictive_interval(fit, prob = 0.8, ndraws = 200L)
-  expect_identical(nrow(pi), nrow(dat))
-  expect_identical(ncol(pi), 2L)
+  expect_identical(dim(pi), c(nrow(dat), 2L))
   expect_true(all(pi[, 1L] <= pi[, 2L]))
 
   poi <- posterior_interval(fit, prob = 0.8)
   expect_identical(ncol(poi), 2L)
   expect_true(all(poi[, 1L] <= poi[, 2L]))
 
-  # A wider probability gives a wider interval, which is what says the
-  # argument is read.
+  # A wider probability gives a wider interval
   wide <- predictive_interval(fit, prob = 0.95, ndraws = 200L)
-  expect_gte(mean(wide[, 2L] - wide[, 1L]),
-             mean(pi[, 2L] - pi[, 1L]))
+  expect_gt(mean(wide[, 2L] - wide[, 1L]), mean(pi[, 2L] - pi[, 1L]))
 })
 
 
 test_that("how_to_cite reports the sampler settings this fit used", {
-  # The methods text names the chains and iterations this fit ran,
-  # 2 chains of 500 warmup and 500 sampling iterations.
+  # This fit ran 2 chains of 500 warmup and 500 sampling iterations
   txt <- paste(capture.output(how_to_cite(fit)), collapse = " ")
   txt <- gsub("\\s+", " ", txt)
   expect_match(txt, paste("We ran 2 Hamiltonian Monte Carlo chains for",
                           "500 warmup iterations and 500 sampling",
                           "iterations."), fixed = TRUE)
-  # The family's own peer-reviewed reference is cited.
+  # The family's own reference
   expect_match(txt, "Shmueli et al. 2005", fixed = TRUE)
 })
 
 
 test_that("a user prior reaches the program on every class it fits", {
-  # Two accounts of one fact: what `prior_summary()` reports and what
-  # the generated program contains. mvgam injects defaults of its own
-  # for classes brms would get wrong, so a merge that dropped or
-  # reordered the user's rows would leave the report and the program
-  # disagreeing while both stayed well formed.
+  # mvgam injects its own defaults for classes brms would get wrong. A
+  # merge that dropped or reordered the user's rows would leave
+  # `prior_summary()` and the program disagreeing, both well formed.
   cases <- list(
     list(prior(normal(0, 0.123), class = "b"), "0.123"),
     list(prior(normal(3, 0.456), class = "Intercept"), "0.456"),
@@ -499,8 +421,7 @@ test_that("a user prior reaches the program on every class it fits", {
     expect_true(grepl(cs[[2L]], code, fixed = TRUE))
   }
 
-  # The classes a user can set are the ones `get_prior()` advertises,
-  # and the trend's own belong among them.
+  # `get_prior()` lists the trend's classes among those a user can set
   expect_warning(
     gp <- as.data.frame(get_prior(
       mvgam_formula(obs_formula, trend_formula = ~ AR(p = 1)),
@@ -509,9 +430,8 @@ test_that("a user prior reaches the program on every class it fits", {
     na_notice
   )
   expect_true(all(c("sigma_trend", "ar1_trend") %in% gp$class))
-  # And what it advertises for the modelled dpar is what the program
-  # uses, rather than the positive-only default brms reaches for when
-  # it sees a parameter named `nu`.
+  # brms gives a parameter named `nu` a positive-only default. The
+  # modelled `nu` intercept takes the prior the program uses.
   nu_row <- gp[gp$class == "Intercept" &
                  !is.na(gp$dpar) & gp$dpar == "nu", "prior"]
   expect_identical(as.character(nu_row), "normal(1, 1)")
@@ -519,11 +439,9 @@ test_that("a user prior reaches the program on every class it fits", {
 
 
 test_that("no method warns about a prior this model does not use", {
-  # `prior_summary()` and the program agree on `normal(1, 1)` for the
-  # dpar intercept. The methods that delegate to the stored brms
-  # model re-derive brms's own default set and warn about the
-  # positive-only prior mvgam replaced, which reaches a reader on the
-  # two calls they are most likely to make.
+  # Methods that delegate to the stored brms model re-derived brms's
+  # default priors and warned about the positive-only `nu` prior mvgam
+  # replaced
   for (call in list(
     function() variables(fit),
     function() capture.output(summary(fit)),
@@ -538,42 +456,28 @@ test_that("no method warns about a prior this model does not use", {
 })
 
 
-test_that("the marginaleffects coefficient hook reads every term", {
-  # `get_coef()` is what a third-party package calls to learn this
-  # model's coefficients, so an omission there is invisible from
-  # mvgam's own output. brms writes the population block as an indexed
-  # array, and the aliasing pass is what turns those into names, so a
-  # hook reading the raw draws sees `b_Intercept` written out in full
-  # and nothing else.
-  #
-  # This fit is the one that can show it: a model whose only
-  # population term is the intercept would be reported correctly.
+test_that("get_coef reports every population coefficient fixef reports", {
+  # Third-party packages learn the coefficients from `get_coef()`.
+  # brms writes the population block as an indexed array. Without the
+  # aliasing pass the hook found `b_Intercept` and nothing else.
   gc <- mvgam:::get_coef.mvgam(fit)
-  expect_true(length(gc) > 1L)
-  # The named coefficients the other accessors report.
-  expect_true("b_serieslower" %in% names(gc))
-  # `fixef()` reports the same coefficients, the smooth and monotonic
-  # ones among them, without their class prefix
   expect_identical(mvgam:::fixef_name(names(gc)), rownames(fixef(fit)))
 })
 
 
 test_that("a tensor product is refused with the term to use instead", {
-  # `te()` and `ti()` have no brms implementation, and the refusal
-  # names `t2()` rather than failing inside the basis construction.
-  err <- expect_error(
+  # brms implements neither `te()` nor `ti()`. The refusal names `t2()`.
+  expect_error(
     mvgam(bf(y | trials(n_trials) ~ te(x, z)),
           trend_formula = ~ AR(p = 1), data = dat,
-          family = com_binomial(), run_model = FALSE, silent = 2)
+          family = com_binomial(), run_model = FALSE, silent = 2),
+    "t2", fixed = TRUE
   )
-  expect_match(conditionMessage(err), "t2", fixed = TRUE)
 })
 
 
 test_that("predict refuses variance and names what it does offer", {
-  # `type = "variance"` has no closed form for this family, and the
-  # refusal names both the families that do support it and what to
-  # reach for instead, rather than failing inside the kernel.
+  # `type = "variance"` has no closed form for this family
   err <- expect_error(predict(fit, type = "variance", ndraws = 20L))
   expect_match(conditionMessage(err), "family 'com_binomial'",
                fixed = TRUE)

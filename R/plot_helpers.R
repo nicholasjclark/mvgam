@@ -537,8 +537,11 @@ mvgam_cut_layer <- function(
 #' @noRd
 stack_response_plots <- function(plots) {
   checkmate::assert_list(plots, min.len = 1L, names = "unique")
+  # Wrapped as a panel, each plot leaves the title row to its response.
+  # Wrapped in full, the response title overprinted the plot's axis
+  # labels and its own title.
   titled <- lapply(names(plots), function(r) {
-    patchwork::wrap_elements(full = plots[[r]]) + ggplot2::labs(title = r)
+    patchwork::wrap_elements(panel = plots[[r]]) + ggplot2::labs(title = r)
   })
   patchwork::wrap_plots(titled, ncol = 1L)
 }

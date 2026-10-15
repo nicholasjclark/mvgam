@@ -23,11 +23,11 @@
 \arguments{
 \item{object}{An object of class \code{mvgam}}
 
-\item{type}{Type of the ppc plot as given by a character string.
-See \code{\link[bayesplot:PPC-overview]{PPC}} for an overview
-of currently supported types. You may also use an invalid
-type (e.g. \code{type = "xyz"}) to get a list of supported
-types in the resulting error message.}
+\item{type}{Type of the check, the name of a \pkg{bayesplot} \verb{ppc_*}
+function without its prefix or one of the residual types below.
+The default is \code{"bars"} for a bernoulli or ordinal response and
+\code{"dens_overlay"} otherwise. Multi-response families take the
+defaults described under "Multi-response families".}
 
 \item{ndraws}{Positive integer indicating how many
 posterior draws should be used.
@@ -62,30 +62,31 @@ If \code{NULL} (the default), all draws are used.}
 
 \item{per_obs}{Logical. For \code{type = 'resid_vs_fitted'}, whether each
 observation collapses to its posterior median on both axes, giving
-one point per observation. \code{FALSE} keeps the draw by observation
-scatter, which shows the posterior spread. Read only by that type.}
+one point per observation. \code{FALSE} keeps the scatter of every draw
+for every observation, which shows the posterior spread. Other
+types ignore it.}
 
 \item{series}{For the residual types \code{resid_hist}, \code{resid_ribbon},
 \code{resid_qq}, \code{resid_vs_fitted}, \code{resid_acf} and \code{resid_pacf}, the
 one series whose residuals are drawn, as a name or an index. The
 default is the first series. Its residuals are taken in time order.
-\code{resid_acf} keeps missing responses in place, and its lags count
-time steps. \code{resid_pacf} drops them, and its lags count
-observations. A plot from a fit with several series names its
-series in the subtitle.}
+\code{resid_acf} keeps missing responses in place. Its lags count time
+steps. \code{resid_pacf} drops them. Its lags count observations. A
+plot from a fit with several series names its series in the
+subtitle.}
 
 \item{...}{Further arguments passed to \code{\link{predict.mvgam}}
 as well as to the PPC function specified in \code{type}. A name
 belonging to neither is refused, naming the argument. Ten
-bayesplot types read a \code{stat} of their own; \code{type = 'fit_stat'}
-reads one here too, either \code{'chi_squared'} (default) or
+bayesplot types take a \code{stat} of their own. \code{type = 'fit_stat'}
+takes one here too, either \code{'chi_squared'} (default) or
 \code{'freeman_tukey'}, naming the discrepancy it computes.}
 }
 \value{
 A ggplot object that can be further
 customized using the \pkg{ggplot2} package. A multivariate model
-given no \code{resp} answers with one figure holding a panel per
-response, each titled by its response.
+given no \code{resp} returns one figure with a panel per response, each
+titled by its response.
 }
 \description{
 Perform unconditional posterior predictive checks with the help
@@ -94,13 +95,13 @@ can be further customised.
 }
 \details{
 Replicates are drawn against the latent trend state the model
-inferred at each time, so the check compares the model's fitted
-trajectory with the series that produced it, the same basis
-\code{\link[=residuals.mvgam]{residuals.mvgam()}} and \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} use. Supplying \code{newdata}
-the fit never saw integrates over the trend dynamics instead. The
-\verb{loo_*} types always read the conditional state whatever data they
-cover, because their importance weights come from the likelihood,
-which reads it too.
+inferred at each time. The check then compares the model's fitted
+trajectory with the series that produced it, on the same basis as
+\code{\link[=residuals.mvgam]{residuals.mvgam()}} and \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}. Supplying \code{newdata} the
+fit never saw integrates over the trend dynamics instead. The
+\verb{loo_*} types always use the conditional state, whatever data they
+cover. Their importance weights come from the likelihood, which
+uses the conditional state too.
 
 The residual histograms and ribbons take their residuals from 500
 draws by default. \code{resid_hist} and \code{resid_hist_grouped} draw one
@@ -154,7 +155,7 @@ the natural fit (\code{bars}, \code{bars_grouped}, \code{rootogram},
 variants (\code{dens_overlay}, \code{ecdf_overlay},
 \code{ecdf_overlay_grouped}), per-unit stats (\code{stat}, \code{stat_2d},
 \code{stat_grouped}), intervals / ribbons over a unit-constant
-covariate (\code{intervals}, \code{ribbon}), and the residual
+covariate (\code{intervals}, \code{ribbon}) and the residual
 histograms (\code{resid_hist}, \code{resid_qq}) all work as
 expected. Per-row scatter / fitted-vs-residual / per-row
 time-axis types (\code{scatter_avg}, \code{error_binned},

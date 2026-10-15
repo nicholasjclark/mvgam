@@ -1,11 +1,8 @@
-# Fast CI-safe tests for the insight + marginaleffects S3 surface.
-# Signature parity, NAMESPACE wiring, validation paths — no fitted
-# objects required.
+# CI tests for the insight and marginaleffects methods. The tests use
+# stubs and unfitted models. None of them compiles Stan.
 
 test_that("every S3 method mvgam registers is reachable", {
-  # Four blocks checked this, one package apiece and two of them
-  # holding a single pair. The table names each (generic, class) pair
-  # in one place, and a new registration is one row.
+  # Each row names one (generic, class) pair
   registered <- list(
     c("find_formula", "mvgam"), c("find_response", "mvgam"),
     c("find_predictors", "mvgam"), c("get_data", "mvgam"),
@@ -24,10 +21,26 @@ test_that("every S3 method mvgam registers is reachable", {
   }
 })
 
+test_that("mvgam re-exports the marginaleffects entry points", {
+  exports <- getNamespaceExports("mvgam")
+  for (nm in c("conditional_effects",
+               "predictions", "avg_predictions", "slopes", "avg_slopes",
+               "comparisons", "avg_comparisons", "datagrid",
+               "hypotheses", "plot_predictions",
+               "plot_slopes", "plot_comparisons")) {
+    expect_true(nm %in% exports, label = paste0("mvgam re-exports ", nm))
+  }
+})
+
+test_that("attaching mvgam names its class to marginaleffects", {
+  withr::local_options(marginaleffects_model_classes = NULL)
+  expect_message(mvgam:::.onAttach(), "Loading 'mvgam'")
+  expect_identical(getOption("marginaleffects_model_classes"), "mvgam")
+})
+
 test_that("model_info describes each response of a multivariate fit", {
-  # insight answers once per response for a brms fit. Reading
-  # `$family` alone described every arm as the last one, and three
-  # caught errors turned a failed lookup into a blank family.
+  # insight returns one description per response for a brms fit. A
+  # lookup of `$family` alone gave every response the last family.
   d <- data.frame(time = 1:20, count = rpois(20, 4), seen = rbinom(20, 1, 0.5))
   pf <- mvgam(
     brms::bf(count ~ 1, family = poisson()) +
@@ -45,80 +58,42 @@ test_that("model_info describes each response of a multivariate fit", {
                "must be a response of this model")
 })
 
-test_that(".onAttach sets marginaleffects_model_classes", {
-  # `loadNamespace` does not always trigger .onAttach, and the installed
-  # package ships no R source, so deparse the function body directly.
-  # This does not depend on load order or on source files being present.
-  body_src <- deparse(mvgam:::.onAttach)
-  expect_true(any(grepl("marginaleffects_model_classes", body_src)))
-})
-
-test_that("model.frame.mvgam signature has trend_effects after formula", {
-  fmls <- names(formals(getS3method("model.frame", "mvgam")))
-  expect_equal(fmls[1L], "formula")
-  expect_true("trend_effects" %in% fmls)
-})
-
-test_that("get_predict.mvgam validates type via checkmate::assert_choice", {
-  stub <- structure(list(), class = "mvgam")
-  # Invalid type triggers checkmate before any model machinery runs.
+test_that("get_predict, get_coef and set_coef check their inputs", {
+  stub <- structure(list(marker = 42L, trend_formula = NULL),
+                    class = "mvgam")
   expect_error(
-    marginaleffects::get_predict(
-      stub,
-      newdata = data.frame(x = 1),
-      type = "bogus"
-    ),
-    regexp = "type"
-  )
-})
-
-test_that("get_coef.mvgam errors on trend_effects when no trend formula", {
-  stub <- structure(
-    list(trend_formula = NULL),
-    class = "mvgam"
+    marginaleffects::get_predict(stub, newdata = data.frame(x = 1),
+                                 type = "bogus"),
+    "Must be element of set"
   )
   expect_error(
     marginaleffects::get_coef(stub, trend_effects = TRUE),
-    regexp = "trend"
+    "needs a model fitted with a 'trend_formula'"
   )
+  # The draws carry the uncertainty. A coefficient vector from
+  # marginaleffects leaves the model unchanged.
+  expect_identical(marginaleffects::set_coef(stub, coefs = c(a = 1)), stub)
 })
 
-test_that("get_vcov.mvgam returns NULL", {
+test_that("get_vcov warns only when given a vcov estimator", {
   stub <- structure(list(), class = "mvgam")
-  expect_null(marginaleffects::get_vcov(stub))
-})
-
-test_that("get_vcov.mvgam speaks only for a vcov estimator", {
-  stub <- structure(list(), class = "mvgam")
-  # marginaleffects passes `vcov = TRUE` on every call it makes, so
-  # a notice there would reach every user of `predictions()`.
+  # marginaleffects passes `vcov = TRUE` on every call. A warning there
+  # would reach every user of `predictions()`.
+  expect_null(expect_silent(marginaleffects::get_vcov(stub)))
   expect_silent(marginaleffects::get_vcov(stub, vcov = TRUE))
   expect_silent(marginaleffects::get_vcov(stub, vcov = FALSE))
-  # A named estimator is a request mvgam cannot honour, and it is
-  # raised per call rather than once per session, so a second call
-  # in the same session still reports it.
-  expect_warning(
-    marginaleffects::get_vcov(stub, vcov = "HC3"),
-    regexp = "posterior draws"
-  )
-  expect_warning(
-    marginaleffects::get_vcov(stub, vcov = "HC3"),
-    regexp = "posterior draws"
-  )
+  # A named estimator warns on every call. The second call in a
+  # session warns again.
+  for (i in 1:2) {
+    expect_warning(marginaleffects::get_vcov(stub, vcov = "HC3"),
+                   "posterior draws")
+  }
 })
 
-test_that("set_coef.mvgam is a no-op pass-through", {
-  stub <- structure(list(marker = 42L), class = "mvgam")
-  out <- marginaleffects::set_coef(stub, coefs = c(a = 1))
-  expect_identical(out$marker, 42L)
-})
-
-test_that("find_predictors reads both submodels and leaves the axis out", {
-  # A covariate of either submodel is a term. The axis columns are
-  # not: nothing takes a slope over an occasion number or a series
-  # index, and offering them is what put a grouping into
-  # `avg_slopes()`. They stay in the variable list, which is what a
-  # prediction grid is built from.
+test_that("find_predictors takes terms from both submodels", {
+  # A covariate of either submodel is a term. Nobody takes a slope over
+  # an occasion number or a series index. Listing the axis columns as
+  # terms put a grouping into `avg_slopes()`.
   stub <- structure(
     list(
       formula = y ~ x1,
@@ -129,61 +104,55 @@ test_that("find_predictors reads both submodels and leaves the axis out", {
     ),
     class = "mvgam"
   )
-  preds <- insight::find_predictors(stub)$conditional
-  expect_true(all(c("x1", "x2") %in% preds))
-  expect_false(any(c("time", "series") %in% preds))
+  expect_setequal(insight::find_predictors(stub)$conditional, c("x1", "x2"))
 })
 
-test_that("find_predictors.mvgam walks nl sub-formulas and jsdgam aliases", {
-  # nl: trait1 in a sub-formula must surface alongside env (top-level).
-  obs_nl <- brms::bf(
-    y  ~ a + b * env,
-    a  ~ trait1 + (1 | species),
-    b  ~ trait1 + (1 | species),
-    nl = TRUE
-  )
-  stub_nl <- structure(
+test_that("non-linear sub-formulas give terms and a grouping", {
+  # The top-level right-hand side of a non-linear formula names the
+  # parameters `a` and `b`. Their sub-formulas hold the covariates.
+  stub <- structure(
     list(
-      formula = obs_nl, trend_formula = NULL,
-      trend_metadata = NULL
+      formula = brms::bf(
+        y ~ a + b * env,
+        a ~ trait1 + (1 | species),
+        b ~ trait1 + (1 | species),
+        nl = TRUE
+      ),
+      trend_formula = NULL, trend_metadata = NULL
     ),
     class = "mvgam"
   )
-  preds <- insight::find_predictors(stub_nl, flatten = TRUE)
-  expect_true("env" %in% preds)
-  expect_true("trait1" %in% preds)
-  expect_false("a" %in% preds)
-  expect_false("b" %in% preds)
-  # `species` groups the sub-formulas' varying terms. It is the
-  # grouping, not a term a slope can be taken over, so it answers
-  # under `random`.
-  expect_false("species" %in% preds)
-  expect_identical(insight::find_random(stub_nl)$random, "species")
+  expect_setequal(insight::find_predictors(stub, flatten = TRUE),
+                  c("env", "trait1"))
+  # `species` groups the varying terms. Its levels are exchangeable
+  # draws. `find_random()` reports it as a grouping.
+  expect_identical(insight::find_random(stub)$random, "species")
+  # Neither parameter name splits off as a panel variable
+  expect_equal(mvgam:::detect_conditional_effects(stub),
+               list("env", "trait1"))
+})
 
-  # jsdgam: the fit records the user's unit and species column
-  # names, and find_predictors() lists them for grid builders.
-  stub_jsdgam <- structure(
+test_that("find_predictors lists a jsdgam fit's unit and species", {
+  # A grid builder needs the unit and species columns jsdgam() recorded
+  stub <- structure(
     list(
-      formula = y ~ env, trend_formula = NULL,
-      trend_metadata = NULL,
+      formula = y ~ env, trend_formula = NULL, trend_metadata = NULL,
       data = data.frame(y = 1:3, env = 1:3, species = letters[1:3],
                         site = 1:3),
       jsdgam_args = list(unit = "site", species = "species")
     ),
     class = "mvgam"
   )
-  preds_j <- insight::find_predictors(stub_jsdgam, flatten = TRUE)
-  expect_true("species" %in% preds_j)
-  expect_true("site" %in% preds_j)
+  expect_true(all(c("env", "species", "site") %in%
+                    insight::find_predictors(stub, flatten = TRUE)))
 })
 
-test_that("the term list splits one formula the way its readers ask", {
-  # One parse answers `find_predictors()`, `find_random()`,
-  # `find_variables()`, `terms()` and the prediction grid. The split
-  # decides whether a consumer offers a slope over a column: a
-  # grouping, a binomial denominator and an offset each name a column
-  # the model reads without anyone taking a slope over it, and each
-  # has to stay addressable in the grid all the same.
+test_that("the term list sorts each column to the readers that need it", {
+  # One parse serves `find_predictors()`, `find_random()`,
+  # `find_variables()`, `terms()` and the prediction grid. A grouping,
+  # a binomial denominator and an offset each name a column the model
+  # uses. Nobody takes a slope over them. Each must still appear in the
+  # prediction grid.
   set.seed(1)
   d <- data.frame(
     time = rep(1:10, 2),
@@ -200,30 +169,21 @@ test_that("the term list splits one formula the way its readers ask", {
   preds <- insight::find_predictors(pf, effects = "all")
   expect_identical(preds$conditional, "x")
   expect_identical(preds$random, "g")
-  # The denominator, the offset and the axis are addressable and are
-  # not terms.
   expect_true(all(c("n", "e", "time", "series") %in% preds$grid))
-  expect_false(any(c("n", "e", "g", "time", "series") %in%
-                     preds$conditional))
   expect_identical(insight::find_random(pf)$random, "g")
-
-  # `find_variables()` is what a prediction grid is built from, so
-  # every column above has to survive into it.
-  vars <- insight::find_variables(pf, flatten = TRUE)
+  # A prediction grid is built from `find_variables()`
   expect_true(all(c("y", "x", "g", "n", "e", "time", "series") %in%
-                    vars))
-
-  # `terms()` carries the terms and none of the rest, and
-  # `model.frame()` carries every column the model reads.
+                    insight::find_variables(pf, flatten = TRUE)))
+  # `terms()` holds the terms alone. `model.frame()` holds every column
+  # the model uses.
   expect_identical(attr(terms(pf), "term.labels"), "x")
   expect_true(all(c("y", "x", "g", "n", "e") %in%
                     names(model.frame(pf))))
 })
 
 test_that("a distributional sub-formula's covariate is a term", {
-  # A covariate reaching the linear predictor only through a `dpar`
-  # appears in no top-level right-hand side, and a grid built without
-  # it holds the parameter it governs at one value.
+  # `w` enters the model through `sigma` alone. A grid built without it
+  # holds `sigma` at one value.
   set.seed(2)
   d <- data.frame(
     time = rep(1:10, 2),
@@ -237,62 +197,50 @@ test_that("a distributional sub-formula's covariate is a term", {
   expect_setequal(insight::find_predictors(pf)$conditional, c("x", "w"))
 })
 
-test_that("detect_conditional_effects recurses into nl sub-formulas", {
-  # Reason: bf(..., nl = TRUE) hides the user-relevant covariates
-  # inside per-nlpar pforms; the top-level RHS only enumerates the
-  # nlpar names themselves (`a + b * env`). Naive parsing of the
-  # top-level formula would return c("a", "b", "env") and split
-  # the `b * env` interaction into a nonsense (b, env) grouping.
-  # The recursion pulls trait1 etc. out of each pform and filters
-  # nlpar tokens from the split.
-  obs_nl <- brms::bf(
-    y  ~ a + b * env,
-    a  ~ trait1 + (1 | species),
-    b  ~ trait1 + (1 | species),
-    nl = TRUE
+test_that("an offset is never offered as a conditional effect", {
+  # The formulas pair the offset with a linear term, a smooth and a
+  # trend-side term in turn
+  stubs <- list(
+    y ~ env + offset(log(n)),
+    y ~ s(env) + offset(log(n))
   )
-  stub <- structure(
-    list(formula = obs_nl, trend_formula = NULL),
-    class = "mvgam"
-  )
-  cond <- mvgam:::detect_conditional_effects(stub)
-  flat <- unlist(cond, use.names = FALSE)
-  # env comes off the top-level right-hand side and trait1 off a
-  # sub-formula, so both are terms a reader can take a slope over.
-  expect_true("env" %in% flat)
-  expect_true("trait1" %in% flat)
-  expect_false("a" %in% flat)
-  expect_false("b" %in% flat)
-  # `species` groups the sub-formulas' varying terms. Its levels are
-  # exchangeable draws from a distribution whose scale the model
-  # estimates, so a panel over them draws shrunk deviations as though
-  # they were a population contrast. It answers under `find_random()`.
-  expect_false("species" %in% flat)
-  expect_identical(insight::find_random(stub)$random, "species")
-  # No grouping should contain a nlpar after filtering.
-  for (g in cond) {
-    expect_false(any(g %in% c("a", "b")))
+  for (f in stubs) {
+    stub <- structure(list(formula = f, trend_formula = NULL),
+                      class = "mvgam")
+    expect_equal(mvgam:::detect_conditional_effects(stub), list("env"))
   }
-})
-
-test_that("detect_conditional_effects leaves linear formulas alone", {
-  # Regression guard: the nl branch must not leak into the plain
-  # linear path. A bare y ~ env model should produce just c("env").
-  stub <- structure(
-    list(formula = y ~ env, trend_formula = NULL),
+  trend_stub <- structure(
+    list(formula = y ~ env, trend_formula = ~ z + offset(log(n))),
     class = "mvgam"
   )
-  cond <- mvgam:::detect_conditional_effects(stub)
-  expect_equal(cond, list("env"))
+  expect_equal(mvgam:::detect_conditional_effects(trend_stub),
+               list("env", "z"))
 })
 
-test_that("a smooth's covariates are read off its call", {
-  # A smooth names its covariates as unnamed arguments and its
-  # grouping as `by`; every other argument is a setting. The
-  # covariates and the `by` are read off the call rather than by
-  # evaluating it, so `by = interaction(a, b)` answers with the two
-  # columns it names instead of a column named after the call, and a
-  # three-covariate smooth answers with its three pairwise margins.
+test_that("each response offers its own effects and the trend's", {
+  # A panel over a covariate that a response's formula lacks draws a
+  # flat line at that response's mean
+  stub <- structure(
+    list(
+      formula = brms::bf(count ~ s(month), family = poisson()) +
+        brms::bf(camera ~ deploy, family = bernoulli()),
+      trend_formula = ~ temp
+    ),
+    class = "mvgam"
+  )
+  expect_equal(mvgam:::detect_conditional_effects(stub, resp = "count"),
+               list("month", "temp"))
+  expect_equal(mvgam:::detect_conditional_effects(stub, resp = "camera"),
+               list("deploy", "temp"))
+  expect_equal(mvgam:::detect_conditional_effects(stub),
+               list("month", "deploy", "temp"))
+})
+
+test_that("a smooth's covariates come from its call", {
+  # A smooth names its covariates as unnamed arguments and its grouping
+  # as `by`. The other arguments are settings. Parsing the call without
+  # evaluating it gives `by = interaction(a, b)` its two columns. A
+  # three-covariate smooth gives its three pairwise margins.
   stub <- structure(
     list(
       formula = y ~ s(x, k = 5) + t2(x, z, w) +
@@ -309,8 +257,7 @@ test_that("a smooth's covariates are read off its call", {
 
 test_that("an effect varying by series puts the series second", {
   # The first variable of a grouping is the x axis of its panel. A
-  # slope written after the series level arrived as `series:x`, which
-  # drew the series on the x axis and `x` as colours.
+  # slope written as `series:x` drew the series on the x axis.
   stub <- structure(
     list(formula = y ~ series + series:x + s(z, by = series),
          trend_formula = NULL),
@@ -318,28 +265,17 @@ test_that("an effect varying by series puts the series second", {
   )
   detected <- mvgam:::detect_conditional_effects(stub)
   expect_equal(detected, list("series", c("x", "series"), c("z", "series")))
-  # Naming `effects = "x"` drew the slope at the reference series. The
-  # named effect takes the series grouping the model detects.
+  # A named effect takes the series grouping the model detects. Without
+  # it, `effects = "x"` drew the slope at the reference series.
   expect_identical(mvgam:::with_series_grouping("x", detected, "series"),
                    c("x", "series"))
   expect_identical(mvgam:::with_series_grouping("w", detected, "series"),
                    "w")
 })
 
-test_that("conditional_effects.mvgam signature has expected args", {
-  fmls <- names(formals(getS3method("conditional_effects", "mvgam")))
-  expect_true("x" %in% fmls)
-  expect_true("effects" %in% fmls)
-  expect_true("type" %in% fmls)
-  expect_true("process_error" %in% fmls)
-  expect_true("series" %in% fmls)
-})
-
-# Build a minimal mvgam-class stub carrying the axis record
-# `resolve_series_arg` needs. A fit records its series on the axis. A
-# stub holding a `series` column alone describes an object no
-# constructor builds: a hierarchical fit records four series and
-# carries no such column.
+# A stub carrying the axis record that `resolve_series_arg()` uses. A
+# hierarchical fit records its series on the axis and holds no `series`
+# column, which `with_series_col = FALSE` reproduces.
 series_stub <- function(levels = c("s1", "s2", "s3"),
                         with_series_col = TRUE) {
   dat <- data.frame(y = seq_along(levels))
@@ -362,66 +298,29 @@ series_stub <- function(levels = c("s1", "s2", "s3"),
   )
 }
 
-test_that("resolve_series_arg(NULL) returns kind = 'none'", {
-  out <- mvgam:::resolve_series_arg(NULL, series_stub())
-  expect_equal(out$kind, "none")
-  expect_true(is.na(out$level))
+test_that("resolve_series_arg resolves each accepted form", {
+  resolved <- function(series, object = series_stub()) {
+    out <- mvgam:::resolve_series_arg(series, object)
+    c(out$kind, out$level)
+  }
+  expect_identical(resolved(NULL), c("none", NA))
+  expect_identical(resolved("all"), c("all", NA))
+  expect_identical(resolved("s2"), c("one", "s2"))
+  expect_identical(resolved(3L), c("one", "s3"))
+  # The levels come from the axis record. A frame without a series
+  # column resolves the same level.
+  expect_identical(resolved("s2", series_stub(with_series_col = FALSE)),
+                   c("one", "s2"))
 })
 
-test_that("resolve_series_arg('all') returns kind = 'all'", {
-  out <- mvgam:::resolve_series_arg("all", series_stub())
-  expect_equal(out$kind, "all")
-  expect_true(is.na(out$level))
-})
-
-test_that("resolve_series_arg(<chr>) resolves to a single level", {
-  out <- mvgam:::resolve_series_arg("s2", series_stub())
-  expect_equal(out$kind, "one")
-  expect_equal(out$level, "s2")
-})
-
-test_that("resolve_series_arg(<int>) indexes into levels()", {
-  out <- mvgam:::resolve_series_arg(3L, series_stub())
-  expect_equal(out$kind, "one")
-  expect_equal(out$level, "s3")
-})
-
-test_that("resolve_series_arg errors on unknown level", {
-  expect_error(
-    mvgam:::resolve_series_arg("not_a_series", series_stub()),
-    regexp = "not one of the model's series levels"
-  )
-})
-
-test_that("resolve_series_arg errors on out-of-range index", {
-  # The handler wraps the bound check in `insight::format_error` so
-  # the user sees the requested index, the valid range, and the
-  # available level names. Match the stable leading line.
-  expect_error(
-    mvgam:::resolve_series_arg(99L, series_stub()),
-    regexp = "'series' index is out of range"
-  )
-})
-
-test_that("resolve_series_arg errors on length-N vector", {
-  expect_error(
-    mvgam:::resolve_series_arg(c("s1", "s2"), series_stub()),
-    regexp = "NULL, 'all', a series name"
-  )
-})
-
-test_that("resolve_series_arg resolves a level from the axis record", {
-  # A hierarchical fit records its series and derives them from `gr`
-  # and `subgr`. The old column test refused four series the record
-  # names. The levels now come from the axis, and a frame carrying
-  # only the response resolves the same level.
-  no_col <- series_stub(with_series_col = FALSE)
-  out <- mvgam:::resolve_series_arg("s2", no_col)
-  expect_equal(out$kind, "one")
-  expect_equal(out$level, "s2")
-})
-
-test_that("resolve_series_arg errors on an empty series axis", {
+test_that("resolve_series_arg refuses what names no single series", {
+  stub <- series_stub()
+  expect_error(mvgam:::resolve_series_arg("not_a_series", stub),
+               "not one of the model's series levels")
+  expect_error(mvgam:::resolve_series_arg(99L, stub),
+               "'series' index is out of range")
+  expect_error(mvgam:::resolve_series_arg(c("s1", "s2"), stub),
+               "NULL, 'all', a series name")
   empty <- structure(
     list(
       data = data.frame(y = 1:3),
@@ -429,16 +328,12 @@ test_that("resolve_series_arg errors on an empty series axis", {
     ),
     class = c("mvgam", "brmsfit")
   )
-  expect_error(
-    mvgam:::resolve_series_arg("s1", empty),
-    regexp = "empty series axis"
-  )
+  expect_error(mvgam:::resolve_series_arg("s1", empty),
+               "empty series axis")
 })
 
-test_that(
-  "conditional_effects rejects clashes between `...` and reserved args", {
-  # A stub is enough — the collision guard fires before any
-  # plot_predictions / posterior_epred machinery runs.
+test_that("conditional_effects refuses `...` that sets its own arguments", {
+  # The guard runs before any prediction. A stub is enough to reach it.
   stub <- structure(
     list(
       formula = y ~ x,
@@ -450,14 +345,13 @@ test_that(
     expect_error(
       do.call(conditional_effects, c(list(stub, effects = "x"),
                                       setNames(list("hijack"), kw))),
-      regexp = "Cannot pass"
+      paste0("Cannot pass '", kw, "'")
     )
   }
 })
 
-test_that("as.data.frame.mvgam_conditional_effects handles both shapes", {
-  # Univariate shape: list of ggplots keyed by effect. Simulate the
-  # marginaleffects-style ggplot payload with a $data slot.
+test_that("as.data.frame stacks one and several responses' panels", {
+  # Each panel is a ggplot whose `$data` holds the marginaleffects grid
   fake_ggplot <- function(effect_var, n = 3L) {
     d <- data.frame(
       rowid     = seq_len(n),
@@ -474,73 +368,19 @@ test_that("as.data.frame.mvgam_conditional_effects handles both shapes", {
     class = "mvgam_conditional_effects"
   )
   df_u <- as.data.frame(uni)
-  expect_true(is.data.frame(df_u))
   expect_true(all(c("effect", "estimate__", "lower__", "upper__")
                     %in% colnames(df_u)))
   expect_false("rowid" %in% colnames(df_u))
-  expect_setequal(unique(df_u$effect), c("env", "rain"))
+  expect_identical(df_u$effect, rep(c("env", "rain"), each = 3L))
+  expect_identical(df_u$estimate__, rep(c(0, 0.5, 1), 2L))
 
-  # Multivariate shape: wrapper tagged mv_wrapper, elements are
-  # themselves mvgam_conditional_effects lists.
+  # A multivariate fit wraps one such list per response
   mv <- structure(
     list(count = uni, pa = uni),
-    class = "mvgam_conditional_effects"
+    class = "mvgam_conditional_effects",
+    mv_wrapper = TRUE
   )
-  attr(mv, "mv_wrapper") <- TRUE
   df_m <- as.data.frame(mv)
-  expect_true("resp" %in% colnames(df_m))
-  expect_setequal(unique(df_m$resp), c("count", "pa"))
-  expect_setequal(unique(df_m$effect), c("env", "rain"))
-  # Row count: two effects x n=3 grid x two arms = 12.
-  expect_equal(nrow(df_m), 12L)
-})
-
-
-test_that("re-exports of marginaleffects entry points are wired", {
-  exports <- getNamespaceExports("mvgam")
-  for (nm in c("conditional_effects",
-               "predictions", "avg_predictions", "slopes", "avg_slopes",
-               "comparisons", "avg_comparisons", "datagrid",
-               "hypotheses", "plot_predictions",
-               "plot_slopes", "plot_comparisons")) {
-    expect_true(
-      nm %in% exports,
-      label = paste0("mvgam re-exports ", nm)
-    )
-  }
-})
-
-
-test_that("an offset is not offered as a conditional effect", {
-  # `stats::terms()` files an offset under the "offset" attribute
-  # rather than in "term.labels", so it never reaches the effect
-  # list. This guards that the answer stays right even if `terms()`
-  # ever starts putting offsets in "term.labels" instead.
-  stub <- structure(
-    list(formula = y ~ env + offset(log(n)), trend_formula = NULL),
-    class = "mvgam"
-  )
-  expect_equal(mvgam:::detect_conditional_effects(stub), list("env"))
-
-  # brms reaches the same set from the same formula.
-  expect_equal(
-    unlist(brms:::get_all_effects(
-      brms::brmsterms(brms::bf(y ~ env + offset(log(n))))
-    )),
-    "env"
-  )
-
-  # An offset alongside a smooth, and an offset on the trend side.
-  smooth_stub <- structure(
-    list(formula = y ~ s(env) + offset(log(n)), trend_formula = NULL),
-    class = "mvgam"
-  )
-  expect_equal(mvgam:::detect_conditional_effects(smooth_stub),
-               list("env"))
-  trend_stub <- structure(
-    list(formula = y ~ env, trend_formula = ~ z + offset(log(n))),
-    class = "mvgam"
-  )
-  expect_equal(mvgam:::detect_conditional_effects(trend_stub),
-               list("env", "z"))
+  expect_identical(df_m$resp, rep(c("count", "pa"), each = 6L))
+  expect_identical(df_m$effect, rep(df_u$effect, 2L))
 })

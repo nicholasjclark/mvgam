@@ -760,6 +760,9 @@ test_that("each response of a multivariate model is described by its family", {
            "bf(size_g ~ x, sigma ~ x, family = lognormal())"),
     fixed = TRUE
   )
+  # Each `bf()` names its family. The call's `family` argument would
+  # print a default the user never set.
+  expect_false(grepl("family        =", out, fixed = TRUE))
 })
 
 
@@ -1106,8 +1109,27 @@ test_that("a gamma fit is described as one", {
   out <- methods_md(mod)
   expect_match(out, "positive real observations", fixed = TRUE)
   expect_match(out, "\\text{Gamma}(", fixed = TRUE)
+  # The call names the brms constructor. `gamma()` is the mathematical
+  # function.
   expect_identical(mvgam:::family_call_text(mod$family),
-                   "gamma(link = \"log\")")
+                   "Gamma(link = \"log\")")
+})
+
+
+test_that("an offset enters the predictor with its coefficient at one", {
+  set.seed(4L)
+  d <- data.frame(time = rep(1:30, 2),
+                  series = factor(rep(c("a", "b"), each = 30)),
+                  x = rnorm(60), e = runif(60, 1, 2), y = rpois(60, 3))
+  out <- methods_md(make_methods_md_prefit(
+    y ~ x + offset(e) + offset(log(e)), data = d
+  ))
+  expect_match(out, "\\beta_{x} x_{i,t} + e_{i,t} + o_{i,t}\n", fixed = TRUE)
+  expect_match(out, "$o_{i,t}$: offset `log(e)`, with its coefficient",
+               fixed = TRUE)
+  # brms writes the default intercept location of an offset model at
+  # full precision. The page shows three significant digits.
+  expect_match(out, "\\\\text\\{StudentT\\}\\(3, -?0\\.[0-9]{1,3}, 2\\.5\\)")
 })
 
 

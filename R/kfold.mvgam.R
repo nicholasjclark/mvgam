@@ -1,19 +1,5 @@
-# K-fold cross-validation for mvgam fits with optional group
-# stratification and a selective-refit hybrid that mirrors the
-# `lfo_cv.mvgam()` approximate leave-future-out algorithm,
-# generalised from rolling-time blocks to arbitrary groups.
-#
-# Reuses:
-#   - `log_sum_exp` / `log_mean_exp` / `lfo_sum_rows`
-#     (R/lfo_cv.mvgam.R) for numerically stable log-density math.
-#   - `clean_ll` (R/loo.mvgam.R) for sanitising log-lik draws.
-#   - `closure_unit_grouping` (R/families.R) for the default group
-#     key on closure-unit families (occ / nmix variants).
-#   - `update.mvgam` for per-fold refits: passing the prior arg
-#     OMITTED inherits the parent fit's pinned prior table so the
-#     compiled Stan binary is reused across all refits.
-#   - `loo::kfold_split_grouped` / `loo::kfold_split_random` for
-#     the fold partition logic.
+# K-fold cross-validation for mvgam fits, with optional grouping and
+# the selective refits of `lfo_cv.mvgam()` applied to groups of rows.
 
 #' K-fold cross-validation for `mvgam` fits
 #'

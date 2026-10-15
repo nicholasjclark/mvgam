@@ -1,13 +1,10 @@
-# CI unit tests for `score.mvgam_forecast()` in
-# `R/score.mvgam_forecast.R`. Mock `mvgam_forecast` objects let
-# us pin the return-shape contract, the dispatch routing, the
-# validation guards, and the per-series / all_series aggregation
-# without any Stan compilation. The local recovery suite covers
-# the on-real-fits half of the testing surface.
+# CI unit tests for `score.mvgam_forecast()`. Mock `mvgam_forecast`
+# objects pin the return shape, the dispatch, the validation guards
+# and the aggregation over series. The local suite scores real fits.
 
 
 # Build a mock `mvgam_forecast` with two series, `h` test points
-# per series, and `ndraws` posterior draws per cell.
+# per series and `ndraws` posterior draws per cell.
 make_mock_forecast <- function(n_series = 2L, h = 5L,
                                  ndraws = 30L, type = "response",
                                  family = "gaussian",
@@ -73,6 +70,13 @@ test_that("all_series row-sums the per-series score column", {
     out$all_series$score,
     out$s1$score + out$s2$score
   )
+  # A horizon observed in one series sums that series alone. A horizon
+  # observed in none has no score.
+  fc$test_observations$s1[2:3] <- NA
+  fc$test_observations$s2[3] <- NA
+  gap <- score(fc, "crps")
+  expect_equal(gap$all_series$score[2L], gap$s2$score[2L])
+  expect_identical(gap$all_series$score[3L], NA_real_)
 })
 
 
@@ -80,7 +84,7 @@ test_that("Multivariate scorers return per-series coverage + joint", {
   fc <- make_mock_forecast(n_series = 2L, h = 4L)
   out <- score(fc, "energy")
   expect_named(out, c("s1", "s2", "all_series"))
-  # Per-series rows carry NA score and a coverage indicator.
+  # Per-series rows hold an NA score and a coverage indicator.
   expect_true(all(is.na(out$s1$score)))
   expect_true(all(out$s1$in_interval %in% c(0, 1)))
   # all_series carries the joint multivariate score.
@@ -136,19 +140,17 @@ test_that("Brier requires a 'bernoulli' family", {
 })
 
 
-test_that("Brier accepted on a bernoulli mock fit", {
+test_that("Brier scores each horizon's forecast probability", {
   fc <- make_mock_forecast(family = "bernoulli", h = 3L,
                              ndraws = 40L)
-  # Forecasts are draws in (0, 1); truths are 0 / 1.
-  fc$forecasts <- lapply(fc$forecasts, function(m) {
-    stats::plogis(m)
-  })
+  # Expected-value draws in (0, 1) against an observed 1
+  fc$forecasts <- lapply(fc$forecasts, stats::plogis)
   fc$test_observations <- lapply(fc$test_observations, function(v) {
     rep(1L, length(v))
   })
   out <- score(fc, "brier")
   expect_identical(unique(out$s1$score_type), "brier")
-  expect_true(all(is.finite(out$s1$score)))
+  expect_equal(out$s1$score, (1 - colMeans(fc$forecasts$s1))^2)
 })
 
 
@@ -174,8 +176,8 @@ test_that("Unknown score name errors via match.arg", {
 
 test_that("interval_width outside [0.05, 0.95] errors", {
   fc <- make_mock_forecast()
-  expect_error(score(fc, "crps", interval_width = 0.99))
-  expect_error(score(fc, "crps", interval_width = 0.001))
+  expect_error(score(fc, "crps", interval_width = 0.99), "<= 0.95")
+  expect_error(score(fc, "crps", interval_width = 0.001), ">= 0.05")
 })
 
 
@@ -207,7 +209,7 @@ test_that("Multivariate scoring on inconsistent horizons errors", {
 
 test_that("series forecast at their own times are summed by time", {
   fc <- make_mock_forecast(n_series = 2L, h = 3L)
-  # Both series hold three forecasts, and share the time 12 alone
+  # Both series hold three forecasts. They share only time 12
   fc$test_times <- list(s1 = c(11, 12, 15), s2 = c(12, 13, 14))
   out <- score(fc, "crps")
   # One row per time any series is forecast at: 11, 12, 13, 14, 15

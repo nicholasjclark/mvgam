@@ -435,14 +435,14 @@ lfo_cv.mvgam <- function(object,
     # reverse instead of skipping them.
     logratio <- if (k - 1L >= idx_refit + 1L) {
       last_obs_times <- all_unique_times[seq.int(idx_refit + 1L, k - 1L)]
-      lfo_sum_rows(loglik_past[
+      sum_measured(loglik_past[
         , rows_at_times(all_data, time_var, last_obs_times), drop = FALSE
-      ])
+      ], dims = 1L)
     }
     # With no response observed since the last refit, the posterior
     # is the refit's own and there is nothing to reweight. A gap in
     # sampling does this: every series is missing at those times and
-    # `lfo_sum_rows()` returns `NA` for every draw.
+    # `sum_measured()` returns `NA` for every draw.
     if (is.null(logratio) || all(is.na(logratio))) {
       psis_lw <- NULL
       pareto_ks[k_eval] <- NA_real_
@@ -612,9 +612,8 @@ scores_at_window <- function(fit, all_data, time_var,
 
   # ELPD.
   if ("elpd" %in% score_names) {
-    per_draw_loglik <- lfo_sum_rows(
-      loglik[, fc_idx, drop = FALSE]
-    )
+    per_draw_loglik <- sum_measured(loglik[, fc_idx, drop = FALSE],
+                                    dims = 1L)
     if (is.null(psis_log_weights)) {
       elpds[eval_idx] <- log_mean_exp(per_draw_loglik)
     } else {
@@ -650,7 +649,7 @@ scores_at_window <- function(fit, all_data, time_var,
     }
     for (sc in other_scores) {
       score_arrays[[sc]][eval_idx] <- lfo_aggregate_score(
-        score(fc, score = sc), sc
+        score(fc, score = sc)
       )
     }
   }
@@ -661,32 +660,20 @@ scores_at_window <- function(fit, all_data, time_var,
 
 #' One scalar score per fold from the output of `score()`
 #'
-#' Reports the `all_series` sum. Without one, the per-series scores are
-#' summed.
+#' Sums the `all_series` scores. A multivariate fit on a long frame
+#' scores each response. Its fold score sums the responses. A fold with
+#' no observation has no score.
 #'
 #' @param s_out List returned by `score()`, or `NULL`
-#' @param sc Character name of the score
 #' @return Numeric scalar score
 #' @noRd
-lfo_aggregate_score <- function(s_out, sc) {
+lfo_aggregate_score <- function(s_out) {
   checkmate::assert_list(s_out, null.ok = TRUE)
-  checkmate::assert_string(sc)
   if (is.null(s_out)) return(NA_real_)
-  if ("all_series" %in% names(s_out)) {
-    all_df <- s_out$all_series
-    if (is.data.frame(all_df) && "score" %in% names(all_df)) {
-      return(sum(all_df$score, na.rm = TRUE))
-    }
+  if (is.null(s_out$all_series)) {
+    return(sum_measured(vapply(s_out, lfo_aggregate_score, numeric(1L))))
   }
-  # Fallback: sum every per-series score.
-  vals <- vapply(s_out, function(d) {
-    if (is.data.frame(d) && "score" %in% names(d)) {
-      sum(d$score, na.rm = TRUE)
-    } else {
-      NA_real_
-    }
-  }, numeric(1L))
-  sum(vals, na.rm = TRUE)
+  sum_measured(s_out$all_series$score)
 }
 
 
@@ -749,28 +736,6 @@ rows_at_times <- function(data, time_var, times) {
   checkmate::assert_string(time_var)
   checkmate::assert_atomic_vector(times)
   which(data[[time_var]] %in% times)
-}
-
-
-#' The per-draw sum of log-densities across observations
-#'
-#' Returns one entry per draw for any window width. The caller adds
-#' the sum to a weight vector of the same length. A draw whose every
-#' value is missing gets `NA`. A sum of zero would mean a probability
-#' of one.
-#'
-#' @param x Numeric matrix of log-densities, one row per draw
-#' @return Numeric vector with one value per draw
-#' @noRd
-lfo_sum_rows <- function(x) {
-  checkmate::assert(
-    checkmate::check_matrix(x),
-    checkmate::check_numeric(x)
-  )
-  x <- as.matrix(x)
-  out <- rowSums(x, na.rm = TRUE)
-  out[rowSums(!is.na(x)) == 0L] <- NA_real_
-  out
 }
 
 

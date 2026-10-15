@@ -27,8 +27,9 @@ the forecast ribbon. Defaults to \code{c(0.5, 0.8, 0.95)} which
 draws three nested bands from the outer 95\% to the inner
 50\%. Hindcast ribbons always use the widest entry.}
 
-\item{hindcast, forecast}{Logical toggles controlling which
-arm is drawn. Both default to \code{TRUE}; setting \code{forecast = FALSE} produces a hindcast-only panel and vice versa.}
+\item{hindcast, forecast}{Logical. Whether the hindcast and the
+forecast are drawn. Both default to \code{TRUE}. Setting one to \code{FALSE}
+draws the other alone.}
 
 \item{newdata_obs}{Logical. When \code{TRUE} (the default) and the
 object carries \code{test_observations}, the test observations
@@ -41,21 +42,17 @@ A \code{ggplot} object.
 }
 \description{
 Plot method for \code{mvgam_forecast} objects returned by
-\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}}. Renders one panel
-per series (faceted by default) with a multi-quantile ribbon
-for the forecast arm, a single grey ribbon for the hindcast
-arm, posterior median lines, and observed-points overlays.
-A dashed vertical line marks the training / forecast boundary
-when both arms are present.
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}}. Draws one panel per
+series (faceted by default) with nested quantile ribbons for the
+forecast, a single grey ribbon for the hindcast, posterior median
+lines and the observations as points. A dashed vertical line marks
+the boundary between training and forecast times when both are
+drawn.
 }
 \details{
-The plot palette is read lazily from
-\code{bayesplot::color_scheme_get()} so a user-side
-\code{bayesplot::color_scheme_set()} call composes, so changing the
-bayesplot scheme to retheme every panel without touching
-the call. The hindcast band is plotted in light grey to
-distinguish in-sample uncertainty from the multi-band
-forecast region.
+The forecast takes the shades of the red bayesplot scheme.
+The hindcast band is light grey, which separates in-sample
+uncertainty from the nested forecast bands.
 
 For state-extrapolating prediction over arbitrary newdata
 see \code{\link[=forecast.mvgam]{forecast.mvgam()}} and \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}; for

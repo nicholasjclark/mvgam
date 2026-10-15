@@ -56,6 +56,11 @@ The returned object takes its series names, family, training data
 and test data from the first input. All inputs must share the
 series names, the hindcast lengths, the forecast horizons and, when
 present, the test observations.
+
+A multivariate fit on a wide frame gives one forecast whose series
+are its responses. The ensemble is a forecast over those series. On
+a long frame the ensemble keeps one forecast per response. Every
+response takes the same draws.
 }
 \seealso{
 \code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}},

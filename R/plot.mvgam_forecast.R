@@ -1,12 +1,12 @@
 #' Plot posterior hindcasts and forecasts
 #'
 #' Plot method for `mvgam_forecast` objects returned by
-#' [hindcast.mvgam()] and [forecast.mvgam()]. Renders one panel
-#' per series (faceted by default) with a multi-quantile ribbon
-#' for the forecast arm, a single grey ribbon for the hindcast
-#' arm, posterior median lines, and observed-points overlays.
-#' A dashed vertical line marks the training / forecast boundary
-#' when both arms are present.
+#' [hindcast.mvgam()] and [forecast.mvgam()]. Draws one panel per
+#' series (faceted by default) with nested quantile ribbons for the
+#' forecast, a single grey ribbon for the hindcast, posterior median
+#' lines and the observations as points. A dashed vertical line marks
+#' the boundary between training and forecast times when both are
+#' drawn.
 #'
 #' @param x An `mvgam_forecast` object.
 #' @param series Optional integer vector, character vector of
@@ -17,9 +17,9 @@
 #'   the forecast ribbon. Defaults to `c(0.5, 0.8, 0.95)` which
 #'   draws three nested bands from the outer 95% to the inner
 #'   50%. Hindcast ribbons always use the widest entry.
-#' @param hindcast,forecast Logical toggles controlling which
-#'   arm is drawn. Both default to `TRUE`; setting `forecast =
-#'   FALSE` produces a hindcast-only panel and vice versa.
+#' @param hindcast,forecast Logical. Whether the hindcast and the
+#'   forecast are drawn. Both default to `TRUE`. Setting one to `FALSE`
+#'   draws the other alone.
 #' @param newdata_obs Logical. When `TRUE` (the default) and the
 #'   object carries `test_observations`, the test observations
 #'   are overlaid on the forecast region.
@@ -27,13 +27,9 @@
 #'
 #' @return A `ggplot` object.
 #'
-#' @details The plot palette is read lazily from
-#'   `bayesplot::color_scheme_get()` so a user-side
-#'   `bayesplot::color_scheme_set()` call composes, so changing the
-#'   bayesplot scheme to retheme every panel without touching
-#'   the call. The hindcast band is plotted in light grey to
-#'   distinguish in-sample uncertainty from the multi-band
-#'   forecast region.
+#' @details The forecast takes the shades of the red bayesplot scheme.
+#'   The hindcast band is light grey, which separates in-sample
+#'   uncertainty from the nested forecast bands.
 #'
 #'   For state-extrapolating prediction over arbitrary newdata
 #'   see [forecast.mvgam()] and [hindcast.mvgam()]; for
@@ -73,41 +69,16 @@ plot.mvgam_forecast <- function(
     ))
   }
 
-  # Multi-response fan-out wrapper: `x` is a named list keyed
-  # by response, each element itself an `mvgam_forecast`.
-  #
-  # On a wide frame the responses are the series and each holds its
-  # own latent state, so the elements are the panels of one plot and
-  # are drawn as one forecast over the response axis. Taking the
-  # first element as standing for all of them drew one response's
-  # state in every panel.
-  #
-  # On a long frame every response reads the one state its series
-  # has, so a trend-scale wrapper does repeat one trajectory and the
-  # first arm is drawn alone. Response-scale arms differ per outcome;
-  # when `patchwork` is available we return a side-by-side stack,
-  # otherwise we print each per-arm plot in turn and invisibly return
-  # the raw list.
-  if (isTRUE(attr(x, "response_keyed"))) {
-    return(plot(response_axis_forecast(x), series = series,
-                probs = probs, hindcast = hindcast,
-                forecast = forecast, newdata_obs = newdata_obs, ...))
+  # The forecasts of a long-frame multivariate fit differ by response.
+  # They stack into one figure, one titled plot per response.
+  parts <- forecast_parts(x)
+  if (is_forecast_list(parts)) {
+    return(stack_response_plots(lapply(parts, function(fc) {
+      plot(fc, series = series, probs = probs, hindcast = hindcast,
+           forecast = forecast, newdata_obs = newdata_obs)
+    })))
   }
-  if (isTRUE(attr(x, "mv_wrapper"))) {
-    plot_arm <- function(arm, title = NULL) {
-      p <- plot(arm, series = series, probs = probs,
-                 hindcast = hindcast, forecast = forecast,
-                 newdata_obs = newdata_obs, ...)
-      if (is.null(title)) p else p + ggplot2::labs(title = title)
-    }
-    if (is_trend_forecast(x[[1L]])) return(plot_arm(x[[1L]]))
-    per_arm <- Map(plot_arm, x, names(x))
-    if (requireNamespace("patchwork", quietly = TRUE)) {
-      return(Reduce(`+`, per_arm))
-    }
-    for (p in per_arm) print(p)
-    return(invisible(per_arm))
-  }
+  x <- parts
 
   series_levels <- as.character(x$series_names)
   series_idx <- resolve_series(series, series_levels)
@@ -145,11 +116,8 @@ plot.mvgam_forecast <- function(
     y_label <- paste0(y_label, " for ", plotted_series)
   }
 
-  # Build the plot under the mvgam palette so the ribbon and
-  # median colours are read from the 'red' scheme rather than
-  # bayesplot's default 'blue'. The prior scheme is restored when
-  # this function returns so user-side `color_scheme_set` calls
-  # compose.
+  # The ribbon and median colours come from the 'red' scheme. The
+  # caller's scheme is restored when this function returns.
   set_color_scheme_local("red")
   fc_layers <- build_forecast_layers(
     x,
@@ -169,14 +137,6 @@ plot.mvgam_forecast <- function(
   }
   p
 }
-
-
-# Return TRUE when the forecast object is on the latent trend
-# scale, i.e. `hindcast(fit, type = "trend")` or
-# `forecast(fit, type = "trend")`. Used by the mv wrapper and
-# by the per-series observation-overlay guard.
-#'@noRd
-is_trend_forecast <- function(x) identical(x$type, "trend")
 
 
 # Resolve the user-facing series argument to an integer vector
@@ -236,16 +196,16 @@ build_forecast_layers <- function(
   layers <- list()
 
   for (s in plotted) {
-    # A factor in the order the object holds its series, since a facet
-    # over a character column sorts it: the trend panels came back
-    # alphabetical beside a series plot in the model's own order.
+    # A factor in the order the object holds its series. A facet over
+    # a character column sorts it. The trend panels then came back
+    # alphabetical while the series plot kept the model's own order.
     panel <- factor(s, levels = plotted)
     hc_mat <- if (hindcast) x$hindcasts[[s]] else NULL
     fc_mat <- if (forecast) x$forecasts[[s]] else NULL
     hc_times <- if (hindcast) x$train_times[[s]] else NULL
     fc_times <- if (forecast) x$test_times[[s]] else NULL
 
-    # Hindcast arm: single outer-prob grey ribbon plus median.
+    # Hindcast: one grey ribbon at the widest interval with its median
     if (!is.null(hc_mat)) {
       layers <- c(layers, mvgam_band_layer(
         hc_mat, hc_times, probs = outer_prob,
@@ -259,7 +219,7 @@ build_forecast_layers <- function(
       )
     }
 
-    # Forecast arm: full multi-band ribbon plus median.
+    # Forecast: nested ribbons with their median
     if (!is.null(fc_mat)) {
       layers <- c(
         layers,

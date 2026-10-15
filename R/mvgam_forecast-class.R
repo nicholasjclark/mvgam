@@ -23,7 +23,7 @@
 #'   \item `train_observations`, `train_times` Lists of length `n_series`
 #'     holding the training responses and the time of each hindcast
 #'     column. A closure-unit family's `"expected"` and `"response"`
-#'     hindcasts have one column per visit, and their times repeat.
+#'     hindcasts have one column per visit. Their times repeat.
 #'
 #'   \item `test_observations`, `test_times` If `forecast()` produced the
 #'     object, the corresponding test response vectors and time grids.
@@ -60,8 +60,9 @@ NULL
 #'
 #' @return A long-format `tibble` with one row per series and time,
 #'   holding the posterior median and the two quantiles of the
-#'   predictions, the observed value for `type = 'response'`, and the
-#'   prediction type.
+#'   predictions, the observed value for `type = 'response'` and the
+#'   prediction type. A multivariate fit on a long frame adds a leading
+#'   `resp` column naming the response.
 #'
 #' @method summary mvgam_forecast
 #'
@@ -72,6 +73,15 @@ NULL
 #' @export
 summary.mvgam_forecast <- function(object, probs = c(0.025, 0.975), ...) {
   rlang::check_dots_empty()
+  parts <- forecast_parts(object)
+  if (is_forecast_list(parts)) {
+    out <- do.call(rbind, lapply(names(parts), function(r) {
+      cbind(resp = r, summary(parts[[r]], probs = probs))
+    }))
+    class(out) <- c("tbl_df", "tbl", "data.frame")
+    return(out)
+  }
+  object <- parts
   fc_preds <- do.call(rbind, lapply(object$series_names, function(s_name) {
     # The time vectors are listed in the order of the hindcasts.
     pos <- match(s_name, names(object$hindcasts))
@@ -93,6 +103,43 @@ summary.mvgam_forecast <- function(object, probs = c(0.025, 0.975), ...) {
   class(fc_preds) <- c("tbl_df", "tbl", "data.frame")
   fc_preds
 }
+
+
+#' The forecasts a method acts on
+#'
+#' A multivariate fit's forecast is a wrapper holding one forecast per
+#' response. Its own slots are empty. On a wide frame the responses are
+#' the series. The wrapper then becomes one forecast over them. On a
+#' long frame every response shares its series' latent state. A
+#' trend-scale wrapper repeats that state once per response and becomes
+#' its first element. Other scales differ by response. Each element
+#' remains its response's forecast.
+#'
+#' @param x An `mvgam_forecast` object
+#' @return An `mvgam_forecast` object, or the long wrapper as a named
+#'   list of `mvgam_forecast` objects
+#' @noRd
+forecast_parts <- function(x) {
+  checkmate::assert_class(x, "mvgam_forecast")
+  if (isTRUE(attr(x, "response_keyed"))) {
+    return(response_axis_forecast(x))
+  }
+  if (!isTRUE(attr(x, "mv_wrapper"))) {
+    return(x)
+  }
+  if (identical(x[[1L]]$type, "trend")) {
+    return(x[[1L]])
+  }
+  lapply(unclass(x), identity)
+}
+
+
+#' Whether `forecast_parts()` returned one forecast per response
+#'
+#' @param parts The value of `forecast_parts()`
+#' @return A single logical
+#' @noRd
+is_forecast_list <- function(parts) !inherits(parts, "mvgam_forecast")
 
 
 #' Compact summary of an `mvgam_forecast` object
@@ -120,11 +167,21 @@ summary.mvgam_forecast <- function(object, probs = c(0.025, 0.975), ...) {
 #' @method print mvgam_forecast
 #' @export
 print.mvgam_forecast <- function(x, ...) {
+  parts <- forecast_parts(x)
+  if (is_forecast_list(parts)) {
+    for (r in names(parts)) {
+      cat("Response '", r, "'\n", sep = "")
+      print(parts[[r]])
+    }
+    return(invisible(x))
+  }
+  x_in <- x
+  x <- parts
   n_series <- length(x$series_names)
-  # The count is of occasions. A closure-unit hindcast has one column
-  # per visit and several visits on each occasion.
-  # One count per series. Series observed or forecast at their own
-  # times hold different numbers, and the range is printed.
+  # The count is of occasions, one count per series. A closure-unit
+  # hindcast has one column per visit and several visits on each
+  # occasion. Series observed or forecast at their own times hold
+  # different numbers. The header then prints their range.
   n_occasions <- function(draws, times) {
     if (length(draws) == 0L) return(0L)
     counts <- if (is.null(times)) {
@@ -152,7 +209,8 @@ print.mvgam_forecast <- function(x, ...) {
   ensemble_w <- attr(x, "weights", exact = TRUE)
   lines <- c(
     paste0("mvgam_forecast (type '", x$type %||% "response", "')"),
-    paste0("  family:    ", x$family %||% "unknown"),
+    paste0("  family:    ",
+           paste(unique(x$family %||% "unknown"), collapse = ", ")),
     paste0("  series:    ", n_series),
     paste0("  hindcast:  ", count_label(n_train)),
     paste0("  forecast:  ",
@@ -170,5 +228,5 @@ print.mvgam_forecast <- function(x, ...) {
     )
   }
   cat(lines, sep = "\n")
-  invisible(x)
+  invisible(x_in)
 }

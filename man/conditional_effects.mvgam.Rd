@@ -54,19 +54,19 @@ observations' scale, which covers \code{type = "response"} and
 axes, on the same scales the points overlay applies to.}
 
 \item{process_error}{Logical. Passed to \code{plot_predictions()} /
-\code{get_predict.mvgam}. Defaults to \code{FALSE}, so the trend
-contributes its deterministic submodel and the panel shows the
-covariate effect with the latent process held out. Set \code{TRUE} to
-integrate over the trend's dynamics, which widens the band by the
-latent state's own spread.}
+\code{get_predict.mvgam}. With the default \code{FALSE} the trend
+contributes its deterministic submodel. The panel then shows the
+covariate effect with the latent process held out. \code{TRUE}
+integrates over the trend's dynamics, which widens the band by
+the latent state's own spread.}
 
 \item{series}{Which series the panels show. \code{NULL} (the default)
 draws one panel per effect at the reference series, as brms does
 for a grouping factor. A factor model whose \code{trend_formula} uses
-\code{\link[=lv_axis]{lv_axis()}} gives each series its own effect, and \code{NULL} then
-draws a panel per series. \code{"all"} draws a panel per series for
-any model. A single integer or character value picks one series
-and filters the prediction grid to its observations.}
+\code{\link[=lv_axis]{lv_axis()}} gives each series its own effect. \code{NULL} then draws a
+panel per series. \code{"all"} draws a panel per series for any model.
+A single integer or character value picks one series and filters
+the prediction grid to its observations.}
 
 \item{resp}{For multivariate (multiple-response) models, the
 name of a single response variable to return results for.
@@ -106,10 +106,9 @@ prediction grid as a long-format \code{data.frame} (one row per grid
 point, per effect, per response). Columns are \code{resp} (present only
 when the fit is multivariate), \code{effect} (the primary conditioning
 variable name), \code{estimate__}, \code{lower__}, \code{upper__}, followed by
-whichever additional grid columns marginaleffects populated. Those
-three are brms's names for them, and \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}
-answers with the same three, so one frame can be read the way the
-other is.
+whichever additional grid columns marginaleffects populated. The
+three estimate columns take brms's names, as in the frame
+\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}} returns.
 
 Use this to reach the raw numbers when you want to build a custom
 plot, overlay several fits, or compare against a known truth. It

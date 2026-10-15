@@ -1,8 +1,6 @@
-# Unit tests for `R/scoring_kernels.R`. Each test asserts a
-# known-answer property or a structural contract; together they
-# pin the per-cell kernel correctness and the shared
-# apply_*_score() wrapper behaviour (NA guard, output shape,
-# column naming).
+# Unit tests for `R/scoring_kernels.R`. Each test checks a kernel
+# against a known value or checks the shared apply_*_score() wrappers:
+# the NA guard, the output shape and the column names.
 
 
 # ----- Shared utility tests ---------------------------------------
@@ -38,7 +36,7 @@ test_that("apply_univariate_score returns [h, 2] with NA on NA truth", {
 })
 
 
-test_that("stack_fcs_per_horizon groups by horizon, not by series", {
+test_that("stack_fcs_per_horizon groups the series at each horizon", {
   # Two series, h = 3, ndraws = 4. Each cell encodes
   # 100 * series + 10 * draw + time.
   fc_a <- matrix(c(111, 112, 113,
@@ -95,7 +93,7 @@ test_that("DRPS skips NA truth and leaves the row NA", {
   set.seed(4L)
   fc <- matrix(rpois(200L, 5), nrow = 100L, ncol = 2L)
   out <- drps_mcmc_object(truth = c(5L, NA), fc = fc)
-  expect_true(!is.na(out[1, "score"]))
+  expect_false(is.na(out[1, "score"]))
   expect_true(is.na(out[2, "score"]))
 })
 
@@ -124,27 +122,22 @@ test_that("SIS penalises a miss outside the PI", {
 
 # ----- Brier ------------------------------------------------------
 
-test_that("Brier of a perfect binary forecast is 0", {
-  # All draws predict 1 and truth is 1 -> MSE = 0.
-  fc <- matrix(1, nrow = 100L, ncol = 1L)
-  out <- brier_mcmc_object(truth = 1, fc = fc)
-  expect_equal(as.numeric(out[1, "score"]), 0)
-  expect_true(is.na(out[1, "in_interval"]))
-})
-
-
-test_that("Brier MSE matches mean((truth - fc)^2)", {
-  truth <- 1
-  fc <- matrix(c(0, 1, 0.5, 1, 1), nrow = 5L, ncol = 1L)
-  out <- brier_mcmc_object(truth = truth, fc = fc)
-  expect_equal(as.numeric(out[1, "score"]),
-                mean((truth - fc[, 1])^2))
+test_that("Brier scores the forecast probability", {
+  # 0/1 response draws and expected-value draws with the same mean
+  # give the same score, (1 - 0.75)^2
+  binary <- matrix(c(0, 1, 1, 1), ncol = 1L)
+  probs <- matrix(c(0.6, 0.9), ncol = 1L)
+  for (fc in list(binary, probs)) {
+    out <- brier_mcmc_object(truth = 1, fc = fc)
+    expect_equal(as.numeric(out[1, "score"]), 0.0625)
+    expect_true(is.na(out[1, "in_interval"]))
+  }
 })
 
 
 # ----- Energy -----------------------------------------------------
 
-test_that("Energy score returns a length-h numeric vector", {
+test_that("Energy score at each horizon is es_sample over the series", {
   set.seed(6L)
   truths <- matrix(c(0, 1, 0.5, 1.5,
                      -1, 0), nrow = 2L, ncol = 3L)
@@ -152,8 +145,10 @@ test_that("Energy score returns a length-h numeric vector", {
     matrix(stats::rnorm(60L), nrow = 20L, ncol = 3L),
     matrix(stats::rnorm(60L), nrow = 20L, ncol = 3L)
   )
-  out <- energy_mcmc_object(truths, fcs)
-  expect_length(out, 3L)
+  direct <- vapply(1:3, function(h) {
+    scoringRules::es_sample(truths[, h], rbind(fcs[[1]][, h], fcs[[2]][, h]))
+  }, numeric(1L))
+  expect_equal(energy_mcmc_object(truths, fcs), direct)
 })
 
 
@@ -170,16 +165,9 @@ test_that("Energy of a degenerate forecast (draws = truth) is ~0", {
 
 # ----- Variogram --------------------------------------------------
 
-test_that("Variogram score returns a length-h numeric vector", {
-  set.seed(7L)
+test_that("Variogram score of draws equal to the truth is 0", {
   truths <- matrix(c(0, 1, 0.5, 1.5,
                      -1, 0), nrow = 2L, ncol = 3L)
-  fcs <- list(
-    matrix(stats::rnorm(60L), nrow = 20L, ncol = 3L),
-    matrix(stats::rnorm(60L), nrow = 20L, ncol = 3L)
-  )
-  out <- variogram_mcmc_object(truths, fcs)
-  expect_length(out, 3L)
   # Draws equal to the truth reproduce the truth-side pairwise
   # differences, which drives every squared term to zero. A
   # non-negative result cannot fail on a sum of squares.
@@ -254,7 +242,7 @@ test_that("Quantile score is 0 when truth equals the alpha quantile", {
 })
 
 
-test_that("Quantile score differs across levels and is finite-positive", {
+test_that("Quantile score weights a miss by its quantile level", {
   set.seed(11L)
   # When truth lies in the upper tail, the 0.95-quantile pinball
   # loss applies the larger asymmetric weight (0.95 vs 0.05),
@@ -266,8 +254,6 @@ test_that("Quantile score differs across levels and is finite-positive", {
   truth <- 3
   s_lower <- qs_mcmc_object(truth, fc, quantile_level = 0.05)
   s_upper <- qs_mcmc_object(truth, fc, quantile_level = 0.95)
-  expect_true(all(is.finite(c(as.numeric(s_lower[1, "score"]),
-                              as.numeric(s_upper[1, "score"])))))
   expect_true(as.numeric(s_upper[1, "score"]) >
               as.numeric(s_lower[1, "score"]))
 })
@@ -303,17 +289,18 @@ test_that("twCRPS with a > truth focuses scoring on the upper tail", {
 
 # ----- Threshold-weighted Energy ----------------------------------
 
-test_that("twEnergy returns a length-h vector for multivariate forecasts", {
+test_that("twEnergy is the energy score of the clamped values", {
   set.seed(14L)
   truths <- matrix(c(0, 1, 0.5, 1.5), nrow = 2L, ncol = 2L)
   fcs <- list(
     matrix(stats::rnorm(40L), nrow = 20L, ncol = 2L),
     matrix(stats::rnorm(40L), nrow = 20L, ncol = 2L)
   )
-  out <- twenergy_mcmc_object(truths, fcs, lower = -1, upper = 2)
-  expect_length(out, 2L)
-  # The chaining function is `min(max(x, a), b)`. Infinite bounds
-  # make it the identity, which recovers the plain energy score.
+  # The chaining function is `min(max(x, a), b)`
+  clamp <- function(x) pmin(pmax(x, -1), 2)
+  expect_equal(twenergy_mcmc_object(truths, fcs, lower = -1, upper = 2),
+               energy_mcmc_object(clamp(truths), lapply(fcs, clamp)))
+  # Infinite bounds make the chaining function the identity
   expect_equal(twenergy_mcmc_object(truths, fcs),
                energy_mcmc_object(truths, fcs), tolerance = 1e-8)
 })
