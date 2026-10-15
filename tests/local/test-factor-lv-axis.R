@@ -1169,28 +1169,10 @@ test_that("pp_check and the plotting methods render", {
     expect_s3_class(drawn[[nm]]$value, "ggplot")
   }
 
-  # A plot of observed against fitted has rows it cannot draw, and
-  # says so. Counted rather than silenced, and counted per call: the
-  # residual panel runs the same check once per panel, so reporting
-  # it once for the grid is the contract and reporting it four times
-  # is the defect.
-  miss <- function(w) grep("missing response", w, value = TRUE)
-  expect_length(miss(drawn$pp_check$warnings), 1L)
-  expect_length(miss(drawn$residuals$warnings), 1L)
-
-  # A plot that draws no observations owes no such notice, so this
-  # separates one raised where it belongs from one raised on every
-  # plot the package makes.
-  expect_identical(miss(drawn$trend$warnings), character(0))
-  expect_identical(miss(drawn$factors$warnings), character(0))
-  expect_identical(miss(drawn$mcmc$warnings), character(0))
-
-  # And nothing unrelated was raised anywhere in the set.
+  # Rows a plot cannot draw are reported once per session by
+  # `inform_once()`, which stays quiet under testthat. No plot warns.
   for (nm in names(drawn)) {
-    expect_identical(
-      setdiff(drawn[[nm]]$warnings, miss(drawn[[nm]]$warnings)),
-      character(0)
-    )
+    expect_identical(drawn[[nm]]$warnings, character(0))
   }
 })
 
@@ -1211,6 +1193,37 @@ test_that("a factor model's prediction reads its observation sigma", {
   spread <- stats::sd(drawn$value - ep, na.rm = TRUE)
   sigma <- mean(posterior::as_draws_matrix(fit$fit)[ids, "sigma"])
   expect_equal(spread / sigma, 1, tolerance = 0.1)
+})
+
+fit_slope <- cached_fit(
+  "val_mvgam_by_lv_slope.rds",
+  function() {
+    with_warnings(mvgam(
+      formula = obs_formula, trend_formula = ~ elev:lv_axis() - 1 + ZMVN(),
+      trend_map = trend_map, data = dat, family = gaussian(),
+      chains = 2L, iter = 1000L, warmup = 500L, silent = 2
+    ))$value
+  },
+  key = sim_truth
+)
+
+
+test_that("per-factor slopes are reported in the identified basis", {
+  # The factor paths add each slope's predictor to the factor's state.
+  # Loaded with `Z_tilde`, they rebuild the stored trend in every draw.
+  draws <- posterior::as_draws_matrix(fit_slope$fit)
+  paths <- extract_lv_trend_matrices(fit_slope, N_lv)
+  Z <- extract_Z_loadings(draws, n_species, N_lv)
+  trend_cols <- grep("^trend\\[", colnames(draws), value = TRUE)
+  for (d in c(1L, 500L)) {
+    rebuilt <- sapply(paths, function(p) p[d, ]) %*% t(Z[d, , ])
+    expect_equal(as.numeric(rebuilt), as.numeric(draws[d, trend_cols]),
+                 tolerance = 1e-6)
+  }
+  # The rotated slopes replace the raw ones in every reported view
+  slopes <- paste0("elev:.trend", seq_len(N_lv), "_trend")
+  expect_identical(rownames(fixef(fit_slope, trend_effects = TRUE)), slopes)
+  expect_false(any(grepl("^b_trend\\[", variables(fit_slope))))
 })
 
 cat("\nDone.\n")

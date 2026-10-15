@@ -53,8 +53,12 @@ test_that("every cmdstanr algorithm returns a posterior mvgam can use", {
   # 2.23.0 does not know it. It stopped the conversion to a stanfit,
   # and once past that, it shifted every parameter name after it.
   for (algorithm in c("pathfinder", "laplace", "meanfield", "fullrank")) {
-    fit <- suppressMessages(fit_ar(algorithm = algorithm, silent = 2L,
-                                   refresh = 0))
+    # Laplace finds its mode with `$optimize()`, which printed its log
+    # under `silent = 2`.
+    out <- capture.output(
+      fit <- fit_ar(algorithm = algorithm, silent = 2L, refresh = 0)
+    )
+    expect_identical(out, character(0))
     # The stanfit's `@sim` holds no algorithm, and the fit records
     # the one `mvgam()` ran. `update()` inherits the slot, and a
     # wrong record would refit an approximation with NUTS.
@@ -66,6 +70,14 @@ test_that("every cmdstanr algorithm returns a posterior mvgam can use", {
                       vars))
     fc <- forecast(fit, newdata = newdata, ndraws = 20L)
     expect_true(all(is.finite(unlist(fc$forecasts))))
+    # brms records arguments the algorithm never takes as zero-length
+    # values. The summary printed an empty `iter` and named NUTS.
+    printed <- capture.output(print(summary(fit)))
+    expect_true(any(grepl(
+      paste0("using ", mvgam:::sampler_label(algorithm), "."), printed,
+      fixed = TRUE
+    )))
+    expect_match(methods_md(fit), "Posterior drawn via", fixed = TRUE)
   }
 })
 

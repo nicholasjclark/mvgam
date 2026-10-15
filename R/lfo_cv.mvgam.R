@@ -1157,34 +1157,23 @@ stack_mvgam_lfo <- function(models, model_names) {
 #' @method print mvgam_lfo
 #' @export
 print.mvgam_lfo <- function(x, ...) {
-  threshold_val <- x$pareto_k_threshold
-  adaptive_label <- if (isTRUE(x$pareto_k_threshold_adaptive)) {
-    " (adaptive)"
-  } else {
-    ""
+  totals <- function(v) {
+    paste0("sum = ", format(round(sum(v, na.rm = TRUE), 2)),
+           ", mean = ", format(round(mean(v, na.rm = TRUE), 2)))
   }
+  rows <- c(
+    fc_horizon = x$fc_horizon,
+    pareto_k_threshold = paste0(
+      format(round(x$pareto_k_threshold, 3)),
+      if (isTRUE(x$pareto_k_threshold_adaptive)) " (adaptive)"
+    ),
+    `evaluation points` = length(x$eval_timepoints),
+    refits = length(x$refits_at)
+  )
+  if (!is.null(x$elpds)) rows["ELPD"] <- totals(x$elpds)
+  for (sc in names(x$scores)) rows[sc] <- totals(x$scores[[sc]])
   cat("Approximate leave-future-out cross-validation\n")
-  cat("  fc_horizon         :", x$fc_horizon, "\n")
-  cat("  pareto_k_threshold :", threshold_val,
-      adaptive_label, "\n", sep = "")
-  cat("  evaluation points  :", length(x$eval_timepoints), "\n")
-  cat("  refits             :", length(x$refits_at), "\n")
-  if (!is.null(x$elpds)) {
-    cat("  ELPD               : sum =",
-        format(round(sum(x$elpds, na.rm = TRUE), 2)),
-        " mean =",
-        format(round(mean(x$elpds, na.rm = TRUE), 2)),
-        "\n")
-  }
-  if (!is.null(x$scores)) {
-    for (sc in names(x$scores)) {
-      cat("  ", sc, " : sum =",
-          format(round(sum(x$scores[[sc]], na.rm = TRUE), 2)),
-          " mean =",
-          format(round(mean(x$scores[[sc]], na.rm = TRUE), 2)),
-          "\n", sep = "")
-    }
-  }
+  cat(paste0("  ", format(names(rows)), " : ", rows, "\n"), sep = "")
   invisible(x)
 }
 

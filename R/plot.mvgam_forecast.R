@@ -112,7 +112,9 @@ plot.mvgam_forecast <- function(
     trend = "Latent trend",
     "Predictions"
   )
-  if (length(plotted_series) == 1L) {
+  # A plot of one series out of several names it on the axis. A fit
+  # with one series has nothing to tell apart.
+  if (length(plotted_series) == 1L && length(series_levels) > 1L) {
     y_label <- paste0(y_label, " for ", plotted_series)
   }
 

@@ -58,7 +58,10 @@
 #' loadings and the factor effects trade scale, and their product is
 #' what the data identify. [conditional_effects()] and [predict()]
 #' report that product, the effect of the covariate on each series,
-#' and [conditional_effects()] draws a panel per series.
+#' and [conditional_effects()] draws a panel per series. When every
+#' `lv_axis()` term is a slope or a level, [summary()] reports the
+#' per-factor coefficients in the basis of the identified loadings
+#' `Z_tilde`.
 #'
 #' @seealso [mvgam()], [jsdgam()], [conditional_effects.mvgam()]
 #'

@@ -766,8 +766,8 @@ uses_threading <- function(object) {
 
 # The sampling settings of a fit, taken from the `stan_args` slot of
 # the stanfit that mvgam builds from rstan and cmdstanr output alike.
-# Returns NULL when the slot is empty, as it is for variational,
-# Laplace and Pathfinder fits.
+# Returns NULL for a fit drawn by any algorithm other than NUTS, or
+# when the slot is empty.
 #
 # `how_to_cite()` uses chains, warmup and iter. The Implementation
 # block of `methods_md()` also uses threads, adapt_delta,
@@ -790,25 +790,25 @@ printable_init <- function(init) {
 
 #'@noRd
 extract_sampling_info <- function(object) {
-  fit <- object$fit
-  if (is.null(fit) || !methods::is(fit, "stanfit")) return(NULL)
-  sa <- methods::slot(fit, "stan_args")
-  if (length(sa) == 0L) return(NULL)
-  first <- sa[[1L]]
+  if (!identical(object$algorithm %||% "sampling", "sampling")) {
+    return(NULL)
+  }
+  first <- recorded_stan_args(object$fit)[[1L]]
+  if (is.null(first)) return(NULL)
   ctl <- first$control
   list(
-    chains        = length(sa),
+    chains        = realised_chain_count(object$fit),
     warmup        = first$warmup %||% NA_integer_,
     iter          = first$iter   %||% NA_integer_,
-    threads       = as.integer(
-      first$threads_per_chain %||% NA_integer_
-    ),
-    adapt_delta   = if (is.null(ctl)) NA_real_ else {
-      as.numeric(ctl$adapt_delta %||% NA_real_)
+    # cmdstanr records the threads it was given whether or not the
+    # program threads. A program threads only through `reduce_sum`.
+    threads       = if (uses_threading(object)) {
+      as.integer(first$num_threads %||% NA_integer_)
+    } else {
+      NA_integer_
     },
-    max_treedepth = if (is.null(ctl)) NA_integer_ else {
-      as.integer(ctl$max_treedepth %||% NA_integer_)
-    },
+    adapt_delta   = as.numeric(ctl$adapt_delta %||% NA_real_),
+    max_treedepth = as.integer(ctl$max_treedepth %||% NA_integer_),
     init          = printable_init(first$init)
   )
 }
@@ -1106,10 +1106,9 @@ how_to_cite.mvgam <- function(object, ...) {
     list(
       detect = uses_threading(object),
       text = paste0(
-        " Sampling was accelerated by within-chain parallelism via",
-        " Stan's `reduce_sum` (Intel oneTBB) on the closure-unit",
-        " or population likelihood, as exposed through brms's",
-        " threading interface (Burkner 2017)."
+        " Each chain evaluated the likelihood in parallel with",
+        " Stan's `reduce_sum`, through the threading interface of",
+        " brms (Burkner 2017)."
       ),
       refs = "burkner_brms"
     )

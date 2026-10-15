@@ -623,12 +623,5 @@ control_params.mvgam <- function(x, ...) {
 inits.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
   rlang::check_dots_empty()
-  fit_obj <- x$fit
-  if (!isS4(fit_obj) ||
-        !"stan_args" %in% methods::slotNames(fit_obj)) {
-    return(list())
-  }
-  args <- fit_obj@stan_args
-  if (length(args) == 0L) return(list())
-  lapply(args, function(a) a$init)
+  lapply(recorded_stan_args(x$fit), function(chain) chain$init)
 }

@@ -511,6 +511,23 @@ test_that("plot.mvgam_lfo draws a panel per score without notices", {
 })
 
 
+test_that("print.mvgam_lfo aligns every row", {
+  scored <- mk_mvgam_lfo(c(-2, -2.5, -3))
+  scored$pareto_k_threshold <- 2 / 3
+  scored$pareto_k_threshold_adaptive <- TRUE
+  scored$scores <- list(crps = c(1, 2, 3))
+  out <- capture.output(print(scored))
+  expect_identical(out[-1L], c(
+    "  fc_horizon         : 1",
+    "  pareto_k_threshold : 0.667 (adaptive)",
+    "  evaluation points  : 3",
+    "  refits             : 0",
+    "  ELPD               : sum = -7.5, mean = -2.5",
+    "  crps               : sum = 6, mean = 2"
+  ))
+})
+
+
 test_that("loo_compare.mvgam_lfo orders by elpd_diff descending", {
   m1 <- mk_mvgam_lfo(c(-2, -2.5, -3, -2.2, -2.7))
   # Non-uniform offset so sd(diff) > 0 and se_diff is meaningful.

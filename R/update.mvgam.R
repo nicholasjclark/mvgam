@@ -428,21 +428,16 @@ denormalise_loadings_prior <- function(spec) {
 mvgam_sampler_inheritance <- function(object) {
   checkmate::assert_list(object)
   out <- list()
-  fit_obj <- object$fit
-  if (!isS4(fit_obj) ||
-      !"stan_args" %in% methods::slotNames(fit_obj)) {
+  first <- recorded_stan_args(object$fit)[[1L]]
+  if (is.null(first)) {
     return(out)
   }
-  args <- fit_obj@stan_args
-  if (length(args) == 0L) {
-    return(out)
-  }
-  first <- args[[1L]]
-  out$chains <- realised_chain_count(fit_obj)
+  out$chains <- realised_chain_count(object$fit)
   if (!is.null(first$iter)) out$iter <- first$iter
   if (!is.null(first$warmup)) out$warmup <- first$warmup
   if (!is.null(first$thin)) out$thin <- first$thin
-  if (length(first$control)) out$control <- first$control
+  control <- Filter(length, first$control)
+  if (length(control)) out$control <- control
   out
 }
 

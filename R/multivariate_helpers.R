@@ -1,6 +1,5 @@
-# Shared utilities for multivariate (mvbind / mvbrmsformula) fits,
-# used by residuals.mvgam / pp_check.mvgam / plot.mvgam /
-# conditional_effects.mvgam / hindcast.mvgam / methods_md:
+# Utilities for multivariate (mvbind / mvbrmsformula) fits. They
+# cover:
 #
 #   1. which responses a model has, keyed as brms keys them, and
 #      the data column of each
@@ -32,15 +31,13 @@ first_trend_spec <- function(object) {
 #'
 #' brms keys a response by its column with every `.` and `_` removed:
 #' the column `my_count` is the response `mycount`. `resp` takes the
-#' key, `forms` is indexed by it, and every per-response parameter and
-#' data array takes it as a suffix. A lookup in the data frame takes
-#' the column. Code that used one spelling for the other looked for a
-#' column that did not exist, and refused every trend model whose
-#' response name contained an underscore or a dot.
+#' key. `forms` is indexed by it. Every per-response parameter and data
+#' array takes it as a suffix. A lookup in the data frame takes the
+#' column, which differs from the key when the name holds `_` or `.`.
 #'
 #' Every lookup of a model's responses goes through this function. It
 #' derives them from the formula for a fit, a prefit and a bare
-#' observation formula alike, and no stored copy can drift from the
+#' observation formula alike. No stored copy exists to drift from the
 #' model.
 #'
 #' @param x A fitted `mvgam`, a prefit, its summary, or an observation
@@ -100,7 +97,7 @@ formula_families <- function(x, family) {
 #' The family of one response of a model, or of each
 #'
 #' A model written with `brms::mvbf()` gives each response its own
-#' family, and no single family describes it. Without `resp`, a model
+#' family. Without `resp`, a model
 #' with several responses returns one family per response, named by
 #' brms's key for it. Otherwise the function returns one family.
 #'
@@ -117,9 +114,9 @@ model_families <- function(object, resp = NULL) {
 
 #' Check the response a caller named against the model's own
 #'
-#' Every method taking `resp` checks two things: that it names one of
-#' the model's responses, and whether the method needs one. This
-#' function checks both, and every method raises the same refusal.
+#' Every method taking `resp` checks that it names one of the model's
+#' responses. It also checks whether the method needs one. This
+#' function checks both. Every method then raises the same refusal.
 #'
 #' @param x A fitted `mvgam`, or anything else `response_columns()`
 #'   accepts
@@ -148,7 +145,7 @@ resolve_resp <- function(x, resp, required = FALSE, caller = NULL) {
   }
   checkmate::assert_string(resp)
   if (!resp %in% keys) {
-    # Users type a column name, and brms accepts the key alone. The
+    # Users type a column name. brms accepts the key alone. The
     # refusal names the key the column became.
     as_key <- keys[match(resp, columns)]
     stop(insight::format_error(c(
@@ -261,17 +258,15 @@ mv_resp_fan_out <- function(object, resp, class = NULL, combine = NULL) {
   # Per-response fan-out for multivariate user-facing methods.
   # When `resp` is NULL on an mv fit, re-invoke the calling
   # function once per response with `resp = r` and return a named
-  # list; otherwise return NULL so the caller can fall through to
-  # its univariate body. Centralises the pattern shared by
-  # residuals.mvgam, pp_check.mvgam, conditional_effects.mvgam,
-  # mvgam_resid_panel, and hindcast.mvgam.
+  # list. Otherwise return NULL. The caller then runs its
+  # single-response body.
   #
   # `class` is the class of the caller's single-response result.
-  # Given it, the list takes that class too, and a method dispatches
+  # Given it, the list takes that class too. A method then dispatches
   # on the wrapper as it would on one result. Two attributes record
   # what the shape alone does not show: that the object is a wrapper,
   # and whether its responses are the fit's series. On a wide frame
-  # they are, and the elements together cover the whole series axis.
+  # they are. The elements together then cover the whole series axis.
   # On a long frame each element spans every series.
   #
   # `combine`, where given, turns the named list into the one object
@@ -279,9 +274,9 @@ mv_resp_fan_out <- function(object, resp, class = NULL, combine = NULL) {
   # figure.
   #
   # Implementation: capture the caller's matched call via
-  # `match.call(sys.function(-1L), sys.call(-1L))`, swap `resp`
-  # per iteration, and eval in the caller's parent frame so any
-  # symbolic arguments resolve in the user's environment.
+  # `match.call(sys.function(-1L), sys.call(-1L))` and swap `resp`
+  # per iteration. Each call is evaluated in the caller's parent
+  # frame, where its symbolic arguments resolve.
   #
   # Requires direct S3 method invocation (`residuals(fit)` etc.).
   # `do.call(method.mvgam, ...)` and S4 dispatch insert intermediate
@@ -292,8 +287,11 @@ mv_resp_fan_out <- function(object, resp, class = NULL, combine = NULL) {
     return(NULL)
   }
   parent_fn <- sys.function(-1L)
+  # A `...` in the caller's call holds the dots of the frame that made
+  # the call. The caller itself may take no dots.
+  eval_env <- parent.frame(n = 2L)
   parent_call <- match.call(definition = parent_fn,
-                              call = sys.call(-1L))
+                            call = sys.call(-1L), envir = eval_env)
   # When the user called via an S3 generic (e.g. residuals(mod) ->
   # residuals.mvgam(mod)), `parent_call[[1L]]` is the .mvgam method
   # symbol, which isn't visible from the caller's frame. Strip
@@ -308,7 +306,6 @@ mv_resp_fan_out <- function(object, resp, class = NULL, combine = NULL) {
     }
   }
   responses <- names(response_columns(object))
-  eval_env <- parent.frame(n = 2L)
   out <- lapply(responses, function(r) {
     call_r <- parent_call
     call_r$resp <- r
@@ -330,10 +327,10 @@ mv_resp_fan_out <- function(object, resp, class = NULL, combine = NULL) {
 #' Drop the posterior draws classes from a matrix
 #'
 #' `posterior::as_draws_matrix()` returns an object that keeps its
-#' class through subsetting and arithmetic, and anything computed from
-#' it inherits the class. A prediction whose class depends on
-#' whether the model had random effects is a surprise on its own, and
-#' S4 slots that accept a plain matrix reject it outright. Values,
+#' class through subsetting and arithmetic. Anything computed from it
+#' inherits the class. A prediction's class would then depend on
+#' whether the model had random effects. S4 slots that accept a plain
+#' matrix reject it outright. Values,
 #' dimensions and dimnames are untouched.
 #'
 #' @param x A matrix, possibly of class `draws_matrix`

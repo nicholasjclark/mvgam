@@ -308,6 +308,21 @@ test_that("identified factor parameters are recognised in one place", {
   expect_false(has_identified_factor_states("mu_lv_trend_tilde"))
 })
 
+test_that("loadings take series names and length scales feature names", {
+  local_mocked_bindings(fitted_series_levels = function(x) c("ant", "bee"))
+  stub <- structure(list(standata = list(
+    row_features = matrix(0, 2, 2, dimnames = list(NULL, c("size", "hair")))
+  )), class = "mvgam")
+  raw <- c("Z[1,1]", "Z_tilde[2,1]", "theta_features[2]",
+           "theta_features[1]", "lv_trend[1,1]")
+  expect_identical(
+    mvgam_factor_aliases(stub, raw),
+    c(theta_features_size = "theta_features[1]",
+      theta_features_hair = "theta_features[2]",
+      `Z[ant,1]` = "Z[1,1]", `Z_tilde[bee,1]` = "Z_tilde[2,1]")
+  )
+})
+
 
 test_that("an autoregressive coefficient is told from its hyperparameters", {
   expect_true(all(is_ar_coefficient(c("ar1_trend", "ar2_trend",
@@ -335,7 +350,8 @@ test_that("every family and loadings-prior parameter has a kind", {
   # A name of no kind reached no summary block and printed nowhere
   family <- c("p", "Psi[2]", "quantile", "disc", "sigma_y2", "theta1")
   expect_true(all(mvgam_par_kind(family) == "family"))
-  prior <- c("theta_features[1]", "theta_dist_phylo", "Psi_diag[1]")
+  prior <- c("theta_features[1]", "theta_features_Femur.length",
+             "theta_dist_phylo", "Psi_diag[1]")
   expect_true(all(mvgam_par_kind(prior) == "loadings_prior"))
   working <- c("varrho_inv[1]", "Z_cols[1,1]", "L_Phi_loadings[1,1]")
   expect_true(all(mvgam_par_kind(working) == "internal"))

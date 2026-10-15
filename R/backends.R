@@ -623,6 +623,12 @@ fit_model <- function(model, backend, ...) {
     if (threading_on) {
       args$threads <- threads$threads
     }
+    # `$laplace()` finds the mode with `$optimize()`, which receives
+    # the output settings through `opt_args` alone.
+    args$opt_args <- utils::modifyList(
+      args[c("show_messages", "show_exceptions")],
+      as.list(args$opt_args)
+    )
     out <- brms::do_call(model$laplace, args)
   } else {
     stop(insight::format_error(
@@ -1262,6 +1268,29 @@ repair_stanfit <- function(x) {
   x
 }
 
+#' The sampler arguments each chain recorded
+#'
+#' `brms::read_csv_as_stanfit()` records an argument the method never
+#' takes as a zero-length value. A variational fit holds
+#' `iter = integer(0)`, for one. Those entries are dropped here.
+#'
+#' @param fit A `stanfit`, or any other fit object
+#' @return List with one named list of recorded arguments per chain,
+#'   or `NULL` when the fit has no `stan_args` slot or the slot is
+#'   empty
+#' @noRd
+recorded_stan_args <- function(fit) {
+  if (!isS4(fit) || !"stan_args" %in% methods::slotNames(fit)) {
+    return(NULL)
+  }
+  args <- methods::slot(fit, "stan_args")
+  if (length(args) == 0L) {
+    return(NULL)
+  }
+  lapply(args, function(chain) chain[lengths(chain) > 0L])
+}
+
+
 
 #' How many chains does a fitted Stan model hold?
 #'
@@ -1281,11 +1310,9 @@ repair_stanfit <- function(x) {
 #'   route yields one
 #' @noRd
 realised_chain_count <- function(fit) {
-  if (isS4(fit) && "stan_args" %in% methods::slotNames(fit)) {
-    n <- length(methods::slot(fit, "stan_args"))
-    if (n > 0L) {
-      return(as.integer(n))
-    }
+  n <- length(recorded_stan_args(fit))
+  if (n > 0L) {
+    return(n)
   }
   if (is.stanfit(fit) || inherits(fit, "draws")) {
     return(as.integer(posterior::nchains(posterior::as_draws(fit))))

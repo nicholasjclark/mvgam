@@ -189,8 +189,8 @@ test_that("character vector of series subsets the panels", {
   )
 })
 
-test_that("y-axis label names the series when single-series", {
+test_that("y-axis label names one series picked from several", {
   fc <- .make_fc(series = c("a", "b"))
-  p <- plot(fc, series = "b")
-  expect_match(p$labels$y, "Predictions for b")
+  expect_identical(plot(fc, series = "b")$labels$y, "Predictions for b")
+  expect_identical(plot(.make_fc(series = "a"))$labels$y, "Predictions")
 })

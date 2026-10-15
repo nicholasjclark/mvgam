@@ -66,6 +66,11 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * `score(score = "variogram")` follows Scheuerer and Hamill (2015) through `scoringRules::vs_sample()`
 * Every `mvgam_forecast` method takes the forecasts of a multivariate model
 * `methods_md()` writes offsets into the linear predictor
+* `methods_md()` describes variational fits. Its reproduction call keeps `threads`
+* Variational, Laplace and Pathfinder fits name their algorithm in `summary()` and `glance()`
+* `summary()` reports per-factor slopes from `x:lv_axis()` in the basis of the identified loadings. `ordinate()` adds them to the site scores
+* `plot(type = "series")` stacks one plot per response on a multivariate fit
+* `algorithm = "laplace"` honours `silent = 2`
 * Fixes to forecast scores with one test observation, offsets with `gp()` terms, piecewise trend predictions, by-factor Gaussian Process predictions, the `max_treedepth` check in `summary()` and plots of residuals with missing values (thanks to @StefanoMezzini)
 
 # mvgam 1.1.51

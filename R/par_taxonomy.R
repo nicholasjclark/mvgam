@@ -447,4 +447,4 @@ MVGAM_PAR_FAMILY_PATTERN <- paste0(
 # classified before the side is consulted.
 #'@noRd
 MVGAM_PAR_LOADINGS_PRIOR_PATTERN <-
-  "^theta_features\\[|^theta_dist_|^Psi_diag\\["
+  "^theta_features(\\[|_)|^theta_dist_|^Psi_diag\\["

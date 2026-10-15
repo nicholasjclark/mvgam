@@ -242,10 +242,10 @@ active_factors.mvgam <- function(object,
 plot.mvgam_active_factors <- function(x, ...) {
   checkmate::assert_class(x, "mvgam_active_factors")
   rlang::check_dots_empty()
-  # Single-category fill: pick the strong tone (`[5L]`) from the
-  # active bayesplot scheme via mvgam_palette() to match the
-  # convention in plot_mvgam_series() / pp_check.mvgam().
-  fill_col <- mvgam_palette()[5L]
+  # One fill from the 'red' scheme, as every mvgam figure takes. The
+  # caller's scheme is restored when this function returns.
+  set_color_scheme_local("red")
+  fill_col <- mvgam_colour("dark")
   cutoff <- 1 - x$threshold$prob_threshold
   subtitle <- sprintf(
     "Posterior median active count: %.1f  (95%% CI %.1f, %.1f)",

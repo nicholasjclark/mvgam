@@ -1205,7 +1205,8 @@ factor_state_param_pattern <- function(pars) {
 #'   of the factor paths.
 #' - With the QR rotation, the unrotated loadings `Z[i, j]` and factor
 #'   paths `lv_trend[t, k]` vary by rotation and sign between draws.
-#'   `Z_tilde` and `lv_trend_tilde` are their reported forms.
+#'   `Z_tilde` and `lv_trend_tilde` are their reported forms. So does
+#'   `b_trend` where each factor takes its own slope.
 #' - `Phi_trend_tilde` replaces the unrotated `Phi_trend` of a VAR
 #'   factor model.
 #' - A partial `trend_map` samples `Z_free_vec`. `Z` repeats each of
@@ -1241,8 +1242,10 @@ hidden_par_pattern <- function(pars) {
       "^Sigma_trend\\["
     )
   }
+  # The alias map names a rotated `b_trend_tilde` by its terms, which
+  # leaves the unrotated `b_trend` under its Stan name
   if (has_identified_loadings(pars)) {
-    patterns <- c(patterns, "^Z\\[", "^lv_trend\\[")
+    patterns <- c(patterns, "^Z\\[", "^lv_trend\\[", "^b_trend\\[")
   }
   if (partial_map) {
     patterns <- c(patterns, "^Z_free_vec\\[")

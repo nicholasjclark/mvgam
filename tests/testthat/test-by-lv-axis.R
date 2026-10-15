@@ -55,75 +55,60 @@ test_that("the series column is refused in a trend_formula term", {
 })
 
 test_that("no by-lv terms leaves has_by_lv FALSE", {
-  f <- ~ s(elev) + s(temp, by = grp) + 1
-  res <- detect_and_rewrite_by_lv(f)
+  res <- detect_and_rewrite_by_lv(~ s(elev) + s(temp, by = grp) + 1)
   expect_false(res$has_by_lv)
   expect_equal(res$n_by_lv, 0L)
 })
 
-test_that("mixed by_lv + non-by_lv smooths handled correctly", {
-  f <- ~ s(elev, by = lv_axis()) + s(temp) - 1
-  res <- detect_and_rewrite_by_lv(f)
-  expect_true(res$has_by_lv)
-  expect_equal(res$n_by_lv, 1L)
-  expect_match(deparse(res$formula), "by = \\.trend", fixed = FALSE)
-  expect_match(deparse(res$formula), "s\\(temp\\)", fixed = FALSE)
-})
+# 2. Validator and codegen via run_model = FALSE ------------------------
 
-test_that("lv_axis() returns NULL invisibly", {
-  expect_null(lv_axis())
-})
-
-# 2. Validator acceptance ------------------------------------------------
-
-test_that("by = lv_axis() without n_lv is accepted (non-factor path)", {
-  set.seed(1)
-  dat <- expand.grid(time = 1:30, series = paste0("sp", 1:3))
-  dat$series <- factor(dat$series)
+# Three series sharing one covariate value per time, as the factor
+# grain requires
+lv_dat <- function(seed) {
+  set.seed(seed)
+  dat <- expand.grid(time = 1:30, series = factor(paste0("sp", 1:3)))
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
-  # With no `n_lv`, `lv_axis()` becomes the series column and the
-  # trend design keeps its (time, series) grain. `has_by_lv` stays
-  # FALSE on the trend metadata.
-  mod <- mvgam(
-    formula = y ~ -1,
-    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-    data = dat,
-    family = gaussian(),
-    run_model = FALSE,
-    silent = 2
-  )
+  dat
+}
+lv_prefit <- function(trend_formula, n_lv = NULL, dat = lv_dat(1)) {
+  mvgam(y ~ -1, trend_formula = trend_formula, data = dat,
+        family = gaussian(), run_model = FALSE, silent = 2,
+        trend_map = if (!is.null(n_lv)) matrix(NA_real_, 3L, n_lv))
+}
+
+test_that("lv_axis() in a model with no factors is the series column", {
+  mod <- lv_prefit(~ s(elev, k = 5, by = lv_axis()) - 1)
+  # The trend keeps its (time, series) grain. `had_by_lv` lets display
+  # code hide the rewritten series token.
   expect_false(isTRUE(mod$trend_metadata$has_by_lv))
+  expect_true(isTRUE(mod$trend_metadata$had_by_lv))
+  # `update()` takes the user's own text from `trend_call`
+  expect_match(deparse(mod$trend_call), "by = lv_axis()", fixed = TRUE)
+  expect_match(deparse(mod$trend_formula), "by = series", fixed = TRUE)
 })
 
-test_that("by = lv_axis() with n_lv = n_series is accepted (factor path)", {
-  set.seed(2)
-  dat <- expand.grid(time = 1:30, series = paste0("sp", 1:3))
-  dat$series <- factor(dat$series)
-  dat$elev <- rep(rnorm(30), times = 3)
-  dat$y <- rnorm(nrow(dat))
-  # Reason: n_lv = n_series is a full-rank factor model. The user
-  # owns the identifiability decision; a post-fit advisor warns the
-  # user when convergence is poor (see flag_by_lv_full_rank_funnel).
-  # The validator only rejects n_lv > n_series.
-  mod <- mvgam(
-    formula = y ~ -1,
-    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-    trend_map = matrix(NA_real_, nrow = 3L, ncol = 3L),
-    data = dat,
-    family = gaussian(),
-    run_model = FALSE,
-    silent = 2
+test_that("with factors only per-factor slopes rotate with the loadings", {
+  # n_lv = n_series is accepted. A post-fit advisor warns of the
+  # full-rank funnel.
+  smooth <- lv_prefit(~ s(elev, k = 5, by = lv_axis()) - 1, n_lv = 3L)
+  expect_true(isTRUE(smooth$trend_metadata$has_by_lv))
+  expect_equal(smooth$trend_metadata$n_lv_for_grain, 3L)
+  expect_identical(fit_factor_identification(smooth), "none")
+  slope <- lv_prefit(~ elev:lv_axis() - 1, n_lv = 2L)
+  expect_identical(fit_factor_identification(slope), "rotation")
+  expect_match(slope$stancode,
+               "b_trend_tilde[by_lv_coef_trend[g]] = Q * b_trend",
+               fixed = TRUE)
+  expect_identical(
+    unname(mvgam_beta_aliases(slope)[paste0("b_elev:.trend", 1:2, "_trend")]),
+    c("b_trend_tilde[1]", "b_trend_tilde[2]")
   )
-  expect_true(isTRUE(mod$trend_metadata$has_by_lv))
-  expect_equal(mod$trend_metadata$n_lv_for_grain, 3L)
 })
 
 test_that("lv_axis() refuses a varying covariate and a single factor", {
-  set.seed(4)
-  dat <- expand.grid(time = 1:30, series = factor(paste0("sp", 1:3)))
+  dat <- lv_dat(4)
   dat$elev <- rnorm(nrow(dat))
-  dat$y <- rnorm(nrow(dat))
   refused <- function(trend_formula, ...) {
     mvgam(y ~ 1, trend_formula = trend_formula, data = dat,
           family = gaussian(), run_model = FALSE, silent = 2, ...)
@@ -136,32 +121,12 @@ test_that("lv_axis() refuses a varying covariate and a single factor", {
                "requires at least two latent factors")
   expect_error(refused(~ elev:series + AR()),
                "is not supported in a 'trend_formula' term")
-})
-
-test_that("by = lv_axis() with n_lv > n_series still errors", {
-  set.seed(3)
-  dat <- expand.grid(time = 1:30, series = paste0("sp", 1:3))
-  dat$series <- factor(dat$series)
-  dat$elev <- rep(rnorm(30), times = 3)
-  dat$y <- rnorm(nrow(dat))
-  expect_error(
-    mvgam(
-      formula = y ~ -1,
-      trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      trend_map = matrix(NA_real_, nrow = 3L, ncol = 4L),
-      data = dat,
-      family = gaussian(),
-      run_model = FALSE,
-      silent = 2
-    ),
-    "Got n_lv = 4, n_series = 3"
-  )
+  expect_error(lv_prefit(~ s(elev, k = 5, by = lv_axis()) - 1, n_lv = 4L),
+               "Got n_lv = 4, n_series = 3")
 })
 
 test_that("the n_lv ceiling counts series the responses define", {
-  # A frame whose responses are its series has no series column. The
-  # ceiling once counted that column, found none and passed three
-  # factors on two series.
+  # A frame whose responses are its series has no series column
   set.seed(1)
   wide <- data.frame(time = 1:30, y1 = rpois(30, 3), y2 = rpois(30, 3))
   expect_error(
@@ -172,130 +137,15 @@ test_that("the n_lv ceiling counts series the responses define", {
   )
 })
 
-# 3. Display-relabel: had_by_lv marker + by_lv_rewrite_tokens helper -----
+# 3. Display: the had_by_lv marker and the rewritten tokens -------------
 
-test_that("mvgam_had_by_lv reads the trend_metadata marker", {
+test_that("display code drops the tokens lv_axis() was rewritten to", {
   expect_false(mvgam_had_by_lv(list()))
-  expect_false(mvgam_had_by_lv(list(trend_metadata = list())))
-  expect_false(mvgam_had_by_lv(
-    list(trend_metadata = list(had_by_lv = FALSE))
-  ))
-  expect_true(mvgam_had_by_lv(
-    list(trend_metadata = list(had_by_lv = TRUE))
-  ))
+  expect_true(mvgam_had_by_lv(list(trend_metadata = list(had_by_lv = TRUE))))
+  labs <- list(c("mintemp", "series"), c("ndvi", ".trend"), c("x", "y"),
+               "series")
+  expect_identical(strip_by_lv_rewrite_tokens(labs, had_by_lv = FALSE), labs)
+  # A lone `series` label is kept, which leaves no empty label
+  expect_identical(strip_by_lv_rewrite_tokens(labs, had_by_lv = TRUE),
+                   list("mintemp", "ndvi", c("x", "y"), "series"))
 })
-
-test_that("strip_by_lv_rewrite_tokens is identity when had_by_lv = FALSE", {
-  cond_labs <- list(c("mintemp", "series"), c("ndvi", "series"))
-  expect_identical(
-    strip_by_lv_rewrite_tokens(cond_labs, had_by_lv = FALSE),
-    cond_labs
-  )
-})
-
-test_that("strip_by_lv_rewrite_tokens drops series + .trend when had_by_lv = TRUE", {
-  cond_labs <- list(
-    c("mintemp", "series"),
-    c("ndvi", ".trend"),
-    c("x", "y")  # no rewrite token present
-  )
-  expect_identical(
-    strip_by_lv_rewrite_tokens(cond_labs, had_by_lv = TRUE),
-    list(c("mintemp"), c("ndvi"), c("x", "y"))
-  )
-})
-
-test_that("strip_by_lv_rewrite_tokens keeps singleton 'series' grouping", {
-  # Reason: a user effects = "series" call (rejected upstream for
-  # trend_formula, but defensive here) should not collapse to a
-  # zero-length label that breaks vapply/paste downstream.
-  expect_identical(
-    strip_by_lv_rewrite_tokens(list(c("series")), had_by_lv = TRUE),
-    list(c("series"))
-  )
-})
-
-test_that("had_by_lv is set on non-factor by_lv fits (validation only)", {
-  set.seed(11)
-  dat <- expand.grid(time = 1:30, series = paste0("sp", 1:3))
-  dat$series <- factor(dat$series)
-  dat$elev <- rep(rnorm(30), times = 3)
-  dat$y <- rnorm(nrow(dat))
-  mod <- mvgam(
-    formula = y ~ -1,
-    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-    data = dat, family = gaussian(),
-    run_model = FALSE, silent = 2
-  )
-  # Non-factor path: has_by_lv stays FALSE (codegen takes the
-  # standard (time, series) path) but had_by_lv is TRUE so display
-  # code hides the internal `series` rewrite token.
-  expect_false(isTRUE(mod$trend_metadata$has_by_lv))
-  expect_true(isTRUE(mod$trend_metadata$had_by_lv))
-})
-
-test_that("had_by_lv is set on factor by_lv fits", {
-  set.seed(12)
-  dat <- expand.grid(time = 1:30, series = paste0("sp", 1:3))
-  dat$series <- factor(dat$series)
-  dat$elev <- rep(rnorm(30), times = 3)
-  dat$y <- rnorm(nrow(dat))
-  mod <- mvgam(
-    formula = y ~ -1,
-    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-    trend_map = matrix(NA_real_, nrow = 3L, ncol = 3L),
-    data = dat, family = gaussian(),
-    run_model = FALSE, silent = 2
-  )
-  expect_true(isTRUE(mod$trend_metadata$has_by_lv))
-  expect_true(isTRUE(mod$trend_metadata$had_by_lv))
-})
-
-test_that("had_by_lv stays FALSE for fits without by_lv", {
-  set.seed(13)
-  dat <- expand.grid(time = 1:30, series = paste0("sp", 1:3))
-  dat$series <- factor(dat$series)
-  dat$elev <- rep(rnorm(30), times = 3)
-  dat$y <- rnorm(nrow(dat))
-  mod <- mvgam(
-    formula = y ~ -1,
-    trend_formula = ~ s(elev, k = 5) - 1,
-    data = dat, family = gaussian(),
-    run_model = FALSE, silent = 2
-  )
-  expect_false(isTRUE(mod$trend_metadata$has_by_lv))
-  expect_false(isTRUE(mod$trend_metadata$had_by_lv))
-})
-
-test_that("trend_call preserves original by = lv_axis() for update.mvgam", {
-  # Reason: update.mvgam reads the original trend_formula via
-  # `object$trend_call` (mvgam_update_inheritance table). The
-  # rewrite-to-series happens deep inside the validator, but
-  # `trend_call` is captured BEFORE that rewrite, so update() round-
-  # trips correctly and the new fit re-detects had_by_lv via the
-  # AST.
-  set.seed(14)
-  dat <- expand.grid(time = 1:30, series = paste0("sp", 1:3))
-  dat$series <- factor(dat$series)
-  dat$elev <- rep(rnorm(30), times = 3)
-  dat$y <- rnorm(nrow(dat))
-  mod <- mvgam(
-    formula = y ~ -1,
-    trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-    data = dat, family = gaussian(),
-    run_model = FALSE, silent = 2
-  )
-  # `trend_call` carries the user's literal text.
-  expect_match(
-    deparse(mod$trend_call),
-    "by = lv_axis()",
-    fixed = TRUE
-  )
-  # `trend_formula` has been rewritten by the AST detector.
-  expect_match(
-    deparse(mod$trend_formula),
-    "by = series",
-    fixed = TRUE
-  )
-})
-

@@ -134,8 +134,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # posterior. Rotation- and sign-indeterminate factor parameters give
   # way to their QR-identified forms (Heaps & Jermyn 2024). Broadcast
   # shared-coefficient copies give way to the sampled scalar. The
-  # convergence advisor and loadings table then use the reported
-  # names.
+  # loadings table then uses the reported names.
   identified <- filter_hidden_pars(pars)
   if (length(identified) < length(pars)) {
     all_summaries <- all_summaries[identified, , drop = FALSE]
@@ -702,12 +701,16 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     print_param_section(x$loadings, "Factor Loadings", digits)
     print_param_section(x$loadings_prior, "Loadings Prior", digits)
   }
-  cat("Draws were sampled using sampling(NUTS). For each parameter, ",
-      "Bulk_ESS\n", sep = "")
-  cat("and Tail_ESS are effective sample size measures, ",
-      "and Rhat is the potential\n", sep = "")
-  cat("scale reduction factor on split chains (at convergence, ",
-      "Rhat = 1).\n", sep = "")
+  cat("Draws were sampled using ", x$sampler, ". ", sep = "")
+  # Rhat and ESS diagnose Markov chains alone, as in brms.
+  if (identical(x$sampler, sampler_label("sampling"))) {
+    cat("For each parameter, Bulk_ESS\n",
+        "and Tail_ESS are effective sample size measures, ",
+        "and Rhat is the potential\n",
+        "scale reduction factor on split chains (at convergence, ",
+        "Rhat = 1).", sep = "")
+  }
+  cat("\n")
 
   steps <- build_next_steps(x)
   cat("\nNext steps:\n")
@@ -722,22 +725,47 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
 #'
 #' The sampler's own arguments record what was asked for.
 #' `posterior::niterations()` counts the draws kept after warmup. It
-#' gives `iter` only when the fit recorded no sampler arguments.
+#' gives `iter` only when the fit recorded no sampler arguments. Only
+#' NUTS has a warmup. Every other algorithm reports zero warmup.
 #'
 #' @param object A fitted `mvgam` object
-#' @return List with `nchains`, `niter`, `nwarmup` (`NULL` when
-#'   unrecorded), `nthin` and `ndraws`
+#' @return List with `sampler` (the label `sampler_label()` gives),
+#'   `nchains`, `niter`, `nwarmup` (`NULL` when unrecorded), `nthin`
+#'   and `ndraws`
 #' @noRd
 draw_counts <- function(object) {
   checkmate::assert_class(object, "mvgam")
   draws <- posterior::as_draws(object$fit)
   sampler <- mvgam_sampler_inheritance(object)
+  algorithm <- object$algorithm %||% "sampling"
   list(
+    sampler = sampler_label(algorithm),
     nchains = sampler$chains %||% posterior::nchains(draws),
     niter = sampler$iter %||% posterior::niterations(draws),
-    nwarmup = sampler$warmup,
+    nwarmup = if (identical(algorithm, "sampling")) sampler$warmup else 0L,
     nthin = sampler$thin %||% 1L,
     ndraws = posterior::ndraws(draws)
+  )
+}
+
+
+#' The algorithm label `summary()` prints
+#'
+#' brms's `method(algorithm)` form. Each backend records the Stan
+#' method under its own name. The label comes from the algorithm the
+#' fit was run with.
+#'
+#' @param algorithm One of `algorithm_choices()`
+#' @return A single string, such as `"variational(meanfield)"`
+#' @noRd
+sampler_label <- function(algorithm) {
+  checkmate::assert_choice(algorithm, algorithm_choices())
+  switch(
+    algorithm,
+    sampling = "sampling(NUTS)",
+    meanfield = ,
+    fullrank = paste0("variational(", algorithm, ")"),
+    algorithm
   )
 }
 

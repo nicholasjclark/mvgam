@@ -57,7 +57,10 @@ factor. The coefficient of one factor has no scale of its own: the
 loadings and the factor effects trade scale, and their product is
 what the data identify. \code{\link[=conditional_effects]{conditional_effects()}} and \code{\link[=predict]{predict()}}
 report that product, the effect of the covariate on each series,
-and \code{\link[=conditional_effects]{conditional_effects()}} draws a panel per series.
+and \code{\link[=conditional_effects]{conditional_effects()}} draws a panel per series. When every
+\code{lv_axis()} term is a slope or a level, \code{\link[cmdstanr:fit-method-summary]{cmdstanr::summary()}} reports the
+per-factor coefficients in the basis of the identified loadings
+\code{Z_tilde}.
 }
 
 \examples{

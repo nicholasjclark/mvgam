@@ -102,8 +102,28 @@ test_that("identification follows the dynamics of the factors", {
   expect_identical(
     factor_identification(spec("AR", fixed_Z = partial, cor = TRUE)), "none"
   )
-  expect_identical(factor_identification(spec("AR"), has_by_lv = TRUE),
-                   "none")
+  # Per-factor slopes rotate with the factors. Smooths have no slope
+  # groups. AR factors keep their own dynamics.
+  slopes <- matrix(1:4, 2, 2)
+  expect_identical(factor_identification(spec("ZMVN"), TRUE, slopes),
+                   "rotation")
+  expect_identical(factor_identification(spec("ZMVN"), TRUE), "none")
+  expect_identical(factor_identification(spec("AR"), TRUE, slopes), "none")
+})
+
+test_that("slope groups pair each covariate's coefficients by factor", {
+  X <- function(cols) list(X = matrix(0, 1, length(cols),
+                                      dimnames = list(NULL, cols)))
+  expect_identical(
+    by_lv_coef_groups(X(c("x:.trend2", "x:.trend1", ".trend1:z",
+                          ".trend2:z")), n_lv = 2L),
+    matrix(c(3L, 2L, 4L, 1L), 2, 2)
+  )
+  # A slope shared by every factor, a missing factor and a smooth each
+  # leave a coefficient the rotation cannot carry
+  expect_null(by_lv_coef_groups(X(c("z", "x:.trend1", "x:.trend2")), 2L))
+  expect_null(by_lv_coef_groups(X("x:.trend1"), 2L))
+  expect_null(by_lv_coef_groups(c(X("x:.trend1"), Ks = 1L), 1L))
 })
 
 test_that("every per-factor parameter of an AR factor model is relabelled", {

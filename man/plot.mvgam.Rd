@@ -39,13 +39,12 @@ returned ggplot carries a \code{"contribution"} attribute
 across factors. Access via
 \code{attr(plot(fit, type = "factors"), "contribution")} if
 you want the numeric summary without the figure.
-Per-draw factor paths themselves live on \code{object$fit} as
-\code{lv_trend[t, k]}; pull them with
-\code{\link[posterior:draws_array]{posterior::as_draws_array()}} when you need the raw
-draws (e.g. for custom summaries).}
-\item{\code{"series"}}{Input-data exploratory plot (works
-without a fit, wraps the observation data carried on
-the object).}
+The fit stores the per-draw factor paths as
+\code{lv_trend[t, k]}. \code{\link[posterior:draws_array]{posterior::as_draws_array()}} extracts
+them for custom summaries.}
+\item{\code{"series"}}{Exploratory plot of the observed data the
+fit carries. A long-frame multivariate fit stacks one plot
+per response. Use \code{\link[=mvgam_data]{mvgam_data()}} to plot data before a fit.}
 \item{\code{"latent_state"}}{Per-(series, time) ribbon of the
 marginal latent state for closure-unit families: latent
 abundance \code{N} for \code{nmix()} (and its variants) or
@@ -55,9 +54,8 @@ posterior at each (species, time) cell. Errors clearly
 for non-closure-unit fits.}
 }
 
-For posterior forecasts, parametric effects, random
-effects, and arbitrary conditional surfaces use the
-dedicated surfaces directly:
+Forecasts, effects and custom conditional plots have dedicated
+functions:
 \itemize{
 \item Forecasts: \code{forecast(x, newdata = ...) |> plot()}.
 \item Parametric / random effects: \code{\link[=conditional_effects]{conditional_effects()}}
@@ -67,8 +65,8 @@ dedicated surfaces directly:
 }}
 
 \item{series}{Optional series subset, as an integer index or a
-series name. \code{"trend"} and \code{"series"} also take \code{"all"}, and
-draw every series by default. \code{"residuals"} draws one series,
+series name. \code{"trend"} and \code{"series"} also take \code{"all"}, which
+they use by default. \code{"residuals"} draws one series,
 the first by default. Ignored by branches that summarise across
 series (\code{"smooths"}, \code{"factors"}).}
 

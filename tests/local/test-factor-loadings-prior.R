@@ -277,9 +277,10 @@ test_that("cluster: the fit describes itself to a caller", {
 test_that("cluster: summary reports the prior's own block", {
   s <- summary(cluster_fit())
   block <- rownames(s$loadings_prior)
-  expect_true(all(c("theta_features[1]", "theta_features[2]",
-                    "theta_features[3]", "theta_dist_cluster") %in%
+  # Each feature length scale takes its encoded column's name
+  expect_true(all(c("theta_features_trait", "theta_dist_cluster") %in%
                     block))
+  expect_equal(sum(startsWith(block, "theta_features_")), 3L)
   # `varrho_inv` is a cumulative-product parameter for `Psi_diag` and
   # means nothing on its own, so it is deliberately hidden.
   expect_false(any(grepl("^varrho_inv", block)))

@@ -570,7 +570,8 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 #' @return A tibble with one row, or on a multivariate fit given no
 #'   `resp` one row per response with a `resp` column. Columns:
 #'
-#'   * `algorithm` -- the Stan algorithm used.
+#'   * `algorithm` -- the algorithm the fit ran, such as `"sampling"`
+#'     or `"meanfield"`.
 #'   * `pss` -- post-warmup sample size summed across chains.
 #'   * `nobs` -- number of (non-missing) training observations.
 #'   * `nseries` -- number of unique series in the training data.
@@ -639,7 +640,7 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
 
   d <- x$data
   out <- tibble::tibble(
-    algorithm = glance_algorithm(x),
+    algorithm = x$algorithm,
     pss = posterior::ndraws(posterior::as_draws(x$fit)),
     nobs = sum(!is.na(d[[response_column(x, resp)]])),
     nseries = length(fitted_series_levels(x)),
@@ -659,21 +660,5 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
 }
 
 
-#' The Stan algorithm a fit ran
-#'
-#' @param x Fitted `mvgam` object
-#' @return Character scalar such as `"sampling"`, or `NA` when the fit
-#'   holds no `stanfit`
-#' @noRd
-glance_algorithm <- function(x) {
-  checkmate::assert_class(x, "mvgam")
-  fit <- x$fit
-  if (inherits(fit, "stanfit") &&
-        length(fit@stan_args) > 0L) {
-    algo <- fit@stan_args[[1L]][["method"]]
-    return(if (is.null(algo)) NA_character_ else algo)
-  }
-  NA_character_
-}
 
 

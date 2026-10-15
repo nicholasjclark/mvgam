@@ -309,6 +309,50 @@ test_that("extract_implementation_info() prefers the stored init request", {
                    NA_character_)
 })
 
+test_that("a variational fit reports its algorithm alone", {
+  # brms records arguments a method never takes as zero-length values
+  stub <- structure(
+    list(
+      fit = methods::new("stanfit", stan_args = list(list(
+        method = "variational", algorithm = "meanfield",
+        iter = integer(0), warmup = NULL,
+        control = list(adapt_delta = NULL, max_treedepth = NULL)
+      ))),
+      backend = "cmdstanr",
+      algorithm = "meanfield"
+    ),
+    class = "mvgam"
+  )
+  expect_identical(mvgam:::mvgam_sampler_inheritance(stub),
+                   list(chains = 1L))
+  expect_null(mvgam:::extract_sampling_info(stub))
+  expect_match(
+    mvgam:::implementation_prose("mvgam",
+                                 mvgam:::extract_implementation_info(stub)),
+    "Posterior drawn via Stan's mean-field ADVI.", fixed = TRUE
+  )
+  expect_identical(mvgam:::sampler_label("meanfield"),
+                   "variational(meanfield)")
+})
+
+test_that("the recorded thread count is reported where the program threads", {
+  # cmdstanr records `num_threads` whether or not the program threads
+  stub <- structure(
+    list(
+      fit = methods::new("stanfit", stan_args = list(list(
+        method = "sample", num_threads = "4", iter = 2000, warmup = 1000
+      ))),
+      backend = "cmdstanr",
+      algorithm = "sampling",
+      stancode = "target += reduce_sum(partial_lpmf, seq, 1);"
+    ),
+    class = "mvgam"
+  )
+  expect_identical(mvgam:::extract_sampling_info(stub)$threads, 4L)
+  stub$stancode <- "target += poisson_log_lpmf(Y | mu);"
+  expect_identical(mvgam:::extract_sampling_info(stub)$threads, NA_integer_)
+})
+
 
 # ---------------------------------------------------------------
 # assert_stan_version()

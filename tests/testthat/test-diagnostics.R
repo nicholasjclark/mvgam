@@ -639,7 +639,8 @@ test_that(
     "L_Omega_trend[1,1]", "L_Omega_trend[2,1]", "Sigma_trend[1,1]",
     "Z[1,1]", "Z[2,1]", "Z_tilde[1,1]", "Z_tilde[2,1]",
     "lv_trend[1,1]", "lv_trend_tilde[1,1]",
-    "innovations_trend[1,1]", "scaled_innovations_trend[1,1]"
+    "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
+    "b_trend[1]", "b_x:.trend1_trend"
   )
   pat <- mvgam:::hidden_par_pattern(pars_free)
   hidden <- pars_free[grepl(pat, pars_free)]
@@ -651,13 +652,14 @@ test_that(
       "L_Omega_trend[1,1]", "L_Omega_trend[2,1]", "Sigma_trend[1,1]",
       "Z[1,1]", "Z[2,1]",
       "lv_trend[1,1]", "innovations_trend[1,1]",
-      "scaled_innovations_trend[1,1]")
+      "scaled_innovations_trend[1,1]", "b_trend[1]")
   )
   # Identified counterparts + obs-side params survive.
   expect_identical(
     surviving,
     c("Intercept", "b_x", "shape",
-      "Z_tilde[1,1]", "Z_tilde[2,1]", "lv_trend_tilde[1,1]")
+      "Z_tilde[1,1]", "Z_tilde[2,1]", "lv_trend_tilde[1,1]",
+      "b_x:.trend1_trend")
   )
 })
 

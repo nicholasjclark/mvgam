@@ -4,11 +4,11 @@
 
 #' Observed time series exploratory plot
 #'
-#' Single-series: a 4-panel patchwork showing time series, ACF,
-#' empirical CDF, and histogram of the response. Multi-series:
-#' one faceted time series plot. When `newdata` is supplied (or
-#' carried on the fit as `object$test_data`), the test arm is
-#' overlaid in black with a dashed cut at the boundary.
+#' Single-series: a 4-panel patchwork of the time series, its ACF,
+#' its empirical CDF and its histogram. Multi-series: one faceted
+#' time series plot. When `newdata` is supplied (or carried on the
+#' fit as `object$test_data`), the test observations are overlaid in
+#' black with a dashed line at the boundary.
 #'
 #' @param object A fitted `mvgam` object.
 #' @param newdata Optional data frame / list of future
@@ -20,7 +20,8 @@
 #'   `"all"` for multi-series fits and `1` for single-series.
 #' @param resp Optional response of a multivariate fit. Where the
 #'   responses are the series it narrows the plot to that response's
-#'   series; otherwise it names the response every series is drawn for.
+#'   series. Otherwise it names the response every series is drawn for,
+#'   and `NULL` stacks one plot per response.
 #' @param lines Logical. Plot lines (default) or points.
 #' @param n_bins Optional histogram bin count. Defaults to the
 #'   number returned by `hist(..., plot = FALSE)$breaks` (at
@@ -30,7 +31,8 @@
 #'   are common).
 #'
 #' @return A `ggplot` (multi-series) or `patchwork`
-#'   (single-series 4-panel) object.
+#'   (single-series 4-panel) object. A long-frame multivariate fit
+#'   without `resp` gives one `patchwork` stacking each response's plot.
 #'
 #' @noRd
 plot_mvgam_series <- function(
@@ -43,6 +45,13 @@ plot_mvgam_series <- function(
   log_scale = FALSE
 ) {
   checkmate::assert_class(object, "mvgam")
+  # Where the responses are the series, one plot draws them all. On a
+  # long frame each response gets its own plot, stacked in one figure.
+  keyed <- is_response_keyed(object)
+  if (!keyed) {
+    fan <- mv_resp_fan_out(object, resp, combine = stack_response_plots)
+    if (!is.null(fan)) return(fan)
+  }
   resolve_resp(object, resp)
   time_var <- axis_vars(object)$time_var
   series_levels <- fitted_series_levels(object)
@@ -55,13 +64,11 @@ plot_mvgam_series <- function(
   }
 
   # Where the responses are the series, a row is one occasion carrying
-  # every response, so each series is its own response's column and
-  # the frame is stacked one response at a time. Everywhere else a row
-  # names its series the way the fit identified it, and every series
-  # is drawn for the one response in scope. Reading the raw series
-  # column instead put a derived axis in a single panel labelled NA,
-  # and reading one response column drew one response of three.
-  keyed <- is_response_keyed(object)
+  # every response. Each series is then its own response's column. The
+  # frame is stacked one response at a time. Everywhere else a row
+  # names its series the way the fit identified it. Every series is
+  # drawn for the one response in scope. A derived series axis has no
+  # raw column to take the labels from.
   if (keyed && !is.null(resp)) {
     series_levels <- resp
   }
@@ -144,9 +151,9 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
   }
 
   # An ordinal response arrives as an ordered factor, which none of the
-  # four panels can take. Its level index is the representation the rest
-  # of the package already predicts on, so the panels are drawn against
-  # that and the axis says which levels the numbers stand for.
+  # four panels can take. The rest of the package predicts on its level
+  # index. The panels draw that index. The axis label lists the levels
+  # in order.
   ordinal_levels <- NULL
   if (is.factor(dat$y)) {
     if (!is.ordered(dat$y)) {
@@ -175,8 +182,8 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
       x = paste0("Series: '", s_name, "'.")
     )))
   }
-  # The ACF panel takes its values in row order, and a frame may hold
-  # a series out of time order.
+  # The ACF panel takes its values in row order. A frame may hold a
+  # series out of time order.
   dat_s <- dat_s[order(dat_s$time), , drop = FALSE]
   patchwork::wrap_plots(
     series_time_plot(dat_s, ylab, lines, facet = FALSE),
@@ -320,7 +327,7 @@ series_hist_panel <- function(y, ylab, n_bins = NULL) {
   }
   ggplot2::ggplot(data.frame(y = y), ggplot2::aes(x = y)) +
     ggplot2::geom_histogram(
-      bins = n_bins, fill = mvgam_palette()[5L], colour = "white"
+      bins = n_bins, fill = mvgam_colour("dark"), colour = "white"
     ) +
     ggplot2::labs(title = "Histogram", x = ylab, y = "Count") +
     mvgam_theme()
@@ -341,10 +348,10 @@ series_acf_panel <- function(y) {
     ) +
     ggplot2::geom_hline(
       yintercept = 0,
-      colour = mvgam_palette()[5L], linewidth = 0.25
+      colour = mvgam_colour("dark"), linewidth = 0.25
     ) +
     ggplot2::geom_segment(
-      colour = mvgam_palette()[5L], linewidth = 1
+      colour = mvgam_colour("dark"), linewidth = 1
     ) +
     ggplot2::labs(title = "ACF", x = "Lag", y = "Autocorrelation") +
     mvgam_theme()
@@ -359,7 +366,7 @@ series_ecdf_panel <- function(y, ylab) {
   df$y <- stats::ecdf(y_clean)(df$x)
   ggplot2::ggplot(df, ggplot2::aes(x = x, y = y)) +
     ggplot2::geom_line(
-      colour = mvgam_palette()[5L], linewidth = 0.75
+      colour = mvgam_colour("dark"), linewidth = 0.75
     ) +
     ggplot2::scale_y_continuous(limits = c(0, 1)) +
     ggplot2::labs(title = "CDF", x = ylab, y = "Empirical CDF") +

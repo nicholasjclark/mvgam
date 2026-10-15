@@ -445,6 +445,10 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
     # With `by = lv_axis()` the trend predictor joins each factor
     has_by_lv = isTRUE(dimensions$has_by_lv)
   )
+  if (data_info$has_by_lv) {
+    data_info$by_lv_groups <- by_lv_coef_groups(trend_setup$standata,
+                                                trend_specs$n_lv)
+  }
   hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
   data_info$n_groups <- hierarchical_info$n_groups
   data_info$n_subgroups <- hierarchical_info$n_subgroups
@@ -1686,7 +1690,8 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv,
 #' @return The stanvars, reordered, with the same class
 #' @details
 #' The order, each level depending on the ones above it:
-#' - the trend's dimensions (`N_trend`, `N_series_trend`, ...)
+#' - the sizes, each a positive integer scalar (`N_trend`,
+#'   `N_series_trend`, ...)
 #' - whatever the trend's linear predictor is built from, which the
 #'   names that predictor references identify
 #' - the linear predictor `mu_trend` itself
@@ -1737,10 +1742,9 @@ sort_stanvars <- function(stanvars) {
       any(extract_computed_variables(code_only(scode)) %in% mu_references)
   }, logical(1L), USE.NAMES = FALSE)
 
-  is_dimension <- grepl(paste0(
-    "^\\s*int<lower=1>\\s+(N_series_trend|N_lv_trend|N_time_trend|",
-    "N_trend)\\s*;"
-  ), scodes)
+  # Code opening on a positive integer scalar declares a size other
+  # declarations may use
+  is_dimension <- grepl("^\\s*int<lower=1>\\s+\\w+\\s*;", scodes)
   is_dimension_array <- grepl(
     "^\\s*array\\[.*\\b(N_series_trend|N_lv_trend)\\b.*\\]", scodes
   )
@@ -1994,6 +1998,8 @@ z_is_identity <- function(is_factor_model, fixed_Z = NULL) {
 #' draw. `qr_thin_R()` returns a non-negative diagonal, which fixes the
 #' sign of each factor. A VAR factor model also rotates its
 #' coefficients, as `Phi_trend_tilde[lag] = Q * Phi_trend[lag] * Q'`.
+#' The per-factor slopes of `x:lv_axis()` terms, grouped in
+#' `data_info$by_lv_groups`, rotate to `b_trend_tilde` as `Q b`.
 #' Factors with their own coefficients are relabelled after sampling by
 #' `relabel_factors()` and take no rotation.
 #'
@@ -2051,8 +2057,10 @@ generate_factor_model <- function(trend_specs, data_info, prior = NULL,
       block = "model"
     )
   }
+  groups <- data_info$by_lv_groups
   rotate <- identical(
-    factor_identification(trend_specs, data_info$has_by_lv), "rotation"
+    factor_identification(trend_specs, data_info$has_by_lv, groups),
+    "rotation"
   )
   if (!rotate) {
     return(z_prior)
@@ -2072,6 +2080,7 @@ generate_factor_model <- function(trend_specs, data_info, prior = NULL,
       paste0("array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] ",
              transitions, "_tilde;")
     },
+    if (!is.null(groups)) "vector[K_trend] b_trend_tilde = b_trend;",
     "{",
     "  matrix[N_lv_trend, N_lv_trend] Q = qr_thin_Q(Z')';",
     paste0("  ", paths, "_tilde = ", paths, " * Q';"),
@@ -2082,10 +2091,32 @@ generate_factor_model <- function(trend_specs, data_info, prior = NULL,
                "[lag] * Q';"),
         "  }")
     },
+    # Each slope of a `x:lv_axis()` term holds one coefficient per
+    # factor, rotated as `Q b`
+    if (!is.null(groups)) {
+      c("  for (g in 1:N_by_lv_coef_trend) {",
+        paste0("    b_trend_tilde[by_lv_coef_trend[g]] = ",
+               "Q * b_trend[by_lv_coef_trend[g]];"),
+        "  }")
+    },
     "}"
   )
   combine_stanvars(
     z_prior,
+    if (!is.null(groups)) {
+      list(
+        brms::stanvar(
+          x = nrow(groups), name = "N_by_lv_coef_trend",
+          scode = "int<lower=1> N_by_lv_coef_trend;", block = "data"
+        ),
+        brms::stanvar(
+          x = groups, name = "by_lv_coef_trend",
+          scode = paste0("array[N_by_lv_coef_trend, N_lv_trend] ",
+                         "int<lower=1> by_lv_coef_trend;"),
+          block = "data"
+        )
+      )
+    },
     brms::stanvar(
       name = "factor_z_identification",
       scode = paste(qr_lines, collapse = "\n"),

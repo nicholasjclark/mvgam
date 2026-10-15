@@ -168,7 +168,11 @@ mvgam_beta_aliases <- function(x) {
     if (identical(blk, "X")) {
       build(X, "b", "b_", "")
     } else if (identical(blk, "X_trend")) {
-      build(X, "b_trend", "b_", "_trend")
+      # A slope that varies by factor is reported in the identified
+      # factor basis
+      rotated <- isTRUE(x$trend_metadata$has_by_lv) &&
+        identical(fit_factor_identification(x), "rotation")
+      build(X, if (rotated) "b_trend_tilde" else "b_trend", "b_", "_trend")
     } else {
       suffix <- sub("^X_", "", blk)
       build(
@@ -387,6 +391,40 @@ stan_index <- function(v) {
 }
 
 
+#' Names for the factor parameters a Stan index alone labels
+#'
+#' Each row of the loadings `Z[i, k]` and `Z_tilde[i, k]` is a series,
+#' and takes the series' name, as brms names `r_<group>[level,term]`.
+#' `theta_features[k]` is the length scale of the `k`th column of the
+#' encoded features matrix. It takes that column's name, as each
+#' distance length scale is named `theta_dist_<name>`.
+#'
+#' @param x Fitted `mvgam` object
+#' @param raw Character vector of the Stan names in the posterior
+#' @return Named character vector mapping user names to Stan names
+#' @noRd
+mvgam_factor_aliases <- function(x, raw) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_character(raw)
+  out <- character(0L)
+  theta <- raw[startsWith(raw, "theta_features[")]
+  features <- colnames(x$standata$row_features)
+  if (length(theta) > 0L && length(theta) == length(features)) {
+    theta <- theta[order(as.integer(stan_index(theta)))]
+    out <- stats::setNames(theta, paste0("theta_features_", features))
+  }
+  loadings <- grep("^Z(_tilde)?\\[[0-9]+,[0-9]+\\]$", raw, value = TRUE)
+  series <- fitted_series_levels(x)
+  row <- as.integer(sub("^.*\\[([0-9]+),.*$", "\\1", loadings))
+  if (length(loadings) > 0L && max(row) <= length(series)) {
+    named <- paste0(sub("\\[.*$", "", loadings), "[", series[row], ",",
+                    sub("^.*,([0-9]+)\\]$", "\\1", loadings), "]")
+    out <- c(out, stats::setNames(loadings, named))
+  }
+  out
+}
+
+
 #' The label brms gives each smooth object of one term
 #'
 #' Follows the internal brms function `frame_sm()`. The label joins the
@@ -479,7 +517,8 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   raw <- pars %||% posterior::variables(posterior::as_draws(x$fit))
   user <- apply_mvgam_aliases(
     raw, c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x),
-           mvgam_smooth_aliases(x, raw), mvgam_special_aliases(x, raw))
+           mvgam_smooth_aliases(x, raw), mvgam_special_aliases(x, raw),
+           mvgam_factor_aliases(x, raw))
   )
   # The empty-observation placeholder is a structural column mvgam
   # adds for a design brms cannot build. The user wrote no such
@@ -731,11 +770,14 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   # Split user input into keyword shortcuts and "free" patterns so
   # both can compose in a single call (e.g. variable = c("betas",
   # "^sd_", "Intercept")).
+  # A keyword names the reported parameters. Only an explicit name
+  # reaches a hidden one.
   is_keyword <- variable %in% mvgam_keyword_shortcuts
   matched <- character(0L)
   if (any(is_keyword)) {
+    reported <- filter_hidden_pars(all_vars)
     matched <- unlist(lapply(variable[is_keyword], function(k) {
-      resolve_mvgam_keyword(k, all_vars)
+      resolve_mvgam_keyword(k, reported)
     }))
   }
   free <- variable[!is_keyword]

@@ -256,6 +256,11 @@ collect_lv_trend_column_names <- function(par_names, n_lv) {
 
 #' The posterior draws of each latent factor path
 #'
+#' Slopes of `x:lv_axis()` terms move each factor before the loadings
+#' apply. A factor's path is then its state plus its predictor, which
+#' the identified slopes `b_trend_tilde` give in the basis of
+#' `Z_tilde`.
+#'
 #' @param object Fitted `mvgam` factor model
 #' @param n_lv Integer number of latent factors
 #' @return List of `n_lv` draws matrices with dimensions
@@ -266,9 +271,17 @@ extract_lv_trend_matrices <- function(object, n_lv) {
   checkmate::assert_int(n_lv, lower = 1L)
   draws_mat <- posterior::as_draws_matrix(object$fit)
   meta <- collect_lv_trend_column_names(colnames(draws_mat), n_lv)
+  X <- object$standata$X_trend
+  b_cols <- paste0("b_trend_tilde[", seq_len(NCOL(X)), "]")
+  mu <- if (all(b_cols %in% colnames(draws_mat))) {
+    unclass(draws_mat[, b_cols, drop = FALSE]) %*% t(X)
+  }
   setNames(
     lapply(seq_len(n_lv), function(k) {
-      draws_mat[, meta$cols_by_tk[, k], drop = FALSE]
+      path <- draws_mat[, meta$cols_by_tk[, k], drop = FALSE]
+      if (is.null(mu)) path else {
+        path + mu[, object$standata$times_trend[, k], drop = FALSE]
+      }
     }),
     paste0("Factor ", seq_len(n_lv))
   )

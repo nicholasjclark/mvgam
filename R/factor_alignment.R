@@ -22,19 +22,33 @@
 
 #' How a model identifies its sampled loadings
 #'
+#' A `lv_axis()` term gives each factor its own effect. The rotation
+#' carries those effects with the factors only when each is a slope,
+#' with one coefficient per factor that `by_lv_coef_groups()` finds.
+#'
 #' @param trend_spec A normalised trend specification, or a
 #'   per-response list of them.
-#' @param has_by_lv Does a `by = lv_axis()` term tie each factor to
-#'   its own covariate effect?
+#' @param has_by_lv Does a `lv_axis()` term tie each factor to its own
+#'   covariate effect?
+#' @param by_lv_groups The matrix `by_lv_coef_groups()` returns, or
+#'   `NULL`.
 #' @return `"rotation"` for the QR step in Stan, `"relabel"` for
 #'   `relabel_factors()`, `"none"` where the loadings keep the
 #'   orientation they were sampled in.
 #' @noRd
-factor_identification <- function(trend_spec, has_by_lv = FALSE) {
+factor_identification <- function(trend_spec, has_by_lv = FALSE,
+                                  by_lv_groups = NULL) {
   checkmate::assert_flag(has_by_lv, null.ok = TRUE)
+  checkmate::assert_matrix(by_lv_groups, mode = "integer",
+                           null.ok = TRUE)
   spec <- trend_spec_head(trend_spec)
-  if (!samples_any_loading(spec) || isTRUE(has_by_lv)) {
+  if (!samples_any_loading(spec)) {
     return("none")
+  }
+  if (isTRUE(has_by_lv)) {
+    rotatable <- !is.null(by_lv_groups) && is.null(spec$fixed_Z) &&
+      !has_factor_coefficients(spec)
+    return(if (rotatable) "rotation" else "none")
   }
   partial <- !is.null(spec$fixed_Z)
   if (has_factor_coefficients(spec)) {
@@ -55,8 +69,57 @@ factor_identification <- function(trend_spec, has_by_lv = FALSE) {
 #' @return As `factor_identification()`.
 #' @noRd
 fit_factor_identification <- function(object) {
-  factor_identification(first_trend_spec(object),
-                        object$trend_metadata$has_by_lv)
+  spec <- first_trend_spec(object)
+  has_by_lv <- object$trend_metadata$has_by_lv
+  groups <- if (isTRUE(has_by_lv)) {
+    by_lv_coef_groups(object$standata, trend_spec_head(spec)$n_lv,
+                      suffix = "_trend")
+  }
+  factor_identification(spec, has_by_lv, groups)
+}
+
+
+#' The trend coefficients of each slope that varies by factor
+#'
+#' `lv_axis()` becomes the factor `.trend`. brms names the design
+#' columns of `x:lv_axis()` as `x:.trend1`, ..., `x:.trendK`. A
+#' rotation of the factors by `Q` rotates each such group as `Q b`. A
+#' column shared by every factor, or a smooth, Gaussian process,
+#' monotonic or group-level term, has no such group.
+#'
+#' @param standata The trend's Stan data, with its names ending in
+#'   `suffix`.
+#' @param n_lv Number of latent factors.
+#' @param suffix `""` for the trend's own data, `"_trend"` for a
+#'   fitted model's combined data.
+#' @return Integer matrix with one row per slope and one column per
+#'   factor, holding indices into the trend coefficients. `NULL` when
+#'   any term of the trend has no such group.
+#' @noRd
+by_lv_coef_groups <- function(standata, n_lv, suffix = "") {
+  checkmate::assert_list(standata)
+  checkmate::assert_int(n_lv, lower = 1L)
+  checkmate::assert_string(suffix)
+  other_terms <- paste0("^(Ks|Kgp|Ksp|Kcs|Kme|M_[0-9]+)(_.*)?", suffix, "$")
+  if (any(grepl(other_terms, names(standata)))) {
+    return(NULL)
+  }
+  cols <- colnames(standata[[paste0("X", suffix)]])
+  if (length(cols) == 0L || !all(grepl("\\.trend[0-9]+", cols))) {
+    return(NULL)
+  }
+  factor_k <- as.integer(sub("^.*\\.trend([0-9]+).*$", "\\1", cols))
+  groups <- split(seq_along(cols), sub("\\.trend[0-9]+", ".trend", cols))
+  ordered <- lapply(groups, function(idx) idx[order(factor_k[idx])])
+  complete <- vapply(groups, function(idx) {
+    identical(sort(factor_k[idx]), seq_len(n_lv))
+  }, logical(1L))
+  if (!all(complete)) {
+    return(NULL)
+  }
+  out <- do.call(rbind, unname(ordered))
+  storage.mode(out) <- "integer"
+  out
 }
 
 #' Does each factor of this trend take its own coefficients?

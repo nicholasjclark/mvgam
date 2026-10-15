@@ -491,7 +491,7 @@ stability_intervals <- function(dat, keep) {
                         linetype = "dashed", colour = "grey30") +
     ggplot2::geom_pointrange(
       ggplot2::aes(xmin = .data[[bounds[1L]]], xmax = .data[[bounds[2L]]]),
-      colour = mvgam_palette()[4L]
+      colour = mvgam_colour("mid_highlight")
     ) +
     ggplot2::facet_wrap(
       ~ metric, scales = "free_x", nrow = 1L,
@@ -554,7 +554,7 @@ stability_histogram <- function(counts) {
   ggplot2::ggplot(long, ggplot2::aes(x = .data$mid, y = .data$count)) +
     ggplot2::geom_col(
       ggplot2::aes(width = .data$width),
-      fill = mvgam_palette()[4L],
+      fill = mvgam_colour("mid_highlight"),
       colour = "white"
     ) +
     ggplot2::geom_vline(data = stability_threshold(names(counts)),

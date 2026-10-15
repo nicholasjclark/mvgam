@@ -46,9 +46,8 @@ test_that("resolve_series_index defaults make sense", {
   lv4 <- c("s1", "s2", "s3", "s4")
   expect_equal(mvgam:::resolve_series_index(NULL, lv1), 1L)
   expect_equal(mvgam:::resolve_series_index(NULL, lv4), "all")
-  # A name reaches the index every other series-aware surface gives
-  # it. This plot once took indices alone, and a reader of its panel
-  # labels had no value to pass back.
+  # A name resolves to the index every other series-aware surface
+  # gives it, which lets a panel label be passed back as `series`.
   expect_equal(mvgam:::resolve_series_index("s3", lv4), 3L)
 })
 
@@ -122,3 +121,20 @@ test_that("plot_mvgam_series auto-fetches object$test_data", {
   expect_true("GeomVline" %in% geoms)
 })
 
+
+test_that("the response fan-out forwards dots past a dot-free caller", {
+  # `plot(type = "series")` reaches `plot_mvgam_series()`, which takes
+  # no dots, through a call that forwards `plot()`'s dots.
+  stub <- structure(
+    list(formula = brms::bf(y1 ~ 1) + brms::bf(y2 ~ 1)),
+    class = "mvgam"
+  )
+  inner <- function(object, resp = NULL, label = "") {
+    fan <- mvgam:::mv_resp_fan_out(object, resp)
+    if (!is.null(fan)) return(fan)
+    paste(resp, label)
+  }
+  outer <- function(x, ...) inner(object = x, ...)
+  expect_identical(outer(stub, label = "a"),
+                   list(y1 = "y1 a", y2 = "y2 a"))
+})

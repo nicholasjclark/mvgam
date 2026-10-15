@@ -433,7 +433,7 @@ mvgam_median_layer <- function(
   checkmate::assert_string(colour, null.ok = TRUE)
   checkmate::assert_number(linewidth, lower = 0)
   if (is.null(colour)) {
-    colour <- mvgam_palette()[5L]
+    colour <- mvgam_colour("dark")
   }
   df <- occasion_quantiles(draws_mat, times, 0.5, group)
   names(df)[2L] <- "med"

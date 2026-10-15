@@ -3398,12 +3398,8 @@ render_implementation_section <- function(ctx) {
   if (!is.na(info$warmup)) {
     call_lines <- c(call_lines, paste0("  warmup        = ", info$warmup))
   }
-  # Within-chain threading. mvgam exposes it as `threads_per_chain`
-  # (R/mvgam_core.R); the Stan slot uses the same name.
   if (!is.na(info$threads) && info$threads > 1L) {
-    call_lines <- c(call_lines, paste0(
-      "  threads_per_chain = ", info$threads
-    ))
+    call_lines <- c(call_lines, paste0("  threads       = ", info$threads))
   }
   # NUTS sampler control: only surface when the user moved them
   # off Stan defaults (adapt_delta = 0.8, max_treedepth = 10), so
@@ -3467,11 +3463,9 @@ extract_implementation_info <- function(obj) {
                            .var.name = "obj$backend")
   checkmate::assert_choice(algorithm, c(algorithm_choices(), "none"),
                            .var.name = "obj$algorithm")
-  # Reuse the shared sampling-args extractor from how_to_cite.R.
-  # `extract_sampling_info()` reads `obj$fit@stan_args` and
-  # returns (chains, warmup, iter, threads, adapt_delta,
-  # max_treedepth, init), or NULL for variational / Laplace
-  # / pathfinder fits with empty stan_args.
+  # `extract_sampling_info()` returns (chains, warmup, iter, threads,
+  # adapt_delta, max_treedepth, init) for a NUTS fit and NULL for any
+  # other algorithm.
   sampling <- extract_sampling_info(obj)
   if (is.null(sampling)) {
     sampling <- list(

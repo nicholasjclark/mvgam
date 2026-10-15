@@ -29,13 +29,12 @@
 #'       across factors. Access via
 #'       `attr(plot(fit, type = "factors"), "contribution")` if
 #'       you want the numeric summary without the figure.
-#'       Per-draw factor paths themselves live on `object$fit` as
-#'       `lv_trend[t, k]`; pull them with
-#'       [posterior::as_draws_array()] when you need the raw
-#'       draws (e.g. for custom summaries).}
-#'     \item{`"series"`}{Input-data exploratory plot (works
-#'       without a fit, wraps the observation data carried on
-#'       the object).}
+#'       The fit stores the per-draw factor paths as
+#'       `lv_trend[t, k]`. [posterior::as_draws_array()] extracts
+#'       them for custom summaries.}
+#'     \item{`"series"`}{Exploratory plot of the observed data the
+#'       fit carries. A long-frame multivariate fit stacks one plot
+#'       per response. Use [mvgam_data()] to plot data before a fit.}
 #'     \item{`"latent_state"`}{Per-(series, time) ribbon of the
 #'       marginal latent state for closure-unit families: latent
 #'       abundance `N` for `nmix()` (and its variants) or
@@ -45,9 +44,8 @@
 #'       for non-closure-unit fits.}
 #'   }
 #'
-#'   For posterior forecasts, parametric effects, random
-#'   effects, and arbitrary conditional surfaces use the
-#'   dedicated surfaces directly:
+#'   Forecasts, effects and custom conditional plots have dedicated
+#'   functions:
 #'   \itemize{
 #'     \item Forecasts: `forecast(x, newdata = ...) |> plot()`.
 #'     \item Parametric / random effects: [conditional_effects()]
@@ -56,8 +54,8 @@
 #'       [marginaleffects::plot_predictions()].
 #'   }
 #' @param series Optional series subset, as an integer index or a
-#'   series name. `"trend"` and `"series"` also take `"all"`, and
-#'   draw every series by default. `"residuals"` draws one series,
+#'   series name. `"trend"` and `"series"` also take `"all"`, which
+#'   they use by default. `"residuals"` draws one series,
 #'   the first by default. Ignored by branches that summarise across
 #'   series (`"smooths"`, `"factors"`).
 #' @inheritParams forecast.mvgam

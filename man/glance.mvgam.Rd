@@ -24,7 +24,8 @@ name of a single response variable to return results for.
 A tibble with one row, or on a multivariate fit given no
 \code{resp} one row per response with a \code{resp} column. Columns:
 \itemize{
-\item \code{algorithm} -- the Stan algorithm used.
+\item \code{algorithm} -- the algorithm the fit ran, such as \code{"sampling"}
+or \code{"meanfield"}.
 \item \code{pss} -- post-warmup sample size summed across chains.
 \item \code{nobs} -- number of (non-missing) training observations.
 \item \code{nseries} -- number of unique series in the training data.
