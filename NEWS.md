@@ -33,7 +33,8 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * The 'brms' post-processing methods, including `posterior_predict()`, `log_lik()`, `update()`, `hypothesis()` and `as_draws_*()`
 * `bridge_sampler()`, `bayes_factor()`, `waic()`, `loo_model_weights()`, `pp_average()`, `compare_scores()` and `compare_elpds()` for model comparison
 * `threads`, `init = "pathfinder"`, `mvgam_multiple()` for imputed data, and helpers to pivot wide occupancy and species data
-* `methods_md()` writes a model description, and `bibtex()` extracts the citation
+* `methods_md()` writes a model description. `bibtex()` extracts the citation
+* On a hierarchical VAR, `stability()` reports each group and `posterior_transition_matrix()` averages the group matrices. Plots of `irf()` and `fevd()` select processes by name
 
 ## Changed defaults
 * `posterior_epred()`, `posterior_predict()`, `posterior_linpred()` and `fitted()` default to `process_error = FALSE`, as `predict()` does

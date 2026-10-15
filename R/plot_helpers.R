@@ -195,11 +195,13 @@ mvgam_categorical_palette <- function(n) {
 
 #' A colour scale for plots that overlay several groups
 #'
-#' Serves the models of `compare_scores()` and `compare_elpds()` and
-#' the levels of a conditional effect's second variable. Up to three
-#' groups take the dark, mid and light shades of the active bayesplot
-#' scheme, matching the forecast and residual figures. A single-hue
-#' scheme has three distinguishable line shades. More groups take the
+#' Every plot that colours discrete groups takes this scale. The groups
+#' can be compared models or fits, the levels of a conditional effect's
+#' second variable, or the outcomes and sources of a VAR. Up to three
+#' groups take a dark, a middle and a light shade of the active
+#' bayesplot scheme, matching the forecast and residual figures. The
+#' dark shade is the scheme's darkest moved halfway towards black. The
+#' three groups then differ clearly in lightness. More groups take the
 #' Okabe-Ito hues.
 #'
 #' @param n Integer number of groups
@@ -214,13 +216,27 @@ mvgam_model_colour_scale <- function(n, name = NULL,
   checkmate::assert_count(n, positive = TRUE)
   checkmate::assert_character(aesthetics, min.len = 1L)
   values <- if (n <= 3L) {
-    vapply(c("dark", "mid", "light_highlight")[seq_len(n)],
-           mvgam_colour, character(1L), USE.NAMES = FALSE)
+    c(darken_colour(mvgam_colour("dark_highlight"), 0.55),
+      mvgam_colour("mid_highlight"),
+      mvgam_colour("light"))[seq_len(n)]
   } else {
     mvgam_categorical_palette(n)
   }
   ggplot2::scale_colour_manual(name = name, values = values,
                                aesthetics = aesthetics, ...)
+}
+
+#' A colour moved towards black
+#'
+#' @param colour A colour R recognises
+#' @param amount Share of the distance to black, between 0 and 1
+#' @return A hex colour string
+#' @noRd
+darken_colour <- function(colour, amount) {
+  checkmate::assert_string(colour)
+  checkmate::assert_number(amount, lower = 0, upper = 1)
+  rgb <- grDevices::col2rgb(colour)[, 1L] * (1 - amount)
+  grDevices::rgb(rgb[1L], rgb[2L], rgb[3L], maxColorValue = 255)
 }
 
 #' Light-to-dark fills for `n` symmetric quantile bands

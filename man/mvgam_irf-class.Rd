@@ -14,13 +14,14 @@ are computed from the posterior estimates of Vector Autoregressive
 parameters. \code{\link[=irf]{irf()}} applies a positive shock of one standard
 deviation to one process and calculates how each process in the
 latent VAR responds over \code{h} horizons, for every process in turn.
-Horizon 1 is the time step of the shock. To inspect community-level metrics of stability from the
-same parameters, use \code{\link[=stability]{stability()}}.
+Horizon 1 is the time step of the shock. \code{\link[=stability]{stability()}} computes
+community-level metrics of stability from the same parameters.
 
 A shock response is a \code{K} by \code{K} matrix per horizon per posterior
-draw, which on a wide panel runs to hundreds of megabytes for a
-quantity read as a median and an interval. \code{\link[=irf]{irf()}} therefore
-returns the summary, and the two forms carry different classes:
+draw. On a wide panel the draws run to hundreds of megabytes,
+where a median and an interval are what a reader uses. \code{\link[=irf]{irf()}}
+returns the summary by default. The two forms carry different
+classes:
 \itemize{
 \item \code{mvgam_irf_summary}, the default. A long-format \code{tibble}
 inheriting from \code{mvgam_var_surface_summary}, with one row per
@@ -29,9 +30,9 @@ shock-response pair per horizon. \code{shock} names the pair as
 the latent processes are the series and \code{"Process_k"} where a
 factor VAR's processes are latent factors instead. \code{horizon}
 counts from 1, the time step of the shock. Three further
-columns hold the posterior median and the
-interval bounds, named for the percentiles asked for:
-\code{irfQ50}, and by default \code{irfQ2.5} and \code{irfQ97.5}. An
+columns hold the posterior median and the interval bounds,
+named for the percentiles asked for: \code{irfQ50}, \code{irfQ2.5} and
+\code{irfQ97.5} by default. An
 \code{irf_type} attribute records whether the responses are
 orthogonalised.
 \item \code{mvgam_irf}, returned under \code{summary = FALSE}. A \code{list} with one
@@ -40,8 +41,8 @@ element per posterior draw, each itself a \code{list} holding one
 \code{summary()} to reach the form above.
 }
 
-Both forms take \code{ndraws} and \code{draw_ids}, so a subset of the
-posterior answers faster where the full one is not needed.
+Both forms take \code{ndraws} and \code{draw_ids}. A subset of the posterior
+shortens the computation.
 }
 \references{
 Pesaran HH and Shin Y (1998). Generalized impulse

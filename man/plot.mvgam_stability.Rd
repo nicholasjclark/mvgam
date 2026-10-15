@@ -14,11 +14,9 @@
 \arguments{
 \item{x}{A \code{mvgam_stability} object returned by \code{\link[=stability]{stability()}}.}
 
-\item{variables}{Character vector picking which columns of \code{x}
-to render. Defaults to the three core dynamic-stability
-metrics (\code{"reactivity"}, \code{"mean_return_rate"},
-\code{"var_return_rate"}); pass any subset of \code{x}'s column names
-to widen or narrow the panel set.}
+\item{variables}{Character vector of the metrics to draw. Defaults
+to reactivity and the mean and variance return rates. Any column
+of \code{x} can be named.}
 
 \item{bins}{Number of histogram bins.}
 
@@ -28,11 +26,11 @@ to widen or narrow the panel set.}
 A \code{ggplot} object.
 }
 \description{
-Renders a faceted histogram of the reactivity, mean return rate
-and variance return rate posterior draws returned by
-\code{stability.mvgam()}. A dashed reference line at zero on the
+Draws a histogram of the posterior draws of each metric
+\code{stability.mvgam()} returned. A dashed line at zero on the
 reactivity panel marks the threshold above which the system
-amplifies a shock before it decays.
+amplifies a shock before it decays. A hierarchical VAR draws a
+median and interval for each panel.
 }
 \seealso{
 \code{\link[=stability]{stability()}}, \code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}},

@@ -136,7 +136,7 @@ compare_loadings <- function(
     shift = rep(shift, 2L)
   )
 
-  pal <- mvgam_categorical_palette(2L)
+  set_color_scheme_local("red")
   axis_labs <- c(
     sprintf("Z loading on LV%d", which_lvs[1L]),
     sprintf("Z loading on LV%d", which_lvs[2L])
@@ -149,7 +149,7 @@ compare_loadings <- function(
     ) +
       ggplot2::geom_point(size = 2.2, alpha = 0.85) +
       ggplot2::facet_wrap(~ .data$fit) +
-      ggplot2::scale_colour_manual(values = pal, guide = "none")
+      mvgam_model_colour_scale(2L, guide = "none")
   } else {
     seg_df <- data.frame(
       species = species_names,
@@ -172,7 +172,7 @@ compare_loadings <- function(
         ),
         size = 2.2, alpha = 0.85
       ) +
-      ggplot2::scale_colour_manual(values = pal, name = NULL)
+      mvgam_model_colour_scale(2L)
   }
 
   if (label_species != "none") {

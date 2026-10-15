@@ -58,15 +58,15 @@ var_surface_columns <- function(x) {
 #' its sources in one panel per target, as [plot.mvgam_fevd()] does.
 #'
 #' @param x A `mvgam_irf_summary` or `mvgam_fevd_summary`
-#' @param series Integer vector of processes to keep. On an impulse
-#'   response these are the processes a shock originates in. On a
-#'   variance decomposition they are the targets whose forecast error
-#'   is decomposed. Default keeps every process.
-#' @param responses Impulse responses only. Integer vector of the
+#' @param series Positions or names of the processes to keep. On an
+#'   impulse response these are the processes a shock originates in.
+#'   On a variance decomposition they are the targets whose forecast
+#'   error is decomposed. Default keeps every process.
+#' @param responses Impulse responses only. Positions or names of the
 #'   processes whose response to the shock is drawn. Default keeps
 #'   every process.
-#' @param contributing Variance decompositions only. Integer vector of
-#'   the source processes stacked in each bar. The shares of the
+#' @param contributing Variance decompositions only. Positions or names
+#'   of the source processes stacked in each bar. The shares of the
 #'   sources drawn are renormalised to sum to one.
 #' @param shocks Optional character vector naming shock-response pairs
 #'   directly, for a selection the index arguments cannot express.
@@ -121,14 +121,14 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
   keep <- rep(TRUE, nrow(dat))
   if (is_fevd) {
     keep <- keep &
-      to %in% validate_var_plot_ids(series, n_proc, "series") &
+      to %in% validate_var_plot_ids(series, labels, "series") &
       from %in% validate_var_plot_ids(
-        contributing, n_proc, "contributing"
+        contributing, labels, "contributing"
       )
   } else {
     keep <- keep &
-      from %in% validate_var_plot_ids(series, n_proc, "series") &
-      to %in% validate_var_plot_ids(responses, n_proc, "responses")
+      from %in% validate_var_plot_ids(series, labels, "series") &
+      to %in% validate_var_plot_ids(responses, labels, "responses")
   }
   if (!is.null(shocks)) {
     unknown <- setdiff(shocks, unique(dat$shock))
@@ -178,7 +178,8 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
     ) +
     ggplot2::geom_hline(yintercept = 0, linetype = "dashed",
                         colour = "black") +
-    ggplot2::facet_wrap(~ shock, scales = "free_y") +
+    ggplot2::facet_wrap(~ shock, scales = "free_y",
+                        labeller = irf_panel_labeller()) +
     scale_x_steps() +
     ggplot2::labs(y = irf_axis_label(attr(x, "irf_type"))) +
     mvgam_theme()

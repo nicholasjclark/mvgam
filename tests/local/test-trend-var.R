@@ -1193,6 +1193,16 @@ test_that("a grouped VAR(2) is stationary, block by block", {
     max(abs(Omega - stored))
   }, numeric(1L)))
   expect_lt(worst, 1e-6)
+  # Each group's matrix is its own block of Phi_trend. The default is
+  # the mean of the groups' matrices in every draw.
+  r1 <- posterior_transition_matrix(gr_fit, groups = "r1", lag = 2L,
+                                    summary = FALSE)
+  r2 <- posterior_transition_matrix(gr_fit, groups = "r2", lag = 2L,
+                                    summary = FALSE)
+  pooled <- posterior_transition_matrix(gr_fit, lag = 2L, summary = FALSE)
+  expect_equal(as.numeric(r2[7L, , ]), as.numeric(phi(7L, 2L)[3:4, 3:4]))
+  expect_equal(as.numeric(pooled), as.numeric((r1 + r2) / 2))
+  expect_identical(attr(pooled, "group_label"), "mean over groups")
 })
 
 

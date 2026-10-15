@@ -9,24 +9,26 @@
 \arguments{
 \item{object}{An object of class \code{mvgam_stability}}
 
-\item{probs}{The lower and upper percentiles to report alongside the
-median}
+\item{probs}{The lower and upper percentiles of the interval
+reported with the median}
 
-\item{robust}{Logical; report the median and median absolute
-deviation rather than the mean and standard deviation}
+\item{robust}{Logical. \code{TRUE} (the default) reports the median and
+median absolute deviation. \code{FALSE} reports the mean and standard
+deviation.}
 
-\item{bins}{Number of bins used to record the shape of each metric
-alongside its interval, which is what \code{plot()} draws}
+\item{bins}{Number of bins that record the shape of each metric for
+\code{plot()}}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A \code{data.frame} with one row per metric
+A \code{data.frame} with one row per metric. On a hierarchical
+VAR it holds one row per panel and metric, with the panel in
+\code{group}.
 }
 \description{
 Reports the posterior median and interval of each stability metric.
-\code{stability()} returns this by default, matching the other post-fit
-surfaces; the draws behind it are available with
-\code{stability(summary = FALSE)} and are what \code{plot()} draws histograms
-of.
+\code{stability()} returns this summary by default, as the other post-fit
+summaries of a VAR do. \code{stability(summary = FALSE)} returns the
+draws.
 }

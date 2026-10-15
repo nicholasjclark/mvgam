@@ -17,16 +17,14 @@ posterior_transition_matrix(
 \item{object}{A fitted \code{mvgam} object whose trend is a VAR.}
 
 \item{groups}{Which panels of a hierarchical VAR fit to
-return. \code{NULL} (the default) gives the global shrinkage
-target built from \code{Amu_trend}, and is the only setting a
-non-hierarchical fit accepts. Name one panel, by level name
-or by integer index into the fitted grouping factor's levels
-as stored on \code{object$data[[gr]]}, and that panel's matrix is
-returned on its own. Name several, or pass \code{"all"}, and the
-result is a named list of \code{mvgam_var_matrix} objects classed
-as \code{mvgam_var_matrix_list}, so \code{plot()} produces a faceted
-panel (heatmap grid or per-outcome self-persistence
-pointrange, see \code{\link[=plot.mvgam_var_matrix_list]{plot.mvgam_var_matrix_list()}}).}
+return. \code{NULL} (the default) gives the mean of the panels'
+matrices. A non-hierarchical fit accepts \code{NULL} alone. A single
+panel, named by level or by integer index into the levels of
+\code{gr}, returns that panel's matrix on its own. Several panels, or
+\code{"all"}, return a named list of \code{mvgam_var_matrix} objects
+classed as \code{mvgam_var_matrix_list}. Its \code{plot()} method draws a
+faceted heatmap grid or a pointrange of each outcome's
+self-persistence, see \code{\link[=plot.mvgam_var_matrix_list]{plot.mvgam_var_matrix_list()}}.}
 
 \item{summary}{Logical. \code{TRUE} (default) returns an
 \code{mvgam_var_matrix} object with per-cell point estimates,
@@ -70,24 +68,24 @@ encode cross-outcome dependence at lag $l$.
 The extractor dispatches on whether the fit is hierarchical
 (\verb{VAR(gr = <var>, ...)}) or single-panel.
 \itemize{
-\item On a \strong{single-panel VAR} the routine reads the fitted
+\item On a \strong{single-panel VAR} the routine returns the fitted
 \code{Phi_trend} array.
 \item On a \strong{hierarchical VAR} with \verb{groups = <int>} or
 \verb{groups = <name>} it returns the panel-specific matrix
 \code{Phi_group_trend[c, l, , ]}, the transition matrix of the
 requested panel.
-\item On a \strong{hierarchical VAR} with \code{groups = NULL} it synthesises
-the shrinkage target from the hyperparameters:
-diagonal cells take \code{Amu_trend[1, l]}, off-diagonal cells
-take \code{Amu_trend[2, l]}. This is the mean the sampler pulls
-every panel's $A_c$ toward, so it summarises the pool
-without reading any single country
-(Savage \href{https://rpubs.com/jimsavage/hierarchical_var}{2016}).
+\item On a \strong{hierarchical VAR} with \code{groups = NULL} it returns the
+mean of the panels' matrices, computed in each posterior draw.
+The hyperparameters \code{Amu_trend} and \code{Aomega_trend} pool the
+unconstrained matrices that the stationarity map of Heaps
+(2023) turns into each panel's $A_c$. Their mean is no
+transition matrix. The mean over panels summarises the pool on
+the scale of $A_c$.
 }
 
 With \code{summary = TRUE} (default) the per-cell summary uses the
-same machinery as \code{residual_cor()}, so the printed and
-plotted output stays consistent across the two extractors:
+same machinery as \code{residual_cor()}. The printed and plotted output
+of the two extractors then agree:
 point estimates default to the posterior mean; intervals use
 \code{probs} on the raw draws; effective sample sizes come from
 \code{posterior::ess_basic()}; and

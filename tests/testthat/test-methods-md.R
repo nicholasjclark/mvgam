@@ -809,6 +809,18 @@ test_that("how_to_cite cites a prefit's trend", {
   # a VAR trend carries.
   mod <- make_methods_md_prefit(y ~ 1, trend_formula = ~ VAR())
   expect_true("heaps_var" %in% names(how_to_cite(mod)$bibtex))
+  expect_false("savage_hvar" %in% names(how_to_cite(mod)$bibtex))
+  # A hierarchical VAR also describes its pooling
+  hier <- data.frame(time = rep(1:30, 4), region = rep(c("n", "s"), each = 60),
+                     sp = rep(rep(c("a", "b"), each = 30), 2),
+                     y = rpois(120, 3))
+  hier_mod <- make_methods_md_prefit(
+    y ~ 1, trend_formula = ~ VAR(gr = region, subgr = sp, cor = TRUE),
+    data = hier
+  )
+  hier_cite <- how_to_cite(hier_mod)
+  expect_true("savage_hvar" %in% names(hier_cite$bibtex))
+  expect_match(hier_cite$methods_text, "exchangeable prior")
   # The backend and algorithm are what the object records. One
   # recording neither was described as an rstan HMC run.
   mod$backend <- NULL

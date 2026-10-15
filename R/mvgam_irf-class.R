@@ -9,13 +9,14 @@
 #'   parameters. [irf()] applies a positive shock of one standard
 #'   deviation to one process and calculates how each process in the
 #'   latent VAR responds over `h` horizons, for every process in turn.
-#'   Horizon 1 is the time step of the shock. To inspect community-level metrics of stability from the
-#'   same parameters, use [stability()].
+#'   Horizon 1 is the time step of the shock. [stability()] computes
+#'   community-level metrics of stability from the same parameters.
 #'
 #'   A shock response is a `K` by `K` matrix per horizon per posterior
-#'   draw, which on a wide panel runs to hundreds of megabytes for a
-#'   quantity read as a median and an interval. [irf()] therefore
-#'   returns the summary, and the two forms carry different classes:
+#'   draw. On a wide panel the draws run to hundreds of megabytes,
+#'   where a median and an interval are what a reader uses. [irf()]
+#'   returns the summary by default. The two forms carry different
+#'   classes:
 #'
 #'   - `mvgam_irf_summary`, the default. A long-format `tibble`
 #'     inheriting from `mvgam_var_surface_summary`, with one row per
@@ -24,9 +25,9 @@
 #'     the latent processes are the series and `"Process_k"` where a
 #'     factor VAR's processes are latent factors instead. `horizon`
 #'     counts from 1, the time step of the shock. Three further
-#'     columns hold the posterior median and the
-#'     interval bounds, named for the percentiles asked for:
-#'     `irfQ50`, and by default `irfQ2.5` and `irfQ97.5`. An
+#'     columns hold the posterior median and the interval bounds,
+#'     named for the percentiles asked for: `irfQ50`, `irfQ2.5` and
+#'     `irfQ97.5` by default. An
 #'     `irf_type` attribute records whether the responses are
 #'     orthogonalised.
 #'
@@ -35,8 +36,8 @@
 #'     `h` by `K` matrix of responses per shocked process. Pass it to
 #'     `summary()` to reach the form above.
 #'
-#'   Both forms take `ndraws` and `draw_ids`, so a subset of the
-#'   posterior answers faster where the full one is not needed.
+#'   Both forms take `ndraws` and `draw_ids`. A subset of the posterior
+#'   shortens the computation.
 #'
 #' @seealso [mvgam], [VAR], [irf], [stability]
 #'
@@ -116,12 +117,10 @@ irf_draws <- function(x, series, resp_ids) {
 #'
 #' @param x \code{list} object of class \code{mvgam_irf}. See [irf()]
 #'
-#' @param series \code{integer} specifying which process series should be
-#'   given the shock
-#' @param responses Optional integer vector of process indices to
-#'   display as response panels. Useful for hierarchical VAR fits
-#'   where the raw K-panel grid is unreadable. Defaults to all
-#'   processes.
+#' @param series Position or name of the process given the shock
+#' @param responses Optional positions or names of the processes drawn
+#'   as response panels. Useful for hierarchical VAR fits where the
+#'   raw K-panel grid is unreadable. Defaults to all processes.
 #'
 #' @param ... Unused. Anything passed here is refused.
 #'
@@ -137,28 +136,19 @@ irf_draws <- function(x, series, resp_ids) {
 #' @export
 plot.mvgam_irf <- function(x, series = 1, responses = NULL, ...) {
   checkmate::assert_class(x, "mvgam_irf")
-  checkmate::assert_int(series, lower = 1)
+  checkmate::assert_vector(series, len = 1L, any.missing = FALSE)
   rlang::check_dots_empty()
   # Lock the bayesplot scheme to the house red for the duration
   # of this call so IRFs share the visual identity of forecast(),
   # fevd() and stability() plots.
   set_color_scheme_local("red")
-  n_processes <- dim(x[[1]][[1]])[2]
-  if (series > n_processes) {
-    stop(insight::format_error(c(
-      paste0("'series' must be at most ", n_processes, "."),
-      x = paste0("Got series = ", series, "."),
-      i = paste0(
-        "The fitted VAR has ", n_processes, " latent processes."
-      )
-    )), call. = FALSE)
-  }
-  resp_ids <- validate_var_plot_ids(responses, n_processes, "responses")
+  labels <- names(x[[1]])
+  series <- validate_var_plot_ids(series, labels, "series")
+  resp_ids <- validate_var_plot_ids(responses, labels, "responses")
   h <- dim(x[[1]][[1]])[1]
 
   # One panel per response, labelled as `summary()` labels the pair and
   # ordered as the VAR numbers its processes
-  labels <- names(x[[1]])
   resp_keys <- paste0(labels[series], " -> ", labels[resp_ids])
   draws_mat <- irf_draws(x, series, resp_ids)
   times <- rep(seq_len(h), times = length(resp_ids))
@@ -173,10 +163,23 @@ plot.mvgam_irf <- function(x, series = 1, responses = NULL, ...) {
     ggplot2::geom_hline(
       yintercept = 0, linetype = "dashed", colour = "black"
     ) +
-    ggplot2::facet_wrap(~series, scales = "free_y") +
+    ggplot2::facet_wrap(~series, scales = "free_y",
+                        labeller = irf_panel_labeller()) +
     scale_x_steps() +
     ggplot2::labs(y = irf_axis_label(attr(x, "irf_type"))) +
     mvgam_theme()
+}
+
+#' Panel titles of an impulse response plot
+#'
+#' A title names the pair as `"<from> -> <to>"`. On a hierarchical VAR
+#' each name joins a group and a subgroup. A title that outgrows its
+#' panel breaks after the arrow.
+#'
+#' @return A ggplot2 labeller
+#' @noRd
+irf_panel_labeller <- function() {
+  ggplot2::label_wrap_gen(width = 24)
 }
 
 #' Axis title of an impulse response plot

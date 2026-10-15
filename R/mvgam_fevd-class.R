@@ -108,12 +108,12 @@ summary.mvgam_fevd <- function(object, probs = c(0.025, 0.975), ...) {
 #'@importFrom ggplot2 ggplot aes geom_bar facet_wrap labs
 #'
 #'@param x \code{list} object of class \code{mvgam_fevd}. See [fevd()]
-#'@param series Optional integer vector selecting which
-#'  target processes should be shown as facets. Useful on
-#'  hierarchical VAR fits where the raw K x K panel would run to
-#'  dozens of panels. Defaults to all processes.
-#'@param contributing Optional integer vector selecting which
-#'  source processes appear as stacked contributions to each target.
+#'@param series Optional positions or names of the target processes
+#'  shown as facets. Useful on hierarchical VAR fits where the raw
+#'  K x K panel would run to dozens of panels. Defaults to all
+#'  processes.
+#'@param contributing Optional positions or names of the source
+#'  processes stacked as contributions to each target.
 #'  The shares of the sources drawn are renormalised to sum to one. On
 #'  a hierarchical VAR this isolates the dependencies within one group.
 #'  Defaults to all processes.
@@ -134,10 +134,9 @@ plot.mvgam_fevd <- function(x, series = NULL, contributing = NULL, ...) {
   checkmate::assert_class(x, "mvgam_fevd")
   rlang::check_dots_empty()
   ynames <- names(x[[1]])
-  n_proc <- length(ynames)
-  target_keep <- validate_var_plot_ids(series, n_proc, "series")
+  target_keep <- validate_var_plot_ids(series, ynames, "series")
   source_keep <- validate_var_plot_ids(
-    contributing, n_proc, "contributing"
+    contributing, ynames, "contributing"
   )
   surface <- fevd_draws(x)
   shares <- surface$keys
@@ -170,16 +169,18 @@ plot_fevd_shares <- function(shares, target_names, source_names) {
   shares$Series <- factor(shares$Series, levels = source_names)
   shares$target <- factor(shares$target, levels = target_names)
 
-  # The bars partition a variance among sources, a categorical split.
-  # They take the colour-blind-safe Okabe-Ito palette.
-  fill_values <- mvgam_categorical_palette(length(source_names))
-  names(fill_values) <- source_names
+  # The bars partition a variance among sources. Up to three sources
+  # take the shades of the red scheme the irf and stability plots draw
+  # with. More sources take the Okabe-Ito hues.
+  set_color_scheme_local("red")
   ggplot2::ggplot(
     shares,
     ggplot2::aes(fill = .data$Series, y = .data$share, x = .data$horizon)
   ) +
-    ggplot2::geom_bar(position = "stack", stat = "identity") +
-    ggplot2::scale_fill_manual(values = fill_values) +
+    ggplot2::geom_bar(position = "stack", stat = "identity",
+                      colour = "white", linewidth = 0.2) +
+    mvgam_model_colour_scale(length(source_names), name = "Source",
+                             aesthetics = "fill") +
     ggplot2::facet_wrap(~ target) +
     mvgam_theme() +
     scale_x_steps("Forecast horizon") +

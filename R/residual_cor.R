@@ -28,8 +28,9 @@
 #'   coincide for a trend whose states keep no memory between times.
 #' @param by_group Logical. Only relevant for hierarchical trends
 #'   (`gr = ...` supplied to the trend constructor). When `FALSE`
-#'   (default) the population-level correlation
-#'   (`tcrossprod(L_Omega_global)`) is returned. When `TRUE`, a named
+#'   (default) the population-level correlation of the shocks
+#'   (`tcrossprod(L_Omega_global)`) is returned, whatever `covariance`
+#'   asks for. When `TRUE`, a named
 #'   list of `mvgam_residcor` objects is returned, one per group; each
 #'   group's correlation is reconstructed as
 #'   `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])`.
@@ -524,6 +525,9 @@ compute_residcor_hierarchical <- function(object, cov_struct, covariance,
     glob_cov[d, , ] <- tcrossprod(L_glob_arr[d, , ])
   }
   global_names <- series_names$global
+  # The population correlation is a hyperparameter of the shocks. No
+  # population transition matrix exists to lift it through. It is an
+  # innovation correlation under either setting of `covariance`.
   global_out <- finalise_residcor(
     cov_draws = glob_cov,
     series_names = global_names,
@@ -532,7 +536,7 @@ compute_residcor_hierarchical <- function(object, cov_struct, covariance,
     robust = robust,
     probs = probs,
     pattern = "hierarchical_cholesky",
-    covariance = covariance,
+    covariance = "innovation",
     hierarchical = TRUE,
     group_label = "_global"
   )

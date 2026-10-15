@@ -23,610 +23,563 @@ knitr::opts_chunk$set(
   out.width = "85%", fig.align = "center"
 )
 library(mvgam)
-library(brms)
-library(dplyr)
-library(tidyr)
 library(ggplot2)
 theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 ```
 
-When several units are each observed over time on the same set
-of outcomes, which VAR should you fit? Pooling every panel into
-one shared transition matrix and one shared innovation
-covariance squeezes out real heterogeneity between units.
-Estimating a separate VAR for each panel throws away the shared
-signal that similar units behave similarly, and on short panels
-the individual fits collapse into noise. Partial pooling is the
-usual answer. Each panel gets its own $(A, \Sigma)$. Each of
-those objects is then shrunk toward a global mean the sampler
-learns from the whole collection (Savage
-[2016](https://rpubs.com/jimsavage/hierarchical_var); Gelman &
-Hill [2007](https://doi.org/10.1017/CBO9780511790942)). This
-article replicates Jim Savage's 2016 tutorial in mvgam on fresh
-World Development Indicators macro data for eight economies. It
-then pushes past his summaries into per-country impulse
-responses, forecast error variance decompositions and system
-stability metrics, all of which fall straight out of the same
-fitted object.
+Eight economies, each observed for forty-nine years on the same three
+outcomes, could share one vector autoregression (VAR) or have one each.
+A single VAR for all eight ignores the differences between economies.
+Eight separate VARs ignore what the economies have in common.
+Forty-nine annual observations per economy also estimate a VAR poorly
+on their own. A hierarchical VAR
+gives each economy its own transition matrix and its own covariance of
+shocks. It draws both towards a mean shared by all eight. The data
+decide how strongly (Gelman and Hill
+[2007](https://doi.org/10.1017/CBO9780511790942)).
 
-## What Savage set out to answer
-
-There are really only three ways to fit a VAR to a group of
-economies observed over time. You can pool the data and estimate
-a single VAR that applies to every country. You can fit each
-country's VAR by itself. Or you can partially pool: keep a
-transition matrix and innovation covariance per country, and
-shrink each of them toward a global mean the sampler learns
-alongside them. The pooled fit throws away all the interesting
-differences between countries; the independent fits waste the
-common structure that the panels share, and struggle to pin down
-anything with only 30 to 50 annual observations each. Savage
-([2016](https://rpubs.com/jimsavage/hierarchical_var)) argued
-that the third option is the sensible one in practice, and
-worked through it in Stan. His formulation kept each country's
-$(A_c, \Sigma_c)$ but mixed its innovation correlation with the
-global one through a scalar `rho`, using the LKJ-mixture
-construction Ben Goodrich contributed to the original post.
-
-Savage's own numbers (WDI data up to about 2015, roughly 313
-observations after log-differencing and dropping incomplete
-rows) reported a posterior mean global correlation of
-
-$$
-\bar\Omega \;\approx\;
-\begin{bmatrix}
-1.00 & 0.89 & 0.93 \\
-0.89 & 1.00 & 0.74 \\
-0.93 & 0.74 & 1.00
-\end{bmatrix},
-$$
-
-a partial pooling weight $\mathrm{E}[\rho] = 0.82$ with a 90%
-credible interval of $[0.75,\ 0.90]$, and effective sample sizes
-in the low hundreds at $\hat R \approx 1.01$. Those are the
-targets a modern mvgam refit should recover on the same data.
-The sections below check whether it does. Then they push past
-the summaries Savage stopped at into per-country IRFs, FEVDs,
-stability metrics and forecasts, all of which fall out of the
-same fitted object.
+Savage ([2016](https://rpubs.com/jimsavage/hierarchical_var)) fitted
+such a model in Stan to growth in output, consumption and investment
+for eight economies. This article fits it in mvgam to the same eight
+economies over 1970 to 2019. It compares the pooling with Savage's
+estimates, then works through what each economy's VAR offers: its
+transition matrix, the correlation of its shocks, impulse responses,
+variance decompositions and stability metrics.
 
 ## The data
 
-We use annual growth rates of three real macroeconomic series
-(GDP, consumption, gross fixed capital formation) from the World
-Development Indicators (World Bank
-[2024](https://data.worldbank.org/)) for the eight economies
-Savage used (Australia, Canada, Chile, Ireland, New Zealand,
-South Africa, the United Kingdom and the United States). The
-WDI package pulls the raw levels; a log-difference gives growth
-rates.
+The World Development Indicators (World Bank
+[2024](https://data.worldbank.org/)) record annual GDP, final
+consumption and gross fixed capital formation in constant local
+currency. The WDI package (Arel-Bundock
+[2013](https://doi.org/10.32614/RJ-2013-023)) downloads them for the
+economies Savage used: Australia, Canada, Chile, Ireland, New Zealand,
+South Africa, the United Kingdom and the United States.
 
-```{r data-fetch}
+```{r cache-path, include = FALSE}
+# The download runs on the first knit. Later knits read the copy
+# saved in the user's cache directory.
+cache_file <- file.path(tools::R_user_dir("mvgam", "cache"),
+                        "wdi_growth_1970_2019.rds")
+```
+
+```{r wdi, eval = !file.exists(cache_file)}
 raw <- WDI::WDI(
-  indicator = c("NY.GDP.MKTP.KN", "NE.CON.TOTL.KN", "NE.GDI.FTOT.KN"),
-  start = 1970
+  country = c("AU", "CA", "CL", "IE", "NZ", "ZA", "GB", "US"),
+  indicator = c(gdp = "NY.GDP.MKTP.KN", cons = "NE.CON.TOTL.KN",
+                gfcf = "NE.GDI.FTOT.KN"),
+  start = 1970, end = 2019
 )
 ```
 
-Keep the years where all three indicators are populated, take the
-annual log-difference within each country and restrict the panel
-to Savage's eight economies.
-
-```{r growth-rates}
-wide <- raw |>
-  dplyr::filter(stats::complete.cases(raw)) |>
-  dplyr::rename(
-    GDP  = NY.GDP.MKTP.KN,
-    CONS = NE.CON.TOTL.KN,
-    GFCF = NE.GDI.FTOT.KN
-  ) |>
-  dplyr::filter(GDP > 0, CONS > 0, GFCF > 0) |>
-  dplyr::group_by(country) |>
-  dplyr::arrange(year) |>
-  dplyr::mutate(
-    dl_gdp  = c(NA, diff(log(GDP))),
-    dl_cons = c(NA, diff(log(CONS))),
-    dl_gfcf = c(NA, diff(log(GFCF)))
-  ) |>
-  dplyr::ungroup() |>
-  dplyr::filter(stats::complete.cases(dplyr::across(
-    c(dl_gdp, dl_cons, dl_gfcf)
-  ))) |>
-  dplyr::filter(country %in% c(
-    "United States", "United Kingdom", "Australia",
-    "New Zealand", "Chile", "Canada", "Ireland", "South Africa"
-  )) |>
-  dplyr::group_by(country) |>
-  dplyr::arrange(year) |>
-  dplyr::mutate(time = seq_len(dplyr::n())) |>
-  dplyr::ungroup()
+```{r wdi-cache, include = FALSE}
+if (file.exists(cache_file)) {
+  raw <- readRDS(cache_file)
+} else {
+  dir.create(dirname(cache_file), recursive = TRUE, showWarnings = FALSE)
+  saveRDS(raw, cache_file)
+}
 ```
 
-Growth rates then get standardised per outcome. The three
-outcomes sit on quite different scales: investment growth has
-roughly three times the standard deviation of consumption or GDP
-growth. Standardising puts them onto a common variance so a
-single prior on AR coefficients and innovation correlations is
-equally informative for each outcome. Countries and outcomes
-become factors, and every `(country, outcome)` pair gets a
-unique `series` label that mvgam uses to identify the 24
-outcome-series inside the panel.
+The panel ends in 2019. The contractions and rebounds of the pandemic
+years would dominate every estimate. Growth
+is the difference in log levels from one year to the next, which
+leaves 49 years for each economy:
 
-```{r reshape}
-long <- wide |>
-  tidyr::pivot_longer(
-    cols = c(dl_gdp, dl_cons, dl_gfcf),
-    names_to = "outcome",
-    values_to = "y"
-  ) |>
-  dplyr::mutate(
-    country = factor(country),
-    outcome = factor(outcome),
-    series  = factor(paste(country, outcome, sep = "."))
-  )
-
-scales <- long |>
-  dplyr::group_by(outcome) |>
-  dplyr::summarise(
-    mean = mean(y, na.rm = TRUE),
-    sd   = stats::sd(y, na.rm = TRUE),
-    .groups = "drop"
-  )
-long <- long |>
-  dplyr::left_join(scales, by = "outcome") |>
-  dplyr::mutate(y = (y - mean) / sd) |>
-  dplyr::select(-mean, -sd)
+```{r growth}
+raw <- raw[order(raw$country, raw$year), ]
+outcomes <- c(gdp = "GDP", cons = "Consumption", gfcf = "Investment")
+growth <- do.call(rbind, lapply(split(raw, raw$country), function(d) {
+  do.call(rbind, lapply(names(outcomes), function(v) {
+    data.frame(country = d$country[-1], year = d$year[-1],
+               outcome = outcomes[[v]], growth = diff(log(d[[v]])))
+  }))
+}))
+growth$country <- factor(growth$country)
+growth$outcome <- factor(growth$outcome, levels = outcomes)
+growth$time <- growth$year - min(growth$year) + 1
+rownames(growth) <- NULL
 ```
 
-### Padding ragged tails
-
-Panel data in the wild rarely line up cleanly. The WDI pull ends
-in different years for different countries: two of the eight in
-this panel (New Zealand and the United States) stop one year
-earlier than the other six. mvgam requires a **rectangular
-panel** on the shared union of time points, so every
-`(series, time)` cell must exist as a row with `y = NA` at any
-cell where the observation is missing. The per-response NA
-machinery then handles the missing rows internally so the
-sampler treats them correctly. This padding step is the most
-common data-prep gotcha for hierarchical panel fits. Doing it
-with `tidyr::expand_grid()` and `dplyr::left_join()` makes the
-intent explicit.
-
-```{r padding-example}
-full_grid <- tidyr::expand_grid(
-  country = levels(long$country),
-  outcome = levels(long$outcome),
-  time    = seq_len(max(long$time))
-) |>
-  dplyr::mutate(
-    country = factor(country, levels = levels(long$country)),
-    outcome = factor(outcome, levels = levels(long$outcome)),
-    series  = factor(
-      paste(country, outcome, sep = "."),
-      levels = levels(long$series)
-    )
-  )
-long <- dplyr::left_join(
-  full_grid, long,
-  by = c("country", "outcome", "time", "series")
-)
+```{r plot-growth, fig.asp = 0.9, fig.cap = "Annual growth in real GDP, consumption and investment for the eight economies, 1971 to 2019, as the difference in log levels."}
+ggplot(growth, aes(year, growth, colour = country)) +
+  geom_line(linewidth = 0.4) +
+  scale_colour_manual(values = palette.colors(8, "Okabe-Ito")) +
+  facet_wrap(~ outcome, ncol = 1, scales = "free_y") +
+  labs(x = NULL, y = "Growth (log difference)", colour = NULL)
 ```
 
-After padding, `long` has 55 time points × 24 series = 1320 rows,
-with `y = NA` at the six cells (two countries × three outcomes)
-where WDI stopped early. mvgam validates this rectangle at fit
-time; if you skip the pad you will see a data-shape error naming
-the mismatched counts.
-
-```{r data-glimpse}
-head(long)
-data.frame(
-  rows      = nrow(long),
-  countries = nlevels(long$country),
-  outcomes  = nlevels(long$outcome),
-  series    = nlevels(long$series)
-)
+```{r growth-numbers, include = FALSE}
+sds <- tapply(growth$growth, growth$outcome, stats::sd)
+fe_inv_ratio <- sprintf("%.0f", sds[["Investment"]] / sds[["GDP"]])
+gdp09 <- growth[growth$outcome == "GDP" & growth$year == 2009, ]
+fe_fell09 <- sum(gdp09$growth < 0)
+ireland <- function(o, y) {
+  g <- growth$growth[growth$country == "Ireland" & growth$outcome == o &
+                       growth$year == y]
+  sprintf("%.0f%%", 100 * (exp(g) - 1))
+}
+fe_ie_gdp15 <- ireland("GDP", 2015)
+fe_ie_inv19 <- ireland("Investment", 2019)
+# The prose below calls these the largest rises in GDP and investment
+top <- function(o) growth[growth$outcome == o, ][
+  which.max(growth$growth[growth$outcome == o]), c("country", "year")]
+stopifnot(identical(unlist(lapply(top("GDP"), as.character)),
+                    c(country = "Ireland", year = "2015")),
+          identical(unlist(lapply(top("Investment"), as.character)),
+                    c(country = "Ireland", year = "2019")))
+# The prose below names Chile and Ireland as the most volatile
+by_country <- tapply(growth$growth, growth$country, stats::sd)
+stopifnot(setequal(names(sort(by_country, decreasing = TRUE))[1:2],
+                   c("Chile", "Ireland")))
 ```
 
-## Building the hierarchical VAR
+Investment growth varies about `r fe_inv_ratio` times as much as GDP
+growth. GDP fell in 2009 in `r fe_fell09` of the eight economies.
+Ireland's GDP grew by `r fe_ie_gdp15` in 2015 and its investment by
+`r fe_ie_inv19` in 2019, the largest rises in the panel.
 
-The target model gives each country its own transition matrix
-$A_c$ and its own innovation covariance $\Sigma_c$, and shrinks
-both toward a global mean the sampler learns simultaneously.
-mvgam encodes that structure through three arguments to `VAR()`:
-`gr = country` specifies the grouping factor (one matrix per
-country), `subgr = outcome` specifies the matrix dimension (3
-outcomes per country), and `cor = TRUE` turns on the correlated
-innovations that carry the LKJ-mixture pooling on the
-innovation correlations. Together the three arguments map to
-the multi-panel prior in Savage's formulation:
+Because the three outcomes differ in scale, one prior on the
+coefficients would mean different things for each. Dividing each
+outcome by its standard deviation over the whole panel puts them on one
+scale, where a single prior means the same for all three. The
+economies keep their own volatility. Chile and Ireland remain the most
+variable of the eight.
+
+```{r standardise}
+growth$y <- growth$growth / ave(growth$growth, growth$outcome, FUN = sd)
+growth$y <- growth$y - ave(growth$y, growth$country, growth$outcome)
+head(growth)
+```
+
+The second line subtracts each series' mean. Because an intercept for
+each series and that series' latent states describe the same level,
+estimating both leaves the pair poorly identified. The subtracted means
+take the place of the intercepts Savage estimated for each economy and
+outcome.
+
+## The model
+
+The model has two layers. The observation layer says that each
+standardised growth rate $y_{c,o,t}$, for economy $c$, outcome $o$ and
+year $t$, measures a latent state $z_{c,o,t}$ with observation error:
 
 $$
-\begin{aligned}
-y_{c, o, t} \;&=\; z_{c, o, t} \\
-\mathbf{z}_{c, t} \;&=\; A_c \, \mathbf{z}_{c, t-1} + \boldsymbol{\varepsilon}_{c, t}, \quad
-  \boldsymbol{\varepsilon}_{c, t} \sim \mathrm{MVN}\!\left(\mathbf{0},\; \Sigma_c\right), \\
-\mathrm{vec}(A_c) \;&\sim\; \mathrm{Normal}\!\left(\mathrm{vec}(\bar A),\; \sigma_A\right), \\
-\Sigma_c \;&=\; \mathrm{diag}(\tau_c)\, \Omega_c\, \mathrm{diag}(\tau_c), \\
-\Omega_c \;&\sim\; \mathrm{LKJ\text{-}mix}\!\left(\Omega_{\text{global}},\; \alpha_{\text{cor}}\right).
-\end{aligned}
+y_{c,o,t} \sim \mathrm{Normal}(z_{c,o,t},\ \sigma).
 $$
 
-Country $c$ has its own transition matrix $A_c$ and innovation
-correlation $\Omega_c$; both are pulled toward global objects
-$\bar A$ and $\Omega_{\text{global}}$ the sampler learns
-simultaneously. The scalar $\alpha_{\text{cor}} \in (0, 1)$
-controls how tightly $\Omega_c$ is pulled toward the global
-correlation (Savage's `rho`); when
-$\alpha_{\text{cor}} \to 1$ every country's correlation matrix
-sits at the global mean, when $\alpha_{\text{cor}} \to 0$ each
-country's correlation is estimated freely with almost no
-pooling.
+The three states of each economy follow a VAR of their own:
 
-We replace three priors the mvgam defaults leave diffuse: the AR
-coefficient location (`Amu_trend`, tighter around zero than the
-default `normal(0, sqrt(0.455))`), the global correlation Cholesky
-(`L_Omega_global_trend`, mildly shrunk toward the identity with
-`lkj(2)`), and the residual observation SD (already small on
-standardised data). The rest of the priors are the mvgam
-defaults.
+$$
+\mathbf{z}_{c,t} \sim \mathrm{MVN}(A_c\,\mathbf{z}_{c,t-1},\ \Sigma_c),
+\qquad
+\Sigma_c = \mathrm{diag}(\boldsymbol{\tau}_c)\,\Omega_c\,
+  \mathrm{diag}(\boldsymbol{\tau}_c).
+$$
 
-```{r fit-code}
-custom_priors <- c(
-  prior(normal(0, 0.15),         class = "Amu_trend"),
-  prior(lkj_corr_cholesky(2),    class = "L_Omega_global_trend"),
-  prior(student_t(3, 0, 0.5),    class = "sigma")
-)
+$A_c$ holds the lagged effects among economy $c$'s outcomes.
+$\boldsymbol{\tau}_c$ holds the standard deviations of its shocks and
+$\Omega_c$ their correlations. The economies do not interact: a shock
+in Chile moves only Chile's states.
 
-mod_hier <- mvgam(
-  formula       = y ~ 0,
-  trend_formula = ~ VAR(p = 1, gr = country, subgr = outcome,
-                          cor = TRUE),
-  data          = long,
-  family        = gaussian(),
-  prior         = custom_priors,
-  chains        = 4,
-  cores         = 4,
-  iter          = 700,
-  warmup        = 500,
-  control       = list(adapt_delta = 0.95, max_treedepth = 15),
-  silent        = 2
+The pooling acts on both $A_c$ and $\Omega_c$. mvgam keeps every $A_c$
+stationary through the prior of Heaps
+([2023](https://doi.org/10.1080/10618600.2022.2079648)), under which
+each $A_c$ is a transformation of an unconstrained matrix. The
+diagonal elements of the eight unconstrained matrices share one normal
+prior. Their off-diagonal elements share another. mvgam estimates the
+means and precisions of both priors. The correlation of each
+economy's shocks mixes a correlation shared by all eight with a
+deviation of its own:
+
+$$
+\Omega_c = \alpha\,\Omega + (1 - \alpha)\,\tilde\Omega_c .
+$$
+
+With $\alpha$ near one, every economy's shocks correlate as $\Omega$
+says. With $\alpha$ near zero, each economy's correlation is its own.
+Ben Goodrich proposed this mixture in the discussion of Savage's post.
+We kept the priors given there. The global correlation keeps mvgam's
+default LKJ(1) prior, which is uniform over correlation matrices. Each
+deviation $\tilde\Omega_c$ has an LKJ(10) prior, which holds it near
+the identity (Lewandowski et al.
+[2009](https://doi.org/10.1016/j.jmva.2009.04.008)). $\alpha$ has a
+Beta(2, 2) prior.
+
+Savage fitted the VAR to the observed growth rates. Because
+statistical agencies revise national accounts after their first
+release, a published growth rate measures the economy with error of
+its own. The state-space layer keeps that measurement error apart from
+the economies' shocks (Auger-Méthé et al.
+[2021](https://doi.org/10.1002/ecm.1470)). Forty-nine years of data
+separate the two variances poorly. The inverse gamma prior on $\sigma$
+supplies the missing information, placing observation error near 0.16
+of a standard deviation of growth.
+
+In mvgam, `VAR()` takes the grouping through two arguments. `gr`
+names the factor whose levels each get a VAR, here the economies.
+`subgr` names the factor whose levels are the states within each
+group, here the outcomes. `cor = TRUE` estimates the correlations of
+the shocks:
+
+```{r fit}
+fit <- mvgam(
+  formula = y ~ -1,
+  trend_formula = ~ VAR(p = 1, gr = country, subgr = outcome, cor = TRUE),
+  family = gaussian(),
+  data = growth,
+  priors = c(
+    prior(inv_gamma(20, 3), class = sigma),
+    prior(lkj_corr_cholesky(10), class = L_deviation_group_trend),
+    prior(beta(2, 2), class = alpha_cor_trend)
+  ),
+  chains = 4,
+  iter = 2000,
+  warmup = 1000,
+  control = list(adapt_delta = 0.95),
+  seed = 2016,
+  silent = 2
 )
 ```
 
-The Heaps ([2023](https://doi.org/10.1080/10618600.2022.2079648))
-stationarity transform runs once per country per gradient
-evaluation, so a hierarchical VAR is roughly $C$ times slower
-per iteration than a single-panel fit of the same dimension.
-The sampler needs `adapt_delta = 0.95` and
-`max_treedepth = 15` to keep divergence counts low on this
-panel; the tight `Amu_trend` prior at `normal(0, 0.15)` reflects
-that macro AR(1) coefficients on log-difference growth rates
-concentrate near zero.
+The observation formula `y ~ -1` adds nothing to the latent states.
+mvgam names each of the 24 series by joining its economy and outcome,
+as in `Australia_GDP`.
 
-## Model summary
-
-`summary()` on a hierarchical VAR fit reports the shared
-observation parameters (a single residual SD here) and the global
-trend hyperparameters: the shrinkage targets `Amu_trend` and
-`Aomega_trend`, the pooling weight `alpha_cor_trend` and the
-innovation SDs `sigma_group_trend` for each country and outcome.
-Each country carries its own $A_c$ and $\Sigma_c$. Those arrays
-run to hundreds of cells on this panel, and `summary()` prints
-them only with `matrices = TRUE`. The sections below pull out
-individual blocks with `posterior_transition_matrix()`,
-`residual_cor()` and `mcmc_plot()`.
-
-```{r summary}
-summary(mod_hier)
+```{r helpers, include = FALSE}
+# Format an estimate with its interval for inline reporting
+ci <- function(est, lo, hi, digits = 2) {
+  # A value that rounds to zero prints without a minus sign
+  f <- function(v) sub("^-(0\\.0+)$", "\\1",
+                       formatC(v, format = "f", digits = digits))
+  paste0(f(est), " [", f(lo), ", ", f(hi), "]")
+}
 ```
 
-## Diagnostics: convergence and identification
+## How strongly the economies pool
 
-The `summary()` above runs mvgam's internal convergence advisor,
-which filters out latent state parameters (the trajectories
-$\mathbf{z}_{c,t}$) before checking $\hat R$ and effective
-sample size on the structural parameters that carry the story.
-The advisor emits warnings for parameters with $\hat R > 1.05$
-or bulk ESS below $100 \times$ chains, so any surviving message
-tells you which block needs attention.
+`alpha_cor_trend` is the weight $\alpha$ on the shared correlation:
 
-For this fit the country transition matrices ($A_c$), the
-country innovation covariances ($\Sigma_c$), the global
-shrinkage targets (`Amu_trend`, `Aomega_trend`,
-`L_Omega_global_trend`) and the partial pooling weight
-(`alpha_cor_trend`) all converge cleanly at $\hat R \leq 1.01$.
-The one weak link is `sigma`, the residual observation SD: a
-Gaussian state space model on continuous data cannot fully
-separate observation noise from process innovation noise
-(Auger-Méthé et al.
-[2021](https://doi.org/10.1002/ecm.1470)). Both scales enter the
-likelihood only through the sum of their variances at any given
-timepoint, so the sampler traces a ridge along which their
-posteriors trade off.
+```{r alpha, fig.asp = 0.5, fig.cap = "Posterior distribution of the weight on the shared correlation of the shocks."}
+mcmc_plot(fit, variable = "alpha_cor_trend", type = "hist")
+```
 
-The `summary()` output above reports `sigma` with a small
-posterior mean (near 0.05 on the standardised scale) but very
-large `Rhat` and small effective sample size. Practically this
-says the observation SD hugs zero while the process innovation
-SDs (`sigma_group_trend[c, k]`, further down the summary) carry
-almost all of the variance. Treat `sigma` as poorly identified
-here and interpret only the structural blocks below.
+```{r alpha-numbers, include = FALSE}
+alpha <- as.numeric(as_draws_matrix(fit, variable = "alpha_cor_trend"))
+fe_alpha <- ci(mean(alpha), quantile(alpha, 0.025), quantile(alpha, 0.975))
+```
 
-## Transition matrices per country
+The weight is `r fe_alpha`. Savage estimated 0.82 [0.75, 0.90] from
+313 annual observations of an earlier vintage of the same indicators.
 
-How much does the partial-pooling prior shrink each country's
-AR persistence toward the global mean? Plotting the medians and
-95% intervals for the self-persistence diagonal by country
-answers that directly. `posterior_transition_matrix(mod_hier,
-groups = <name>)` returns the `[ndraws, K, K]` array of posterior
-draws for one country's $A_c$, `groups = "all"` returns the set
-of them classed for a faceted plot, and the default `groups =
-NULL` returns the shrinkage target built from the
-hyperparameters `Amu_trend[1, 1]` (diagonal mean) and
-`Amu_trend[2, 1]` (off-diagonal mean).
+`residual_cor()` summarises the shared correlation $\Omega$.
+`covariance = "innovation"` asks for the correlation of the shocks
+themselves. The default, `"stationary"`, passes them through each
+economy's transition matrix:
 
-```{r plot-A-country-diag, fig.cap = "Posterior medians and 95% intervals for the three self-persistence coefficients (diagonal of A_c) by country. Points close together across countries indicate that the partial-pooling prior has pulled the country-specific estimates toward the same global value."}
-A_all <- posterior_transition_matrix(mod_hier, groups = "all")
+```{r rc-global}
+rc <- residual_cor(fit, covariance = "innovation")
+summary(rc)
+```
+
+```{r rc-numbers, include = FALSE}
+pair <- function(rc, a, b) {
+  s <- summary(rc)
+  r <- s[(s$series_1 == a & s$series_2 == b) |
+           (s$series_1 == b & s$series_2 == a), ]
+  ci(r$Estimate, r$Q_lower, r$Q_upper)
+}
+fe_gc <- pair(rc, "GDP", "Consumption")
+fe_gi <- pair(rc, "GDP", "Investment")
+fe_ci <- pair(rc, "Consumption", "Investment")
+# The prose below orders the three correlations
+est <- rc$cor
+stopifnot(est["GDP", "Investment"] > est["GDP", "Consumption"],
+          est["GDP", "Consumption"] > est["Consumption", "Investment"])
+```
+
+GDP shocks correlate with investment shocks at `r fe_gi` and with
+consumption shocks at `r fe_gc`. Consumption and investment shocks
+correlate at `r fe_ci`. Savage's estimates were 0.93, 0.89 and 0.74,
+in the same order.
+
+`by_group = TRUE` returns the correlation of each economy's shocks:
+
+```{r rc-groups, fig.width = 8, fig.asp = 0.8, fig.cap = "Posterior mean correlations of the shocks in each economy. Outlined pairs have 95% credible intervals that exclude zero."}
+rc_groups <- residual_cor(fit, covariance = "innovation", by_group = TRUE)
+plot(rc_groups, include_global = FALSE)
+```
+
+```{r rc-group-numbers, include = FALSE}
+gi <- vapply(names(rc_groups)[-1], function(g) {
+  rc_groups[[g]]$cor["GDP", "Investment"]
+}, numeric(1))
+fe_gi_range <- sprintf("%.2f", range(gi))
+# The prose below says every economy's GDP-investment correlation
+# falls below the shared one
+stopifnot(all(gi < est["GDP", "Investment"]))
+```
+
+The economies' GDP and investment shocks correlate at
+`r fe_gi_range[1]` to `r fe_gi_range[2]`, all below the shared
+`r sprintf("%.2f", est["GDP", "Investment"])`. Forty-nine years of
+shocks move each deviation little from the identity its LKJ(10) prior
+favours. The fifth of each economy's correlation that the deviation
+contributes pulls that correlation towards zero.
+
+## Transition matrices
+
+`posterior_transition_matrix()` with `groups = "all"` returns each
+economy's $A_c$. Its diagonal holds the persistence of each outcome
+from one year to the next:
+
+```{r A-diag, fig.asp = 0.8, fig.cap = "Posterior means and 95% credible intervals of the diagonal of each economy's transition matrix."}
+A_all <- posterior_transition_matrix(fit, groups = "all")
 plot(A_all, type = "diagonal")
 ```
 
-## The global innovation correlation
-
-The global correlation matrix $\Omega_{\text{global}}$ tells you
-which outcomes tend to share contemporaneous shocks across
-countries once the country-specific piece has been factored out.
-`residual_cor(mod_hier)` reads the LKJ Cholesky
-`L_Omega_global_trend` internally and returns a classed
-`mvgam_residcor` object. That object carries, per cell, the
-posterior mean, standard error, credible interval, effective
-sample size, and probability of a nonzero correlation. The `cor`
-slot is the correlation matrix a reader will usually want to
-print.
-
-```{r sigma-cor-global}
-rc_global <- residual_cor(mod_hier)
-round(rc_global$cor, 2)
+```{r A-numbers, include = FALSE}
+A <- posterior_transition_matrix(fit)
+cell <- function(m, i, j) ci(m$A[i, j], m$A_lower[i, j], m$A_upper[i, j])
+fe_cons_pool <- cell(A, "Consumption", "Consumption")
+fe_gdp_pool <- cell(A, "GDP", "GDP")
+us <- A_all[["United States"]]
+fe_us_gdp <- cell(us, "GDP", "GDP")
+fe_us_cons <- cell(us, "GDP", "Consumption")
+# The stationary correlation of the states, the regressors of each VAR
+states <- residual_cor(fit, by_group = TRUE)
+gdp_cons <- vapply(names(states)[-1], function(g) {
+  states[[g]]$cor["GDP", "Consumption"]
+}, numeric(1))
+fe_us_states <- sprintf("%.2f", gdp_cons[["United States"]])
+# The prose below says consumption is the most persistent outcome on
+# average, that the US GDP diagonal is negative and that US GDP and
+# consumption states correlate most strongly of the eight
+stopifnot(which.max(diag(A$A)) == 2L, us$A_upper["GDP", "GDP"] < 0,
+          names(which.max(gdp_cons)) == "United States")
 ```
 
-## The partial-pooling weight
+Without `groups`, `posterior_transition_matrix()` averages the eight
+matrices in each posterior draw:
 
-The scalar `alpha_cor_trend` mixes each country's innovation
-correlation between its own data-driven estimate and the global
-$\Omega_{\text{global}}$. Values close to one indicate strong
-pooling (country correlations sit near the global mean); values
-close to zero indicate little pooling (each country's correlation
-is estimated almost freely).
-
-```{r plot-alpha-cor, fig.cap = "Posterior distribution of the partial-pooling weight alpha_cor_trend. Values near one mean country-specific innovation correlations are pulled tightly toward the global correlation; values near zero mean each country is estimated with little pooling."}
-mcmc_plot(mod_hier,
-          variable = "alpha_cor_trend",
-          type = "hist")
+```{r A}
+A
 ```
 
-## Country-specific innovation correlations
+Consumption growth is the most persistent of the three outcomes. Its
+average diagonal coefficient is `r fe_cons_pool`, against
+`r fe_gdp_pool` for GDP.
 
-The pooling weight `alpha_cor_trend` sets how tightly each
-country's innovation correlation is pulled toward the global
-mean; heatmaps of the per-country posterior median correlations
-show how that pull plays out. If the weight is high, the country
-heatmaps should look close to the global heatmap above. If it is
-low, some countries should show idiosyncratic structure.
+The United States departs from this pattern. Its GDP diagonal is
+`r fe_us_gdp` and its GDP growth loads on last year's consumption
+growth at `r fe_us_cons`. In the United States, the states of GDP and
+consumption
+correlate at `r fe_us_states`, the most strongly of the eight. Last
+year's GDP and consumption then carry nearly the same information
+about this year. The model can trade a negative coefficient on one
+against a positive coefficient on the other. The wide intervals record
+that trade-off.
 
-```{r plot-country-cor, fig.width = 8, fig.height = 5, fig.cap = "Posterior mean innovation correlation matrix for each country. Each cell is the correlation between two outcomes (GDP, consumption, investment) once each country's transition matrix has absorbed the lagged structure. Similarity across countries reflects the pull of the alpha_cor_trend partial-pooling weight."}
-plot(
-  residual_cor(mod_hier, by_group = TRUE),
-  include_global = FALSE
+## Impulse responses
+
+An impulse response gives the expected path of every state after a
+single shock to one of them (Lütkepohl
+[2005](https://doi.org/10.1007/978-3-540-27752-1)). `irf()` computes
+the generalised impulse response by default (Pesaran and Shin
+[1998](https://doi.org/10.1016/S0165-1765(97)00214-0)). A shock to one
+outcome brings with it the shocks its correlated outcomes receive in
+the same year. Horizon 1 is the year of the shock.
+
+```{r irf}
+irfs <- irf(fit, h = 8)
+```
+
+`plot()` selects the shock and the responses among the 24 states by
+name. Here we draw the responses of the three Australian states to a
+shock in Australian investment:
+
+```{r plot-irf, fig.asp = 0.5, fig.cap = "Generalised impulse responses of Australian GDP, consumption and investment to a one standard deviation shock in Australian investment, with 95% credible intervals."}
+aus <- c("Australia_GDP", "Australia_Consumption", "Australia_Investment")
+plot(irfs, series = "Australia_Investment", responses = aus)
+```
+
+```{r irf-numbers, include = FALSE}
+ir <- as.data.frame(irfs)
+resp <- function(shock, h) {
+  r <- ir[ir$shock == shock & ir$horizon == h, ]
+  ci(r$irfQ50, r$irfQ2.5, r$irfQ97.5)
+}
+fe_ir_ii1 <- resp("Australia_Investment -> Australia_Investment", 1)
+fe_ir_ig1 <- resp("Australia_Investment -> Australia_GDP", 1)
+fe_ir_ic2 <- resp("Australia_Investment -> Australia_Consumption", 2)
+from_inv <- ir[startsWith(ir$shock, "Australia_Investment ->"), ]
+# The prose below says the shock stays within Australia, that
+# consumption is still raised in the second year and that every
+# response has decayed by year five
+stopifnot(
+  all(from_inv$irfQ50[!from_inv$shock %in%
+                        paste0("Australia_Investment -> ", aus)] == 0),
+  ir$irfQ2.5[ir$shock == "Australia_Investment -> Australia_Consumption" &
+               ir$horizon == 2] > 0,
+  all(abs(from_inv$irfQ50[from_inv$horizon >= 5]) < 0.01)
 )
 ```
 
-## Impulse responses (per country)
+The shock raises Australian investment by `r fe_ir_ii1` standard
+deviations in its first year. Because investment and GDP shocks
+correlate, GDP rises with it, by `r fe_ir_ig1`. Consumption is still
+raised in the second year, at `r fe_ir_ic2`. Every response has
+decayed by the fifth year.
 
-`irf()` traces how a unit shock to one outcome propagates
-through the VAR over the next $h$ years. On the hierarchical
-fit it uses the full $24 \times 24$ block-diagonal
-`Phi_trend`, and the default plot draws 24 response panels per
-shock. `responses` narrows the plot to the panels of
-interest. The three Australian processes occupy slots 1-3, and
-`series = 2` (Australian GDP) with `responses = 1:3` shows
-Australia's within-country IRF.
+## Variance decompositions
 
-```{r irf, fig.cap = "Generalized impulse response functions for Australia over an eight-year horizon. Each panel shows how one Australian outcome responds to a positive shock in Australian GDP."}
-irfs <- irf(mod_hier, h = 8)
-plot(irfs, series = 2, responses = 1:3)
+A forecast error variance decomposition (FEVD) splits the variance of
+each state's forecast among the states whose shocks generate it, at
+each horizon. `fevd()` splits the variance with the Cholesky factor of
+each economy's $\Sigma_c$, taken in the order of the levels of
+`outcome`. Where two outcomes' shocks correlate, the factor assigns
+the shared part to the outcome that comes first, here GDP.
+
+```{r fevd, fig.width = 8, fig.asp = 0.45, fig.cap = "Median share of the forecast error variance of each Australian outcome that each Australian source of shocks generates, by forecast horizon."}
+fevds <- fevd(fit, h = 8)
+plot(fevds, series = aus, contributing = aus)
 ```
 
-The diagonal panel, GDP against its own shock, traces own-lag
-persistence. The off-diagonal panels trace spillover to
-consumption and investment. Both spillovers are positive and
-substantial at short horizons, matching the strong global
-correlations we already saw in $\Omega_{\text{global}}$.
-
-## Forecast error variance decomposition
-
-`fevd()` turns the same lagged machinery around: at horizon $h$,
-what fraction of the forecast variance for outcome $i$ was
-generated by shocks in each source outcome? On a $24$-dimensional
-hierarchical VAR the raw output has 24 target panels each
-decomposed over 24 sources, so we pass `series = 1:3` and
-`contributing = 1:3` to keep the display within Australia. The
-retained shares get renormalised per (target, horizon) so each
-bar still reads as a proper decomposition.
-
-```{r fevd, fig.cap = "Forecast error variance decomposition for Australia. Each panel is an Australian target outcome; each bar breaks that outcome's forecast variance at a given horizon into contributions from the three Australian source outcomes."}
-fevds <- fevd(mod_hier, h = 8)
-plot(fevds, series = 1:3, contributing = 1:3)
+```{r fevd-numbers, include = FALSE}
+fv <- as.data.frame(fevds)
+share <- function(shock, h) {
+  r <- fv[fv$shock == shock & fv$horizon == h, ]
+  sprintf("%.0f%%", 100 * r$fevdQ50)
+}
+fe_fv_gi1 <- share("Australia_GDP -> Australia_Investment", 1)
+fe_fv_gc8 <- share("Australia_GDP -> Australia_Consumption", 8)
+fe_fv_gg8 <- share("Australia_GDP -> Australia_GDP", 8)
 ```
 
-At horizon one, the share attributed to an outcome's own past
-dominates: the one-step forecast error is almost entirely that
-outcome's own innovation. Longer horizons let the VAR integrate
-shocks through the transition matrix, so the cross-outcome
-slices grow.
+In the first year, GDP shocks generate `r fe_fv_gi1` of the forecast
+variance of Australian investment. That share is the part of two
+correlated shocks the ordering assigns to GDP. The shares barely move
+with the horizon. At eight years GDP shocks generate `r fe_fv_gg8` of
+the forecast variance of GDP itself and `r fe_fv_gc8` of that of
+consumption. Reordering the levels of `outcome` and refitting would
+move the shared part of each correlated pair to the other outcome. The
+generalised impulse responses above are the same in any order.
 
-## System-wide stability metrics
+## Stability of each economy
 
-`stability()` returns posterior draws of three interpretable
-system dynamics metrics on the fitted transition matrix (Ives
-et al.
-[2003](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2);
-Neubert & Caswell
-[1997](https://doi.org/10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2)):
-reactivity, mean return rate and variance return rate. On a
-hierarchical fit the routine operates on the assembled
-$A_{\text{trend}}$ of the whole eight-country pool. The
-histograms below therefore describe the system as a whole,
-not any single country. Two accompanying summaries mask on
-the structural zeros the block diagonal enforces:
-`prop_int_offdiag` isolates the share of interaction strength
-that lies within a country's own block, and
-`prop_cov_offdiag` does the same for the innovation
-correlations. Both quantities let you check how much of the
-system's dynamics live within countries and how much crosses
-between them.
+`stability()` summarises each economy's $A_c$ as the stability metrics
+of Ives et al.
+([2003](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2)).
+Reactivity is the log of the largest singular value of $A_c$. Above
+zero, some perturbation grows in the year after it occurs before the
+economy returns towards its means (Neubert et al.
+[2009](https://doi.org/10.1890/08-2014.1)). The mean return rate is
+the largest modulus of the eigenvalues of $A_c$. Once the slowest mode
+dominates, a deviation shrinks by about this factor each year. The
+variance return rate is its square. On a hierarchical fit,
+`stability()` reports these three metrics for every economy:
 
-```{r stability, fig.width = 8, fig.asp = 0.45, fig.cap = "Posterior distributions of three system dynamics metrics for the assembled 24-dimensional VAR. The dashed line marks zero, the reactivity threshold above which small shocks would grow immediately after the shock before decaying."}
-stab <- stability(mod_hier)
+```{r stability, fig.width = 8, fig.asp = 0.5, fig.cap = "Posterior medians and 95% credible intervals of reactivity and of the mean and variance return rates of each economy. The dashed line marks zero reactivity."}
+stab <- stability(fit)
 plot(stab)
 ```
 
-The posterior median mean return rate lands near 0.5. A
-typical shock therefore decays to roughly one-half of its
-magnitude after a single year, and to a negligible size within
-a handful of years thereafter, reflecting the mild persistence
-implied by the AR coefficients in $\bar A$. The reactivity
-distribution straddles zero. Some draws show a brief transient
-amplification of a shock before decay sets in; others do not.
+```{r stability-numbers, include = FALSE}
+st <- function(g, m) {
+  r <- stab[stab$group == g & stab$metric == m, ]
+  ci(r$Estimate, r$Q2.5, r$Q97.5)
+}
+react <- stab[stab$metric == "reactivity", ]
+fe_us_react <- st("United States", "reactivity")
+mrr <- stab[stab$metric == "mean_return_rate", ]
+fe_mrr_range <- sprintf("%.2f", range(mrr$Estimate))
+# The prose below says the United States alone has reactivity whose
+# interval lies above zero, and that deviations halve within two years
+stopifnot(identical(as.character(react$group[react$Q2.5 > 0]),
+                    "United States"),
+          max(mrr$Estimate)^2 < 0.5)
+```
 
-## Take-aways
+The median mean return rates run from `r fe_mrr_range[1]` to
+`r fe_mrr_range[2]`. A deviation of growth from its mean halves within
+two years in every economy. Only the United States has a reactivity
+interval above zero, at `r fe_us_react`. The other seven span zero. The
+US reactivity comes from the large offsetting coefficients of its
+transition matrix.
 
-Once fitted, a small set of helpers exposes the hierarchical
-VAR at any level:
+Partial pooling puts four fifths of the weight on a correlation of
+shocks shared by all eight economies, close to Savage's estimate from
+an earlier vintage of the same data. Each economy keeps a transition
+matrix of its own. The least certain of the eight belongs to the United
+States, whose GDP and consumption states move most closely together.
+Forty-nine annual observations are few for a VAR of three states. The
+shared means make eight of them estimable at once.
 
-- `summary(mod)` prints the hyperparameters, and
-  `matrices = TRUE` adds every cell of each country's matrices.
-- `posterior_transition_matrix(mod, groups = <name>)` returns
-  each country's $A_c$ as a `[ndraws, K, K]` array. Leave
-  `groups` at its default for the shrinkage target built from
-  `Amu_trend`.
-- `residual_cor(mod)` returns the global innovation correlation
-  as an `mvgam_residcor` object with print, summary and plot
-  methods. Pass `by_group = TRUE` to receive the same object per
-  country plus a `_global` reference matrix.
-- `mcmc_plot(mod, variable = "alpha_cor_trend")` reads off how
-  much pooling the data support on the innovation correlations.
-- `irf(mod)` and `fevd(mod)` operate on the assembled
-  $24 \times 24$ transition matrix. Their `plot` methods take
-  `series`, `responses` and `contributing` selectors, so a
-  hierarchical fit can be inspected one country at a time.
+## Where to next
 
-Partial pooling on the correlation structure
-(`alpha_cor_trend`) balances information sharing with
-country-level adaptation. Each economy keeps its own dynamics
-and its own shocks, but every panel borrows strength from the
-whole pool. That middle ground matters. Pooled VARs cannot
-reach it, because forcing one shared $(A, \Sigma)$ on eight
-economies that differ in volatility and persistence throws
-away the very heterogeneity a reader would look at these
-countries for. Fully unpooled VARs abandon it too, because 30
-to 50 annual observations per country are far too short to pin
-down a 3 × 3 transition matrix and a 3 × 3 innovation
-covariance in isolation. Only the hierarchical fit recovers
-Savage's global correlation (diagonal 1, off-diagonals near 0.9
-and 0.65 on this WDI vintage) while still letting Chile carry
-three times the innovation scale of Australia.
+Each function used here has a help page, such as `?stability` or
+`?residual_cor`, with its arguments and output. `how_to_cite()` writes
+a methods paragraph for a fitted model, with its references.
 
-## Further reading
+Related articles:
 
-Complementary in-package tools:
-
-- `?VAR` for the trend-side constructor; the `gr` and `subgr`
-  arguments are what turn on the hierarchical panel structure
-  used here.
-- `?forecast.mvgam` and `?score` still work on hierarchical VAR
-  fits and forecast each country's outcomes forward using its own
-  $A_c$ and $\Sigma_c$.
-- `?how_to_cite` for a methods paragraph you can drop into a
-  manuscript. It describes the Heaps stationary prior, the LKJ
-  mixture pooling on the correlation matrices and the sampler
-  configuration.
-
-Sibling articles in this series:
-
-- The
-  [VAR article](https://nicholasjclark.github.io/mvgam/articles/var.html)
-  is the single-panel version of the same machinery, with a full
-  treatment of impulse responses, forecast error variance
-  decomposition and community stability metrics.
-- The
-  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
-  covers a different generalisation: several outcomes on
-  different observation families sharing one latent process.
-
-## Acknowledgements
-
-The World Development Indicators dataset is maintained by the
-World Bank ([2024](https://data.worldbank.org/)); the accompanying
-`WDI` R package (Arel-Bundock
-[2013](https://doi.org/10.32614/RJ-2013-023)) provides the long
-panel pull used here. The hierarchical VAR framing follows
-Jim Savage's tutorial post
-([2016](https://rpubs.com/jimsavage/hierarchical_var)) and the
-partial-pooling perspective in Gelman & Hill
-([2007](https://doi.org/10.1017/CBO9780511790942)). The
-stationary Heaps prior on the VAR coefficients follows Heaps
-([2023](https://doi.org/10.1080/10618600.2022.2079648)); the
-LKJ-mixture prior on the correlation matrices follows the
-suggestion Ben Goodrich contributed to Savage's original post.
-Formulas rely on mgcv smooths (Wood
-[2017](https://doi.org/10.1201/9781315370279)) and brms's
-multilevel apparatus (Bürkner
-[2017](https://doi.org/10.18637/jss.v080.i01)); sampling is
-performed with Stan (Carpenter et al.
-[2017](https://doi.org/10.18637/jss.v076.i01)). The state-space
-DGAM framing follows Clark & Wells
-([2023](https://doi.org/10.1111/2041-210X.13974)).
+- [State-space VARs](https://nicholasjclark.github.io/mvgam/articles/var.html)
+  fit one VAR to five plankton taxa, with covariates on the latent
+  means and forecasts for a held-out year.
+- [Dynamic factor models](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+  describe many series with fewer latent processes than series.
+- [Forecast evaluation](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+  covers scoring rules and leave-future-out cross-validation.
+- [mvgam overview](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+  introduces the observation and trend formulas.
+- [Formatting data](https://nicholasjclark.github.io/mvgam/articles/data.html)
+  covers the long data format and `mvgam_data()`.
 
 ## References
 
-Arel-Bundock V (2013). WDI: World Development Indicators and
-other World Bank data. *The R Journal* 5(2), 190-192.
+Arel-Bundock V (2013). WDI: World Development Indicators and other
+World Bank data. *The R Journal* 5(2), 190-192.
 [doi:10.32614/RJ-2013-023](https://doi.org/10.32614/RJ-2013-023)
 
-Bürkner PC (2017). brms: An R package for Bayesian multilevel
-models using Stan. *Journal of Statistical Software* 80(1),
-1-28.
-[doi:10.18637/jss.v080.i01](https://doi.org/10.18637/jss.v080.i01)
-
-Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt
-M, Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A
-probabilistic programming language. *Journal of Statistical
-Software* 76(1), 1-32.
-[doi:10.18637/jss.v076.i01](https://doi.org/10.18637/jss.v076.i01)
-
-Clark NJ and Wells K (2023). Dynamic Generalized Additive Models
-(DGAMs) for forecasting discrete ecological time series.
-*Methods in Ecology and Evolution* 14, 771-784.
-[doi:10.1111/2041-210X.13974](https://doi.org/10.1111/2041-210X.13974)
+Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA,
+Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G and Thomas L
+(2021). A guide to state-space modeling of ecological time series.
+*Ecological Monographs* 91(4), e01470.
+[doi:10.1002/ecm.1470](https://doi.org/10.1002/ecm.1470)
 
 Gelman A and Hill J (2007). *Data Analysis Using Regression and
 Multilevel/Hierarchical Models*. Cambridge University Press.
 [doi:10.1017/CBO9780511790942](https://doi.org/10.1017/CBO9780511790942)
 
-Heaps SE (2023). Enforcing stationarity through the prior in
-vector autoregressions. *Journal of Computational and Graphical
-Statistics* 32(1), 74-83.
+Heaps SE (2023). Enforcing stationarity through the prior in vector
+autoregressions. *Journal of Computational and Graphical Statistics*
+32(1), 74-83.
 [doi:10.1080/10618600.2022.2079648](https://doi.org/10.1080/10618600.2022.2079648)
 
-Savage J (2016). Hierarchical Vector Autoregression.
-RPubs, 27 November 2016.
+Ives AR, Dennis B, Cottingham KL and Carpenter SR (2003). Estimating
+community stability and ecological interactions from time-series
+data. *Ecological Monographs* 73(2), 301-330.
+[doi:10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2)
+
+Lewandowski D, Kurowicka D and Joe H (2009). Generating random
+correlation matrices based on vines and extended onion method.
+*Journal of Multivariate Analysis* 100(9), 1989-2001.
+[doi:10.1016/j.jmva.2009.04.008](https://doi.org/10.1016/j.jmva.2009.04.008)
+
+Lütkepohl H (2005). *New Introduction to Multiple Time Series
+Analysis*. Springer, Berlin.
+[doi:10.1007/978-3-540-27752-1](https://doi.org/10.1007/978-3-540-27752-1)
+
+Neubert MG, Caswell H and Solow AR (2009). Detecting reactivity.
+*Ecology* 90(10), 2683-2688.
+[doi:10.1890/08-2014.1](https://doi.org/10.1890/08-2014.1)
+
+Pesaran HH and Shin Y (1998). Generalized impulse response analysis
+in linear multivariate models. *Economics Letters* 58(1), 17-29.
+[doi:10.1016/S0165-1765(97)00214-0](https://doi.org/10.1016/S0165-1765(97)00214-0)
+
+Savage J (2016). Hierarchical Vector Autoregression. RPubs.
 [https://rpubs.com/jimsavage/hierarchical_var](https://rpubs.com/jimsavage/hierarchical_var)
 
-Wood SN (2017). *Generalized Additive Models: An Introduction
-with R* (2nd edition). Chapman and Hall/CRC.
-[doi:10.1201/9781315370279](https://doi.org/10.1201/9781315370279)
-
-World Bank (2024). *World Development Indicators*. World Bank
-Group.
+World Bank (2024). *World Development Indicators*. World Bank Group.
 [https://data.worldbank.org/](https://data.worldbank.org/)

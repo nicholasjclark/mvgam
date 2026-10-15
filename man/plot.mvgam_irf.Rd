@@ -9,13 +9,11 @@
 \arguments{
 \item{x}{\code{list} object of class \code{mvgam_irf}. See \code{\link[=irf]{irf()}}}
 
-\item{series}{\code{integer} specifying which process series should be
-given the shock}
+\item{series}{Position or name of the process given the shock}
 
-\item{responses}{Optional integer vector of process indices to
-display as response panels. Useful for hierarchical VAR fits
-where the raw K-panel grid is unreadable. Defaults to all
-processes.}
+\item{responses}{Optional positions or names of the processes drawn
+as response panels. Useful for hierarchical VAR fits where the
+raw K-panel grid is unreadable. Defaults to all processes.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

@@ -84,15 +84,15 @@ draw_slice <- function(arr, draw) {
 #' Extract VAR posterior draws of (A, D, Sigma) from a fitted mvgam
 #'
 #' Pulls the per-draw coefficient matrices `Phi_trend[l, , ]` of every
-#' lag, the moving-average matrices `Theta_trend[j, , ]` of a VARMA, and
+#' lag, the moving-average matrices `Theta_trend[j, , ]` of a VARMA and
 #' the innovation covariance `Sigma_trend` from `object$fit`.
 #'
 #' `K` is the number of latent series in the VAR. For both factor
 #' and non-factor VARs the Stan-side dimension is `N_lv_trend` (for
 #' a non-factor VAR over the raw series, the compiler sets
-#' `N_lv_trend = N_series_trend`). We read this directly from the
-#' standata cached on the fit so the value is always what the Stan
-#' model actually compiled with.
+#' `N_lv_trend = N_series_trend`). The function takes it from the Stan
+#' data stored on the fit, which hold the dimension the model was
+#' compiled with.
 #'
 #' @param object A fitted `mvgam` object whose trend is a VAR.
 #' @return A list with elements:
@@ -109,22 +109,21 @@ extract_var_posterior <- function(object, ndraws = NULL,
   checkmate::assert_class(object, "mvgam")
   draws_mat <- posterior::as_draws_matrix(object$fit)
   # Impulse responses and variance decompositions are built one
-  # transition matrix per draw, so their cost and their size both grow
-  # with the number of draws multiplied by the square of the number of
-  # processes. A wide VAR is therefore worth summarising from a subset,
-  # and the same subset has to serve the coefficients and the
-  # innovation covariance or a response would be built from a matrix
-  # pair no single draw produced.
+  # transition matrix per draw. Their cost and their size grow with the
+  # number of draws multiplied by the square of the number of
+  # processes. A subset of draws shortens the work on a wide VAR. The
+  # coefficients and the innovation covariance come from the same
+  # subset. A response built from two different draws would describe
+  # no posterior sample.
   draws_mat <- subset_draws_rows(draws_mat, ndraws, draw_ids)
   # The unrotated `Phi_trend`. For a factor VAR with Heaps QR
   # identification the generated-quantities block also emits
-  # `Phi_trend_tilde = Q Phi_trend Q'`, and a caller wanting the
-  # QR-identified surface takes `Phi_trend_tilde` and rotates
-  # `Sigma_trend` by the same Q.
+  # `Phi_trend_tilde = Q Phi_trend Q'`. The QR-identified surface takes
+  # `Phi_trend_tilde` and rotates `Sigma_trend` by the same Q.
   # `N_lv_trend` is the Stan-side VAR dimension for every code
   # path: factor VARs set it to the number of factors, non-factor
-  # VARs set it equal to `N_series_trend`. Reading from standata
-  # guarantees the value matches what the compiled model uses.
+  # VARs set it equal to `N_series_trend`. The Stan data hold the
+  # value the compiled model uses.
   K <- var_dim(object, "N_lv_trend")
 
   ndraws <- nrow(draws_mat)
@@ -158,18 +157,16 @@ extract_var_posterior <- function(object, ndraws = NULL,
 #' `stability.mvgam()`. Their per-draw loops run under the `future`
 #' plan the caller set, as chain fitting does.
 #'
-#' When `future = FALSE` (the default) the loop reduces to base
-#' `lapply()`, so there is no `future` dependency needed and no
-#' runtime overhead. When `future = TRUE`, `future::future()`
-#' schedules each draw on whatever `plan()` the caller set
-#' (defaulting to `sequential()`, which behaves like `lapply` with
-#' negligible extra overhead); `plan(multisession, workers = N)`
-#' before the call spreads draws across `N` R processes. Errors
-#' from any draw propagate.
+#' When `future = FALSE` (the default) the loop is base `lapply()`,
+#' with no `future` dependency and no runtime overhead. When
+#' `future = TRUE`, `future::future()` runs every posterior draw under
+#' the `plan()` the caller set (defaulting to `sequential()`, which
+#' behaves like `lapply` with negligible extra overhead);
+#' `plan(multisession, workers = N)` before the call spreads draws
+#' across `N` R processes. Errors from any draw propagate.
 #'
-#' `future` is a Suggests-only dependency, so the helper errors
-#' with an install hint if the caller asks for parallel execution
-#' without the package installed.
+#' `future` is in Suggests. A request for parallel execution without
+#' the package installed stops with an install hint.
 #'
 #' @param n Integer. Number of draws (loop length).
 #' @param fn Function taking a single integer index and returning
@@ -195,18 +192,40 @@ mvgam_maybe_future_lapply <- function(n, fn, future = FALSE) {
   lapply(futures, future::value)
 }
 
-#' Validate a subset of process indices for `plot.mvgam_irf()` /
-#' `plot.mvgam_fevd()` selectors. Accepts `NULL` (returns the full
-#' `1:n_proc` set) or an integer vector; verifies bounds and
-#' returns a sorted, de-duplicated integer vector.
+#' Validate the processes a VAR surface plot selects
 #'
-#' @param ids `NULL` or an integer vector.
-#' @param n_proc Total number of latent processes on the fit.
+#' The impulse response and variance decomposition plots select
+#' processes by position or by name. A name is matched against the
+#' process labels the surface carries. A selection by name survives a
+#' change in the order of the series levels.
+#'
+#' @param ids `NULL`, an integer vector of positions or a character
+#'   vector of process names. `NULL` selects every process.
+#' @param labels The process labels, in the order the VAR numbers them.
 #' @param arg The user-facing argument name (for error messages).
-#' @return Integer vector of indices to keep.
+#' @return Sorted, de-duplicated integer vector of positions.
 #' @noRd
-validate_var_plot_ids <- function(ids, n_proc, arg) {
+validate_var_plot_ids <- function(ids, labels, arg) {
+  checkmate::assert_character(labels, min.len = 1L, any.missing = FALSE)
+  n_proc <- length(labels)
   if (is.null(ids)) return(seq_len(n_proc))
+  if (is.character(ids)) {
+    checkmate::assert_character(ids, min.len = 1L, any.missing = FALSE,
+                                .var.name = arg)
+    unknown <- setdiff(ids, labels)
+    if (length(unknown)) {
+      shown <- utils::head(labels, 6L)
+      stop(insight::format_error(c(
+        paste0("'", arg, "' names processes outside the fitted VAR."),
+        x = paste0("Unknown: ", paste(unknown, collapse = ", "), "."),
+        i = paste0(
+          "Processes: ", paste(shown, collapse = ", "),
+          if (n_proc > length(shown)) ", ..." else "", "."
+        )
+      )), call. = FALSE)
+    }
+    ids <- match(ids, labels)
+  }
   checkmate::assert_integerish(
     ids, lower = 1L, upper = n_proc, min.len = 1L, any.missing = FALSE,
     .var.name = arg
@@ -216,12 +235,11 @@ validate_var_plot_ids <- function(ids, n_proc, arg) {
 
 #' The name each latent VAR process carries
 #'
-#' An impulse response and a variance decomposition are both read to
-#' decide which series drives which, so the label has to name a series
-#' wherever one names the process. A VAR over the observed series
-#' numbers its processes by the series axis, and a factor VAR's
-#' processes are latent factors that no series names, which is what
-#' keeps the index available as the other answer.
+#' An impulse response and a variance decomposition show which series
+#' drives which. Their labels name a series wherever a series names the
+#' process. A VAR over the observed series numbers its processes by the
+#' series axis. A factor VAR's processes are latent factors that no
+#' series names. They are labelled by index.
 #'
 #' @param object A fitted `mvgam` object whose trend is a VAR.
 #' @param K The VAR dimension.
@@ -230,8 +248,8 @@ validate_var_plot_ids <- function(ids, n_proc, arg) {
 var_process_labels <- function(object, K) {
   checkmate::assert_int(K, lower = 1L)
   generic <- paste0("Process_", seq_len(K))
-  # `detect_factor_n_lv()` answers NULL when the processes are the
-  # series, a model carrying one factor per series included.
+  # `detect_factor_n_lv()` returns NULL when the processes are the
+  # series, including a model with one factor per series.
   if (!is.null(detect_factor_n_lv(object))) {
     return(generic)
   }
@@ -256,23 +274,23 @@ var_process_labels <- function(object, K) {
 #' The extractor dispatches on whether the fit is hierarchical
 #' (`VAR(gr = <var>, ...)`) or single-panel.
 #'
-#' * On a **single-panel VAR** the routine reads the fitted
+#' * On a **single-panel VAR** the routine returns the fitted
 #'   `Phi_trend` array.
 #' * On a **hierarchical VAR** with `groups = <int>` or
 #'   `groups = <name>` it returns the panel-specific matrix
 #'   `Phi_group_trend[c, l, , ]`, the transition matrix of the
 #'   requested panel.
-#' * On a **hierarchical VAR** with `groups = NULL` it synthesises
-#'   the shrinkage target from the hyperparameters:
-#'   diagonal cells take `Amu_trend[1, l]`, off-diagonal cells
-#'   take `Amu_trend[2, l]`. This is the mean the sampler pulls
-#'   every panel's $A_c$ toward, so it summarises the pool
-#'   without reading any single country
-#'   (Savage [2016](https://rpubs.com/jimsavage/hierarchical_var)).
+#' * On a **hierarchical VAR** with `groups = NULL` it returns the
+#'   mean of the panels' matrices, computed in each posterior draw.
+#'   The hyperparameters `Amu_trend` and `Aomega_trend` pool the
+#'   unconstrained matrices that the stationarity map of Heaps
+#'   (2023) turns into each panel's $A_c$. Their mean is no
+#'   transition matrix. The mean over panels summarises the pool on
+#'   the scale of $A_c$.
 #'
 #' With `summary = TRUE` (default) the per-cell summary uses the
-#' same machinery as `residual_cor()`, so the printed and
-#' plotted output stays consistent across the two extractors:
+#' same machinery as `residual_cor()`. The printed and plotted output
+#' of the two extractors then agree:
 #' point estimates default to the posterior mean; intervals use
 #' `probs` on the raw draws; effective sample sizes come from
 #' `posterior::ess_basic()`; and
@@ -284,16 +302,14 @@ var_process_labels <- function(object, K) {
 #' @param lag The lag whose transition matrix is returned, at most
 #'   the order `p` of the fitted `VAR(p)`. Defaults to `1`.
 #' @param groups Which panels of a hierarchical VAR fit to
-#'   return. `NULL` (the default) gives the global shrinkage
-#'   target built from `Amu_trend`, and is the only setting a
-#'   non-hierarchical fit accepts. Name one panel, by level name
-#'   or by integer index into the fitted grouping factor's levels
-#'   as stored on `object$data[[gr]]`, and that panel's matrix is
-#'   returned on its own. Name several, or pass `"all"`, and the
-#'   result is a named list of `mvgam_var_matrix` objects classed
-#'   as `mvgam_var_matrix_list`, so `plot()` produces a faceted
-#'   panel (heatmap grid or per-outcome self-persistence
-#'   pointrange, see [plot.mvgam_var_matrix_list()]).
+#'   return. `NULL` (the default) gives the mean of the panels'
+#'   matrices. A non-hierarchical fit accepts `NULL` alone. A single
+#'   panel, named by level or by integer index into the levels of
+#'   `gr`, returns that panel's matrix on its own. Several panels, or
+#'   `"all"`, return a named list of `mvgam_var_matrix` objects
+#'   classed as `mvgam_var_matrix_list`. Its `plot()` method draws a
+#'   faceted heatmap grid or a pointrange of each outcome's
+#'   self-persistence, see [plot.mvgam_var_matrix_list()].
 #' @param summary Logical. `TRUE` (default) returns an
 #'   `mvgam_var_matrix` object with per-cell point estimates,
 #'   credible intervals, standard errors, effective sample
@@ -366,27 +382,16 @@ posterior_transition_matrix <- function(object, groups = NULL,
     )
   }
 
-  # No selection asks for the global shrinkage target, which is also
-  # the only matrix a non-hierarchical fit has.
-  if (is.null(groups)) {
+  # No selection asks for the mean over panels, or for the one matrix
+  # a non-hierarchical fit has
+  target_names <- resolve_var_groups(object, groups)
+  if (is.null(target_names)) {
     return(one_matrix(NULL))
   }
 
-  is_hier <- is_hierarchical_var(colnames(
-    posterior::as_draws_matrix(object$fit)
-  ))
-  if (!is_hier) {
-    stop(insight::format_error(c(
-      "'groups' only applies to hierarchical VAR fits.",
-      i = "Leave 'groups' at NULL on a non-hierarchical fit."
-    )), call. = FALSE)
-  }
-
-  target_names <- resolve_transition_matrix_groups(object, groups)
-
-  # Naming one panel answers with that panel's matrix. `"all"` is
-  # plural whatever the fit holds, so it keeps the list shape that
-  # `plot.mvgam_var_matrix_list()` facets.
+  # One named panel returns that panel's matrix. `"all"` returns the
+  # list that `plot.mvgam_var_matrix_list()` facets, whatever the
+  # number of panels.
   if (length(target_names) == 1L && !identical(groups, "all")) {
     return(one_matrix(target_names))
   }
@@ -396,10 +401,23 @@ posterior_transition_matrix <- function(object, groups = NULL,
   structure(out, class = "mvgam_var_matrix_list")
 }
 
-#' Resolve the `groups` argument of `posterior_transition_matrix()`
-#' to a character vector of group names.
+#' The panels of a hierarchical VAR that a surface asks for
+#'
+#' @param object A fitted `mvgam` object whose trend is a VAR
+#' @param groups `NULL`, `"all"`, panel names or panel indices
+#' @return `NULL` when `groups` is `NULL`, or the names of the panels.
+#'   A non-hierarchical fit accepts `NULL` alone.
 #' @noRd
-resolve_transition_matrix_groups <- function(object, groups) {
+resolve_var_groups <- function(object, groups) {
+  if (is.null(groups)) {
+    return(NULL)
+  }
+  if (is.null(object$standata$N_groups_trend)) {
+    stop(insight::format_error(c(
+      "'groups' only applies to hierarchical VAR fits.",
+      i = "Leave 'groups' at NULL on a non-hierarchical fit."
+    )), call. = FALSE)
+  }
   all_levels <- group_labels(object, var_dim(object, "N_groups_trend"))
   if (identical(groups, "all")) return(all_levels)
   if (is.numeric(groups)) {
@@ -424,50 +442,35 @@ resolve_transition_matrix_groups <- function(object, groups) {
 
 #' Extract raw `[ndraws, K, K]` posterior draws of the lag-`lag` VAR
 #' transition matrix from a fitted mvgam. Returned array carries
-#' `attr(., "group_label")` (`"global"`, a country name, or
-#' `"single-panel"`) so downstream summarisers can label the
-#' object.
+#' `attr(., "group_label")` (`"mean over groups"`, a group name, or
+#' `"single-panel"`) for downstream summarisers to label the object.
 #' @noRd
 extract_transition_matrix_draws <- function(object, group, lag) {
   draws_mat <- posterior::as_draws_matrix(object$fit)
-  all_cols <- colnames(draws_mat)
-  is_hier <- is_hierarchical_var(all_cols)
 
-  if (is_hier && is.null(group)) {
+  if (!is.null(object$standata$N_groups_trend)) {
     K <- var_dim(object, "N_subgroups_trend")
-    labs <- subgroup_labels(object, K)
-    # `Amu_trend[1, lag]` is the population mean of the diagonal and
-    # `Amu_trend[2, lag]` of the off-diagonal entries.
-    amu <- read_draws_matrix(
-      draws_mat, "Amu_trend", 2L, length(object$trend_metadata$ar_lags),
-      needed_for = "the global 'Amu_trend' A matrix"
-    )
-    ndraws <- nrow(draws_mat)
-    diag_draws <- amu[, 1L, lag]
-    off_draws <- amu[, 2L, lag]
-    out <- vapply(seq_len(ndraws), function(d) {
-      m <- matrix(off_draws[d], K, K)
-      diag(m) <- diag_draws[d]
-      as.numeric(m)
-    }, numeric(K * K))
-    out <- aperm(array(out, dim = c(K, K, ndraws)), c(3, 1, 2))
-    dimnames(out) <- list(NULL, labs, labs)
-    attr(out, "group_label") <- "global"
-    return(out)
-  }
-
-  if (is_hier) {
-    # `resolve_transition_matrix_groups()` validated the name
-    group_int <- match(group, group_labels(
-      object, var_dim(object, "N_groups_trend")
-    ))
-    K <- var_dim(object, "N_subgroups_trend")
-    out <- extract_indexed_array_2d(
-      draws_mat, "Phi_group_trend", K, K,
-      prefix_ids   = c(group_int, lag),
-      labels       = subgroup_labels(object, K),
-      required_for = "a per-group VAR transition matrix"
-    )
+    n_groups <- var_dim(object, "N_groups_trend")
+    group_matrix <- function(g) {
+      extract_indexed_array_2d(
+        draws_mat, "Phi_group_trend", K, K,
+        prefix_ids   = c(g, lag),
+        labels       = subgroup_labels(object, K),
+        required_for = "a per-group VAR transition matrix"
+      )
+    }
+    # The hyperparameters `Amu_trend` pool the raw matrices before the
+    # stationarity map, which leaves no transition matrix at the
+    # population level. The function returns the mean of the groups'
+    # matrices in each draw for the pool.
+    if (is.null(group)) {
+      out <- Reduce(`+`, lapply(seq_len(n_groups), group_matrix)) /
+        n_groups
+      attr(out, "group_label") <- "mean over groups"
+      return(out)
+    }
+    # `resolve_var_groups()` validated the name
+    out <- group_matrix(match(group, group_labels(object, n_groups)))
     attr(out, "group_label") <- group
     return(out)
   }
@@ -526,9 +529,8 @@ finalise_transition_matrix <- function(arr, group_label,
 #' off-diagonal absolute entry magnitude) and the posterior
 #' point-estimate transition matrix rounded to `digits`. Reminds
 #' the reader that the per-cell credible interval is available in
-#' the `A_lower` / `A_upper` slots. Mirrors the layout of
-#' [print.mvgam_residcor()] so a user reading both objects sees a
-#' consistent header.
+#' the `A_lower` / `A_upper` slots. The header follows the layout of
+#' [print.mvgam_residcor()].
 #'
 #' @param x An `mvgam_var_matrix` object returned by
 #'   [posterior_transition_matrix()].
@@ -677,14 +679,11 @@ print.mvgam_var_matrix_list <- function(x, ...) {
 #' * `type = "heatmap"` (default): one heatmap per group, drawn as
 #'   by [plot.mvgam_var_matrix()]. The facets share fill limits.
 #' * `type = "diagonal"`: self-persistence pointrange with one
-#'   point per group per outcome (dodged by outcome), using the
-#'   Okabe-Ito categorical palette so outcomes match the fevd
-#'   and irf plots.
+#'   point per group per outcome (dodged by outcome). Up to three
+#'   outcomes take the dark, mid and light shades of the red
+#'   bayesplot scheme, as the fevd, irf and stability plots do.
 #'
-#' Both use the internal `mvgam_theme()`,
-#' `mvgam_diverging_scale()` and `mvgam_categorical_palette()`,
-#' so the panel looks consistent with `plot.mvgam_var_matrix()`,
-#' `plot.mvgam_residcor()` and the fevd / irf / stability plots.
+#' Both draw with [mvgam_theme()].
 #'
 #' @param x An `mvgam_var_matrix_list` returned by
 #'   [posterior_transition_matrix()] with `groups` set.
@@ -723,13 +722,13 @@ plot_var_matrix_list_heatmap <- function(x, ncol) {
   var_matrix_heatmap(panel, ncol)
 }
 
-#' Per-outcome self-persistence pointrange: one facet per
-#' outcome (diagonal cell), one point per group with the
-#' credible interval from `A_lower` / `A_upper`. Uses the
-#' Okabe-Ito categorical palette so outcomes match the fevd /
-#' irf plots.
+#' Per-outcome self-persistence pointrange: one row per group, one
+#' point per outcome (diagonal cell) with the credible interval from
+#' `A_lower` / `A_upper`. Outcomes take the shades of the red scheme
+#' that the fevd, irf and stability plots draw with.
 #' @noRd
 plot_var_matrix_list_diagonal <- function(x) {
+  set_color_scheme_local("red")
   outc <- x[[1L]]$series_names
   df <- do.call(rbind, lapply(seq_along(x), function(g) {
     obj <- x[[g]]
@@ -742,31 +741,21 @@ plot_var_matrix_list_diagonal <- function(x) {
       stringsAsFactors = FALSE
     )
   }))
-  n_outcomes <- length(outc)
-  fill_values <- mvgam_categorical_palette(n_outcomes)
-  names(fill_values) <- outc
-  ggplot2::ggplot(df, ggplot2::aes(x = med, y = group,
-                                    colour = outcome)) +
+  # The first group is drawn at the top and the outcomes keep the
+  # order of the levels of `subgr`
+  df$group <- factor(df$group, levels = rev(names(x)))
+  df$outcome <- factor(df$outcome, levels = outc)
+  ggplot2::ggplot(df, ggplot2::aes(x = .data$med, y = .data$group,
+                                    colour = .data$outcome)) +
+    ggplot2::geom_vline(xintercept = 0, linetype = "dashed",
+                        colour = "grey30") +
     ggplot2::geom_pointrange(
-      ggplot2::aes(xmin = lo, xmax = hi),
-      position = ggplot2::position_dodge(width = 0.5)
+      ggplot2::aes(xmin = .data$lo, xmax = .data$hi),
+      position = ggplot2::position_dodge(width = 0.6)
     ) +
-    ggplot2::geom_vline(xintercept = 0, linetype = "dashed") +
-    ggplot2::scale_colour_manual(values = fill_values) +
-    ggplot2::labs(x = "Self-persistence coefficient",
-                  y = NULL, colour = "Outcome") +
+    mvgam_model_colour_scale(length(outc), name = "Outcome") +
+    ggplot2::labs(x = "Self-persistence coefficient", y = NULL) +
     mvgam_theme()
-}
-
-#' Detect a hierarchical VAR fit by searching for its per-group
-#' or global-Cholesky parameter names in the posterior draws
-#' column set.
-#' @noRd
-is_hierarchical_var <- function(all_cols) {
-  any(grepl(
-    "^(L_Omega_global_trend|Phi_group_trend|Sigma_group_trend)\\[",
-    all_cols
-  ))
 }
 
 #' A dimension of the VAR, as the fitted Stan program declared it

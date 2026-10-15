@@ -33,8 +33,9 @@ coincide for a trend whose states keep no memory between times.}
 
 \item{by_group}{Logical. Only relevant for hierarchical trends
 (\code{gr = ...} supplied to the trend constructor). When \code{FALSE}
-(default) the population-level correlation
-(\code{tcrossprod(L_Omega_global)}) is returned. When \code{TRUE}, a named
+(default) the population-level correlation of the shocks
+(\code{tcrossprod(L_Omega_global)}) is returned, whatever \code{covariance}
+asks for. When \code{TRUE}, a named
 list of \code{mvgam_residcor} objects is returned, one per group; each
 group's correlation is reconstructed as
 \verb{alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])}.}

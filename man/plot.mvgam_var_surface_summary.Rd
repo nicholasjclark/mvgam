@@ -16,17 +16,17 @@
 \arguments{
 \item{x}{A \code{mvgam_irf_summary} or \code{mvgam_fevd_summary}}
 
-\item{series}{Integer vector of processes to keep. On an impulse
-response these are the processes a shock originates in. On a
-variance decomposition they are the targets whose forecast error
-is decomposed. Default keeps every process.}
+\item{series}{Positions or names of the processes to keep. On an
+impulse response these are the processes a shock originates in.
+On a variance decomposition they are the targets whose forecast
+error is decomposed. Default keeps every process.}
 
-\item{responses}{Impulse responses only. Integer vector of the
+\item{responses}{Impulse responses only. Positions or names of the
 processes whose response to the shock is drawn. Default keeps
 every process.}
 
-\item{contributing}{Variance decompositions only. Integer vector of
-the source processes stacked in each bar. The shares of the
+\item{contributing}{Variance decompositions only. Positions or names
+of the source processes stacked in each bar. The shares of the
 sources drawn are renormalised to sum to one.}
 
 \item{shocks}{Optional character vector naming shock-response pairs

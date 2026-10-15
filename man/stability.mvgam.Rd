@@ -9,6 +9,7 @@ stability(object, ...)
 
 \method{stability}{mvgam}(
   object,
+  groups = NULL,
   ndraws = NULL,
   draw_ids = NULL,
   summary = TRUE,
@@ -23,20 +24,24 @@ to \code{\link[=mvgam]{mvgam()}} that used a \code{VAR(p = 1)} latent process mo
 
 \item{...}{Unused. Anything passed here is refused.}
 
+\item{groups}{Hierarchical VAR fits only. The panels to summarise,
+by name or by index into the levels of \code{gr}. The default \code{NULL}
+summarises every panel. A non-hierarchical fit accepts \code{NULL}
+alone.}
+
 \item{ndraws}{Optional integer; the number of posterior draws to use.
-Each draw costs a Lyapunov solve, so a wide panel is worth
-answering from a subset. Default \code{NULL} uses every draw.}
+Each draw costs a Lyapunov solve. A subset of draws shortens the
+computation on a wide panel. Default \code{NULL} uses every draw.}
 
 \item{draw_ids}{Optional integer vector naming the posterior draws to
 use, in place of \code{ndraws}.}
 
-\item{summary}{Logical; return the posterior median and interval of
-each metric (the default), or the per-draw metrics themselves. The
-spread of a metric is often the point of asking, and \code{plot()} draws
-histograms of the draws.}
+\item{summary}{Logical. \code{TRUE} (the default) returns the posterior
+median and interval of each metric. \code{FALSE} returns the metrics of
+each draw. \code{plot()} draws histograms of either form.}
 
-\item{probs}{The lower and upper percentiles to report alongside the
-median when \code{summary = TRUE}.}
+\item{probs}{The lower and upper percentiles of the interval reported
+with the median when \code{summary = TRUE}.}
 
 \item{future}{\code{Logical}. When \code{TRUE}, per-draw stability
 computation runs under whatever

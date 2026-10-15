@@ -23,9 +23,8 @@ Prints a compact header (group label, dimension, mean
 off-diagonal absolute entry magnitude) and the posterior
 point-estimate transition matrix rounded to \code{digits}. Reminds
 the reader that the per-cell credible interval is available in
-the \code{A_lower} / \code{A_upper} slots. Mirrors the layout of
-\code{\link[=print.mvgam_residcor]{print.mvgam_residcor()}} so a user reading both objects sees a
-consistent header.
+the \code{A_lower} / \code{A_upper} slots. The header follows the layout of
+\code{\link[=print.mvgam_residcor]{print.mvgam_residcor()}}.
 }
 \seealso{
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}},

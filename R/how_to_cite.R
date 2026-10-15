@@ -213,6 +213,19 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    savage_hvar = list(
+      text = "Savage J (2016). Hierarchical Vector Autoregression. RPubs. https://rpubs.com/jimsavage/hierarchical_var",
+      bibtex = paste(
+        "@misc{savage2016hvar,",
+        "  title = {Hierarchical Vector Autoregression},",
+        "  author = {Savage, Jim},",
+        "  year = {2016},",
+        "  howpublished = {RPubs},",
+        "  url = {https://rpubs.com/jimsavage/hierarchical_var}",
+        "}",
+        sep = "\n"
+      )
+    ),
     heaps_var = list(
       text = "Heaps SE (2023). Enforcing stationarity through the prior in vector autoregressions. Journal of Computational and Graphical Statistics, 32(1), 74-83. https://doi.org/10.1080/10618600.2022.2079648",
       bibtex = paste(
@@ -846,6 +859,17 @@ how_to_cite.mvgam <- function(object, ...) {
       detect = grepl("^VAR", trend_model),
       text = " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following Heaps (2023) and Clark et al. (2025).",
       refs = c("heaps_var", "clark_multispecies")
+    ),
+    list(
+      detect = "alpha_cor_trend" %in% object$prior$class,
+      text = " The innovation correlation of each group was a weighted mix of a shared population correlation and a deviation for that group. The weight was estimated with the other parameters (Savage 2016).",
+      refs = "savage_hvar"
+    ),
+    list(
+      detect = grepl("^VAR", trend_model) &&
+        !is.null(object$standata$N_groups_trend),
+      text = " The unconstrained coefficient matrices of the groups shared an exchangeable prior with estimated means and precisions before the stationarity transform (Heaps 2023).",
+      refs = "heaps_var"
     ),
     list(
       detect = uses_gp_smooth(object),

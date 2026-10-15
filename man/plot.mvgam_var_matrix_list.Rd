@@ -30,15 +30,12 @@ orientations are available:
 \item \code{type = "heatmap"} (default): one heatmap per group, drawn as
 by \code{\link[=plot.mvgam_var_matrix]{plot.mvgam_var_matrix()}}. The facets share fill limits.
 \item \code{type = "diagonal"}: self-persistence pointrange with one
-point per group per outcome (dodged by outcome), using the
-Okabe-Ito categorical palette so outcomes match the fevd
-and irf plots.
+point per group per outcome (dodged by outcome). Up to three
+outcomes take the dark, mid and light shades of the red
+bayesplot scheme, as the fevd, irf and stability plots do.
 }
 
-Both use the internal \code{mvgam_theme()},
-\code{mvgam_diverging_scale()} and \code{mvgam_categorical_palette()},
-so the panel looks consistent with \code{plot.mvgam_var_matrix()},
-\code{plot.mvgam_residcor()} and the fevd / irf / stability plots.
+Both draw with \code{\link[=mvgam_theme]{mvgam_theme()}}.
 }
 \seealso{
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}},

@@ -9,13 +9,13 @@
 \arguments{
 \item{x}{\code{list} object of class \code{mvgam_fevd}. See \code{\link[=fevd]{fevd()}}}
 
-\item{series}{Optional integer vector selecting which
-target processes should be shown as facets. Useful on
-hierarchical VAR fits where the raw K x K panel would run to
-dozens of panels. Defaults to all processes.}
+\item{series}{Optional positions or names of the target processes
+shown as facets. Useful on hierarchical VAR fits where the raw
+K x K panel would run to dozens of panels. Defaults to all
+processes.}
 
-\item{contributing}{Optional integer vector selecting which
-source processes appear as stacked contributions to each target.
+\item{contributing}{Optional positions or names of the source
+processes stacked as contributions to each target.
 The shares of the sources drawn are renormalised to sum to one. On
 a hierarchical VAR this isolates the dependencies within one group.
 Defaults to all processes.}

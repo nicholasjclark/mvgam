@@ -1195,6 +1195,8 @@ test_that("residual_cor returns the global block by default", {
   expect_s3_class(res, "mvgam_residcor")
   expect_true(isTRUE(res$hierarchical))
   expect_identical(res$group_label, "_global")
+  # No population transition exists to lift the shocks through
+  expect_identical(res$covariance, "innovation")
   # The matrix is over subgroups, not over series: three species, not
   # the six series the grouping produces. A block sized by the series
   # axis would be 6 x 6 and pass any symmetry or bounds check.

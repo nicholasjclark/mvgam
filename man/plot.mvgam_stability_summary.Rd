@@ -16,8 +16,8 @@
 
 \item{variables}{Metrics to draw}
 
-\item{intervals}{Logical; draw each metric as a median and interval
-rather than as its binned posterior}
+\item{intervals}{Logical. \code{TRUE} draws each metric as a median and
+interval. \code{FALSE} (the default) draws its binned posterior.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
@@ -25,9 +25,8 @@ rather than as its binned posterior}
 A \code{ggplot} object
 }
 \description{
-Draws the same histogram as the plot for the draws. \code{summary()}
-bins each metric on its way through, so the shape survives without
-the draws behind it: a metric is often asked for to see whether its
-mass crosses zero, which a median and an interval alone do not
-answer. Pass \code{intervals = TRUE} for a median and interval instead.
+Draws the histogram of each metric from the bins \code{summary()}
+recorded. A histogram shows whether the mass of reactivity crosses
+zero. Pass \code{intervals = TRUE} for a median and interval instead. A
+hierarchical VAR draws a median and interval for each panel.
 }
