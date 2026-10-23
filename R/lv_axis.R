@@ -71,22 +71,17 @@
 #' lv_axis()
 #'
 #' \dontrun{
+#' # Three series whose seasonal effect differs: 1, 0.5 and -1
 #' set.seed(1)
-#' dat <- sim_mvgam(
-#'   family       = gaussian(),
-#'   n_series     = 3L,
-#'   n_timepoints = 60L
-#' )$data_train
-#' # `x` differs among the series at each time. `season` takes one
-#' # value per time, and its effect here differs among the series.
+#' dat <- sim_mvgam(family = gaussian(), n_series = 3L,
+#'                  n_timepoints = 60L)$data_train
 #' dat$season <- sin(2 * pi * dat$time / 12)
 #' dat$y <- dat$y + c(1, 0.5, -1)[as.integer(dat$series)] * dat$season
 #'
-#' # ---- No latent factors ----
-#' # A slope of `x` for each series
+#' # One seasonal slope per series
 #' mod_slopes <- mvgam(
 #'   formula       = y ~ 1,
-#'   trend_formula = ~ x:lv_axis() + AR(p = 1),
+#'   trend_formula = ~ season:lv_axis() + AR(p = 1),
 #'   data          = dat,
 #'   family        = gaussian(),
 #'   chains        = 2,
@@ -95,21 +90,9 @@
 #' summary(mod_slopes)
 #' conditional_effects(mod_slopes)
 #'
-#' # A smooth of `x` for each series
-#' mod_smooths <- mvgam(
-#'   formula       = y ~ 1,
-#'   trend_formula = ~ s(x, k = 5, by = lv_axis()) + AR(p = 1),
-#'   data          = dat,
-#'   family        = gaussian(),
-#'   chains        = 2,
-#'   silent        = 2
-#' )
-#' conditional_effects(mod_smooths)
-#'
-#' # ---- Two latent factors ----
-#' # Each factor takes its own seasonal slope, and the loadings carry
-#' # the two slopes to the three series. The covariate takes one value
-#' # per time, as every term of this trend formula must.
+#' # With two latent factors, each factor takes a seasonal slope and
+#' # the loadings carry the two slopes to the three series. A smooth
+#' # takes the same marker: `s(season, by = lv_axis())`.
 #' mod_factors <- mvgam(
 #'   formula       = y ~ 1,
 #'   trend_formula = ~ season:lv_axis() + AR(p = 1, n_lv = 2),
@@ -118,13 +101,12 @@
 #'   chains        = 2,
 #'   silent        = 2
 #' )
-#' # The seasonal effect on each series
 #' conditional_effects(mod_factors)
 #'
 #' # The series column is refused in a trend term
 #' try(mvgam(
 #'   formula       = y ~ 1,
-#'   trend_formula = ~ x:series + AR(p = 1),
+#'   trend_formula = ~ season:series + AR(p = 1),
 #'   data          = dat,
 #'   family        = gaussian(),
 #'   run_model     = FALSE

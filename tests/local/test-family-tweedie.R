@@ -402,14 +402,13 @@ test_that("model.frame answers with the training frame", {
 
 
 test_that("one parameter block reads the same way through every method", {
-  # The raw stanfit writes the population slope as `b[1]`, and mvgam
-  # aliases it to `b_x` on the way out. Three methods do that and
-  # `tidy()` does not, so a reader moving between two tables of the
-  # same fit meets two names for one parameter.
+  # The raw stanfit writes the population slope as `b[1]`. mvgam
+  # aliases it to `b_x` in the draws methods. `tidy()` gives it the
+  # name `fixef()` gives, `x`, as broom.mixed names a brms fit.
   #
   # The custom parameters are the control. `mphi` and `mtheta` are
-  # written out under their own names and need no alias, and every
-  # method below reports them identically.
+  # written out under their own names and need no alias. Every method
+  # below reports them identically.
   aliased <- function(z) grep("^b\\[|^b_x$", z, value = TRUE)
   for (nm in c("variables", "posterior_summary", "rhat")) {
     got <- switch(nm,
@@ -420,7 +419,10 @@ test_that("one parameter block reads the same way through every method", {
     expect_true(all(c("mphi", "mtheta") %in% got))
     expect_identical(aliased(got), "b_x")
   }
-  expect_identical(aliased(tidy(fit, effects = "all")$term), "b_x")
+  td <- tidy(fit, effects = "all")
+  expect_true(all(c("mphi", "mtheta") %in% td$term))
+  expect_identical(grep("^b\\[|^b_|^x$", td$term, value = TRUE), "x")
+  expect_true("x" %in% rownames(fixef(fit)))
 })
 
 

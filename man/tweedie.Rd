@@ -131,17 +131,8 @@ summary(mod)
 # The dispersion and power parameters
 mcmc_plot(mod, variable = c("mphi", "mtheta"), type = "hist")
 
-# The dispersion can vary with a covariate. Its predictor is on the
-# log scale.
-mod_phi <- mvgam(
-  bf(y ~ 1, mphi ~ x),
-  trend_formula = ~ AR(p = 1),
-  data          = simdat$data_train,
-  family        = tweedie(),
-  chains        = 2,
-  silent        = 2
-)
-summary(mod_phi)
+# A covariate on the dispersion, on the log scale, takes the
+# formula `bf(y ~ 1, mphi ~ x)`
 }
 
 }

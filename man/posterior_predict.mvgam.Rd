@@ -144,13 +144,8 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
 pp <- posterior_predict(mod, ndraws = 50L)
 dim(pp)
 
-# A coverage check: how often does the central 80\% predictive
-# interval contain the observed cell? Should land near 0.80 for
-# a well-calibrated marginal-MC fit.
-lo <- apply(pp, 2L, quantile, 0.10)
-hi <- apply(pp, 2L, quantile, 0.90)
-mean(simdat$data_train$y >= lo & simdat$data_train$y <= hi,
-      na.rm = TRUE)
+# The draws track the observed counts
+cor(colMeans(pp), simdat$data_train$y, use = "complete.obs")
 }
 
 }

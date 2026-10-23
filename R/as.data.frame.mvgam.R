@@ -382,14 +382,30 @@ formula_term_labels <- function(form) {
 }
 
 
-#' The index a Stan element name carries
+#' The indices a Stan element name carries
+#'
+#' @param v Character vector of Stan element names, all with the same
+#'   number of indices, such as `"Sigma_trend[2,1]"`
+#' @return Character matrix with one row per name and one column per
+#'   index
+#' @noRd
+stan_indices <- function(v) {
+  checkmate::assert_character(v)
+  if (!length(v)) return(matrix(character(0L), 0L, 0L))
+  do.call(rbind, strsplit(sub("^.*\\[(.*)\\]$", "\\1", v), ",",
+                          fixed = TRUE))
+}
+
+
+#' The index a one-dimensional Stan element name carries
 #'
 #' @param v Character vector of Stan element names, such as `"x[3]"`
 #' @return Character vector of indices, such as `"3"`
 #' @noRd
 stan_index <- function(v) {
   checkmate::assert_character(v)
-  sub("^.*\\[([0-9]+)\\]$", "\\1", v)
+  if (!length(v)) return(character(0L))
+  stan_indices(v)[, 1L]
 }
 
 
@@ -425,13 +441,14 @@ mvgam_index_aliases <- function(x, raw) {
   }
   series <- fitted_series_levels(x)
   loadings <- grep("^Z(_tilde)?\\[[0-9]+,[0-9]+\\]$", raw, value = TRUE)
-  row <- as.integer(sub("^.*\\[([0-9]+),.*$", "\\1", loadings))
-  if (length(loadings) > 0L && max(row) <= length(series)) {
-    named <- paste0(sub("\\[.*$", "", loadings), "[", series[row], ",",
-                    sub("^.*,([0-9]+)\\]$", "\\1", loadings), "]")
+  idx <- stan_indices(loadings)
+  if (length(loadings) > 0L && max(as.integer(idx[, 1L])) <= length(series)) {
+    named <- paste0(sub("\\[.*$", "", loadings), "[",
+                    series[as.integer(idx[, 1L])], ",", idx[, 2L], "]")
     out <- c(out, stats::setNames(loadings, named))
   }
-  if (is.null(x$stancode) ||
+  # A trend-free fit has no series dimensions to name
+  if (length(series) == 0L || is.null(x$stancode) ||
         !is.null(detect_factor_n_lv(x, length(series)))) {
     return(out)
   }
@@ -450,7 +467,7 @@ mvgam_index_aliases <- function(x, raw) {
     if (!any(on_series) || any(startsWith(dims, "N_time"))) next
     el <- raw[startsWith(raw, paste0(nm, "["))]
     if (length(el) == 0L) next
-    idx <- do.call(rbind, strsplit(sub("^.*\\[(.*)\\]$", "\\1", el), ","))
+    idx <- stan_indices(el)
     if (ncol(idx) != length(dims) ||
           max(as.integer(idx[, on_series])) > length(series)) next
     idx[, on_series] <- series[as.integer(idx[, on_series])]
@@ -573,6 +590,19 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
     keep <- keep &
       !(mvgam_par_kind(user) %in% c("internal", "bookkeeping"))
     keep <- keep & !is_hidden_par(user)
+    # A symmetric matrix lists each off-diagonal cell once. The test
+    # takes the positional Stan indices, which the series aliases
+    # replace.
+    sym <- grepl(MVGAM_PAR_SYMMETRIC_PATTERN, raw)
+    if (any(sym)) {
+      stems <- sub("\\[.*$", "", raw[sym])
+      lower <- lapply(split(raw[sym], stems), function(v) {
+        idx <- stan_indices(v)
+        n <- ncol(idx)
+        as.integer(idx[, n - 1L]) >= as.integer(idx[, n])
+      })
+      keep[sym] <- keep[sym] & unsplit(lower, stems)
+    }
   }
   raw <- raw[keep]
   user <- user[keep]
@@ -787,9 +817,13 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   # have arbitrary Rhat and ESS because no rotation is fixed under
   # the prior, and their QR-identified counterparts are in the same
   # posterior. Naming one explicitly keeps it.
-  user_map <- mvgam_user_pars(
-    x, pars = posterior::variables(drws), all = !is.null(variable)
-  )
+  raw_vars <- posterior::variables(drws)
+  reported_map <- mvgam_user_pars(x, pars = raw_vars)
+  user_map <- if (is.null(variable)) {
+    reported_map
+  } else {
+    mvgam_user_pars(x, pars = raw_vars, all = TRUE)
+  }
   renames <- user_map[names(user_map) != user_map]
   if (length(renames) > 0L) {
     drws <- do.call(
@@ -811,7 +845,7 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   is_keyword <- variable %in% mvgam_keyword_shortcuts
   matched <- character(0L)
   if (any(is_keyword)) {
-    reported <- filter_hidden_pars(all_vars)
+    reported <- names(reported_map)
     matched <- unlist(lapply(variable[is_keyword], function(k) {
       resolve_mvgam_keyword(k, reported)
     }))

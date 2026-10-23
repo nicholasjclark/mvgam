@@ -50,9 +50,10 @@ under the hard mode-2 reference subtraction, any K-shared
 coefficient (\code{b_Intercept}, \code{b_env}, etc.) has no likelihood
 contribution and samples from that prior, so a once-per-session
 warning fires from \code{jsdgam()} when the user's formula contains
-no per-\code{species} interaction term. The \code{loadings_prior} matrix-normal prior, when
-supplied, composes with the sum-to-zero constraint and is the
-recommended path when traits or phylogeny are available.
+no per-\code{species} interaction term. The \code{loadings_prior}
+matrix-normal prior, when supplied, composes with the sum-to-zero
+constraint and is the recommended path when traits or phylogeny are
+available.
 
 Data layout: long format, one row per (site, species), exactly
 K rows per site. The user passes the species axis via the
@@ -120,70 +121,36 @@ species) row summing to 1 within each site.
 
 \examples{
 \dontrun{
-# Simulate Dirichlet compositional data on 40 sites x K = 3
-# categories under an environmental gradient. The first category
-# is the reference; per-category logit-mean offsets and env
-# slopes are encoded relative to it.
-set.seed(2)
-K <- 3L; cat_names <- paste0("y", seq_len(K)); n_sites <- 40L
-env <- rnorm(n_sites)
-intercept_true <- c(0, 0.6, -0.4)
-beta_env_true  <- c(0, 0.8, -0.6)
-phi_true <- 12
-mu_true <- outer(rep(1, n_sites), intercept_true) +
-             outer(env, beta_env_true)
-mu_true[, 1L] <- 0
-probs <- t(apply(mu_true, 1L, function(z) {
-  z <- exp(z); z / sum(z)
-}))
-Y_wide <- t(apply(probs, 1L, function(p) {
-  d <- rgamma(K, shape = p * phi_true, rate = 1)
-  d / sum(d)
-}))
-Y_wide <- pmax(Y_wide, 1e-4)
-Y_wide <- Y_wide / rowSums(Y_wide)
-colnames(Y_wide) <- cat_names
+# Shares of three categories at 60 sites along an environmental
+# gradient
+simdat <- sim_jsdm(family = diri(), n_species = 3L, n_sites = 60L,
+                   seed = 2L)
+head(simdat$data_train)
 
-# Reshape to the long-format closure-unit layout: K rows per
-# site in (time, species) order with `series = category`.
-long_dat <- data.frame(
-  y      = as.numeric(t(Y_wide)),
-  series = factor(rep(cat_names, n_sites), levels = cat_names),
-  time   = rep(seq_len(n_sites), each = K),
-  env    = rep(env, each = K)
-)
-
-# Fit the compositional JSDM. The `env * series` interaction
-# makes the environmental slope category-specific, matching
-# brms-native Dirichlet's per-category linear predictors. `n_lv`
-# adds a rank-2 latent-factor correction over the population
-# mean structure.
+# `env * series` gives each category its own slope
 fit <- jsdgam(
   formula        = y ~ env * series,
   factor_formula = ~ -1,
-  data           = long_dat,
+  data           = simdat$data_train,
   unit           = time, species = series,
   family         = diri(),
   n_lv           = 2L,
   chains         = 2L,
-  iter           = 800L, warmup = 400L,
-  silent         = 2,
-  backend        = "cmdstanr"
+  silent         = 2
 )
 
-# Per-category offsets recover their truth; the K-shared
-# `b_Intercept` and `b_env` are not likelihood-identified under
-# the simplex reference subtraction and sample from their prior.
-draws <- posterior::as_draws_matrix(fit)
-draws[, c("b_seriesy2", "b_seriesy3",
-          "b_env:seriesy2", "b_env:seriesy3")] |>
-  posterior::summarise_draws(median, ~quantile(.x, c(0.05, 0.95)))
+# The species terms are contrasts with the first species. `Intercept`
+# and `env` act on every species alike. The softmax cancels them. Their
+# posteriors repeat the prior.
+summary(fit)
 
-# posterior_epred returns one probability per (site, species)
-# summing to 1 within each site.
+# The expected shares move along the gradient
+conditional_effects(fit, effects = "env:series")
+
+# Each site's expected shares sum to one
 pe <- posterior_epred(fit, ndraws = 50L)
-first_site <- which(long_dat$time == 1L)
-rowSums(pe[1L:5L, first_site, drop = FALSE])
+first_site <- which(simdat$data_train$time == 1L)
+rowSums(pe[1:5, first_site])
 }
 
 }

@@ -86,42 +86,30 @@ bias \code{p} away from \code{0.5}.
 
 \examples{
 \dontrun{
-# Simulate an under-dispersed COM-Binomial series via
-# sim_mvgam(): nu_true = 1.5, T = 20 trials per observation,
-# the default observation-side smooth `s(x)`, and a random-walk
-# latent state on the logit-probability.
+# Counts out of 10 trials, simulated with `nu = 3`. At `nu = 1`
+# the family is the binomial. Values above 1 give counts with
+# less spread than a binomial.
 set.seed(1)
 sim <- sim_mvgam(
   family       = com_binomial(),
   n_series     = 1L,
-  n_timepoints = 120L,
-  trend_model  = RW(),
-  family_pars  = list(nu = 1.5, trials = 20L)
+  n_timepoints = 160L,
+  trend_model  = "None",
+  family_pars  = list(nu = 3, trials = 10L)
 )
-head(sim$data_train)
 
-# Fit the matching state-space CMB model. `trials` is supplied
-# through brms's `trials()` addition term; `nu` is the
-# dispersion parameter (nu = 1 recovers the binomial,
-# nu > 1 under-dispersed, nu < 1 over-dispersed, nu < 0
-# super-dispersed / bimodal).
+# The denominator enters through brms's `trials()` term
 fit <- mvgam(
   bf(y | trials(trials) ~ s(x)),
-  trend_formula = ~ RW(),
-  data          = sim$data_train,
-  family        = com_binomial(),
-  chains        = 2,
-  iter          = 800,
-  warmup        = 400,
-  silent        = 2
+  data   = sim$data_train,
+  family = com_binomial(),
+  chains = 2,
+  silent = 2
 )
 
-# The `nu` posterior should concentrate around the simulated
-# 1.5 and stay well above the binomial null at nu = 1.
+# The posterior for `nu` lies above the binomial's value of 1
 summary(fit)
 mcmc_plot(fit, variable = "nu", type = "areas")
-
-# Posterior predictive check of the marginal count distribution.
 pp_check(fit, type = "bars", ndraws = 50)
 }
 }

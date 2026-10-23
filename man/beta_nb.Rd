@@ -79,30 +79,22 @@ family, keep \code{1 - F(y)} large and are unaffected.
 
 \examples{
 \dontrun{
-# Counts with a heavier tail than a negative binomial expects. The
-# dpars are `shape`, playing the usual negative binomial role, and
-# `mtail`, where smaller values give heavier tails and anything
-# below 1 gives infinite variance.
+# Counts drawn from the mixture in Details: a negative binomial
+# whose success probability follows a Beta distribution. The tail
+# is set by `mtail = 2`, the bulk by `shape = 3`.
 set.seed(1)
-simdat <- sim_mvgam(
-  family = beta_nb(), n_series = 1L, n_timepoints = 120L,
-  trend_model = AR(),
-  family_pars = list(shape = 2, mtail = 2)
-)
+n <- 300
+dat <- data.frame(x = rnorm(n), time = seq_len(n))
+mu <- exp(1 + 0.5 * dat$x)
+p <- rbeta(n, 1 + 2, mu * 2 / 3)
+dat$y <- rnbinom(n, size = 3, prob = p)
 
-mod <- mvgam(
-  y ~ 1,
-  trend_formula = ~ AR(p = 1),
-  data          = simdat$data_train,
-  family        = beta_nb(),
-  chains        = 2,
-  silent        = 2
-)
+mod <- mvgam(y ~ x, data = dat, family = beta_nb(), chains = 2,
+             silent = 2)
+
+# The posteriors recover `shape` and `mtail`. A negative binomial
+# is the limit of a large `mtail`.
 summary(mod)
-
-# `mtail` is what separates this family from a negative binomial.
-# A posterior that drifts toward the upper prior range is a sign
-# the extra tail parameter is not earning its place.
 mcmc_plot(mod, variable = c("shape", "mtail"), type = "hist")
 }
 }

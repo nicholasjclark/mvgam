@@ -104,7 +104,7 @@
 #'               family  = gaussian(),
 #'               chains  = 2, silent = 2)
 #'
-#' k <- kfold(mod, K = 3L, save_fits = FALSE)
+#' k <- kfold(mod, K = 3L)
 #' k$estimates
 #' }
 #'

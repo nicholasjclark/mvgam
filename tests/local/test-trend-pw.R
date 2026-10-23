@@ -745,6 +745,10 @@ test_that("summary, tidiers and criticism run on a PW fit", {
   # Whatever was raised is that notice and nothing else, so an
   # unrelated warning cannot hide among the expected ones.
   expect_true(all(grepl("Pareto k", loo_warnings)))
+  # The brms alias forwards only the arguments its caller wrote. 'loo()'
+  # refuses a brms default such as 'compare' wherever one is supplied.
+  alias <- with_warnings(LOO(fit))$value
+  expect_equal(alias$estimates, ic$estimates)
 
   aug <- augment(fit)
   expect_identical(nrow(aug), nrow(dat))
@@ -773,16 +777,16 @@ test_that("print describes the model without printing a pointer", {
 
 
 test_that("the tidy table carries the smooth this model is built on", {
-  # The two-dimensional smooth's basis coefficients are reported by
-  # `variables()` and by `posterior_summary()` and are absent from
-  # `tidy()`, so the table describes a model with no `s(x1, x2)` in
-  # it while carrying the changepoint block in full.
+  # The two-dimensional smooth's unpenalised coefficients reach
+  # `variables()`, `posterior_summary()` and `tidy()`. `tidy()` names
+  # them as `fixef()` does, without the `bs_` prefix.
   vars <- variables(fit)
   ps <- rownames(posterior_summary(fit))
   td <- tidy(fit, effects = "all")
-  expect_gt(sum(grepl("^bs_", vars)), 0L)
-  expect_identical(sum(grepl("^bs_", ps)), sum(grepl("^bs_", vars)))
-  expect_identical(sum(grepl("^bs_", td$term)), sum(grepl("^bs_", vars)))
+  bs <- grep("^bs_", vars, value = TRUE)
+  expect_gt(length(bs), 0L)
+  expect_identical(sum(grepl("^bs_", ps)), length(bs))
+  expect_true(all(mvgam:::fixef_name(bs) %in% td$term))
   # The changepoint adjustments are carried, which is what makes the
   # omission specific rather than the tidier failing on this fit.
   expect_identical(sum(grepl("^delta_trend", td$term)),

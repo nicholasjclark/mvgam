@@ -68,3 +68,43 @@ with_pareto_k_handled <- function(expr) {
     }
   })
 }
+
+
+#' A "Did you mean" bullet for a name that matched nothing
+#'
+#' Follows the rule of `rlang::arg_match()`. A unique partial match is
+#' the candidate. A closer candidate replaces it where its edit distance
+#' is at most half its length. Case is ignored only when neither
+#' finds one.
+#'
+#' @param name The name that matched nothing
+#' @param candidates The names it could have meant
+#' @return A named `c(i = ...)` bullet, or `NULL` with no candidate
+#' @noRd
+did_you_mean <- function(name, candidates) {
+  checkmate::assert_string(name)
+  checkmate::assert_character(candidates)
+  if (!length(candidates)) {
+    return(NULL)
+  }
+  candidate <- NULL
+  partial <- pmatch(name, candidates)
+  if (!is.na(partial)) {
+    candidate <- candidates[[partial]]
+  }
+  close <- utils::adist(name, candidates)[1L, ] / nchar(candidates)
+  if (any(close <= 0.5)) {
+    candidate <- candidates[[which.min(close)]]
+  }
+  if (is.null(candidate)) {
+    close <- utils::adist(name, candidates, ignore.case = TRUE)[1L, ] /
+      nchar(candidates)
+    if (any(close <= 0.5)) {
+      candidate <- candidates[[which.min(close)]]
+    }
+  }
+  if (is.null(candidate)) {
+    return(NULL)
+  }
+  c(i = paste0("Did you mean '", candidate, "'?"))
+}

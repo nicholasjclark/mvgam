@@ -637,6 +637,7 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
                                    silent = 1L, stanvars = NULL,
                                    validate = TRUE, ...) {
   reject_removed_args(list(...), fn = "stancode")
+  refuse_unread_dots(list(...), mvgam_dots_args(), "stancode")
   stancode <- mvgam_formula_component(
     "stancode", object, data, family, prior, data2, sample_prior,
     knots, drop_unused_levels, backend, threads, normalize,
@@ -794,6 +795,7 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
                                    silent = 1L, stanvars = NULL,
                                    validate = TRUE, ...) {
   reject_removed_args(list(...), fn = "standata")
+  refuse_unread_dots(list(...), mvgam_dots_args(), "standata")
   standata <- mvgam_formula_component(
     "standata", object, data, family, prior, data2, sample_prior,
     knots, drop_unused_levels, backend, threads, normalize,

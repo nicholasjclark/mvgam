@@ -282,10 +282,8 @@
 #'
 #' summary(mod)
 #'
-#' # Marginal env effect on the response (occupancy * detection)
-#' # scale. Pass `type = "link"` for the logit-occupancy scale,
-#' # which often reads more cleanly for ecologists used to
-#' # discussing logit psi directly.
+#' # The effect of env on the chance of a detection, which is
+#' # occupancy times detection. `type = "link"` gives logit occupancy.
 #' conditional_effects(mod)
 #'
 #' # Inspect the implied residual species-species correlations.

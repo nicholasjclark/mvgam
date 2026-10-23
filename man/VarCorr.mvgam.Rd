@@ -74,14 +74,10 @@ mod <- mvgam(y ~ s(x) + (1 | series),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# `VarCorr()` returns the per-grouping variance / covariance
-# estimates. Each grouping has an `sd` matrix (rows = effects,
-# columns = posterior summary) and, for multi-effect groupings,
-# a `cor` matrix giving the implied correlation structure. Use
-# `ranef()` for the level-specific BLUP-style estimates.
-vc <- VarCorr(mod)
-str(vc, max.level = 2)
-vc$series$sd
+# The standard deviation of the series intercepts. A grouping
+# with several effects adds their correlations under `cor`.
+# `ranef()` gives each level's own estimate.
+VarCorr(mod)$series$sd
 }
 
 }

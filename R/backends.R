@@ -1079,16 +1079,36 @@ refuse_unknown_cmdstanr_args <- function(model, algorithm, arg_names) {
     meanfield = , fullrank = "variational",
     algorithm
   )
-  unknown <- setdiff(arg_names, names(formals(model[[method]])))
-  if (length(unknown)) {
-    stop(insight::format_error(c(
-      paste0("Unknown argument for cmdstanr's '$", method, "()': ",
-             paste0("'", unknown, "'", collapse = ", "), "."),
-      i = paste0("Check the name against '?cmdstanr::model-method-",
-                 method, "'.")
-    )), call. = FALSE)
-  }
+  refuse_unread_dots(
+    stats::setNames(vector("list", length(arg_names)), arg_names),
+    names(formals(model[[method]])), "mvgam"
+  )
   invisible(NULL)
+}
+
+
+#' The arguments the samplers of both backends take
+#'
+#' cmdstanr's `$sample()` declares its arguments as formals of the
+#' `CmdStanModel` class, taken from the class when cmdstanr is
+#' installed. rstan's `sampling()` method declares only `...`. Its
+#' documented arguments are listed here.
+#'
+#' @return Character vector of argument names
+#' @noRd
+sampler_arg_names <- function() {
+  rstan_args <- c(
+    "pars", "include", "chains", "iter", "warmup", "thin", "seed",
+    "init", "check_data", "sample_file", "diagnostic_file", "verbose",
+    "algorithm", "control", "cores", "open_progress", "show_messages",
+    "chain_id", "init_r", "test_grad", "append_samples", "refresh",
+    "save_warmup", "enable_random_init"
+  )
+  cmdstanr_args <- if (requireNamespace("cmdstanr", quietly = TRUE)) {
+    model_class <- utils::getFromNamespace("CmdStanModel", "cmdstanr")
+    names(formals(model_class$public_methods$sample))
+  }
+  setdiff(unique(c(rstan_args, cmdstanr_args)), "...")
 }
 
 

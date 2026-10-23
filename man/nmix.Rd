@@ -53,8 +53,8 @@ represent replicate visits to the same underlying abundance.
 The latent count \code{N_g} for closure unit \code{g} is marginalised
 analytically over the truncated range
 \verb{K_max[g] >= k >= max(y[g, ])} using a \code{log_sum_exp} over
-\verb{poisson_log_lpmf(k | log_lambda_g) + binomial_logit_lpmf(y[g,] | k, logit_p_\{g,j\})}
-(Royle 2004).
+\code{poisson_log_lpmf(k | log_lambda_g)} plus
+\verb{binomial_logit_lpmf(y[g,] | k, logit_p_\{g,j\})} (Royle 2004).
 }
 \details{
 Parameterised with two distributional parameters:
@@ -343,59 +343,30 @@ naive enumeration baseline; the threaded variant
 
 \examples{
 \dontrun{
-# Poisson-binomial N-mixture: per-visit counts with imperfect
-# detection. The state mu is lambda (expected abundance) and
-# the dpar p is the detection probability per visit.
+# Counts at 50 sites, each visited four times. The state `mu` is
+# the expected abundance and `p` the detection probability.
 set.seed(5)
 simdat <- sim_closure_unit_data(family = nmix(), n_species = 1L,
-                                  n_sites = 50L, n_visits = 4L,
-                                  type = 1L)
-
+                                n_sites = 50L, n_visits = 4L,
+                                type = 1L)
 mod <- mvgam(
   bf(y ~ env, p ~ tod_c),
-  data    = simdat$data_train,
-  family  = nmix(),
-  chains  = 2,
-  silent  = 2
+  data   = simdat$data_train,
+  family = nmix(),
+  chains = 2,
+  silent = 2
 )
 summary(mod)
 
-# Marginal env effect on the response scale (expected count
-# = lambda * p).
-conditional_effects(mod)
-
-# Closure-unit post-fit surface. `predict(type = "latent_state")`
-# returns posterior summaries of latent abundance N at each
-# unit; `predict(type = "detection")` returns the per-visit
-# detection probability p. These two quantities are confounded
-# in the raw response and only separable under the N-mixture
-# marginalisation.
+# Abundance and detection, separated by the model
 head(predict(mod, type = "latent_state"))
 head(predict(mod, type = "detection"))
+plot(hindcast(mod, type = "latent_state"))
 
-# `hindcast(type = "latent_state")` packs the full per-draw
-# posterior at every training unit into an `mvgam_latent_state`
-# object with print / summary / as.data.frame / plot methods.
-# `summary()` returns a tidy (series, time, median, 50\% and 95\%
-# CI) frame for direct ggplot use; `plot()` returns a faceted
-# step-style ribbon that can be extended with extra ggplot
-# layers (e.g. `+ geom_point(aes(time, true_N))` to overlay a
-# known truth).
-hc <- hindcast(mod, type = "latent_state")
-print(hc)
-head(as.data.frame(hc))
-plot(hc)
-
-# `pp_check(type = "fit_stat", ...)` runs a closure-unit
-# goodness-of-fit test: collapse to per-unit sufficient
-# statistics, compare observed vs replicated under either the
-# chi-squared or Freeman-Tukey discrepancy of MacKenzie & Bailey
-# (2004). Returns an `mvgam_ppc_fit_stat` object with the
-# Bayesian p-value; values near 0 or 1 indicate poor fit.
+# A goodness-of-fit test on the per-site totals. A Bayesian p-value
+# near 0 or 1 marks a misfit.
 pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
-          ndraws = 200L)
-pp_check(mod, type = "fit_stat", stat = "chi_squared",
-          ndraws = 200L)
+         ndraws = 200L)
 }
 
 }

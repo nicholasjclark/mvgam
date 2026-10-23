@@ -597,11 +597,13 @@ LOO.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                        reloo = FALSE, k_threshold = 0.7,
                        save_psis = FALSE, moment_match_args = list(),
                        reloo_args = list(), model_names = NULL) {
-  loo(x, ..., compare = compare, resp = resp,
-      pointwise = pointwise, moment_match = moment_match,
-      reloo = reloo, k_threshold = k_threshold,
-      save_psis = save_psis, moment_match_args = moment_match_args,
-      reloo_args = reloo_args, model_names = model_names)
+  # As in brms, the call is replayed on `loo()` with the arguments the
+  # caller wrote. `loo.mvgam()` refuses a brms argument it cannot
+  # honour where one is supplied, which a default passed on here would
+  # count as.
+  cl <- match.call()
+  cl[[1L]] <- quote(loo::loo)
+  eval(cl, parent.frame())
 }
 
 
@@ -611,8 +613,10 @@ LOO.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
 #' @export
 WAIC.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                         pointwise = FALSE, model_names = NULL) {
-  waic(x, ..., compare = compare, resp = resp,
-       pointwise = pointwise, model_names = model_names)
+  # Replayed on `waic()` as `LOO.mvgam()` replays its call on `loo()`
+  cl <- match.call()
+  cl[[1L]] <- quote(loo::waic)
+  eval(cl, parent.frame())
 }
 
 

@@ -105,6 +105,7 @@ hindcast.mvgam <- function(object,
                            resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   require_fitted_model(object, "hindcast")
+  require_series_axis(object, "hindcast")
   # Both methods take every argument by name after `...`, so a
   # misspelling lands in `...` and the method proceeds on the default
   # it was trying to override. That is how `incl_autocor` went

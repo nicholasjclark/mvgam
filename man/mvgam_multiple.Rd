@@ -125,16 +125,7 @@ fit_pooled <- mvgam_multiple(
 # comes from the imputations
 summary(fit_pooled)
 
-# `combine = FALSE` keeps the fits separate
-fit_list <- mvgam_multiple(
-  formula = y ~ x,
-  trend_formula = ~ AR(p = 1),
-  data_list = imputed_list,
-  family = gaussian(),
-  combine = FALSE,
-  chains = 2,
-  silent = 2
-)
+# `combine = FALSE` returns the three fits as a list
 }
 
 }

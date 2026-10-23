@@ -174,12 +174,12 @@ validate_supported_family <- function(family) {
 #'   exceed one.
 #' @param unit_grouping_vars Optional character vector of column
 #'   names identifying one closure unit. Defaults to
-#'   `c(series_var, time_var)`. Multi-season families (`occ(multi_season = TRUE)`,
-#'   `nmix(multi_season = TRUE)`) pass a 3-axis grouping such as
-#'   `c("series", "site", "time")` so each (species, site, season)
-#'   forms one closure unit with replicate visits inside. The cap-
-#'   constancy and single-visit identifiability checks all generalise
-#'   over the supplied grouping cardinality.
+#'   `c(series_var, time_var)`. Multi-season families
+#'   (`occ(multi_season = TRUE)`, `nmix(multi_season = TRUE)`) pass a
+#'   3-axis grouping such as `c("series", "site", "time")`. Each
+#'   (species, site, season) then forms one closure unit with replicate
+#'   visits inside. The cap-constancy and single-visit identifiability
+#'   checks generalise over the supplied grouping cardinality.
 #' @param identifiability Logical. Whether to run the checks that the
 #'   design separates state from detection: two units at minimum, then
 #'   the single-visit tests. They concern a design being fitted. A
@@ -979,7 +979,7 @@ require_fitted_models <- function(models, fn) {
 #' discards a name in neither set. The caller then gets the default
 #' they meant to override. bayesplot warns about such a name and loo
 #' stays silent. `rlang::check_dots_empty()` covers the methods with
-#' no use for dots.
+#' no use for dots. A name close to an allowed one draws a suggestion.
 #'
 #' @param dots The method's `list(...)`.
 #' @param allowed Names in the method's or the receiver's formals.
@@ -990,7 +990,7 @@ refuse_unread_dots <- function(dots, allowed, fn) {
   checkmate::assert_list(dots)
   checkmate::assert_character(allowed)
   checkmate::assert_string(fn)
-  unread <- setdiff(names(dots), allowed)
+  unread <- setdiff(names(dots), c(allowed, ""))
   if (!length(unread)) {
     return(invisible(TRUE))
   }
@@ -1000,7 +1000,8 @@ refuse_unread_dots <- function(dots, allowed, fn) {
       "Unknown to ", fn, "() and to what it hands the work to: ",
       paste0("'", unread, "'", collapse = ", "), "."
     ),
-    i = paste0("Check the spelling against '?", fn, "'.")
+    did_you_mean(unread[[1L]], setdiff(allowed, "...")) %||%
+      c(i = paste0("Check the spelling against '?", fn, "'."))
   )), call. = FALSE)
 }
 
@@ -1238,6 +1239,41 @@ require_factor_n_lv <- function(object, caller) {
     )), call. = FALSE)
   }
   n_lv
+}
+
+
+#' Refuse a time-series view of a fit whose data name no series
+#'
+#' A trend-free model fits on any frame. A frame naming no time column
+#' or no series column leaves the fit with no axis record. A hindcast
+#' or forecast then has no series to step along.
+#'
+#' @param object A fitted `mvgam` object
+#' @param caller The function that needs the axes, for the message
+#' @return `TRUE`, invisibly
+#' @noRd
+require_series_axis <- function(object, caller) {
+  checkmate::assert_string(caller)
+  if (!is.null(fitted_series_levels(object))) {
+    return(invisible(TRUE))
+  }
+  vars <- axis_vars(object)
+  cols <- c(vars$time_var, vars$series_var)
+  absent <- setdiff(cols, names(object$data))
+  stop(insight::format_error(c(
+    paste0("'", caller, "()' requires data that name a time and a ",
+           "series."),
+    x = if (length(absent)) {
+      paste0("Absent from the fitted data: ",
+             paste0("'", absent, "'", collapse = ", "), ".")
+    } else {
+      paste0("The fitted data's ", paste0("'", cols, "'", collapse = " or "),
+             " column holds missing values.")
+    },
+    i = paste0("For a single time series, add data$", vars$series_var,
+               " <- factor(\"series_1\") and refit."),
+    i = "'predict()' and 'posterior_predict()' work on this fit."
+  )), call. = FALSE)
 }
 
 
@@ -2303,6 +2339,21 @@ validate_trend_formula <- function(formula) {
   }
 
   ensure_registry_initialized()
+  # A call to no function that lies close to a trend constructor is a
+  # misspelt trend. brms would report only that the function is absent.
+  # The brms and mvgam namespaces resolve 's()', 'gp()' and 'lv_axis()'
+  # for a caller who attached neither package.
+  envs <- list(environment(formula) %||% globalenv(), asNamespace("brms"),
+               asNamespace("mvgam"))
+  for (nm in setdiff(formula_rhs_function_names(formula),
+                     mvgam_trend_registry())) {
+    resolved <- any(vapply(envs, function(env) {
+      exists(nm, envir = env, mode = "function")
+    }, logical(1L)))
+    if (!resolved && !is.null(did_you_mean(nm, mvgam_trend_registry()))) {
+      get_trend_info(nm)
+    }
+  }
   constructors <- find_calls(rhs, mvgam_trend_registry())
   if (length(constructors) > 1L) {
     stop(insight::format_error(c(
@@ -3127,8 +3178,10 @@ validate_newdata_complete <- function(newdata, object) {
   # The term list keeps a meta variable only where it varies in the
   # training data. A fit on one occasion drops its time column from
   # that list. The axis names the column whatever the training values
-  # did. The time comes from there.
-  time_var <- if (named_var(vars$time_var)) {
+  # did. The time comes from there. A trend-free fit places no row in
+  # time. Its formulas name any time column it uses.
+  time_var <- if (named_var(vars$time_var) &&
+                    get_trend_type(object) != "None") {
     vars$time_var
   } else {
     character(0L)
@@ -5049,34 +5102,58 @@ assert_forecast_times_steppable <- function(fc_times, object) {
   # The step keeps its recorded value. Coercion to integer would turn
   # a grid spaced by half a unit into a step of zero.
   step <- as.numeric(step)
+  end <- past[length(past)]
   for (lv in names(fc_times)) {
     # The comparison uses the occasions the user supplied. Integer
     # truncation would make a grid spaced by less than one unit equal
     # itself shifted. It would make a correct grid spaced by more than
     # one unequal. The expected occasions are arithmetic on a recorded
     # step. They land within floating-point noise of the frame's
-    # values. `all.equal()` allows for that noise.
-    fut <- sort(as.numeric(fc_times[[lv]]))
+    # values. The tolerance allows for that noise.
+    fut <- sort(unique(as.numeric(fc_times[[lv]])))
     if (!length(fut)) next
-    expected <- past[length(past)] + step * seq_along(fut)
-    if (!isTRUE(all.equal(fut, expected))) {
-      stop(insight::format_error(c(
-        paste0(
-          "'newdata' must continue the training series for a '",
-          get_trend_name(trend_spec), "' trend."
-        ),
-        x = paste0("The training grid runs to time ", past[length(past)],
-                   "."),
-        x = paste0("Series '", lv, "' needs times ", expected[1L], " to ",
-                   expected[length(expected)], " and got ", fut[1L],
-                   " to ", fut[length(fut)], "."),
-        i = "'CAR()' models a trend over irregular times.",
-        i = "'hindcast()' covers times inside the training grid."
-      )), call. = FALSE)
-    }
+    steps <- (fut - end) / step
+    inside <- fut[steps < 1 - 1e-8]
+    off_step <- setdiff(fut[abs(steps - round(steps)) > 1e-8], inside)
+    expected <- end + step * seq_len(max(0L, round(max(steps))))
+    skipped <- expected[!vapply(expected, function(t) {
+      any(abs(fut - t) <= 1e-8 * max(1, abs(t)))
+    }, logical(1L))]
+    if (!length(inside) && !length(off_step) && !length(skipped)) next
+    stop(insight::format_error(c(
+      paste0(
+        "'newdata' must continue the training series for a '",
+        get_trend_name(trend_spec), "' trend."
+      ),
+      x = paste0("The training grid runs to time ", end, " in steps of ",
+                 step, "."),
+      if (length(inside)) {
+        c(x = cli::format_inline(
+          "Series '{lv}' has {cli::qty(length(inside))}time{?s} {inside} ",
+          "inside the training grid."
+        ))
+      },
+      if (length(skipped)) {
+        c(x = cli::format_inline(
+          "Series '{lv}' skips {cli::qty(length(skipped))}time{?s} {skipped}."
+        ))
+      },
+      if (length(off_step)) {
+        c(x = cli::format_inline(
+          "Series '{lv}' has {cli::qty(length(off_step))}time{?s} ",
+          "{off_step} off the step of {step}."
+        ))
+      },
+      i = "Supply one row per step, through the last time to forecast.",
+      i = "'CAR()' models a trend over irregular times.",
+      if (length(inside)) {
+        c(i = "'hindcast()' covers times inside the training grid.")
+      }
+    )), call. = FALSE)
   }
   invisible(TRUE)
 }
+
 
 
 #' Map each observation row onto its row of the trend design

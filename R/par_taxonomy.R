@@ -319,6 +319,13 @@ MVGAM_PAR_MATRIX_PATTERN <- paste0(
   "Omega_trend|Theta_trend)\\["
 )
 
+# The symmetric matrices among them: the innovation covariances and a
+# VAR's stationary covariance. A cell above the diagonal repeats the
+# cell below it. The default view lists the diagonal and the lower
+# triangle, the half `residual_cor()` draws.
+#'@noRd
+MVGAM_PAR_SYMMETRIC_PATTERN <- "^(Sigma_group_trend|Sigma_trend|Omega_trend)\\["
+
 # The name `brms::fixef()` gives a population-level coefficient: its
 # class prefix `b_`, `bs_` or `bsp_` dropped, as `brms:::fixef_pars()`
 # drops it.

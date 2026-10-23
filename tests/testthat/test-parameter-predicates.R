@@ -213,6 +213,29 @@ test_that("one taxonomy answers for every consumer of a name", {
 })
 
 
+test_that("a symmetric matrix lists each off-diagonal cell once", {
+  local_mocked_bindings(
+    mvgam_beta_aliases = function(...) character(0L),
+    mvgam_ranef_aliases = function(...) character(0L),
+    mvgam_smooth_aliases = function(...) character(0L),
+    mvgam_special_aliases = function(...) character(0L),
+    mvgam_index_aliases = function(...) character(0L)
+  )
+  stub <- structure(list(), class = "mvgam")
+  pars <- c("Sigma_trend[1,1]", "Sigma_trend[2,1]", "Sigma_trend[1,2]",
+            "Sigma_trend[2,2]", "Sigma_group_trend[1,1,2]",
+            "Sigma_group_trend[1,2,1]", "Phi_trend[1,1,2]")
+  # A transition matrix is not symmetric and keeps every cell
+  expect_setequal(
+    names(mvgam_user_pars(stub, pars)),
+    c("Sigma_trend[1,1]", "Sigma_trend[2,1]", "Sigma_trend[2,2]",
+      "Sigma_group_trend[1,2,1]", "Phi_trend[1,1,2]")
+  )
+  # Naming a cell retrieves it
+  expect_setequal(names(mvgam_user_pars(stub, pars, all = TRUE)), pars)
+})
+
+
 test_that("tidy() files each block under broom.mixed's effects class", {
   # A group-level block's standard deviations and correlations are
   # `ran_pars` and its coefficients `ran_vals`; a smooth's penalty and
@@ -266,8 +289,8 @@ test_that("tidy() files each block under broom.mixed's effects class", {
     stats::rnorm(6L), nrow = 2L, dimnames = list(NULL, small)
   ))
   # Row order is the spec's class order, and the family extras are
-  # its first class.
-  expect_identical(tidy(stub)$term, c("sigma", "b_Intercept"))
+  # its first class. A fixed effect takes its `fixef()` name.
+  expect_identical(tidy(stub)$term, c("sigma", "Intercept"))
   none <- tidy(stub, effects = "ran_vals")
   expect_identical(nrow(none), 0L)
   expect_identical(names(none),
@@ -332,16 +355,26 @@ test_that("series-indexed parameters take series names", {
     "cov_matrix[N_lv_trend] Sigma_trend;",
     "array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] Phi_trend;",
     "matrix[N_time_trend, N_lv_trend] lv_trend;",
+    # A declaration that defines its variable names it the same way
+    "vector<lower=0>[N_lv_trend] sigma_slope_trend\n  = s * raw;",
     sep = "\n"
   )
   expect_identical(
     mvgam_index_aliases(stub, c("sigma_trend[2]", "b_trend[1]",
                                 "Sigma_trend[2,1]", "Phi_trend[3,1,2]",
-                                "lv_trend[1,2]")),
+                                "lv_trend[1,2]", "sigma_slope_trend[1]")),
     c(`sigma_trend[bee]` = "sigma_trend[2]",
       `Sigma_trend[bee,ant]` = "Sigma_trend[2,1]",
-      `Phi_trend[3,ant,bee]` = "Phi_trend[3,1,2]")
+      `Phi_trend[3,ant,bee]` = "Phi_trend[3,1,2]",
+      `sigma_slope_trend[ant]` = "sigma_slope_trend[1]")
   )
+})
+
+
+test_that("a trend-free fit keeps its parameter names", {
+  local_mocked_bindings(fitted_series_levels = function(x) NULL)
+  stub <- structure(list(stancode = "vector[K] b;"), class = "mvgam")
+  expect_identical(mvgam_index_aliases(stub, "b[1]"), character(0L))
 })
 
 

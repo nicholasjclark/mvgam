@@ -155,54 +155,27 @@ response scale.
 
 \examples{
 \dontrun{
-# Single-species occupancy fit with separate covariates on
-# the occupancy (psi) and detection (p) sub-formulas. The
-# closure-unit grain is (series, time) -- 50 sites, 4 visits
-# each.
+# Detections at 50 sites, each visited four times, with covariates
+# on occupancy and on detection
 set.seed(4)
 simdat <- sim_closure_unit_data(family = occ(), n_species = 1L,
-                                  n_sites = 50L, n_visits = 4L,
-                                  type = 1L)
-
+                                n_sites = 50L, n_visits = 4L,
+                                type = 1L)
 mod <- mvgam(
   bf(y ~ env, p ~ tod_c),
-  data    = simdat$data_train,
-  family  = occ(),
-  chains  = 2,
-  silent  = 2
+  data   = simdat$data_train,
+  family = occ(),
+  chains = 2,
+  silent = 2
 )
 summary(mod)
 
-# Marginal env effect on the response scale (occupancy *
-# detection). For the logit-occupancy view pass
-# `type = "link"`.
-conditional_effects(mod)
+# Occupancy along the gradient, on the logit scale
+conditional_effects(mod, type = "link")
 
-# Closure-unit post-fit surface. `predict(type = "latent_state")`
-# returns posterior summaries of the latent occupancy probability
-# psi at each unit; `predict(type = "detection")` returns the
-# per-visit detection probability p. Both are confounded in the
-# raw 0/1 record and only separable under the marginalised
-# occupancy likelihood.
+# Occupancy and detection, separated by the model
 head(predict(mod, type = "latent_state"))
 head(predict(mod, type = "detection"))
-
-# `hindcast(type = "latent_state")` returns the full per-draw
-# posterior on psi as an `mvgam_latent_state` object with
-# `as.data.frame()` and a faceted `plot()` for direct inspection
-# and ggplot composition.
-hc <- hindcast(mod, type = "latent_state")
-print(hc)
-plot(hc)
-
-# `pp_check(type = "fit_stat", ...)` runs a closure-unit
-# goodness-of-fit test: collapse to per-unit sufficient
-# statistics, compare observed vs replicated under the
-# Freeman-Tukey or chi-squared discrepancy of MacKenzie &
-# Bailey (2004). Returns an `mvgam_ppc_fit_stat` object with
-# the Bayesian p-value; values near 0 or 1 indicate poor fit.
-pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
-          ndraws = 200L)
 }
 
 }

@@ -153,14 +153,19 @@ test_that("a frame is held to the axis columns the fit needs", {
   flat <- data.frame(y = rpois(30, 3), x = rnorm(30),
                      time = rep(1L, 30),
                      series = factor(rep(c("a", "b", "c"), each = 10)))
-  prefit <- mvgam(y ~ x, data = flat, family = poisson(),
-                  run_model = FALSE, silent = 2, validate = FALSE)
+  prefit <- mvgam(y ~ x, trend_formula = ~ ZMVN(), data = flat,
+                  family = poisson(), run_model = FALSE, silent = 2,
+                  validate = FALSE)
   no_time <- flat
   no_time$time <- NULL
   expect_error(
     mvgam:::validate_newdata_complete(no_time, prefit),
     "Absent: 'time'"
   )
+  # A trend-free fit places no row in time and needs no time column.
+  trend_free <- mvgam(y ~ x, data = flat, family = poisson(),
+                      run_model = FALSE, silent = 2, validate = FALSE)
+  expect_silent(mvgam:::validate_newdata_complete(no_time, trend_free))
 
   # A frame omitting the series column reaches prediction with every
   # row unmapped. The column is exempt where a grouping names the

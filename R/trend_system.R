@@ -102,8 +102,9 @@ get_trend_info <- function(name) {
     available_trends <- ls(trend_registry)
     stop(insight::format_error(c(
       cli::format_inline("Unknown trend type: {.field {name}}"),
+      did_you_mean(name, available_trends),
       i = cli::format_inline("Available types: {.val {available_trends}}")
-    )))
+    )), call. = FALSE)
   }
 
   trend_registry[[name]]
@@ -1465,20 +1466,13 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #' @examples
 #' \dontrun{
-#' # Simulate three Gaussian series driven by a correlated VAR(1)
-#' # process so the cross-series dependencies are recoverable.
+#' # Three Gaussian series driven by a VAR(1)
 #' set.seed(0)
-#' simdat <- sim_mvgam(
-#'   family       = gaussian(),
-#'   n_series     = 3L,
-#'   n_timepoints = 120L,
-#'   trend_model  = VAR(),
-#'   prop_trend   = 0.95
-#' )
+#' simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
+#'                     n_timepoints = 120L, trend_model = VAR(),
+#'                     prop_trend = 0.95)
 #'
-#' # Fit a VAR(1) state-space model. The trend constructor goes
-#' # inside `trend_formula`; the obs side carries only the
-#' # intercept.
+#' # The constructor goes inside `trend_formula`
 #' mod <- mvgam(
 #'   y ~ 1,
 #'   trend_formula = ~ VAR(p = 1),
@@ -1489,70 +1483,21 @@ print.mvgam_trend <- function(x, ...) {
 #' )
 #' summary(mod)
 #'
-#' # `variable = "trend_params"` is a keyword shortcut that pulls
-#' # every trend-dynamics parameter (Phi_trend, sigma_trend, the
-#' # Sigma_trend covariance, etc.) in one call. See ?mvgam_draws
-#' # for the full keyword set ("betas", "obs_params",
-#' # "smooth_params", "trend_betas", "trend_params",
-#' # "trend_smooth_params").
+#' # Every trend parameter, through the `trend_params` keyword
 #' mcmc_plot(mod, variable = "trend_params", type = "intervals")
 #'
-#' # Post-fit sweep on the same VAR(1). `residual_cor()` pulls
-#' # the innovation correlation matrix between the three series.
-#' # `irf()` shows how a one-time shock to one series ripples
-#' # through the others over h steps; `fevd()` reports the share
-#' # of each series' forecast-error variance attributable to each
-#' # shock; `stability()` summarises the long-run dynamics
-#' # (reactivity = peak amplification of a shock; mean_return_rate
-#' # = speed of decay back to the stationary distribution).
-#' residual_cor(mod)
-#' plot(irf(mod, h = 8L), series = 1)
-#' plot(fevd(mod, h = 8L))
-#' stab <- stability(mod)
-#' stab[stab$metric %in% c("reactivity", "mean_return_rate"), ]
-#'
-#' # Forecast the held-out cells. `forecast()` propagates
-#' # uncertainty through the VAR; `plot(fc, series = i)` overlays
-#' # the in-sample hindcast and the out-of-sample interval.
+#' # The forecast carries the cross-series dynamics forward
 #' fc <- forecast(mod, newdata = simdat$data_test)
 #' plot(fc, series = 1)
 #'
-#' # Continuous-time AR(1) on irregularly-spaced data. Recipe 6
-#' # of sim_mvgam() defaults to CAR() with U(1, 6) time gaps.
-#' set.seed(7)
-#' simdat_car <- sim_mvgam(
-#'   type         = 6L,
-#'   family       = gaussian(),
-#'   n_series     = 1L,
-#'   n_timepoints = 120L
-#' )
-#'
-#' # Fit the CAR(1) model. ar1_trend is the damping over the
-#' # median gap between observations.
-#' mod_car <- mvgam(
-#'   y ~ 1,
-#'   trend_formula = ~ CAR(),
-#'   data          = simdat_car$data_train,
-#'   family        = gaussian(),
-#'   chains        = 2,
-#'   silent        = 2
-#' )
-#' mcmc_plot(mod_car, variable = "trend_params", type = "intervals")
-#'
-#' # Correlated CAR(1) for three series observed at their own times.
-#' # Each series keeps a random 60 percent of the survey times.
+#' # A continuous-time AR(1) takes series observed at their own
+#' # irregular times. Each series here keeps 60 percent of the surveys.
 #' set.seed(11)
-#' simdat_cor <- sim_mvgam(
-#'   type         = 6L,
-#'   family       = poisson(),
-#'   n_series     = 3L,
-#'   n_timepoints = 80L
-#' )
-#' own_times <- simdat_cor$data_train
+#' simdat_car <- sim_mvgam(type = 6L, family = poisson(), n_series = 3L,
+#'                         n_timepoints = 80L)
+#' own_times <- simdat_car$data_train
 #' own_times <- own_times[runif(nrow(own_times)) < 0.6, ]
-#' table(own_times$series)
-#'
-#' mod_car_cor <- mvgam(
+#' mod_car <- mvgam(
 #'   y ~ s(season, bs = "cc", k = 6),
 #'   trend_formula = ~ CAR(cor = TRUE),
 #'   data          = own_times,
@@ -1560,69 +1505,36 @@ print.mvgam_trend <- function(x, ...) {
 #'   chains        = 2,
 #'   silent        = 2
 #' )
-#' summary(mod_car_cor)
+#' residual_cor(mod_car)
+#' plot(forecast(mod_car, newdata = simdat_car$data_test), series = 2)
 #'
-#' # Correlations among the series' innovations
-#' residual_cor(mod_car_cor)
-#'
-#' # The trend has a state for every series at every survey time,
-#' # and forecast() takes each series at its own future times.
-#' plot(hindcast(mod_car_cor), series = 1)
-#' fc_car <- forecast(mod_car_cor, newdata = simdat_cor$data_test)
-#' plot(fc_car, series = 2)
-#'
-#' # Other trend constructors swap in the same place. For example
-#' # an AR(1) on a single series:
-#' #   trend_formula = ~ AR(p = 1)
-#' # or a zero-mean multivariate normal residual prior for cross-
-#' # series correlations:
-#' #   trend_formula = ~ ZMVN()
-#'
-#' # Hierarchical VAR with two regions and two outcomes per region.
-#' # `gr` names the grouping unit (region) and `subgr` the series
-#' # within it (outcome). The fit estimates a population innovation
-#' # correlation across outcomes and per-region deviations from it.
-#' # `alpha_cor_trend`, with a beta(3, 2) prior by default, sets how
-#' # strongly the two are pooled. The simulated outcomes share a
-#' # correlation of about 0.6, which gives the population estimate a
-#' # signal to recover.
+#' # A hierarchical VAR: two outcomes in each of two regions. `gr`
+#' # names the region and `subgr` the outcome within it. The outcomes
+#' # share a correlation of 0.6. `alpha_cor_trend` sets how strongly
+#' # each region's correlation is pooled toward the shared one.
 #' set.seed(3)
-#' n_t <- 30L; rho <- 0.6
-#' Sigma <- matrix(c(1, rho, rho, 1), 2L, 2L)
-#' L <- chol(Sigma)
-#' regions <- c("A", "B")
-#' hdat <- do.call(rbind, lapply(regions, function(r) {
+#' n_t <- 30L
+#' L <- chol(matrix(c(1, 0.6, 0.6, 1), 2L, 2L))
+#' hdat <- do.call(rbind, lapply(c("A", "B"), function(r) {
 #'   eps <- matrix(rnorm(n_t * 2L), n_t, 2L) %*% L
 #'   data.frame(
 #'     time    = rep(seq_len(n_t), 2L),
-#'     region  = factor(r, levels = regions),
+#'     region  = factor(r, levels = c("A", "B")),
 #'     outcome = factor(rep(c("gdp", "cons"), each = n_t),
-#'                       levels = c("gdp", "cons")),
+#'                      levels = c("gdp", "cons")),
 #'     y       = c(eps[, 1L], eps[, 2L])
 #'   )
 #' }))
-#'
 #' mod_hv <- mvgam(
 #'   y ~ 1,
-#'   trend_formula = ~ VAR(
-#'     p = 1, gr = region, subgr = outcome, cor = TRUE
-#'   ),
-#'   data    = hdat,
-#'   family  = gaussian(),
-#'   chains  = 1,
-#'   iter    = 600,
-#'   warmup  = 300,
-#'   silent  = 2
+#'   trend_formula = ~ VAR(p = 1, gr = region, subgr = outcome,
+#'                         cor = TRUE),
+#'   data   = hdat,
+#'   family = gaussian(),
+#'   chains = 2,
+#'   silent = 2
 #' )
-#'
-#' # Marginal posterior for the pooling weight. Mass near 1 means
-#' # the per-region correlations track the population correlation;
-#' # mass near 0 lets the regions diverge.
-#' mcmc_plot(mod_hv, variable = "alpha_cor_trend", type = "hist")
-#'
-#' # `residual_cor()` returns the population (across-outcome)
-#' # correlation by default. `by_group = TRUE` also returns the
-#' # per-region correlations, for comparing the regions.
+#' # The shared correlation, then each region's
 #' residual_cor(mod_hv)
 #' residual_cor(mod_hv, by_group = TRUE)
 #' }
@@ -1838,32 +1750,32 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #'
 #' @examples
 #' \dontrun{
-#' # A series that grows, then levels off
+#' # A series that grows, then levels off: its slope shrinks by a
+#' # factor of 0.9 at each step
 #' set.seed(4)
 #' n_t <- 80
-#' growth <- cumsum(c(0.08, rnorm(n_t - 1, 0, 0.01))) * exp(-(1:n_t) / 60)
+#' slope <- 0.1 * 0.9^(0:(n_t - 1))
 #' dat <- data.frame(
 #'   time = 1:n_t,
 #'   series = factor("s1"),
-#'   y = rpois(n_t, exp(1 + cumsum(growth) + rnorm(n_t, 0, 0.1)))
+#'   y = rpois(n_t, exp(1 + cumsum(slope) + cumsum(rnorm(n_t, 0, 0.03))))
 #' )
 #'
 #' mod <- mvgam(
 #'   y ~ 1,
 #'   trend_formula = ~ LLT(damped = TRUE),
-#'   data = dat[1:70, ],
+#'   data = dat[1:60, ],
 #'   family = poisson(),
 #'   chains = 2,
 #'   silent = 2
 #' )
+#'
+#' # The posterior for `ar1_slope_trend` recovers the damping of 0.9
 #' summary(mod)
 #'
-#' # The damped slope bends the forecast toward a level
-#' fc <- forecast(mod, newdata = dat[71:80, ])
+#' # The damped slope levels the forecast off
+#' fc <- forecast(mod, newdata = dat[61:80, ])
 #' plot(fc)
-#'
-#' # How strongly the slope is damped
-#' mcmc_plot(mod, variable = "ar1_slope_trend", type = "hist")
 #' }
 #'
 #' @export

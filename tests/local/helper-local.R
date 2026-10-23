@@ -84,8 +84,9 @@ expect_drawn <- function(p) {
 
 
 # `tidy()` and `glance()` held to what they report. Each tidy row is
-# a parameter's posterior mean and standard deviation. Each glance
-# row counts the responses the likelihood used.
+# a parameter's posterior mean and standard deviation. A fixed effect
+# takes the name `fixef()` gives it. That name locates its draws. Each
+# glance row counts the responses the likelihood used.
 #
 # @param fit A fitted mvgam object
 # @param observed Number of non-missing responses, or `NULL` to skip
@@ -94,8 +95,12 @@ expect_drawn <- function(p) {
 expect_tidy_glance <- function(fit, observed = NULL) {
   td <- tidy(fit)
   dm <- posterior::as_draws_matrix(fit)
-  testthat::expect_identical(setdiff(td$term, colnames(dm)), character(0))
-  draws <- dm[, td$term, drop = FALSE]
+  cols <- td$term
+  fixed <- td$type %in% c("observation_beta", "trend_beta")
+  betas <- grep("^b(s|sp)?_", colnames(dm), value = TRUE)
+  cols[fixed] <- betas[match(td$term[fixed], mvgam:::fixef_name(betas))]
+  testthat::expect_identical(setdiff(cols, colnames(dm)), character(0))
+  draws <- dm[, cols, drop = FALSE]
   testthat::expect_equal(td$estimate, unname(colMeans(draws)))
   testthat::expect_equal(td$std.error, unname(apply(draws, 2L, stats::sd)))
   gl <- glance(fit)

@@ -217,32 +217,32 @@ scale, and a factor model always keeps some level noise. A
 }
 \examples{
 \dontrun{
-# A series that grows, then levels off
+# A series that grows, then levels off: its slope shrinks by a
+# factor of 0.9 at each step
 set.seed(4)
 n_t <- 80
-growth <- cumsum(c(0.08, rnorm(n_t - 1, 0, 0.01))) * exp(-(1:n_t) / 60)
+slope <- 0.1 * 0.9^(0:(n_t - 1))
 dat <- data.frame(
   time = 1:n_t,
   series = factor("s1"),
-  y = rpois(n_t, exp(1 + cumsum(growth) + rnorm(n_t, 0, 0.1)))
+  y = rpois(n_t, exp(1 + cumsum(slope) + cumsum(rnorm(n_t, 0, 0.03))))
 )
 
 mod <- mvgam(
   y ~ 1,
   trend_formula = ~ LLT(damped = TRUE),
-  data = dat[1:70, ],
+  data = dat[1:60, ],
   family = poisson(),
   chains = 2,
   silent = 2
 )
+
+# The posterior for `ar1_slope_trend` recovers the damping of 0.9
 summary(mod)
 
-# The damped slope bends the forecast toward a level
-fc <- forecast(mod, newdata = dat[71:80, ])
+# The damped slope levels the forecast off
+fc <- forecast(mod, newdata = dat[61:80, ])
 plot(fc)
-
-# How strongly the slope is damped
-mcmc_plot(mod, variable = "ar1_slope_trend", type = "hist")
 }
 
 }

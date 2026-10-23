@@ -764,6 +764,8 @@ apply_trend_class_suffix <- function(class) {
 #'
 #' A Stan declaration carries the variable's type, support and size in
 #' the line that names it, as `vector<lower=-1, upper=1>[N] ar1_trend;`.
+#' A declaration may also define the variable, as
+#' `vector<lower=0>[N] sigma_slope_trend = scale * raw;` does.
 #' The prior table takes the bounds from the compiled program. The
 #' parameter names take the size, from which they label a vector's
 #' entries.
@@ -784,7 +786,7 @@ stancode_declarations <- function(sc) {
     "cholesky_factor_cov|corr_matrix|cov_matrix)",
     "[[:space:]]*(<[^>]*>)?",
     "[[:space:]]*(?:", size_re, ")?",
-    "[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*;"
+    "[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*(?:;|=)"
   )
   out <- list()
   for (hit in regmatches(sc, gregexpr(decl_re, sc))[[1L]]) {

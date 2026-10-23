@@ -117,27 +117,19 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Default: summary matrix with columns Estimate, Est.Error,
-#' # Q2.5, Q97.5 on the response scale (counts here).
+#' # Predicted counts with their 95% intervals
 #' head(predict(mod))
 #'
-#' # `type` controls the scale of the prediction. The four most
-#' # common views, all on the same fit, summarise the predictive
-#' # cascade from the linear predictor to the observed response.
-#' # `link` is the linear predictor (log-rate for Poisson);
-#' # `expected` is E[Y | parameters] (mean count); `response` is
-#' # a posterior predictive draw of Y; `variance` is the
-#' # conditional variance of Y given the parameters.
+#' # The same fit on the link scale, as an expected count and as the
+#' # variance of a count. A Poisson's variance equals its mean.
 #' head(predict(mod, type = "link"))
-#' head(predict(mod, type = "expected"))
-#' head(predict(mod, type = "response"))
-#' head(predict(mod, type = "variance"))
+#' head(cbind(
+#'   expected = predict(mod, type = "expected")[, "Estimate"],
+#'   variance = predict(mod, type = "variance")[, "Estimate"]
+#' ))
 #'
-#' # Raw posterior draws (rows = draws, cols = observations).
-#' # Useful for any downstream scoring or calibration check that
-#' # needs the full posterior, not just a summary.
-#' draws <- predict(mod, summary = FALSE)
-#' dim(draws)
+#' # `summary = FALSE` returns the draws, one row per draw
+#' dim(predict(mod, summary = FALSE))
 #' }
 #'
 #' @export

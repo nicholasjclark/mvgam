@@ -50,9 +50,12 @@ generics::glance
 #'     `"trend_random_effect_beta"` -- the same five blocks of the
 #'     trend formula.
 #'
-#' brms writes a centred intercept beside the intercept on the data's
-#' scale, `b_Intercept`. The table reports the coefficient once, as
-#' `b_Intercept`.
+#' Fixed-effect terms take the names [fixef.mvgam()] gives them, as
+#' `broom.mixed::tidy.brmsfit()` names them: `b_x` is `x` and
+#' `b_sigma_x` is `sigma_x`. Every other term keeps the name
+#' [variables.mvgam()] lists. brms samples a centred intercept and
+#' transforms it to the intercept on the data's scale. The table reports
+#' the coefficient once, as `Intercept`.
 #'
 #' @param x A fitted `mvgam` object.
 #' @param effects Character. One of `"all"` (the default;
@@ -142,11 +145,14 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
     function(i) {
       params <- spec$params[[i]]
       if (length(params) == 0L) return(tibble::tibble())
+      alias <- apply_alias(params)
+      # A fixed effect takes its `fixef()` name, as broom.mixed gives it
+      if (spec$effect[i] == "fixed") alias <- fixef_name(alias)
       summarise_param_block(
         draws = draws,
         param_names = params,
         type = spec$type[i],
-        alias = apply_alias(params),
+        alias = alias,
         robust = robust,
         conf.int = conf.int,
         conf.level = conf.level,

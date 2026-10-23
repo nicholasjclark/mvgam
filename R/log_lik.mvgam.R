@@ -631,11 +631,10 @@ logLik.mvgam <- function(object, pointwise = FALSE, ...) {
   per_draw_sum <- rowSums(clean_ll(object, ll_mat))
   ll_scalar <- mean(per_draw_sum)
 
-  diag_pars <- c(
-    "lp__", "lprior", "accept_stat__", "stepsize__", "treedepth__",
-    "n_leapfrog__", "divergent__", "energy__"
-  )
-  df <- length(setdiff(variables(object), diag_pars))
+  # The parameters `variables()` lists. That list leaves out `lp__`,
+  # `lprior` and the sampler's diagnostics. It names each off-diagonal
+  # cell of a symmetric matrix once.
+  df <- length(variables(object))
 
   structure(
     ll_scalar,

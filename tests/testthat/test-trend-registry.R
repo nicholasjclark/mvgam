@@ -27,6 +27,10 @@ test_that("the registry initialises once with every core trend", {
                   c("CAR", "PW"))
   expect_error(get_trend_info("NonExistentTrend"),
                "Unknown trend type.*NonExistentTrend")
+  # A misspelt constructor reaches the same refusal, which names the
+  # likely trend. brms would report only that 'ARR' is absent.
+  expect_error(validate_trend_formula(~ s(x) + ARR(p = 1)),
+               "Did you mean 'AR'?")
 })
 
 test_that("trend properties are validated", {

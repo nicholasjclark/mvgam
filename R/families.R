@@ -188,17 +188,8 @@
 #' # The dispersion and power parameters
 #' mcmc_plot(mod, variable = c("mphi", "mtheta"), type = "hist")
 #'
-#' # The dispersion can vary with a covariate. Its predictor is on the
-#' # log scale.
-#' mod_phi <- mvgam(
-#'   bf(y ~ 1, mphi ~ x),
-#'   trend_formula = ~ AR(p = 1),
-#'   data          = simdat$data_train,
-#'   family        = tweedie(),
-#'   chains        = 2,
-#'   silent        = 2
-#' )
-#' summary(mod_phi)
+#' # A covariate on the dispersion, on the log scale, takes the
+#' # formula `bf(y ~ 1, mphi ~ x)`
 #' }
 #'
 #' @export
@@ -727,30 +718,22 @@ check_tweedie_truncation <- function(object, resp = NULL) {
 #'   responses with a point mass at zero.
 #' @examples
 #' \dontrun{
-#' # Counts with a heavier tail than a negative binomial expects. The
-#' # dpars are `shape`, playing the usual negative binomial role, and
-#' # `mtail`, where smaller values give heavier tails and anything
-#' # below 1 gives infinite variance.
+#' # Counts drawn from the mixture in Details: a negative binomial
+#' # whose success probability follows a Beta distribution. The tail
+#' # is set by `mtail = 2`, the bulk by `shape = 3`.
 #' set.seed(1)
-#' simdat <- sim_mvgam(
-#'   family = beta_nb(), n_series = 1L, n_timepoints = 120L,
-#'   trend_model = AR(),
-#'   family_pars = list(shape = 2, mtail = 2)
-#' )
+#' n <- 300
+#' dat <- data.frame(x = rnorm(n), time = seq_len(n))
+#' mu <- exp(1 + 0.5 * dat$x)
+#' p <- rbeta(n, 1 + 2, mu * 2 / 3)
+#' dat$y <- rnbinom(n, size = 3, prob = p)
 #'
-#' mod <- mvgam(
-#'   y ~ 1,
-#'   trend_formula = ~ AR(p = 1),
-#'   data          = simdat$data_train,
-#'   family        = beta_nb(),
-#'   chains        = 2,
-#'   silent        = 2
-#' )
+#' mod <- mvgam(y ~ x, data = dat, family = beta_nb(), chains = 2,
+#'              silent = 2)
+#'
+#' # The posteriors recover `shape` and `mtail`. A negative binomial
+#' # is the limit of a large `mtail`.
 #' summary(mod)
-#'
-#' # `mtail` is what separates this family from a negative binomial.
-#' # A posterior that drifts toward the upper prior range is a sign
-#' # the extra tail parameter is not earning its place.
 #' mcmc_plot(mod, variable = c("shape", "mtail"), type = "hist")
 #' }
 #' @export
@@ -985,42 +968,30 @@ beta_nb_stan_funs <- function() {
 #' @author Nicholas J Clark, Julijus Bogomolovas
 #' @examples
 #' \dontrun{
-#' # Simulate an under-dispersed COM-Binomial series via
-#' # sim_mvgam(): nu_true = 1.5, T = 20 trials per observation,
-#' # the default observation-side smooth `s(x)`, and a random-walk
-#' # latent state on the logit-probability.
+#' # Counts out of 10 trials, simulated with `nu = 3`. At `nu = 1`
+#' # the family is the binomial. Values above 1 give counts with
+#' # less spread than a binomial.
 #' set.seed(1)
 #' sim <- sim_mvgam(
 #'   family       = com_binomial(),
 #'   n_series     = 1L,
-#'   n_timepoints = 120L,
-#'   trend_model  = RW(),
-#'   family_pars  = list(nu = 1.5, trials = 20L)
+#'   n_timepoints = 160L,
+#'   trend_model  = "None",
+#'   family_pars  = list(nu = 3, trials = 10L)
 #' )
-#' head(sim$data_train)
 #'
-#' # Fit the matching state-space CMB model. `trials` is supplied
-#' # through brms's `trials()` addition term; `nu` is the
-#' # dispersion parameter (nu = 1 recovers the binomial,
-#' # nu > 1 under-dispersed, nu < 1 over-dispersed, nu < 0
-#' # super-dispersed / bimodal).
+#' # The denominator enters through brms's `trials()` term
 #' fit <- mvgam(
 #'   bf(y | trials(trials) ~ s(x)),
-#'   trend_formula = ~ RW(),
-#'   data          = sim$data_train,
-#'   family        = com_binomial(),
-#'   chains        = 2,
-#'   iter          = 800,
-#'   warmup        = 400,
-#'   silent        = 2
+#'   data   = sim$data_train,
+#'   family = com_binomial(),
+#'   chains = 2,
+#'   silent = 2
 #' )
 #'
-#' # The `nu` posterior should concentrate around the simulated
-#' # 1.5 and stay well above the binomial null at nu = 1.
+#' # The posterior for `nu` lies above the binomial's value of 1
 #' summary(fit)
 #' mcmc_plot(fit, variable = "nu", type = "areas")
-#'
-#' # Posterior predictive check of the marginal count distribution.
 #' pp_check(fit, type = "bars", ndraws = 50)
 #' }
 #' @export
@@ -2719,8 +2690,8 @@ build_closure_unit_arrays <- function(data,
 #' The latent count `N_g` for closure unit `g` is marginalised
 #' analytically over the truncated range
 #' `K_max[g] >= k >= max(y[g, ])` using a `log_sum_exp` over
-#' `poisson_log_lpmf(k | log_lambda_g) + binomial_logit_lpmf(y[g,] | k, logit_p_{g,j})`
-#' (Royle 2004).
+#' `poisson_log_lpmf(k | log_lambda_g)` plus
+#' `binomial_logit_lpmf(y[g,] | k, logit_p_{g,j})` (Royle 2004).
 #'
 #' Parameterised with two distributional parameters:
 #' \describe{
@@ -3051,59 +3022,30 @@ build_closure_unit_arrays <- function(data,
 #'
 #' @examples
 #' \dontrun{
-#' # Poisson-binomial N-mixture: per-visit counts with imperfect
-#' # detection. The state mu is lambda (expected abundance) and
-#' # the dpar p is the detection probability per visit.
+#' # Counts at 50 sites, each visited four times. The state `mu` is
+#' # the expected abundance and `p` the detection probability.
 #' set.seed(5)
 #' simdat <- sim_closure_unit_data(family = nmix(), n_species = 1L,
-#'                                   n_sites = 50L, n_visits = 4L,
-#'                                   type = 1L)
-#'
+#'                                 n_sites = 50L, n_visits = 4L,
+#'                                 type = 1L)
 #' mod <- mvgam(
 #'   bf(y ~ env, p ~ tod_c),
-#'   data    = simdat$data_train,
-#'   family  = nmix(),
-#'   chains  = 2,
-#'   silent  = 2
+#'   data   = simdat$data_train,
+#'   family = nmix(),
+#'   chains = 2,
+#'   silent = 2
 #' )
 #' summary(mod)
 #'
-#' # Marginal env effect on the response scale (expected count
-#' # = lambda * p).
-#' conditional_effects(mod)
-#'
-#' # Closure-unit post-fit surface. `predict(type = "latent_state")`
-#' # returns posterior summaries of latent abundance N at each
-#' # unit; `predict(type = "detection")` returns the per-visit
-#' # detection probability p. These two quantities are confounded
-#' # in the raw response and only separable under the N-mixture
-#' # marginalisation.
+#' # Abundance and detection, separated by the model
 #' head(predict(mod, type = "latent_state"))
 #' head(predict(mod, type = "detection"))
+#' plot(hindcast(mod, type = "latent_state"))
 #'
-#' # `hindcast(type = "latent_state")` packs the full per-draw
-#' # posterior at every training unit into an `mvgam_latent_state`
-#' # object with print / summary / as.data.frame / plot methods.
-#' # `summary()` returns a tidy (series, time, median, 50% and 95%
-#' # CI) frame for direct ggplot use; `plot()` returns a faceted
-#' # step-style ribbon that can be extended with extra ggplot
-#' # layers (e.g. `+ geom_point(aes(time, true_N))` to overlay a
-#' # known truth).
-#' hc <- hindcast(mod, type = "latent_state")
-#' print(hc)
-#' head(as.data.frame(hc))
-#' plot(hc)
-#'
-#' # `pp_check(type = "fit_stat", ...)` runs a closure-unit
-#' # goodness-of-fit test: collapse to per-unit sufficient
-#' # statistics, compare observed vs replicated under either the
-#' # chi-squared or Freeman-Tukey discrepancy of MacKenzie & Bailey
-#' # (2004). Returns an `mvgam_ppc_fit_stat` object with the
-#' # Bayesian p-value; values near 0 or 1 indicate poor fit.
+#' # A goodness-of-fit test on the per-site totals. A Bayesian p-value
+#' # near 0 or 1 marks a misfit.
 #' pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
-#'           ndraws = 200L)
-#' pp_check(mod, type = "fit_stat", stat = "chi_squared",
-#'           ndraws = 200L)
+#'          ndraws = 200L)
 #' }
 #'
 #' @seealso [occ()] for the related joint-occupancy family,
@@ -3386,54 +3328,27 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #'
 #' @examples
 #' \dontrun{
-#' # Single-species occupancy fit with separate covariates on
-#' # the occupancy (psi) and detection (p) sub-formulas. The
-#' # closure-unit grain is (series, time) -- 50 sites, 4 visits
-#' # each.
+#' # Detections at 50 sites, each visited four times, with covariates
+#' # on occupancy and on detection
 #' set.seed(4)
 #' simdat <- sim_closure_unit_data(family = occ(), n_species = 1L,
-#'                                   n_sites = 50L, n_visits = 4L,
-#'                                   type = 1L)
-#'
+#'                                 n_sites = 50L, n_visits = 4L,
+#'                                 type = 1L)
 #' mod <- mvgam(
 #'   bf(y ~ env, p ~ tod_c),
-#'   data    = simdat$data_train,
-#'   family  = occ(),
-#'   chains  = 2,
-#'   silent  = 2
+#'   data   = simdat$data_train,
+#'   family = occ(),
+#'   chains = 2,
+#'   silent = 2
 #' )
 #' summary(mod)
 #'
-#' # Marginal env effect on the response scale (occupancy *
-#' # detection). For the logit-occupancy view pass
-#' # `type = "link"`.
-#' conditional_effects(mod)
+#' # Occupancy along the gradient, on the logit scale
+#' conditional_effects(mod, type = "link")
 #'
-#' # Closure-unit post-fit surface. `predict(type = "latent_state")`
-#' # returns posterior summaries of the latent occupancy probability
-#' # psi at each unit; `predict(type = "detection")` returns the
-#' # per-visit detection probability p. Both are confounded in the
-#' # raw 0/1 record and only separable under the marginalised
-#' # occupancy likelihood.
+#' # Occupancy and detection, separated by the model
 #' head(predict(mod, type = "latent_state"))
 #' head(predict(mod, type = "detection"))
-#'
-#' # `hindcast(type = "latent_state")` returns the full per-draw
-#' # posterior on psi as an `mvgam_latent_state` object with
-#' # `as.data.frame()` and a faceted `plot()` for direct inspection
-#' # and ggplot composition.
-#' hc <- hindcast(mod, type = "latent_state")
-#' print(hc)
-#' plot(hc)
-#'
-#' # `pp_check(type = "fit_stat", ...)` runs a closure-unit
-#' # goodness-of-fit test: collapse to per-unit sufficient
-#' # statistics, compare observed vs replicated under the
-#' # Freeman-Tukey or chi-squared discrepancy of MacKenzie &
-#' # Bailey (2004). Returns an `mvgam_ppc_fit_stat` object with
-#' # the Bayesian p-value; values near 0 or 1 indicate poor fit.
-#' pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
-#'           ndraws = 200L)
 #' }
 #'
 #' @seealso [nmix()] for the related N-mixture family,
@@ -3727,9 +3642,10 @@ make_occ_stanvars <- function(arrays) {
 #' coefficient (`b_Intercept`, `b_env`, etc.) has no likelihood
 #' contribution and samples from that prior, so a once-per-session
 #' warning fires from `jsdgam()` when the user's formula contains
-#' no per-`species` interaction term. The `loadings_prior` matrix-normal prior, when
-#' supplied, composes with the sum-to-zero constraint and is the
-#' recommended path when traits or phylogeny are available.
+#' no per-`species` interaction term. The `loadings_prior`
+#' matrix-normal prior, when supplied, composes with the sum-to-zero
+#' constraint and is the recommended path when traits or phylogeny are
+#' available.
 #'
 #' Data layout: long format, one row per (site, species), exactly
 #' K rows per site. The user passes the species axis via the
@@ -3820,70 +3736,36 @@ make_occ_stanvars <- function(arrays) {
 #'
 #' @examples
 #' \dontrun{
-#' # Simulate Dirichlet compositional data on 40 sites x K = 3
-#' # categories under an environmental gradient. The first category
-#' # is the reference; per-category logit-mean offsets and env
-#' # slopes are encoded relative to it.
-#' set.seed(2)
-#' K <- 3L; cat_names <- paste0("y", seq_len(K)); n_sites <- 40L
-#' env <- rnorm(n_sites)
-#' intercept_true <- c(0, 0.6, -0.4)
-#' beta_env_true  <- c(0, 0.8, -0.6)
-#' phi_true <- 12
-#' mu_true <- outer(rep(1, n_sites), intercept_true) +
-#'              outer(env, beta_env_true)
-#' mu_true[, 1L] <- 0
-#' probs <- t(apply(mu_true, 1L, function(z) {
-#'   z <- exp(z); z / sum(z)
-#' }))
-#' Y_wide <- t(apply(probs, 1L, function(p) {
-#'   d <- rgamma(K, shape = p * phi_true, rate = 1)
-#'   d / sum(d)
-#' }))
-#' Y_wide <- pmax(Y_wide, 1e-4)
-#' Y_wide <- Y_wide / rowSums(Y_wide)
-#' colnames(Y_wide) <- cat_names
+#' # Shares of three categories at 60 sites along an environmental
+#' # gradient
+#' simdat <- sim_jsdm(family = diri(), n_species = 3L, n_sites = 60L,
+#'                    seed = 2L)
+#' head(simdat$data_train)
 #'
-#' # Reshape to the long-format closure-unit layout: K rows per
-#' # site in (time, species) order with `series = category`.
-#' long_dat <- data.frame(
-#'   y      = as.numeric(t(Y_wide)),
-#'   series = factor(rep(cat_names, n_sites), levels = cat_names),
-#'   time   = rep(seq_len(n_sites), each = K),
-#'   env    = rep(env, each = K)
-#' )
-#'
-#' # Fit the compositional JSDM. The `env * series` interaction
-#' # makes the environmental slope category-specific, matching
-#' # brms-native Dirichlet's per-category linear predictors. `n_lv`
-#' # adds a rank-2 latent-factor correction over the population
-#' # mean structure.
+#' # `env * series` gives each category its own slope
 #' fit <- jsdgam(
 #'   formula        = y ~ env * series,
 #'   factor_formula = ~ -1,
-#'   data           = long_dat,
+#'   data           = simdat$data_train,
 #'   unit           = time, species = series,
 #'   family         = diri(),
 #'   n_lv           = 2L,
 #'   chains         = 2L,
-#'   iter           = 800L, warmup = 400L,
-#'   silent         = 2,
-#'   backend        = "cmdstanr"
+#'   silent         = 2
 #' )
 #'
-#' # Per-category offsets recover their truth; the K-shared
-#' # `b_Intercept` and `b_env` are not likelihood-identified under
-#' # the simplex reference subtraction and sample from their prior.
-#' draws <- posterior::as_draws_matrix(fit)
-#' draws[, c("b_seriesy2", "b_seriesy3",
-#'           "b_env:seriesy2", "b_env:seriesy3")] |>
-#'   posterior::summarise_draws(median, ~quantile(.x, c(0.05, 0.95)))
+#' # The species terms are contrasts with the first species. `Intercept`
+#' # and `env` act on every species alike. The softmax cancels them. Their
+#' # posteriors repeat the prior.
+#' summary(fit)
 #'
-#' # posterior_epred returns one probability per (site, species)
-#' # summing to 1 within each site.
+#' # The expected shares move along the gradient
+#' conditional_effects(fit, effects = "env:series")
+#'
+#' # Each site's expected shares sum to one
 #' pe <- posterior_epred(fit, ndraws = 50L)
-#' first_site <- which(long_dat$time == 1L)
-#' rowSums(pe[1L:5L, first_site, drop = FALSE])
+#' first_site <- which(simdat$data_train$time == 1L)
+#' rowSums(pe[1:5, first_site])
 #' }
 #'
 #' @export
@@ -4370,63 +4252,25 @@ make_categ_stanvars <- function(arrays) {
 #'
 #' @examples
 #' \dontrun{
-#' # Simulate K = 3 species at 60 sites under a low-rank residual
-#' # covariance Sigma = Z Z' + diag(Psi^2). Per-species intercepts
-#' # and an env slope drive the mean; cross-species covariance comes
-#' # entirely from the factor structure.
-#' set.seed(1)
-#' K <- 3L; species_levels <- paste0("y", seq_len(K)); N_lv <- 2L
-#' Z_true <- matrix(rnorm(K * N_lv, sd = 1.0), nrow = K, ncol = N_lv)
-#' psi_true <- rep(0.5, K)
-#' sigma_true <- tcrossprod(Z_true) + diag(psi_true^2)
-#' mu_intercept <- c(0.0, 0.6, -0.4)
-#' mu_env_slope <- c(0.3, 0.8, -0.5)
+#' # Five species at 80 sites whose residuals share two latent
+#' # factors
+#' simdat <- sim_jsdm(family = mvn(), n_species = 5L, n_sites = 80L,
+#'                    n_lv = 2L, seed = 1L)
 #'
-#' n_sites <- 60L; env <- rnorm(n_sites)
-#' L_true <- chol(sigma_true)
-#' Y_wide <- matrix(NA_real_, n_sites, K)
-#' for (i in seq_len(n_sites)) {
-#'   mu_i <- mu_intercept + mu_env_slope * env[i]
-#'   Y_wide[i, ] <- mu_i + as.numeric(crossprod(L_true, rnorm(K)))
-#' }
-#' colnames(Y_wide) <- species_levels
-#'
-#' # Reshape to the long-format closure-unit layout: K rows per
-#' # site in (time, species) order with `series = species`.
-#' long_dat <- data.frame(
-#'   y      = as.numeric(t(Y_wide)),
-#'   series = factor(rep(species_levels, n_sites),
-#'                   levels = species_levels),
-#'   time   = rep(seq_len(n_sites), each = K),
-#'   env    = rep(env, each = K)
-#' )
-#'
-#' # Fit the gllvm-style JSDM with a rank-2 factor structure on the
-#' # residual covariance.
 #' fit <- jsdgam(
 #'   formula        = y ~ env * series,
 #'   factor_formula = ~ -1,
-#'   data           = long_dat,
+#'   data           = simdat$data_train,
 #'   unit           = time, species = series,
 #'   family         = mvn(),
 #'   n_lv           = 2L,
 #'   chains         = 2L,
-#'   iter           = 800L, warmup = 400L,
-#'   silent         = 2,
-#'   backend        = "cmdstanr"
+#'   silent         = 2
 #' )
+#' summary(fit)
 #'
-#' # Per-species intercepts and env slopes recover their truth.
-#' draws <- posterior::as_draws_matrix(fit)
-#' draws[, c("b_seriesy2", "b_seriesy3",
-#'           "b_env:seriesy2", "b_env:seriesy3")] |>
-#'   posterior::summarise_draws(median, ~quantile(.x, c(0.05, 0.95)))
-#'
-#' # The headline diagnostic: implied residual covariance recovers
-#' # the off-diagonal Sigma the data was drawn under.
-#' res_cor <- residual_cor(fit)
-#' cor(sigma_true[upper.tri(sigma_true)],
-#'     res_cor$cov[upper.tri(res_cor$cov)])
+#' # The species-by-species residual correlations the factors imply
+#' round(residual_cor(fit)$cor, 2)
 #' }
 #'
 #' @export

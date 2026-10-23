@@ -299,130 +299,66 @@ the draws.
 }
 \examples{
 \dontrun{
-# ---- Single-series fit with a smooth covariate and an AR(1) trend ----
-# Useful as a quick first model: one response, one nonlinear
-# covariate effect, latent autoregressive dynamics.
+# One count series with a smooth covariate and an AR(1) trend
 set.seed(1)
 simdat <- sim_mvgam(family = poisson())
 mod <- mvgam(
   y ~ s(x),
   trend_formula = ~ AR(p = 1),
-  data = simdat$data_train,
-  family = poisson(),
-  chains = 2,
-  silent = 2
+  data          = simdat$data_train,
+  family        = poisson(),
+  chains        = 2,
+  silent        = 2
 )
 summary(mod)
 conditional_effects(mod)
-mcmc_plot(mod, variable = "^ar1", regex = TRUE, type = "hist")
 
-# ---- Positive continuous response with a trend ----
-# A mean that must stay positive needs `link = "log"` once a trend
-# enters the linear predictor. `stats::Gamma()` supplies the
-# `inverse` link by default. A trend reaching negative values then
-# leaves the likelihood undefined. mvgam warns on that pairing.
-set.seed(3)
-gamdat <- sim_mvgam(family = Gamma(link = "log"))
-gmod <- mvgam(
-  y ~ s(x),
-  trend_formula = ~ AR(p = 1),
-  data = gamdat$data_train,
-  family = Gamma(link = "log"),
-  chains = 2,
-  silent = 2
-)
-summary(gmod)
+# A positive continuous response with a trend takes a log link,
+# as in `Gamma(link = "log")`. The default inverse link is
+# undefined wherever the trend turns the predictor negative.
 
-# ---- Multivariate VAR(1) with intercept suppression + custom priors ----
-# Three correlated series, no observation intercept (`y ~ 0`),
-# a per-series smooth on the trend side and tighter custom
-# priors on the regression coefficients and trend innovation
-# scale. Mirrors the workflow used in the README's Portal VAR
-# example.
+# Three correlated series: a VAR(1) trend, a smooth of x for each
+# series and custom priors. `get_prior()` lists the priors a model
+# takes.
 set.seed(2)
-vardat <- sim_mvgam(
-  family = poisson(),
-  n_series = 3L,
-  n_timepoints = 120L,
-  trend_model = VAR(cor = TRUE)
-)
-
-# Inspect the default priors before fitting. Wrap the formula
-# pair in `mvgam_formula()` so `get_prior()` can dispatch. The
-# returned table lists every adjustable prior row keyed by
-# `class` and `coef`; pass a modified subset back via
-# `priors = c(prior(...), ...)` to override.
-mf <- mvgam_formula(
-  formula = y ~ 0,
-  trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR()
-)
-get_prior(mf, data = vardat$data_train, family = poisson())
-
+vardat <- sim_mvgam(family = poisson(), n_series = 3L,
+                    n_timepoints = 120L, trend_model = VAR(cor = TRUE))
 var_mod <- mvgam(
-  formula = y ~ 0,
+  formula       = y ~ 0,
   trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR(),
-  data = vardat$data_train,
-  family = poisson(),
-  priors = c(
-    prior(normal(0, 2), class = b),
+  data          = vardat$data_train,
+  family        = poisson(),
+  priors        = c(
+    prior(normal(0, 2), class = b_trend),
     prior(exponential(2.5), class = sigma_trend)
   ),
-  chains = 2,
-  iter = 1000,
-  warmup = 500,
-  silent = 2
+  chains        = 2,
+  silent        = 2
 )
 summary(var_mod)
 
-# Hindcasts (training cells) and forecasts (held-out cells)
-# share a single object; plot one series to inspect the
-# in-sample fit and the out-of-sample predictive interval.
+# Hindcasts and forecasts of one series, drawn with the held-out
+# counts
 fc <- forecast(var_mod, newdata = vardat$data_test)
 plot(fc, series = 1)
 
-# Per-series marginal effects of the trend-side smooth.
-conditional_effects(var_mod)
-
-# Impulse response: how a shock to one series propagates
-# through the VAR over the next eight steps.
-plot(irf(var_mod, h = 8L), series = 1)
-
-# Methods-section helpers. `how_to_cite()` returns the prose
-# paragraph for a paper; `methods_md()` returns the matching
-# math statement of the model (likelihood, link, latent
-# dynamics, priors, sampler configuration) as Markdown + LaTeX.
+# A paragraph for a methods section, with its references
 how_to_cite(var_mod)
-cat(methods_md(var_mod))
 
-# ---- Time-varying coefficient via s(time, by = x) ----
-# When a covariate's effect on the response drifts over the
-# study period, an interaction between `time` and the
-# covariate captures that drift: `s(time, by = x)` fits one
-# smooth per unit of `x`, evaluated at each timepoint. The
-# intercept is suppressed with `y ~ 0 + ...` so the smooth
-# carries the whole conditional mean.
+# A coefficient that drifts over time. The slope on x grows from 0
+# to 2. `s(time, by = x)` estimates it at every time.
 set.seed(3)
 n <- 100
-tvdat <- data.frame(
-  time = seq_len(n),
-  x = rnorm(n),
-  series = factor("s1")
-)
-# True coefficient on x grows linearly from 0 to 2 over time.
-tvdat$y <- tvdat$x * seq(0, 2, length.out = n) +
-  rnorm(n, 0, 0.3)
-
+tvdat <- data.frame(time = seq_len(n), x = rnorm(n),
+                    series = factor("s1"))
+tvdat$y <- tvdat$x * seq(0, 2, length.out = n) + rnorm(n, 0, 0.3)
 tv_mod <- mvgam(
   y ~ 0 + s(time, by = x, k = 6),
-  data = tvdat,
+  data   = tvdat,
   family = gaussian(),
   chains = 2,
-  iter = 1000,
-  warmup = 500,
   silent = 2
 )
-# `conditional_effects()` shows the two-way surface: the
-# slope on x visibly steepens as time progresses.
 conditional_effects(tv_mod)
 }
 

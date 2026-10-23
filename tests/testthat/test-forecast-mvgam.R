@@ -416,6 +416,10 @@ test_that("Trendless fit rejects type = 'trend' but accepts others", {
     forecast(fit, newdata = newdata, type = "trend"),
     "not defined for trendless fits"
   )
+  # Data naming no series leave the fit no axis record to step along
+  fit$trend_metadata <- NULL
+  fit$data$series <- NULL
+  expect_error(hindcast(fit), "Absent from the fitted data: 'series'")
 })
 
 
@@ -821,6 +825,11 @@ test_that("the step check names the grid, not an observation", {
   # this is not a check that refuses everything.
   expect_true(mvgam:::assert_forecast_times_steppable(list(s1 = 41),
                                                       prefit))
+  # A gap in the horizon is named as the time skipped
+  expect_error(
+    mvgam:::assert_forecast_times_steppable(list(s1 = c(41, 43)), prefit),
+    "Series 's1' skips time 42."
+  )
 })
 
 

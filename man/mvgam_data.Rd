@@ -109,55 +109,29 @@ same friendly errors \code{mvgam()} raises at fit time. Mirrors the
 role of \code{\link[=mvgam_formula]{mvgam_formula()}} for the data side.
 }
 \examples{
-\donttest{
 set.seed(1)
 simdat <- sim_mvgam(family = poisson(), n_series = 3L,
-                     n_timepoints = 120L)
+                    n_timepoints = 60L)
 
-# Verify structure for a Poisson fit and view the multi-series
-# plot.
-mvgam_data(
-  simdat$data_train,
-  y             = "y",
-  family        = poisson(),
-  trend_formula = ~ AR()
-)
+# Check the frame for a Poisson trend model and plot every series
+mvgam_data(simdat$data_train, family = poisson(),
+           trend_formula = ~ AR())
 
-# 4-panel single-series view (time series, histogram, ACF,
-# ECDF).
+# One series in four panels: time series, histogram, ACF and ECDF
 mvgam_data(simdat$data_train, family = poisson(), series = 1L)
 
-# The point of checking first: a response the family cannot
-# take is refused here, naming the column, the offending values
-# and the support, rather than after a Stan compile.
+# A response the family cannot take is refused before any Stan
+# compile. The error names the column, the values and the support.
 counts <- simdat$data_train
 counts$y[3L] <- -1
 try(mvgam_data(counts, family = poisson(), plot = FALSE))
 
-# The same column read as a proportion. Beta excludes both
-# endpoints, so an exact zero has to be modelled rather than
-# ignored, and the error names the family that does so.
-props <- simdat$data_train
-props$y <- props$y / (max(props$y) + 1)
-try(mvgam_data(props, family = Beta(), plot = FALSE))
-
-# Irregular time is refused for a trend that assumes even
-# spacing, and accepted for CAR(), which models the gaps.
+# AR() assumes evenly spaced times. CAR() models the gaps.
 gappy <- simdat$data_train[simdat$data_train$time != 5L, ]
 try(mvgam_data(gappy, family = poisson(), trend_formula = ~ AR(),
-                plot = FALSE))
+               plot = FALSE))
 mvgam_data(gappy, family = poisson(), trend_formula = ~ CAR(),
-            plot = FALSE)
-
-# A trend needs each row's series, even for a single series.
-one <- simdat$data_train[simdat$data_train$series == "series_1", ]
-one$series <- NULL
-try(mvgam_data(one, family = poisson(), trend_formula = ~ AR(),
-                plot = FALSE))
-one$series <- factor("series_1")
-mvgam_data(one, family = poisson(), trend_formula = ~ AR(),
-            plot = FALSE)
-}
+           plot = FALSE)
 
 }
 \seealso{

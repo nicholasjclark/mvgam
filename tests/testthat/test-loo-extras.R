@@ -151,16 +151,22 @@ test_that("vcov.mvgam refuses a 'pars' entry the model does not have", {
 
 # ---- LOO / WAIC aliases --------------------------------------------
 
-test_that("LOO.mvgam forwards to loo() via S3 dispatch", {
-  meth <- getS3method("LOO", "mvgam")
-  # Body of the alias must reference `loo(`, not duplicate logic.
-  expect_match(deparse(body(meth)), "loo\\(x", all = FALSE)
-})
-
-
-test_that("WAIC.mvgam forwards to waic() via S3 dispatch", {
-  meth <- getS3method("WAIC", "mvgam")
-  expect_match(deparse(body(meth)), "waic\\(x", all = FALSE)
+test_that("LOO and WAIC forward only the arguments the caller wrote", {
+  # `loo()` and `waic()` refuse a brms argument such as `compare`
+  # wherever it is supplied. An alias passing its defaults on was
+  # refused on every call.
+  seen <- NULL
+  record <- function(x, ...) {
+    seen <<- names(list(...))
+    "called"
+  }
+  local_mocked_s3_method("loo", "mvgam", record)
+  local_mocked_s3_method("waic", "mvgam", record)
+  stub <- structure(list(), class = "mvgam")
+  expect_identical(LOO(stub, resp = "y"), "called")
+  expect_identical(seen, "resp")
+  expect_identical(WAIC(stub), "called")
+  expect_null(seen)
 })
 
 

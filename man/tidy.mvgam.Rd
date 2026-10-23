@@ -89,9 +89,12 @@ loadings.
 trend formula.
 }
 
-brms writes a centred intercept beside the intercept on the data's
-scale, \code{b_Intercept}. The table reports the coefficient once, as
-\code{b_Intercept}.
+Fixed-effect terms take the names \code{\link[=fixef.mvgam]{fixef.mvgam()}} gives them, as
+\code{broom.mixed::tidy.brmsfit()} names them: \code{b_x} is \code{x} and
+\code{b_sigma_x} is \code{sigma_x}. Every other term keeps the name
+\code{\link[=variables.mvgam]{variables.mvgam()}} lists. brms samples a centred intercept and
+transforms it to the intercept on the data's scale. The table reports
+the coefficient once, as \code{Intercept}.
 }
 \examples{
 \dontrun{

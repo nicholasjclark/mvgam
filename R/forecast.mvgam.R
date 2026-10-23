@@ -111,6 +111,7 @@ forecast.mvgam <- function(object,
                            resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   require_fitted_model(object, "forecast")
+  require_series_axis(object, "forecast")
   # Every argument after `...` is named. A misspelt one would land in
   # `...` and leave its default in force.
   rlang::check_dots_empty()
@@ -789,22 +790,24 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
       ),
       resp = resp
     ) %||% matrix(0, nrow = length(draw_idx), ncol = nrow(sub_data))
-    obs_linpred <- extract_component_linpred(
-      mvgam_fit = object, newdata = sub_data,
-      component = "obs", resp = resp, draw_ids = draw_idx
-    )
-    assert_one_response_draws(obs_linpred, "The observation predictor")
-    linpred <- obs_linpred + fitted_states
     full <- if (type == "trend") {
       fitted_states
-    } else if (type == "link") {
-      linpred
-    } else if (sample_family) {
-      draw_observations(object, linpred, sub_data, draw_ids = draw_idx,
-                        resp = resp)
     } else {
-      expected_from_linpred(object, linpred, newdata = sub_data,
-                            draw_ids = draw_idx, resp = resp)
+      obs_linpred <- extract_component_linpred(
+        mvgam_fit = object, newdata = sub_data,
+        component = "obs", resp = resp, draw_ids = draw_idx
+      )
+      assert_one_response_draws(obs_linpred, "The observation predictor")
+      linpred <- obs_linpred + fitted_states
+      if (type == "link") {
+        linpred
+      } else if (sample_family) {
+        draw_observations(object, linpred, sub_data, draw_ids = draw_idx,
+                          resp = resp)
+      } else {
+        expected_from_linpred(object, linpred, newdata = sub_data,
+                              draw_ids = draw_idx, resp = resp)
+      }
     }
   }
   assert_one_response_draws(full, "The hindcast")
