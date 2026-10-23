@@ -22,7 +22,7 @@ test_that("detect_and_rewrite_by_lv detects by = lv_axis() and rewrites", {
   )
 })
 
-test_that("legacy by = trend triggers deprecation + auto-translate", {
+test_that("the 1.x spelling by = trend is translated with a deprecation", {
   f <- ~ s(elev, by = trend) - 1
   res <- detect_and_rewrite_by_lv(f)
   expect_true(res$has_by_lv)
@@ -74,7 +74,8 @@ lv_dat <- function(seed) {
 lv_prefit <- function(trend_formula, n_lv = NULL, dat = lv_dat(1)) {
   mvgam(y ~ -1, trend_formula = trend_formula, data = dat,
         family = gaussian(), run_model = FALSE, silent = 2,
-        trend_map = if (!is.null(n_lv)) matrix(NA_real_, 3L, n_lv))
+        trend_map = if (!is.null(n_lv)) matrix(NA_real_, 3L, n_lv),
+        validate = FALSE)
 }
 
 test_that("lv_axis() in a model with no factors is the series column", {
@@ -111,7 +112,8 @@ test_that("lv_axis() refuses a varying covariate and a single factor", {
   dat$elev <- rnorm(nrow(dat))
   refused <- function(trend_formula, ...) {
     mvgam(y ~ 1, trend_formula = trend_formula, data = dat,
-          family = gaussian(), run_model = FALSE, silent = 2, ...)
+          family = gaussian(), run_model = FALSE, silent = 2, ...,
+          validate = FALSE)
   }
   # The factor grain holds one covariate value per time, and `elev`
   # differs among the series.
@@ -132,7 +134,7 @@ test_that("the n_lv ceiling counts series the responses define", {
   expect_error(
     mvgam(bf(mvbind(y1, y2) ~ 1) + set_rescor(FALSE),
           trend_formula = ~ AR(n_lv = 3), data = wide, family = poisson(),
-          run_model = FALSE, silent = 2),
+          run_model = FALSE, silent = 2, validate = FALSE),
     "Got n_lv = 3, n_series = 2"
   )
 })

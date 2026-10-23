@@ -6,7 +6,6 @@
 # 2-coef correlated RE, and S3 dispatch + signature parity with
 # brms.
 
-
 # A fit-shaped stub for a gaussian model: the formula, its Stan data
 # and the brms observation model, whose `ranef` table the aliases are
 # built from.
@@ -37,7 +36,6 @@ make_ranef_stub <- function(include_x = TRUE) {
   ranef_stub(brms::bf(form), df)
 }
 
-
 # ---- mvgam_ranef_aliases gate --------------------------------------
 
 test_that("mvgam_ranef_aliases returns empty for fits without REs", {
@@ -48,17 +46,13 @@ test_that("mvgam_ranef_aliases returns empty for fits without REs", {
   expect_identical(mvgam_ranef_aliases(stub), character(0L))
 })
 
-
 # ---- mvgam_ranef_aliases map shape ---------------------------------
 
 test_that("mvgam_ranef_aliases produces r_/sd_/cor_ aliases for (x|grp)", {
   stub <- make_ranef_stub()
   map <- mvgam_ranef_aliases(stub)
-  expect_true(length(map) > 0L)
-  # Map shape mirrors mvgam_beta_aliases: names are aliases,
-  # values are positional Stan parameter names.
-  expect_identical(class(map), "character")
-  expect_true(!is.null(names(map)))
+  # As in mvgam_beta_aliases, names are aliases and values are
+  # positional Stan parameter names.
   # r_<group>[<level>,<coef>] aliases for 6 levels x 2 coefs.
   # Naming the twelve is stronger than counting them. A count of 12
   # was true of any twelve aliases, a set repeating one level and
@@ -68,11 +62,6 @@ test_that("mvgam_ranef_aliases produces r_/sd_/cor_ aliases for (x|grp)", {
     paste0("r_grp[", rep(letters[1:6], each = 2L), ",",
            c("Intercept", "x"), "]")
   )
-  # sd_<group>__<coef> aliases for each coef.
-  expect_true("sd_grp__Intercept" %in% names(map))
-  expect_true("sd_grp__x" %in% names(map))
-  # cor_<group>__<coef1>__<coef2> alias for the single off-diagonal.
-  expect_true("cor_grp__Intercept__x" %in% names(map))
   # Positional values follow the brms internal convention. The
   # per-level deviations come from the per-coefficient vectors, which
   # is what a posterior carries: the matrix a correlated block is
@@ -84,21 +73,17 @@ test_that("mvgam_ranef_aliases produces r_/sd_/cor_ aliases for (x|grp)", {
   expect_identical(map[["cor_grp__Intercept__x"]], "cor_1[1]")
 })
 
-
 test_that("mvgam_ranef_aliases skips cor_ block for intercept-only REs", {
   stub <- make_ranef_stub(include_x = FALSE)
   map <- mvgam_ranef_aliases(stub)
   expect_false(any(grepl("^cor_", names(map))))
-  # Intercept-only: one coef per level, no correlation.
-  expect_true("r_grp[a,Intercept]" %in% names(map))
-  expect_true("sd_grp__Intercept" %in% names(map))
-  expect_length(grep("^sd_", names(map)), 1L)
+  expect_identical(grep("^sd_", names(map), value = TRUE),
+                   "sd_grp__Intercept")
   # M = 1: brms emits the per-coef vector `r_<id>_1[<level_idx>]`,
   # not the matrix form. Lock in the positional value.
   expect_identical(map[["r_grp[a,Intercept]"]], "r_1_1[1]")
   expect_identical(map[["r_grp[f,Intercept]"]], "r_1_1[6]")
 })
-
 
 # ---- Edge cases ---------------------------------------------------
 
@@ -121,7 +106,6 @@ test_that("mvgam_ranef_aliases handles uncorrelated multi-coef REs ((x||g))", {
   expect_identical(map[["r_grp[a,Intercept]"]], "r_1_1[1]")
   expect_identical(map[["r_grp[d,x]"]], "r_1_2[4]")
 })
-
 
 test_that("mvgam_ranef_aliases handles multiple grouping factors", {
   set.seed(17L); n_obs <- 40L
@@ -148,7 +132,6 @@ test_that("mvgam_ranef_aliases handles multiple grouping factors", {
   expect_false(any(grepl("^cor_", names(map))))
 })
 
-
 test_that("by-factor and multivariate dpar groupings take brms's names", {
   set.seed(23L)
   n_obs <- 40L
@@ -174,7 +157,6 @@ test_that("by-factor and multivariate dpar groupings take brms's names", {
   expect_identical(mv_map[["sd_g__sigma_y_Intercept"]], "sd_1[1]")
   expect_identical(mv_map[["r_g__sigma_y[a,Intercept]"]], "r_1_sigma_y_1[1]")
 })
-
 
 test_that("mvgam_ranef_aliases verifies cor index order for M = 3 and M = 4", {
   build_stub <- function(extra_coefs) {
@@ -209,7 +191,6 @@ test_that("mvgam_ranef_aliases verifies cor index order for M = 3 and M = 4", {
   expect_identical(m4[["cor_grp__x__w"]],         "cor_1[5]")
   expect_identical(m4[["cor_grp__z__w"]],         "cor_1[6]")
 })
-
 
 # ---- mvgam_beta_aliases for nl sub-formulas -----------------------
 
@@ -249,44 +230,12 @@ test_that("mvgam_ranef_aliases reads nlpar per row under shared-ID syntax", {
   )
 })
 
-test_that(
-  "mvgam_ranef_aliases prefixes nlpar so duplicate (group, coef) survive", {
-  # Reason: a nl fit with (1 | species) under BOTH nlpar a and nlpar
-  # b would otherwise alias sd_species__Intercept twice and fail
-  # posterior's duplicate-name check. brms emits
-  # sd_species__a_Intercept / sd_species__b_Intercept; the aliaser
-  # must do the same.
-  set.seed(17L)
-  n_obs <- 40L
-  df <- data.frame(
-    y       = rnorm(n_obs),
-    env     = rnorm(n_obs),
-    trait1  = rnorm(n_obs),
-    species = factor(sample(letters[1:5], n_obs, replace = TRUE))
-  )
-  obs_nl <- brms::bf(
-    y  ~ a + b * env,
-    a  ~ trait1 + (1 | species),
-    b  ~ trait1 + (1 | species),
-    nl = TRUE
-  )
-  stub <- ranef_stub(obs_nl, df)
-  alias <- mvgam_ranef_aliases(stub)
-  expect_true("sd_species__a_Intercept" %in% names(alias))
-  expect_true("sd_species__b_Intercept" %in% names(alias))
-  expect_true(
-    "r_species__a[a,Intercept]" %in% names(alias) ||
-      any(grepl("^r_species__a\\[", names(alias)))
-  )
-  expect_true(any(grepl("^r_species__b\\[", names(alias))))
-  expect_equal(length(unique(names(alias))), length(alias))
-})
-
-test_that("mvgam_beta_aliases keeps the Intercept column for nl nlpars", {
-  # Reason: brms does NOT intercept-centre non-linear sub-formulas, so
-  # `b_<nlpar>` has length K (not K - 1) and position 1 is the
-  # Intercept itself. Stripping the Intercept the way the linear
-  # main-formula path does drops a parameter AND mis-maps the rest.
+test_that("each nlpar keeps its own names and its Intercept column", {
+  # brms does not centre a non-linear sub-formula's intercept, so
+  # `b_<nlpar>` has length K and position 1 is the Intercept itself.
+  # Stripping it as the linear path does drops a parameter and
+  # mis-maps the rest. A `(1 | species)` under both nlpars is named
+  # once per nlpar, which keeps posterior's names unique.
   set.seed(13L)
   n_obs <- 40L
   df <- data.frame(
@@ -302,6 +251,11 @@ test_that("mvgam_beta_aliases keeps the Intercept column for nl nlpars", {
     nl = TRUE
   )
   stub <- ranef_stub(obs_nl, df)
+  re_alias <- mvgam_ranef_aliases(stub)
+  expect_true(all(c("sd_species__a_Intercept", "sd_species__b_Intercept")
+                  %in% names(re_alias)))
+  expect_true(any(grepl("^r_species__b\\[", names(re_alias))))
+  expect_false(anyDuplicated(names(re_alias)) > 0L)
   alias <- mvgam_beta_aliases(stub)
   expect_setequal(
     names(alias),
@@ -329,7 +283,6 @@ test_that("mvgam_beta_aliases still strips Intercept on linear main formulas", {
   expect_false(any(grepl("Intercept", names(alias))))
 })
 
-
 # ---- ranef.mvgam / VarCorr.mvgam dispatch + shape -----------------
 
 test_that("ranef.mvgam matches brms::ranef.brmsfit signature", {
@@ -338,13 +291,11 @@ test_that("ranef.mvgam matches brms::ranef.brmsfit signature", {
   expect_identical(actual, expected)
 })
 
-
 test_that("VarCorr.mvgam matches brms::VarCorr.brmsfit signature", {
   expected <- names(formals(getS3method("VarCorr", "brmsfit")))
   actual <- names(formals(getS3method("VarCorr", "mvgam")))
   expect_identical(actual, expected)
 })
-
 
 test_that("ranef.mvgam names what to do on a fit with no REs", {
   # A stub without an observation model has no group-level table.
@@ -359,7 +310,6 @@ test_that("ranef.mvgam names what to do on a fit with no REs", {
   expect_error(ranef.mvgam(stub), "random effects")
   expect_error(VarCorr.mvgam(stub), "random effects")
 })
-
 
 test_that("assemble_cor_array builds the correct symmetric structure", {
   # 2 draws, M = 3, hand-crafted correlation packing
@@ -383,7 +333,6 @@ test_that("assemble_cor_array builds the correct symmetric structure", {
   expect_identical(arr[2L, 1L, 2L], 0.6)
 })
 
-
 test_that("assemble_cov_array yields D R D per draw", {
   # 1 draw, M = 2 with sd = (2, 3) and cor = (1, 0.5; 0.5, 1).
   # Expected cov: (4, 3; 3, 9).
@@ -399,7 +348,6 @@ test_that("assemble_cov_array yields D R D per draw", {
   expect_identical(cov_arr[1L, 1L, 2L], 3)
   expect_identical(cov_arr[1L, 2L, 1L], 3)
 })
-
 
 # ---- both sides of the group-level block --------------------------
 
@@ -442,7 +390,6 @@ test_that("a trend-side random effect is named, not numbered", {
   expect_true("r_grp_trend[a,Intercept]" %in% names(map))
   expect_false(any(grepl("\\]_trend$", names(map))))
 })
-
 
 # ---- apply_mvgam_aliases composition --------------------------
 

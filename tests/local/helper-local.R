@@ -113,6 +113,22 @@ expect_tidy_glance <- function(fit, observed = NULL) {
 }
 
 
+# `hypothesis()` with `class = NULL` reaches each name `variables()`
+# lists. Each estimate it returns is finite.
+#
+# @param fit A fitted mvgam object
+# @param names Parameter names as `variables()` lists them
+expect_hypothesis_reaches <- function(fit, names) {
+  testthat::expect_gt(length(names), 0L)
+  vars <- variables(fit)
+  for (nm in names) {
+    testthat::expect_true(nm %in% vars, label = nm)
+    h <- hypothesis(fit, paste0("`", nm, "` = 0"), class = NULL)
+    testthat::expect_true(all(is.finite(h$hypothesis$Estimate)), label = nm)
+  }
+}
+
+
 # The range of x a plot draws over, from its built layers.
 #
 # @param p A ggplot

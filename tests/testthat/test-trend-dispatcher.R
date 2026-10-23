@@ -246,7 +246,8 @@ test_that("a grouped trend takes its subgroups from the series column", {
   d$y <- seq_len(nrow(d)) / 10
   m <- mvgam(y ~ 1,
              trend_formula = ~ ZMVN(time = t, series = site, gr = region),
-             data = d, family = gaussian(), run_model = FALSE, silent = 2)
+             data = d, family = gaussian(), run_model = FALSE, silent = 2,
+             validate = FALSE)
   sd <- standata(m)
   expect_identical(as.integer(sd$group_inds_trend), c(1L, 1L, 2L, 2L))
   expect_identical(unname(sd$group_members_trend),

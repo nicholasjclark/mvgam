@@ -1680,13 +1680,10 @@ test_that("multi-season: the fit describes its own specification", {
 test_that("multi-season: every listed parameter is reachable", {
   fit <- fit_multi_season()
   vars <- variables(fit)
-  # With `class = NULL`, `hypothesis()` takes a parameter by the name
-  # `variables()` lists
-  for (v in c("b_Intercept", grep("^ar1_trend\\[", vars, value = TRUE)[1L],
-              grep("^(sds|bs)_", vars, value = TRUE))) {
-    h <- hypothesis(fit, paste0("`", v, "` > 0"), class = NULL)
-    expect_true(is.finite(h$hypothesis$Estimate))
-  }
+  expect_hypothesis_reaches(fit, c(
+    "b_Intercept", grep("^ar1_trend\\[", vars, value = TRUE)[1L],
+    grep("^(sds|bs)_", vars, value = TRUE)
+  ))
 })
 
 

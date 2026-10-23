@@ -331,13 +331,13 @@ test_that("mvgam(trend_map) reaches the Stan data through the trend", {
   # With no trend spec to hold it the mapping would be discarded
   expect_error(
     mvgam(y ~ 1, trend_map = tm, data = d, family = poisson(),
-          run_model = FALSE),
+          run_model = FALSE, validate = FALSE),
     "requires a 'trend_formula'"
   )
   prefit <- mvgam(
     y ~ 1, trend_formula = ~ AR(p = 1), trend_map = tm, data = d,
     family = poisson(), run_model = FALSE
-  )
+  , validate = FALSE)
   expect_equal(unname(prefit$standata$Z),
                matrix(c(1, 1, 0, 0, 0, 1), nrow = 3L))
 })

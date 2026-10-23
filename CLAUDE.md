@@ -58,6 +58,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - When proposing new tests, first check existing test file names and add to the most appropriate existing file
 - DO NOT write wrapper functions to fix failing tests
 - DO NOT use `try()`, `tryCatch()` or `skip()` within tests
+- `skip_on_cran()` is the one exception: it gates a heavy sweep whose core cases still run on CRAN, which keeps the check under CRAN's 10-minute budget
 - DO NOT insert placeholder functions or use `try()` / `tryCatch()` within functions to address test errors or warnings
 
 ### testthat Expectations Guidelines

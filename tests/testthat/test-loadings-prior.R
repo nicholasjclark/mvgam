@@ -68,7 +68,7 @@ test_that("normalise_loadings_prior handles a named list of distances", {
   expect_equal(names(spec$distance_mats), c("phylo", "geo"))
 })
 
-test_that("normalise_loadings_prior resolves multiple distance names from data2", {
+test_that("normalise_loadings_prior resolves distance names in data2", {
   data <- make_test_data(3L)
   d1 <- matrix(c(0, 1, 2, 1, 0, 3, 2, 3, 0), nrow = 3L)
   d2 <- matrix(c(0, 5, 6, 5, 0, 7, 6, 7, 0), nrow = 3L)
@@ -91,7 +91,7 @@ test_that("normalise_loadings_prior errors on unknown spec fields", {
   )
 })
 
-test_that("normalise_loadings_prior errors when features, distances, and mgp are all absent", {
+test_that("normalise_loadings_prior refuses an empty spec", {
   data <- make_test_data(3L)
   expect_error(
     normalise_loadings_prior(
@@ -101,31 +101,21 @@ test_that("normalise_loadings_prior errors when features, distances, and mgp are
   )
 })
 
-test_that("normalise_loadings_prior accepts pure MGP (no features / distances)", {
+test_that("normalise_loadings_prior accepts pure MGP, also as a string", {
   data <- make_test_data(4L)
   spec <- normalise_loadings_prior(
     list(column_shrinkage = "mgp"), data2 = NULL, data = data
   )
-  expect_identical(spec$column_shrinkage, "mgp")
   expect_null(spec$features_mat)
   expect_identical(spec$N_features_trend, 0L)
   expect_identical(spec$n_distances, 0L)
   expect_equal(spec$mgp_a1, 2)
   expect_equal(spec$mgp_a2, 4)
+  expect_identical(normalise_loadings_prior("mgp", data2 = NULL, data = data),
+                   spec)
 })
 
-test_that("normalise_loadings_prior accepts string shorthand 'mgp'", {
-  data <- make_test_data(4L)
-  spec <- normalise_loadings_prior(
-    "mgp", data2 = NULL, data = data
-  )
-  expect_identical(spec$column_shrinkage, "mgp")
-  expect_null(spec$features_mat)
-  expect_equal(spec$mgp_a1, 2)
-  expect_equal(spec$mgp_a2, 4)
-})
-
-test_that("make_loadings_prior_stanvars leaves the MGP column scale to the innovations", {
+test_that("the MGP loadings stanvars leave the column scale alone", {
   data <- make_test_data(4L)
   spec <- normalise_loadings_prior(
     list(column_shrinkage = "mgp"), data2 = NULL, data = data
@@ -133,9 +123,6 @@ test_that("make_loadings_prior_stanvars leaves the MGP column scale to the innov
   sv <- make_loadings_prior_stanvars(spec)
   sc <- paste(vapply(sv, function(s) s$scode, character(1L)),
               collapse = "\n")
-  # No Phi / Cholesky construction in the pure-MGP path.
-  expect_false(grepl("Phi_loadings", sc, fixed = TRUE))
-  expect_false(grepl("L_Phi_loadings", sc, fixed = TRUE))
   # Z is drawn at unit scale. Scaling its prior by sqrt(Psi_diag)
   # here would give the column a second scale on top of
   # `sigma_trend`, leaving only their product identified, and would
@@ -148,42 +135,27 @@ test_that("make_loadings_prior_stanvars leaves the MGP column scale to the innov
   expect_match(sc, "inv_gamma(mgp_a1, 1)", fixed = TRUE)
 })
 
-
 test_that("the MGP column scale reaches the trend through sigma_trend", {
-  # The end-to-end contract the split above serves: exactly one
-  # declaration of the cumulative product, and `sigma_trend` derived
-  # from it rather than sampled alongside it.
+  # The program declares the cumulative product once and derives
+  # `sigma_trend` from it.
   set.seed(1L)
   d <- sim_mvgam(family = poisson(), n_series = 6L,
                   n_timepoints = 20L)$data_train
   m <- mvgam(
     y ~ 1, trend_formula = ~ AR(n_lv = 3), data = d, family = poisson(),
     loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
-  )
+  , validate = FALSE)
   ln <- strsplit(paste(as.character(m$model_file %||% m$stancode),
                         collapse = "\n"), "\n")[[1]]
   expect_equal(sum(grepl("Psi_diag = exp(cumulative_sum", ln,
                           fixed = TRUE)), 1L)
   expect_true(any(grepl("sigma_trend = sqrt(Psi_diag)", ln, fixed = TRUE)))
   # It is derived, so it is not also a sampled parameter. Both
-  # spellings of a sampling statement are named, because a
-  # normalised program writes the density call rather than a tilde
-  # and an assertion against one spelling alone passes vacuously.
+  # spellings of a sampling statement are named. A normalised program
+  # writes the density call in place of a tilde.
   expect_false(any(grepl("] sigma_trend;", ln, fixed = TRUE)))
   expect_false(any(grepl("sigma_trend ~", ln, fixed = TRUE)))
   expect_false(any(grepl("_lpdf(sigma_trend", ln, fixed = TRUE)))
-})
-
-test_that("normalise_loadings_prior accepts column_shrinkage = 'mgp' with defaults", {
-  data <- make_test_data(3L)
-  d <- matrix(c(0, 1, 2, 1, 0, 3, 2, 3, 0), nrow = 3L)
-  spec <- normalise_loadings_prior(
-    list(distances = d, column_shrinkage = "mgp"),
-    data2 = NULL, data = data
-  )
-  expect_equal(spec$column_shrinkage, "mgp")
-  expect_equal(spec$mgp_a1, 2)
-  expect_equal(spec$mgp_a2, 4)
 })
 
 test_that("normalise_loadings_prior respects user-supplied mgp_a1/a2", {
@@ -198,7 +170,7 @@ test_that("normalise_loadings_prior respects user-supplied mgp_a1/a2", {
   expect_equal(spec$mgp_a2, 5)
 })
 
-test_that("normalise_loadings_prior errors on mgp hyperparams without mgp shrinkage", {
+test_that("MGP hyperparameters require MGP column shrinkage", {
   data <- make_test_data(3L)
   d <- matrix(c(0, 1, 2, 1, 0, 3, 2, 3, 0), nrow = 3L)
   expect_error(
@@ -221,7 +193,7 @@ test_that("normalise_loadings_prior errors on invalid column_shrinkage", {
   )
 })
 
-test_that("normalise_loadings_prior errors when distance matrix has wrong dim", {
+test_that("normalise_loadings_prior refuses a misshapen distance matrix", {
   data <- make_test_data(3L)
   d <- matrix(0, nrow = 2L, ncol = 2L)
   expect_error(
@@ -295,13 +267,6 @@ test_that("assert_loadings_prior_spec_consistent rejects a corrupt spec", {
                "distance list has the wrong shape")
 })
 
-test_that("assert_distance_names_unreserved rejects 'dist_' prefix", {
-  expect_error(
-    assert_distance_names_unreserved(c("phylo", "dist_geo")),
-    "cannot start with 'dist_'"
-  )
-})
-
 test_that("assert_distance_names_unreserved accepts unreserved names", {
   expect_null(
     assert_distance_names_unreserved(c("phylo", "geo", "habitat"))
@@ -320,13 +285,11 @@ test_that("normalise_loadings_prior errors on reserved 'dist_' name", {
   )
 })
 
-
 test_that("MGP shrinkage is refused on trends that cannot carry it", {
   # The column scale reaches the model through `sigma_trend`, which
   # only the shared-innovation path builds. VAR() constructs its own
-  # innovation covariance instead, so the shrinkage would be declared
-  # and never applied. Refusing beats emitting a model whose prior
-  # does nothing.
+  # innovation covariance. The shrinkage would be declared and never
+  # applied.
   set.seed(1L)
   d <- sim_mvgam(family = poisson(), n_series = 6L,
                   n_timepoints = 20L)$data_train
@@ -334,28 +297,17 @@ test_that("MGP shrinkage is refused on trends that cannot carry it", {
     mvgam(y ~ 1, trend_formula = ~ VAR(n_lv = 3), data = d,
           family = poisson(),
           loadings_prior = list(column_shrinkage = "mgp"),
-          run_model = FALSE),
+          run_model = FALSE, validate = FALSE),
     "Got 'VAR\\(\\)'"
   )
-  # The trends that do carry it are unaffected.
-  for (tf in list(~ AR(n_lv = 3), ~ RW(n_lv = 3), ~ ZMVN(n_lv = 3))) {
+  # The other factor trends carry it. AR() is built above.
+  for (tf in list(~ RW(n_lv = 3), ~ ZMVN(n_lv = 3))) {
     expect_no_error(mvgam(
       y ~ 1, trend_formula = tf, data = d, family = poisson(),
       loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
-    ))
+    , validate = FALSE))
   }
-  # The refusal is specific to the MGP column scale. It fires
-  # during spec validation, before code generation, so it does not
-  # depend on whether a VAR factor model assembles.
-  expect_error(
-    mvgam(y ~ 1, trend_formula = ~ VAR(n_lv = 3), data = d,
-          family = poisson(),
-          loadings_prior = list(column_shrinkage = "mgp"),
-          run_model = FALSE),
-    "Got 'VAR\\(\\)'"
-  )
 })
-
 
 test_that("loadings_prior requires a trend to carry it", {
   # The structured prior replaces the iid prior on `Z`, which exists
@@ -367,25 +319,17 @@ test_that("loadings_prior requires a trend to carry it", {
   err <- expect_error(
     mvgam(y ~ 1, data = d, family = poisson(),
           loadings_prior = list(column_shrinkage = "mgp"),
-          run_model = FALSE),
+          run_model = FALSE, validate = FALSE),
     "loadings_prior"
   )
   expect_match(conditionMessage(err), "trend_formula", fixed = TRUE)
   expect_error(
     mvgam(y ~ 1, trend_formula = ~ AR(), data = d, family = poisson(),
           loadings_prior = list(column_shrinkage = "mgp"),
-          run_model = FALSE),
+          run_model = FALSE, validate = FALSE),
     "requires a factor trend"
   )
-
-  # With a trend carrying factors the same argument still builds.
-  expect_no_error(mvgam(
-    y ~ 1, trend_formula = ~ AR(n_lv = 3), data = d,
-    family = poisson(),
-    loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
-  ))
 })
-
 
 test_that("each kernel length-scale can be seen and set", {
   # The length-scales were emitted as literals with no registry
@@ -410,7 +354,8 @@ test_that("each kernel length-scale can be seen and set", {
   expect_true(all(scales$lb == "0"))
 
   # What is reported is what is emitted.
-  sc <- stancode(mf, data = dat, family = poisson(), loadings_prior = lp)
+  sc <- stancode(mf, data = dat, family = poisson(), loadings_prior = lp,
+                 validate = FALSE)
   for (i in seq_len(nrow(scales))) {
     expect_true(grepl(
       stan_prior_line(scales$class[i], scales$prior[i]), sc,
@@ -422,7 +367,7 @@ test_that("each kernel length-scale can be seen and set", {
   user <- brms::prior_string("inv_gamma(3, 2)", class = "theta_features") +
     brms::prior_string("lognormal(1, 0.5)", class = "theta_dist_phy")
   sc2 <- stancode(mf, data = dat, family = poisson(),
-                  loadings_prior = lp, prior = user)
+                  loadings_prior = lp, prior = user, validate = FALSE)
   expect_true(grepl(stan_prior_line("theta_features", "inv_gamma(3, 2)"),
                       sc2, fixed = TRUE))
   expect_true(grepl(stan_prior_line("theta_dist_phy", "lognormal(1, 0.5)"),

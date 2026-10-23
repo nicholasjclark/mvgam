@@ -748,15 +748,10 @@ test_that("summary, tidiers and criticism run on a multi-lag AR", {
 
 
 test_that("hypothesis reaches the smooth's own coefficient", {
-  vars <- variables(fit)
-  # With `class = NULL`, `hypothesis()` takes a parameter by the name
-  # `variables()` lists
-  targets <- grep("^(ar1_trend\\[|(sdgp|lscale|sds|bs)_)", vars,
-                  value = TRUE)
+  targets <- grep("^(ar1_trend\\[|(sdgp|lscale|sds|bs)_)",
+                  variables(fit), value = TRUE)
   expect_gt(length(targets), 4L)
-  for (nm in targets) {
-    expect_no_error(hypothesis(fit, paste0("`", nm, "` = 0"), class = NULL))
-  }
+  expect_hypothesis_reaches(fit, targets)
 })
 
 

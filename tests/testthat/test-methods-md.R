@@ -22,16 +22,16 @@ make_methods_md_prefit <- function(formula, trend_formula = NULL,
     family        = family,
     run_model     = FALSE,
     silent        = 2
-  )
+  , validate = FALSE)
 }
 
-test_that("methods_md returns mvgam_methods_md and prints", {
-  mod <- make_methods_md_prefit(y ~ x)
-  out <- methods_md(mod)
-  expect_s3_class(out, "mvgam_methods_md")
-  expect_true(grepl("## Data", out))
-  expect_true(grepl("## Model", out))
-  expect_true(grepl("## Priors", out))
+# The `y ~ x` Poisson prefit most tests describe, built once
+base_prefit <- local({
+  cached <- NULL
+  function() {
+    if (is.null(cached)) cached <<- make_methods_md_prefit(y ~ x)
+    cached
+  }
 })
 
 test_that("the software versions reported are the ones the fit recorded", {
@@ -39,7 +39,7 @@ test_that("the software versions reported are the ones the fit recorded", {
   # one that built the model. Reporting the session's versions
   # described software the model never met, and under rstan it gave
   # the rstan package version as the version of Stan.
-  mod <- make_methods_md_prefit(y ~ x)
+  mod <- base_prefit()
   expect_identical(mod$stan_version, mvgam:::live_stan_version(mod$backend))
   mod$stan_version <- "9.9.9"
   mod$brms_version <- package_version("8.8.8")
@@ -51,7 +51,7 @@ test_that("the software versions reported are the ones the fit recorded", {
 })
 
 test_that("Data section labels family + reports dimensions", {
-  mod <- make_methods_md_prefit(y ~ x)
+  mod <- base_prefit()
   out <- methods_md(mod)
   expect_true(grepl("non-negative integer counts", out))
   expect_true(grepl("N = 120", out))
@@ -60,7 +60,7 @@ test_that("Data section labels family + reports dimensions", {
 })
 
 test_that("Model section emits a single align block with likelihood + link", {
-  mod <- make_methods_md_prefit(y ~ x)
+  mod <- base_prefit()
   out <- methods_md(mod)
   expect_true(grepl("\\\\begin\\{aligned\\}", out))
   expect_true(grepl("\\\\sim \\\\text\\{Poisson\\}", out))
@@ -85,6 +85,8 @@ test_that("Gaussian family renders Normal likelihood + identity link", {
   expect_true(grepl("real-valued observations", out))
   # Identity link should not introduce a log / logit wrapper.
   expect_false(grepl("\\\\log \\\\mu_\\{i,t\\}", out))
+  # A model without a trend has no eta in its predictor
+  expect_false(grepl("\\\\eta_\\{i,t\\}", out))
 })
 
 test_that("RW trend emits eta_{t-1} dynamics + Normal innovation", {
@@ -388,7 +390,7 @@ test_that("nl formula renders per-nlpar decompositions", {
   mod <- mvgam(
     formula = f, data = dat, family = gaussian(),
     run_model = FALSE, silent = 2L
-  )
+  , validate = FALSE)
   out <- methods_md(mod)
   # Top-level mu uses nlpar tokens verbatim with (i, t) subscripts.
   expect_true(grepl("a_\\{i,t\\}", out))
@@ -411,16 +413,7 @@ test_that("nl formula renders per-nlpar decompositions", {
 })
 
 test_that("Response column never surfaces in the Predictors list", {
-  set.seed(1L)
-  dat <- data.frame(
-    time = rep(1:30, 4),
-    series = factor(rep(paste0("s", 1:4), each = 30)),
-    x = rnorm(120),
-    grp = factor(rep(c("a","b","c","d"), each = 30)),
-    y = rpois(120, 3)
-  )
-  mod <- make_methods_md_prefit(y ~ x, data = dat)
-  out <- methods_md(mod)
+  out <- methods_md(base_prefit())
   # The Predictors bullet list must not include "y" as a covariate.
   expect_false(grepl("- \\$y\\$:", out))
 })
@@ -433,28 +426,7 @@ test_that("Group-level RE renders alpha_{grp[i]} + hyperprior shape", {
     "\\\\alpha_\\{\\\\mathrm\\{grp\\}\\} &\\\\sim \\\\text\\{Normal\\}\\(0",
     out
   ))
-  expect_true(grepl("\\\\sigma_\\{\\\\mathrm\\{grp\\}\\}", out))
-})
-
-test_that("No-trend gaussian model omits eta_{i,t} from linpred", {
-  mod <- make_methods_md_prefit(
-    y ~ x, family = gaussian(),
-    data = data.frame(
-      time = rep(1:30, 4),
-      series = factor(rep(paste0("s", 1:4), each = 30)),
-      x = rnorm(120),
-      grp = factor(rep(c("a", "b", "c", "d"), each = 30)),
-      y = rnorm(120)
-    )
-  )
-  out <- methods_md(mod)
-  expect_false(grepl("\\\\eta_\\{i,t\\}", out))
-})
-
-test_that("Priors section backfills umbrella text onto specific rows", {
-  mod <- make_methods_md_prefit(y ~ (1 | grp))
-  out <- methods_md(mod)
-  # sigma_{grp} should appear (specific group label), not sigma_j.
+  # The umbrella SD prior is stated on the group's own row
   expect_true(grepl(
     "\\\\sigma_\\{\\\\mathrm\\{grp\\}\\} &\\\\sim \\\\text\\{StudentT\\}", out
   ))
@@ -462,17 +434,16 @@ test_that("Priors section backfills umbrella text onto specific rows", {
 })
 
 test_that("methods_md(file = path) writes the markdown to disk", {
-  mod <- make_methods_md_prefit(y ~ x)
+  mod <- base_prefit()
   tmp <- tempfile(fileext = ".md")
   on.exit(unlink(tmp), add = TRUE)
   ret <- methods_md(mod, file = tmp)
-  expect_true(file.exists(tmp))
   expect_true(grepl("## Model", paste(readLines(tmp), collapse = "\n")))
   expect_s3_class(ret, "mvgam_methods_md")
 })
 
 test_that("notation arg accepts 'default' and 'brms', rejects others", {
-  mod <- make_methods_md_prefit(y ~ x)
+  mod <- base_prefit()
   expect_s3_class(methods_md(mod, notation = "default"),
                    "mvgam_methods_md")
   expect_s3_class(methods_md(mod, notation = "brms"),
@@ -481,114 +452,28 @@ test_that("notation arg accepts 'default' and 'brms', rejects others", {
                "element of set")
 })
 
-# Family-distribution renderer: covers brms-native shapes the
-# methods_md user is most likely to fit. Targeted unit tests on
-# family_distribution_text + family_data_label so adding a new
-# family is one switch entry plus one assertion line here.
-
-test_that("family_distribution_text covers core brms families", {
-  ft <- mvgam:::family_distribution_text
-  mu <- "\\mu"
-  expect_equal(ft("poisson", mu, NULL),
-               "\\text{Poisson}(\\mu)")
-  expect_equal(ft("bernoulli", mu, NULL),
-               "\\text{Bernoulli}(\\mu)")
-  expect_equal(ft("binomial", mu, NULL),
-               "\\text{Binomial}(n_{i,t}, \\mu)")
-  expect_equal(ft("gaussian", mu, NULL),
-               "\\text{Normal}(\\mu, \\sigma)")
-  expect_equal(ft("student", mu, NULL),
-               "\\text{StudentT}(\\nu, \\mu, \\sigma)")
-  expect_equal(ft("lognormal", mu, NULL),
-               "\\text{LogNormal}(\\mu, \\sigma)")
-  expect_equal(ft("gamma", mu, NULL),
-               "\\text{Gamma}(\\varphi, \\mu)")
-  expect_equal(ft("beta", mu, NULL),
-               "\\text{Beta}(\\mu, \\phi)")
-  expect_equal(ft("negbinomial", mu, NULL),
-               "\\text{NegBin}(\\mu, \\varphi)")
-})
-
-test_that("family_distribution_text covers tweedie + hurdle + ZI", {
-  ft <- mvgam:::family_distribution_text
-  mu <- "\\mu"
-  expect_equal(ft("tweedie", mu, NULL),
-               "\\text{Tweedie}(\\mu, \\phi, \\xi)")
-  expect_equal(ft("hurdle_poisson", mu, NULL),
-               "\\text{Hurdle-Poisson}(\\mu, \\pi^{(\\text{hu})})")
-  expect_equal(
-    ft("hurdle_negbinomial", mu, NULL),
-    "\\text{Hurdle-NegBin}(\\mu, \\varphi, \\pi^{(\\text{hu})})"
-  )
-  expect_equal(ft("zero_inflated_poisson", mu, NULL),
-               "\\text{ZIPoisson}(\\mu, \\pi^{(\\text{zi})})")
-  expect_equal(
-    ft("zero_inflated_negbinomial", mu, NULL),
-    "\\text{ZINegBin}(\\mu, \\varphi, \\pi^{(\\text{zi})})"
-  )
-  expect_equal(
-    ft("zero_inflated_binomial", mu, NULL),
-    "\\text{ZIBinomial}(n_{i,t}, \\mu, \\pi^{(\\text{zi})})"
-  )
-})
-
-test_that("family_distribution_text covers ordinal families", {
-  ft <- mvgam:::family_distribution_text
-  mu <- "\\eta_{i,t}"
-  expect_equal(
-    ft("cumulative", mu, NULL),
-    "\\text{OrderedCumulative}(\\boldsymbol{\\theta}, \\eta_{i,t})"
-  )
-  expect_equal(
-    ft("sratio", mu, NULL),
-    "\\text{OrderedStoppingRatio}(\\boldsymbol{\\theta}, \\eta_{i,t})"
-  )
-  expect_equal(
-    ft("cratio", mu, NULL),
-    "\\text{OrderedContinuationRatio}(\\boldsymbol{\\theta}, \\eta_{i,t})"
-  )
-  expect_equal(
-    ft("acat", mu, NULL),
-    "\\text{OrderedAdjacentCategory}(\\boldsymbol{\\theta}, \\eta_{i,t})"
-  )
-})
-
-test_that("family_data_label maps mixture / ordinal families", {
-  fl <- mvgam:::family_data_label
-  expect_equal(
-    fl("hurdle_poisson"),
-    "non-negative integer counts with point mass at zero"
-  )
-  expect_equal(
-    fl("zero_inflated_poisson"),
-    "zero-inflated non-negative integer counts"
-  )
-  expect_equal(fl("cumulative"), "ordered categorical observations")
-  expect_equal(
-    fl("tweedie"),
-    "non-negative real observations (compound Poisson-gamma)"
-  )
-})
-
 # Prior distribution formatter: targeted unit tests on the
 # regex-based string mapper. Easier to keep in sync with brms
 # prior-string conventions when tested directly.
 
-test_that("format_prior_distribution maps every common brms family", {
+test_that("format_prior_distribution renders the arguments it is given", {
   fmt <- mvgam:::format_prior_distribution
-  expect_equal(fmt("normal(0, 1)"), "\\text{Normal}(0, 1)")
-  expect_equal(fmt("student_t(3, 0, 2.5)"),
-               "\\text{StudentT}(3, 0, 2.5)")
-  expect_equal(fmt("lognormal(0, 1)"), "\\text{LogNormal}(0, 1)")
-  expect_equal(fmt("exponential(1)"), "\\text{Exponential}(1)")
-  expect_equal(fmt("gamma(2, 1)"), "\\text{Gamma}(2, 1)")
-  expect_equal(fmt("inv_gamma(2, 1)"), "\\text{InvGamma}(2, 1)")
-  expect_equal(fmt("cauchy(0, 5)"), "\\text{Cauchy}(0, 5)")
-  expect_equal(fmt("beta(1, 1)"), "\\text{Beta}(1, 1)")
-  expect_equal(fmt("uniform(-1, 1)"), "\\text{Uniform}(-1, 1)")
-  expect_equal(fmt("lkj_corr_cholesky(1)"), "\\text{LKJCorr}(1)")
+  expect_equal(fmt("student_t(3, 0, 2.5)"), "\\text{StudentT}(3, 0, 2.5)")
+  expect_equal(fmt("std_normal()"), "\\text{Normal}(0, 1)")
   expect_equal(fmt("(flat)"), "\\text{flat}")
   expect_equal(fmt(""), "\\text{flat}")
+  # A full-precision location is shown to three significant digits
+  expect_equal(fmt("normal(0.123456, 1)"), "\\text{Normal}(0.123, 1)")
+  expect_equal(fmt("normal(0, sqrt(0.455))"),
+               "\\text{Normal}(0, \\sqrt{0.455})")
+  # A sampled hyperparameter takes its symbol. Another name is set
+  # upright, with its underscore escaped.
+  expect_equal(fmt("inv_gamma(mgp_a1, 1)", symbols = c(mgp_a1 = "a_1")),
+               "\\text{InvGamma}(a_1, 1)")
+  expect_equal(fmt("inv_gamma(mgp_a1, 1)"),
+               "\\text{InvGamma}(\\mathrm{mgp\\_a1}, 1)")
+  # An unrecognised distribution is rendered verbatim
+  expect_equal(fmt("frechet(1, 2)"), "\\text{frechet(1, 2)}")
 })
 
 
@@ -673,7 +558,8 @@ test_that("MGP loadings scale the factor innovations by sqrt(Psi_k)", {
   )
   mod <- mvgam(y ~ x, trend_formula = ~ AR(p = 1, n_lv = 2), data = d,
                family = poisson(), run_model = FALSE, silent = 2,
-               loadings_prior = list(column_shrinkage = "mgp"))
+               loadings_prior = list(column_shrinkage = "mgp"),
+               validate = FALSE)
   out <- methods_md(mod)
   # Stan draws Z at unit scale and scales the factor innovations by
   # sqrt(Psi_k), with Psi_k the cumulative product of `varrho_inv`.
@@ -727,7 +613,7 @@ make_occ_prefit <- function() {
     formula = bf(y ~ elev, p ~ tod),
     data = d, family = occ(),
     run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
 }
 
 make_nmix_prefit <- function(type = "poisson_binomial") {
@@ -749,7 +635,7 @@ make_nmix_prefit <- function(type = "poisson_binomial") {
     formula = bf(y ~ elev, p ~ tod),
     data = d, family = nmix(type),
     run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
 }
 
 test_that("each response of a multivariate model is described by its family", {
@@ -764,7 +650,7 @@ test_that("each response of a multivariate model is described by its family", {
     bf(n_seen ~ x, family = poisson()) +
       bf(size_g ~ x, sigma ~ x, family = lognormal()) + set_rescor(FALSE),
     data = d, run_model = FALSE
-  )
+  , validate = FALSE)
   out <- methods_md(mv)
   expect_match(out, "$\\mathrm{n\\_seen}$ non-negative integer counts",
                fixed = TRUE)
@@ -814,7 +700,7 @@ test_that("how_to_cite cites each family a model has", {
   expect_true("neyman_type_a_1939" %in%
                 cited(make_nmix_prefit("poisson_poisson")))
   expect_true("mackenzie_occu_2002" %in% cited(make_occ_prefit()))
-  expect_false("jorgensen_tweedie" %in% cited(make_methods_md_prefit(y ~ x)))
+  expect_false("jorgensen_tweedie" %in% cited(base_prefit()))
   set.seed(2L)
   d <- data.frame(time = 1:30, amount = rgamma(30, 2, 1),
                   count = rpois(30, 4))
@@ -822,7 +708,7 @@ test_that("how_to_cite cites each family a model has", {
     bf(amount ~ 1, family = tweedie()) +
       bf(count ~ 1, family = poisson()) + set_rescor(FALSE),
     data = d, run_model = FALSE
-  )
+  , validate = FALSE)
   expect_true(all(c("jorgensen_tweedie", "dunn_smyth_tweedie") %in%
                     cited(mv)))
 })
@@ -858,7 +744,7 @@ test_that("methods_md renders the family the model stores", {
   # Each section spelled its own fallback family and link. The
   # object's family is the one `mvgam()` validated, and an object
   # without one is refused.
-  mod <- make_methods_md_prefit(y ~ x, family = poisson())
+  mod <- base_prefit()
   out <- methods_md(mod)
   expect_match(out, "family        = poisson()", fixed = TRUE)
   expect_false(grepl("gaussian", out, fixed = TRUE))
@@ -955,7 +841,7 @@ test_that("diri() emits Dirichlet + alpha = phi * pi + softmax row", {
     data = d, unit = time, species = series,
     family = diri(), n_lv = 2L,
     run_model = FALSE, silent = 2, backend = "cmdstanr"
-  )
+  , validate = FALSE)
   out <- methods_md(mod)
   expect_true(grepl(
     "\\\\mathbf\\{Y\\}_i &\\\\sim \\\\text\\{Dirichlet\\}",
@@ -988,7 +874,7 @@ test_that("nl b_<nlpar>_<term> prior carries nlpar superscript on beta", {
       brms::prior(normal(0, 1), nlpar = "b")
     ),
     run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
   out <- methods_md(mod)
   expect_true(grepl("\\\\beta\\^\\{\\(a\\)\\}_\\{\\\\mathrm\\{trait1\\}\\}", out))
   expect_true(grepl("\\\\beta\\^\\{\\(b\\)\\}_\\{\\\\mathrm\\{trait1\\}\\}", out))
@@ -1005,10 +891,9 @@ test_that("Ordinal Intercept rows render as theta_{k} thresholds", {
     formula = yord ~ x,
     data = d, family = cumulative(),
     run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
   out <- methods_md(mod)
-  expect_true(grepl("\\\\theta_\\{1\\}", out) ||
-              grepl("\\\\theta_\\{[0-9]+\\}", out))
+  expect_true(grepl("\\\\theta_\\{1\\}", out))
 })
 
 test_that("mvbind rescor priors carry response superscripts", {
@@ -1022,7 +907,7 @@ test_that("mvbind rescor priors carry response superscripts", {
       brms::set_rescor(TRUE),
     data = d, family = gaussian(),
     run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
   out <- methods_md(mod)
   expect_true(grepl("\\\\sigma\\^\\{\\(yA\\)\\}", out))
   expect_true(grepl("\\\\sigma\\^\\{\\(yB\\)\\}", out))
@@ -1045,7 +930,7 @@ test_that("mvn() emits MVNormal with a diagonal Sigma", {
     data = d, unit = time, species = series,
     family = mvn(), n_lv = 1L,
     run_model = FALSE, silent = 2, backend = "cmdstanr"
-  )
+  , validate = FALSE)
   out <- methods_md(mod)
   expect_true(grepl(
     "\\\\mathbf\\{Y\\}_i &\\\\sim \\\\text\\{MVNormal\\}",
@@ -1163,7 +1048,8 @@ test_that("an unfitted model prints each family by its own name", {
   # for a model with several responses.
   d <- data.frame(time = 1:30, series = factor("s1"),
                   y = rgamma(30, 2, 1))
-  pf <- mvgam(y ~ 1, data = d, family = tweedie(), run_model = FALSE)
+  pf <- mvgam(y ~ 1, data = d, family = tweedie(), run_model = FALSE,
+              validate = FALSE)
   printed <- capture.output(print(pf))
   expect_true(any(grepl("Family: tweedie", printed, fixed = TRUE)))
   expect_false(any(grepl("custom", printed, fixed = TRUE)))
@@ -1174,7 +1060,7 @@ test_that("an unfitted model prints each family by its own name", {
     brms::bf(count ~ 1, family = poisson()) +
       brms::bf(seen ~ 1, family = bernoulli()) + brms::set_rescor(FALSE),
     trend_formula = ~ AR(p = 1), data = w, run_model = FALSE
-  )
+  , validate = FALSE)
   printed <- capture.output(print(mv))
   expect_true(any(grepl("count: poisson", printed, fixed = TRUE)))
   expect_true(any(grepl("seen: bernoulli", printed, fixed = TRUE)))

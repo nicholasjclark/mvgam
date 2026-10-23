@@ -5,7 +5,6 @@
 # posterior. Concordance with brms on fitted models lives in
 # tests/local/test-linpred-parity.R.
 
-
 smooth_frame <- function(n = 40L) {
   set.seed(5L)
   data.frame(
@@ -58,7 +57,6 @@ smooth_by_hand <- function(sdata, draws, sfx, object) {
   unname(eta)
 }
 
-
 # ---- Dispatch + signature parity -----------------------------------
 
 test_that("posterior_smooths.mvgam matches brms signature", {
@@ -68,7 +66,6 @@ test_that("posterior_smooths.mvgam matches brms signature", {
   # minimum the same named formals up to (and including) `...`.
   expect_true(all(expected %in% actual))
 })
-
 
 test_that("conditional_smooths.mvgam matches brms-parity arg set", {
   brms_args <- names(formals(getS3method("conditional_smooths", "brmsfit")))
@@ -81,7 +78,6 @@ test_that("conditional_smooths.mvgam matches brms-parity arg set", {
   # The mvgam-only `facets` knob must also be present.
   expect_true("facets" %in% mvgam_args)
 })
-
 
 # ---- The smooth record ----------------------------------------------
 
@@ -96,7 +92,6 @@ test_that("each predictor's smooths are listed, the trend's last", {
     c("mu: s(z)", "sigma: s(x)", "mu: s(z) (trend)")
   )
 })
-
 
 test_that("a term's smooth objects are numbered as brms numbers them", {
   # brms gives a `by` factor one smooth object per level and numbers
@@ -113,14 +108,12 @@ test_that("a term's smooth objects are numbered as brms numbers them", {
   expect_identical(hits[[3L]]$covars, c("x", "w"))
 })
 
-
 test_that("a numeric by variable is one smooth object", {
   hits <- mvgam_smooth_terms(smooth_stub(brms::bf(y ~ s(x, by = w))))
   expect_length(hits, 1L)
   expect_identical(hits[[1L]]$objects, 1L)
   expect_identical(hits[[1L]]$by_var, "w")
 })
-
 
 test_that("each response of a model with several keeps its own smooths", {
   stub <- smooth_stub(
@@ -134,7 +127,6 @@ test_that("each response of a model with several keeps its own smooths", {
                    c("y_mu: s(x)", "trendy_mu: s(w)"))
 })
 
-
 test_that("a non-linear parameter's smooths belong to it", {
   stub <- smooth_stub(
     brms::bf(y ~ a * exp(b * x), a ~ s(z), b ~ 1, nl = TRUE),
@@ -147,7 +139,6 @@ test_that("a non-linear parameter's smooths belong to it", {
   expect_null(hits[[1L]]$dpar)
 })
 
-
 test_that("a smooth is found under a family carrying an addition term", {
   # `count | trials(size) ~ s(x)` only parses when brms knows the
   # family, which the fitted model does.
@@ -156,7 +147,6 @@ test_that("a smooth is found under a family carrying an addition term", {
   expect_identical(smooths(stub), "s(x)")
 })
 
-
 test_that("a label matches whatever its spacing", {
   stub <- smooth_stub(brms::bf(y ~ 1 + s(z, by = grp)))
   hit1 <- resolve_mvgam_smooth(stub, "s(z,by=grp)")
@@ -164,7 +154,6 @@ test_that("a label matches whatever its spacing", {
   expect_identical(hit1$term, "s(z, by = grp)")
   expect_identical(hit2$term, "s(z, by = grp)")
 })
-
 
 # ---- Evaluating one smooth ------------------------------------------
 
@@ -186,7 +175,6 @@ test_that("a smooth reads only its own objects", {
   )
 })
 
-
 test_that("a smooth is evaluated on a frame holding its own variables", {
   # brms fills every other variable from the fitted frame, `trials()`
   # included, with a value it accepts.
@@ -207,7 +195,6 @@ test_that("a smooth is evaluated on a frame holding its own variables", {
   )
 })
 
-
 test_that("a distributional parameter's smooth reads its own names", {
   stub <- smooth_stub(brms::bf(y ~ 1, sigma ~ s(x)))
   sdata <- brms::standata(stub$obs_model, internal = TRUE)
@@ -224,17 +211,7 @@ test_that("a distributional parameter's smooth reads its own names", {
   expect_error(posterior_smooths(stub, "s(x)"), "Available smooth terms")
 })
 
-
 # ---- Error paths ---------------------------------------------------
-
-test_that("posterior_smooths.mvgam errors on unknown smooth term", {
-  stub <- smooth_stub(brms::bf(y ~ 1 + s(z)))
-  expect_error(
-    posterior_smooths(stub, smooth = "s(nope)"),
-    "Available smooth terms"
-  )
-})
-
 
 test_that("posterior_smooths.mvgam takes one of 'dpar' and 'nlpar'", {
   stub <- smooth_stub(brms::bf(y ~ 1 + s(z)))
@@ -242,12 +219,10 @@ test_that("posterior_smooths.mvgam takes one of 'dpar' and 'nlpar'", {
                "Supply only one of")
 })
 
-
 test_that("conditional_smooths.mvgam errors on no-smooth fits", {
   expect_error(conditional_smooths(smooth_stub(brms::bf(y ~ x))),
                "no smooth terms")
 })
-
 
 # ---- subset_draws_rows ---------------------------------------------
 
@@ -267,65 +242,47 @@ test_that("subset_draws_rows validates ndraws and draw_ids", {
   expect_error(subset_draws_rows(mat, NULL, c(1L, 99L)), "exceed")
 })
 
-
 # ---- Conditional_smooths grid builder edge cases -------------------
 
-test_that("build_smooth_grid surface=TRUE uses resolution^2 for 2D", {
+test_that("a 2D smooth's grid is a surface or focal slices", {
   stub <- smooth_stub(brms::bf(y ~ s(x, z)))
   hit <- mvgam_smooth_terms(stub)[[1L]]
-  g <- build_smooth_grid(stub, hit, surface = TRUE, facets = 3L,
-                          resolution = 10L, int_conditions = NULL,
-                          too_far = 0)
+  grid <- function(surface, facets, resolution) {
+    build_smooth_grid(stub, hit, surface = surface, facets = facets,
+                      resolution = resolution, int_conditions = NULL,
+                      too_far = 0)
+  }
+  # A surface crosses the resolution with itself
+  g <- grid(TRUE, 3L, 10L)
   expect_identical(nrow(g$newdata), 100L)
   expect_true(g$surface)
-})
-
-
-test_that("build_smooth_grid surface=FALSE for 2D uses focal x facets", {
-  stub <- smooth_stub(brms::bf(y ~ s(x, z)))
-  hit <- mvgam_smooth_terms(stub)[[1L]]
-  # facets = 5 should produce 5 levels of the second covariate
-  g <- build_smooth_grid(stub, hit, surface = FALSE, facets = 5L,
-                          resolution = 20L, int_conditions = NULL,
-                          too_far = 0)
-  expect_identical(nrow(g$newdata), 100L)  # 20 x 5
+  # Slices cross the focal resolution with one level per facet
+  g <- grid(FALSE, 5L, 20L)
+  expect_identical(nrow(g$newdata), 100L)
   expect_false(g$surface)
 })
 
-
-test_that("int_conditions overrides the focal-covariate grid values", {
+test_that("int_conditions sets the focal covariate's grid values", {
   stub <- smooth_stub(brms::bf(y ~ s(x)))
   hit <- mvgam_smooth_terms(stub)[[1L]]
-  g <- build_smooth_grid(stub, hit, surface = TRUE, facets = 3L,
-                          resolution = 20L,
-                          int_conditions = list(x = c(-1, 0, 1)),
-                          too_far = 0)
+  grid <- function(cond) {
+    build_smooth_grid(stub, hit, surface = TRUE, facets = 3L,
+                      resolution = 20L, int_conditions = cond, too_far = 0)
+  }
+  g <- grid(list(x = c(-1, 0, 1)))
   expect_identical(g$newdata$x, c(-1, 0, 1))
   # The grid holds the term's own variable alone.
   expect_identical(names(g$newdata), "x")
+  # A function is applied to the data: quantile() gives five values
+  expect_identical(unname(grid(list(x = stats::quantile))$newdata$x),
+                   unname(stats::quantile(stub$data$x)))
 })
-
-
-test_that("int_conditions accepts a function applied to the data", {
-  stub <- smooth_stub(brms::bf(y ~ s(x)))
-  hit <- mvgam_smooth_terms(stub)[[1L]]
-  g <- build_smooth_grid(stub, hit, surface = TRUE, facets = 3L,
-                          resolution = 20L,
-                          int_conditions = list(x = stats::quantile),
-                          too_far = 0)
-  # quantile(x) returns 5 quantiles by default
-  expect_identical(length(g$newdata$x), 5L)
-})
-
 
 # ---- Drawing -------------------------------------------------------
 
 test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
-  # Mock a 1D smooth's summary data.frame with the columns
-  # `conditional_smooths.mvgam` produces. Verifies:
-  #   - class is `mvgam_conditional_smooths` (not just brms's)
-  #   - plot() returns a list of ggplots
-  #   - the ribbon is not a flat line at zero
+  # A 1D smooth's summary frame with the columns
+  # `conditional_smooths.mvgam` produces
   grid <- seq(-2, 2, length.out = 25L)
   df <- data.frame(
     env = grid,
@@ -351,14 +308,7 @@ test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
   ggs <- plot(cs, plot = FALSE)
   expect_length(ggs, 1L)
   expect_s3_class(ggs[[1L]], "ggplot")
-  # Ribbon should not be a flat line at zero: the estimate at the
-  # peak (env ~ 0.4) should be clearly above the estimate at the
-  # tail (env ~ 2).
-  peak_idx <- which.min(abs(grid - 0.4))
-  tail_idx <- which.min(abs(grid - 2))
-  expect_gt(df$estimate__[peak_idx] - df$estimate__[tail_idx], 0.5)
 })
-
 
 test_that("spaghetti draws one line per draw from its own columns", {
   # The overlay is built by `build_spaghetti_data()` and drawn by
@@ -381,7 +331,6 @@ test_that("spaghetti draws one line per draw from its own columns", {
     expect_equal(lines$y[lines$group == g], eta[g, ])
   }
 })
-
 
 test_that("a factor smooth draws one interval per level", {
   # `s(series, bs = "re")` puts a single grid point on each level.

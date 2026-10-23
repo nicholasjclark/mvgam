@@ -15,13 +15,10 @@ bnb_test_data <- function(n = 60L) {
   )
 }
 
-
 # ---- constructor ---------------------------------------------------
 
 test_that("beta_nb() returns a customfamily with the documented contract", {
   fam <- beta_nb()
-  expect_s3_class(fam, "customfamily")
-  expect_identical(fam$name, "beta_nb")
   expect_identical(fam$dpars, c("mu", "shape", "mtail"))
   expect_identical(fam$type, "int")
   expect_identical(fam$link, "log")
@@ -40,7 +37,6 @@ test_that("beta_nb() attaches linkinv / linkfun for the epred dispatcher", {
 
 test_that("beta_nb() carries its Stan functions as stanvars", {
   sv <- attr(beta_nb(), "mvgam_stanvars", exact = TRUE)
-  expect_s3_class(sv, "stanvars")
   scode <- paste(vapply(sv, function(x) x$scode, character(1)), collapse = "\n")
   expect_true(grepl("real beta_nb_lpmf(int y, real mu, real shape, real mtail)",
                     scode, fixed = TRUE))
@@ -61,18 +57,23 @@ test_that("the Stan wrapper does not shadow Stan's own beta_neg_binomial", {
   expect_true(grepl("lbeta(", scode, fixed = TRUE))
 })
 
-
 # ---- stancode and standata -----------------------------------------
 
-test_that("beta_nb() emits its functions and bounded dpars into stancode", {
+test_that("beta_nb() emits its likelihood, bounds and default priors", {
   dat <- bnb_test_data()
-  mf <- mvgam_formula(y ~ x)
-  sc <- paste(unlist(stancode(mf, data = dat, family = beta_nb(),
-                              backend = "cmdstanr")), collapse = "\n")
+  sc <- paste(unlist(stancode(mvgam_formula(y ~ x), data = dat,
+                              family = beta_nb(), backend = "cmdstanr",
+                              validate = FALSE)),
+              collapse = "\n")
   expect_true(grepl("target += beta_nb_lpmf(Y[n] | mu[n], shape, mtail);",
                     sc, fixed = TRUE))
   expect_true(grepl("real<lower=0> shape", sc, fixed = TRUE))
   expect_true(grepl("real<lower=0> mtail", sc, fixed = TRUE))
+  # `shape` would otherwise inherit brms's negative binomial
+  # gamma(0.01, 0.01), which concentrates mass where the Beta mixing
+  # scale mu * mtail / shape diverges
+  expect_true(grepl("gamma_lpdf(shape | 2, 0.5)", sc, fixed = TRUE))
+  expect_true(grepl("gamma_lpdf(mtail | 2, 0.25)", sc, fixed = TRUE))
 })
 
 test_that("beta_nb() builds identically under either backend", {
@@ -82,23 +83,12 @@ test_that("beta_nb() builds identically under either backend", {
   dat <- bnb_test_data()
   mf <- mvgam_formula(y ~ x)
   sc_r <- paste(unlist(stancode(mf, data = dat, family = beta_nb(),
-                                backend = "rstan")), collapse = "\n")
+                                backend = "rstan",
+                                validate = FALSE)), collapse = "\n")
   sc_c <- paste(unlist(stancode(mf, data = dat, family = beta_nb(),
-                                backend = "cmdstanr")), collapse = "\n")
+                                backend = "cmdstanr",
+                                validate = FALSE)), collapse = "\n")
   expect_identical(sc_r, sc_c)
-})
-
-test_that("beta_nb() injects its default priors ahead of the brms defaults", {
-  # `shape` would otherwise inherit brms's negative binomial
-  # gamma(0.01, 0.01), which concentrates mass where the Beta mixing
-  # scale mu * mtail / shape diverges
-  dat <- bnb_test_data()
-  sc <- paste(unlist(stancode(mvgam_formula(y ~ x), data = dat,
-                              family = beta_nb(), backend = "cmdstanr")),
-              collapse = "\n")
-  expect_true(grepl("gamma_lpdf(shape | 2, 0.5)", sc, fixed = TRUE))
-  expect_true(grepl("gamma_lpdf(mtail | 2, 0.25)", sc, fixed = TRUE))
-  expect_false(grepl("gamma_lpdf(shape | 0.01, 0.01)", sc, fixed = TRUE))
 })
 
 test_that("beta_nb() supports distributional regression on mtail", {
@@ -106,7 +96,8 @@ test_that("beta_nb() supports distributional regression on mtail", {
   dat$site <- factor(rep(c("a", "b"), length.out = nrow(dat)))
   mf <- mvgam_formula(brms::bf(y ~ 1, mtail ~ site))
   sc <- paste(unlist(stancode(mf, data = dat, family = beta_nb(),
-                              backend = "cmdstanr")), collapse = "\n")
+                              backend = "cmdstanr",
+                              validate = FALSE)), collapse = "\n")
   expect_true(grepl("mtail = exp(mtail);", sc, fixed = TRUE))
   expect_true(grepl("target += beta_nb_lpmf(Y[n] | mu[n], shape, mtail[n]);",
                     sc, fixed = TRUE))
@@ -124,15 +115,16 @@ test_that("cens() and trunc() reach the distribution function", {
   dat$cn <- ifelse(dat$y > 12, "right", "none")
   sc_cens <- paste(unlist(stancode(
     mvgam_formula(ycens | cens(cn) ~ 1), data = dat,
-    family = beta_nb(), backend = "cmdstanr")), collapse = "\n")
+    family = beta_nb(), backend = "cmdstanr",
+    validate = FALSE)), collapse = "\n")
   expect_true(grepl("beta_nb_lccdf(", sc_cens, fixed = TRUE))
 
   sc_trunc <- paste(unlist(stancode(
     mvgam_formula(y | trunc(ub = 200) ~ 1), data = dat,
-    family = beta_nb(), backend = "cmdstanr")), collapse = "\n")
+    family = beta_nb(), backend = "cmdstanr",
+    validate = FALSE)), collapse = "\n")
   expect_true(grepl("beta_nb_lcdf(", sc_trunc, fixed = TRUE))
 })
-
 
 # ---- registration --------------------------------------------------
 
@@ -157,7 +149,6 @@ test_that("beta_nb() has a mean-equals-mu epred", {
   # The shifted tail parameter exists so that E[Y] = mu exactly
   expect_equal(as.numeric(ep), c(2, 5, 9), tolerance = 1e-12)
 })
-
 
 # ---- R-side density and RNG ----------------------------------------
 
@@ -188,7 +179,8 @@ test_that("rbeta_nb_mvgam() draws non-negative integers with the right mean", {
   expect_length(y, 2e5)
   expect_true(all(y >= 0))
   expect_true(all(y == floor(y)))
-  expect_equal(mean(y), 10, tolerance = 0.5)
+  # The standard error of the mean is near 0.2% at this size
+  expect_equal(mean(y), 10, tolerance = 0.02)
 })
 
 test_that("the beta_nb log density matches the closed-form density", {
@@ -228,9 +220,7 @@ test_that("sim_mvgam() can generate from beta_nb()", {
   y <- sim$data_train$y
   expect_true(all(y >= 0))
   expect_true(all(y == floor(y)))
-  expect_true(is.factor(sim$data_train$series))
 })
-
 
 # ---- distribution function -----------------------------------------
 

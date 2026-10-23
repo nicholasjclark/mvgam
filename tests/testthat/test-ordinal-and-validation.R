@@ -217,13 +217,13 @@ test_that("ordinal thresholds that vary by group are refused at build", {
   )
   expect_error(
     stancode(mvgam_formula(y | thres(gr = g) ~ x), data = d,
-             family = cumulative()),
+             family = cumulative(), validate = FALSE),
     "vary by group"
   )
   # A shared threshold count is one set for every observation.
   expect_no_error(
     stancode(mvgam_formula(y | thres(3) ~ x), data = d,
-             family = cumulative())
+             family = cumulative(), validate = FALSE)
   )
 })
 

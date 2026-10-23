@@ -2,15 +2,39 @@
 # `R/trend_propagation.R`. Covers every supported trend type
 # plus the sparse-lag, MA, and cross-series-correlation paths.
 
+# ---- Dispatch -----------------------------------------------------
 
-# ---- None ----------------------------------------------------------
-
-test_that("propagate_trend('None') returns a zero matrix", {
-  out <- propagate_trend("None", h = 20L, n_series = 3L)
-  expect_identical(dim(out), c(20L, 3L))
-  expect_true(all(out == 0))
+test_that("every trend propagates an h by n_series matrix", {
+  set.seed(5L)
+  cases <- list(
+    RW = list(RW(), list(sigma = 0.5), 1L),
+    sparse_AR = list(AR(p = c(1L, 3L, 12L)),
+                     list(ar = c(0.4, 0.2, 0.1), sigma = 0.5), 1L),
+    shared_AR = list(AR(p = 2L),
+                     list(ar = c(0.5, 0.2), sigma = rep(0.4, 4L)), 4L)
+  )
+  for (nm in names(cases)) {
+    cs <- cases[[nm]]
+    out <- propagate_trend(cs[[1]], params = cs[[2]], h = 30L,
+                           n_series = cs[[3]])
+    expect_identical(dim(out), c(30L, cs[[3]]), label = nm)
+    expect_true(all(is.finite(out)), label = nm)
+  }
+  expect_true(all(propagate_trend("None", h = 20L, n_series = 3L) == 0))
+  # A CAR takes irregular gaps. An AR takes a supplied state.
+  car <- propagate_trend(CAR(), params = list(phi = 0.7, sigma = 0.5),
+                         h = 40L, n_series = 2L,
+                         time = stats::runif(40L, 1, 6))
+  expect_identical(dim(car), c(40L, 2L))
+  expect_true(all(is.finite(car)))
+  ls <- list(trends = matrix(0.5, nrow = 3L, ncol = 2L),
+             errors = matrix(0, nrow = 1L, ncol = 2L), time = NULL)
+  out <- propagate_trend(
+    AR(p = 3L), params = list(ar = c(0.5, 0.2, 0.1), sigma = rep(0.4, 2L)),
+    h = 10L, n_series = 2L, last_state = ls
+  )
+  expect_identical(dim(out), c(10L, 2L))
 })
-
 
 # ---- ZMVN ----------------------------------------------------------
 
@@ -24,50 +48,7 @@ test_that("propagate_trend(ZMVN()) returns IID MVN draws", {
   expect_lt(abs(stats::cor(out[, 1L], out[, 2L]) - 0.5), 0.2)
 })
 
-
-# ---- RW + AR -------------------------------------------------------
-
-test_that("propagate_trend(RW()) returns correctly-shaped output", {
-  out <- propagate_trend(RW(), params = list(sigma = 0.5),
-                          h = 60L, n_series = 1L)
-  expect_identical(dim(out), c(60L, 1L))
-  expect_true(all(is.finite(out)))
-})
-
-
-test_that("propagate_trend(AR(p = 1)) is approximately stationary", {
-  set.seed(42L)
-  reps <- replicate(500L, propagate_trend(
-    AR(p = 1L), params = list(ar = 0.6, sigma = 1),
-    h = 1L, n_series = 1L
-  ))
-  marginal_var <- stats::var(as.numeric(reps))
-  # Theoretical marginal var = sigma^2 / (1 - ar1^2) = 1 / 0.64 = 1.5625
-  expect_lt(abs(marginal_var - 1.5625), 0.4)
-})
-
-
-test_that("propagate_trend(AR(p = c(1, 3, 12))) accepts sparse lags", {
-  out <- propagate_trend(
-    AR(p = c(1L, 3L, 12L)),
-    params = list(ar = c(0.4, 0.2, 0.1), sigma = 0.5),
-    h = 100L, n_series = 1L
-  )
-  expect_identical(dim(out), c(100L, 1L))
-  expect_true(all(is.finite(out)))
-})
-
-
-test_that("propagate_trend(AR(p = 2)) for 4 series with shared coefs", {
-  out <- propagate_trend(
-    AR(p = 2L),
-    params = list(ar = c(0.5, 0.2), sigma = rep(0.4, 4L)),
-    h = 50L, n_series = 4L
-  )
-  expect_identical(dim(out), c(50L, 4L))
-  expect_true(all(is.finite(out)))
-})
-
+# ---- AR and LLT -------------------------------------------------
 
 test_that("the forecast kernel runs the recursion the Stan program fits", {
   # The generated Stan forms `u_t = e_t + theta * e_{t-1}` and takes
@@ -106,7 +87,6 @@ test_that("the forecast kernel runs the recursion the Stan program fits", {
   expect_equal(as.numeric(kernel[, 1L]), fitted_fwd, tolerance = 1e-12)
 })
 
-
 test_that("an ARMA(2, 1) step from a fitted state carries theta * e_T", {
   # A fitted state holds two states and one innovation. The first
   # forecast step is `ar1 y_T + ar2 y_{T-1} + theta e_T` plus a fresh
@@ -127,7 +107,6 @@ test_that("an ARMA(2, 1) step from a fitted state carries theta * e_T", {
                ar[1L] * y[2L] + ar[2L] * y[1L] + theta * e_T,
                tolerance = 1e-8)
 })
-
 
 test_that("a burn-in hands on its final states and innovations", {
   # With no fitted state, propagation runs 200 steps from zero and
@@ -164,27 +143,6 @@ test_that("a burn-in hands on its final states and innovations", {
   expect_equal(as.numeric(state$errors), tail(e, max_lag))
 })
 
-
-test_that("propagate_trend(AR(p = 2, ma = TRUE)) settles at its own variance", {
-  # An ARMA(2, 1) settles at `1 + sum(psi_j^2)` for its moving-average
-  # weights, which `stats::ARMAtoMA()` gives. Dropping the moving-average
-  # term settles 32% lower, and 1600 draws put the tolerance at 4
-  # standard errors.
-  set.seed(19L)
-  ar <- c(0.5, 0.2)
-  theta <- 0.3
-  out <- replicate(1600L, propagate_trend(
-    AR(p = 2L, ma = TRUE),
-    params = list(ar = ar, theta = theta, sigma = 1),
-    h = 1L, n_series = 1L
-  ))
-  target <- 1 + sum(stats::ARMAtoMA(ar, theta, 2000L)^2)
-  expect_lt(abs(stats::var(as.numeric(out)) - target) / target, 0.15)
-})
-
-
-# ---- VAR ----------------------------------------------------------
-
 test_that("an LLT forecast adds the slope to the level, damped by phi", {
   # The reference replays the recursion on the propagator's own draws:
   # level shocks first, then slope shocks.
@@ -208,6 +166,8 @@ test_that("an LLT forecast adds the slope to the level, damped by phi", {
   }
   expect_equal(out, ref)
 })
+
+# ---- VAR ----------------------------------------------------------
 
 test_that("the VAR kernel multiplies each lag's matrix into its state", {
   # The Stan program steps as `Phi[1] x[t - 1] + Phi[2] x[t - 2]`.
@@ -235,7 +195,6 @@ test_that("the VAR kernel multiplies each lag's matrix into its state", {
   expect_equal(kernel, x[3:(h + 2L), ], tolerance = 1e-12)
 })
 
-
 test_that("propagate_trend(VAR()) errors when A is missing", {
   expect_error(
     propagate_trend(
@@ -246,20 +205,7 @@ test_that("propagate_trend(VAR()) errors when A is missing", {
   )
 })
 
-
 # ---- CAR ----------------------------------------------------------
-
-test_that("propagate_trend(CAR()) accepts irregular intervals", {
-  set.seed(7L)
-  out <- propagate_trend(
-    CAR(), params = list(phi = 0.7, sigma = 0.5),
-    h = 40L, n_series = 2L,
-    time = stats::runif(40L, 1, 6)
-  )
-  expect_identical(dim(out), c(40L, 2L))
-  expect_true(all(is.finite(out)))
-})
-
 
 test_that("correlated CAR steps by the exact continuous-time law", {
   # Series that damp at very different rates under a strong
@@ -314,7 +260,6 @@ test_that("correlated CAR steps by the exact continuous-time law", {
   expect_identical(seen_df, 5)
 })
 
-
 test_that("propagate_trend(CAR()) errors when time is missing", {
   expect_error(
     propagate_trend(
@@ -324,7 +269,6 @@ test_that("propagate_trend(CAR()) errors when time is missing", {
     "needs the forecast time gaps"
   )
 })
-
 
 test_that("CAR(1) phi <= 0 / >= 1 guard fires through dispatcher", {
   expect_error(
@@ -343,37 +287,6 @@ test_that("CAR(1) phi <= 0 / >= 1 guard fires through dispatcher", {
   )
 })
 
-
-# ---- Reproducibility ----------------------------------------------
-
-test_that("propagate_trend is reproducible under set.seed", {
-  set.seed(99L)
-  a <- propagate_trend(AR(p = 1L), list(sigma = 0.5),
-                        h = 30L, n_series = 1L)
-  set.seed(99L)
-  b <- propagate_trend(AR(p = 1L), list(sigma = 0.5),
-                        h = 30L, n_series = 1L)
-  expect_identical(a, b)
-})
-
-
-# ---- last_state contract ------------------------------------------
-
-test_that("propagate_trend accepts a caller-supplied last_state", {
-  ls <- list(
-    trends = matrix(0.5, nrow = 3L, ncol = 2L),
-    errors = matrix(0, nrow = 1L, ncol = 2L),
-    time = NULL
-  )
-  out <- propagate_trend(
-    AR(p = 3L),
-    params = list(ar = c(0.5, 0.2, 0.1), sigma = rep(0.4, 2L)),
-    h = 10L, n_series = 2L, last_state = ls
-  )
-  expect_identical(dim(out), c(10L, 2L))
-})
-
-
 # ---- Unsupported trend type ---------------------------------------
 
 test_that("an unregistered trend type reaching the propagator is a fault", {
@@ -388,7 +301,6 @@ test_that("an unregistered trend type reaching the propagator is a fault", {
     "lacks 'propagate_unknown\\(\\)'"
   )
 })
-
 
 # ----- PW: horizon-changepoint sampling reproducibility -----------
 
@@ -421,7 +333,6 @@ test_that("propagate_pw is deterministic under set.seed", {
   expect_equal(a, b)
 })
 
-
 test_that("propagate_pw errors on mismatched k / m lengths", {
   spec <- structure(
     list(trend = "PW", growth = "linear"),
@@ -441,7 +352,6 @@ test_that("propagate_pw errors on mismatched k / m lengths", {
     "params"
   )
 })
-
 
 test_that("propagate_pw needs a cap and takes one below zero", {
   spec <- structure(

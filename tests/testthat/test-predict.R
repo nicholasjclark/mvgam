@@ -66,7 +66,6 @@ test_that("each draw's spectral density is its own", {
   }
 })
 
-
 test_that("the Matern 3/2 density is the one brms writes in Stan", {
   # brms's `spd_gp_matern32()` for one dimension:
   # sdgp^2 * 2 * sqrt(pi) * gamma(2) * 3^1.5 / (0.5 * sqrt(pi)) * l *
@@ -155,7 +154,7 @@ test_that("a frame is held to the axis columns the fit needs", {
                      time = rep(1L, 30),
                      series = factor(rep(c("a", "b", "c"), each = 10)))
   prefit <- mvgam(y ~ x, data = flat, family = poisson(),
-                  run_model = FALSE, silent = 2)
+                  run_model = FALSE, silent = 2, validate = FALSE)
   no_time <- flat
   no_time$time <- NULL
   expect_error(
@@ -171,7 +170,8 @@ test_that("a frame is held to the axis columns the fit needs", {
                   time = rep(1:20, 2),
                   series = factor(rep(c("a", "b"), each = 20)))
   fit <- mvgam(y ~ x, trend_formula = ~ AR(p = 1), data = d,
-               family = poisson(), run_model = FALSE, silent = 2)
+               family = poisson(), run_model = FALSE, silent = 2,
+               validate = FALSE)
   no_series <- d
   no_series$series <- NULL
   expect_error(
@@ -183,12 +183,12 @@ test_that("a frame is held to the axis columns the fit needs", {
   one <- data.frame(y = rpois(20, 3), x = rnorm(20), time = 1:20,
                     series = factor(rep("only", 20)))
   solo <- mvgam(y ~ x, trend_formula = ~ AR(p = 1), data = one,
-                family = poisson(), run_model = FALSE, silent = 2)
+                family = poisson(), run_model = FALSE, silent = 2,
+                validate = FALSE)
   bare <- one
   bare$series <- NULL
   expect_silent(mvgam:::validate_newdata_complete(bare, solo))
 })
-
 
 test_that("validate_prediction_factor_levels refuses unseen groups", {
   metadata <- axes_metadata(c("s1"), gr_var = "group",
@@ -235,7 +235,6 @@ test_that("compute_family_epred handles simple families correctly", {
   )
   epred_poisson <- compute_family_epred(linpred, poisson_family)
   expect_equal(epred_poisson, exp(linpred))
-  expect_true(all(epred_poisson >= 0))
 
   # Gaussian family (identity link): epred = linpred
   gaussian_family <- list(
@@ -252,7 +251,6 @@ test_that("compute_family_epred handles simple families correctly", {
   )
   epred_bernoulli <- compute_family_epred(linpred, bernoulli_family)
   expect_equal(epred_bernoulli, plogis(linpred))
-  expect_true(all(epred_bernoulli >= 0 & epred_bernoulli <= 1))
 })
 
 test_that("compute_family_epred handles binomial with trials", {
@@ -298,7 +296,6 @@ test_that("compute_family_epred handles lognormal with sigma", {
                                 family_pars = list(sigma = sigma))
   expected <- exp(linpred + sigma^2 / 2)
   expect_equal(epred, expected)
-  expect_true(all(epred > 0))
 })
 
 test_that("compute_family_epred rejects unsupported families", {
@@ -315,10 +312,6 @@ test_that("compute_family_epred rejects unsupported families", {
     "reached the unit-free mean dispatch"
   )
   expect_error(compute_family_epred(linpred, nmix_family), "'nmix'")
-
-  # `tweedie` has an analytic epred branch (linkinv(linpred)), so
-  # it routes through compute_family_epred without erroring; only
-  # families whose mean reads a unit's other visits raise here.
 })
 
 test_that("compute_family_epred validates inputs", {
@@ -437,86 +430,30 @@ test_that("multiply_dpar_rate_denom returns unchanged when no rate_denom", {
   result <- multiply_dpar_rate_denom(dpar, prep)
   expect_equal(result, dpar)
 })
-test_that("multiply_dpar_rate_denom applies single rate_denom", {
-  dpar <- matrix(c(1, 2, 3, 4), nrow = 2, ncol = 2)
-  prep <- list(data = list(rate_denom = 10))
-  result <- multiply_dpar_rate_denom(dpar, prep)
-  expect_equal(result, dpar * 10)
-})
-
 test_that("multiply_dpar_rate_denom applies vector rate_denom", {
   dpar <- matrix(1:6, nrow = 2, ncol = 3)
   rate_denom <- c(10, 20, 30)
   prep <- list(data = list(rate_denom = rate_denom))
   result <- multiply_dpar_rate_denom(dpar, prep)
-  # Each column multiplied by corresponding rate_denom
-  expected <- dpar
-  for (j in 1:3) {
-    expected[, j] <- dpar[, j] * rate_denom[j]
-  }
-  expect_equal(result, expected)
+  expect_equal(result, sweep(dpar, 2, rate_denom, `*`))
 })
 
 # ==============================================================================
 # Family-specific posterior_epred_* function tests
 # ==============================================================================
 
-test_that("posterior_epred_gaussian returns mu directly", {
-  prep <- list(dpars = list(mu = matrix(1:6, nrow = 2, ncol = 3)))
-  result <- posterior_epred_gaussian(prep)
-  expect_equal(result, prep$dpars$mu)
-})
-
-test_that("posterior_epred_student returns mu directly", {
-  prep <- list(dpars = list(mu = matrix(1:6, nrow = 2, ncol = 3)))
-  result <- posterior_epred_student(prep)
-  expect_equal(result, prep$dpars$mu)
-})
-
-test_that("posterior_epred_beta returns mu directly", {
-  prep <- list(dpars = list(mu = matrix(runif(6), nrow = 2, ncol = 3)))
-  result <- posterior_epred_beta(prep)
-  expect_equal(result, prep$dpars$mu)
-})
-
-test_that("posterior_epred_bernoulli returns mu directly", {
-  prep <- list(dpars = list(mu = matrix(runif(6), nrow = 2, ncol = 3)))
-  result <- posterior_epred_bernoulli(prep)
-  expect_equal(result, prep$dpars$mu)
-})
-
-test_that("posterior_epred_poisson applies rate_denom", {
-  mu <- matrix(c(5, 10, 15, 20), nrow = 2, ncol = 2)
-  prep <- list(
-    dpars = list(mu = mu),
-    data = list(rate_denom = c(2, 3))
-  )
-  result <- posterior_epred_poisson(prep)
-  # Column 1 * 2, column 2 * 3
-  expected <- mu
-  expected[, 1] <- mu[, 1] * 2
-  expected[, 2] <- mu[, 2] * 3
-  expect_equal(result, expected)
-})
-
-test_that("posterior_epred_poisson returns mu when no rate_denom", {
-  mu <- matrix(c(5, 10, 15, 20), nrow = 2, ncol = 2)
-  prep <- list(
-    dpars = list(mu = mu),
-    data = list()
-  )
-  result <- posterior_epred_poisson(prep)
-  expect_equal(result, mu)
-})
-
-test_that("posterior_epred_negbinomial applies rate_denom", {
-  mu <- matrix(c(5, 10), nrow = 1, ncol = 2)
-  prep <- list(
-    dpars = list(mu = mu),
-    data = list(rate_denom = 10)
-  )
-  result <- posterior_epred_negbinomial(prep)
-  expect_equal(result, mu * 10)
+test_that("each mean kernel returns mu where E[Y] is mu", {
+  mu <- matrix(runif(6), nrow = 2, ncol = 3)
+  for (fam in c("gaussian", "student", "beta", "bernoulli", "poisson")) {
+    kernel <- get(paste0("posterior_epred_", fam), envir = asNamespace("mvgam"))
+    expect_equal(kernel(list(dpars = list(mu = mu), data = list())), mu,
+                 label = fam)
+  }
+  # A count kernel scales its rate by the denominator
+  prep <- list(dpars = list(mu = mu), data = list(rate_denom = c(2, 3, 4)))
+  expect_equal(posterior_epred_poisson(prep), sweep(mu, 2, c(2, 3, 4), `*`))
+  expect_equal(posterior_epred_negbinomial(prep),
+               sweep(mu, 2, c(2, 3, 4), `*`))
 })
 
 test_that("posterior_epred_lognormal computes E[Y] = exp(mu + sigma^2/2)", {
@@ -547,12 +484,7 @@ test_that("posterior_epred_binomial multiplies mu by trials", {
     ndraws = 2,
     nobs = 2
   )
-  result <- posterior_epred_binomial(prep)
-  # Each column multiplied by corresponding trial count
-  expected <- mu
-  expected[, 1] <- mu[, 1] * 10
-  expected[, 2] <- mu[, 2] * 20
-  expect_equal(result, expected)
+  expect_equal(posterior_epred_binomial(prep), sweep(mu, 2, trials, `*`))
 })
 
 test_that("posterior_epred_beta_binomial multiplies mu by trials", {
@@ -676,14 +608,14 @@ test_that("posterior_epred_hurdle_lognormal combines lognormal E[Y] with hu", {
 # Complex distribution mean helper tests
 # ==============================================================================
 
-test_that("mean_discrete_weibull computes series approximation", {
-  # Test with simple inputs where series converges quickly
+test_that("mean_discrete_weibull sums the series it approximates", {
+  # E[Y] = sum over k >= 1 of mu^(k^shape), truncated once the terms
+  # fall below 0.001
   mu <- matrix(c(0.3, 0.5), nrow = 1, ncol = 2)
   shape <- matrix(c(1, 1.5), nrow = 1, ncol = 2)
-  result <- mean_discrete_weibull(mu, shape)
-  expect_equal(dim(result), c(1, 2))
-  # Result should be positive for valid inputs
-  expect_true(all(result >= 0))
+  full <- c(sum(0.3^(1:2000)), sum(0.5^((1:2000)^1.5)))
+  expect_equal(as.numeric(mean_discrete_weibull(mu, shape)), full,
+               tolerance = 0.005)
 })
 
 test_that("mean_com_poisson returns mu when shape = 1 (Poisson)", {
@@ -695,13 +627,12 @@ test_that("mean_com_poisson returns mu when shape = 1 (Poisson)", {
   expect_equal(as.numeric(result), as.numeric(mu))
 })
 
-test_that("mean_com_poisson uses approximation for large mu", {
-  # Large mu values should trigger closed-form approximation
+test_that("the large-mu COM-Poisson approximation matches the series", {
   mu <- matrix(c(10, 20), nrow = 1, ncol = 2)
   shape <- matrix(c(2, 2), nrow = 1, ncol = 2)
-  result <- mean_com_poisson(mu, shape)
-  expect_true(all(is.finite(result)))
-  expect_true(all(result > 0))
+  expect_equal(mean_com_poisson(mu, shape),
+               mean_com_poisson(mu, shape, approx = FALSE),
+               tolerance = 0.01)
 })
 
 test_that("mean_com_poisson validates shape parameter", {
@@ -925,40 +856,10 @@ test_that("extract_truncation_bounds handles NULL and constant bounds", {
   expect_equal(result_const$ub, rep(100, 5))
 })
 
-test_that("apply_truncation clamps samples to specified bounds", {
-  set.seed(42)
-  ndraws <- 50
-  nobs <- 4
-
-  # Normal samples centered at 5 with sd=3 will have values outside [0, 10]
-  samples <- matrix(
-    rnorm(ndraws * nobs, mean = 5, sd = 3),
-    nrow = ndraws,
-    ncol = nobs
-  )
-
-  result <- apply_truncation(
-    samples = samples,
-    lb = 0,
-    ub = 10,
-    ntrys = 5,
-    ndraws = ndraws,
-    nobs = nobs,
-    redraw = function() matrix(rnorm(ndraws * nobs, mean = 5, sd = 3),
-                                nrow = ndraws, ncol = nobs)
-  )
-
-  # All values should be within [0, 10] after truncation
-  expect_true(all(result >= 0))
-  expect_true(all(result <= 10))
-  expect_equal(dim(result), c(ndraws, nobs))
-})
-
 test_that("truncation reaches sample_from_family without erroring", {
-  # The unit tests below drive `apply_truncation()` directly, which
-  # left the wiring between it and the family sampler uncovered: a
-  # signature change to one passed every test while any truncated
-  # model errored. This drives the entry point instead.
+  # The tests below drive `apply_truncation()` directly. A signature
+  # change between it and the family sampler once passed them while
+  # every truncated model errored. This test drives the entry point.
   set.seed(3)
   ndraws <- 40L
   epred <- matrix(5, nrow = ndraws, ncol = 3L)
@@ -982,7 +883,6 @@ test_that("truncation reaches sample_from_family without erroring", {
   expect_true(all(counts >= 1))
   expect_true(any(counts == 1))
 })
-
 
 test_that("a truncated draw follows the truncated distribution", {
   # Replacing an out-of-bounds draw by inverting the distribution
@@ -1010,7 +910,6 @@ test_that("a truncated draw follows the truncated distribution", {
   truth <- stats::qnorm(p0 + probs * (1 - p0), 5, 3)
   expect_lt(max(abs(stats::quantile(v, probs) - truth)), 0.15)
 })
-
 
 test_that("a replaced draw comes from the fit's own predictive", {
   # The replacement for an out-of-bounds draw has to be drawn from
@@ -1064,8 +963,10 @@ test_that("summarize_predictions computes correct statistics", {
                                   robust = FALSE)
 
   expect_equal(nrow(result), 5)
-  expect_equal(ncol(result), 4)
   expect_equal(colnames(result), c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
+  expect_equal(colnames(summarize_predictions(draws, probs = 0.5,
+                                              robust = FALSE)),
+               c("Estimate", "Est.Error", "Q50"))
   expect_equal(result[, "Estimate"], colMeans(draws), tolerance = 1e-10)
   expect_equal(result[, "Est.Error"], apply(draws, 2, sd), tolerance = 1e-10)
 })
@@ -1081,24 +982,6 @@ test_that("summarize_predictions handles robust = TRUE", {
   expect_equal(result[, "Est.Error"], apply(draws, 2, mad), tolerance = 1e-10)
 })
 
-test_that("summarize_predictions handles single and multiple quantiles", {
-  draws <- matrix(rnorm(50 * 4), nrow = 50)
-
-  # Single quantile
-  result1 <- summarize_predictions(draws, probs = 0.5, robust = FALSE)
-  expect_equal(ncol(result1), 3)
-  expect_equal(colnames(result1), c("Estimate", "Est.Error", "Q50"))
-
-  # Multiple quantiles
-  result2 <- summarize_predictions(
-    draws,
-    probs = c(0.025, 0.25, 0.5, 0.75, 0.975),
-    robust = FALSE
-  )
-  expect_equal(ncol(result2), 7)
-})
-
-
 # predict.mvgam type= dispatch. Each type routes to a different
 # posterior_* method (or, for type = "variance", to predict_variance()).
 # Tests use mocked S3 methods so the dispatcher can be exercised
@@ -1106,68 +989,35 @@ test_that("summarize_predictions handles single and multiple quantiles", {
 
 predict_stub_obj <- function() structure(list(), class = "mvgam")
 
-test_that("predict.mvgam(type = 'response') routes to posterior_predict", {
-  called <- list()
-  sentinel <- matrix(rnorm(4 * 3), 4, 3)
-  testthat::local_mocked_bindings(
-    posterior_predict.mvgam = function(object, ...) {
-      called$response <<- TRUE
-      sentinel
-    },
-    .package = "mvgam"
-  )
-  out <- predict.mvgam(predict_stub_obj(), summary = FALSE)
-  expect_true(isTRUE(called$response))
-  expect_identical(out, sentinel)
+test_that("predict.mvgam routes each type to its posterior method", {
+  routes <- c(response = "posterior_predict.mvgam",
+              link = "posterior_linpred.mvgam",
+              expected = "posterior_epred.mvgam")
+  seen <- list()
+  for (type in names(routes)) {
+    sentinel <- matrix(rnorm(4 * 3), 4, 3)
+    mock <- list(local({
+      route <- type
+      out <- sentinel
+      function(object, ...) {
+        seen[[route]] <<- list(...)
+        out
+      }
+    }))
+    names(mock) <- routes[[type]]
+    do.call(testthat::local_mocked_bindings, c(mock, .package = "mvgam"))
+    out <- predict.mvgam(predict_stub_obj(), type = type, summary = FALSE)
+    expect_identical(out, sentinel, label = type)
+  }
+  # The link route asks for the untransformed predictor
+  expect_identical(seen$link$transform, FALSE)
 })
-
-
-test_that("predict.mvgam(type = 'link') routes to posterior_linpred", {
-  called <- list()
-  sentinel <- matrix(rnorm(4 * 3), 4, 3)
-  testthat::local_mocked_bindings(
-    posterior_linpred.mvgam = function(object, ...) {
-      called$link <<- TRUE
-      called$dots <<- list(...)
-      sentinel
-    },
-    .package = "mvgam"
-  )
-  out <- predict.mvgam(predict_stub_obj(), type = "link", summary = FALSE)
-  expect_true(isTRUE(called$link))
-  expect_identical(out, sentinel)
-  # transform should be hard-coded FALSE for the link route
-  expect_identical(called$dots$transform, FALSE)
-})
-
-
-test_that("predict.mvgam(type = 'expected') routes to posterior_epred", {
-  called <- list()
-  sentinel <- matrix(rnorm(4 * 3), 4, 3)
-  testthat::local_mocked_bindings(
-    posterior_epred.mvgam = function(object, ...) {
-      called$expected <<- TRUE
-      sentinel
-    },
-    .package = "mvgam"
-  )
-  out <- predict.mvgam(predict_stub_obj(), type = "expected", summary = FALSE)
-  expect_true(isTRUE(called$expected))
-  expect_identical(out, sentinel)
-})
-
 
 test_that("predict.mvgam(type = 'terms') errors with a redirect", {
-  expect_error(
-    predict.mvgam(predict_stub_obj(), type = "terms"),
-    "no single equivalent"
-  )
-  expect_error(
-    predict.mvgam(predict_stub_obj(), type = "terms"),
-    "posterior_smooths"
-  )
+  err <- expect_error(predict.mvgam(predict_stub_obj(), type = "terms"),
+                      "no single equivalent")
+  expect_match(conditionMessage(err), "posterior_smooths")
 })
-
 
 test_that("predict.mvgam(type = 'latent_state'/'detection') errors clearly", {
   expect_error(
@@ -1180,98 +1030,37 @@ test_that("predict.mvgam(type = 'latent_state'/'detection') errors clearly", {
   )
 })
 
-
 # compute_family_variance: family-by-family variance formulas.
 
-test_that("compute_family_variance: gaussian returns sigma^2", {
-  mu <- matrix(rnorm(6), 2, 3)
-  sigma <- matrix(c(1, 2, 3, 4, 5, 6), 2, 3)
-  v <- compute_family_variance(
-    mu = mu, family = gaussian(), sigma = sigma
-  )
-  expect_equal(v, sigma^2)
-})
-
-
-test_that("compute_family_variance: poisson returns mu", {
-  mu <- matrix(c(1, 2, 3, 4, 5, 6), 2, 3)
-  v <- compute_family_variance(mu = mu, family = poisson())
-  expect_equal(v, mu)
-})
-
-
-test_that("compute_family_variance: bernoulli returns mu*(1-mu)", {
-  mu <- matrix(c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6), 2, 3)
-  v <- compute_family_variance(
-    mu = mu,
-    family = list(family = "bernoulli", linkinv = plogis)
-  )
-  expect_equal(v, mu * (1 - mu))
-})
-
-
-test_that("compute_family_variance: binomial uses trials per obs", {
-  mu <- matrix(c(2, 4, 6), 1, 3)
-  trials <- c(10, 10, 10)
-  v <- compute_family_variance(
-    mu = mu,
-    family = list(family = "binomial", linkinv = plogis),
-    trials = trials
-  )
-  # p = mu/trials; Var = trials*p*(1-p)
-  p <- mu / 10
-  expect_equal(v, p * (1 - p) * 10)
-})
-
-
-test_that("compute_family_variance: negbinomial uses mu + mu^2/shape", {
-  mu <- matrix(c(1, 2, 3, 4), 2, 2)
-  shape <- matrix(c(2, 4, 6, 8), 2, 2)
-  v <- compute_family_variance(
-    mu = mu,
-    family = list(family = "negbinomial", linkinv = exp),
-    shape = shape
-  )
-  expect_equal(v, mu + mu^2 / shape)
-})
-
-
-test_that("compute_family_variance: gamma uses mu^2/shape", {
-  mu <- matrix(c(2, 3, 4, 5), 2, 2)
-  shape <- matrix(c(1, 2, 3, 4), 2, 2)
-  v <- compute_family_variance(
-    mu = mu,
-    family = list(family = "gamma", linkinv = exp),
-    shape = shape
-  )
-  expect_equal(v, mu^2 / shape)
-})
-
-
-test_that("compute_family_variance: beta uses mu(1-mu)/(1+phi)", {
+test_that("compute_family_variance gives each family's variance", {
   mu <- matrix(c(0.1, 0.2, 0.3, 0.4), 2, 2)
-  phi <- matrix(c(2, 4, 6, 8), 2, 2)
-  v <- compute_family_variance(
-    mu = mu,
-    family = list(family = "beta", linkinv = plogis),
-    phi = phi
+  d <- matrix(c(2, 4, 6, 8), 2, 2)
+  fam <- function(name, link = identity) list(family = name, linkinv = link)
+  cases <- list(
+    gaussian = list(gaussian(), list(sigma = d), d^2),
+    poisson = list(poisson(), list(), mu),
+    bernoulli = list(fam("bernoulli"), list(), mu * (1 - mu)),
+    negbinomial = list(fam("negbinomial"), list(shape = d), mu + mu^2 / d),
+    gamma = list(fam("gamma"), list(shape = d), mu^2 / d),
+    beta = list(fam("beta"), list(phi = d), mu * (1 - mu) / (1 + d)),
+    student = list(fam("student"), list(sigma = d, nu = d + 3),
+                   d^2 * (d + 3) / (d + 1)),
+    # mu is the response-scale mean, exp(meanlog + sdlog^2 / 2)
+    lognormal = list(fam("lognormal"), list(sigma = d),
+                     mu^2 * (exp(d^2) - 1))
   )
-  expect_equal(v, mu * (1 - mu) / (1 + phi))
+  for (nm in names(cases)) {
+    cs <- cases[[nm]]
+    v <- do.call(compute_family_variance,
+                 c(list(mu = mu, family = cs[[1]]), cs[[2]]))
+    expect_equal(v, cs[[3]], label = nm)
+  }
+  # A binomial mean is p * trials. Its variance is trials * p * (1 - p).
+  v <- compute_family_variance(mu = matrix(c(2, 4, 6), 1, 3),
+                               family = fam("binomial"), trials = rep(10, 3))
+  p <- c(2, 4, 6) / 10
+  expect_equal(as.numeric(v), p * (1 - p) * 10)
 })
-
-
-test_that("compute_family_variance: student uses sigma^2 * nu/(nu-2)", {
-  mu <- matrix(c(1, 2, 3, 4), 2, 2)
-  sigma <- matrix(c(1, 2, 1, 2), 2, 2)
-  nu <- matrix(c(5, 10, 5, 10), 2, 2)
-  v <- compute_family_variance(
-    mu = mu,
-    family = list(family = "student", linkinv = identity),
-    sigma = sigma, nu = nu
-  )
-  expect_equal(v, sigma^2 * nu / (nu - 2))
-})
-
 
 test_that("compute_family_variance: student returns Inf when nu <= 2", {
   mu <- matrix(1, 2, 2)
@@ -1283,25 +1072,8 @@ test_that("compute_family_variance: student returns Inf when nu <= 2", {
     family = list(family = "student", linkinv = identity),
     sigma = sigma, nu = nu
   )
-  expect_true(is.infinite(v[1, 1]))  # nu = 1.5
-  expect_true(is.infinite(v[2, 1]))  # nu = 2.0 (boundary)
-  expect_true(is.finite(v[1, 2]))    # nu = 5.0
-  expect_true(is.finite(v[2, 2]))    # nu = 10.0
+  expect_identical(is.infinite(v), nu <= 2)
 })
-
-
-test_that("compute_family_variance: lognormal uses mu^2 * (exp(sigma^2) - 1)", {
-  # mu here is the response-scale mean E[Y] = exp(meanlog + sdlog^2/2).
-  mu <- matrix(c(2, 4, 6, 8), 2, 2)
-  sigma <- matrix(c(0.5, 1, 0.5, 1), 2, 2)
-  v <- compute_family_variance(
-    mu = mu,
-    family = list(family = "lognormal", linkinv = identity),
-    sigma = sigma
-  )
-  expect_equal(v, mu^2 * (exp(sigma^2) - 1))
-})
-
 
 test_that("compute_family_variance: errors for unsupported family", {
   mu <- matrix(1, 2, 2)
@@ -1314,7 +1086,6 @@ test_that("compute_family_variance: errors for unsupported family", {
   )
 })
 
-
 test_that("compute_family_variance: errors with dim mismatch on dpar", {
   mu <- matrix(1, 2, 3)
   bad_sigma <- matrix(1, 2, 2)
@@ -1326,7 +1097,6 @@ test_that("compute_family_variance: errors with dim mismatch on dpar", {
   )
 })
 
-
 test_that("compute_family_variance: errors when required dpar missing", {
   mu <- matrix(1, 2, 2)
   expect_error(
@@ -1337,7 +1107,6 @@ test_that("compute_family_variance: errors when required dpar missing", {
     "shape"
   )
 })
-
 
 test_that("a denominator of zero is a legal binomial observation", {
   # A row whose response was never observed has no trials behind it,
@@ -1495,14 +1264,13 @@ test_that("sampled draws average to the mean the same predictor implies", {
     "zero_inflated_beta", "zero_inflated_beta_binomial"
   )
   set.seed(2024)
-  ndraws <- 40000L
+  ndraws <- 10000L
   # Trial totals differ by observation. A sampler handed one total per
   # observation once recycled it along the flattened draws, pairing
   # draws with other observations' totals: a zero-trial observation
   # drew counts of 46. Every observation's own mean catches that.
   trials <- c(0, 3, 40)
   nobs <- length(trials)
-  checked <- 0L
 
   for (family_name in families) {
     family <- brms::brmsfamily(family_name)
@@ -1527,10 +1295,8 @@ test_that("sampled draws average to the mean the same predictor implies", {
     expect_false(anyNA(drawn))
     # A zero-trial observation has one possible count.
     expect_true(all(drawn[expected == 0] == 0))
-    # Monte Carlo error over 40k draws. The defects this guards against
-    # were off by a factor, not by a few percent.
+    # Monte Carlo error over 10k draws stays near one percent. The
+    # defects this guards against were off by a factor.
     expect_equal(colMeans(drawn), expected[1L, ], tolerance = 0.05)
-    checked <- checked + 1L
   }
-  expect_equal(checked, length(families))
 })

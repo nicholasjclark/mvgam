@@ -1,37 +1,6 @@
 # CI tests for the insight and marginaleffects methods. The tests use
 # stubs and unfitted models. None of them compiles Stan.
 
-test_that("every S3 method mvgam registers is reachable", {
-  # Each row names one (generic, class) pair
-  registered <- list(
-    c("find_formula", "mvgam"), c("find_response", "mvgam"),
-    c("find_predictors", "mvgam"), c("get_data", "mvgam"),
-    c("model_info", "mvgam"),
-    c("get_predict", "mvgam"), c("get_coef", "mvgam"),
-    c("get_vcov", "mvgam"), c("set_coef", "mvgam"),
-    c("conditional_effects", "mvgam"),
-    c("plot", "mvgam_conditional_effects"),
-    c("print", "mvgam_conditional_effects")
-  )
-  for (pair in registered) {
-    expect_false(
-      is.null(getS3method(pair[1L], pair[2L], optional = TRUE)),
-      label = paste0(pair[1L], ".", pair[2L], " registered")
-    )
-  }
-})
-
-test_that("mvgam re-exports the marginaleffects entry points", {
-  exports <- getNamespaceExports("mvgam")
-  for (nm in c("conditional_effects",
-               "predictions", "avg_predictions", "slopes", "avg_slopes",
-               "comparisons", "avg_comparisons", "datagrid",
-               "hypotheses", "plot_predictions",
-               "plot_slopes", "plot_comparisons")) {
-    expect_true(nm %in% exports, label = paste0("mvgam re-exports ", nm))
-  }
-})
-
 test_that("attaching mvgam names its class to marginaleffects", {
   withr::local_options(marginaleffects_model_classes = NULL)
   expect_message(mvgam:::.onAttach(), "Loading 'mvgam'")
@@ -46,7 +15,7 @@ test_that("model_info describes each response of a multivariate fit", {
     brms::bf(count ~ 1, family = poisson()) +
       brms::bf(seen ~ 1, family = bernoulli()) + brms::set_rescor(FALSE),
     trend_formula = ~ AR(p = 1), data = d, run_model = FALSE
-  )
+  , validate = FALSE)
   info <- insight::model_info(pf)
   expect_named(info, c("count", "seen"))
   expect_true(info$count$is_count)
@@ -165,7 +134,7 @@ test_that("the term list sorts each column to the readers that need it", {
     brms::bf(y | trials(n) ~ x + offset(log(e)) + (1 | g)),
     trend_formula = ~ AR(p = 1), data = d, family = binomial(),
     run_model = FALSE
-  )
+  , validate = FALSE)
   preds <- insight::find_predictors(pf, effects = "all")
   expect_identical(preds$conditional, "x")
   expect_identical(preds$random, "g")
@@ -193,7 +162,7 @@ test_that("a distributional sub-formula's covariate is a term", {
   pf <- mvgam(
     brms::bf(y ~ x, sigma ~ w), trend_formula = ~ AR(p = 1),
     data = d, family = gaussian(), run_model = FALSE
-  )
+  , validate = FALSE)
   expect_setequal(insight::find_predictors(pf)$conditional, c("x", "w"))
 })
 

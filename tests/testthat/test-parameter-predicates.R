@@ -55,7 +55,7 @@ test_that("a trend with no design declares no mu_trend", {
   )
   code_of <- function(trend) {
     stancode(mvgam_formula(y ~ 1, trend_formula = trend), data = dat,
-             family = poisson())
+             family = poisson(), validate = FALSE)
   }
   zero <- list(~ RW(), ~ AR(p = 2), ~ VAR(), ~ -1 + AR(cor = TRUE))
   for (trend in zero) {

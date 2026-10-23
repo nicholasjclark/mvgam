@@ -425,9 +425,8 @@ test_that("one parameter block reads the same way through every method", {
 
 
 test_that("hypothesis reaches every parameter variables lists", {
-  expect_true(all(c("mphi", "b_x") %in% variables(fit)))
-  expect_s3_class(hypothesis(fit, "mphi = 1", class = NULL),
-                  "brmshypothesis")
+  expect_hypothesis_reaches(fit, c("mphi", "b_x"))
+  # The default class takes a coefficient by its covariate
   expect_s3_class(hypothesis(fit, "x = 0"), "brmshypothesis")
 })
 

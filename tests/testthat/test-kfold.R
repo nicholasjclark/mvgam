@@ -44,7 +44,7 @@ test_that("a fold is held out of every response or refused", {
   prefit <- mvgam(
     brms::bf(brms::mvbind(y1, y2) ~ x) + brms::set_rescor(FALSE),
     data = d, family = gaussian(), run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
   masked <- mvgam:::mask_heldout_response(prefit, d, 1:3)
   expect_true(all(is.na(masked$y1[1:3])))
   expect_true(all(is.na(masked$y2[1:3])))

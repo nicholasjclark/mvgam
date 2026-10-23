@@ -866,11 +866,10 @@ test_that("the index columns are not reported as model predictors", {
 
 
 test_that("hypothesis reaches every name variables() lists", {
-  # With `class = NULL`, `hypothesis()` takes a parameter by the name
-  # `variables()` lists
-  ar1 <- grep("^ar1_trend\\[", variables(fit), value = TRUE)[1L]
-  expect_s3_class(hypothesis(fit, paste(ar1, "> 0"), class = NULL),
-                  "brmshypothesis")
+  expect_hypothesis_reaches(
+    fit, grep("^ar1_trend\\[", variables(fit), value = TRUE)[1L]
+  )
+  # The default class takes a coefficient by its covariate
   expect_s3_class(hypothesis(fit, "temp > 0"), "brmshypothesis")
 })
 
@@ -1521,7 +1520,6 @@ test_that("ZMVN accepts the grid CAR needs the gaps of", {
   gaps <- diff(sort(sim$unique_times))
   expect_gt(length(unique(gaps)), 1L)
   fit <- zmvn_fit()
-  expect_s3_class(fit, "mvgam")
   # The occasions the fit kept are the ones the frame supplied, in
   # their own values rather than their ranks.
   expect_identical(

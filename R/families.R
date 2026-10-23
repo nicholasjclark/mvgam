@@ -3136,10 +3136,9 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
       ub    = c(NA, 1)
     ),
     # Poisson-Poisson: p is an encounter rate per individual per
-    # visit, NOT a probability. Log link on both dpars keeps the
-    # rate on the positive real line. Bollen's logit(p) reparam
-    # is rejected because it imposes a Cauchy(0, 1)-tailed prior
-    # on the rate (stats review 2026-06-10).
+    # visit, unbounded above. A log link on both dpars keeps the
+    # rate positive. A logit(p) parameterisation would impose a
+    # Cauchy(0, 1)-tailed prior on the rate.
     poisson_poisson = list(
       name  = "nmix_poisson_poisson",
       links = c("log", "log"),

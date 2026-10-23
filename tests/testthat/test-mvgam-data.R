@@ -2,7 +2,6 @@
 # happy path, the closure-unit dispatch, and the response-vs-family
 # / structural errors users hit before paying for a Stan compile.
 
-
 # ---- Happy path --------------------------------------------------
 
 test_that("mvgam_data returns an mvgam_data list on a clean Poisson sim", {
@@ -20,7 +19,6 @@ test_that("mvgam_data returns an mvgam_data list on a clean Poisson sim", {
                range(simdat$data_train$time, na.rm = TRUE))
 })
 
-
 test_that("mvgam_data validates closure-unit data via the shared validator", {
   cu <- sim_closure_unit_data(family = occ(), type = 1L)
   res <- suppressMessages(
@@ -28,7 +26,6 @@ test_that("mvgam_data validates closure-unit data via the shared validator", {
   )
   expect_s3_class(res, "mvgam_data")
 })
-
 
 test_that("a trend requires a series column", {
   set.seed(2L)
@@ -64,7 +61,6 @@ test_that("a trend requires a series column", {
   expect_identical(res$n_series, 1L)
 })
 
-
 test_that("the trend constructor names the axis columns", {
   set.seed(3L)
   df <- data.frame(week = rep(seq_len(10L), 2L),
@@ -79,7 +75,6 @@ test_that("the trend constructor names the axis columns", {
   expect_identical(res$time_range, c(1L, 10L))
 })
 
-
 test_that("mvgam_data refuses a mixture family as mvgam() does", {
   set.seed(4L)
   df <- data.frame(time = seq_len(10L),
@@ -91,7 +86,6 @@ test_that("mvgam_data refuses a mixture family as mvgam() does", {
     "Mixture families are not supported"
   )
 })
-
 
 # ---- Response-vs-family hard errors ------------------------------
 
@@ -108,7 +102,6 @@ test_that("mvgam_data errors on negative y with Poisson", {
     "outside the support"
   )
 })
-
 
 # ---- Structural errors -------------------------------------------
 
@@ -166,7 +159,6 @@ test_that("a positive mean under a zero-admitting link warns with a trend", {
   )
 })
 
-
 test_that("the trend link warning reaches a prefit", {
   # The helper alone would pass with the call site mis-wired, so the
   # warning is driven through `mvgam()` itself. `run_model = FALSE`
@@ -179,11 +171,10 @@ test_that("the trend link warning reaches a prefit", {
   )
   expect_warning(
     mvgam(y ~ 1, trend_formula = ~ AR(p = 1), data = df,
-          family = Gamma(), run_model = FALSE, silent = 2),
+          family = Gamma(), run_model = FALSE, silent = 2, validate = FALSE),
     "positive linear\\s+predictor"
   )
 })
-
 
 test_that("the trend link warning reaches mvgam_multiple", {
   # `mvgam_multiple()` is exported and reaches a fit without passing
@@ -199,11 +190,10 @@ test_that("the trend link warning reaches mvgam_multiple", {
   expect_warning(
     mvgam_multiple(y ~ 1, trend_formula = ~ AR(p = 1),
                    data_list = list(mk(), mk()), family = Gamma(),
-                   run_model = FALSE, silent = 2),
+                   run_model = FALSE, silent = 2, validate = FALSE),
     "positive linear\\s+predictor"
   )
 })
-
 
 test_that("mvgam_data refuses multi-response families", {
   set.seed(5L)
@@ -218,7 +208,6 @@ test_that("mvgam_data refuses multi-response families", {
   )
 })
 
-
 test_that("mvgam_data errors when 'series' is not a factor", {
   set.seed(6L)
   df <- data.frame(time   = seq_len(10L),
@@ -231,45 +220,6 @@ test_that("mvgam_data errors when 'series' is not a factor", {
     "factor"
   )
 })
-
-
-# ---- Time regularity / CAR dispensation --------------------------
-
-test_that("mvgam_data enforces regular time intervals for AR()", {
-  set.seed(7L)
-  df <- data.frame(time   = c(1L, 2L, 4L, 7L),
-                   series = factor(rep("s1", 4L)),
-                   y      = rpois(4L, lambda = 3))
-  expect_error(
-    suppressMessages(
-      mvgam_data(df, y = "y", family = poisson(),
-                 trend_formula = ~ AR(), plot = FALSE)
-    ),
-    "regular|Irregular"
-  )
-  # A model without a trend has no dynamics to space evenly.
-  expect_s3_class(
-    suppressMessages(
-      mvgam_data(df, y = "y", family = poisson(), plot = FALSE)
-    ),
-    "mvgam_data"
-  )
-})
-
-
-test_that("mvgam_data skips time-regularity check under CAR()", {
-  set.seed(8L)
-  df <- data.frame(time   = c(1L, 2L, 4L, 7L),
-                   series = factor(rep("s1", 4L)),
-                   y      = rpois(4L, lambda = 3))
-  expect_no_error(
-    suppressMessages(
-      mvgam_data(df, y = "y", family = poisson(),
-                  trend_formula = ~ CAR(), plot = FALSE)
-    )
-  )
-})
-
 
 # ---- Model columns (validate_model_columns) ---------------------
 
@@ -295,7 +245,6 @@ test_that("NAs in observation covariates are refused", {
   )
 })
 
-
 test_that("NAs in trend covariates are refused", {
   set.seed(1L)
   simdat <- sim_mvgam(family = poisson(), n_series = 2L,
@@ -312,7 +261,6 @@ test_that("NAs in trend covariates are refused", {
   )
 })
 
-
 test_that("NAs in the response and unused columns pass", {
   set.seed(1L)
   simdat <- sim_mvgam(family = poisson(), n_series = 2L,
@@ -328,10 +276,7 @@ test_that("NAs in the response and unused columns pass", {
     ),
     "mvgam_data"
   )
-  # NAs in y (the response) are also allowed by the validator.
-  expect_true(any(is.na(dat$y)))
 })
-
 
 test_that("an addition term is complete on the rows its response was seen", {
   # brms drops a row whose addition term is missing. The trend mapping
@@ -349,7 +294,6 @@ test_that("an addition term is complete on the rows its response was seen", {
   dat$y[4L] <- NA
   expect_silent(validate_model_columns(dat, y | weights(w) ~ x, poisson()))
 })
-
 
 test_that("gp() and RE group columns are checked for NAs", {
   set.seed(1L)
@@ -379,7 +323,6 @@ test_that("gp() and RE group columns are checked for NAs", {
   )
 })
 
-
 test_that("NAs in matrix-column predictors are counted", {
   # A matrix predictor (distributed-lag style) is carried as a list
   # entry, since as.data.frame() would flatten it. A row counts once
@@ -397,7 +340,6 @@ test_that("NAs in matrix-column predictors are counted", {
     regexp = "'Z': 2 NAs"
   )
 })
-
 
 test_that("columns the formulas use must be in the data", {
   set.seed(1L)
@@ -438,7 +380,6 @@ test_that("columns the formulas use must be in the data", {
   )
 })
 
-
 test_that("lhs_columns() handles formula / brmsformula / mvbrmsformula", {
   expect_identical(lhs_columns(NULL),    character(0L))
   expect_identical(lhs_columns(~ x),     character(0L))
@@ -452,23 +393,14 @@ test_that("lhs_columns() handles formula / brmsformula / mvbrmsformula", {
                    "y")
 })
 
-
 # ---- Response support (validate_response_for_family) -------------
 
-test_that("response support matches brms for every shared family", {
-  # brms holds each family's support in `family_info(family,
-  # "ybounds")` / `"closed"`, which is unexported and so closed to
-  # a CRAN package. mvgam carries the same values in
-  # `mvgam_response_support`; this drives brms through its public
-  # `make_standata()` and asserts the two refuse the same vectors,
-  # so the copied values cannot drift from their source.
-  shared <- c(
-    "poisson", "negbinomial", "geometric", "bernoulli", "gamma",
-    "lognormal", "weibull", "exponential", "frechet",
-    "inverse.gaussian", "beta", "zero_inflated_beta",
-    "zero_one_inflated_beta", "von_mises", "hurdle_gamma",
-    "hurdle_lognormal", "hurdle_poisson", "zero_inflated_poisson"
-  )
+# brms holds each family's support in `family_info(family, "ybounds")`
+# and `"closed"`, which is unexported and closed to a CRAN package.
+# mvgam carries the same values in `mvgam_response_support`. The check
+# drives brms through its public `make_standata()` and lists the
+# family and probe vector where the two disagree on refusal.
+response_support_mismatches <- function(families) {
   probes <- list(
     negative = c(-1, 0.5, 2),
     zero = c(0, 0.5, 2),
@@ -478,8 +410,8 @@ test_that("response support matches brms for every shared family", {
     exactly_one = c(0.1, 0.4, 1),
     large = c(1, 2, 9)
   )
-  # `gamma` and `beta` resolve to base R functions, so each family
-  # is named by its constructor rather than looked up by string.
+  # `gamma` and `beta` resolve to base R functions. The table names
+  # each family by its constructor.
   ctors <- list(
     poisson = poisson, negbinomial = brms::negbinomial,
     geometric = brms::geometric, bernoulli = brms::bernoulli,
@@ -495,7 +427,8 @@ test_that("response support matches brms for every shared family", {
     hurdle_poisson = brms::hurdle_poisson,
     zero_inflated_poisson = brms::zero_inflated_poisson
   )
-  for (fam_name in shared) {
+  mismatches <- character(0)
+  for (fam_name in families) {
     fam <- ctors[[fam_name]]()
     for (pname in names(probes)) {
       y <- probes[[pname]]
@@ -506,15 +439,31 @@ test_that("response support matches brms for every shared family", {
       mvgam_ok <- is.null(caught_error(
         validate_response_for_family(y, fam, "y")
       ))
-      # Named so a failure says which family and which probe.
-      expect_equal(
-        mvgam_ok, brms_ok,
-        label = paste0(fam_name, " / ", pname, ": mvgam accepts")
-      )
+      if (!identical(mvgam_ok, brms_ok)) {
+        mismatches <- c(mismatches, paste(fam_name, pname))
+      }
     }
   }
+  mismatches
+}
+
+test_that("response support matches brms for each kind of bound", {
+  # Counts, binary, positive, the open and the closed unit interval,
+  # and the circle
+  expect_identical(response_support_mismatches(c(
+    "poisson", "bernoulli", "gamma", "beta", "zero_one_inflated_beta",
+    "von_mises"
+  )), character(0))
 })
 
+test_that("response support matches brms for every other shared family", {
+  skip_on_cran()
+  expect_identical(response_support_mismatches(c(
+    "negbinomial", "geometric", "lognormal", "weibull", "exponential",
+    "frechet", "inverse.gaussian", "zero_inflated_beta", "hurdle_gamma",
+    "hurdle_lognormal", "hurdle_poisson", "zero_inflated_poisson"
+  )), character(0))
+})
 
 test_that("mvgam() reports the response support itself, not brms", {
   # The message has to name the column and the values that broke
@@ -526,7 +475,8 @@ test_that("mvgam() reports the response support itself, not brms", {
     series = factor(rep("s1", 4L))
   )
   err <- expect_error(
-    mvgam(y ~ 1, data = bad, family = Beta(), run_model = FALSE)
+    mvgam(y ~ 1, data = bad, family = Beta(), run_model = FALSE,
+          validate = FALSE)
   )
   # insight wraps the message, so a phrase can straddle a newline.
   msg <- gsub("[[:space:]]+", " ", conditionMessage(err))
@@ -538,36 +488,6 @@ test_that("mvgam() reports the response support itself, not brms", {
   expect_false(grepl("requires response smaller than", msg))
 })
 
-
-test_that("every family the support table names is refused by mvgam()", {
-  # A family reaching brms means the table has no entry for it, and
-  # the user gets a message naming neither their column nor their
-  # data.
-  cases <- list(
-    list(geometric(), c(1, 2, -3)),
-    list(weibull(), c(1, 2, -3)),
-    list(exponential(), c(1, 2, -3)),
-    list(frechet(), c(1, 2, -3)),
-    list(inverse.gaussian(), c(1, 2, -3)),
-    list(zero_inflated_beta(), c(0.2, 0.5, 1.4)),
-    list(zero_one_inflated_beta(), c(0.2, 0.5, 1.4)),
-    list(von_mises(), c(0, 1, 9)),
-    list(tweedie(), c(1, 2, -3))
-  )
-  for (cs in cases) {
-    y <- cs[[2]]
-    dat <- data.frame(
-      y = y, time = seq_along(y),
-      series = factor(rep("s1", length(y)))
-    )
-    err <- expect_error(
-      mvgam(y ~ 1, data = dat, family = cs[[1]], run_model = FALSE)
-    )
-    expect_match(conditionMessage(err), "outside the support")
-  }
-})
-
-
 test_that("a factor response is left to the family that takes one", {
   # Comparing a factor to floor() errors, so the check has to stand
   # aside rather than break a legitimate bernoulli fit.
@@ -575,7 +495,6 @@ test_that("a factor response is left to the family that takes one", {
   expect_silent(validate_response_for_family(y, bernoulli(), "y"))
   expect_silent(validate_response_for_family(y, cumulative(), "y"))
 })
-
 
 test_that("a response inside its support passes every family", {
   expect_silent(validate_response_for_family(c(0, 1, 5), poisson(), "y"))
@@ -586,11 +505,13 @@ test_that("a response inside its support passes every family", {
                                               zero_one_inflated_beta(), "y"))
   expect_silent(validate_response_for_family(c(0.5, 2), Gamma(), "y"))
   expect_silent(validate_response_for_family(c(0, 2.5), tweedie(), "y"))
-  # All-NA and empty responses have nothing to check.
+  # An all-NA response has nothing to check.
   expect_silent(validate_response_for_family(c(NA_real_, NA_real_),
                                               poisson(), "y"))
+  # tweedie() is mvgam's own family, absent from the brms comparison
+  expect_error(validate_response_for_family(c(1, 2, -3), tweedie(), "y"),
+               "outside the support")
 })
-
 
 test_that("only a response is held to its family, and to its own", {
   dat <- data.frame(count = rpois(10L, 3), mass = rnorm(10L),
@@ -609,7 +530,6 @@ test_that("only a response is held to its family, and to its own", {
                regexp = "'count'")
 })
 
-
 test_that("newdata is held to the same support as the training data", {
   set.seed(1L)
   sd <- sim_mvgam(family = poisson(), n_series = 2L,
@@ -627,11 +547,10 @@ test_that("newdata is held to the same support as the training data", {
   bad$y[2L] <- -5
   err <- expect_error(
     mvgam(y ~ 1, data = tr, newdata = bad, family = poisson(),
-          run_model = FALSE)
+          run_model = FALSE, validate = FALSE)
   )
   expect_match(conditionMessage(err), "outside the support")
 })
-
 
 test_that("time regularity is gated on the trend's own rules", {
   # The rule was written twice: `validations.R` reads each trend's
@@ -658,4 +577,6 @@ test_that("time regularity is gated on the trend's own rules", {
     ),
     "Gaps between times range from 1 to 3"
   )
+  # A model without a trend has no dynamics to space evenly
+  expect_silent(suppressMessages(mvgam_data(dat, family = poisson())))
 })

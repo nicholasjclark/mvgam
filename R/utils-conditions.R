@@ -48,3 +48,23 @@ inform_once <- function(message, id) {
                 .frequency_id = id)
   invisible(NULL)
 }
+
+
+#' Evaluate a PSIS call whose caller acts on the Pareto k values
+#'
+#' `loo` warns when a Pareto k is high or the tail holds too few draws
+#' to fit. `lfo_cv()` and `kfold()` refit wherever k crosses their
+#' threshold, which makes both warnings the decision itself. Every other
+#' warning reaches the user.
+#'
+#' @param expr A call to `loo::psis()` or `loo::loo()`
+#' @return The value of `expr`
+#' @noRd
+with_pareto_k_handled <- function(expr) {
+  withCallingHandlers(expr, warning = function(w) {
+    if (grepl("Pareto k diagnostic|Not enough tail samples",
+              conditionMessage(w))) {
+      invokeRestart("muffleWarning")
+    }
+  })
+}

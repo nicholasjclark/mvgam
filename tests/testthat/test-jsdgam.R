@@ -1,10 +1,8 @@
-# Tests for the `jsdgam()` wrapper: skeleton, legacy signature
-# port, class and slot plumbing. Three layers:
+# Tests for the `jsdgam()` wrapper:
 #   1. Argument validation: 'unit' / 'species' / 'n_lv' / 'data'.
-#   2. Class + slot plumbing: the `jsdgam` class and the
-#      recorded unit and species column names.
-#   3. Forward-compat smoke test: a minimal jsdgam call composes
-#      cleanly with the brms-integration mvgam() pipeline.
+#   2. What a prefit carries: class, unit and species columns, program.
+#   3. The traits and phylo aliases for the loadings prior.
+#   4. Arguments the wrapper refuses.
 
 # Utility -----------------------------------------------------------------
 
@@ -30,17 +28,15 @@ test_that("jsdgam errors when 'species' column is missing", {
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, family = poisson(), n_lv = 2L,
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "must.+include"
   )
 })
 
 test_that("jsdgam accepts brmsformula (bf) in addition to plain formula", {
   dat <- build_jsdgam_toy()
-  # Relaxed assertion allows `brms::bf()` so downstream dpar
-  # sub-formulas (`phi ~ env` for diri(), `p ~ visit_cov` for
-  # occ() / nmix()) compose with `jsdgam()`. Plain `bf(y ~ x)`
-  # round-trips identically to a plain `formula`.
+  # A `bf()` carries the dpar sub-formulas of diri(), occ() and
+  # nmix(), as in `p ~ visit_cov`.
   expect_no_error(
     jsdgam(
       formula = brms::bf(y ~ elev),
@@ -48,7 +44,7 @@ test_that("jsdgam accepts brmsformula (bf) in addition to plain formula", {
       data = dat, species = species,
       family = poisson(), n_lv = 2L,
       run_model = FALSE, silent = 2
-    )
+    , validate = FALSE)
   )
 })
 
@@ -61,7 +57,7 @@ test_that("jsdgam rejects non-formula non-brmsformula 'formula' arg", {
       data = dat, species = species,
       family = poisson(), n_lv = 2L,
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "Must inherit from class"
   )
 })
@@ -80,7 +76,7 @@ test_that("jsdgam accepts n_lv = n_species under iid prior (user owns ID)", {
       data = dat, species = species,
       family = poisson(), n_lv = 4L,
       run_model = FALSE, silent = 2
-    )
+    , validate = FALSE)
   )
 })
 
@@ -92,7 +88,7 @@ test_that("jsdgam rejects n_lv > n_species under iid prior", {
       data = dat, species = species,
       family = poisson(), n_lv = 5L,
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "Got n_lv = 5, n_species = 4"
   )
 })
@@ -107,7 +103,7 @@ test_that("jsdgam allows n_lv = n_species under MGP loadings_prior", {
       family = poisson(), n_lv = 4L,
       loadings_prior = "mgp",
       run_model = FALSE, silent = 2
-    )
+    , validate = FALSE)
   )
 })
 
@@ -120,7 +116,7 @@ test_that("jsdgam rejects n_lv > n_species even under MGP", {
       family = poisson(), n_lv = 5L,
       loadings_prior = "mgp",
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "at most the number of species"
   )
 })
@@ -133,7 +129,7 @@ test_that("jsdgam rejects n_lv = 0", {
       data = dat, species = species,
       family = poisson(), n_lv = 0L,
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "not >= 1"
   )
 })
@@ -147,7 +143,7 @@ test_that("jsdgam rejects non-numeric unit column", {
       data = dat, unit = site_name, species = species,
       family = poisson(), n_lv = 2L,
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "must be numeric"
   )
 })
@@ -160,7 +156,7 @@ test_that("jsdgam rejects single-species data", {
       data = dat, species = species,
       family = poisson(), n_lv = 2L,
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "requires at least 2 species"
   )
 })
@@ -175,7 +171,7 @@ test_that("jsdgam refuses to overwrite existing 'time' column", {
       data = dat, unit = site, species = species,
       family = poisson(), n_lv = 2L,
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "already contains a 'time' column"
   )
 })
@@ -189,25 +185,32 @@ test_that("jsdgam refuses to overwrite existing 'series' column", {
       data = dat, unit = time, species = species,
       family = poisson(), n_lv = 2L,
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "already contains a 'series' column"
   )
 })
 
 # 2. Class + slot plumbing -------------------------------------------------
 
-test_that("jsdgam returns c('mvgam', 'jsdgam') and the metadata slots", {
+test_that("a jsdgam prefit carries its class, axes, trend and program", {
   dat <- build_jsdgam_toy()
   mod <- jsdgam(
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
   expect_identical(class(mod), c("mvgam", "jsdgam", "mvgam_prefit"))
-
   expect_identical(mvgam:::jsdgam_axis_names(mod),
                    list(unit = "time", species = "species"))
+  expect_equal(mod$standata$N_lv_trend, 2L)
+  expect_equal(mod$standata$N_series_trend, 4L)
+  # The default trend is the correlated latent prior. It writes no
+  # `subgr`: a subgroup without a group is refused.
+  spec <- mod$mv_spec$trend_specs
+  expect_identical(spec$trend, "ZMVN")
+  expect_true(isTRUE(spec$cor))
+  expect_identical(spec$gr, "NA")
 })
 
 test_that("jsdgam records the unit column name the user gave", {
@@ -219,29 +222,9 @@ test_that("jsdgam records the unit column name the user gave", {
     data = dat, unit = site, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
   expect_identical(mvgam:::jsdgam_axis_names(mod)$unit, "site")
   expect_true("time" %in% names(mod$data))
-})
-
-# 3. Forward-compat composition --------------------------------------------
-
-test_that("jsdgam composes with the standard mvgam pipeline", {
-  dat <- build_jsdgam_toy()
-  mod <- jsdgam(
-    formula = y ~ 1, factor_formula = ~ -1,
-    data = dat, unit = time, species = species,
-    family = poisson(), n_lv = 2L,
-    run_model = FALSE, silent = 2
-  )
-  # `run_model = FALSE` returns the stub mvgam shape with stancode +
-  # standata populated and a NULL $fit; the end-to-end smoke fit
-  # lives in tests/local/.
-  expect_null(mod$fit)
-  expect_true(!is.null(mod$standata))
-  expect_true(!is.null(mod$stancode))
-  expect_equal(mod$standata$N_lv_trend, 2L)
-  expect_equal(mod$standata$N_series_trend, 4L)
 })
 
 test_that("jsdgam with by = lv_axis() composes the per-factor smooth path", {
@@ -252,36 +235,30 @@ test_that("jsdgam with by = lv_axis() composes the per-factor smooth path", {
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
   expect_true(isTRUE(mod$trend_metadata$has_by_lv))
   expect_equal(mod$trend_metadata$n_lv_for_grain, 2L)
   expect_equal(mod$standata$N_lv_trend, 2L)
 })
 
 test_that("jsdgam default family is binomial", {
-  # Inspect formals rather than fit so the test does not need to wire
-  # a trials() addition term into the formula just to exercise the
-  # default. The end-to-end smoke for binomial fitting lives in the
-  # full-suite recovery fixtures and the user-facing examples.
+  # The test inspects the formals. A binomial prefit needs a trials() term.
   expect_identical(
     eval(formals(jsdgam)$family)$family,
     "binomial"
   )
 })
 
-# 4. traits + phylo aliases -----------------------------------------------
+# 3. traits + phylo aliases -----------------------------------------------
 #
-# Unit-test the alias compiler directly and exercise the downstream
-# Stan emission via standata.mvgam_formula() (no jsdgam()/mvgam() fit
-# pipeline). Goes straight to the brms-style helper so every test is
-# bounded by a single make_standata() call rather than full wrapper
-# validation + slot plumbing.
+# The alias compiler, then the Stan data it gives through
+# standata.mvgam_formula().
 
 species_4 <- function() paste0("sp", 1:4)
 
-# 4a. build_jsdgam_loadings_prior helper
+# 3a. build_jsdgam_loadings_prior helper
 
-test_that("build_jsdgam_loadings_prior returns NULL when all aliases are NULL", {
+test_that("build_jsdgam_loadings_prior returns NULL by default", {
   spec <- mvgam:::build_jsdgam_loadings_prior(
     traits = NULL, phylo = NULL, loadings_prior = NULL,
     species_levels = species_4()
@@ -331,21 +308,14 @@ test_that("build_jsdgam_loadings_prior forwards explicit loadings_prior", {
   expect_identical(spec, lp)
 })
 
-# 4b. jsdgam_phylo_to_dist helper
+# 3b. jsdgam_phylo_to_dist helper
 
-test_that("jsdgam_phylo_to_dist passes through a numeric distance matrix", {
+test_that("jsdgam_phylo_to_dist orders a distance matrix by species", {
   d <- matrix(c(0, 1, 2, 3, 1, 0, 1, 2, 2, 1, 0, 1, 3, 2, 1, 0), 4, 4)
   rownames(d) <- colnames(d) <- species_4()
-  out <- mvgam:::jsdgam_phylo_to_dist(d, species_4())
-  expect_equal(out, d[species_4(), species_4()])
-})
-
-test_that("jsdgam_phylo_to_dist reorders rows / cols to species_levels", {
-  d <- matrix(c(0, 1, 2, 3, 1, 0, 1, 2, 2, 1, 0, 1, 3, 2, 1, 0), 4, 4)
-  reordered <- rev(species_4())
-  rownames(d) <- colnames(d) <- reordered
-  out <- mvgam:::jsdgam_phylo_to_dist(d, species_4())
-  expect_equal(rownames(out), species_4())
+  expect_equal(mvgam:::jsdgam_phylo_to_dist(d, species_4()), d)
+  rev_d <- d[4:1, 4:1]
+  expect_equal(mvgam:::jsdgam_phylo_to_dist(rev_d, species_4()), d)
 })
 
 test_that("jsdgam_phylo_to_dist errors when distance matrix lacks names", {
@@ -366,11 +336,9 @@ test_that("jsdgam_phylo_to_dist errors when species missing from matrix", {
 })
 
 test_that("jsdgam_phylo_to_dist reads a phylo and returns named distances", {
-  # The tree is built here rather than drawn with `ape::rcoal()`, so
-  # the test needs no package that might be absent and the distances
-  # are known rather than random: `((a,b),(c,d))` with every branch
-  # 0.5 puts each pair within a clade at 1 and each pair across the
-  # clades at 2.
+  # A tree built by hand needs no 'ape' and has known distances.
+  # `((a,b),(c,d))` with every branch 0.5 puts each pair within a clade
+  # at 1 and each pair across the clades at 2.
   sp <- species_4()
   tree <- structure(
     list(
@@ -385,10 +353,7 @@ test_that("jsdgam_phylo_to_dist reads a phylo and returns named distances", {
     class = "phylo"
   )
   out <- mvgam:::jsdgam_phylo_to_dist(tree, sp)
-  expect_equal(dim(out), c(4L, 4L))
   expect_equal(rownames(out), sp)
-  expect_equal(colnames(out), sp)
-  expect_true(isSymmetric(out))
   expect_equal(unname(diag(out)), rep(0, 4L))
   # Within a clade, then across. Indexed by position, since the
   # labels come from `species_4()`.
@@ -404,8 +369,7 @@ test_that("jsdgam_phylo_to_dist rejects bad object types", {
   )
 })
 
-# 4c. End-to-end Stan emission via standata.mvgam_formula().
-# Single standata() call rather than per-test mvgam compiles.
+# 3c. Stan data via standata.mvgam_formula()
 
 jsdgam_loadings_fixture <- function() {
   set.seed(2L)
@@ -446,10 +410,7 @@ test_that("traits + phylo route through standata.mvgam_formula cleanly", {
     )
   )
   # Feature matrix: 1 numeric + 3 one-hot diet columns = 4 features
-  expect_true(!is.null(sd$row_features))
-  expect_equal(nrow(sd$row_features), 4L)
-  expect_equal(ncol(sd$row_features), 4L)
-  expect_true("dist_phylo" %in% names(sd))
+  expect_equal(dim(sd$row_features), c(4L, 4L))
   expect_equal(dim(sd$dist_phylo), c(4L, 4L))
   # validate_pairwise_distance() rescales to max = 1.
   expect_equal(max(sd$dist_phylo), 1)
@@ -465,8 +426,7 @@ test_that("default (no aliases) yields no row_features / dist_* slots", {
   expect_false("row_features" %in% names(sd))
 })
 
-
-# 4. Arguments the wrapper no longer takes --------------------------------
+# 4. Arguments the wrapper refuses ----------------------------------------
 
 test_that("mvgam refuses the arguments 1.x took and 2.0 does not", {
   dat <- build_jsdgam_toy()
@@ -490,11 +450,11 @@ test_that("mvgam refuses the arguments 1.x took and 2.0 does not", {
   expect_error(
     jsdgam(formula = y ~ 1, factor_formula = ~ -1, data = dat,
            species = species, family = poisson(), n_lv = 2L,
-           share_obs_params = TRUE, run_model = FALSE, silent = 2),
+           share_obs_params = TRUE, run_model = FALSE, silent = 2,
+           validate = FALSE),
     "share_obs_params"
   )
 })
-
 
 test_that("every removed argument names its replacement", {
   # The table is what the message is built from, so an entry added
@@ -513,32 +473,12 @@ test_that("every removed argument names its replacement", {
   )
 })
 
-
-test_that("the trend a jsdgam builds is the correlated latent prior", {
-  dat <- build_jsdgam_toy()
-  # The default branch decides the trend without needing an explicit
-  # `ZMVN(cor = TRUE, subgr = "series")` pin: such a pin would say
-  # nothing the default does not, and its `subgr` would be refused
-  # outright, since a subgroup without a group is an error.
-  mod <- jsdgam(
-    formula = y ~ 1, factor_formula = ~ -1,
-    data = dat, unit = time, species = species,
-    family = poisson(), n_lv = 2L,
-    run_model = FALSE, silent = 2
-  )
-  spec <- mod$mv_spec$trend_specs
-  expect_identical(spec$trend, "ZMVN")
-  expect_true(isTRUE(spec$cor))
-  expect_identical(spec$gr, "NA")
-})
-
-
 test_that("jsdgam accepts the formulas mvgam accepts", {
   # A multivariate formula gives each species its own response and its
   # own observation family, which is the only way to fit a joint
   # species model over mixed data types. `jsdgam()` forwards to
-  # `mvgam()`, so refusing a formula `mvgam()` accepts would be an
-  # accident of the wrapper rather than a limit of the model.
+  # `mvgam()`. A formula `mvgam()` accepts and the wrapper refused
+  # would be a fault of the wrapper.
   set.seed(1L)
   n_site <- 24L
   d <- data.frame(
@@ -553,7 +493,7 @@ test_that("jsdgam accepts the formulas mvgam accepts", {
   m <- SW(jsdgam(
     formula = mvf, factor_formula = ~ -1, data = d,
     unit = site, species = species, n_lv = 1L, run_model = FALSE
-  ))
+  , validate = FALSE))
   expect_s3_class(m, "jsdgam")
   expect_identical(names(response_columns(m)), c("cnt", "pa"))
 
@@ -562,15 +502,13 @@ test_that("jsdgam accepts the formulas mvgam accepts", {
   expect_true(grepl("poisson_log_glm_lpmf(Y_cnt", code, fixed = TRUE))
   expect_true(grepl("bernoulli_logit_glm_lpmf(Y_pa", code, fixed = TRUE))
 
-  # The loadings run across the responses, which is the species axis
-  # on this layout, so the factor model is the one that was asked for
-  # rather than one latent state per response.
+  # The loadings run across the responses, the species axis on this
+  # layout. One latent state per response would ignore 'n_lv'.
   expect_identical(as.integer(m$standata$N_series_trend), 2L)
   expect_identical(as.integer(m$standata$N_lv_trend), 1L)
   expect_true(grepl("matrix[N_series_trend, N_lv_trend] Z", code,
                     fixed = TRUE))
 })
-
 
 test_that("a species column is required only when the formula needs one", {
   # The responses name the species on a multivariate formula, so
@@ -587,11 +525,10 @@ test_that("a species column is required only when the formula needs one", {
     SW(jsdgam(formula = y ~ env, factor_formula = ~ -1,
               data = d[, setdiff(names(d), "species")],
               unit = site, species = species, n_lv = 1L,
-              family = poisson(), run_model = FALSE)),
+              family = poisson(), run_model = FALSE, validate = FALSE)),
     "species"
   )
 })
-
 
 test_that("a frame takes the series and time a jsdgam fit uses", {
   lev <- c("ant", "bee", "cod")

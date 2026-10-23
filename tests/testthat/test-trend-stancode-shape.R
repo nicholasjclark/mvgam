@@ -52,22 +52,15 @@ test_that("AR(p = 1) declares ar1_trend only", {
   expect_false(stan_has(code, "ar3_trend"))
 })
 
-test_that("AR(p = 2) declares ar1_trend AND ar2_trend", {
-  code <- get_trend_stancode(~ AR(p = 2))
-  expect_true(stan_has(code, "[N_lv_trend] ar1_trend;"))
-  expect_true(stan_has(code, "[N_lv_trend] ar2_trend;"))
-  expect_false(stan_has(code, "ar3_trend"))
-  # Each coefficient multiplies the state at its own lag
-  expect_true(stan_has(code, "ar1_trend[j] * lv_trend[i - 1, j]"))
-  expect_true(stan_has(code, "ar2_trend[j] * lv_trend[i - 2, j]"))
-})
-
 test_that("AR(p = 3) declares ar1_trend, ar2_trend, ar3_trend", {
   code <- get_trend_stancode(~ AR(p = 3))
-  expect_true(stan_has(code, "[N_lv_trend] ar1_trend;"))
-  expect_true(stan_has(code, "[N_lv_trend] ar2_trend;"))
-  expect_true(stan_has(code, "[N_lv_trend] ar3_trend;"))
-  expect_true(stan_has(code, "ar3_trend[j] * lv_trend[i - 3, j]"))
+  # Each coefficient multiplies the state at its own lag
+  for (lag in 1:3) {
+    expect_true(stan_has(code, paste0("[N_lv_trend] ar", lag, "_trend;")))
+    expect_true(stan_has(
+      code, paste0("ar", lag, "_trend[j] * lv_trend[i - ", lag, ", j]")
+    ))
+  }
 })
 
 
@@ -84,23 +77,9 @@ test_that("AR(p = c(2, 4)) declares ar2_trend and ar4_trend only", {
 })
 
 
-# ----- VAR stationary start ---------------------------------------
-
-test_that("a VAR takes its start covariance from its autocovariances", {
-  # The Lyapunov solve has side (p m)^2 at every gradient. The map
-  # that gives the coefficients also gives the autocovariances. Only
-  # a VARMA, whose MA term changes the autocovariances, needs the solve.
-  code <- get_trend_stancode(~ VAR(p = 2))
-  expect_true(stan_has(
-    code, "Omega_trend = var_stationary_joint(result_var[2]);"
-  ))
-  expect_false(stan_has(code, "varma_autocov("))
-})
-
-
 # ----- VAR scalar p (intended: CONSECUTIVE lags 1..p) ------------
 
-test_that("VAR(p = 2) declares a matrix for each of lags 1 and 2", {
+test_that("VAR(p = 2) declares two lag matrices and a stationary start", {
   code <- get_trend_stancode(~ VAR(p = 2))
   expect_true(stan_has(
     code, "array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] A_trend"
@@ -108,6 +87,13 @@ test_that("VAR(p = 2) declares a matrix for each of lags 1 and 2", {
   sd <- standata(mvgam_formula(y ~ x, trend_formula = ~ VAR(p = 2)),
                  data = build_test_data(), family = poisson())
   expect_identical(as.integer(sd$N_lags_trend), 2L)
+  # The Lyapunov solve has side (p m)^2 at every gradient. The map
+  # that gives the coefficients also gives the autocovariances. Only
+  # a VARMA, whose MA term changes the autocovariances, needs the solve.
+  expect_true(stan_has(
+    code, "Omega_trend = var_stationary_joint(result_var[2]);"
+  ))
+  expect_false(stan_has(code, "varma_autocov("))
 })
 
 
@@ -134,107 +120,58 @@ tdf_data <- function() {
   d
 }
 
+# Each program is built and checked by stanc once
+tdf_cache <- new.env(parent = emptyenv())
 tdf_code <- function(tf) {
-  paste(unlist(stancode(
-    mvgam_formula(y ~ 1, trend_formula = tf), data = tdf_data(),
-    family = poisson(), backend = "cmdstanr"
-  )), collapse = "\n")
+  key <- deparse1(tf)
+  if (is.null(tdf_cache[[key]])) {
+    tdf_cache[[key]] <- paste(unlist(stancode(
+      mvgam_formula(y ~ 1, trend_formula = tf), data = tdf_data(),
+      family = poisson(), backend = "cmdstanr"
+    )), collapse = "\n")
+  }
+  tdf_cache[[key]]
 }
 
-test_that("is_gaussian_df() treats Inf and NULL as Gaussian", {
-  # A t with infinite degrees of freedom is a normal. Inf spells the
-  # default exactly.
-  expect_true(mvgam:::is_gaussian_df(Inf))
-  expect_true(mvgam:::is_gaussian_df(NULL))
-  expect_false(mvgam:::is_gaussian_df(NA))
-  expect_false(mvgam:::is_gaussian_df(5))
-})
-
-test_that("innovation_sampling_code() emits normal or multivariate t", {
-  expect_identical(
-    mvgam:::innovation_sampling_code("N_lv_trend", Inf),
-    "to_vector(innovations_trend) ~ std_normal();"
-  )
-  est <- paste(mvgam:::innovation_sampling_code("N_lv_trend", NA),
-               collapse = "\n")
-  expect_true(grepl("multi_student_t_cholesky(nu_trend,", est, fixed = TRUE))
-  fixed <- paste(mvgam:::innovation_sampling_code("N_lv_trend", 7),
-                 collapse = "\n")
-  expect_true(grepl("multi_student_t_cholesky(7,", fixed, fixed = TRUE))
-  # The correlation transform stays in transformed parameters. A
-  # linear map of a multivariate t is a multivariate t with the mapped
-  # scale matrix, which makes the identity scale here exact.
-  expect_true(grepl("identity_matrix(", est, fixed = TRUE))
-})
-
-test_that("nu_trend is declared and given a prior only when estimated", {
-  expect_null(mvgam:::nu_trend_stanvars(Inf))
-  expect_null(mvgam:::nu_trend_stanvars(7))
-  sv <- mvgam:::nu_trend_stanvars(NA)
-  blocks <- vapply(sv, function(x) x$block, character(1))
-  expect_setequal(blocks, c("parameters", "model"))
-})
+nu_monitored <- function(tf) {
+  spec <- mvgam:::parse_trend_formula(tf)$trend_model
+  "nu_trend" %in% mvgam:::generate_monitor_params(spec)
+}
 
 test_that("df = Inf leaves the generated Stan code unchanged", {
   # The default must be byte-identical to the Gaussian model, otherwise
   # every existing fit changes.
-  expect_identical(tdf_code(~ AR(p = 1)), tdf_code(~ AR(p = 1, df = Inf)))
+  gauss <- tdf_code(~ AR(p = 1))
+  expect_identical(gauss, tdf_code(~ AR(p = 1, df = Inf)))
   expect_true(grepl(
     stan_prior_line("to_vector(innovations_trend)", "std_normal()"),
-    tdf_code(~ AR(p = 1)), fixed = TRUE
+    gauss, fixed = TRUE
   ))
-  expect_false(grepl("nu_trend", tdf_code(~ AR(p = 1)), fixed = TRUE))
+  expect_false(grepl("nu_trend", gauss, fixed = TRUE))
+  expect_false(nu_monitored(~ AR(p = 1)))
 })
 
 test_that("df is honoured across every trend type that has innovations", {
+  # get_prior() takes the monitor list and stancode() the stanvar
+  # generator. Both have to name `nu_trend`, under the registry default.
+  default <- mvgam:::common_trend_priors$nu_trend$default
   for (tf in list(~ AR(p = 1, df = NA), ~ RW(df = NA), ~ ZMVN(df = NA),
                   ~ CAR(df = NA), ~ AR(p = 1, cor = TRUE, df = NA))) {
     sc <- tdf_code(tf)
     expect_true(grepl("multi_student_t_cholesky", sc, fixed = TRUE))
     expect_true(grepl("real<lower=2> nu_trend", sc, fixed = TRUE))
-    expect_true(grepl(stan_prior_line("nu_trend", "gamma(4, 0.3)"),
-                        sc, fixed = TRUE))
+    expect_true(grepl(stan_prior_line("nu_trend", default), sc,
+                      fixed = TRUE))
+    expect_true(nu_monitored(tf))
   }
 })
 
 test_that("a fixed df needs no estimated parameter", {
   sc <- tdf_code(~ AR(p = 1, df = 7))
-  expect_true(grepl("multi_student_t_cholesky_lpdf", sc,
-                      fixed = TRUE))
+  expect_true(grepl("multi_student_t_cholesky_lpdf", sc, fixed = TRUE))
   expect_true(grepl("| 7,", sc, fixed = TRUE))
   expect_false(grepl("real<lower=2> nu_trend", sc, fixed = TRUE))
-})
-
-test_that("nu_trend is monitored exactly when the Stan code declares it", {
-  # get_prior() takes the monitor list. stancode() takes the stanvar
-  # generator. A disagreement would have get_prior() offer a prior
-  # for a parameter the model never declares.
-  cases <- list(
-    list(tf = ~ AR(p = 1), spec = AR(p = 1)),
-    list(tf = ~ AR(p = 1, df = NA), spec = AR(p = 1, df = NA)),
-    list(tf = ~ AR(p = 1, df = 7), spec = AR(p = 1, df = 7)),
-    list(tf = ~ RW(df = NA), spec = RW(df = NA)),
-    list(tf = ~ VAR(), spec = VAR())
-  )
-  for (case in cases) {
-    monitored <- "nu_trend" %in% mvgam:::generate_monitor_params(case$spec)
-    declared <- grepl("real<lower=2> nu_trend", tdf_code(case$tf),
-                      fixed = TRUE)
-    expect_identical(monitored, declared)
-  }
-})
-
-test_that("one registry entry drives both stancode and get_prior", {
-  # stancode() and get_prior() both take the registry's default
-  # string
-  default <- mvgam:::common_trend_priors$nu_trend$default
-  expect_true(grepl(stan_prior_line("nu_trend", default),
-                      tdf_code(~ AR(p = 1, df = NA)), fixed = TRUE))
-  prior_tab <- get_prior(
-    mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, df = NA)),
-    data = tdf_data(), family = poisson()
-  )
-  expect_identical(prior_tab$prior[prior_tab$class == "nu_trend"], default)
+  expect_false(nu_monitored(~ AR(p = 1, df = 7)))
 })
 
 test_that("a reported bound is the bound Stan declares", {

@@ -128,7 +128,7 @@ test_that("a `y ~ 0` formula builds under a family with no dpars", {
   # has 0".
   for (f in list(y ~ 0, brms::bf(y ~ 0))) {
     pf <- mvgam(f, trend_formula = ~ AR(p = 1), data = empty_obs_frame(),
-                family = poisson(), run_model = FALSE)
+                family = poisson(), run_model = FALSE, validate = FALSE)
     sd <- standata(pf)
     expect_identical(sd$K, 1L)
     expect_true(all(sd$X == 0))
@@ -143,7 +143,7 @@ test_that("a `y ~ 0` formula builds under a family with no dpars", {
     brms::mvbf(brms::bf(y ~ 0), brms::bf(z ~ 0), rescor = FALSE),
     trend_formula = ~ AR(p = 1), data = d, family = poisson(),
     run_model = FALSE
-  )
+  , validate = FALSE)
   sd <- standata(pf)
   expect_true(all(sd$X_y == 0) && all(sd$X_z == 0))
   expect_match(stancode(pf), "b_y[1] = 0;", fixed = TRUE)

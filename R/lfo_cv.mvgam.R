@@ -229,16 +229,11 @@ lfo_cv.mvgam <- function(object,
   # every time, and each fold then scores the series observed in it.
   if (!is.null(series_fac) &&
       !trend_completes_time_grid(first_trend_spec(object))) {
-    short <- ragged_series(all_data[[time_var]], series_fac)
-    if (length(short) > 0L) {
-      stop(insight::format_error(c(
-        "'lfo_cv()' requires all series to share one time grid.",
-        x = paste0("Series missing a time the others have: ",
-                   paste0("'", short, "'", collapse = ", "), "."),
-        i = "Give each unobserved time of a series a row with response 'NA'.",
-        i = "A series with its own times takes its own 'lfo_cv()' call."
-      )), call. = FALSE)
-    }
+    refuse_ragged_trend_grid(
+      all_data[[time_var]], series_fac,
+      headline = "'lfo_cv()' requires all series to share one time grid.",
+      remedy = "A series with its own times takes its own 'lfo_cv()' call."
+    )
   }
 
   # The rolling origin walks every time the evaluation frame holds,
@@ -447,7 +442,7 @@ lfo_cv.mvgam <- function(object,
       psis_lw <- NULL
       pareto_ks[k_eval] <- NA_real_
     } else {
-      psis_obj <- suppressWarnings(loo::psis(logratio))
+      psis_obj <- with_pareto_k_handled(loo::psis(logratio, r_eff = 1))
       pareto_ks[k_eval] <- loo::pareto_k_values(psis_obj)[1L]
       psis_lw <- loo::weights.importance_sampling(
         psis_obj, normalize = TRUE

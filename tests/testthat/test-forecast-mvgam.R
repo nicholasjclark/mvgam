@@ -802,7 +802,8 @@ test_that("the step check names the grid, not an observation", {
   # The padding rows leave the likelihood, and brms says so.
   expect_warning(
     prefit <- mvgam(y ~ 1, trend_formula = ~ AR(p = 1), data = d,
-                    family = gaussian(), run_model = FALSE, silent = 2),
+                    family = gaussian(), run_model = FALSE, silent = 2,
+                    validate = FALSE),
     "Rows containing NAs were excluded"
   )
   err <- conditionMessage(expect_error(
@@ -837,7 +838,7 @@ test_that("a wide frame padded at the end is stepped from its grid", {
       brms::bf(brms::mvbind(y1, y2) ~ 1) + brms::set_rescor(FALSE),
       trend_formula = ~ AR(p = 1), data = d, family = gaussian(),
       run_model = FALSE, silent = 2
-    ),
+    , validate = FALSE),
     "Rows containing NAs were excluded"
   )
   series_levels <- mvgam:::fitted_series_levels(prefit)

@@ -1046,14 +1046,10 @@ test_that("partial residual correlations invert the stationary covariance", {
 
 
 test_that("hypothesis reaches every parameter the fit reports", {
-  vars <- variables(fit)
-  # With `class = NULL`, `hypothesis()` takes a parameter by the name
-  # `variables()` lists
-  for (nm in c("b_Intercept", "sigma", "Phi_trend[1,1,2]",
-               "b_elev", "sd_block__Intercept")) {
-    expect_true(nm %in% vars)
-    expect_no_error(hypothesis(fit, paste0("`", nm, "` = 0"), class = NULL))
-  }
+  # A series-indexed parameter is named by its series, in level order
+  expect_hypothesis_reaches(fit, c("b_Intercept", "sigma",
+                                   "Phi_trend[1,willow,ash]", "b_elev",
+                                   "sd_block__Intercept"))
 })
 
 

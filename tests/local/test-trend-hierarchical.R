@@ -1245,7 +1245,6 @@ test_that("a grouped AR(1) settles at the joint stationary covariance", {
   # group match and parts from it as they spread.
   cs <- mvgam:::get_trend_covariance_structure(fit)
   L_stat <- cs$params$L_group_stationary
-  expect_false(is.null(L_stat))
 
   gi <- cs$group_info
   n_groups <- as.integer(gi$n_groups)

@@ -33,7 +33,9 @@ local_seed <- function(seed, frame = parent.frame()) {
     )
   } else {
     restore <- quote(
-      suppressWarnings(rm(".Random.seed", envir = .GlobalEnv))
+      if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+        rm(".Random.seed", envir = .GlobalEnv)
+      }
     )
   }
   do.call(on.exit, list(restore, add = TRUE), envir = frame)

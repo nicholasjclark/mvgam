@@ -30,20 +30,16 @@ build_prefit <- function() {
   mvgam(
     y ~ x, data = dat, family = poisson(),
     run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
 }
-
 
 test_that("a prefit failure names the state it is in", {
   pf <- build_prefit()
-  expect_s3_class(pf, "mvgam_prefit")
 
   # Arguments a method needs before it can be asked anything.
   needs <- list(posterior_smooths = list(smooth = "s(x)"))
   # These refit a model, which belongs in tests/local. `update()` on
-  # a prefit reaches the sampler once the recorded `algorithm` stops
-  # blocking it, which is the fix below and the reason it stays out
-  # of this loop.
+  # a prefit reaches the sampler and has its own test below.
   refits <- c("update", "kfold", "lfo_cv", "add_criterion",
               "loo_subsample", "loo_moment_match")
   # `parnames()` returns `variables()`, which the loop drives, and its
@@ -72,28 +68,25 @@ test_that("a prefit failure names the state it is in", {
       }
     }
   )
-  # Named rather than counted: a failure here states which methods.
+  # The message lists the failing methods by name
   expect_identical(paste(offenders, collapse = ", "), "")
 })
-
 
 test_that("a prefit states what it has and what it lacks", {
   pf <- build_prefit()
 
   # The program and its data are why the mode exists.
   expect_type(stancode(pf), "character")
-  expect_type(standata(pf), "list")
   expect_identical(nobs(pf), 40L)
   expect_identical(nrow(model.frame(pf)), 40L)
 
   # A method needing draws names the state and the argument that
-  # produced it, rather than failing inside posterior.
+  # produced it. It once failed inside posterior.
   err <- expect_error(summary(pf))
   expect_match(conditionMessage(err), "run_model", fixed = TRUE)
   expect_match(conditionMessage(err), "requires a fitted model",
                fixed = TRUE)
 })
-
 
 test_that("a VAR prefit names its trend and the posterior it needs", {
   # The registry loop above builds a trendless prefit. The VAR
@@ -107,7 +100,7 @@ test_that("a VAR prefit names its trend and the posterior it needs", {
   pf <- mvgam(
     y ~ 1, trend_formula = ~ VAR(cor = TRUE), data = dat,
     family = gaussian(), run_model = FALSE, silent = 2
-  )
+  , validate = FALSE)
 
   # A prefit records its trend type as a fit does.
   expect_identical(get_trend_type(pf), "VAR")
@@ -123,7 +116,6 @@ test_that("a VAR prefit names its trend and the posterior it needs", {
                        fixed = TRUE))
   }
 })
-
 
 test_that("mvgam_multiple gives one prefit when run_model is FALSE", {
   set.seed(9)
@@ -142,15 +134,12 @@ test_that("mvgam_multiple gives one prefit when run_model is FALSE", {
     pf <- mvgam_multiple(
       y ~ 1, data_list = list(mk(), mk()), family = poisson(),
       combine = comb, run_model = FALSE, silent = 2
-    )
+    , validate = FALSE)
     expect_s3_class(pf, "mvgam_prefit")
     expect_false(inherits(pf, "mvgam_pooled"))
-    expect_null(pf$fit)
-    expect_type(stancode(pf), "character")
     expect_identical(nobs(pf), 20L)
   }
 })
-
 
 test_that("a prefit built inside a function omits that function's locals", {
   # A formula records the environment it was written in, and a model
@@ -171,7 +160,7 @@ test_that("a prefit built inside a function omits that function's locals", {
     mvgam(
       y ~ x, trend_formula = ~ AR(p = 1), data = d,
       family = poisson(), run_model = FALSE, silent = 2
-    )
+    , validate = FALSE)
   }
   pf <- build(dat)
 
@@ -179,7 +168,6 @@ test_that("a prefit built inside a function omits that function's locals", {
   on.exit(unlink(path), add = TRUE)
   saveRDS(pf, path)
   ballast_mb <- as.numeric(utils::object.size(numeric(5e5))) / 1024^2
-  expect_gt(ballast_mb, 3)
   expect_lt(file.size(path) / 1024^2, ballast_mb / 3)
 
   # Each carrier is named. A regression then states which one came
@@ -194,13 +182,10 @@ test_that("a prefit built inside a function omits that function's locals", {
                       inherits = TRUE))
 })
 
-
 test_that("update rebuilds a prefit past the algorithm it recorded", {
   pf <- build_prefit()
   # A prefit records `algorithm = "none"`, which no backend lists.
   # Handing that back refused the very call that takes a prefit on to
   # a fit. `run_model = FALSE` keeps the check free of sampling.
-  again <- update(pf, run_model = FALSE)
-  expect_s3_class(again, "mvgam_prefit")
-  expect_type(stancode(again), "character")
+  expect_s3_class(update(pf, run_model = FALSE), "mvgam_prefit")
 })

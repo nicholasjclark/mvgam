@@ -4125,9 +4125,16 @@ ragged_series <- function(time_vals, series_vals) {
 #' and the trend that takes series at their own times.
 #'
 #' @param time_vals,series_vals The resolved axes, one per row.
+#' @param headline Character headline of the refusal
+#' @param remedy Character hint naming what takes ragged series
 #' @return `TRUE`, invisibly.
 #' @noRd
-refuse_ragged_trend_grid <- function(time_vals, series_vals) {
+refuse_ragged_trend_grid <- function(
+    time_vals, series_vals,
+    headline = "Every series in 'data' must share one time grid.",
+    remedy = "'CAR()' takes series observed at their own times.") {
+  checkmate::assert_string(headline)
+  checkmate::assert_string(remedy)
   short <- ragged_series(time_vals, series_vals)
   if (length(short) == 0L) {
     return(invisible(TRUE))
@@ -4136,15 +4143,15 @@ refuse_ragged_trend_grid <- function(time_vals, series_vals) {
   n_series <- length(unique(series_vals))
   n_cells <- nrow(unique(data.frame(time_vals, series_vals)))
   stop(insight::format_error(c(
-    "Every series in 'data' must share one time grid.",
+    headline,
     x = paste0("Series missing a time the others have: ",
                paste0("'", short, "'", collapse = ", "), "."),
     x = paste0(
       "Got ", n_cells, " time and series cells over ", n_time,
       " times and ", n_series, " series, expected ", n_time * n_series, "."
     ),
-    i = "Give each unobserved time of a series a row with response 'NA'.",
-    i = "'CAR()' takes series observed at their own times."
+    i = "Add a row with an NA response for each time a series missed.",
+    i = remedy
   )), call. = FALSE)
 }
 
@@ -4190,7 +4197,7 @@ refuse_heavy_tails_on_ragged_grid <- function(time_vals, series_vals,
     x = paste0("Series missing a time the others have: ",
                paste0("'", short, "'", collapse = ", "), "."),
     x = "The times of one series would change the trend of another.",
-    i = "Give each unobserved time of a series a row with response 'NA'.",
+    i = "Add a row with an NA response for each time a series missed.",
     i = "Gaussian innovations take the series as they are."
   )), call. = FALSE)
 }
@@ -4217,7 +4224,7 @@ refuse_covariates_on_ragged_grid <- function(time_vals, series_vals,
     x = paste0("Series missing a time the others have: ",
                paste0("'", short, "'", collapse = ", "), "."),
     x = "The trend's design matrix needs a covariate value at those times.",
-    i = "Give each unobserved time of a series a row with response 'NA'.",
+    i = "Add a row with an NA response for each time a series missed.",
     i = "Or move the covariates to the observation formula."
   )), call. = FALSE)
 }

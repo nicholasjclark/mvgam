@@ -153,8 +153,8 @@ test_that(
   "stancode() for occ emits the occ_lpmf signature and omits K_max", {
   d <- make_occ_data()
   mf <- mvgam_formula(bf(y ~ elev, p ~ tod))
-  sc <- as.character(stancode(mf, data = d, family = occ()))
-  sd <- standata(mf, data = d, family = occ())
+  sc <- as.character(stancode(mf, data = d, family = occ(), validate = FALSE))
+  sd <- standata(mf, data = d, family = occ(), validate = FALSE)
   # All four lpmf overloads emitted.
   expect_match(
     sc, "real occ_lpmf\\(\\s*array\\[\\] int y,\\s*vector mu,\\s*vector p,"
@@ -173,7 +173,7 @@ test_that(
   "stancode for occ declares scalar p in (0, 1) when p is unmodelled", {
   d <- make_occ_data()
   mf <- mvgam_formula(y ~ elev)
-  sc <- as.character(stancode(mf, data = d, family = occ()))
+  sc <- as.character(stancode(mf, data = d, family = occ(), validate = FALSE))
   expect_match(sc, "real<lower=0, ?upper=1> p;")
 })
 

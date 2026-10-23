@@ -224,7 +224,7 @@ kfold.mvgam <- function(x,
     # Hybrid mode: PSIS-LOO on the aggregated matrix gives a
     # per-group elpd + Pareto-k. Refit only folds containing
     # high-k groups.
-    psis_loo <- suppressWarnings(loo::loo(loglik_grouped))
+    psis_loo <- with_pareto_k_handled(loo::loo(loglik_grouped, r_eff = 1))
     pointwise <- psis_loo$pointwise[, "elpd_loo"]
     names(pointwise) <- group_labels
     pareto_k <- psis_loo$diagnostics$pareto_k

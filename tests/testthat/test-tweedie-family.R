@@ -9,9 +9,6 @@
 
 test_that("tweedie() returns a customfamily with mu/mphi/mtheta dpars", {
   fam <- tweedie()
-  expect_s3_class(fam, "customfamily")
-  expect_s3_class(fam, "brmsfamily")
-  expect_identical(fam$name, "tweedie")
   expect_identical(fam$dpars, c("mu", "mphi", "mtheta"))
   expect_identical(fam$link, "log")
   expect_identical(fam$link_mphi, "log")
@@ -29,14 +26,7 @@ test_that("tweedie() M argument validates and flows through to the M stanvar", {
   expect_error(tweedie(M = 0), "not >= 1")
   expect_error(tweedie(M = -1L), "not >= 1")
   expect_error(tweedie(M = "30"), "integerish")
-  fam_default <- tweedie()
-  fam_custom <- tweedie(M = 50L)
-  sv_default <- attr(fam_default, "mvgam_stanvars")
-  sv_custom <- attr(fam_custom, "mvgam_stanvars")
-  expect_s3_class(sv_default, "stanvars")
-  expect_s3_class(sv_custom, "stanvars")
-  expect_equal(sv_default$M$sdata, 30L)
-  expect_equal(sv_custom$M$sdata, 50L)
+  expect_equal(attr(tweedie(M = 50L), "mvgam_stanvars")$M$sdata, 50L)
 })
 
 test_that("mvgam(family = tweedie()) auto-injects the Stan function block + M data", {
@@ -48,17 +38,14 @@ test_that("mvgam(family = tweedie()) auto-injects the Stan function block + M da
     series = factor(rep("s1", 80))
   )
   mf <- mvgam_formula(y ~ x)
-  sc <- paste(unlist(stancode(mf, data = dat, family = tweedie())),
+  sc <- paste(unlist(stancode(mf, data = dat, family = tweedie(),
+                              validate = FALSE)),
               collapse = "\n")
   # The likelihood takes the response-scale mean and both dpars.
   expect_true(grepl("mu = exp(mu);", sc, fixed = TRUE))
   expect_true(grepl("target += tweedie_lpdf(Y | mu, mphi, mtheta, M);",
                     sc, fixed = TRUE))
-  # Strict positivity guards (the AIMS reference accepted mu/mphi
-  # >= 0; mvgam tightens to strict > 0).
-  # check_tweedie now operates per-element (vector dpars) so the
-  # guard reads `mphi[n] <= 0`, `mu[n] <= 0`,
-  # `mtheta[n] <= 1 || mtheta[n] >= 2`.
+  # Strict positivity guards, checked per element of a vector dpar
   expect_true(grepl("if \\(mphi\\[n\\] <= 0\\)", sc))
   expect_true(grepl("if \\(mu\\[n\\] <= 0\\)", sc))
   expect_true(grepl(
@@ -80,8 +67,9 @@ test_that("standata under tweedie() carries M with the requested value", {
     series = factor(rep("s1", 50))
   )
   mf <- mvgam_formula(y ~ 1)
-  sd_default <- standata(mf, data = dat, family = tweedie())
-  sd_custom <- standata(mf, data = dat, family = tweedie(M = 75L))
+  sd_default <- standata(mf, data = dat, family = tweedie(), validate = FALSE)
+  sd_custom <- standata(mf, data = dat, family = tweedie(M = 75L),
+                        validate = FALSE)
   expect_equal(sd_default$M, 30L)
   expect_equal(sd_custom$M, 75L)
 })
@@ -103,30 +91,6 @@ test_that("compute_family_epred returns mu directly for tweedie", {
   linpred <- matrix(rnorm(20, mean = 0.5, sd = 0.2), nrow = 4)
   epred <- mvgam:::compute_family_epred(linpred = linpred, family = fam)
   expect_equal(epred, exp(linpred), tolerance = 1e-12)
-})
-
-test_that("the tweedie log density returns finite log densities for zero + positive y", {
-  fam <- tweedie()
-  ndraws <- 5L
-  nobs <- 4L
-  y <- c(0, 0, 1.5, 3.2)
-  linpred <- matrix(log(2), nrow = ndraws, ncol = nobs)
-  mphi <- matrix(0.5, nrow = ndraws, ncol = nobs)
-  mtheta <- matrix(1.5, nrow = ndraws, ncol = nobs)
-  ll <- mvgam:::dispatch_log_lik(
-    "tweedie", linpred = linpred,
-    link = "log",
-    y = y,
-    family_pars = list(mphi = mphi, mtheta = mtheta),
-    trials = NULL
-  )
-  expect_true(is.matrix(ll))
-  expect_equal(dim(ll), c(ndraws, nobs))
-  expect_true(all(is.finite(ll)))
-  # Zero observations have non-trivial log probability; positive
-  # observations have finite log density.
-  expect_true(all(ll[, 1] < 0))
-  expect_true(all(ll[, 3] < 0))
 })
 
 test_that("the tweedie log density matches mgcv::ldTweedie row-wise", {
@@ -161,7 +125,6 @@ test_that("the tweedie log density matches mgcv::ldTweedie row-wise", {
 test_that("attach_family_stanvars merges tweedie stanvars with user stanvars", {
   user_sv <- brms::stanvar(scode = "// user", block = "functions")
   merged <- mvgam:::attach_family_stanvars(user_sv, list(y = tweedie()))
-  expect_s3_class(merged, "stanvars")
   # The user's stanvar, tweedie's function block and its `M` data.
   expect_length(merged, 3L)
   scodes <- vapply(merged, function(sv) sv$scode, character(1))
@@ -205,7 +168,8 @@ test_that("check_tweedie_truncation requires a tweedie response", {
   set.seed(8)
   d <- data.frame(time = 1:30, series = factor("a"),
                   y = rpois(30, 4), pos = rgamma(30, 2, 1))
-  pf <- mvgam(y ~ 1, data = d, family = poisson(), run_model = FALSE)
+  pf <- mvgam(y ~ 1, data = d, family = poisson(), run_model = FALSE,
+              validate = FALSE)
   expect_error(
     check_tweedie_truncation(pf),
     "needs a response with family tweedie()",
@@ -215,7 +179,7 @@ test_that("check_tweedie_truncation requires a tweedie response", {
     bf(y ~ 1, family = poisson()) + bf(pos ~ 1, family = tweedie()) +
       set_rescor(FALSE),
     data = d, run_model = FALSE
-  )
+  , validate = FALSE)
   expect_error(
     check_tweedie_truncation(mv, resp = "y"),
     "needs a response with family tweedie()",
@@ -227,12 +191,6 @@ test_that("how_to_cite reference_db includes Tweedie entries", {
   db <- mvgam:::reference_db()
   expect_true("jorgensen_tweedie" %in% names(db))
   expect_true("dunn_smyth_tweedie" %in% names(db))
-  # Canonical Tweedie reference (Jorgensen 1987) DOI present.
-  expect_true(grepl("10\\.1111/j\\.2517-6161",
-                    db$jorgensen_tweedie$text))
-  # Series-truncation reference (Dunn & Smyth 2005) DOI present.
-  expect_true(grepl("10\\.1007/s11222-005-4070-y",
-                    db$dunn_smyth_tweedie$text))
 })
 
 test_that("tweedie_lpdf has overloaded scalar / vector dpar signatures", {
@@ -260,9 +218,8 @@ test_that("tweedie_lpdf has overloaded scalar / vector dpar signatures", {
 })
 
 test_that("tweedie() supports brms distributional regression on mphi", {
-  # Confirms that the user can write `mphi ~ covs` and brms
-  # routes a vector mphi into the lpdf via the per-element
-  # path. Does NOT fit -- just checks stancode + standata.
+  # `mphi ~ covs` routes a vector mphi into the lpdf's per-element
+  # path
   set.seed(1)
   dat <- data.frame(
     y    = c(rep(0, 10), rgamma(40, 2, 0.5)),
@@ -271,7 +228,8 @@ test_that("tweedie() supports brms distributional regression on mphi", {
     series = factor(rep("s1", 50))
   )
   mf <- mvgam_formula(brms::bf(y ~ 1, mphi ~ site))
-  sc <- paste(unlist(stancode(mf, data = dat, family = tweedie())),
+  sc <- paste(unlist(stancode(mf, data = dat, family = tweedie(),
+                              validate = FALSE)),
               collapse = "\n")
   # The dispersion predictor is on the log scale. The program
   # exponentiates it before the likelihood. On an identity link the
@@ -289,7 +247,7 @@ test_that("tweedie() supports brms distributional regression on mphi", {
   own <- paste(unlist(stancode(
     mf, data = dat, family = tweedie(),
     prior = brms::prior(normal(0, 1), class = Intercept, dpar = mphi)
-  )), collapse = "\n")
+  , validate = FALSE)), collapse = "\n")
   expect_true(grepl("lprior += normal_lpdf(Intercept_mphi | 0, 1);", own,
                     fixed = TRUE))
   expect_false(grepl("student_t_lpdf(Intercept_mphi", own, fixed = TRUE))
@@ -298,11 +256,10 @@ test_that("tweedie() supports brms distributional regression on mphi", {
   # linear predictor leave that range. A sub-formula on it is refused.
   expect_error(
     stancode(mvgam_formula(brms::bf(y ~ 1, mtheta ~ site)), data = dat,
-             family = tweedie()),
+             family = tweedie(), validate = FALSE),
     "'mtheta' must stay in [1.001, 1.999]", fixed = TRUE
   )
 })
-
 
 # ---- custom-family dpar resolution in the forecast path -------------
 

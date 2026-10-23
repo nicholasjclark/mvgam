@@ -434,10 +434,15 @@ link_scale_spread <- function(y, family) {
     return(0)
   }
   y <- y[!is.na(y)]
+  # A log or square root has no value below zero, which leaves no
+  # spread to measure
+  if (link %in% c("log", "sqrt") && any(y < 0)) {
+    return(0)
+  }
   if (link %in% c("log", "inverse", "1/mu^2")) {
     y <- ifelse(y == 0, y + 0.1, y)
   }
-  spread <- round(stats::mad(suppressWarnings(transform(y))), 1)
+  spread <- round(stats::mad(transform(y)), 1)
   if (is.finite(spread)) spread else 0
 }
 

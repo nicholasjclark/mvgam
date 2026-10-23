@@ -366,7 +366,8 @@ test_that("a reported prior carries the support it is sampled on", {
   }
   for (tr in list(~ AR(p = 1), ~ CAR())) {
     fit <- mvgam(y ~ 1, trend_formula = tr, data = dat,
-                 family = poisson(), run_model = FALSE, silent = 2)
+                 family = poisson(), run_model = FALSE, silent = 2,
+                 validate = FALSE)
     tab <- as.data.frame(prior_summary(fit))
     sc <- as.character(stancode(fit))
     for (par in c("ar1_trend", "sigma_trend")) {
