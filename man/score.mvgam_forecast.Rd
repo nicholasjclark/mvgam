@@ -38,11 +38,11 @@ central interval the other scorers use, which
 unweighted scores.}
 
 \item{log}{Logical; apply \code{log(x + 0.001)} to truth and
-forecast draws before scoring. Honoured by \code{"crps"},
-\code{"drps"} and \code{"sis"}; passing \code{TRUE} with any other score is
-an error, since \code{"brier"} scores a binary outcome and
-\code{"twcrps"} carries its thresholds on the untransformed
-scale.}
+forecast draws before scoring. Taken by \code{"crps"}, \code{"drps"},
+\code{"sis"}, \code{"energy"} and \code{"variogram"}. Passing \code{TRUE} with any
+other score is an error. \code{"brier"} scores a binary outcome.
+\code{"twcrps"} and \code{"twenergy"} set their thresholds on the
+untransformed scale.}
 
 \item{weights}{Optional length-\code{n_series} numeric vector of
 per-series weights for \code{"variogram"}.}

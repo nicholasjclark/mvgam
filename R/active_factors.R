@@ -256,9 +256,7 @@ plot.mvgam_active_factors <- function(x, ...) {
     mapping = ggplot2::aes(x = .data$factor, y = .data$prob_active)
   ) +
     ggplot2::geom_col(fill = fill_col, alpha = 0.85) +
-    ggplot2::geom_hline(
-      yintercept = cutoff, linetype = "dashed", colour = "grey40"
-    ) +
+    reference_line(yintercept = cutoff) +
     ggplot2::scale_x_continuous(breaks = x$per_factor$factor) +
     ggplot2::scale_y_continuous(
       limits = c(0, 1), expand = ggplot2::expansion(mult = c(0, 0.05))

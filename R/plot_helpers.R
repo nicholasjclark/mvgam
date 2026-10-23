@@ -525,6 +525,27 @@ mvgam_cut_layer <- function(
   )
 }
 
+#' A dashed reference line, such as zero or a cutoff
+#'
+#' Give exactly one of `yintercept` and `xintercept`.
+#'
+#' @param yintercept Numeric height of a horizontal line, or `NULL`
+#' @param xintercept Numeric position of a vertical line, or `NULL`
+#' @return A ggplot2 layer
+#' @noRd
+reference_line <- function(yintercept = NULL, xintercept = NULL) {
+  checkmate::assert_number(yintercept, null.ok = TRUE)
+  checkmate::assert_number(xintercept, null.ok = TRUE)
+  stopifnot(xor(is.null(yintercept), is.null(xintercept)))
+  if (is.null(xintercept)) {
+    return(ggplot2::geom_hline(yintercept = yintercept,
+                               linetype = "dashed", colour = "grey40"))
+  }
+  ggplot2::geom_vline(xintercept = xintercept, linetype = "dashed",
+                      colour = "grey40")
+}
+
+
 #' One figure from one plot per response
 #'
 #' A plotting method returns one plot per response of a multivariate

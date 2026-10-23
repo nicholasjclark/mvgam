@@ -744,10 +744,10 @@ rows_at_times <- function(data, time_var, times) {
 #' @description Renders a faceted ggplot of the per-fold Pareto-k
 #'   diagnostic and every populated score (ELPD plus any non-ELPD
 #'   scores requested at fit time). Outlier points are highlighted
-#'   per these thresholds: Pareto-k above `pareto_k_threshold` and
-#'   ELPD below its 15% quantile.
+#'   per these thresholds: Pareto-k above `pareto_k_threshold`, ELPD
+#'   below its 15% quantile and any other score above its 85%
+#'   quantile.
 #'
-#' @importFrom graphics layout axis lines abline polygon points
 #' @param x An object of class `mvgam_lfo`.
 #' @param ... Unused. Anything passed here is refused.
 #' @return A `ggplot` object.
@@ -779,7 +779,8 @@ plot.mvgam_lfo <- function(x, ...) {
     eval = obj$eval_timepoints,
     value = ks,
     threshold = threshold_val,
-    facet = "Pareto K"
+    facet = "Pareto K",
+    worse_above = TRUE
   )
   if (!is.null(obj$elpds)) {
     # `quantile()` names its result, and `data.frame()` reads a name
@@ -790,7 +791,8 @@ plot.mvgam_lfo <- function(x, ...) {
       value = obj$elpds,
       threshold = unname(stats::quantile(obj$elpds, probs = 0.15,
                                            na.rm = TRUE)),
-      facet = "ELPD"
+      facet = "ELPD",
+      worse_above = FALSE
     )
   }
   if (!is.null(obj$scores)) {
@@ -801,7 +803,8 @@ plot.mvgam_lfo <- function(x, ...) {
         threshold = unname(stats::quantile(obj$scores[[sc]],
                                              probs = 0.85,
                                              na.rm = TRUE)),
-        facet = toupper(sc)
+        facet = score_label(sc),
+        worse_above = TRUE
       )
     }
   }
@@ -811,11 +814,8 @@ plot.mvgam_lfo <- function(x, ...) {
   # observation. Neither has a point to draw.
   long <- long[!is.na(long$value), , drop = FALSE]
   long$colour <- ifelse(
-    (long$facet == "Pareto K" & long$value > long$threshold) |
-      (long$facet == "ELPD" & long$value < long$threshold) |
-      (long$facet %in% c("CRPS", "DRPS", "SIS", "BRIER",
-                          "ENERGY", "VARIOGRAM") &
-         long$value > long$threshold),
+    ifelse(long$worse_above, long$value > long$threshold,
+           long$value < long$threshold),
     "outlier", "inlier"
   )
 

@@ -76,7 +76,7 @@ compare_scores <- function(..., score = "crps", model_names = NULL,
         series       = rep(s, n),
         eval_horizon = df$eval_horizon,
         score        = pad(df$score,       NA_real_),
-        in_interval  = pad(df$in_interval, NA_integer_),
+        in_interval  = pad(df$in_interval, NA_real_),
         stringsAsFactors = FALSE
       )
     })
@@ -213,27 +213,10 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
       i = "Check the source forecasts have the expected series."
     )))
   }
-  y_lab <- toupper(score_type)
+  y_lab <- score_label(score_type)
   if (!is.null(relative)) {
-    checkmate::assert_string(relative)
-    if (!relative %in% levels(df$model)) {
-      stop(insight::format_error(c(
-        "Baseline model not found in the compare_scores frame.",
-        x = paste0("'relative' = '", relative,
-                   "' is not in x$model."),
-        i = paste0("Available: ",
-                   paste(levels(df$model), collapse = ", "))
-      )))
-    }
-    base <- df[df$model == relative,
-               c("series", "eval_horizon", "score"),
-               drop = FALSE]
-    names(base)[3L] <- "base_score"
-    df <- merge(df, base, by = c("series", "eval_horizon"),
-                all.x = TRUE)
-    df$score <- df$score - df$base_score
-    df <- df[df$model != relative, , drop = FALSE]
-    df$model <- droplevels(df$model)
+    df <- difference_from_baseline(df, relative, "score",
+                                   c("series", "eval_horizon"))
     y_lab <- paste0("\u0394 ", y_lab, " vs ", relative)
   }
   p <- ggplot2::ggplot(
@@ -250,9 +233,7 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
     mvgam_theme() +
     mvgam_model_colour_scale(nlevels(df$model))
   if (!is.null(relative)) {
-    p <- p + ggplot2::geom_hline(yintercept = 0,
-                                  linetype = "dashed",
-                                  colour = "grey40")
+    p <- p + reference_line(yintercept = 0)
   }
   if (!is_joint && isTRUE(facet)) {
     p <- p + ggplot2::facet_wrap(~ series, scales = "free_y")
@@ -302,23 +283,7 @@ plot.mvgam_compare_elpds <- function(x, relative = NULL,
   set_color_scheme_local("red")
   df <- as.data.frame(x)
   if (!is.null(relative)) {
-    checkmate::assert_string(relative)
-    if (!relative %in% levels(df$model)) {
-      stop(insight::format_error(c(
-        "Baseline model not found in the compare_elpds frame.",
-        x = paste0("'relative' = '", relative,
-                   "' is not in x$model."),
-        i = paste0("Available: ",
-                   paste(levels(df$model), collapse = ", "))
-      )))
-    }
-    base <- df[df$model == relative,
-               c("eval_time", "elpd"), drop = FALSE]
-    names(base)[2L] <- "base_elpd"
-    df <- merge(df, base, by = "eval_time", all.x = TRUE)
-    df$elpd <- df$elpd - df$base_elpd
-    df <- df[df$model != relative, , drop = FALSE]
-    df$model <- droplevels(df$model)
+    df <- difference_from_baseline(df, relative, "elpd", "eval_time")
   }
   if (isTRUE(cumulative)) {
     df <- df[order(df$model, df$eval_time), , drop = FALSE]
@@ -353,11 +318,44 @@ plot.mvgam_compare_elpds <- function(x, relative = NULL,
     mvgam_theme() +
     mvgam_model_colour_scale(nlevels(df$model))
   if (!is.null(relative)) {
-    p <- p + ggplot2::geom_hline(yintercept = 0,
-                                  linetype = "dashed",
-                                  colour = "grey40")
+    p <- p + reference_line(yintercept = 0)
   }
   p
+}
+
+
+#' Each model's values minus a baseline model's
+#'
+#' `relative` in the plots of [compare_scores()] and [compare_elpds()]
+#' takes this route. The baseline's own rows are dropped, being zero.
+#'
+#' @param df Data frame holding a `model` factor
+#' @param relative Character name of the baseline model
+#' @param value Character name of the column to difference
+#' @param by Character names of the columns that identify a cell
+#' @return `df` without the baseline's rows, `value` differenced
+#' @noRd
+difference_from_baseline <- function(df, relative, value, by) {
+  checkmate::assert_data_frame(df)
+  checkmate::assert_string(relative)
+  checkmate::assert_string(value)
+  checkmate::assert_character(by, min.len = 1L)
+  if (!relative %in% levels(df$model)) {
+    stop(insight::format_error(c(
+      "'relative' must name a model in the comparison.",
+      x = paste0("Got '", relative, "'."),
+      i = paste0("Available: ", paste(levels(df$model), collapse = ", "),
+                 ".")
+    )), call. = FALSE)
+  }
+  base <- df[df$model == relative, c(by, value), drop = FALSE]
+  names(base)[names(base) == value] <- ".baseline"
+  df <- merge(df, base, by = by, all.x = TRUE)
+  df[[value]] <- df[[value]] - df$.baseline
+  df <- df[df$model != relative, setdiff(names(df), ".baseline"),
+           drop = FALSE]
+  df$model <- droplevels(df$model)
+  df
 }
 
 

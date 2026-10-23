@@ -30,10 +30,12 @@ Observation parameters take their \pkg{brms} names, such as \code{b_x},
 trend model's parameters take the same names with a \verb{_trend}
 suffix, such as \code{b_x_trend} or \code{sds_sx_1_trend}.
 
-A trend parameter with one entry per series takes the series' name
-as its index, as \pkg{brms} labels a grouping factor's levels. A
-model with series \code{DM} and \code{DO} has \code{sigma_trend[DM]},
-\code{sigma_trend[DO]} and \code{ar1_trend[DM]}. Its factor loadings are
+An index that runs over the series takes the series' name, as
+\pkg{brms} labels a grouping factor's levels. A model with series
+\code{DM} and \code{DO} has \code{sigma_trend[DM]}, \code{ar1_trend[DM]} and the
+innovation covariance \code{Sigma_trend[DM,DO]}. A VAR's coefficients
+keep the lag as a number, as in \code{Phi_trend[1,DM,DO]}, as do the
+changepoints of \code{PW()} in \code{delta_trend[3,DM]}. Factor loadings are
 \code{Z_tilde[DM,1]}, with the factor as the second index. In a factor
 model the dynamics belong to the factors, as in \code{ar1_trend[1]}.
 The latent state matrices keep numeric indices, as in

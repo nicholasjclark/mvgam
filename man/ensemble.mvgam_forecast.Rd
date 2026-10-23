@@ -20,8 +20,9 @@ ensemble(object, ...)
 weighting), or a numeric vector with one non-negative entry per
 supplied forecast. The weights are normalised to sum to 1.
 Strategies such as stacking need the fitted models. Compute them
-with \code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}} on the fits and pass the numeric
-result.}
+with \code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}} on the fits, or with
+\code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}} on their \code{\link[=lfo_cv]{lfo_cv()}} results. Pass
+the numeric result here.}
 
 \item{ndraws}{Positive integer giving the total number of
 ensemble draws to return per series. Defaults to \code{5000}.

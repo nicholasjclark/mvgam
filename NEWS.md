@@ -16,7 +16,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * Removed `get_mvgam_priors()`, the `plot_mvgam_*()` functions, `compare_mvgams()`, `eval_mvgam()`, `roll_eval_mvgam()`, `lv_correlations()`, `add_residuals()`, `code()`, `ppc()` and `summary(include_states = )`. Use `get_prior()`, `plot()`, `loo_compare()`, `lfo_cv()`, `residual_cor()`, `augment()`, `stancode()` and `pp_check()`
 * mvgam no longer re-exports `te()` and `ti()`
 * `mvgam_forecast` objects store `train_times` and `test_times` as per-series lists
-* Parameter names and `summary()` blocks follow 'brms', with smooths, Gaussian processes and monotonic effects named by term
+* Parameter names and `summary()` blocks follow 'brms', with smooths, Gaussian processes and monotonic effects named by term and trend parameters indexed by series name, as in `sigma_trend[DM]`
 * `series_to_mvgam()` takes a `tsibble`, `ts`, `mts`, `msts` or wide data frame, fills gaps and returns one data frame unless `h` or `train_prop` is given. `xts` input has been removed
 
 ## New features

@@ -398,9 +398,13 @@ stan_index <- function(v) {
 #' brms labels an index that runs over a factor's levels with the
 #' level, as in `r_<group>[level,term]`. The same holds here. Each row
 #' of the loadings `Z[i, k]` and `Z_tilde[i, k]` is a series and takes
-#' the series' name. In a fit without factors, a trend vector of
-#' `N_lv_trend` or `N_series_trend` entries holds one entry per
-#' series. `sigma_trend[k]` then takes the name of series `k`.
+#' the series' name. In a fit without factors, a trend dimension of
+#' `N_lv_trend` or `N_series_trend` runs over the series.
+#' `sigma_trend[k]` then takes the name of series `k`, as do both
+#' indices of `Sigma_trend[i,j]` and the second of the changepoint
+#' matrix `delta_trend[c,k]`. A VAR's `Phi_trend[l,i,j]` keeps its lag
+#' `l` and names `i` and `j`. A variable with a time dimension, such as
+#' the states `lv_trend[t,k]`, keeps its numeric indices.
 #' `theta_features[k]` is the length scale of the `k`th column of the
 #' encoded features matrix. It takes that column's name, as each
 #' distance length scale is named `theta_dist_<name>`.
@@ -432,15 +436,26 @@ mvgam_index_aliases <- function(x, raw) {
     return(out)
   }
   declared <- stancode_declarations(paste(x$stancode, collapse = "\n"))
-  per_series <- names(Filter(function(d) {
-    d$type == "vector" && d$size %in% c("N_lv_trend", "N_series_trend")
-  }, declared))
-  base <- sub("\\[.*$", "", raw)
-  vec <- raw[base %in% per_series & grepl("\\[[0-9]+\\]$", raw)]
-  k <- as.integer(stan_index(vec))
-  if (length(vec) > 0L && max(k) <= length(series)) {
-    named <- paste0(sub("\\[.*$", "", vec), "[", series[k], "]")
-    out <- c(out, stats::setNames(vec, named))
+  square <- c("cov_matrix", "corr_matrix", "cholesky_factor_corr",
+              "cholesky_factor_cov")
+  split_dims <- function(size) {
+    trimws(strsplit(size, ",", fixed = TRUE)[[1L]])
+  }
+  for (nm in names(declared)) {
+    d <- declared[[nm]]
+    dims <- split_dims(d$size)
+    if (d$type %in% square) dims <- rep(dims, 2L)
+    dims <- c(split_dims(d$array), dims)
+    on_series <- dims %in% c("N_lv_trend", "N_series_trend")
+    if (!any(on_series) || any(startsWith(dims, "N_time"))) next
+    el <- raw[startsWith(raw, paste0(nm, "["))]
+    if (length(el) == 0L) next
+    idx <- do.call(rbind, strsplit(sub("^.*\\[(.*)\\]$", "\\1", el), ","))
+    if (ncol(idx) != length(dims) ||
+          max(as.integer(idx[, on_series])) > length(series)) next
+    idx[, on_series] <- series[as.integer(idx[, on_series])]
+    named <- paste0(nm, "[", apply(idx, 1L, paste, collapse = ","), "]")
+    out <- c(out, stats::setNames(el, named))
   }
   out
 }

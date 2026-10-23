@@ -169,7 +169,7 @@ summary(mod)
 
 ```{r wind-numbers, include = FALSE}
 wind <- as.numeric(as_draws_matrix(mod, variable = "b_p_wind"))
-fe_wind <- sprintf("%.2f [%.2f, %.2f]", median(wind),
+fe_wind <- sprintf("%.2f [%.2f, %.2f]", mean(wind),
                    quantile(wind, 0.025), quantile(wind, 0.975))
 # The prose below says the interval covers the simulated -1.5
 stopifnot(quantile(wind, 0.025) < -1.5, quantile(wind, 0.975) > -1.5)

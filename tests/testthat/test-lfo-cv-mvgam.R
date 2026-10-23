@@ -488,15 +488,17 @@ test_that("plot.mvgam_lfo draws a panel per score without notices", {
   # before these tests, so the notice went unseen. A warning fails
   # this suite, which is what holds the fix.
   scored <- mk_mvgam_lfo(c(-2, -2.5, -3))
-  scored$scores <- list(crps = c(1.1, 1.4, 0.9), sis = c(2, 3, 4))
+  scored$scores <- list(crps = c(1.1, 1.4, 0.9), dss = c(2, 3, 4))
   # The first fold is scored on a fresh refit and has no Pareto k.
   # ggplot warned on rendering it until the method dropped it.
   scored$pareto_ks[1L] <- NA_real_
   g <- plot(scored)
   expect_no_warning(ggplot2::ggplot_build(g))
-  expect_identical(
-    unique(g$data$facet), c("Pareto K", "ELPD", "CRPS", "SIS")
-  )
+  dss <- "Dawid-Sebastiani score"
+  expect_identical(unique(g$data$facet), c("Pareto K", "ELPD", "CRPS", dss))
+  # Every score is lower-is-better. Its worst fold is the outlier
+  expect_identical(g$data$colour[g$data$facet == dss],
+                   c("inlier", "inlier", "outlier"))
 
   # A regular grid is labelled in whole steps. An irregular CAR grid
   # keeps its own fractional times.

@@ -747,8 +747,7 @@ plot_var_matrix_list_diagonal <- function(x) {
   df$outcome <- factor(df$outcome, levels = outc)
   ggplot2::ggplot(df, ggplot2::aes(x = .data$med, y = .data$group,
                                     colour = .data$outcome)) +
-    ggplot2::geom_vline(xintercept = 0, linetype = "dashed",
-                        colour = "grey30") +
+    reference_line(xintercept = 0) +
     ggplot2::geom_pointrange(
       ggplot2::aes(xmin = .data$lo, xmax = .data$hi),
       position = ggplot2::position_dodge(width = 0.6)

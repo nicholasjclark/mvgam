@@ -176,8 +176,7 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
     ggplot2::geom_line(
       colour = mvgam_colour("dark_highlight"), linewidth = 0.7
     ) +
-    ggplot2::geom_hline(yintercept = 0, linetype = "dashed",
-                        colour = "black") +
+    reference_line(yintercept = 0) +
     ggplot2::facet_wrap(~ shock, scales = "free_y",
                         labeller = irf_panel_labeller()) +
     scale_x_steps() +

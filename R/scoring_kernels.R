@@ -255,13 +255,12 @@ energy_cell <- function(truth, fc, log = FALSE) {
 # convention as twCRPS: focuses scoring on the joint region
 # whose components fall inside `[lower, upper]`.
 #'@noRd
-twenergy_cell <- function(truth, fc, lower = -Inf, upper = Inf,
-                            log = FALSE) {
+twenergy_cell <- function(truth, fc, lower = -Inf, upper = Inf) {
   insight::check_if_installed(
     "scoringRules",
     reason = "to calculate threshold-weighted energy scores"
   )
-  cleaned <- clean_fc_for_es(truth, fc, log = log)
+  cleaned <- clean_fc_for_es(truth, fc)
   scoringRules::twes_sample(
     y = cleaned$truth, dat = cleaned$fc,
     a = lower, b = upper
@@ -362,8 +361,7 @@ variogram_mcmc_object <- function(truths, fcs, log = FALSE,
 
 #'@noRd
 twenergy_mcmc_object <- function(truths, fcs, lower = -Inf,
-                                    upper = Inf, log = FALSE) {
+                                    upper = Inf) {
   apply_multivariate_score(truths, fcs, twenergy_cell,
-                             lower = lower, upper = upper,
-                             log = log)
+                             lower = lower, upper = upper)
 }

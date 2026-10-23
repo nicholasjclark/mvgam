@@ -156,9 +156,11 @@ test_that("Brier scores each horizon's forecast probability", {
 
 # ----- Validation / error paths -----------------------------------
 
-test_that("type = 'trend' errors with a clear message", {
-  fc <- make_mock_forecast(type = "trend")
-  expect_error(score(fc, "crps"), "trend")
+test_that("Link-scale forecasts are refused", {
+  for (type in c("link", "trend")) {
+    fc <- make_mock_forecast(type = type)
+    expect_error(score(fc, "crps"), paste0("A '", type, "' forecast"))
+  }
 })
 
 
@@ -246,4 +248,13 @@ test_that("score(fc, 'energy')$all_series$score equals energy_mcmc_object", {
   via_dispatch <- score(fc, "energy")$all_series$score
   direct <- energy_mcmc_object(truths, fc$forecasts)
   expect_equal(via_dispatch, direct)
+  # The joint scores take the log scale. The threshold-weighted one
+  # refuses it
+  fc$forecasts <- lapply(fc$forecasts, abs)
+  expect_equal(
+    score(fc, "variogram", log = TRUE)$all_series$score,
+    variogram_mcmc_object(log_offset(truths),
+                          lapply(fc$forecasts, log_offset))
+  )
+  expect_error(score(fc, "twenergy", log = TRUE), "does not apply")
 })

@@ -226,6 +226,11 @@ test_that("ensemble takes one set of draws across series and slots", {
   bad <- mk(10L)
   bad$forecasts$s1 <- bad$forecasts$s1[1:5, ]
   expect_error(ensemble(bad, mk(10L)), "Input 1 holds 5, 10 draws")
+  # A forecast over other times is refused
+  short <- mk(10L)
+  short$forecasts <- lapply(short$forecasts, `[`, , 1L, drop = FALSE)
+  expect_error(ensemble(mk(10L), short),
+               "Input 2 differs in its forecast horizons")
 })
 
 
@@ -291,18 +296,14 @@ test_that("plot.mvgam_compare_scores relative pivot drops the baseline", {
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
   p <- plot(out, relative = "fc1")
-  # The baseline is dropped. Only fc2 remains.
+  # The baseline is dropped and each cell holds fc2 minus fc1
   expect_identical(levels(p$data$model), "fc2")
-  # The Δ in the y-label confirms the relative branch was taken.
-  expect_match(p$labels$y, "Δ")
-})
-
-
-test_that("plot.mvgam_compare_scores errors on unknown baseline", {
-  fc1 <- make_mock_forecast(seed = 1L)
-  fc2 <- make_mock_forecast(seed = 2L)
-  out <- compare_scores(fc1, fc2, score = "crps")
-  expect_error(plot(out, relative = "ghost"), "not in x\\$model")
+  cells <- out[out$series != "all_series", ]
+  diffs <- cells$score[cells$model == "fc2"] -
+    cells$score[cells$model == "fc1"]
+  plotted <- p$data[order(p$data$series, p$data$eval_horizon), ]
+  expect_equal(plotted$score, diffs)
+  expect_error(plot(out, relative = "ghost"), "must name a model")
 })
 
 
@@ -325,6 +326,7 @@ test_that("plot.mvgam_compare_elpds relative drops baseline", {
   m2 <- make_mock_lfo(c(-3, -4, -5))
   p <- plot(compare_elpds(m1, m2), relative = "m1")
   expect_identical(levels(p$data$model), "m2")
+  expect_equal(p$data$elpd, c(-2, -2, -2))
   expect_match(p$labels$y, "Δ")
 })
 

@@ -15,8 +15,9 @@
 #'   weighting), or a numeric vector with one non-negative entry per
 #'   supplied forecast. The weights are normalised to sum to 1.
 #'   Strategies such as stacking need the fitted models. Compute them
-#'   with [loo_model_weights.mvgam()] on the fits and pass the numeric
-#'   result.
+#'   with [loo_model_weights.mvgam()] on the fits, or with
+#'   [loo_model_weights.mvgam_lfo()] on their [lfo_cv()] results. Pass
+#'   the numeric result here.
 #' @param ndraws Positive integer giving the total number of
 #'   ensemble draws to return per series. Defaults to `5000`.
 #'   A model allocated more draws than it holds is sampled with
@@ -83,6 +84,7 @@ ensemble.mvgam_forecast <- function(object, ..., weights = NULL,
       )
     )), call. = FALSE)
   }
+  assert_compared_objects(split$models, "mvgam_forecast", "ensemble")
   models <- lapply(split$models, forecast_parts)
   n_models <- length(models)
   w <- if (is.null(weights)) {
@@ -157,29 +159,11 @@ ensemble_slots <- function(models, draw_idx, w, ndraws_per) {
 #' the forecast horizons and any test observations of the first. Within
 #' one forecast, every draw matrix must hold the same number of draws.
 #'
-#' @param models List of `mvgam_forecast` objects
+#' @param models List of at least two `mvgam_forecast` objects
 #' @return `NULL`, invisibly, or an error at the first mismatch
 #' @noRd
 validate_forecast_compatibility <- function(models) {
-  checkmate::assert_list(models)
-  if (length(models) < 2L) {
-    stop(insight::format_error(
-      "Ensembling requires at least two 'mvgam_forecast' inputs."
-    ), call. = FALSE)
-  }
-  ref <- models[[1L]]
-  ref_series <- ref$series_names
-  ref_n_hcs <- length(ref$hindcasts)
-  ref_n_fcs <- length(ref$forecasts)
-  ref_fc_horizons <- vapply(
-    ref$forecasts,
-    function(x) ncol(x), integer(1L)
-  )
-  ref_hc_lengths <- vapply(
-    ref$hindcasts,
-    function(x) ncol(x), integer(1L)
-  )
-  ref_test_obs <- ref$test_observations
+  checkmate::assert_list(models, min.len = 2L)
   for (i in seq_along(models)) {
     n_rows <- unique(vapply(
       c(models[[i]]$hindcasts, models[[i]]$forecasts), NROW, integer(1L)
@@ -193,65 +177,28 @@ validate_forecast_compatibility <- function(models) {
       )), call. = FALSE)
     }
   }
+  shape <- function(m) {
+    list(
+      "series names" = as.character(m$series_names),
+      "hindcast lengths" = vapply(m$hindcasts, NCOL, integer(1L)),
+      "forecast horizons" = vapply(m$forecasts, NCOL, integer(1L)),
+      "test observations" = m$test_observations
+    )
+  }
+  ref <- shape(models[[1L]])
   for (i in seq.int(2L, length(models))) {
-    cand <- models[[i]]
-    if (!identical(as.character(cand$series_names),
-                    as.character(ref_series))) {
-      stop(insight::format_error(c(
-        "Series names must match for all forecast inputs.",
-        x = paste0(
-          "Input ", i,
-          " has different series than the first input."
-        )
-      )), call. = FALSE)
+    cand <- shape(models[[i]])
+    # A forecast without test observations is compared on the rest
+    if (is.null(cand$`test observations`)) {
+      cand["test observations"] <- list(ref$`test observations`)
     }
-    if (length(cand$hindcasts) != ref_n_hcs ||
-          length(cand$forecasts) != ref_n_fcs) {
+    differs <- !mapply(identical, ref, cand)
+    if (any(differs)) {
       stop(insight::format_error(c(
-        paste0(
-          "All forecast inputs must have the same number of ",
-          "series in 'hindcasts' and 'forecasts'."
-        ),
-        x = paste0(
-          "Input ", i, " has ", length(cand$hindcasts),
-          " hindcast series and ", length(cand$forecasts),
-          " forecast series."
-        )
-      )), call. = FALSE)
-    }
-    cand_fc_horizons <- vapply(
-      cand$forecasts, function(x) ncol(x), integer(1L)
-    )
-    cand_hc_lengths <- vapply(
-      cand$hindcasts, function(x) ncol(x), integer(1L)
-    )
-    if (!identical(cand_fc_horizons, ref_fc_horizons)) {
-      stop(insight::format_error(c(
-        "Forecast horizons must match for all forecast inputs.",
-        x = paste0(
-          "Input ", i, " forecast horizons differ from the ",
-          "first input."
-        )
-      )), call. = FALSE)
-    }
-    if (!identical(cand_hc_lengths, ref_hc_lengths)) {
-      stop(insight::format_error(c(
-        "Hindcast lengths must match for all forecast inputs.",
-        x = paste0(
-          "Input ", i, " hindcast lengths differ from the ",
-          "first input."
-        )
-      )), call. = FALSE)
-    }
-    if (!is.null(ref_test_obs) &&
-          !is.null(cand$test_observations) &&
-          !identical(cand$test_observations, ref_test_obs)) {
-      stop(insight::format_error(c(
-        "Test observations must match for all forecast inputs.",
-        x = paste0(
-          "Input ", i, " has different test observations than ",
-          "the first input."
-        )
+        "Every forecast in an ensemble must align with the first.",
+        x = paste0("Input ", i, " differs in its ",
+                   names(ref)[which(differs)[1L]], "."),
+        i = "Forecast every model over the same 'newdata'."
       )), call. = FALSE)
     }
   }

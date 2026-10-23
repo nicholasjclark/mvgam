@@ -12,10 +12,12 @@
 #' trend model's parameters take the same names with a `_trend`
 #' suffix, such as `b_x_trend` or `sds_sx_1_trend`.
 #'
-#' A trend parameter with one entry per series takes the series' name
-#' as its index, as \pkg{brms} labels a grouping factor's levels. A
-#' model with series `DM` and `DO` has `sigma_trend[DM]`,
-#' `sigma_trend[DO]` and `ar1_trend[DM]`. Its factor loadings are
+#' An index that runs over the series takes the series' name, as
+#' \pkg{brms} labels a grouping factor's levels. A model with series
+#' `DM` and `DO` has `sigma_trend[DM]`, `ar1_trend[DM]` and the
+#' innovation covariance `Sigma_trend[DM,DO]`. A VAR's coefficients
+#' keep the lag as a number, as in `Phi_trend[1,DM,DO]`, as do the
+#' changepoints of `PW()` in `delta_trend[3,DM]`. Factor loadings are
 #' `Z_tilde[DM,1]`, with the factor as the second index. In a factor
 #' model the dynamics belong to the factors, as in `ar1_trend[1]`.
 #' The latent state matrices keep numeric indices, as in

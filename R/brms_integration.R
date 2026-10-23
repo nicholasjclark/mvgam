@@ -769,32 +769,36 @@ apply_trend_class_suffix <- function(class) {
 #' entries.
 #'
 #' @param sc The generated Stan code, as one string.
-#' @return A named list of `list(type, lb, ub, size)`, all character.
-#'   `lb`, `ub` and `size` are empty where the declaration has none.
+#' @return A named list of `list(type, lb, ub, size, array)`, all
+#'   character. `array` holds the sizes of an `array[...]` prefix. Each
+#'   field is empty where the declaration has none.
 #' @noRd
 stancode_declarations <- function(sc) {
   checkmate::assert_string(sc)
+  # A size may nest one index, as `[knots_1[1]]` does
+  size_re <- "\\[((?:[^][]|\\[[^]]*\\])*)\\]"
   decl_re <- paste0(
+    "(?:array[[:space:]]*", size_re, "[[:space:]]*)?",
     "(real|int|vector|row_vector|matrix|simplex|ordered|",
     "positive_ordered|unit_vector|cholesky_factor_corr|",
     "cholesky_factor_cov|corr_matrix|cov_matrix)",
     "[[:space:]]*(<[^>]*>)?",
-    # A size may nest one index, as `[knots_1[1]]` does.
-    "[[:space:]]*(?:\\[((?:[^][]|\\[[^]]*\\])*)\\])?",
+    "[[:space:]]*(?:", size_re, ")?",
     "[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*;"
   )
   out <- list()
   for (hit in regmatches(sc, gregexpr(decl_re, sc))[[1L]]) {
     m <- regmatches(hit, regexec(decl_re, hit))[[1L]]
-    if (length(m) < 5L) next
-    spec <- m[3L]
+    if (length(m) < 6L) next
+    spec <- m[4L]
     one <- function(which) {
       pat <- paste0(which, "[[:space:]]*=[[:space:]]*")
       if (!grepl(pat, spec)) return("")
       trimws(sub(paste0(".*", pat, "([^,>]+).*"), "\\1", spec))
     }
-    out[[m[5L]]] <- list(type = m[2L], lb = one("lower"),
-                         ub = one("upper"), size = trimws(m[4L]))
+    out[[m[6L]]] <- list(type = m[3L], lb = one("lower"),
+                         ub = one("upper"), size = trimws(m[5L]),
+                         array = trimws(m[2L]))
   }
   out
 }

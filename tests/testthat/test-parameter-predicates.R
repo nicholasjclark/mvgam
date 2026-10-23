@@ -322,18 +322,25 @@ test_that("series-indexed parameters take series names", {
       theta_features_hair = "theta_features[2]",
       `Z[ant,1]` = "Z[1,1]", `Z_tilde[bee,1]` = "Z_tilde[2,1]")
   )
-  # Without factors a vector the program sizes by series takes series
-  # names. `b_trend` is sized by its coefficients and keeps its index.
+  # Without factors every dimension the program sizes by series takes
+  # series names. `b_trend` is sized by its coefficients and the lag of
+  # `Phi_trend` by the lags. Those indices stay numeric. So do all the
+  # indices of a state, being indexed by time too.
   stub$stancode <- paste(
     "vector<lower=0>[N_lv_trend] sigma_trend;",
     "vector[K_trend] b_trend;",
+    "cov_matrix[N_lv_trend] Sigma_trend;",
+    "array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] Phi_trend;",
     "matrix[N_time_trend, N_lv_trend] lv_trend;",
     sep = "\n"
   )
   expect_identical(
     mvgam_index_aliases(stub, c("sigma_trend[2]", "b_trend[1]",
+                                "Sigma_trend[2,1]", "Phi_trend[3,1,2]",
                                 "lv_trend[1,2]")),
-    c(`sigma_trend[bee]` = "sigma_trend[2]")
+    c(`sigma_trend[bee]` = "sigma_trend[2]",
+      `Sigma_trend[bee,ant]` = "Sigma_trend[2,1]",
+      `Phi_trend[3,ant,bee]` = "Phi_trend[3,1,2]")
   )
 })
 

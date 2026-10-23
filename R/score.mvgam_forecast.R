@@ -19,14 +19,14 @@
 score <- function(object, ...) UseMethod("score")
 
 
-#' The univariate scores that take `interval_width` and `log`
+#' The scores that take `log = TRUE`
 #'
-#' The `brier` score grades a binary outcome. The `twcrps` score sets
-#' its thresholds on the untransformed scale. A log transform of the
-#' draws alone gives neither of them a defined meaning.
+#' The `brier` score grades a binary outcome. The threshold-weighted
+#' scores set their thresholds on the untransformed scale. The `logs`,
+#' `dss` and `qs` scores grade the draws as they are.
 #'
 #' @noRd
-scores_honouring_log <- c("crps", "drps", "sis")
+scores_honouring_log <- c("crps", "drps", "sis", "energy", "variogram")
 
 
 #' The scores that grade every series jointly
@@ -36,6 +36,23 @@ scores_honouring_log <- c("crps", "drps", "sis")
 #'
 #' @noRd
 joint_forecast_scores <- c("energy", "variogram", "twenergy")
+
+
+#' The axis label of each score
+#'
+#' @param score Character name of a score
+#' @return Character scalar
+#' @noRd
+score_label <- function(score) {
+  checkmate::assert_string(score)
+  labels <- c(crps = "CRPS", drps = "DRPS", sis = "Scaled interval score",
+              brier = "Brier score", logs = "Log score",
+              dss = "Dawid-Sebastiani score", qs = "Quantile score",
+              twcrps = "Threshold-weighted CRPS", energy = "Energy score",
+              variogram = "Variogram score",
+              twenergy = "Threshold-weighted energy score")
+  if (score %in% names(labels)) labels[[score]] else score
+}
 
 
 #' Proper scoring rules for `mvgam_forecast` objects
@@ -87,11 +104,11 @@ joint_forecast_scores <- c("energy", "variogram", "twenergy")
 #'   `"twenergy"`. Defaults `-Inf` / `Inf` recover the
 #'   unweighted scores.
 #' @param log Logical; apply `log(x + 0.001)` to truth and
-#'   forecast draws before scoring. Honoured by `"crps"`,
-#'   `"drps"` and `"sis"`; passing `TRUE` with any other score is
-#'   an error, since `"brier"` scores a binary outcome and
-#'   `"twcrps"` carries its thresholds on the untransformed
-#'   scale.
+#'   forecast draws before scoring. Taken by `"crps"`, `"drps"`,
+#'   `"sis"`, `"energy"` and `"variogram"`. Passing `TRUE` with any
+#'   other score is an error. `"brier"` scores a binary outcome.
+#'   `"twcrps"` and `"twenergy"` set their thresholds on the
+#'   untransformed scale.
 #' @param weights Optional length-`n_series` numeric vector of
 #'   per-series weights for `"variogram"`.
 #' @param ... Currently unused.
@@ -182,8 +199,6 @@ score.mvgam_forecast <- function(object,
   checkmate::assert_number(upper)
   checkmate::assert_flag(log)
 
-  # `log` reaches three of the eight univariate scorers. With any
-  # other score the transform would have no effect on the result.
   if (isTRUE(log) && !score %in% scores_honouring_log) {
     stop(insight::format_error(c(
       paste0("'log = TRUE' does not apply to score '", score, "'."),
@@ -221,10 +236,10 @@ score.mvgam_forecast <- function(object,
 
 #' Refuse a forecast that cannot be scored
 #'
-#' Both score branches call it. A `trend` forecast is on the link scale
-#' of the latent state and cannot be scored against observations. A
-#' forecast needs held-out forecasts and observations. The `brier` score
-#' needs a Bernoulli family for every series.
+#' Both score branches call it. A `link` or `trend` forecast is on the
+#' link scale and cannot be scored against observations. A forecast
+#' needs held-out forecasts and observations. The `brier` score needs a
+#' Bernoulli family for every series.
 #'
 #' @param object Object of class `mvgam_forecast`
 #' @param score Character name of the score
@@ -233,15 +248,11 @@ score.mvgam_forecast <- function(object,
 validate_scoreable_forecast <- function(object, score) {
   checkmate::assert_list(object)
   checkmate::assert_string(score)
-  if (identical(object$type, "trend")) {
+  if (object$type %in% c("link", "trend")) {
     stop(insight::format_error(c(
-      "Cannot score a 'trend'-type forecast.",
-      x = "test_observations are on the response scale.",
-      x = "The forecast is on the latent-state link scale.",
-      i = paste0(
-        "Re-run 'forecast()' with type = 'response' or ",
-        "'expected'."
-      )
+      "Scoring requires a 'response' or 'expected' forecast.",
+      x = paste0("A '", object$type, "' forecast holds link-scale draws."),
+      i = "Re-run 'forecast()' with type = 'response' or 'expected'."
     )), call. = FALSE)
   }
   if (is.null(object$forecasts) ||
@@ -297,8 +308,7 @@ score_univariate <- function(object, series_names, score,
   series_score <- lapply(series_names, function(lv) {
     truth <- object$test_observations[[lv]]
     fc <- object$forecasts[[lv]]
-    if (is.null(truth) || length(truth) == 0L ||
-        is.null(fc) || ncol(fc) == 0L) {
+    if (!has_heldout(truth, fc)) {
       return(empty_score_df())
     }
     kernel_out <- dispatch_univariate_score(
@@ -322,6 +332,17 @@ score_univariate <- function(object, series_names, score,
     series_score, score, object$test_times[series_names]
   )
   series_score
+}
+
+
+#' Whether a series holds held-out observations and forecasts
+#'
+#' @param truth Numeric vector of held-out observations, or `NULL`
+#' @param fc Numeric matrix of forecast draws, or `NULL`
+#' @return Logical scalar
+#' @noRd
+has_heldout <- function(truth, fc) {
+  length(truth) > 0L && !is.null(fc) && ncol(fc) > 0L
 }
 
 
@@ -444,11 +465,7 @@ score_multivariate <- function(object, series_names, score,
   fcs <- lapply(series_names, function(lv) {
     object$forecasts[[lv]]
   })
-  ok <- vapply(seq_along(series_names), function(i) {
-    !(is.null(truths_list[[i]]) ||
-        length(truths_list[[i]]) == 0L ||
-        is.null(fcs[[i]]) || ncol(fcs[[i]]) == 0L)
-  }, logical(1L))
+  ok <- mapply(has_heldout, truths_list, fcs)
   if (!any(ok)) {
     stop(insight::format_error(
       "No held-out series available for multivariate scoring."
@@ -465,11 +482,10 @@ score_multivariate <- function(object, series_names, score,
     )), call. = FALSE)
   }
 
-  series_score <- lapply(series_names, function(lv) {
-    truth <- object$test_observations[[lv]]
-    fc <- object$forecasts[[lv]]
-    if (is.null(truth) || length(truth) == 0L ||
-        is.null(fc) || ncol(fc) == 0L) {
+  series_score <- lapply(seq_along(series_names), function(i) {
+    truth <- truths_list[[i]]
+    fc <- fcs[[i]]
+    if (!ok[i]) {
       return(empty_score_df())
     }
     cov_indicator <- vapply(
@@ -582,7 +598,7 @@ dispatch_multivariate_score <- function(score, truths, fcs,
       truths, fcs, log = log, weights = weights
     ),
     "twenergy" = twenergy_mcmc_object(
-      truths, fcs, lower = lower, upper = upper, log = log
+      truths, fcs, lower = lower, upper = upper
     )
   )
 }
