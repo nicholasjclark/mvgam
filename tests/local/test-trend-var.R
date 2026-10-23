@@ -934,14 +934,15 @@ test_that("the plotting methods render for a VAR fit", {
   panel <- as.character(mcmc_plot(fit)$data$parameter)
   # The default panel shows the interpretable parameters under the
   # names `variables()` lists.
+  sigma_1 <- paste0("sigma_trend[", fitted_series_levels(fit)[1L], "]")
   expect_true(all(
-    c("b_elev", "sd_block__Intercept", "sigma_trend[1]") %in% panel
+    c("b_elev", "sd_block__Intercept", sigma_1) %in% panel
   ))
   # The per-level deviations stay out of the default panel.
   # `variable` selects them.
   expect_false(any(grepl("^r_block", panel)))
   expect_s3_class(
-    pairs(fit, variable = c("sigma", "sigma_trend[1]")),
+    pairs(fit, variable = c("sigma", sigma_1)),
     "bayesplot_grid"
   )
   expect_drawn(plot(conditional_effects(fit))[[1L]])

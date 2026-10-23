@@ -466,7 +466,7 @@ simdat_car <- sim_mvgam(
   n_timepoints = 120L
 )
 
-# Fit the CAR(1) model. ar1_trend[1] is the damping over the
+# Fit the CAR(1) model. ar1_trend is the damping over the
 # median gap between observations.
 mod_car <- mvgam(
   y ~ 1,

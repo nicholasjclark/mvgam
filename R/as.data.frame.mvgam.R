@@ -23,7 +23,9 @@
 #'       (autoregressive coefficients, innovation SDs, ...).
 #'     \item `"trend_smooth_params"`: trend-side smooth SDs.
 #'   }
-#'   `NULL` (the default) returns every parameter.
+#'   `NULL` (the default) returns every parameter. A bare vector name,
+#'   such as `"sigma_trend"`, selects every element. [variables.mvgam()]
+#'   lists the exact names and how they are formed.
 #' @param regex Logical. When `TRUE`, each entry of `variable` is
 #'   treated as a regular expression and any parameter matching at
 #'   least one pattern is selected. Keyword shortcuts are still
@@ -391,10 +393,14 @@ stan_index <- function(v) {
 }
 
 
-#' Names for the factor parameters a Stan index alone labels
+#' Names for the parameters a Stan index alone labels
 #'
-#' Each row of the loadings `Z[i, k]` and `Z_tilde[i, k]` is a series,
-#' and takes the series' name, as brms names `r_<group>[level,term]`.
+#' brms labels an index that runs over a factor's levels with the
+#' level, as in `r_<group>[level,term]`. The same holds here. Each row
+#' of the loadings `Z[i, k]` and `Z_tilde[i, k]` is a series and takes
+#' the series' name. In a fit without factors, a trend vector of
+#' `N_lv_trend` or `N_series_trend` entries holds one entry per
+#' series. `sigma_trend[k]` then takes the name of series `k`.
 #' `theta_features[k]` is the length scale of the `k`th column of the
 #' encoded features matrix. It takes that column's name, as each
 #' distance length scale is named `theta_dist_<name>`.
@@ -403,7 +409,7 @@ stan_index <- function(v) {
 #' @param raw Character vector of the Stan names in the posterior
 #' @return Named character vector mapping user names to Stan names
 #' @noRd
-mvgam_factor_aliases <- function(x, raw) {
+mvgam_index_aliases <- function(x, raw) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(raw)
   out <- character(0L)
@@ -413,13 +419,28 @@ mvgam_factor_aliases <- function(x, raw) {
     theta <- theta[order(as.integer(stan_index(theta)))]
     out <- stats::setNames(theta, paste0("theta_features_", features))
   }
-  loadings <- grep("^Z(_tilde)?\\[[0-9]+,[0-9]+\\]$", raw, value = TRUE)
   series <- fitted_series_levels(x)
+  loadings <- grep("^Z(_tilde)?\\[[0-9]+,[0-9]+\\]$", raw, value = TRUE)
   row <- as.integer(sub("^.*\\[([0-9]+),.*$", "\\1", loadings))
   if (length(loadings) > 0L && max(row) <= length(series)) {
     named <- paste0(sub("\\[.*$", "", loadings), "[", series[row], ",",
                     sub("^.*,([0-9]+)\\]$", "\\1", loadings), "]")
     out <- c(out, stats::setNames(loadings, named))
+  }
+  if (is.null(x$stancode) ||
+        !is.null(detect_factor_n_lv(x, length(series)))) {
+    return(out)
+  }
+  declared <- stancode_declarations(paste(x$stancode, collapse = "\n"))
+  per_series <- names(Filter(function(d) {
+    d$type == "vector" && d$size %in% c("N_lv_trend", "N_series_trend")
+  }, declared))
+  base <- sub("\\[.*$", "", raw)
+  vec <- raw[base %in% per_series & grepl("\\[[0-9]+\\]$", raw)]
+  k <- as.integer(stan_index(vec))
+  if (length(vec) > 0L && max(k) <= length(series)) {
+    named <- paste0(sub("\\[.*$", "", vec), "[", series[k], "]")
+    out <- c(out, stats::setNames(vec, named))
   }
   out
 }
@@ -518,7 +539,7 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   user <- apply_mvgam_aliases(
     raw, c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x),
            mvgam_smooth_aliases(x, raw), mvgam_special_aliases(x, raw),
-           mvgam_factor_aliases(x, raw))
+           mvgam_index_aliases(x, raw))
   )
   # The empty-observation placeholder is a structural column mvgam
   # adds for a design brms cannot build. The user wrote no such
@@ -788,7 +809,7 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
         grep(p, all_vars, value = TRUE)
       })))
     } else {
-      intersect(free, all_vars)
+      intersect(expand_variable_names(free, all_vars), all_vars)
     }
   }
   # Keyword shortcuts may legitimately return an empty set (e.g.
@@ -813,6 +834,27 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
     return(posterior::subset_draws(drws, variable = character(0L)))
   }
   posterior::subset_draws(drws, variable = matched)
+}
+
+
+#' Parameter names a request selects
+#'
+#' A name selects itself. A bare vector name, such as `sigma_trend`,
+#' selects every element, as `posterior::subset_draws()` does. A
+#' request that matches nothing is kept for the caller's error to name.
+#'
+#' @param variable Character vector of requested names
+#' @param available Character vector of the names a fit holds
+#' @return Character vector of names
+#' @noRd
+expand_variable_names <- function(variable, available) {
+  checkmate::assert_character(variable)
+  checkmate::assert_character(available)
+  base <- sub("\\[.*\\]$", "", available)
+  unique(unlist(lapply(variable, function(v) {
+    hit <- available[available == v | base == v]
+    if (length(hit) > 0L) hit else v
+  })))
 }
 
 

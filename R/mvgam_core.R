@@ -36,7 +36,7 @@ mvgam_removed_args <- c(
     "the parameters a fit keeps are chosen with 'save_pars', as in ",
     "'save_pars = brms::save_pars(all = TRUE)'"
   ),
-  parallel = "use 'cores', which brms passes to the backend",
+  parallel = "'cores' sets how many chains run in parallel",
   sparse = paste0(
     "a sparse design matrix is requested on the formula, as in ",
     "'bf(y ~ x, sparse = TRUE)'"
@@ -440,8 +440,11 @@ mvgam_imputation_forwarded <- c(
 #'   and `latent` keep the per-level deviations and the latent values
 #'   of a `me()` covariate. `manual` names individual parameters to
 #'   keep.
-#' @param ... Additional arguments passed to Stan fitting. Two are worth
-#'   calling out. `algorithm` selects how the posterior is explored and
+#' @param ... Additional arguments passed to Stan fitting. `cores` sets
+#'   how many chains sample at once. It defaults to
+#'   `getOption("mc.cores")` when that option is set. Otherwise it is
+#'   one fewer than the machine's cores, up to `chains`. Two more are
+#'   worth calling out. `algorithm` selects how the posterior is explored and
 #'   accepts `"sampling"` (the default), `"meanfield"`, `"fullrank"` or
 #'   `"fixed_param"` on either backend, plus `"pathfinder"` and
 #'   `"laplace"` when `backend = "cmdstanr"`. `init` sets the starting
@@ -797,10 +800,9 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   warn_positive_mean_link_with_trend(formula, family, trend_formula)
 
   # Single dataset processing. `threads` is forwarded only when the
-  # user actually set it; sending `threads = NULL` explicitly down
-  # the pipeline trips the `assert_int(threads, lower = 1)` check
-  # in stancode.mvgam_formula (which has its own positive-integer
-  # default of `getOption("mc.cores", 1)`).
+  # user set it. `threads = NULL` would fail the
+  # `assert_int(threads, lower = 1)` check in `build_stan_components()`,
+  # which defaults to one thread.
   mvgam_single_args <- list(
     formula = formula,
     trend_formula = trend_formula,
@@ -1027,7 +1029,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
       i = "Use 'run_model = FALSE' to build the model without sampling."
     )), call. = FALSE)
   }
-  cores <- dots$cores %||% 1
+  cores <- dots$cores %||% default_cores(chains)
   threads <- dots$threads %||% NULL
   opencl <- dots$opencl %||% NULL
   init <- dots$init %||% "random"

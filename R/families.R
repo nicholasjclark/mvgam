@@ -6918,6 +6918,26 @@ posterior_latent_N <- function(object, newdata = NULL,
 }
 
 
+#' Expected closure-unit latent state at each unit
+#'
+#' The mean of the latent state given the covariates: `lambda` for an
+#' `nmix()` variant, `psi` for `occ()`. `get_predict.mvgam()` returns
+#' it for effects plots and marginal predictions. A prediction grid
+#' holds no observed visits. Its placeholder counts would otherwise
+#' condition the state.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family
+#' @param newdata Long-format data, or `NULL` for the training data
+#' @param draw_ids Posterior draw indices, or `NULL`
+#' @return `[S x N_unit]` numeric matrix
+#' @noRd
+expected_latent_state <- function(object, newdata = NULL,
+                                  draw_ids = NULL) {
+  require_closure_unit_predict_type(object$family, "latent_state")
+  extract_closure_unit_components(object, newdata, draw_ids)$state
+}
+
+
 #' Per-unit posterior saturation of the closure-unit K_max truncation
 #'
 #' For a fit using a closure-unit family, reports the share of

@@ -18,10 +18,8 @@ of the series. Defaults to all.}
 A \code{ggplot} object.
 }
 \description{
-Faceted ribbon plot over the unit / time axis, with the
-posterior median, 50\% credible interval, and 95\% credible
-interval per series. For integer-valued state (\code{nmix} variants)
-the ribbon is drawn step-style to match the discrete domain; for
-continuous state (\code{occ()} posterior occupancy probability) the
-ribbon is drawn smooth.
+Faceted plot of the posterior median with its 50\% and 95\% credible
+intervals per series. Over a time axis the state is drawn as a line
+with ribbons. Units without an order, such as the sites of a
+single-season design, are drawn as points with interval bars.
 }

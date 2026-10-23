@@ -50,7 +50,8 @@ parameter names of \code{brms::hypothesis.brmsfit()}. By default a
 hypothesis names population-level coefficients without their \code{b_}
 prefix, as \code{"x > 0"} tests \code{b_x}. \code{class = NULL} names any
 parameter by the full name \code{\link[=variables.mvgam]{variables.mvgam()}} lists, such as
-\code{ar1_trend[1]} or \code{sigma}.
+\code{ar1_trend[series_1]} or \code{sigma}. That help page sets out how the
+names are formed.
 }
 \examples{
 \dontrun{
@@ -68,7 +69,8 @@ mod <- mvgam(y ~ x,
 hypothesis(mod, "x > 0")
 
 # Any parameter by its full name.
-hypothesis(mod, c("ar1_trend[1] > 0", "sigma_trend[1] < 1"),
+hypothesis(mod, c("ar1_trend[series_1] > 0",
+                  "sigma_trend[series_1] < 1"),
            class = NULL)
 }
 

@@ -275,10 +275,12 @@ new_mvgam_forecast <- function(object, type, resp, reported, training,
       series_names = factor(reported, levels = reported),
       train_observations = pick(training$observations),
       train_times = if (!is.null(training)) {
-        pick(hindcast_column_times(object, type, resp, training))
+        pick(column_times(object, type, resp, training))
       },
       test_observations = pick(fc_grid$observations),
-      test_times = pick(fc_grid$times),
+      test_times = if (!is.null(fc_grid)) {
+        pick(column_times(object, type, resp, fc_grid))
+      },
       hindcasts = hindcasts,
       forecasts = forecasts
     ),
@@ -410,26 +412,23 @@ build_training_arms <- function(object, series_levels, resp = NULL,
 }
 
 
-#' The time of each column of a hindcast matrix
+#' The time of each column of a hindcast or forecast matrix
 #'
-#' `build_hindcast_arms()` predicts a closure-unit family's `expected`
-#' and `response` predictions per visit row. Every other type takes one
-#' column per occasion. `plot()` and `summary()` pair each column with
+#' A closure-unit family's `expected` and `response` predictions take
+#' one column per visit row. Every other type takes one column per
+#' occasion. `plot()`, `summary()` and `score()` pair each column with
 #' its time by position.
 #'
 #' @param object A fitted `mvgam` object
 #' @param type The prediction type
 #' @param resp A response name, or NULL
-#' @param training The training data from `build_training_arms()`
+#' @param grid The training data from `build_training_arms()` or the
+#'   forecast grid from `resolve_forecast_grid()`
 #' @return List of times, one vector per series
 #' @noRd
-hindcast_column_times <- function(object, type, resp, training) {
-  checkmate::assert_list(training)
-  if (hindcast_per_row(object, type, resp)) {
-    training$row_times
-  } else {
-    training$times
-  }
+column_times <- function(object, type, resp, grid) {
+  checkmate::assert_list(grid)
+  if (hindcast_per_row(object, type, resp)) grid$row_times else grid$times
 }
 
 
@@ -574,7 +573,8 @@ resolve_forecast_grid <- function(object, newdata, training,
     fc_data <- fc_data[
       order(fc_data[[time_var]]), , drop = FALSE
     ]
-    return(list(data = fc_data, times = fc_times,
+    # One row per occasion, which every series shares
+    return(list(data = fc_data, times = fc_times, row_times = fc_times,
                 observations = fc_observations,
                 time_var = time_var))
   }
@@ -616,17 +616,20 @@ resolve_forecast_grid <- function(object, newdata, training,
     newdata[[time_var]][i] %in% fc_times[[lv]]
   }, logical(1L))
   fc_data <- newdata[keep, , drop = FALSE]
-  fc_data <- fc_data[
-    order(
-      match(as.character(series_fac[keep]), series_levels),
-      fc_data[[time_var]]
-    ), ,
-    drop = FALSE
-  ]
+  fc_series <- series_fac[keep]
+  row_order <- order(match(as.character(fc_series), series_levels),
+                     fc_data[[time_var]])
+  fc_data <- fc_data[row_order, , drop = FALSE]
+  fc_series <- fc_series[row_order]
+  # A closure-unit frame holds several visit rows per occasion
+  row_times <- lapply(stats::setNames(nm = series_levels), function(lv) {
+    fc_data[[time_var]][fc_series == lv]
+  })
 
   list(
     data = fc_data,
     times = fc_times,
+    row_times = row_times,
     observations = fc_observations,
     time_var = time_var
   )
@@ -845,21 +848,12 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
   # Scoped to one response, which gives one draws matrix
   full <- predictor(object, newdata = fc_data, draw_ids = draw_idx,
                     resp = resp)
-
-  # The rows take their series as the fit placed them. On a wide frame
-  # every row belongs to the response this call is for.
-  series_fac <- if (is_response_keyed(object)) {
-    factor(rep(resp, nrow(fc_data)), levels = series_levels)
-  } else {
-    axis_row_series(object, fc_data) %||%
-      factor(
-        fc_data[[axis_vars(object)$series_var]],
-        levels = series_levels
-      )
-  }
-  lapply(stats::setNames(nm = series_levels), function(lv) {
-    full[, which(series_fac == lv), drop = FALSE]
-  })
+  slice_per_series(
+    full, fc_grid,
+    get_observation_structure(object, newdata = fc_data, resp = resp),
+    length(draw_idx), series_levels,
+    per_row = hindcast_per_row(object, type, resp)
+  )
 }
 
 
@@ -914,8 +908,10 @@ build_forecast_arms <- function(object, trend_model, meta,
   # One step per occasion of the forecast grid. Series forecast at
   # their own times make the union longer than any one series.
   h_max <- length(obs_struct_fc$unique_times)
+  per_row <- hindcast_per_row(object, type, resp)
   arms_of <- function(mat) {
-    slice_per_series(mat, fc_grid, obs_struct_fc, ndraws_use, reported)
+    slice_per_series(mat, fc_grid, obs_struct_fc, ndraws_use, reported,
+                     per_row = per_row)
   }
 
   # The linear predictors are computed once, over every draw, and the
@@ -1383,12 +1379,16 @@ pw_cap_link_family <- function(families) {
 #' @param obs_struct Observation structure of the forecast grid
 #' @param ndraws_use Number of draws
 #' @param series_levels The series to report
+#' @param per_row Whether each visit row of a closure unit keeps its
+#'   own column. Otherwise each occasion takes its first row.
 #' @return Named list of `[ndraws_use, h_s]` matrices, one column per
-#'   forecast time of each series
+#'   forecast time of each series, or per row with `per_row`
 #' @noRd
 slice_per_series <- function(mat, fc_grid, obs_struct,
-                             ndraws_use, series_levels) {
+                             ndraws_use, series_levels,
+                             per_row = FALSE) {
   checkmate::assert_matrix(mat, nrows = ndraws_use)
+  checkmate::assert_flag(per_row)
   # The forecast times come from this column too. Both sides hold the
   # same doubles. Labels printed from them lose digits.
   raw_times <- as.numeric(fc_grid$data[[fc_grid$time_var]])
@@ -1399,6 +1399,7 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
     rows <- which(
       obs_struct$series_int == match(lv, obs_struct$series_levels)
     )
+    if (per_row) return(mat[, rows, drop = FALSE])
     cells <- rows[match(as.numeric(ts), raw_times[rows])]
     if (anyNA(cells)) {
       stop_mvgam_fault(

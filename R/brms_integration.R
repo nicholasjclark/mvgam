@@ -236,8 +236,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # stanvars and do not depend on this path.
   dots <- list(...)
   # Threads are forwarded only when the user asked for more than one.
-  # The upstream default `threads = getOption("mc.cores", 1)` would
-  # otherwise wrap every fit in brms's `partial_log_lik_lpmf`, adding
+  # brms otherwise wraps the fit in its `partial_log_lik_lpmf`, adding
   # compile time for no gain.
   raw_threads <- dots$threads
   if (inherits(raw_threads, "brmsthreads")) {
@@ -761,38 +760,41 @@ apply_trend_class_suffix <- function(class) {
 }
 
 
-#' The bounds each parameter is declared with, keyed by name
+#' The declaration of each Stan variable, keyed by name
 #'
-#' A Stan declaration carries the parameter's support in the same
-#' line that names it, as `vector<lower=-1, upper=1>[N] ar1_trend;`.
-#' The prior table takes its bounds from the compiled program.
+#' A Stan declaration carries the variable's type, support and size in
+#' the line that names it, as `vector<lower=-1, upper=1>[N] ar1_trend;`.
+#' The prior table takes the bounds from the compiled program. The
+#' parameter names take the size, from which they label a vector's
+#' entries.
 #'
 #' @param sc The generated Stan code, as one string.
-#' @return A named list of `list(lb, ub)`, both character and empty
-#'   where the declaration names no bound.
+#' @return A named list of `list(type, lb, ub, size)`, all character.
+#'   `lb`, `ub` and `size` are empty where the declaration has none.
 #' @noRd
-stancode_declared_bounds <- function(sc) {
+stancode_declarations <- function(sc) {
   checkmate::assert_string(sc)
   decl_re <- paste0(
-    "(?:real|int|vector|row_vector|matrix|simplex|ordered|",
+    "(real|int|vector|row_vector|matrix|simplex|ordered|",
     "positive_ordered|unit_vector|cholesky_factor_corr|",
     "cholesky_factor_cov|corr_matrix|cov_matrix)",
     "[[:space:]]*(<[^>]*>)?",
     # A size may nest one index, as `[knots_1[1]]` does.
-    "[[:space:]]*(?:\\[(?:[^][]|\\[[^]]*\\])*\\])?",
+    "[[:space:]]*(?:\\[((?:[^][]|\\[[^]]*\\])*)\\])?",
     "[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*;"
   )
   out <- list()
   for (hit in regmatches(sc, gregexpr(decl_re, sc))[[1L]]) {
     m <- regmatches(hit, regexec(decl_re, hit))[[1L]]
-    if (length(m) < 3L) next
-    spec <- m[2L]
+    if (length(m) < 5L) next
+    spec <- m[3L]
     one <- function(which) {
       pat <- paste0(which, "[[:space:]]*=[[:space:]]*")
       if (!grepl(pat, spec)) return("")
       trimws(sub(paste0(".*", pat, "([^,>]+).*"), "\\1", spec))
     }
-    out[[m[3L]]] <- list(lb = one("lower"), ub = one("upper"))
+    out[[m[5L]]] <- list(type = m[2L], lb = one("lower"),
+                         ub = one("upper"), size = trimws(m[4L]))
   }
   out
 }
@@ -827,7 +829,7 @@ mvgam_stancode_prior_rows <- function(sc) {
   # prior. Without the bounds an autoregressive coefficient held inside
   # (-1, 1) would report `normal(0, 0.5)` with half its mass outside
   # the support.
-  declared <- stancode_declared_bounds(sc)
+  declared <- stancode_declarations(sc)
 
   rows <- list()
   seen <- character(0L)
@@ -1002,7 +1004,7 @@ brms_declared_params <- function(stancode) {
   if (is.null(stancode)) return(character(0L))
   lines <- strsplit(paste(stancode, collapse = "\n"), "\n", fixed = TRUE)[[1L]]
   body <- stan_block_body(lines, "parameters")
-  names(stancode_declared_bounds(paste(body, collapse = "\n")))
+  names(stancode_declarations(paste(body, collapse = "\n")))
 }
 
 

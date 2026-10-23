@@ -14,7 +14,7 @@
   knots = NULL,
   drop_unused_levels = TRUE,
   backend = "rstan",
-  threads = getOption("mc.cores", 1),
+  threads = 1L,
   normalize = TRUE,
   save_model = NULL,
   silent = 1L,
@@ -78,8 +78,8 @@ Default is \code{TRUE}.}
 \item{backend}{Character string specifying Stan backend. Options:
 \code{"rstan"} (default) or \code{"cmdstanr"}.}
 
-\item{threads}{Number of threads to use for parallelization. Default is
-\code{getOption("mc.cores", 1)}.}
+\item{threads}{Number of threads within each chain. Default is
+\code{1}.}
 
 \item{normalize}{Logical; should brms drop the normalising constants
 from its sampling statements? Default is \code{TRUE}.}

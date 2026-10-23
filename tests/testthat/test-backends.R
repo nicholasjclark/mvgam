@@ -397,3 +397,14 @@ test_that("assert_stan_version() rejects the mock backend", {
   # would be meaningless
   expect_error(mvgam:::assert_stan_version("mock", "2.26.0"), "backend")
 })
+
+test_that("chains sample in parallel by default", {
+  withr::local_options(mc.cores = 3L)
+  expect_identical(default_cores(4L), 3L)
+  withr::local_options(mc.cores = NULL)
+  local_mocked_bindings(detectCores = function(...) 6L,
+                        .package = "parallel")
+  # One core stays free and no more cores than chains are taken
+  expect_identical(default_cores(4L), 4L)
+  expect_identical(default_cores(8L), 5L)
+})

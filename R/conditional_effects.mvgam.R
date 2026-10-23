@@ -185,7 +185,7 @@ conditional_effects.mvgam <- function(x,
 
   if (any(lengths(cond_labs) > 3L)) {
     stop(insight::format_error(c(
-      "Effects of order higher than 3 are not supported by conditional_effects.",
+      "Effects of more than three variables are not supported.",
       i = cli::format_inline(paste0(
         "Use {.fn marginaleffects::plot_predictions} directly to ",
         "build the higher-order plot."
@@ -305,7 +305,13 @@ conditional_effects.mvgam <- function(x,
       pp_args$condition, series_var
     )
     # marginaleffects labels the y axis with the model's first
-    # response. On a multivariate fit the label names `resp`.
+    # response. A closure-unit state or detection axis takes its own
+    # name. On a multivariate fit the label names `resp`.
+    if (type %in% c("latent_state", "detection")) {
+      p <- p + ggplot2::labs(y = closure_unit_labels(x$family)[[
+        if (type == "detection") "detection" else "label"
+      ]])
+    }
     if (!is.null(resp)) {
       p <- p + ggplot2::labs(y = resp)
       # The overlay inside `plot_predictions()` takes the

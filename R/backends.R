@@ -907,6 +907,24 @@ is.brmsthreads <- function(x) {
   inherits(x, "brmsthreads")
 }
 
+#' Number of chains to sample at once
+#'
+#' `getOption("mc.cores")` when set, as in brms. Otherwise one fewer
+#' than the machine's cores, which keeps one free. The count never
+#' exceeds the number of chains.
+#'
+#' @param chains Number of chains
+#' @return Positive integer
+#' @noRd
+default_cores <- function(chains) {
+  checkmate::assert_int(chains, lower = 1L)
+  set <- getOption("mc.cores")
+  if (!is.null(set)) return(as.integer(set))
+  available <- parallel::detectCores()
+  if (is.na(available)) available <- 1L
+  as.integer(max(1L, min(chains, available - 1L)))
+}
+
 #' Validate the threading argument
 #' @description
 #' Validates and normalizes the threads argument for Stan threading.

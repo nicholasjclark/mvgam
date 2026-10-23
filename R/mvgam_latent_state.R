@@ -27,10 +27,6 @@
 #'   columns `series` (factor) and `time` (integer / numeric). Row
 #'   order matches the columns of `draws`.
 #' @param family The fitted family object.
-#' @param state_label Character; the human label for the state
-#'   (e.g. `"Latent abundance (N)"` or `"Occupancy probability (psi)"`).
-#' @param state_short Character; short symbol for the state used in
-#'   print output (e.g. `"N"`, `"psi"`).
 #' @param has_time Logical. `TRUE` when the fit carries a real time
 #'   dimension; `FALSE` when `time` is just the unit index.
 #'
@@ -38,30 +34,57 @@
 #'
 #' @noRd
 new_mvgam_latent_state <- function(draws, unit, family,
-                                     state_label, state_short,
                                      has_time = FALSE) {
   checkmate::assert_matrix(draws, mode = "numeric",
                             any.missing = FALSE)
   checkmate::assert_data_frame(unit, min.rows = 1L)
   checkmate::assert_subset(c("series", "time"), names(unit))
   checkmate::assert_factor(unit$series)
-  checkmate::assert_string(state_label)
-  checkmate::assert_string(state_short)
   checkmate::assert_flag(has_time)
   if (ncol(draws) != nrow(unit)) {
     stop_shape_fault("The latent-state draws", ncol(draws), nrow(unit))
   }
+  state <- closure_unit_labels(family)
   structure(
     list(
       draws        = draws,
       unit         = unit,
       family       = family,
-      state_label  = state_label,
-      state_short  = state_short,
+      state_label  = state$label,
+      state_short  = state$short,
       has_time     = has_time
     ),
     class = "mvgam_latent_state"
   )
+}
+
+
+#' Axis labels of a closure-unit family's state and detection
+#'
+#' An `nmix()` variant holds a latent abundance `N`. Every other
+#' closure-unit family with a latent state holds an occupancy
+#' probability `psi`. `nmix("poisson_poisson")` models an encounter
+#' rate per individual. The other families model a probability of
+#' detection.
+#'
+#' @param family A closure-unit family object
+#' @return List with the state's axis `label`, its `short` symbol and
+#'   the `detection` axis label
+#' @noRd
+closure_unit_labels <- function(family) {
+  detection <- if (identical(attr(family, "mvgam_nmix_type"),
+                             "poisson_poisson")) {
+    "Encounter rate (p)"
+  } else {
+    "Detection probability (p)"
+  }
+  if (models_latent_count(family)) {
+    list(label = "Latent abundance (N)", short = "N",
+         detection = detection)
+  } else {
+    list(label = "Occupancy probability (psi)", short = "psi",
+         detection = detection)
+  }
 }
 
 
@@ -150,12 +173,10 @@ print.mvgam_latent_state <- function(x, digits = 2L, ...) {
 
 #' Plot the posterior latent state
 #'
-#' Faceted ribbon plot over the unit / time axis, with the
-#' posterior median, 50% credible interval, and 95% credible
-#' interval per series. For integer-valued state (`nmix` variants)
-#' the ribbon is drawn step-style to match the discrete domain; for
-#' continuous state (`occ()` posterior occupancy probability) the
-#' ribbon is drawn smooth.
+#' Faceted plot of the posterior median with its 50% and 95% credible
+#' intervals per series. Over a time axis the state is drawn as a line
+#' with ribbons. Units without an order, such as the sites of a
+#' single-season design, are drawn as points with interval bars.
 #'
 #' @param x A `mvgam_latent_state` object.
 #' @param series Optional integer / character; restrict to a subset
@@ -183,33 +204,33 @@ plot.mvgam_latent_state <- function(x, series = NULL, ...) {
     smry <- smry[smry$series %in% keep, , drop = FALSE]
     smry$series <- droplevels(smry$series)
   }
-  is_step <- identical(x$state_short, "N")
-  x_lab   <- if (x$has_time) "Time" else "Closure-unit index"
-  if (is_step) {
-    p <- ggplot2::ggplot(smry, ggplot2::aes(x = .data$time)) +
+  p <- ggplot2::ggplot(smry, ggplot2::aes(x = .data$time))
+  p <- if (x$has_time) {
+    p +
       ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lower_95,
-                                          ymax = .data$upper_95),
-                            fill = mvgam_colour("light"), alpha = 0.8,
-                            stat = "identity") +
+                                        ymax = .data$upper_95),
+                           fill = mvgam_colour("light"), alpha = 0.8) +
       ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lower_50,
-                                          ymax = .data$upper_50),
-                            fill = mvgam_colour("mid"), alpha = 0.9,
-                            stat = "identity") +
-      ggplot2::geom_step(ggplot2::aes(y = .data$median),
-                          colour = mvgam_colour("dark_highlight"),
-                          linewidth = 0.7)
-  } else {
-    p <- ggplot2::ggplot(smry, ggplot2::aes(x = .data$time)) +
-      ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lower_95,
-                                          ymax = .data$upper_95),
-                            fill = mvgam_colour("light"), alpha = 0.8) +
-      ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lower_50,
-                                          ymax = .data$upper_50),
-                            fill = mvgam_colour("mid"), alpha = 0.9) +
+                                        ymax = .data$upper_50),
+                           fill = mvgam_colour("mid"), alpha = 0.9) +
       ggplot2::geom_line(ggplot2::aes(y = .data$median),
+                         colour = mvgam_colour("dark_highlight"),
+                         linewidth = 0.7)
+  } else {
+    p +
+      ggplot2::geom_linerange(ggplot2::aes(ymin = .data$lower_95,
+                                           ymax = .data$upper_95),
+                              colour = mvgam_colour("light"),
+                              linewidth = 0.8) +
+      ggplot2::geom_linerange(ggplot2::aes(ymin = .data$lower_50,
+                                           ymax = .data$upper_50),
+                              colour = mvgam_colour("mid"),
+                              linewidth = 1.6) +
+      ggplot2::geom_point(ggplot2::aes(y = .data$median),
                           colour = mvgam_colour("dark_highlight"),
-                          linewidth = 0.7)
+                          size = 1.5)
   }
+  x_lab <- if (x$has_time) "Time" else "Closure-unit index"
   p +
     ggplot2::facet_wrap(~ series, scales = "free_y") +
     ggplot2::labs(x = x_lab, y = x$state_label) +

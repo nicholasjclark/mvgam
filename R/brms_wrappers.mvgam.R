@@ -94,7 +94,8 @@ rstantools::predictive_interval
 #' hypothesis names population-level coefficients without their `b_`
 #' prefix, as `"x > 0"` tests `b_x`. `class = NULL` names any
 #' parameter by the full name [variables.mvgam()] lists, such as
-#' `ar1_trend[1]` or `sigma`.
+#' `ar1_trend[series_1]` or `sigma`. That help page sets out how the
+#' names are formed.
 #'
 #' @param x A fitted `mvgam` object.
 #' @param hypothesis Character vector of hypothesis strings in the
@@ -136,7 +137,8 @@ rstantools::predictive_interval
 #' hypothesis(mod, "x > 0")
 #'
 #' # Any parameter by its full name.
-#' hypothesis(mod, c("ar1_trend[1] > 0", "sigma_trend[1] < 1"),
+#' hypothesis(mod, c("ar1_trend[series_1] > 0",
+#'                   "sigma_trend[series_1] < 1"),
 #'            class = NULL)
 #' }
 #'

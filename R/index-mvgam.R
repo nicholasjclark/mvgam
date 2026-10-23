@@ -1,29 +1,67 @@
-#' Index \code{mvgam} objects
+#' Parameter names of a fitted mvgam model
 #'
-#' @aliases variables
+#' `variables()` lists the name of every quantity in a fitted model's
+#' draws. [hypothesis.mvgam()], [as_draws()], [as.data.frame.mvgam()],
+#' [mcmc_plot.mvgam()] and [posterior_average.mvgam()] accept these
+#' names. [summary.mvgam()] and [posterior_summary()] label their rows
+#' with them.
 #'
-#' Index variables and their `mgcv` coefficient names
+#' @section How parameters are named:
+#' Observation parameters take their \pkg{brms} names, such as `b_x`,
+#' `sds_sx_1`, `sd_site__Intercept` and `r_site[a,Intercept]`. The
+#' trend model's parameters take the same names with a `_trend`
+#' suffix, such as `b_x_trend` or `sds_sx_1_trend`.
 #'
-#' @param x A \code{mvgam} object or another \R object for which
-#' the methods are defined.
+#' A trend parameter with one entry per series takes the series' name
+#' as its index, as \pkg{brms} labels a grouping factor's levels. A
+#' model with series `DM` and `DO` has `sigma_trend[DM]`,
+#' `sigma_trend[DO]` and `ar1_trend[DM]`. Its factor loadings are
+#' `Z_tilde[DM,1]`, with the factor as the second index. In a factor
+#' model the dynamics belong to the factors, as in `ar1_trend[1]`.
+#' The latent state matrices keep numeric indices, as in
+#' `trend[12,1]` for time 12 of the first series.
 #'
+#' A bare name such as `variable = "sigma_trend"` selects every element
+#' of a vector, as in \pkg{posterior}. Because `variables()` includes
+#' the latent states, its output runs to hundreds of names on most
+#' fits. `grep()` narrows it, as in
+#' `grep("^(sigma|ar1)_trend", variables(fit), value = TRUE)`.
+#'
+#' @param x A fitted `mvgam` object.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @name index-mvgam
-NULL
-
-#' @rdname index-mvgam
+#' @return A character vector of parameter names.
 #'
-#' @importFrom posterior variables
+#' @seealso [mvgam_draws] to extract draws by name,
+#'   [hypothesis.mvgam()] to test them, [summary.mvgam()] and
+#'   [posterior_summary()] to summarise them.
 #'
-#' @param x \code{list} object returned from \code{mvgam}. See [mvgam()]
+#' @examples
+#' \dontrun{
+#' set.seed(13)
+#' simdat <- sim_mvgam(n_series = 2L, trend_model = AR())
+#' mod <- mvgam(y ~ x,
+#'              trend_formula = ~ AR(),
+#'              data = simdat$data_train,
+#'              chains = 2, silent = 2)
 #'
-#' @method variables mvgam
+#' # The trend dynamics, indexed by series
+#' grep("^(sigma|ar1)_trend", variables(mod), value = TRUE)
 #'
-#' @return a character vector of parameter names
+#' # Every element of a vector by its bare name
+#' as_draws_df(mod, variable = "sigma_trend")
+#'
+#' # Two series' autoregressive coefficients compared
+#' hypothesis(mod, "ar1_trend[series_1] > ar1_trend[series_2]",
+#'            class = NULL)
+#' }
 #'
 #' @author Nicholas J Clark
 #'
+#' @name index-mvgam
+#' @aliases variables
+#' @importFrom posterior variables
+#' @method variables mvgam
 #' @export
 #' @export variables
 variables.mvgam <- function(x, ...) {

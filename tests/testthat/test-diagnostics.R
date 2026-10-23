@@ -142,6 +142,9 @@ test_that("variable = explicit name vector works (no regex)", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub, variable = c("b_Intercept", "sigma"))
   expect_identical(colnames(out), c("b_Intercept", "sigma"))
+  # A bare vector name selects its elements, as posterior does
+  out <- as.matrix(stub, variable = "sigma_trend")
+  expect_identical(colnames(out), "sigma_trend[1]")
 })
 
 test_that("free pattern that matches nothing errors informatively", {

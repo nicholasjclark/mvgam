@@ -27,7 +27,8 @@ and (named) additional arguments passed through to
 \code{\link[=as.data.frame.mvgam]{as.data.frame.mvgam()}} / \code{\link[=variables.mvgam]{variables.mvgam()}}.}
 
 \item{variable}{Optional character vector of parameter names
-to extract. \code{NULL} (the default) selects all parameters
+to extract, as \code{\link[=variables.mvgam]{variables.mvgam()}} lists them. A bare vector name
+selects every element. \code{NULL} (the default) selects all parameters
 shared across fits (or all parameters across the union when
 \code{missing} is supplied), excluding \code{"lp__"}.}
 
@@ -84,7 +85,7 @@ mod2 <- mvgam(y ~ 1,    trend_formula = ~ AR(p = 1),
                chains  = 2, silent = 2)
 
 # 50:50 average of one trend parameter across the two fits.
-pa <- posterior_average(mod1, mod2, variable = "ar1_trend[1]",
+pa <- posterior_average(mod1, mod2, variable = "ar1_trend",
                          weights = c(0.5, 0.5))
 summary(pa)
 }

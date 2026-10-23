@@ -448,7 +448,7 @@ mvgam_data(nmix_dat, family = nmix(),
 ```
 
 The [N-mixture article](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
-fits these data.
+fits a model to data in this layout.
 
 ## Joint species distribution models
 

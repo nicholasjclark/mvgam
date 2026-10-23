@@ -292,7 +292,8 @@ test_that("the identified quantities recover the simulated truth", {
   # per-draw identities above are what this file tests.
   post <- posterior_summary(fit)
   for (s in seq_len(n_series)) {
-    expect_equal(unname(post[sprintf("sigma_trend[%d]", s), "Estimate"]),
+    sigma_s <- paste0("sigma_trend[", fitted_series_levels(fit)[s], "]")
+    expect_equal(unname(post[sigma_s, "Estimate"]),
                  sigma_true[s], tolerance = 0.25)
   }
   expect_equal(unname(post["sigma", "Estimate"]), obs_sd, tolerance = 0.1)
@@ -386,8 +387,10 @@ test_that("the reporting methods return on a correlated AR(2)", {
   expect_identical(nobs(fit), nrow(dat))
   expect_gt(nrow(tidy(fit)), 0L)
   expect_identical(nrow(glance(fit)), 1L)
-  expect_true(all(c("sigma_trend[1]", "ar1_trend[1]", "ar2_trend[1]") %in%
-                    rownames(posterior_summary(fit))))
+  # Each series' trend parameters are named by the series
+  first <- paste0("[", fitted_series_levels(fit)[1L], "]")
+  expect_true(all(paste0(c("sigma_trend", "ar1_trend", "ar2_trend"), first)
+                  %in% rownames(posterior_summary(fit))))
 })
 
 

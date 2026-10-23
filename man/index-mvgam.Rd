@@ -2,28 +2,75 @@
 % Please edit documentation in R/index-mvgam.R
 \name{index-mvgam}
 \alias{index-mvgam}
-\alias{variables}
-\alias{Index}
-\alias{and}
-\alias{their}
-\alias{`mgcv`}
-\alias{coefficient}
-\alias{names}
 \alias{variables.mvgam}
-\title{Index \code{mvgam} objects}
+\alias{variables}
+\title{Parameter names of a fitted mvgam model}
 \usage{
 \method{variables}{mvgam}(x, ...)
 }
 \arguments{
-\item{x}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{x}{A fitted \code{mvgam} object.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-a character vector of parameter names
+A character vector of parameter names.
 }
 \description{
-Index \code{mvgam} objects
+\code{variables()} lists the name of every quantity in a fitted model's
+draws. \code{\link[=hypothesis.mvgam]{hypothesis.mvgam()}}, \code{\link[=as_draws]{as_draws()}}, \code{\link[=as.data.frame.mvgam]{as.data.frame.mvgam()}},
+\code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} and \code{\link[=posterior_average.mvgam]{posterior_average.mvgam()}} accept these
+names. \code{\link[=summary.mvgam]{summary.mvgam()}} and \code{\link[=posterior_summary]{posterior_summary()}} label their rows
+with them.
+}
+\section{How parameters are named}{
+
+Observation parameters take their \pkg{brms} names, such as \code{b_x},
+\code{sds_sx_1}, \code{sd_site__Intercept} and \code{r_site[a,Intercept]}. The
+trend model's parameters take the same names with a \verb{_trend}
+suffix, such as \code{b_x_trend} or \code{sds_sx_1_trend}.
+
+A trend parameter with one entry per series takes the series' name
+as its index, as \pkg{brms} labels a grouping factor's levels. A
+model with series \code{DM} and \code{DO} has \code{sigma_trend[DM]},
+\code{sigma_trend[DO]} and \code{ar1_trend[DM]}. Its factor loadings are
+\code{Z_tilde[DM,1]}, with the factor as the second index. In a factor
+model the dynamics belong to the factors, as in \code{ar1_trend[1]}.
+The latent state matrices keep numeric indices, as in
+\code{trend[12,1]} for time 12 of the first series.
+
+A bare name such as \code{variable = "sigma_trend"} selects every element
+of a vector, as in \pkg{posterior}. Because \code{variables()} includes
+the latent states, its output runs to hundreds of names on most
+fits. \code{grep()} narrows it, as in
+\code{grep("^(sigma|ar1)_trend", variables(fit), value = TRUE)}.
+}
+
+\examples{
+\dontrun{
+set.seed(13)
+simdat <- sim_mvgam(n_series = 2L, trend_model = AR())
+mod <- mvgam(y ~ x,
+             trend_formula = ~ AR(),
+             data = simdat$data_train,
+             chains = 2, silent = 2)
+
+# The trend dynamics, indexed by series
+grep("^(sigma|ar1)_trend", variables(mod), value = TRUE)
+
+# Every element of a vector by its bare name
+as_draws_df(mod, variable = "sigma_trend")
+
+# Two series' autoregressive coefficients compared
+hypothesis(mod, "ar1_trend[series_1] > ar1_trend[series_2]",
+           class = NULL)
+}
+
+}
+\seealso{
+\link{mvgam_draws} to extract draws by name,
+\code{\link[=hypothesis.mvgam]{hypothesis.mvgam()}} to test them, \code{\link[=summary.mvgam]{summary.mvgam()}} and
+\code{\link[=posterior_summary]{posterior_summary()}} to summarise them.
 }
 \author{
 Nicholas J Clark

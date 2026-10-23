@@ -250,8 +250,11 @@ written as an \code{\link[=mvgam_formula]{mvgam_formula()}}, calling \code{\link
 \code{\link[=jsdgam]{jsdgam()}} knows how to build. Both helpers build the same Stan
 code and data as \code{mvgam()}. Defaults to \code{TRUE}.}
 
-\item{...}{Additional arguments passed to Stan fitting. Two are worth
-calling out. \code{algorithm} selects how the posterior is explored and
+\item{...}{Additional arguments passed to Stan fitting. \code{cores} sets
+how many chains sample at once. It defaults to
+\code{getOption("mc.cores")} when that option is set. Otherwise it is
+one fewer than the machine's cores, up to \code{chains}. Two more are
+worth calling out. \code{algorithm} selects how the posterior is explored and
 accepts \code{"sampling"} (the default), \code{"meanfield"}, \code{"fullrank"} or
 \code{"fixed_param"} on either backend, plus \code{"pathfinder"} and
 \code{"laplace"} when \code{backend = "cmdstanr"}. \code{init} sets the starting

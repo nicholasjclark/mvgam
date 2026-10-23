@@ -398,7 +398,7 @@ pp_check.mvgam <- function(
           "Family '", resolve_family_name(object$family),
           "' does not aggregate repeat visits within a unit."
         ),
-        i = "Use family = occ() or family = nmix() to enable this discrepancy GOF."
+        i = "Use family = occ() or family = nmix() for this check."
       )))
     }
     # The default below tests `is.null(draw_ids)`, as the residual
@@ -1058,8 +1058,8 @@ build_resid_lag_panel <- function(
   n_used <- per_draw[[1L]]$n_used[1L]
   ci_bound <- stats::qnorm(0.975) / sqrt(n_used)
   palette <- mvgam_palette()
-  ylab <- if (lag_type == "acf") "Autocorrelation" else
-    "Partial autocorrelation"
+  # The title names the statistic. The residual figure stacks this
+  # panel under the Q-Q panel, where a y title would join the Q-Q one.
   title <- if (lag_type == "acf") "ACF" else "pACF"
 
   ggplot2::ggplot(bands, ggplot2::aes(x = lag)) +
@@ -1082,7 +1082,7 @@ build_resid_lag_panel <- function(
       colour = palette[6L], linewidth = 1.5,
       ggplot2::aes(y = q250, yend = q750)
     ) +
-    ggplot2::labs(title = title, x = "Lag", y = ylab) +
+    ggplot2::labs(title = title, x = "Lag", y = NULL) +
     mvgam_theme()
 }
 
@@ -1304,23 +1304,36 @@ closure_unit_fit_stat_ppc <- function(object, newdata, stat,
 #' @method print mvgam_ppc_fit_stat
 #' @export
 print.mvgam_ppc_fit_stat <- function(x, ...) {
-  stat_lab <- if (identical(x$stat, "chi_squared")) {
-    "chi-squared"
-  } else {
-    "Freeman-Tukey"
-  }
+  stat_lab <- fit_stat_label(x$stat)
   cat("Posterior predictive check (closure-unit discrepancy)\n")
   cat(sprintf("  Family:           %s\n",       x$family))
   cat(sprintf("  Statistic:        %s\n",       stat_lab))
   cat(sprintf("  Aggregation:      %s\n",       x$grain))
   cat(sprintf("  Posterior draws:  %d\n",       x$n_draws))
   cat(sprintf("  Bayesian p-value: %.3f\n",     x$bayes_p))
-  if (x$bayes_p < 0.05 || x$bayes_p > 0.95) {
-    cat(
-      "  Note: extreme p-value indicates poor model fit at this grain.\n"
-    )
+  # A small p-value means the replicates rarely reach the observed
+  # discrepancy. A large one means the observed data deviate less from
+  # the fitted expectation than replicates do. Terms flexible enough to
+  # follow the data give that.
+  if (x$bayes_p < 0.05) {
+    cat("  Note: replicates rarely reach the observed discrepancy.",
+        "The model may not fit.\n")
+  } else if (x$bayes_p > 0.95) {
+    cat("  Note: the observed data deviate less from the fitted",
+        "expectation than replicates do.\n")
   }
   invisible(x)
+}
+
+
+#' Display label of a closure-unit discrepancy statistic
+#'
+#' @param stat Character statistic, `"chi_squared"` or
+#'   `"freeman_tukey"`
+#' @return Character label
+#' @noRd
+fit_stat_label <- function(stat) {
+  if (identical(stat, "chi_squared")) "chi-squared" else "Freeman-Tukey"
 }
 
 
@@ -1340,13 +1353,9 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
   rlang::check_dots_empty()
   d <- data.frame(T_obs = x$T_obs, T_rep = x$T_rep)
   rng <- range(c(d$T_obs, d$T_rep))
-  stat_lab <- if (identical(x$stat, "chi_squared")) {
-    "chi-squared"
-  } else {
-    "Freeman-Tukey"
-  }
+  stat_lab <- fit_stat_label(x$stat)
   ggplot2::ggplot(d, ggplot2::aes(x = .data$T_obs, y = .data$T_rep)) +
-    ggplot2::geom_point(alpha = 0.4, colour = "steelblue") +
+    ggplot2::geom_point(alpha = 0.4, colour = mvgam_colour("dark")) +
     ggplot2::geom_abline(intercept = 0, slope = 1,
                          linetype = 2, colour = "grey40") +
     ggplot2::coord_equal(xlim = rng, ylim = rng) +

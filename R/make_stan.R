@@ -56,7 +56,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
                                  sample_prior = "no",
                                  knots = NULL, drop_unused_levels = TRUE,
                                  backend = "rstan",
-                                 threads = getOption("mc.cores", 1),
+                                 threads = 1L,
                                  normalize = TRUE, save_model = NULL,
                                  silent = 1L,
                                  stanvars = NULL, validate = TRUE,
@@ -601,8 +601,8 @@ brms_threading_case <- function(threads, family, mv_spec) {
 #'   Default is \code{TRUE}.
 #' @param backend Character string specifying Stan backend. Options:
 #'   \code{"rstan"} (default) or \code{"cmdstanr"}.
-#' @param threads Number of threads to use for parallelization. Default is
-#'   \code{getOption("mc.cores", 1)}.
+#' @param threads Number of threads within each chain. Default is
+#'   \code{1}.
 #' @param normalize Logical; should brms drop the normalising constants from
 #'   its sampling statements? Default is \code{TRUE}.
 #' @param save_model File path to write the assembled Stan program to. If
@@ -632,7 +632,7 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
                                    sample_prior = "no",
                                    knots = NULL, drop_unused_levels = TRUE,
                                    backend = "rstan",
-                                   threads = getOption("mc.cores", 1),
+                                   threads = 1L,
                                    normalize = TRUE, save_model = NULL,
                                    silent = 1L, stanvars = NULL,
                                    validate = TRUE, ...) {
@@ -762,8 +762,8 @@ standata.bform <- function(object, ...) {
 #'   variables, parameters, or functions.
 #' @param backend Character string specifying Stan backend. Options:
 #'   \code{"rstan"} (default) or \code{"cmdstanr"}.
-#' @param threads Number of threads to use for parallelization. Default is
-#'   \code{getOption("mc.cores", 1)}.
+#' @param threads Number of threads within each chain. Default is
+#'   \code{1}.
 #' @param normalize Logical; should brms drop the normalising constants
 #'   from its sampling statements? Default is \code{TRUE}.
 #' @param save_model File path to write the assembled Stan program to.
@@ -789,7 +789,7 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
                                    sample_prior = "no",
                                    knots = NULL, drop_unused_levels = TRUE,
                                    backend = "rstan",
-                                   threads = getOption("mc.cores", 1),
+                                   threads = 1L,
                                    normalize = TRUE, save_model = NULL,
                                    silent = 1L, stanvars = NULL,
                                    validate = TRUE, ...) {

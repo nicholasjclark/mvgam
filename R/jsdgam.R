@@ -577,10 +577,9 @@ jsdgam <- function(formula,
   if (!missing(family) || !is_mv_formula) {
     forward_args$family <- family
   }
-  # Only forward `threads` when the user actually set it; mvgam()
-  # defaults the unset case via `getOption("mc.cores", 1)` further
-  # down (in stancode.mvgam_formula), and passing NULL trips that
-  # default's `assert_int(threads, lower = 1)` check.
+  # `threads` is forwarded only when the user set it. `mvgam()` then
+  # builds the model on one thread. NULL would fail that default's
+  # `assert_int(threads, lower = 1)` check.
   if (!is.null(threads)) {
     forward_args$threads <- threads
   }

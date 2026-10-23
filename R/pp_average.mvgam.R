@@ -20,7 +20,8 @@
 #'   and (named) additional arguments passed through to
 #'   [as.data.frame.mvgam()] / [variables.mvgam()].
 #' @param variable Optional character vector of parameter names
-#'   to extract. `NULL` (the default) selects all parameters
+#'   to extract, as [variables.mvgam()] lists them. A bare vector name
+#'   selects every element. `NULL` (the default) selects all parameters
 #'   shared across fits (or all parameters across the union when
 #'   `missing` is supplied), excluding `"lp__"`.
 #' @param pars Deprecated brms alias for `variable`.
@@ -67,7 +68,7 @@
 #'                chains  = 2, silent = 2)
 #'
 #' # 50:50 average of one trend parameter across the two fits.
-#' pa <- posterior_average(mod1, mod2, variable = "ar1_trend[1]",
+#' pa <- posterior_average(mod1, mod2, variable = "ar1_trend",
 #'                          weights = c(0.5, 0.5))
 #' summary(pa)
 #' }
@@ -94,6 +95,9 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
   require_fitted_models(models, "posterior_average")
   vars_list <- lapply(models, variables)
   all_vars <- unique(unlist(vars_list))
+  if (!is.null(variable)) {
+    variable <- expand_variable_names(as.character(variable), all_vars)
+  }
   missing_resolved <- NULL
   if (is.null(missing)) {
     common <- Reduce(intersect, vars_list)

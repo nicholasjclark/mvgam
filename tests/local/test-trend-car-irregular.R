@@ -868,7 +868,8 @@ test_that("the index columns are not reported as model predictors", {
 test_that("hypothesis reaches every name variables() lists", {
   # With `class = NULL`, `hypothesis()` takes a parameter by the name
   # `variables()` lists
-  expect_s3_class(hypothesis(fit, "ar1_trend[1] > 0", class = NULL),
+  ar1 <- grep("^ar1_trend\\[", variables(fit), value = TRUE)[1L]
+  expect_s3_class(hypothesis(fit, paste(ar1, "> 0"), class = NULL),
                   "brmshypothesis")
   expect_s3_class(hypothesis(fit, "temp > 0"), "brmshypothesis")
 })

@@ -120,14 +120,12 @@ get_predict.mvgam <- function(model,
   #              observation-process noise
   #   response - outcome-scale draws WITH observation-process noise
   #              (posterior_predict). Integer for count families.
-  # `latent_N` / `detection` are closure-unit-only family types that
-  # delegate to predict.mvgam, which runs the family-availability gate
-  # and dispatches to the per-family kernel (posterior_occupancy /
-  # posterior_latent_N / posterior_detection). `latent_N` is the
-  # marginaleffects wire token for the latent state; mvgam's own
-  # user-facing token for the same quantity is `latent_state`, which
-  # is accepted here as an alias for direct `get_predict()` calls that
-  # bypass the dictionary check.
+  #   latent_N - expected closure-unit latent state, `lambda` for
+  #              nmix() and `psi` for occ(), from the covariates
+  #   detection - per-visit detection probability, from predict.mvgam
+  # `latent_N` is the marginaleffects wire token for the latent state.
+  # mvgam's own token, `latent_state`, is accepted as an alias for
+  # direct `get_predict()` calls that bypass the dictionary check.
   checkmate::assert_choice(
     type,
     c("response", "link", "expected", "detection",
@@ -171,8 +169,8 @@ get_predict.mvgam <- function(model,
     expected     = do.call(posterior_epred, shared),
     response     = do.call(posterior_predict, shared),
     latent_N     = ,
-    latent_state = do.call(
-      predict, c(shared, list(type = "latent_state", summary = FALSE))
+    latent_state = expected_latent_state(
+      model, newdata, resolve_draw_ids(model, ndraws, draw_ids)
     ),
     detection    = do.call(
       predict, c(shared, list(type = "detection", summary = FALSE))

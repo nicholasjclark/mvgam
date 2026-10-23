@@ -308,18 +308,32 @@ test_that("identified factor parameters are recognised in one place", {
   expect_false(has_identified_factor_states("mu_lv_trend_tilde"))
 })
 
-test_that("loadings take series names and length scales feature names", {
-  local_mocked_bindings(fitted_series_levels = function(x) c("ant", "bee"))
+test_that("series-indexed parameters take series names", {
+  local_mocked_bindings(fitted_series_levels = function(x) c("ant", "bee"),
+                        detect_factor_n_lv = function(...) NULL)
   stub <- structure(list(standata = list(
     row_features = matrix(0, 2, 2, dimnames = list(NULL, c("size", "hair")))
   )), class = "mvgam")
   raw <- c("Z[1,1]", "Z_tilde[2,1]", "theta_features[2]",
            "theta_features[1]", "lv_trend[1,1]")
   expect_identical(
-    mvgam_factor_aliases(stub, raw),
+    mvgam_index_aliases(stub, raw),
     c(theta_features_size = "theta_features[1]",
       theta_features_hair = "theta_features[2]",
       `Z[ant,1]` = "Z[1,1]", `Z_tilde[bee,1]` = "Z_tilde[2,1]")
+  )
+  # Without factors a vector the program sizes by series takes series
+  # names. `b_trend` is sized by its coefficients and keeps its index.
+  stub$stancode <- paste(
+    "vector<lower=0>[N_lv_trend] sigma_trend;",
+    "vector[K_trend] b_trend;",
+    "matrix[N_time_trend, N_lv_trend] lv_trend;",
+    sep = "\n"
+  )
+  expect_identical(
+    mvgam_index_aliases(stub, c("sigma_trend[2]", "b_trend[1]",
+                                "lv_trend[1,2]")),
+    c(`sigma_trend[bee]` = "sigma_trend[2]")
   )
 })
 

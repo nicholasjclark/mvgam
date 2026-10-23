@@ -636,7 +636,7 @@ sub_predictor_rhs <- function(prior, value, col,
   }
   parts <- character(0L)
   if (has_int) {
-    parts <- c(parts, paste0("\\alpha^{(", value, ")}"))
+    parts <- c(parts, paste0("\\alpha^{(", escape_math_text(value), ")}"))
   }
   for (co in coefs) {
     parts <- c(parts, paste0(
@@ -775,9 +775,9 @@ sub_predictor_glossary <- function(obj) {
   subs <- subs[nzchar(subs)]
   if (length(subs) == 0L) return(character(0L))
   paste0(
-    "- $\\alpha^{(p)}$, $\\beta_{p,j}$: intercept and effect of ",
-    "covariate $j$ in the predictor of parameter $p$ (",
-    paste0("$", subs, "$", collapse = ", "), ")"
+    "- $\\alpha^{(d)}$, $\\beta_{d,j}$: intercept and effect of ",
+    "covariate $j$ in the predictor of parameter $d$, for $d$ in ",
+    paste0("$", escape_math_text(subs), "$", collapse = ", ")
   )
 }
 
@@ -809,16 +809,12 @@ term_glossary <- function(obj) {
     defs <- c(defs, paste0(
       "- $", sym[["f"]], "$: ", basis_label(spec$bs, spec$fname),
       " in $", paste(escape_math_text(spec$vars), collapse = "$, $"),
-      "$, basis size ",
+      "$", by_clause(spec), ", basis size ",
       k_label, ", smoothing SD $", sym[["sd"]], "$"
     ))
   }
   for (spec in classes$gp) {
     sym <- term_symbols("gp", spec, obj)
-    by_text <- if (!is.null(spec$by) && !is.na(spec$by) &&
-                    nzchar(spec$by)) {
-      paste0(", stratified by $", escape_math_text(spec$by), "$")
-    } else ""
     k_text <- if (!is.null(spec$k) && !is.na(spec$k)) {
       paste0(", approximated with ", spec$k, " basis functions")
     } else {
@@ -826,7 +822,7 @@ term_glossary <- function(obj) {
     }
     defs <- c(defs, paste0(
       "- $", sym[["f"]], "$: Gaussian process in $",
-      spec_subscript(spec), "$", by_text, " with ",
+      spec_subscript(spec), "$", by_clause(spec), " with ",
       gp_kernel_human_label(spec$cov), " kernel, length scale $",
       sym[["rho"]], "$ and marginal SD $", sym[["sd"]], "$", k_text
     ))
@@ -1187,11 +1183,15 @@ response_letter <- function(obj) {
 #' @noRd
 escape_math_text <- function(s) {
   # Inside `$...$` a `_` is a subscript marker. Left bare, `y_diri`
-  # renders as `y` with subscript `diri`. A name carrying one is set
-  # upright.
+  # renders as `y` with subscript `diri`. Math italic also sets a bare
+  # `mintemp` as a product of seven symbols. A name carrying a `_` or
+  # longer than one letter is set upright. Numbers stay as they are.
   if (is.null(s) || !is.character(s)) return(s)
   out <- vapply(s, function(x) {
-    if (!grepl("_", x, fixed = TRUE)) return(x)
+    if (!grepl("_", x, fixed = TRUE) &&
+        !grepl("^[A-Za-z.][A-Za-z0-9.]+$", x)) {
+      return(x)
+    }
     math_upright(x)
   }, character(1L))
   if (length(out) == 1L) unname(out) else out
@@ -1687,7 +1687,7 @@ closure_unit_glossary <- function(obj) {
       ),
       paste0(
         "- $\\psi_", unit_idx, " \\in (0, 1)$: occupancy ",
-        "probability (state linpred on the logit scale)"
+        "probability, logit link"
       ),
       paste0(
         "- $", det_sym, "_{i,j} \\in (0, 1)$: per-visit ",
@@ -1701,8 +1701,8 @@ closure_unit_glossary <- function(obj) {
         "latent abundance"
       ),
       paste0(
-        "- $\\lambda_", unit_idx, " > 0$: abundance ",
-        "intensity (state linpred on the log scale)"
+        "- $\\lambda_", unit_idx, " > 0$: expected abundance, ",
+        "log link"
       )
     )
     if (identical(kind, "nmix_rn")) {
@@ -1773,21 +1773,28 @@ classify_obs_parameters <- function(obj) {
   )
 }
 
+#' Prior rows of the mean's own linear predictor
+#'
+#' Rows scoped to a distributional or non-linear parameter belong to
+#' that parameter's predictor.
+#'
+#' @param prior A `brmsprior` table
+#' @return Logical vector, one entry per row
+#' @noRd
+mean_predictor_rows <- function(prior) {
+  !nzchar(prior$dpar) & !nzchar(prior$nlpar %||% rep("", nrow(prior)))
+}
+
 #' @noRd
 obs_fixed_terms_from_prior <- function(obj) {
   prior <- obj$prior
   if (is.null(prior) || nrow(prior) == 0L) return(character(0L))
-  # Rows scoped to a dpar or nlpar drive their own predictor row.
-  nlpar_col <- prior$nlpar %||% rep("", nrow(prior))
+  own <- mean_predictor_rows(prior)
   # An ordinal family's `Intercept` rows are its thresholds, and its
   # predictor has no intercept of its own.
-  has_int <- !is_ordinal_family(obj$family) && any(
-    prior$class == "Intercept" &
-      !nzchar(prior$dpar) &
-      !nzchar(nlpar_col)
-  )
-  b_rows <- prior$class == "b" & !nzchar(prior$dpar) &
-    !nzchar(nlpar_col) & nzchar(prior$coef)
+  has_int <- !is_ordinal_family(obj$family) &&
+    any(prior$class == "Intercept" & own)
+  b_rows <- prior$class == "b" & own & nzchar(prior$coef)
   coefs <- unique(prior$coef[b_rows])
   # A smooth's unpenalised columns and the special terms each render
   # through their own block.
@@ -1911,7 +1918,8 @@ obs_mo_specs_from_prior <- function(obj) {
 #' @noRd
 obs_smooth_specs_from_prior <- function(prior) {
   if (is.null(prior) || nrow(prior) == 0L) return(list())
-  sds_rows <- prior$class == "sds" & nzchar(prior$coef)
+  sds_rows <- prior$class == "sds" & nzchar(prior$coef) &
+    mean_predictor_rows(prior)
   if (!any(sds_rows)) return(list())
   coefs <- prior$coef[sds_rows]
   specs <- lapply(coefs, parse_smooth_coef)
@@ -1920,7 +1928,7 @@ obs_smooth_specs_from_prior <- function(prior) {
   out <- list()
   for (s in specs) {
     if (is.null(s$vars) || all(is.na(s$vars))) next
-    key <- paste(s$vars, collapse = ":")
+    key <- paste(c(s$vars, stats::na.omit(s$by)), collapse = ":")
     if (key %in% seen) next
     out[[length(out) + 1L]] <- s
     seen <- c(seen, key)
@@ -1948,8 +1956,12 @@ parse_smooth_coef <- function(coef_str) {
     formula_arg_text(call_args$k)
   } else NA_character_
   bs <- if ("bs" %in% arg_names) formula_arg_text(call_args$bs) else "tp"
+  by <- if ("by" %in% arg_names) {
+    formula_arg_text(call_args$by)
+  } else NA_character_
   list(
-    var = vars[[1L]], vars = unname(vars), k = k, bs = bs, fname = fname
+    var = vars[[1L]], vars = unname(vars), k = k, bs = bs, by = by,
+    fname = fname
   )
 }
 
@@ -2014,14 +2026,13 @@ obs_re_specs_from_prior <- function(prior) {
   # `has_corr` true when brms emits an L row keyed on the group
   # (correlated random intercept + slope under `|grp`).
   if (is.null(prior) || nrow(prior) == 0L) return(list())
-  sd_rows <- prior$class == "sd" & nzchar(prior$group)
+  own <- mean_predictor_rows(prior) & nzchar(prior$group)
+  sd_rows <- prior$class == "sd" & own
   if (!any(sd_rows)) return(list())
   groups <- unique(prior$group[sd_rows])
-  l_groups <- if (any(prior$class == "L" & nzchar(prior$group))) {
-    prior$group[prior$class == "L" & nzchar(prior$group)]
-  } else character(0L)
+  l_groups <- prior$group[prior$class == "L" & own]
   lapply(groups, function(g) {
-    g_rows <- prior$class == "sd" & prior$group == g & nzchar(prior$coef)
+    g_rows <- sd_rows & prior$group == g & nzchar(prior$coef)
     coefs <- prior$coef[g_rows]
     slopes <- setdiff(coefs, "Intercept")
     list(
@@ -2110,14 +2121,14 @@ response_symbol <- function(obj, sym) {
 term_symbols <- function(kind, spec, obj = NULL) {
   out <- switch(kind,
     smooth = {
-      sub <- spec_subscript(spec)
+      sub <- by_subscript(spec)
       key <- spec_key(spec)
       c(f = paste0("f_{", sub, "}"),
         basis = paste0("\\beta^{(", key, ")}_k"),
         sd = paste0("\\sigma^{(s)}_{", key, "}"))
     },
     gp = {
-      sub <- gp_subscript(spec)
+      sub <- by_subscript(spec)
       rho <- if (length(spec$vars) > 1L) "\\boldsymbol{\\rho}" else "\\rho"
       c(f = paste0("f^{(\\text{gp})}_{", sub, "}"),
         rho = paste0(rho, "_{", sub, "}"),
@@ -2238,14 +2249,25 @@ spec_vars_indexed <- function(spec, suffix = "_{i,t}") {
   paste(paste0(escape_math_text(spec$vars), suffix), collapse = ", ")
 }
 
+#' Whether a smooth or GP term is fitted per level of a `by` variable
 #' @noRd
-gp_subscript <- function(spec) {
+has_by <- function(spec) {
+  is.character(spec$by) && !is.na(spec$by) && nzchar(spec$by)
+}
+
+#' Term subscript that names the `by` variable, as `x \mid grp`
+#' @noRd
+by_subscript <- function(spec) {
   base <- spec_subscript(spec)
-  if (!is.null(spec$by) && !is.na(spec$by) && nzchar(spec$by)) {
-    paste0(base, " \\mid ", escape_math_text(spec$by))
-  } else {
-    base
-  }
+  if (has_by(spec)) paste0(base, " \\mid ", escape_math_text(spec$by)) else base
+}
+
+#' Glossary clause naming the `by` variable of a term
+#' @noRd
+by_clause <- function(spec) {
+  if (has_by(spec)) {
+    paste0(", stratified by $", escape_math_text(spec$by), "$")
+  } else ""
 }
 
 #' @noRd
@@ -2662,7 +2684,9 @@ innovation_sd <- function(obj, vector = FALSE) {
 diag_cov_text <- function(sd) {
   if (identical(sd, "1")) return("\\mathbf{I}")
   # Under MGP shrinkage the variances are the shrinkage products.
-  if (identical(sd, "\\sqrt{\\Psi_k}")) return("\\text{diag}(\\boldsymbol{\\Psi})")
+  if (identical(sd, "\\sqrt{\\Psi_k}")) {
+    return("\\text{diag}(\\boldsymbol{\\Psi})")
+  }
   paste0("\\text{diag}(", sd, "^2)")
 }
 
@@ -3252,7 +3276,7 @@ prior_align_rows <- function(obj, prior, symbols) {
       startsWith(prior$coef, base)
     level <- substring(prior$coef[hit], nchar(base) + 1L)
     prior$coef[hit] <- paste0(
-      "gp", gp_subscript(sp), ifelse(nzchar(level), paste0(" = ", level), "")
+      "gp", by_subscript(sp), ifelse(nzchar(level), paste0(" = ", level), "")
     )
   }
 
@@ -3725,24 +3749,24 @@ format_parameter_symbol_base <- function(row) {
       return(paste0("\\theta_{", coef, "}"))
     }
     if (nzchar(dpar)) {
-      return(paste0("\\alpha^{(", dpar, ")}"))
+      return(paste0("\\alpha^{(", escape_math_text(dpar), ")}"))
     }
     if (nzchar(nlpar)) {
-      return(paste0("\\alpha^{(", nlpar, ")}"))
+      return(paste0("\\alpha^{(", escape_math_text(nlpar), ")}"))
     }
     return("\\alpha")
   }
   if (identical(cls, "b")) {
     if (nzchar(dpar)) {
-      lbl <- if (nzchar(coef)) paste0(dpar, ",", coef) else dpar
-      return(paste0("\\beta_{", escape_math_text(lbl), "}"))
+      lbl <- escape_math_text(c(dpar, if (nzchar(coef)) coef))
+      return(paste0("\\beta_{", paste(lbl, collapse = ","), "}"))
     }
     # nl sub-formula coefficients: brms emits b_<nlpar>_<term>
     # priors with nzchar(nlpar). Carry the nlpar through as a
     # superscript so each nlpar's coefficient set is visually
     # distinct from the top-level beta_{term} family.
     if (nzchar(nlpar)) {
-      base <- paste0("\\beta^{(", nlpar, ")}")
+      base <- paste0("\\beta^{(", escape_math_text(nlpar), ")}")
       if (nzchar(coef)) {
         return(paste0(base, "_{", escape_math_text(coef), "}"))
       }

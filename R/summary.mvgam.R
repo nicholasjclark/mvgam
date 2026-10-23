@@ -882,10 +882,10 @@ build_next_steps <- function(x) {
   # Candidates in priority order. A closure-unit fit (occ or nmix)
   # takes the family-aware goodness-of-fit and latent-state
   # suggestions: the chi-squared or Freeman-Tukey discrepancy, the
-  # posterior of latent psi or N and the per-(series, time) ribbon
+  # posterior of its latent state and the per-(series, time) ribbon
   # plot. Every other fit takes the standard mvgam suggestions.
   pp_text <- if (is_cu) {
-    "`pp_check(fit, type = \"fit_stat\")`: closure-unit GOF p-value"
+    "`pp_check(fit, type = \"fit_stat\")`: goodness of fit per closure unit"
   } else {
     "`pp_check(fit)`: posterior predictive checks"
   }
@@ -893,8 +893,8 @@ build_next_steps <- function(x) {
     list(when = TRUE, text = pp_text),
     list(when = has_latent_state,
          text = paste0(
-           "`hindcast(fit, type = \"latent_state\")`: ",
-           "psi (occ) or N (nmix)"
+           "`plot(hindcast(fit, type = \"latent_state\"))`: posterior ",
+           closure_unit_labels(x$family)$short, " of each unit"
          )),
     list(when = grepl("^VAR", trend_model),
          text = paste0(
@@ -920,10 +920,7 @@ build_next_steps <- function(x) {
            "`loo(fit)` / `loo_compare(...)`: model fit + comparison"
          }),
     list(when = has_covariates,
-         text = "`conditional_effects(fit)`: covariate effects"),
-    # The drawn form of the same call, offered on the same terms.
-    list(when = has_latent_state,
-         text = "`plot(hindcast(fit, type = \"latent_state\"))`: state ribbon")
+         text = "`conditional_effects(fit)`: covariate effects")
   )
   texts <- vapply(
     Filter(function(c) isTRUE(c$when), candidates),

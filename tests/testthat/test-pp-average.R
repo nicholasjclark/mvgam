@@ -289,10 +289,17 @@ test_that("posterior_average default missing silently intersects", {
   out <- posterior_average(
     a, b, weights = c(0.5, 0.5), seed = 7L
   )
-  # `b_x` and `b_z` are unique to one fit each — must be dropped.
+  # `b_x` and `b_z` are each unique to one fit. Both are dropped, as
+  # is `lp__`.
   expect_setequal(colnames(out), c("b_Intercept", "sigma"))
-  # 'lp__' must be excluded by default.
-  expect_false("lp__" %in% colnames(out))
+  # A bare vector name selects each of its elements
+  vec <- c("b_Intercept", "sigma_trend[1]", "sigma_trend[2]", "lp__")
+  out <- posterior_average(
+    make_pp_average_stub(varnames = vec),
+    make_pp_average_stub(varnames = vec, seed = 2L),
+    weights = c(0.5, 0.5), variable = "sigma_trend", seed = 7L
+  )
+  expect_identical(colnames(out), c("sigma_trend[1]", "sigma_trend[2]"))
 })
 
 

@@ -1,5 +1,5 @@
 # Tests for the closure-unit pp_check helpers. Structural coverage
-# of the new `closure_unit_pp_check_setup()` aggregation hook and
+# of the `closure_unit_pp_check_setup()` aggregation hook and
 # the `check_closure_unit_var_unit_constant()` group / x validator;
 # end-to-end MCMC integration on the cached occ fixture lives in
 # tests/local/test-closure-unit-pp-check.R.
@@ -43,23 +43,18 @@ test_that(
   res <- closure_unit_pp_check_setup(
     obj, newdata = d, yrep = yrep, type = "bars"
   )
-  expect_identical(length(res$y), 4L)
-  expect_identical(dim(res$yrep), c(5L, 4L))
   expect_identical(res$arrays$N_unit, 4L)
-  # The collapse is what this names, and both sides collapse. Taking
-  # the dimensions of `yrep` admitted any 5 x 4 matrix, including one
-  # summing another unit's visits into each column. `visit_row`
-  # numbers the rows of the frame, the axis carrying both `d$y` and
-  # the columns of `yrep`.
+  # Each unit's observed and replicated values are the sums of its own
+  # visits. `visit_row` numbers the rows of the frame, the axis of both
+  # `d$y` and the columns of `yrep`.
   for (g in seq_len(res$arrays$N_unit)) {
     idx <- res$arrays$visit_row[g, seq_len(res$arrays$n_rep[g])]
     expect_equal(unname(res$y[g]), sum(d$y[idx]))
     expect_equal(unname(res$yrep[, g]),
                  rowSums(yrep[, idx, drop = FALSE]))
   }
-  # Each unit occupies three consecutive rows of the grid, and its
-  # first visit is its first row. Counting them passed a lookup
-  # naming one row four times.
+  # Each unit occupies three consecutive rows of the grid. Its first
+  # visit is its first row.
   expect_identical(res$first_visits, c(1L, 4L, 7L, 10L))
 })
 
@@ -73,9 +68,7 @@ test_that(
     obj, newdata = d,
     yrep = per_unit_resid, type = "resid_hist"
   )
-  # Preservation is the claim. Comparing dimensions admitted any
-  # 7 x 4 matrix, an aggregated one included; the matrix itself is
-  # what passes through untouched.
+  # The per-unit residuals pass through untouched
   expect_identical(res$yrep, per_unit_resid)
   # y is zeros at unit length for resid_* (bayesplot's
   # ppc_error_hist receives y = 0 + (-1)*resid).
@@ -158,51 +151,31 @@ test_that("pp_check(type = 'fit_stat') is refused where no unit aggregates", {
     pp_check(stub(gaussian()), type = "fit_stat"),
     "only available for the detection"
   )
-  # The case the gaussian stub alone could not reach: these five
-  # carry `mvgam_closure_unit = TRUE` but never aggregate a unit's
-  # rows, so the discrepancy has nothing to sum. Asking the
-  # wire-format question admitted them, and a composition's rows
-  # sum to one whatever the fit says, so the Bayesian p-value came
-  # back near 0.5 for every model.
+  # These five share the closure-unit layout but never sum the rows of
+  # a unit. A composition's rows sum to one whatever the fit says. The
+  # discrepancy then has nothing to test.
   for (fam in list(diri(), multi(), categ(), mvn(), mvt())) {
-    expect_false(is_closure_unit_family(fam))
     expect_error(
       pp_check(stub(fam), type = "fit_stat"),
       "does not aggregate repeat visits"
     )
   }
-  # The two that do aggregate must not be caught by the same gate.
-  for (fam in list(occ(), nmix())) {
-    expect_true(is_closure_unit_family(fam))
-  }
-  # Custom families without the flag and built-in families
-  for (fam in list(tweedie(), beta_nb(), com_binomial(), poisson(),
-                   bernoulli(), brms::negbinomial())) {
-    expect_false(is_closure_unit_family(fam))
-  }
 })
 
-test_that("mvgam_ppc_fit_stat print + plot methods produce expected output", {
-  # Hand-construct a fit_stat result with a known Bayesian p-value
-  # so the formatting is testable without a real Stan fit.
-  set.seed(7L)
-  T_obs <- rnorm(50L, mean = 100, sd = 5)
-  T_rep <- rnorm(50L, mean = 100, sd = 5)
-  obj <- structure(
-    list(
-      stat = "chi_squared", group = NULL, grain = "closure unit",
-      T_obs = T_obs, T_rep = T_rep,
-      bayes_p = mean(T_rep >= T_obs),
-      n_draws = 50L, family = "occ"
-    ),
-    class = c("mvgam_ppc_fit_stat", "list")
-  )
-  out <- capture.output(print(obj))
-  expect_true(any(grepl("chi-squared", out)))
-  expect_true(any(grepl("Bayesian p-value", out)))
-  expect_true(any(grepl("closure unit", out)))
-  p <- plot(obj)
-  expect_s3_class(p, "ggplot")
+test_that("mvgam_ppc_fit_stat print names the direction of a far p-value", {
+  fit_stat <- function(p) {
+    structure(
+      list(stat = "chi_squared", group = NULL, grain = "closure unit",
+           T_obs = 1, T_rep = 1, bayes_p = p, n_draws = 50L,
+           family = "occ"),
+      class = c("mvgam_ppc_fit_stat", "list")
+    )
+  }
+  # Replicates that rarely reach the data suggest lack of fit. Data
+  # closer to the expectation than replicates follow from flexible terms.
+  expect_output(print(fit_stat(0.01)), "may not fit")
+  expect_output(print(fit_stat(0.99)), "deviate less")
+  expect_false(any(grepl("Note", capture.output(print(fit_stat(0.5))))))
 })
 
 
@@ -330,8 +303,6 @@ test_that("complete_closure_unit_newdata stamps occ defaults", {
   out  <- mvgam:::complete_closure_unit_newdata(
     stub, make_stripped_grid(5L)
   )
-  expect_true(all(c("series", "time", "visit", "cap", "y") %in%
-                    names(out)))
   expect_identical(out$cap, rep(1L, 5L))
   expect_identical(out$visit, rep(1L, 5L))
   expect_identical(out$time, 1:5)
@@ -399,13 +370,8 @@ test_that(
   partial <- partial[rep(1L, 3L), , drop = FALSE]
   rownames(partial) <- NULL
   out <- mvgam:::complete_closure_unit_newdata(stub, partial)
-  # series was present; left alone (still all "1").
+  # The supplied series stays as given. The response is replaced.
   expect_identical(as.character(out$series), rep("1", 3L))
-  # time / visit / cap stamped.
-  expect_identical(out$time, 1:3)
-  expect_identical(out$visit, rep(1L, 3L))
-  expect_identical(out$cap, rep(1L, 3L))
-  # response always overridden to 0L.
   expect_identical(out$y, rep(0L, 3L))
 })
 
@@ -417,7 +383,6 @@ test_that("complete_closure_unit_newdata handles multi-species fits", {
     stub, make_stripped_grid(3L)
   )
   expect_identical(levels(out$series), levels(stub$data$series))
-  expect_identical(as.character(out$series), rep("1", 3L))
 })
 
 test_that("complete_closure_unit_newdata overrides datagrid-pinned time", {

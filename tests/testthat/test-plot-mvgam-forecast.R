@@ -85,12 +85,6 @@
   )
 }
 
-test_that("plot.mvgam_forecast returns a ggplot", {
-  fc <- .make_fc()
-  p <- plot(fc)
-  expect_ggplot(p)
-})
-
 test_that("default plot faceted when >1 series", {
   fc <- .make_fc(series = c("a", "b", "c"))
   p <- plot(fc)
@@ -132,6 +126,12 @@ test_that("multi-band forecast emits one ribbon per prob, per series", {
   geoms <- .layer_geoms(p)
   # 2 series x (1 hindcast ribbon + 3 forecast ribbons) = 8.
   expect_equal(sum(geoms == "GeomRibbon"), 8L)
+  # The forecast bands start at the last training time and join the
+  # hindcast. Drawn alone, they start at the first forecast time.
+  # Layers 1 and 2 are the hindcast band and median.
+  expect_identical(min(p$layers[[3L]]$data$time), 10L)
+  alone <- plot(fc, hindcast = FALSE, probs = 0.5)
+  expect_identical(min(alone$layers[[1L]]$data$time), 11L)
 })
 
 test_that("observation overlay can be suppressed via newdata_obs=FALSE", {

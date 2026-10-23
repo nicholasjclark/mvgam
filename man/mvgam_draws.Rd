@@ -60,7 +60,9 @@ coefficients (\verb{b_*_trend}, \verb{bs_*_trend} and \verb{bsp_*_trend}).
 (autoregressive coefficients, innovation SDs, ...).
 \item \code{"trend_smooth_params"}: trend-side smooth SDs.
 }
-\code{NULL} (the default) returns every parameter.}
+\code{NULL} (the default) returns every parameter. A bare vector name,
+such as \code{"sigma_trend"}, selects every element. \code{\link[=variables.mvgam]{variables.mvgam()}}
+lists the exact names and how they are formed.}
 
 \item{draw}{For \code{as.data.frame.mvgam}, an optional integer
 vector of draw indices (1-based) to subset after extraction.

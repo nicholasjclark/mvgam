@@ -1212,7 +1212,7 @@ window_predictive <- function(fit, fc_data) {
     training = NULL, hindcasts = NULL, forecasts = arms,
     fc_grid = list(
       observations = window$observations,
-      times = hindcast_column_times(fit, "response", NULL, window)
+      times = column_times(fit, "response", NULL, window)
     )
   )
 }

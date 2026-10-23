@@ -167,21 +167,16 @@ hindcast.mvgam <- function(object,
 
 
 # Build an mvgam_latent_state object from a fitted closure-unit
-# model. Pulls per-draw latent state from the family kernel
-# (`posterior_latent_N()` / `posterior_occupancy()`), then derives
-# the unit grain (`series`, `time`) from the training data so the
-# returned object's `unit` slot lines up with the columns of the
-# draw matrix. `time` here is whatever column the user supplied as
-# the closure-unit identifier (for single-season designs it is just
-# the unit index; for multi-season designs it is the season).
+# model. The family kernel (`posterior_latent_N()` or
+# `posterior_occupancy()`) gives the per-draw latent state. The
+# closure-unit arrays give the (`series`, `time`) label of each draw
+# column.
 #'@noRd
 hindcast_latent_state <- function(object, ndraws = NULL,
                                   draw_ids = NULL, resp = NULL) {
   checkmate::assert_string(resp, null.ok = TRUE)
-  # Sharing the closure-unit pipeline is not the same as having a
-  # latent state to report, and this asked only the first. `mvn()`,
-  # `mvt()` and `diri()` passed it and met the dispatcher, which
-  # answered with a source file to edit.
+  # `mvn()`, `mvt()` and `diri()` share the closure-unit layout and
+  # hold no latent state.
   require_closure_unit_predict_type(object$family, "latent_state")
 
   total_draws <- nrow(posterior::as_draws_matrix(object$fit))
@@ -203,59 +198,24 @@ hindcast_latent_state <- function(object, ndraws = NULL,
                             any.missing = FALSE,
                             .var.name = "kernel return value")
 
-  # Per-unit grain, taken from the arrays the kernel was built on
-  # rather than rebuilt here. `build_closure_unit_arrays()` numbers
-  # units by first appearance over the time-major data and records the
-  # grouping values in `unit_grid` in that same order, so reading it
-  # keeps the labels attached to the draw columns they belong to.
-  # Rebuilding the grid and sorting it by series relabelled every unit
-  # on any fit carrying more than one series: one species' first year
-  # was reported as another's, and a unit could be handed an abundance
-  # below the count observed there.
+  # `build_closure_unit_arrays()` records the grouping values of each
+  # unit in `unit_grid`, in the order of the draw columns.
   meta <- axis_vars(object)
-  arrays <- extract_closure_unit_components(object)$arrays
-  unit_df <- arrays$unit_grid
-  if (is.null(unit_df)) {
-    # A fit built before `unit_grid` was recorded. Fall back to the
-    # first-appearance order of the training data, which is what the
-    # arrays used, and do not sort it.
-    td <- object$data
-    unit_df <- unique(td[, c(meta$series_var, meta$time_var),
-                         drop = FALSE])
-  }
+  unit_df <- extract_closure_unit_components(object)$arrays$unit_grid
   names(unit_df)[match(c(meta$series_var, meta$time_var),
                          names(unit_df))] <- c("series", "time")
   rownames(unit_df) <- NULL
 
-  if (ncol(draws) != nrow(unit_df)) {
-    stop(insight::format_error(c(
-      "Kernel draws and unit grid disagree.",
-      x = paste0("ncol(draws) = ", ncol(draws),
-                  ", unique (series, time) rows = ",
-                  nrow(unit_df), ".")
-    )))
-  }
-
-  is_nmix <- models_latent_count(object$family)
-  state_label <- if (is_nmix) {
-    "Latent abundance (N)"
-  } else {
-    "Occupancy probability (psi)"
-  }
-  state_short <- if (is_nmix) "N" else "psi"
-
-  # A multi-season fit indexes `time` as a season, so the plotted
-  # axis is a time axis. For a single-season fit `time` is only the
-  # closure-unit identifier and the axis labelling switches to
-  # "Closure-unit index" via `has_time`.
-  has_time <- is_multi_season_family(object$family)
+  # `time` is a time axis when a multi-season fit indexes seasons by
+  # it, or when a trend evolves along it. A single-season fit without
+  # a temporal trend uses it only to identify closure units.
+  has_time <- is_multi_season_family(object$family) ||
+    !get_trend_type(object) %in% c("None", "ZMVN")
 
   new_mvgam_latent_state(
     draws       = draws,
     unit        = unit_df,
     family      = object$family,
-    state_label = state_label,
-    state_short = state_short,
     has_time    = has_time
   )
 }

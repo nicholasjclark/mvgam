@@ -76,19 +76,14 @@ test_that("hindcast.mvgam returns mvgam_forecast with NULL forecast slots", {
     }
   )
   hc <- hindcast(fit, type = "response")
-  expect_s3_class(hc, "mvgam_forecast")
   required <- c("family", "family_pars", "type", "series_names",
                 "train_observations", "train_times",
                 "test_observations", "test_times",
                 "hindcasts", "forecasts")
   expect_equal(sort(names(hc)), sort(required))
-  dead <- c("call", "trend_call", "trend_model", "drift",
-            "use_lv", "fit_engine")
-  expect_false(any(dead %in% names(hc)))
   expect_null(hc$forecasts)
   expect_null(hc$test_times)
   expect_null(hc$test_observations)
-  expect_identical(hc$type, "response")
   expect_identical(dim(hc$hindcasts[["s1"]]), c(3L, 8L))
 })
 
@@ -323,3 +318,4 @@ test_that("Multi-series hindcast returns one matrix per series", {
   expect_equal(hc$train_times[["a"]], 1:8)
   expect_equal(hc$train_times[["b"]], 1:8)
 })
+

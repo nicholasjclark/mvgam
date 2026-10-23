@@ -221,7 +221,13 @@ build_forecast_layers <- function(
       )
     }
 
-    # Forecast: nested ribbons with their median
+    # Forecast: nested ribbons with their median. With a hindcast drawn,
+    # they start from its last occasion and join it.
+    if (!is.null(fc_mat) && !is.null(hc_mat) && length(hc_times) > 0L) {
+      last <- hc_times == max(hc_times)
+      fc_mat <- cbind(hc_mat[, last, drop = FALSE], fc_mat)
+      fc_times <- c(hc_times[last], fc_times)
+    }
     if (!is.null(fc_mat)) {
       layers <- c(
         layers,

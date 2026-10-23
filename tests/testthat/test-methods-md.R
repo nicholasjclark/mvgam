@@ -191,8 +191,30 @@ test_that("By-factor GP carries the grouping variable in the subscript", {
   )
   out <- methods_md(mod)
   # Subscript uses `\mid` to separate vars from the by var.
-  expect_true(grepl("x \\\\mid grp", out))
-  expect_true(grepl("stratified by \\$grp\\$", out))
+  expect_true(grepl("x \\\\mid \\\\mathrm\\{grp\\}", out))
+  expect_true(grepl("stratified by \\$\\\\mathrm\\{grp\\}\\$", out))
+})
+
+test_that("Terms render in the predictor they belong to", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = rnorm(120),
+    grp = factor(rep(c("a", "b", "c", "d"), each = 30)),
+    y = rnorm(120)
+  )
+  # A by-factor smooth is one smooth per level of its by variable
+  out <- methods_md(make_methods_md_prefit(
+    y ~ s(x, by = grp, k = 5), data = dat, family = gaussian()
+  ))
+  expect_match(out, "f_{x \\mid \\mathrm{grp}}", fixed = TRUE)
+  expect_match(out, "stratified by $\\mathrm{grp}$", fixed = TRUE)
+  # A random effect on sigma stays out of the mean's predictor
+  out <- methods_md(make_methods_md_prefit(
+    brms::bf(y ~ x, sigma ~ (1 | grp)), data = dat, family = gaussian()
+  ))
+  expect_false(grepl("\\alpha_{\\mathrm{grp}[i]}", out, fixed = TRUE))
 })
 
 test_that("Tensor t2(x, z) smooth renders as f_{x, z} with both args", {
@@ -242,26 +264,26 @@ test_that("Varying slope (x | grp) renders MVNormal + LKJ joint", {
   mod <- make_methods_md_prefit(y ~ x + (x | grp), data = dat)
   out <- methods_md(mod)
   # Linear predictor contains both intercept and slope deviations.
-  expect_true(grepl("\\\\alpha_\\{grp\\[i\\]\\}", out))
+  expect_true(grepl("\\\\alpha_\\{\\\\mathrm\\{grp\\}\\[i\\]\\}", out))
   expect_true(grepl(
-    "\\\\beta\\^\\{\\(grp\\)\\}_\\{x, grp\\[i\\]\\} x_\\{i,t\\}",
+    "\\\\beta\\^\\{\\(\\\\mathrm\\{grp\\}\\)\\}_\\{x, \\\\mathrm\\{grp\\}\\[i\\]\\} x_\\{i,t\\}",
     out
   ))
   # Term def: joint MVNormal + LKJ on Omega.
   expect_true(grepl("\\\\text\\{MVNormal\\}", out))
   expect_true(grepl(
-    "\\\\boldsymbol\\{\\\\Omega\\}_\\{grp\\} &\\\\sim \\\\text\\{LKJCorr\\}",
+    "\\\\boldsymbol\\{\\\\Omega\\}_\\{\\\\mathrm\\{grp\\}\\} &\\\\sim \\\\text\\{LKJCorr\\}",
     out
   ))
   expect_true(grepl(
-    "\\\\boldsymbol\\{\\\\Sigma\\}_\\{grp\\}", out
+    "\\\\boldsymbol\\{\\\\Sigma\\}_\\{\\\\mathrm\\{grp\\}\\}", out
   ))
   # Priors: distinct intercept and slope SDs.
   expect_true(grepl(
-    "\\\\sigma\\^\\{\\(\\\\alpha\\)\\}_\\{grp\\}", out
+    "\\\\sigma\\^\\{\\(\\\\alpha\\)\\}_\\{\\\\mathrm\\{grp\\}\\}", out
   ))
   expect_true(grepl(
-    "\\\\sigma\\^\\{\\(\\\\beta_\\{x\\}\\)\\}_\\{grp\\}", out
+    "\\\\sigma\\^\\{\\(\\\\beta_\\{x\\}\\)\\}_\\{\\\\mathrm\\{grp\\}\\}", out
   ))
 })
 
@@ -282,7 +304,7 @@ test_that("me(x, sdx) renders observation + latent + hyperprior layers", {
   ))
   # Observation layer: noisy x ~ Normal(tilde{x}, sdx).
   expect_true(grepl(
-    "x_\\{i,t\\} &\\\\sim \\\\text\\{Normal\\}.*\\\\tilde\\{x\\}_\\{i,t\\}.*sdx_\\{i,t\\}",
+    "x_\\{i,t\\} &\\\\sim \\\\text\\{Normal\\}.*\\\\tilde\\{x\\}_\\{i,t\\}.*\\\\mathrm\\{sdx\\}_\\{i,t\\}",
     out
   ))
   # Latent layer: tilde{x} ~ Normal(hyper-mean, hyper-SD).
@@ -337,17 +359,17 @@ test_that("dpar second-formula renders its own linear predictor", {
   out <- methods_md(mod)
   # Sigma gets its own row, log-linked by default.
   expect_true(grepl(
-    "\\\\log \\\\sigma_\\{i,t\\} &= \\\\alpha\\^\\{\\(sigma\\)\\}",
+    "\\\\log \\\\sigma_\\{i,t\\} &= \\\\alpha\\^\\{\\(\\\\mathrm\\{sigma\\}\\)\\}",
     out
   ))
   # `\\,` thin space between coef token and the data-column
   # symbol; shared with the nl per-nlpar predictor format.
   expect_true(grepl(
-    "\\\\beta_\\{sigma,x\\} \\\\, x_\\{i,t\\}", out
+    "\\\\beta_\\{\\\\mathrm\\{sigma\\},x\\} \\\\, x_\\{i,t\\}", out
   ))
   # Priors block carries the distinct alpha^{(sigma)}.
   expect_true(grepl(
-    "\\\\alpha\\^\\{\\(sigma\\)\\} &\\\\sim", out
+    "\\\\alpha\\^\\{\\(\\\\mathrm\\{sigma\\}\\)\\} &\\\\sim", out
   ))
 })
 
@@ -371,7 +393,7 @@ test_that("nl formula renders per-nlpar decompositions", {
   # Top-level mu uses nlpar tokens verbatim with (i, t) subscripts.
   expect_true(grepl("a_\\{i,t\\}", out))
   expect_true(grepl("b_\\{i,t\\}", out))
-  expect_true(grepl("env_\\{i,t\\}", out))
+  expect_true(grepl("\\\\mathrm\\{env\\}_\\{i,t\\}", out))
   # Each nlpar gets its own decomposition row with alpha^{(np)}
   # and beta_{np,trait1}.
   expect_true(grepl(
@@ -381,10 +403,10 @@ test_that("nl formula renders per-nlpar decompositions", {
     "b_\\{i,t\\} &= \\\\alpha\\^\\{\\(b\\)\\}", out
   ))
   expect_true(grepl(
-    "\\\\beta_\\{a,trait1\\} \\\\, trait1_\\{i,t\\}", out
+    "\\\\beta_\\{a,\\\\mathrm\\{trait1\\}\\} \\\\, \\\\mathrm\\{trait1\\}_\\{i,t\\}", out
   ))
   expect_true(grepl(
-    "\\\\beta_\\{b,trait1\\} \\\\, trait1_\\{i,t\\}", out
+    "\\\\beta_\\{b,\\\\mathrm\\{trait1\\}\\} \\\\, \\\\mathrm\\{trait1\\}_\\{i,t\\}", out
   ))
 })
 
@@ -406,12 +428,12 @@ test_that("Response column never surfaces in the Predictors list", {
 test_that("Group-level RE renders alpha_{grp[i]} + hyperprior shape", {
   mod <- make_methods_md_prefit(y ~ (1 | grp))
   out <- methods_md(mod)
-  expect_true(grepl("\\\\alpha_\\{grp\\[i\\]\\}", out))
+  expect_true(grepl("\\\\alpha_\\{\\\\mathrm\\{grp\\}\\[i\\]\\}", out))
   expect_true(grepl(
-    "\\\\alpha_\\{grp\\} &\\\\sim \\\\text\\{Normal\\}\\(0",
+    "\\\\alpha_\\{\\\\mathrm\\{grp\\}\\} &\\\\sim \\\\text\\{Normal\\}\\(0",
     out
   ))
-  expect_true(grepl("\\\\sigma_\\{grp\\}", out))
+  expect_true(grepl("\\\\sigma_\\{\\\\mathrm\\{grp\\}\\}", out))
 })
 
 test_that("No-trend gaussian model omits eta_{i,t} from linpred", {
@@ -434,7 +456,7 @@ test_that("Priors section backfills umbrella text onto specific rows", {
   out <- methods_md(mod)
   # sigma_{grp} should appear (specific group label), not sigma_j.
   expect_true(grepl(
-    "\\\\sigma_\\{grp\\} &\\\\sim \\\\text\\{StudentT\\}", out
+    "\\\\sigma_\\{\\\\mathrm\\{grp\\}\\} &\\\\sim \\\\text\\{StudentT\\}", out
   ))
   expect_false(grepl("\\\\sigma_\\{j\\}", out))
 })
@@ -968,8 +990,8 @@ test_that("nl b_<nlpar>_<term> prior carries nlpar superscript on beta", {
     run_model = FALSE, silent = 2
   )
   out <- methods_md(mod)
-  expect_true(grepl("\\\\beta\\^\\{\\(a\\)\\}_\\{trait1\\}", out))
-  expect_true(grepl("\\\\beta\\^\\{\\(b\\)\\}_\\{trait1\\}", out))
+  expect_true(grepl("\\\\beta\\^\\{\\(a\\)\\}_\\{\\\\mathrm\\{trait1\\}\\}", out))
+  expect_true(grepl("\\\\beta\\^\\{\\(b\\)\\}_\\{\\\\mathrm\\{trait1\\}\\}", out))
 })
 
 test_that("Ordinal Intercept rows render as theta_{k} thresholds", {

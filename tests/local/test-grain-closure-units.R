@@ -1682,7 +1682,7 @@ test_that("multi-season: every listed parameter is reachable", {
   vars <- variables(fit)
   # With `class = NULL`, `hypothesis()` takes a parameter by the name
   # `variables()` lists
-  for (v in c("b_Intercept", "ar1_trend[1]",
+  for (v in c("b_Intercept", grep("^ar1_trend\\[", vars, value = TRUE)[1L],
               grep("^(sds|bs)_", vars, value = TRUE))) {
     h <- hypothesis(fit, paste0("`", v, "` > 0"), class = NULL)
     expect_true(is.finite(h$hypothesis$Estimate))
@@ -1731,6 +1731,15 @@ test_that("latent_state and latent_N are one type under two names", {
   # occupancy state is a probability, which the detection-scale
   # answer for these data is not.
   expect_true(all(gp_state$estimate >= 0 & gp_state$estimate <= 1))
+  # The effect is the expected state given the covariates. A grid's
+  # placeholder counts leave it unchanged.
+  zeroed <- dat
+  zeroed[[response_column(fit)]] <- 0L
+  expect_equal(
+    marginaleffects::get_predict(fit, newdata = zeroed,
+                                 type = "latent_state")$estimate,
+    gp_state$estimate
+  )
 
   ce <- conditional_effects(fit, type = "latent_state")
   expect_s3_class(ce, "mvgam_conditional_effects")

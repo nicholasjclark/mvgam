@@ -144,7 +144,7 @@ summary(mod_joint)
 ```
 
 ```{r trend-numbers, include = FALSE}
-ar12 <- as.numeric(as_draws_matrix(mod_joint, variable = "ar12_trend[1]"))
+ar12 <- as.numeric(as_draws_matrix(mod_joint, variable = "ar12_trend"))
 fe_ar12 <- sprintf("%.2f [%.2f, %.2f]", median(ar12),
                    quantile(ar12, 0.025), quantile(ar12, 0.975))
 ```

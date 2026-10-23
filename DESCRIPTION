@@ -21,6 +21,7 @@ Depends:
     brms (>= 2.21.0)
 Imports:
     methods,
+    parallel,
     mgcv (>= 1.8-13),
     cli (>= 3.6.0),
     insight (>= 0.19.1),
