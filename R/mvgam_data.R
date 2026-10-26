@@ -118,6 +118,7 @@
 #' mvgam_data(gappy, family = poisson(), trend_formula = ~ CAR(),
 #'            plot = FALSE)
 #'
+#' @family model fitting
 #' @export
 mvgam_data <- function(data,
                        y = "y",

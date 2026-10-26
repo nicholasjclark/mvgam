@@ -33,44 +33,52 @@
 )
 }
 \arguments{
-\item{x}{Object of class \code{mvgam}}
+\item{x}{A fitted \code{mvgam} or \code{jsdgam} object.}
 
-\item{...}{More \code{mvgam} objects}
+\item{...}{For \code{loo()}, further arguments to \code{\link[loo:loo]{loo::loo()}}. For
+\code{loo_compare()}, further fitted models.}
 
-\item{compare, resp, pointwise, moment_match, reloo, k_threshold, save_psis, moment_match_args, reloo_args}{Accepted for \link[brms:loo.brmsfit]{brms::loo.brmsfit} parity. Two are honoured: \code{resp}
-scopes a multivariate fit to one response, and \code{save_psis} keeps
-the smoothing object. The rest name machinery mvgam does not
-have. \code{pointwise} streams the density, \code{moment_match} and \code{reloo}
-refit the model and \code{k_threshold} with the \verb{*_args} lists
-configure those refits, while \code{compare} and \code{model_names} rank
-several models, which \code{\link[=loo_compare]{loo_compare()}} does. Supplying any of them
-raises an error naming it.}
+\item{compare, resp, pointwise, moment_match, reloo, k_threshold, save_psis, moment_match_args, reloo_args}{The arguments of \link[brms:loo.brmsfit]{brms::loo.brmsfit}. mvgam uses two of them.
+\code{resp} scopes a multivariate fit to one response. \code{save_psis}
+keeps the smoothing object. \code{pointwise} would stream the density.
+\code{moment_match} and \code{reloo} would refit the model, configured by
+\code{k_threshold} and the \verb{*_args} lists. \code{compare} and \code{model_names}
+would rank several models, which \code{\link[=loo_compare.mvgam]{loo_compare.mvgam()}} does.
+mvgam runs none of these. Supplying one raises an error naming
+it.}
 
-\item{model_names}{If \code{NULL} (the default) will use model names derived
-from deparsing the call. Otherwise will use the passed values as model names}
+\item{model_names}{Character vector of row names for the comparison,
+one per model. \code{NULL} takes them from the call.}
 
-\item{incl_autocor}{Logical, passed through to \code{\link[=loo.mvgam]{loo.mvgam()}} /
-\code{\link[=waic.mvgam]{waic.mvgam()}}. Default \code{TRUE} to match \code{\link[=loo.mvgam]{loo.mvgam()}}.}
+\item{incl_autocor}{Logical, default \code{TRUE}. Passed to
+\code{\link[=log_lik.mvgam]{log_lik.mvgam()}}. \code{TRUE} scores each observation under the latent
+trend state the model inferred at that time. The ELPD then
+describes the series that was observed. \code{FALSE} scores the
+deterministic submodel alone.}
 
 \item{incl_dynamics}{Superseded by \code{incl_autocor} and still
-accepted; ignored when \code{incl_autocor} is also given.}
+accepted. \code{TRUE} maps to \code{incl_autocor = TRUE} and \code{FALSE} to
+\code{incl_autocor = FALSE}. \code{incl_autocor} takes precedence when both
+are given.}
 
-\item{by_series}{Logical, default \code{FALSE}. When \code{TRUE}, return a
-data frame with one row per series (\code{series} column) and per-series
-ELPD estimates instead of a single \code{psis_loo} object. Matches the
-\code{spOccupancy::waicOcc(by.sp = TRUE)} workflow for ranking species-
-level fit in joint-species distribution models. Requires a \code{series}
-column on the fit's data. For closure-unit families the log_lik
-columns are at the per-unit grain; each unit is mapped to a series
-via the first row of its visit block.}
+\item{by_series}{Logical, default \code{FALSE}. \code{TRUE} returns a data
+frame with one row per series and columns \code{series}, \code{elpd},
+\code{se_elpd}, \code{p} and \code{n_obs}, as \code{spOccupancy::waicOcc(by.sp = TRUE)}
+ranks species. An occupancy or N-mixture fit is scored per site,
+each site counted in its species.}
 
-\item{criterion}{Information criterion used for comparison. One of
-\code{"loo"} (default) or \code{"waic"}.}
+\item{criterion}{\code{"loo"} (the default) or \code{"waic"}.}
 }
 \value{
-For \code{loo.mvgam}, an object of class \code{psis_loo} (see \code{\link[loo:loo]{loo::loo()}}
-for details). For \code{loo_compare.mvgam}, an object of class \code{compare.loo}
-(see \code{\link[loo:loo_compare]{loo::loo_compare()}} for details).
+For \code{loo.mvgam}, an object of class \code{psis_loo} (see
+\code{\link[loo:loo]{loo::loo()}}). For \code{loo_compare.mvgam}, a \code{compare.loo} table with
+one row per model, best first (see \code{\link[loo:loo_compare]{loo::loo_compare()}}). Three
+columns follow Sivula et al. (2025). \code{p_worse} is the normal
+probability that the model predicts worse than the best one.
+\code{diag_diff} holds \code{"|elpd_diff| < 4"} for a difference too small
+for its SE to be trusted. \code{diag_elpd} holds \code{"N < 100"} for too
+few observations and \code{"k_psis > 0.7"} for an unreliable PSIS
+approximation.
 }
 \description{
 Extract the LOOIC (leave-one-out information criterion) using \code{\link[loo:loo]{loo::loo()}}.
@@ -86,41 +94,40 @@ original model fit (i.e. leave-one-out cross-validation).
 See \code{\link[loo:loo]{loo::loo()}} and \code{\link[loo:loo_compare]{loo::loo_compare()}} for further details on how this
 importance sampling works.
 
-A fit carrying a latent trend strains this approximation, and not
-occasionally. Leaving an observation out does not remove its
-influence on the state the model inferred at that time, so the
-density being re-weighted still conditions on a state that saw it.
-The ELPD then describes conditional in-sample fit rather than
-out-of-sample accuracy, and the effective number of parameters
-climbs towards the number of observations. Read the Pareto \eqn{k}
-diagnostics before trusting a comparison, and prefer
-\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}}, which refits along the time axis and scores each
-window against data the model has not seen. \code{\link[=forecast.mvgam]{forecast.mvgam()}} with
-\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} serves the same purpose on a held-out
-horizon.
+A fit with a latent trend routinely strains this approximation.
+Leaving an observation out keeps its influence on the state the
+model inferred at that time. The re-weighted density still
+conditions on a state estimated from that observation. The ELPD
+then measures conditional in-sample fit. The effective number of
+parameters climbs towards the number of observations. Check the
+Pareto \eqn{k} diagnostics before trusting a comparison.
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} refits along the time axis and scores each window
+against data the model has not seen. \code{\link[=forecast.mvgam]{forecast.mvgam()}} with
+\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} scores a held-out horizon.
 }
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
+                    n_timepoints = 120L, trend_model = AR())
 
+# Two models of one count series: with and without a smooth of x
 mod1 <- mvgam(y ~ s(x),
-               trend_formula = ~ AR(p = 1),
-               data    = simdat$data_train,
-               family  = poisson(),
-               chains  = 2, silent = 2)
-mod2 <- mvgam(y ~ 1,
-               trend_formula = ~ AR(p = 1),
-               data    = simdat$data_train,
-               family  = poisson(),
-               chains  = 2, silent = 2)
+              trend_formula = ~ AR(p = 1),
+              data   = simdat$data_train,
+              family = poisson(),
+              chains = 2, silent = 2)
+mod2 <- update(mod1, formula. = y ~ 1)
 
+# The ELPD estimate, with Pareto k diagnostics for each observation
 loo(mod1)
 
-# `loo_compare()` lists the better model, here the one with the
-# effect of x, first
+# The better model comes first, with elpd_diff = 0. The diagnostic
+# columns say how far the difference can be trusted
 loo_compare(mod1, mod2)
+
+# Next: lfo_cv() scores each model's forecasts of data it has not
+# seen
 }
 
 }
@@ -135,13 +142,31 @@ leave-future-out cross-validation for Bayesian time series
 models. \emph{Journal of Statistical Computation and
 Simulation}, 90(14):2499-2523.
 \doi{10.1080/00949655.2020.1783262}
+
+Sivula, T., Magnusson, M., Matamoros, A. A. and Vehtari, A. (2025).
+Uncertainty in Bayesian leave-one-out cross-validation based model
+comparison. \emph{Bayesian Analysis}. \doi{10.1214/25-BA1569}
 }
 \seealso{
-\code{\link[=waic.mvgam]{waic.mvgam()}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}},
-\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} for time-block (rolling) CV,
-\code{\link[=kfold.mvgam]{kfold.mvgam()}} for grouped k-fold CV with optional
-selective refit.
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} scores forecasts by refitting along the
+time axis. \code{\link[=kfold.mvgam]{kfold.mvgam()}} runs grouped k-fold cross-validation.
+\code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}} weights models by their predictions.
+The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+compares models by approximate and exact cross-validation.
+
+Other model comparison: 
+\code{\link{bridge_sampler.mvgam}()},
+\code{\link{compare_elpds}()},
+\code{\link{kfold.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{log_lik.mvgam}()},
+\code{\link{loo_compare.mvgam_lfo}()},
+\code{\link{mvgam_loo_extras}},
+\code{\link{posterior_average.mvgam}()},
+\code{\link{waic.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model comparison}

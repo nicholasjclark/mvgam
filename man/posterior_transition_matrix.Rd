@@ -35,13 +35,13 @@ the outcome names (levels of \code{subgr} on a hierarchical fit,
 \code{series_names} on a single-panel fit) for downstream custom
 summaries.}
 
-\item{robust}{Logical. When \code{summary = TRUE}, use the median
-as the per-cell point estimate; defaults to the posterior
-mean when \code{FALSE}.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
-\item{probs}{Length-2 numeric vector of quantile probabilities
-for the per-cell credible interval when \code{summary = TRUE}.
-Defaults to \code{c(0.025, 0.975)}.}
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
 
 \item{lag}{The lag whose transition matrix is returned, at most
 the order \code{p} of the fitted \code{VAR(p)}. Defaults to \code{1}.}
@@ -108,7 +108,18 @@ vector autoregressions.
 \code{\link[=VAR]{VAR()}}, \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}},
 \code{\link[=stability]{stability()}}, \code{\link[=print.mvgam_var_matrix]{print.mvgam_var_matrix()}},
 \code{\link[=plot.mvgam_var_matrix]{plot.mvgam_var_matrix()}}.
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{fevd.mvgam}()},
+\code{\link{irf.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{residual_cor}()},
+\code{\link{shared_variation}()},
+\code{\link{stability.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

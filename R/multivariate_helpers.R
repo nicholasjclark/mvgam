@@ -190,33 +190,41 @@ response_suffix <- function(object, resp = NULL) {
 }
 
 
+#' One response's view of a multivariate model
+#'
+#' The view keeps the prior rows of response `r` and the rows every
+#' response shares. Its formula and family are the response's own. The
+#' `methods_md()` extractors and renderers then describe the response
+#' with no argument of their own for it.
+#'
+#' @param obj A multivariate `mvgam` object
+#' @param r Response key
+#' @return The view
 #' @noRd
 subset_obj_to_response <- function(obj, r) {
-  # Per-response slice of a multi-response fit. Filters the prior
-  # table to rows scoped to response `r` and to rows with no `resp`,
-  # which all responses share. Narrows the formula and the family to
-  # that response's own. Downstream extractors and renderers then work
-  # on the single-response view with no argument of their own for it.
+  checkmate::assert_string(r)
   out <- obj
   out$methods_md_resp <- r
   out$family <- model_families(obj, r)
   out$formula <- obj$formula$forms[[r]]
   prior <- obj$prior
   if (!is.null(prior) && nrow(prior) > 0L) {
-    rsp <- prior$resp %||% rep("", nrow(prior))
-    keep <- rsp == r | !nzchar(rsp)
-    out$prior <- prior[keep, , drop = FALSE]
+    rsp <- prior_field(prior, "resp")
+    out$prior <- prior[rsp == r | !nzchar(rsp), , drop = FALSE]
   }
   out
 }
 
 
+#' Whether a multivariate model correlates its residuals
+#'
+#' The formula records `set_rescor(TRUE)`. A table holding brms's
+#' `Lrescor` prior row also marks it.
+#'
+#' @param obj An `mvgam` object
+#' @return Logical scalar
 #' @noRd
 has_rescor <- function(obj) {
-  # TRUE when the user set `set_rescor(TRUE)` on a multivariate
-  # brms formula. Prefer the formula attribute (authoritative);
-  # fall back to detecting brms's `Lrescor` row in the prior
-  # table (post-fit objects with stripped formula metadata).
   f <- obj$formula
   if (inherits(f, "mvbrmsformula") && isTRUE(f$rescor)) {
     return(TRUE)

@@ -66,6 +66,8 @@ as_draws_df(mod, variable = "sigma_trend")
 # Two series' autoregressive coefficients compared
 hypothesis(mod, "ar1_trend[series_1] > ar1_trend[series_2]",
            class = NULL)
+
+# Next, plot chosen parameters with mcmc_plot(mod, variable = ...)
 }
 
 }
@@ -73,7 +75,22 @@ hypothesis(mod, "ar1_trend[series_1] > ar1_trend[series_2]",
 \link{mvgam_draws} to extract draws by name,
 \code{\link[=hypothesis.mvgam]{hypothesis.mvgam()}} to test them, \code{\link[=summary.mvgam]{summary.mvgam()}} and
 \code{\link[=posterior_summary]{posterior_summary()}} to summarise them.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

@@ -52,28 +52,25 @@ over the trend's stochastic dynamics at the supplied design
 points. Use \code{forecast()} for time-series forecasting and
 \code{posterior_predict()} for marginal predictive checks.}
 
-\item{trend_map}{Optional fixed factor-loading specification.
-Accepts one of three shapes, a numeric \verb{n_series x n_lv}
-matrix for general loadings, a \code{data.frame(series, trend)}
-for sparse series-to-trend sharing, or a character code
-\code{"identity"} / \code{"shared"} for the two most common cases.
-The numeric matrix may carry \code{NA} entries to mark loadings
-that should be sampled (partial Z); finite entries are
-treated as fixed and preserved exactly on \code{Z} in the
-posterior. An all-NA mask is treated as equivalent to
-\code{trend_map = NULL} (no fixed entries, factor model
-triggered by \code{n_lv} alone) so it composes with
-\code{loadings_prior}. Default factor models (no \code{trend_map})
-sample \code{Z} unconstrained and identify it post-hoc via thin
-QR (see Heaps & Jermyn 2024); any user-supplied \code{trend_map}
-with at least one fixed entry bypasses that rotation so the
-encoded structure is not altered. Top-level alias for the
-\code{trend_map} argument on the trend constructor; passing both
-is an error. See \code{loadings_prior} for the compatibility
-matrix between \code{trend_map} patterns and structured
-loadings priors. The mapping is stored on a trend spec and
-requires a \code{trend_formula}. Supplying it without one is an
-error.}
+\item{trend_map}{Optional fixed factor loadings, in one of three
+forms:
+\itemize{
+\item a numeric \verb{n_series x n_lv} matrix of loadings. \code{NA}
+entries are sampled. Finite entries stay fixed on \code{Z} in the
+posterior. An all-\code{NA} matrix fixes nothing and acts as
+\code{trend_map = NULL}
+\item a \code{data.frame(series, trend)} assigning each series to one
+latent process
+\item \code{"identity"}, one process per series, or \code{"shared"}, one
+process for every series
+}
+A factor model without a \code{trend_map} samples every loading. It
+identifies \code{Z} after sampling by a thin QR rotation (Heaps and
+Jermyn 2024). A \code{trend_map} with any fixed entry takes no
+rotation. The argument requires a \code{trend_formula}. It is an
+alternative to the \code{trend_map} argument of the trend constructor,
+and supplying both is an error. \code{loadings_prior} lists the
+\code{trend_map} forms a structured loadings prior accepts.}
 
 \item{loadings_prior}{Optional named list specifying a
 structured prior on the unconstrained factor loadings
@@ -169,7 +166,8 @@ and double-count regularisation.
 The structured prior has no free parameters to act on.
 }}
 
-\item{backend}{Stan backend (defaults to "cmdstanr")}
+\item{backend}{\code{"cmdstanr"} or \code{"rstan"}. Defaults to
+\code{getOption("brms.backend", "cmdstanr")}.}
 
 \item{combine}{Logical, pool multiple imputation results (default TRUE)}
 
@@ -204,19 +202,17 @@ Closure-unit and multi-response families (\code{\link[=occ]{occ()}}, \code{\link
 out by unit. Each models its response alone and cannot be one
 response of a multivariate model.}
 
-\item{threads}{Positive integer or \code{NULL}. When non-NULL the
-model is compiled with \code{cpp_options$stan_threads = TRUE} and
-cmdstanr passes \code{threads_per_chain = N} at sample time.
-Closure-unit families (\code{nmix()}, \code{occ()}) and multi-response
-families (\code{diri()}, \code{mvn()}, \code{mvt()}, \code{multi()}, \code{categ()})
-thread their per-unit lpmf via \code{reduce_sum}; brms-native
-families (\code{gaussian()}, \code{poisson()}, etc.) without a
-\code{trend_formula} thread their lpmf loops via brms's
-\code{partial_log_lik_lpmf}. For closure-unit families, expect
-~30-40\% sampling throughput improvement at \code{threads = 4} on a
-fixture with N_unit >= 50; smaller fixtures may see
-thread-overhead-dominated regressions. The internal grainsize
-is auto-tuned to ~8 chunks regardless of \code{threads}.
+\item{threads}{Positive integer number of threads per chain, or
+\code{NULL} (the default) for none. The model is compiled with
+\code{cpp_options$stan_threads = TRUE}. cmdstanr then samples with
+\code{threads_per_chain = threads}. The closure-unit families (\code{nmix()},
+\code{occ()}) and the multi-response families (\code{diri()}, \code{mvn()},
+\code{mvt()}, \code{multi()}, \code{categ()}) split their likelihood over units
+with \code{reduce_sum}, in about eight chunks. With 50 or more closure
+units, \code{threads = 4} samples about a third faster. Fewer units can
+sample slower, the threading overhead outweighing the gain. A
+brms family without a \code{trend_formula} uses the threading brms
+writes.
 
 A brms-native family with a \code{trend_formula} samples serially
 whatever \code{threads} says. When it threads, brms moves the \code{mu}
@@ -238,54 +234,59 @@ and \code{latent} keep the per-level deviations and the latent values
 of a \code{me()} covariate. \code{manual} names individual parameters to
 keep.}
 
-\item{run_model}{Logical. Setting \code{run_model = FALSE} stops before
-Stan parse, compile and sampling and returns a stub \code{mvgam}
-object whose \verb{$stancode} and \verb{$standata} slots are populated but
-whose \verb{$fit} is \code{NULL}. Methods that need a fitted model
-(\code{summary()}, \code{predict()}, \code{forecast()}, \code{loo()}) reject the
-stub and say which helper to reach for. Where the model can be
-written as an \code{\link[=mvgam_formula]{mvgam_formula()}}, calling \code{\link[=stancode]{stancode()}} or
-\code{\link[=standata]{standata()}} on that object says the same thing more directly;
-\code{run_model = FALSE} is the route for a specification that only
-\code{\link[=jsdgam]{jsdgam()}} knows how to build. Both helpers build the same Stan
-code and data as \code{mvgam()}. Defaults to \code{TRUE}.}
+\item{run_model}{Logical. \code{FALSE} builds the model without parsing,
+compiling or sampling it. The result holds \verb{$stancode},
+\verb{$standata} and the prior table, with \verb{$fit} set to \code{NULL}.
+\code{\link[=stancode.mvgam_formula]{stancode.mvgam_formula()}}, \code{\link[=standata.mvgam_formula]{standata.mvgam_formula()}} and
+\code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}} return them. Methods that need draws,
+such as \code{summary()} and \code{forecast()}, refuse it. A \code{\link[=jsdgam]{jsdgam()}}
+model has no \code{\link[=mvgam_formula]{mvgam_formula()}}, which makes \code{run_model = FALSE}
+the way to inspect one before fitting. Defaults to \code{TRUE}.}
 
-\item{...}{Additional arguments passed to Stan fitting. \code{cores} sets
-how many chains sample at once. It defaults to
-\code{getOption("mc.cores")} when that option is set. Otherwise it is
-one fewer than the machine's cores, up to \code{chains}. Two more are
-worth calling out. \code{algorithm} selects how the posterior is explored and
-accepts \code{"sampling"} (the default), \code{"meanfield"}, \code{"fullrank"} or
+\item{...}{Further arguments for the model and its sampler.
+
+\code{prior} takes a \code{brmsprior} built with \code{\link[brms:set_prior]{brms::prior()}}. Its rows
+replace the matching defaults. \code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}} lists
+every class a model takes, with trend classes carrying a \verb{_trend}
+suffix. The plural \code{priors} is accepted as well.
+
+\code{chains}, \code{iter}, \code{warmup}, \code{thin}, \code{seed} and \code{control} reach
+Stan as in \code{\link[brms:brm]{brms::brm()}}. \code{cores} sets how many chains sample at
+once. It defaults to \code{getOption("mc.cores")} when that option is
+set and otherwise to one fewer than the machine's cores, up to
+\code{chains}.
+
+\code{algorithm} selects how the posterior is explored. It accepts
+\code{"sampling"} (the default), \code{"meanfield"}, \code{"fullrank"} or
 \code{"fixed_param"} on either backend, plus \code{"pathfinder"} and
-\code{"laplace"} when \code{backend = "cmdstanr"}. \code{init} sets the starting
-values and accepts \code{"random"} (the default), \code{"0"}, a numeric
-value, a list or a function. With \code{backend = "cmdstanr"} it also
-accepts \code{"pathfinder"}. The \code{"pathfinder"} keyword runs Stan's
-Pathfinder approximation on the compiled model and draws one
-starting value per chain from it. The algorithm you asked for
-still explores the posterior. The fit remains exact.
+\code{"laplace"} when \code{backend = "cmdstanr"}.
 
-\code{init = "pathfinder"} is a recovery option. On models that already
-warm up cleanly it is slower: across random walk, autoregressive,
-correlated autoregressive and dynamic factor trends with 60 to 750
-latent states, it added roughly a second of wall time. Warmup
-duration was essentially unchanged. Effective samples per second
-fell by 15 to 25 percent. It pays off on models that struggle to
-leave a poor starting point at all. There the extra second buys a
-warmup that would otherwise stall or fill with divergences.
+\code{init} sets the starting values. It accepts \code{"random"} (the
+default), \code{"0"}, a numeric value, a list or a function. With
+\code{backend = "cmdstanr"} it also accepts \code{"pathfinder"}. That
+keyword runs Stan's Pathfinder approximation on the compiled model
+and draws one starting value per chain from it. The requested
+algorithm still explores the posterior. The fit stays exact.
+It helps a model whose chains stall at a poor starting point or
+fill warmup with divergences. On a model that already warms up
+cleanly it adds about a second and lowers effective samples per
+second.
 
-Four arguments shape the Stan program. brms receives them
-unchanged. \code{knots} gives knot positions by covariate name and
-reaches the basis constructors for the observation and trend
-formulas alike. \code{drop_unused_levels} decides whether a factor
-level with no observations still earns a coefficient.
-\code{sample_prior} takes \code{"no"}, \code{"yes"} or \code{"only"}. Under \code{"only"}
-the observation likelihood drops out while the latent process
-keeps its own prior. The draws then describe the model before it
-sees the response. \code{normalize} decides whether the sampling
-statements carry their normalising constants; dropping them is
-faster and leaves the posterior unchanged. \code{save_model} names a
-file to write the assembled Stan program to.}
+Five arguments shape the Stan program and reach brms unchanged:
+\itemize{
+\item \code{knots} gives knot positions by covariate name, for the
+observation and trend formulas alike.
+\item \code{drop_unused_levels} decides whether a factor level with
+no observations still takes a coefficient.
+\item \code{sample_prior} takes \code{"no"}, \code{"yes"} or \code{"only"}. Under
+\code{"only"} the observation likelihood drops out and the latent
+process keeps its prior. The draws then show what the model
+implies before any response is observed.
+\item \code{normalize = FALSE} drops the normalising constants from
+the sampling statements. Sampling is faster and the posterior
+is unchanged.
+\item \code{save_model} names a file to write the Stan program to.
+}}
 }
 \value{
 An object of class \code{mvgam}.
@@ -299,67 +300,49 @@ the draws.
 }
 \examples{
 \dontrun{
-# One count series with a smooth covariate and an AR(1) trend
-set.seed(1)
-simdat <- sim_mvgam(family = poisson())
+# One count series with a smooth effect of a covariate x and an
+# AR(1) latent trend, split into training and test times
+set.seed(2)
+simdat <- sim_mvgam(family = poisson(), n_timepoints = 100L,
+                    trend_model = AR(), prop_trend = 0.5)
+head(simdat$data_train)
+
+# The parameters a model takes, with their default priors, before
+# any fitting. A `prior` argument to mvgam() replaces any of them
+get_prior(
+  mvgam_formula(y ~ s(x), trend_formula = ~ AR(p = 1)),
+  data   = simdat$data_train,
+  family = poisson()
+)
+
+# A smooth of x in the observation model and an AR(1) latent trend.
+# The test data are stored on the fit for forecasting
 mod <- mvgam(
   y ~ s(x),
   trend_formula = ~ AR(p = 1),
   data          = simdat$data_train,
+  newdata       = simdat$data_test,
   family        = poisson(),
   chains        = 2,
   silent        = 2
 )
 summary(mod)
+
+# Do draws from the model resemble the observed counts?
+pp_check(mod)
+
+# The effect of x on the expected count
 conditional_effects(mod)
 
-# A positive continuous response with a trend takes a log link,
-# as in `Gamma(link = "log")`. The default inverse link is
-# undefined wherever the trend turns the predictor negative.
+# Forecasts of the test times, with the held-out counts overlaid
+plot(forecast(mod))
 
-# Three correlated series: a VAR(1) trend, a smooth of x for each
-# series and custom priors. `get_prior()` lists the priors a model
-# takes.
-set.seed(2)
-vardat <- sim_mvgam(family = poisson(), n_series = 3L,
-                    n_timepoints = 120L, trend_model = VAR(cor = TRUE))
-var_mod <- mvgam(
-  formula       = y ~ 0,
-  trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR(),
-  data          = vardat$data_train,
-  family        = poisson(),
-  priors        = c(
-    prior(normal(0, 2), class = b_trend),
-    prior(exponential(2.5), class = sigma_trend)
-  ),
-  chains        = 2,
-  silent        = 2
-)
-summary(var_mod)
+# A methods paragraph with its references
+how_to_cite(mod)
 
-# Hindcasts and forecasts of one series, drawn with the held-out
-# counts
-fc <- forecast(var_mod, newdata = vardat$data_test)
-plot(fc, series = 1)
-
-# A paragraph for a methods section, with its references
-how_to_cite(var_mod)
-
-# A coefficient that drifts over time. The slope on x grows from 0
-# to 2. `s(time, by = x)` estimates it at every time.
-set.seed(3)
-n <- 100
-tvdat <- data.frame(time = seq_len(n), x = rnorm(n),
-                    series = factor("s1"))
-tvdat$y <- tvdat$x * seq(0, 2, length.out = n) + rnorm(n, 0, 0.3)
-tv_mod <- mvgam(
-  y ~ 0 + s(time, by = x, k = 6),
-  data   = tvdat,
-  family = gaussian(),
-  chains = 2,
-  silent = 2
-)
-conditional_effects(tv_mod)
+# Next: a slope that drifts over time takes `s(time, by = x)` in the
+# formula. loo() and lfo_cv() compare models. The articles under
+# 'See Also' fit many series, factor models and VAR trends
 }
 
 }
@@ -389,29 +372,33 @@ Bayesian Gaussian processes for probabilistic programming.
 \emph{Statistics and Computing}, 33:1.
 \doi{10.1007/s11222-022-10167-2} (used when \code{formula}
 or \code{trend_formula} contains \code{gp()} terms.)
-
-Use \code{how_to_cite(fit)} for a citation-ready methods
-description that adapts to the model's actual structure
-(trend type, factor identification, sampling algorithm,
-backend). For the matching math-only model statement
-(likelihood, link, latent dynamics, priors, sampler config)
-rendered as a Markdown + LaTeX block, use
-\code{\link{methods_md}(fit)}.
 }
 \seealso{
-\code{\link{methods_md}}, \code{\link{how_to_cite}},
-\code{\link{jsdgam}}. The CRAN-shipped overview is
-available via \code{vignette("mvgam_overview")}; for data
-formatting requirements see
-\code{vignette("data", package = "mvgam")}; for the
-forecast-evaluation workflow (LOO, LFO, ensembling) see
-the online article at
-\url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html};
-for the multi-response \code{mvbf()} workflow and the
-integrated species distribution model pattern that ties
-several observation families to one shared latent process,
-see
-\url{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}
-and
-\url{https://nicholasjclark.github.io/mvgam/articles/idm.html}.
+\link{trend_constructors} lists the latent trends.
+\link{mvgam_families} lists the observation families mvgam adds to
+those of brms. \code{\link[=how_to_cite]{how_to_cite()}} writes a methods paragraph for a
+fitted model. \code{\link[=methods_md]{methods_md()}} writes its equations. \code{\link[=jsdgam]{jsdgam()}} fits
+joint species distribution models. The
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview vignette} introduces
+the package. The \href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data vignette} sets out
+the data format. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+scores and compares forecasts. The
+\href{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}{multivariate formula article} fits
+several responses at once. The
+\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated distribution model article}
+ties several observation families to one latent process.
+
+Other model fitting: 
+\code{\link{check_newdata}()},
+\code{\link{jsdgam}()},
+\code{\link{mvgam_data}()},
+\code{\link{mvgam_formula}()},
+\code{\link{mvgam_multiple}()},
+\code{\link{pivot_detection_array}()},
+\code{\link{pivot_species_matrix}()},
+\code{\link{series_to_mvgam}()},
+\code{\link{stancode.mvgam_formula}()},
+\code{\link{update.mvgam}()}
 }
+\concept{model fitting}

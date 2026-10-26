@@ -18,15 +18,13 @@
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}
 
-\item{effects}{Character. One of \code{"all"} (the default;
-returns every parameter), \code{"fixed"}, \code{"ran_pars"} or
-\code{"ran_vals"}, selecting the categories above. The vocabulary
-matches \code{broom.mixed::tidy.brmsfit()}.}
+\item{effects}{\code{"all"} (the default) for every parameter, or one of
+\code{"fixed"}, \code{"ran_pars"} and \code{"ran_vals"} for the categories above,
+as in \code{broom.mixed::tidy.brmsfit()}.}
 
-\item{robust}{Logical. If \code{FALSE} (the default) the posterior
-mean and standard deviation are used as the point estimate
-and dispersion. If \code{TRUE} the median and the median
-absolute deviation (MAD) are used instead.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
 \item{conf.int}{Logical. If \code{TRUE} (the default), include
 \code{conf.low} and \code{conf.high} posterior quantile columns.}
@@ -44,19 +42,16 @@ posterior::ess_bulk() values.}
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A tibble with one row per parameter and columns
-\code{term}, \code{type}, \code{estimate}, \code{std.error}, optionally
-\code{conf.low} / \code{conf.high}, and optionally \code{rhat} /
+A tibble with one row per parameter and the columns
+\code{term}, \code{type}, \code{estimate} and \code{std.error}. \code{conf.int = TRUE} adds
+\code{conf.low} and \code{conf.high}. \code{rhat} and \code{ess} add \code{rhat} and
 \code{ess_bulk}.
 }
 \description{
-Posterior summaries for the fixed and random parameters of a
-fitted \code{mvgam} model, returned as a tibble in the column
-layout established by the \pkg{broom} / \pkg{broom.mixed}
-package: \code{term}, \code{estimate}, \code{std.error}, \code{conf.low},
-\code{conf.high}. An additional \code{type} column carries an
-\code{mvgam}-specific categorisation that distinguishes
-observation-model and trend-model parameters.
+Posterior summaries of the parameters of a fitted \code{mvgam} model, as
+a tibble with the columns of \pkg{broom.mixed}: \code{term}, \code{estimate},
+\code{std.error}, \code{conf.low} and \code{conf.high}. A \code{type} column assigns
+each parameter to the observation model or the trend.
 }
 \details{
 The \code{type} column places every parameter into one of the
@@ -66,9 +61,8 @@ following categories, each with the \code{effects} class it belongs to:
 observation-family parameters such as \code{sigma}, \code{shape},
 \code{nu}, \code{phi}, \code{zi}, \code{hu}.
 \item \code{"observation_beta"} (\code{fixed}) -- population-level
-coefficients of the observation formula, the intercept
-included, and the fixed parts of its smooths and monotonic
-terms.
+coefficients of the observation formula, with the intercept
+and the fixed parts of its smooths and monotonic terms.
 \item \code{"observation_smooth_param"} (\code{ran_pars}) -- the penalty of each
 smooth (\code{sds_}) and the marginal deviation and length scale of
 each Gaussian process.
@@ -106,15 +100,18 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# `tidy()` returns one row per posterior parameter with
-# broom-standard columns (`term`, `estimate`, `std.error`,
-# `conf.low`, `conf.high`) for filtering and downstream piping.
+# One row per parameter, with broom's column names
 td <- tidy(mod)
 td
 
-# Add Rhat / effective-sample-size columns when you want to
-# screen for convergence issues alongside the point estimates.
-tidy(mod, rhat = TRUE, ess = TRUE)
+# The `type` column separates the trend's parameters from the
+# observation model's
+td[td$type == "trend_model_param", ]
+
+# The fixed effects alone, with convergence diagnostics
+tidy(mod, effects = "fixed", rhat = TRUE, ess = TRUE)
+
+# Next, augment() adds fitted values and residuals to the data
 }
 
 }

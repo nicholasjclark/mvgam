@@ -1,13 +1,30 @@
 # The axis a trend's effects vary along.
 #
 # `lv_axis()` marks a `trend_formula` term as varying along the
-# trend's own axis: each latent factor of a factor model, and each
-# series of any other model. `detect_and_rewrite_by_lv()` finds every
-# call by name and replaces it with the column the trend data holds
-# for that axis, and brms then builds the term as it builds any term
-# on a factor. In a factor model the column is `.trend`, and the
-# trend data runs over (time, factor). The leading dot keeps `.trend`
-# clear of any column a user supplies.
+# trend's own axis. That axis is each latent factor of a factor model
+# and each series of any other model. `detect_and_rewrite_by_lv()`
+# finds every call by name. It replaces each with the trend data's
+# column for that axis. brms then builds the term as it builds any
+# term on a factor. In a factor model the column is `.trend`. The
+# trend data then runs over (time, factor). The leading dot keeps
+# `.trend` clear of any column a user supplies.
+
+# The trend data's factor column in a factor model
+factor_axis_column <- ".trend"
+
+#' One row per combination of the given columns and latent factor
+#'
+#' The factor column varies fastest. Each consecutive block of `n_lv`
+#' rows then shares one value of the other columns.
+#'
+#' @param n_lv Integer number of latent factors
+#' @param ... Named columns to cross with the factors
+#' @return A tibble with the columns and `factor_axis_column`
+#' @noRd
+expand_factor_axis <- function(n_lv, ...) {
+  checkmate::assert_count(n_lv, positive = TRUE)
+  tidyr::expand_grid(..., !!factor_axis_column := factor(seq_len(n_lv)))
+}
 
 #' Vary a trend effect along the trend's axis
 #'
@@ -23,19 +40,19 @@
 #' }
 #'
 #' With `n_lv` set on the trend constructor, each factor
-#' `k = 1, ..., n_lv` takes its own effect, and the effect of a
-#' covariate on series `s` is the sum over factors of the loading
-#' `Z[s, k]` times the effect on factor `k`. This is constrained
-#' ordination, the model [jsdgam()] fits. Every term of such a
-#' `trend_formula` is then evaluated once per factor and time, and
-#' each covariate must take one value per time.
+#' `k = 1, ..., n_lv` takes its own effect. The effect of a covariate
+#' on series `s` is the sum over factors of the loading `Z[s, k]` times
+#' the effect on factor `k`. This is constrained ordination, the model
+#' [jsdgam()] fits. Every term of such a `trend_formula` is then
+#' evaluated once per factor and time. Each covariate must take one
+#' value per time.
 #'
 #' With no `n_lv`, each series takes its own effect on the latent
 #' state.
 #'
 #' The series column itself is not supported in a `trend_formula`
 #' term. Write `lv_axis()` for an effect that differs along the
-#' trend's axis, and put an effect of the series on the observations
+#' trend's axis. An effect of the series on the observations belongs
 #' in `formula`. `by = trend` is deprecated and is treated as
 #' `by = lv_axis()`.
 #'
@@ -54,16 +71,20 @@
 #'     smoothness penalty.
 #' }
 #' With `n_lv` latent factors, each of these is estimated once per
-#' factor. The coefficient of one factor has no scale of its own: the
-#' loadings and the factor effects trade scale, and their product is
-#' what the data identify. [conditional_effects()] and [predict()]
+#' factor. The coefficient of one factor has no scale of its own. The
+#' loadings and the factor effects trade scale. The data identify
+#' their product. [conditional_effects()] and [predict()]
 #' report that product, the effect of the covariate on each series,
 #' and [conditional_effects()] draws a panel per series. When every
 #' `lv_axis()` term is a slope or a level, [summary()] reports the
 #' per-factor coefficients in the basis of the identified loadings
 #' `Z_tilde`.
 #'
-#' @seealso [mvgam()], [jsdgam()], [conditional_effects.mvgam()]
+#' @seealso [jsdgam()] fits per-factor effects across species.
+#'   [conditional_effects.mvgam()] plots the effect on each series. The
+#'   `r mvgam_article("dfm", "dynamic factor vignette")` fits factor
+#'   models. The `r mvgam_article("jsdgam", "JSDM article")` fits
+#'   per-factor trait and covariate effects.
 #'
 #' @examples
 #' # `lv_axis()` marks a term in a formula. Called by itself it
@@ -79,7 +100,7 @@
 #' dat$y <- dat$y + c(1, 0.5, -1)[as.integer(dat$series)] * dat$season
 #'
 #' # One seasonal slope per series
-#' mod_slopes <- mvgam(
+#' mod <- mvgam(
 #'   formula       = y ~ 1,
 #'   trend_formula = ~ season:lv_axis() + AR(p = 1),
 #'   data          = dat,
@@ -87,32 +108,22 @@
 #'   chains        = 2,
 #'   silent        = 2
 #' )
-#' summary(mod_slopes)
-#' conditional_effects(mod_slopes)
+#' summary(mod)
+#' conditional_effects(mod)
 #'
-#' # With two latent factors, each factor takes a seasonal slope and
-#' # the loadings carry the two slopes to the three series. A smooth
-#' # takes the same marker: `s(season, by = lv_axis())`.
-#' mod_factors <- mvgam(
-#'   formula       = y ~ 1,
-#'   trend_formula = ~ season:lv_axis() + AR(p = 1, n_lv = 2),
-#'   data          = dat,
-#'   family        = gaussian(),
-#'   chains        = 2,
-#'   silent        = 2
+#' # With two latent factors, each factor takes a seasonal slope. The
+#' # loadings carry the two slopes to the three series. The prior
+#' # table lists one coefficient per factor. A smooth takes the same
+#' # marker: `s(season, by = lv_axis())`
+#' get_prior(
+#'   mvgam_formula(y ~ 1,
+#'                 trend_formula = ~ season:lv_axis() + AR(p = 1, n_lv = 2)),
+#'   data   = dat,
+#'   family = gaussian()
 #' )
-#' conditional_effects(mod_factors)
-#'
-#' # The series column is refused in a trend term
-#' try(mvgam(
-#'   formula       = y ~ 1,
-#'   trend_formula = ~ season:series + AR(p = 1),
-#'   data          = dat,
-#'   family        = gaussian(),
-#'   run_model     = FALSE
-#' ))
 #' }
 #'
+#' @family trend models
 #' @export
 lv_axis <- function() {
   invisible(NULL)
@@ -164,7 +175,7 @@ is_legacy_trend_symbol <- function(expr) {
 #'   replacements, `deprecated_trend_seen` and the rewritten
 #'   `formula`.
 #' @noRd
-detect_and_rewrite_by_lv <- function(formula, target = ".trend",
+detect_and_rewrite_by_lv <- function(formula, target = factor_axis_column,
                                      series_var = NULL) {
   checkmate::assert_class(formula, "formula")
   checkmate::assert_string(target, min.chars = 1L)
@@ -309,7 +320,7 @@ translate_lv_axis_labels <- function(priors, target, to = c("user", "brms")) {
 #' @noRd
 by_lv_rewrite_tokens <- function(series_var = NULL) {
   checkmate::assert_string(series_var, null.ok = TRUE)
-  unique(c(".trend", "series", series_var))
+  unique(c(factor_axis_column, "series", series_var))
 }
 
 
@@ -330,10 +341,10 @@ mvgam_had_by_lv <- function(object) {
 
 #' Drop the columns that replaced `lv_axis()` from effect groupings
 #'
-#' `conditional_effects.mvgam()` names each panel by its grouping and
+#' `conditional_effects.mvgam()` names each panel by its grouping. It
 #' passes the full grouping to `marginaleffects::plot_predictions()`,
 #' which keeps the facet for each series. A grouping holding only such
-#' a column is returned as it is, and its panel keeps a name.
+#' a column is returned as it is. Its panel then keeps a name.
 #'
 #' @param cond_labs List of character vectors (each one a
 #'   conditional-effects grouping).
@@ -355,21 +366,17 @@ strip_by_lv_rewrite_tokens <- function(cond_labs, had_by_lv,
 }
 
 
-#' Emit the deprecation warning for `by = trend` (legacy jsdgam
-#' syntax). Raised once per session through `warn_once()`, quiet
-#' under testthat.
+#' Warn that `by = trend` is deprecated
 #'
-#' Called once per validator pass when
-#' `detect_and_rewrite_by_lv()` reports `deprecated_trend_seen`.
+#' Raised once per session through `warn_once()`. The validator calls
+#' it when `detect_and_rewrite_by_lv()` reports `deprecated_trend_seen`.
 #'
 #' @noRd
 warn_legacy_trend_by <- function() {
   warn_once(
-    paste0(
-      "'by = trend' in 'trend_formula' is deprecated. Use ",
-      "'by = lv_axis()' instead. mvgam will continue to accept ",
-      "'by = trend' but the legacy spelling may be removed in a ",
-      "future release."
+    c(
+      "'by = trend' in 'trend_formula' is deprecated.",
+      i = "Use 'by = lv_axis()', which fits the same model."
     ),
     "mvgam_by_trend_deprecated"
   )

@@ -1966,8 +1966,8 @@ test_that("a trend keeps the columns its constructor names", {
   for (nm in names(shapes)) {
     prefit <- mvgam(
       y ~ x, trend_formula = shapes[[nm]], data = d,
-      family = gaussian(), run_model = FALSE
-    , validate = FALSE)
+      family = gaussian(), run_model = FALSE, validate = FALSE
+    )
     vars <- axis_vars(prefit)
     expect_identical(vars$time_var, "wk", label = paste(nm, "time"))
     expect_identical(vars$series_var, "sp", label = paste(nm, "series"))

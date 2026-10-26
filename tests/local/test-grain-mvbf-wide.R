@@ -506,6 +506,11 @@ test_that("the summary and tidiers name every response", {
   expect_identical(paste(setdiff(coefs, shown), collapse = ", "), "")
 
   expect_tidy_glance(fit)
+  expect_identical(glance(fit)$resp, responses)
+  # Each response's rows are stacked and named
+  aug <- augment(fit)
+  expect_identical(as.vector(table(aug$.resp)[responses]),
+                   rep(nrow(fit$data), length(responses)))
   expect_true(any(grepl("^ar1_trend\\[", variables(fit))))
 })
 

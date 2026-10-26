@@ -29,7 +29,8 @@ ensemble draws to return per series. Defaults to \code{5000}.
 A model allocated more draws than it holds is sampled with
 replacement.}
 
-\item{seed}{Optional integer seed for reproducibility.}
+\item{seed}{Optional integer seed. The session's random state is
+restored when the call returns.}
 }
 \value{
 An object of class \code{mvgam_forecast} containing the
@@ -64,13 +65,21 @@ a long frame the ensemble keeps one forecast per response. Every
 response takes the same draws.
 }
 \seealso{
-\code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}},
-\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}, \code{\link[=pp_average.mvgam]{pp_average.mvgam()}},
-\code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}}. The online article
-\url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
-shows \code{ensemble()} weighted by stacking weights derived
-from \code{loo_model_weights.mvgam_lfo()}.
+\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} scores the ensemble.
+\code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}} computes weights from forecast
+performance. \code{\link[=pp_average.mvgam]{pp_average.mvgam()}} averages predictions in place of
+forecasts. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+weights an ensemble by leave-future-out stacking weights.
+
+Other forecasting: 
+\code{\link{compare_scores}()},
+\code{\link{forecast.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{score.mvgam_forecast}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{forecasting}

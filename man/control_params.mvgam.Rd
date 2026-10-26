@@ -2,7 +2,7 @@
 % Please edit documentation in R/brms_wrappers.mvgam.R
 \name{control_params.mvgam}
 \alias{control_params.mvgam}
-\title{Extract sampler control parameters from a fitted mvgam model}
+\title{Sampler control settings of a fitted mvgam model}
 \usage{
 \method{control_params}{mvgam}(x, ...)
 }
@@ -12,14 +12,11 @@
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-Named list of NUTS control settings (same shape as
-\code{brms::control_params()} on a \code{brmsfit}); empty list when
-no NUTS args are stored (e.g. variational fits).
+A named list, as \code{\link[brms:control_params]{brms::control_params()}} returns for a
+\code{brmsfit}. A fit with no NUTS settings, such as a variational
+fit, gives an empty list.
 }
 \description{
-Method on \code{brms::control_params()} for mvgam fits. Reads the
-NUTS control settings (adapt_delta, max_treedepth, stepsize,
-etc.) from the underlying stanfit's \verb{@stan_args} slot. The
-brms default method only dispatches on \code{brmsfit}, so without
-this method \code{control_params(fit)} fails on an mvgam object.
+The NUTS settings the model was sampled with, such as
+\code{adapt_delta}, \code{max_treedepth} and \code{stepsize}.
 }

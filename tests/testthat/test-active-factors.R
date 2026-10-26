@@ -9,7 +9,7 @@ test_that("plot.mvgam_active_factors returns a ggplot", {
         is_active       = c(TRUE, TRUE, TRUE, TRUE, FALSE)
       ),
       threshold = list(
-        fraction = 0.01, prob_threshold = 0.5, epsilon = 0.1
+        criterion = "variance", value = 0.05, prob_threshold = 0.5
       ),
       n_lv = 5L
     ),
@@ -33,7 +33,7 @@ test_that("plot.mvgam_active_factors threshold line tracks prob_threshold", {
         median_norm_sq = c(5, 0.2), is_active = c(TRUE, FALSE)
       ),
       threshold = list(
-        fraction = 0.01, prob_threshold = 0.8, epsilon = 0.05
+        criterion = "variance", value = 0.05, prob_threshold = 0.8
       ),
       n_lv = 2L
     ),
@@ -60,12 +60,10 @@ test_that("plot.mvgam_active_factors rejects non-class input", {
 
 
 test_that("a column's activity is measured with its own scale", {
-  # A factor column contributes `sigma_trend[k] * Z[, k]`. Reading
-  # `Z` alone was right while `Z` carried the column magnitude, and
-  # wrong once multiplicative gamma process shrinkage moved that
-  # magnitude into `sigma_trend` and left `Z` at unit scale: every
-  # column's norm then has the same distribution, so a shrunk
-  # column reports as active.
+  # A factor column contributes `sigma_trend[k] * Z[, k]`.
+  # Multiplicative gamma process shrinkage acts on `sigma_trend` and
+  # draws `Z` at unit scale. A shrunk column differs only in its
+  # scale.
   ndraws <- 40L
   draws <- posterior::as_draws_matrix(
     matrix(
@@ -75,11 +73,9 @@ test_that("a column's activity is measured with its own scale", {
     )
   )
   scales <- resolve_column_scales(NULL, draws, n_lv = 2L)
-  expect_equal(dim(scales), c(ndraws, 2L))
   expect_equal(unname(scales[1L, ]), c(2, 0.01))
 
-  # A fit with no per-column scale multiplies by one, so every
-  # other route is left exactly as it was.
+  # A fit with no per-column scale multiplies by one
   bare <- posterior::as_draws_matrix(
     matrix(1, nrow = ndraws, ncol = 1L,
            dimnames = list(NULL, "lp__"))
@@ -89,10 +85,24 @@ test_that("a column's activity is measured with its own scale", {
     matrix(1, nrow = ndraws, ncol = 3L)
   )
 
-  # Equal raw norms, unequal scales: the second column is not active.
-  Z <- array(1, dim = c(ndraws, 4L, 2L))
-  raw <- apply(Z, c(1L, 3L), function(col) sum(col^2))
-  expect_equal(raw[1L, 1L], raw[1L, 2L])
-  scaled <- raw * scales^2
-  expect_gt(scaled[1L, 1L], scaled[1L, 2L] * 1000)
+})
+
+
+test_that("each activity rule counts the columns it describes", {
+  # Shares 0.6, 0.3, 0.07 and 0.03 in every draw
+  norm_sq <- matrix(c(6, 3, 0.7, 0.3), nrow = 2L, ncol = 4L, byrow = TRUE)
+  active <- function(...) active_factor_draws(norm_sq, ...)[1L, ]
+  expect_identical(active("variance", 0.05), c(TRUE, TRUE, TRUE, FALSE))
+  expect_identical(active("cumulative", 0.95), c(TRUE, TRUE, TRUE, FALSE))
+  expect_identical(active("cumulative", 0.9), c(TRUE, TRUE, FALSE, FALSE))
+  expect_identical(active("relative", 0.1), c(TRUE, TRUE, TRUE, FALSE))
+  # The ranking is within each draw, whatever the column order
+  expect_identical(
+    active_factor_draws(norm_sq[, 4:1, drop = FALSE], "cumulative",
+                        0.9)[1L, ],
+    c(FALSE, FALSE, TRUE, TRUE)
+  )
+  # One column reaches any cumulative share alone
+  expect_true(all(active_factor_draws(norm_sq[, 1L, drop = FALSE],
+                                      "cumulative", 1)))
 })

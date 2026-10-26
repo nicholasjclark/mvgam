@@ -187,7 +187,7 @@ plot(fcs, series = 1) +
   plot(fcs, series = 4)
 ```
 
-For Vector Autoregressions fit in `mvgam`, we can inspect [impulse response functions and forecast error variance decompositions](https://ecogambler.netlify.app/blog/vector-autoregressions/#impulse-response-functions){target="_blank"}. The `irf()` function runs an Impulse Response Function (IRF) simulation whereby a positive “shock” is generated for a target process at time `t = 0`. All else remaining stable, it then monitors how each of the remaining processes in the latent VAR would be expected to respond over the forecast horizon `h`. The function computes impulse responses for all processes in the object and returns them in an array that can be plotted using the S3 `plot()` function. Here we will use the generalized IRF, which makes no assumptions about the order in which the series appear in the VAR process, and inspect how each process is expected to respond to a sudden, positive pulse from the other processes over a horizon of 12 timepoints.
+For Vector Autoregressions fit in `mvgam`, we can inspect [impulse response functions and forecast error variance decompositions](https://ecogambler.netlify.app/blog/vector-autoregressions/#impulse-response-functions){target="_blank"}. `irf()` runs an Impulse Response Function (IRF) simulation in which a positive “shock” hits a target process at time `t = 0`. Holding all else stable, it computes how each remaining process in the latent VAR would be expected to respond over the forecast horizon `h`. It returns the impulse responses for every process in an array that the S3 `plot()` method draws. Here we use the generalized IRF, which makes no assumption about the order of the series in the VAR process. The plots show how each process is expected to respond to a sudden, positive pulse from the other processes over 12 timepoints.
 ```{r, fig.alt = "Impulse response functions computed using mvgam in R"}
 irfs <- irf(mod, 
             h = 12, 
@@ -198,7 +198,7 @@ plot(irfs,
      series = 3)
 ```
 
-Using the same logic as above, we can inspect forecast error variance decompositions (FEVDs) for each process using`fevd()`. This type of analysis asks how orthogonal shocks to all process in the system contribute to the variance of forecast uncertainty for a focal process over increasing horizons. In other words, the proportion of the forecast variance of each latent time series can be attributed to the effects of the other series in the VAR process. FEVDs are useful because some shocks may not be expected to cause variations in the short-term but may cause longer-term fluctuations
+`fevd()` computes forecast error variance decompositions (FEVDs) for each process. An FEVD measures how orthogonal shocks to every process in the system contribute to the forecast variance of a focal process over increasing horizons. It splits the forecast variance of each latent series into the shares attributable to each series in the VAR process. FEVDs are useful because some shocks cause little short-term variation but larger fluctuations over longer horizons.
 ```{r, fig.alt = "Forecast error variance decompositions computed using mvgam in R"}
 fevds <- fevd(mod, 
               h = 12)
@@ -245,10 +245,15 @@ for (i in seq_along(description$other_citations)) {
 }
 ```
 
-The post-processing methods we have shown above are just the tip of the iceberg. For a full list of methods to apply on fitted model objects, type `methods(class = "mvgam")`. 
+`methods_md()` writes the same model as Markdown equations, with a glossary of every symbol and the priors, for a methods section or an appendix
+```{r, eval = FALSE}
+methods_md(mod)
+```
+
+The methods shown above are a small selection. For a full list of methods for fitted model objects, type `methods(class = "mvgam")`. 
 
 ## Extended observation families
-`mvgam` began as a tool for forecasting ecological counts, and counts are still where its most specialised machinery sits. Successive releases have widened what the observation model will accept, so the choice of `family` now spans most of the response types met in ecological and environmental monitoring.
+`mvgam` began as a tool for forecasting ecological counts. Its most specialised families still model counts. Successive releases have widened the observation families it accepts. The choice of `family` now spans most of the response types met in ecological and environmental monitoring.
 
 For continuous responses:
 
@@ -268,7 +273,7 @@ For counts and binary outcomes:
 * `binomial()` and `beta_binomial()` for counts with a known number of trials
 * `com_binomial()` for bounded counts that are under-, over- or super-dispersed relative to a binomial
 
-A further group of families operates on *closure units*, where several rows of the data share a single latent state. Rows belonging to a unit are recognised from their `series` and `time` values, so replicate visits to a site, or the species that together make up one assemblage, need no reshaping:
+A further group of families operates on *closure units*, where several rows of the data share a single latent state. Because `mvgam` groups the rows of a unit by their `series` and `time` values, replicate visits to a site or the species of one assemblage need no reshaping:
 
 * `nmix()` for repeat counts of an unknown abundance seen with imperfect detection
 * `occ()` for repeat detection and non-detection visits to a site of unknown occupancy
@@ -342,7 +347,7 @@ wrap_plots(
 There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic and spatially varying coefficient models, dynamic factors, Joint Species Distribution Models and much more. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. `mvgam` can also be used to generate all necessary data structures and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [`Stan` Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
 
 ## Citing `mvgam` and related software
-Research software is written and maintained by people whose only currency is citation. If `mvgam` contributed to an analysis, please cite it, and cite the packages it builds on as well. A ⭐ on the repository is welcome too.
+Research software is written and maintained by people whose only currency is citation. If `mvgam` contributed to an analysis, please cite it and the packages it depends on. A ⭐ on the repository is welcome too.
 
 When using `mvgam`, please cite the following:
 
@@ -355,7 +360,7 @@ As `mvgam` acts as an interface to `Stan`, please additionally cite:
 `mvgam` relies on several other `R` packages and, of course, on `R` itself. Use `how_to_cite()` to simplify the process of finding appropriate citations for your software setup.
 
 ## Getting help
-Bug reports belong on the [issue tracker](https://github.com/nicholasjclark/mvgam/issues), and a minimal reproducible example is what makes them fixable. Questions about model syntax, priors or interpretation are better suited to the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions), where an earlier thread has often covered the same ground already. The [Changelog](https://nicholasjclark.github.io/mvgam/news/index.html) records what changed in each release.
+Bug reports belong on the [issue tracker](https://github.com/nicholasjclark/mvgam/issues). A minimal reproducible example makes a report fixable. Questions about model syntax, priors or interpretation are better suited to the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions), where an earlier thread has often covered the same ground already. The [Changelog](https://nicholasjclark.github.io/mvgam/news/index.html) records what changed in each release.
 
 ## Other resources
 A series of [vignettes cover data formatting, forecasting and several extended case studies of DGAMs](https://nicholasjclark.github.io/mvgam/){target="_blank"}. A number of other examples, including some step-by-step introductory webinars, have also been compiled:

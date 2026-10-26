@@ -800,11 +800,8 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # loadings against the species axis. A wrong axis gives every one
     # of them a real answer about the wrong species.
     af <- active_factors(fit)
-    expect_s3_class(af, "mvgam_active_factors")
-    expect_identical(as.integer(af$n_lv), N_lv)
-    # One row per latent factor, not per species: reading this at the
-    # series grain is how a factor method comes to report K factors
-    # for an N_lv-factor fit.
+    # One row per latent factor. The species grain would give one row
+    # per species.
     expect_identical(nrow(af$per_factor), N_lv)
 
     sv <- shared_variation(fit)

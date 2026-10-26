@@ -13,7 +13,7 @@
 \item{digits}{Integer. Digits used when rounding the printed
 matrix.}
 
-\item{...}{Currently unused.}
+\item{...}{Ignored.}
 }
 \value{
 \code{x}, invisibly, after side-effect printing.

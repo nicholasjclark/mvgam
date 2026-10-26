@@ -37,29 +37,27 @@ from the lower Cholesky factor of the innovation covariance. These
 depend on the order of the levels of the series factor. The
 default generalised responses do not (Pesaran and Shin 1998).}
 
-\item{ndraws}{Optional integer; the number of posterior draws to
-summarise over. A response is built from one transition matrix per
-draw, so a wide panel is worth answering from a subset. Default
-\code{NULL} uses every draw.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Optional integer vector naming the posterior draws
-to use, in place of \code{ndraws}.}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
 \item{summary}{Logical; return the posterior median and interval of
 each response (the default), or the per-draw responses themselves.
 The draws are one \code{K} by \code{K} matrix per horizon per draw, which on
 a wide panel runs to hundreds of megabytes.}
 
-\item{probs}{The lower and upper percentiles to report alongside the
-median when \code{summary = TRUE}.}
+\item{probs}{The lower and upper percentiles of the interval reported
+with the median when \code{summary = TRUE}.}
 
-\item{future}{\code{Logical}. When \code{TRUE}, per-draw IRF
-computation runs under whatever
-\code{\link[future:plan]{future::plan()}} the caller has set
-(default \code{sequential} behaves like base \code{lapply} with
-negligible overhead; \code{plan(multisession, workers = N)}
-splits draws across \code{N} R processes). Requires the
-\code{future} package (mvgam Suggests).}
+\item{future}{\code{Logical}. When \code{TRUE}, the per-draw computation
+runs under the \code{\link[future:plan]{future::plan()}} the caller
+has set. The default \code{sequential} plan runs as base \code{lapply()}
+does. \code{plan(multisession, workers = N)} splits the draws across
+\code{N} R processes. Without the \pkg{future} package the draws
+run in turn, with a message.}
 }
 \value{
 An object of \code{\link{mvgam_irf-class}}. \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}
@@ -86,6 +84,10 @@ var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
 # Generalised responses of every series to a shock in each
 irf_obj <- irf(var_mod, h = 8L)
 plot(irf_obj, series = 1)
+
+# Next: fevd() splits each series' forecast variance among the
+# shocks. stability() summarises how the system returns to
+# equilibrium
 }
 
 }
@@ -98,14 +100,23 @@ in linear multivariate models. Economics Letters 58, 17-29.
 \doi{10.1016/S0165-1765(97)00214-0}
 }
 \seealso{
-\code{\link{mvgam_irf-class}}, \code{\link[=VAR]{VAR()}},
-\code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=stability]{stability()}}, \code{\link[=fevd]{fevd()}},
-\code{\link[=plot.mvgam_stability]{plot.mvgam_stability()}}, \code{\link[=plot.mvgam_fevd]{plot.mvgam_fevd()}},
-\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}.
-The article at
-\url{https://nicholasjclark.github.io/mvgam/articles/var.html}
-runs \code{irf()} on a plankton community.
+\code{\link[=fevd]{fevd()}} and \code{\link[=stability]{stability()}} summarise the same VAR dynamics.
+The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{irf()} on a
+plankton community. The
+\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
+runs it on each group of a hierarchical VAR.
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{fevd.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{residual_cor}()},
+\code{\link{shared_variation}()},
+\code{\link{stability.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

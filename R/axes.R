@@ -1,25 +1,24 @@
 # The series and time axes of a fitted model, resolved in one place.
 #
-# Generated Stan reads the two together:
+# The generated Stan code uses both together:
 #
 #   trend[t, s] = Z[s, ] * lv_trend[t, ] + mu_trend[times_trend[t, s]]
 #   mu += to_vector(trend)[obs_trend_idx]
 #
 # where `obs_trend_idx[n]` is the column-major cell of
-# `(obs_trend_time[n], obs_trend_series[n])`,
+# `(obs_trend_time[n], obs_trend_series[n])`.
 #
-# so one question, which latent state an observation reads, decides
-# every fitted value, forecast, residual and label. Answering it in
-# more than one place is how two answers to it came to disagree.
+# Which latent state an observation uses decides every fitted value,
+# forecast, residual and label. Resolving it in one place keeps every
+# consumer in agreement.
 
 #' The grouping variables a trend specification names
 #'
 #' A specification reaches its consumers in two shapes. Some callers
-#' hold it flat, with `gr` and `subgr` at the top level; others hold it
-#' nested under `$trend_model`. Reading one spelling makes a
-#' hierarchical model look ungrouped everywhere the other is passed,
-#' which is how a single frame acquired two series axes within one
-#' `standata()` build.
+#' hold it flat, with `gr` and `subgr` at the top level. Others hold it
+#' nested under `$trend_model`. A reader that checks one spelling misses
+#' the grouping of a hierarchical model passed in the other. The model
+#' then looks ungrouped.
 #'
 #' @param spec Trend specification in either shape, or `NULL`
 #' @return List with `gr` and `subgr`, each a column name or `NULL`
@@ -38,15 +37,15 @@ spec_groupings <- function(spec) {
 
 #' One field of a trend specification, at either depth
 #'
-#' A specification carries its fields at the top level or nested
-#' under `$trend_model`, so both are looked in. `[[` on a name a
-#' list does not carry raises rather than answering `NULL`, so the
-#' name is tested first: a caller that happens to pass a
-#' specification carrying every field never sees the difference,
-#' which is why this held until a spec spelled by hand reached it.
+#' A specification carries its fields at the top level or nested under
+#' `$trend_model`. Both depths are searched. A `[[` lookup on a missing
+#' name raises an error. The name test prevents that error. A caller that
+#' passes a specification carrying every field never reaches the error.
+#' A hand-written specification that omits some fields reaches this path
+#' and relies on the name test.
 #'
 #' @param spec A single trend specification
-#' @param field Name of the field to read
+#' @param field Name of the field to extract
 #' @return The field's value, or `NULL` where neither depth has it
 #' @noRd
 spec_field <- function(spec, field) {
@@ -58,13 +57,12 @@ spec_field <- function(spec, field) {
 
 #' One trend specification, whatever shape it arrives in
 #'
-#' A multivariate model carries one specification per response, so the
-#' object handed round is sometimes that list and sometimes a single
-#' specification. Every response shares one trend axis, so the first
-#' answers for all of them. Reading the list as though it were a
-#' specification finds none of its fields and reports a model with no
-#' grouping and no factors, which is the shape of defect this record
-#' exists to end.
+#' A multivariate model holds one specification per response. The object
+#' passed around is sometimes that list and sometimes a single
+#' specification. All responses share one trend axis, which the first
+#' entry describes. Treating the list as one specification finds none of
+#' its fields and reports a model with no grouping and no factors. Code
+#' must check the shape before it accesses the fields.
 #'
 #' @param spec A trend specification, a list of them, or `NULL`
 #' @return A single specification, or `NULL`
@@ -80,7 +78,7 @@ trend_spec_head <- function(spec) {
 #' Apply a function to every copy of the trend specification
 #'
 #' A multivariate model holds one copy of the specification per
-#' response. A change made to one copy has to reach them all, and the
+#' response. A change made to one copy must reach all of them. The
 #' result keeps the shape it arrived in.
 #'
 #' @param spec A trend specification or a list of them
@@ -100,7 +98,7 @@ map_trend_specs <- function(spec, fn) {
 #'
 #' A per-response list is named by response and carries no `trend`
 #' field of its own. A specification written without a `trend` field
-#' matches that description too, and taking its first element returns
+#' matches that description too. Taking its first element then returns
 #' a column name in place of a model. Requiring every entry to be a
 #' list tells the two apart. `trend_model` marks the wrapper that
 #' `ensure_mvgam_variables()` receives.
@@ -140,8 +138,8 @@ time_axis_values <- function(times) {
 
 #' The series axis of a frame that names its series in a column
 #'
-#' The observed levels, from `observed_levels()`: a factor keeps its
-#' declared order, and a character column is sorted.
+#' The observed levels, from `observed_levels()`. A factor keeps its
+#' declared order. A character column is sorted.
 #'
 #' @param series_vals Per-row series identifiers
 #' @return The distinct series, in axis order
@@ -152,9 +150,9 @@ series_axis_values <- function(series_vals) {
 
 #' The group each series on the axis belongs to
 #'
-#' Answers in the axis's own order, taken from the rows the axis was
-#' built from. Stan subscripts `group_inds_trend` with the trend's
-#' series index, so any other order correlates the wrong series
+#' Returns the values in the axis's own order, taken from the rows the
+#' axis was built from. Stan subscripts `group_inds_trend` with the
+#' trend's series index. Any other order correlates the wrong series
 #' together while staying in range.
 #'
 #' @param data Data frame the axis was built from
@@ -179,12 +177,12 @@ axis_group_values <- function(data, spec, series_vals, series_axis) {
   as.character(data[[gr_var]])[rows]
 }
 
-#' The axes a fit was built on
+#' The axes a fit was constructed from
 #'
-#' The single post-fit reading of which series and which times the
-#' model was given. Post-processing asks this in place of rebuilding
-#' the axes from the training frame. A rebuild can return a
-#' permutation that stays in range and raises nothing.
+#' The series and times the model was given, as recorded at fit time.
+#' Post-processing uses this record. Rebuilding the axes from the
+#' training frame can return a permutation that stays in range and
+#' raises nothing.
 #'
 #' @param object A fitted `mvgam` object or an `mvgam_prefit`
 #' @return The axes record, or `NULL` for a model whose frame names no
@@ -198,8 +196,8 @@ mvgam_axes <- function(object) {
 #' The columns a row is placed by
 #'
 #' The axes record names them where the axes are resolved. A model
-#' whose frame names no axis carries no record, and this function
-#' then returns the literal defaults. A caller spelling its own default could name a
+#' whose frame names no axis has no record. This function then returns
+#' the literal defaults. A caller that spells its own default may name a
 #' different column from the one the model was fitted on.
 #'
 #' @param object A fitted `mvgam` object
@@ -220,12 +218,11 @@ axis_vars <- function(object) {
 
 #' The columns a trend spec names
 #'
-#' A spec carries the pair under two spellings, `time_var` and
-#' `time`, at either of two depths, flat or under `$trend_model`.
-#' `spec_field()` settles the depth and both spellings are taken
-#' here. This function holds the literal defaults for the layers
-#' running before a fit exists, where `axis_vars()` has no object to
-#' take them from.
+#' A spec holds the pair under two spellings, `time_var` and `time`,
+#' at either of two depths, flat or under `$trend_model`. `spec_field()`
+#' settles the depth. This function checks both spellings and supplies
+#' the literal defaults for the layers that run before a fit exists.
+#' `axis_vars()` has no object to take them from at that stage.
 #'
 #' @param spec A trend spec, a list of them, or `NULL`
 #' @return A list naming `time_var` and `series_var`.
@@ -243,13 +240,12 @@ spec_axis_vars <- function(spec) {
 #' Whether a fit's series are its responses
 #'
 #' A wide `mvbf()` frame holds one row per occasion and one column per
-#' response, so the series an observation sits on is the response it
-#' was measured for rather than anything the row names. Its series
-#' column, where there is one, is a single constant standing in for
-#' all of them. Every post-fit path that maps a row to a trend column
-#' has to know this, and the axis record states it, so this is the one
-#' test they ask. Rebuilding the answer from a frame instead cost a
-#' preparation pass per call and gave the question four spellings.
+#' response. Each observation belongs to the response it was measured
+#' for. The row names no series. Its series column, where there is one,
+#' is a single constant that applies to all responses. Every post-fit
+#' path that maps a row to a trend column needs this fact. The axis
+#' record states it. Callers use this test to check it. Rebuilding the
+#' result from a frame would cost a preparation pass per call.
 #'
 #' @param object A fitted `mvgam` object
 #' @return A single logical
@@ -261,9 +257,9 @@ is_response_keyed <- function(object) {
 #' Give a frame the `series` column a derived trend axis is named by
 #'
 #' A trend whose series come from a grouping has no series column in
-#' the data, and its design names them `series`. A term written with
-#' `lv_axis()` uses that column, and a prediction frame takes it from
-#' the grouping here. Any other fit returns the frame unchanged.
+#' the data. Its design names the series `series`. A term written with
+#' `lv_axis()` uses that column. A prediction frame takes it from the
+#' grouping here. Any other fit returns the frame unchanged.
 #'
 #' @param object A fitted `mvgam` object
 #' @param data Frame to predict for
@@ -284,30 +280,29 @@ derived_series_column <- function(object, data) {
 
 #' Per-row series identity, as the fit resolved it
 #'
-#' Returns a factor whose levels are the axis itself, so the order of
-#' `levels()` is the order the trend matrix numbers its columns and a
-#' row matches the series it was fitted on. A frame whose `series`
-#' column was superseded by a grouping is read through the grouping,
-#' which is what the model read; reading the column instead compares
-#' the supplanted spelling against the derived one and matches
-#' nothing.
+#' Returns a factor whose levels are the axis itself. The order of
+#' `levels()` matches the order of the trend matrix columns. Each row
+#' maps to the series it was fitted on. A frame whose `series` column
+#' was superseded by a grouping is matched through the grouping, as the
+#' model matched it. Matching the column instead compares the superseded
+#' spelling with the derived one and matches nothing.
 #'
 #' @param object A fitted `mvgam` object
 #' @param data Frame to identify the rows of
-#' @param required Whether a frame naming no series and carrying no
-#'   grouping is refused rather than answered with `NULL`
+#' @param required If `TRUE`, a frame naming no series and carrying no
+#'   grouping is refused. If `FALSE`, such a frame returns `NULL`.
 #' @return A factor with one entry per row, or `NULL` when the frame
-#'   names no series and carries no grouping. A frame keyed by
-#'   response answers `NULL`: there the series is a property of the
-#'   `(row, response)` pair, which one value per row cannot state,
-#'   and the caller reads the response axis instead.
+#'   names no series and carries no grouping. A frame keyed by response
+#'   returns `NULL`. There the series is a property of the
+#'   `(row, response)` pair, which one value per row cannot state. The
+#'   caller uses the response axis instead.
 #' @noRd
 axis_row_series <- function(object, data, required = FALSE) {
   checkmate::assert_data_frame(data)
   checkmate::assert_flag(required)
-  # Answering for a response-keyed frame with its series constant
-  # would put every row on the first series, so the question is
-  # refused and the caller reads the response axis instead.
+  # Resolving a response-keyed frame to one series would put every row on
+  # the first series. The function returns `NULL` instead. The caller
+  # uses the response axis.
   if (is_response_keyed(object)) {
     return(NULL)
   }
@@ -316,10 +311,9 @@ axis_row_series <- function(object, data, required = FALSE) {
   gr_var <- vars$gr_var
   subgr_var <- vars$subgr_var
 
-  # `factor()` given no levels takes the values' own, which is the
-  # right answer for an object recording no axis and the wrong one
-  # for an object recording a different order, so the record is used
-  # wherever it exists.
+  # `factor()` given no levels takes the values' own order. That order
+  # suits an object recording no axis and fails for an object recording
+  # a different order. The record is used wherever it exists.
   as_axis <- function(values) {
     values <- as.character(values)
     if (is.null(levs)) factor(values) else factor(values, levels = levs)
@@ -349,12 +343,12 @@ axis_row_series <- function(object, data, required = FALSE) {
 #'
 #' Everything else about the axes is settled where they are resolved.
 #' Whether the design is indexed by series or by latent factor depends
-#' on a `by = lv_axis()` term, which is only known once the trend
-#' formula has been walked, so the record is completed here rather
-#' than built a second time.
+#' on a `by = lv_axis()` term. That term is known only after the trend
+#' formula has been walked. The record is completed here, without a
+#' second build.
 #'
-#' Without factors, `by = lv_axis()` is rewritten onto the series, and
-#' the design runs on the series grain.
+#' Without factors, `by = lv_axis()` is rewritten onto the series. The
+#' design then runs on the series grain.
 #'
 #' @param axes The axes record, or `NULL`
 #' @param has_by_lv Whether the emitted trend takes the factor grain
@@ -382,21 +376,21 @@ complete_axes_grain <- function(axes, has_by_lv) {
 #' @param series_axis The series axis, in order
 #' @param times Per-row times, in the units the record holds
 #' @param response_axis The response axis where the responses are the
-#'   series, from `mvgam_response_axis()`, and `NULL` otherwise
+#'   series, from `mvgam_response_axis()`. It is `NULL` otherwise.
 #' @param response_vars The response columns named by response key, from
 #'   `response_columns()`. They name the column a response-keyed series
-#'   takes its values from, and tell an observation from a padding row
-#'   on a stacked frame.
+#'   takes its values from. They also distinguish an observation from a
+#'   padding row on a stacked frame.
 #' @return A list of numeric vectors, empty where a series has no
 #'   response
 #' @noRd
 axis_observed_times <- function(data, series_vals, series_axis, times,
                                 response_axis = NULL,
                                 response_vars = NULL) {
-  # A response-keyed frame has every response on every row, and a
-  # response is observed where its own column holds a value. The test
-  # is whether the axis is the responses. A wide frame naming its own
-  # series column has one series that every response is measured on.
+  # A response-keyed frame has every response on every row. A response
+  # is observed where its own column holds a value. The test is whether
+  # the axis is the responses. A wide frame naming its own series column
+  # has one series that every response is measured on.
   if (!is.null(response_axis)) {
     return(lapply(as.character(series_axis), function(key) {
       as.numeric(times[!is.na(data[[response_vars[[key]]]])])

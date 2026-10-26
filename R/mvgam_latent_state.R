@@ -142,7 +142,7 @@ as.data.frame.mvgam_latent_state <- function(x, ...) {
 #' @param x A `mvgam_latent_state` object.
 #' @param digits Integer; rounding for the posterior-median range
 #'   shown in the print header. Defaults to 2.
-#' @param ... Currently unused.
+#' @param ... Ignored.
 #'
 #' @return The `mvgam_latent_state` object `x`, returned invisibly.
 #'
@@ -190,10 +190,7 @@ print.mvgam_latent_state <- function(x, digits = 2L, ...) {
 plot.mvgam_latent_state <- function(x, series = NULL, ...) {
   checkmate::assert_class(x, "mvgam_latent_state")
   rlang::check_dots_empty()
-  # Pin the scheme the way every other mvgam figure does, so a
-  # user's own `bayesplot::color_scheme_set()` does not leave this
-  # panel the odd one out.
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   smry <- summary(x)
   if (!is.null(series)) {
     keep <- if (is.numeric(series)) {

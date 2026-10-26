@@ -164,7 +164,7 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
   # first. A character facet sorted them alphabetically.
   pair_order <- order(from, to)
   dat$shock <- factor(dat$shock, levels = unique(dat$shock[pair_order]))
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   ggplot2::ggplot(
     dat,
     ggplot2::aes(x = .data$horizon, y = .data[[cols$median]])

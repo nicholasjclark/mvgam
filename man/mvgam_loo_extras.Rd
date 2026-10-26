@@ -13,7 +13,7 @@
 \alias{loo_moment_match.mvgam}
 \alias{loo_model_weights.mvgam}
 \alias{add_criterion.mvgam}
-\title{LOO / WAIC extras and aliases for mvgam models}
+\title{Leave-one-out predictions, R-squared and criteria for mvgam models}
 \usage{
 \method{LOO}{mvgam}(
   x,
@@ -108,105 +108,94 @@
 \arguments{
 \item{x, object}{A fitted \code{mvgam} object.}
 
-\item{...}{Forwarded to the \verb{loo::*} or mvgam method each of these
-wraps. \code{loo_R2()} reads none of them and refuses them.}
+\item{...}{Further arguments to the method each function calls.
+\code{loo_R2()} refuses them.}
 
-\item{compare}{Logical. If \code{TRUE}, compare multiple models.}
+\item{compare, pointwise, moment_match, reloo, k_threshold, save_psis, moment_match_args, reloo_args}{As in \code{\link[=loo.mvgam]{loo.mvgam()}}, which describes the two it uses and refuses
+the rest.}
 
-\item{resp}{Character. Response name for multivariate models.}
+\item{resp}{Optional name of one response of a multivariate model.}
 
-\item{pointwise}{Logical. Pointwise streaming mode (not
-supported; passing \code{TRUE} raises an error).}
+\item{model_names}{Optional character vector of model labels;
+overrides the names inferred from the call.}
 
-\item{moment_match, reloo}{Logical. LOO post-processing
-modes (not supported; raise informative errors).}
+\item{summary}{Logical. \code{TRUE} (the default) returns the summary
+matrix with \code{Estimate}, \code{Est.Error} and interval columns. \code{FALSE}
+returns the draws.}
 
-\item{k_threshold, save_psis, moment_match_args, reloo_args}{Forwarded
-verbatim to the LOO machinery.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
-\item{model_names}{Optional character vector of model labels for
-multi-model methods.}
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
 
-\item{summary}{Logical. If \code{TRUE} (the default), return a
-summary matrix with \code{Estimate}, \code{Est.Error}, and credible
-interval columns; otherwise return the raw posterior draws.}
+\item{seed}{Optional integer seed. The session's random state is
+restored when the call returns.}
 
-\item{robust}{Logical. If \code{TRUE}, use median + median absolute
-deviation instead of mean + standard deviation when summarising.}
+\item{args_epred, args_loglik}{Lists of further arguments to
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} and \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} for \code{loo_R2()}.}
 
-\item{probs}{Numeric vector. Lower and upper quantile
-probabilities for credible intervals. Defaults to
-\code{c(0.025, 0.975)}.}
-
-\item{seed}{Optional integer seed for reproducibility.}
-
-\item{args_epred, args_loglik}{Lists of additional arguments
-forwarded to \code{\link{posterior_epred}} / \code{\link{log_lik}} when computing
-the LOO R^2.}
-
-\item{type}{For \code{loo_predict.mvgam}, \code{loo_epred.mvgam}, and
-\code{loo_linpred.mvgam}, one of \code{"mean"}, \code{"var"}, or
+\item{type}{The expectation: \code{"mean"} (the default), \code{"var"} or
 \code{"quantile"}.}
 
-\item{psis_object}{Optional precomputed \code{loo::psis} object.}
+\item{psis_object}{Optional \code{psis} object from
+\code{loo(x, save_psis = TRUE)}, reused across calls.}
 
-\item{prob}{For \code{loo_predictive_interval.mvgam}, a single
-numeric in \verb{(0, 1)} giving the credible-interval mass.
-Defaults to \code{0.9} (matching brms).}
+\item{prob}{Interval mass of \code{loo_predictive_interval()}, 0.9 by
+default as in brms.}
 
-\item{loo, newdata, check, recompile}{Retained for brms-parity on
-\code{loo_moment_match.mvgam} (the method errors before they are
-read).}
+\item{loo, newdata, check, recompile}{Accepted for the brms signature of
+\code{loo_moment_match()}, which mvgam refuses.}
 
-\item{criterion}{For \code{add_criterion.mvgam}, a character vector
-of criterion names. Supported: \code{"loo"}, \code{"waic"},
-\code{"loo_subsample"}, \code{"bayes_R2"}, \code{"loo_R2"}.}
+\item{criterion}{Character vector of criteria for \code{add_criterion()}:
+\code{"loo"}, \code{"waic"}, \code{"bayes_R2"} or \code{"loo_R2"}.}
 
-\item{model_name}{Optional character. Stored in \code{x$model_name}
-when supplied.}
+\item{model_name}{Optional name stored in \code{x$model_name}.}
 
-\item{overwrite}{Logical. If \code{TRUE}, recompute criteria that
-already exist in \code{x$criteria}.}
+\item{overwrite}{Logical. \code{TRUE} recomputes criteria \code{x$criteria}
+already holds.}
 
-\item{file}{Optional file stub. When supplied, the fitted
-object is saved as \code{paste0(file, ".rds")} after the criteria
-loop.}
+\item{file}{Optional path without extension. The fit is saved to
+\code{paste0(file, ".rds")} with its criteria.}
 
-\item{force_save}{Retained for brms-parity; ignored.}
+\item{force_save}{Unused. Accepted for the brms signature.}
 }
 \value{
-Shape depends on the method (see method details and the
-brms / loo equivalents).
+\code{loo_predict()}, \code{loo_epred()} and \code{loo_linpred()} return a
+matrix with one row per scored observation and a column per
+expectation. \code{loo_predictive_interval()} returns its two quantile
+columns. \code{loo_R2()} returns a one-row summary, or its draws with
+\code{summary = FALSE}. \code{add_criterion()} returns \code{x} with the criteria
+in \code{x$criteria}. \code{loo_model_weights()} returns the weights of
+\code{\link[loo:loo_model_weights]{loo::loo_model_weights()}}.
 }
 \description{
-brms-parity S3 methods that compose mvgam's existing prediction
-and log-likelihood primitives (\code{\link{log_lik.mvgam}}, \code{\link{loo.mvgam}},
-\code{\link{waic.mvgam}}, \code{\link{posterior_epred.mvgam}},
-\code{\link{posterior_linpred.mvgam}}, \code{\link{posterior_predict.mvgam}}) with
-helpers from the \pkg{loo} package.
+The \pkg{brms} methods that take their weights from \code{\link[=loo.mvgam]{loo.mvgam()}}.
+\code{loo_predict()},
+\code{loo_epred()} and \code{loo_linpred()} reweight posterior predictions by
+the PSIS weights of each observation, approximating the prediction
+made without it. \code{loo_predictive_interval()} gives the
+leave-one-out predictive interval. \code{loo_R2()} is the Bayesian R^2 of
+Gelman et al. (2019) computed from leave-one-out predictions.
+\code{add_criterion()} stores criteria on the fit. \code{LOO()} and \code{WAIC()}
+are the brms aliases of \code{\link[=loo.mvgam]{loo.mvgam()}} and \code{\link[=waic.mvgam]{waic.mvgam()}}.
 }
-\section{Which observation these answer for}{
+\section{The observations scored}{
 
-Every method here pairs a prediction with importance weights, so
-both describe the observation the likelihood scored. For most
-families that is a row of the data. The detection families
-(\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}}) write their likelihood over a closure unit
-instead, marginalising the repeat visits within it, so
-\code{loo_predict()}, \code{loo_epred()}, \code{loo_predictive_interval()} and
-\code{loo_R2()} answer once per closure unit and a unit's visits are
-summed to reach that grain. A frame of 300 visits across 75 units
-gives 75 values, ordered as \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} orders its columns.
+The weights and the predictions describe the observation the
+likelihood scored. For most families that is a row of the data. The
+detection families (\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}}) write their likelihood per
+closure unit, marginalising its visits. \code{loo_predict()},
+\code{loo_epred()}, \code{loo_predictive_interval()} and \code{loo_R2()} then sum a
+unit's visits and return one value per unit, in the column order of
+\code{\link[=log_lik.mvgam]{log_lik.mvgam()}}. \code{loo_linpred()} is refused for them. A sum of
+linear predictors over visits has no interpretation.
 
-\code{loo_linpred()} is refused for those families rather than
-answered: summing a linear predictor across a unit's visits names
-no quantity, and the per-visit predictor has no weights of its
-own.
-
-\code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}} keep the per-row grain, since their density
-is written per row. The composition families (\code{\link[=diri]{diri()}},
-\code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}) write one joint density per site and carry
-it on the site's first row, so their answers stay at row grain
-and only one row in K holds a density.
+\code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}} keep one density per row. The composition
+families (\code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}) hold one joint density per
+site. These methods refuse them.
 }
 
 \examples{
@@ -221,27 +210,41 @@ mod <- mvgam(y ~ s(x),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-LOO(mod)            # brms-style alias for loo()
-loo_R2(mod)         # leave-one-out Bayesian R^2
-head(loo_predict(mod))   # per-observation LOO posterior mean
+# The leave-one-out R^2 is lower than the in-sample one
+loo_R2(mod)
+bayes_R2(mod)
+
+# One PSIS object serves every leave-one-out prediction
+psis <- loo(mod, save_psis = TRUE)$psis_object
+head(loo_predict(mod, psis_object = psis))
+head(loo_predictive_interval(mod, psis_object = psis))
+
+# Next, loo_compare() ranks models by their ELPD
 }
 
 }
+\references{
+Gelman, A., Goodrich, B., Gabry, J. and Vehtari, A. (2019).
+R-squared for Bayesian regression models. \emph{The American
+Statistician}, 73(3):307-309. \doi{10.1080/00031305.2018.1549100}
+}
 \seealso{
-\link{mvgam_diagnostics} for posterior summaries and convergence
-diagnostics,
-\link{mvgam_draws} for raw draws extraction,
-\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=waic.mvgam]{waic.mvgam()}} for the underlying information
-criteria,
-\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} for pointwise log densities,
-\code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} for the non-LOO Bayesian R^2,
-\code{\link[brms:loo_R2.brmsfit]{brms::loo_R2.brmsfit()}}, \code{\link[brms:loo_predict.brmsfit]{brms::loo_predict.brmsfit()}},
-\code{\link[brms:loo_predict.brmsfit]{brms::loo_epred.brmsfit()}}, \code{\link[brms:loo_predict.brmsfit]{brms::loo_linpred.brmsfit()}},
-\code{\link[brms:loo_predict.brmsfit]{brms::loo_predictive_interval.brmsfit()}},
-\code{\link[brms:add_criterion]{brms::add_criterion()}}, \code{\link[loo:loo_subsample]{loo::loo_subsample()}},
-\code{\link[loo:loo_model_weights]{loo::loo_model_weights()}}, \code{\link[loo:E_loo]{loo::E_loo()}},
-\code{\link[loo:psis]{loo::psis()}}.
+\code{\link[=loo.mvgam]{loo.mvgam()}} estimates the ELPD these weights come from.
+\code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} is the in-sample R^2. \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} scores
+forecasts of data the model has not seen.
+
+Other model comparison: 
+\code{\link{bridge_sampler.mvgam}()},
+\code{\link{compare_elpds}()},
+\code{\link{kfold.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{log_lik.mvgam}()},
+\code{\link{loo.mvgam}()},
+\code{\link{loo_compare.mvgam_lfo}()},
+\code{\link{posterior_average.mvgam}()},
+\code{\link{waic.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model comparison}

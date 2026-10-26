@@ -138,7 +138,20 @@ mvgam_data(gappy, family = poisson(), trend_formula = ~ CAR(),
 \code{\link[=mvgam]{mvgam()}}, \code{\link[=mvgam_formula]{mvgam_formula()}}, \code{\link[=jsdgam]{jsdgam()}},
 \code{\link[=sim_mvgam]{sim_mvgam()}}, \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}},
 \code{\link[=default_prior.mvgam_formula]{default_prior.mvgam_formula()}}.
+
+Other model fitting: 
+\code{\link{check_newdata}()},
+\code{\link{jsdgam}()},
+\code{\link{mvgam}()},
+\code{\link{mvgam_formula}()},
+\code{\link{mvgam_multiple}()},
+\code{\link{pivot_detection_array}()},
+\code{\link{pivot_species_matrix}()},
+\code{\link{series_to_mvgam}()},
+\code{\link{stancode.mvgam_formula}()},
+\code{\link{update.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model fitting}

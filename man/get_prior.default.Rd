@@ -9,7 +9,8 @@
 \arguments{
 \item{object}{Model specification object}
 
-\item{...}{Additional arguments passed to \code{brms::get_prior}}
+\item{...}{Further arguments of \code{\link[brms:default_prior]{brms::get_prior()}}, such as
+\code{knots} or \code{drop_unused_levels}.}
 }
 \value{
 A \code{brmsprior} data frame

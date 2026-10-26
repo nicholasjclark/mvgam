@@ -26,208 +26,182 @@ jsdgam(
 )
 }
 \arguments{
-\item{formula}{A \code{formula} object specifying the GAM observation
-model formula. These behave exactly like the formula for a GLM
-except that smooth terms (\code{s()}, \code{t2()}),
-nonparametric \code{gp()} terms and \code{offset()} can be added to the
-right-hand side. Time-varying effects are expressed as
-\code{s(time, by = X)} or \code{gp(time, by = X)}. \code{gp()} accepts
-both the approximate Hilbert-space form (\code{gp(x, k = 20)}) and
-the exact full-covariance form (\code{gp(x)}, no \code{k}). Both fit
-fine, but only the approximate form currently supports
-prediction at newdata; exact \code{gp()} terms emit a one-shot
-warning to that effect.}
+\item{formula}{Main observation model formula (supports brms syntax).
+Smooth specials \code{s()}, \code{t2()}, \code{gp()}, varying intercepts and
+slopes, monotonic \code{mo()}, measurement-error \code{me()}, distributional
+\code{dpar} sub-formulas and \code{offset()} are all available. \code{gp()}
+accepts both the approximate Hilbert-space form
+(\code{gp(x, k = 20)}) and the exact full-covariance form
+(\code{gp(x)}, no \code{k}). Prediction at \code{newdata} requires the
+approximate form. An exact \code{gp()} term fits and scores
+in-sample. \code{mvgam()} says so once per session.}
 
-\item{factor_formula}{A \code{formula} for the latent factors' linear
-predictor. Write \code{\link[=lv_axis]{lv_axis()}} in a term to give each latent
-factor its own effect, as in \code{~ s(elev, by = lv_axis())} or
+\item{factor_formula}{A one-sided formula for the latent factors'
+linear predictor. Write \code{\link[=lv_axis]{lv_axis()}} in a term to give each factor
+its own effect, as in \code{~ s(elev, by = lv_axis())} or
 \code{~ elev:lv_axis()}. Each covariate must take one value per
-sampling unit. \code{by = trend} is deprecated and is treated as
-\code{by = lv_axis()}.}
+sampling unit. The deprecated \code{by = trend} acts as
+\code{by = lv_axis()}. Defaults to \code{~ -1}, factors without predictors.}
 
-\item{knots}{An optional \code{list} of knot values for any smooth
-terms, forwarded to \code{\link[=mvgam]{mvgam()}} and handled exactly as its own
-\code{knots} argument is. Knot values are named by covariate rather
-than by formula, so there is one list for the model.}
+\item{knots}{Optional named list of knot positions for smooth terms,
+by covariate, as \code{knots} of \code{\link[=mvgam]{mvgam()}}.}
 
-\item{data}{A \code{data.frame} or \code{list} containing the response
-variable and the covariates referenced by \code{formula} and
-\code{factor_formula}. Must contain the column named by \code{unit} (the
-sampling-unit index, often \code{time} or \code{site}) and the factor
-column named by \code{species} (the response-unit index).
+\item{data}{A \code{data.frame} or \code{list} holding the response, the
+covariates of both formulas, the \code{unit} column and the \code{species}
+factor.
 
-Users arriving from \code{unmarked}, \code{ubms}, \code{flocker}, \code{Hmsc}, or
-\code{spOccupancy} typically carry their data in multi-dimensional
-arrays. Use \code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert occupancy /
-N-mixture detection-history arrays (2D \verb{[J, K]}, 3D \verb{[N, J, K]},
-4D \verb{[N, J, T, K]} multi-season, or named list of \verb{[J, K]}
-matrices per species) into the long-format \code{data} that
-\code{jsdgam()} expects, and \code{\link[=pivot_species_matrix]{pivot_species_matrix()}} for the
-Hmsc-style wide \verb{[J, N]} species-composition matrix.}
+Data held as arrays, as \pkg{unmarked}, \pkg{ubms},
+\pkg{flocker}, \pkg{Hmsc} and \pkg{spOccupancy} take them, convert
+to this long format. \code{\link[=pivot_detection_array]{pivot_detection_array()}} converts detection
+histories of occupancy and N-mixture data: \verb{[J, K]}, \verb{[N, J, K]},
+multi-season \verb{[N, J, T, K]} or a list of \verb{[J, K]} matrices per
+species. \code{\link[=pivot_species_matrix]{pivot_species_matrix()}} converts a wide \verb{[J, N]} species
+composition matrix.}
 
-\item{newdata}{Optional held-out \code{data.frame} / \code{list} of the
-same structure as \code{data}, forwarded to \code{\link[=mvgam]{mvgam()}} and
-persisted on the returned fit for later prediction.}
+\item{newdata}{Optional held-out \code{data.frame}, stored on the fit
+as \code{object$test_data}. \code{forecast()} forecasts to it when called
+without \code{newdata}. \code{plot(fit, type = "series")} overlays it.
+The fit itself draws no forecasts. \code{forecast()} propagates the
+fitted latent state forward in time per posterior draw.
+\code{posterior_predict(mod, newdata = mod$test_data)} marginalises
+over the trend's stochastic dynamics at the supplied design
+points. Use \code{forecast()} for time-series forecasting and
+\code{posterior_predict()} for marginal predictive checks.}
 
-\item{family}{A \code{family} object specifying the observation
-distribution shared by every species. Supported families are
-documented in \code{mvgam_families}. Defaults to \code{binomial()}, the
-standard choice for presence/absence JSDM responses; switch to a
-count family (\code{poisson()}, \code{negbinomial()}) when modelling counts.
+\item{family}{The observation family every species shares, as a
+family object. \link{mvgam_families} lists them. Defaults to
+\code{binomial()} for presence-absence data. Counts take a count family
+such as \code{poisson()} or \code{negbinomial()}.
 
-To give each species its own family, write \code{formula} as a
-multivariate formula naming one response per species and its
-family inside each \code{\link[brms:brmsformula]{brms::bf()}}, as in
-\code{bf(count ~ env, family = poisson()) + bf(seen ~ env, family = bernoulli())}. The responses then form the species axis the
-latent factors load across and \code{species} is read from them
-rather than from a column. A family named there belongs to that
-response; this argument then applies only to responses that
-named none, and is left alone entirely when every response
-speaks for itself. For simplex
-multi-response families (\code{diri()}, \code{multi()}, \code{categ()}), write
-the formula with a per-\code{species} interaction (e.g.
-\code{y ~ env * species} or the brms-native-style
-\code{y ~ 0 + species + env:species}). All fixed effects shared
-across species drop out of the softmax likelihood, so a
-formula like \code{y ~ env} will fit but its \code{b_Intercept} and
-\code{b_env} coefficients carry no posterior information; a
-once-per-session warning fires in that case to point at the
-interpretable form. See \code{?diri} for the identification
-constraints that make this work.}
+For one family per species, write \code{formula} with one \code{\link[brms:brmsformula]{brms::bf()}}
+per species, each naming its family, as in
+\code{bf(count ~ env, family = poisson()) + bf(seen ~ env, family = bernoulli())}. The responses then form the
+species axis, in place of a \code{species} column. \code{family} applies to
+any response that names none.
 
-\item{unit}{The unquoted name of the \code{numeric/integer} variable
-that indexes the sampling unit (typical names: \code{time} or
-\code{site}). Defaults to \code{time}.}
+The simplex families \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}} and \code{\link[=categ]{categ()}} need a
+per-species term, as in \code{y ~ env * species} or
+\code{y ~ 0 + species + env:species}. A coefficient shared by every
+species cancels from their likelihood. In \code{y ~ env}, \code{b_Intercept}
+and \code{b_env} take their priors alone. mvgam warns of this once per
+session. \code{\link[=diri]{diri()}} sets out the identification.}
 
-\item{species}{The unquoted name of the \code{factor} variable that
-indexes the different response units (typical name in a JSDM:
-\code{species}). Defaults to \code{series} to stay consistent with other
-mvgam models.}
+\item{unit}{The unquoted name of the numeric column indexing the
+sampling units, often \code{time} or \code{site}. Defaults to \code{time}.}
 
-\item{priors}{Optional \code{data.frame} or \code{brmsprior} vector with
-prior overrides. See \code{\link[=default_prior.mvgam_formula]{default_prior.mvgam_formula()}} and
-\code{\link[brms:set_prior]{brms::prior()}} for the conventions.}
+\item{species}{The unquoted name of the factor column indexing the
+species. Defaults to \code{series}, as in other mvgam models.}
 
-\item{n_lv}{\code{integer}. Number of latent factors to use for
-modelling residual associations. Must be \verb{>= 1} and at most the
-number of species. Defaults to \code{2}. One bound covers every
-\code{loadings_prior}: the marginal residual covariance
-\verb{Z Z' + diag(Psi^2)} has rank at most the number of species,
-and further columns of \code{Z} add no expressive capacity.
-\code{n_lv = n_species} is admitted. Whether that boundary samples
-well is a question for the prior.
+\item{priors}{Optional \code{brmsprior} of priors to set, from
+\code{\link[brms:set_prior]{brms::prior()}}. \code{prior}, the brms spelling, is accepted in \code{...}.
+\code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}} lists the classes a model takes.}
 
-What \code{n_lv} counts does depend on the prior:
-\itemize{
-\item Default iid Z prior (\code{student_t(3, 0, 0.5)}) or any
-kernel-driven structured prior built from \code{traits} /
-\code{phylo} / \code{loadings_prior$distances}: \code{n_lv} is the
-\strong{exact factor count} that enters the likelihood.
-\item Multiplicative gamma process prior
-(\code{loadings_prior = "mgp"} or
-\code{loadings_prior = list(column_shrinkage = "mgp", ...)}):
-\code{n_lv} is a \strong{truncation ceiling}. Set it at or above
-the rank you want to admit; the MGP shrinks later columns
-of \code{Z} toward zero by construction, and unused columns are
-pruned by the prior. Tighten \code{mgp_a2} for stronger
-shrinkage.
-}
-See \code{\link[=active_factors]{active_factors()}} for a posterior summary of how many
-columns the data actually used under MGP.}
+\item{n_lv}{Integer number of latent factors, from 1 to the number
+of species. Defaults to 2. The residual covariance
+\verb{Z Z' + diag(Psi^2)} has rank at most the number of species.
+Further columns of \code{Z} add nothing.
 
-\item{traits}{Optional per-species feature \code{data.frame}, matrix,
-or single string referencing a slot in \code{data2}. Rows correspond
-to species and are matched against \code{levels(data[[species]])} by
-the \code{series} column (if present), rownames, or row order.
-Forwarded as \code{loadings_prior$features}; categorical columns are
-one-hot encoded and numerics z-scored downstream by
-\code{encode_loadings_features()}. Mutually exclusive with an
-explicit \code{loadings_prior} argument.}
+Under the default Student-t prior on \code{Z}, or a structured prior
+built from \code{traits}, \code{phylo} or \code{loadings_prior$distances}, \code{n_lv}
+is the number of factors in the likelihood. Under the
+multiplicative gamma process prior (\code{loadings_prior = "mgp"} or
+\code{list(column_shrinkage = "mgp", ...)}) it is a ceiling. The prior
+shrinks later columns towards zero. A larger
+\code{loadings_prior$mgp_a2} shrinks them harder. \code{\link[=active_factors]{active_factors()}}
+counts the columns the data support.}
 
-\item{trait_slopes}{Optional one-sided \code{formula} (e.g.
-\code{~ trait1 + trait2}) requesting trait-mediated environmental
-slopes, i.e. the Hmsc "fourth corner" regression. Each fixed
-term in \code{formula} becomes a non-linear parameter whose value
-is regressed on the supplied traits plus a species-level
-random deviation (\code{(1 | sp | species)} correlating intercept
-and slope deviations under LKJ). The trait columns must
-already live in \code{data}, must be constant within species, and
-must reference per-species values rather than per-observation
-covariates. Smooth specials (\code{s()}, \code{gp()}) in \code{formula} are
-rejected because brms's top-level non-linear formula cannot
-host them; supply smooths inside \code{trait_slopes} itself
-(e.g. \code{~ s(trait1)}) where they land in a sub-formula and
-brms accepts them. Weakly-informative default priors
-(\code{normal(0, 1)} on each gamma, \code{student_t(3, 0, 2.5)} on the
-species SD) are emitted; user \verb{priors =} rows override on
-matching class / coef / nlpar tuples.}
+\item{traits}{Optional species traits for a structured loadings
+prior: a \code{data.frame} or matrix with one row per species, or the
+name of an element of \code{data2}. Rows are matched to
+\code{levels(data[[species]])} by a \code{series} column, by row name or by
+order. Factor columns are one-hot encoded and numeric columns are
+standardised. They become \code{loadings_prior$features}. Supplying an
+explicit \code{loadings_prior} as well is refused.}
 
-\item{phylo}{Optional phylogeny. Either an \code{ape::phylo} object
-(in which case \code{ape::cophenetic.phylo()} produces a pairwise
-distance matrix and a non-ultrametric tree triggers a one-time
-warning) or a pre-computed numeric distance matrix whose
-row/column names match \code{levels(data[[species]])}. The matrix
-is forwarded as \code{loadings_prior$distances$phylo} and rescaled
-to \code{max(d) = 1} by \code{validate_pairwise_distance()}. Requires the
-\pkg{ape} package when an \code{ape::phylo} object is supplied.
-Mutually exclusive with an explicit \code{loadings_prior} argument.}
+\item{trait_slopes}{Optional one-sided formula of traits, such as
+\code{~ trait1 + trait2}, for trait-mediated responses to the
+environment (the fourth-corner model of \pkg{Hmsc}). Each
+population-level term of \code{formula} becomes a non-linear parameter
+regressed on the traits, plus a species-level deviation. The
+deviations of intercept and slope correlate under an LKJ prior
+(\code{(1 | sp | species)}). The traits must be columns of \code{data},
+constant within species. A smooth of a trait goes in
+\code{trait_slopes}, as \code{~ s(trait1)}. A smooth in \code{formula} is
+refused, because brms's top-level non-linear formula takes none.
+The defaults are \code{normal(0, 1)} on each trait coefficient and
+\code{student_t(3, 0, 2.5)} on the species SD. \code{priors} overrides
+them.}
 
-\item{loadings_prior}{Optional explicit specification of the
-structured loadings prior, mirroring the \code{mvgam()} argument.
-When supplied the \code{traits} and \code{phylo} aliases must be \code{NULL};
-see \verb{[mvgam()]} for the accepted field list.}
+\item{phylo}{Optional phylogeny: an \code{ape::phylo} tree, whose
+cophenetic distances are taken, or a numeric distance matrix
+with row and column names matching \code{levels(data[[species]])}.
+The distances are rescaled to a maximum of 1 and become
+\code{loadings_prior$distances$phylo}. A tree that is not ultrametric
+draws a warning once. A tree requires the \pkg{ape} package.
+Supplying an explicit \code{loadings_prior} as well is refused.}
 
-\item{backend}{Character string specifying the Stan backend,
-either \code{"cmdstanr"} or \code{"rstan"}. Forwarded to \code{\link[=mvgam]{mvgam()}}.
-Defaults to \code{getOption("brms.backend", "cmdstanr")}.}
+\item{loadings_prior}{Optional structured prior on the loadings, as
+\code{loadings_prior} of \code{\link[=mvgam]{mvgam()}} takes it. Supplying \code{traits} or
+\code{phylo} as well is refused.}
 
-\item{threads}{Positive integer or \code{NULL}. Forwarded to
-\code{\link[=mvgam]{mvgam()}} / \code{cmdstanr}. With closure-unit families
-(\code{nmix()}, \code{occ()}) and multi-response families
-(\code{diri()}, \code{mvn()}, \code{mvt()}), enables \code{reduce_sum} threading of
-the per-unit lpmf. Combining \code{threads > 1} with a
-\code{trend_formula} on a brms-native family currently compiles
-un-threaded after a one-time warning; see \code{\link[=mvgam]{mvgam()}} for the
-full threading notes and bench guidance.}
+\item{backend}{\code{"cmdstanr"} or \code{"rstan"}. Defaults to
+\code{getOption("brms.backend", "cmdstanr")}.}
 
-\item{run_model}{Logical, forwarded to \code{\link[=mvgam]{mvgam()}}. When \code{FALSE},
-skips Stan parse, compile and sampling and returns a stub
-\code{mvgam} / \code{jsdgam} object with \verb{$stancode} and \verb{$standata}
-populated and \verb{$fit = NULL}. This is how a joint species model
-is read without fitting it: \code{jsdgam()} derives the species axis,
-the loadings map and the trend itself, so there is no
-\code{\link[=mvgam_formula]{mvgam_formula()}} to hand to \code{\link[=stancode]{stancode()}} in its place.
-Defaults to \code{TRUE}.}
+\item{threads}{Positive integer number of threads per chain, or
+\code{NULL} (the default) for none. The model is compiled with
+\code{cpp_options$stan_threads = TRUE}. cmdstanr then samples with
+\code{threads_per_chain = threads}. The closure-unit families (\code{nmix()},
+\code{occ()}) and the multi-response families (\code{diri()}, \code{mvn()},
+\code{mvt()}, \code{multi()}, \code{categ()}) split their likelihood over units
+with \code{reduce_sum}, in about eight chunks. With 50 or more closure
+units, \code{threads = 4} samples about a third faster. Fewer units can
+sample slower, the threading overhead outweighing the gain. A
+brms family without a \code{trend_formula} uses the threading brms
+writes.
 
-\item{...}{Other arguments forwarded to \code{mvgam()}. Notable ones
-include \code{data2} (lookup list for string-named \code{traits} / \code{phylo}
-slots), \code{algorithm}, \code{chains}, and \code{silent}.}
+A brms-native family with a \code{trend_formula} samples serially
+whatever \code{threads} says. When it threads, brms moves the \code{mu}
+assignment inside \code{partial_log_lik_lpmf}, where mvgam cannot add
+the trend to it. The program is then built without threading.
+This applies to every trend model under a brms-native family:
+\code{RW()}, \code{AR()}, \code{VAR()}, \code{LLT()}, \code{ZMVN()}, \code{CAR()} and
+\code{PW()}. Each fit that drops the request warns. A batch script
+that fits repeatedly shows it every time.}
+
+\item{run_model}{Logical. \code{FALSE} builds the model without parsing,
+compiling or sampling it. The result holds \verb{$stancode},
+\verb{$standata} and the prior table, with \verb{$fit} set to \code{NULL}.
+\code{\link[=stancode.mvgam_formula]{stancode.mvgam_formula()}}, \code{\link[=standata.mvgam_formula]{standata.mvgam_formula()}} and
+\code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}} return them. Methods that need draws,
+such as \code{summary()} and \code{forecast()}, refuse it. A \code{\link[=jsdgam]{jsdgam()}}
+model has no \code{\link[=mvgam_formula]{mvgam_formula()}}, which makes \code{run_model = FALSE}
+the way to inspect one before fitting. Defaults to \code{TRUE}.}
+
+\item{...}{Further arguments of \code{\link[=mvgam]{mvgam()}}, such as \code{data2} (where
+\code{traits} and \code{phylo} find a named element), \code{algorithm}, \code{chains}
+and \code{silent}.}
 }
 \value{
-A \code{list} of class \code{c("mvgam", "jsdgam", "brmsfit")}. The full mvgam
-method surface (\code{summary}, \code{predict}, \code{forecast}, \code{loo},
-\code{posterior_epred}, etc.) applies; jsdgam-specific surfaces
-(\code{ordinate}, \code{residual_cor}) recognise the additional class.
-\code{\link[=update.mvgam]{update()}} refits it through \code{jsdgam()}, with any
-argument above overridden, e.g. \code{update(fit, n_lv = 3)}.
+A fitted model of class \code{c("mvgam", "jsdgam", "brmsfit")}.
+Every mvgam method applies, such as \code{summary()}, \code{predict()},
+\code{forecast()} and \code{loo()}. \code{\link[=ordinate]{ordinate()}} and \code{\link[=residual_cor]{residual_cor()}}
+describe the factors. \code{update(fit, n_lv = 3)} refits it through
+\code{jsdgam()} with the arguments given changed.
 }
 \description{
-Sets up a Joint Species Distribution Model (JSDM) in which the
-residual associations among species are modelled in a reduced-rank
-format using a set of latent factors. The factor specification accepts
-spatial, temporal, or any other type of predictor effects, which enter
-the latent factors via \code{factor_formula}, while the
-observation model itself supports all the smooth, GP and random
-effects that mvgam can handle. Write \code{\link[=lv_axis]{lv_axis()}} in a term of
-\code{factor_formula} to give each latent factor its own effect of a
-covariate (constrained ordination).
+Fits a joint species distribution model (JSDM). The residual
+associations among species are modelled at reduced rank with a set
+of latent factors. The observation model takes the smooths,
+Gaussian processes and random effects of any mvgam model. The
+factors take their own predictors through \code{factor_formula}. Write
+\code{\link[=lv_axis]{lv_axis()}} in one of its terms to give each factor its own effect
+of a covariate, a constrained ordination.
 }
 \examples{
 \dontrun{
-# Simulate a small closure-unit JSDM: 4 species, 50 sites,
-# 4 visits, env + elev site covariates, tod_c + effort visit
-# covariates. Recipe 2L gives both state-level and detection-
-# level covariates.
+# Detections of 4 species at 50 sites, 4 visits each. `type = 2L`
+# simulates site covariates of occupancy (`env`, `elev`) and visit
+# covariates of detection (`tod_c`, `effort`).
 set.seed(1)
 simdat <- sim_closure_unit_data(
   family    = occ(),
@@ -237,9 +211,9 @@ simdat <- sim_closure_unit_data(
   type      = 2L
 )
 
-# Fit a joint occupancy model: env on the occupancy linear
-# predictor, tod_c on the detection sub-formula, two latent
-# factors capturing residual species-species covariation.
+# A joint occupancy model. `env` drives occupancy and `tod_c`
+# drives detection. Two latent factors carry the residual
+# association among species.
 mod <- jsdgam(
   formula        = bf(y ~ env, p ~ tod_c),
   factor_formula = ~ -1,
@@ -252,16 +226,17 @@ mod <- jsdgam(
 
 summary(mod)
 
-# The effect of env on the chance of a detection, which is
-# occupancy times detection. `type = "link"` gives logit occupancy.
+# The effect of `env` on the chance of a detection, occupancy times
+# detection
 conditional_effects(mod)
 
-# Inspect the implied residual species-species correlations.
-residual_cor(mod)
+# The residual correlations among species the factors imply
+plot(residual_cor(mod))
 
-# Two-factor ordination biplot. Site scores in latent space
-# plus species loading arrows.
+# Site scores and species loadings on the two factors
 ordinate(mod, rotation = "varimax")
+
+# Next, compare n_lv = 1 with update(mod, n_lv = 1L) and loo()
 }
 
 }
@@ -292,14 +267,27 @@ models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
-\code{\link[=sim_jsdm]{sim_jsdm()}} to simulate data this function fits, and
-\code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} for the \code{occ()} / \code{nmix()} case;
-\code{\link[=mvgam]{mvgam()}}, \code{\link[=lv_axis]{lv_axis()}}, \code{\link[=residual_cor]{residual_cor()}},
-\code{\link[=ordinate]{ordinate()}}, \code{\link[=shared_variation]{shared_variation()}}, \code{\link[=active_factors]{active_factors()}},
-\code{\link[=compare_loadings]{compare_loadings()}}, \code{\link[=methods_md]{methods_md()}}, \code{\link[=how_to_cite]{how_to_cite()}}. A
-worked online article walking through \code{jsdgam()} with a
-negative binomial observation model, the Heaps & Jermyn
-(2024) trait-informed loadings prior, ordination biplots
-and the MGP shrinkage criterion is at
-\url{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}.
+\code{\link[=sim_jsdm]{sim_jsdm()}} simulates data this function fits.
+\code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} simulates the \code{occ()} and \code{nmix()}
+case. \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=ordinate]{ordinate()}}, \code{\link[=shared_variation]{shared_variation()}},
+\code{\link[=active_factors]{active_factors()}} and \code{\link[=compare_loadings]{compare_loadings()}} interpret the fitted
+factors. \code{\link[=lv_axis]{lv_axis()}} gives each factor its own covariate effect.
+\code{\link[=how_to_cite]{how_to_cite()}} drafts a methods paragraph for the fit and
+\code{\link[=methods_md]{methods_md()}} writes its equations.
+The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits a negative
+binomial model with a trait-informed loadings prior, ordination
+biplots and multiplicative gamma process shrinkage.
+
+Other model fitting: 
+\code{\link{check_newdata}()},
+\code{\link{mvgam}()},
+\code{\link{mvgam_data}()},
+\code{\link{mvgam_formula}()},
+\code{\link{mvgam_multiple}()},
+\code{\link{pivot_detection_array}()},
+\code{\link{pivot_species_matrix}()},
+\code{\link{series_to_mvgam}()},
+\code{\link{stancode.mvgam_formula}()},
+\code{\link{update.mvgam}()}
 }
+\concept{model fitting}

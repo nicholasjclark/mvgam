@@ -3,50 +3,48 @@
 # observation overlays, faceting, and label-repel wrappers.
 # Nothing in this file is exported.
 
-#' The colours of a bayesplot scheme as an ordered vector
+#' A bayesplot colour scheme, by name or the active one
 #'
-#' Defaults to the active scheme. A user's
-#' `bayesplot::color_scheme_set()` call then applies to mvgam figures.
-#' A named scheme such as `"red"` or `"blue"` leaves the global state
-#' unchanged.
+#' The plot methods set the `"red"` scheme with
+#' `set_color_scheme_local()`. A helper they call takes its colours from
+#' the active scheme. A named scheme leaves the global state unchanged.
 #'
 #' @param scheme Character scheme name, or `NULL` for the active
 #'   scheme
-#' @return Character vector of six colours
+#' @return The scheme as `bayesplot::color_scheme_get()` returns it,
+#'   a list of six colours named by role
 #' @noRd
-mvgam_palette <- function(scheme = NULL) {
+mvgam_scheme <- function(scheme = NULL) {
   checkmate::assert_string(scheme, null.ok = TRUE)
   if (is.null(scheme)) {
-    cs <- bayesplot::color_scheme_get()
-  } else {
-    cs <- bayesplot::color_scheme_get(scheme)
-  }
-  unname(unlist(cs))
-}
-
-#' One colour of a bayesplot scheme, selected by its role
-#'
-#' Every mvgam figure takes its colours through this helper. Each
-#' figure then follows a user's `bayesplot::color_scheme_set()`. A hex
-#' code written at the call site would fix that panel to one scheme.
-#'
-#' @param role One of the six bayesplot scheme roles: `light`,
-#'   `light_highlight`, `mid`, `mid_highlight`, `dark`,
-#'   `dark_highlight`.
-#' @param scheme Optional scheme name; the active scheme by default.
-#' @return A single colour string.
-#'
-#' @noRd
-mvgam_colour <- function(role, scheme = NULL) {
-  roles <- c("light", "light_highlight", "mid", "mid_highlight",
-             "dark", "dark_highlight")
-  checkmate::assert_choice(role, roles)
-  checkmate::assert_string(scheme, null.ok = TRUE)
-  cs <- if (is.null(scheme)) {
     bayesplot::color_scheme_get()
   } else {
     bayesplot::color_scheme_get(scheme)
   }
+}
+
+#' The colours of a bayesplot scheme as an ordered vector
+#'
+#' @inheritParams mvgam_scheme
+#' @return Character vector of six colours, light to dark
+#' @noRd
+mvgam_palette <- function(scheme = NULL) {
+  unname(unlist(mvgam_scheme(scheme)))
+}
+
+#' One colour of a bayesplot scheme, selected by its role
+#'
+#' A figure takes its colours through this helper in place of hex codes.
+#'
+#' @inheritParams mvgam_scheme
+#' @param role One of the six bayesplot scheme roles: `light`,
+#'   `light_highlight`, `mid`, `mid_highlight`, `dark`,
+#'   `dark_highlight`.
+#' @return A single colour string.
+#' @noRd
+mvgam_colour <- function(role, scheme = NULL) {
+  cs <- mvgam_scheme(scheme)
+  checkmate::assert_choice(role, names(cs))
   cs[[role]]
 }
 
@@ -73,16 +71,17 @@ restore_color_scheme <- function(cs) {
 }
 
 
-#' Evaluate an expression under another bayesplot colour scheme
+#' Evaluate an expression under the mvgam colour scheme
 #'
-#' The prior scheme is restored on exit. Suits short call-style
-#' wrappers (`with_color_scheme("red", do.call(...))`).
+#' Every mvgam figure draws with the bayesplot `"red"` scheme. The
+#' scheme a user set with `bayesplot::color_scheme_set()` is restored
+#' on exit.
 #'
-#' @param scheme Character scheme name
 #' @param expr Expression to evaluate
+#' @param scheme Character scheme name
 #' @return The value of `expr`
 #' @noRd
-with_color_scheme <- function(scheme, expr) {
+with_color_scheme <- function(expr, scheme = "red") {
   checkmate::assert_string(scheme)
   prior <- bayesplot::color_scheme_get()
   bayesplot::color_scheme_set(scheme)
@@ -90,18 +89,18 @@ with_color_scheme <- function(scheme, expr) {
   force(expr)
 }
 
-#' Set a bayesplot colour scheme until the calling function returns
+#' Set the mvgam colour scheme until the calling function returns
 #'
-#' Mirrors the `rlang::local_*` family. Use it when the body is too
-#' long to wrap in `with_color_scheme(...)`. Adds an
-#' `on.exit(..., add = TRUE)` to `envir`.
+#' The `rlang::local_*` form of `with_color_scheme()`. It adds an
+#' `on.exit(..., add = TRUE)` to `envir`, which restores the user's
+#' scheme.
 #'
 #' @param scheme Character scheme name
 #' @param envir Environment whose exit restores the prior scheme.
 #'   Defaults to the caller's frame.
 #' @return `NULL`, invisibly
 #' @noRd
-set_color_scheme_local <- function(scheme, envir = parent.frame()) {
+set_color_scheme_local <- function(scheme = "red", envir = parent.frame()) {
   checkmate::assert_string(scheme)
   checkmate::assert_environment(envir)
   prior <- bayesplot::color_scheme_get()
@@ -124,10 +123,9 @@ set_color_scheme_local <- function(scheme, envir = parent.frame()) {
 #' [ggplot2::theme_classic()] and matches the bayesplot figures. Apply
 #' it to a plot of your own to give it the look of mvgam output.
 #'
-#' Colours come from the active bayesplot scheme.
-#' [bayesplot::color_scheme_set()] changes the colours of mvgam's
-#' figures and yours together. [bayesplot::color_scheme_get()] returns
-#' the current scheme.
+#' mvgam's figures take their colours from the `"red"` scheme of
+#' \pkg{bayesplot}, which `bayesplot::color_scheme_get("red")` returns.
+#' The example colours its points with it.
 #'
 #' @param base_size Base font size in points. Defaults to `11`,
 #'   matching [ggplot2::theme_classic()].
@@ -525,6 +523,95 @@ mvgam_cut_layer <- function(
   )
 }
 
+#' One panel of a cross-validation diagnostic plot
+#'
+#' @param x Vector of the x positions, times or group labels
+#' @param value Numeric vector of the diagnostic
+#' @param facet Character panel title
+#' @param threshold Numeric threshold, or `NULL` for the `probs`
+#'   quantile of `value`
+#' @param probs Numeric quantile probability, used when `threshold` is
+#'   `NULL`
+#' @param worse_above Logical. `TRUE` when values above the threshold
+#'   are the poor ones
+#' @return Data frame with columns `x`, `value`, `threshold`, `facet`
+#'   and `worse_above`
+#' @noRd
+cv_panel <- function(x, value, facet, threshold = NULL, probs = NULL,
+                     worse_above = TRUE) {
+  checkmate::assert_atomic_vector(x)
+  checkmate::assert_numeric(value, len = length(x))
+  checkmate::assert_string(facet)
+  checkmate::assert_number(threshold, null.ok = TRUE)
+  checkmate::assert_number(probs, lower = 0, upper = 1,
+                           null.ok = !is.null(threshold))
+  checkmate::assert_flag(worse_above)
+  if (is.null(threshold)) {
+    threshold <- unname(stats::quantile(value, probs, na.rm = TRUE))
+  }
+  data.frame(x = x, value = value, threshold = threshold, facet = facet,
+             worse_above = worse_above)
+}
+
+
+#' The Pareto k panel of a cross-validation diagnostic plot
+#'
+#' loo gives an infinite k when the tail holds fewer than five draws.
+#' Such points are drawn at the largest finite k to keep the panel's
+#' scale.
+#'
+#' @param x Vector of the x positions
+#' @param k Numeric vector of Pareto k values
+#' @param threshold Numeric refit threshold
+#' @return Data frame from `cv_panel()`
+#' @noRd
+pareto_k_panel <- function(x, k, threshold) {
+  checkmate::assert_numeric(k)
+  finite_k <- k[is.finite(k)]
+  if (length(finite_k) > 0L) {
+    k[is.infinite(k)] <- max(finite_k)
+  }
+  cv_panel(x, k, "Pareto k", threshold = threshold)
+}
+
+
+#' Cross-validation diagnostics in one panel each
+#'
+#' Used by `plot.mvgam_lfo()` and `plot.mvgam_kfold()`. The dashed line
+#' in each panel is its threshold. Points past it are drawn dark red.
+#' Missing values, such as the Pareto k of a refit, are not drawn.
+#'
+#' @param long Data frame of stacked `cv_panel()` results
+#' @return A `ggplot` object with no x scale or label
+#' @noRd
+cv_diagnostic_plot <- function(long) {
+  checkmate::assert_data_frame(long, min.rows = 1L)
+  set_color_scheme_local()
+  long <- long[!is.na(long$value), , drop = FALSE]
+  long$facet <- factor(long$facet, levels = unique(long$facet))
+  past <- ifelse(long$worse_above, long$value > long$threshold,
+                 long$value < long$threshold)
+  long$colour <- ifelse(past, "outlier", "inlier")
+  ggplot2::ggplot(long, ggplot2::aes(x = .data$x, y = .data$value)) +
+    ggplot2::facet_wrap(~ .data$facet, ncol = 1L, scales = "free_y") +
+    ggplot2::geom_hline(
+      ggplot2::aes(yintercept = .data$threshold),
+      colour = mvgam_colour("mid_highlight"), linetype = "dashed",
+      linewidth = 1
+    ) +
+    ggplot2::geom_line(ggplot2::aes(group = .data$facet),
+                       linewidth = 0.5, colour = "grey30") +
+    ggplot2::geom_point(shape = 16, colour = "white", size = 2) +
+    ggplot2::geom_point(ggplot2::aes(colour = .data$colour),
+                        shape = 16, show.legend = FALSE, size = 1.5) +
+    ggplot2::scale_colour_manual(
+      values = c(inlier = "grey30", outlier = mvgam_colour("dark"))
+    ) +
+    ggplot2::labs(y = NULL) +
+    mvgam_theme()
+}
+
+
 #' A dashed reference line, such as zero or a cutoff
 #'
 #' Give exactly one of `yintercept` and `xintercept`.
@@ -558,9 +645,8 @@ reference_line <- function(yintercept = NULL, xintercept = NULL) {
 #' @noRd
 stack_response_plots <- function(plots) {
   checkmate::assert_list(plots, min.len = 1L, names = "unique")
-  # Wrapped as a panel, each plot leaves the title row to its response.
-  # Wrapped in full, the response title overprinted the plot's axis
-  # labels and its own title.
+  # Each plot is wrapped as a panel. Its title row is then free for the
+  # response name.
   titled <- lapply(names(plots), function(r) {
     patchwork::wrap_elements(panel = plots[[r]]) + ggplot2::labs(title = r)
   })
@@ -677,17 +763,17 @@ pretty_symmetric_breaks <- function(limits) {
 }
 
 
-#' Long-format lower triangle of an estimate matrix for a heatmap
+#' Lower triangle of a correlation matrix for a heatmap
 #'
-#' The result omits the upper triangle and the diagonal. A symmetric
-#' matrix repeats each entry in its upper triangle. The diagonal of a
-#' correlation matrix is 1.
+#' A symmetric matrix repeats each entry in its upper triangle. The
+#' diagonal of a correlation matrix is 1. The panel keeps the entries
+#' below the diagonal.
 #'
 #' @param estimate Symmetric matrix of posterior point estimates.
 #' @param cluster Reorder by `cluster_cormat()`.
 #' @param clear Optional logical matrix, `TRUE` where the interval of
 #'   an entry excludes zero. Reordered with `estimate`.
-#' @return Data frame with `Var1`, `Var2`, `value` and `clear`.
+#' @return Frame from `matrix_panel()`.
 #'
 #' @noRd
 residcor_panel_data <- function(estimate, cluster = FALSE, clear = NULL) {
@@ -695,20 +781,9 @@ residcor_panel_data <- function(estimate, cluster = FALSE, clear = NULL) {
   # that cause before an empty frame fails in ggplot2.
   checkmate::assert_matrix(estimate, mode = "numeric", min.rows = 2L)
   checkmate::assert_flag(cluster)
-  clear <- clear %||% matrix(FALSE, nrow(estimate), ncol(estimate))
-  checkmate::assert_matrix(clear, mode = "logical",
-                           nrows = nrow(estimate), ncols = ncol(estimate))
-  if (isTRUE(cluster)) {
-    idx <- cluster_cormat(estimate)
-    estimate <- estimate[idx, idx]
-    clear <- clear[idx, idx]
-  }
-  keep <- lower.tri(estimate)
-  out <- expand.grid(dimnames(estimate))
-  colnames(out) <- c("Var1", "Var2")
-  out$value <- as.vector(estimate)
-  out$clear <- as.vector(clear)
-  out[as.vector(keep), , drop = FALSE]
+  idx <- if (cluster) cluster_cormat(estimate) else seq_len(nrow(estimate))
+  matrix_panel(estimate[idx, idx], clear = clear[idx, idx],
+               lower_only = TRUE)
 }
 
 
@@ -791,31 +866,29 @@ matrix_heatmap <- function(panel, fill_scale,
 }
 
 
-#' A matrix in long format with `Var1`, `Var2` and `value` columns
-#'
-#' By default the upper triangle and the diagonal are set to `NA`.
-#' The heatmap then shows the off-diagonal lower triangle, which suits
-#' a correlation matrix. A covariance or coefficient matrix keeps both
-#' with `drop_diag = FALSE` and `drop_upper = FALSE`.
+#' A matrix in long format for `matrix_heatmap()`
 #'
 #' @param mat Numeric matrix
-#' @param drop_diag Logical. `TRUE` sets the diagonal to `NA`.
-#' @param drop_upper Logical. `TRUE` sets the upper triangle to `NA`.
-#' @return Data frame with `Var1`, `Var2` and `value`
+#' @param clear Optional logical matrix the shape of `mat`, `TRUE` where
+#'   an entry's interval excludes zero. `NULL` marks no entry.
+#' @param lower_only Logical. `TRUE` keeps the entries below the
+#'   diagonal.
+#' @return Data frame of `Var1` (row), `Var2` (column), `value` and
+#'   `clear`
 #' @noRd
-gather_matrix <- function(mat, drop_diag = TRUE, drop_upper = TRUE) {
+matrix_panel <- function(mat, clear = NULL, lower_only = FALSE) {
   checkmate::assert_matrix(mat)
-  checkmate::assert_flag(drop_diag)
-  checkmate::assert_flag(drop_upper)
-  if (drop_upper) mat[upper.tri(mat)] <- NA
-  if (drop_diag) diag(mat) <- NA
-  if (is.null(dimnames(mat))) {
-    grid <- expand.grid(seq.int(NROW(mat)), seq.int(NCOL(mat)))
-  } else {
-    grid <- expand.grid(dimnames(mat))
+  checkmate::assert_flag(lower_only)
+  clear <- clear %||% matrix(FALSE, nrow(mat), ncol(mat))
+  checkmate::assert_matrix(clear, mode = "logical", nrows = nrow(mat),
+                           ncols = ncol(mat))
+  out <- expand.grid(Var1 = rownames(mat) %||% seq_len(nrow(mat)),
+                     Var2 = colnames(mat) %||% seq_len(ncol(mat)))
+  out$value <- as.vector(mat)
+  out$clear <- as.vector(clear)
+  if (lower_only) {
+    out <- out[as.vector(lower.tri(mat)), , drop = FALSE]
   }
-  out <- as.data.frame(cbind(grid, value = as.vector(mat)))
-  colnames(out) <- c("Var1", "Var2", "value")
   out
 }
 
@@ -997,8 +1070,8 @@ reorder_clusters <- function(x, dis) {
 #'   Required when callers omit `n_series`/`n_lv`.
 #' @param draws_mat Optional pre-extracted posterior draws.
 #'   Required when `object` is omitted and `fixed_Z` is NULL.
-#' @param fixed_Z Optional explicit fixed-loadings matrix; the
-#'   normal path pulls this from `object$trend_metadata`.
+#' @param fixed_Z Optional fixed-loadings matrix. With `object` it
+#'   defaults to `object$trend_metadata$fixed_Z`.
 #' @param n_lv Integer factor dimension. Required in
 #'   explicit-style; derived from `object` otherwise.
 #' @param n_series Integer series count. Required in
@@ -1049,7 +1122,7 @@ resolve_factor_loadings <- function(object = NULL,
     ndraws <- if (!is.null(draws_mat)) {
       nrow(draws_mat)
     } else if (!is.null(object)) {
-      posterior::ndraws(posterior::as_draws_matrix(object$fit))
+      posterior::ndraws(object)
     } else {
       stop_mvgam_fault(
         "The fixed loadings need a draw count.",

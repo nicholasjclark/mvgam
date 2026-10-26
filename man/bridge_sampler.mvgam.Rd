@@ -10,85 +10,105 @@
 \method{bayes_factor}{mvgam}(x1, x2, log = FALSE, ...)
 }
 \arguments{
-\item{samples}{An object of class \code{mvgam} (the argument name
-\code{samples} matches the \code{bridgesampling} generic).}
+\item{samples}{An \code{mvgam} fit. The name follows the
+\pkg{bridgesampling} generic.}
 
-\item{recompile}{Logical. When \code{TRUE}, refits the model via
-\code{\link[=update.mvgam]{update.mvgam()}} before running the bridge sampler. Set
-this when the fit was loaded from disk and its compiled
-Stan DSO is no longer valid in the current R session (the
-usual RDS-reload symptom is
-\code{"the model object is not created or not valid"}). The
-refit runs through the same backend the original fit used
-(rstan or cmdstanr) and redraws the posterior, so estimates
-from \code{recompile = TRUE} are stochastic in both the sampler
-and the bridge estimator. \code{...} is passed only to
-\code{bridgesampling::bridge_sampler()}; to customise the refit
-itself, call \code{update()} explicitly with the desired
-arguments first and then pass the recompiled fit here with
-\code{recompile = FALSE}. Defaults to \code{FALSE}.}
+\item{recompile}{Logical. Bridge sampling evaluates the density
+through a compiled rstan model. A fit without one, sampled by
+cmdstanr or loaded with \code{\link[=readRDS]{readRDS()}} in a new session, has one
+compiled, with its draws kept. \code{TRUE} compiles one for any fit. Defaults to \code{FALSE}.}
 
-\item{...}{Additional arguments forwarded to
-\code{bridgesampling::bridge_sampler()} (for example \code{samples},
-\code{method}, \code{cores}).}
+\item{...}{Arguments of \code{bridgesampling::bridge_sampler()}, such as
+\code{method}, \code{repetitions} or \code{cores}.}
 
 \item{x1, x2}{\code{mvgam} fits, or \code{bridge} objects returned by
 \code{bridge_sampler()}, to compare.}
 
-\item{log}{Logical. Return the Bayes factor on the log scale
-when \code{TRUE}; ratio scale otherwise.}
+\item{log}{Logical. \code{TRUE} returns the log Bayes factor.}
 }
 \value{
-\code{bridge_sampler.mvgam()} returns a \code{bridge} object with
-a finite \code{logml}. \code{bayes_factor.mvgam()} returns a
-\code{bayes_factor} object with the numeric ratio (or log-ratio).
+\code{bridge_sampler()} returns a \code{bridge} object holding the
+log marginal likelihood in \code{logml}. \code{bayes_factor()} returns a
+\code{bayes_factor} object.
 }
 \description{
-Log marginal likelihood via bridge sampling (Gronau, Singmann
-& Wagenmakers 2020) and paired Bayes factors, delegating to the
-\code{bridgesampling} package on the underlying \code{stanfit}. Bridge
-sampling answers the M-closed model-choice question that
-predictive scoring (\code{\link{loo.mvgam}},
-\code{\link{lfo_cv.mvgam}}) cannot: which model does the data
-support as the data-generating process, weighted by the prior?
-On state-space fits this is a natural complement to LFO because
-the answer does not depend on the choice of forecast horizon.
+Estimates the log marginal likelihood of a fit by bridge sampling
+(Gronau, Singmann and Wagenmakers 2020) and compares two fits by
+their Bayes factor. The marginal likelihood weighs how well a model
+explains the data under its prior. \code{\link[=loo.mvgam]{loo.mvgam()}} and
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} score predictions of held-out data instead. A
+Bayes factor sets no forecast horizon, which makes it a complement
+to leave-future-out scores for state-space models. It also
+depends on the priors, which predictive scores barely do.
 }
 \details{
-The routing bypasses the internal brms \code{bridge_sampler.brmsfit}
-method, whose \code{restructure()} and \code{update_misc_env()} calls assume a
-brmsfit that mvgam objects do not conform to. Instead the S3
-method resolves the requirements itself and delegates directly
-to \code{bridgesampling::bridge_sampler()} on \code{object$fit}.
-
-Bridge sampling requires the Stan model to use normalized
-probability densities (\verb{_lpdf} / \verb{_lpmf}), not the un-normalized
-variants (\verb{_lupdf} / \verb{_lupmf}). mvgam's shipped emitters already
-satisfy this; the method errors early with an informative
-message if the constraint is violated (typically because a user
-hand-edited the Stan code).
+The Stan program must keep the normalising constants of its
+densities. mvgam builds it that way by default. A fit built with
+\code{normalize = FALSE} is refused. Bridge sampling also needs the draws
+of every parameter, which a fit keeps under
+\code{save_pars = save_pars(all = TRUE)}.
 }
 \section{Multivariate fits}{
- On an \code{mvbf} fit the Stan program
-computes a single joint log posterior pooling every response
-family's likelihood, so \code{bridge_sampler()} naturally estimates
-the joint log marginal likelihood
+ The Stan program of an \code{mvbf()} fit has
+one joint log posterior over every response. \code{bridge_sampler()}
+then estimates the joint log marginal likelihood
 \eqn{\log p(y_{1}, \ldots, y_{K} \mid \mathrm{model})}. The
-bridge-sampling estimator variance grows with parameter
-dimension: for multi-response, factor or VAR fits pass
-\code{samples = 10000} or larger, and consider
-\code{method = "warp3"} when the default \code{"normal"} returns high
-\code{re2} (relative squared error).
+variance of the estimate grows with the number of parameters. For
+multi-response, factor or VAR fits, pass \code{repetitions} above 1 or
+\code{method = "warp3"} when the default method reports a high \code{re2}
+(relative squared error).
 }
 
+\examples{
+\dontrun{
+set.seed(4)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 80L, trend_model = AR())
+
+# Bridge sampling needs many draws and every parameter's draws. It
+# evaluates the density through rstan. A fit sampled by rstan needs
+# no second compile.
+mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+                data = simdat$data_train, family = poisson(),
+                save_pars = save_pars(all = TRUE), backend = "rstan",
+                chains = 2, iter = 3000, silent = 2)
+mod_rw <- update(mod_ar, trend_formula = ~ RW())
+
+# The log marginal likelihood of each model
+bs_ar <- bridge_sampler(mod_ar, silent = TRUE)
+bs_rw <- bridge_sampler(mod_rw, silent = TRUE)
+bs_ar
+
+# A Bayes factor above 1 favours the AR(1) trend. Passing the
+# bridge objects reuses their estimates.
+bayes_factor(bs_ar, bs_rw)
+
+# Next, compare their forecasts with loo() or lfo_cv()
+}
+
+}
 \references{
 Gronau QF, Singmann H and Wagenmakers E-J (2020).
 bridgesampling: An R package for estimating normalizing
 constants. \emph{Journal of Statistical Software}. 92(10).
 }
 \seealso{
-\code{\link{loo.mvgam}}, \code{\link{lfo_cv.mvgam}}.
+\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}}. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+compares models by their forecasts.
+
+Other model comparison: 
+\code{\link{compare_elpds}()},
+\code{\link{kfold.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{log_lik.mvgam}()},
+\code{\link{loo.mvgam}()},
+\code{\link{loo_compare.mvgam_lfo}()},
+\code{\link{mvgam_loo_extras}},
+\code{\link{posterior_average.mvgam}()},
+\code{\link{waic.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model comparison}

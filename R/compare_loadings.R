@@ -79,6 +79,7 @@
 #' for the covariance matrix in latent factor models. *Statistics
 #' and Computing* 34, 143. \doi{10.1007/s11222-024-10454-0}
 #'
+#' @family latent dynamics
 #' @export
 compare_loadings <- function(
   fit_a, fit_b,
@@ -136,7 +137,7 @@ compare_loadings <- function(
     shift = rep(shift, 2L)
   )
 
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   axis_labs <- c(
     sprintf("Z loading on LV%d", which_lvs[1L]),
     sprintf("Z loading on LV%d", which_lvs[2L])

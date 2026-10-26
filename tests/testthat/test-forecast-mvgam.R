@@ -846,8 +846,8 @@ test_that("a wide frame padded at the end is stepped from its grid", {
     prefit <- mvgam(
       brms::bf(brms::mvbind(y1, y2) ~ 1) + brms::set_rescor(FALSE),
       trend_formula = ~ AR(p = 1), data = d, family = gaussian(),
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "Rows containing NAs were excluded"
   )
   series_levels <- mvgam:::fitted_series_levels(prefit)

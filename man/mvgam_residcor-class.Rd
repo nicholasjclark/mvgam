@@ -9,8 +9,9 @@ following components:
 
 \item{cor, cor_se, cor_lower, cor_upper}{Posterior summaries of
 the \eqn{p \times p} correlation matrix: the posterior mean (the
-median under \code{robust = TRUE}), the standard error and the limits of
-the credible interval at the \code{probs} levels.}
+median under \code{robust = TRUE}), the posterior SD (the MAD under
+\code{robust = TRUE}) and the limits of the credible interval at the
+\code{probs} levels.}
 \item{cor_ess}{\eqn{p \times p} matrix of per-entry effective
 sample sizes of the correlation draws, computed on the Fisher-z
 scale with \code{\link[posterior:ess_basic]{posterior::ess_basic()}}. The diagonal is \code{NA}, being

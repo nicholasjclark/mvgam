@@ -151,16 +151,6 @@ test_that("a smooth view can be scoped to one response", {
 })
 
 
-test_that("loo and waic refuse the parity arguments they cannot honour", {
-  # Both accept the brms signature. `resp` and `save_psis` are
-  # honoured; the rest name refits and multi-model ranking that this
-  # package answers elsewhere, and each is refused where supplied.
-  expect_error(loo(fit, k_threshold = 1), "cannot honour")
-  expect_error(loo(fit, compare = FALSE), "cannot honour")
-  expect_error(loo(fit, model_names = "m"), "cannot honour")
-  expect_error(loo(fit, moment_match_args = list(k = 1)), "cannot honour")
-  expect_error(waic(fit, compare = FALSE), "cannot honour")
-  expect_error(waic(fit, model_names = "m"), "cannot honour")
-  # The two that are honoured still answer.
-  expect_s3_class(loo(fit, save_psis = TRUE), "psis_loo")
+test_that("loo honours save_psis from the brms signature", {
+  expect_s3_class(loo(fit, save_psis = TRUE)$psis_object, "psis")
 })

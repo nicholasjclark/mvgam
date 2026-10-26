@@ -39,6 +39,7 @@
 #'   [plot.mvgam_compare_scores()], [compare_elpds()],
 #'   [forecast.mvgam()], [ensemble.mvgam_forecast()]
 #'
+#' @family forecasting
 #' @export
 compare_scores <- function(..., score = "crps", model_names = NULL,
                             score_args = list()) {
@@ -102,10 +103,9 @@ compare_scores <- function(..., score = "crps", model_names = NULL,
 #'   objects into one long-format `tibble`, with one row per model
 #'   and evaluation time.
 #'
+#' @inheritParams compare_scores
 #' @param ... Two or more `mvgam_lfo` objects from [lfo_cv()].
 #'   Argument names are taken from the call.
-#' @param model_names Optional character vector of model labels;
-#'   overrides the names inferred from the call.
 #'
 #' @return A `tibble` with columns:
 #' \itemize{
@@ -123,6 +123,7 @@ compare_scores <- function(..., score = "crps", model_names = NULL,
 #'   [loo_model_weights.mvgam_lfo()],
 #'   [plot.mvgam_compare_elpds()], [compare_scores()]
 #'
+#' @family model comparison
 #' @export
 compare_elpds <- function(..., model_names = NULL) {
   lfos <- list(...)
@@ -198,7 +199,7 @@ compare_elpds <- function(..., model_names = NULL) {
 plot.mvgam_compare_scores <- function(x, relative = NULL,
                                        facet = TRUE, ...) {
   rlang::check_dots_empty()
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   score_type <- attr(x, "score") %||% "score"
   is_joint <- score_type %in% joint_forecast_scores
   df <- if (is_joint) {
@@ -280,7 +281,7 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
 plot.mvgam_compare_elpds <- function(x, relative = NULL,
                                       cumulative = FALSE, ...) {
   rlang::check_dots_empty()
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   df <- as.data.frame(x)
   if (!is.null(relative)) {
     df <- difference_from_baseline(df, relative, "elpd", "eval_time")

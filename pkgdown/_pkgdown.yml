@@ -115,8 +115,6 @@ reference:
   - get_prior.default
   - get_prior.mvgam
   - get_prior.mvgam_formula
-  - default_prior.mvgam
-  - default_prior.mvgam_formula
 
 - title: Data preparation and validation
   desc: >
@@ -170,7 +168,6 @@ reference:
   - plot.mvgam_latent_state
   - ensemble.mvgam_forecast
   - posterior_average.mvgam
-  - pp_average.mvgam
   - posterior_interval.mvgam
   - predictive_interval.mvgam
   - predictive_error.mvgam
@@ -235,10 +232,7 @@ reference:
   - how_to_cite.mvgam
   - methods_md
   - bibtex
-  - stancode.mvgam
   - stancode.mvgam_formula
-  - standata.mvgam
-  - standata.mvgam_formula
   - print.mvgamstancode
 
 - title: Marginal and conditional effects

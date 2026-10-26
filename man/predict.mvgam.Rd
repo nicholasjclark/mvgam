@@ -26,8 +26,8 @@
 \arguments{
 \item{object}{An object of class \code{mvgam}.}
 
-\item{newdata}{An optional data.frame containing new predictor values.
-If \code{NULL} (the default), the original training data is used.}
+\item{newdata}{Optional data frame with covariates for prediction. If
+NULL, uses original training data stored in the model object.}
 
 \item{type}{Character; one of \code{"response"} (default), \code{"link"},
 \code{"expected"}, \code{"variance"}, \code{"terms"}, \code{"latent_state"},
@@ -37,43 +37,43 @@ If \code{NULL} (the default), the original training data is used.}
 innovation to its deterministic submodel. Each posterior draw
 takes one innovation from the distribution the trend settles
 into. An autoregressive trend settles into its stationary
-distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}, and
-the Jensen correction on a log link is
+distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}. The
+Jensen correction on a log link is
 \eqn{\sigma^2/(2(1-\rho^2))}. A random walk lacks a stationary
 distribution and a \code{ZMVN()} trend lacks dynamics. Both draw their
-innovations directly. \code{CAR()} holds one stationary covariance at
+innovations directly. \code{CAR()} uses one stationary covariance at
 every time of an irregular grid and draws from it. If \code{FALSE},
 the default, the trend contributes its deterministic submodel
 alone, at its own per-draw values. The argument applies under
 \code{incl_autocor = FALSE}. Conditioning on the fitted state already
 fixes every innovation.
 
-Each call draws new innovations, and two calls on one fit give
-different results. Set a seed to reproduce a result.}
+Each call draws new innovations. Two calls on one fit give different
+results. Set a seed to reproduce a result.}
 
 \item{incl_autocor}{Logical; which prediction surface the trend
-contribution comes from. \code{FALSE}, the default, keeps the fitted
-\code{trend[t, s]} out and answers from the two submodels' covariate
-structure, so an effect reads the same whether it is asked at the
-first time point or the fiftieth. \code{TRUE} reads the latent state
-the model inferred at each time, which is the quantity
-\code{\link[=hindcast]{hindcast()}} returns and the one an ELPD is built from;
-\code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} ask for it, because an
-R^2 describes the series that was observed rather than a
-counterfactual one. A row whose time falls outside the fitted grid
-is refused under \code{TRUE}. \code{\link[=forecast.mvgam]{forecast.mvgam()}} predicts those times.
+contribution comes from. \code{FALSE}, the default, omits the fitted
+\code{trend[t, s]} and uses the two submodels' covariate structure. The
+effect is the same at the first time point as at the fiftieth. \code{TRUE}
+uses the latent state the model inferred at each time. That is the
+quantity \code{\link[=hindcast]{hindcast()}} returns. The ELPD is computed from it.
+\code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} request this surface. An R^2
+describes the observed series. A row whose time falls outside the
+fitted grid is refused under \code{TRUE}. \code{\link[=forecast.mvgam]{forecast.mvgam()}} predicts
+those times.
 
-The default suits a model whose covariates carry the signal. When
-most of the series-level variation sits in the trend instead, as
-in a fit with few covariates and a strong autoregressive process,
-this surface has little left to say; \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
-\code{\link[=forecast.mvgam]{forecast.mvgam()}} are the better reading there.}
+The default suits a model whose covariates explain most of the
+signal. When most of the series-level variation lies in the trend,
+as in a fit with few covariates and a strong autoregressive process,
+this surface has little to say. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} are more informative there.}
 
-\item{ndraws}{Positive integer specifying the number of posterior draws
-to use. If \code{NULL} (the default), all draws are used.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Integer vector specifying which draws to use. If \code{NULL},
-draws are selected based on \code{ndraws}.}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
 \item{re_formula}{Group-level terms to include: \code{NULL} (the default)
 for every one, \code{NA} for none. A formula choosing some of them is not
@@ -81,16 +81,16 @@ supported.}
 
 \item{allow_new_levels}{Logical; accepted for brms compatibility.
 A grouping level the model never saw is refused whatever this is
-set to, because a new level has no fitted random effect and, for
-a new series, no latent state to propagate. Predict for levels
-the fit knows, or refit with the new levels included.}
+set to. A new level has no fitted random effect. For a new series,
+it has no latent state to propagate. Predict for levels the fit
+knows, or refit with the new levels included.}
 
 \item{sample_new_levels}{Character; accepted for brms
 compatibility and not used, since new levels are refused. See
 \code{allow_new_levels}.}
 
-\item{resp}{Character specifying which response variable to predict for
-multivariate models. If \code{NULL}, predictions are returned for all
+\item{resp}{Character specifying which response variable for
+multivariate models. NULL (default) returns predictions for all
 responses.}
 
 \item{summary}{Logical. If \code{TRUE} (the default), returns summary
@@ -104,76 +104,60 @@ deviation (MAD).}
 Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
 single value or multiple values.}
 
-\item{...}{Unused. Anything passed here is refused; every argument
-this method passes to \code{posterior_predict} / \code{posterior_epred} /
-\code{posterior_linpred} it names above.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-If \code{summary = FALSE}, returns a numeric matrix of posterior
-draws with dimensions \verb{\\\[ndraws x nobs\\\]}. For multivariate fits with
-\code{resp = NULL}, returns a named list of such matrices.
-
-If \code{summary = TRUE}, returns a matrix with columns:
+With \code{summary = FALSE}, an \verb{[ndraws, nobs]} matrix of
+draws. With \code{summary = TRUE}, a matrix with one row per
+observation and the columns:
 \itemize{
-\item \code{Estimate}: point estimate (mean or median depending on
-\code{robust})
-\item \code{Est.Error}: uncertainty estimate (sd or mad depending on
-\code{robust})
-\item \verb{Q*}: quantile columns corresponding to values in \code{probs}
+\item \code{Estimate}: the posterior mean, or the median under
+\code{robust = TRUE}.
+\item \code{Est.Error}: the posterior SD, or the MAD under
+\code{robust = TRUE}.
+\item \verb{Q*}: one quantile column per value of \code{probs}.
 }
+A multivariate model with \code{resp = NULL} gives a named list of
+these, one per response.
 }
 \description{
-Compute posterior predictions for mvgam models. Dispatches by \code{type}
-to the appropriate prediction surface:
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for \code{"response"} (default),
-\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} for \code{"link"},
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for \code{"expected"}, and an internal
-family-aware helper for \code{"variance"}.
+Posterior predictions for mvgam models. \code{type} selects the
+quantity: \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for \code{"response"} (the
+default), \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} for \code{"link"} and
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for \code{"expected"}. \code{"variance"} gives the
+family's conditional variance.
 }
 \details{
-The \code{type} argument selects which posterior summary to return:
+\code{type} selects the quantity returned:
 \itemize{
 \item \code{"response"} (default): draws from the posterior predictive
-distribution on the outcome scale. Routes through
+distribution on the outcome scale, from
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}.
-\item \code{"link"}: linear predictor draws on the link scale (no
-inverse-link applied). Routes through
+\item \code{"link"}: the linear predictor on the link scale, from
 \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}.
-\item \code{"expected"}: posterior expectation E[Y | X] on the response
-scale. Routes through \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}.
-\item \code{"variance"}: conditional variance Var[Y | theta] per draw,
-using family-specific mean-variance formulas. Supported
-families: gaussian, student, lognormal, poisson, bernoulli,
-binomial, negbinomial, gamma, beta. Other families raise an
-informative error. Under the default the variance is
-conditional on the parameter draw alone, so it is the
-observation noise around the mean the two submodels give.
-\code{process_error = TRUE} conditions on that draw's sampled
-trend innovation as well, giving the observation noise at
-the trend-integrated mean.
-\item \code{"terms"}: accepted so that a call carried over from
-\code{\link[mgcv:predict.gam]{mgcv::predict.gam()}} is answered rather than silently
-mismatched. mvgam splits the decomposition across
-\code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} for per-smooth draws and
-\code{\link[=fixef.mvgam]{fixef.mvgam()}} / \code{\link[=ranef.mvgam]{ranef.mvgam()}} for the parametric and
-random-effect components, so the call errors with a pointer
-at those.
-\item \code{"latent_state"}: closure-unit families. Family-aware
-posterior of the latent state per closure unit, conditioned
-on the observed detection history:
+\item \code{"expected"}: the expectation E[Y | X] on the response
+scale, from \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}.
+\item \code{"variance"}: the conditional variance Var[Y | theta] per
+draw, from the family's mean-variance relation. It covers the
+gaussian, student, lognormal, poisson, bernoulli, binomial,
+negbinomial, gamma and beta families. Other families raise an
+error. By default the variance is the observation noise around
+the mean of the two submodels. \code{process_error = TRUE} also
+conditions on each draw's sampled trend innovation.
+\item \code{"terms"}: refused with a pointer to the functions that
+decompose a prediction. \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} returns
+per-smooth draws. \code{\link[=fixef.mvgam]{fixef.mvgam()}} and \code{\link[=ranef.mvgam]{ranef.mvgam()}} return the
+parametric and random-effect components.
+\item \code{"latent_state"}: for closure-unit families, the posterior of
+the latent state of each closure unit given its detection
+history:
 \itemize{
-\item \code{nmix()}: posterior latent abundance \code{N}
-conditional on the observed visit counts, via
-\code{posterior_latent_N()} (Royle 2004).
-\item \code{occ()}: posterior occupancy probability
-\code{P(z = 1 | y_g)} via \code{posterior_occupancy()}. Returns
-the probability matrix by default; use
-\code{posterior_occupancy(draw = TRUE)} directly for 0/1 z
-draws.
+\item \code{nmix()}: the latent abundance \code{N} given the observed
+visit counts (Royle 2004).
+\item \code{occ()}: the occupancy probability \code{P(z = 1 | y_g)}.
 }
-\item \code{"detection"}: closure-unit families (nmix(), occ()).
-Per-visit detection probability \eqn{p_{g,j}} on the response
-scale.
+\item \code{"detection"}: for \code{nmix()} and \code{occ()}, the per-visit
+detection probability \eqn{p_{g,j}} on the response scale.
 }
 }
 \examples{
@@ -199,11 +183,28 @@ head(cbind(
 
 # `summary = FALSE` returns the draws, one row per draw
 dim(predict(mod, summary = FALSE))
+
+# Next: forecast() predicts beyond the training times from the
+# fitted trend state
 }
 
 }
 \seealso{
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}},
-\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}, \code{\link[=fitted.mvgam]{fitted.mvgam()}},
-\code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}}.
+\code{\link[=fitted.mvgam]{fitted.mvgam()}} returns expected values with the inferred
+trend state. \code{\link[=forecast.mvgam]{forecast.mvgam()}} predicts future times from the
+fitted state. \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} plots predictions
+against a covariate.
+
+Other predictions: 
+\code{\link{conditional_effects.mvgam}()},
+\code{\link{conditional_smooths.mvgam}()},
+\code{\link{fitted.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{posterior_epred.mvgam}()},
+\code{\link{posterior_linpred.mvgam}()},
+\code{\link{posterior_predict.mvgam}()},
+\code{\link{posterior_smooths.mvgam}()},
+\code{\link{predictive_error.mvgam}()},
+\code{\link{predictive_interval.mvgam}()}
 }
+\concept{predictions}

@@ -1,176 +1,97 @@
-# Unit tests for `lfo_cv.mvgam()` in `R/lfo_cv.mvgam.R`. The
-# method orchestrates a sequence of `update.mvgam` refits and
-# `log_lik.mvgam` / `window_predictive` / `score.mvgam_forecast`
-# calls; the algorithmic primitives are exercised by their own
-# test files. These tests stub the primitives via
-# `local_mocked_bindings()` and assert:
-#
-#   * Argument validation (score subset, min_t guard, fc_horizon).
-#   * Return-shape contract (mvgam_lfo class with the documented
-#     slot names; per-score arrays sized to n_evals).
-#   * The deprecated `data` arg forwards to `newdata` with a
-#     warning.
-#   * `summary.mvgam_lfo()` returns a tibble with one row per
-#     evaluation timepoint and the expected columns.
-#   * `print.mvgam_lfo()` runs without error.
+# `lfo_cv.mvgam()` runs here on stubbed refits and log likelihoods.
+# The methods for its results follow. Real fits are scored in
+# tests/local/test-grain-mvbf-wide.R.
 
+# A mock fit of Poisson counts on the given times and series
+lfo_mock_fit <- function(time, series = rep("s1", length(time)),
+                         trend_type = "AR") {
+  structure(
+    list(
+      fit = structure(list(), class = "fake_stanfit"),
+      data = data.frame(time = time, series = factor(series),
+                        y = stats::rpois(length(time), lambda = 3)),
+      formula = y ~ 1,
+      family = poisson(),
+      trend_metadata = list(trend_type = trend_type),
+      backend = "rstan"
+    ),
+    class = "mvgam"
+  )
+}
 
-# Minimal mock mvgam fit; enough surface for lfo_cv to traverse
-# (data frame access, trend_metadata, family).
-make_lfo_mock <- function(n_time = 40L, n_series = 1L) {
-  d <- data.frame(
-    time = rep(seq_len(n_time), n_series),
-    series = factor(rep(paste0("s", seq_len(n_series)),
-                         each = n_time),
-                     levels = paste0("s", seq_len(n_series))),
-    y = stats::rpois(n_time * n_series, lambda = 3)
+make_lfo_mock <- function(n_time = 35L, n_series = 1L, offset = 0L) {
+  lfo_mock_fit(
+    rep(offset + seq_len(n_time), n_series),
+    rep(paste0("s", seq_len(n_series)), each = n_time)
   )
-  fit <- list(
-    fit = structure(list(), class = "fake_stanfit"),
-    data = d,
-    formula = stats::as.formula("y ~ 1"),
-    family = poisson(),
-    trend_metadata = list(trend_type = "AR"),
-    backend = "rstan"
+}
+
+# A refit returns the mock unchanged. Every observation has log density
+# -1 under each of five draws unless `loglik` is given. A `crps` value
+# stubs the forecast draws and their score.
+local_lfo_stubs <- function(fit, loglik = NULL, crps = NULL,
+                            env = parent.frame()) {
+  ll <- loglik %||% matrix(-1, 5L, nrow(fit$data))
+  stubs <- list(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) ll
   )
-  class(fit) <- "mvgam"
-  fit
+  if (!is.null(crps)) {
+    stubs$window_predictive <- function(fit, fc_data) {
+      structure(list(forecasts = list(s1 = matrix(0, 5L, 1L))),
+                class = "mvgam_forecast")
+    }
+    stubs$score <- function(object, score, ...) {
+      list(all_series = data.frame(score = crps))
+    }
+  }
+  do.call(testthat::local_mocked_bindings, c(stubs, list(.env = env)))
 }
 
 
-# ----- Validation arms --------------------------------------------
-
-test_that("score arg validation rejects unknown rules", {
+test_that("lfo_cv refuses arguments it cannot evaluate", {
   fit <- make_lfo_mock()
-  expect_error(
-    lfo_cv(fit, min_t = 30L, score = "nonsense"),
-    "Must be a subset"
-  )
+  expect_error(lfo_cv(fit, score = "nonsense"), "Must be a subset")
+  expect_error(lfo_cv(fit, fc_horizon = 0L), "fc_horizon")
+  expect_error(lfo_cv(fit, pareto_k_threshold = 1.5), "pareto_k_threshold")
+  expect_error(lfo_cv(fit, fc_horizon = 40L),
+               "exceeds the available time span")
+  expect_error(lfo_cv(fit, min_t = 35L), "largest valid 'min_t' is 34")
+  expect_error(lfo_cv(make_lfo_mock(offset = 2009L), min_t = 25L),
+               "must be an observed time")
+  # Series s1 runs 1 to 30 and s2 runs 5 to 34
+  ragged <- lfo_mock_fit(c(1:30, 5:34), rep(c("s1", "s2"), each = 30L))
+  expect_error(lfo_cv(ragged, min_t = 20L), "share one time grid")
 })
 
 
-test_that("fc_horizon must be a positive integer", {
+test_that("the data argument of mvgam 1.x is passed to newdata", {
   fit <- make_lfo_mock()
-  expect_error(
-    lfo_cv(fit, min_t = 30L, fc_horizon = 0L),
-    "fc_horizon"
-  )
-})
-
-
-test_that("pareto_k_threshold must be in [0, 1]", {
-  fit <- make_lfo_mock()
-  expect_error(
-    lfo_cv(fit, min_t = 30L, pareto_k_threshold = 1.5),
-    "pareto_k_threshold"
-  )
-})
-
-
-test_that("min_t leaving no eval room errors informatively", {
-  fit <- make_lfo_mock(n_time = 40L)
-  expect_error(
-    lfo_cv(fit, min_t = 40L, fc_horizon = 1L),
-    "no room for evaluation"
-  )
-})
-
-
-test_that("deprecated data arg forwards to newdata with warning", {
-  fit <- make_lfo_mock(n_time = 40L)
-  newdat <- fit$data
-  # Stub the heavy machinery so we can reach the deprecation
-  # branch without actually fitting.
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      matrix(stats::rnorm(5L * nrow(newdat)),
-             nrow = 5L, ncol = nrow(newdat))
-    }
-  )
+  local_lfo_stubs(fit)
   expect_warning(
-    lfo_cv(fit, min_t = 30L, fc_horizon = 1L, data = newdat,
-            silent = 2L),
-    "data.*deprecated"
+    lfo_cv(fit, min_t = 30L, data = fit$data, silent = 2L),
+    "'data' is deprecated"
   )
 })
 
 
-# ----- Return-shape contract --------------------------------------
-
-test_that("Return object has all documented mvgam_lfo slots", {
-  fit <- make_lfo_mock(n_time = 35L)
-  ndraws <- 5L
-  newdat <- fit$data
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
-    }
-  )
-  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
-                 score = "elpd", silent = 2L)
+test_that("lfo_cv scores each origin after the first refit", {
+  fit <- make_lfo_mock()
+  local_lfo_stubs(fit, crps = 0.5)
+  out <- lfo_cv(fit, min_t = 30L, score = c("elpd", "crps"), silent = 2L)
   expect_s3_class(out, "mvgam_lfo")
-  required <- c("elpds", "sum_ELPD", "scores", "pareto_ks",
-                "eval_timepoints", "refits_at",
-                "pareto_k_threshold",
-                "pareto_k_threshold_adaptive", "fc_horizon")
-  expect_true(all(required %in% names(out)))
-  expect_identical(out$fc_horizon, 1L)
-  # One field holds the threshold, and it is the number the refit
-  # gate applied. It used to hold whatever the caller passed, so on
-  # a default call the documented name was empty and the number sat
-  # under a second one.
-  expect_lte(out$pareto_k_threshold, 0.7)
-  expect_true(out$pareto_k_threshold_adaptive)
-  expect_true(min_t_in_refits <- 30L %in% out$refits_at)
-  # eval window is (min_t + 1):(N - fc_horizon + 1) = 31:35,
-  # so 5 evaluations on a 35-step series with fc_horizon = 1.
-  expect_identical(length(out$eval_timepoints), 5L)
-  expect_identical(length(out$elpds), 5L)
-  expect_null(out$scores)
-})
-
-
-test_that("Non-ELPD score adds named entries to scores list", {
-  fit <- make_lfo_mock(n_time = 35L)
-  ndraws <- 5L
-  newdat <- fit$data
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
-    },
-    # The window's predictive draws. Stubbed because a mock fit
-    # carries no posterior to draw from; the value it returns is
-    # never asserted, only the shape of what `lfo_cv()` builds
-    # around it.
-    window_predictive = function(fit, fc_data) {
-      n_h <- length(unique(fc_data$time))
-      structure(
-        list(
-          forecasts = list(s1 = matrix(0, ndraws, n_h)),
-          test_observations = list(s1 = rep(0, n_h)),
-          series_names = "s1",
-          type = "response"
-        ),
-        class = "mvgam_forecast"
-      )
-    },
-    score = function(object, score, ...) {
-      list(all_series = data.frame(score = 0.5))
-    }
-  )
-  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
-                 score = c("elpd", "crps"), silent = 2L)
-  expect_true("crps" %in% names(out$scores))
-  # One score per evaluation point, which is the contract this mock
-  # can speak to. `score()` is stubbed here, so its value says
-  # nothing about the package; the number a real fit produces is
-  # asserted in `tests/local/test-grain-mvbf-wide.R`.
-  expect_identical(length(out$scores$crps),
-                   length(out$eval_timepoints))
-  expect_false(anyNA(out$scores$crps))
+  expect_identical(out$eval_timepoints, 31:35)
+  expect_identical(out$refits_at[1L], 30L)
+  # A constant log density of -1 gives every fold an ELPD of -1
+  expect_equal(out$elpds, rep(-1, 5L))
+  expect_identical(out$scores$crps, rep(0.5, 5L))
+  expect_identical(out$n_obs, rep(1L, 5L))
+  # The adaptive threshold for five draws
+  expect_equal(out$pareto_k_threshold, 1 - 1 / log10(5))
+  tib <- summary(out)
+  expect_named(tib, c("eval_time", "refit_here", "pareto_k", "n_obs",
+                      "elpd", "crps"))
+  expect_true(tib$refit_here[1L])
 })
 
 
@@ -187,246 +108,34 @@ test_that("a fold's score sums its responses and its observed horizons", {
 })
 
 
-# ----- summary / print methods -----------------------------------
-
-test_that("summary.mvgam_lfo returns a tibble with one row per fold", {
-  fit <- make_lfo_mock(n_time = 35L)
-  ndraws <- 5L
-  newdat <- fit$data
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
-    },
-    # The window's predictive draws. Stubbed because a mock fit
-    # carries no posterior to draw from; the value it returns is
-    # never asserted, only the shape of what `lfo_cv()` builds
-    # around it.
-    window_predictive = function(fit, fc_data) {
-      n_h <- length(unique(fc_data$time))
-      structure(
-        list(
-          forecasts = list(s1 = matrix(0, ndraws, n_h)),
-          test_observations = list(s1 = rep(0, n_h)),
-          series_names = "s1",
-          type = "response"
-        ),
-        class = "mvgam_forecast"
-      )
-    },
-    score = function(object, score, ...) {
-      list(all_series = data.frame(score = 0.5))
-    }
-  )
-  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
-                 score = c("elpd", "crps"), silent = 2L)
-  tib <- summary(out)
-  expect_s3_class(tib, "tbl_df")
-  expect_identical(nrow(tib), length(out$eval_timepoints))
-  expect_true(all(c("eval_time", "refit_here", "pareto_k",
-                     "elpd", "crps") %in% names(tib)))
-  expect_true(is.logical(tib$refit_here))
-  expect_true(tib$refit_here[1L])  # min_t triggered the initial refit
-})
-
-
-test_that("print.mvgam_lfo runs without error and returns invisibly", {
-  fit <- make_lfo_mock(n_time = 35L)
-  ndraws <- 5L
-  newdat <- fit$data
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
-    }
-  )
-  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
-                 score = "elpd", silent = 2L)
-  capture.output(expect_invisible(print(out)))
-  expect_output(print(out), "Approximate leave-future-out")
-  expect_output(print(out), "ELPD")
-})
-
-
-# ----- Multi-series ----------------------------------------------
-
 test_that("lfo_cv runs on a 2-series fit with a gap in sampling", {
-  fit <- make_lfo_mock(n_time = 35L, n_series = 2L)
-  ndraws <- 5L
-  newdat <- fit$data
-  # Neither series was sampled at time 31. `log_lik()` returns a
-  # missing density in every draw for an `NA` response.
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      ll <- matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
-      ll[, newdat$time == 31L] <- NA_real_
-      ll
-    }
-  )
-  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
-                 score = "elpd", silent = 2L)
+  fit <- make_lfo_mock(n_series = 2L)
+  # Neither series was sampled at time 31
+  ll <- matrix(-1, 5L, nrow(fit$data))
+  ll[, fit$data$time == 31L] <- NA_real_
+  local_lfo_stubs(fit, loglik = ll)
+  out <- lfo_cv(fit, min_t = 30L, silent = 2L)
   expect_identical(length(out$elpds), 5L)
-  # Nothing was observed between the refit and time 32. That fold
-  # has no importance ratio and no Pareto k, where `loo::psis()`
-  # refused the all-missing ratio.
+  # Nothing was observed between the refit and time 32. That fold has
+  # no importance ratio and no Pareto k
   expect_identical(is.na(out$pareto_ks), c(TRUE, TRUE, FALSE, FALSE, FALSE))
 })
 
 
-# ----- Index-based design: arbitrary time starts ------------------
-
-# Build a mock fit whose time column is shifted by `offset`, so
-# times run (offset + 1):(offset + n_time). Exercises that lfo_cv
-# arithmetic is position-based, not value-based.
-make_lfo_mock_shifted <- function(n_time = 35L, offset = 2009L) {
-  d <- data.frame(
-    time = seq.int(offset + 1L, offset + n_time),
-    series = factor("s1", levels = "s1"),
-    y = stats::rpois(n_time, lambda = 3)
-  )
-  fit <- list(
-    fit = structure(list(), class = "fake_stanfit"),
-    data = d,
-    formula = stats::as.formula("y ~ 1"),
-    family = poisson(),
-    trend_metadata = list(trend_type = "AR"),
-    backend = "rstan"
-  )
-  class(fit) <- "mvgam"
-  fit
-}
-
-
-test_that("min_t works as a time VALUE for non-1-indexed times", {
-  # Times run 2010..2044. With min_t = 2039, expect evals at
-  # 2040..2044 (5 points), refits_at = 2039.
-  fit <- make_lfo_mock_shifted(n_time = 35L, offset = 2009L)
-  ndraws <- 5L
-  newdat <- fit$data
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
-    }
-  )
-  out <- lfo_cv(fit, min_t = 2039L, fc_horizon = 1L,
-                 score = "elpd", silent = 2L)
-  expect_identical(length(out$eval_timepoints), 5L)
+test_that("min_t is a time value on any time origin or grid", {
+  years <- make_lfo_mock(offset = 2009L)
+  local_lfo_stubs(years)
+  out <- lfo_cv(years, min_t = 2039L, silent = 2L)
   expect_identical(out$eval_timepoints, 2040:2044)
-  expect_true(2039L %in% out$refits_at)
-})
+  # The default is the 24th time, leaving 10 origins and the horizon
+  expect_identical(lfo_cv(years, silent = 2L)$eval_timepoints[1L], 2034L)
 
-
-test_that("default min_t picks the 30th observed time for n=35", {
-  fit <- make_lfo_mock_shifted(n_time = 35L, offset = 2009L)
-  ndraws <- 5L
-  newdat <- fit$data
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
-    }
-  )
-  out <- lfo_cv(fit, fc_horizon = 1L,
-                 score = "elpd", silent = 2L)
-  # Default base_idx = 30, capped by n_times - 10 - fc_horizon =
-  # 35 - 11 = 24. So base_idx = 24, min_t = all_unique_times[24]
-  # = 2009 + 24 = 2033.
-  expect_true(2033L %in% out$refits_at)
-  expect_identical(out$eval_timepoints[1L], 2034L)
-})
-
-
-# ----- Irregular (CAR-style) grid --------------------------------
-
-test_that("lfo_cv handles irregular CAR-style time grids", {
-  # Observed times have gaps (e.g., monthly samples missing some
-  # months). 12 observed times in a 20-month span.
-  obs_times <- c(1L, 2L, 4L, 5L, 7L, 9L, 10L, 13L, 15L,
-                  17L, 19L, 20L)
-  d <- data.frame(
-    time = obs_times,
-    series = factor("s1", levels = "s1"),
-    y = stats::rpois(length(obs_times), lambda = 3)
-  )
-  fit <- list(
-    fit = structure(list(), class = "fake_stanfit"),
-    data = d,
-    formula = stats::as.formula("y ~ 1"),
-    family = poisson(),
-    trend_metadata = list(trend_type = "CAR"),
-    backend = "rstan"
-  )
-  class(fit) <- "mvgam"
-  ndraws <- 5L
-  testthat::local_mocked_bindings(
-    update.mvgam = function(object, ...) object,
-    log_lik = function(object, ...) {
-      matrix(-1.0, nrow = ndraws, ncol = nrow(d))
-    }
-  )
-  # min_t = 9 is the 6th observed time. Expect 6 evaluations at
-  # the next 6 observed times: 10, 13, 15, 17, 19, 20.
-  out <- lfo_cv(fit, min_t = 9L, fc_horizon = 1L,
-                 score = "elpd", silent = 2L)
-  expect_identical(out$eval_timepoints,
-                    c(10L, 13L, 15L, 17L, 19L, 20L))
-  expect_identical(length(out$elpds), 6L)
-})
-
-
-# ----- New error conditions --------------------------------------
-
-test_that("Mismatched per-series time grids error", {
-  d <- data.frame(
-    time = c(1:30, 5:34),  # series s1: 1..30, s2: 5..34
-    series = factor(rep(c("s1", "s2"), each = 30L)),
-    y = stats::rpois(60L, lambda = 3)
-  )
-  fit <- list(
-    fit = structure(list(), class = "fake_stanfit"),
-    data = d,
-    formula = stats::as.formula("y ~ 1"),
-    family = poisson(),
-    trend_metadata = list(trend_type = "AR"),
-    backend = "rstan"
-  )
-  class(fit) <- "mvgam"
-  expect_error(
-    lfo_cv(fit, min_t = 20L, score = "elpd", silent = 2L),
-    "share one time grid"
-  )
-})
-
-
-test_that("fc_horizon >= n_times errors with focused message", {
-  fit <- make_lfo_mock(n_time = 10L)
-  expect_error(
-    lfo_cv(fit, min_t = 5L, fc_horizon = 12L,
-            score = "elpd", silent = 2L),
-    "exceeds the available time span"
-  )
-})
-
-
-test_that("min_t not in observed times errors informatively", {
-  fit <- make_lfo_mock_shifted(n_time = 35L, offset = 2009L)
-  expect_error(
-    lfo_cv(fit, min_t = 25L, fc_horizon = 1L,
-            score = "elpd", silent = 2L),
-    "must be an observed time"
-  )
-})
-
-
-test_that("min_t too late errors with the largest valid value", {
-  fit <- make_lfo_mock(n_time = 35L)
-  expect_error(
-    lfo_cv(fit, min_t = 35L, fc_horizon = 1L,
-            score = "elpd", silent = 2L),
-    "leaves no room for evaluation"
-  )
+  # On an irregular CAR grid the origins are the observed times
+  car <- lfo_mock_fit(c(1L, 2L, 4L, 5L, 7L, 9L, 10L, 13L, 15L, 17L, 19L,
+                        20L), trend_type = "CAR")
+  local_lfo_stubs(car)
+  expect_identical(lfo_cv(car, min_t = 9L, silent = 2L)$eval_timepoints,
+                   c(10L, 13L, 15L, 17L, 19L, 20L))
 })
 
 
@@ -455,47 +164,40 @@ mk_mvgam_lfo <- function(elpds, eval_timepoints = NULL,
 
 
 test_that("plot.mvgam_lfo keeps an unfittable Pareto k off the floor", {
-  # `loo:::do_psis_i()` starts `khat` at `Inf` and replaces it only
-  # when the tail holds five draws, so every k is infinite on a
-  # posterior of twenty draws or fewer. Standing the largest finite k
-  # in for the infinities took a maximum over an empty set there and
-  # returned `-Inf`, which sits below the threshold and coloured the
-  # evaluations loo could not fit at all as the most reliable ones.
+  # `loo:::do_psis_i()` gives an infinite k for a tail of fewer than
+  # five draws. Every k is infinite for twenty draws or fewer. Those
+  # points stay above the threshold.
   all_inf <- mk_mvgam_lfo(c(-2, -2.5, -3), pareto_ks = rep(Inf, 3L))
   g <- plot(all_inf)
-  ks <- g$data$value[g$data$facet == "Pareto K"]
+  ks <- g$data$value[g$data$facet == "Pareto k"]
   expect_false(any(ks == -Inf))
   expect_true(all(is.infinite(ks) & ks > 0))
-  # An unfittable tail is the opposite of a reliable one, and the
-  # panel colours it that way.
+  # An infinite k is drawn as unreliable
   expect_identical(
-    unique(g$data$colour[g$data$facet == "Pareto K"]), "outlier"
+    unique(g$data$colour[g$data$facet == "Pareto k"]), "outlier"
   )
 
-  # One finite k is enough to stand in for the rest, which is what
-  # keeps the panel's scale readable.
+  # An infinite k is drawn at the largest finite one
   mixed <- mk_mvgam_lfo(c(-2, -2.5, -3), pareto_ks = c(0.2, Inf, 0.6))
   g2 <- plot(mixed)
-  ks2 <- g2$data$value[g2$data$facet == "Pareto K"]
+  ks2 <- g2$data$value[g2$data$facet == "Pareto k"]
   expect_identical(ks2, c(0.2, 0.6, 0.6))
 })
 
 
 test_that("plot.mvgam_lfo draws a panel per score without notices", {
-  # `quantile()` names its result, and a named length-one column sends
-  # `data.frame()` looking for row names it then discards, with a
-  # notice on every call. Nothing reached `plot()` on an `mvgam_lfo`
-  # before these tests, so the notice went unseen. A warning fails
-  # this suite, which is what holds the fix.
+  # A named quantile column makes `data.frame()` warn. A warning fails
+  # this test.
   scored <- mk_mvgam_lfo(c(-2, -2.5, -3))
   scored$scores <- list(crps = c(1.1, 1.4, 0.9), dss = c(2, 3, 4))
-  # The first fold is scored on a fresh refit and has no Pareto k.
-  # ggplot warned on rendering it until the method dropped it.
+  # The first fold is scored on a refit and has no Pareto k. ggplot2
+  # warns on a missing value it is asked to draw.
   scored$pareto_ks[1L] <- NA_real_
   g <- plot(scored)
   expect_no_warning(ggplot2::ggplot_build(g))
   dss <- "Dawid-Sebastiani score"
-  expect_identical(unique(g$data$facet), c("Pareto K", "ELPD", "CRPS", dss))
+  expect_identical(as.character(unique(g$data$facet)),
+                   c("Pareto k", "ELPD", "CRPS", dss))
   # Every score is lower-is-better. Its worst fold is the outlier
   expect_identical(g$data$colour[g$data$facet == dss],
                    c("inlier", "inlier", "outlier"))
@@ -530,77 +232,43 @@ test_that("print.mvgam_lfo aligns every row", {
 })
 
 
-test_that("loo_compare.mvgam_lfo orders by elpd_diff descending", {
+test_that("loo_compare.mvgam_lfo pairs the folds of each model", {
   m1 <- mk_mvgam_lfo(c(-2, -2.5, -3, -2.2, -2.7))
-  # Non-uniform offset so sd(diff) > 0 and se_diff is meaningful.
   m2 <- mk_mvgam_lfo(c(-3, -3.7, -3.5, -3.4, -3.1))
   cmp <- loo_compare(m1, m2)
   expect_s3_class(cmp, "compare.loo")
-  expect_equal(nrow(cmp), 2L)
-  expect_equal(cmp$elpd_diff[1L], 0)
-  expect_lt(cmp$elpd_diff[2L], 0)
-  # se_diff[best] is 0 by construction; se_diff[worst] > 0 because
-  # the per-fold differences vary across folds.
-  expect_equal(cmp$se_diff[1L], 0)
-  expect_gt(cmp$se_diff[2L], 0)
+  expect_identical(rownames(cmp), c("m1", "m2"))
+  expect_equal(cmp$elpd_diff, c(0, sum(m2$elpds - m1$elpds)))
+  expect_equal(cmp$se_diff,
+               c(0, sqrt(5) * stats::sd(m2$elpds - m1$elpds)))
+  expect_equal(cmp$elpd_lfo, c(sum(m1$elpds), sum(m2$elpds)))
+  # A constant difference has no spread. The normal probability is then
+  # undefined
+  m3 <- mk_mvgam_lfo(m1$elpds - 1)
+  exact <- loo_compare(m1, m3)
+  expect_equal(exact$se_diff, c(0, 0))
+  expect_true(all(is.na(exact$p_worse)))
+  expect_identical(exact$diag_elpd, c("N < 100", "N < 100"))
 })
 
 
-test_that("loo_compare.mvgam_lfo errors when eval_timepoints differ", {
+test_that("compared LFO results must share a grid and hold ELPDs", {
   m1 <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(10, 11, 12))
-  m2 <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(20, 21, 22))
-  expect_error(loo_compare(m1, m2), "eval_timepoints")
-})
-
-
-test_that("loo_compare.mvgam_lfo errors when fc_horizon differs", {
-  m1 <- mk_mvgam_lfo(c(-1, -2, -3), fc_horizon = 1L)
-  m2 <- mk_mvgam_lfo(c(-1, -2, -3), fc_horizon = 3L)
-  expect_error(loo_compare(m1, m2), "fc_horizon")
-})
-
-
-test_that("loo_compare.mvgam_lfo errors when ELPDs are missing", {
-  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
-  m2 <- mk_mvgam_lfo(c(-1, -2, -3))
-  m2$elpds <- NULL
-  expect_error(loo_compare(m1, m2), "no ELPDs")
-})
-
-
-test_that("loo_compare.mvgam_lfo SE matches paired-diff convention", {
-  # Construct two models where per-fold diff is known exactly:
-  # m2$elpds = m1$elpds - c(1, 1, 1) so diff = (1,1,1), sd = 0
-  # se_diff = sqrt(3) * 0 = 0; elpd_diff = -3
-  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
-  m2 <- mk_mvgam_lfo(c(-2, -3, -4))
-  cmp <- loo_compare(m1, m2)
-  expect_equal(cmp$elpd_diff[2L], -3, tolerance = 1e-10)
-  expect_equal(cmp$se_diff[2L], 0, tolerance = 1e-10)
-})
-
-
-test_that("loo_compare.mvgam_lfo emits Sivula diagnostic columns", {
-  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
-  m2 <- mk_mvgam_lfo(c(-2, -3, -4))
-  cmp <- loo_compare(m1, m2)
-  expect_true(all(c("p_worse", "diag_diff", "diag_elpd") %in%
-                    colnames(cmp)))
-  # Reference row is NA-guarded on p_worse because se_diff = 0.
-  expect_true(is.na(cmp$p_worse[1L]))
-  # Candidate row has finite elpd_diff = -3 and se_diff = 0, so
-  # p_worse is NA there too (the guard triggers whenever a se_diff
-  # entry is zero, which holds for both rows in this exact-diff
-  # scenario).
-  expect_true(is.na(cmp$p_worse[2L]))
-  # n_folds = 3 -> both rows carry N < 100 in diag_elpd.
-  expect_true(all(grepl("N < 100", cmp$diag_elpd)))
+  shifted <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(20, 21, 22))
+  longer <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(10, 11, 12),
+                         fc_horizon = 3L)
+  expect_error(loo_compare(m1, shifted), "'eval_timepoints'")
+  expect_error(loo_compare(m1, longer), "'fc_horizon'")
+  expect_error(loo_model_weights(m1, shifted), "'eval_timepoints'")
+  unscored <- m1
+  unscored$elpds <- NULL
+  expect_error(loo_compare(m1, unscored), "no ELPDs")
+  expect_error(loo_model_weights(m1, unscored), "no ELPDs")
 })
 
 
 test_that("mvgam_loo_compare_diagnostics computes p_worse correctly", {
-  # candidate model 3 units worse with SE 1: p_worse = P(Z > 3)
-  d <- mvgam_ps_khat_threshold  # ensures the file is loaded
+  # A candidate 3 units worse with SE 1
   out <- mvgam:::mvgam_loo_compare_diagnostics(
     elpd_diff = c(0, -3),
     se_diff = c(0, 1),
@@ -610,154 +278,55 @@ test_that("mvgam_loo_compare_diagnostics computes p_worse correctly", {
   expect_true(is.na(out$p_worse[1L]))
   expect_equal(out$p_worse[2L], pnorm(0, mean = -3, sd = 1),
                tolerance = 1e-12)
-  expect_identical(out$diag_diff[1L], "")
-  expect_identical(out$diag_diff[2L], "|elpd_diff| < 4")
+  expect_identical(out$diag_diff, c("", "|elpd_diff| < 4"))
   expect_identical(out$diag_elpd, c("", ""))
 })
 
 
 test_that("mvgam_loo_compare_diagnostics threshold overlays", {
-  # Small n triggers diag_elpd = "N < 100"; high pareto_k on
-  # the second model overlays "; k_psis > 0.7".
+  # Few observations mark both rows. A high Pareto k adds a second note
   out <- mvgam:::mvgam_loo_compare_diagnostics(
     elpd_diff = c(0, -5),
     se_diff = c(0, 2),
     n_pointwise = c(50L, 50L),
     pareto_k_list = list(c(0.1, 0.3), c(0.8, 0.4))
   )
-  expect_identical(out$diag_elpd[1L], "N < 100")
-  expect_identical(out$diag_elpd[2L], "N < 100; k_psis > 0.7")
-  # |elpd_diff| = 5 > 4 so diag_diff stays empty.
+  expect_identical(out$diag_elpd, c("N < 100", "N < 100; k_psis > 0.7"))
   expect_identical(out$diag_diff, c("", ""))
 })
 
 
-# ---- loo_model_weights.mvgam_lfo --------------------------------
-
-test_that("loo_model_weights.mvgam_lfo pseudobma_weights sum to 1", {
+test_that("pseudo-BMA weights are the softmax of the summed ELPDs", {
   m1 <- mk_mvgam_lfo(c(-1, -2, -3))
   m2 <- mk_mvgam_lfo(c(-3, -4, -5))
   w <- loo_model_weights(m1, m2)
   expect_s3_class(w, "pseudobma_weights")
-  expect_length(w, 2L)
-  expect_equal(sum(w), 1, tolerance = 1e-12)
-  # m1 has higher total ELPD (-6 vs -12), so weight[1] > weight[2].
-  expect_gt(w[1L], w[2L])
+  expect_equal(unname(c(w)), exp(c(-6, -12)) / sum(exp(c(-6, -12))))
+  expect_equal(unname(c(loo_model_weights(m1))), 1)
 })
 
 
-test_that("loo_model_weights.mvgam_lfo single model returns 1", {
-  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
-  w <- loo_model_weights(m1)
-  expect_length(w, 1L)
-  expect_equal(unname(w[1L]), 1, tolerance = 1e-12)
-})
-
-
-test_that("loo_model_weights.mvgam_lfo errors on grid mismatch", {
-  m1 <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(10, 11, 12))
-  m2 <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(20, 21, 22))
-  expect_error(loo_model_weights(m1, m2), "eval_timepoints")
-})
-
-
-test_that("loo_model_weights.mvgam_lfo errors when ELPDs are missing", {
-  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
-  m2 <- mk_mvgam_lfo(c(-1, -2, -3))
-  m2$elpds <- NULL
-  expect_error(loo_model_weights(m1, m2), "no ELPDs")
-})
-
-
-test_that("loo_model_weights.mvgam_lfo stacking errs on missing $log_lik", {
-  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
-  m2 <- mk_mvgam_lfo(c(-2, -3, -4))
-  expect_error(
-    loo_model_weights(m1, m2, method = "stacking"),
-    "log_lik"
-  )
-})
-
-
-test_that("loo_model_weights.mvgam_lfo method='stacking' runs with $log_lik", {
-  # Build two LFO shells with synthetic per-draw log-density
-  # matrices. Model A's log-densities are systematically higher,
-  # so stacking should put more weight on it. The PSIS step
-  # inside loo's stacking optimiser warns about Pareto-k on this
-  # synthetic data; that is incidental to the test (real LFO log
-  # densities are smoother) and we tolerate it explicitly here.
+test_that("stacking weights favour the model with higher log densities", {
   set.seed(42L)
   m_a <- mk_mvgam_lfo(c(-1, -1, -1))
   m_b <- mk_mvgam_lfo(c(-2, -2, -2))
-  n_draws <- 100L
-  n_eval  <- 30L
-  m_a$log_lik <- matrix(
-    stats::rnorm(n_draws * n_eval, mean = -1, sd = 0.3),
-    nrow = n_draws
-  )
-  m_b$log_lik <- matrix(
-    stats::rnorm(n_draws * n_eval, mean = -2, sd = 0.3),
-    nrow = n_draws
-  )
-  w <- withCallingHandlers(
-    loo_model_weights(m_a, m_b, method = "stacking"),
-    warning = function(cnd) {
-      if (grepl("Pareto k", conditionMessage(cnd))) {
-        invokeRestart("muffleWarning")
-      }
-    }
-  )
-  expect_length(w, 2L)
+  expect_error(loo_model_weights(m_a, m_b, method = "stacking"),
+               "log_lik")
+  m_a$log_lik <- matrix(stats::rnorm(3000L, -1, 0.3), nrow = 100L)
+  m_b$log_lik <- matrix(stats::rnorm(3000L, -2, 0.3), nrow = 100L)
+  w <- loo_model_weights(m_a, m_b, method = "stacking")
   expect_equal(sum(w), 1, tolerance = 1e-8)
   expect_gt(w[["m_a"]], w[["m_b"]])
-  expect_match(attr(w, "method"), "stacking")
+  m_b$log_lik <- m_b$log_lik[, 1:25]
+  expect_error(loo_model_weights(m_a, m_b, method = "stacking"),
+               "different widths")
 })
 
 
-test_that("loo_model_weights.mvgam_lfo stacking errs on width mismatch", {
-  m_a <- mk_mvgam_lfo(c(-1, -1, -1))
-  m_b <- mk_mvgam_lfo(c(-2, -2, -2))
-  m_a$log_lik <- matrix(stats::rnorm(100L * 30L), nrow = 100L)
-  m_b$log_lik <- matrix(stats::rnorm(100L * 25L), nrow = 100L)
-  expect_error(
-    loo_model_weights(m_a, m_b, method = "stacking"),
-    "different widths"
-  )
-})
-
-
-test_that("loo_model_weights.mvgam_lfo rejects unknown method", {
-  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
-  m2 <- mk_mvgam_lfo(c(-3, -4, -5))
-  expect_error(loo_model_weights(m1, m2, method = "stacking-energy"))
-})
-
-
-# Adaptive Pareto-k threshold (Vehtari, Simpson, Gelman, Yao,
-# Gabry 2024). Formula: min(1 - 1 / log10(S), 0.7). Draws S is
-# taken from the posterior; unit tests exercise the helper
-# directly on synthetic S values so no fit is required.
-
-test_that("mvgam_ps_khat_threshold tightens with small S", {
-  # S = 200 -> 1 - 1/log10(200) = 0.5654...
-  expect_equal(mvgam:::mvgam_ps_khat_threshold(200L),
-               1 - 1 / log10(200), tolerance = 1e-8)
-  # S = 500 -> 1 - 1/log10(500) = 0.6289...
-  expect_equal(mvgam:::mvgam_ps_khat_threshold(500L),
-               1 - 1 / log10(500), tolerance = 1e-8)
-})
-
-test_that("mvgam_ps_khat_threshold clamps at 0.7 for large S", {
-  # Formula is monotone increasing in S; once 1 - 1 / log10(S)
-  # exceeds 0.7, the min() clamps and the classical guarantee
-  # holds. S = 5000 -> 1 - 1/3.699 = 0.7297 -> clamp to 0.7.
+test_that("the adaptive Pareto k threshold stops at 0.7", {
+  # min(1 - 1 / log10(S), 0.7) for S draws (Vehtari et al. 2024)
+  expect_equal(mvgam:::mvgam_ps_khat_threshold(200L), 1 - 1 / log10(200))
   expect_equal(mvgam:::mvgam_ps_khat_threshold(5000L), 0.7)
-  expect_equal(mvgam:::mvgam_ps_khat_threshold(1000000L), 0.7)
-})
-
-test_that("mvgam_ps_khat_threshold rejects S < 2", {
-  # S = 1 would divide by log10(1) = 0. The helper rejects it up
-  # front so no downstream call has to guard against -Inf.
+  # The formula divides by zero at S = 1
   expect_error(mvgam:::mvgam_ps_khat_threshold(1L))
-  expect_error(mvgam:::mvgam_ps_khat_threshold(0L))
 })

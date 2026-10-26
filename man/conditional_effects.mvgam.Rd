@@ -68,9 +68,9 @@ panel per series. \code{"all"} draws a panel per series for any model.
 A single integer or character value picks one series and filters
 the prediction grid to its observations.}
 
-\item{resp}{For multivariate (multiple-response) models, the
-name of a single response variable to return results for.
-\code{NULL} (the default) returns results for all responses.}
+\item{resp}{Character specifying which response variable for
+multivariate models. NULL (default) returns predictions for all
+responses.}
 
 \item{...}{Ignored.}
 
@@ -79,9 +79,7 @@ otherwise returns the list invisibly so callers can post-process.}
 
 \item{ask}{Logical. If \code{TRUE}, prompts before each new plot.}
 
-\item{row.names}{Ignored, present for S3 signature compatibility.}
-
-\item{optional}{Ignored, present for S3 signature compatibility.}
+\item{row.names, optional}{Ignored.}
 }
 \value{
 An object of class \code{mvgam_conditional_effects}: a named
@@ -125,8 +123,17 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Marginal effect of x on the response scale.
-conditional_effects(mod)
+# The effect of x on the expected count, with the observations
+conditional_effects(mod, points = TRUE)
+
+# The same effect on the log link scale
+conditional_effects(mod, type = "link")
+
+# The average slope of the expected count with respect to x
+marginaleffects::avg_slopes(mod, variables = "x", type = "expected")
+
+# Next: marginaleffects::plot_predictions() draws custom effect
+# displays, such as one covariate conditional on another
 }
 
 }
@@ -137,19 +144,27 @@ Python. \emph{Journal of Statistical Software}, 111(9):1-32.
 \doi{10.18637/jss.v111.i09}
 }
 \seealso{
-\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}} for the underlying
-conditional-effect engine,
-\code{\link[marginaleffects:predictions]{marginaleffects::predictions()}} for the same content as a
-\code{data.frame},
-\code{\link[marginaleffects:slopes]{marginaleffects::avg_slopes()}},
-\code{\link[marginaleffects:comparisons]{marginaleffects::avg_comparisons()}} for marginal-effect tables,
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for the prediction primitive that
-\code{plot_predictions} calls,
-\code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for posterior predictive checks,
-[mvgam_diagnostics] for parameter-level diagnostics
-(\code{fixef}, \code{rhat}, \code{bayes_R2}, ...),
-[mvgam_draws] for raw draws extraction
+\code{\link[marginaleffects:predictions]{marginaleffects::predictions()}} returns the plotted
+values as a data frame. \code{\link[marginaleffects:slopes]{marginaleffects::avg_slopes()}} and
+\code{\link[marginaleffects:comparisons]{marginaleffects::avg_comparisons()}} summarise effects as numbers.
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} computes the expected values the panels
+draw. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} checks the fit against the data. The
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview vignette} interprets
+effects in both formulas.
+
+Other predictions: 
+\code{\link{conditional_smooths.mvgam}()},
+\code{\link{fitted.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{posterior_epred.mvgam}()},
+\code{\link{posterior_linpred.mvgam}()},
+\code{\link{posterior_predict.mvgam}()},
+\code{\link{posterior_smooths.mvgam}()},
+\code{\link{predict.mvgam}()},
+\code{\link{predictive_error.mvgam}()},
+\code{\link{predictive_interval.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{predictions}

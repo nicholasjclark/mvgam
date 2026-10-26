@@ -11,13 +11,6 @@ test_that("shared_variation() errors on non-factor mvgam fits", {
   )
 })
 
-test_that("shared_variation S3 dispatch routes through to .mvgam method", {
-  expect_true("shared_variation" %in% ls("package:mvgam") ||
-              exists("shared_variation"))
-  expect_true(exists("shared_variation.mvgam"))
-  expect_true(exists("print.mvgam_shared_variation"))
-})
-
 test_that("shared_variation returns Z Sigma Z', not Z Z'", {
   case <- mk_factor_obj()
   testthat::local_mocked_bindings(

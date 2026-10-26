@@ -982,8 +982,8 @@ test_that("trend priors name the trend's axis as lv_axis()", {
   code <- stancode(
     f, data = dat, family = gaussian(),
     prior = brms::set_prior("inv_gamma(2, 1)", class = "sds_trend",
-                            coef = coef)
-  , validate = FALSE)
+                            coef = coef), validate = FALSE
+  )
   # The prior reaches the smooth of each of the three series
   expect_equal(lengths(regmatches(code, gregexpr(
     "inv_gamma_lpdf\\(sds_[0-9]_trend", code
@@ -1155,7 +1155,7 @@ test_that("get_prior refuses a factor request the trend cannot take", {
 
 test_that("trend priors are checked against the table get_prior() shows", {
   defaults <- rbind(
-    brms::set_prior("exponential(2)", class = "sigma_trend"),
+    brms::set_prior("exponential(2)", class = "sigma_trend", lb = 0),
     brms::set_prior("", class = "lscale_trend"),
     brms::set_prior("inv_gamma(1.5, 0.06)", class = "lscale_trend",
                     coef = "gpz")
@@ -1174,6 +1174,10 @@ test_that("trend priors are checked against the table get_prior() shows", {
   expect_error(
     check(brms::set_prior("exponential(5)", class = "sigma_trend", lb = 0.5)),
     "sets the bounds"
+  )
+  # A fitted table restates the declared bound. update() inherits it.
+  expect_silent(
+    check(brms::set_prior("exponential(5)", class = "sigma_trend", lb = 0))
   )
   # brms ignores a class-wide length-scale prior, and its own warning
   # names the class with the suffix removed.

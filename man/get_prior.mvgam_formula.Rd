@@ -2,7 +2,8 @@
 % Please edit documentation in R/priors.R
 \name{get_prior.mvgam_formula}
 \alias{get_prior.mvgam_formula}
-\title{Extract prior specifications for mvgam formula objects}
+\alias{default_prior.mvgam_formula}
+\title{The priors an mvgam model takes, before fitting}
 \usage{
 \method{get_prior}{mvgam_formula}(
   object,
@@ -13,32 +14,165 @@
   trend_map = NULL,
   ...
 )
+
+\method{default_prior}{mvgam_formula}(object, ...)
 }
 \arguments{
-\item{object}{An object of class \code{mvgam_formula} created by
-\code{\link{mvgam_formula}}}
+\item{object}{An \code{\link[=mvgam_formula]{mvgam_formula()}}, or an \code{mvgam} model fitted or
+built with \code{run_model = FALSE}.}
 
-\item{data}{A data frame containing the variables in the model
-(required)}
+\item{data}{A data frame holding every variable the formulas use.}
 
 \item{family}{A description of the response distribution and link
-function. Default is \code{gaussian()}. Not required if formula
-contains embedded families via \code{bf()} specifications.}
+function, given as a family function, a call to one or its name.
+Supports most brms families, including the ordinal families
+(\code{\link[brms:brmsfamily]{brms::cumulative()}}, \code{\link[brms:brmsfamily]{brms::sratio()}}, \code{\link[brms:brmsfamily]{brms::cratio()}},
+\code{\link[brms:brmsfamily]{brms::acat()}}). The brms families needing a separate linear
+predictor per response category, \code{\link[brms:brmsfamily]{brms::categorical()}},
+\code{\link[brms:brmsfamily]{brms::multinomial()}} and \code{\link[brms:brmsfamily]{brms::dirichlet()}}, are refused: use
+\code{\link[=categ]{categ()}}, \code{\link[=multi]{multi()}} and \code{\link[=diri]{diri()}}, which take the categories in
+long format and share one latent structure across them. A family
+whose mean has to stay positive needs a link that keeps it there
+once a trend enters the linear predictor: pair \code{\link[stats:family]{stats::Gamma()}},
+\code{\link[brms:brmsfamily]{brms::weibull()}}, \code{\link[brms:brmsfamily]{brms::exponential()}}, \code{\link[brms:brmsfamily]{brms::frechet()}} and
+\code{\link[stats:family]{stats::inverse.gaussian()}} with \code{link = "log"}. Their default
+links leave the mean positive only where the predictor is. A
+latent trend is centred near zero and reaches negative values,
+where the likelihood is undefined. \code{mvgam()} warns before
+fitting. \code{\link[brms:brmsfamily]{brms::lognormal()}} is the exception: its \code{mu} is a
+log-scale location that takes any sign.
 
-\item{loadings_prior}{Optional structured prior on the factor
-loadings, in the form \code{\link{mvgam}} accepts. The prior
-reported for \code{Z} depends on it. Pass the value the fit will
-use.}
+A family written inside a univariate \code{\link[brms:brmsformula]{brms::bf()}} is the model's
+family, as in brms. In a multivariate model each response may take
+its own family, in which case name it inside that response's
+\code{\link[brms:brmsformula]{brms::bf()}}: \code{bf(count ~ x, family = poisson()) + bf(seen ~ x, family = bernoulli())}. Passing a list of families to this
+argument, as \code{\link[brms:brm]{brms::brm()}} allows, is not supported; the family
+belongs to the response that names it. A single family given here
+applies to every response that does not name one of its own.
+Closure-unit and multi-response families (\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}},
+\code{\link[=mvn]{mvn()}}, \code{\link[=mvt]{mvt()}}, \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}) lay their data
+out by unit. Each models its response alone and cannot be one
+response of a multivariate model.}
 
-\item{data2}{Optional named list holding objects a
-\code{loadings_prior} refers to by name, matching the argument
-\code{\link{mvgam}} takes.}
+\item{loadings_prior}{Optional named list specifying a
+structured prior on the unconstrained factor loadings
+matrix following Heaps & Jermyn (2024). The loadings belong
+to a trend with latent factors. The argument requires a
+\code{trend_formula}. Supplying it without one is an error. When
+supplied, the
+default iid \code{to_vector(Z) ~ student_t(3, 0, 0.5)} prior is
+replaced with a per-column matrix-normal prior of the form
+\code{Z[, i] ~ multi_normal_cholesky(0, L_Phi)}, where the
+among-row scale matrix \code{Phi} is assembled
+multiplicatively from any combination of:
+\itemize{
+\item a per-series feature matrix (\code{features}), expanded
+into an ARD exponential kernel via \code{gp_exponential_cov()}
+\item one or more pairwise distance matrices
+(\code{distances}), each contributing an \code{exp(-d / theta)}
+factor
+}
 
-\item{trend_map}{Optional fixed or partial factor loadings, in the
-form \code{\link{mvgam}} accepts. The table then lists the
-loadings the map leaves free.}
+Accepted fields:
+\itemize{
+\item \code{features}: string lookup into \code{data2}, a numeric
+matrix, or a data.frame. Columns are encoded by type
+(numeric/integer/logical: z-score; ordered factor:
+z-score after \code{as.numeric()}; unordered factor /
+character: one-hot with all levels retained, following
+Heaps Sect. 6.2). Each encoded column receives its own
+ARD length-scale.
+\item \code{distances}: string name (or character vector of
+names) of pairwise distance matrices in \code{data2}, or a
+single matrix / named list of matrices passed inline.
+Each matrix is rescaled to maximum entry one so the
+default length-scale prior is interpretable on a unit
+scale (matching Heaps Supps S4.2.1).
+\item \code{column_shrinkage}: \code{"iid"} (default; no shrinkage)
+or \code{"mgp"} (multiplicative-gamma-process increasing
+shrinkage of Bhattacharya & Dunson 2011, used in
+Heaps Eq. (9)). \code{"mgp"} applies its column scale through
+the shared innovation scale. It is available for \code{AR()},
+\code{RW()} and \code{ZMVN()} trends. \code{VAR()} builds its own innovation
+covariance and has no shared scale for it; pair a \code{VAR()}
+factor model with \code{"iid"} instead.
+\item \code{mgp_a1}, \code{mgp_a2}: numeric MGP hyperparameters,
+only used when \code{column_shrinkage = "mgp"}. Default
+\verb{(2, 4)} lies within the \verb{a2 in [3, 5]} range
+recommended for moderate-n ecology / community panels
+by Legramanti, Durante and Dunson (2020, JRSS-B) and
+Schiavon, Canale and Dunson (2022, Biometrics 78:995).
+Heaps Sect. 6.3.1 used \verb{(2, 3)} for the gas-demand
+application; Sect. 6.2.2 used \verb{(2, 6)} for the
+Finnish-bird JSDM. Lower \code{a2} for less shrinkage when
+the data weakly identify the active rank.
+}
 
-\item{...}{Additional arguments passed to \code{brms::get_prior}}
+Length-scales receive a \code{lognormal(0, 1)} prior in the
+model block. This prior is set on the standardised distance
+scale. Pairwise distance matrices are rescaled to
+\code{max(d) = 1} inside the normaliser. A length-scale of 1 then
+corresponds to correlation \code{exp(-1)} between the two most
+distant series. Heaps' Finnish-birds application (Sect.
+6.2.2) used the wider \code{lognormal(0, sqrt(10))} instead;
+override the default by passing a \code{prior()} for
+\code{theta_features} / \verb{theta_dist_<name>} if your data weakly
+identify length-scales and you want less regularisation.
+Note: the \code{max(d) = 1} rule is the natural generic
+standardisation. Heaps Supps S4.2.1 used "root-to-tip
+distance = 1" for ultrametric phylogenies, which corresponds
+to \code{max(d) = 2} (twice the per-leaf depth); pre-standardise
+your distance matrix to match if exact parity matters.
+Identification. The structured prior applies to the sampled
+columns of \code{Z}. Where the QR rotation gives the reported
+loadings \code{Z_tilde}, each of its columns mixes the sampled
+columns. \code{shared_variation()} and \code{residual_cor()} use
+\verb{Z Z'}, which is the same before and after the rotation. See
+the Identification section of the trend constructors.
+
+Compatibility with \code{trend_map}:
+\itemize{
+\item \code{trend_map = NULL} (default): compatible. \code{n_lv} alone
+triggers the free-Z factor model; \code{loadings_prior} applies
+to the sampled \code{Z} column-wise.
+\item \code{trend_map = matrix(NA_real_, n_series, n_lv)}
+(all-NA mask, used internally by \code{jsdgam()}): compatible.
+Treated as a free-Z trigger upstream; \code{loadings_prior}
+applies as if \code{trend_map} were \code{NULL}.
+\item \code{trend_map} with a mix of fixed entries and \code{NA}s:
+incompatible. Partial-Z parameterises the free entries
+as a vector under an iid \code{student_t(3, 0, 1)} prior,
+which would overlap with the matrix-normal structure
+and double-count regularisation.
+\item Fully-fixed \code{trend_map} (no \code{NA}s): incompatible.
+The structured prior has no free parameters to act on.
+}}
+
+\item{data2}{A named list of objects the model uses that are not
+variables in \code{data}, as in \code{\link[brms:brm]{brms::brm()}}.}
+
+\item{trend_map}{Optional fixed factor loadings, in one of three
+forms:
+\itemize{
+\item a numeric \verb{n_series x n_lv} matrix of loadings. \code{NA}
+entries are sampled. Finite entries stay fixed on \code{Z} in the
+posterior. An all-\code{NA} matrix fixes nothing and acts as
+\code{trend_map = NULL}
+\item a \code{data.frame(series, trend)} assigning each series to one
+latent process
+\item \code{"identity"}, one process per series, or \code{"shared"}, one
+process for every series
+}
+A factor model without a \code{trend_map} samples every loading. It
+identifies \code{Z} after sampling by a thin QR rotation (Heaps and
+Jermyn 2024). A \code{trend_map} with any fixed entry takes no
+rotation. The argument requires a \code{trend_formula}. It is an
+alternative to the \code{trend_map} argument of the trend constructor,
+and supplying both is an error. \code{loadings_prior} lists the
+\code{trend_map} forms a structured loadings prior accepts.}
+
+\item{...}{Further arguments of \code{\link[brms:default_prior]{brms::get_prior()}}, such as
+\code{knots} or \code{drop_unused_levels}.}
 }
 \value{
 A \code{brmsprior} data frame of the observation and trend
@@ -47,11 +181,11 @@ priors, usable with \code{brms::set_prior()} and
 suffix.
 }
 \description{
-Extracts and combines prior specifications for both observation and
-trend components of an mvgam model. One interface serves prior
-inspection before model fitting. With
-\code{trend_formula = NULL}, this function behaves identically to
-\code{brms::get_prior} for observation-only models.
+Lists the priors of the observation and trend parts of the model an
+\code{\link[=mvgam_formula]{mvgam_formula()}} describes, with their defaults for the data given.
+Without a \code{trend_formula} the table matches that of
+\code{\link[brms:default_prior]{brms::get_prior()}}. \code{default_prior()} is the same method under the
+newer brms name.
 }
 \details{
 The observation priors are those \code{brms::get_prior()} gives,
@@ -93,55 +227,41 @@ trend-side class is refused.
 }
 \examples{
 \dontrun{
-# Workflow: discover the adjustable priors, override a subset,
-# then pass the result back to `mvgam()`.
 set.seed(1)
-dat <- sim_mvgam(
-  family = poisson(),
-  n_series = 2L,
-  n_timepoints = 120L,
-  trend_model = AR()
-)$data_train
+dat <- sim_mvgam(family = poisson(), n_series = 2L,
+                 n_timepoints = 120L, trend_model = AR())$data_train
 
-# Wrap the formula pair in `mvgam_formula()` so this S3 method
-# dispatches; the returned `brmsprior` data frame lists every
-# adjustable row keyed by `class` and `coef`.
-mf <- mvgam_formula(
-  formula = y ~ s(x, k = 5),
-  trend_formula = ~ AR(p = 1)
-)
+# Every prior the model takes, before any fitting. Trend classes
+# carry a `_trend` suffix: `b` belongs to the observation formula
+# and `b_trend` would belong to the trend formula.
+mf <- mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1))
 get_prior(mf, data = dat, family = poisson())
 
-# Override a subset. Each `prior(...)` returns one row; untouched
-# classes keep their defaults. Trend-side classes carry a
-# `_trend` suffix so they do not collide with obs-side classes
-# of the same name (e.g. `b` vs `b_trend`).
+# Replace three defaults. Each `prior()` call gives one row.
 my_priors <- c(
   prior(normal(0, 1), class = b),
-  prior(exponential(2), class = sigma_trend),
-  prior(normal(0, 0.5), class = ar1_trend)
+  prior(inv_gamma(5, 1), class = sigma_trend),
+  prior(normal(0.5, 0.25), class = ar1_trend)
 )
 
-mod <- mvgam(
-  formula = y ~ s(x, k = 5),
-  trend_formula = ~ AR(p = 1),
-  data = dat,
-  family = poisson(),
-  priors = my_priors,
-  chains = 2,
-  iter = 750,
-  warmup = 500,
-  silent = 2
-)
+# `run_model = FALSE` builds the model without sampling. Its prior
+# table marks the replaced rows as "user".
+pre <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+             data = dat, family = poisson(), prior = my_priors,
+             run_model = FALSE)
+prior_summary(pre)
 
-# Inspect the posterior to confirm the overrides took effect. The
-# `ar1_trend` and `sigma_trend` estimates follow the scale their
-# custom priors set.
-summary(mod)
+# Next, drop `run_model = FALSE` to fit the model under these priors
 }
 
 }
 \seealso{
-\code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}},
-\code{\link[brms]{set_prior}}, \code{\link[brms]{prior}}
+\code{\link[=mvgam_formula]{mvgam_formula()}}, \code{\link[brms:set_prior]{brms::prior()}} and
+\code{\link[brms:set_prior]{brms::set_prior()}}. The
+\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
+sets priors on the observation error and the trend correlations.
+
+Other priors: 
+\code{\link{get_prior.mvgam}()}
 }
+\concept{priors}

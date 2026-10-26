@@ -85,7 +85,20 @@ dim(sm)
 \seealso{
 \code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}},
 \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, \code{\link[=smooths.mvgam]{smooths.mvgam()}}.
+
+Other predictions: 
+\code{\link{conditional_effects.mvgam}()},
+\code{\link{conditional_smooths.mvgam}()},
+\code{\link{fitted.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{posterior_epred.mvgam}()},
+\code{\link{posterior_linpred.mvgam}()},
+\code{\link{posterior_predict.mvgam}()},
+\code{\link{predict.mvgam}()},
+\code{\link{predictive_error.mvgam}()},
+\code{\link{predictive_interval.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{predictions}

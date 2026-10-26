@@ -11,7 +11,7 @@
 
 \item{digits}{Integer for decimal places. Default is 2.}
 
-\item{...}{Additional arguments (currently unused).}
+\item{...}{Ignored.}
 }
 \value{
 The \code{mvgam_summary} object invisibly.

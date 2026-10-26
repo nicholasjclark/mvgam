@@ -14,8 +14,8 @@ family is \code{tweedie()}.}
 every \code{tweedie()} response is checked.}
 }
 \value{
-Invisible \code{NULL}. Emits a message indicating the
-adequacy of \code{M}, and a warning if \code{M} looks tight.
+Invisible \code{NULL}. Emits a message on the adequacy of \code{M}. It
+also emits a warning if \code{M} looks tight.
 }
 \description{
 Computes the per-observation Poisson rate
@@ -28,9 +28,9 @@ starts to omit appreciable Poisson tail mass and bias the
 log-density downward.
 }
 \details{
-The rate is taken for every response whose family is \code{tweedie()},
-since a multivariate model can name it for one response among
-several, and all of them share the one \code{M}. \code{mphi} and \code{mtheta}
-are read per observation, which covers a parameter given a
-formula of its own as well as a scalar one.
+The rate is taken for every response whose family is \code{tweedie()}. A
+multivariate model can name it for one response among several. All of
+them share the one \code{M}. \code{mphi} and \code{mtheta} are taken per observation.
+This covers a parameter given a formula of its own as well as a scalar
+one.
 }

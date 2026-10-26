@@ -1,32 +1,28 @@
-#' LOO / WAIC extras and aliases for mvgam models
+#' Leave-one-out predictions, R-squared and criteria for mvgam models
 #'
-#' brms-parity S3 methods that compose mvgam's existing prediction
-#' and log-likelihood primitives ([`log_lik.mvgam`], [`loo.mvgam`],
-#' [`waic.mvgam`], [`posterior_epred.mvgam`],
-#' [`posterior_linpred.mvgam`], [`posterior_predict.mvgam`]) with
-#' helpers from the \pkg{loo} package.
+#' The \pkg{brms} methods that take their weights from [loo.mvgam()].
+#' `loo_predict()`,
+#' `loo_epred()` and `loo_linpred()` reweight posterior predictions by
+#' the PSIS weights of each observation, approximating the prediction
+#' made without it. `loo_predictive_interval()` gives the
+#' leave-one-out predictive interval. `loo_R2()` is the Bayesian R^2 of
+#' Gelman et al. (2019) computed from leave-one-out predictions.
+#' `add_criterion()` stores criteria on the fit. `LOO()` and `WAIC()`
+#' are the brms aliases of [loo.mvgam()] and [waic.mvgam()].
 #'
-#' @section Which observation these answer for:
-#' Every method here pairs a prediction with importance weights, so
-#' both describe the observation the likelihood scored. For most
-#' families that is a row of the data. The detection families
-#' ([occ()], [nmix()]) write their likelihood over a closure unit
-#' instead, marginalising the repeat visits within it, so
-#' `loo_predict()`, `loo_epred()`, `loo_predictive_interval()` and
-#' `loo_R2()` answer once per closure unit and a unit's visits are
-#' summed to reach that grain. A frame of 300 visits across 75 units
-#' gives 75 values, ordered as [log_lik.mvgam()] orders its columns.
+#' @section The observations scored:
+#' The weights and the predictions describe the observation the
+#' likelihood scored. For most families that is a row of the data. The
+#' detection families ([occ()], [nmix()]) write their likelihood per
+#' closure unit, marginalising its visits. `loo_predict()`,
+#' `loo_epred()`, `loo_predictive_interval()` and `loo_R2()` then sum a
+#' unit's visits and return one value per unit, in the column order of
+#' [log_lik.mvgam()]. `loo_linpred()` is refused for them. A sum of
+#' linear predictors over visits has no interpretation.
 #'
-#' `loo_linpred()` is refused for those families rather than
-#' answered: summing a linear predictor across a unit's visits names
-#' no quantity, and the per-visit predictor has no weights of its
-#' own.
-#'
-#' [mvn()] and [mvt()] keep the per-row grain, since their density
-#' is written per row. The composition families ([diri()],
-#' [multi()], [categ()]) write one joint density per site and carry
-#' it on the site's first row, so their answers stay at row grain
-#' and only one row in K holds a density.
+#' [mvn()] and [mvt()] keep one density per row. The composition
+#' families ([diri()], [multi()], [categ()]) hold one joint density per
+#' site. These methods refuse them.
 #'
 #' @name mvgam_loo_extras
 #' @aliases LOO.mvgam WAIC.mvgam loo_R2.mvgam loo_predict.mvgam
@@ -34,70 +30,55 @@
 #'   loo_subsample.mvgam loo_moment_match.mvgam
 #'   loo_model_weights.mvgam add_criterion.mvgam
 #'
+#' @inheritParams predict.mvgam
+#' @inheritParams compare_scores
 #' @param x,object A fitted `mvgam` object.
-#' @param resp Character. Response name for multivariate models.
-#' @param summary Logical. If `TRUE` (the default), return a
-#'   summary matrix with `Estimate`, `Est.Error`, and credible
-#'   interval columns; otherwise return the raw posterior draws.
-#' @param robust Logical. If `TRUE`, use median + median absolute
-#'   deviation instead of mean + standard deviation when summarising.
-#' @param probs Numeric vector. Lower and upper quantile
-#'   probabilities for credible intervals. Defaults to
-#'   `c(0.025, 0.975)`.
-#' @param seed Optional integer seed for reproducibility.
-#' @param args_epred,args_loglik Lists of additional arguments
-#'   forwarded to [`posterior_epred`] / [`log_lik`] when computing
-#'   the LOO R^2.
-#' @param type For `loo_predict.mvgam`, `loo_epred.mvgam`, and
-#'   `loo_linpred.mvgam`, one of `"mean"`, `"var"`, or
+#' @param resp Optional name of one response of a multivariate model.
+#' @param summary Logical. `TRUE` (the default) returns the summary
+#'   matrix with `Estimate`, `Est.Error` and interval columns. `FALSE`
+#'   returns the draws.
+#' @param seed Optional integer seed. The session's random state is
+#'   restored when the call returns.
+#' @param args_epred,args_loglik Lists of further arguments to
+#'   [posterior_epred.mvgam()] and [log_lik.mvgam()] for `loo_R2()`.
+#' @param type The expectation: `"mean"` (the default), `"var"` or
 #'   `"quantile"`.
-#' @param prob For `loo_predictive_interval.mvgam`, a single
-#'   numeric in `(0, 1)` giving the credible-interval mass.
-#'   Defaults to `0.9` (matching brms).
-#' @param psis_object Optional precomputed `loo::psis` object.
-#' @param compare Logical. If `TRUE`, compare multiple models.
-#' @param pointwise Logical. Pointwise streaming mode (not
-#'   supported; passing `TRUE` raises an error).
-#' @param moment_match,reloo Logical. LOO post-processing
-#'   modes (not supported; raise informative errors).
-#' @param k_threshold,save_psis,moment_match_args,reloo_args Forwarded
-#'   verbatim to the LOO machinery.
-#' @param model_names Optional character vector of model labels for
-#'   multi-model methods.
-#' @param criterion For `add_criterion.mvgam`, a character vector
-#'   of criterion names. Supported: `"loo"`, `"waic"`,
-#'   `"loo_subsample"`, `"bayes_R2"`, `"loo_R2"`.
-#' @param model_name Optional character. Stored in `x$model_name`
-#'   when supplied.
-#' @param overwrite Logical. If `TRUE`, recompute criteria that
-#'   already exist in `x$criteria`.
-#' @param file Optional file stub. When supplied, the fitted
-#'   object is saved as `paste0(file, ".rds")` after the criteria
-#'   loop.
-#' @param force_save Retained for brms-parity; ignored.
-#' @param loo,newdata,check,recompile Retained for brms-parity on
-#'   `loo_moment_match.mvgam` (the method errors before they are
-#'   read).
-#' @param ... Forwarded to the `loo::*` or mvgam method each of these
-#'   wraps. `loo_R2()` reads none of them and refuses them.
+#' @param prob Interval mass of `loo_predictive_interval()`, 0.9 by
+#'   default as in brms.
+#' @param psis_object Optional `psis` object from
+#'   `loo(x, save_psis = TRUE)`, reused across calls.
+#' @param compare,pointwise,moment_match,reloo,k_threshold,save_psis,moment_match_args,reloo_args
+#'   As in [loo.mvgam()], which describes the two it uses and refuses
+#'   the rest.
+#' @param criterion Character vector of criteria for `add_criterion()`:
+#'   `"loo"`, `"waic"`, `"bayes_R2"` or `"loo_R2"`.
+#' @param model_name Optional name stored in `x$model_name`.
+#' @param overwrite Logical. `TRUE` recomputes criteria `x$criteria`
+#'   already holds.
+#' @param file Optional path without extension. The fit is saved to
+#'   `paste0(file, ".rds")` with its criteria.
+#' @param force_save Unused. Accepted for the brms signature.
+#' @param loo,newdata,check,recompile Accepted for the brms signature of
+#'   `loo_moment_match()`, which mvgam refuses.
+#' @param ... Further arguments to the method each function calls.
+#'   `loo_R2()` refuses them.
 #'
-#' @return Shape depends on the method (see method details and the
-#'   brms / loo equivalents).
+#' @return `loo_predict()`, `loo_epred()` and `loo_linpred()` return a
+#'   matrix with one row per scored observation and a column per
+#'   expectation. `loo_predictive_interval()` returns its two quantile
+#'   columns. `loo_R2()` returns a one-row summary, or its draws with
+#'   `summary = FALSE`. `add_criterion()` returns `x` with the criteria
+#'   in `x$criteria`. `loo_model_weights()` returns the weights of
+#'   [loo::loo_model_weights()].
 #'
-#' @seealso
-#'   [mvgam_diagnostics] for posterior summaries and convergence
-#'   diagnostics,
-#'   [mvgam_draws] for raw draws extraction,
-#'   [loo.mvgam()], [waic.mvgam()] for the underlying information
-#'   criteria,
-#'   [log_lik.mvgam()] for pointwise log densities,
-#'   [bayes_R2.mvgam()] for the non-LOO Bayesian R^2,
-#'   [brms::loo_R2.brmsfit()], [brms::loo_predict.brmsfit()],
-#'   [brms::loo_epred.brmsfit()], [brms::loo_linpred.brmsfit()],
-#'   [brms::loo_predictive_interval.brmsfit()],
-#'   [brms::add_criterion()], [loo::loo_subsample()],
-#'   [loo::loo_model_weights()], [loo::E_loo()],
-#'   [loo::psis()].
+#' @references
+#' Gelman, A., Goodrich, B., Gabry, J. and Vehtari, A. (2019).
+#' R-squared for Bayesian regression models. \emph{The American
+#' Statistician}, 73(3):307-309. \doi{10.1080/00031305.2018.1549100}
+#'
+#' @seealso [loo.mvgam()] estimates the ELPD these weights come from.
+#'   [bayes_R2.mvgam()] is the in-sample R^2. [lfo_cv.mvgam()] scores
+#'   forecasts of data the model has not seen.
 #'
 #' @examples
 #' \dontrun{
@@ -111,25 +92,29 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' LOO(mod)            # brms-style alias for loo()
-#' loo_R2(mod)         # leave-one-out Bayesian R^2
-#' head(loo_predict(mod))   # per-observation LOO posterior mean
+#' # The leave-one-out R^2 is lower than the in-sample one
+#' loo_R2(mod)
+#' bayes_R2(mod)
+#'
+#' # One PSIS object serves every leave-one-out prediction
+#' psis <- loo(mod, save_psis = TRUE)$psis_object
+#' head(loo_predict(mod, psis_object = psis))
+#' head(loo_predictive_interval(mod, psis_object = psis))
+#'
+#' # Next, loo_compare() ranks models by their ELPD
 #' }
 #'
 #' @author Nicholas J Clark
+#' @family model comparison
 NULL
 
 
 #' Relative effective sample sizes of a log-likelihood matrix
 #'
-#' Ported from the internal brms function `r_eff_log_lik()`. Every
-#' method that builds a PSIS object calls it. `loo::relative_eff()`
-#' needs every chain to contribute the same number of rows. A
-#' subsampled or unbalanced set of draws breaks that requirement.
-#' Where the chain layout cannot be recovered exactly, every relative
-#' efficiency is 1. The loo documentation gives that value for
-#' independent draws. A random subsample across chains is close to
-#' independent.
+#' Follows the internal brms function `r_eff_log_lik()`.
+#' `loo::relative_eff()` needs the same number of draws from each
+#' chain. A subsample that breaks the balance gets a relative
+#' efficiency of 1, the loo value for independent draws.
 #'
 #' @param x Fitted `mvgam` object
 #' @param ll Numeric log-likelihood matrix, one row per draw
@@ -156,9 +141,7 @@ mvgam_r_eff_log_lik <- function(x, ll, draw_ids = NULL) {
 #' How a fit's posterior divides into chains
 #'
 #' One conversion of the posterior gives both counts. A
-#' `run_model = FALSE` fit holds no posterior and returns `NULL`
-#' without attempting the conversion. An error from a broken posterior
-#' is left to propagate.
+#' `run_model = FALSE` fit holds no posterior and returns `NULL`.
 #'
 #' @param x Fitted `mvgam` object
 #' @return List holding the number of `chains` and the `total` number
@@ -209,8 +192,7 @@ mvgam_chain_id <- function(layout, n_draws, draw_ids = NULL) {
   if (any(counts == 0L) || length(unique(as.integer(counts))) != 1L) {
     return(NULL)
   }
-  # relative_eff() reads the matrix chain-block by chain-block, so the
-  # ids must arrive grouped by chain.
+  # `relative_eff()` takes the draws in blocks of one chain
   if (is.unsorted(cid)) {
     return(NULL)
   }
@@ -242,8 +224,8 @@ mvgam_loo_R2 <- function(y, epred, ll, r_eff) {
   err <- yhat_loo - y
   S <- nrow(epred)
   N <- ncol(epred)
-  # Bayesian-bootstrap weights (Dirichlet(1, ..., 1) via normalised
-  # exponentials); identical to the brms reference implementation.
+  # Bayesian bootstrap weights, Dirichlet(1, ..., 1) from normalised
+  # exponentials, as in brms
   w <- matrix(stats::rexp(S * N, rate = 1), S, N)
   w <- w / rowSums(w)
   var_y <- (N / (N - 1)) *
@@ -261,32 +243,25 @@ mvgam_loo_R2 <- function(y, epred, ll, r_eff) {
 
 #' Carry a per-row value onto the columns of `log_lik()`
 #'
-#' `log_lik()` answers at one column per row of the frame for most
-#' families and at one column per closure unit for the families that
-#' marginalise a latent state over a unit's visits. Anything built
-#' beside the frame -- a fold key, a series label -- is per row, so it
-#' has to be reduced to the same grain before the two are paired.
+#' `log_lik()` has one column per row, or one per closure unit for a
+#' family that marginalises a latent state over a unit's visits. A
+#' per-row value such as a fold key or a series label is taken at each
+#' unit's first row. Every row of a unit shares a grouping value. The
+#' family decides the grain. Two groupings of the same rows can share a
+#' column count.
 #'
-#' The grain is read from the family, which owns it, rather than
-#' inferred from whether the two counts happen to agree. A count
-#' standing in for an identity is silent exactly when it is wrong: two
-#' different groupings of the same rows can share a total.
-#'
-#' A unit's rows all carry the same value for any grouping a unit is
-#' defined within, so the unit's first row answers for it, and
-#' `visit_row` is where the array builder records which row that is.
-#'
-#' @param object The fitted model, read for its family and unit layout
-#' @param data The frame `x` was built alongside
-#' @param x A value per row of `data`
-#' @param n_cols Columns the log-likelihood returned, checked against
-#'   the reduction so a mismatch is reported as itself. `NULL` where
-#'   the caller has not read the matrix yet and guards it in its own
-#'   terms.
-#' @return `x` at the grain `log_lik()` answers on
-#'
+#' @param object Fitted `mvgam` object
+#' @param data Data frame `x` describes
+#' @param x Vector with one value per row of `data`
+#' @param n_cols Integer number of log-likelihood columns to check
+#'   against, or `NULL`
+#' @return `x` with one value per log-likelihood column
 #' @noRd
 loglik_col_values <- function(object, data, x, n_cols = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(data)
+  checkmate::assert_atomic_vector(x, len = nrow(data))
+  checkmate::assert_int(n_cols, lower = 0L, null.ok = TRUE)
   if (is_closure_unit_family(object$family)) {
     arrays <- closure_unit_arrays_for(object, data)
     out <- x[closure_unit_first_rows(arrays)]
@@ -312,26 +287,14 @@ loglik_col_values <- function(object, data, x, n_cols = NULL) {
 
 #' Put a per-row quantity on the grain `log_lik()` answers
 #'
-#' A prediction always answers once per row of the frame, while the
-#' detection families' likelihood answers once per closure unit. The
-#' two are paired by importance weights, so a prediction has to reach
-#' the unit grain before `narrow_to_scored()` selects columns from
-#' it. Letting the counts decide instead is what
-#' `loglik_col_values()` already warns against, and it failed
-#' silently in exactly the way that note describes: on a 300-row
-#' occupancy fit with 75 units, `narrow_to_scored()` found 75 scored
-#' columns inside 300 supplied ones, took the first 75 visits and
-#' paired them with the weights of the units they do not correspond
-#' to. `loo_predict()` and `loo_R2()` both answered.
+#' A prediction has one value per row. A detection family's likelihood
+#' has one per closure unit. The prediction is summed within each unit
+#' before `narrow_to_scored()` selects the scored columns.
 #'
-#' The reduction is the sum within a unit, which is what the package
-#' aggregates a unit's visits with everywhere else.
-#'
-#' @param object Fitted `mvgam` object.
-#' @param data The frame `x` was built alongside.
-#' @param x Per-row vector, or `[ndraws x nobs]` matrix.
-#' @return `x` at the grain `log_lik()` answers on.
-#'
+#' @param object Fitted `mvgam` object
+#' @param data Data frame `x` describes
+#' @param x Per-row vector, or `[ndraws, nobs]` matrix
+#' @return `x` with one value or column per log-likelihood column
 #' @noRd
 at_loglik_grain <- function(object, data, x) {
   if (!is_closure_unit_family(object$family)) {
@@ -343,25 +306,16 @@ at_loglik_grain <- function(object, data, x) {
 
 #' Refuse a LOO pairing this family's grain cannot carry
 #'
-#' Each of these methods reweights a per-observation prediction by
-#' importance weights taken from the density of that same
-#' observation, so a family whose density and prediction sit on
-#' different grains has no pairing to make. Two do, for different
-#' reasons, and both used to answer with a plausible number.
+#' Each method reweights a prediction by the importance weights of the
+#' same observation's density. A detection family scores one density
+#' per closure unit. Its expectation and predictive draws sum over a
+#' unit's visits. A sum of linear predictors has no meaning. A
+#' composition scores one joint density per site, with no scalar
+#' prediction to reweight.
 #'
-#' A detection family scores one density per closure unit. Its
-#' expectation and its predictive draws aggregate a unit's visits
-#' the way that density does, so those pair; a linear predictor does
-#' not, because summing log-odds across visits names no quantity.
-#'
-#' A composition scores one joint density per site across the K
-#' categories measured there. No scalar summarises that site, so
-#' none of these methods has anything to reweight.
-#'
-#' @param object Fitted `mvgam` object.
-#' @param fn_name The user-facing method name, from `loo_fn_name()`.
-#' @return Invisible `TRUE`, or an error.
-#'
+#' @param object Fitted `mvgam` object
+#' @param fn_name The exported method name, from `loo_fn_name()`
+#' @return `TRUE`, invisibly, or an error
 #' @noRd
 require_loo_pairing <- function(object, fn_name) {
   family <- object$family
@@ -394,19 +348,11 @@ require_loo_pairing <- function(object, fn_name) {
 
 #' Narrow anything paired with a scored log-likelihood
 #'
-#' `clean_ll()` drops the columns a missing response left unscorable
-#' and records which survived, so anything built alongside the full
-#' frame describes more observations than the scored matrix does.
-#' Selecting the same columns is what keeps the two talking about the
-#' same rows, and is the contract the `scored_columns` attribute
-#' exists to make keepable. Inputs that already match are returned
-#' untouched, so a fit with no missing response pays nothing.
-#'
-#' Three shapes reach this: a prediction matrix
-#' `[ndraws x nobs]`, an array `[ndraws x nobs x k]`, and a plain
-#' per-observation vector such as the series label of each column.
-#' The observation axis is the second dimension for the first two
-#' and the length for the third.
+#' `clean_ll()` drops the columns of missing responses and records the
+#' kept ones in `scored_columns`. The same columns are selected from
+#' `x`. An `x` of the scored width is returned unchanged. The
+#' observation axis is the second dimension of a `[ndraws, nobs]`
+#' matrix or `[ndraws, nobs, k]` array. A vector's is its length.
 #'
 #' @param x Matrix, array, or per-observation vector
 #' @param scored_from The object carrying the record: a PSIS object,
@@ -436,7 +382,7 @@ narrow_to_scored <- function(x, scored_from) {
         "causes this."
       ),
       i = "Leave 'psis_object' unset to have it computed here."
-    )))
+    )), call. = FALSE)
   }
   if (is.null(dim(x))) {
     return(x[scored])
@@ -450,13 +396,11 @@ narrow_to_scored <- function(x, scored_from) {
 
 #' PSIS-weighted expectations of a prediction function
 #'
-#' `loo_predict()`, `loo_epred()` and `loo_linpred()` all call it. A
-#' PSIS object is built with `loo(save_psis = TRUE)` when none is
-#' supplied. The weights and the predictions are both conditional on
-#' the latent state, describing the same observation. The observation
-#' noise `posterior_predict()` draws is still random. Both calls run
-#' under one fixed seed, making a repeated call reproducible. The
-#' caller's RNG state is restored on exit.
+#' `loo_predict()`, `loo_epred()` and `loo_linpred()` call it. Without a
+#' `psis_object`, one is built with `loo(save_psis = TRUE)`. The weights
+#' and the predictions both condition on the inferred latent state. Both
+#' calls run under one fixed seed, making a repeated call reproducible.
+#' The caller's random state is restored on exit.
 #'
 #' @param object Fitted `mvgam` object
 #' @param posterior_fn Prediction function, one of `posterior_predict`,
@@ -479,20 +423,15 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
   fn_name <- loo_fn_name(posterior_fn)
   resolve_resp(object, resp, required = TRUE,
                caller = paste0(fn_name, "()"))
-  # Refused before the weights are computed, not after: running PSIS
-  # over the whole posterior to then reject the pairing spends
-  # minutes to reach an answer already known from the family.
+  # The family alone decides the refusal. PSIS is not run first.
   require_loo_pairing(object, fn_name)
   type <- match.arg(type)
-  # `local_seed()` takes responsibility for putting the caller's
-  # stream back. The two `set.seed(aligned_seed)` calls below are
-  # not redundant with it: they restart the same stream before the
-  # weighting and before the prediction, so the two draw together.
+  # `local_seed()` restores the caller's stream. Each `set.seed()` below
+  # restarts one stream before the weighting and before the prediction.
   aligned_seed <- 1L
   local_seed(aligned_seed)
-  # `incl_autocor` names a prediction surface, so it is held back from
-  # the weighting call, which reaches `loo::loo()` through `...` and
-  # would not know the argument.
+  # `incl_autocor` selects the prediction surface. The weighting call
+  # omits it. `loo::loo()` would refuse it.
   dots <- list(...)
   surface <- dots$incl_autocor
   dots$incl_autocor <- NULL
@@ -505,25 +444,16 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
     psis_object <- loo_object$psis_object
   }
   set.seed(aligned_seed)
-  # The weights come from a density evaluated under the latent state
-  # the model inferred at each time, so the prediction they reweight
-  # is taken under that same state. brms pairs the two the same way,
-  # handing one set of arguments to both `loo()` and the prediction,
-  # each carrying its autocorrelation term. A caller naming the
-  # surface is left to it.
+  # The weights come from densities under the inferred latent state.
+  # The prediction they reweight is taken under the same state unless
+  # the caller names another.
   preds <- do.call(
     posterior_fn,
     c(list(object, resp = resp),
       list(incl_autocor = surface %||% TRUE), dots)
   )
-  # The weights are one per observation the likelihood scored, which
-  # is a closure unit for the detection families and a row for
-  # everything else, so the prediction reaches that grain first.
+  # One weight per scored row, or per closure unit
   preds <- at_loglik_grain(object, object$data, preds)
-  # A prediction covers every observation; the weights cover only
-  # those the likelihood could score. Narrow the prediction to those
-  # before pairing the two, or a fit with any missing response asks
-  # `loo::E_loo()` to weight observations it has no weights for.
   preds <- narrow_to_scored(preds, psis_object)
   if (length(dim(preds)) == 3L) {
     out <- apply(preds, 3L, mvgam_E_loo_normalise,
@@ -597,10 +527,9 @@ LOO.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                        reloo = FALSE, k_threshold = 0.7,
                        save_psis = FALSE, moment_match_args = list(),
                        reloo_args = list(), model_names = NULL) {
-  # As in brms, the call is replayed on `loo()` with the arguments the
-  # caller wrote. `loo.mvgam()` refuses a brms argument it cannot
-  # honour where one is supplied, which a default passed on here would
-  # count as.
+  # As in brms, the call is replayed on `loo()` with only the arguments
+  # the caller wrote. `loo.mvgam()` refuses some brms arguments when
+  # they are supplied.
   cl <- match.call()
   cl[[1L]] <- quote(loo::loo)
   eval(cl, parent.frame())
@@ -630,61 +559,35 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
                           args_loglik = list(), ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_string(resp, null.ok = TRUE)
-  checkmate::assert_logical(summary, len = 1L)
-  checkmate::assert_logical(robust, len = 1L)
+  checkmate::assert_flag(summary)
+  checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L)
   checkmate::assert_list(args_epred)
   checkmate::assert_list(args_loglik)
   rlang::check_dots_empty()
-  is_mv <- brms::is.mvbrmsformula(object$formula)
   resolve_resp(object, resp, required = TRUE, caller = "loo_R2()")
   require_loo_pairing(object, "loo_R2")
   local_seed(seed)
   data_used <- object$data
-  y_col <- response_column(object, resp)
-  y <- data_used[[y_col]]
-  if (!is.numeric(y)) {
-    stop(insight::format_error(c(
-      "'loo_R2()' requires a numeric response.",
-      x = paste0("Response '", y_col, "' has class '", class(y)[1L], "'."),
-      i = "LOO Bayesian R^2 is undefined for ordinal and categorical fits."
-    )), call. = FALSE)
-  }
-  resp_arg <- if (is_mv) list(resp = resp) else list()
-  # The expectation and the importance weights have to describe the
-  # same observation, so both are taken conditional on the latent
-  # state the model inferred at that time. Pairing a marginal
-  # expectation with weights built from a conditional density is what
-  # pinned this statistic at its clamp.
+  y <- r2_response(object, resp, "loo_R2()")
+  resp_arg <- r2_resp_arg(object, resp)
+  # The expectation conditions on the inferred latent state, as the
+  # density giving the weights does
   epred_args <- c(list(object), resp_arg, args_epred)
   if (!"incl_autocor" %in% names(epred_args)) {
     epred_args$incl_autocor <- TRUE
   }
   epred <- do.call(posterior_epred, epred_args)
   ll <- do.call(log_lik, c(list(object), resp_arg, args_loglik))
-  # A row with no response contributes no density, so its column is
-  # unscorable and importance sampling refuses it. Dropping those
-  # columns means the observed values and the expectations paired with
-  # them have to lose the same ones, or the three describe different
-  # observations.
-  ll <- clean_ll(object, ll)
-  # The response and the expectation are per row; `ll` is per closure
-  # unit on a detection family. Both reach the likelihood's grain
-  # before the scored columns are selected from them, or the
-  # selection takes a unit's index out of a visit-indexed vector.
+  # The response and the expectation are summed to the likelihood's
+  # grain. They then lose the columns `clean_ll()` drops.
+  ll <- clean_ll(ll)
   y <- at_loglik_grain(object, data_used, y)
   epred <- at_loglik_grain(object, data_used, epred)
   y <- narrow_to_scored(y, ll)
   epred <- narrow_to_scored(epred, ll)
   r_eff <- mvgam_r_eff_log_lik(object, ll)
-  r2 <- mvgam_loo_R2(y, epred, ll, r_eff)
-  colnames(r2) <- "R2"
-  if (!isTRUE(summary)) {
-    return(r2)
-  }
-  out <- mvgam_post_summary(r2, robust = robust, probs = probs)
-  rownames(out) <- "R2"
-  out
+  r2_result(mvgam_loo_R2(y, epred, ll, r_eff), summary, robust, probs)
 }
 
 
@@ -742,10 +645,8 @@ loo_predictive_interval.mvgam <- function(object, prob = 0.9,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_number(prob, lower = 0, upper = 1)
   alpha <- (1 - prob) / 2
-  # brms's method takes no `resp`, so a multivariate caller supplies
-  # it through `...`; it reaches `loo_predict()`, which carries the
-  # guard. Declaring it here instead would break signature parity
-  # with brms.
+  # The brms method has no `resp` argument. A multivariate caller
+  # passes it through `...` to `loo_predict()`.
   loo_predict(
     object, type = "quantile", probs = c(alpha, 1 - alpha),
     psis_object = psis_object, ...
@@ -766,7 +667,7 @@ loo_subsample.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
       " observation. mvgam does not expose one."
     ),
     i = "Use 'loo(x)' on the full log-likelihood matrix."
-  )))
+  )), call. = FALSE)
 }
 
 
@@ -781,15 +682,15 @@ loo_moment_match.mvgam <- function(x, loo = NULL, k_threshold = 0.7,
   stop(insight::format_error(c(
     "'loo_moment_match()' is not supported for 'mvgam' fits.",
     x = paste0(
-      "Moment matching evaluates the joint log-density again at",
-      " proposed parameter values through 'unconstrain_pars' /",
-      " 'log_prob'. mvgam does not expose these methods."
+      "Moment matching evaluates the log density at new parameter ",
+      "values."
     ),
+    x = "mvgam has no 'log_prob' or 'unconstrain_pars' method.",
     i = paste0(
-      "Inspect pareto-k diagnostics from 'loo(x)' and refit",
-      " excluding problematic observations if needed."
+      "Inspect the Pareto k diagnostics from 'loo(x)'. 'kfold()' ",
+      "refits the model for the observations PSIS approximates poorly."
     )
-  )))
+  )), call. = FALSE)
 }
 
 
@@ -799,25 +700,9 @@ loo_moment_match.mvgam <- function(x, loo = NULL, k_threshold = 0.7,
 #' @export
 loo_model_weights.mvgam <- function(x, ..., model_names = NULL) {
   checkmate::assert_class(x, "mvgam")
-  dots <- list(...)
-  is_model <- vapply(dots, inherits, logical(1), "mvgam")
-  models <- c(list(x), dots[is_model])
-  rest <- dots[!is_model]
-  if (length(rest) > 0L &&
-      (is.null(names(rest)) || any(nchar(names(rest)) == 0L))) {
-    stop(insight::format_error(c(
-      "All non-model arguments to 'loo_model_weights()' must be named.",
-      i = "Pass mvgam fits by position."
-    )))
-  }
-  loos <- lapply(models, loo)
-  if (!is.null(model_names)) {
-    checkmate::assert_character(
-      model_names, len = length(loos), any.missing = FALSE
-    )
-    names(loos) <- model_names
-  }
-  do.call(loo::loo_model_weights, c(list(loos), rest))
+  split <- mvgam_split_models(x, ..., model_names = model_names)
+  loos <- lapply(split$models, loo)
+  do.call(loo::loo_model_weights, c(list(loos), split$other))
 }
 
 
@@ -831,23 +716,19 @@ add_criterion.mvgam <- function(x, criterion, model_name = NULL,
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(criterion, min.len = 1L)
   checkmate::assert_string(model_name, null.ok = TRUE)
-  checkmate::assert_logical(overwrite, len = 1L)
+  checkmate::assert_flag(overwrite)
   checkmate::assert_string(file, null.ok = TRUE)
-  supported <- c("loo", "waic", "loo_subsample",
-                 "bayes_R2", "loo_R2")
+  supported <- c("loo", "waic", "bayes_R2", "loo_R2")
   bad <- setdiff(criterion, supported)
   if (length(bad) > 0L) {
     stop(insight::format_error(c(
-      "Unsupported criterion requested.",
-      x = paste0(
-        "Unrecognised: ",
-        paste0("'", bad, "'", collapse = ", "), "."
-      ),
-      i = paste0(
-        "Supported: ",
-        paste0("'", supported, "'", collapse = ", "), "."
-      )
-    )))
+      paste0(paste0("'", bad, "'", collapse = ", "),
+             if (length(bad) > 1L) " are" else " is",
+             " not supported by 'add_criterion()'."),
+      i = paste0("Supported criteria: ",
+                 paste0("'", supported, "'", collapse = ", "), "."),
+      i = "'kfold()' and 'lfo_cv()' return their own results."
+    )), call. = FALSE)
   }
   if (!is.null(model_name)) {
     x$model_name <- model_name

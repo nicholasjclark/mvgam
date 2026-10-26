@@ -1,230 +1,134 @@
-# Joint Species Distribution GAMs.
+# Joint species distribution GAMs.
 #
-# `jsdgam()` is a thin wrapper over `mvgam()` that fits a Joint Species
-# Distribution Model with a Heaps-architecture factor model on the
-# species loadings. The wrapper accepts the jsdgam signature
-# (`formula`, `factor_formula`, `unit`, `species`, `n_lv`, etc.) and
-# forwards everything to `mvgam()` via:
-#   trend_formula = factor_formula   (`~ -1` resolves to ZMVN())
-#   trend_map     = matrix(NA_real_, n_species, n_lv)   (partial-Z full mask)
-# A jsdgam fit is an mvgam fit with `jsdgam` inserted after `mvgam`
-# in its class. The package defines no `.jsdgam` methods: the mvgam
-# methods serve these fits and use the extra slots set below.
+# `jsdgam()` builds the `mvgam()` call of a joint species distribution
+# model. The latent factors form the trend. `trend_formula` is
+# `factor_formula`, where `~ -1` gives `ZMVN()`. `trend_map` is an
+# all-NA `n_species` by `n_lv` matrix, which samples every loading. The
+# fit is an mvgam fit with `jsdgam` after `mvgam` in its class. The
+# mvgam methods serve it, using the extra slots set below.
 #
-# The wrapper does NOT patch Stan code, does NOT rotate species across
-# factors via a modulo trend_map, and does NOT introduce new
-# stanvar emission. Identification is handled either by the existing
-# Heaps post-hoc QR (when `by = lv_axis()` is absent) or by the env
-# constraint and rotate auto-skip (when by = lv_axis() is present in
-# `factor_formula`). The user can still supply `loadings_prior` to
-# layer the structured trait + phylo prior on top.
+# The loadings are identified after sampling by the QR rotation of
+# Heaps and Jermyn. A `factor_formula` with `by = lv_axis()` constrains
+# them instead and skips the rotation.
 
 #' Fit Joint Species Distribution Models in mvgam
 #'
-#' Sets up a Joint Species Distribution Model (JSDM) in which the
-#' residual associations among species are modelled in a reduced-rank
-#' format using a set of latent factors. The factor specification accepts
-#' spatial, temporal, or any other type of predictor effects, which enter
-#' the latent factors via `factor_formula`, while the
-#' observation model itself supports all the smooth, GP and random
-#' effects that mvgam can handle. Write [lv_axis()] in a term of
-#' `factor_formula` to give each latent factor its own effect of a
-#' covariate (constrained ordination).
+#' Fits a joint species distribution model (JSDM). The residual
+#' associations among species are modelled at reduced rank with a set
+#' of latent factors. The observation model takes the smooths,
+#' Gaussian processes and random effects of any mvgam model. The
+#' factors take their own predictors through `factor_formula`. Write
+#' [lv_axis()] in one of its terms to give each factor its own effect
+#' of a covariate, a constrained ordination.
 #'
-#' @param formula A `formula` object specifying the GAM observation
-#'   model formula. These behave exactly like the formula for a GLM
-#'   except that smooth terms (`s()`, `t2()`),
-#'   nonparametric `gp()` terms and `offset()` can be added to the
-#'   right-hand side. Time-varying effects are expressed as
-#'   `s(time, by = X)` or `gp(time, by = X)`. `gp()` accepts
-#'   both the approximate Hilbert-space form (`gp(x, k = 20)`) and
-#'   the exact full-covariance form (`gp(x)`, no `k`). Both fit
-#'   fine, but only the approximate form currently supports
-#'   prediction at newdata; exact `gp()` terms emit a one-shot
-#'   warning to that effect.
-#'
-#' @param factor_formula A `formula` for the latent factors' linear
-#'   predictor. Write [lv_axis()] in a term to give each latent
-#'   factor its own effect, as in `~ s(elev, by = lv_axis())` or
+#' @inheritParams mvgam
+#' @param factor_formula A one-sided formula for the latent factors'
+#'   linear predictor. Write [lv_axis()] in a term to give each factor
+#'   its own effect, as in `~ s(elev, by = lv_axis())` or
 #'   `~ elev:lv_axis()`. Each covariate must take one value per
-#'   sampling unit. `by = trend` is deprecated and is treated as
-#'   `by = lv_axis()`.
+#'   sampling unit. The deprecated `by = trend` acts as
+#'   `by = lv_axis()`. Defaults to `~ -1`, factors without predictors.
+#' @param knots Optional named list of knot positions for smooth terms,
+#'   by covariate, as `knots` of [mvgam()].
+#' @param data A `data.frame` or `list` holding the response, the
+#'   covariates of both formulas, the `unit` column and the `species`
+#'   factor.
 #'
-#' @param knots An optional `list` of knot values for any smooth
-#'   terms, forwarded to [mvgam()] and handled exactly as its own
-#'   `knots` argument is. Knot values are named by covariate rather
-#'   than by formula, so there is one list for the model.
+#'   Data held as arrays, as \pkg{unmarked}, \pkg{ubms},
+#'   \pkg{flocker}, \pkg{Hmsc} and \pkg{spOccupancy} take them, convert
+#'   to this long format. [pivot_detection_array()] converts detection
+#'   histories of occupancy and N-mixture data: `[J, K]`, `[N, J, K]`,
+#'   multi-season `[N, J, T, K]` or a list of `[J, K]` matrices per
+#'   species. [pivot_species_matrix()] converts a wide `[J, N]` species
+#'   composition matrix.
+#' @param family The observation family every species shares, as a
+#'   family object. [mvgam_families] lists them. Defaults to
+#'   `binomial()` for presence-absence data. Counts take a count family
+#'   such as `poisson()` or `negbinomial()`.
 #'
-#' @param data A `data.frame` or `list` containing the response
-#'   variable and the covariates referenced by `formula` and
-#'   `factor_formula`. Must contain the column named by `unit` (the
-#'   sampling-unit index, often `time` or `site`) and the factor
-#'   column named by `species` (the response-unit index).
+#'   For one family per species, write `formula` with one [brms::bf()]
+#'   per species, each naming its family, as in
+#'   `bf(count ~ env, family = poisson()) +
+#'   bf(seen ~ env, family = bernoulli())`. The responses then form the
+#'   species axis, in place of a `species` column. `family` applies to
+#'   any response that names none.
 #'
-#'   Users arriving from `unmarked`, `ubms`, `flocker`, `Hmsc`, or
-#'   `spOccupancy` typically carry their data in multi-dimensional
-#'   arrays. Use [pivot_detection_array()] to convert occupancy /
-#'   N-mixture detection-history arrays (2D `[J, K]`, 3D `[N, J, K]`,
-#'   4D `[N, J, T, K]` multi-season, or named list of `[J, K]`
-#'   matrices per species) into the long-format `data` that
-#'   `jsdgam()` expects, and [pivot_species_matrix()] for the
-#'   Hmsc-style wide `[J, N]` species-composition matrix.
+#'   The simplex families [diri()], [multi()] and [categ()] need a
+#'   per-species term, as in `y ~ env * species` or
+#'   `y ~ 0 + species + env:species`. A coefficient shared by every
+#'   species cancels from their likelihood. In `y ~ env`, `b_Intercept`
+#'   and `b_env` take their priors alone. mvgam warns of this once per
+#'   session. [diri()] sets out the identification.
+#' @param unit The unquoted name of the numeric column indexing the
+#'   sampling units, often `time` or `site`. Defaults to `time`.
+#' @param species The unquoted name of the factor column indexing the
+#'   species. Defaults to `series`, as in other mvgam models.
+#' @param n_lv Integer number of latent factors, from 1 to the number
+#'   of species. Defaults to 2. The residual covariance
+#'   `Z Z' + diag(Psi^2)` has rank at most the number of species.
+#'   Further columns of `Z` add nothing.
 #'
-#' @param newdata Optional held-out `data.frame` / `list` of the
-#'   same structure as `data`, forwarded to [mvgam()] and
-#'   persisted on the returned fit for later prediction.
+#'   Under the default Student-t prior on `Z`, or a structured prior
+#'   built from `traits`, `phylo` or `loadings_prior$distances`, `n_lv`
+#'   is the number of factors in the likelihood. Under the
+#'   multiplicative gamma process prior (`loadings_prior = "mgp"` or
+#'   `list(column_shrinkage = "mgp", ...)`) it is a ceiling. The prior
+#'   shrinks later columns towards zero. A larger
+#'   `loadings_prior$mgp_a2` shrinks them harder. [active_factors()]
+#'   counts the columns the data support.
+#' @param priors Optional `brmsprior` of priors to set, from
+#'   [brms::prior()]. `prior`, the brms spelling, is accepted in `...`.
+#'   [get_prior.mvgam_formula()] lists the classes a model takes.
+#' @param traits Optional species traits for a structured loadings
+#'   prior: a `data.frame` or matrix with one row per species, or the
+#'   name of an element of `data2`. Rows are matched to
+#'   `levels(data[[species]])` by a `series` column, by row name or by
+#'   order. Factor columns are one-hot encoded and numeric columns are
+#'   standardised. They become `loadings_prior$features`. Supplying an
+#'   explicit `loadings_prior` as well is refused.
+#' @param trait_slopes Optional one-sided formula of traits, such as
+#'   `~ trait1 + trait2`, for trait-mediated responses to the
+#'   environment (the fourth-corner model of \pkg{Hmsc}). Each
+#'   population-level term of `formula` becomes a non-linear parameter
+#'   regressed on the traits, plus a species-level deviation. The
+#'   deviations of intercept and slope correlate under an LKJ prior
+#'   (`(1 | sp | species)`). The traits must be columns of `data`,
+#'   constant within species. A smooth of a trait goes in
+#'   `trait_slopes`, as `~ s(trait1)`. A smooth in `formula` is
+#'   refused, because brms's top-level non-linear formula takes none.
+#'   The defaults are `normal(0, 1)` on each trait coefficient and
+#'   `student_t(3, 0, 2.5)` on the species SD. `priors` overrides
+#'   them.
+#' @param phylo Optional phylogeny: an `ape::phylo` tree, whose
+#'   cophenetic distances are taken, or a numeric distance matrix
+#'   with row and column names matching `levels(data[[species]])`.
+#'   The distances are rescaled to a maximum of 1 and become
+#'   `loadings_prior$distances$phylo`. A tree that is not ultrametric
+#'   draws a warning once. A tree requires the \pkg{ape} package.
+#'   Supplying an explicit `loadings_prior` as well is refused.
+#' @param loadings_prior Optional structured prior on the loadings, as
+#'   `loadings_prior` of [mvgam()] takes it. Supplying `traits` or
+#'   `phylo` as well is refused.
+#' @param ... Further arguments of [mvgam()], such as `data2` (where
+#'   `traits` and `phylo` find a named element), `algorithm`, `chains`
+#'   and `silent`.
 #'
-#' @param family A `family` object specifying the observation
-#'   distribution shared by every species. Supported families are
-#'   documented in `mvgam_families`. Defaults to `binomial()`, the
-#'   standard choice for presence/absence JSDM responses; switch to a
-#'   count family (`poisson()`, `negbinomial()`) when modelling counts.
+#' @return A fitted model of class `c("mvgam", "jsdgam", "brmsfit")`.
+#'   Every mvgam method applies, such as `summary()`, `predict()`,
+#'   `forecast()` and `loo()`. [ordinate()] and [residual_cor()]
+#'   describe the factors. `update(fit, n_lv = 3)` refits it through
+#'   `jsdgam()` with the arguments given changed.
 #'
-#'   To give each species its own family, write `formula` as a
-#'   multivariate formula naming one response per species and its
-#'   family inside each [brms::bf()], as in
-#'   `bf(count ~ env, family = poisson()) + bf(seen ~ env, family =
-#'   bernoulli())`. The responses then form the species axis the
-#'   latent factors load across and `species` is read from them
-#'   rather than from a column. A family named there belongs to that
-#'   response; this argument then applies only to responses that
-#'   named none, and is left alone entirely when every response
-#'   speaks for itself. For simplex
-#'   multi-response families (`diri()`, `multi()`, `categ()`), write
-#'   the formula with a per-`species` interaction (e.g.
-#'   `y ~ env * species` or the brms-native-style
-#'   `y ~ 0 + species + env:species`). All fixed effects shared
-#'   across species drop out of the softmax likelihood, so a
-#'   formula like `y ~ env` will fit but its `b_Intercept` and
-#'   `b_env` coefficients carry no posterior information; a
-#'   once-per-session warning fires in that case to point at the
-#'   interpretable form. See `?diri` for the identification
-#'   constraints that make this work.
-#'
-#' @param unit The unquoted name of the `numeric/integer` variable
-#'   that indexes the sampling unit (typical names: `time` or
-#'   `site`). Defaults to `time`.
-#'
-#' @param species The unquoted name of the `factor` variable that
-#'   indexes the different response units (typical name in a JSDM:
-#'   `species`). Defaults to `series` to stay consistent with other
-#'   mvgam models.
-#'
-#' @param n_lv `integer`. Number of latent factors to use for
-#'   modelling residual associations. Must be `>= 1` and at most the
-#'   number of species. Defaults to `2`. One bound covers every
-#'   `loadings_prior`: the marginal residual covariance
-#'   `Z Z' + diag(Psi^2)` has rank at most the number of species,
-#'   and further columns of `Z` add no expressive capacity.
-#'   `n_lv = n_species` is admitted. Whether that boundary samples
-#'   well is a question for the prior.
-#'
-#'   What `n_lv` counts does depend on the prior:
-#'   \itemize{
-#'     \item Default iid Z prior (`student_t(3, 0, 0.5)`) or any
-#'       kernel-driven structured prior built from `traits` /
-#'       `phylo` / `loadings_prior$distances`: `n_lv` is the
-#'       **exact factor count** that enters the likelihood.
-#'     \item Multiplicative gamma process prior
-#'       (`loadings_prior = "mgp"` or
-#'       `loadings_prior = list(column_shrinkage = "mgp", ...)`):
-#'       `n_lv` is a **truncation ceiling**. Set it at or above
-#'       the rank you want to admit; the MGP shrinks later columns
-#'       of `Z` toward zero by construction, and unused columns are
-#'       pruned by the prior. Tighten `mgp_a2` for stronger
-#'       shrinkage.
-#'   }
-#'   See [active_factors()] for a posterior summary of how many
-#'   columns the data actually used under MGP.
-#'
-#' @param priors Optional `data.frame` or `brmsprior` vector with
-#'   prior overrides. See [default_prior.mvgam_formula()] and
-#'   [brms::prior()] for the conventions.
-#'
-#' @param traits Optional per-species feature `data.frame`, matrix,
-#'   or single string referencing a slot in `data2`. Rows correspond
-#'   to species and are matched against `levels(data[[species]])` by
-#'   the `series` column (if present), rownames, or row order.
-#'   Forwarded as `loadings_prior$features`; categorical columns are
-#'   one-hot encoded and numerics z-scored downstream by
-#'   `encode_loadings_features()`. Mutually exclusive with an
-#'   explicit `loadings_prior` argument.
-#'
-#' @param trait_slopes Optional one-sided `formula` (e.g.
-#'   `~ trait1 + trait2`) requesting trait-mediated environmental
-#'   slopes, i.e. the Hmsc "fourth corner" regression. Each fixed
-#'   term in `formula` becomes a non-linear parameter whose value
-#'   is regressed on the supplied traits plus a species-level
-#'   random deviation (`(1 | sp | species)` correlating intercept
-#'   and slope deviations under LKJ). The trait columns must
-#'   already live in `data`, must be constant within species, and
-#'   must reference per-species values rather than per-observation
-#'   covariates. Smooth specials (`s()`, `gp()`) in `formula` are
-#'   rejected because brms's top-level non-linear formula cannot
-#'   host them; supply smooths inside `trait_slopes` itself
-#'   (e.g. `~ s(trait1)`) where they land in a sub-formula and
-#'   brms accepts them. Weakly-informative default priors
-#'   (`normal(0, 1)` on each gamma, `student_t(3, 0, 2.5)` on the
-#'   species SD) are emitted; user `priors =` rows override on
-#'   matching class / coef / nlpar tuples.
-#'
-#' @param phylo Optional phylogeny. Either an `ape::phylo` object
-#'   (in which case `ape::cophenetic.phylo()` produces a pairwise
-#'   distance matrix and a non-ultrametric tree triggers a one-time
-#'   warning) or a pre-computed numeric distance matrix whose
-#'   row/column names match `levels(data[[species]])`. The matrix
-#'   is forwarded as `loadings_prior$distances$phylo` and rescaled
-#'   to `max(d) = 1` by `validate_pairwise_distance()`. Requires the
-#'   \pkg{ape} package when an `ape::phylo` object is supplied.
-#'   Mutually exclusive with an explicit `loadings_prior` argument.
-#'
-#' @param loadings_prior Optional explicit specification of the
-#'   structured loadings prior, mirroring the `mvgam()` argument.
-#'   When supplied the `traits` and `phylo` aliases must be `NULL`;
-#'   see `[mvgam()]` for the accepted field list.
-#'
-#' @param backend Character string specifying the Stan backend,
-#'   either `"cmdstanr"` or `"rstan"`. Forwarded to [mvgam()].
-#'   Defaults to `getOption("brms.backend", "cmdstanr")`.
-#'
-#' @param threads Positive integer or `NULL`. Forwarded to
-#'   [`mvgam()`] / `cmdstanr`. With closure-unit families
-#'   (`nmix()`, `occ()`) and multi-response families
-#'   (`diri()`, `mvn()`, `mvt()`), enables `reduce_sum` threading of
-#'   the per-unit lpmf. Combining `threads > 1` with a
-#'   `trend_formula` on a brms-native family currently compiles
-#'   un-threaded after a one-time warning; see [`mvgam()`] for the
-#'   full threading notes and bench guidance.
-#' @param run_model Logical, forwarded to [`mvgam()`]. When `FALSE`,
-#'   skips Stan parse, compile and sampling and returns a stub
-#'   `mvgam` / `jsdgam` object with `$stancode` and `$standata`
-#'   populated and `$fit = NULL`. This is how a joint species model
-#'   is read without fitting it: `jsdgam()` derives the species axis,
-#'   the loadings map and the trend itself, so there is no
-#'   [`mvgam_formula()`] to hand to [`stancode()`] in its place.
-#'   Defaults to `TRUE`.
-#'
-#' @param ... Other arguments forwarded to `mvgam()`. Notable ones
-#'   include `data2` (lookup list for string-named `traits` / `phylo`
-#'   slots), `algorithm`, `chains`, and `silent`.
-#'
-#' @return A `list` of class `c("mvgam", "jsdgam", "brmsfit")`. The full mvgam
-#'   method surface (`summary`, `predict`, `forecast`, `loo`,
-#'   `posterior_epred`, etc.) applies; jsdgam-specific surfaces
-#'   (`ordinate`, `residual_cor`) recognise the additional class.
-#'   [`update()`][update.mvgam] refits it through `jsdgam()`, with any
-#'   argument above overridden, e.g. `update(fit, n_lv = 3)`.
-#'
-#' @seealso [sim_jsdm()] to simulate data this function fits, and
-#'   [sim_closure_unit_data()] for the `occ()` / `nmix()` case;
-#'   [mvgam()], [lv_axis()], [residual_cor()],
-#'   [ordinate()], [shared_variation()], [active_factors()],
-#'   [compare_loadings()], [methods_md()], [how_to_cite()]. A
-#'   worked online article walking through `jsdgam()` with a
-#'   negative binomial observation model, the Heaps & Jermyn
-#'   (2024) trait-informed loadings prior, ordination biplots
-#'   and the MGP shrinkage criterion is at
-#'   \url{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}.
+#' @seealso [sim_jsdm()] simulates data this function fits.
+#'   [sim_closure_unit_data()] simulates the `occ()` and `nmix()`
+#'   case. [residual_cor()], [ordinate()], [shared_variation()],
+#'   [active_factors()] and [compare_loadings()] interpret the fitted
+#'   factors. [lv_axis()] gives each factor its own covariate effect.
+#'   [how_to_cite()] drafts a methods paragraph for the fit and
+#'   [methods_md()] writes its equations.
+#'   The `r mvgam_article("jsdgam", "JSDM article")` fits a negative
+#'   binomial model with a trait-informed loadings prior, ordination
+#'   biplots and multiplicative gamma process shrinkage.
 #'
 #' @references
 #' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
@@ -254,10 +158,9 @@
 #'
 #' @examples
 #' \dontrun{
-#' # Simulate a small closure-unit JSDM: 4 species, 50 sites,
-#' # 4 visits, env + elev site covariates, tod_c + effort visit
-#' # covariates. Recipe 2L gives both state-level and detection-
-#' # level covariates.
+#' # Detections of 4 species at 50 sites, 4 visits each. `type = 2L`
+#' # simulates site covariates of occupancy (`env`, `elev`) and visit
+#' # covariates of detection (`tod_c`, `effort`).
 #' set.seed(1)
 #' simdat <- sim_closure_unit_data(
 #'   family    = occ(),
@@ -267,9 +170,9 @@
 #'   type      = 2L
 #' )
 #'
-#' # Fit a joint occupancy model: env on the occupancy linear
-#' # predictor, tod_c on the detection sub-formula, two latent
-#' # factors capturing residual species-species covariation.
+#' # A joint occupancy model. `env` drives occupancy and `tod_c`
+#' # drives detection. Two latent factors carry the residual
+#' # association among species.
 #' mod <- jsdgam(
 #'   formula        = bf(y ~ env, p ~ tod_c),
 #'   factor_formula = ~ -1,
@@ -282,18 +185,20 @@
 #'
 #' summary(mod)
 #'
-#' # The effect of env on the chance of a detection, which is
-#' # occupancy times detection. `type = "link"` gives logit occupancy.
+#' # The effect of `env` on the chance of a detection, occupancy times
+#' # detection
 #' conditional_effects(mod)
 #'
-#' # Inspect the implied residual species-species correlations.
-#' residual_cor(mod)
+#' # The residual correlations among species the factors imply
+#' plot(residual_cor(mod))
 #'
-#' # Two-factor ordination biplot. Site scores in latent space
-#' # plus species loading arrows.
+#' # Site scores and species loadings on the two factors
 #' ordinate(mod, rotation = "varimax")
+#'
+#' # Next, compare n_lv = 1 with update(mod, n_lv = 1L) and loo()
 #' }
 #'
+#' @family model fitting
 #' @export
 jsdgam <- function(formula,
                    factor_formula = ~ -1,
@@ -315,43 +220,25 @@ jsdgam <- function(formula,
                    ...) {
   call <- match.call(expand.dots = FALSE)
 
-  # Stash silent on a global option so deep validators (the
-  # exact-GP notice in particular) can honour `silent >= 2`
-  # without threading the arg through every intermediate call.
-  call_silent <- list(...)$silent %||% 1L
-  old_silent <- options(mvgam.silent = call_silent)
-  on.exit(options(old_silent), add = TRUE)
+  local_mvgam_silent(list(...)$silent %||% 1L)
 
-  # NSE capture of unit + species column names. Defaults are bare
-  # symbols `time` / `series` so substitute() returns those names.
-  unit_chr <- as.character(substitute(unit))
-  species_chr <- as.character(substitute(species))
-  if (length(unit_chr) != 1L || nchar(unit_chr) == 0L) {
-    stop(insight::format_error(
-      "'unit' must resolve to a single column name."
-    ))
-  }
-  if (length(species_chr) != 1L || nchar(species_chr) == 0L) {
-    stop(insight::format_error(
-      "'species' must resolve to a single column name."
-    ))
-  }
+  # `unit` and `species` are unquoted column names, `time` and
+  # `series` by default
+  unit_chr <- column_name_arg(substitute(unit), "unit")
+  species_chr <- column_name_arg(substitute(species), "species")
 
   checkmate::assert_data_frame(data, min.rows = 1L)
-  # Accept every formula spelling `mvgam()` accepts, since this
-  # forwards to it: a plain `formula`, a `brms::bf(...)` carrying
-  # detection / dpar sub-formulas (`p ~ visit_cov` for occ() /
-  # nmix(); `phi ~ env` for diri()), or a multivariate formula whose
-  # responses each name their own family.
+  # Every formula `mvgam()` takes: a plain `formula`, a `bf()` with
+  # sub-formulas (`p ~ visit_cov` for occ() and nmix(), `phi ~ env` for
+  # diri()), or a multivariate formula naming a family per response.
   checkmate::assert_multi_class(
     formula, c("formula", "brmsformula", "mvbrmsformula")
   )
   checkmate::assert_class(factor_formula, "formula")
-  # A multivariate formula gives each species its own response and its
-  # own family, so the species axis is the set of responses and the
-  # data carries a column per species rather than a species column.
-  # Everything below reads `species_levels` rather than the column, so
-  # the two layouts share one path.
+  # A multivariate formula gives each species its own response and
+  # family. Its species axis is the set of responses, with a data
+  # column per species in place of a species column. The code below
+  # takes the species from `species_levels` in both layouts.
   is_mv_formula <- inherits(formula, "mvbrmsformula")
   checkmate::assert_names(
     names(data),
@@ -374,11 +261,8 @@ jsdgam <- function(formula,
       )
     )))
   }
-  # Early `n_lv` ceiling gate so jsdgam-side errors mention
-  # "species" rather than the canonical mvgam "series". The
-  # downstream wrapper-layer call in `make_stan.R` covers the
-  # `mvgam()` direct path; the two share `validate_n_lv_ceiling()`
-  # so the ceiling lives in one place.
+  # Checked here as well as in `mvgam()`, where the error would name
+  # series. This one names species.
   validate_n_lv_ceiling(
     n_lv         = n_lv,
     n_species    = n_species,
@@ -388,57 +272,38 @@ jsdgam <- function(formula,
   # The unit becomes the time axis.
   assert_axis_column(data, unit_chr, "time")
 
-  # Promote (unit, species) to the canonical (time, series) columns
-  # mvgam expects. The original columns stay attached so a prediction
-  # grid can still be addressed in the names the user wrote, which is
-  # what `insight::find_predictors()` reads them for.
-  data_train <- data
-  if (!identical(unit_chr, "time")) {
-    if ("time" %in% names(data_train)) {
-      stop(insight::format_error(c(
-        "'data' already contains a 'time' column.",
-        x = paste0("'unit = ", unit_chr, "' refers to a different column.")
-      )))
-    }
-    data_train$time <- data_train[[unit_chr]]
-  }
-  # `mvgam()` builds the series axis from the responses on a
-  # multivariate formula, so there is nothing to promote there.
+  # The unit and species columns are copied to the `time` and
+  # `series` columns mvgam fits on. The originals stay. A prediction
+  # grid can then name them, as `insight::find_predictors()` reports.
+  # On a multivariate formula `mvgam()` builds the series from the
+  # responses.
+  data_train <- copy_axis_column(data, unit_chr, "time", "unit")
   if (!is_mv_formula) {
-    if (!identical(species_chr, "series")) {
-      if ("series" %in% names(data_train)) {
-        stop(insight::format_error(c(
-          "'data' already contains a 'series' column.",
-          x = paste0(
-            "'species = ", species_chr, "' refers to a different column."
-          )
-        )))
-      }
-      data_train$series <- data_train[[species_chr]]
-    }
+    data_train <- copy_axis_column(data_train, species_chr, "series",
+                                   "species")
     data_train$series <- factor(data_train$series,
-                                 levels = species_levels)
+                                levels = species_levels)
   }
 
-  # Partial-Z full mask: n_species x n_lv matrix of NAs triggers the
-  # factor model via normalise_trend_map() -> ncol(Z) -> n_lv with
-  # the standard 'is_factor_model <- n_lv < n_series' gate.
+  # An all-NA `n_species` by `n_lv` map samples every loading. Its
+  # column count sets `n_lv` in `normalise_trend_map()`.
   trend_map_mat <- matrix(NA_real_, nrow = n_species, ncol = as.integer(n_lv))
   rownames(trend_map_mat) <- species_levels
 
-  # Resolve the trait + phylogeny aliases into a loadings_prior list
-  # before forwarding. The downstream pipeline (normalise_loadings_prior
-  # -> make_loadings_prior_stanvars -> generate_factor_model) does the
-  # encoding, validation and Stan emission; the helper here only
-  # translates user-facing names into that spec.
   # The deprecated `samples` and `burnin` become `iter` and `warmup`
-  # here. A refit inherits `iter` and `warmup`, and the stored
-  # arguments have to name the pair it adds to.
+  # here. `update()` merges new arguments into the stored ones. Under
+  # the translated names, a new `iter` replaces the stored `iter`.
   dots <- translate_samples_burnin(list(...))
   attr(dots, "translated") <- NULL
+  # The priors arrive as `priors` or as the brms spelling `prior` in
+  # `...`. Both resolve to one table, which the refit arguments store.
+  if (!missing(priors)) dots$priors <- priors
+  dots <- normalise_prior_arg_alias(dots)
+  user_prior <- dots$prior
+  dots$prior <- NULL
   # The arguments as evaluated, which `update()` hands back to this
-  # function. The call records symbols, and a refit in another scope
-  # or session has to resolve them.
+  # function. The call records symbols. A refit in another scope or
+  # session could not resolve them.
   refit_args <- Filter(Negate(is.null), c(
     list(
       formula = formula, factor_formula = factor_formula,
@@ -447,11 +312,12 @@ jsdgam <- function(formula,
       traits = traits, trait_slopes = trait_slopes, phylo = phylo,
       loadings_prior = loadings_prior, backend = backend,
       threads = threads,
-      priors = if (!missing(priors)) priors,
+      prior = user_prior,
       knots = if (!missing(knots)) knots
     ),
     dots
   ))
+  # `traits` and `phylo` become fields of `loadings_prior`
   loadings_prior_resolved <- build_jsdgam_loadings_prior(
     traits = traits,
     phylo = phylo,
@@ -459,28 +325,20 @@ jsdgam <- function(formula,
     species_levels = species_levels
   )
 
-  # Soft warn (once per session) for simplex multi-response families
-  # whose `formula` carries no term referencing the species factor.
-  # Under the mode-1 + mode-2 constraints any such K-shared coefficient
-  # is pulled to near zero by the prior and contributes nothing to the
-  # likelihood; the user almost certainly wants per-species fixed
-  # effects via `* series` (or the user's species column name) or the
-  # brms-native-style `0 + series + env:series`.
-  # The family a univariate `bf()` names is the model's, as `mvgam()`
-  # reads it.
+  # A simplex family whose `formula` has no species term draws a
+  # warning. The family a univariate `bf()` names is the model's, as
+  # in `mvgam()`.
   if (is_simplex_response_family(
     resolve_observation_family(formula, family)$family
   )) {
     warn_simplex_obs_formula_lacks_species(formula, species_chr)
   }
 
-  # trait_slopes: Hmsc-style trait-mediated environmental response.
-  # When supplied, rewrite `formula` into a brms nl formula whose
-  # nlpars regress each fixed slope on the traits, plus a shared
-  # species-level RE block correlating the intercept and slope
-  # deviations under LKJ. Emit weakly-informative default priors on
-  # the new nlpars; user-supplied priors merge on top via the
-  # existing prior pipeline.
+  # `trait_slopes` rewrites `formula` as a brms non-linear formula.
+  # Each population-level slope becomes a parameter regressed on the
+  # traits, with species deviations of intercept and slopes correlated
+  # under an LKJ prior. The new parameters take default priors. A user
+  # prior with the same class, coef and nlpar replaces one.
   trait_slopes_priors <- NULL
   if (is_mv_formula && !is.null(trait_slopes)) {
     stop(insight::format_error(c(
@@ -503,10 +361,9 @@ jsdgam <- function(formula,
       data         = data_train,
       species_chr  = "series"
     )
-    # Reason: emit default priors from the ORIGINAL formula (one
-    # nlpar per fixed term); the rewritten brms formula's top-level
-    # RHS contains the nlpar tokens themselves and would yield
-    # spurious b2 / b3 / b4 priors.
+    # The default priors come from the formula as given, one per
+    # population-level term. The right-hand side of the rewritten
+    # formula holds the parameter names themselves.
     trait_slopes_priors <- default_trait_slopes_priors(formula)
     formula <- build_trait_slopes_formula(
       obs_formula  = formula,
@@ -515,26 +372,19 @@ jsdgam <- function(formula,
     )
   }
 
-  # Forward to mvgam(). Optional args (knots, newdata, priors) only
-  # enter the call if the user supplied them so mvgam's own argument
-  # defaults handle the missing case. The trend comes from
-  # `factor_formula`, which defaults to `~ -1` and so resolves to
-  # `ZMVN()`, the correlated latent prior a JSDM wants.
-  # A multivariate formula names its responses rather than carrying a
-  # series column, and `trend_map` is validated against that column.
-  # `n_lv` on the trend constructor asks for the same factor model by
-  # the route that layout supports, so the loadings are requested
-  # there instead. A `factor_formula` that already names a
-  # constructor carries the user's own `n_lv` and is left alone.
+  # The trend is `factor_formula`. Its default `~ -1` gives `ZMVN()`.
+  # A multivariate formula has no series column to check `trend_map`
+  # against. Its factors are requested as `ZMVN(n_lv = )` on the trend
+  # formula instead. A `factor_formula` naming a constructor keeps the
+  # caller's `n_lv`.
   trend_formula_out <- factor_formula
   if (is_mv_formula) {
     trend_map_mat <- NULL
     spec <- stats::terms(factor_formula)
     labels <- attr(spec, "term.labels")
     if (!any(vapply(labels, is_trend_constructor_call, logical(1L)))) {
-      # `term.labels` drops the intercept, so carry it across
-      # explicitly: rebuilding `~ site - 1` without it would hand the
-      # trend an intercept the caller removed.
+      # `term.labels` omits the intercept. A `~ site - 1` keeps its
+      # `- 1` explicitly.
       parts <- c(labels, paste0("ZMVN(n_lv = ", as.integer(n_lv), ")"))
       if (identical(as.integer(attr(spec, "intercept")), 0L)) {
         parts <- c(parts, "-1")
@@ -544,9 +394,8 @@ jsdgam <- function(formula,
         env = environment(factor_formula)
       )
     } else {
-      # The caller's own constructor carries the loadings count, so
-      # the ceiling has to be read from it rather than from the
-      # `n_lv` argument this call ignored.
+      # The caller's constructor sets the number of factors. The
+      # ceiling is checked against it.
       user_spec <- parse_trend_formula(factor_formula)$trend_model
       if (!is.null(user_spec$n_lv)) {
         validate_n_lv_ceiling(
@@ -564,35 +413,21 @@ jsdgam <- function(formula,
     trend_map = trend_map_mat,
     data = data_train,
     backend = backend,
+    threads = threads,
     run_model = run_model
   )
-  # The family belongs to the response that names it. A multivariate
-  # formula gives each species its own, which is the whole point of
-  # writing one, so the presence-absence default this function carries
-  # for the single-response case must not overwrite them. Forwarding
-  # it only when the caller named one leaves `mvgam()` to apply it to
-  # whichever responses stayed silent.
+  # A family named in a multivariate formula belongs to its response.
+  # The default `binomial()` is forwarded only for a single response.
+  # A `family` the caller gives reaches the responses naming none.
   if (!missing(family) || !is_mv_formula) {
     forward_args$family <- family
   }
-  # `threads` is forwarded only when the user set it. `mvgam()` then
-  # builds the model on one thread. NULL would fail that default's
-  # `assert_int(threads, lower = 1)` check.
-  if (!is.null(threads)) {
-    forward_args$threads <- threads
-  }
+  # `newdata` and `knots` are forwarded when given. `mvgam()` applies
+  # its own defaults otherwise.
   if (!missing(newdata)) forward_args$newdata <- newdata
   if (!missing(knots)) forward_args$knots <- knots
-  # Reason: forward under the singular brms convention so the
-  # prior table actually reaches the codegen pipeline. mvgam()
-  # accepts both forms via normalise_prior_arg_alias() but
-  # canonicalising at the call site avoids any chance of the
-  # plural surviving into `...` and being dropped.
-  # When trait_slopes is set, the wrapper-emitted default nlpar
-  # priors go first so user-supplied 'priors =' rows can override
-  # them via the existing brms prior-merge semantics (last wins on
-  # matching class / coef / nlpar tuples).
-  user_prior <- if (!missing(priors)) priors else NULL
+  # Default priors on the trait-slope nlpars go first. A user row with
+  # the same class, coef and nlpar follows and replaces the default.
   combined_prior <- if (!is.null(trait_slopes_priors)) {
     if (!is.null(user_prior)) {
       c(trait_slopes_priors, user_prior)
@@ -608,9 +443,7 @@ jsdgam <- function(formula,
   if (!is.null(loadings_prior_resolved)) {
     forward_args$loadings_prior <- loadings_prior_resolved
   }
-  # Drop any duplicate loadings_prior coming through ..., since the
-  # explicit argument and the alias resolver have already been
-  # reconciled by build_jsdgam_loadings_prior().
+  # `build_jsdgam_loadings_prior()` has resolved the loadings prior
   dots$loadings_prior <- NULL
   forward_args <- c(forward_args, dots)
 
@@ -620,11 +453,10 @@ jsdgam <- function(formula,
   # named. Messages and prediction frames name those columns in
   # place of the `time` and `series` copies mvgam fits on.
   fit$jsdgam_args <- refit_args
-  # `mvgam()` stamped its own frame's call, which for a forwarded
-  # fit is `do.call()`'s resolved arguments. A `jsdgam` fit was
-  # built by `jsdgam()`, so that is the call it reports, and it is
-  # the one holding the symbols the user wrote.
+  # `mvgam()` recorded the `do.call()` of its resolved arguments. The
+  # fit reports the `jsdgam()` call, with the symbols the user wrote.
   fit$call <- call
+  fit$data.name <- call_data_name(call)
 
   # A fit keeps the classes `mvgam()` gave it, `brmsfit` for a fit
   # and `mvgam_prefit` for a stub, with `jsdgam` after `mvgam`.
@@ -633,20 +465,61 @@ jsdgam <- function(formula,
 }
 
 
-# Soft-warn (once per session) when a simplex `jsdgam()` call has no
-# term in `formula` that interacts with or references the species
-# factor. Such formulas put all per-category differentiation onto the
-# latent factor `Z`, while the K-shared fixed-effect coefficients
-# (e.g. `b_Intercept`, `b_env`) drop out of the softmax likelihood
-# and sample from their default `student_t(3, 0, 2.5)` prior with no
-# data contribution.
-#
-# Detects the species factor by looking for the user-supplied
-# `species_chr` column name in the formula's term labels via
-# `all.vars()`. Returns the formula invariant; only side effect is
-# the warning.
-#
-# @noRd
+#' The column an unquoted argument names
+#'
+#' @param expr The `substitute()`d argument
+#' @param arg The argument's name, for the error
+#' @return Character scalar
+#' @noRd
+column_name_arg <- function(expr, arg) {
+  checkmate::assert_string(arg)
+  out <- as.character(expr)
+  if (length(out) != 1L || !nzchar(out)) {
+    stop(insight::format_error(
+      paste0("'", arg, "' must name a single column.")
+    ), call. = FALSE)
+  }
+  out
+}
+
+
+#' Copy a user's axis column to the column mvgam fits on
+#'
+#' @param data Data frame
+#' @param from The user's column
+#' @param to `"time"` or `"series"`
+#' @param arg The argument naming `from`, for the error
+#' @return `data` with `to` holding `from`
+#' @noRd
+copy_axis_column <- function(data, from, to, arg) {
+  checkmate::assert_choice(to, c("time", "series"))
+  if (identical(from, to)) {
+    return(data)
+  }
+  if (to %in% names(data)) {
+    stop(insight::format_error(c(
+      paste0("'data' already contains a '", to, "' column."),
+      x = paste0("'", arg, " = ", from, "' names a different column."),
+      i = paste0("Rename the '", to, "' column or pass '", arg, " = ",
+                 to, "'.")
+    )), call. = FALSE)
+  }
+  data[[to]] <- data[[from]]
+  data
+}
+
+
+#' Warn once when a simplex formula has no species term
+#'
+#' Without a term naming the species, every category shares each
+#' coefficient. A shared coefficient such as `b_Intercept` or `b_env`
+#' cancels from the softmax likelihood and takes its prior alone. The
+#' latent factors carry every difference among categories.
+#'
+#' @param formula The observation formula
+#' @param species_chr The user's species column
+#' @return `NULL`, invisibly
+#' @noRd
 warn_simplex_obs_formula_lacks_species <- function(formula, species_chr) {
   if (!inherits(formula, "formula") && !inherits(formula, "brmsformula")) {
     return(invisible(NULL))
@@ -725,9 +598,9 @@ series_column_label <- function(object) {
 #' The observation formula may use either name of the species. A
 #' prediction grid varies the column the caller conditions on and
 #' holds the other at its most frequent level, which pairs each
-#' species with the trend of another. In each row where the two
-#' differ, the column away from that level was varied, and both
-#' columns take its value.
+#' species with the trend of another. Where the two columns differ
+#' in a row, the one away from the held level is the varied column.
+#' Both columns take its value.
 #'
 #' @param object A fitted `mvgam` object
 #' @param data Frame to predict for
@@ -739,8 +612,8 @@ jsdgam_axis_columns <- function(object, data) {
     return(data)
   }
   vars <- axis_vars(object)
-  # A value the training data never held keeps its own label, and the
-  # check of unseen levels names it.
+  # A value the training data never held keeps its own label. The
+  # check of unseen levels then names it in its error.
   as_fitted <- function(values, column) {
     fitted <- object$data[[column]]
     if (is.factor(fitted) && all(values %in% levels(fitted))) {
@@ -776,15 +649,15 @@ jsdgam_axis_columns <- function(object, data) {
 }
 
 
-# Resolve the trait + phylogeny aliases supplied to `jsdgam()` into a
-# `loadings_prior` list spec consumed by `normalise_loadings_prior()`.
-# - `traits` -> `loadings_prior$features`
-# - `phylo`  -> `loadings_prior$distances$phylo`
-# `loadings_prior` cannot be combined with the aliases; if both are
-# present the function errors. When all three are NULL it returns
-# NULL so the default iid prior fires downstream.
-#
-# @noRd
+#' The `loadings_prior` that `traits` and `phylo` describe
+#'
+#' `traits` becomes `features` and `phylo` becomes `distances$phylo`.
+#' An explicit `loadings_prior` given with either is refused.
+#'
+#' @param traits,phylo,loadings_prior The arguments of `jsdgam()`
+#' @param species_levels The species, in their fitted order
+#' @return A `loadings_prior` list, or `NULL` for the default prior
+#' @noRd
 build_jsdgam_loadings_prior <- function(traits,
                                         phylo,
                                         loadings_prior,
@@ -814,19 +687,17 @@ build_jsdgam_loadings_prior <- function(traits,
 }
 
 
-# Convert a phylogeny supplied via `phylo =` into a pairwise distance
-# matrix on the species axis. Accepts:
-#   - `ape::phylo` objects: requires the `ape` package; computes
-#     `ape::cophenetic.phylo()` and warns once when the tree is not
-#     ultrametric (the path-length distances still propagate but the
-#     downstream `validate_pairwise_distance()` rescales to max = 1).
-#   - Numeric distance matrices: passed through after a names check.
-# Downstream `validate_pairwise_distance()` does the symmetry,
-# zero-diagonal, non-negativity and rescale checks. This helper only
-# bridges between the phylogeny object types and the matrix shape
-# downstream expects.
-#
-# @noRd
+#' A phylogeny as a distance matrix over the species
+#'
+#' An `ape::phylo` tree gives its cophenetic distances, with a warning
+#' once when it is not ultrametric. A numeric matrix passes after a
+#' check of its names. `validate_pairwise_distance()` checks symmetry,
+#' the zero diagonal and the signs. It rescales to a maximum of 1.
+#'
+#' @param phylo An `ape::phylo` tree or a numeric distance matrix
+#' @param species_levels The species, in their fitted order
+#' @return A numeric matrix with species names on both dimensions
+#' @noRd
 jsdgam_phylo_to_dist <- function(phylo, species_levels) {
   checkmate::assert_character(species_levels, min.len = 2L,
                               any.missing = FALSE)

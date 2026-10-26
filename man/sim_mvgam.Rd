@@ -60,7 +60,8 @@ parameters (\code{sigma}, \code{nu}, \code{size}, \code{trials}, \code{phi},
 entry is absent. \code{com_binomial()} reads \code{nu} (dispersion)
 and \code{trials}.}
 
-\item{seed}{Optional integer seed for reproducibility.}
+\item{seed}{Optional integer seed. The session's random state is
+restored when the call returns.}
 }
 \value{
 A list of class \code{"mvgam_sim"} with elements:
@@ -150,7 +151,12 @@ grain (sites x visits) does not fit the time-series layout
 \code{sim_mvgam()} produces. For multi-species site-by-species
 data with correlated species, use \code{\link[=sim_jsdm]{sim_jsdm()}}, which draws
 one row per species at each site.
+
+Other simulation: 
+\code{\link{sim_closure_unit_data}()},
+\code{\link{sim_jsdm}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{simulation}

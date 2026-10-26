@@ -14,8 +14,8 @@ test_that("model_info describes each response of a multivariate fit", {
   pf <- mvgam(
     brms::bf(count ~ 1, family = poisson()) +
       brms::bf(seen ~ 1, family = bernoulli()) + brms::set_rescor(FALSE),
-    trend_formula = ~ AR(p = 1), data = d, run_model = FALSE
-  , validate = FALSE)
+    trend_formula = ~ AR(p = 1), data = d, run_model = FALSE, validate = FALSE
+  )
   info <- insight::model_info(pf)
   expect_named(info, c("count", "seen"))
   expect_true(info$count$is_count)
@@ -133,8 +133,8 @@ test_that("the term list sorts each column to the readers that need it", {
   pf <- mvgam(
     brms::bf(y | trials(n) ~ x + offset(log(e)) + (1 | g)),
     trend_formula = ~ AR(p = 1), data = d, family = binomial(),
-    run_model = FALSE
-  , validate = FALSE)
+    run_model = FALSE, validate = FALSE
+  )
   preds <- insight::find_predictors(pf, effects = "all")
   expect_identical(preds$conditional, "x")
   expect_identical(preds$random, "g")
@@ -161,8 +161,8 @@ test_that("a distributional sub-formula's covariate is a term", {
   )
   pf <- mvgam(
     brms::bf(y ~ x, sigma ~ w), trend_formula = ~ AR(p = 1),
-    data = d, family = gaussian(), run_model = FALSE
-  , validate = FALSE)
+    data = d, family = gaussian(), run_model = FALSE, validate = FALSE
+  )
   expect_setequal(insight::find_predictors(pf)$conditional, c("x", "w"))
 })
 

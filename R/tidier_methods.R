@@ -13,13 +13,10 @@ generics::glance
 
 #' Tidy an `mvgam` object's parameter posteriors
 #'
-#' Posterior summaries for the fixed and random parameters of a
-#' fitted `mvgam` model, returned as a tibble in the column
-#' layout established by the \pkg{broom} / \pkg{broom.mixed}
-#' package: `term`, `estimate`, `std.error`, `conf.low`,
-#' `conf.high`. An additional `type` column carries an
-#' `mvgam`-specific categorisation that distinguishes
-#' observation-model and trend-model parameters.
+#' Posterior summaries of the parameters of a fitted `mvgam` model, as
+#' a tibble with the columns of \pkg{broom.mixed}: `term`, `estimate`,
+#' `std.error`, `conf.low` and `conf.high`. A `type` column assigns
+#' each parameter to the observation model or the trend.
 #'
 #' The `type` column places every parameter into one of the
 #' following categories, each with the `effects` class it belongs to:
@@ -28,9 +25,8 @@ generics::glance
 #'     observation-family parameters such as `sigma`, `shape`,
 #'     `nu`, `phi`, `zi`, `hu`.
 #'   * `"observation_beta"` (`fixed`) -- population-level
-#'     coefficients of the observation formula, the intercept
-#'     included, and the fixed parts of its smooths and monotonic
-#'     terms.
+#'     coefficients of the observation formula, with the intercept
+#'     and the fixed parts of its smooths and monotonic terms.
 #'   * `"observation_smooth_param"` (`ran_pars`) -- the penalty of each
 #'     smooth (`sds_`) and the marginal deviation and length scale of
 #'     each Gaussian process.
@@ -57,15 +53,11 @@ generics::glance
 #' transforms it to the intercept on the data's scale. The table reports
 #' the coefficient once, as `Intercept`.
 #'
+#' @inheritParams predict.mvgam
 #' @param x A fitted `mvgam` object.
-#' @param effects Character. One of `"all"` (the default;
-#'   returns every parameter), `"fixed"`, `"ran_pars"` or
-#'   `"ran_vals"`, selecting the categories above. The vocabulary
-#'   matches `broom.mixed::tidy.brmsfit()`.
-#' @param robust Logical. If `FALSE` (the default) the posterior
-#'   mean and standard deviation are used as the point estimate
-#'   and dispersion. If `TRUE` the median and the median
-#'   absolute deviation (MAD) are used instead.
+#' @param effects `"all"` (the default) for every parameter, or one of
+#'   `"fixed"`, `"ran_pars"` and `"ran_vals"` for the categories above,
+#'   as in `broom.mixed::tidy.brmsfit()`.
 #' @param conf.int Logical. If `TRUE` (the default), include
 #'   `conf.low` and `conf.high` posterior quantile columns.
 #' @param conf.level Numeric. Probability covered by the
@@ -77,9 +69,9 @@ generics::glance
 #'   posterior::ess_bulk() values.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A tibble with one row per parameter and columns
-#'   `term`, `type`, `estimate`, `std.error`, optionally
-#'   `conf.low` / `conf.high`, and optionally `rhat` /
+#' @return A tibble with one row per parameter and the columns
+#'   `term`, `type`, `estimate` and `std.error`. `conf.int = TRUE` adds
+#'   `conf.low` and `conf.high`. `rhat` and `ess` add `rhat` and
 #'   `ess_bulk`.
 #'
 #' @family tidiers
@@ -94,15 +86,18 @@ generics::glance
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # `tidy()` returns one row per posterior parameter with
-#' # broom-standard columns (`term`, `estimate`, `std.error`,
-#' # `conf.low`, `conf.high`) for filtering and downstream piping.
+#' # One row per parameter, with broom's column names
 #' td <- tidy(mod)
 #' td
 #'
-#' # Add Rhat / effective-sample-size columns when you want to
-#' # screen for convergence issues alongside the point estimates.
-#' tidy(mod, rhat = TRUE, ess = TRUE)
+#' # The `type` column separates the trend's parameters from the
+#' # observation model's
+#' td[td$type == "trend_model_param", ]
+#'
+#' # The fixed effects alone, with convergence diagnostics
+#' tidy(mod, effects = "fixed", rhat = TRUE, ess = TRUE)
+#'
+#' # Next, augment() adds fitted values and residuals to the data
 #' }
 #'
 #' @export
@@ -124,10 +119,9 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
   obj_vars <- categorize_mvgam_parameters(x)
   draws <- posterior::as_draws_array(x$fit)
 
-  # `categorize_mvgam_parameters()` answers in the names Stan wrote.
-  # The table a user reads carries the names `variables()` lists and
-  # holds the same parameters: both the labels and the visibility come
-  # from `mvgam_user_pars()`, the one projection every reader uses.
+  # `categorize_mvgam_parameters()` returns the names Stan wrote. The
+  # table takes the names and the parameters `variables()` lists, both
+  # from `mvgam_user_pars()`.
   user_map <- mvgam_user_pars(x)
   apply_alias <- function(raw) {
     out <- names(user_map)[match(raw, user_map)]
@@ -162,8 +156,9 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
     }
   )
 
-  # A request no parameter answers, `effects = "ran_vals"` on a fit
-  # with no smooths or group-level terms say, keeps the table's columns.
+  # A request matching no parameter keeps the table's columns. An
+  # example is `effects = "ran_vals"` on a fit without smooths or
+  # group-level terms.
   if (nrow(out) == 0L) {
     fns <- broom_summary_fns(robust = robust, conf.int = conf.int,
                              conf.level = conf.level, rhat = rhat,
@@ -192,10 +187,10 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
 tidy_spec <- function(obj_vars, user_map) {
   checkmate::assert_list(obj_vars)
   checkmate::assert_character(user_map)
-  # Every bucket is narrowed to the parameters `variables()` shows a
-  # user. brms writes a centred intercept beside the `b_Intercept` it
-  # is back-transformed into, and the table reports the coefficient
-  # once, under the name on the data's own scale.
+  # Every bucket keeps the parameters `variables()` shows a user. brms
+  # samples a centred intercept and back-transforms it to
+  # `b_Intercept`. The table reports the coefficient once, on the
+  # data's scale.
   visible <- function(pars) {
     # In the order `mvgam_user_pars()` gives, which is brms's
     pars <- unname(user_map[user_map %in% pars])
@@ -203,8 +198,8 @@ tidy_spec <- function(obj_vars, user_map) {
   }
   # The penalty of a smooth, the scales of a Gaussian process and the
   # standard deviations and correlations of a group-level block are
-  # `ran_pars`; the coefficients they govern are `ran_vals`, as
-  # broom.mixed reads a brms fit.
+  # `ran_pars`. The coefficients they govern are `ran_vals`, as in
+  # broom.mixed's tidier for a brms fit.
   by_role <- function(pars) {
     coef <- mvgam_par_kind(pars) %in%
       c("smooth_coef", "gp_coef", "ranef_coef")
@@ -293,11 +288,8 @@ tidy_spec <- function(obj_vars, user_map) {
 #' @param type Character block label for the `type` column
 #' @param alias Character vector of user-facing names, one per
 #'   parameter, or `NULL` to keep the Stan names
-#' @param robust Logical flag to report the median and MAD
-#' @param conf.int Logical flag to report interval bounds
-#' @param conf.level Numeric interval probability
-#' @param rhat Logical flag to report Rhat
-#' @param ess Logical flag to report the bulk effective sample size
+#' @param robust,conf.int,conf.level,rhat,ess As in
+#'   `broom_summary_fns()`, which checks them
 #' @return Tibble holding `term`, `type`, `estimate` and `std.error`,
 #'   then any of `conf.low`, `conf.high`, `rhat` and `ess_bulk`
 #' @noRd
@@ -312,11 +304,6 @@ summarise_param_block <- function(draws, param_names, type,
   checkmate::assert_string(type)
   checkmate::assert_character(alias, len = length(param_names),
                               null.ok = TRUE)
-  checkmate::assert_flag(robust)
-  checkmate::assert_flag(conf.int)
-  checkmate::assert_number(conf.level, lower = 0, upper = 1)
-  checkmate::assert_flag(rhat)
-  checkmate::assert_flag(ess)
   sub <- posterior::subset_draws(draws, variable = param_names)
   summary_fns <- broom_summary_fns(
     robust = robust, conf.int = conf.int,
@@ -338,14 +325,15 @@ summarise_param_block <- function(draws, param_names, type,
 
 #' The named summary functions the tidiers apply
 #'
-#' `posterior::summarise_draws()` applies them. One definition keeps
-#' the column names of `tidy()` and `augment()` in step.
+#' `posterior::summarise_draws()` applies them to each parameter
+#' block of `tidy()`. Their names also set the columns of the empty
+#' table a request matching no parameter returns.
 #'
-#' @param robust Logical flag to report the median and MAD
-#' @param conf.int Logical flag to report interval bounds
+#' @param robust Logical. `TRUE` reports the median and MAD
+#' @param conf.int Logical. `TRUE` reports interval bounds
 #' @param conf.level Numeric interval probability
-#' @param rhat Logical flag to report Rhat
-#' @param ess Logical flag to report the bulk effective sample size
+#' @param rhat Logical. `TRUE` reports Rhat
+#' @param ess Logical. `TRUE` reports the bulk effective sample size
 #' @return Named list of summary functions
 #' @noRd
 broom_summary_fns <- function(robust = FALSE,
@@ -377,22 +365,14 @@ broom_summary_fns <- function(robust = FALSE,
 #' Augment an `mvgam` object's training data with fitted values
 #' and residuals
 #'
-#' Adds posterior summaries of the in-sample fits and
-#' residuals to the training data, using broom column names.
-#' Each row of the input data is preserved and three (or
-#' five, when `conf.int = TRUE`) new columns are appended for
-#' each of the fitted and residual posteriors.
+#' The training data with posterior summaries of the fitted value and
+#' residual of each row, under \pkg{broom}'s column names.
 #'
-#' @param x A fitted `mvgam` object.
-#' @param robust Logical. `FALSE` (the default) uses the
-#'   posterior mean and standard deviation; `TRUE` uses the
-#'   median and the median absolute deviation (MAD).
-#' @param conf.int Logical. If `TRUE` (the default), include
-#'   `.lower` / `.upper` (for `.fitted`) and `.resid.lower` /
-#'   `.resid.upper` (for `.resid`) credible interval columns.
-#' @param conf.level Numeric. Probability covered by the
-#'   credible intervals. Defaults to `0.95`.
+#' @inheritParams tidy.mvgam
 #' @inheritParams forecast.mvgam
+#' @param conf.int Logical. `TRUE` (the default) adds the credible
+#'   interval columns `.lower`, `.upper`, `.resid.lower` and
+#'   `.resid.upper`.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A tibble (or `list`, when `class(x$data) == "list"`)
@@ -416,16 +396,11 @@ broom_summary_fns <- function(robust = FALSE,
 #'     (see below).
 #'
 #' @section Closure-unit families (`nmix()`, `occ()`):
-#'   `.fitted` is per-visit (`psi * p` for occ, `lambda * p` for
-#'   nmix from the per-visit `posterior_epred`). `.resid` is
-#'   computed at the closure-unit grain by [residuals.mvgam()]
-#'   (one residual per site x season, using a sum-summary PIT
-#'   on the per-visit posterior predictive draws) and **recycled**
-#'   back to each visit row of the same unit so the augment
-#'   output stays aligned with the per-visit training frame. The
-#'   `.unit` column makes the recycling explicit: rows sharing
-#'   the same `.unit` share the same `.resid*` values. See
-#'   `?residuals.mvgam` for the per-unit residual semantics.
+#'   `.fitted` is the expected count of each visit: `psi * p` for
+#'   [occ()] and `lambda * p` for [nmix()]. [residuals.mvgam()]
+#'   computes one residual per closure unit, a site in a season, from
+#'   the PIT of the summed visit counts. Each visit row of a unit
+#'   repeats that residual. The `.unit` column names the unit.
 #'
 #' @family tidiers
 #' @seealso [fitted.mvgam()], [residuals.mvgam()]
@@ -440,13 +415,14 @@ broom_summary_fns <- function(robust = FALSE,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # `augment()` returns the training data with fitted, residual,
-#' # and (when applicable) closure-unit columns appended. Use it
-#' # when you want a single tibble for plotting / scoring against
-#' # `.observed` and `.fitted`.
+#' # The training data with fitted values and residuals appended
 #' aug <- augment(mod)
 #' head(aug)
-#' cor(aug$.observed, aug$.fitted, use = "complete.obs")
+#'
+#' # Residuals against fitted values, from one tibble
+#' plot(aug$.fitted, aug$.resid, xlab = "Fitted", ylab = "Residual")
+#'
+#' # Next, glance() summarises the whole fit in one row
 #' }
 #'
 #' @importFrom stats residuals
@@ -461,22 +437,11 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   checkmate::assert_string(resp, null.ok = TRUE)
   rlang::check_dots_empty()
 
-  # Multi-response (mvbrmsformula) fits with no `resp` argument
-  # fan out per outcome and stack the tibbles with a `.resp`
-  # column so downstream tidy verbs can group / filter by
-  # outcome. When `resp` is supplied, the single-response body
-  # below runs scoped to that outcome.
-  if (is.null(resp) && inherits(x$formula, "mvbrmsformula")) {
-    resp_names <- names(response_columns(x))
-    stacked <- lapply(resp_names, function(r) {
-      out <- augment.mvgam(
-        x, robust = robust, conf.int = conf.int,
-        conf.level = conf.level, resp = r, ...
-      )
-      out$.resp <- r
-      out
-    })
-    return(dplyr::bind_rows(stacked))
+  # A multivariate fit without `resp` gives the rows of every
+  # response, stacked, with the response named in `.resp`
+  fan <- mv_resp_fan_out(x, resp, combine = stack_response_rows(".resp"))
+  if (!is.null(fan)) {
+    return(fan)
   }
 
   obs_data <- x$data
@@ -493,10 +458,9 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
     x, robust = robust, probs = probs, resp = resp,
     summary = FALSE
   )
-  # An ordinal fit predicts a probability per category, so it has no
-  # single fitted value to put in a column. The expected ordered level
-  # is that prediction on the scale the residuals and
-  # `posterior_predict()` already work on.
+  # An ordinal fit predicts a probability per category. Its column
+  # takes the expected ordered level, the scale of its residuals and
+  # of `posterior_predict()`.
   if (length(dim(fit_draws)) == 3L) {
     fit_draws <- ordinal_category_mean(fit_draws)
   }
@@ -508,36 +472,20 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
     x, robust = robust, probs = probs, resp = resp
   ) |>
     tibble::as_tibble()
-  # Closure-unit families return one residual per closure unit
-  # (see ?residuals.mvgam). `.fitted` stays per-visit (psi*p or
-  # lambda*p from the per-visit posterior_epred), and we recycle
-  # the per-unit residual rows back to the per-visit obs frame so
-  # every visit row carries its unit's residual. A `.unit` column
-  # makes the grain explicit: rows sharing the same `.unit` share
-  # the same `.resid*` columns and a user can deduplicate to the
-  # unit grain via `dplyr::distinct(out, .unit, .keep_all = TRUE)`.
+  # A closure-unit family has one residual per unit and one fitted
+  # value per visit. Each visit row repeats its unit's residual. The
+  # `.unit` column names the unit. `is_closure_unit_family()` tests
+  # for that grain. `uses_closure_unit_layout()` is also TRUE for the
+  # multi-response families, whose residuals are per row.
   unit_id <- NULL
-  # The grain `residuals()` answered on, asked with the predicate that
-  # names it. `uses_closure_unit_layout()` is the wire-format question
-  # and is TRUE for the multi-response families too, whose residual is
-  # per row: recycling those by unit gave every species at a site one
-  # another's residual, and the `.unit` column this branch adds says
-  # rows sharing a unit share a residual, which was then false.
   if (is_closure_unit_family(x$family)) {
-    # Multi-season families return `c("series", "site", "time")`;
-    # single-season families return NULL and use the 2-axis default.
     arrays <- closure_unit_arrays_for(x, obs_data)
-    # Which unit each row belongs to, read from the array builder
-    # rather than inverted here. Rows whose unit carried no observed
-    # visit are `NA`, which is what recycling a per-unit residual
-    # back to them should say.
+    # The unit of each row, from the array builder. A row whose unit
+    # has no observed visit gets `NA`.
     unit_of_visit <- arrays$row_unit
     resid_summ <- resid_summ[unit_of_visit, , drop = FALSE]
     unit_id <- arrays$unit_labels[unit_of_visit]
   }
-  # `fitted.mvgam` may include forecast rows; align with residual
-  # length (which is training-only) by slicing.
-  fit_summ <- dplyr::slice_head(fit_summ, n = NROW(resid_summ))
   colnames(fit_summ) <- c(".fitted", ".se.fit", ".lower", ".upper")
   colnames(resid_summ) <- c(".resid", ".resid.se",
                               ".resid.lower", ".resid.upper")
@@ -599,10 +547,10 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # `glance()` summarises the fit's sampling configuration and
-#' # data dimensions in one row. `looic = TRUE` adds an
-#' # out-of-sample fit score, which takes longer.
+#' # The sampler and data dimensions of the fit, in one row
 #' glance(mod)
+#'
+#' # Leave-one-out criteria, which take longer to compute
 #' glance(mod, looic = TRUE)
 #' }
 #'
@@ -611,30 +559,23 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_flag(looic)
   checkmate::assert_string(resp, null.ok = TRUE)
-  # The draw count below comes straight off `$fit`. The shared
-  # accessor guards the rest of the draws surface, and this call
-  # bypasses it.
+  # The draw count below comes from `$fit`, past the accessor that
+  # refuses a model without draws.
   require_fitted_model(x, "glance")
-  # `...` reaches `loo()`, and only where `looic = TRUE`, so on the
-  # default path a name nothing reads was dropped without a word. The
-  # receiver is the same whichever branch runs.
+  # `...` reaches `loo()` only under `looic = TRUE`. Checking it
+  # against the formals of `loo.mvgam()` on every call refuses a name
+  # neither branch uses.
   refuse_unread_dots(list(...), names(formals(loo.mvgam)), "glance")
 
-  # Multi-response (mvbrmsformula) fits with no `resp` argument
-  # return one row per outcome carrying that outcome's family
-  # and link. The row order matches `x$formula$responses`.
-  if (is.null(resp) && inherits(x$formula, "mvbrmsformula")) {
-    resp_names <- names(response_columns(x))
-    stacked <- lapply(resp_names, function(r) {
-      out <- glance.mvgam(x, looic = looic, resp = r, ...)
-      out$resp <- r
-      out
-    })
-    return(dplyr::bind_rows(stacked))
+  # A multivariate fit without `resp` gives one row per response,
+  # named in `resp`, in the order of `x$formula$responses`
+  fan <- mv_resp_fan_out(x, resp, combine = stack_response_rows("resp"))
+  if (!is.null(fan)) {
+    return(fan)
   }
 
   # The family of the response in scope. On an mvbf fit `x$family`
-  # holds the family given beside the formula, not any response's.
+  # is the `family` argument of the call. Each response has its own.
   fam <- model_families(x, resp)
   # `resolve_family_name()` returns the user-visible family
   # name even for customfamily objects (e.g. "tweedie" instead
@@ -647,7 +588,7 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
   d <- x$data
   out <- tibble::tibble(
     algorithm = x$algorithm,
-    pss = posterior::ndraws(posterior::as_draws(x$fit)),
+    pss = posterior::ndraws(x),
     nobs = sum(!is.na(d[[response_column(x, resp)]])),
     nseries = length(fitted_series_levels(x)),
     family = fam_name,
@@ -666,5 +607,20 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
 }
 
 
-
-
+#' Stack per-response tables, naming each row's response
+#'
+#' The `combine` function `mv_resp_fan_out()` takes for a tidier.
+#'
+#' @param col Name of the column holding the response
+#' @return A function of a named list of tables, returning them
+#'   stacked with `col` added
+#' @noRd
+stack_response_rows <- function(col) {
+  checkmate::assert_string(col)
+  function(tables) {
+    dplyr::bind_rows(Map(function(tab, r) {
+      tab[[col]] <- r
+      tab
+    }, tables, names(tables)))
+  }
+}

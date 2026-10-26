@@ -100,7 +100,18 @@ and Computing} 34, 143. \doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
 \code{\link[=ordinate]{ordinate()}}, \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=active_factors]{active_factors()}}
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{fevd.mvgam}()},
+\code{\link{irf.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{residual_cor}()},
+\code{\link{shared_variation}()},
+\code{\link{stability.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

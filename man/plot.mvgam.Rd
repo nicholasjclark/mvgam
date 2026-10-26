@@ -70,9 +70,9 @@ they use by default. \code{"residuals"} draws one series,
 the first by default. Ignored by branches that summarise across
 series (\code{"smooths"}, \code{"factors"}).}
 
-\item{resp}{For multivariate (multiple-response) models, the
-name of a single response variable to return results for.
-\code{NULL} (the default) returns results for all responses.}
+\item{resp}{Character specifying which response variable for
+multivariate models. NULL (default) returns predictions for all
+responses.}
 
 \item{ndraws}{Optional cap on posterior draws used by branches
 that subsample. Passed through to the relevant surface.}
@@ -110,7 +110,13 @@ plot(mod)
 \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, \code{\link[=forecast.mvgam]{forecast.mvgam()}},
 \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}, \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}},
 \code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}}
+
+Other model checking: 
+\code{\link{mvgam_diagnostics}},
+\code{\link{pp_check.mvgam}()},
+\code{\link{residuals.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model checking}

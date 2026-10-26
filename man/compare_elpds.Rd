@@ -33,7 +33,19 @@ and evaluation time.
 \code{\link[=lfo_cv]{lfo_cv()}}, \code{\link[=loo_compare.mvgam_lfo]{loo_compare.mvgam_lfo()}},
 \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}},
 \code{\link[=plot.mvgam_compare_elpds]{plot.mvgam_compare_elpds()}}, \code{\link[=compare_scores]{compare_scores()}}
+
+Other model comparison: 
+\code{\link{bridge_sampler.mvgam}()},
+\code{\link{kfold.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{log_lik.mvgam}()},
+\code{\link{loo.mvgam}()},
+\code{\link{loo_compare.mvgam_lfo}()},
+\code{\link{mvgam_loo_extras}},
+\code{\link{posterior_average.mvgam}()},
+\code{\link{waic.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model comparison}

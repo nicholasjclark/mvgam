@@ -16,18 +16,15 @@ ZMVN(
 )
 }
 \arguments{
-\item{time}{The unquoted name of the variable that represents the unit of
-analysis in \code{data} over which latent residuals should be correlated. This
-variable should be either a \code{numeric} or \code{integer} variable in the
-supplied \code{data}. Defaults to \code{time} to be consistent with other
-functionalities in \pkg{mvgam}, though note that the data need not be time
-series in this case. See examples below for further details and
-explanations.
+\item{time}{The unquoted name of the \code{numeric} or \code{integer} variable
+in \code{data} that indexes the units whose latent residuals are
+correlated. Defaults to \code{time}, as for the other trends. The units
+can be sites, plots or any other replicate.
 
 ZMVN takes these values at any spacing. The likelihood is
 \eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma} indexed by
-series alone, and the gap between two units enters nowhere. Use
-ZMVN for spatial or otherwise non-temporal units, where gaps are
+series alone. The gap between two units enters nowhere. Use ZMVN
+for spatial or otherwise non-temporal units, where gaps are
 natural: dropped sites, stratified k-fold refits or irregular
 sampling grids.}
 
@@ -46,14 +43,13 @@ where \eqn{\Omega_{global}} is a \emph{global} correlation matrix,
 \eqn{\Omega_{group, local}} a \emph{local deviation} correlation matrix
 and \eqn{\alpha_{cor}} (\code{alpha_cor_trend}) the weight that shrinks
 each group's matrix toward the global one. Supplying \code{gr} requires
-\code{subgr}. \code{cor} defaults to \code{TRUE} for a grouped trend, and an
-explicit \code{cor = FALSE} is refused.}
+\code{subgr}. \code{cor} defaults to \code{TRUE} for a grouped trend. An explicit
+\code{cor = FALSE} is refused.}
 
 \item{subgr}{A subgrouping \code{factor} in \code{data} naming the
 observational units within each level of \code{gr}. Defaults to
-\code{series}, and the data need not be time series. A model with
-hierarchical correlations builds its series from \code{gr} and \code{subgr},
-and \code{data} then needs no \code{series} column.
+\code{series}. A model with hierarchical correlations builds its series
+from \code{gr} and \code{subgr}. Its \code{data} then needs no \code{series} column.
 
 For example, to model counts of several species (\code{species} in
 \code{data}) at sampling sites (\code{site}) in three regions (\code{region})
@@ -100,15 +96,15 @@ estimate them, or supply a number above \code{2} to fix them.
 Finite degrees of freedom let the latent process absorb an
 occasional large shock while \code{sigma_trend} stays at the scale
 of ordinary variation. That suits boom-and-bust population series
-and outbreak dynamics. The innovations follow a multivariate t,
-which shares one innovation \emph{scale} across the series at each
-time point, and large innovations tend to occur together as a
-result. Each series keeps its own direction and magnitude. A shock
-in one series says nothing about the sign of the others, and one
-series can stay unmoved by an event that moves its neighbours.
-\code{cor} sets the correlation between series exactly as it does
-for Gaussian innovations, and the degrees of freedom control how
-heavy the tails of the innovations are.
+and outbreak dynamics. The innovations follow a multivariate t.
+Because it shares one innovation \emph{scale} across the series at
+each time point, large innovations tend to occur together. Each
+series keeps its own direction and magnitude. A shock in one series
+says nothing about the sign of the others. One series can also stay
+unmoved by an event that moves its neighbours. \code{cor} sets the
+correlation between series exactly as it does for Gaussian
+innovations. The degrees of freedom set how heavy the tails of the
+innovations are.
 
 When \code{df = NA} the degrees of freedom are estimated as
 \code{nu_trend}, with a default \code{gamma(4, 0.3)} prior. The
@@ -117,22 +113,21 @@ When \code{df = NA} the degrees of freedom are estimated as
 \code{\link{get_prior}} lists \code{nu_trend} with the other trend
 classes.
 
-Three caveats. The bound of \code{2} is required: below it the
-innovations have no finite variance, and an autoregressive trend
-has no stationary covariance to start from. Above it, the first
-states of an autoregressive trend take the stationary mean and
-covariance. Their distribution matches the stationary law exactly
-under Gaussian innovations alone. A finite mix of t variates has
-heavier tails than the infinite sum that defines that law. The
-degrees of freedom are informed only through the tail of the
-latent process and are weakly identified in short series: below
-roughly 200 time points, the posterior stays close to its prior.
-Not available for \code{VAR()}, which samples its states directly,
-or \code{PW()}, which has no innovations.}
+Three caveats apply. The bound of \code{2} is required. Below it
+the innovations have no finite variance. An autoregressive trend
+then has no stationary covariance to start from. Above it, the
+first states of an autoregressive trend take the stationary mean
+and covariance. Their distribution matches the stationary law
+exactly under Gaussian innovations alone. A finite mix of t
+variates has heavier tails than the infinite sum that defines that
+law. The degrees of freedom are informed only through the tail of
+the latent process. They are weakly identified in short series:
+below roughly 200 time points, the posterior stays close to its
+prior. \code{VAR()} samples its states directly and \code{PW()}
+has no innovations. Neither takes \code{df}.}
 }
 \value{
-An object of class \code{mvgam_trend}, which contains a list of
-arguments to be interpreted by the parsing functions in \pkg{mvgam}
+An object of class \code{mvgam_trend}.
 }
 \description{
 Set up latent correlated multivariate Gaussian residual processes in
@@ -142,21 +137,22 @@ evaluates them against the data.
 \section{Identification}{
 
 A factor model with sampled loadings fits equally well under any
-reordering or sign change of its factors, and some models under any
-rotation. mvgam reports one version, chosen by the dynamics of the
-factors:
+reordering or sign change of its factors. Some models also fit
+equally well under any rotation. mvgam reports one version, chosen
+by the dynamics of the factors:
 \itemize{
-\item \code{AR()} factors, and \code{RW()} or \code{AR()}
-factors with \code{ma = TRUE}, each take their own coefficients,
-and a rotation would mix them. After sampling, the factors of
-every draw are reordered and signed to agree with one reference,
-and the loadings \code{Z}, the factor paths \code{lv_trend} and the
+\item \code{AR()} factors take their own coefficients, as do
+\code{RW()} and \code{AR()} factors with \code{ma = TRUE}. A
+rotation would mix those coefficients. After sampling, the
+factors of every draw are reordered and signed to agree with one
+reference. The loadings \code{Z}, the factor paths \code{lv_trend} and the
 coefficients \code{ar1_trend} or \code{theta1_trend} move together.
 Factors are numbered by the variance they explain, largest
 first.
-\item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
-\code{AR()} factors with \code{coef_sharing = "shared"}, are
-unchanged by rotation when they carry no moving-average term.
+\item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors
+without a moving-average term are unchanged by rotation. So are
+\code{AR()} factors with \code{coef_sharing = "shared"} and no
+moving-average term.
 Following Heaps & Jermyn (2024), generated quantities rotate each
 draw to lower-triangular loadings \code{Z_tilde} with a non-negative
 diagonal. The factor paths rotate to \code{lv_trend_tilde}. A VAR
@@ -166,7 +162,7 @@ Post-fit methods use the identified loadings and factor paths.
 \code{shared_variation()} and \code{residual_cor()} are the same under every
 version.
 
-A \code{trend_map} keeps its fixed entries on \code{Z} exactly, and a
+A \code{trend_map} keeps its fixed entries on \code{Z} exactly. A
 \code{by = lv_axis()} smooth ties each factor to its own covariate
 effect. Neither takes a rotation. For a model with every loading
 sampled, the \code{loadings_prior}
@@ -223,13 +219,19 @@ models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
-\code{\link{AR}}, \code{\link{VAR}}, \code{\link{RW}},
-\code{\link{CAR}}, \code{\link{mvgam}}, \code{\link{jsdgam}},
-\code{\link{residual_cor}}, \code{\link{ordinate}}. The
-\code{dfm} vignette walks through dynamic factor models built with
-a partial \code{trend_map}
-(\code{vignette("dfm", package = "mvgam")}); for the
-integrated species distribution model pattern that shares one
-latent process across several observation families, see
-\url{https://nicholasjclark.github.io/mvgam/articles/idm.html}.
+\code{\link[=jsdgam]{jsdgam()}} fits \code{ZMVN()} factors across species.
+\code{\link[=residual_cor]{residual_cor()}} and \code{\link[=ordinate]{ordinate()}} interpret the fitted
+correlations. The
+\href{https://nicholasjclark.github.io/mvgam/articles/dfm.html}{dynamic factor vignette} builds factor
+models with a partial \code{trend_map}. The
+\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated distribution model article}
+shares one latent process across several observation families.
+
+Other trend models: 
+\code{\link{LLT}()},
+\code{\link{PW}()},
+\code{\link{RW}()},
+\code{\link{list_trend_types}()},
+\code{\link{lv_axis}()}
 }
+\concept{trend models}

@@ -19,44 +19,37 @@
 )
 }
 \arguments{
-\item{object}{An mvgam fit.}
+\item{object}{A fitted \code{mvgam} object.}
 
-\item{newdata}{Optional data frame containing the response and all
-covariates referenced by the model. \code{NULL} (default) uses the original
-training data.}
+\item{newdata}{Optional data frame holding the response and every
+covariate of the model. \code{NULL} (the default) takes the training
+data.}
 
 \item{re_formula}{Group-level terms to include: \code{NULL} (the default)
 for every one, \code{NA} for none. A formula choosing some of them is not
 supported.}
 
-\item{resp}{Character; response name for multivariate models. Ignored for
-univariate fits.}
+\item{resp}{Optional name of one response of a multivariate model.}
 
-\item{ndraws}{Optional integer; subsample to \code{ndraws} posterior draws.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Optional integer vector of draw indices to use (mutually
-exclusive with \code{ndraws}).}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
-\item{incl_autocor}{Logical. When \code{TRUE} (default) the linear
-predictor carries the latent trend state the model inferred at
-each time, so the density describes the observation that was
-actually seen there. This is the conditional surface, the one
-\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=residuals.mvgam]{residuals.mvgam()}} read. When \code{FALSE}
-the trend contributes
-only its deterministic submodel, giving a density that leaves the
-autocorrelation out. The marginal surface, which integrates over
-the trend dynamics, belongs to \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} and is
-not a basis for an ELPD.}
+\item{incl_autocor}{Logical. \code{TRUE} (the default) evaluates each
+density under the latent trend state the model inferred at that
+time, the state \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns. The ELPD then describes
+the series that was observed. \code{FALSE} keeps only the trend's
+deterministic terms and leaves the autocorrelation out.}
 
 \item{process_error}{Superseded by \code{incl_autocor} and still
-accepted, so calls written against it keep working. \code{TRUE} maps
-to \code{incl_autocor = TRUE} and \code{FALSE} to \code{incl_autocor = FALSE}.
-When only \code{process_error} is given it decides; when both are
-given \code{incl_autocor} decides and \code{process_error} is ignored.}
+accepted. \code{incl_autocor} takes precedence when both are given.}
 
-\item{allow_new_levels}{Logical. Score rows whose grouping level
-the training data did not carry, which is what \code{kfold.mvgam()}
-needs when a fold holds out whole groups. Defaults to \code{FALSE}.}
+\item{allow_new_levels}{Logical. \code{TRUE} scores rows whose grouping
+level the training data lacked, as \code{\link[=kfold.mvgam]{kfold.mvgam()}} needs when a
+fold holds out whole groups. Defaults to \code{FALSE}.}
 
 \item{sample_new_levels}{How a new level's coefficients are drawn:
 \code{"uncertainty"} (the default), \code{"gaussian"} or \code{"old_levels"}.}
@@ -64,37 +57,29 @@ needs when a fold holds out whole groups. Defaults to \code{FALSE}.}
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-Numeric matrix [ndraws x nobs] of pointwise log densities.
-For multi-response (mvbf) fits with \code{resp = NULL}, the returned
-matrix is the joint per-observation log density: each column
-sums the pointwise densities across every response arm for that
-observation row (this matches \code{brms::log_lik.brmsfit()}
-semantics). Pass \code{resp = "<name>"} to scope to a single arm.
+A numeric \verb{[ndraws, nobs]} matrix of log densities. A missing
+response gives a column of \code{NA}. For a multivariate fit with
+\code{resp = NULL}, each column sums the densities of the responses
+measured in that row, as brms does. An occupancy, N-mixture or
+composition family has one density per site, carried on the site's
+first row.
 }
 \description{
-Compute the per-observation log-likelihood for each posterior draw,
-matching \code{brms::log_lik} semantics. The result is an \verb{S x N} matrix where
-\code{S} is the number of posterior draws and \code{N} is the number of observations
-in \code{newdata} (or the training data when \code{newdata = NULL}). Used by
-\code{\link[loo:loo]{loo::loo()}}, \code{\link[loo:waic]{loo::waic()}}, \code{\link[loo:psis]{loo::psis()}} and bayesplot PSIS-PIT helpers.
+The log density of each observation under each posterior draw, as
+\code{\link[brms:log_lik.brmsfit]{brms::log_lik.brmsfit()}} returns it. \code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=waic.mvgam]{waic.mvgam()}},
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} and \code{\link[=kfold.mvgam]{kfold.mvgam()}} score models from it.
 }
 \details{
-The implementation dispatches by \code{object$family$family} to per-family log
-density helpers. brms's parameterisations are reproduced verbatim
-(\code{negbinomial} uses the \code{neg_binomial_2} mean-shape parameterisation;
-\code{beta} uses \verb{(mu, phi)}; \verb{hurdle_*} and \verb{zero_inflated_*} mix a point mass
-at zero with the corresponding base family). Trials for \code{binomial} /
-\code{beta_binomial} are extracted from \code{newdata} or from the model object via
-the existing \code{extract_trials_for_family()} helper.
+Each family uses the brms parameterisation. For example,
+\code{negbinomial()} takes a mean and shape, \code{Beta()} a mean and precision.
+Hurdle and zero-inflated families mix a mass at zero with their base
+family. The \code{weights()}, \code{cens()} and \code{trunc()} addition terms change
+each row's contribution as they do in the Stan model.
 
-A density is evaluated under the latent trend state the model
-inferred at that time, which is the state \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns
-and \code{\link[=residuals.mvgam]{residuals.mvgam()}} scores against. That is what lets \code{\link[=loo]{loo()}},
-\code{\link[=waic]{waic()}} and the importance weights built from them describe the
-series that was observed. The \verb{posterior_*} methods answer a
-different question, integrating over the trend dynamics so that a
-covariate effect reads the same whatever time it is asked at, and
-they should not be used to build an ELPD.
+The \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} family of methods integrates over the
+trend dynamics. A covariate effect then has the same meaning at every
+time. Those predictions describe no particular observed series and
+do not give an ELPD.
 }
 \examples{
 \dontrun{
@@ -108,14 +93,35 @@ mod <- mvgam(y ~ s(x),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Pointwise posterior log-densities; rows are draws, columns
-# are observations. Feeds straight into loo::loo().
+# One row per draw, one column per observation
 ll <- log_lik(mod)
 dim(ll)
+
+# Without the latent trend, the densities are far lower. The trend
+# explains most of the series
+ll_fixed <- log_lik(mod, incl_autocor = FALSE)
+c(with_trend = mean(rowSums(ll)), without = mean(rowSums(ll_fixed)))
+
+# Next, loo() estimates the ELPD from these densities
 }
 
 }
 \seealso{
-\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=waic.mvgam]{waic.mvgam()}}, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}},
-\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}.
+\code{\link[=loo.mvgam]{loo.mvgam()}} and \code{\link[=waic.mvgam]{waic.mvgam()}} estimate the ELPD from this
+matrix. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the latent states it conditions
+on. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+compares models by cross-validation.
+
+Other model comparison: 
+\code{\link{bridge_sampler.mvgam}()},
+\code{\link{compare_elpds}()},
+\code{\link{kfold.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{loo.mvgam}()},
+\code{\link{loo_compare.mvgam_lfo}()},
+\code{\link{mvgam_loo_extras}},
+\code{\link{posterior_average.mvgam}()},
+\code{\link{waic.mvgam}()}
 }
+\concept{model comparison}

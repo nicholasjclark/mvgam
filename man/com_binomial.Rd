@@ -9,25 +9,24 @@ com_binomial(link = "logit")
 }
 \arguments{
 \item{link}{Link function for the success probability \code{p}.
-Currently \code{logit} only -- the COM-Binomial PMF factorises
-cleanly only against the canonical logit parameterisation, so
-\code{probit} and \code{cloglog} are deliberately not exposed.}
+Currently \code{logit} only. The COM-Binomial PMF factorises cleanly only
+against the canonical logit parameterisation. For that reason,
+\code{probit} and \code{cloglog} are not exposed.}
 }
 \value{
 A \code{brms::custom_family()} object suitable for the
-\code{family} argument of \code{mvgam()} / \code{jsdgam()}. Carries
-\code{attr(., "mvgam_stanvars")} holding the Stan function-block
-stanvar so mvgam's setup auto-attaches it.
+\code{family} argument of \code{mvgam()} / \code{jsdgam()}. The object has an
+\code{attr(., "mvgam_stanvars")} attribute, which holds the Stan
+function-block stanvar. mvgam's setup attaches it automatically.
 }
 \description{
 A two-parameter generalisation of the binomial that exponentiates
 the binomial coefficient by a real-valued dispersion parameter
-\code{nu}. \code{nu = 1} is the standard binomial; \code{nu > 1} under-disperses
-(concentrates mass near the mode); \verb{0 < nu < 1} over-disperses;
-\code{nu < 0} super-disperses, producing bimodal "all-or-nothing" mass
-at the boundaries. Useful when a binomial fit shows systematic
-lack-of-fit in either tail and the response is bounded by a known
-trial count.
+\code{nu}. \code{nu = 1} is the standard binomial. \code{nu > 1} under-disperses,
+concentrating mass near the mode. \verb{0 < nu < 1} over-disperses.
+\code{nu < 0} super-disperses, producing bimodal "all-or-nothing" mass at
+the boundaries. Useful when a binomial fit shows systematic lack-of-fit
+in either tail and the response is bounded by a known trial count.
 }
 \section{Distributional parameters}{
 
@@ -42,8 +41,8 @@ The support is \code{0:T}, a finite range. The normalising sum
 runs over \code{T + 1} positive terms at every real \code{nu}, which
 keeps the density proper with no lower bound on it. \code{lb = -5}
 is a numerical floor. The log factorial term grows with
-\code{-nu}, and gradients past that point are hard for the
-sampler. A scalar \code{nu} carries the floor as
+\code{-nu}. Gradients past that point are hard for the sampler. A
+scalar \code{nu} carries the floor as
 \verb{real<lower=-5>} with a prior truncated to match. A modelled
 \code{nu} is a linear predictor and carries no such declaration,
 leaving \code{nu[n]} free. Hold the predictor inside the range the
@@ -56,10 +55,10 @@ data resolve, roughly \verb{(-1, 4)}.}
 \itemize{
 \item \code{nu ~ normal(1, 1)} -- centred at \code{nu = 1}, where the
 trials are independent and the distribution is binomial.
-The scale spans the range the data can resolve: the
-response saturates below \code{nu = -1} and above \code{nu = 4}, so
-values outside roughly \verb{(-1, 4)} are barely distinguishable.
-Strongly under-dispersed data sit near \code{nu = 3}. Override
+The scale spans the range the data can resolve. The response
+saturates below \code{nu = -1} and above \code{nu = 4}. Values outside
+roughly \verb{(-1, 4)} are barely distinguishable. Strongly
+under-dispersed data have \code{nu} near 3. Override
 with \code{prior(normal(1, 2), class = "nu")} to explore wider,
 or a tighter scale to pull harder toward the binomial.
 }
@@ -125,7 +124,20 @@ dependent service rates. \emph{Journal of Industrial Engineering},
 }
 \seealso{
 \code{\link[brms]{custom_family}}, \code{\link{tweedie}}
+
+Other observation families: 
+\code{\link{beta_nb}()},
+\code{\link{categ}()},
+\code{\link{diri}()},
+\code{\link{multi}()},
+\code{\link{mvgam_families}},
+\code{\link{mvn}()},
+\code{\link{mvt}()},
+\code{\link{nmix}()},
+\code{\link{occ}()},
+\code{\link{tweedie}()}
 }
 \author{
 Nicholas J Clark, Julijus Bogomolovas
 }
+\concept{observation families}

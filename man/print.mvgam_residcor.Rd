@@ -12,7 +12,7 @@
 \item{digits}{Integer; number of significant digits for printed
 numbers. Default \code{2}.}
 
-\item{...}{Currently ignored.}
+\item{...}{Ignored.}
 }
 \value{
 The \code{mvgam_residcor} object \code{x}, returned invisibly.

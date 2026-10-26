@@ -12,9 +12,9 @@
 #   * Factors with their own coefficients (AR) are unchanged only by
 #     reordering the factors and flipping their signs. A rotation
 #     would mix factors that follow different dynamics. Each draw is
-#     relabelled here after sampling to agree with a reference, and
-#     the loadings, the factor paths and the per-factor coefficients
-#     move together.
+#     relabelled here after sampling to agree with a reference. The
+#     loadings, the factor paths and the per-factor coefficients move
+#     together.
 #
 # `factor_identification()` makes that choice once, for the Stan
 # generators and for `relabel_factors()`.
@@ -105,11 +105,13 @@ by_lv_coef_groups <- function(standata, n_lv, suffix = "") {
     return(NULL)
   }
   cols <- colnames(standata[[paste0("X", suffix)]])
-  if (length(cols) == 0L || !all(grepl("\\.trend[0-9]+", cols))) {
+  axis <- gsub(".", "\\.", factor_axis_column, fixed = TRUE)
+  level_re <- paste0(axis, "([0-9]+)")
+  if (length(cols) == 0L || !all(grepl(level_re, cols))) {
     return(NULL)
   }
-  factor_k <- as.integer(sub("^.*\\.trend([0-9]+).*$", "\\1", cols))
-  groups <- split(seq_along(cols), sub("\\.trend[0-9]+", ".trend", cols))
+  factor_k <- as.integer(sub(paste0("^.*", level_re, ".*$"), "\\1", cols))
+  groups <- split(seq_along(cols), sub(level_re, factor_axis_column, cols))
   ordered <- lapply(groups, function(idx) idx[order(factor_k[idx])])
   complete <- vapply(groups, function(idx) {
     identical(sort(factor_k[idx]), seq_len(n_lv))
@@ -144,7 +146,7 @@ has_factor_coefficients <- function(trend_spec) {
 
 # The stored parameters indexed by factor. `relabel_factors()` moves
 # exactly these. A sign flip of a factor negates the `signed` ones.
-# Their factor index comes last, and `Z_cols` holds it first. A new
+# Their factor index comes last. `Z_cols` holds it first. A new
 # per-factor parameter of a trend with its own coefficients is added
 # here. The multiplicative gamma process samples `varrho_inv`, whose
 # running product is `Psi_diag`. `relabel_chain()` recomputes it from
@@ -161,8 +163,8 @@ factor_indexed_pars <- list(
 
 #' Relabel the factors of a fit to one ordering and orientation
 #'
-#' Runs once, where the fit is assembled. The stored draws are
-#' rewritten, and every post-fit method then uses one labelling.
+#' Runs once, where the fit is assembled. It rewrites the stored
+#' draws. Every post-fit method then uses one labelling.
 #' `Z %*% t(lv_trend)` is identical in every draw before and after.
 #'
 #' @param object A fitted `mvgam` object.
@@ -205,17 +207,17 @@ relabel_factors <- function(object) {
 #' The ordering and signs that align each draw's factors
 #'
 #' Each draw's loading columns are matched to a reference by the
-#' assignment with the largest summed absolute inner product, and a
-#' column takes the sign of its inner product. The reference starts at
-#' the draw of highest log density and is replaced by the mean of the
-#' aligned draws until the assignment stops changing. The factors are
-#' then ordered by the variance they contribute to the series, largest
-#' first, and signed so the largest mean loading of each is positive.
-#' A factor's contribution is the sum of its squared mean loadings
-#' times the variance of its path.
+#' assignment with the largest summed absolute inner product. A column
+#' takes the sign of its inner product. The reference starts at the
+#' draw of highest log density. The mean of the aligned draws replaces
+#' it until the assignment stops changing. The factors are then ordered
+#' by the variance they contribute to the series, largest first. Each
+#' is signed to make its largest mean loading positive. A factor's
+#' contribution is the sum of its squared mean loadings times the
+#' variance of its path.
 #'
 #' A `template` restricts the moves to those that keep it intact.
-#' Columns are exchanged only with columns of the same template, and a
+#' Columns are exchanged only with columns of the same template. A
 #' column with a non-zero fixed entry keeps its sign.
 #'
 #' @param Z Loadings, `[draws, series, factors]`.
@@ -225,7 +227,7 @@ relabel_factors <- function(object) {
 #' @param path_var Variance over time of each sampled factor path,
 #'   `[draws, factors]`, or `NULL` to order by the loadings alone.
 #' @return A list of two `[draws, factors]` matrices. `perm[s, j]` is
-#'   the sampled column that becomes factor `j` in draw `s`, and
+#'   the sampled column that becomes factor `j` in draw `s`.
 #'   `sign[s, j]` multiplies it.
 #' @noRd
 align_factor_draws <- function(Z, lp, template = NULL, path_var = NULL) {

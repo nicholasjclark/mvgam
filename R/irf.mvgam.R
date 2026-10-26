@@ -4,35 +4,29 @@
 #' \code{mvgam} models with Vector Autoregressive dynamics
 #'
 #' @name irf.mvgam
+#' @inheritParams posterior_epred.mvgam
 #' @param object An object of class \code{mvgam} fitted with a `VAR()`
 #'   latent process model
 #' @param h Positive integer. The number of horizons to compute. Horizon
 #'   1 is the time step of the shock.
-#' @param ndraws Optional integer; the number of posterior draws to
-#'   summarise over. A response is built from one transition matrix per
-#'   draw, so a wide panel is worth answering from a subset. Default
-#'   `NULL` uses every draw.
-#' @param draw_ids Optional integer vector naming the posterior draws
-#'   to use, in place of `ndraws`.
 #' @param summary Logical; return the posterior median and interval of
 #'   each response (the default), or the per-draw responses themselves.
 #'   The draws are one `K` by `K` matrix per horizon per draw, which on
 #'   a wide panel runs to hundreds of megabytes.
-#' @param probs The lower and upper percentiles to report alongside the
-#'   median when `summary = TRUE`.
+#' @param probs The lower and upper percentiles of the interval reported
+#'   with the median when `summary = TRUE`.
 #' @param cumulative Logical. `TRUE` accumulates each response over the
 #'   horizons.
 #' @param orthogonal Logical. `TRUE` computes orthogonalised responses
 #'   from the lower Cholesky factor of the innovation covariance. These
 #'   depend on the order of the levels of the series factor. The
 #'   default generalised responses do not (Pesaran and Shin 1998).
-#' @param future \code{Logical}. When `TRUE`, per-draw IRF
-#'   computation runs under whatever
-#'   \code{\link[future:plan]{future::plan()}} the caller has set
-#'   (default \code{sequential} behaves like base `lapply` with
-#'   negligible overhead; \code{plan(multisession, workers = N)}
-#'   splits draws across \code{N} R processes). Requires the
-#'   \code{future} package (mvgam Suggests).
+#' @param future \code{Logical}. When `TRUE`, the per-draw computation
+#'   runs under the \code{\link[future:plan]{future::plan()}} the caller
+#'   has set. The default \code{sequential} plan runs as base `lapply()`
+#'   does. \code{plan(multisession, workers = N)} splits the draws across
+#'   \code{N} R processes. Without the \pkg{future} package the draws
+#'   run in turn, with a message.
 #' @param ... Unused. Anything passed here is refused.
 #' @details
 #' See \code{\link{mvgam_irf-class}} for the quantities computed and
@@ -46,13 +40,11 @@
 #'   Pesaran HH and Shin Y (1998). Generalized impulse response analysis
 #'   in linear multivariate models. Economics Letters 58, 17-29.
 #'   \doi{10.1016/S0165-1765(97)00214-0}
-#' @seealso \code{\link{mvgam_irf-class}}, [VAR()],
-#'   [plot.mvgam_irf()], [stability()], [fevd()],
-#'   [plot.mvgam_stability()], [plot.mvgam_fevd()],
-#'   [plot.mvgam_forecast()].
-#'   The article at
-#'   <https://nicholasjclark.github.io/mvgam/articles/var.html>
-#'   runs `irf()` on a plankton community.
+#' @seealso [fevd()] and [stability()] summarise the same VAR dynamics.
+#'   The `r mvgam_article("var", "VAR article")` runs `irf()` on a
+#'   plankton community. The
+#'   `r mvgam_article("hierarchical_var", "hierarchical VAR article")`
+#'   runs it on each group of a hierarchical VAR.
 #'
 #' @examples
 #' \dontrun{
@@ -67,8 +59,13 @@
 #' # Generalised responses of every series to a shock in each
 #' irf_obj <- irf(var_mod, h = 8L)
 #' plot(irf_obj, series = 1)
+#'
+#' # Next: fevd() splits each series' forecast variance among the
+#' # shocks. stability() summarises how the system returns to
+#' # equilibrium
 #' }
 #'
+#' @family latent dynamics
 #' @export
 irf <- function(object, ...) {
   UseMethod("irf", object)
@@ -116,10 +113,9 @@ irf.mvgam <- function(
   if (!summary) {
     return(all_irfs)
   }
-  # A response is summarised over draws before it is returned, because
-  # the draws themselves are one K by K matrix per horizon per draw and
-  # a wide VAR makes that far larger than anything a reader wants in
-  # hand. `summary = FALSE` keeps them for anyone who does.
+  # The draws are one K by K matrix per horizon per draw. A wide VAR
+  # makes that very large. The response is summarised over draws.
+  # `summary = FALSE` returns the draws.
   as_var_surface_summary(
     summary(all_irfs, probs = probs), "mvgam_irf_summary",
     irf_type = attr(all_irfs, "irf_type"),
@@ -138,9 +134,9 @@ irf.mvgam <- function(
 #' MA representation of A but project it differently:
 #'
 #' * Orthogonalised: `Psi_k e_j = (Phi_k P) e_j` where `P` is the
-#'   lower Cholesky factor of `Sigma_u`. `var_psi(x, h)` returns
-#'   `Phi_k P` pre-multiplied, so applying `e_j` (a unit vector) is
-#'   a single column lookup; no further Cholesky-side multiplication.
+#'   lower Cholesky factor of `Sigma_u`. `var_psi(x, h)` returns the
+#'   product `Phi_k P`. Applying the unit vector `e_j` is then a single
+#'   column lookup.
 #' * Generalised: `sigma_jj^{-1/2} Phi_k Sigma_u e_j`. Uses the raw
 #'   MA reps (`var_phi`) and projects via the j-th column of
 #'   `Sigma_u` scaled by the inverse-root of `Sigma_u[j, j]`.
@@ -155,8 +151,8 @@ gen_irf <- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {
   )
 
   if (orthogonal) {
-    # Psi_k = Phi_k * P; `var_psi` already absorbs P, so the OIRF
-    # for shock j is just the j-th column of Psi_k.
+    # Psi_k = Phi_k * P. `var_psi()` includes P. The orthogonalised
+    # response to shock j is the j-th column of Psi_k.
     Psi <- var_psi(x, h)
     for (jj in 1:x$K) {
       for (kk in 1:h) {
@@ -196,8 +192,8 @@ gen_irf <- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {
 #' \eqn{\Phi_n = D_n + \sum_{j = 1}^{\min(n, p)} A_j \Phi_{n - j}},
 #' with \eqn{D_n = 0} beyond the moving-average order.
 #'
-#' @param x One draw: `A` a `[K, K, p]` array, `D` a `[K, K, q]` array
-#'   (`q` may be 0), and `K`
+#' @param x One draw, a list holding `A` (a `[K, K, p]` array), `D` (a
+#'   `[K, K, q]` array, where `q` may be 0) and `K`
 #' @param h Horizon
 #' @return A `[K, K, h + 1]` array holding \eqn{\Phi_0, \ldots, \Phi_h}
 #' @noRd

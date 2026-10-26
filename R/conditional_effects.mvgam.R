@@ -50,19 +50,13 @@
 #'   list with one `ggplot` per effect, drawn by the `plot` and
 #'   `print` methods.
 #'
-#' @seealso
-#'   [marginaleffects::plot_predictions()] for the underlying
-#'     conditional-effect engine,
-#'   [marginaleffects::predictions()] for the same content as a
-#'     `data.frame`,
-#'   [marginaleffects::avg_slopes()],
-#'   [marginaleffects::avg_comparisons()] for marginal-effect tables,
-#'   [posterior_epred.mvgam()] for the prediction primitive that
-#'     `plot_predictions` calls,
-#'   [pp_check.mvgam()] for posterior predictive checks,
-#'   \[mvgam_diagnostics\] for parameter-level diagnostics
-#'   (`fixef`, `rhat`, `bayes_R2`, ...),
-#'   \[mvgam_draws\] for raw draws extraction
+#' @seealso [marginaleffects::predictions()] returns the plotted
+#'   values as a data frame. [marginaleffects::avg_slopes()] and
+#'   [marginaleffects::avg_comparisons()] summarise effects as numbers.
+#'   [posterior_epred.mvgam()] computes the expected values the panels
+#'   draw. [pp_check.mvgam()] checks the fit against the data. The
+#'   `r mvgam_article("mvgam_overview", "overview vignette")` interprets
+#'   effects in both formulas.
 #'
 #' @references
 #' Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to
@@ -80,11 +74,21 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Marginal effect of x on the response scale.
-#' conditional_effects(mod)
+#' # The effect of x on the expected count, with the observations
+#' conditional_effects(mod, points = TRUE)
+#'
+#' # The same effect on the log link scale
+#' conditional_effects(mod, type = "link")
+#'
+#' # The average slope of the expected count with respect to x
+#' marginaleffects::avg_slopes(mod, variables = "x", type = "expected")
+#'
+#' # Next: marginaleffects::plot_predictions() draws custom effect
+#' # displays, such as one covariate conditional on another
 #' }
 #'
 #' @author Nicholas J Clark
+#' @family predictions
 #' @method conditional_effects mvgam
 #' @export
 #' @importFrom brms conditional_effects
@@ -404,8 +408,7 @@ print.mvgam_conditional_effects <- function(x, ...) plot(x, ...)
 
 
 #' @rdname conditional_effects.mvgam
-#' @param row.names Ignored, present for S3 signature compatibility.
-#' @param optional Ignored, present for S3 signature compatibility.
+#' @inheritParams as.data.frame.mvgam
 #' @description
 #' `as.data.frame.mvgam_conditional_effects()` returns the underlying
 #' prediction grid as a long-format `data.frame` (one row per grid
@@ -631,7 +634,7 @@ resolve_series_arg <- function(series, x) {
 # colours, taken from the active scheme.
 #'@noRd
 style_effect_panel <- function(p, condition, series_var) {
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   group_var <- if (length(condition) >= 2L) condition[[2L]] else NULL
   by_series <- identical(group_var, series_var)
   for (layer in p$layers) {

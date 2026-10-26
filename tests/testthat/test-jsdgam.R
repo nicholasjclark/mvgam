@@ -27,8 +27,8 @@ test_that("jsdgam errors when 'species' column is missing", {
     jsdgam(
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, family = poisson(), n_lv = 2L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "must.+include"
   )
 })
@@ -43,8 +43,8 @@ test_that("jsdgam accepts brmsformula (bf) in addition to plain formula", {
       factor_formula = ~ -1,
       data = dat, species = species,
       family = poisson(), n_lv = 2L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE)
+      run_model = FALSE, silent = 2, validate = FALSE
+    )
   )
 })
 
@@ -56,8 +56,8 @@ test_that("jsdgam rejects non-formula non-brmsformula 'formula' arg", {
       factor_formula = ~ -1,
       data = dat, species = species,
       family = poisson(), n_lv = 2L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "Must inherit from class"
   )
 })
@@ -75,8 +75,8 @@ test_that("jsdgam accepts n_lv = n_species under iid prior (user owns ID)", {
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, species = species,
       family = poisson(), n_lv = 4L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE)
+      run_model = FALSE, silent = 2, validate = FALSE
+    )
   )
 })
 
@@ -87,8 +87,8 @@ test_that("jsdgam rejects n_lv > n_species under iid prior", {
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, species = species,
       family = poisson(), n_lv = 5L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "Got n_lv = 5, n_species = 4"
   )
 })
@@ -102,8 +102,8 @@ test_that("jsdgam allows n_lv = n_species under MGP loadings_prior", {
       data = dat, species = species,
       family = poisson(), n_lv = 4L,
       loadings_prior = "mgp",
-      run_model = FALSE, silent = 2
-    , validate = FALSE)
+      run_model = FALSE, silent = 2, validate = FALSE
+    )
   )
 })
 
@@ -115,8 +115,8 @@ test_that("jsdgam rejects n_lv > n_species even under MGP", {
       data = dat, species = species,
       family = poisson(), n_lv = 5L,
       loadings_prior = "mgp",
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "at most the number of species"
   )
 })
@@ -128,8 +128,8 @@ test_that("jsdgam rejects n_lv = 0", {
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, species = species,
       family = poisson(), n_lv = 0L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "not >= 1"
   )
 })
@@ -142,8 +142,8 @@ test_that("jsdgam rejects non-numeric unit column", {
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, unit = site_name, species = species,
       family = poisson(), n_lv = 2L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "must be numeric"
   )
 })
@@ -155,8 +155,8 @@ test_that("jsdgam rejects single-species data", {
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, species = species,
       family = poisson(), n_lv = 2L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "requires at least 2 species"
   )
 })
@@ -170,8 +170,8 @@ test_that("jsdgam refuses to overwrite existing 'time' column", {
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, unit = site, species = species,
       family = poisson(), n_lv = 2L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "already contains a 'time' column"
   )
 })
@@ -184,8 +184,8 @@ test_that("jsdgam refuses to overwrite existing 'series' column", {
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, unit = time, species = species,
       family = poisson(), n_lv = 2L,
-      run_model = FALSE, silent = 2
-    , validate = FALSE),
+      run_model = FALSE, silent = 2, validate = FALSE
+    ),
     "already contains a 'series' column"
   )
 })
@@ -198,8 +198,8 @@ test_that("a jsdgam prefit carries its class, axes, trend and program", {
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
-    run_model = FALSE, silent = 2
-  , validate = FALSE)
+    run_model = FALSE, silent = 2, validate = FALSE
+  )
   expect_identical(class(mod), c("mvgam", "jsdgam", "mvgam_prefit"))
   expect_identical(mvgam:::jsdgam_axis_names(mod),
                    list(unit = "time", species = "species"))
@@ -221,8 +221,8 @@ test_that("jsdgam records the unit column name the user gave", {
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = site, species = species,
     family = poisson(), n_lv = 2L,
-    run_model = FALSE, silent = 2
-  , validate = FALSE)
+    run_model = FALSE, silent = 2, validate = FALSE
+  )
   expect_identical(mvgam:::jsdgam_axis_names(mod)$unit, "site")
   expect_true("time" %in% names(mod$data))
 })
@@ -234,8 +234,8 @@ test_that("jsdgam with by = lv_axis() composes the per-factor smooth path", {
     factor_formula = ~ s(elev, k = 5L, by = lv_axis()) - 1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
-    run_model = FALSE, silent = 2
-  , validate = FALSE)
+    run_model = FALSE, silent = 2, validate = FALSE
+  )
   expect_true(isTRUE(mod$trend_metadata$has_by_lv))
   expect_equal(mod$trend_metadata$n_lv_for_grain, 2L)
   expect_equal(mod$standata$N_lv_trend, 2L)
@@ -492,8 +492,9 @@ test_that("jsdgam accepts the formulas mvgam accepts", {
 
   m <- SW(jsdgam(
     formula = mvf, factor_formula = ~ -1, data = d,
-    unit = site, species = species, n_lv = 1L, run_model = FALSE
-  , validate = FALSE))
+    unit = site, species = species, n_lv = 1L, run_model = FALSE,
+    validate = FALSE
+  ))
   expect_s3_class(m, "jsdgam")
   expect_identical(names(response_columns(m)), c("cnt", "pa"))
 

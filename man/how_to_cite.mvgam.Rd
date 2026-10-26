@@ -3,7 +3,7 @@
 \name{how_to_cite.mvgam}
 \alias{how_to_cite.mvgam}
 \alias{how_to_cite}
-\title{Generate a methods description for \pkg{mvgam} models}
+\title{A methods paragraph and references for an \pkg{mvgam} model}
 \usage{
 how_to_cite(object, ...)
 
@@ -15,20 +15,17 @@ how_to_cite(object, ...)
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-An object of class \code{how_to_cite} carrying a
-\code{methods_text} skeleton, the matched \code{citations}, a
-curated \code{other_citations} block and a \code{bibtex} list
-keyed by reference handle. Use \code{bibtex(x)} to extract the
-BibTeX entries. The default \code{print()} method renders all
-sections together.
+A \code{how_to_cite} object holding the \code{methods_text}, the
+\code{citations} it makes, an \code{other_citations} list of related
+references and a \code{bibtex} list keyed by reference. \code{\link[=bibtex]{bibtex()}}
+extracts the BibTeX entries. \code{print()} shows every section.
 }
 \description{
-Construct a methods skeleton plus a deduplicated reference
-list and BibTeX block for a fitted \code{mvgam} object. The
-assembled text and citation set are driven by the model's
-actual structure: the family / link, trend type, factor
-identification, structured loadings prior, GP smooths,
-piecewise trends, Stan backend, and sampling algorithm.
+Drafts a methods paragraph for a fitted model, with the references
+it cites and their BibTeX entries. The text and references follow
+the model's structure: the family and link, the trend, the factor
+identification and loadings prior, Gaussian process smooths,
+piecewise trends, the Stan backend and the sampling algorithm.
 }
 \examples{
 \dontrun{
@@ -40,18 +37,37 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Methods skeleton, citations, and BibTeX, all driven by the
-# fitted family / trend / GP / Stan backend.
-how_to_cite(mod)
+# A methods paragraph naming the Poisson family, the smooth and
+# the AR(1) trend, with the references it cites
+cite <- how_to_cite(mod)
+cite
+
+# The BibTeX entries, for a reference manager
+bibtex(cite)
+
+# Next, methods_md() writes the model's equations
 }
 
 }
 \seealso{
-\code{\link[utils]{citation}}, \code{\link{mvgam}},
-\code{\link{methods_md}}. \code{how_to_cite()} produces the
-prose methods paragraph; \code{methods_md()} produces the
-matching math statement of the model.
+\code{\link[=methods_md]{methods_md()}} writes the model's equations to accompany
+the paragraph. \code{\link[utils:citation]{utils::citation()}} cites the package itself.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

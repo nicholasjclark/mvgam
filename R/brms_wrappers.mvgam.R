@@ -1,28 +1,22 @@
-# Thin brms-parity wrappers on a fitted `mvgam` object. Each
-# method mirrors the corresponding `brms::*.brmsfit` signature
-# and delegates to the primitive that already exists in mvgam
-# (`as.matrix.mvgam`, `posterior_predict.mvgam`,
-# `mvgam_ranef_metadata`) so users can drop into the brms
-# workflow without per-method shims.
+# Methods of brms and rstantools generics for an `mvgam` object. Each
+# takes the signature of its `brmsfit` method and calls an mvgam
+# function such as `as.matrix.mvgam()` or `posterior_predict.mvgam()`.
 
 
 #' Posterior credible intervals on a fitted \pkg{mvgam} model
 #'
-#' Returns quantile-based credible intervals for posterior
-#' draws of the requested parameters. Mirrors
-#' [brms::posterior_interval.brmsfit()] and dispatches through
-#' [as.matrix.mvgam()] (so all `variable` shortcuts and
-#' aliasing apply unchanged).
+#' Quantile credible intervals of the posterior draws of parameters,
+#' as [brms::posterior_interval.brmsfit()] gives them. The parameters
+#' are chosen as in [as.matrix.mvgam()].
 #'
+#' @inheritParams as.matrix.mvgam
 #' @param object A fitted `mvgam` object.
-#' @param pars Deprecated brms alias for `variable`. If supplied
-#'   and `variable` is `NULL`, `pars` is used.
-#' @param variable Optional character vector of parameter names
-#'   or a `variables(object)` keyword shortcut. Passed straight
-#'   through to [as.matrix.mvgam()].
+#' @param pars The older brms name for `variable`, used when
+#'   `variable` is `NULL`.
 #' @param prob Numeric in `(0, 1)`. The credible-interval mass
 #'   to report. Defaults to `0.95`.
-#' @param ... Unused; present for S3 / brms-parity.
+#' @param ... Further arguments of [as.matrix.mvgam()], such as
+#'   `regex`.
 #'
 #' @return A numeric matrix with one row per parameter and two
 #'   columns reporting the lower and upper interval bounds.
@@ -32,6 +26,7 @@
 #' @seealso [brms::posterior_interval.brmsfit()],
 #'   [as.matrix.mvgam()], [predictive_interval.mvgam()].
 #'
+#' @family posterior summaries
 #' @method posterior_interval mvgam
 #' @export
 posterior_interval.mvgam <- function(object, pars = NA,
@@ -55,9 +50,9 @@ rstantools::posterior_interval
 #' Posterior predictive credible intervals on a fitted
 #' \pkg{mvgam} model
 #'
-#' Returns quantile-based credible intervals for posterior
-#' predictive draws. Mirrors [brms::predictive_interval.brmsfit()]
-#' and routes through [posterior_predict.mvgam()].
+#' Quantile credible intervals of the posterior predictive draws of
+#' [posterior_predict.mvgam()], as
+#' [brms::predictive_interval.brmsfit()] gives them.
 #'
 #' @param object A fitted `mvgam` object.
 #' @param prob Numeric in `(0, 1)`. The credible-interval mass
@@ -72,6 +67,7 @@ rstantools::posterior_interval
 #' @seealso [brms::predictive_interval.brmsfit()],
 #'   [posterior_predict.mvgam()], [posterior_interval.mvgam()].
 #'
+#' @family predictions
 #' @method predictive_interval mvgam
 #' @export
 predictive_interval.mvgam <- function(object, prob = 0.9, ...) {
@@ -97,6 +93,7 @@ rstantools::predictive_interval
 #' `ar1_trend[series_1]` or `sigma`. That help page sets out how the
 #' names are formed.
 #'
+#' @inheritParams predict.mvgam
 #' @param x A fitted `mvgam` object.
 #' @param hypothesis Character vector of hypothesis strings in the
 #'   [brms::hypothesis()] grammar, such as `"x > 0"` or
@@ -109,10 +106,9 @@ rstantools::predictive_interval
 #'   `Intercept`.
 #' @param alpha One minus the credible-interval mass. Defaults
 #'   to `0.05` (90%-CI for one-sided, 95%-CI for two-sided).
-#' @param robust Logical. Use median / MAD in place of mean / SD
-#'   when summarising. Defaults to `FALSE`.
-#' @param seed Seed for the random draws of an evidence ratio, or
-#'   `NULL`.
+#' @param seed Optional integer seed for the random draws of an
+#'   evidence ratio. The session's random state is restored when the
+#'   call returns.
 #' @param ... Forwarded to `brms::hypothesis`.
 #'
 #' @return A `brmshypothesis` object. See [brms::hypothesis()].
@@ -143,6 +139,7 @@ rstantools::predictive_interval
 #' }
 #'
 #' @importFrom brms hypothesis
+#' @family posterior summaries
 #' @method hypothesis mvgam
 #' @export
 hypothesis.mvgam <- function(x, hypothesis, class = "b", group = "",
@@ -156,9 +153,7 @@ hypothesis.mvgam <- function(x, hypothesis, class = "b", group = "",
   checkmate::assert_number(alpha, lower = 0, upper = 1)
   checkmate::assert_flag(robust)
   checkmate::assert_count(seed, null.ok = TRUE)
-  if (!is.null(seed)) {
-    set.seed(seed)
-  }
+  local_seed(seed)
   # `brms::hypothesis.brmsfit()` needs the brmsfit internals mvgam
   # does not store. Its draws come from the projection every draws
   # method shares, which names `b[1]` as `b_x`.
@@ -185,97 +180,99 @@ hypothesis.mvgam <- function(x, hypothesis, class = "b", group = "",
 
 #' Bridge sampling and Bayes factors for `mvgam` fits
 #'
-#' Log marginal likelihood via bridge sampling (Gronau, Singmann
-#' & Wagenmakers 2020) and paired Bayes factors, delegating to the
-#' `bridgesampling` package on the underlying `stanfit`. Bridge
-#' sampling answers the M-closed model-choice question that
-#' predictive scoring (\code{\link{loo.mvgam}},
-#' \code{\link{lfo_cv.mvgam}}) cannot: which model does the data
-#' support as the data-generating process, weighted by the prior?
-#' On state-space fits this is a natural complement to LFO because
-#' the answer does not depend on the choice of forecast horizon.
+#' Estimates the log marginal likelihood of a fit by bridge sampling
+#' (Gronau, Singmann and Wagenmakers 2020) and compares two fits by
+#' their Bayes factor. The marginal likelihood weighs how well a model
+#' explains the data under its prior. [loo.mvgam()] and
+#' [lfo_cv.mvgam()] score predictions of held-out data instead. A
+#' Bayes factor sets no forecast horizon, which makes it a complement
+#' to leave-future-out scores for state-space models. It also
+#' depends on the priors, which predictive scores barely do.
 #'
-#' The routing bypasses the internal brms `bridge_sampler.brmsfit`
-#' method, whose `restructure()` and `update_misc_env()` calls assume a
-#' brmsfit that mvgam objects do not conform to. Instead the S3
-#' method resolves the requirements itself and delegates directly
-#' to `bridgesampling::bridge_sampler()` on `object$fit`.
+#' The Stan program must keep the normalising constants of its
+#' densities. mvgam builds it that way by default. A fit built with
+#' `normalize = FALSE` is refused. Bridge sampling also needs the draws
+#' of every parameter, which a fit keeps under
+#' `save_pars = save_pars(all = TRUE)`.
 #'
-#' Bridge sampling requires the Stan model to use normalized
-#' probability densities (`_lpdf` / `_lpmf`), not the un-normalized
-#' variants (`_lupdf` / `_lupmf`). mvgam's shipped emitters already
-#' satisfy this; the method errors early with an informative
-#' message if the constraint is violated (typically because a user
-#' hand-edited the Stan code).
-#'
-#' @section Multivariate fits: On an `mvbf` fit the Stan program
-#'   computes a single joint log posterior pooling every response
-#'   family's likelihood, so `bridge_sampler()` naturally estimates
-#'   the joint log marginal likelihood
+#' @section Multivariate fits: The Stan program of an `mvbf()` fit has
+#'   one joint log posterior over every response. `bridge_sampler()`
+#'   then estimates the joint log marginal likelihood
 #'   \eqn{\log p(y_{1}, \ldots, y_{K} \mid \mathrm{model})}. The
-#'   bridge-sampling estimator variance grows with parameter
-#'   dimension: for multi-response, factor or VAR fits pass
-#'   `samples = 10000` or larger, and consider
-#'   `method = "warp3"` when the default `"normal"` returns high
-#'   `re2` (relative squared error).
+#'   variance of the estimate grows with the number of parameters. For
+#'   multi-response, factor or VAR fits, pass `repetitions` above 1 or
+#'   `method = "warp3"` when the default method reports a high `re2`
+#'   (relative squared error).
 #'
-#' @param samples An object of class `mvgam` (the argument name
-#'   `samples` matches the `bridgesampling` generic).
-#' @param recompile Logical. When `TRUE`, refits the model via
-#'   [update.mvgam()] before running the bridge sampler. Set
-#'   this when the fit was loaded from disk and its compiled
-#'   Stan DSO is no longer valid in the current R session (the
-#'   usual RDS-reload symptom is
-#'   `"the model object is not created or not valid"`). The
-#'   refit runs through the same backend the original fit used
-#'   (rstan or cmdstanr) and redraws the posterior, so estimates
-#'   from `recompile = TRUE` are stochastic in both the sampler
-#'   and the bridge estimator. `...` is passed only to
-#'   `bridgesampling::bridge_sampler()`; to customise the refit
-#'   itself, call `update()` explicitly with the desired
-#'   arguments first and then pass the recompiled fit here with
-#'   `recompile = FALSE`. Defaults to `FALSE`.
+#' @param samples An `mvgam` fit. The name follows the
+#'   \pkg{bridgesampling} generic.
+#' @param recompile Logical. Bridge sampling evaluates the density
+#'   through a compiled rstan model. A fit without one, sampled by
+#'   cmdstanr or loaded with [readRDS()] in a new session, has one
+#'   compiled, with its draws kept. `TRUE` compiles one for any fit. Defaults to `FALSE`.
 #' @param x1,x2 `mvgam` fits, or `bridge` objects returned by
 #'   `bridge_sampler()`, to compare.
-#' @param log Logical. Return the Bayes factor on the log scale
-#'   when `TRUE`; ratio scale otherwise.
-#' @param ... Additional arguments forwarded to
-#'   `bridgesampling::bridge_sampler()` (for example `samples`,
-#'   `method`, `cores`).
+#' @param log Logical. `TRUE` returns the log Bayes factor.
+#' @param ... Arguments of `bridgesampling::bridge_sampler()`, such as
+#'   `method`, `repetitions` or `cores`.
 #'
-#' @return `bridge_sampler.mvgam()` returns a `bridge` object with
-#'   a finite `logml`. `bayes_factor.mvgam()` returns a
-#'   `bayes_factor` object with the numeric ratio (or log-ratio).
+#' @return `bridge_sampler()` returns a `bridge` object holding the
+#'   log marginal likelihood in `logml`. `bayes_factor()` returns a
+#'   `bayes_factor` object.
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(4)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                     n_timepoints = 80L, trend_model = AR())
+#'
+#' # Bridge sampling needs many draws and every parameter's draws. It
+#' # evaluates the density through rstan. A fit sampled by rstan needs
+#' # no second compile.
+#' mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+#'                 data = simdat$data_train, family = poisson(),
+#'                 save_pars = save_pars(all = TRUE), backend = "rstan",
+#'                 chains = 2, iter = 3000, silent = 2)
+#' mod_rw <- update(mod_ar, trend_formula = ~ RW())
+#'
+#' # The log marginal likelihood of each model
+#' bs_ar <- bridge_sampler(mod_ar, silent = TRUE)
+#' bs_rw <- bridge_sampler(mod_rw, silent = TRUE)
+#' bs_ar
+#'
+#' # A Bayes factor above 1 favours the AR(1) trend. Passing the
+#' # bridge objects reuses their estimates.
+#' bayes_factor(bs_ar, bs_rw)
+#'
+#' # Next, compare their forecasts with loo() or lfo_cv()
+#' }
 #'
 #' @references
 #' Gronau QF, Singmann H and Wagenmakers E-J (2020).
 #' bridgesampling: An R package for estimating normalizing
 #' constants. *Journal of Statistical Software*. 92(10).
 #'
-#' @seealso \code{\link{loo.mvgam}}, \code{\link{lfo_cv.mvgam}}.
+#' @seealso [loo.mvgam()], [lfo_cv.mvgam()]. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   compares models by their forecasts.
 #'
 #' @author Nicholas J Clark
 #'
 #' @importFrom brms bridge_sampler
+#' @family model comparison
 #' @method bridge_sampler mvgam
 #' @export
 bridge_sampler.mvgam <- function(samples, recompile = FALSE, ...) {
   checkmate::assert_class(samples, "mvgam")
   checkmate::assert_flag(recompile)
-  if (!requireNamespace("bridgesampling", quietly = TRUE)) {
-    stop(insight::format_error(c(
-      "Package 'bridgesampling' is required.",
-      i = "Install it with install.packages('bridgesampling')."
-    )))
-  }
-  # Bridge sampling reads the joint density off the compiled model,
-  # so a density that dropped its normalising constant moves the log
-  # marginal likelihood by an unknown amount. The offset cancels in
-  # a Bayes factor only when both models carry priors matching in
-  # family, hyperparameters and dimension, which is exactly what a
-  # comparison across trend structures does not. Reading both
-  # spellings covers brms, which writes `_lupdf`, and mvgam, which
-  # writes `~`.
+  insight::check_if_installed("bridgesampling")
+  # Bridge sampling evaluates the joint density of the compiled model.
+  # A density without its normalising constant shifts the log marginal
+  # likelihood by an unknown offset. The offset cancels in a Bayes
+  # factor only between models whose densities match in family,
+  # hyperparameters and dimension. Models with different trends do
+  # not match. brms writes an unnormalised density as `_lupdf` and
+  # mvgam writes it as `~`. The check looks for both spellings.
   offenders <- mvgam_unnormalized_terms(samples$stancode)
   if (length(offenders) > 0L) {
     stop(insight::format_error(c(
@@ -287,15 +284,66 @@ bridge_sampler.mvgam <- function(samples, recompile = FALSE, ...) {
       i = "Refit with 'normalize = TRUE'."
     )))
   }
-  if (isTRUE(recompile)) {
-    # `...` is reserved for bridgesampling::bridge_sampler() and
-    # would collide with mvgam()'s own argument names (e.g.
-    # `silent` differs in type). Callers who need to customise
-    # the refit should call `update()` themselves first, then
-    # pass the recompiled fit with `recompile = FALSE`.
-    samples <- update(samples, recompile = TRUE)
+  # bridgesampling evaluates the density through the fit's compiled
+  # rstan model. A cmdstanr fit has none, nor does one loaded with
+  # `readRDS()` in a new session. As in brms, one is compiled and the draws are kept.
+  fit <- samples$fit
+  if (recompile || !has_rstan_model(fit)) {
+    fit <- with_rstan_model(fit, samples$stancode, samples$standata)
   }
-  bridgesampling::bridge_sampler(samples$fit, ...)
+  # As in brms, a failure is reported with the two causes a user can
+  # remedy
+  tryCatch(
+    bridgesampling::bridge_sampler(fit, ...),
+    error = function(e) {
+      stop(insight::format_error(c(
+        "Bridge sampling failed.",
+        x = conditionMessage(e),
+        i = paste0("Bridge sampling needs the draws of every parameter. ",
+                   "Refit with 'save_pars = save_pars(all = TRUE)'."),
+        i = "A fit loaded from disk may need 'recompile = TRUE'."
+      )), call. = FALSE)
+    }
+  )
+}
+
+
+#' Whether a stanfit holds a compiled rstan model
+#'
+#' The test of `brms:::has_rstan_model()`.
+#'
+#' @param fit A `stanfit`
+#' @return A single logical
+#' @noRd
+has_rstan_model <- function(fit) {
+  isTRUE(nzchar(fit@stanmodel@model_cpp$model_cppname)) &&
+    length(ls(fit@.MISC)) > 0L
+}
+
+
+#' A stanfit with a freshly compiled rstan model, its draws kept
+#'
+#' As `brms:::add_rstan_model()`, the program is compiled with rstan
+#' and run for no chains. Its model and environment replace those of
+#' `fit`.
+#'
+#' @param fit A `stanfit`
+#' @param stancode,standata The program and data of the model
+#' @return `fit` with its `stanmodel` and `.MISC` slots replaced
+#' @noRd
+with_rstan_model <- function(fit, stancode, standata) {
+  checkmate::assert_class(fit, "stanfit")
+  checkmate::assert_string(stancode)
+  checkmate::assert_list(standata)
+  model <- compile_model(stancode, backend = "rstan",
+                         threads = validate_threads(NULL),
+                         opencl = validate_opencl(NULL))
+  # rstan reports an empty run in a message
+  empty <- eval_silent(rstan::sampling(model, data = standata, chains = 0),
+                       type = "message")
+  fit@stanmodel <- empty@stanmodel
+  fit@.MISC <- empty@.MISC
+  fit
 }
 
 
@@ -324,16 +372,14 @@ bayes_factor.mvgam <- function(x1, x2, log = FALSE, ...) {
 #' Number of levels per grouping factor in a fitted
 #' \pkg{mvgam} model
 #'
-#' Returns a named list of integer counts: one entry per
-#' grouping factor with the number of levels it contains.
-#' Mirrors [brms::ngrps.brmsfit()] and returns `NULL` when the
-#' fit has no observation-side random effects.
+#' The number of levels of each grouping factor of the observation
+#' formula, as [brms::ngrps.brmsfit()] gives it.
 #'
 #' @param object A fitted `mvgam` object.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A named list of integer scalars, or `NULL` if no
-#'   group-level effects are present.
+#' @return A named list of integers, one per grouping factor, or
+#'   `NULL` for a model without group-level effects.
 #'
 #' @author Nicholas J Clark
 #'
@@ -360,37 +406,34 @@ brms::ngrps
 
 #' Posterior predictive errors on a fitted \pkg{mvgam} model
 #'
-#' Returns posterior draws of the response-scale prediction
-#' error (observed minus predicted) for each observation.
-#' Mirrors [brms::predictive_error.brmsfit()].
+#' Posterior draws of the prediction error, observed minus predicted,
+#' of each observation on the response scale. The arguments are those
+#' of [brms::predictive_error.brmsfit()].
 #'
-#' @param object A fitted `mvgam` object.
-#' @param newdata Optional `data.frame` to compute errors on.
-#'   `NULL` (the default) uses the training data.
-#' @param method One of `"posterior_predict"` (default) or
-#'   `"posterior_epred"`. Selects the predicted-value primitive
-#'   from which errors are taken.
-#' @param resp,re_formula,re.form,ndraws,draw_ids,sort
-#'   Forwarded to the prediction primitive; matched to brms's
-#'   signature.
-#' @param ... Unused; present for S3 / brms-parity.
+#' @inheritParams posterior_epred.mvgam
+#' @param method `"posterior_predict"` (the default) takes the errors
+#'   from predictive draws, `"posterior_epred"` from expected values.
+#' @param re.form The \pkg{lme4} name for `re_formula`.
+#' @param sort Logical. `TRUE` orders the columns by the observed
+#'   response. Defaults to `FALSE`.
+#' @param ... Further arguments of the `method` function, such as
+#'   `incl_autocor` or `allow_new_levels`.
 #'
-#' @return A numeric matrix of dimension
-#'   `[n_draws x n_observations]` containing observed minus
-#'   predicted for each draw and observation.
+#' @return An `[ndraws, nobs]` matrix of observed minus predicted
+#'   values.
 #'
 #' @details
-#' This is the quantity [residuals.mvgam()] returns under
-#' `type = "ordinary"`, and it reads the same surface: in sample the
-#' prediction carries the latent trend state the model inferred at
-#' that time, while `newdata` the fit never saw integrates over the
-#' trend dynamics instead.
+#' The errors are those [residuals.mvgam()] returns with
+#' `type = "ordinary"`. In sample, each prediction carries the latent
+#' trend state the model inferred at that time. A prediction for
+#' `newdata` integrates over the trend dynamics.
 #'
 #' @author Nicholas J Clark
 #'
 #' @seealso [brms::predictive_error.brmsfit()], [residuals.mvgam()],
 #'   [posterior_predict.mvgam()], [posterior_epred.mvgam()].
 #'
+#' @family predictions
 #' @method predictive_error mvgam
 #' @export
 predictive_error.mvgam <- function(object, newdata = NULL,
@@ -423,8 +466,8 @@ predictive_error.mvgam <- function(object, newdata = NULL,
   } else {
     posterior_epred
   }
-  # The same quantity `residuals(type = "ordinary")` returns, so it
-  # reads the same surface: in sample, the state the model inferred.
+  # In sample, the prediction carries the inferred latent state, as
+  # `residuals(type = "ordinary")` does.
   preds <- do.call(pred_fun, diagnostic_surface_args(
     list(object, newdata = newdata, re_formula = re_formula,
          resp = resp, ndraws = ndraws, draw_ids = draw_ids, ...),
@@ -451,19 +494,17 @@ predictive_error.mvgam <- function(object, newdata = NULL,
 rstantools::predictive_error
 
 
-# Deprecated brms aliases. `marginal_smooths()`, `marginal_effects()`
-# and `as.mcmc()` are covered by `conditional_smooths()`,
-# `conditional_effects()` and `posterior::as_draws_array()`, and
-# carry no mvgam method.
+# Deprecated brms names. `marginal_smooths()`, `marginal_effects()`
+# and `as.mcmc()` have no mvgam method. Their replacements are
+# `conditional_smooths()`, `conditional_effects()` and
+# `posterior::as_draws_array()`.
 #
-# `parnames()` and `nsamples()` do need one. An `mvgam` object also
-# inherits from `brmsfit`, so a call to either resolves to the brms
-# method, which reads the raw stanfit and reports parameters and
-# draws that `variables()` and `ndraws()` deliberately filter out.
-# Without delegation, code calling the deprecated spelling would
-# disagree with the current spelling on the same fit. Delegating
-# keeps the two answers identical while brms still raises its own
-# deprecation warning.
+# An `mvgam` object inherits from `brmsfit`. Without a method,
+# `parnames()` and `nsamples()` would take the brms method. That
+# method lists every stanfit parameter and draw, including those
+# `variables()` and `ndraws()` leave out. The mvgam methods return
+# what `variables()` and `ndraws()` return. brms still warns that
+# the names are deprecated.
 
 #' @importFrom brms parnames
 #' @method parnames mvgam
@@ -480,15 +521,14 @@ nsamples.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
   rlang::check_dots_empty()
   require_fitted_model(object, "nsamples")
-  posterior::ndraws(posterior::as_draws(object$fit))
+  posterior::ndraws(object)
 }
 
 
 #' The frame a prediction is made for
 #'
-#' `newdata` where the caller gave one, with the `time` and `series`
-#' columns of a `jsdgam()` fit filled in, and the training data
-#' otherwise.
+#' `newdata` when the caller gives it, with the `time` and `series`
+#' columns of a `jsdgam()` fit filled in. Otherwise the training data.
 #'
 #' @param object A fitted `mvgam` object
 #' @param newdata The caller's frame, or `NULL`
@@ -514,93 +554,16 @@ prediction_frame <- function(object, newdata = NULL) {
 }
 
 
-# ============================================================
-# brms helper-parity dispatch methods
-# ============================================================
-#
-# mvgam-side dispatch methods that brms's default dispatchers do
-# not know about. Each method forwards to an existing mvgam helper:
-#
-#   default_prior.mvgam_formula -> get_prior.mvgam_formula
-#   default_prior.mvgam         -> get_prior.mvgam
-#   standata.mvgam              -> object$standata
-#
-# stancode.mvgam / stancode.mvgam_formula / standata.mvgam_formula
-# already exist; brms::make_stancode and brms::make_standata are
-# thin wrappers around stancode() / standata() so they dispatch
-# correctly via the existing methods with no extra code.
-
-#' Stan data for a fitted mvgam model
+#' Sampler control settings of a fitted mvgam model
 #'
-#' Returns the Stan data list that was generated at fit time
-#' and stored on `object$standata`. Mirrors [stancode.mvgam()];
-#' useful for re-running the same model with `rstan` or
-#' `cmdstanr` directly, or for inspecting which design matrices
-#' brms produced from the formula and data.
-#'
-#' @param object An `mvgam` model, fitted or built with
-#'   `run_model = FALSE`.
-#' @param ... Unused. Anything passed here is refused, `newdata`
-#'   included: this method reports the data the model was fitted to
-#'   and cannot rebuild it for another frame.
-#' @return A named list of Stan data.
-#' @method standata mvgam
-#' @export
-standata.mvgam <- function(object, ...) {
-  checkmate::assert_class(object, "mvgam")
-  rlang::check_dots_empty()
-  object$standata
-}
-
-#' Default priors for an mvgam_formula
-#'
-#' Alias for [get_prior.mvgam_formula()] under the brms
-#' `default_prior()` generic. mvgam routes both names to the
-#' same prior-construction code, so this method exists purely
-#' so users coming from newer brms releases can call
-#' `default_prior(mf, data = ...)` interchangeably with
-#' `get_prior(mf, data = ...)`.
-#'
-#' @inheritParams get_prior.mvgam_formula
-#' @return A `brmsprior` data frame.
-#' @method default_prior mvgam_formula
-#' @export
-default_prior.mvgam_formula <- function(object, data,
-                                        family = gaussian(), ...) {
-  get_prior.mvgam_formula(
-    object, data = data, family = family, ...
-  )
-}
-
-#' Default priors for a fitted mvgam model
-#'
-#' Alias for [get_prior.mvgam()] under the brms
-#' `default_prior()` generic. Returns the prior table the model was
-#' fit with, the one [prior_summary()] reports.
-#'
-#' @param object A fitted `mvgam` model.
-#' @param ... Unused; an argument given here is refused.
-#' @return A `brmsprior` data frame.
-#' @method default_prior mvgam
-#' @export
-default_prior.mvgam <- function(object, ...) {
-  get_prior.mvgam(object, ...)
-}
-
-
-#' Extract sampler control parameters from a fitted mvgam model
-#'
-#' Method on `brms::control_params()` for mvgam fits. Reads the
-#' NUTS control settings (adapt_delta, max_treedepth, stepsize,
-#' etc.) from the underlying stanfit's `@stan_args` slot. The
-#' brms default method only dispatches on `brmsfit`, so without
-#' this method `control_params(fit)` fails on an mvgam object.
+#' The NUTS settings the model was sampled with, such as
+#' `adapt_delta`, `max_treedepth` and `stepsize`.
 #'
 #' @param x A fitted `mvgam` model.
 #' @param ... Unused. Anything passed here is refused.
-#' @return Named list of NUTS control settings (same shape as
-#'   `brms::control_params()` on a `brmsfit`); empty list when
-#'   no NUTS args are stored (e.g. variational fits).
+#' @return A named list, as [brms::control_params()] returns for a
+#'   `brmsfit`. A fit with no NUTS settings, such as a variational
+#'   fit, gives an empty list.
 #' @method control_params mvgam
 #' @export
 control_params.mvgam <- function(x, ...) {
@@ -609,17 +572,13 @@ control_params.mvgam <- function(x, ...) {
   mvgam_sampler_inheritance(x)$control %||% list()
 }
 
-#' Extract initial values used in a fitted mvgam model
+#' Initial values of a fitted mvgam model
 #'
-#' Method on `brms::inits()` for mvgam fits. Reads the per-chain
-#' `init` argument from the underlying stanfit's `@stan_args`
-#' slot. The brms default method only dispatches on `brmsfit`,
-#' so without this method `inits(fit)` fails on an mvgam object.
+#' The `init` argument each chain started from.
 #'
 #' @param x A fitted `mvgam` model.
 #' @param ... Unused. Anything passed here is refused.
-#' @return List with one element per chain, mirroring the `init`
-#'   argument passed to the sampler.
+#' @return A list with one element per chain.
 #' @method inits mvgam
 #' @export
 inits.mvgam <- function(x, ...) {

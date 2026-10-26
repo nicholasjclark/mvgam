@@ -143,8 +143,9 @@ test_that("the MGP column scale reaches the trend through sigma_trend", {
                   n_timepoints = 20L)$data_train
   m <- mvgam(
     y ~ 1, trend_formula = ~ AR(n_lv = 3), data = d, family = poisson(),
-    loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
-  , validate = FALSE)
+    loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE,
+    validate = FALSE
+  )
   ln <- strsplit(paste(as.character(m$model_file %||% m$stancode),
                         collapse = "\n"), "\n")[[1]]
   expect_equal(sum(grepl("Psi_diag = exp(cumulative_sum", ln,
@@ -304,8 +305,9 @@ test_that("MGP shrinkage is refused on trends that cannot carry it", {
   for (tf in list(~ RW(n_lv = 3), ~ ZMVN(n_lv = 3))) {
     expect_no_error(mvgam(
       y ~ 1, trend_formula = tf, data = d, family = poisson(),
-      loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
-    , validate = FALSE))
+      loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE,
+      validate = FALSE
+    ))
   }
 })
 

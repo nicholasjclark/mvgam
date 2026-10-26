@@ -256,8 +256,8 @@ test_that("format_model_formula() deparses a brmsformula to one line", {
 test_that("an addition term is matched as a call, not as a name", {
   # Addition terms live on the response side, so a covariate that
   # happens to share the term's name must not read as the term.
-  expect_false(is.null(mvgam:::find_aterm_call(bf(y | trials(n) ~ x),
-                                               "trials")))
+  expect_identical(mvgam:::find_aterm_call(bf(y | trials(n) ~ x),
+                                           "trials"), quote(trials(n)))
   expect_null(mvgam:::find_aterm_call(bf(y ~ x), "trials"))
   expect_null(mvgam:::find_aterm_call(y ~ trials, "trials"))
 })

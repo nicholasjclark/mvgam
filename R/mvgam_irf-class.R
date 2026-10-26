@@ -138,10 +138,7 @@ plot.mvgam_irf <- function(x, series = 1, responses = NULL, ...) {
   checkmate::assert_class(x, "mvgam_irf")
   checkmate::assert_vector(series, len = 1L, any.missing = FALSE)
   rlang::check_dots_empty()
-  # Lock the bayesplot scheme to the house red for the duration
-  # of this call so IRFs share the visual identity of forecast(),
-  # fevd() and stability() plots.
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   labels <- names(x[[1]])
   series <- validate_var_plot_ids(series, labels, "series")
   resp_ids <- validate_var_plot_ids(responses, labels, "responses")

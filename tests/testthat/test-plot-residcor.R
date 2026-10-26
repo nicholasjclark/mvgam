@@ -1,7 +1,5 @@
-# Unit tests for plot.mvgam_residcor + the shared diverging
-# scale / matrix-melting / Robinson-ordering helpers in
-# R/plot_helpers.R. Built on hand-rolled mvgam_residcor objects
-# so no Stan fit or residual_cor() call is needed.
+# `plot.mvgam_residcor()` and its heatmap helpers, on hand-built
+# `mvgam_residcor` objects.
 
 .make_residcor <- function(cor_mat) {
   structure(
@@ -17,17 +15,13 @@
   )
 }
 
-test_that("gather_matrix masks upper triangle and diagonal", {
+test_that("matrix_panel keeps every cell or the lower triangle", {
   m <- matrix(seq_len(9L), nrow = 3L,
               dimnames = list(letters[1:3], letters[1:3]))
-  out <- mvgam:::gather_matrix(m)
-  expect_identical(colnames(out), c("Var1", "Var2", "value"))
-  expect_identical(nrow(out), 9L)
-  # Counting the masked diagonal left the other half of the name
-  # untested. A helper masking the diagonal alone keeps six values
-  # and passed. The cells that survive are the lower triangle, and
-  # naming them covers both halves at once.
-  kept <- out[!is.na(out$value), ]
+  expect_identical(nrow(mvgam:::matrix_panel(m)), 9L)
+  # Naming the kept cells checks that the diagonal and the upper
+  # triangle both go
+  kept <- mvgam:::matrix_panel(m, lower_only = TRUE)
   expect_identical(paste0(kept$Var1, kept$Var2), c("ba", "ca", "cb"))
   expect_identical(kept$value, c(2L, 3L, 6L))
 })
@@ -42,9 +36,7 @@ test_that("cluster_cormat reorders a scrambled chain", {
   perm <- c(3L, 1L, 4L, 2L)
   scrambled <- natural[perm, perm]
   idx <- mvgam:::cluster_cormat(scrambled)
-  # The chain comes back exactly. Requiring one adjacent pair to
-  # clear 0.7 asserted something the scrambled matrix already
-  # managed.
+  # The chain comes back exactly
   expect_identical(perm[idx], 1:4)
   expect_equal(scrambled[idx, idx], natural)
 })
@@ -52,8 +44,7 @@ test_that("cluster_cormat reorders a scrambled chain", {
 test_that("type = 'precision' errors when the partial surface is absent", {
   cor_mat <- diag(3L)
   rc <- .make_residcor(cor_mat)
-  # The message has to name the argument that fixes it. It named
-  # `compute_precision`, which `residual_cor()` does not take.
+  # The message names the argument of `residual_cor()` that adds them
   expect_error(
     plot(rc, type = "precision"),
     "partial = TRUE",
@@ -77,9 +68,8 @@ test_that("type = 'precision' works when the partial surface is present", {
 
 
 test_that("the panel draws the estimate, not the thresholded matrix", {
-  # `sig_cor` zeroes any pair whose evidence misses 0.95, so drawing
-  # it made a correlation of 0.4 white and a whole jsdgam panel
-  # blank. Fill carries the estimate of every pair.
+  # `sig_cor` zeroes a pair whose evidence misses 0.95. The fill
+  # carries the estimate of every pair.
   cor_mat <- matrix(c(
     1.0, 0.40, 0.18,
     0.40, 1.0, 0.58,
@@ -113,11 +103,9 @@ test_that("rescale switches the colour limits", {
   fill_limits <- function(p) {
     ggplot2::ggplot_build(p)$plot$scales$get_scales("fill")$limits
   }
-  # A correlation runs on [-1, 1], so that is the honest default and
-  # keeps panels from different fits comparable.
+  # The default limits are those of a correlation. Panels from
+  # different fits are then comparable.
   expect_equal(fill_limits(plot(rc)), c(-1, 1))
   rescaled <- fill_limits(plot(rc, rescale = TRUE))
   expect_equal(rescaled, c(-0.3, 0.3))
 })
-
-

@@ -9,8 +9,9 @@
 #'
 #'  \item{cor, cor_se, cor_lower, cor_upper}{Posterior summaries of
 #'  the \eqn{p \times p} correlation matrix: the posterior mean (the
-#'  median under `robust = TRUE`), the standard error and the limits of
-#'  the credible interval at the `probs` levels.}
+#'  median under `robust = TRUE`), the posterior SD (the MAD under
+#'  `robust = TRUE`) and the limits of the credible interval at the
+#'  `probs` levels.}
 #'  \item{cor_ess}{\eqn{p \times p} matrix of per-entry effective
 #'  sample sizes of the correlation draws, computed on the Fisher-z
 #'  scale with [posterior::ess_basic()]. The diagonal is `NA`, being
@@ -130,7 +131,7 @@ plot.mvgam_residcor <- function(
   checkmate::assert_flag(cluster)
   checkmate::assert_flag(rescale)
   rlang::check_dots_empty()
-  set_color_scheme_local("red")
+  set_color_scheme_local()
 
   scale_name <- if (type == "correlation") {
     "Posterior\ncorrelation"
@@ -214,7 +215,7 @@ plot.mvgam_residcor_list <- function(x, include_global = TRUE,
   checkmate::assert_flag(include_global)
   checkmate::assert_flag(rescale)
   rlang::check_dots_empty()
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   keep <- if (isTRUE(include_global)) names(x) else
     setdiff(names(x), "_global")
   panel <- do.call(rbind, lapply(keep, function(g) {

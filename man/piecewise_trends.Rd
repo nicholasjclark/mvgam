@@ -50,11 +50,9 @@ series, the movement the
 \code{\link[=LLT]{LLT()}} slope prior allows. Prophet's own default of \code{0.05} holds a
 link-scale trend close to a straight line.}
 
-\item{growth}{Character string specifying either \code{'linear'} or \code{'logistic'}
-growth of the trend. If \code{'logistic'}, the \code{cap} argument must specify the
-variable containing maximum saturation points for the trend (see
-details and examples in \code{\link{mvgam}} for more information). Default
-is \code{'linear'}.}
+\item{growth}{Character string, \code{'linear'} (the default) or
+\code{'logistic'}. Logistic growth saturates the trend at the carrying
+capacity in the \code{cap} column.}
 
 \item{n_lv}{The number of latent factors to estimate for dynamic
 factor models. When \code{n_lv} is smaller than the number of series,
@@ -68,8 +66,7 @@ See \code{\link{mvgam}} for the accepted formats. Defaults to
 \code{NULL}.}
 }
 \value{
-An object of class \code{mvgam_trend}, which contains a list of
-arguments to be interpreted by the parsing functions in \code{mvgam}.
+An object of class \code{mvgam_trend}.
 }
 \description{
 Sets up a piecewise linear or logistic trend in \code{mvgam}. The
@@ -79,8 +76,8 @@ the data.
 \details{
 \emph{Offsets and intercepts}:
 A linear piecewise trend takes its level from the observation
-formula, matching every other trend model in \pkg{mvgam}, which
-leaves \code{y ~ 1} as the ordinary spelling for it.
+formula, as every other trend model in \pkg{mvgam} does. \code{y ~ 1} is
+the ordinary observation formula for it.
 
 A logistic piecewise trend estimates an offset (\code{m_trend}) that
 positions its curve along the time axis. It contributes
@@ -90,8 +87,8 @@ omits its intercept (\code{y ~ -1} or \code{y ~ 0 + ...}). An intercept
 there raises the ceiling above \code{cap}.
 
 \emph{Priors}:
-Time runs in steps \verb{1, ..., N}, and the default priors are set on
-the span of the series. The base growth rate takes
+Time runs in steps \verb{1, ..., N}. The default priors are set on the
+span of the series. The base growth rate takes
 \verb{k_trend ~ normal(0, 2 s / (N - 1))}, two units of growth over the
 series at one standard deviation, where \eqn{s} is the factor
 \code{\link[=get_prior]{get_prior()}} describes for linear growth and 1 for logistic
@@ -104,7 +101,7 @@ Many growing series approach a ceiling, such as a total market size,
 a population size or an ecological carrying capacity.
 \code{growth = 'logistic'} saturates the trend at a capacity that \code{data}
 supplies in its \code{cap} column. The capacity can vary by series and by
-time, and every observation needs a \code{cap} value.
+time. Every observation needs a \code{cap} value.
 
 For observation families that use a non-identity link function, the
 \code{cap} value is transformed to the link scale internally: it is
@@ -140,13 +137,21 @@ mcmc_plot(mod, variable = "trend_params", type = "intervals")
 
 }
 \references{
-Taylor, Sean J., and Benjamin Letham. "Forecasting at scale."
-The American Statistician 72.1 (2018): 37-45.
+Taylor, S. J. and Letham, B. (2018). Forecasting at scale.
+\emph{The American Statistician}, 72:37-45.
 }
 \seealso{
 \code{\link[=LLT]{LLT()}} for a trend whose growth changes continuously,
 \code{\link[=get_prior]{get_prior()}} for the scale of the default priors
+
+Other trend models: 
+\code{\link{LLT}()},
+\code{\link{RW}()},
+\code{\link{ZMVN}()},
+\code{\link{list_trend_types}()},
+\code{\link{lv_axis}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{trend models}

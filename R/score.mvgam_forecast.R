@@ -111,7 +111,7 @@ score_label <- function(score) {
 #'   untransformed scale.
 #' @param weights Optional length-`n_series` numeric vector of
 #'   per-series weights for `"variogram"`.
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A named `list` with one entry per series plus a
 #'   trailing `all_series` summary. Per-series entries are
@@ -129,11 +129,11 @@ score_label <- function(score) {
 #'   forecast at. A multivariate score needs every series at the same
 #'   forecast times.
 #'
-#' @seealso [forecast.mvgam], [hindcast.mvgam],
-#'   [mvgam_forecast-class][mvgam]. The CRPS / DRPS / ELPD /
-#'   energy / variogram scoring rules and their per-horizon
-#'   interpretation are illustrated in the online article
-#'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}.
+#' @seealso [forecast.mvgam()] produces the forecast.
+#'   [compare_scores()] scores several forecasts with one rule.
+#'   [ensemble.mvgam_forecast()] combines forecasts. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   compares models by their scores at each horizon.
 #'
 #' @references Gneiting, T. and Raftery, A. E. (2007). Strictly
 #'   Proper Scoring Rules, Prediction, and Estimation.
@@ -166,6 +166,7 @@ score_label <- function(score) {
 #' head(sc[[1L]])
 #' }
 #'
+#' @family forecasting
 #' @method score mvgam_forecast
 #' @export
 #' @export score
@@ -179,6 +180,7 @@ score.mvgam_forecast <- function(object,
                                    weights = NULL,
                                    ...) {
   checkmate::assert_class(object, "mvgam_forecast")
+  rlang::check_dots_empty()
   # A long-frame wrapper is scored per response
   object <- forecast_parts(object)
   if (is_forecast_list(object)) {

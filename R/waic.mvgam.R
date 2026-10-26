@@ -1,40 +1,24 @@
-#' Widely Applicable Information Criterion for mvgam models
+#' Widely applicable information criterion for mvgam models
 #'
-#' Compute the WAIC by passing pointwise log-likelihoods from
-#' [log_lik.mvgam()] to [loo::waic()]. Provided for brms parity; the
-#' [loo.mvgam()] method (LOO-PSIS) is usually preferred for posterior
-#' model comparison.
+#' Passes the pointwise log likelihood of [log_lik.mvgam()] to
+#' [loo::waic()]. [loo.mvgam()] estimates the same ELPD by PSIS and
+#' reports Pareto k diagnostics that say when to distrust it. Vehtari
+#' et al. (2017) recommend it over WAIC.
 #'
-#' @param x An mvgam fit.
-#' @param ... Additional arguments passed to [log_lik.mvgam()] (e.g.
-#'   `newdata`, `ndraws`, `draw_ids`).
-#' @param compare,resp,pointwise,model_names Accepted for
-#'   [brms::waic.brmsfit] parity. `resp` scopes a multivariate fit to
-#'   one response and is honoured. `pointwise` streams the density,
-#'   which mvgam does not do, and `compare` with `model_names` ranks
-#'   several models, which [loo_compare()] does. Supplying one of
-#'   those three raises an error naming it.
-#' @param incl_autocor Logical, default `TRUE`. Passed to
-#'   [log_lik.mvgam()] as its argument of the same name, so each
-#'   observation is scored on the conditional surface, under the latent
-#'   trend state the model inferred at that time.
-#' @param incl_dynamics Superseded by `incl_autocor` and still
-#'   accepted, so calls written against it keep working. `TRUE` maps
-#'   to `incl_autocor = TRUE` and `FALSE` to `incl_autocor = FALSE`.
-#'   When only `incl_dynamics` is given it decides; when both are
-#'   given `incl_autocor` decides and `incl_dynamics` is ignored.
-#' @param by_series Logical, default `FALSE`. When `TRUE`, return a
-#'   data frame with one row per series (`series` column) and per-
-#'   series WAIC estimates instead of a single `loo::waic` object.
-#'   Matches the `spOccupancy::waicOcc(by.sp = TRUE)` workflow for
-#'   ranking per-series fit in joint-species distribution models.
-#'   See [loo.mvgam()] for the column-to-series mapping convention.
+#' @inheritParams loo.mvgam
+#' @param ... Further arguments to [log_lik.mvgam()], such as `ndraws`.
+#' @param compare,resp,pointwise,model_names The arguments of
+#'   [brms::waic.brmsfit]. `resp` scopes a multivariate fit to one
+#'   response. Supplying one of the others raises an error.
+#'   [loo_compare()] ranks several `waic()` results.
 #'
-#' @return A `loo::waic` object.
+#' @return A `waic` object (see [loo::waic()]), or with
+#'   `by_series = TRUE` a data frame of per-series estimates.
 #'
-#' @seealso [loo.mvgam()], [log_lik.mvgam()],
-#'   [lfo_cv.mvgam()] for rolling-time CV,
-#'   [kfold.mvgam()] for grouped k-fold CV with selective refit.
+#' @seealso [loo.mvgam()] estimates the same ELPD by PSIS.
+#'   [lfo_cv.mvgam()] scores forecasts from rolling origins. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   compares models by approximate and exact cross-validation.
 #'
 #' @references
 #' Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical
@@ -54,9 +38,18 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
+#' # The WAIC estimate of the ELPD, with its effective number of
+#' # parameters p_waic
 #' waic(mod)
+#'
+#' # The PSIS estimate of the same ELPD. Its Pareto k diagnostics mark
+#' # the observations it estimates poorly
+#' loo(mod)
+#'
+#' # Next, loo_compare() ranks several models by either estimate
 #' }
 #'
+#' @family model comparison
 #' @method waic mvgam
 #' @export
 waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
@@ -64,44 +57,21 @@ waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                        incl_autocor = TRUE,
                        incl_dynamics = NULL,
                        by_series = FALSE) {
+  require_fitted_model(x, "waic")
   incl_autocor <- resolve_incl_autocor(
     incl_autocor = incl_autocor,
     legacy = incl_dynamics,
     autocor_supplied = !missing(incl_autocor)
   )
-  if (isTRUE(pointwise)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "{.field pointwise = TRUE} is not supported on mvgam waic."
-      ),
-      i = cli::format_inline(
-        "Compute WAIC in-memory by leaving {.field pointwise = FALSE}."
-      )
-    )))
-  }
-  # `compare` and `model_names` rank several models, which
-  # `loo_compare()` does on the results this returns.
-  unhonoured <- c(
+  refuse_unsupported_ic_args(c(
+    pointwise = isTRUE(pointwise),
     compare = !missing(compare),
     model_names = !is.null(model_names)
-  )
-  if (any(unhonoured)) {
-    stop(insight::format_error(c(
-      "Arguments this method cannot honour were supplied.",
-      x = paste0(
-        "Supplied: ",
-        paste0("'", names(unhonoured)[unhonoured], "'", collapse = ", "),
-        "."
-      ),
-      i = "Rank models with 'loo_compare()' on their 'waic()' results."
-    )))
-  }
+  ), "waic")
   logliks <- log_lik(
     x, resp = resp, incl_autocor = incl_autocor, ...
   )
-  # Drop the all-NA columns a missing response leaves behind, the same
-  # way loo.mvgam does, so both criteria score the same observations.
-  logliks <- clean_ll(x, logliks)
+  logliks <- clean_ll(logliks)
   if (isTRUE(by_series)) {
     return(per_series_ic(x, logliks, criterion = "waic"))
   }

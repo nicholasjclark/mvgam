@@ -46,12 +46,12 @@ compute_family_epred <- function(linpred, family, trials = NULL,
 
   checkmate::assert_numeric(trials, lower = 0, min.len = 1, null.ok = TRUE)
 
-  # A family named in `epred_extra_dpars()` has a mean that is not the
-  # inverse link of its predictor, and a kernel that says what it is
-  # instead. Routing on that registry keeps one list rather than two:
-  # the families needing extra parameters and the families needing a
-  # kernel are the same families, and adding one means editing one
-  # place. `log_lik.mvgam()` dispatches to its own kernels the same way.
+  # A family named in `epred_extra_dpars()` has a mean that differs from
+  # the inverse link of its predictor. Such a family needs a kernel that
+  # computes its mean. The families needing extra parameters are the same
+  # families needing a kernel. One registry lists both. Adding a family
+  # requires one edit. `log_lik.mvgam()` dispatches to its own kernels the
+  # same way.
   if (length(epred_extra_dpars(family)) > 0L &&
       !is.null(epred_kernel(family_name))) {
     return(family_mean_from_kernel(
@@ -105,9 +105,9 @@ compute_family_epred <- function(linpred, family, trials = NULL,
     # zero is absorbed into mu without any Jensen correction.
     "tweedie" = family$linkinv(linpred),
 
-    # Beta negative binomial: the family is parameterised so that
-    # E[Y] = mu exactly, with the shifted tail parameter absorbing
-    # the alpha > 1 constraint that makes the mean exist at all.
+    # Beta negative binomial: the family is parameterised with E[Y] = mu
+    # exactly. The shifted tail parameter absorbs the alpha > 1 constraint
+    # that makes the mean exist.
     "beta_nb" = family$linkinv(linpred),
 
     # Default: try inverse link with warning for unknown families
@@ -139,23 +139,23 @@ compute_family_epred <- function(linpred, family, trials = NULL,
 #'   `compute_family_epred()` or `posterior_epred.mvgam()`).
 #' @param family A family or brmsfamily object; `family$family` selects
 #'   the variance formula.
-#' @param sigma Optional ``\\[ndraws x nobs\\]`` matrix of `sigma` draws. Required
-#'   for `gaussian` (Var = sigma^2). Other families ignore it.
-#' @param shape Optional ``\\[ndraws x nobs\\]`` matrix of `shape` draws. Required
-#'   for `negbinomial` (Var = mu + mu^2/shape) and `gamma`
+#' @param sigma Optional ``\\[ndraws x nobs\\]`` matrix of `sigma` draws.
+#'   Required for `gaussian` (Var = sigma^2). Other families ignore it.
+#' @param shape Optional ``\\[ndraws x nobs\\]`` matrix of `shape` draws.
+#'   Required for `negbinomial` (Var = mu + mu^2/shape) and `gamma`
 #'   (Var = mu^2/shape).
-#' @param phi Optional ``\\[ndraws x nobs\\]`` matrix of `phi` draws. Required for
-#'   `beta` (Var = mu(1-mu)/(1+phi)). `phi` here is the brms precision
-#'   parameter (shape1 + shape2 of the underlying Beta), not an
-#'   overdispersion.
+#' @param phi Optional ``\\[ndraws x nobs\\]`` matrix of `phi` draws.
+#'   Required for `beta` (Var = mu(1-mu)/(1+phi)). Here `phi` is the brms
+#'   precision parameter, equal to shape1 + shape2 of the underlying Beta.
+#'   A larger `phi` gives a narrower distribution.
 #' @param nu Optional ``\\[ndraws x nobs\\]`` matrix of `nu` (degrees of
 #'   freedom) draws. Required for `student`
 #'   (Var = sigma^2 * nu / (nu - 2) when nu > 2; `Inf` otherwise).
 #' @param trials Optional numeric vector (length `ncol(mu)` or 1) of trial
 #'   counts for `binomial` (Var = trials * p * (1-p) where p = mu/trials).
 #'
-#' @return Numeric matrix ``\\[ndraws x nobs\\]`` of conditional variances on the
-#'   response scale.
+#' @return Numeric matrix ``\\[ndraws x nobs\\]`` of conditional variances
+#'   on the response scale.
 #'
 #' @noRd
 compute_family_variance <- function(mu, family, sigma = NULL,
@@ -247,8 +247,8 @@ compute_family_variance <- function(mu, family, sigma = NULL,
       s <- require_dpar(sigma, "sigma")
       df <- require_dpar(nu, "nu")
       # Var[Y] = sigma^2 * nu/(nu-2) for nu > 2; undefined otherwise.
-      # Return Inf for the undefined region so downstream summaries
-      # propagate non-finiteness rather than silently NA.
+      # Return Inf for the undefined region. Downstream summaries then
+      # propagate non-finiteness. The value is not converted to NA.
       v <- s^2 * df / (df - 2)
       v[df <= 2] <- Inf
       v
@@ -292,36 +292,35 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   innovation to its deterministic submodel. Each posterior draw
 #'   takes one innovation from the distribution the trend settles
 #'   into. An autoregressive trend settles into its stationary
-#'   distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}, and
-#'   the Jensen correction on a log link is
+#'   distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}. The
+#'   Jensen correction on a log link is
 #'   \eqn{\sigma^2/(2(1-\rho^2))}. A random walk lacks a stationary
 #'   distribution and a `ZMVN()` trend lacks dynamics. Both draw their
-#'   innovations directly. `CAR()` holds one stationary covariance at
+#'   innovations directly. `CAR()` uses one stationary covariance at
 #'   every time of an irregular grid and draws from it. If `FALSE`,
 #'   the default, the trend contributes its deterministic submodel
 #'   alone, at its own per-draw values. The argument applies under
 #'   `incl_autocor = FALSE`. Conditioning on the fitted state already
 #'   fixes every innovation.
 #'
-#'   Each call draws new innovations, and two calls on one fit give
-#'   different results. Set a seed to reproduce a result.
+#'   Each call draws new innovations. Two calls on one fit give different
+#'   results. Set a seed to reproduce a result.
 #' @param incl_autocor Logical; which prediction surface the trend
-#'   contribution comes from. `FALSE`, the default, keeps the fitted
-#'   `trend[t, s]` out and answers from the two submodels' covariate
-#'   structure, so an effect reads the same whether it is asked at the
-#'   first time point or the fiftieth. `TRUE` reads the latent state
-#'   the model inferred at each time, which is the quantity
-#'   [hindcast()] returns and the one an ELPD is built from;
-#'   [loo_R2.mvgam()] and [bayes_R2.mvgam()] ask for it, because an
-#'   R^2 describes the series that was observed rather than a
-#'   counterfactual one. A row whose time falls outside the fitted grid
-#'   is refused under `TRUE`. [forecast.mvgam()] predicts those times.
+#'   contribution comes from. `FALSE`, the default, omits the fitted
+#'   `trend[t, s]` and uses the two submodels' covariate structure. The
+#'   effect is the same at the first time point as at the fiftieth. `TRUE`
+#'   uses the latent state the model inferred at each time. That is the
+#'   quantity [hindcast()] returns. The ELPD is computed from it.
+#'   [loo_R2.mvgam()] and [bayes_R2.mvgam()] request this surface. An R^2
+#'   describes the observed series. A row whose time falls outside the
+#'   fitted grid is refused under `TRUE`. [forecast.mvgam()] predicts
+#'   those times.
 #'
-#'   The default suits a model whose covariates carry the signal. When
-#'   most of the series-level variation sits in the trend instead, as
-#'   in a fit with few covariates and a strong autoregressive process,
-#'   this surface has little left to say; [hindcast.mvgam()] and
-#'   [forecast.mvgam()] are the better reading there.
+#'   The default suits a model whose covariates explain most of the
+#'   signal. When most of the series-level variation lies in the trend,
+#'   as in a fit with few covariates and a strong autoregressive process,
+#'   this surface has little to say. [hindcast.mvgam()] and
+#'   [forecast.mvgam()] are more informative there.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param draw_ids Optional integer vector selecting a subset of posterior
@@ -332,9 +331,9 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   supported.
 #' @param allow_new_levels Logical; accepted for brms compatibility.
 #'   A grouping level the model never saw is refused whatever this is
-#'   set to, because a new level has no fitted random effect and, for
-#'   a new series, no latent state to propagate. Predict for levels
-#'   the fit knows, or refit with the new levels included.
+#'   set to. A new level has no fitted random effect. For a new series,
+#'   it has no latent state to propagate. Predict for levels the fit
+#'   knows, or refit with the new levels included.
 #' @param sample_new_levels Character; accepted for brms
 #'   compatibility and not used, since new levels are refused. See
 #'   `allow_new_levels`.
@@ -373,9 +372,9 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @seealso [posterior_linpred.mvgam()] for link scale predictions,
 #'   [posterior_predict.mvgam()] for posterior predictive samples,
 #'   \[forecast.mvgam\] and \[hindcast.mvgam\] for the deterministic
-#'   state-extrapolating prediction surface (state read from the
-#'   fitted `lv_trend` posterior draws instead of integrated over
-#'   via Monte Carlo).
+#'   state-extrapolating prediction surface. That surface takes the
+#'   state from the fitted `lv_trend` posterior draws, with no Monte
+#'   Carlo integration.
 #'
 #' @examples
 #' \dontrun{
@@ -402,6 +401,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' }
 #'
 #' @importFrom brms posterior_epred
+#' @family predictions
 #' @method posterior_epred mvgam
 #' @export
 posterior_epred.mvgam <- function(object, newdata = NULL,
@@ -424,10 +424,10 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
 
   newdata <- prediction_frame(object, newdata)
 
-  # The linear predictor and the distributional parameters are drawn
-  # by separate extractions, so a requested count is materialised as
-  # concrete indices before either runs; otherwise the two subsample
-  # independently and answer from unrelated iterations.
+  # The linear predictor and the distributional parameters are drawn by
+  # separate extractions. Each one subsamples on its own. A requested count
+  # is converted to concrete indices before either runs. Without that
+  # conversion, the two subsamples come from unrelated iterations.
   draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
   if (!is.null(draw_ids)) {
     ndraws <- NULL
@@ -446,17 +446,16 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     resp = resp
   )
 
-  # The marginal expectation integrates over the trend's dynamics by
-  # carrying sampled innovations on the link scale before the inverse
-  # link is applied, which reaches the same place as the analytic
-  # correction brms makes for an AR-cov model (sigma^2/(1-ar^2)/2 for
-  # a Poisson log link) while working uniformly across families,
-  # links and trend types. `get_combined_linpred()` samples them, and
-  # samples them once: drawing a second set here as well put twice
-  # the process variance into every marginal prediction.
+  # The marginal expectation integrates over the trend's dynamics. Sampled
+  # innovations are carried on the link scale before the inverse link is
+  # applied. This matches the analytic correction brms makes for an AR-cov
+  # model (sigma^2/(1-ar^2)/2 for a Poisson log link). It works the same
+  # way across families, links and trend types. `get_combined_linpred()`
+  # samples the innovations once. A second set drawn here would double
+  # the process variance in every marginal prediction.
 
-  # A model with several responses answers for each when `resp` names
-  # none, as brms does.
+  # A model with several responses returns a result for each response when
+  # `resp` names none, as brms does.
   if (is.list(linpred) && !is.matrix(linpred)) {
     return(lapply(stats::setNames(nm = names(linpred)), function(r) {
       response_epred(object, linpred[[r]], newdata, draw_ids, resp = r,
@@ -507,44 +506,43 @@ response_epred <- function(object, linpred, newdata, draw_ids, resp,
 
 #' The family's mean for a linear predictor already on the link scale
 #'
-#' The inverse link answers this only for a family whose expectation
-#' is its predictor. A binomial mean is `trials * p` and a
-#' zero-inflated mean is `(1 - zi) * mu`, so a surface that applies
-#' the inverse link alone reports a probability where a count was
-#' asked for, or a rate before its mixing probability.
+#' The inverse link gives this mean only for a family whose expectation
+#' is its predictor. A binomial mean is `trials * p`. A zero-inflated
+#' mean is `(1 - zi) * mu`. A surface that applies the inverse link alone
+#' reports a probability where a count was asked for, or a rate before
+#' its mixing probability.
 #'
-#' Trials come from `extract_trials_for_family()`. Families needing
-#' more than `(linpred, trials)` are named by `epred_extra_dpars()`:
-#' a mixture at zero needs its mixing probability, a lognormal the
-#' dispersion its Jensen correction uses, and a
-#' Conway-Maxwell-binomial has no closed form in `mu` alone. Those
-#' draws are resolved against the same iterations the predictor came
-#' from.
+#' Trials come from `extract_trials_for_family()`. Families that need
+#' more than `(linpred, trials)` are named by `epred_extra_dpars()`. A
+#' mixture at zero needs its mixing probability. A lognormal needs the
+#' dispersion its Jensen correction uses. A Conway-Maxwell-binomial has
+#' no closed form in `mu` alone. The extra draws are resolved against the
+#' same iterations the predictor came from.
 #'
-#' A closure-unit family's mean reads sibling rows: an occupancy is
-#' thinned by the visit's detection probability, and a composition
-#' normalises across the K rows of its site. Neither is a function of
-#' one row's predictor, so each has a kernel that says what it is,
-#' and this routes to that kernel with the predictor it was handed.
-#' Applying the inverse link instead returned the raw predictor for
-#' a composition and the occupancy without its detection.
+#' A closure-unit family's mean depends on sibling rows. An occupancy is
+#' thinned by the visit's detection probability. A composition normalises
+#' across the K rows of its site. Neither is a function of one row's
+#' predictor. Each has a dedicated kernel. This function passes the
+#' predictor to that kernel. The inverse link alone would give the raw
+#' predictor for a composition and the occupancy without its
+#' detection.
 #'
-#' An ordinal response's mean is its expected ordered level, the
-#' scale `posterior_predict()` draws on. `posterior_epred()` reports
-#' the category probabilities instead, through `response_epred()`.
+#' An ordinal response's mean is its expected ordered level, on the
+#' scale that `posterior_predict()` draws from. `posterior_epred()`
+#' reports the category probabilities through `response_epred()`.
 #'
-#' Each response reads its own family, trials and parameters. A
-#' response of a model with several stores its parameters under its
-#' own key, `hu_count` for `hu`, and reading them unscoped found
+#' Each response uses its own family, trials and parameters. A response
+#' of a model with several responses stores its parameters under its own
+#' key, `hu_count` for `hu`. Looking them up without that scope returns
 #' none.
 #'
 #' @param object A fitted `mvgam` object.
 #' @param linpred `[ndraws x nobs]` link-scale predictor, or a named
 #'   list of them for a multivariate fit.
-#' @param newdata Data the predictor was built for, used to read
-#'   trials and any per-observation parameter.
-#' @param draw_ids Draws the predictor was taken at, so the extra
-#'   parameters are read at the same iterations.
+#' @param newdata Data the predictor was built for. The function looks up
+#'   trials and any per-observation parameter in it.
+#' @param draw_ids Draws the predictor was taken at. The extra parameters
+#'   are taken at the same iterations.
 #' @param resp The response's key, or `NULL`.
 #' @return Matrix of expected values, or a named list of them.
 #' @noRd
@@ -600,13 +598,12 @@ expected_from_linpred <- function(object, linpred, newdata = NULL,
 #' Distributional parameters a family's mean needs beyond the predictor
 #'
 #' Most families have `E[Y]` equal to the inverse link of the linear
-#' predictor, so the predictor is all `compute_family_epred()` needs.
-#' The families named here do not: a mixture at zero, a Jensen
-#' correction or a sum over the support puts another parameter in the
-#' mean. Naming them in one place is what lets `posterior_epred()`
-#' resolve those draws before it dispatches, rather than each family
-#' discovering at the last moment that it was handed the predictor
-#' alone.
+#' predictor. For them, the predictor is all `compute_family_epred()`
+#' needs. The families named here need additional parameters. A mixture
+#' at zero, a Jensen correction or a sum over the support puts another
+#' parameter in the mean. Naming them in one place lets `posterior_epred()`
+#' resolve those draws before it dispatches. Otherwise each family would
+#' find, too late, that it had received only the predictor.
 #'
 #' @param family A family or brmsfamily object
 #' @return Character vector of `dpar` names, empty when the mean needs
@@ -652,19 +649,18 @@ epred_extra_dpars_for <- function(family_name) {
 
 #' The mean kernel a family's `E[Y]` is defined by
 #'
-#' Each family's mean lives in one `posterior_epred_<family>()`
-#' function copied from brms. Looking it up by name is how
-#' `log_lik.mvgam()` reaches its own per-family densities, and it means
-#' a family's mean is written once rather than once in a kernel and
-#' again in a dispatch branch.
+#' Each family's mean is defined in one `posterior_epred_<family>()`
+#' function copied from brms. `log_lik.mvgam()` looks up that function by
+#' name to reach its own per-family densities. The mean is then written
+#' once, in one kernel, with no second copy in a dispatch branch.
 #'
 #' @param family_name Resolved family name
 #' @return The kernel, or `NULL` when the family has none
 #'
 #' @noRd
 epred_kernel <- function(family_name) {
-  # Asked rather than attempted, so a family with no kernel is
-  # answered `NULL` while a kernel that fails to load still raises.
+  # The existence check returns `NULL` for a family with no kernel. A
+  # kernel that exists but fails to load still raises.
   nm <- paste0("posterior_epred_", family_name)
   if (!exists(nm, mode = "function", envir = asNamespace("mvgam"))) {
     return(NULL)
@@ -673,13 +669,13 @@ epred_kernel <- function(family_name) {
 }
 
 
-#' Mean of a family whose mean is not its inverse link
+#' Mean of a family whose mean differs from its inverse link
 #'
-#' Applies the per-family mean its brms counterpart uses, so the two
-#' agree on what `posterior_epred()` returns and there is one
-#' definition of each mean rather than a kernel and a dispatch branch
-#' free to drift apart. `mu` here is the base distribution's
-#' parameter, already on the response scale.
+#' Applies the per-family mean that its brms counterpart uses. The two
+#' agree on what `posterior_epred()` returns. Each mean has one
+#' definition. A kernel and a dispatch branch cannot drift apart.
+#' `mu` here is the base distribution's parameter, already on the
+#' response scale.
 #'
 #' @param family_name Resolved family name
 #' @param mu Numeric matrix ``\\[ndraws x nobs\\]`` of the base
@@ -752,8 +748,8 @@ extract_trials_for_family <- function(object, family, newdata) {
   checkmate::assert_multi_class(family, c("family", "brmsfamily"))
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
 
-  # `resolve_family_name()` reads a custom family's own name, which
-  # brms records as "custom", and `com_binomial()` takes trials too.
+  # `resolve_family_name()` looks up a custom family's own name. brms
+  # records that name as "custom". `com_binomial()` also takes trials.
   family_name <- resolve_family_name(family)
 
   binomial_families <- c("binomial", "beta_binomial",
@@ -765,18 +761,18 @@ extract_trials_for_family <- function(object, family, newdata) {
     return(NULL)
   }
 
-  # Predictions cover every row of the target data, including rows
-  # whose response was missing, so the denominator is resolved
-  # against that data rather than reused from `standata`, which is
-  # sized to the likelihood's observed rows.
+  # Predictions cover every row of the target data, including rows whose
+  # response was missing. The denominator is resolved against that data.
+  # It is not reused from `standata`, which is sized to the likelihood's
+  # observed rows.
   pred_data <- prediction_frame(object, newdata)
   trials <- resolve_trials_denominator(object$formula, pred_data) %||%
     pred_data$trials
 
-  # `standata` answers only for the data the model was fitted to.
-  # Reusing it for a grid the caller supplied would hand each row
-  # another observation's denominator, and would go unnoticed
-  # whenever the two happen to carry the same number of rows.
+  # `standata` covers only the data the model was fitted to. Reusing it
+  # for a grid the caller supplied would give each row another
+  # observation's denominator. The error goes unnoticed whenever the two
+  # carry the same number of rows.
   if (is.null(trials) && is.null(newdata)) {
     trials <- object$standata$trials
   }
@@ -802,11 +798,11 @@ extract_trials_for_family <- function(object, family, newdata) {
     )))
   }
 
-  # A denominator of zero is a legal binomial observation: no trials
-  # were run, so the response is necessarily zero and the expected
-  # value with it. brms accepts it (`data_response()` rejects only
-  # negatives), and it is the natural padding for a cell the
-  # likelihood never saw, so the bound here matches.
+  # A denominator of zero is a legal binomial observation. No trials were
+  # run. The response is necessarily zero. The expected value is zero too.
+  # brms accepts a zero denominator, since `data_response()` rejects only
+  # negatives. Zero is also the natural padding for a cell the likelihood
+  # never saw. The bound here matches that padding.
   checkmate::assert_numeric(trials, lower = 0, finite = TRUE,
                             any.missing = FALSE, min.len = 1,
                             .var.name = "trials")
@@ -835,9 +831,9 @@ extract_trials_for_family <- function(object, family, newdata) {
 
 #' Expand Data to Posterior Draw Dimensions
 #'
-#' Converts vector or matrix data to appropriate dimensions for vectorized
-#' multiplication with posterior draws. Used to broadcast observation-level
-#' data (trials, rate denominators) across all posterior draws.
+#' Converts vector or matrix data to dimensions that match the posterior
+#' draws, for vectorized multiplication. Broadcasts observation-level data
+#' (trials, rate denominators) across all posterior draws.
 #'
 #' @param x Numeric vector or matrix to expand
 #' @param dim Integer vector specifying target dimensions:
@@ -1004,12 +1000,10 @@ posterior_epred_binomial <- function(prep) {
   prep$dpars$mu * trials
 }
 
-#' Beta dispersion is included in mu; formula identical to binomial
+#' The beta-binomial mean is the binomial mean. Its dispersion leaves
+#' `mu` unchanged.
 #' @noRd
-posterior_epred_beta_binomial <- function(prep) {
-  trials <- data2draws(prep$data$trials, dim_mu(prep))
-  prep$dpars$mu * trials
-}
+posterior_epred_beta_binomial <- posterior_epred_binomial
 
 #' @noRd
 posterior_epred_gen_extreme_value <- function(prep) {
@@ -1039,9 +1033,8 @@ posterior_epred_zero_inflated_poisson <- function(prep) {
 }
 
 #' @noRd
-posterior_epred_zero_inflated_negbinomial <- function(prep) {
-  with(prep$dpars, mu * (1 - zi))
-}
+posterior_epred_zero_inflated_negbinomial <-
+  posterior_epred_zero_inflated_poisson
 
 #' @noRd
 posterior_epred_zero_inflated_binomial <- function(prep) {
@@ -1049,17 +1042,14 @@ posterior_epred_zero_inflated_binomial <- function(prep) {
   prep$dpars$mu * trials * (1 - prep$dpars$zi)
 }
 
-#' Beta dispersion is included in mu; formula identical to zi_binomial
+#' The zero-inflated beta-binomial mean is the zero-inflated binomial
+#' mean. Its dispersion leaves `mu` unchanged.
 #' @noRd
-posterior_epred_zero_inflated_beta_binomial <- function(prep) {
-  trials <- data2draws(prep$data$trials, dim_mu(prep))
-  prep$dpars$mu * trials * (1 - prep$dpars$zi)
-}
+posterior_epred_zero_inflated_beta_binomial <-
+  posterior_epred_zero_inflated_binomial
 
 #' @noRd
-posterior_epred_zero_inflated_beta <- function(prep) {
-  with(prep$dpars, mu * (1 - zi))
-}
+posterior_epred_zero_inflated_beta <- posterior_epred_zero_inflated_poisson
 
 #' @noRd
 posterior_epred_zero_one_inflated_beta <- function(prep) {
@@ -1213,8 +1203,7 @@ posterior_epred_com_poisson <- function(prep) {
 #'
 #' brms marks each of its ordinal families with the special
 #' `"ordinal"`: cumulative, sratio, cratio, acat and
-#' hurdle_cumulative. Reading the mark keeps the hurdle variant in,
-#' which a list of four names had left out.
+#' hurdle_cumulative. Checking the mark includes the hurdle variant.
 #'
 #' @param family A family object, or `NULL`
 #' @return A single logical
@@ -1229,12 +1218,12 @@ is_ordinal_family <- function(family) {
 
 #' Expectation of a function of the ordered level under an ordinal epred
 #'
-#' An ordinal epred holds a probability per category rather than a mean,
-#' so a summary on the response scale is an expectation over the ordered
-#' levels. Each category's level is its name on the third margin, the
+#' An ordinal epred holds a probability for each category. A summary on
+#' the response scale is an expectation over the ordered levels. Each
+#' category's level is its name on the third margin. That name is the
 #' value `posterior_predict()` draws: `1..K`, with `0` for the hurdle
-#' category of `hurdle_cumulative()`. Every ordinal summary is then on
-#' the scale of the draws themselves.
+#' category of `hurdle_cumulative()`. Every ordinal summary is then on the
+#' scale of the draws themselves.
 #'
 #' @param epred Array ``\\[ndraws x nobs x ncat\\]`` of category
 #'   probabilities, its third margin named by level
@@ -1253,7 +1242,7 @@ ordinal_category_moment <- function(epred, f) {
 }
 
 
-#' The ordered level each category of an ordinal epred stands for
+#' The ordered level that each category of an ordinal epred represents
 #'
 #' @param probs Array ``\\[ndraws x nobs x ncat\\]`` of category
 #'   probabilities, its third margin named by level
@@ -1297,14 +1286,14 @@ ordinal_category_variance <- function(epred) {
 
 #' Ordinal thresholds on the scale of mvgam's linear predictor
 #'
-#' brms centres the design before sampling, so the sampled
-#' `Intercept[k]` cut a predictor built from the centred columns. The
-#' predictor mvgam builds after fitting uses the uncentred design, as
-#' brms's own predictions do, and the thresholds that cut it are the
-#' `b_Intercept[k]` brms writes in generated quantities. The two differ
-#' by the slopes times the covariate means, and reading the first set
-#' shifted every category probability by that much. A response of a
-#' model with several reads its own, `b_<resp>_Intercept[k]`.
+#' brms centres the design before sampling. The sampled `Intercept[k]`
+#' cuts a predictor built from the centred columns. The predictor mvgam
+#' builds after fitting uses the uncentred design, as brms's own
+#' predictions do. The thresholds that cut it are the `b_Intercept[k]`
+#' that brms writes in generated quantities. The two differ by the slopes
+#' times the covariate means. Using the first set shifts every category
+#' probability by that much. A response of a model with several responses
+#' uses its own, `b_<resp>_Intercept[k]`.
 #'
 #' @param object A fitted `mvgam` object
 #' @param draw_ids Draws the predictor was taken at, or `NULL` for all
@@ -1331,15 +1320,15 @@ ordinal_thresholds <- function(object, draw_ids = NULL, resp = NULL) {
 
 #' Category probabilities of an ordinal response
 #'
-#' The one account of an ordinal family's predictive distribution:
-#' `posterior_epred()` reports it, `log_lik()` reads the observed
-#' category's probability from it and `posterior_predict()` draws a
-#' category from it. `disc`, and `hu` for the hurdle variant, come from
-#' `resolve_family_pars()`, which reads a sampled parameter off the
-#' draws and rebuilds a modelled one from its own formula. brms fixes
-#' `disc` at one unless it is given a formula. A modelled `disc` is a
-#' local of the model block and leaves no draw behind, which is why
-#' reading the posterior for it fell back to one.
+#' The category probabilities of an ordinal family's predictive
+#' distribution. `posterior_epred()` reports them. `log_lik()` takes the
+#' observed category's probability from them. `posterior_predict()` draws
+#' a category from them. `disc` and `hu` (for the hurdle variant) come
+#' from `resolve_family_pars()`. That function takes a sampled parameter
+#' from the draws and rebuilds a modelled one from its own formula. brms
+#' fixes `disc` at one unless it is given a formula. A modelled `disc` is
+#' a local of the model block and leaves no draw. The posterior holds no
+#' value for it. Its fallback is one.
 #'
 #' @param object A fitted `mvgam` object
 #' @param linpred `[ndraws x nobs]` link-scale predictor of `mu`
@@ -1373,23 +1362,24 @@ ordinal_category_probs <- function(object, linpred, family,
 
 #' Category probabilities from an ordinal predictor
 #'
-#' Adapted from brms. Every threshold is set against the predictor,
-#' as `disc * (thres - eta)` for the families brms marks
-#' `"thres_minus_eta"` and as `disc * (eta - thres)` for those it marks
-#' `"eta_minus_thres"`, and the family's inverse link turns the result
-#' into category probabilities. A family brms marks `"extra_cat"`, the
-#' hurdle variant, puts its hurdle probability on a category of its
-#' own ahead of the ordered ones and scales those by `1 - hu`.
+#' Adapted from brms. Each threshold is set against the predictor.
+#' Families that brms marks `"thres_minus_eta"` use
+#' `disc * (thres - eta)`. Families marked `"eta_minus_thres"` use
+#' `disc * (eta - thres)`. The family's inverse link then turns the result
+#' into category probabilities. A family that brms marks `"extra_cat"` is
+#' the hurdle variant. It puts its hurdle probability on a category of its
+#' own, placed before the ordered categories. Those categories are scaled
+#' by `1 - hu`.
 #'
 #' @param eta `[ndraws x nobs]` predictor of `mu`
 #' @param thres `[ndraws x nthres]` thresholds
 #' @param family An ordinal brms family
 #' @param disc `[ndraws x nobs]` discrimination, or `NULL` for brms's
 #'   fixed value of one
-#' @param hu `[ndraws x nobs]` hurdle probability, read only by a family
+#' @param hu `[ndraws x nobs]` hurdle probability, used only by a family
 #'   marked `"extra_cat"`
 #' @return Array `[ndraws x nobs x ncat]` whose third margin is named by
-#'   the ordered level each category stands for: `1..K`, and `0` first
+#'   the ordered level each category represents: `1..K`, with `0` first
 #'   for the hurdle category
 #' @noRd
 ordinal_probs <- function(eta, thres, family, disc = NULL, hu = NULL) {
@@ -1512,7 +1502,7 @@ ordinal_draws <- function(probs) {
 
 # --- Ordinal link inverses, adapted from brms::distributions.R ---
 # Each takes `x`, an array `[ndraws x nobs x nthres]` of the threshold
-# offsets `ordinal_probs()` forms, and returns `[ndraws x nobs x ncat]`
+# offsets that `ordinal_probs()` forms. It returns `[ndraws x nobs x ncat]`
 # category probabilities.
 
 #' Inverse Link for Cumulative Models

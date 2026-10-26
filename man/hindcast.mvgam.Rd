@@ -18,62 +18,48 @@
 \arguments{
 \item{object}{A fitted \link[=mvgam]{mvgam} object.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{type}{One of \code{"response"}, \code{"link"}, \code{"expected"},
-\code{"trend"}, \code{"latent_state"}. \code{"response"} samples from the
-observation family (the default); \code{"expected"} returns the
-family's mean, which carries any further parameter the
-expectation needs (a binomial mean is \code{trials * p}, a
-zero-inflated mean \code{(1 - zi) * mu}); \code{"link"} returns the
-link-scale linpred; \code{"trend"} returns the latent-trend
-trajectory on the link scale. \code{"latent_state"} is only valid
-for closure-unit families (\code{occ()}, \code{nmix()} variants) and
-returns the posterior latent state (\code{psi} for \code{occ()}, \code{N}
-for the \code{nmix} variants) at each closure unit as an
-\code{mvgam_latent_state} object with its own \code{print()},
-\code{summary()}, \code{as.data.frame()} and \code{plot()} methods.}
+\item{type}{The scale of the draws, as in \code{\link[=forecast.mvgam]{forecast.mvgam()}}, or
+\code{"latent_state"} for a closure-unit family. \code{"latent_state"}
+returns the occupancy probability \code{psi} of an \code{\link[=occ]{occ()}} model or the
+abundance \code{N} of an \code{\link[=nmix]{nmix()}} model at each closure unit, as an
+\code{mvgam_latent_state} object with \code{print()}, \code{summary()},
+\code{as.data.frame()} and \code{plot()} methods.}
 
-\item{ndraws}{Optional integer; the number of posterior draws
-to use, taken at random. Defaults to all available draws.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Optional integer vector of the posterior draws to
-use, in the order given. Supply one of \code{ndraws} or \code{draw_ids}.
-Passing the same \code{draw_ids} to another method, such as
-\code{posterior_predict()} or \code{stability()}, pairs each forecast draw
-with the same iteration there.}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
 \item{obs_uncertainty}{Logical. When \code{FALSE}, skips
 observation-family sampling for \code{type = "response"},
 returning the family mean instead.
 Defaults to \code{TRUE}.}
 
-\item{process_error}{Logical. When \code{FALSE} (the default),
-hindcasts take the Stan-fitted latent state directly
-(\code{trend[t, s]} from the posterior), and
-\code{type = "response"} samples only observation-family noise on
-top of that exact state. When \code{TRUE}, fresh innovations are
-drawn from the trend's covariance structure and added to the
-linear predictor instead, which is what
-\code{posterior_epred()} and \code{posterior_predict()} do under the
-same argument.}
+\item{process_error}{Logical. \code{FALSE} (the default) takes the
+fitted latent state of each draw. \code{type = "response"} then adds
+the observation noise alone. \code{TRUE} adds fresh trend innovations
+to the linear predictor, as \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} does with
+the same argument.}
 
-\item{resp}{For multivariate (multiple-response) models, the
-name of a single response variable to return results for.
-\code{NULL} (the default) returns results for all responses.}
+\item{resp}{Character specifying which response variable for
+multivariate models. NULL (default) returns predictions for all
+responses.}
 }
 \value{
-An object of class \link[=mvgam]{mvgam_forecast-class}.
-Hindcasts are returned as a named list of \verb{[ndraws, n_times]}
-matrices, one per series; \code{forecasts} / \verb{test_*} slots are
-\code{NULL}.
+An \link[=mvgam]{mvgam_forecast-class} object. Its hindcasts are a
+named list of \verb{[ndraws, n_times]} matrices, one per series. Its
+forecast slots are \code{NULL}.
 }
 \description{
-Draw posterior hindcasts at the training time points. The
-fitted latent state is read directly from the posterior draws
-and the observation family then maps the trajectory back to
-the response scale. For predictions at unseen times use
-\link{forecast.mvgam}.
+Posterior draws at the training time points. Each draw takes the
+latent state the model inferred at each time. The observation
+family maps it to the response scale. A hindcast shows how closely
+the fitted states track the data. \code{\link[=forecast.mvgam]{forecast.mvgam()}} predicts
+unseen times.
 }
 \examples{
 \dontrun{
@@ -89,15 +75,49 @@ mod <- mvgam(
   chains  = 2, silent = 2
 )
 
+# The fitted states track the training counts
 hc <- hindcast(mod)
 plot(hc)
+
+# The AR(1) trend on the log scale
+plot(hindcast(mod, type = "trend"))
+
+# Fresh innovations in place of the fitted states give the wider
+# spread a model without the observed history would predict
+plot(hindcast(mod, process_error = TRUE))
+
+# Next, forecast the held-out times with forecast()
 }
 
 }
 \seealso{
-\link[=mvgam]{mvgam_forecast-class}, \link{forecast.mvgam},
-\link{posterior_predict.mvgam} and \link{posterior_epred.mvgam} for the
-alternative marginal-MC prediction surface that integrates
-over the trend's stochastic dynamics instead of reading the
-fitted latent state.
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} extrapolates the fitted state.
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} predict
+by integrating over the trend's dynamics. The
+\href{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}{multivariate article} compares
+\code{type = "trend"} hindcasts of one latent state from a joint model
+and from each data source alone. The
+\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} summarises
+\code{type = "latent_state"} hindcasts of abundance.
+
+Other predictions: 
+\code{\link{conditional_effects.mvgam}()},
+\code{\link{conditional_smooths.mvgam}()},
+\code{\link{fitted.mvgam}()},
+\code{\link{posterior_epred.mvgam}()},
+\code{\link{posterior_linpred.mvgam}()},
+\code{\link{posterior_predict.mvgam}()},
+\code{\link{posterior_smooths.mvgam}()},
+\code{\link{predict.mvgam}()},
+\code{\link{predictive_error.mvgam}()},
+\code{\link{predictive_interval.mvgam}()}
+
+Other forecasting: 
+\code{\link{compare_scores}()},
+\code{\link{ensemble.mvgam_forecast}()},
+\code{\link{forecast.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{score.mvgam_forecast}()}
 }
+\concept{forecasting}
+\concept{predictions}

@@ -2,19 +2,18 @@
 % Please edit documentation in R/print.mvgam.R
 \name{print.mvgamstancode}
 \alias{print.mvgamstancode}
-\title{Print mvgam Stan Code Objects}
+\title{Print the Stan program of an mvgam model}
 \usage{
 \method{print}{mvgamstancode}(x, ...)
 }
 \arguments{
-\item{x}{A mvgamstancode object.}
+\item{x}{An \code{mvgamstancode} object.}
 
-\item{...}{Currently unused.}
+\item{...}{Ignored.}
 }
 \value{
-The mvgamstancode object is returned invisibly.
+\code{x}, invisibly.
 }
 \description{
-Print method for mvgamstancode objects that displays Stan model code in a
-clean, readable format.
+Writes the program of \code{\link[=stancode.mvgam_formula]{stancode.mvgam_formula()}} one line at a time.
 }

@@ -10,7 +10,7 @@
 \item{x}{An \code{mvgam_var_matrix_list} returned by
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}} with \code{groups} set.}
 
-\item{...}{Currently unused.}
+\item{...}{Ignored.}
 }
 \value{
 \code{x}, invisibly, after side-effect printing.

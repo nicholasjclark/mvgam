@@ -47,7 +47,7 @@ untransformed scale.}
 \item{weights}{Optional length-\code{n_series} numeric vector of
 per-series weights for \code{"variogram"}.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A named \code{list} with one entry per series plus a
@@ -134,9 +134,17 @@ scoring rules for probabilistic forecasts of multivariate
 quantities. \emph{Monthly Weather Review}, 143(4), 1321-1334.
 }
 \seealso{
-\link{forecast.mvgam}, \link{hindcast.mvgam},
-\link[=mvgam]{mvgam_forecast-class}. The CRPS / DRPS / ELPD /
-energy / variogram scoring rules and their per-horizon
-interpretation are illustrated in the online article
-\url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}.
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} produces the forecast.
+\code{\link[=compare_scores]{compare_scores()}} scores several forecasts with one rule.
+\code{\link[=ensemble.mvgam_forecast]{ensemble.mvgam_forecast()}} combines forecasts. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+compares models by their scores at each horizon.
+
+Other forecasting: 
+\code{\link{compare_scores}()},
+\code{\link{ensemble.mvgam_forecast}()},
+\code{\link{forecast.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{lfo_cv.mvgam}()}
 }
+\concept{forecasting}

@@ -12,14 +12,13 @@
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A \code{tibble} (\code{tbl_df}) with one row per evaluation time
-point.
+A \code{tibble} with columns \code{eval_time}, \code{refit_here},
+\code{pareto_k}, \code{n_obs} and one per score.
 }
 \description{
-Returns a long-format tibble with one row per
-evaluation time point. Columns include the Pareto-k
-diagnostic, a refit flag, and the per-fold values of every
-requested score (ELPD plus any non-ELPD scores). Mirrors the
-single-layer summary convention used for \code{mvgam_forecast},
-\code{mvgam_irf} and \code{mvgam_fevd}.
+One row per evaluation time. \code{refit_here} is \code{TRUE}
+where the model was refitted for that origin. \code{pareto_k} is the
+Pareto k of the importance weights, \code{NA} at a refit. \code{n_obs}
+counts the responses scored. One column follows for each score
+requested from \code{\link[=lfo_cv]{lfo_cv()}}.
 }

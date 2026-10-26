@@ -38,25 +38,23 @@ have its own forecast times, all after the last fitted time.
 \code{ZMVN()} and \code{PW()} need one set of forecast times shared by
 every series.}
 
-\item{...}{Unused. A misspelt argument would land here and is
-refused.}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{type}{One of \code{"response"}, \code{"link"}, \code{"expected"},
-\code{"trend"}. \code{"response"} samples from the observation family
-(the default); \code{"expected"} returns the family's mean, which
-carries any further parameter the expectation needs (a binomial
-mean is \code{trials * p}, a zero-inflated mean \code{(1 - zi) * mu});
-\code{"link"} returns the link-scale linear predictor; \code{"trend"}
-returns the latent-trend trajectory on the link scale.}
+\item{type}{The scale of the draws:
+\itemize{
+\item \code{"response"} (the default) samples from the observation family.
+\item \code{"expected"} returns the family's mean. A binomial mean is
+\code{trials * p} and a zero-inflated mean is \code{(1 - zi) * mu}.
+\item \code{"link"} returns the linear predictor on the link scale.
+\item \code{"trend"} returns the latent trend on the link scale.
+}}
 
-\item{ndraws}{Optional integer; the number of posterior draws
-to use, taken at random. Defaults to all available draws.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Optional integer vector of the posterior draws to
-use, in the order given. Supply one of \code{ndraws} or \code{draw_ids}.
-Passing the same \code{draw_ids} to another method, such as
-\code{posterior_predict()} or \code{stability()}, pairs each forecast draw
-with the same iteration there.}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
 \item{coef_uncertainty}{Logical. When \code{FALSE}, every forecast
 draw uses the first posterior draw of every coefficient in the
@@ -76,9 +74,9 @@ observation-family sampling for \code{type = "response"},
 returning the family mean instead.
 Defaults to \code{TRUE}.}
 
-\item{resp}{For multivariate (multiple-response) models, the
-name of a single response variable to return results for.
-\code{NULL} (the default) returns results for all responses.}
+\item{resp}{Character specifying which response variable for
+multivariate models. NULL (default) returns predictions for all
+responses.}
 }
 \value{
 An object of class \link[=mvgam]{mvgam_forecast-class}.
@@ -107,18 +105,36 @@ mod <- mvgam(
   chains  = 2, silent = 2
 )
 
-# The held-out data given to mvgam() drive the forecast horizon.
+# The held-out data given to mvgam() set the forecast horizon
 fc <- forecast(mod)
 plot(fc)
+
+# The latent AR(1) trend alone, on the log scale
+plot(forecast(mod, type = "trend"))
+
+# The expected counts, without the Poisson sampling noise
+plot(forecast(mod, type = "expected"))
+
+# Next, score the forecast against the held-out counts
+head(score(fc, score = "crps")[[1]])
 }
 
 }
 \seealso{
-\link[=mvgam]{mvgam_forecast-class}, \link{hindcast.mvgam}.
-\link{posterior_predict.mvgam} and \link{posterior_epred.mvgam} predict by
-integrating over the trend's stochastic dynamics. \code{forecast()}
-extrapolates the fitted latent state. The online article
-\url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
-walks through \code{forecast()} together with \code{score()},
-\code{lfo_cv()} and \code{ensemble()} on a worked count-data example.
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the fitted latent states.
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} predict
+by integrating over the trend's stochastic dynamics. \code{forecast()}
+extrapolates the fitted latent state. \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}
+scores a forecast against held-out data. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+scores, compares and combines the forecasts of three models of
+rodent counts.
+
+Other forecasting: 
+\code{\link{compare_scores}()},
+\code{\link{ensemble.mvgam_forecast}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{score.mvgam_forecast}()}
 }
+\concept{forecasting}

@@ -8,10 +8,10 @@ occ(multi_season = FALSE)
 }
 \arguments{
 \item{multi_season}{Logical. When \code{TRUE}, closure units are
-defined by \verb{(series, site, time)} instead of the default
-\verb{(series, time)}. The data must carry a \code{site} column;
-produce it from a 4-axis observation array with
-\code{\link[=pivot_detection_array]{pivot_detection_array()}} (set \code{multi_season = "hierarchical"}).
+defined by \verb{(series, site, time)}. The default is \verb{(series, time)}.
+The data must carry a \code{site} column. Produce it from a 4-axis
+observation array with \code{\link[=pivot_detection_array]{pivot_detection_array()}} (set
+\code{multi_season = "hierarchical"}).
 The per-unit visits shrink to those within a single
 (site, season): with few visits per unit and low detection
 probability the posterior occupancy can become prior-dominated;
@@ -62,7 +62,7 @@ parameters are prior-dominated (Royle and Dorazio 2008,
 ch. 3.5). The validator warns in this configuration but
 allows the fit. With 3 or more visits per unit and detection
 probability above 0.1, identification is reliable (the same
-Kery 2018 result that holds for nmix carries to the
+Kery 2018 result for nmix extends to the
 Bernoulli-binomial form).
 
 Data shape. A long-format data frame, one row per visit, with
@@ -76,29 +76,28 @@ unit. The \code{cap} column required by \code{nmix()} is implicit at
 \section{Importing array data}{
 
 Detection-history data from \code{unmarked::unmarkedFrameOccu},
-\code{unmarkedFrameOccuMulti}, \code{spOccupancy}, \code{ubms}, and \code{flocker}
-arrives as a 2D \verb{[J, K]} matrix, 3D \verb{[N, J, K]} array, 4D
+\code{unmarkedFrameOccuMulti}, \code{spOccupancy}, \code{ubms} or \code{flocker} takes
+the form of a 2D \verb{[J, K]} matrix, 3D \verb{[N, J, K]} array, 4D
 \verb{[N, J, T, K]} array (multi-season), or named list of \verb{[J, K]}
-matrices per species. Use \code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert
-any of these into the long-format \code{data} that
-\code{mvgam(family = occ())} / \code{jsdgam(family = occ())} expect, with
-\code{site_covs}, \code{season_covs}, \code{site_season_covs}, and \code{obs_covs}
-broadcast across the right grid axes.
+matrices per species. Use \code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert any of
+these into the long-format \code{data} that \code{mvgam(family = occ())} and
+\code{jsdgam(family = occ())} expect. The covariates \code{site_covs},
+\code{season_covs}, \code{site_season_covs} and \code{obs_covs} are broadcast across
+the right grid axes.
 }
 
 \section{JSDM with imperfect detection}{
 
 Passing \code{occ()} to \code{\link[=jsdgam]{jsdgam()}} with \code{n_lv > 0} composes the
 single-season Bernoulli marginalisation with the Heaps factor
-model so the user gets a hierarchical JSDM whose three levels
-each live in a distinct dpar:
+model. The user then gets a hierarchical JSDM. Its three levels each
+occupy a distinct dpar:
 
 \describe{
 \item{\strong{lowest level}: env-driven latent factors.}{
 \code{factor_formula = ~ s(env, by = lv_axis())} makes each
-latent factor a smooth of an environmental covariate, so
-the factors track env gradients rather than being free
-draws.}
+latent factor a smooth of an environmental covariate. The
+factors track env gradients. They are not free draws.}
 \item{\strong{middle level}: species loadings on occupancy.}{Each
 species \code{s} loads on the \code{K} factors via the row
 \verb{Z[s, :]}, so
@@ -109,14 +108,12 @@ Jermyn (2024) post-hoc QR.}
 carries its own brms sub-formula (e.g.,
 \code{bf(y ~ species, p ~ s(tod))}) so the per-visit detection
 process is modelled independently of the latent occupancy
-state. The lpmf marginalises latent \code{z} per closure unit;
-nothing about the factor model has to be aware of the
-marginalisation, and nothing about the marginalisation has
-to be aware of the factor model.}
+state. The lpmf marginalises latent \code{z} per closure unit. No
+part of the factor model depends on the marginalisation. No part
+of the marginalisation depends on the factor model.}
 }
 
-Recovery on this composition is documented in
-\code{tests/local/jsdgam_mv_occ.R}. See \code{\link[=jsdgam]{jsdgam()}} for the
+See \code{\link[=jsdgam]{jsdgam()}} for the
 wrapper-level API and \code{\link[=lv_axis]{lv_axis()}} for the \code{by = lv_axis()}
 sentinel that turns smooths into per-factor regressors.
 }
@@ -197,11 +194,23 @@ occupancy estimation in R. \emph{bioRxiv}.
 \doi{10.1101/2023.10.26.564080}.
 }
 \seealso{
-\code{\link[=nmix]{nmix()}} for the related N-mixture family,
-\code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for closure-unit goodness-of-fit. The
-online article at
-\url{https://nicholasjclark.github.io/mvgam/articles/nmix.html}
-covers both occupancy and N-mixture workflows; the
-closure-unit data-shape requirements that \code{occ()} consumes
-are documented in \code{vignette("data", package = "mvgam")}.
+\code{\link[=nmix]{nmix()}} for the related N-mixture family and
+\code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for closure-unit goodness-of-fit checks. The
+\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} fits occupancy and
+N-mixture models from data preparation to inference. The
+\href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data article} sets out the row layout
+that \code{occ()} expects.
+
+Other observation families: 
+\code{\link{beta_nb}()},
+\code{\link{categ}()},
+\code{\link{com_binomial}()},
+\code{\link{diri}()},
+\code{\link{multi}()},
+\code{\link{mvgam_families}},
+\code{\link{mvn}()},
+\code{\link{mvt}()},
+\code{\link{nmix}()},
+\code{\link{tweedie}()}
 }
+\concept{observation families}

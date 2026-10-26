@@ -21,10 +21,9 @@ Every figure the package draws uses this theme. It extends
 \code{\link[ggplot2:ggtheme]{ggplot2::theme_classic()}} and matches the bayesplot figures. Apply
 it to a plot of your own to give it the look of mvgam output.
 
-Colours come from the active bayesplot scheme.
-\code{\link[bayesplot:bayesplot-colors]{bayesplot::color_scheme_set()}} changes the colours of mvgam's
-figures and yours together. \code{\link[bayesplot:bayesplot-colors]{bayesplot::color_scheme_get()}} returns
-the current scheme.
+mvgam's figures take their colours from the \code{"red"} scheme of
+\pkg{bayesplot}, which \code{bayesplot::color_scheme_get("red")} returns.
+The example colours its points with it.
 }
 \examples{
 library(ggplot2)

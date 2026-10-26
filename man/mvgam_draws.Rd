@@ -116,7 +116,22 @@ these draws (\code{rhat}, \code{neff_ratio}, \code{fixef}, \code{bayes_R2},
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}, \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}},
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for prediction-scale outputs,
 \link[posterior:draws]{posterior::draws} for the underlying draws classes.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

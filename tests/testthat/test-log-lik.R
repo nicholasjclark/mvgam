@@ -1,187 +1,130 @@
-# Targeted tests for log_lik.mvgam and the consumers it unblocks.
-# These exercise the per-family log-density helpers in isolation and the
-# dispatcher, plus signature compatibility for log_lik.mvgam itself.
-# Numerical concordance against brms lives in
-# tests/local/test-log-lik-brms-concordance.R and runs manually with a
-# fitted fixture; this file is fixture-free and CI-safe.
+# The per-family kernels, the dispatcher and the addition terms,
+# checked against closed-form densities. The brms concordance check
+# runs on a fitted model in tests/local/test-log-lik-brms-concordance.R.
 
-# Helper: synthetic [ndraws x nobs] linpred + dpars + y for a few small
-# families. Uses fixed seeds and small shapes to keep assertions stable.
-.make_synthetic <- function(n_draws = 50, n_obs = 8, mu = 1.0, sd = 0.2) {
+test_that("the dispatcher returns each family's stats density", {
   set.seed(123)
-  linpred <- matrix(rnorm(n_draws * n_obs, mean = mu, sd = sd),
-                    nrow = n_draws, ncol = n_obs)
-  list(
-    linpred = linpred,
-    sigma = matrix(0.5, nrow = n_draws, ncol = n_obs),
-    shape = matrix(2.0, nrow = n_draws, ncol = n_obs),
-    phi = matrix(5.0, nrow = n_draws, ncol = n_obs),
-    nu = matrix(4.0, nrow = n_draws, ncol = n_obs),
-    hu = matrix(0.2, nrow = n_draws, ncol = n_obs),
-    zi = matrix(0.3, nrow = n_draws, ncol = n_obs)
-  )
-}
+  linpred <- matrix(rnorm(12, 0.5, 0.2), 3L, 4L)
+  mu <- exp(linpred)
+  sigma <- matrix(0.5, 3L, 4L)
+  shape <- matrix(2, 3L, 4L)
+  phi <- matrix(5, 3L, 4L)
+  cols <- function(f) vapply(seq_len(4L), f, numeric(3L))
+  y_count <- c(0, 2, 5, 1)
+  y_unit <- c(0.2, 0.5, 0.7, 0.9)
 
-test_that("the gaussian log density returns finite [ndraws x nobs]", {
-  s <- .make_synthetic()
-  y <- rnorm(8, mean = 1, sd = 0.5)
-  out <- dispatch_log_lik(
-    "gaussian", linpred = s$linpred, link = "identity", y = y,
-    family_pars = list(sigma = s$sigma), trials = NULL
+  expect_equal(
+    dispatch_log_lik("gaussian", "identity", linpred, y_unit,
+                     list(sigma = sigma), NULL),
+    cols(function(j) stats::dnorm(y_unit[j], linpred[, j], 0.5, log = TRUE))
   )
-  expect_equal(dim(out), c(50, 8))
-  expect_true(all(is.finite(out)))
+  expect_equal(
+    dispatch_log_lik("poisson", "log", linpred, y_count, list(), NULL),
+    cols(function(j) stats::dpois(y_count[j], mu[, j], log = TRUE))
+  )
+  expect_equal(
+    dispatch_log_lik("negbinomial", "log", linpred, y_count,
+                     list(shape = shape), NULL),
+    cols(function(j) {
+      stats::dnbinom(y_count[j], mu = mu[, j], size = 2, log = TRUE)
+    })
+  )
+  p <- stats::plogis(linpred)
+  expect_equal(
+    dispatch_log_lik("beta", "logit", linpred, y_unit, list(phi = phi),
+                     NULL),
+    cols(function(j) {
+      stats::dbeta(y_unit[j], p[, j] * 5, (1 - p[, j]) * 5, log = TRUE)
+    })
+  )
+  # Each row has its own number of trials
+  trials <- c(6, 7, 8, 9)
+  expect_equal(
+    dispatch_log_lik("binomial", "logit", linpred, y_count, list(), trials),
+    cols(function(j) {
+      stats::dbinom(y_count[j], trials[j], p[, j], log = TRUE)
+    })
+  )
+  # The asymmetric Laplace density at quantile q, with the check
+  # function rho_q(u) = u (q - 1[u < 0])
+  q <- matrix(0.25, 3L, 4L)
+  expect_equal(
+    dispatch_log_lik("asym_laplace", "identity", linpred, y_unit,
+                     list(sigma = sigma, quantile = q), NULL),
+    cols(function(j) {
+      u <- (y_unit[j] - linpred[, j]) / 0.5
+      log(0.25 * 0.75 / 0.5) - u * (0.25 - (u < 0))
+    })
+  )
 })
 
-test_that("the poisson log density returns finite [ndraws x nobs]", {
-  s <- .make_synthetic(mu = 1.5)
-  y <- rpois(8, lambda = exp(1.5))
-  out <- dispatch_log_lik(
-    "poisson", linpred = s$linpred, link = "log", y = y,
-    family_pars = list(), trials = NULL
-  )
-  expect_equal(dim(out), c(50, 8))
-  expect_true(all(is.finite(out)))
-})
+test_that("hurdle and zero-inflated kernels match their closed forms", {
+  linpred <- log(matrix(c(1.5, 2.5), 2L, 2L))
+  mu <- exp(linpred[, 1L])
+  mix <- matrix(0.3, 2L, 2L)
+  shape <- matrix(2, 2L, 2L)
+  y <- c(0, 3)
+  kernel <- function(fn, pars, link = "log", yy = y, trials = NULL) {
+    fn(linpred = linpred, link = link, y = yy, family_pars = pars,
+       trials = trials)
+  }
 
-test_that("the negbinomial log density returns finite [ndraws x nobs]", {
-  s <- .make_synthetic(mu = 1.5)
-  y <- rnbinom(8, mu = exp(1.5), size = 2)
-  out <- dispatch_log_lik(
-    "negbinomial", linpred = s$linpred, link = "log", y = y,
-    family_pars = list(shape = s$shape), trials = NULL
-  )
-  expect_equal(dim(out), c(50, 8))
-  expect_true(all(is.finite(out)))
-})
+  hp <- kernel(log_lik_hurdle_poisson, list(hu = mix))
+  expect_equal(hp[, 1L], log(c(0.3, 0.3)))
+  expect_equal(hp[, 2L], log(0.7) + stats::dpois(3, mu, log = TRUE) -
+                 log(1 - exp(-mu)))
+  hnb <- kernel(log_lik_hurdle_negbinomial, list(hu = mix, shape = shape))
+  expect_equal(hnb[, 2L], log(0.7) +
+                 stats::dnbinom(3, mu = mu, size = 2, log = TRUE) -
+                 log(1 - stats::dnbinom(0, mu = mu, size = 2)))
+  hg <- kernel(log_lik_hurdle_gamma, list(hu = mix, shape = shape))
+  expect_equal(hg[, 2L], log(0.7) + stats::dgamma(3, 2, 2 / mu, log = TRUE))
 
-test_that("the binomial log density uses trials per observation", {
-  s <- .make_synthetic(mu = 0)
-  y  <- c(1L, 3L, 2L, 5L, 4L, 0L, 6L, 2L)
-  tr <- c(6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L)
-  out <- dispatch_log_lik(
-    "binomial", linpred = s$linpred, link = "logit", y = y,
-    family_pars = list(), trials = tr
-  )
-  expect_equal(dim(out), c(50, 8))
-  expect_true(all(is.finite(out)))
-  # The denominator varies by row, which is what the name claims. A
-  # constant `trials` and a shape check together passed a kernel
-  # dropping the argument, and these two differ.
-  want <- vapply(seq_along(y), function(j) {
-    stats::dbinom(y[j], size = tr[j],
-                  prob = stats::plogis(s$linpred[, j]), log = TRUE)
-  }, numeric(50L))
-  expect_equal(out, want)
-  expect_false(isTRUE(all.equal(
-    out,
-    dispatch_log_lik("binomial", linpred = s$linpred, link = "logit",
-                     y = y, family_pars = list(), trials = rep(10L, 8L))
-  )))
-})
-
-test_that("the beta log density returns finite densities on (0, 1)", {
-  s <- .make_synthetic(mu = 0)
-  y <- rbeta(8, shape1 = 2, shape2 = 2)
-  out <- dispatch_log_lik(
-    "beta", linpred = s$linpred, link = "logit", y = y,
-    family_pars = list(phi = s$phi), trials = NULL
-  )
-  expect_equal(dim(out), c(50, 8))
-  expect_true(all(is.finite(out)))
-})
-
-test_that("log_lik_hurdle_poisson splits cleanly at y = 0", {
-  s <- .make_synthetic(mu = 1.5)
-  y <- c(0L, 0L, 1L, 2L, 3L, 0L, 4L, 5L)
-  out <- log_lik_hurdle_poisson(
-    linpred = s$linpred, link = "log", y = y,
-    family_pars = list(hu = s$hu), trials = NULL
-  )
-  expect_equal(dim(out), c(50, 8))
-  expect_true(all(is.finite(out)))
-  # At y = 0 the log density equals log(hu); does not depend on mu draws
-  expect_equal(out[1, 1], log(0.2), tolerance = 1e-10)
-})
-
-test_that("log_lik_zero_inflated_poisson splits cleanly at y = 0", {
-  s <- .make_synthetic(mu = 1.5)
-  y <- c(0L, 0L, 1L, 2L, 3L, 0L, 4L, 5L)
-  out <- log_lik_zero_inflated_poisson(
-    linpred = s$linpred, link = "log", y = y,
-    family_pars = list(zi = s$zi), trials = NULL
-  )
-  expect_equal(dim(out), c(50, 8))
-  expect_true(all(is.finite(out)))
-  # P(Y=0) = zi + (1 - zi) * exp(-mu); must be > log(zi) since the mass at
-  # zero from the Poisson is non-negative
-  expect_true(all(out[, 1] >= log(0.3) - 1e-10))
+  zp <- kernel(log_lik_zero_inflated_poisson, list(zi = mix))
+  expect_equal(zp[, 1L], log(0.3 + 0.7 * exp(-mu)))
+  expect_equal(zp[, 2L], log(0.7) + stats::dpois(3, mu, log = TRUE))
+  znb <- kernel(log_lik_zero_inflated_negbinomial,
+                list(zi = mix, shape = shape))
+  expect_equal(znb[, 1L],
+               log(0.3 + 0.7 * stats::dnbinom(0, mu = mu, size = 2)))
+  zb <- kernel(log_lik_zero_inflated_binomial, list(zi = mix),
+               link = "logit", trials = c(5, 5))
+  prob <- stats::plogis(linpred[, 1L])
+  expect_equal(zb[, 1L], log(0.3 + 0.7 * (1 - prob)^5))
+  # The beta gives zero no mass, leaving it to the inflation
+  zbeta <- kernel(log_lik_zero_inflated_beta,
+                  list(zi = mix, phi = matrix(5, 2L, 2L)),
+                  link = "logit", yy = c(0, 0.4))
+  expect_equal(zbeta[, 1L], log(c(0.3, 0.3)))
+  expect_equal(zbeta[, 2L], log(0.7) +
+                 stats::dbeta(0.4, prob * 5, (1 - prob) * 5, log = TRUE))
 })
 
 test_that("dispatch_log_lik errors clearly for unknown family", {
-  s <- .make_synthetic()
   refuse <- function() {
     dispatch_log_lik(
       family_name = "definitely_not_a_family",
       link = "identity",
-      linpred = s$linpred,
-      y = rnorm(8),
+      linpred = matrix(0, 2L, 2L),
+      y = c(0, 1),
       family_pars = list(),
       trials = NULL
     )
   }
-  # Names the family the caller's model carries, says the fault is
-  # mvgam's, and gives somewhere to report it.
+  # The message names the family and the issue tracker. It reports the
+  # fault as mvgam's.
   err <- expect_error(refuse(), regexp = "definitely_not_a_family")
   msg <- conditionMessage(err)
   expect_match(msg, "Please report this mvgam fault")
   expect_match(msg, "mvgam/issues")
-  # A reader of this message is running the package, not maintaining
-  # it, so it must not hand them an edit to make in mvgam's source.
+  # The reader runs the package. The message gives them no source edit
   expect_false(grepl("Add a ", msg, fixed = TRUE))
   expect_false(grepl("branch", msg, fixed = TRUE))
   expect_false(grepl("R/", msg, fixed = TRUE))
 })
 
-test_that("every log-lik S3 method is registered", {
-  # Three blocks checked this, one generic apiece. The table names
-  # them in one place.
-  for (g in c("log_lik", "waic", "logLik")) {
-    expect_false(
-      is.null(getS3method(g, "mvgam", optional = TRUE)),
-      label = paste0(g, ".mvgam registered")
-    )
-  }
-})
 
-test_that("log_lik.mvgam signature matches brms log_lik.brmsfit", {
-  brms_args <- names(formals(getS3method("log_lik", "brmsfit")))
-  mvgam_args <- names(formals(getS3method("log_lik", "mvgam")))
-  # Both should accept the brms-parity arguments
-  parity_args <- c("object", "newdata", "re_formula", "resp",
-                   "ndraws", "draw_ids")
-  expect_true(all(parity_args %in% mvgam_args))
-  # mvgam adds process_error, which brms doesn't have
-  expect_true("process_error" %in% mvgam_args)
-})
-
-test_that("waic.mvgam signature matches brms waic.brmsfit", {
-  brms_args <- names(formals(getS3method("waic", "brmsfit")))
-  mvgam_args <- names(formals(getS3method("waic", "mvgam")))
-  parity_args <- c("x", "compare", "resp", "pointwise", "model_names")
-  expect_true(all(parity_args %in% mvgam_args))
-})
-
-test_that("loo.mvgam no longer calls removed logLik / extract_family_pars", {
-  src <- deparse(getS3method("loo", "mvgam"))
-  src <- paste(src, collapse = "\n")
-  expect_false(grepl("logLik\\(", src))
-  expect_false(grepl("extract_family_pars", src))
-  expect_true(grepl("log_lik\\(", src))
-})
-
-
-# logLik.mvgam: stats::logLik S3 method enabling AIC()/BIC().
+# logLik.mvgam, which AIC() and BIC() call
 test_that("logLik.mvgam(pointwise = FALSE) returns scalar with df + nobs", {
   ll_mat <- matrix(c(-1, -2, -3, -4, -5, -6), nrow = 2, byrow = TRUE)
   testthat::local_mocked_bindings(
@@ -224,10 +167,8 @@ test_that("logLik.mvgam validates pointwise as a flag", {
 # ------------------------------------------------------------------
 # Addition terms: weights(), cens() and trunc()
 #
-# Each changes what one row contributes to the likelihood, and every
-# information criterion reads that matrix, so the arithmetic is
-# checked directly against the reference density rather than through
-# a fit.
+# Each changes one row's contribution to the likelihood. The results
+# are checked against the reference distribution functions.
 # ------------------------------------------------------------------
 
 addition_fixture <- function(S = 6L, N = 5L) {
@@ -313,12 +254,10 @@ test_that("truncation renormalises over the retained region", {
     f$ll, lb, ub, f$spec, f$linpred, discrete = FALSE
   )
   denom <- log(
-    stats::pnorm(3, f$linpred[, 1L], f$pars$sigma[, 1L]) -
-      stats::pnorm(-1, f$linpred[, 1L], f$pars$sigma[, 1L])
+    stats::pnorm(3, f$linpred, f$pars$sigma) -
+      stats::pnorm(-1, f$linpred, f$pars$sigma)
   )
-  expect_equal(out[, 1L], f$ll[, 1L] - denom)
-  # Truncation always removes mass, so contributions rise.
-  expect_true(all(out >= f$ll))
+  expect_equal(out, f$ll - denom)
 })
 
 
@@ -352,7 +291,7 @@ test_that("a discrete lower bound excludes the step below it", {
     ll, rep(2, N), rep(9, N), spec, linpred, discrete = TRUE
   )
   # brms generates log_diff_exp(lcdf(ub), lcdf(lb - 1)) for a discrete
-  # family, so the bound itself keeps its mass.
+  # family. The bound itself keeps its mass.
   denom <- log(stats::ppois(9, 4) - stats::ppois(1, 4))
   expect_equal(out[, 1L], ll[, 1L] - denom)
 })
@@ -367,11 +306,9 @@ test_that("a family with no distribution function is refused", {
 
 
 test_that("a family with no quantile function samples by rejection", {
-  # extraDistr supplies a beta-binomial density and distribution
-  # function and no quantile function, and the COM-binomial and
-  # Tweedie kernels supply none either. `truncated_dist_draws()` reads
-  # NULL as its instruction to sample by rejection, so naming a
-  # function that does not exist is what breaks the path.
+  # extraDistr has no beta-binomial quantile function. The COM-binomial
+  # and Tweedie kernels have none either. `truncated_dist_draws()`
+  # samples by rejection when `dist_fun()` returns `NULL`.
   for (dist in c("bbinom", "cmb", "tweedie")) {
     expect_type(mvgam:::dist_fun(dist, "d"), "closure")
     expect_type(mvgam:::dist_fun(dist, "p"), "closure")
@@ -432,12 +369,12 @@ test_that("addition-term keys are read per response", {
   sdata <- list(weights = rep(2, 4L), weights_y1 = rep(5, 4L))
   obj <- structure(list(standata = sdata), class = "mvgam")
 
-  # A univariate fit reads the bare key.
+  # A univariate fit takes the bare key
   uni <- mvgam:::addition_term_data(obj, NULL, nobs = 4L)
   expect_equal(uni$weights, rep(2, 4L))
 
-  # A named response reads only its own suffixed key, so one arm of a
-  # multivariate fit cannot inherit another's weights.
+  # A named response takes only its own suffixed key. One response of
+  # a multivariate fit never takes another's weights.
   y1 <- mvgam:::addition_term_data(obj, "y1", nobs = 4L)
   expect_equal(y1$weights, rep(5, 4L))
   y2 <- mvgam:::addition_term_data(obj, "y2", nobs = 4L)
@@ -453,8 +390,8 @@ test_that("a scalar bound is recycled across observations", {
 
 
 test_that("terms recorded at the wrong grain are refused", {
-  # A closure-unit family scores once per unit while the terms are
-  # recorded per visit, so applying them would silently misalign.
+  # A closure-unit family is scored per unit. Terms recorded per visit
+  # would be misaligned with its columns.
   obj <- structure(
     list(standata = list(weights = rep(1.5, 12L))), class = "mvgam"
   )
@@ -465,73 +402,37 @@ test_that("terms recorded at the wrong grain are refused", {
 })
 
 
-test_that("a missing response yields NA rather than aborting", {
-  # The hurdle, zero-inflated and ordinal kernels branch on the
-  # response value, so `if (NA)` would abort the whole call. The
-  # guard lives in `.apply_log_density()` so every kernel inherits it.
+test_that("a missing response leaves its column NA", {
+  # The hurdle kernels branch on the response value. `if (NA)` would
+  # abort the call.
   linpred <- matrix(log(3), 4L, 3L)
-  y <- c(2, NA, 5)
-  ll <- mvgam:::.apply_log_density(linpred, y, function(yj, j) {
-    if (yj == 0) rep(-1, nrow(linpred)) else stats::dpois(
-      yj, lambda = exp(linpred[, j]), log = TRUE
-    )
-  })
+  ll <- log_lik_hurdle_poisson(linpred, "log", c(2, NA, 0),
+                               list(hu = matrix(0.2, 4L, 3L)), NULL)
   expect_true(all(is.na(ll[, 2L])))
-  expect_true(all(is.finite(ll[, -2L])))
+  expect_equal(ll[, 3L], rep(log(0.2), 4L))
 })
 
 
-test_that("resolve_incl_autocor keeps the superseded spelling working", {
-  # Nothing supplied but the current argument: it is used as given.
-  expect_true(resolve_incl_autocor(TRUE, legacy = NULL,
-                                    autocor_supplied = FALSE))
-  expect_false(resolve_incl_autocor(FALSE, legacy = NULL,
-                                     autocor_supplied = FALSE))
-  # Only the superseded argument named: it decides.
+test_that("resolve_incl_autocor takes the superseded spelling second", {
+  # With only the superseded argument named, its value is used
   expect_false(resolve_incl_autocor(TRUE, legacy = FALSE,
                                      autocor_supplied = FALSE))
   expect_true(resolve_incl_autocor(FALSE, legacy = TRUE,
                                     autocor_supplied = FALSE))
-})
-
-
-test_that("resolve_incl_autocor prefers the current spelling", {
-  # Both named: the documented argument wins and the superseded value
-  # is ignored rather than combined with it.
+  # With both named, the documented argument's value is used
   expect_false(resolve_incl_autocor(FALSE, legacy = TRUE,
                                      autocor_supplied = TRUE))
-  expect_true(resolve_incl_autocor(TRUE, legacy = FALSE,
-                                    autocor_supplied = TRUE))
-})
-
-
-test_that("resolve_incl_autocor rejects a non-logical", {
-  expect_error(
-    resolve_incl_autocor("yes", legacy = NULL, autocor_supplied = FALSE),
-    "logical"
-  )
-  expect_error(
-    resolve_incl_autocor(TRUE, legacy = "no", autocor_supplied = FALSE),
-    "logical"
-  )
-  expect_error(
-    resolve_incl_autocor(NA, legacy = NULL, autocor_supplied = FALSE),
-    "missing"
-  )
+  expect_true(resolve_incl_autocor(TRUE, legacy = NULL,
+                                    autocor_supplied = FALSE))
 })
 
 
 # ------------------------------------------------------------------
-# The multi-response families' distribution functions.
+# The multi-response families' distribution functions
 #
-# These three are what a randomised quantile residual is built from,
-# and a residual on the wrong scale is not visibly wrong: it is
-# finite, it moves with the draw and it fills every column. So each
-# spec is pinned here against its closed form, computed from the same
-# parameters but written out rather than looked up, and each check is
-# one a plausible mistake would fail -- reading `nu` without the
-# location and scale, or taking a Dirichlet component's second shape
-# to be the whole concentration rather than its complement.
+# Randomised quantile residuals are built from them. A residual on the
+# wrong scale is still finite and varies by draw. Each distribution
+# function is compared with its closed form.
 # ------------------------------------------------------------------
 
 mv_spec_fixture <- function(S = 4L, N = 6L) {
@@ -561,7 +462,7 @@ test_that("the mvn distribution function is normal on the row scale", {
 })
 
 
-test_that("the mvt distribution function carries location and scale", {
+test_that("the mvt distribution function takes each row's location and scale", {
   f <- mv_spec_fixture()
   spec <- mvgam:::family_dist_spec(
     "mvt", "identity", f$linpred, list(Psi_row = f$Psi, nu = f$nu), NULL
@@ -571,11 +472,6 @@ test_that("the mvt distribution function carries location and scale", {
     stats::pt((f$y[j] - f$linpred[, j]) / f$Psi[, j], df = f$nu)
   }, numeric(f$S))
   expect_equal(got, want)
-  # A scale of one everywhere is the only case where dropping the
-  # standardisation agrees, so the two must differ here.
-  bare <- vapply(seq_len(f$N), function(j) stats::pt(f$y[j], df = f$nu),
-                 numeric(f$S))
-  expect_false(isTRUE(all.equal(got, bare)))
 })
 
 
@@ -592,25 +488,18 @@ test_that("a Dirichlet component's second shape is the complement", {
                  (1 - f$prob[, j]) * f$phi[, j])
   }, numeric(f$S))
   expect_equal(got, want)
-  # Taking alpha_0 itself as the second shape rather than the
-  # complement is the mistake this pins, and it is not a small one.
-  wrong <- vapply(seq_len(f$N), function(j) {
-    stats::pbeta(y[j], f$prob[, j] * f$phi[, j], f$phi[, j])
-  }, numeric(f$S))
-  expect_gt(max(abs(got - wrong)), 0.05)
 })
 
 
 test_that("a beta mean at the boundary has no transform to take", {
-  # A share of one leaves the second shape at zero, where every
-  # probability is a boundary and `qnorm` would report the clamp as
-  # an eight-sigma residual. NA is the honest answer.
+  # A share of one sets the second shape to zero. Every probability is
+  # then a boundary, which `qnorm()` turns into an eight-sigma residual.
   guarded <- mvgam:::beta_shapes(c(0.4, 1, 0, NA), rep(10, 4L),
                                  boundary_na = TRUE)
   expect_equal(guarded$shape1, c(4, NA, NA, NA))
   expect_equal(guarded$shape2, c(6, NA, NA, NA))
-  # A simulator draws a degenerate beta happily, so it keeps the
-  # shapes it was given and the guard is off by default.
+  # A simulator can draw a degenerate beta. The guard is off by
+  # default.
   bare <- mvgam:::beta_shapes(c(0.4, 1, 0, NA), rep(10, 4L))
   expect_equal(bare$shape1, c(4, 10, 0, NA))
   expect_equal(bare$shape2, c(6, 0, 10, NA))

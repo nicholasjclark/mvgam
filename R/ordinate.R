@@ -144,6 +144,7 @@
 #' ordinate(mod)
 #' }
 #'
+#' @family latent dynamics
 #' @export
 ordinate <- function(object, ...) {
   UseMethod("ordinate", object)

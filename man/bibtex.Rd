@@ -3,7 +3,7 @@
 \name{bibtex}
 \alias{bibtex}
 \alias{bibtex.how_to_cite}
-\title{Extract the BibTeX block from a \code{how_to_cite} object}
+\title{The BibTeX entries of a \code{how_to_cite} object}
 \usage{
 bibtex(x, ...)
 
@@ -12,21 +12,37 @@ bibtex(x, ...)
 \arguments{
 \item{x}{A \code{how_to_cite} object.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{file}{Optional output path. When non-NULL the BibTeX
-is written to disk and the string is returned invisibly.}
+\item{file}{Optional path of a \code{.bib} file to write the entries to
+in place of printing them.}
 
-\item{other}{Logical. When \code{TRUE} (default), include the
-curated "other useful references" block; set to \code{FALSE}
-to emit only the matched primary references.}
+\item{other}{Logical. \code{TRUE} (the default) includes the related
+references. \code{FALSE} keeps the references the methods text cites.}
 }
 \value{
-A single character string containing the BibTeX
-entries separated by blank lines.
+The string of entries separated by blank lines, invisibly.
 }
 \description{
-Concatenates the matched BibTeX entries into one string.
-Pass \code{file = "refs.bib"} to write the block to disk; the
-default returns the string invisibly and prints to stdout.
+Joins the BibTeX entries of \code{\link[=how_to_cite]{how_to_cite()}} into one string. It is
+printed, or written to \code{file}.
 }
+\seealso{
+\code{\link[=how_to_cite]{how_to_cite()}} builds the object, with an example of both.
+\code{\link[=methods_md]{methods_md()}} writes the model's equations.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
+}
+\concept{posterior summaries}

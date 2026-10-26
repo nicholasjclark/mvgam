@@ -19,7 +19,7 @@ Continuous-response JSDM with low-rank residual covariance
 (gllvm / boral style): each row of the linear predictor receives
 the latent-factor contribution \verb{Z[k, :] * lv[i, :]} from the
 trend pipeline (with \code{lv ~ N(0, I_n_lv)} sampled jointly with
-the model), and the lpdf is then independent normal per row with
+the model). The lpdf is then independent normal per row with
 SD \code{Psi[k]} for species \code{k}. Integrating out \code{lv} recovers the
 gllvm marginal covariance \code{Sigma}.
 }
@@ -85,3 +85,17 @@ distributions for the covariance matrix in latent factor
 models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
 }
+\seealso{
+Other observation families: 
+\code{\link{beta_nb}()},
+\code{\link{categ}()},
+\code{\link{com_binomial}()},
+\code{\link{diri}()},
+\code{\link{multi}()},
+\code{\link{mvgam_families}},
+\code{\link{mvt}()},
+\code{\link{nmix}()},
+\code{\link{occ}()},
+\code{\link{tweedie}()}
+}
+\concept{observation families}

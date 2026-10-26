@@ -15,10 +15,9 @@
 A \code{ggplot} object.
 }
 \description{
-Renders a faceted ggplot of the per-fold Pareto-k
-diagnostic and every populated score (ELPD plus any non-ELPD
-scores requested at fit time). Outlier points are highlighted
-per these thresholds: Pareto-k above \code{pareto_k_threshold}, ELPD
-below its 15\% quantile and any other score above its 85\%
-quantile.
+One panel for the Pareto k of each fold and one for
+each score. The dashed line in each panel is the threshold above
+which points are highlighted. For Pareto k it is the threshold
+\code{\link[=lfo_cv]{lfo_cv()}} used. For ELPD it is the 15\% quantile, with lower
+values highlighted. For the other scores it is the 85\% quantile.
 }

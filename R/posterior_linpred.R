@@ -259,8 +259,6 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' this is logit-scale.
 #'
 #' @param object A fitted mvgam object from [mvgam()].
-#' @param newdata Optional data frame with covariates for prediction. If
-#'   NULL, uses original training data stored in the model object.
 #' @param transform Logical; if `FALSE` (default), values are returned
 #'   on the link scale. If `TRUE`, the inverse link of `mu` is applied,
 #'   so the result is on that parameter's own scale. This is not the
@@ -271,27 +269,6 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'   argument of [brms::posterior_linpred()], which sets `dpar = "mu"`
 #'   and answers on the response scale.
 #' @inheritParams posterior_epred.mvgam
-#' @param ndraws Positive integer specifying number of posterior draws to
-#'   use. NULL (default) uses all available draws. Mutually exclusive
-#'   with `draw_ids`; supply one or the other.
-#' @param draw_ids Optional integer vector of specific draw indices to
-#'   use. `NULL` (default) selects draws via `ndraws` (or all draws when
-#'   both are NULL). Useful for keeping multiple downstream extractions
-#'   aligned to the same posterior subset.
-#' @param re_formula Group-level terms to include: `NULL` (the default)
-#'   for every one, `NA` for none. A formula choosing some of them is not
-#'   supported.
-#' @param allow_new_levels Logical; accepted for brms compatibility.
-#'   A grouping level the model never saw is refused whatever this is
-#'   set to, because a new level has no fitted random effect and, for
-#'   a new series, no latent state to propagate. Predict for levels
-#'   the fit knows, or refit with the new levels included.
-#' @param sample_new_levels Character; accepted for brms
-#'   compatibility and not used, since new levels are refused. See
-#'   `allow_new_levels`.
-#' @param resp Character specifying which response variable for
-#'   multivariate models. NULL (default) returns predictions for all
-#'   responses.
 #' @param dpar Character naming a distributional parameter, such as
 #'   `"sigma"` or `"nu"`. The default `NULL` answers for the mean.
 #'   Naming a parameter that carries a formula of its own returns its
@@ -356,6 +333,7 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' }
 #'
 #' @importFrom brms posterior_linpred
+#' @family predictions
 #' @method posterior_linpred mvgam
 #' @export
 posterior_linpred.mvgam <- function(object, transform = FALSE,

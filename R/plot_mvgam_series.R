@@ -135,7 +135,7 @@ series_obs_plot <- function(dat, labels, series_levels, series = NULL,
   checkmate::assert_flag(log_scale)
   checkmate::assert_integerish(n_bins, lower = 1L, len = 1L,
                                 null.ok = TRUE)
-  set_color_scheme_local("red")
+  set_color_scheme_local()
 
   series_idx <- resolve_series_index(series, series_levels)
   dat$series <- factor(dat$series, levels = series_levels)

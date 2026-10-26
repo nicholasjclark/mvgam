@@ -15,12 +15,10 @@
 A \code{ggplot} object.
 }
 \description{
-Faceted ggplot matching the \code{\link[=plot.mvgam_lfo]{plot.mvgam_lfo()}} convention: one
-panel per diagnostic with outlier folds highlighted. The Pareto-k
-panel flags groups above \code{pareto_k_threshold} (PSIS approximation
-unreliable, refit recommended); the ELPD panel flags groups below
-the 15\% quantile (poorest-fit folds). Inlier groups are drawn in
-grey, outliers in the package red.
+One panel for the ELPD of each group and one for its Pareto k, as
+in \code{\link[=plot.mvgam_lfo]{plot.mvgam_lfo()}}. Dark red points mark a Pareto k above the
+dashed threshold, where PSIS is unreliable. In the ELPD panel they
+mark the groups below the 15\% quantile.
 }
 \seealso{
 \code{\link[=plot.mvgam_lfo]{plot.mvgam_lfo()}} for the matching time-block CV plot.

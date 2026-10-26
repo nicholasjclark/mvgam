@@ -174,7 +174,18 @@ ordinate(mod)
 \code{\link[=jsdgam]{jsdgam()}}, \code{\link[=residual_cor]{residual_cor()}},
 \code{\link[=plot.mvgam]{plot.mvgam()}} (especially \code{type = "factors"} and
 \code{type = "latent_state"})
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{fevd.mvgam}()},
+\code{\link{irf.mvgam}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{residual_cor}()},
+\code{\link{shared_variation}()},
+\code{\link{stability.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

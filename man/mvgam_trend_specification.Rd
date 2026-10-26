@@ -23,8 +23,8 @@ columns of a hierarchical trend, or \code{"NA"}.}
 always has them.}
 \item{validation_rules}{What the trend assumes about the data.
 \code{"requires_regular_intervals"} marks a trend that indexes its
-lags by position, and fitting then requires evenly spaced
-times. \code{\link[=CAR]{CAR()}} and \code{\link[=ZMVN]{ZMVN()}} carry no rule.}
+lags by position. Fitting it requires evenly spaced times.
+\code{\link[=CAR]{CAR()}} and \code{\link[=ZMVN]{ZMVN()}} carry no rule.}
 }
 }
 
@@ -60,8 +60,8 @@ from the \code{loadings_prior} argument of \code{\link[=mvgam]{mvgam()}}.}
 \section{Parameters and priors}{
 
 Which parameters a trend samples depends on its fields at the time
-the model is built. A fully fixed \code{trend_map} samples no loadings,
-and a loadings prior with column shrinkage derives the innovation
+the model is built. A fully fixed \code{trend_map} samples no loadings.
+A loadings prior with column shrinkage derives the innovation
 scale. \code{\link[=get_prior]{get_prior()}} lists the parameters for a given model.
 }
 

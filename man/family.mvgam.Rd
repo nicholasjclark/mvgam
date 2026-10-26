@@ -10,8 +10,8 @@
 \item{object}{mvgam object}
 
 \item{resp}{Optional name of one response of a multivariate model.
-Without it, a model with several responses answers with one
-family per response.}
+Without it, a model with several responses returns one family
+per response.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

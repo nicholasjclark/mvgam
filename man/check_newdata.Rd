@@ -55,4 +55,17 @@ try(check_newdata(test_weeks, train, ~ AR(time = week, series = species)))
 }
 \seealso{
 \code{\link[=predict.mvgam]{predict.mvgam()}}, \code{\link[=forecast.mvgam]{forecast.mvgam()}}
+
+Other model fitting: 
+\code{\link{jsdgam}()},
+\code{\link{mvgam}()},
+\code{\link{mvgam_data}()},
+\code{\link{mvgam_formula}()},
+\code{\link{mvgam_multiple}()},
+\code{\link{pivot_detection_array}()},
+\code{\link{pivot_species_matrix}()},
+\code{\link{series_to_mvgam}()},
+\code{\link{stancode.mvgam_formula}()},
+\code{\link{update.mvgam}()}
 }
+\concept{model fitting}

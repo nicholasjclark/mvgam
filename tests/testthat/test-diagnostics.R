@@ -1,19 +1,9 @@
-# Fast CI-safe runtime tests for as_draws_*.mvgam, the keyword
-# shortcuts in `variable=`, and the bayesplot-ecosystem wrappers
-# (rhat, neff_ratio, nuts_params, log_posterior, coef, fixef,
-# bayes_R2, prior_summary, ndraws, nchains, niterations, nvariables,
-# posterior_summary, getCall).
-#
-# Each test builds a draws_array-backed mvgam stub so the runtime
-# paths execute without invoking Stan, exercising every slot the
-# diagnostic family reads (rather than relying on a stale
-# `x$model_output` reference that no longer exists).
+# The draws accessors, the `variable` keywords and the summary and
+# diagnostic methods, on stubs whose `$fit` is a draws array.
 
 
-# Minimal mvgam-class stub. Carries the slots every diagnostic /
-# draws method reads: a posterior::draws_array as `$fit`, the
-# response name(s), the data frame, the formula, and an empty
-# trend_formula so resolve_mvgam_keyword takes the obs-only branch.
+# A stub holding draws, data, formula and prior table. Its empty
+# `trend_formula` makes the keywords resolve on the observation side.
 make_mvgam_stub <- function(varnames = c(
                               "b_Intercept", "b_x", "b_trend[1]",
                               "b_x_trend", "Intercept", "Intercept_trend",
@@ -61,11 +51,8 @@ make_mvgam_stub <- function(varnames = c(
 test_that("as.matrix.mvgam(variable = NULL) returns all parameters", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub)
-  # A caller asking for a matrix is handed one, as
-  # `brms::as.matrix.brmsfit()` hands one: it unclasses the draws
-  # object before returning. The class matters because it survives
-  # subsetting and arithmetic, so anything typed to a bare matrix
-  # downstream refuses a `draws_matrix`.
+  # A plain matrix, as `brms::as.matrix.brmsfit()` returns. The draws
+  # class survives subsetting and arithmetic.
   expect_true(is.matrix(out))
   expect_false(inherits(out, "draws"))
   # The stub declares 18 columns, two of them Stan's own `lp__` and
@@ -78,9 +65,7 @@ test_that("as.matrix.mvgam(variable = NULL) returns all parameters", {
 test_that("as.matrix.mvgam(variable = 'betas') extracts b_* only", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub, variable = "betas")
-  # Column order is the order a caller indexes by position and the
-  # order the selection declared. Comparing the sets alone passed on
-  # a permutation.
+  # The columns keep the order of the draws
   expect_identical(colnames(out), c("b_Intercept", "b_x"))
   # The set `brms::fixef()` reports: the unpenalised smooth part is
   # in, the monotonic simplex is not
@@ -172,8 +157,7 @@ test_that("as.data.frame.mvgam returns a data.frame", {
 test_that("as.array.mvgam returns a plain array", {
   stub <- make_mvgam_stub()
   out <- as.array(stub, variable = "betas")
-  # Unclassed for the same reason `as.matrix.mvgam()` is, and to
-  # match `brms::as.array.brmsfit()`.
+  # A plain array, as `brms::as.array.brmsfit()` returns
   expect_true(is.array(out))
   expect_false(inherits(out, "draws"))
   expect_s3_class(posterior::as_draws_array(stub, variable = "betas"),
@@ -196,35 +180,21 @@ test_that("as_draws_matrix / df / array / list / rvars all dispatch", {
 
 # ---- bayesplot-ecosystem wrappers ------------------------------------
 
-test_that("coef.mvgam returns named posterior means of b_* by default", {
+test_that("coef and fixef summarise the population coefficients", {
   stub <- make_mvgam_stub()
-  out <- coef(stub)
-  expect_type(out, "double")
-  expect_identical(names(out), c("b_Intercept", "b_x"))
-})
-
-test_that("coef.mvgam(summary = FALSE) returns the full chain", {
-  stub <- make_mvgam_stub()
-  out <- coef(stub, summary = FALSE)
-  expect_s3_class(out, "draws_matrix")
-  expect_equal(ncol(out), 2L)
-})
-
-test_that("fixef.mvgam returns a brms-shaped summary matrix", {
-  stub <- make_mvgam_stub()
-  out <- fixef(stub)
-  expect_true(is.matrix(out))
-  # Both orders are what a reader sees in the printed table.
-  expect_identical(colnames(out), c("Estimate", "Est.Error",
-                                    "Q2.5", "Q97.5"))
-  expect_identical(rownames(out), c("Intercept", "x"))
-})
-
-test_that("fixef.mvgam(summary = FALSE) returns the draws matrix", {
-  stub <- make_mvgam_stub()
-  out <- fixef(stub, summary = FALSE)
-  expect_true(is.matrix(out))
-  expect_identical(colnames(out), c("Intercept", "x"))
+  betas <- unclass(posterior::as_draws_matrix(stub$fit))[
+    , c("b_Intercept", "b_x")
+  ]
+  expect_equal(coef(stub), colMeans(betas))
+  draws <- coef(stub, summary = FALSE)
+  expect_identical(colnames(draws), colnames(betas))
+  expect_equal(as.vector(draws), as.vector(betas))
+  fe <- fixef(stub)
+  expect_identical(dimnames(fe), list(c("Intercept", "x"),
+                   c("Estimate", "Est.Error", "Q2.5", "Q97.5")))
+  expect_equal(unname(fe[, "Est.Error"]), unname(apply(betas, 2L, sd)))
+  expect_identical(colnames(fixef(stub, summary = FALSE)),
+                   c("Intercept", "x"))
 })
 
 test_that("fixef.mvgam refuses a 'pars' entry the model does not have", {
@@ -236,8 +206,7 @@ test_that("fixef.mvgam refuses a 'pars' entry the model does not have", {
 })
 
 test_that("trend_effects reports the trend formula's coefficients", {
-  # A model with its covariates in `trend_formula` had no route to
-  # their table through `fixef()`, `coef()` or `vcov()`.
+  # `fixef()`, `coef()` and `vcov()` reach the trend formula's terms
   stub <- make_mvgam_stub(c("b_Intercept", "b_x", "b_x_trend", "lp__"))
   expect_error(fixef(stub, trend_effects = TRUE), "'trend_formula'")
   stub$trend_formula <- ~ x
@@ -253,27 +222,18 @@ test_that("trend_effects reports the trend formula's coefficients", {
                       dimnames = list("x_trend", "x_trend")))
 })
 
-test_that("rhat.mvgam returns a named numeric vector", {
+test_that("rhat and neff_ratio follow posterior and brms", {
   stub <- make_mvgam_stub()
-  out <- rhat(stub)
-  expect_type(out, "double")
-  # One entry per user-facing parameter, with `lp__` and `lprior`
-  # left to the raw fit.
-  expect_equal(length(out), 16L)
-})
-
-test_that("rhat.mvgam(pars = ...) filters", {
-  stub <- make_mvgam_stub()
-  out <- rhat(stub, pars = c("b_Intercept", "sigma"))
-  expect_identical(names(out), c("b_Intercept", "sigma"))
-})
-
-test_that("neff_ratio.mvgam returns ratios <= 1 in [0,1]", {
-  stub <- make_mvgam_stub(n_iter = 200L, n_chains = 4L)
-  out <- neff_ratio(stub, pars = c("b_Intercept"))
-  # The upper bound is the claim the name makes. An effective sample
-  # size above the draw count would break it.
-  expect_true(all(out > 0 & out <= 1))
+  # One entry per parameter, leaving out `lp__` and `lprior`
+  expect_length(rhat(stub), 16L)
+  sigma <- posterior::extract_variable_matrix(stub$fit, "sigma")
+  expect_equal(rhat(stub, pars = c("b_Intercept", "sigma"))[["sigma"]],
+               posterior::rhat(sigma))
+  # The smaller of the bulk and tail ESS over the number of draws
+  expect_equal(
+    neff_ratio(stub, pars = "sigma")[["sigma"]],
+    min(posterior::ess_bulk(sigma), posterior::ess_tail(sigma)) / 100
+  )
 })
 
 test_that("compute_all_summaries() columns and measures match the draws", {
@@ -284,8 +244,7 @@ test_that("compute_all_summaries() columns and measures match the draws", {
   robust_out <- compute_all_summaries(
     stub, probs = c(0.025, 0.975), robust = TRUE
   )
-  # These are the columns `summary()` prints, and this is the only
-  # place in the suite that drives them.
+  # The columns `summary()` prints
   expect_equal(colnames(robust_out),
                c("Estimate", "Est.Error", "l-95% CI", "u-95% CI",
                  "Rhat", "Bulk_ESS", "Tail_ESS"))
@@ -343,13 +302,13 @@ test_that("a lost chain is named against the count that was asked for", {
   expect_silent(check_chains_finished(stub$fit, 3L, "sampling"))
   expect_silent(check_chains_finished(stub$fit, 2L, "sampling"))
 
-  # The approximations carry no chains, and "pathfinder" spends the
-  # same argument on its number of paths.
+  # The approximations have no chains. "pathfinder" uses the same
+  # argument for its number of paths.
   expect_silent(check_chains_finished(stub$fit, 4L, "pathfinder"))
   expect_silent(check_chains_finished(stub$fit, 4L, "meanfield"))
   expect_silent(check_chains_finished(stub$fit, 4L, "laplace"))
 
-  # Nothing countable gives no verdict, never a false alarm.
+  # Without a count there is no warning
   expect_identical(realised_chain_count(NULL), NA_integer_)
   expect_silent(check_chains_finished(NULL, 4L, "sampling"))
 })
@@ -366,24 +325,18 @@ test_that("ndraws / nchains / niterations / nvariables work", {
 
 test_that("getCall.mvgam returns the stored call", {
   stub <- make_mvgam_stub()
-  expect_true(is.call(getCall(stub)))
+  expect_identical(getCall(stub), stub$call)
 })
 
 test_that("prior_summary.mvgam returns the prior table", {
   stub <- make_mvgam_stub()
-  out <- prior_summary(stub)
-  expect_s3_class(out, "data.frame")
-  expect_true("prior" %in% names(out))
+  expect_identical(prior_summary(stub), stub$prior)
 })
 
 test_that(
   "extract_prior_from_setup merges a partial user prior into the table", {
-  # The stored prior table on an mvgam fit must include every
-  # parameter class the model exposes, with the user-supplied row
-  # tagged source = 'user' and the defaults preserved with
-  # source = 'default'. Before fix #1 of the prior-surface audit,
-  # the function returned the user subset only, so prior_summary()
-  # silently under-reported. This test pins the merge behaviour.
+  # The stored table holds every parameter class of the model. The
+  # user row is tagged 'user'. The defaults keep the tag 'default'.
   dat <- data.frame(
     y      = rpois(40, 3),
     x      = rnorm(40),
@@ -407,8 +360,7 @@ test_that(
   expect_equal(nrow(user_row), 1L)
   expect_equal(user_row$prior, "normal(0, 2)")
   expect_equal(user_row$source, "user")
-  # The Intercept default that brms emits must still be present
-  # alongside the user row, not replaced by it.
+  # The Intercept default brms emits is kept with the user row
   intercept_row <- merged[
     merged$class == "Intercept", ,
     drop = FALSE
@@ -440,10 +392,9 @@ test_that(
                     c("default", "(vectorized)")))
 })
 
-# lift_mvgam_stanvar_priors: scanner tests over hand-built stancode
-# fragments. Each fragment contains exactly the prior pattern under
-# test; the helper should detect it and append a row tagged
-# source = "mvgam" on top of an empty brmsprior baseline.
+# lift_mvgam_stanvar_priors() on hand-written Stan fragments. Each
+# holds one prior pattern. The helper appends a row tagged
+# source = "mvgam" to an empty brmsprior table.
 
 empty_brmsprior <- function() {
   brms::validate_prior(
@@ -465,9 +416,8 @@ test_that("lift detects Z_free_vec partial-Z loadings prior", {
 })
 
 test_that("lift strips comments before matching priors and bounds", {
-  # A program keeps its comments, and a comment can carry the shape of
-  # a prior or of a bounded declaration. Each here names bounds and a
-  # prior the code contradicts.
+  # A comment in the program can look like a prior or a bounded
+  # declaration. Each comment here contradicts the code.
   sc <- paste(
     "parameters {",
     "  // vector<lower=0, upper=5>[N] ar1_trend;",
@@ -487,9 +437,8 @@ test_that("lift strips comments before matching priors and bounds", {
 })
 
 test_that("lift detects a length-scale prior in either spelling", {
-  # brms writes `target += dist_lpdf(x | args)` and mvgam writes
-  # `x ~ dist(args)`, and a fitted model carries both, so the scan
-  # that builds `prior_summary()` has to read either.
+  # brms writes `target += dist_lpdf(x | args)`. mvgam writes
+  # `x ~ dist(args)`. The scan for `prior_summary()` matches both.
   emitted <- "  theta_features ~ inv_gamma(3, 2);"
   row <- mvgam:::mvgam_stancode_prior_rows(emitted)[[1L]]
   expect_equal(row$class, "theta_features")
@@ -542,11 +491,9 @@ test_that("lift detects closure-unit Psi exponential prior", {
 })
 
 test_that("lift keeps every latent state out of the prior table", {
-  # The states carry sampling statements of their own, the trend
-  # equation and the reparameterisations it is written under, and
-  # every one of them ends in `_trend`. `init_trend` reached fitted
-  # prior tables for exactly that reason, so the exclusion list needs
-  # a guard rather than a reader remembering to extend it.
+  # The latent states have sampling statements of their own. Their
+  # names end in `_trend`, as the parameters' do. Every name in
+  # `MVGAM_STATE_PARAMS` is excluded.
   sc <- paste(
     "model {",
     paste0("  ", mvgam:::MVGAM_STATE_PARAMS, " ~ normal(0, 1);",
@@ -561,7 +508,7 @@ test_that("lift keeps every latent state out of the prior table", {
 
 test_that("lift keeps one row per parameter the table holds", {
   # The trend's brms model writes a user's `b_trend` prior into the
-  # program, and the stored table already has the row brms validated.
+  # program. The stored table already holds that row.
   base <- brms::prior_string("std_normal()", class = "b_trend")
   base$source <- "user"
   sc <- "lprior += std_normal_lpdf(b_trend);"
@@ -624,12 +571,22 @@ test_that("lift rejects non-brmsprior prior input", {
   )
 })
 
-test_that("bayes_R2.mvgam errors for multivariate without resp", {
-  stub <- make_mvgam_stub(mv = TRUE)
-  expect_error(
-    bayes_R2(stub),
-    regexp = "Choose a response with 'resp'"
-  )
+test_that("bayes_R2 compares the expectation with the observed rows", {
+  stub <- make_mvgam_stub()
+  stub$data$y[3L] <- NA
+  epred <- matrix(seq(0.1, 4, length.out = 40L), 4L, 10L)
+  local_mocked_bindings(posterior_epred.mvgam = function(object, ...) epred)
+  r2 <- bayes_R2(stub, summary = FALSE)
+  expect_identical(colnames(r2), "R2")
+  # Gelman et al. (2019), over the rows with a response
+  obs <- -3L
+  resid <- sweep(epred[, obs], 2L, stub$data$y[obs])
+  want <- apply(epred[, obs], 1L, var) /
+    (apply(epred[, obs], 1L, var) + apply(resid, 1L, var))
+  expect_equal(r2[, 1L], want)
+  expect_identical(rownames(bayes_R2(stub)), "R2")
+  expect_error(bayes_R2(make_mvgam_stub(mv = TRUE)),
+               "Choose a response with 'resp'")
 })
 
 test_that(
@@ -707,7 +664,7 @@ test_that("the funnel advisor checks only an MCMC run", {
 })
 
 test_that("compiled_model() requires the backend the fit recorded", {
-  # A fit records its backend, and an object without one is refused.
+  # A fit without a recorded backend is refused
   stub <- make_mvgam_stub()
   expect_error(mvgam:::compiled_model(stub), "x\\$backend")
 })

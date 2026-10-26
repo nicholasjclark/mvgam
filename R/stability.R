@@ -6,28 +6,17 @@
 #'
 #' @name stability.mvgam
 #'
-#' @param object \code{list} object of class \code{mvgam} resulting from a call
-#'   to [mvgam()] that used a `VAR(p = 1)` latent process model
+#' @param object An object of class \code{mvgam} fitted with a
+#'   `VAR(p = 1)` latent process model
 #' @param groups Hierarchical VAR fits only. The panels to summarise,
 #'   by name or by index into the levels of `gr`. The default `NULL`
 #'   summarises every panel. A non-hierarchical fit accepts `NULL`
 #'   alone.
 #'
-#'@param ndraws Optional integer; the number of posterior draws to use.
-#'  Each draw costs a Lyapunov solve. A subset of draws shortens the
-#'  computation on a wide panel. Default `NULL` uses every draw.
-#'@param draw_ids Optional integer vector naming the posterior draws to
-#'  use, in place of `ndraws`.
-#'@param summary Logical. `TRUE` (the default) returns the posterior
-#'  median and interval of each metric. `FALSE` returns the metrics of
-#'  each draw. `plot()` draws histograms of either form.
-#'@param probs The lower and upper percentiles of the interval reported
-#'  with the median when `summary = TRUE`.
-#' @param future \code{Logical}. When `TRUE`, per-draw stability
-#'   computation runs under whatever
-#'   \code{\link[future:plan]{future::plan()}} the caller has set;
-#'   see [`irf()`] for details. Requires the \code{future} package
-#'   (mvgam Suggests).
+#' @param summary Logical. `TRUE` (the default) returns the posterior
+#'   median and interval of each metric. `FALSE` returns the metrics of
+#'   each draw. `plot()` draws histograms of either form.
+#' @inheritParams irf.mvgam
 #'
 #' @param ... Unused. Anything passed here is refused.
 #'
@@ -107,15 +96,11 @@
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso
-#'   \code{\link{VAR}}, \code{\link{irf}}, \code{\link{fevd}},
-#'   \code{\link{plot.mvgam_stability}},
-#'   \code{\link{plot.mvgam_irf}},
-#'   \code{\link{plot.mvgam_fevd}},
-#'   \code{\link{plot.mvgam_forecast}}.
-#'   The article at
-#'   <https://nicholasjclark.github.io/mvgam/articles/var.html>
-#'   runs `stability()` on a plankton community.
+#' @seealso [irf()] and [fevd()] summarise the same VAR dynamics.
+#'   The `r mvgam_article("var", "VAR article")` runs `stability()` on
+#'   a plankton community. The
+#'   `r mvgam_article("hierarchical_var", "hierarchical VAR article")`
+#'   reports the metrics for each group of a hierarchical VAR.
 #'
 #' @examples
 #' \dontrun{
@@ -133,8 +118,11 @@
 #'
 #' # The full posterior of each metric
 #' plot(stability(var_mod, summary = FALSE))
+#'
+#' # Next: irf() traces a shock through the system over time
 #' }
 #'
+#' @family latent dynamics
 #' @export
 stability <- function(object, ...) {
   UseMethod("stability", object)
@@ -416,7 +404,7 @@ plot.mvgam_stability_summary <- function(
   checkmate::assert_flag(intervals)
   rlang::check_dots_empty()
   keep <- resolve_stability_metrics(variables, x$metric)
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   counts <- attr(x, "bin_counts")
   if (intervals || is.null(counts)) {
     return(stability_intervals(x[x$metric %in% keep, , drop = FALSE], keep))
@@ -459,9 +447,7 @@ plot.mvgam_stability <- function(
   if (!is.null(x$group)) {
     return(plot(summary(x), variables = keep))
   }
-  # The red scheme of the `irf()`, `fevd()` and `forecast()` plots,
-  # restored when the call returns
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   stability_histogram(lapply(stats::setNames(keep, keep), function(v) {
     bin_draws(x[[v]], bins)
   }))

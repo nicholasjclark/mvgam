@@ -9,82 +9,64 @@
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}
 
-\item{formula.}{A new observation-side formula, or a formula
-update specification such as \code{~ . + new_term}. \code{NULL} (the
-default) reuses \code{object$formula}. Routed through
-\code{\link[stats:update.formula]{stats::update.formula()}} so all of \code{~ . + z}, \code{~ . - z},
-\code{y2 ~ x}, and \code{. ~ .} work via R's standard mechanics.}
+\item{formula.}{A new observation formula, or an update to the
+fitted one such as \code{~ . + new_term}. \code{NULL} (the default) keeps
+\code{object$formula}. \code{\link[stats:update.formula]{stats::update.formula()}} applies the update.
+\code{~ . + z}, \code{~ . - z}, \code{y2 ~ x} and \code{. ~ .} all work.}
 
-\item{newdata}{An optional new training data frame. \code{NULL}
-(the default) reuses \code{object$data}. Passing \code{data = ...} in
-\code{...} is an error; use \code{newdata}.}
+\item{newdata}{An optional new training data frame. \code{NULL} (the
+default) keeps \code{object$data}. A \code{data} argument in \code{...} is an
+error.}
 
-\item{recompile}{Optional logical. Controls Stan recompilation
-behaviour. Both supported backends (\code{cmdstanr}, \code{rstan}) cache
-compiled models by stancode hash, so an unchanged stancode
-skips the compile step transparently. \code{NULL} (the default)
-and \code{TRUE} both delegate to \code{mvgam()} and let the cache
-decide. \code{FALSE} regenerates the prospective stancode, compares
-it byte-for-byte against the cached \code{object$stancode}, and
-errors if they diverge (so the caller is alerted to a needed
-recompile rather than silently paying compile cost). When
-\code{FALSE} and the stancodes match, the cache is guaranteed to
-hit.}
+\item{recompile}{Optional logical. \code{NULL} (the default) and \code{TRUE}
+refit through \code{mvgam()}. Both backends cache compiled models by
+their Stan code. A refit with unchanged code skips compilation.
+\code{FALSE} builds the new Stan code first and compares it with
+\code{object$stancode}. A difference is an error. A refit that passes
+the check compiles nothing.}
 
-\item{...}{Any other argument accepted by \code{\link[=mvgam]{mvgam()}}, or by
-\code{\link[=jsdgam]{jsdgam()}} for a \code{jsdgam} fit (e.g.
-\code{trend_formula}, \code{family}, \code{prior}, \code{chains}, \code{iter},
-\code{warmup}, \code{cores}, \code{threads}, \code{algorithm}, \code{backend},
-\code{silent}, \code{seed}, \code{init}, \code{control}). Each value overrides
-the matching slot inherited from \code{object}. A \code{prior} joins
-the priors the original fit set. See "Prior inheritance and
-Stan model reuse" in Details.}
+\item{...}{Any other argument \code{\link[=mvgam]{mvgam()}} accepts, or \code{\link[=jsdgam]{jsdgam()}} for a
+\code{jsdgam} fit (e.g. \code{trend_formula}, \code{family}, \code{prior}, \code{chains},
+\code{iter}, \code{warmup}, \code{cores}, \code{threads}, \code{algorithm}, \code{backend},
+\code{silent}, \code{seed}, \code{init}, \code{control}). Each value overrides the one
+inherited from \code{object}. A \code{prior} joins the priors the original
+fit set, as Details describes.}
 }
 \value{
 A refit \code{mvgam} object.
 }
 \description{
-Refit a fitted \code{mvgam} object with new data, an updated formula,
-new priors, different sampler settings, or any other argument
-accepted by \code{\link[=mvgam]{mvgam()}}. The signature mirrors
-\code{\link[brms:update.brmsfit]{brms::update.brmsfit()}} so users familiar with brms can drop
-into the same workflow.
+Refit a fitted \code{mvgam} object with new data, an updated formula, new
+priors, different sampler settings or any other argument \code{\link[=mvgam]{mvgam()}}
+accepts. The signature follows \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}.
 }
 \details{
-Argument inheritance: every \code{mvgam()} argument is taken from
-the corresponding slot on \code{object} unless the caller overrides
-via \code{...}. This means
-\code{update(fit, iter = 4000)} reuses the original formula, data,
-family, trend, prior, and backend, and only bumps the iteration
-count.
+Every \code{mvgam()} argument comes from \code{object} unless \code{...} overrides
+it. \code{update(fit, iter = 4000)} keeps the original formula, data,
+family, trend, prior and backend. Only the iteration count changes.
 
-Sampler settings follow \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}. \code{chains},
-\code{iter}, \code{warmup}, \code{thin} and \code{control} carry over when the refit
-keeps the original \code{algorithm}, and \code{control} also needs the
-original \code{backend}. A new \code{iter} without a \code{warmup} takes the
-default warmup of \code{iter / 2}. \code{control} merges entry by entry:
-\code{update(fit, adapt_delta = 0.99)} keeps the original
-\code{max_treedepth}.
+Sampler settings follow \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}. \code{chains}, \code{iter},
+\code{warmup}, \code{thin} and \code{control} carry over when the refit keeps the
+original \code{algorithm}. \code{control} also needs the original \code{backend}. A
+new \code{iter} without a \code{warmup} takes the default warmup of
+\code{iter / 2}. \code{control} merges entry by entry:
+\code{update(fit, adapt_delta = 0.99)} keeps the original \code{max_treedepth}.
 
-New training data passed as \code{newdata} keeps the fit's held-out
-data when that lies after the new training times. Held-out data
+New training data passed as \code{newdata} keeps the fit's held-out data
+when that lies after the new training times. Held-out data
 overlapping them is dropped with a message.
 
-Prior inheritance and Stan model reuse. The fitted object's
-\code{prior} table is reused on every \code{update()} call by default.
-The \code{brms} adaptive priors (e.g. the response-centred Intercept
-prior, response-scaled \code{sigma} prior) carry their literal
-constants from the original fit rather than being regenerated
-from new training data, so a refit with a different
-\code{newdata} window does not change the stancode and the compiled
-Stan model is reused. This is what makes \code{\link[=lfo_cv]{lfo_cv()}} and other
-refit-heavy workflows fast: subsequent refits skip the (slow)
-compile step and only repeat sampling. To override the inherited
-priors for a single refit (e.g. swap a coefficient's prior or
-loosen a constraint) pass \code{prior = ...} directly to
-\code{\link[=update]{update()}}. As in \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}, the new rows join
-the priors the user set on the original fit, and a new row
-replaces an old one for the same parameter:
+A refit reuses the fitted prior table. The adaptive priors of brms,
+such as the Intercept prior centred on the response, keep the
+constants of the original fit. Because the constants stay fixed, a
+refit on a different \code{newdata} window has the same Stan code and
+reuses the compiled model. \code{\link[=lfo_cv]{lfo_cv()}} and other workflows that refit
+many times then repeat only the sampling. An inherited row for a
+parameter the refit lacks, such as the smooth of a dropped term, is
+left out of the refit. A \code{prior} passed to
+\code{update()} joins the priors the user set on the original fit, as in
+\code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}. A new row replaces an old one for the same
+parameter:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{new_priors <- c(
   prior(normal(0, 1), class = "b"),
@@ -93,54 +75,64 @@ replaces an old one for the same parameter:
 refit <- update(mod, prior = new_priors)
 }\if{html}{\out{</div>}}
 
-A change in priors that alters the Stan model will cause a
-recompile (and a \code{recompile = FALSE} call would error). Use
-\code{stancode(refit)} after the call to confirm the model surface
-you intended.
+A prior change that alters the Stan code recompiles the model. With
+\code{recompile = FALSE} it is an error. \code{stancode(refit)} shows the
+model the refit compiled.
 
 Multivariate fits take a complete new formula as \code{formula.}. A
 formula update written with \code{.} is refused, as brms refuses it.
 
-\code{jsdgam()} fits refit through \code{\link[=jsdgam]{jsdgam()}} with the arguments the
+A \code{jsdgam()} fit refits through \code{\link[=jsdgam]{jsdgam()}} with the arguments the
 original call evaluated, including \code{factor_formula}, \code{n_lv},
-\code{traits}, \code{trait_slopes} and \code{phylo}. Any of them can be overridden
-through \code{...}.
+\code{traits}, \code{trait_slopes} and \code{phylo}. \code{...} overrides any of them.
 
-Multiple-imputation fits (produced by \code{mvgam_multiple(combine = TRUE)}) are not supported by \code{update()}. Refit each imputation with
+\code{update()} refuses multiple-imputation fits from
+\code{mvgam_multiple(combine = TRUE)}. Refit each imputation with
 \code{\link[=mvgam]{mvgam()}} and pool them again.
 }
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
+                    n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-              data    = simdat$data_train,
-              family  = poisson(),
-              chains  = 2, silent = 2)
+             data   = simdat$data_train,
+             family = poisson(),
+             chains = 2, silent = 2)
 
-# Refit with a richer obs-side formula (adding a smooth of
-# `time`). `update()` reuses the original family, trend
-# constructor, priors, and data when the call doesn't override
-# them, so only the new term has to be named.
-upd <- update(mod, formula. = ~ . + s(time, k = 5), silent = 2)
+# Add a smooth of time to the observation formula. The family,
+# trend, priors, data and sampler settings carry over
+upd <- update(mod, formula. = ~ . + s(time, k = 5))
 
-# Compare the two fits via leave-one-out cross-validation. A
-# positive `elpd_diff` for the richer model indicates the smooth
-# on time raised expected log predictive density; check that
-# the difference exceeds its standard error before drawing a
-# firm conclusion.
-loo_compare(loo(mod), loo(upd))
+# Compare the two fits by approximate leave-one-out cross-validation.
+# The better model has elpd_diff = 0. A difference smaller than about
+# two of its standard errors favours neither model
+loo_compare(mod, upd)
+
+# A change of sampler settings alone reuses the compiled model
+longer <- update(mod, iter = 3000, recompile = FALSE)
 }
 
 }
 \seealso{
-\code{\link[=mvgam]{mvgam()}}, \code{\link[stats:update.formula]{stats::update.formula()}},
-\code{\link[brms:update.brmsfit]{brms::update.brmsfit()}},
-\code{\link[=stancode.mvgam]{stancode.mvgam()}} for inspecting the cached Stan model,
-\link{mvgam_diagnostics} / \link{mvgam_loo_extras} for diagnostics and
-model comparison on the refit object.
+\code{\link[=loo.mvgam]{loo.mvgam()}} and \code{\link[=loo_compare.mvgam]{loo_compare.mvgam()}} compare a refit with the
+original. \code{\link[=stancode.mvgam]{stancode.mvgam()}} shows the compiled model. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+compares competing models by their forecasts.
+
+Other model fitting: 
+\code{\link{check_newdata}()},
+\code{\link{jsdgam}()},
+\code{\link{mvgam}()},
+\code{\link{mvgam_data}()},
+\code{\link{mvgam_formula}()},
+\code{\link{mvgam_multiple}()},
+\code{\link{pivot_detection_array}()},
+\code{\link{pivot_species_matrix}()},
+\code{\link{series_to_mvgam}()},
+\code{\link{stancode.mvgam_formula}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model fitting}

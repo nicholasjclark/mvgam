@@ -9,33 +9,63 @@
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}
 
-\item{pars}{Deprecated brms alias for \code{variable}. If supplied
-and \code{variable} is \code{NULL}, \code{pars} is used.}
+\item{pars}{The older brms name for \code{variable}, used when
+\code{variable} is \code{NULL}.}
 
-\item{variable}{Optional character vector of parameter names
-or a \code{variables(object)} keyword shortcut. Passed straight
-through to \code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}}.}
+\item{variable}{Either a keyword shortcut, a character vector of
+parameter names, or (when \code{regex = TRUE}) a vector of regular
+expressions. Recognised keywords:
+\itemize{
+\item \code{"betas"}: population-level coefficients, the set
+\code{\link[brms:fixef.brmsfit]{brms::fixef()}} reports (\verb{b_*}, \verb{bs_*} and \verb{bsp_*}).
+\item \code{"obs_params"}: observation-family distributional
+parameters (\code{sigma}, \code{phi}, \code{shape}, ...).
+\item \code{"smooth_params"}: smooth-term standard deviations
+(\verb{sds_*}).
+\item \code{"trend_betas"}: the trend formula's population-level
+coefficients (\verb{b_*_trend}, \verb{bs_*_trend} and \verb{bsp_*_trend}).
+\item \code{"trend_params"}: trend-dynamics parameters
+(autoregressive coefficients, innovation SDs, ...).
+\item \code{"trend_smooth_params"}: trend-side smooth SDs.
+}
+\code{NULL} (the default) returns every parameter. A bare vector name,
+such as \code{"sigma_trend"}, selects every element. \code{\link[=variables.mvgam]{variables.mvgam()}}
+lists the exact names and how they are formed.}
 
 \item{prob}{Numeric in \verb{(0, 1)}. The credible-interval mass
 to report. Defaults to \code{0.95}.}
 
-\item{...}{Unused; present for S3 / brms-parity.}
+\item{...}{Further arguments of \code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}}, such as
+\code{regex}.}
 }
 \value{
 A numeric matrix with one row per parameter and two
 columns reporting the lower and upper interval bounds.
 }
 \description{
-Returns quantile-based credible intervals for posterior
-draws of the requested parameters. Mirrors
-\code{\link[brms:posterior_interval.brmsfit]{brms::posterior_interval.brmsfit()}} and dispatches through
-\code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}} (so all \code{variable} shortcuts and
-aliasing apply unchanged).
+Quantile credible intervals of the posterior draws of parameters,
+as \code{\link[brms:posterior_interval.brmsfit]{brms::posterior_interval.brmsfit()}} gives them. The parameters
+are chosen as in \code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}}.
 }
 \seealso{
 \code{\link[brms:posterior_interval.brmsfit]{brms::posterior_interval.brmsfit()}},
 \code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}}, \code{\link[=predictive_interval.mvgam]{predictive_interval.mvgam()}}.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

@@ -73,6 +73,7 @@
 #'
 #' @author Nicholas J Clark
 #'
+#' @family posterior summaries
 NULL
 
 
@@ -917,7 +918,11 @@ as.data.frame.mvgam <- function(x, row.names = NULL, optional = TRUE,
     extract_mvgam_draws(x, variable, regex)
   )
   if (!is.null(draw)) {
-    drws <- posterior::subset_draws(drws, draw = draw)
+    # A draw index counts across chains. `subset_draws()` merges the
+    # chains to apply it and prints a message saying so. Merging first
+    # applies the same index without the message.
+    drws <- posterior::subset_draws(posterior::merge_chains(drws),
+                                    draw = draw)
   }
   as.data.frame(drws)
 }

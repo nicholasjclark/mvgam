@@ -7,41 +7,27 @@
 \method{logLik}{mvgam}(object, pointwise = FALSE, ...)
 }
 \arguments{
-\item{object}{A fitted [mvgam][mvgam] object.}
+\item{object}{A fitted \code{mvgam} object.}
 
-\item{pointwise}{Logical. When \code{FALSE} (default) a single scalar
-\code{logLik} value is returned for compatibility with \code{AIC} and \code{BIC}.
-When \code{TRUE} the underlying [ndraws x nobs] pointwise matrix from
-\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} is returned (matches the historical mvgam
-return shape).}
+\item{pointwise}{Logical. \code{TRUE} returns the \verb{[ndraws, nobs]} matrix
+of \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}. Defaults to \code{FALSE}.}
 
-\item{...}{Additional arguments forwarded to \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}
-(e.g. \code{newdata}, \code{ndraws}, \code{process_error}).}
+\item{...}{Further arguments to \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}, such as \code{newdata}
+or \code{ndraws}.}
 }
 \value{
-When \code{pointwise = FALSE}, a length-1 \code{logLik} object with
-\code{df} (number of sampled parameters, excluding sampler
-diagnostics) and \code{nobs} attributes. When \code{pointwise = TRUE}, a
-[ndraws x nobs] numeric matrix of pointwise log densities.
+A \code{logLik} object. \code{df} counts the parameters \code{\link[=variables]{variables()}}
+lists. With \code{pointwise = TRUE}, the matrix of \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}.
 }
 \description{
-Method for the \code{stats::logLik} generic so that \code{AIC()} and \code{BIC()}
-dispatch on \code{mvgam} objects. Returns the posterior mean of the
-summed pointwise log-likelihood (across observations) as a numeric
-scalar with the \code{df} and \code{nobs} attributes the \code{\link[stats:AIC]{stats::AIC()}} /
-\code{\link[stats:AIC]{stats::BIC()}} machinery expects.
+The posterior mean of the summed log likelihood, with the \code{df} and
+\code{nobs} attributes that \code{\link[stats:AIC]{stats::AIC()}} and \code{\link[stats:AIC]{stats::BIC()}} use.
 }
 \details{
-The scalar returned is the posterior mean, across draws, of the
-summed pointwise log-likelihood over the observations that carry a
-density. Those are every row for most families, and one row per
-closure unit for the detection and composition families, whose
-likelihood is written per unit.
-For Bayesian state-space models AIC and BIC are coarse
-instruments because every latent state inflates the parameter count;
-\code{\link[=loo]{loo()}} / \code{\link[=waic]{waic()}} are usually the better model-selection tools and
-are recommended in preference.
+Each latent state counts as a parameter, which makes AIC and BIC
+coarse for a state-space model. \code{\link[=loo.mvgam]{loo.mvgam()}} estimates the ELPD
+with diagnostics for its reliability.
 }
 \seealso{
-\code{\link[=log_lik.mvgam]{log_lik.mvgam()}}, \code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=waic.mvgam]{waic.mvgam()}}.
+\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} returns the pointwise matrix.
 }

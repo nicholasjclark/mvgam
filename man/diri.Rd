@@ -8,9 +8,9 @@ diri()
 }
 \value{
 A \code{brms::custom_family} object tagged with the
-\code{mvgam_closure_unit}, \code{mvgam_multi_response}, and
-\code{mvgam_simplex_response} attributes that route the
-downstream data prep, validation, and Stan emission.
+\code{mvgam_closure_unit}, \code{mvgam_multi_response} and
+\code{mvgam_simplex_response} attributes. They route the downstream data
+prep, validation and Stan emission.
 }
 \description{
 Composes Stan's native \code{dirichlet_logit_lpdf} with the mvgam
@@ -48,8 +48,8 @@ population-effect default prior is also injected because brms
 \code{custom_family()} would otherwise emit flat improper priors;
 under the hard mode-2 reference subtraction, any K-shared
 coefficient (\code{b_Intercept}, \code{b_env}, etc.) has no likelihood
-contribution and samples from that prior, so a once-per-session
-warning fires from \code{jsdgam()} when the user's formula contains
+contribution and samples from that prior. A once-per-session warning
+is raised by \code{jsdgam()} when the user's formula contains
 no per-\code{species} interaction term. The \code{loadings_prior}
 matrix-normal prior, when supplied, composes with the sum-to-zero
 constraint and is the recommended path when traits or phylogeny are
@@ -65,16 +65,15 @@ groups by (series, time) so each site forms one closure unit.
 
 A \code{phi ~ env} sub-formula in \code{bf()} (e.g.
 \code{bf(y ~ env * species, phi ~ env, family = diri())} through
-\code{mvgam()} rather than \code{jsdgam()}, which currently exposes only
-the response formula) IS supported at fit time: the lpdf
+\code{mvgam()}. \code{jsdgam()} currently exposes only the response formula.
+The \code{phi} sub-formula IS supported at fit time: the lpdf
 dispatches \verb{vector phi} vs \verb{real phi} so brms can pass either.
 Per-row \code{phi[i, k]} is collapsed to one scalar per closure unit
-by taking \code{phi[idx[1]]}, which assumes the \code{phi} covariate is
+by taking \code{phi[idx[1]]}. This requires the \code{phi} covariate to be
 constant across the K rows of any site (site-level only). A
-species-level \code{phi} covariate is statistically ill-defined for
-a Dirichlet observation; if you pass one, the lpdf silently uses
-row 1's value, since there is no pre-fit validator for this
-contract.
+species-level \code{phi} covariate is statistically ill-defined for a
+Dirichlet observation. If one is passed, the lpdf silently uses row
+1's value. No pre-fit validator checks this contract.
 
 Post-fit response-scale dispatchers
 (\code{posterior_predict()} / \code{posterior_epred()} / \code{log_lik()})
@@ -92,15 +91,14 @@ phi shifts under modest sample sizes).
 
 \section{Post-fit conventions}{
 
-\code{log_lik()}, \code{loo()}, and \code{waic()} score at the \strong{site grain},
+\code{log_lik()}, \code{loo()} and \code{waic()} score at the \strong{site grain},
 not the (site, species) row grain. The Stan lpdf evaluates the
-joint K-vector Dirichlet density once per closure unit, so the
-per-unit log-density is attributed to the first row of the unit
-and the remaining K - 1 rows return \code{NA} for \code{log_lik()}, which
-is how a row carrying no density of its own is spelled: a \code{0}
-there would assert a density of one, and \code{loo()} would score the
-site once per species. This is
-the only correct grain for joint multi-row outcomes and matches
+joint K-vector Dirichlet density once per closure unit. The per-unit
+log-density is attributed to the first row of the unit. The remaining
+K - 1 rows return \code{NA} for \code{log_lik()}. A row with no density of its
+own is spelled \code{NA}. A \code{0} there would assert a density of one.
+\code{loo()} would then score the site once per species. This is the
+correct grain for joint multi-row outcomes. It matches
 the flocker / ubms convention for closure-unit families;
 Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
 for PSIS-LOO whenever the per-row likelihoods are not
@@ -175,3 +173,17 @@ distributions for the covariance matrix in latent factor
 models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
 }
+\seealso{
+Other observation families: 
+\code{\link{beta_nb}()},
+\code{\link{categ}()},
+\code{\link{com_binomial}()},
+\code{\link{multi}()},
+\code{\link{mvgam_families}},
+\code{\link{mvn}()},
+\code{\link{mvt}()},
+\code{\link{nmix}()},
+\code{\link{occ}()},
+\code{\link{tweedie}()}
+}
+\concept{observation families}

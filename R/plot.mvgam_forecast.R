@@ -118,9 +118,7 @@ plot.mvgam_forecast <- function(
     y_label <- paste0(y_label, " for ", plotted_series)
   }
 
-  # The ribbon and median colours come from the 'red' scheme. The
-  # caller's scheme is restored when this function returns.
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   fc_layers <- build_forecast_layers(
     x,
     plotted = plotted_series,

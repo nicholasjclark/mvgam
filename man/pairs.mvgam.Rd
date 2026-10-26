@@ -54,3 +54,19 @@ pairs(mod, variable = "^(sigma|ar1)_trend", regex = TRUE)
 }
 
 }
+\seealso{
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
+}
+\concept{posterior summaries}

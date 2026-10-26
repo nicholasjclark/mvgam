@@ -7,10 +7,9 @@
 # `kfold()` inherit the corrected contributions without knowing the
 # terms exist.
 #
-# Censoring and truncation need the family's distribution function
-# rather than its density. Both read the same parameterisation the
-# density does, so `family_dist_spec()` names the R distribution and
-# builds its arguments once and the two callers share it.
+# Censoring and truncation need the family's distribution function. It
+# takes the parameterisation the density takes. `family_dist_spec()`
+# names the R distribution and builds its arguments once for both.
 
 
 #' The two shapes of a beta from its mean and precision
@@ -71,10 +70,14 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
     gaussian = spec("norm", function(j) {
       list(mean = mu[, j], sd = sigma[, j])
     }),
-    # A location-scale Student t is standardised before `pt`, so its
-    # bound has to be standardised the same way.
+    # `pt` takes a standard Student t. A location-scale value and its
+    # bound are standardised before it.
     student = spec("t", function(j) {
       list(df = nu[, j], .shift = mu[, j], .scale = sigma[, j])
+    }),
+    asym_laplace = spec("asym_laplace", function(j) {
+      list(mu = mu[, j], sigma = sigma[, j],
+           quantile = family_pars$quantile[, j])
     }),
     lognormal = spec("lnorm", function(j) {
       list(meanlog = linpred[, j], sdlog = sigma[, j])
@@ -119,10 +122,9 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
       list(mu = mu[, j], shape = shape[, j],
            mtail = family_pars$mtail[, j])
     }),
-    # `mvn` and `mvt` are written row-wise: conditional on the latent
-    # state a row is normal or location-scale Student t, which is the
-    # density `log_lik()` evaluates, so the distribution function is
-    # that row's own.
+    # `mvn` and `mvt` are written row by row. Given the latent state a
+    # row is normal or location-scale Student t. `log_lik()` evaluates
+    # that density. The distribution function is the row's own.
     mvn = spec("norm", function(j) {
       list(mean = mu[, j], sd = family_pars$Psi_row[, j])
     }),
@@ -130,28 +132,27 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
       list(df = family_pars$nu, .shift = mu[, j],
            .scale = family_pars$Psi_row[, j])
     }),
-    # A Dirichlet is a joint over the rows of a unit, and the
-    # marginal of one component is Beta(alpha_j, alpha_0 - alpha_j).
-    # The softmax makes a unit's probabilities sum to one and `phi`
-    # is constant across it, so alpha_0 is `phi` and the row's mean
-    # is its softmax probability: the beta family's own two
-    # arguments, read at the row grain.
+    # A Dirichlet is a joint law over the rows of a unit. The marginal
+    # of one component is Beta(alpha_j, alpha_0 - alpha_j). A unit's
+    # softmax probabilities sum to one and `phi` is constant across
+    # it. alpha_0 is then `phi` and the row's mean is its softmax
+    # probability. These are the beta family's two arguments, taken
+    # row by row.
     #
-    # Being a marginal, it answers a per-row question such as a
-    # residual exactly and says nothing about what bounding one row
-    # does to the density of the unit that row belongs to. Only the
-    # residual asks: `cens()` and `trunc()` reach the univariate
-    # path alone, since a closure-unit fit refuses an addition term
-    # before one is parsed.
+    # The marginal gives a per-row quantity such as a residual exactly.
+    # It leaves out what bounding one row does to its unit's density.
+    # Only the residual uses it. A closure-unit fit refuses an addition
+    # term before parsing one. `cens()` and `trunc()` reach the
+    # univariate path alone.
     diri = spec("beta", function(j) {
       beta_shapes(family_pars$prob_row[, j], family_pars$phi[, j],
                   boundary_na = TRUE)
     }),
-    # The other two compositions have a marginal on the same
-    # argument. A multinomial's K counts are drawn jointly against the
-    # site's own total, and one component of that draw is
-    # `Binomial(N_site, p_k)`. A categorical unit records one species,
-    # which is that binomial at a single trial.
+    # The other two compositions have a marginal of the same kind. A
+    # multinomial draws its K counts jointly against the site's total.
+    # One component of that draw is `Binomial(N_site, p_k)`. A
+    # categorical unit records one species, which is that binomial at
+    # a single trial.
     multi = spec("binom", function(j) {
       list(size = family_pars$unit_total_row[j],
            prob = family_pars$prob_row[, j])
@@ -159,10 +160,10 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
     categ = spec("binom", function(j) {
       list(size = 1L, prob = family_pars$prob_row[, j])
     }),
-    # A Tweedie puts a point mass at zero and is continuous above it,
-    # so the spec records where that mass sits; a caller forming a
-    # probability-integral transform needs to know the interval an
-    # observation of zero occupies.
+    # A Tweedie puts a point mass at zero and is continuous above it.
+    # The spec records the location of that mass. A caller forming a
+    # probability-integral transform needs the interval an observation
+    # of zero occupies.
     tweedie = c(
       spec("tweedie", function(j) {
         list(power = family_pars$mtheta[, j], mu = mu[, j],
@@ -177,8 +178,9 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
 
 #' The density, distribution or quantile function of a distribution
 #'
-#' Most come from base R. `bbinom` comes from extraDistr. `cmb`,
-#' `beta_nb` and `tweedie` use the package's own kernels.
+#' Most come from base R. `bbinom` comes from extraDistr and
+#' `asym_laplace` from brms. `cmb`, `beta_nb` and `tweedie` use the
+#' package's own kernels.
 #'
 #' @param dist Character distribution name from `family_dist_spec()`
 #' @param kind Character function kind, `"d"`, `"p"` or `"q"`
@@ -207,6 +209,8 @@ dist_fun <- function(dist, kind = c("d", "p", "q")) {
     # quantile function here. `NULL` tells a caller asking for one to
     # take rejection sampling.
     cmb = switch(kind, d = dcmb, p = pcmb, q = NULL),
+    asym_laplace = switch(kind, d = brms::dasym_laplace,
+                          p = brms::pasym_laplace, q = brms::qasym_laplace),
     beta_nb = switch(kind, d = dbeta_nb_mvgam, p = pbeta_nb_mvgam,
                      q = NULL),
     tweedie = switch(kind, d = dtweedie_cpg, p = ptweedie_cpg,
@@ -400,9 +404,9 @@ addition_term_data <- function(object, resp, nobs) {
   if (is.null(sdata)) {
     return(list())
   }
-  # A multivariate fit suffixes each key with the response, so an
-  # unsuffixed key belongs to a univariate fit and must not be read
-  # when a response was named.
+  # A multivariate fit suffixes each key with the response. An
+  # unsuffixed key belongs to a univariate fit. A named response takes
+  # its suffixed key alone.
   pick <- function(key) {
     nm <- if (!is.null(resp)) paste0(key, "_", resp) else key
     val <- sdata[[nm]]
@@ -422,10 +426,9 @@ addition_term_data <- function(object, resp, nobs) {
   )
   out <- out[!vapply(out, is.null, logical(1L))]
 
-  # A closure-unit family scores at the unit grain while the addition
-  # terms are recorded per visit. Silently dropping them would report
-  # an information criterion that looks ordinary and is wrong, so the
-  # mismatch is refused instead.
+  # A closure-unit family scores once per unit. Its addition terms are
+  # recorded per visit. Dropping them would report a wrong information
+  # criterion that looks ordinary. The mismatch is refused.
   bad <- names(out)[vapply(out, function(v) isTRUE(attr(v, "mismatch")),
                            logical(1L))]
   if (length(bad)) {

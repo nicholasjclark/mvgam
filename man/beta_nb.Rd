@@ -11,35 +11,33 @@ A \code{customfamily} object for use with \code{\link[=mvgam]{mvgam()}}.
 }
 \description{
 A three-parameter count family that mixes the negative binomial
-success probability over a Beta distribution, giving a
-power-law rather than geometric tail. Useful for outbreak counts
-and boom-bust population series where a negative binomial fits
-the bulk of the data but is repeatedly surprised by the largest
-observations.
+success probability over a Beta distribution. The tail follows a
+power law. It suits outbreak counts and boom-bust population series,
+where a negative binomial fits the bulk of the data but repeatedly
+underpredicts the largest observations.
 }
 \details{
-The family is parameterised so that \code{mu} is the mean:
+The family is parameterised with \code{mu} as the mean:
 \deqn{Y \mid p \sim \mathrm{NegBinomial}(r, p), \quad
       p \sim \mathrm{Beta}(1 + \tau, \mu \tau / r)}
 where \code{r} is \code{shape} and \eqn{\tau} is \code{mtail}. Writing Stan's
-native first Beta parameter as \eqn{\alpha = 1 + \tau} keeps the
-mean finite by construction, since \eqn{E[Y] = \mu} requires
+native first Beta parameter as \eqn{\alpha = 1 + \tau} makes the
+mean finite by construction. \eqn{E[Y] = \mu} requires
 \eqn{\alpha > 1}.
 
-The variance is finite only when \code{mtail} exceeds 1, and the
-family becomes genuinely heavy-tailed below that. This is the
-behaviour the family exists to provide, but it has two
-consequences worth knowing. Randomised quantile residuals, the
-default in \code{\link[=residuals.mvgam]{residuals.mvgam()}}, are unaffected because they need
-only the distribution function. Moment-based scoring is not:
-\code{score(..., score = "dss")} assumes a finite predictive variance
-and should not be trusted when the posterior for \code{mtail} places
+The variance is finite only when \code{mtail} exceeds 1. Below that value,
+the family is heavy-tailed. This is the behaviour the
+family exists to provide. It has two consequences worth knowing.
+Randomised quantile residuals, the default in \code{\link[=residuals.mvgam]{residuals.mvgam()}},
+are unaffected. They need only the distribution function. Moment-based
+scoring is affected. \code{score(..., score = "dss")} assumes a finite
+predictive variance. Avoid it when the posterior for \code{mtail} places
 appreciable mass below 1. Prefer \code{"crps"}, \code{"drps"} or \code{"logs"}.
 
-As \code{mtail} grows the family converges to the negative binomial
-with the same \code{shape}, so a posterior for \code{mtail} that runs off
-toward its prior upper range is evidence that the extra tail
-parameter is not needed.
+As \code{mtail} grows the family converges to the negative binomial with
+the same \code{shape}. A posterior for \code{mtail} that runs off toward its
+prior upper range is evidence that the extra tail parameter is not
+needed.
 }
 \section{Distributional parameters}{
 
@@ -56,25 +54,25 @@ below 1 give infinite variance. Default prior
 
 \section{Censoring and truncation}{
 
-The Stan code supplies the distribution function alongside the
-density, so \code{cens()} and \code{trunc()} addition terms work as they do
+The Stan code supplies the distribution function as well as the
+density. The \code{cens()} and \code{trunc()} addition terms work as they do
 for the built-in count families.
 
 Two limits are worth knowing. The distribution function accumulates
-the mass function term by term, so both its cost and the length of
-the automatic-differentiation tape grow linearly in the count at
-which it is evaluated. At the counts these models usually see this
-is unnoticeable; a censoring bound in the thousands will dominate
-the gradient evaluation, and one in the millions is impractical.
+the mass function term by term. Its cost and the length of the
+automatic-differentiation tape both grow linearly in the count at
+which it is evaluated. At the counts these models usually see this is
+unnoticeable. A censoring bound in the thousands dominates the
+gradient evaluation. One in the millions is impractical.
 
 Right censoring also needs the upper tail, which is computed as
 \code{log1m_exp()} of the distribution function. That subtraction loses
 precision once the survival probability approaches the accumulated
 rounding error, roughly when \code{1 - F(y)} falls below \code{y * 5e-16}. A
 censoring bound placed far into the tail of a light-tailed fit can
-therefore return a survival probability of zero rather than a small
-positive number. Heavy-tailed fits, which are the point of this
-family, keep \code{1 - F(y)} large and are unaffected.
+return a survival probability of zero. A small positive value is the
+correct result there. Heavy-tailed fits, the purpose of this family,
+keep \code{1 - F(y)} large. They are unaffected.
 }
 
 \examples{
@@ -95,7 +93,7 @@ mod <- mvgam(y ~ x, data = dat, family = beta_nb(), chains = 2,
 # The posteriors recover `shape` and `mtail`. A negative binomial
 # is the limit of a large `mtail`.
 summary(mod)
-mcmc_plot(mod, variable = c("shape", "mtail"), type = "hist")
+mcmc_plot(mod, variable = c("shape", "mtail"), type = "areas")
 }
 }
 \references{
@@ -105,6 +103,19 @@ Society A}, 131(2), 205-225. \doi{10.2307/2343842}
 }
 \seealso{
 \code{\link[brms:brmsfamily]{brms::negbinomial()}}, which this family approaches as
-\code{mtail} grows, and \code{\link[=tweedie]{tweedie()}} for non-negative continuous
-responses with a point mass at zero.
+\code{mtail} grows. \code{\link[=tweedie]{tweedie()}} covers non-negative continuous responses
+with a point mass at zero.
+
+Other observation families: 
+\code{\link{categ}()},
+\code{\link{com_binomial}()},
+\code{\link{diri}()},
+\code{\link{multi}()},
+\code{\link{mvgam_families}},
+\code{\link{mvn}()},
+\code{\link{mvt}()},
+\code{\link{nmix}()},
+\code{\link{occ}()},
+\code{\link{tweedie}()}
 }
+\concept{observation families}

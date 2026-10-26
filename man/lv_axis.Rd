@@ -24,19 +24,19 @@ trend_formula = ~ s(temp, lv_axis(), bs = "fs") + AR()
 }
 
 With \code{n_lv} set on the trend constructor, each factor
-\verb{k = 1, ..., n_lv} takes its own effect, and the effect of a
-covariate on series \code{s} is the sum over factors of the loading
-\code{Z[s, k]} times the effect on factor \code{k}. This is constrained
-ordination, the model \code{\link[=jsdgam]{jsdgam()}} fits. Every term of such a
-\code{trend_formula} is then evaluated once per factor and time, and
-each covariate must take one value per time.
+\verb{k = 1, ..., n_lv} takes its own effect. The effect of a covariate
+on series \code{s} is the sum over factors of the loading \code{Z[s, k]} times
+the effect on factor \code{k}. This is constrained ordination, the model
+\code{\link[=jsdgam]{jsdgam()}} fits. Every term of such a \code{trend_formula} is then
+evaluated once per factor and time. Each covariate must take one
+value per time.
 
 With no \code{n_lv}, each series takes its own effect on the latent
 state.
 
 The series column itself is not supported in a \code{trend_formula}
 term. Write \code{lv_axis()} for an effect that differs along the
-trend's axis, and put an effect of the series on the observations
+trend's axis. An effect of the series on the observations belongs
 in \code{formula}. \code{by = trend} is deprecated and is treated as
 \code{by = lv_axis()}.
 }
@@ -53,9 +53,9 @@ and \code{~ s(x, lv_axis(), bs = "fs")} gives smooths that share a
 smoothness penalty.
 }
 With \code{n_lv} latent factors, each of these is estimated once per
-factor. The coefficient of one factor has no scale of its own: the
-loadings and the factor effects trade scale, and their product is
-what the data identify. \code{\link[=conditional_effects]{conditional_effects()}} and \code{\link[=predict]{predict()}}
+factor. The coefficient of one factor has no scale of its own. The
+loadings and the factor effects trade scale. The data identify
+their product. \code{\link[=conditional_effects]{conditional_effects()}} and \code{\link[=predict]{predict()}}
 report that product, the effect of the covariate on each series,
 and \code{\link[=conditional_effects]{conditional_effects()}} draws a panel per series. When every
 \code{lv_axis()} term is a slope or a level, \code{\link[cmdstanr:fit-method-summary]{cmdstanr::summary()}} reports the
@@ -77,7 +77,7 @@ dat$season <- sin(2 * pi * dat$time / 12)
 dat$y <- dat$y + c(1, 0.5, -1)[as.integer(dat$series)] * dat$season
 
 # One seasonal slope per series
-mod_slopes <- mvgam(
+mod <- mvgam(
   formula       = y ~ 1,
   trend_formula = ~ season:lv_axis() + AR(p = 1),
   data          = dat,
@@ -85,33 +85,34 @@ mod_slopes <- mvgam(
   chains        = 2,
   silent        = 2
 )
-summary(mod_slopes)
-conditional_effects(mod_slopes)
+summary(mod)
+conditional_effects(mod)
 
-# With two latent factors, each factor takes a seasonal slope and
-# the loadings carry the two slopes to the three series. A smooth
-# takes the same marker: `s(season, by = lv_axis())`.
-mod_factors <- mvgam(
-  formula       = y ~ 1,
-  trend_formula = ~ season:lv_axis() + AR(p = 1, n_lv = 2),
-  data          = dat,
-  family        = gaussian(),
-  chains        = 2,
-  silent        = 2
+# With two latent factors, each factor takes a seasonal slope. The
+# loadings carry the two slopes to the three series. The prior
+# table lists one coefficient per factor. A smooth takes the same
+# marker: `s(season, by = lv_axis())`
+get_prior(
+  mvgam_formula(y ~ 1,
+                trend_formula = ~ season:lv_axis() + AR(p = 1, n_lv = 2)),
+  data   = dat,
+  family = gaussian()
 )
-conditional_effects(mod_factors)
-
-# The series column is refused in a trend term
-try(mvgam(
-  formula       = y ~ 1,
-  trend_formula = ~ season:series + AR(p = 1),
-  data          = dat,
-  family        = gaussian(),
-  run_model     = FALSE
-))
 }
 
 }
 \seealso{
-\code{\link[=mvgam]{mvgam()}}, \code{\link[=jsdgam]{jsdgam()}}, \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}}
+\code{\link[=jsdgam]{jsdgam()}} fits per-factor effects across species.
+\code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} plots the effect on each series. The
+\href{https://nicholasjclark.github.io/mvgam/articles/dfm.html}{dynamic factor vignette} fits factor
+models. The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits
+per-factor trait and covariate effects.
+
+Other trend models: 
+\code{\link{LLT}()},
+\code{\link{PW}()},
+\code{\link{RW}()},
+\code{\link{ZMVN}()},
+\code{\link{list_trend_types}()}
 }
+\concept{trend models}

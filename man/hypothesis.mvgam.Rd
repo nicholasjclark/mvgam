@@ -33,11 +33,13 @@ full name.}
 \item{alpha}{One minus the credible-interval mass. Defaults
 to \code{0.05} (90\%-CI for one-sided, 95\%-CI for two-sided).}
 
-\item{robust}{Logical. Use median / MAD in place of mean / SD
-when summarising. Defaults to \code{FALSE}.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
-\item{seed}{Seed for the random draws of an evidence ratio, or
-\code{NULL}.}
+\item{seed}{Optional integer seed for the random draws of an
+evidence ratio. The session's random state is restored when the
+call returns.}
 
 \item{...}{Forwarded to \code{brms::hypothesis}.}
 }
@@ -77,7 +79,22 @@ hypothesis(mod, c("ar1_trend[series_1] > 0",
 }
 \seealso{
 \code{\link[brms:hypothesis.brmsfit]{brms::hypothesis()}}, \code{\link[=variables.mvgam]{variables.mvgam()}}.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

@@ -72,6 +72,7 @@
 #' dim(sm)
 #' }
 #'
+#' @family predictions
 #' @method posterior_smooths mvgam
 #' @export
 posterior_smooths.mvgam <- function(object, smooth, newdata = NULL,
@@ -170,6 +171,7 @@ brms::posterior_smooths
 #'
 #' @author Nicholas J Clark
 #'
+#' @family predictions
 #' @method conditional_smooths mvgam
 #' @export
 conditional_smooths.mvgam <- function(x, smooths = NULL,
@@ -300,11 +302,7 @@ plot.mvgam_conditional_smooths <- function(x, plot = TRUE,
                                             ask = FALSE, ...) {
   rlang::check_dots_empty()
   if (length(x) == 0L) return(invisible(x))
-  # Lock the palette to the mvgam red scheme for the duration of
-  # this call, matching plot.mvgam_forecast / plot.mvgam_stability
-  # / plot.mvgam_irf. Any user-side bayesplot::color_scheme_set is
-  # restored on exit.
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   labels <- names(x) %||% rep_len(NA_character_, length(x))
   ggs <- Map(build_mvgam_smooth_plot, x, labels)
   if (isTRUE(plot)) {
@@ -442,6 +440,7 @@ brms::conditional_smooths
 #'
 #' @author Nicholas J Clark
 #'
+#' @family posterior summaries
 #' @export
 smooths.mvgam <- function(x) {
   checkmate::assert_class(x, "mvgam")

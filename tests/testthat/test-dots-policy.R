@@ -27,9 +27,11 @@ forwards_or_prints <- c(
   "print.mvgam_conditional_effects", "print.mvgam_conditional_smooths",
   "print.mvgam_sim", "print.mvgam_var_surface_summary",
   "print.how_to_cite",
+  # `print.mvgam_conditional_effects()` hands its `...` here, by the
+  # same convention.
+  "plot.mvgam_conditional_effects",
   # These hand `...` to a callee whose formals are the contract.
-  "plot.mvgam", "plot.mvgam_conditional_effects",
-  "summary.mvgam_pooled"
+  "plot.mvgam", "summary.mvgam_pooled"
 )
 
 

@@ -49,7 +49,15 @@ scores are \code{NA} and the joint score is the row with
 \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}},
 \code{\link[=plot.mvgam_compare_scores]{plot.mvgam_compare_scores()}}, \code{\link[=compare_elpds]{compare_elpds()}},
 \code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=ensemble.mvgam_forecast]{ensemble.mvgam_forecast()}}
+
+Other forecasting: 
+\code{\link{ensemble.mvgam_forecast}()},
+\code{\link{forecast.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{score.mvgam_forecast}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{forecasting}

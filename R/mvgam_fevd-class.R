@@ -68,12 +68,11 @@ NULL
 #'   a posterior summary of the error variance decompositions of each series,
 #'   at all horizons
 #'
+#' @inheritParams summary.mvgam_irf
 #' @param object an object of class `mvgam_fevd` obtained using the
 #'   \code{fevd()} function. This object will contain draws from the posterior
 #'   distribution of the forecast error variance decompositions.
 #'
-#' @param probs The upper and lower percentiles to be computed by the
-#'   `quantile` function, in addition to the median
 #'
 #' @param ... Unused. Anything passed here is refused.
 #'
@@ -172,7 +171,7 @@ plot_fevd_shares <- function(shares, target_names, source_names) {
   # The bars partition a variance among sources. Up to three sources
   # take the shades of the red scheme the irf and stability plots draw
   # with. More sources take the Okabe-Ito hues.
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   ggplot2::ggplot(
     shares,
     ggplot2::aes(fill = .data$Series, y = .data$share, x = .data$horizon)

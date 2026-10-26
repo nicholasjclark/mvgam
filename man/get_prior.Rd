@@ -2,33 +2,30 @@
 % Please edit documentation in R/priors.R
 \name{get_prior}
 \alias{get_prior}
-\title{Get prior specifications for model objects}
+\title{The priors of a model}
 \usage{
 get_prior(object, ...)
 }
 \arguments{
-\item{object}{Model specification object (formula, brmsformula,
-mvgam_formula, etc.)}
+\item{object}{An \code{\link[=mvgam_formula]{mvgam_formula()}}, an \code{mvgam} model, or a model
+formula.}
 
-\item{...}{Additional arguments passed to methods}
+\item{...}{Arguments of the method.}
 }
 \value{
-A \code{brmsprior} data frame with prior specifications
+A \code{brmsprior} data frame.
 }
 \description{
-S3 generic for extracting prior specifications from model objects.
-One interface serves prior inspection across model types, with
-extensions for mvgam State-Space models.
-}
-\details{
-This generic dispatches to a method based on object class:
+Methods:
 \itemize{
-\item \code{formula}: Delegates to \code{brms::get_prior}
-\item \code{brmsformula}: Delegates to \code{brms::get_prior}
-\item \code{mvgam_formula}: Uses mvgam's extended prior system
-\item Default: Falls back to \code{brms::get_prior}
+\item \code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}} lists the priors of a model
+before it is fitted.
+\item \code{\link[=get_prior.mvgam]{get_prior.mvgam()}} returns the prior table of a model.
+\item \code{\link[=get_prior.default]{get_prior.default()}} passes a \code{formula} or \code{brmsformula}
+to \code{\link[brms:default_prior]{brms::get_prior()}}, or builds the mvgam model a
+\code{trend_formula} argument describes.
 }
 }
 \seealso{
-\code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}
+\code{\link[=mvgam_formula]{mvgam_formula()}}, \code{\link[brms:default_prior]{brms::get_prior()}}
 }

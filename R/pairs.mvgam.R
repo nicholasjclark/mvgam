@@ -37,6 +37,7 @@
 #' pairs(mod, variable = "^(sigma|ar1)_trend", regex = TRUE)
 #' }
 #'
+#' @family posterior summaries
 #' @export
 pairs.mvgam <- function(
   x,
@@ -53,5 +54,5 @@ pairs.mvgam <- function(
     regex <- FALSE
   }
   draws <- as.array(x, variable = variable, regex = regex)
-  with_color_scheme("red", bayesplot::mcmc_pairs(draws, ...))
+  with_color_scheme(bayesplot::mcmc_pairs(draws, ...))
 }

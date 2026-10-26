@@ -847,14 +847,35 @@ brmsprior_key_cols <- c("class", "coef", "group", "resp", "dpar",
                         "nlpar", "lb", "ub")
 
 
+#' One string per prior row, built from its key columns
+#'
+#' A missing entry is `NA` from `prior()` and `""` in a fitted table.
+#' Both become `""`, which makes the two keys equal.
+#'
+#' @param tab A `brmsprior` data frame
+#' @param cols Key columns to combine, from `brmsprior_key_cols`
+#' @return Character vector with one key per row of `tab`
+#' @noRd
+brmsprior_row_keys <- function(tab, cols) {
+  checkmate::assert_data_frame(tab)
+  checkmate::assert_subset(cols, brmsprior_key_cols)
+  cols <- intersect(cols, names(tab))
+  # `c()` on a `brmsprior` adds priors. The columns are taken from a
+  # plain list.
+  values <- lapply(unclass(tab)[cols], function(x) {
+    ifelse(is.na(x), "", as.character(x))
+  })
+  do.call(paste, c(values, sep = "\r"))
+}
+
+
 #' Merge user-supplied prior overrides onto a default prior table
 #'
-#' Match each row of `user_priors` against `default_priors` using the
-#' full brms key (`class`, `coef`, `group`, `resp`, `dpar`, `nlpar`,
-#' `lb`, `ub`). brms convention: an empty user-side key field (e.g.
-#' `coef = ""`) is a wildcard that matches every row of that class.
-#' Matched rows have their `prior` string replaced and `source` set
-#' to `"user"`. A user row matching no default is appended.
+#' Each row of `user_priors` is matched against `default_priors` on
+#' `brmsprior_key_cols`. An empty user-side key field (e.g.
+#' `coef = ""`) matches every row of that class. Matched rows take the
+#' user's `prior` string and `source`. A user row matching no default
+#' is appended.
 #'
 #' @param default_priors A `brmsprior` data frame; the table to merge
 #'   onto. Must include a `source` column.
@@ -896,16 +917,16 @@ merge_user_priors <- function(default_priors, user_priors,
         default_priors$source[keep] <- source
       }
     } else {
-      # Unmatched user row: keep it (brms convention is to preserve
-      # user rows even when no default exists, e.g. mvgam-managed
-      # `ar1_trend` / `sigma_trend` that the brms pipeline strips).
+      # A user row matching no default is kept. The parameters a trend
+      # constructor samples, such as `ar1_trend`, have no brms default
+      # row.
       unmatched_rows[[length(unmatched_rows) + 1L]] <- row
     }
   }
   if (length(unmatched_rows) > 0L) {
-    # `prior()` returns a slimmer frame than `validate_prior()`, so
-    # align every unmatched row to `default_priors`'s schema via the
-    # shared helper before stacking.
+    # `prior()` returns fewer columns than `validate_prior()`. Each
+    # unmatched row takes the schema of `default_priors` before
+    # stacking.
     appended_rows <- align_brmsprior_schemas(
       c(list(default_priors), unmatched_rows)
     )[-1L]
@@ -1069,6 +1090,22 @@ add_trend_suffix_to_priors <- function(trend_priors) {
 }
 
 
+#' One column of a prior table, empty strings where it is absent
+#'
+#' A table built by hand or by an older brms may lack the `dpar`,
+#' `nlpar`, `resp` or `coef` column.
+#'
+#' @param prior A prior table
+#' @param col Character name of the column
+#' @return Character vector with one entry per row
+#' @noRd
+prior_field <- function(prior, col) {
+  checkmate::assert_data_frame(prior)
+  checkmate::assert_string(col)
+  prior[[col]] %||% rep("", nrow(prior))
+}
+
+
 #' Suffix a trend-side prior table's classes with `_trend`
 #'
 #' Both trend-side tables apply this rule. It drops brms's
@@ -1082,9 +1119,8 @@ add_trend_suffix_to_priors <- function(trend_priors) {
 suffix_trend_prior_classes <- function(priors) {
   checkmate::assert_data_frame(priors, null.ok = TRUE)
   if (is.null(priors) || nrow(priors) == 0L) return(priors)
-  coefs <- priors$coef %||% rep("", nrow(priors))
   bookkeeping_sigma <- priors$class %in% brms_trend_dropped_params &
-    !nzchar(coefs)
+    !nzchar(prior_field(priors, "coef"))
   priors <- priors[!bookkeeping_sigma, , drop = FALSE]
   if (nrow(priors) == 0L) return(priors)
   priors$class <- apply_trend_class_suffix(priors$class)
@@ -1207,14 +1243,7 @@ check_trend_priors <- function(priors, defaults, constructor_classes) {
   checkmate::assert_character(constructor_classes)
   cell <- intersect(setdiff(brmsprior_key_cols, c("coef", "lb", "ub")),
                     intersect(names(priors), names(defaults)))
-  # `c()` on a `brmsprior` adds priors. The columns are taken from a
-  # plain list.
-  key <- function(tab, cols) {
-    cols <- lapply(unclass(tab)[cols], function(x) {
-      ifelse(is.na(x), "", as.character(x))
-    })
-    do.call(paste, c(cols, sep = "\r"))
-  }
+  key <- brmsprior_row_keys
   describe <- function(tab) {
     paste0("class = ", tab$class,
            ifelse(nzchar(tab$coef), paste0(", coef = ", tab$coef), ""),
@@ -1235,7 +1264,12 @@ check_trend_priors <- function(priors, defaults, constructor_classes) {
   }
   constructor <- priors$class %in% constructor_classes
   has_bound <- function(x) !is.na(x) & nzchar(as.character(x))
-  bounded <- constructor & (has_bound(priors$lb) | has_bound(priors$ub))
+  # A fitted prior table records the declared bounds. A row restating
+  # them, as `update()` inherits it, sets the same bounds.
+  declared <- key(priors, c(cell, "coef", "lb", "ub")) %in%
+    key(defaults, c(cell, "coef", "lb", "ub"))
+  bounded <- constructor & !declared &
+    (has_bound(priors$lb) | has_bound(priors$ub))
   if (any(bounded)) {
     refuse("The trend sets the bounds of its own parameters.", bounded,
            "Drop 'lb' and 'ub' from these priors.")
@@ -1454,6 +1488,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 #' \code{\link{get_prior.mvgam_formula}}, \code{\link[brms]{stancode}},
 #' \code{\link[brms]{standata}}, \code{\link{mvgam}}
 #'
+#' @family model fitting
 #' @export
 mvgam_formula <- function(formula, trend_formula = NULL) {
   checkmate::assert(
@@ -1518,29 +1553,26 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
   out
 }
 
-#' Get prior specifications for model objects
+#' The priors of a model
 #'
 #' @description
-#' S3 generic for extracting prior specifications from model objects.
-#' One interface serves prior inspection across model types, with
-#' extensions for mvgam State-Space models.
-#'
-#' @param object Model specification object (formula, brmsformula,
-#'   mvgam_formula, etc.)
-#' @param ... Additional arguments passed to methods
-#'
-#' @details
-#' This generic dispatches to a method based on object class:
+#' Methods:
 #' \itemize{
-#'   \item \code{formula}: Delegates to \code{brms::get_prior}
-#'   \item \code{brmsformula}: Delegates to \code{brms::get_prior}
-#'   \item \code{mvgam_formula}: Uses mvgam's extended prior system
-#'   \item Default: Falls back to \code{brms::get_prior}
+#'   \item [get_prior.mvgam_formula()] lists the priors of a model
+#'     before it is fitted.
+#'   \item [get_prior.mvgam()] returns the prior table of a model.
+#'   \item [get_prior.default()] passes a `formula` or `brmsformula`
+#'     to [brms::get_prior()], or builds the mvgam model a
+#'     `trend_formula` argument describes.
 #' }
 #'
-#' @return A \code{brmsprior} data frame with prior specifications
+#' @param object An [mvgam_formula()], an `mvgam` model, or a model
+#'   formula.
+#' @param ... Arguments of the method.
 #'
-#' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}
+#' @return A `brmsprior` data frame.
+#'
+#' @seealso [mvgam_formula()], [brms::get_prior()]
 #' @export
 get_prior <- function(object, ...) {
   UseMethod("get_prior")
@@ -1591,7 +1623,8 @@ route_trend_formula <- function(object, dots, mvgam_fun) {
 #' it describes. A call without one delegates to \pkg{brms}.
 #'
 #' @param object Model specification object
-#' @param ... Additional arguments passed to \code{brms::get_prior}
+#' @param ... Further arguments of [brms::get_prior()], such as
+#'   `knots` or `drop_unused_levels`.
 #' @return A \code{brmsprior} data frame
 #' @export
 get_prior.default <- function(object, ...) {
@@ -1602,56 +1635,47 @@ get_prior.default <- function(object, ...) {
   route_trend_formula(object, dots, get_prior)
 }
 
-#' Method for fitted mvgam objects returning the stored prior table
+#' The prior table of an mvgam model
 #'
-#' A shortcut for the post-fit prior table. In brms the post-fit
-#' accessor is `prior_summary()`. mvgam keeps that path and exports
-#' `get_prior.mvgam()` as well, matching the formula method. Both
-#' return the one table the model was built with. It can be edited and
-#' passed to `update(fit, prior = ..., recompile = FALSE)` for refits
-#' that reuse the compiled Stan model.
+#' `get_prior()`, `default_prior()` and [prior_summary()] return the
+#' one prior table a model was built with. Edit it and pass it to
+#' `update(fit, prior = ...)` to refit under other priors without
+#' recompiling.
 #'
-#' @param object A fitted \code{mvgam} model.
-#' @param ... Unused; an argument given here is refused.
-#' @return A \code{brmsprior} data frame covering every adjustable
-#'   prior row (observation and trend components). Rows the user
-#'   overrode at fit time carry `source = "user"`; rows left at
-#'   their defaults carry `source = "default"` (or whatever source
-#'   string \pkg{brms} assigned).
+#' @param object An `mvgam` model, fitted or built with
+#'   `run_model = FALSE`.
+#' @param ... Unused. Anything passed here is refused.
+#' @return A `brmsprior` data frame of the observation and trend
+#'   priors. A row the user set has `source = "user"`. \pkg{brms}
+#'   sets the source of the others, mostly `"default"`.
+#' @family priors
 #' @export
 get_prior.mvgam <- function(object, ...) {
   rlang::check_dots_empty()
   prior_summary.mvgam(object)
 }
 
-#' Extract prior specifications for mvgam formula objects
+#' @rdname get_prior.mvgam
+#' @method default_prior mvgam
+#' @export
+default_prior.mvgam <- function(object, ...) {
+  get_prior.mvgam(object, ...)
+}
+
+
+#' The priors an mvgam model takes, before fitting
 #'
 #' @description
-#' Extracts and combines prior specifications for both observation and
-#' trend components of an mvgam model. One interface serves prior
-#' inspection before model fitting. With
-#' \code{trend_formula = NULL}, this function behaves identically to
-#' \code{brms::get_prior} for observation-only models.
+#' Lists the priors of the observation and trend parts of the model an
+#' [mvgam_formula()] describes, with their defaults for the data given.
+#' Without a `trend_formula` the table matches that of
+#' [brms::get_prior()]. `default_prior()` is the same method under the
+#' newer brms name.
 #'
-#' @param object An object of class \code{mvgam_formula} created by
-#'   \code{\link{mvgam_formula}}
-#' @param data A data frame containing the variables in the model
-#'   (required)
-#' @param family A description of the response distribution and link
-#'   function. Default is \code{gaussian()}. Not required if formula
-#'   contains embedded families via \code{bf()} specifications.
-#' @param loadings_prior Optional structured prior on the factor
-#' @param loadings_prior Optional structured prior on the factor
-#'   loadings, in the form \code{\link{mvgam}} accepts. The prior
-#'   reported for \code{Z} depends on it. Pass the value the fit will
-#'   use.
-#' @param data2 Optional named list holding objects a
-#'   \code{loadings_prior} refers to by name, matching the argument
-#'   \code{\link{mvgam}} takes.
-#' @param trend_map Optional fixed or partial factor loadings, in the
-#'   form \code{\link{mvgam}} accepts. The table then lists the
-#'   loadings the map leaves free.
-#' @param ... Additional arguments passed to \code{brms::get_prior}
+#' @inheritParams stancode.mvgam_formula
+#' @inheritParams mvgam
+#' @param ... Further arguments of [brms::get_prior()], such as
+#'   `knots` or `drop_unused_levels`.
 #'
 #' @return A \code{brmsprior} data frame of the observation and trend
 #'   priors, usable with \code{brms::set_prior()} and
@@ -1698,55 +1722,38 @@ get_prior.mvgam <- function(object, ...) {
 #'
 #' @examples
 #' \dontrun{
-#' # Workflow: discover the adjustable priors, override a subset,
-#' # then pass the result back to `mvgam()`.
 #' set.seed(1)
-#' dat <- sim_mvgam(
-#'   family = poisson(),
-#'   n_series = 2L,
-#'   n_timepoints = 120L,
-#'   trend_model = AR()
-#' )$data_train
+#' dat <- sim_mvgam(family = poisson(), n_series = 2L,
+#'                  n_timepoints = 120L, trend_model = AR())$data_train
 #'
-#' # Wrap the formula pair in `mvgam_formula()` so this S3 method
-#' # dispatches; the returned `brmsprior` data frame lists every
-#' # adjustable row keyed by `class` and `coef`.
-#' mf <- mvgam_formula(
-#'   formula = y ~ s(x, k = 5),
-#'   trend_formula = ~ AR(p = 1)
-#' )
+#' # Every prior the model takes, before any fitting. Trend classes
+#' # carry a `_trend` suffix: `b` belongs to the observation formula
+#' # and `b_trend` would belong to the trend formula.
+#' mf <- mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1))
 #' get_prior(mf, data = dat, family = poisson())
 #'
-#' # Override a subset. Each `prior(...)` returns one row; untouched
-#' # classes keep their defaults. Trend-side classes carry a
-#' # `_trend` suffix so they do not collide with obs-side classes
-#' # of the same name (e.g. `b` vs `b_trend`).
+#' # Replace three defaults. Each `prior()` call gives one row.
 #' my_priors <- c(
 #'   prior(normal(0, 1), class = b),
-#'   prior(exponential(2), class = sigma_trend),
-#'   prior(normal(0, 0.5), class = ar1_trend)
+#'   prior(inv_gamma(5, 1), class = sigma_trend),
+#'   prior(normal(0.5, 0.25), class = ar1_trend)
 #' )
 #'
-#' mod <- mvgam(
-#'   formula = y ~ s(x, k = 5),
-#'   trend_formula = ~ AR(p = 1),
-#'   data = dat,
-#'   family = poisson(),
-#'   priors = my_priors,
-#'   chains = 2,
-#'   iter = 750,
-#'   warmup = 500,
-#'   silent = 2
-#' )
+#' # `run_model = FALSE` builds the model without sampling. Its prior
+#' # table marks the replaced rows as "user".
+#' pre <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+#'              data = dat, family = poisson(), prior = my_priors,
+#'              run_model = FALSE)
+#' prior_summary(pre)
 #'
-#' # Inspect the posterior to confirm the overrides took effect. The
-#' # `ar1_trend` and `sigma_trend` estimates follow the scale their
-#' # custom priors set.
-#' summary(mod)
+#' # Next, drop `run_model = FALSE` to fit the model under these priors
 #' }
 #'
-#' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}},
-#'   \code{\link[brms]{set_prior}}, \code{\link[brms]{prior}}
+#' @seealso [mvgam_formula()], [brms::prior()] and
+#'   [brms::set_prior()]. The
+#'   `r mvgam_article("hierarchical_var", "hierarchical VAR article")`
+#'   sets priors on the observation error and the trend correlations.
+#' @family priors
 #' @export
 get_prior.mvgam_formula <- function(object, data, family = gaussian(),
                                     loadings_prior = NULL,
@@ -1812,4 +1819,12 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
 
   combine_obs_trend_priors(obs_priors, trend_priors)
 }
+
+#' @rdname get_prior.mvgam_formula
+#' @method default_prior mvgam_formula
+#' @export
+default_prior.mvgam_formula <- function(object, ...) {
+  get_prior.mvgam_formula(object, ...)
+}
+
 

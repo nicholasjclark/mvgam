@@ -1,11 +1,12 @@
-#' Polish Generated Stan Code
+#' Polish generated Stan code
 #'
-#' Applies Stan code formatting using StanHeaders stanc.js with auto-format, with
-#' minimal fallback fixes for edge cases. Uses official Stan formatter to
-#' eliminate += operator and word-breaking issues.
+#' Regroups the statements of a generated program and formats it with
+#' the Stan formatter of the stanc.js that StanHeaders bundles.
 #'
-#' @param stan_code Character vector of Stan code lines or single string with newlines
-#' @param silent Logical; should Stan formatting warnings be suppressed? Default TRUE
+#' @param stan_code Character vector of Stan code lines, or one string
+#'   holding newlines
+#' @param silent Logical. `FALSE` reports when the formatter is
+#'   unavailable. Defaults to `TRUE`.
 #'
 #' @return The polished Stan program as one string
 #'
@@ -15,11 +16,11 @@
 #' is regrouped.
 #'
 #' The preprocessing steps run once. Their result is formatted with the
-#' stanc.js bundled in StanHeaders, and returned unformatted when V8 or
-#' stanc.js is unavailable or stanc rejects the program. Formatting is
-#' cosmetic: a program stanc rejects is still returned, and the parse
-#' `build_stan_components()` runs on the polished program reports the
-#' fault.
+#' stanc.js bundled in StanHeaders. It is returned unformatted when V8
+#' or stanc.js is unavailable or stanc rejects the program. Formatting
+#' is cosmetic. A program stanc rejects is still returned. The parse
+#' `build_stan_components()` runs on the polished program then reports
+#' the fault.
 #'
 #' @noRd
 polish_generated_stan_code <- function(stan_code, silent = TRUE) {
@@ -35,24 +36,23 @@ polish_generated_stan_code <- function(stan_code, silent = TRUE) {
   lines <- reorganize_model_block_statements(lines)
   preprocessed_code <- paste(lines, collapse = "\n")
 
-  try_stanheaders_formatting(preprocessed_code, silent) %||%
-    preprocessed_code
+  stanc_format(preprocessed_code, silent) %||% preprocessed_code
 }
 
-#' Try StanHeaders Stan Code Formatting
+#' A Stan program formatted by stanc.js
 #'
-#' Attempts to format Stan code using StanHeaders stanc.js with V8.
-#' Uses the official Stan formatter so output matches stanc.
+#' Runs the stanc.js of StanHeaders in V8 with its `auto-format`
+#' option. The output matches that of `stanc --auto-format`.
 #'
-#' @param stan_code Character string containing Stan code
-#' @param silent Logical; should warnings be suppressed?
-#' @param line_length Integer; maximum line length for formatting (default 80)
+#' @param stan_code Character string of Stan code
+#' @param silent Logical. `FALSE` reports when V8 or stanc.js is missing.
+#' @param line_length Integer maximum line length. Defaults to 80.
 #'
-#' @return Character string with formatted Stan code or NULL if invalid code
+#' @return The formatted program, or `NULL` when the code is empty, the
+#'   formatter is unavailable or stanc rejects the program
 #'
 #' @noRd
-try_stanheaders_formatting <- function(stan_code, silent = TRUE, line_length = 80) {
-  # Validate input first
+stanc_format <- function(stan_code, silent = TRUE, line_length = 80) {
   if (!nzchar(trimws(stan_code))) {
     return(NULL)
   }
@@ -67,14 +67,14 @@ try_stanheaders_formatting <- function(stan_code, silent = TRUE, line_length = 8
     return(NULL)
   }
 
-  # Call stanc with auto-format using the working web demo approach
-  result <- ctx$call('stanc', 'model', stan_code, c('auto-format', as.character(line_length)))
+  result <- ctx$call("stanc", "model", stan_code,
+                     c("auto-format", as.character(line_length)))
 
-  # Extract formatted code if successful
-  if (is.list(result) && 'result' %in% names(result)) {
+  # stanc returns `result` on success and `errors` on a rejection
+  if (is.list(result) && "result" %in% names(result)) {
     formatted_code <- result$result
 
-    # Verify this is formatted Stan code (not C++)
+    # Without `auto-format` stanc writes C++. Formatted Stan is kept.
     if (!grepl('#include.*stan.*model|namespace.*model', formatted_code) &&
         grepl('(data|parameters|model).*\\{', formatted_code)) {
       return(formatted_code)
@@ -89,12 +89,11 @@ try_stanheaders_formatting <- function(stan_code, silent = TRUE, line_length = 8
 # so one isolate can serve every polish call for the session.
 .stanc_v8_env <- new.env(parent = emptyenv())
 
-#' Get the cached V8 context with stanc.js sourced
+#' The V8 context holding stanc.js, built once per session
 #'
-#' First call initialises the V8 isolate and sources StanHeaders'
-#' stanc.js into it. Subsequent calls return the same isolate.
-#' Returns NULL (with optional message) if V8 or stanc.js are
-#' unavailable, so the polish step degrades gracefully.
+#' The first call starts a V8 isolate and sources the stanc.js of
+#' StanHeaders into it. Later calls return the same isolate. Without V8
+#' or stanc.js it returns `NULL`. The program then stays unformatted.
 #'
 #' @param silent Logical; suppress availability messages.
 #'
@@ -158,7 +157,7 @@ fix_blank_lines <- function(lines) {
         last_is_empty <- (last_line_trimmed == "")
         last_is_comment <- grepl("^//", last_line_trimmed)
 
-        # Add blank line if previous line was code (not empty, not comment)
+        # A blank line separates the comment from code above it
         if (!last_is_empty && !last_is_comment) {
           result <- c(result, "", line)
         } else {
@@ -168,7 +167,7 @@ fix_blank_lines <- function(lines) {
         result <- c(result, line)
       }
 
-      # Skip ahead past any blank lines followed by more comments
+      # Blank lines between comments of one block are dropped
       j <- i + 1
       while (j <= length(lines)) {
         next_line_trimmed <- trimws(lines[j])
@@ -193,7 +192,7 @@ fix_blank_lines <- function(lines) {
           result <- c(result, lines[j])
           j <- j + 1
         } else {
-          # Not empty, not comment - stop processing comment block
+          # Code ends the comment block
           break
         }
       }
@@ -250,8 +249,8 @@ update_stan_header <- function(lines) {
 #' Moves every top-level `lprior +=` statement to the line after
 #' `real lprior = 0;`. brms writes these statements at the end of the
 #' block. Each takes a parameter, data or a quantity declared with its
-#' value in the block's declarations, and none uses a quantity the
-#' block assigns later.
+#' value in the block's declarations. None uses a quantity the block
+#' assigns later.
 #'
 #' @param lines Character vector of Stan code lines
 #'

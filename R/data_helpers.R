@@ -158,6 +158,7 @@
 #'   units may vary in the number of observed visits / seasons.
 #'
 #' @author Nicholas J Clark
+#' @family model fitting
 #' @export
 pivot_detection_array <- function(y,
                                     site_covs = NULL,
@@ -516,6 +517,7 @@ assert_no_reserved_cols <- function(nms, reserved, arg_name) {
 #'   across species, and species traits broadcast across sites.
 #'
 #' @author Nicholas J Clark
+#' @family model fitting
 #' @export
 pivot_species_matrix <- function(Y,
                                    site_covs = NULL,

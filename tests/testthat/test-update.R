@@ -17,14 +17,15 @@ make_update_stub <- function(n_iter = 50L, n_chains = 2L) {
   drws <- posterior::as_draws_array(arr)
   X <- model.matrix(~ x, data.frame(x = rnorm(10)))
   colnames(X)[1L] <- "Intercept"
+  dat <- data.frame(y = rnorm(10), x = rnorm(10), z = rnorm(10))
   structure(
     list(
       fit = drws,
       formula = brms::bf(y ~ x),
       trend_formula = NULL,
       family = stats::gaussian(),
-      prior = data.frame(prior = "(flat)", class = "b"),
-      data = data.frame(y = rnorm(10), x = rnorm(10)),
+      prior = brms::get_prior(y ~ x, data = dat),
+      data = dat,
       standata = list(X = X, K = ncol(X), Kc = ncol(X) - 1L),
       stancode = paste0("data { int N; } parameters { real mu; } ",
                         "model { mu ~ normal(0,1); }"),
@@ -104,6 +105,13 @@ test_that("mvgam_update_call applies formula. through brms", {
     stub, formula. = ~ . + z, newdata = NULL, dots = list()
   )
   expect_identical(deparse(out$formula$formula), "y ~ x + z")
+  # A dropped term takes its inherited prior rows with it, as in brms.
+  # brms refuses a row with no parameter.
+  out <- mvgam_update_call(
+    stub, formula. = ~ . - x, newdata = NULL, dots = list()
+  )
+  expect_false("x" %in% out$prior$coef)
+  expect_true("Intercept" %in% out$prior$class)
 })
 
 test_that("mvgam_update_call overrides data when newdata is supplied", {
@@ -116,9 +124,9 @@ test_that("mvgam_update_call overrides data when newdata is supplied", {
 test_that(
   "mvgam_update_call drops the inherited warmup when iter is overridden", {
   # `warmup` cannot be inherited on its own: mvgam derives it as
-  # `iter %/% 2`, so pairing the original fit's warmup with a smaller
-  # user-supplied `iter` asks Stan for a negative sampling count and
-  # fails with a message that names neither argument.
+  # `iter %/% 2`. Pairing the original fit's warmup with a smaller
+  # user-supplied `iter` asks Stan for a negative sampling count. The fit
+  # then fails with a message that names neither argument.
   stub <- make_update_stub()
   local_mocked_bindings(
     mvgam_sampler_inheritance = function(object) {
@@ -132,7 +140,7 @@ test_that(
   expect_identical(out$iter, 400L)
   expect_null(out$warmup)
 
-  # An explicit warmup is still honoured alongside a new iter
+  # An explicit warmup is kept when a new iter is supplied
   out2 <- mvgam_update_call(stub, formula. = NULL, newdata = NULL,
                             dots = list(iter = 400L, warmup = 100L))
   expect_identical(out2$warmup, 100L)
@@ -145,11 +153,10 @@ test_that(
 })
 
 test_that("mvgam_update_call lets the caller override the inherited prior", {
-  # The lfo_cv refit story relies on update.mvgam reusing the
-  # original fit's literal prior table by default (so brms doesn't
-  # regenerate adaptive Intercept / sigma priors and bust the
-  # compiled-model cache). Conversely, users must still be able to
-  # supply `prior = ...` to override that table for a single refit.
+  # A refit reuses the fitted prior table by default. Its adaptive
+  # Intercept and sigma priors keep their constants. The compiled model
+  # is then reused. A `prior` passed to update() replaces the table
+  # for that refit.
   stub <- make_update_stub()
   new_prior <- structure(
     data.frame(
@@ -177,8 +184,8 @@ test_that("mvgam_update_call lets `dots` override inherited slots", {
       cores = 4L
     )
   )
-  # family() captures an environment, so compare by family name
-  # rather than via identical().
+  # family() captures an environment. The test compares the family name.
+  # identical() would also compare that environment.
   expect_identical(out$family$family, "poisson")
   expect_identical(out$backend, "rstan")
   expect_identical(out$cores, 4L)
@@ -226,8 +233,8 @@ test_that("mvgam_normalise_stancode keeps stancode without a header", {
 
 test_that("mvgam_normalise_stancode compares code alone", {
   # A comment anywhere, of either spelling, changes no model. A string
-  # literal holding a comment marker is code, and a change to code is
-  # a different model.
+  # literal holding a comment marker is code. A change to code is a
+  # different model.
   plain <- paste(
     "data { int N; }",
     "model {",
@@ -256,19 +263,16 @@ test_that("mvgam_normalise_stancode compares code alone", {
 })
 
 test_that("restore_trend_call_env binds what the fit already carries", {
-  # A formula keeps the expression and the environment it was written
-  # in, not the values it names. Written inside a function, or read
-  # back from an `.rds` in a fresh session, that environment no longer
-  # holds the loading matrix the constructor referred to, and
-  # `update()` failed with `object 'Z_user' not found` before it
-  # reached `mvgam()`.
+  # A formula keeps the expression and the environment it was written in.
+  # It does not keep the values that the expression names. A formula
+  # written inside a function, or loaded from an `.rds` file in a fresh
+  # session, has an environment without the loading matrix the constructor
+  # referred to. Without restoration, `update()` fails with
+  # `object 'Z_user' not found` before it reaches `mvgam()`.
   trend_call <- ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE)
   environment(trend_call) <- new.env(parent = emptyenv())
   Z <- matrix(c(1, 0, 0.8, 0.2, 0, 1, 0.3, 0.7), nrow = 4)
   out <- restore_trend_call_env(trend_call, list(fixed_Z = Z))
-  expect_true(
-    exists("Z_user", envir = environment(out), inherits = TRUE)
-  )
   expect_equal(get("Z_user", envir = environment(out)), Z)
   # The expression itself is left as the user wrote it.
   expect_equal(deparse(out[[2L]]), deparse(trend_call[[2L]]))
@@ -282,8 +286,8 @@ test_that("restore_trend_call_env covers n_lv as well as trend_map", {
 })
 
 test_that("restore_trend_call_env leaves resolvable calls untouched", {
-  # Nothing to put back when every name already resolves, and a
-  # literal argument names nothing at all.
+  # Nothing needs restoring when every name already resolves. A literal
+  # argument names nothing at all.
   env <- new.env(parent = emptyenv())
   assign("Z_user", matrix(1, 2, 2), envir = env)
   trend_call <- ~ AR(p = 1, trend_map = Z_user)
@@ -301,8 +305,8 @@ test_that("restore_trend_call_env leaves resolvable calls untouched", {
 
 test_that("restore_trend_call_env leaves a name the fit does not carry", {
   # An argument mvgam stores no resolved value for reaches `mvgam()`
-  # and fails there against the user's own call, rather than part-way
-  # through the rebuild.
+  # and fails there against the user's own call. The rebuild does not
+  # stop part-way.
   trend_call <- ~ AR(p = 1, gr = grouping_var)
   environment(trend_call) <- new.env(parent = emptyenv())
   out <- restore_trend_call_env(trend_call, list(fixed_Z = matrix(1, 2, 2)))
@@ -320,16 +324,17 @@ test_that("update() refits a jsdgam through jsdgam()", {
   prefit <- jsdgam(y ~ 0, data = dat, unit = week, species = species,
                    family = poisson(), n_lv = 2L, run_model = FALSE,
                    silent = 2, validate = FALSE)
+  # The summary names the data as the call did
+  expect_identical(prefit$data.name, "dat")
   # The refit frame is the user's own, without the 'time' and 'series'
   # columns jsdgam() added for 'week' and 'species'.
   args <- jsdgam_update_call(prefit, NULL, NULL, list())
   expect_setequal(names(args$data), names(dat))
   # An override reaches jsdgam() and changes the factor count alone.
   refit <- update(prefit, n_lv = 1L, run_model = FALSE)
-  expect_s3_class(refit, "jsdgam")
   expect_equal(refit$standata$N_lv_trend, 1)
-  # The factor count is Stan data, and `recompile = FALSE` passes the
-  # unchanged program. A family adding a parameter changes it.
+  # The factor count is Stan data. With `recompile = FALSE`, the unchanged
+  # program is passed. A family that adds a parameter changes the program.
   expect_s3_class(
     update(prefit, n_lv = 1L, recompile = FALSE, run_model = FALSE),
     "jsdgam"
@@ -338,46 +343,56 @@ test_that("update() refits a jsdgam through jsdgam()", {
     update(prefit, family = brms::negbinomial(), recompile = FALSE),
     "recompile = FALSE"
   )
+  # The priors are stored under one name. A new prior joins them. A
+  # dropped term takes its rows with it.
+  dat$x <- rnorm(nrow(dat))
+  with_prior <- jsdgam(y ~ x, data = dat, unit = week, species = species,
+                       family = poisson(), n_lv = 2L,
+                       priors = brms::prior(normal(0, 1), class = b),
+                       run_model = FALSE, silent = 2, validate = FALSE)
+  joined <- jsdgam_update_call(
+    with_prior, NULL, NULL,
+    list(prior = brms::prior(normal(0, 2), class = Intercept))
+  )$prior
+  expect_setequal(joined$class, c("Intercept", "b"))
+  dropped <- jsdgam_update_call(with_prior, ~ . - x, NULL, list())$prior
+  expect_false("b" %in% dropped$class)
   # A fit without the stored arguments cannot be rebuilt.
   prefit$jsdgam_args <- NULL
   expect_error(update(prefit), "arguments stored on the fit")
 })
 
 test_that("every mvgam() argument is inherited or named as not", {
-  # `loadings_prior` went missing because nothing compared the two
-  # lists. An argument is either carried over by
-  # `update_inheritance_table()` or listed in
-  # `mvgam_update_uninherited` with a reason; anything in neither
-  # fails here rather than silently changing a refit.
+  # This check compares the two lists. An argument is either carried over
+  # by `update_inheritance_table()` or listed in
+  # `mvgam_update_uninherited` with a reason. Anything in neither fails
+  # here. No refit changes silently.
   supplied_by_update <- c("formula", "data", "...")
   formals_needed <- setdiff(names(formals(mvgam)), supplied_by_update)
   inherited <- names(update_inheritance_table())
   accounted <- c(inherited, names(mvgam_update_uninherited))
-  expect_true(all(formals_needed %in% accounted))
+  expect_identical(setdiff(formals_needed, accounted), character(0L))
 
   # The dots `mvgam()` forwards to the code generator are model
-  # defining too, so they are held to the same rule.
+  # defining too. They are held to the same rule.
   generator_args <- setdiff(
     names(formals(build_stan_components)),
     c("formula", "data", "family", "...")
   )
-  expect_true(all(generator_args %in% accounted))
+  expect_identical(setdiff(generator_args, accounted), character(0L))
 
   # Nothing is claimed in both places.
-  expect_length(
-    intersect(inherited, names(mvgam_update_uninherited)),
-    0L
-  )
+  expect_identical(intersect(inherited, names(mvgam_update_uninherited)),
+                   character(0L))
   # Every reason says something.
   expect_true(all(nzchar(mvgam_update_uninherited)))
 })
 
 test_that("every prediction argument reaches the method's body", {
-  # `loadings_prior` went missing from a refit because nothing
-  # compared two lists. The prediction surface carries the same
-  # shape: an argument in a signature that no line consumes is taken
-  # from the user and dropped, and the call returns a plausible
-  # number computed from the default it was meant to override.
+  # The prediction surface carries the same risk. An argument in a
+  # signature that no line consumes is taken from the user and dropped.
+  # The call then returns a plausible number computed from the default
+  # it was meant to override.
   methods <- c(
     "posterior_epred.mvgam", "posterior_predict.mvgam",
     "posterior_linpred.mvgam", "predict.mvgam", "fitted.mvgam",
@@ -395,8 +410,8 @@ test_that("every prediction argument reaches the method's body", {
 })
 
 test_that("denormalise_loadings_prior returns what mvgam accepts", {
-  # The resolved spec renames two fields and adds sizes the
-  # normaliser recomputes, so it cannot be handed back as it stands:
+  # The resolved spec renames two fields and adds sizes that the
+  # normaliser recomputes. It cannot be handed back as it is.
   # `normalise_loadings_prior()` allow-lists the user-facing names and
   # errors on the rest.
   expect_null(denormalise_loadings_prior(NULL))
@@ -407,15 +422,15 @@ test_that("denormalise_loadings_prior returns what mvgam accepts", {
     column_shrinkage = "mgp", mgp_a1 = 2, mgp_a2 = 4,
     n_series = 3L, n_features = 2L, n_distances = 1L
   )
-  # The spec carries the MGP hyperparameters whatever the shrinkage,
-  # and `normalise_loadings_prior()` refuses them unless it is "mgp",
-  # so they travel only when they mean something.
+  # The spec includes the MGP hyperparameters whatever the shrinkage.
+  # `normalise_loadings_prior()` refuses them unless the shrinkage is
+  # "mgp". They travel only when they have a meaning.
   not_mgp <- spec
   not_mgp$column_shrinkage <- "none"
   expect_false(any(c("mgp_a1", "mgp_a2") %in%
                      names(denormalise_loadings_prior(not_mgp))))
-  expect_equal(denormalise_loadings_prior(spec)$mgp_a1, 2)
   out <- denormalise_loadings_prior(spec)
+  expect_equal(out$mgp_a1, 2)
   allowed <- c("features", "distances", "column_shrinkage",
                 "mgp_a1", "mgp_a2")
   expect_true(all(names(out) %in% allowed))
@@ -425,41 +440,42 @@ test_that("denormalise_loadings_prior returns what mvgam accepts", {
   expect_false(any(c("n_series", "n_features", "n_distances") %in%
                      names(out)))
 
-  # A spec holding nothing yields nothing rather than an empty list.
+  # A spec holding nothing yields NULL.
   expect_null(denormalise_loadings_prior(list(n_series = 3L)))
 })
 
 test_that("the threads getter yields a count, not a brmsthreads", {
-  # brms stores threading as a `brmsthreads` object on every fit, with
-  # a NULL count when the user asked for none. `mvgam()` asserts an
-  # integer, so handing the object back errored on any refit.
+  # brms stores threading as a `brmsthreads` object on every fit, with a
+  # NULL count when the user asked for none. `mvgam()` asserts an integer.
+  # Handing back the object makes every refit fail.
   entry <- update_inheritance_table()$threads
   unset <- list(obs_model = list(threads = brms::threading(NULL)))
   expect_null(entry$getter(unset))
 
   set <- list(obs_model = list(threads = brms::threading(2)))
   expect_equal(entry$getter(set), 2)
-  # A fit with no obs_model at all yields nothing rather than erroring.
+  # A fit with no obs_model at all yields NULL.
   expect_null(entry$getter(list()))
 })
 
 test_that("trend_call_names_arg sees the argument, not its value", {
   # `all.vars()` and `all.names()` return the values an argument was
-  # given but never the argument's own name, so the call is walked.
+  # given. They do not return the argument's own name. The function walks
+  # the call.
   tc <- ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE)
   expect_true(trend_call_names_arg(tc, "trend_map"))
   expect_true(trend_call_names_arg(tc, "cor"))
   expect_false(trend_call_names_arg(tc, "n_lv"))
-  # The value's own name is not the argument's.
+  # The value's own name differs from the argument's name.
   expect_false(trend_call_names_arg(tc, "Z_user"))
   expect_false(trend_call_names_arg(NULL, "trend_map"))
   expect_false(trend_call_names_arg(~ AR(p = 1), "trend_map"))
 })
 
 test_that("trend_map is withheld when the constructor already has it", {
-  # Supplying it at both the constructor and the top level is a
-  # collision `mvgam()` refuses, so a refit must hand back only what
-  # the original call put at the top level.
+  # Supplying it at both the constructor and the top level is a collision
+  # that `mvgam()` refuses. A refit hands back only what the original call
+  # put at the top level.
   entry <- update_inheritance_table()$trend_map
   Z <- matrix(c(1, 0, 0, 1), nrow = 2L)
 
@@ -493,7 +509,7 @@ test_that("walk_trend_call_args visits every named argument once", {
   expect_true(is.symbol(seen$trend_map))
   expect_true(seen$cor)
 
-  # Positional arguments carry no name and are not visited.
+  # Positional arguments have no name. They are not visited.
   seen2 <- character(0)
   walk_trend_call_args(~ AR(1), function(name, value) {
     seen2 <<- c(seen2, name)
@@ -508,17 +524,15 @@ test_that("walk_trend_call_args visits every named argument once", {
   )
   expect_true(all(c("p", "gr", "drop") %in% seen3))
 
-  # A missing call visits nothing rather than erroring.
+  # A missing call visits nothing and raises no error.
   expect_silent(walk_trend_call_args(NULL, function(...) stop("unreached")))
 })
 
 test_that("getCall reports the call the user wrote", {
-  # Every entry point reaches the fitting pipeline through
-  # `do.call()`, which substitutes each argument's value for the
-  # symbol. A call captured inside the pipeline therefore had the
-  # function object in its head and the whole data frame in its
-  # `data` slot, so `deparse(getCall(fit))` ran to 50 lines and
-  # printed the training data instead of the call.
+  # Every entry point reaches the fitting pipeline through `do.call()`,
+  # which substitutes each argument's value for its symbol. The stored
+  # call must keep the user's symbols, so `deparse(getCall(fit))` shows
+  # the call as written.
   set.seed(1L)
   d <- data.frame(time = 1:30, series = factor("s1"), x = rnorm(30))
   d$y <- rpois(30, 3)
@@ -526,20 +540,19 @@ test_that("getCall reports the call the user wrote", {
                validate = FALSE)
 
   cl <- getCall(fit)
-  expect_true(is.name(cl[[1L]]))
-  expect_identical(as.character(cl[[1L]]), "mvgam")
-  # The arguments are the symbols and calls that were typed, not the
-  # objects they evaluate to, which is what keeps the deparse short
-  # and re-evaluable.
+  expect_identical(cl[[1L]], as.name("mvgam"))
+  # The arguments are the symbols and calls that were typed. They are not
+  # the objects they evaluate to. This keeps the deparse short and
+  # re-evaluable.
   expect_identical(cl$data, as.name("d"))
   expect_identical(cl$family, quote(poisson()))
   expect_lt(length(deparse(cl)), 5L)
 })
 
 test_that("an updated fit reports the model call it now describes", {
-  # `update()` refits through `do.call(mvgam, ...)`, so the call the
-  # refit captures is that frame's resolved arguments. The call an
-  # updated fit reports is the original with the arguments this
+  # `update()` refits through `do.call(mvgam, ...)`. The call that the
+  # refit captures holds that frame's resolved arguments. The call an
+  # updated fit reports is the original call with the arguments this
   # `update()` named written over it.
   original <- quote(
     mvgam(formula = y ~ x, data = d, family = poisson(), chains = 2L)
@@ -549,16 +562,16 @@ test_that("an updated fit reports the model call it now describes", {
     quote(update(object = fit, chains = 4L, recompile = TRUE))
   )
   expect_identical(restated$chains, 4L)
-  # `recompile` steers the refit, not the model, so it is not part
-  # of the call the model was built from; nor is `object`.
+  # `recompile` steers the refit and does not define the model. It is not
+  # part of the call the model was built from. Neither is `object`.
   expect_false("recompile" %in% names(restated))
   expect_false("object" %in% names(restated))
   # Everything the update did not name survives as written.
   expect_identical(restated$data, as.name("d"))
   expect_identical(restated$family, quote(poisson()))
 
-  # The two arguments spelled differently on the two sides land on
-  # the names `mvgam()` reads.
+  # The two arguments spelled differently on the two sides map to the
+  # names `mvgam()` uses.
   renamed <- mvgam:::restate_updated_call(
     original,
     quote(update(object = fit, formula. = z ~ w, newdata = d2))
@@ -569,11 +582,11 @@ test_that("an updated fit reports the model call it now describes", {
 })
 
 test_that("a refit states an n_lv the trend formula does not name", {
-  # A factor count set by a top-level `trend_map` is on the fit and
-  # nowhere in the expression the user wrote, so re-evaluating that
-  # expression alone builds a different model: `by = lv_axis()` reads
-  # the series axis rather than the factor axis. The refit has to say
-  # what the fit resolved.
+  # A factor count set by a top-level `trend_map` is on the fit. It does
+  # not appear in the expression the user wrote. Re-evaluating that
+  # expression alone builds a different model. In that model
+  # `by = lv_axis()` indexes the series axis. The refit must state what
+  # the fit resolved.
   trend_call <- ~ s(elev, k = 5, by = lv_axis()) - 1 + ZMVN(cor = TRUE)
   out <- state_resolved_trend_args(trend_call, list(n_lv = 2L))
   expect_true(trend_call_names_arg(out, "n_lv"))
@@ -586,16 +599,16 @@ test_that("a refit states an n_lv the trend formula does not name", {
 })
 
 test_that("an n_lv the call already names is left as the user wrote it", {
-  # The expression settles it, so there is nothing to restate; the
-  # symbol is `restore_trend_call_env()`'s job, not this one's.
+  # The expression settles it. Nothing needs restating. Binding the symbol
+  # is the job of `restore_trend_call_env()`.
   trend_call <- ~ AR(p = 1, n_lv = k)
   out <- state_resolved_trend_args(trend_call, list(n_lv = 2L))
   expect_identical(deparse1(rlang::f_rhs(out)), "AR(p = 1, n_lv = k)")
 })
 
 test_that("a fit that resolved no n_lv is rebuilt unchanged", {
-  # Every non-factor fit takes this path, so a value invented here
-  # would turn an ordinary trend into a factor model.
+  # Every non-factor fit takes this path. A value invented here would turn
+  # an ordinary trend into a factor model.
   trend_call <- ~ AR(p = 1)
   expect_identical(
     state_resolved_trend_args(trend_call, list(n_lv = NULL)),
@@ -630,8 +643,8 @@ test_that("a resolved count with nowhere to be stated is refused", {
 })
 
 test_that("the arguments a refit states are ones the map knows", {
-  # Two tables naming the same argument would drift. The slot each
-  # one is read from lives in `trend_arg_metadata` alone.
+  # Two tables naming the same argument would drift. The slot each one is
+  # taken from is recorded in `trend_arg_metadata` alone.
   expect_true(
     all(trend_args_stated_on_rebuild %in% names(trend_arg_metadata))
   )

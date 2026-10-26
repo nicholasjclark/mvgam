@@ -2,24 +2,23 @@
 % Please edit documentation in R/kfold.mvgam.R
 \name{print.mvgam_kfold}
 \alias{print.mvgam_kfold}
-\title{Pretty-print an \code{mvgam_kfold} object}
+\title{Print an \code{mvgam_kfold} object}
 \usage{
 \method{print}{mvgam_kfold}(x, digits = 2L, ...)
 }
 \arguments{
 \item{x}{An \code{mvgam_kfold} object.}
 
-\item{digits}{Integer; significant digits for ELPD / SE.
-Default \code{2}.}
+\item{digits}{Integer number of decimal places. Defaults to 2.}
 
-\item{...}{Ignored.}
+\item{...}{Unused.}
 }
 \value{
-\code{invisible(x)}.
+\code{x}, invisibly.
 }
 \description{
-One-screen summary: total ELPD with SE, fold count, refit
-count, group key, and Pareto-k summary stats for the PSIS
-folds that were NOT refit. Falls back to \code{print.loo()} style
-for the headline numbers.
+Prints the ELPD with its standard error, the folds and refits and
+the Pareto k of the PSIS estimates. The first list below names the
+groups with the lowest ELPD. The second names the refitted groups
+whose ELPD moved most from the PSIS estimate.
 }

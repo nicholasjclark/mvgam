@@ -126,6 +126,27 @@ test_that("hindcast.mvgam type dispatch flows through expected helpers", {
 
   hc_resp <- hindcast(fit, type = "response")
   expect_true(all(hc_resp$hindcasts[["s1"]] == 13))
+
+  # `process_error = TRUE` takes the marginal draws. The trend is the
+  # marginal linear predictor less the observation predictor.
+  marginal <- function(value) {
+    function(object, newdata, draw_ids, process_error, resp) {
+      stopifnot(isTRUE(process_error))
+      matrix(value, nrow = length(draw_ids), ncol = nrow(newdata))
+    }
+  }
+  testthat::local_mocked_bindings(
+    posterior_linpred = marginal(40),
+    posterior_epred = marginal(50),
+    posterior_predict = marginal(60)
+  )
+  pe <- function(type) {
+    hindcast(fit, type = type, process_error = TRUE)$hindcasts[["s1"]]
+  }
+  expect_true(all(pe("trend") == 40 - 3))
+  expect_true(all(pe("link") == 40))
+  expect_true(all(pe("expected") == 50))
+  expect_true(all(pe("response") == 60))
 })
 
 

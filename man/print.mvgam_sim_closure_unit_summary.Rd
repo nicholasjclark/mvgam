@@ -12,7 +12,7 @@
 \item{digits}{Integer; significant digits for printed numbers.
 Default \code{3}.}
 
-\item{...}{Currently ignored.}
+\item{...}{Ignored.}
 }
 \value{
 The \code{mvgam_sim_closure_unit_summary} object \code{x}, returned

@@ -12,13 +12,8 @@
 #' organised by category (fixed effects, smooth terms, family
 #' parameters, trend parameters and factor loadings).
 #'
+#' @inheritParams predict.mvgam
 #' @param object An object of class \code{mvgam}.
-#' @param probs Numeric vector of length 2 specifying quantile
-#'   probabilities for credible intervals. Default is
-#'   \code{c(0.025, 0.975)} for 95% intervals.
-#' @param robust Logical; if \code{TRUE}, the median and MAD measure
-#'   central tendency and spread. The default \code{FALSE} uses the mean
-#'   and SD.
 #' @param matrices Logical; if \code{TRUE}, also print every cell of
 #'   the matrices a correlated, VAR or hierarchical trend derives
 #'   from its sampled parameters (\code{Phi_trend}, \code{Sigma_trend},
@@ -80,8 +75,15 @@
 #'               chains = 2, silent = 2)
 #'
 #' summary(mod)
+#'
+#' # Next, how_to_cite() drafts the methods paragraph
 #' }
 #'
+#' @seealso [how_to_cite()] drafts a methods paragraph for the model.
+#'   [methods_md()] writes its equations, glossary and priors.
+#'   [mcmc_plot.mvgam()] plots the draws of these parameters.
+#'
+#' @family posterior summaries
 #' @export
 summary.mvgam <- function(object, probs = c(0.025, 0.975),
                           robust = FALSE,
@@ -618,7 +620,7 @@ print_family_links <- function(x) {
 #'
 #' @param x An object of class \code{mvgam_summary}.
 #' @param digits Integer for decimal places. Default is 2.
-#' @param ... Additional arguments (currently unused).
+#' @param ... Ignored.
 #'
 #' @return The \code{mvgam_summary} object invisibly.
 #'
@@ -715,7 +717,8 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   steps <- build_next_steps(x)
   cat("\nNext steps:\n")
   for (s in steps) cat("  - ", s, "\n", sep = "")
-  cat("Use `how_to_cite(fit)` for a citation-ready model description.\n")
+  cat("Use `how_to_cite(fit)` for a methods paragraph and",
+      "`methods_md(fit)` for its equations.\n")
 
   invisible(x)
 }
@@ -941,13 +944,8 @@ build_next_steps <- function(x) {
 #' models, with additional diagnostics about the imputation process and
 #' combined posterior draws.
 #'
+#' @inheritParams summary.mvgam
 #' @param object An object of class \code{mvgam_pooled}.
-#' @param probs Numeric vector of length 2 specifying quantile
-#'   probabilities for credible intervals. Default is \code{c(0.025,
-#'   0.975)} for 95% intervals.
-#' @param robust Logical; if \code{TRUE}, the median and MAD measure
-#'   central tendency and spread. The default \code{FALSE} uses the
-#'   mean and SD.
 #' @param ... Additional arguments passed to \code{\link{summary.mvgam}}.
 #'
 #' @return An object of class \code{c("mvgam_pooled_summary",
@@ -990,10 +988,8 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
   combination_method <- attr(object, "combination_method")
 
   # Calculate total draws across all imputations
-  total_draws <- posterior::ndraws(posterior::as_draws(object$fit))
-  draws_per_imp <- posterior::ndraws(
-    posterior::as_draws(individual_fits[[1L]]$fit)
-  )
+  total_draws <- posterior::ndraws(object)
+  draws_per_imp <- posterior::ndraws(individual_fits[[1L]])
 
   # Extract per-imputation convergence diagnostics
   imp_convergence <- lapply(seq_along(individual_fits), function(i) {

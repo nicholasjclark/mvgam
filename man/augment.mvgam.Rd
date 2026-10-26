@@ -17,20 +17,21 @@ and residuals}
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}
 
-\item{robust}{Logical. \code{FALSE} (the default) uses the
-posterior mean and standard deviation; \code{TRUE} uses the
-median and the median absolute deviation (MAD).}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
-\item{conf.int}{Logical. If \code{TRUE} (the default), include
-\code{.lower} / \code{.upper} (for \code{.fitted}) and \code{.resid.lower} /
-\code{.resid.upper} (for \code{.resid}) credible interval columns.}
+\item{conf.int}{Logical. \code{TRUE} (the default) adds the credible
+interval columns \code{.lower}, \code{.upper}, \code{.resid.lower} and
+\code{.resid.upper}.}
 
 \item{conf.level}{Numeric. Probability covered by the
-credible intervals. Defaults to \code{0.95}.}
+credible interval reported in \code{conf.low} / \code{conf.high}.
+Defaults to \code{0.95}.}
 
-\item{resp}{For multivariate (multiple-response) models, the
-name of a single response variable to return results for.
-\code{NULL} (the default) returns results for all responses.}
+\item{resp}{Character specifying which response variable for
+multivariate models. NULL (default) returns predictions for all
+responses.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
@@ -57,24 +58,16 @@ sharing the same \code{.unit} share the same \verb{.resid*} columns
 }
 }
 \description{
-Adds posterior summaries of the in-sample fits and
-residuals to the training data, using broom column names.
-Each row of the input data is preserved and three (or
-five, when \code{conf.int = TRUE}) new columns are appended for
-each of the fitted and residual posteriors.
+The training data with posterior summaries of the fitted value and
+residual of each row, under \pkg{broom}'s column names.
 }
 \section{Closure-unit families (\code{nmix()}, \code{occ()})}{
 
-\code{.fitted} is per-visit (\code{psi * p} for occ, \code{lambda * p} for
-nmix from the per-visit \code{posterior_epred}). \code{.resid} is
-computed at the closure-unit grain by \code{\link[=residuals.mvgam]{residuals.mvgam()}}
-(one residual per site x season, using a sum-summary PIT
-on the per-visit posterior predictive draws) and \strong{recycled}
-back to each visit row of the same unit so the augment
-output stays aligned with the per-visit training frame. The
-\code{.unit} column makes the recycling explicit: rows sharing
-the same \code{.unit} share the same \verb{.resid*} values. See
-\code{?residuals.mvgam} for the per-unit residual semantics.
+\code{.fitted} is the expected count of each visit: \code{psi * p} for
+\code{\link[=occ]{occ()}} and \code{lambda * p} for \code{\link[=nmix]{nmix()}}. \code{\link[=residuals.mvgam]{residuals.mvgam()}}
+computes one residual per closure unit, a site in a season, from
+the PIT of the summed visit counts. Each visit row of a unit
+repeats that residual. The \code{.unit} column names the unit.
 }
 
 \examples{
@@ -87,13 +80,14 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# `augment()` returns the training data with fitted, residual,
-# and (when applicable) closure-unit columns appended. Use it
-# when you want a single tibble for plotting / scoring against
-# `.observed` and `.fitted`.
+# The training data with fitted values and residuals appended
 aug <- augment(mod)
 head(aug)
-cor(aug$.observed, aug$.fitted, use = "complete.obs")
+
+# Residuals against fitted values, from one tibble
+plot(aug$.fitted, aug$.resid, xlab = "Fitted", ylab = "Residual")
+
+# Next, glance() summarises the whole fit in one row
 }
 
 }

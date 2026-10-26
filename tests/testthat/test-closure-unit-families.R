@@ -813,8 +813,9 @@ detection_stancode <- function(key) {
     d <- make_nmix_data(n_unit = 4, n_visit = 3)
     if (case$binary) d$y <- as.integer(d$y > 0L)
     detection_stancode_cache[[key]] <- as.character(stancode(
-      mvgam_formula(y ~ elev), data = d, family = case$family()
-    , validate = FALSE))
+      mvgam_formula(y ~ elev), data = d, family = case$family(),
+      validate = FALSE
+    ))
   }
   detection_stancode_cache[[key]]
 }
@@ -1365,12 +1366,13 @@ test_that("closure units are keyed by the columns the trend names", {
     c("site", "yr")
   sd_default <- standata(mvgam(
     y ~ 1, trend_formula = ~ AR(), data = d, family = nmix(),
-    run_model = FALSE, silent = 2
-  , validate = FALSE))
+    run_model = FALSE, silent = 2, validate = FALSE
+  ))
   sd_renamed <- standata(mvgam(
     y ~ 1, trend_formula = ~ AR(time = yr, series = site),
-    data = renamed, family = nmix(), run_model = FALSE, silent = 2
-  , validate = FALSE))
+    data = renamed, family = nmix(), run_model = FALSE, silent = 2,
+    validate = FALSE
+  ))
   expect_identical(sd_renamed$N_unit, 20L)
   for (nm in c("n_rep", "K_max", "Y_max", "visit_idx")) {
     expect_identical(sd_renamed[[nm]], sd_default[[nm]])

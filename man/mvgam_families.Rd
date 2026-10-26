@@ -136,4 +136,17 @@ poisson(link = "sqrt")
 \code{\link[=mvgam]{mvgam()}}, \code{\link[=jsdgam]{jsdgam()}}, \code{\link[brms:brmsfamily]{brms::brmsfamily()}},
 \code{\link[=get_prior]{get_prior()}}, \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}},
 \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}}
+
+Other observation families: 
+\code{\link{beta_nb}()},
+\code{\link{categ}()},
+\code{\link{com_binomial}()},
+\code{\link{diri}()},
+\code{\link{multi}()},
+\code{\link{mvn}()},
+\code{\link{mvt}()},
+\code{\link{nmix}()},
+\code{\link{occ}()},
+\code{\link{tweedie}()}
 }
+\concept{observation families}

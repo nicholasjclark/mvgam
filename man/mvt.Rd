@@ -15,10 +15,10 @@ emission. The \code{mvgam_simplex_response} attribute is NOT set.
 \description{
 Heavy-tailed continuous-response JSDM. Extends \code{mvn()} with a
 degrees-of-freedom parameter \code{nu} so the per-observation residual
-follows a Student-t distribution rather than a Gaussian. Each row
+follows a Student-t distribution in place of a Gaussian. Each row
 of the linear predictor still receives the latent-factor
 contribution \verb{Z[k, :] * lv[i, :]} from the trend pipeline
-(conditional gllvm / boral parameterisation), and the lpdf is
+(conditional gllvm / boral parameterisation). The lpdf is
 independent Student-t per row with scale \code{Psi[k]} for species
 \code{k} and shared \code{nu}.
 }
@@ -44,9 +44,9 @@ trend pipeline. Default link is identity.}
 Identification: identical to \code{mvn()}. Marginal covariance is
 invariant to \code{Z -> Z * Q} for orthogonal \code{Q}; the Heaps post-hoc
 QR fixes \code{Q}. The Student-t observation is NOT shift-invariant in
-\code{mu_unit}, so no simplex-style constraints apply. The
-\code{nu} parameter is declared with a hard lower bound of 2 so the
-marginal residual variance stays finite; the prior is
+\code{mu_unit}. No simplex-style constraints apply. The
+\code{nu} parameter has a hard lower bound of 2. That bound keeps the
+marginal residual variance finite. The prior is
 \code{(nu - 2) ~ gamma(2, 0.1)}, giving a weakly informative pull
 toward moderate heavy tails (prior median around \code{nu = 14},
 prior \code{Pr(nu < 5) ~ 0.18}).
@@ -65,3 +65,17 @@ distributions for the covariance matrix in latent factor
 models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
 }
+\seealso{
+Other observation families: 
+\code{\link{beta_nb}()},
+\code{\link{categ}()},
+\code{\link{com_binomial}()},
+\code{\link{diri}()},
+\code{\link{multi}()},
+\code{\link{mvgam_families}},
+\code{\link{mvn}()},
+\code{\link{nmix}()},
+\code{\link{occ}()},
+\code{\link{tweedie}()}
+}
+\concept{observation families}

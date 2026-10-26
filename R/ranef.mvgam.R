@@ -8,6 +8,7 @@
 #' convention; the underlying positional Stan parameters are
 #' aliased transparently.
 #'
+#' @inheritParams predict.mvgam
 #' @param object A fitted `mvgam` object.
 #' @param summary Logical. If `TRUE` (the default), collapse each
 #'   group's posterior draws to a `[n_levels x n_stats x n_coefs]`
@@ -15,12 +16,6 @@
 #'   (`Estimate`, `Est.Error`, and the lower / upper quantiles
 #'   defined by `probs`). If `FALSE`, return the raw draws as a
 #'   `[n_draws x n_levels x n_coefs]` array per group.
-#' @param robust Logical. When `summary = TRUE` and `robust = TRUE`,
-#'   the median and MAD give the centre and spread. The default
-#'   `FALSE` uses the mean and SD.
-#' @param probs Numeric vector of length 2 with the quantiles to
-#'   report when `summary = TRUE`. Defaults to
-#'   `c(0.025, 0.975)`.
 #' @param pars Optional character vector. When set, restrict the
 #'   returned coefficients to those whose name matches one of the
 #'   supplied entries (matched against the brms `coef` column).
@@ -72,6 +67,7 @@
 #' re$series[, , "Intercept"]
 #' }
 #'
+#' @family posterior summaries
 #' @method ranef mvgam
 #' @export
 ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
@@ -228,6 +224,7 @@ brms::ranef
 #' VarCorr(mod)$series$sd
 #' }
 #'
+#' @family posterior summaries
 #' @method VarCorr mvgam
 #' @export
 VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,

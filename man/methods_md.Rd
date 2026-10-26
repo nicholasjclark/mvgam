@@ -3,62 +3,41 @@
 \name{methods_md}
 \alias{methods_md}
 \alias{methods_md.mvgam}
-\title{Render a model's mathematical description}
+\title{The equations of a model, as Markdown}
 \usage{
-methods_md(
-  object,
-  file = NULL,
-  notation = "default",
-  implementation = TRUE,
-  ...
-)
+methods_md(object, file = NULL, implementation = TRUE, ...)
 
-\method{methods_md}{mvgam}(
-  object,
-  file = NULL,
-  notation = "default",
-  implementation = TRUE,
-  heading_level = 2L,
-  ...
-)
+\method{methods_md}{mvgam}(object, file = NULL, implementation = TRUE, heading_level = 2L, ...)
 }
 \arguments{
-\item{object}{A fitted \code{mvgam} / \code{jsdgam} object, or a prefit
-produced by \code{mvgam(..., run_model = FALSE)}.}
+\item{object}{A fitted \code{mvgam} or \code{jsdgam} object, or a prefit from
+\code{mvgam(..., run_model = FALSE)}.}
 
-\item{file}{Optional path to write the rendered markdown to.
-When \code{NULL} (default), the result is returned invisibly and
-printed if the caller is interactive.}
+\item{file}{Optional path. The Markdown is written there and returned
+invisibly.}
 
-\item{notation}{Character; symbol convention to use. One of
-\code{"default"} (Greek coefficients, \verb{\eqn{R[i]}} subscript for
-varying intercepts) or \code{"brms"} (keep brms parameter names
-verbatim). Defaults to \code{"default"}.}
-
-\item{implementation}{Logical; append an Implementation
-section that reconstructs the \code{mvgam} / \code{jsdgam} call used
-to fit the model. Defaults to \code{TRUE}.}
+\item{implementation}{Logical. \code{TRUE} (the default) adds the
+Implementation section.}
 
 \item{...}{Unused. Anything passed here is refused.}
 
-\item{heading_level}{Integer; the Markdown level of the section
-headings. The default \code{2} writes \verb{## Model}. Raise it to nest the
-sections under a heading of the document they are placed in.}
+\item{heading_level}{Integer Markdown level of the section headings.
+The default \code{2} writes \verb{## Model}. A higher level nests the
+sections under a heading of the host document.}
 }
 \value{
-An object of class \code{mvgam_methods_md} carrying the
-rendered markdown as a character string. Use \code{print()} to
-display, or pass to \code{writeLines()} / \code{cat()} to emit verbatim.
+A character string of class \code{mvgam_methods_md}, which prints
+as its Markdown.
 }
 \description{
-Produce a markdown document describing the fitted \code{mvgam} or
-\code{jsdgam} model in mathematical form. Three sections are
-emitted: Data (dimensions and response), Model (likelihood,
-linear predictor, latent dynamics, all in one \verb{align*} block),
-and Priors (every prior the Stan model uses, brms-tracked and
-mvgam-emitted alike, in a second \verb{align*} block). No prose
-justification is included; the output is a math-only spec the
-user can paste straight into a methods write-up.
+Writes the model in mathematical notation for a methods section. The
+Data section names the response, the dimensions and the predictors.
+The Model section holds the likelihood, the linear predictors and the
+latent dynamics in one display equation, with a glossary of every
+symbol. The Priors section states every prior the Stan program
+applies. The Implementation section gives the call that fits the
+model and the software versions the fit recorded. The equations are
+LaTeX inside \verb{$$} fences, which Quarto, R Markdown and MathJax render.
 }
 \examples{
 \dontrun{
@@ -70,19 +49,36 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Markdown / LaTeX statement of the model. cat() emits the
-# raw markdown; print() pretty-prints in the console.
-cat(methods_md(mod))
+# The equations, glossary and priors as Markdown
+md <- methods_md(mod)
+md
+
+# Written to a file, nested under a level-two heading
+methods_md(mod, file = tempfile(fileext = ".md"), heading_level = 3L)
+
+# Next, how_to_cite() writes the methods paragraph
 }
 
 }
 \seealso{
-\code{\link{how_to_cite}}, \code{\link[brms]{prior_summary}},
-\code{\link{mvgam}}, \code{\link{jsdgam}}.
-\code{how_to_cite()} produces the prose methods paragraph;
-\code{methods_md()} produces the matching math statement of
-the model.
+\code{\link[=how_to_cite]{how_to_cite()}} writes the matching methods paragraph and
+its references. \code{\link[=prior_summary]{prior_summary()}} lists the priors as a table.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

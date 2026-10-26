@@ -117,4 +117,9 @@ rowSums(comp$y_array)[1:3]
 \code{\link[=jsdgam]{jsdgam()}} for the model this simulates from;
 \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} for the occupancy and N-mixture
 counterpart; \code{\link[=sim_mvgam]{sim_mvgam()}} for time-series simulation.
+
+Other simulation: 
+\code{\link{sim_closure_unit_data}()},
+\code{\link{sim_mvgam}()}
 }
+\concept{simulation}

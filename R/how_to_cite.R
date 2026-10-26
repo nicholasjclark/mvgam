@@ -1,30 +1,25 @@
-#' Generate a methods description for \pkg{mvgam} models
+#' A methods paragraph and references for an \pkg{mvgam} model
 #'
-#' Construct a methods skeleton plus a deduplicated reference
-#' list and BibTeX block for a fitted `mvgam` object. The
-#' assembled text and citation set are driven by the model's
-#' actual structure: the family / link, trend type, factor
-#' identification, structured loadings prior, GP smooths,
-#' piecewise trends, Stan backend, and sampling algorithm.
+#' Drafts a methods paragraph for a fitted model, with the references
+#' it cites and their BibTeX entries. The text and references follow
+#' the model's structure: the family and link, the trend, the factor
+#' identification and loadings prior, Gaussian process smooths,
+#' piecewise trends, the Stan backend and the sampling algorithm.
 #'
 #' @name how_to_cite.mvgam
 #'
 #' @param object A fitted `mvgam` or `jsdgam` object.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return An object of class `how_to_cite` carrying a
-#'   `methods_text` skeleton, the matched `citations`, a
-#'   curated `other_citations` block and a `bibtex` list
-#'   keyed by reference handle. Use `bibtex(x)` to extract the
-#'   BibTeX entries. The default `print()` method renders all
-#'   sections together.
+#' @return A `how_to_cite` object holding the `methods_text`, the
+#'   `citations` it makes, an `other_citations` list of related
+#'   references and a `bibtex` list keyed by reference. [bibtex()]
+#'   extracts the BibTeX entries. `print()` shows every section.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso \code{\link[utils]{citation}}, \code{\link{mvgam}},
-#'   \code{\link{methods_md}}. `how_to_cite()` produces the
-#'   prose methods paragraph; `methods_md()` produces the
-#'   matching math statement of the model.
+#' @seealso [methods_md()] writes the model's equations to accompany
+#'   the paragraph. [utils::citation()] cites the package itself.
 #'
 #' @examples
 #' \dontrun{
@@ -36,11 +31,18 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Methods skeleton, citations, and BibTeX, all driven by the
-#' # fitted family / trend / GP / Stan backend.
-#' how_to_cite(mod)
+#' # A methods paragraph naming the Poisson family, the smooth and
+#' # the AR(1) trend, with the references it cites
+#' cite <- how_to_cite(mod)
+#' cite
+#'
+#' # The BibTeX entries, for a reference manager
+#' bibtex(cite)
+#'
+#' # Next, methods_md() writes the model's equations
 #' }
 #'
+#' @family posterior summaries
 #' @export
 how_to_cite <- function(object, ...) {
   UseMethod("how_to_cite", object)
@@ -1194,50 +1196,44 @@ how_to_cite.mvgam <- function(object, ...) {
   methods_text <- paste0(methods_text, stan_text)
 
   refs <- unique(refs)
-  citations <- lapply(refs, function(k) db[[k]]$text)
-  bibtex <- stats::setNames(
-    lapply(refs, function(k) db[[k]]$bibtex),
-    refs
-  )
-
-  other_keys <- c(
+  other_keys <- setdiff(c(
     "arel_bundock_marginaleffects", "gabry_workflow",
     "vehtari_loo", "burkner_lfo"
-  )
-  other_citations <- lapply(other_keys, function(k) db[[k]]$text)
-  other_bibtex <- stats::setNames(
-    lapply(other_keys, function(k) db[[k]]$bibtex),
-    other_keys
-  )
+  ), refs)
+  entries <- function(keys, field) {
+    stats::setNames(lapply(keys, function(k) db[[k]][[field]]), keys)
+  }
 
+  # `bibtex` holds the cited entries first. `bibtex(other = FALSE)`
+  # keeps the first `length(citations)` of them.
   structure(
     list(
       methods_text = methods_text,
-      citations = citations,
-      other_citations = other_citations,
-      bibtex = c(bibtex, other_bibtex)
+      citations = unname(entries(refs, "text")),
+      other_citations = unname(entries(other_keys, "text")),
+      bibtex = c(entries(refs, "bibtex"), entries(other_keys, "bibtex"))
     ),
     class = "how_to_cite"
   )
 }
 
 
-#' Extract the BibTeX block from a `how_to_cite` object
+#' The BibTeX entries of a `how_to_cite` object
 #'
-#' Concatenates the matched BibTeX entries into one string.
-#' Pass `file = "refs.bib"` to write the block to disk; the
-#' default returns the string invisibly and prints to stdout.
+#' Joins the BibTeX entries of [how_to_cite()] into one string. It is
+#' printed, or written to `file`.
 #'
 #' @param x A `how_to_cite` object.
-#' @param file Optional output path. When non-NULL the BibTeX
-#'   is written to disk and the string is returned invisibly.
-#' @param other Logical. When `TRUE` (default), include the
-#'   curated "other useful references" block; set to `FALSE`
-#'   to emit only the matched primary references.
-#' @param ... Ignored.
+#' @param file Optional path of a `.bib` file to write the entries to
+#'   in place of printing them.
+#' @param other Logical. `TRUE` (the default) includes the related
+#'   references. `FALSE` keeps the references the methods text cites.
+#' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A single character string containing the BibTeX
-#'   entries separated by blank lines.
+#' @return The string of entries separated by blank lines, invisibly.
+#' @seealso [how_to_cite()] builds the object, with an example of both.
+#'   [methods_md()] writes the model's equations.
+#' @family posterior summaries
 #' @export
 bibtex <- function(x, ...) {
   UseMethod("bibtex", x)
@@ -1247,13 +1243,10 @@ bibtex <- function(x, ...) {
 #' @rdname bibtex
 #' @export
 bibtex.how_to_cite <- function(x, file = NULL, other = TRUE, ...) {
-  entries <- if (isTRUE(other)) x$bibtex else {
-    primary_keys <- setdiff(names(x$bibtex), c(
-      "arel_bundock_marginaleffects", "gabry_workflow",
-      "vehtari_loo", "burkner_lfo"
-    ))
-    x$bibtex[primary_keys]
-  }
+  rlang::check_dots_empty()
+  checkmate::assert_string(file, null.ok = TRUE)
+  checkmate::assert_flag(other)
+  entries <- if (other) x$bibtex else x$bibtex[seq_along(x$citations)]
   out <- paste(unlist(entries), collapse = "\n\n")
   if (!is.null(file)) {
     writeLines(out, file)

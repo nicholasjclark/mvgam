@@ -264,19 +264,19 @@ test_that("summary.mvgam_sim returns mvgam_sim_summary with expected fields", {
   expect_equal(s$n_timepoints, 40L)
   expect_equal(s$n_train + s$n_test, NROW(sim$data_train) +
                  (if (is.null(sim$data_test)) 0L else NROW(sim$data_test)))
-  expect_true(is.numeric(s$true_trend_sigma))
+  expect_identical(s$true_trend_sigma, sim$true_trend_sigma)
 })
 
 
-test_that("summary.mvgam_sim trend label uses 'None' when no trend", {
-  sim <- sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 30L,
-                    seed = 3L, trend_model = NULL,
-                    prop_trend = 0)
-  s <- summary(sim)
-  # When prop_trend = 0 the trend_model is still set, but if absent
-  # entirely the label collapses to "None". Either way the field
-  # should be a single non-empty string.
-  expect_true(is.character(s$trend) && nzchar(s$trend))
+test_that("summary.mvgam_sim names the trend simulated", {
+  # `NULL` takes the type's default trend, a random walk for type 1.
+  # "None" simulates none.
+  label <- function(trend_model) {
+    summary(sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 30L,
+                      seed = 3L, trend_model = trend_model))$trend
+  }
+  expect_identical(label(NULL), "RW")
+  expect_identical(label("None"), "None")
 })
 
 

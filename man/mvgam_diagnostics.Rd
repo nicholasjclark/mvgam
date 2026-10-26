@@ -17,7 +17,7 @@
 \alias{posterior_summary.mvgam}
 \alias{getCall.mvgam}
 \alias{vcov.mvgam}
-\title{Diagnostic quantities for mvgam models}
+\title{Posterior summaries and sampler diagnostics of mvgam models}
 \usage{
 \method{coef}{mvgam}(object, summary = TRUE, trend_effects = FALSE, ...)
 
@@ -74,49 +74,58 @@
 \arguments{
 \item{object, x}{A fitted \code{mvgam} object.}
 
-\item{summary}{Logical. If \code{TRUE} (the default), summary statistics
-are returned; if \code{FALSE}, the raw posterior draws are returned.
-\code{coef} summarises to posterior means rather than to the
-Estimate / Est.Error / quantile matrix its siblings return.}
+\item{summary}{Logical. \code{TRUE} (the default) returns a summary.
+\code{FALSE} returns the draws. \code{coef()} summarises to posterior means.}
 
 \item{trend_effects}{Logical. \code{coef()}, \code{fixef()} and \code{vcov()}
 report the coefficients of the observation formula by default.
 \code{TRUE} reports those of the \code{trend_formula} instead. Their names
 end in \verb{_trend}.}
 
-\item{...}{Unused by these methods, and refused, except on
-\code{nuts_params()} and \code{log_posterior()}, which forward what they
-are given to \pkg{bayesplot}.}
+\item{...}{Further arguments. \code{nuts_params()} and \code{log_posterior()}
+pass them to \pkg{bayesplot}. \code{bayes_R2()} passes them to
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}. The other methods refuse them.}
 
-\item{pars}{Optional character vector of parameter names. For
-\code{nuts_params} these are sampler-parameter names; otherwise they
-are model-parameter names. \code{NULL} returns all parameters.}
+\item{pars}{Optional character vector of parameter names, or of
+sampler parameters such as \code{"divergent__"} for \code{nuts_params()}.
+\code{NULL} takes all of them.}
 
-\item{robust}{Logical. If \code{TRUE}, use median + median absolute
-deviation instead of mean + standard deviation. Default \code{FALSE}.}
+\item{robust}{Logical. \code{TRUE} summarises by the median and the median
+absolute deviation. Defaults to \code{FALSE}, the mean and the standard
+deviation.}
 
-\item{probs}{Numeric vector of length 2 giving the lower and upper
-quantile probabilities for credible intervals. Defaults to
-\code{c(0.025, 0.975)} (95\% CI).}
+\item{probs}{Numeric vector of the two interval probabilities,
+\code{c(0.025, 0.975)} by default.}
 
-\item{resp}{Character. Response name for multivariate models.
-Ignored for univariate fits.}
+\item{resp}{Optional name of one response of a multivariate model.}
 
-\item{variable}{Model-parameter names for \code{posterior_summary()},
-as \pkg{brms} names the argument. Takes precedence over \code{pars}.}
+\item{variable}{Parameter names for \code{posterior_summary()}, the
+\pkg{brms} name of the argument. It takes precedence over \code{pars}.}
 
-\item{correlation}{Logical. If \code{TRUE}, return the correlation
-matrix of fixed-effect coefficients; otherwise the covariance
-matrix. Defaults to \code{FALSE}.}
+\item{correlation}{Logical. \code{TRUE} returns the correlation matrix of
+the coefficients. Defaults to \code{FALSE}, the covariance matrix.}
 }
 \value{
-Shape depends on the method (see method details).
+\code{fixef()}, \code{posterior_summary()} and \code{bayes_R2()} return a
+matrix with columns \code{Estimate}, \code{Est.Error} and one per quantile,
+or the draws with \code{summary = FALSE}. \code{coef()} returns the posterior
+means. \code{vcov()} returns the covariance matrix of the coefficients.
+\code{rhat()} and \code{neff_ratio()} return a named vector with one value
+per parameter. \code{nuts_params()} and \code{log_posterior()} return the
+long data frames of \pkg{bayesplot}. The counting methods return
+an integer.
 }
 \description{
-S3 methods that surface Stan / NUTS diagnostics for fitted
-\code{\link{mvgam}} objects. Each method delegates either to \verb{bayesplot::}
-on the underlying stanfit (\code{nuts_params}, \code{log_posterior}) or to
-\verb{posterior::} summaries on the draws array.
+The \pkg{brms} and \pkg{bayesplot} accessors for a fitted model.
+\code{fixef()}, \code{coef()} and \code{vcov()} summarise the population-level
+coefficients of the observation formula, or of the trend formula
+with \code{trend_effects = TRUE}. \code{posterior_summary()} summarises any
+parameters. \code{rhat()} and \code{neff_ratio()} report convergence.
+\code{nuts_params()} and \code{log_posterior()} return the sampler's own
+quantities.
+\code{bayes_R2()} is the Bayesian R^2 of Gelman et al. (2019).
+\code{ndraws()}, \code{nchains()}, \code{niterations()} and \code{nvariables()} count
+the posterior.
 }
 \examples{
 \dontrun{
@@ -128,10 +137,17 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-coef(mod)
+# The population coefficients with 95\% intervals
 fixef(mod)
-vcov(mod)
+
+# Rhat near 1 and effective sample ratios above 0.1 indicate mixing
+rhat(mod, pars = c("ar1_trend", "sigma_trend"))
+neff_ratio(mod, pars = c("ar1_trend", "sigma_trend"))
+
+# The share of variance in the counts the model explains
 bayes_R2(mod)
+
+# Next, mcmc_plot() draws the posterior of these parameters
 }
 
 }
@@ -141,21 +157,22 @@ Burkner, P.-C. (2021). Rank-normalization, folding, and
 localization: An improved Rhat for assessing convergence of
 MCMC. \emph{Bayesian Analysis}, 16(2):667-718.
 \doi{10.1214/20-BA1221}
+
+Gelman, A., Goodrich, B., Gabry, J. and Vehtari, A. (2019).
+R-squared for Bayesian regression models. \emph{The American
+Statistician}, 73(3):307-309. \doi{10.1080/00031305.2018.1549100}
 }
 \seealso{
-\link{mvgam_draws} for raw posterior-draw extraction,
-\code{\link[=summary.mvgam]{summary.mvgam()}} for a printed model summary,
-\code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} for diagnostic visualisations,
-\code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for posterior predictive checks,
-\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=waic.mvgam]{waic.mvgam()}} for information criteria,
-\code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} for partial-effect plots,
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}, \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}},
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for prediction primitives,
-\code{\link[bayesplot:bayesplot-extractors]{bayesplot-extractors}},
-\code{\link[posterior:rhat]{posterior::rhat()}}, \code{\link[posterior:ess_bulk]{posterior::ess_bulk()}},
-\code{\link[brms:bayes_R2.brmsfit]{brms::bayes_R2.brmsfit()}}, \code{\link[brms:fixef.brmsfit]{brms::fixef.brmsfit()}},
-\code{\link[brms:prior_summary.brmsfit]{brms::prior_summary.brmsfit()}}.
+\code{\link[=summary.mvgam]{summary.mvgam()}} prints these summaries for every
+parameter. \code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} plots the draws. \link{mvgam_draws}
+extracts them. \code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} is the leave-one-out R^2.
+
+Other model checking: 
+\code{\link{plot.mvgam}()},
+\code{\link{pp_check.mvgam}()},
+\code{\link{residuals.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model checking}

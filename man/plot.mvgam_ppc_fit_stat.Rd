@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{A \code{mvgam_ppc_fit_stat} object.}
 
-\item{...}{Unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

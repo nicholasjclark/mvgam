@@ -1,19 +1,11 @@
 #' Expected Values from the Posterior Distribution
 #'
-#' Compute fitted values for an mvgam model, returning the expected
-#' value E\[Y | X\] (or the linear predictor, with `scale = "linear"`)
-#' at the training observations by default. Mirrors the brms
-#' [`fitted.brmsfit()`][brms::fitted.brmsfit] interface as closely as
-#' the underlying mvgam posterior methods permit.
+#' Expected values E\[Y | X\] of an mvgam model, or its linear
+#' predictor with `scale = "linear"`, at the training observations by
+#' default. The interface follows
+#' [`fitted.brmsfit()`][brms::fitted.brmsfit].
 #'
 #' @param object An object of class `mvgam`.
-#' @param newdata An optional data.frame of new predictor values. If
-#'   `NULL` (the default), the training data stored in `object` is
-#'   used. This is what makes the call "fitted" rather than a general
-#'   prediction.
-#' @param re_formula Group-level terms to include: `NULL` (the default)
-#'   for every one, `NA` for none. A formula choosing some of them is not
-#'   supported.
 #' @param scale Character; one of `"response"` (default) or `"linear"`.
 #'   `"response"` returns expected values on the response scale via
 #'   [posterior_epred.mvgam()]. `"linear"` returns the linear predictor
@@ -37,88 +29,40 @@
 #'   argument so flocker users have a one-call equivalent.
 #' @param unit_level Logical or `NULL` (default). When `TRUE` for a
 #'   closure-unit detection family and `components = "response"`,
-#'   aggregates the per-visit response matrix to the per-unit grain
-#'   (sum across visits within a unit) via the shared
-#'   `aggregate_closure_unit_visits()` helper. Ignored when
-#'   `components != "response"` (those grains are fixed by the
-#'   component definition) and when the family is not a
-#'   visit-aggregating closure-unit family.
-#' @param resp Character specifying which response variable for
-#'   multivariate models. If `NULL`, fitted values are returned for
-#'   all responses (a named list).
-#' @param ndraws Positive integer specifying the number of posterior
-#'   draws to use. If `NULL` (the default), all draws are used.
-#' @param draw_ids Optional integer vector naming the posterior draws
-#'   to use, indexed into the full posterior. Give one of `ndraws` or
-#'   `draw_ids`.
-#' @param summary Logical. If `TRUE` (the default), returns summary
-#'   statistics. If `FALSE`, returns the full matrix of posterior
-#'   draws.
-#' @param robust Logical. If `FALSE` (the default), uses mean and
-#'   standard deviation for summaries. If `TRUE`, uses median and
-#'   median absolute deviation (MAD).
-#' @param probs Numeric vector of probabilities for quantile
-#'   computation. Default is `c(0.025, 0.975)` for 95% credible
-#'   intervals.
+#'   sums the per-visit response matrix over the visits of each unit.
+#'   Other `components` have fixed grains and ignore it. So do families
+#'   that do not aggregate visits.
 #' @inheritParams posterior_epred.mvgam
+#' @inheritParams predict.mvgam
 #' @param incl_autocor Logical; whether the fitted values include the
 #'   latent trend state the model inferred at each time. Defaults to
 #'   `TRUE` for the training data, as in
-#'   [`brms::fitted.brmsfit()`][brms::fitted.brmsfit], and to `FALSE`
-#'   with `newdata`. Under `TRUE` the observed response minus the
-#'   fitted value is the ordinary residual of [residuals.mvgam()].
-#' @param allow_new_levels Logical; accepted for brms compatibility.
-#'   A grouping level the model never saw is refused whatever this is
-#'   set to, because a new level has no fitted random effect and, for
-#'   a new series, no latent state to propagate. Predict for levels
-#'   the fit knows, or refit with the new levels included.
-#' @param sample_new_levels Character; accepted for brms
-#'   compatibility and not used, since new levels are refused. See
-#'   `allow_new_levels`.
-#' @param ... Unused. Anything passed here is refused; every argument
-#'   this method gives the posterior methods it names above.
+#'   [`brms::fitted.brmsfit()`][brms::fitted.brmsfit]. Defaults to
+#'   `FALSE` with `newdata`. Under `TRUE` the observed response minus
+#'   the fitted value is the ordinary residual of [residuals.mvgam()].
+#' @param ... Unused. Anything passed here is refused.
 #'
-#' @return If `summary = FALSE`, returns a matrix of posterior draws
-#'   with dimensions `[ndraws x nobs]`.
-#'
-#'   If `summary = TRUE`, returns a matrix with columns:
-#'   \itemize{
-#'     \item `Estimate`: Point estimate (mean or median depending on
-#'       `robust`)
-#'     \item `Est.Error`: Uncertainty estimate (sd or mad depending on
-#'       `robust`)
-#'     \item `Q*`: Quantile columns corresponding to values in `probs`
-#'   }
-#'
-#'   For multivariate models with `resp = NULL`, returns a named list
-#'   of matrices (one per response variable), each summarised
-#'   independently when `summary = TRUE`.
+#' @inherit predict.mvgam return
 #'
 #' @details
-#' `fitted.mvgam()` follows the brms convention: it returns the
-#' expected value E\[Y | X\], or the linear predictor with `scale =
-#' "linear"`, and leaves out the observation-family noise that
-#' [posterior_predict.mvgam()] draws on top. Use `predict()` for
-#' predictive samples that carry it.
+#' As in brms, fitted values leave out the observation noise.
+#' [posterior_predict.mvgam()] adds it. Use [predict.mvgam()] for
+#' predictive draws.
 #'
-#' For the training data the fitted values include the trend state
-#' the model inferred at each time, which [hindcast.mvgam()] also
-#' returns. With `newdata`, or under `incl_autocor = FALSE`, the
-#' fitted values describe the covariate structure. `process_error`
-#' then decides the trend's part: `FALSE` keeps its deterministic
-#' submodel, and `TRUE` samples a state per draw from the trend's
-#' dynamics.
+#' For the training data the fitted values include the trend state the
+#' model inferred at each time. [hindcast.mvgam()] returns the same
+#' state. With `newdata`, or under `incl_autocor = FALSE`, the fitted
+#' values describe the covariate structure. `process_error` then sets
+#' the trend's part. `FALSE` keeps its deterministic submodel. `TRUE`
+#' samples a state per draw from the trend's dynamics.
 #'
-#' Two brms `fitted()` arguments have no counterpart here and are
-#' refused rather than dropped. `dpar` and `nlpar` name a
-#' distributional or non-linear parameter to return on its own scale,
-#' which is what [posterior_linpred.mvgam()] answers through its own
-#' `dpar`. `sort` orders the returned rows by series, and this method
-#' returns them in the order the frame supplied.
+#' The brms arguments `dpar`, `nlpar` and `sort` are refused.
+#' [posterior_linpred.mvgam()] returns a distributional parameter
+#' through its own `dpar`. Rows come back in the order of the frame.
 #'
-#' @seealso [posterior_epred.mvgam()], [posterior_linpred.mvgam()],
-#'   [posterior_predict.mvgam()], [predict.mvgam()],
-#'   [`brms::fitted.brmsfit()`][brms::fitted.brmsfit].
+#' @seealso [residuals.mvgam()] compares the fitted values with the
+#'   data. [hindcast.mvgam()] returns the fitted latent states.
+#'   [forecast.mvgam()] predicts future times.
 #'
 #' @examples
 #' \dontrun{
@@ -130,17 +74,20 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Summary matrix of fitted values on the response scale.
-#' ft <- fitted(mod)
-#' head(ft)
+#' # Expected counts at the training observations: the posterior mean,
+#' # error and 95% interval of each
+#' head(fitted(mod))
 #'
-#' # Per-cell residuals on the response scale (observed minus
-#' # posterior mean). Use `pp_check(mod, type = "resid_ribbon")`
-#' # for a graphical view that respects the model family.
-#' resids <- simdat$data_train$y - ft[, "Estimate"]
-#' summary(resids)
+#' # The covariate effects alone, without the inferred trend state
+#' head(fitted(mod, incl_autocor = FALSE))
+#'
+#' # One row per posterior draw and one column per observation
+#' dim(fitted(mod, summary = FALSE))
+#'
+#' # Next: residuals() and pp_check() compare the fit with the data
 #' }
 #'
+#' @family predictions
 #' @method fitted mvgam
 #' @export
 fitted.mvgam <- function(object,

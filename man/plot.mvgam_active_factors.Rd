@@ -17,8 +17,8 @@ A \code{ggplot} object.
 }
 \description{
 Bar plot of the posterior probability that each
-latent factor is active under the Legramanti, Durante & Dunson
-(2020) cumulative-shrinkage criterion. A dashed horizontal line
+latent factor is active under the rule \code{\link[=active_factors]{active_factors()}} applied.
+A dashed horizontal line
 marks the active threshold (\code{1 - prob_threshold}, default
 \code{0.5}). The subtitle reports the posterior median active count
 with the 95\% credible interval.

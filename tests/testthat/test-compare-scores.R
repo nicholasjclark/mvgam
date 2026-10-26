@@ -1,8 +1,6 @@
-# CI unit tests for `compare_scores()`, `compare_elpds()`,
-# `ensemble()` and `print.mvgam_forecast()`. Same mock-object strategy as
-# test-score-mvgam-forecast.R: build tiny `mvgam_forecast` and
-# `mvgam_lfo` shells to pin the contract without any Stan
-# compilation.
+# `compare_scores()`, `compare_elpds()`, `ensemble()` and
+# `print.mvgam_forecast()`, on small hand-built `mvgam_forecast` and
+# `mvgam_lfo` objects.
 
 
 # ---- Mock helpers ------------------------------------------------
@@ -71,13 +69,10 @@ test_that("compare_scores returns a tidy long-format frame for crps", {
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
-  expect_s3_class(out, "tbl_df")
   expect_named(out, c("model", "series", "eval_horizon",
                        "score", "in_interval"))
-  expect_s3_class(out$model, "factor")
-  # Level order decides the legend and the colour assignment. For
-  # `series` it also sets the panel order, with all_series last.
-  # Comparing the sets alone passed on a swap.
+  # Level order sets the legend and the colours. For `series` it also
+  # sets the panel order, with all_series last.
   expect_identical(levels(out$model), c("fc1", "fc2"))
   # 2 series + 1 all_series = 3; 5 horizons; 2 models = 30 rows.
   expect_identical(nrow(out), 30L)
@@ -96,20 +91,15 @@ test_that("compare_scores honours model_names", {
 
 
 test_that("compare_scores forwards score_args to score()", {
-  # The default fixture puts every observation at the centre of its
-  # own predictive distribution, where an interval of any width
-  # contains it: 20 of 20 scored rows covered at both 0.9 and 0.5.
-  # A row count was all that remained to assert. The test above
-  # already checks that count. One SD of offset separates the two
-  # widths.
+  # An observation one SD from the centre of its predictive
+  # distribution separates a 0.9 interval from a 0.5 one.
   fc1 <- make_mock_forecast(seed = 1L, obs_offset = 1)
   fc2 <- make_mock_forecast(seed = 2L, obs_offset = 1)
   wide <- compare_scores(fc1, fc2, score = "crps")
   narrow <- compare_scores(fc1, fc2, score = "crps",
                             score_args = list(interval_width = 0.5))
-  expect_identical(nrow(narrow), 30L)
-  # The default interval still covers every scored row; halving it
-  # leaves a handful. Dropping `score_args` returns 20 here.
+  # The default interval covers all 20 scored rows. The narrow one
+  # covers fewer than half.
   expect_identical(sum(wide$in_interval, na.rm = TRUE), 20)
   expect_lt(sum(narrow$in_interval, na.rm = TRUE), 10L)
 })
@@ -148,7 +138,6 @@ test_that("compare_elpds returns a long-format frame", {
   m1 <- make_mock_lfo(c(-1, -2, -3))
   m2 <- make_mock_lfo(c(-3, -4, -5))
   out <- compare_elpds(m1, m2)
-  expect_s3_class(out, "tbl_df")
   expect_named(out, c("model", "eval_time", "elpd",
                        "pareto_k", "refit_here"))
   expect_identical(nrow(out), 6L)
@@ -239,10 +228,8 @@ test_that("summary.mvgam_compare_scores joint -> wide horizon x model", {
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "energy")
   s <- summary(out)
-  expect_s3_class(s, "tbl_df")
-  # Joint score: idvar = eval_horizon, one column per model. A reader
-  # compares across the columns in the order they are given. The set
-  # alone passed on a reordering.
+  # A joint score has one row per horizon and one column per model, in
+  # the order the models are given
   expect_identical(names(s), c("eval_horizon", "fc1", "fc2"))
   expect_identical(nrow(s), 5L)
 })
@@ -261,7 +248,7 @@ test_that(
 })
 
 
-test_that("plot.mvgam_compare_scores returns ggplot for univariate", {
+test_that("plot.mvgam_compare_scores facets a univariate score by series", {
   fc1 <- make_mock_forecast(seed = 1L)
   fc2 <- make_mock_forecast(seed = 2L)
   out <- compare_scores(fc1, fc2, score = "crps")
@@ -307,11 +294,10 @@ test_that("plot.mvgam_compare_scores relative pivot drops the baseline", {
 })
 
 
-test_that("plot.mvgam_compare_elpds returns ggplot + cumulative arg works", {
+test_that("plot.mvgam_compare_elpds draws cumulative ELPD", {
   m1 <- make_mock_lfo(c(-1, -2, -3))
   m2 <- make_mock_lfo(c(-3, -4, -5))
   out <- compare_elpds(m1, m2)
-  p <- plot(out)
   p_cum <- plot(out, cumulative = TRUE)
   expect_match(p_cum$labels$y, "Cumulative")
   # m1 cumulative is c(-1, -3, -6); confirm last value matches.

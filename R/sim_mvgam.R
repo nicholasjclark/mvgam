@@ -41,7 +41,8 @@
 #'   `shape`, `power`). Type-specific defaults are used when an
 #'   entry is absent. `com_binomial()` reads `nu` (dispersion)
 #'   and `trials`.
-#' @param seed Optional integer seed for reproducibility.
+#' @param seed Optional integer seed. The session's random state is
+#'   restored when the call returns.
 #'
 #' @details
 #' The seven recipes:
@@ -124,6 +125,7 @@
 #' head(simdat$data_train)
 #' summary(simdat)
 #'
+#' @family simulation
 #' @export
 sim_mvgam <- function(type = 1L,
                        family = gaussian(),
@@ -411,7 +413,7 @@ summary.mvgam_sim <- function(object, ...) {
 #' @param x A `mvgam_sim_summary` object.
 #' @param digits Integer; significant digits for printed numbers.
 #'   Default `3`.
-#' @param ... Currently ignored.
+#' @param ... Ignored.
 #'
 #' @return The `mvgam_sim_summary` object `x`, returned invisibly.
 #'

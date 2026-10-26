@@ -127,6 +127,7 @@
 #'
 #' @seealso \code{\link{predict.mvgam}}, [log_lik.mvgam()]
 #'
+#' @family model checking
 #' @export pp_check
 #'
 #' @references
@@ -176,7 +177,7 @@ pp_check.mvgam <- function(
   ...
 ) {
   require_fitted_model(object, "pp_check")
-  set_color_scheme_local("red")
+  set_color_scheme_local()
 
   dots <- list(...)
   type_missing <- missing(type)
@@ -758,7 +759,7 @@ pp_check.mvgam <- function(
     # the unscorable rows a missing response leaves go first. The
     # observed values and replicates were narrowed to the same rows
     # above, where the NA responses were dropped from `y`.
-    ll <- clean_ll(object, ll)
+    ll <- clean_ll(ll)
     r_eff <- mvgam_r_eff_log_lik(object, ll, draw_ids = draw_ids)
     # The panel below is drawn from these weights. `loo()` on the same
     # fit reports the Pareto diagnostic to the user. Muted here, the
@@ -1280,7 +1281,7 @@ closure_unit_fit_stat_ppc <- function(object, newdata, stat,
 #'
 #' @param x A `mvgam_ppc_fit_stat` object returned by
 #'   `pp_check(fit, type = "fit_stat")`.
-#' @param ... Unused.
+#' @param ... Ignored.
 #' @return Invisibly returns `x`.
 #' @author Nicholas J Clark
 #' @method print mvgam_ppc_fit_stat
@@ -1326,7 +1327,7 @@ fit_stat_label <- function(stat) {
 #' p-value annotated in the subtitle.
 #'
 #' @param x A `mvgam_ppc_fit_stat` object.
-#' @param ... Unused.
+#' @param ... Unused. Anything passed here is refused.
 #' @return A `ggplot` object.
 #' @author Nicholas J Clark
 #' @method plot mvgam_ppc_fit_stat

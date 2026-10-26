@@ -1487,8 +1487,8 @@ test_that("an offset keeps the GLM's own coefficients, response by response", {
   uni_data$off <- log(runif(nrow(uni_data), 1, 3))
   uni <- stancode(
     mvgam_formula(y ~ x + offset(off), trend_formula = ~ RW()),
-    data = uni_data, family = poisson()
-  , validate = FALSE)
+    data = uni_data, family = poisson(), validate = FALSE
+  )
   expect_true(stan_pattern("poisson_log_glm_lpmf(Y | Xc, mu, b)", uni,
                            fixed = TRUE))
 
@@ -1500,8 +1500,8 @@ test_that("an offset keeps the GLM's own coefficients, response by response", {
         bf(biomass ~ x, family = gaussian()) + set_rescor(FALSE),
       trend_formula = ~ RW()
     ),
-    data = data
-  , validate = FALSE)
+    data = data, validate = FALSE
+  )
   expect_true(stan_pattern(
     "poisson_log_glm_lpmf(Y_count | Xc_count, mu_count, b_count)", mixed,
     fixed = TRUE
@@ -1816,8 +1816,8 @@ test_that("PW samples its growth on the span of the series", {
     mvgam_formula(
       y ~ x, trend_formula = ~ PW(n_changepoints = 10, growth = "logistic")
     ),
-    data = pw_data, family = poisson()
-  , validate = FALSE)
+    data = pw_data, family = poisson(), validate = FALSE
+  )
   expect_true(stan_pattern(
     paste0("vector<offset=0.5 * (N_time_trend + 1), ",
            "multiplier=0.5 * N_time_trend>[N_lv_trend] m_trend;"),
@@ -1837,8 +1837,8 @@ test_that("PW samples its growth on the span of the series", {
   )
   cap_sd <- standata(
     mvgam_formula(y ~ 1, trend_formula = ~ PW(growth = "logistic")),
-    data = two, family = poisson()
-  , validate = FALSE)
+    data = two, family = poisson(), validate = FALSE
+  )
   expect_equal(exp(cap_sd$cap_trend[1, ]), c(30, 60))
 })
 
@@ -1999,8 +1999,8 @@ test_that("trend formula with covariate on multi-series univariate produces X_tr
 
   sd <- standata(
     mvgam_formula(y ~ 1, trend_formula = ~ x + AR(p = 1)),
-    data = d, family = poisson()
-  , validate = FALSE)
+    data = d, family = poisson(), validate = FALSE
+  )
 
   # N_trend keeps brms's natural nrow(trend_data) so the trend-level
   # design matrix has one row per (time, series). N_time_trend is the
@@ -2055,8 +2055,8 @@ test_that("subgr without gr is rejected with clear error", {
     standata(
       mvgam_formula(biomass ~ 1,
                     trend_formula = ~ ZMVN(subgr = habitat)),
-      data = data, family = lognormal()
-    , validate = FALSE),
+      data = data, family = lognormal(), validate = FALSE
+    ),
     regexp = "'subgr = habitat' requires a main grouping 'gr'"
   )
 })
@@ -2406,8 +2406,8 @@ test_that("loadings_prior errors when combined with a partial trend_map", {
     stancode(
       mf, data = fx$data, family = poisson(),
       data2 = list(phylo = fx$d_phylo),
-      loadings_prior = list(distances = "phylo")
-    , validate = FALSE),
+      loadings_prior = list(distances = "phylo"), validate = FALSE
+    ),
     "fixes 4 of 8 entries"
   )
 })
@@ -2425,8 +2425,8 @@ test_that("loadings_prior errors when combined with a fully-fixed trend_map", {
     stancode(
       mf, data = fx$data, family = poisson(),
       data2 = list(phylo = fx$d_phylo),
-      loadings_prior = list(distances = "phylo")
-    , validate = FALSE),
+      loadings_prior = list(distances = "phylo"), validate = FALSE
+    ),
     "fixes 8 of 8 entries"
   )
 })
@@ -2643,14 +2643,10 @@ test_that("get_prior() surfaces mu_/sigma_ rows under coef_sharing = \"hierarchi
 
 
 # ============================================================
-# brms helper-parity exports
+# brms helpers called from the mvgam namespace
 # ============================================================
-# Users can call stancode / standata / make_stancode /
-# make_standata / default_prior / get_prior from the mvgam
-# namespace directly. The brms wrappers (make_stancode,
-# make_standata) work via the mvgam_formula methods; default_prior
-# gets its own dispatch method that delegates to get_prior, and
-# standata gains a fitted-model method.
+# `make_stancode()` and `make_standata()` call the `stancode()` and
+# `standata()` generics, which dispatch to the mvgam methods.
 
 test_that("brms helper generics are exported by mvgam", {
   ns_exports <- getNamespaceExports("mvgam")
@@ -2675,14 +2671,11 @@ test_that("make_stancode / make_standata dispatch on mvgam_formula without brms:
   expect_true(all(c("N", "Y", "N_trend") %in% names(sd)))
 })
 
-test_that("default_prior dispatches on mvgam_formula (was broken in brms default)", {
+test_that("default_prior() and get_prior() agree on an mvgam_formula", {
   dat <- ar_step3_fixture()
   mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
-  # Sanity: the brms default dispatcher errors with "Nested
-  # formulas are not allowed" on an mvgam_formula; the mvgam
-  # method routes through get_prior.mvgam_formula and returns
-  # the standard brmsprior frame.
-  # Both entry points give the same table
+  # The brms default method refuses an mvgam_formula as a nested
+  # formula. The mvgam method returns the get_prior() table.
   expect_identical(default_prior(mf, data = dat),
                    get_prior(mf, data = dat))
 })
@@ -2783,8 +2776,8 @@ test_that("run_model = FALSE threads through jsdgam() too", {
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
-    run_model = FALSE, silent = 2
-  , validate = FALSE)
+    run_model = FALSE, silent = 2, validate = FALSE
+  )
   expect_s3_class(mod, "jsdgam")
   expect_s3_class(mod, "mvgam")
   expect_null(mod$fit)
@@ -3240,8 +3233,8 @@ test_that("a modelled dpar does not collide with mvgam's injected default prior"
   )
   sc <- paste(unlist(stancode(
     mvgam_formula(brms::bf(y | trials(trials) ~ 1, nu ~ site)),
-    data = dat, family = com_binomial(), backend = "cmdstanr"
-  , validate = FALSE)), collapse = "\n")
+    data = dat, family = com_binomial(), backend = "cmdstanr", validate = FALSE
+  )), collapse = "\n")
   expect_true(grepl("b_nu", sc, fixed = TRUE))
   # nu is identity-linked, so its default belongs on the intercept once
   # nu is modelled. Without the move brms falls back to a positive-only
@@ -3252,8 +3245,8 @@ test_that("a modelled dpar does not collide with mvgam's injected default prior"
   # and the scalar default is still emitted when nu is not modelled
   sc_plain <- paste(unlist(stancode(
     mvgam_formula(y | trials(trials) ~ 1),
-    data = dat, family = com_binomial(), backend = "cmdstanr"
-  , validate = FALSE)), collapse = "\n")
+    data = dat, family = com_binomial(), backend = "cmdstanr", validate = FALSE
+  )), collapse = "\n")
   expect_true(grepl("normal_lpdf(nu | 1, 1)", sc_plain, fixed = TRUE))
 })
 
@@ -3956,16 +3949,16 @@ test_that("an offset-only formula keeps its offset", {
   d <- injection_frame()
   uni <- standata(
     mvgam_formula(yp ~ 0 + offset(log(e)), trend_formula = ~ AR()),
-    data = d, family = poisson()
-  , validate = FALSE)
+    data = d, family = poisson(), validate = FALSE
+  )
   expect_equal(as.numeric(uni$offsets), log(d$e))
   multi <- standata(
     mvgam_formula(
       bf(yg ~ 0 + offset(log(e))) + bf(yh ~ 1) + set_rescor(FALSE),
       trend_formula = ~ AR()
     ),
-    data = d
-  , validate = FALSE)
+    data = d, validate = FALSE
+  )
   expect_equal(as.numeric(multi$offsets_yg), log(d$e))
 })
 
@@ -3981,8 +3974,8 @@ test_that("a mixture family is refused for every response", {
     stancode(
       mvgam_formula(bf(yg ~ x, family = mix) + bf(yh ~ 1) +
                       set_rescor(FALSE)),
-      data = d
-    , validate = FALSE),
+      data = d, validate = FALSE
+    ),
     "Mixture families are not supported"
   )
 })
@@ -4036,7 +4029,6 @@ test_that("group_inds_trend is ordered by the trend's series axis", {
     trend_formula = ~ AR(p = 1, gr = region, subgr = species, cor = TRUE)
   )
   sd <- SW(standata(f, data = d, family = poisson(), validate = FALSE))
-  expect_false(is.null(sd$group_inds_trend))
 
   # The group of whichever series occupies each trend column.
   s_idx <- as.integer(sd$obs_trend_series)
@@ -4101,8 +4093,8 @@ test_that("each response on a wide frame gets its own latent series", {
 
   sd <- standata(
     mvgam_formula(f, trend_formula = ~ AR(p = 1)),
-    data = dat, silent = 2L
-  , validate = FALSE)
+    data = dat, silent = 2L, validate = FALSE
+  )
 
   expect_identical(as.integer(sd$N_series_trend), 2L)
   # Constant within a response, and a different constant per response.
@@ -4134,8 +4126,8 @@ test_that("a wide frame does not require rows divisible by responses", {
 
   sd <- standata(
     mvgam_formula(f, trend_formula = ~ AR(p = 1)),
-    data = dat, silent = 2L
-  , validate = FALSE)
+    data = dat, silent = 2L, validate = FALSE
+  )
 
   expect_identical(as.integer(sd$N_series_trend), 3L)
   series_of <- c(
@@ -4168,8 +4160,8 @@ test_that("an explicit series column supersedes the response axis", {
 
   sd <- standata(
     mvgam_formula(f, trend_formula = ~ AR(p = 1)),
-    data = dat, silent = 2L
-  , validate = FALSE)
+    data = dat, silent = 2L, validate = FALSE
+  )
 
   expect_identical(as.integer(sd$N_series_trend), 1L)
   expect_identical(unique(sd$obs_trend_series_count), 1L)
@@ -4198,8 +4190,8 @@ test_that("the wide-frame trend design is indexed at time level", {
 
   sd <- standata(
     mvgam_formula(f, trend_formula = ~ env + AR(p = 1)),
-    data = dat, silent = 2L
-  , validate = FALSE)
+    data = dat, silent = 2L, validate = FALSE
+  )
 
   expect_identical(as.integer(sd$N_trend), T_)
   expect_identical(as.integer(sd$N_series_trend), 2L)

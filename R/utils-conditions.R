@@ -24,6 +24,38 @@ warn_once <- function(message, id) {
 }
 
 
+#' Record `silent` for the length of the calling function
+#'
+#' `mvgam()`, `jsdgam()` and the Stan code generator store `silent` in
+#' the `mvgam.silent` option. A validator deep in the call then takes
+#' it from `mvgam_quiet()`, without the argument passed down to it. The
+#' option is restored when the caller returns.
+#'
+#' @param silent Verbosity, as `silent` of [mvgam()]
+#' @param frame Frame whose exit restores the option
+#' @return `NULL`, invisibly
+#' @noRd
+local_mvgam_silent <- function(silent, frame = parent.frame()) {
+  checkmate::assert_number(silent)
+  old <- options(mvgam.silent = silent)
+  do.call(
+    base::on.exit,
+    list(substitute(options(old), list(old = old)), add = TRUE),
+    envir = frame
+  )
+  invisible(NULL)
+}
+
+
+#' Whether the running call asked for no messages
+#'
+#' @return `TRUE` when the recorded `silent` is 2 or more
+#' @noRd
+mvgam_quiet <- function() {
+  isTRUE(getOption("mvgam.silent", 1L) >= 2L)
+}
+
+
 #' Show an informational message once per session
 #'
 #' A message informs and a warning reports a problem. `mvgam()` and
@@ -40,8 +72,7 @@ warn_once <- function(message, id) {
 inform_once <- function(message, id) {
   checkmate::assert_character(message, min.len = 1L, any.missing = FALSE)
   checkmate::assert_string(id, min.chars = 1L)
-  if (identical(Sys.getenv("TESTTHAT"), "true") ||
-      isTRUE(getOption("mvgam.silent", 1L) >= 2L)) {
+  if (identical(Sys.getenv("TESTTHAT"), "true") || mvgam_quiet()) {
     return(invisible(NULL))
   }
   rlang::inform(message, class = id, .frequency = "once",

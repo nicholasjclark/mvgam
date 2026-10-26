@@ -20,6 +20,7 @@
 #'     the trend via `gr = ...`).
 #' }
 #'
+#' @inheritParams predict.mvgam
 #' @param object A fitted \[mvgam\]\[mvgam::mvgam\] object.
 #' @param covariance Which covariance to summarise. `"stationary"`
 #'   (default) gives the covariance of the latent states over the whole
@@ -42,20 +43,10 @@
 #'   factors than series implies a singular covariance of rank `n_lv`.
 #'   The call then stops with an error. [shared_variation()] reports
 #'   the variation such a fit's series share.
-#' @param summary Logical. When `TRUE` (default) per-element summaries
-#'   (point estimate, posterior SD, quantile CI, posterior probability
-#'   mass) are returned. When `FALSE` the full per-draw arrays are
-#'   returned for downstream analysis.
-#' @param robust Logical. When `FALSE` (default), the posterior mean
-#'   is the point estimate; when `TRUE`, the posterior median is used.
-#'   Only relevant when `summary = TRUE`.
-#' @param probs Length-2 numeric vector giving the lower and upper
-#'   probabilities for the quantile-based credible interval. Default
-#'   `c(0.025, 0.975)`.
-#' @param ndraws Optional number of posterior draws to use. Default
-#'   `NULL` uses every draw.
-#' @param draw_ids Optional integer vector naming the posterior draws
-#'   to use, in place of `ndraws`.
+#' @param summary Logical. `TRUE` (the default) returns a summary of
+#'   each entry: the point estimate, spread, credible interval and
+#'   posterior sign probabilities. `FALSE` returns the arrays of
+#'   draws.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An \[mvgam_residcor-class\] object when `summary = TRUE` and
@@ -108,7 +99,7 @@
 #' Cholesky factor and per-group deviations via
 #' `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])`.
 #'
-#' Credible intervals and posterior SDs for correlations are computed
+#' Credible intervals and spreads for correlations are computed
 #' on the Fisher z-transformed scale (`atanh(r)`) and back-transformed
 #' for display. The intervals then stay inside `(-1, 1)` for
 #' correlations near the bounds. The reported matrix summarises each
@@ -170,6 +161,7 @@
 #' round(rc$cor, 2)
 #' }
 #'
+#' @family latent dynamics
 #' @export
 residual_cor <- function(object, ...) {
   UseMethod("residual_cor", object)
@@ -694,73 +686,36 @@ partial_cor_from_cor <- function(R) {
 }
 
 
-#' Per-element summary of a correlation array via Fisher z.
+#' Per-element summary of a correlation array on the Fisher-z scale
 #'
-#' For each off-diagonal element of the input draws-by-p-by-p
-#' correlation array, compute point estimate, posterior SD, and
-#' quantile CIs on the Fisher-z scale and back-transform to the
-#' correlation scale. Off-scale draws (r == 1) are clipped before
-#' atanh to avoid infinities.
+#' Each cell is summarised on the Fisher-z scale and back-transformed
+#' to the correlation scale. Draws at `|r| = 1` are clipped first. A
+#' clip of `1e-7` keeps `atanh()` finite and the back-transform then
+#' recovers `r` to print precision. The diagonal is 1 in every draw
+#' and is set exactly, with zero SE.
 #'
+#' @inheritParams summarise_unconstrained_array
+#' @return The list of `summarise_unconstrained_array()` plus the
+#'   matrices of `sign_probabilities()` and `sig`, the point
+#'   estimates with entries below `residcor_prob_threshold` set to 0
 #' @noRd
 summarise_correlation_array <- function(arr, robust, probs, series_names) {
-  p <- dim(arr)[2L]
-  point <- matrix(0, p, p)
-  se    <- matrix(0, p, p)
-  lower <- matrix(0, p, p)
-  upper <- matrix(0, p, p)
-  ess <- matrix(NA_real_, p, p)
-
-  clip <- function(r) {
-    # `atanh(+/-1)` is infinite. A clip of 1e-7 keeps it finite. The
-    # back-transform then recovers `r` to print precision.
-    eps <- 1e-7
-    pmin(pmax(r, -1 + eps), 1 - eps)
-  }
-
-  without_ess_cap_notice(for (i in seq_len(p)) {
-    for (j in seq_len(p)) {
-      r <- arr[, i, j]
-      z <- atanh(clip(r))
-      z_centre <- if (robust) median(z) else mean(z)
-      z_q <- stats::quantile(z, probs = probs, na.rm = TRUE)
-      point[i, j] <- tanh(z_centre)
-      se[i, j]    <- tanh(sd(z))
-      lower[i, j] <- tanh(z_q[1L])
-      upper[i, j] <- tanh(z_q[2L])
-      # ESS computed on the Fisher-z scale to match the location/
-      # scale summaries; equivalent to native ESS for r away from
-      # the boundary and well-defined when r touches +/- 1.
-      ess[i, j] <- if (stats::sd(z) > 0) posterior::ess_basic(z) else NA_real_
-    }
-  })
-
-  # Correlation matrix diagonal is definitionally 1; the Fisher-z
-  # clip + back-transform introduces a tiny bias on the diagonal that
-  # we hard-restore here so output is exact for diag and SE / CI bounds
-  # collapse cleanly.
-  diag_idx <- cbind(seq_len(p), seq_len(p))
-  point[diag_idx] <- 1
-  se[diag_idx]    <- 0
-  lower[diag_idx] <- 1
-  upper[diag_idx] <- 1
-  ess[diag_idx]   <- NA_real_
-
-  # The diagonal of a correlation is 1 in every draw
+  eps <- 1e-7
+  z <- atanh(pmin(pmax(arr, -1 + eps), 1 - eps))
+  stats <- summarise_unconstrained_array(z, robust, probs, series_names,
+                                         back = tanh)
+  diag(stats$point) <- 1
+  diag(stats$se) <- 0
+  diag(stats$lower) <- 1
+  diag(stats$upper) <- 1
+  diag(stats$ess) <- NA_real_
   signs <- sign_probabilities(arr, series_names)
   diag(signs$prob_positive) <- 1
   diag(signs$prob_negative) <- 0
   diag(signs$prob_nonzero) <- 1
-  sig <- point
-  sig[signs$prob_nonzero <= residcor_prob_threshold] <- 0
-
-  c(
-    name_series_matrices(list(
-      point = point, se = se, lower = lower, upper = upper, sig = sig,
-      ess = ess
-    ), series_names),
-    signs
-  )
+  stats$sig <- stats$point
+  stats$sig[signs$prob_nonzero <= residcor_prob_threshold] <- 0
+  c(stats, signs)
 }
 
 
@@ -783,35 +738,39 @@ sign_probabilities <- function(arr, series_names) {
 }
 
 
-#' Per-element summary of an unconstrained array, such as a covariance
-#' or a transition matrix. Uses native-scale quantiles and SD.
+#' Per-element summary of an array of matrix draws
 #'
+#' Each cell takes the summary `mvgam_post_summary()` gives a column of
+#' draws.
+#'
+#' @inheritParams mvgam_post_summary
+#' @param arr `[ndraws, p, p]` array of draws
+#' @param probs Length-2 interval probabilities
+#' @param series_names Labels for both dimensions
+#' @param back Function mapping the scale of `arr` to the reported
+#'   scale. It is applied to the point estimate, spread and bounds.
+#'   The ESS is that of `arr`
+#' @return List of labelled `p` by `p` matrices `point`, `se`,
+#'   `lower`, `upper` and `ess`. A constant cell has `NA` ESS
 #' @noRd
 summarise_unconstrained_array <- function(arr, robust, probs,
-                                           series_names) {
+                                          series_names, back = identity) {
   p <- dim(arr)[2L]
-  point <- matrix(0, p, p)
-  se    <- matrix(0, p, p)
-  lower <- matrix(0, p, p)
-  upper <- matrix(0, p, p)
-  ess   <- matrix(NA_real_, p, p)
-
-  without_ess_cap_notice(for (i in seq_len(p)) {
-    for (j in seq_len(p)) {
-      x <- arr[, i, j]
-      point[i, j] <- if (robust) median(x) else mean(x)
-      se[i, j]    <- stats::sd(x)
-      qs <- stats::quantile(x, probs = probs, na.rm = TRUE)
-      lower[i, j] <- qs[1L]
-      upper[i, j] <- qs[2L]
-      ess[i, j] <- if (stats::sd(x) > 0) posterior::ess_basic(x) else NA_real_
-    }
-  })
-
-  name_series_matrices(
-    list(point = point, se = se, lower = lower, upper = upper, ess = ess),
-    series_names
-  )
+  # Column `(j - 1) * p + i` holds cell `[i, j]`, the order `matrix()`
+  # fills a `p` by `p` matrix in.
+  cells <- matrix(arr, nrow = dim(arr)[1L])
+  stats <- mvgam_post_summary(cells, robust = robust, probs = probs)
+  as_cells <- function(x) back(matrix(x, p, p))
+  ess <- without_ess_cap_notice(apply(cells, 2L, function(x) {
+    if (stats::sd(x) > 0) posterior::ess_basic(x) else NA_real_
+  }))
+  name_series_matrices(list(
+    point = as_cells(stats[, 1L]),
+    se = as_cells(stats[, 2L]),
+    lower = as_cells(stats[, 3L]),
+    upper = as_cells(stats[, 4L]),
+    ess = matrix(ess, p, p)
+  ), series_names)
 }
 
 
@@ -829,6 +788,16 @@ name_series_matrices <- function(mats, series_names) {
 }
 
 
+#' Mean absolute entry of a square matrix off its diagonal
+#'
+#' @param m Square numeric matrix
+#' @return Numeric scalar
+#' @noRd
+mean_abs_offdiag <- function(m) {
+  mean(abs(m[!diag(TRUE, nrow(m))]))
+}
+
+
 #' Scalar summary of off-diagonal correlation magnitude.
 #'
 #' Returns a list with the point estimate and quantile CI of
@@ -842,9 +811,8 @@ mean_abs_offdiag_summary <- function(cor_draws, robust, probs) {
   if (p <= 1L) {
     return(list(point = NA_real_, lower = NA_real_, upper = NA_real_))
   }
-  off_diag_mask <- !diag(TRUE, nrow = p)
   per_draw <- vapply(seq_len(ndraws), function(d) {
-    mean(abs(cor_draws[d, , ][off_diag_mask]))
+    mean_abs_offdiag(cor_draws[d, , ])
   }, numeric(1L))
   point <- if (robust) median(per_draw) else mean(per_draw)
   qs <- stats::quantile(per_draw, probs = probs, na.rm = TRUE)
@@ -1019,7 +987,7 @@ summary.mvgam_residcor <- function(object, ...) {
 #' @param x An `mvgam_residcor` object.
 #' @param digits Integer; number of significant digits for printed
 #'   numbers. Default `2`.
-#' @param ... Currently ignored.
+#' @param ... Ignored.
 #'
 #' @return The `mvgam_residcor` object `x`, returned invisibly.
 #'

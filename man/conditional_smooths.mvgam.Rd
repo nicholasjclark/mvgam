@@ -110,7 +110,20 @@ are drawn as heatmap panels through the same method.
 \code{\link[brms]{conditional_smooths.brmsfit}},
 \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}},
 \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}}.
+
+Other predictions: 
+\code{\link{conditional_effects.mvgam}()},
+\code{\link{fitted.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{posterior_epred.mvgam}()},
+\code{\link{posterior_linpred.mvgam}()},
+\code{\link{posterior_predict.mvgam}()},
+\code{\link{posterior_smooths.mvgam}()},
+\code{\link{predict.mvgam}()},
+\code{\link{predictive_error.mvgam}()},
+\code{\link{predictive_interval.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{predictions}

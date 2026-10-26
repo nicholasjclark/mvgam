@@ -59,7 +59,7 @@ degree of partial pooling).
 
 A grouped trend estimates correlations among the \code{subgr} units
 within each level of \code{gr}. \code{cor} defaults to \code{TRUE} for such a
-trend, and an explicit \code{cor = FALSE} is refused.
+trend. An explicit \code{cor = FALSE} is refused.
 
 Within a \code{VAR()} it sets up a hierarchical panel vector
 autoregression. Each group learns its autoregressive, moving-average
@@ -67,15 +67,14 @@ and correlation matrices from shared hyperparameters. The groups do
 not interact. Without \code{subgr}, the series column names the units
 within each group.
 
-Two constraints currently apply to hierarchical trend models:
+Two constraints apply to hierarchical trend models:
 \itemize{
 \item \code{gr} must be constant within each series (each series belongs to
 a single group). Models with \code{gr} varying within a series are
 rejected at validation time.
 \item Every group must hold the same number of series. The Stan
 program sizes each group's correlation block from one shared
-count, and validation refuses unbalanced groups before
-fitting.
+count. Validation refuses unbalanced groups before fitting.
 }}
 
 \item{subgr}{A subgrouping \code{factor} variable naming the time series
@@ -91,8 +90,8 @@ within regions, specify \code{gr = region} and \code{subgr = species}.
 \verb{series = interaction(gr, subgr, drop = TRUE, sep = "_",}
 \verb{lex.order = TRUE)}
 
-A region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}, and
-the levels sort lexically. \code{summary()}, \code{plot()} and \code{forecast()}
+A region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}. The
+levels sort lexically. \code{summary()}, \code{plot()} and \code{forecast()}
 all label that series \code{"r1_sp1"}. A \code{series} column that disagrees
 with the derived series is replaced by it, with a warning.}
 
@@ -115,15 +114,15 @@ estimate them, or supply a number above \code{2} to fix them.
 Finite degrees of freedom let the latent process absorb an
 occasional large shock while \code{sigma_trend} stays at the scale
 of ordinary variation. That suits boom-and-bust population series
-and outbreak dynamics. The innovations follow a multivariate t,
-which shares one innovation \emph{scale} across the series at each
-time point, and large innovations tend to occur together as a
-result. Each series keeps its own direction and magnitude. A shock
-in one series says nothing about the sign of the others, and one
-series can stay unmoved by an event that moves its neighbours.
-\code{cor} sets the correlation between series exactly as it does
-for Gaussian innovations, and the degrees of freedom control how
-heavy the tails of the innovations are.
+and outbreak dynamics. The innovations follow a multivariate t.
+Because it shares one innovation \emph{scale} across the series at
+each time point, large innovations tend to occur together. Each
+series keeps its own direction and magnitude. A shock in one series
+says nothing about the sign of the others. One series can also stay
+unmoved by an event that moves its neighbours. \code{cor} sets the
+correlation between series exactly as it does for Gaussian
+innovations. The degrees of freedom set how heavy the tails of the
+innovations are.
 
 When \code{df = NA} the degrees of freedom are estimated as
 \code{nu_trend}, with a default \code{gamma(4, 0.3)} prior. The
@@ -132,18 +131,18 @@ When \code{df = NA} the degrees of freedom are estimated as
 \code{\link{get_prior}} lists \code{nu_trend} with the other trend
 classes.
 
-Three caveats. The bound of \code{2} is required: below it the
-innovations have no finite variance, and an autoregressive trend
-has no stationary covariance to start from. Above it, the first
-states of an autoregressive trend take the stationary mean and
-covariance. Their distribution matches the stationary law exactly
-under Gaussian innovations alone. A finite mix of t variates has
-heavier tails than the infinite sum that defines that law. The
-degrees of freedom are informed only through the tail of the
-latent process and are weakly identified in short series: below
-roughly 200 time points, the posterior stays close to its prior.
-Not available for \code{VAR()}, which samples its states directly,
-or \code{PW()}, which has no innovations.}
+Three caveats apply. The bound of \code{2} is required. Below it
+the innovations have no finite variance. An autoregressive trend
+then has no stationary covariance to start from. Above it, the
+first states of an autoregressive trend take the stationary mean
+and covariance. Their distribution matches the stationary law
+exactly under Gaussian innovations alone. A finite mix of t
+variates has heavier tails than the infinite sum that defines that
+law. The degrees of freedom are informed only through the tail of
+the latent process. They are weakly identified in short series:
+below roughly 200 time points, the posterior stays close to its
+prior. \code{VAR()} samples its states directly and \code{PW()}
+has no innovations. Neither takes \code{df}.}
 }
 \value{
 An object of class \code{mvgam_trend}.
@@ -159,12 +158,12 @@ and a slope:
 
 The level shocks \eqn{\eta_t} have scale \code{sigma_trend} and the slope
 shocks \eqn{\zeta_t} scale \code{sigma_slope_trend}. A small
-\code{sigma_slope_trend} gives a trend that keeps its direction, and zero
-gives a random walk with a fixed drift. \code{damped = TRUE} estimates
-\eqn{\phi} on (0, 1) as \code{ar1_slope_trend}, which pulls the growth
-rate back toward zero over the horizon (Gardner and McKenzie 1985).
-The undamped trend has \eqn{\phi = 1}, and its forecasts extend the
-current growth rate.
+\code{sigma_slope_trend} gives a trend that keeps its direction. A zero
+scale gives a random walk with a fixed drift. \code{damped = TRUE}
+estimates \eqn{\phi} on (0, 1) as \code{ar1_slope_trend}, which pulls
+the growth rate back toward zero over the horizon (Gardner and
+McKenzie 1985). The undamped trend has \eqn{\phi = 1}. Its
+forecasts extend the current growth rate.
 
 The level shocks take the innovation structure of \code{RW()}: \code{cor}
 correlates them across series, \code{gr} and \code{subgr} pool their
@@ -173,19 +172,19 @@ The slope shocks are Gaussian and take the level's correlation
 matrix with scales of their own.
 
 The slope starts at a free value, \code{init_slope_trend}, damped or not,
-as in the damped trends of exponential smoothing. A series that
-starts with fast growth and slows is the case damping serves, and
-its initial slope can lie far outside the slope's stationary
-distribution. The level starts at its first shock, and the
-observation intercept carries its mean.
+as in the damped trends of exponential smoothing. Damping serves a
+series that starts with fast growth and slows. The initial slope of
+such a series can lie far outside the slope's stationary
+distribution. The level starts at its first shock. The observation
+intercept carries its mean.
 
 Default priors scale with the number of time points \eqn{N} and
 widen by the factor \eqn{s} that brms applies to its own default
 scales, as \code{\link[=get_prior]{get_prior()}} describes. \code{sigma_slope_trend} takes a
-half-Student-t with 3 degrees of freedom. Its scale gives the
-trend's movement over the series from the slope shocks a standard
-deviation with prior median \eqn{s}, and the movement itself a 90th
-percentile near \eqn{2.8 s}. The scale accounts for the damping at
+half-Student-t with 3 degrees of freedom. Under its scale, the
+trend's movement over the series from the slope shocks has a
+standard deviation with prior median \eqn{s}. The movement itself
+has a 90th percentile near \eqn{2.8 s}. The scale accounts for the damping at
 the median of its prior. \code{init_slope_trend ~ normal(0, 2 / r)},
 where \eqn{r = 1 + \phi + \dots + \phi^{N - 2}} is how far a unit
 initial slope moves the level by the end of the series, gives the
@@ -198,7 +197,7 @@ measures both in units of its level's spread over the series,
 values.
 
 A smooth or linear function of time in either formula competes with
-the slope for the same variation, and \code{mvgam()} warns when the time
+the slope for the same variation. \code{mvgam()} warns when the time
 variable appears in one. The slope variance is weakly identified on
 short series: \code{LLT()} warns below 20 time points and refuses fewer
 than 5. On informative data, such as large counts, a chain started
@@ -208,11 +207,11 @@ approximation.
 
 In a factor model with every loading sampled, the loadings set
 each factor's scale and the level shocks take unit scale. The
-factors share one \code{sigma_slope_trend} and one \code{ar1_slope_trend},
-which leaves the model unchanged under a rotation of the factors,
-and the QR rotation that \code{RW()} factors take identifies the
-loadings. A trend with no level noise then needs an infinite slope
-scale, and a factor model always keeps some level noise. A
+factors share one \code{sigma_slope_trend} and one \code{ar1_slope_trend}.
+The model is then unchanged under a rotation of the factors. The QR
+rotation that \code{RW()} factors take identifies the loadings. A trend
+with no level noise would need an infinite slope scale. A factor
+model always keeps some level noise. A
 \code{trend_map} that fixes loadings keeps one slope scale per factor.
 }
 \examples{
@@ -256,4 +255,12 @@ series. \emph{Management Science}, 31:1237-1246.
 \seealso{
 \code{\link[=RW]{RW()}}, \code{\link[=PW]{PW()}}, \link{trend_constructors}, \code{\link[=get_prior]{get_prior()}} for the
 scale of the default priors, \code{\link[=forecast.mvgam]{forecast.mvgam()}}
+
+Other trend models: 
+\code{\link{PW}()},
+\code{\link{RW}()},
+\code{\link{ZMVN}()},
+\code{\link{list_trend_types}()},
+\code{\link{lv_axis}()}
 }
+\concept{trend models}

@@ -22,7 +22,8 @@
 #'   ensemble draws to return per series. Defaults to `5000`.
 #'   A model allocated more draws than it holds is sampled with
 #'   replacement.
-#' @param seed Optional integer seed for reproducibility.
+#' @param seed Optional integer seed. The session's random state is
+#'   restored when the call returns.
 #'
 #' @details Per-model weights are split into integer draw counts
 #'   that sum to `ndraws` by the largest-remainder rule, after
@@ -50,13 +51,14 @@
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [forecast.mvgam()], [hindcast.mvgam()],
-#'   [score.mvgam_forecast()], [pp_average.mvgam()],
-#'   [loo_model_weights.mvgam()]. The online article
-#'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
-#'   shows `ensemble()` weighted by stacking weights derived
-#'   from `loo_model_weights.mvgam_lfo()`.
+#' @seealso [score.mvgam_forecast()] scores the ensemble.
+#'   [loo_model_weights.mvgam_lfo()] computes weights from forecast
+#'   performance. [pp_average.mvgam()] averages predictions in place of
+#'   forecasts. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   weights an ensemble by leave-future-out stacking weights.
 #'
+#' @family forecasting
 #' @export
 ensemble <- function(object, ...) {
   UseMethod("ensemble", object)
@@ -87,13 +89,15 @@ ensemble.mvgam_forecast <- function(object, ..., weights = NULL,
   assert_compared_objects(split$models, "mvgam_forecast", "ensemble")
   models <- lapply(split$models, forecast_parts)
   n_models <- length(models)
-  w <- if (is.null(weights)) {
-    rep(1 / n_models, n_models)
-  } else {
-    mvgam_normalize_weights(weights, n_models)
-  }
+  w <- stats::setNames(
+    if (is.null(weights)) {
+      rep(1 / n_models, n_models)
+    } else {
+      mvgam_normalize_weights(weights, n_models)
+    },
+    names(models)
+  )
   ndraws_per <- mvgam_round_largest_remainder(w * ndraws)
-  names(w) <- names(ndraws_per) <- names(models)
 
   # A long-frame multivariate forecast holds one forecast per response.
   # Every response takes the same draw rows. The ensemble then keeps

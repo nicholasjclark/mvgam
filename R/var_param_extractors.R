@@ -157,16 +157,13 @@ extract_var_posterior <- function(object, ndraws = NULL,
 #' `stability.mvgam()`. Their per-draw loops run under the `future`
 #' plan the caller set, as chain fitting does.
 #'
-#' When `future = FALSE` (the default) the loop is base `lapply()`,
-#' with no `future` dependency and no runtime overhead. When
-#' `future = TRUE`, `future::future()` runs every posterior draw under
-#' the `plan()` the caller set (defaulting to `sequential()`, which
-#' behaves like `lapply` with negligible extra overhead);
-#' `plan(multisession, workers = N)` before the call spreads draws
-#' across `N` R processes. Errors from any draw propagate.
-#'
-#' `future` is in Suggests. A request for parallel execution without
-#' the package installed stops with an install hint.
+#' `future = FALSE` (the default) loops with `lapply()`. Under
+#' `future = TRUE`, `future::future()` runs each posterior draw under
+#' the caller's `plan()`. The default `sequential()` plan runs them in
+#' turn. `plan(multisession, workers = N)` spreads them across `N` R
+#' processes. An error in any draw reaches the caller. Without the
+#' future package, which is in Suggests, the loop uses `lapply()` and
+#' says so once per session.
 #'
 #' @param n Integer. Number of draws (loop length).
 #' @param fn Function taking a single integer index and returning
@@ -180,10 +177,9 @@ mvgam_maybe_future_lapply <- function(n, fn, future = FALSE) {
   checkmate::assert_int(n, lower = 1L)
   checkmate::assert_function(fn)
   checkmate::assert_flag(future)
-  if (!future) {
+  if (!future || !future_available()) {
     return(lapply(seq_len(n), fn))
   }
-  require_package("future")
   futures <- vector("list", n)
   for (i in seq_len(n)) {
     local_i <- i
@@ -298,6 +294,7 @@ var_process_labels <- function(object, K) {
 #' fraction of draws with each entry above or below zero. See
 #' the argument documentation for the median switch.
 #'
+#' @inheritParams predict.mvgam
 #' @param object A fitted `mvgam` object whose trend is a VAR.
 #' @param lag The lag whose transition matrix is returned, at most
 #'   the order `p` of the fitted `VAR(p)`. Defaults to `1`.
@@ -318,12 +315,6 @@ var_process_labels <- function(object, K) {
 #'   the outcome names (levels of `subgr` on a hierarchical fit,
 #'   `series_names` on a single-panel fit) for downstream custom
 #'   summaries.
-#' @param robust Logical. When `summary = TRUE`, use the median
-#'   as the per-cell point estimate; defaults to the posterior
-#'   mean when `FALSE`.
-#' @param probs Length-2 numeric vector of quantile probabilities
-#'   for the per-cell credible interval when `summary = TRUE`.
-#'   Defaults to `c(0.025, 0.975)`.
 #'
 #' @return One matrix, or a list of them when `groups` names more
 #'   than one panel. With `summary = TRUE`, an object of class
@@ -348,6 +339,7 @@ var_process_labels <- function(object, K) {
 #'   [stability()], [print.mvgam_var_matrix()],
 #'   [plot.mvgam_var_matrix()].
 #' @author Nicholas J Clark
+#' @family latent dynamics
 #' @export
 posterior_transition_matrix <- function(object, groups = NULL,
                                          summary = TRUE,
@@ -488,13 +480,14 @@ extract_transition_matrix_draws <- function(object, group, lag) {
   out
 }
 
-#' Reduce a `[ndraws, K, K]` VAR transition matrix draws array to
-#' an `mvgam_var_matrix` per-cell summary. Reuses
-#' `summarise_unconstrained_array()` (`R/residual_cor.R`) for
-#' point + SE + interval + ESS so the numerics match the
-#' `mvgam_residcor` covariance summariser cell-for-cell. Adds
-#' `prob_positive` / `prob_negative` / `prob_nonzero` matrices
-#' with the same semantic as their `mvgam_residcor` counterparts.
+#' Per-cell summary of VAR transition matrix draws
+#'
+#' The cells take the summary `residual_cor()` gives a covariance,
+#' from `summarise_unconstrained_array()`, plus the sign
+#' probabilities of `sign_probabilities()`.
+#'
+#' @param arr `[ndraws, K, K]` array of transition matrix draws
+#' @return An `mvgam_var_matrix`
 #' @noRd
 finalise_transition_matrix <- function(arr, group_label,
                                         robust, probs, lag = 1L) {
@@ -536,7 +529,7 @@ finalise_transition_matrix <- function(arr, group_label,
 #'   [posterior_transition_matrix()].
 #' @param digits Integer. Digits used when rounding the printed
 #'   matrix.
-#' @param ... Currently unused.
+#' @param ... Ignored.
 #'
 #' @return `x`, invisibly, after side-effect printing.
 #'
@@ -553,13 +546,7 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
       sep = "")
   cat("  Dimension  : ", x$n_series, " x ", x$n_series, "\n",
       sep = "")
-  off_diag_mask <- !diag(TRUE, x$n_series)
-  cat(
-    sprintf(
-      "  Mean |A_ij| (i != j): %.2f\n",
-      mean(abs(x$A[off_diag_mask]))
-    )
-  )
+  cat(sprintf("  Mean |A_ij| (i != j): %.2f\n", mean_abs_offdiag(x$A)))
   cat("  Point estimate:\n")
   print(round(x$A, digits))
   cat("  ", sprintf("%.0f%% CI", 100 * (x$probs[2L] - x$probs[1L])),
@@ -577,8 +564,7 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
 #' colour scale is symmetric about zero and spans the largest absolute
 #' cell.
 #'
-#' @param x An `mvgam_var_matrix` object returned by
-#'   [posterior_transition_matrix()].
+#' @inheritParams print.mvgam_var_matrix
 #' @param cluster Logical. If `TRUE`, reorder rows and columns
 #'   using approximate Robinson clustering on `1 - A` (only
 #'   meaningful when `A` is roughly symmetric).
@@ -608,11 +594,9 @@ plot.mvgam_var_matrix <- function(x, cluster = FALSE, ...) {
 #' @return Frame of `Var1`, `Var2`, `value` and `clear`
 #' @noRd
 var_matrix_panel <- function(x, idx = seq_len(x$n_series)) {
-  long <- gather_matrix(x$A[idx, idx, drop = FALSE],
-                        drop_diag = FALSE, drop_upper = FALSE)
   clear <- interval_excludes_zero(x$A_lower, x$A_upper)
-  long$clear <- as.vector(clear[idx, idx, drop = FALSE])
-  long
+  matrix_panel(x$A[idx, idx, drop = FALSE],
+               clear = clear[idx, idx, drop = FALSE])
 }
 
 #' Heatmap of transition matrices, rows responding to columns
@@ -646,7 +630,7 @@ var_matrix_heatmap <- function(panel, ncol = NULL) {
 #'
 #' @param x An `mvgam_var_matrix_list` returned by
 #'   [posterior_transition_matrix()] with `groups` set.
-#' @param ... Currently unused.
+#' @param ... Ignored.
 #'
 #' @return `x`, invisibly, after side-effect printing.
 #'
@@ -663,10 +647,7 @@ print.mvgam_var_matrix_list <- function(x, ...) {
   cat("  Dimension  : ", x[[1L]]$n_series, " x ",
       x[[1L]]$n_series, "\n", sep = "")
   cat("  Mean |A_ij| (i != j) by group:\n")
-  m <- vapply(x, function(g) {
-    off_diag_mask <- !diag(TRUE, g$n_series)
-    mean(abs(g$A[off_diag_mask]))
-  }, numeric(1L))
+  m <- vapply(x, function(g) mean_abs_offdiag(g$A), numeric(1L))
   print(round(m, 3))
   invisible(x)
 }
@@ -685,8 +666,7 @@ print.mvgam_var_matrix_list <- function(x, ...) {
 #'
 #' Both draw with [mvgam_theme()].
 #'
-#' @param x An `mvgam_var_matrix_list` returned by
-#'   [posterior_transition_matrix()] with `groups` set.
+#' @inheritParams print.mvgam_var_matrix_list
 #' @param type One of `"heatmap"` (default) or `"diagonal"`.
 #' @param ncol Optional integer. Number of facet columns for the
 #'   heatmap grid; defaults to `ceiling(sqrt(length(x)))`. Only
@@ -728,7 +708,7 @@ plot_var_matrix_list_heatmap <- function(x, ncol) {
 #' that the fevd, irf and stability plots draw with.
 #' @noRd
 plot_var_matrix_list_diagonal <- function(x) {
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   outc <- x[[1L]]$series_names
   df <- do.call(rbind, lapply(seq_along(x), function(g) {
     obj <- x[[g]]

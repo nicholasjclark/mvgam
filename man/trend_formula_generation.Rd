@@ -28,8 +28,8 @@ A character string of Stan code, or a list of Stan data.
 \description{
 \code{stancode()} and \code{standata()} delegate a plain formula to
 \pkg{brms}. A \code{trend_formula} in the same call names an mvgam
-model, and these methods build the \code{\link{mvgam_formula}} that
-call describes before generating the program. A call supplying no
+model. These methods then build the \code{\link{mvgam_formula}} that
+call describes and generate its program. A call supplying no
 \code{trend_formula} delegates to \pkg{brms} unchanged.
 }
 \seealso{

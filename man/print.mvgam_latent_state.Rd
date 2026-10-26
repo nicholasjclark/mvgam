@@ -12,7 +12,7 @@
 \item{digits}{Integer; rounding for the posterior-median range
 shown in the print header. Defaults to 2.}
 
-\item{...}{Currently unused.}
+\item{...}{Ignored.}
 }
 \value{
 The \code{mvgam_latent_state} object \code{x}, returned invisibly.

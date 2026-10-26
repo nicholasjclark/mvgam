@@ -5,43 +5,25 @@
 #'
 #' @name fevd.mvgam
 #'
-#' @param object An object of class \code{mvgam} fitted with a `VAR()`
-#'   latent process model
 #'
 #' @param h Positive integer. The number of forecast horizons to
 #'   decompose.
 #'
-#' @param ndraws Optional integer; the number of posterior draws to
-#'   summarise over. A decomposition is built from one transition
-#'   matrix per draw, so a wide panel is worth answering from a subset.
-#'   Default `NULL` uses every draw.
-#' @param draw_ids Optional integer vector naming the posterior draws
-#'   to use, in place of `ndraws`.
 #' @param summary Logical; return the posterior median and interval of
 #'   each decomposition (the default), or the per-draw decompositions
 #'   themselves.
-#' @param probs The lower and upper percentiles to report alongside the
-#'   median when `summary = TRUE`.
-#' @param future \code{Logical}. When `TRUE`, per-draw FEVD
-#'   computation runs under whatever
-#'   \code{\link[future:plan]{future::plan()}} the caller has set;
-#'   see [`irf()`] for details. Requires the \code{future} package
-#'   (mvgam Suggests).
+#' @inheritParams irf.mvgam
 #'
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return See \code{\link{mvgam_fevd-class}} for the quantities
-#'   computed and returned, with references.
+#' @return An object of \code{\link{mvgam_fevd-class}}, which describes
+#'   the quantities computed, with references.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [VAR()], [irf()], [stability()],
-#'   \code{\link{mvgam_fevd-class}}, [plot.mvgam_fevd()],
-#'   [plot.mvgam_irf()], [plot.mvgam_stability()],
-#'   [plot.mvgam_forecast()].
-#'   The article at
-#'   <https://nicholasjclark.github.io/mvgam/articles/var.html>
-#'   runs `fevd()` on a plankton community.
+#' @seealso [irf()] and [stability()] summarise the same VAR dynamics.
+#'   The `r mvgam_article("var", "VAR article")` runs `fevd()` on a
+#'   plankton community.
 #'
 #' @references Lutkepohl H (2005). New Introduction to Multiple Time Series
 #'   Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
@@ -60,8 +42,11 @@
 #' # shock, over an eight-step horizon
 #' fevd_obj <- fevd(var_mod, h = 8L)
 #' plot(fevd_obj)
+#'
+#' # Next: irf() traces each shock through the system over time
 #' }
 #'
+#' @family latent dynamics
 #' @export
 fevd <- function(object, ...) {
   UseMethod("fevd", object)
@@ -88,8 +73,8 @@ fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
   if (!summary) {
     return(all_fevds)
   }
-  # See `irf()`: the draws are one K by K matrix per horizon per draw,
-  # so they are summarised unless asked for.
+  # As in `irf()`, the draws are one K by K matrix per horizon per
+  # draw. They are summarised unless `summary = FALSE`.
   as_var_surface_summary(
     summary(all_fevds, probs = probs), "mvgam_fevd_summary",
     process_labels = var_post$labels

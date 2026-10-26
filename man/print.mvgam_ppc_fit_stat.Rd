@@ -10,7 +10,7 @@
 \item{x}{A \code{mvgam_ppc_fit_stat} object returned by
 \code{pp_check(fit, type = "fit_stat")}.}
 
-\item{...}{Unused.}
+\item{...}{Ignored.}
 }
 \value{
 Invisibly returns \code{x}.

@@ -1250,74 +1250,33 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' Extract Posterior Predictive Distribution from mvgam Models
 #'
 #' @description
-#' Generate posterior predictive samples from fitted mvgam models. These samples
-#' include observation-level noise, making them suitable for posterior predictive
-#' checks and predictions on new data.
+#' Draws from the posterior predictive distribution of a fitted mvgam
+#' model. The draws include the observation noise. They suit posterior
+#' predictive checks and predictions on new data.
 #'
 #' @param object A fitted mvgam object from [mvgam()].
-#' @param newdata Optional data frame with covariates for prediction. If
-#'   NULL, uses original training data stored in the model object.
 #' @inheritParams posterior_epred.mvgam
-#' @param ndraws Positive integer specifying number of posterior draws to
-#'   use. NULL (default) uses all available draws.
-#' @param draw_ids Optional integer vector selecting a subset of posterior
-#'   draw indices to use. NULL (default) uses all draws (subject to
-#'   `ndraws`).
-#' @param re_formula Group-level terms to include: `NULL` (the default)
-#'   for every one, `NA` for none. A formula choosing some of them is not
-#'   supported.
-#' @param allow_new_levels Logical; accepted for brms compatibility.
-#'   A grouping level the model never saw is refused whatever this is
-#'   set to, because a new level has no fitted random effect and, for
-#'   a new series, no latent state to propagate. Predict for levels
-#'   the fit knows, or refit with the new levels included.
-#' @param sample_new_levels Character; accepted for brms
-#'   compatibility and not used, since new levels are refused. See
-#'   `allow_new_levels`.
-#' @param resp Character specifying which response variable for
-#'   multivariate models. NULL (default) returns predictions for all
-#'   responses.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return Matrix with dimensions `\\[ndraws x nobs\\]` containing posterior
-#'   predictive samples. Each row is one posterior draw, each column is
-#'   one observation. Values are on the response scale (include observation
-#'   noise).
-#'
-#'   For multivariate models with resp = NULL, returns a named list of
-#'   matrices (one per response variable).
+#' @return Matrix with dimensions `[ndraws x nobs]`, one row per
+#'   posterior draw and one column per observation, on the response
+#'   scale. For multivariate models with `resp = NULL`, a named list of
+#'   such matrices, one per response.
 #'
 #' @details
-#' The posterior predictive distribution combines:
-#' \itemize{
-#'   \item Expected values E\[Y|X\]: from observation + trend models
-#'   \item Observation noise: family-specific random draws
-#' }
+#' Each draw adds the family's observation noise to the expected value
+#' E\[Y | X\] of the observation and trend models.
+#' [posterior_epred.mvgam()] returns the expected value alone.
 #'
-#' This differs from `posterior_epred.mvgam()` which returns only E\[Y|X\].
-#' Posterior predictive samples have higher variance and are suitable for
-#' checking if the model can generate data like the observed data.
+#' `posterior_predict()`, `posterior_epred()` and `posterior_linpred()`
+#' integrate over the trend's stochastic dynamics. At `newdata` times
+#' beyond the training grid, the latent state is stationary around its
+#' per-series posterior mean. [forecast.mvgam()] and [hindcast.mvgam()]
+#' use the fitted latent states. `hindcast()` returns them at the
+#' training times. `forecast()` propagates them to future times.
 #'
-#' Semantic split (see also the architecture-decisions document):
-#' \itemize{
-#'   \item `posterior_predict()` / `posterior_epred()` /
-#'     `posterior_linpred()` integrate over the trend's stochastic
-#'     dynamics. At newdata times beyond the training grid the
-#'     latent state is treated as stationary at its per-series
-#'     posterior mean (a `marginaleffects`-style convention; an
-#'     informational message fires once per session).
-#'   \item \[forecast.mvgam\] / \[hindcast.mvgam\] read the fitted
-#'     `lv_trend` posterior draws directly. `hindcast()` returns
-#'     them at the training grid; `forecast()` extrapolates them
-#'     forward via the kernel for newdata times beyond training.
-#'     Use these surfaces when you want state-aware out-of-sample
-#'     prediction.
-#' }
-#'
-#' @seealso `posterior_epred.mvgam()` for expected values without
-#'   noise, [posterior_linpred.mvgam()] for link-scale predictions,
-#'   \[forecast.mvgam\] and \[hindcast.mvgam\] for the deterministic
-#'   state-extrapolating prediction surface.
+#' @seealso [pp_check.mvgam()] compares these draws with the data.
+#'   [forecast.mvgam()] predicts future times from the fitted state.
 #'
 #' @examples
 #' \dontrun{
@@ -1329,17 +1288,20 @@ extract_dpars_from_stanfit <- function(stanfit,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Posterior predictive draws on the response scale, marginalising
-#' # over the trend's stochastic dynamics. For h-step forecasts that
-#' # extrapolate the fitted latent state, see [forecast.mvgam()].
+#' # Posterior predictive samples on the response scale, integrating over
+#' # the trend's stochastic dynamics. forecast() extrapolates the
+#' # fitted latent state
 #' pp <- posterior_predict(mod, ndraws = 50L)
 #' dim(pp)
 #'
 #' # The draws track the observed counts
 #' cor(colMeans(pp), simdat$data_train$y, use = "complete.obs")
+#'
+#' # Next: pp_check() plots the draws against the observed counts
 #' }
 #'
 #' @importFrom brms posterior_predict
+#' @family predictions
 #' @method posterior_predict mvgam
 #' @export
 posterior_predict.mvgam <- function(object, newdata = NULL,

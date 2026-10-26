@@ -2,27 +2,32 @@
 % Please edit documentation in R/priors.R
 \name{get_prior.mvgam}
 \alias{get_prior.mvgam}
-\title{Method for fitted mvgam objects returning the stored prior table}
+\alias{default_prior.mvgam}
+\title{The prior table of an mvgam model}
 \usage{
 \method{get_prior}{mvgam}(object, ...)
+
+\method{default_prior}{mvgam}(object, ...)
 }
 \arguments{
-\item{object}{A fitted \code{mvgam} model.}
+\item{object}{An \code{mvgam} model, fitted or built with
+\code{run_model = FALSE}.}
 
-\item{...}{Unused; an argument given here is refused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A \code{brmsprior} data frame covering every adjustable
-prior row (observation and trend components). Rows the user
-overrode at fit time carry \code{source = "user"}; rows left at
-their defaults carry \code{source = "default"} (or whatever source
-string \pkg{brms} assigned).
+A \code{brmsprior} data frame of the observation and trend
+priors. A row the user set has \code{source = "user"}. \pkg{brms}
+sets the source of the others, mostly \code{"default"}.
 }
 \description{
-A shortcut for the post-fit prior table. In brms the post-fit
-accessor is \code{prior_summary()}. mvgam keeps that path and exports
-\code{get_prior.mvgam()} as well, matching the formula method. Both
-return the one table the model was built with. It can be edited and
-passed to \code{update(fit, prior = ..., recompile = FALSE)} for refits
-that reuse the compiled Stan model.
+\code{get_prior()}, \code{default_prior()} and \code{\link[=prior_summary]{prior_summary()}} return the
+one prior table a model was built with. Edit it and pass it to
+\code{update(fit, prior = ...)} to refit under other priors without
+recompiling.
 }
+\seealso{
+Other priors: 
+\code{\link{get_prior.mvgam_formula}()}
+}
+\concept{priors}

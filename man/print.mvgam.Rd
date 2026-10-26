@@ -19,5 +19,7 @@ The \code{mvgam} object is returned invisibly.
 Print an \pkg{mvgam} object
 }
 \seealso{
-\code{\link{summary.mvgam}}, \code{\link{mvgam}}
+\code{\link[=summary.mvgam]{summary.mvgam()}} summarises the posterior of each
+parameter. \code{\link[=methods_md]{methods_md()}} writes the model as equations.
+\code{\link[=how_to_cite]{how_to_cite()}} drafts its methods paragraph.
 }

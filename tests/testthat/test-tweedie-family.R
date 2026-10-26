@@ -178,8 +178,8 @@ test_that("check_tweedie_truncation requires a tweedie response", {
   mv <- mvgam(
     bf(y ~ 1, family = poisson()) + bf(pos ~ 1, family = tweedie()) +
       set_rescor(FALSE),
-    data = d, run_model = FALSE
-  , validate = FALSE)
+    data = d, run_model = FALSE, validate = FALSE
+  )
   expect_error(
     check_tweedie_truncation(mv, resp = "y"),
     "needs a response with family tweedie()",
@@ -246,8 +246,9 @@ test_that("tweedie() supports brms distributional regression on mphi", {
   # A user prior on that intercept replaces the default.
   own <- paste(unlist(stancode(
     mf, data = dat, family = tweedie(),
-    prior = brms::prior(normal(0, 1), class = Intercept, dpar = mphi)
-  , validate = FALSE)), collapse = "\n")
+    prior = brms::prior(normal(0, 1), class = Intercept, dpar = mphi),
+    validate = FALSE
+  )), collapse = "\n")
   expect_true(grepl("lprior += normal_lpdf(Intercept_mphi | 0, 1);", own,
                     fixed = TRUE))
   expect_false(grepl("student_t_lpdf(Intercept_mphi", own, fixed = TRUE))

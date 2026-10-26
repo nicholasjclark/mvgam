@@ -2,7 +2,10 @@
 % Please edit documentation in R/make_stan.R
 \name{stancode.mvgam_formula}
 \alias{stancode.mvgam_formula}
-\title{Stan code of an mvgam model}
+\alias{standata.mvgam_formula}
+\alias{stancode.mvgam}
+\alias{standata.mvgam}
+\title{Stan code and data of an mvgam model}
 \usage{
 \method{stancode}{mvgam_formula}(
   object,
@@ -22,12 +25,35 @@
   validate = TRUE,
   ...
 )
+
+\method{standata}{mvgam_formula}(
+  object,
+  data,
+  family = gaussian(),
+  prior = NULL,
+  data2 = NULL,
+  sample_prior = "no",
+  knots = NULL,
+  drop_unused_levels = TRUE,
+  backend = "rstan",
+  threads = 1L,
+  normalize = TRUE,
+  save_model = NULL,
+  silent = 1L,
+  stanvars = NULL,
+  validate = TRUE,
+  ...
+)
+
+\method{stancode}{mvgam}(object, ...)
+
+\method{standata}{mvgam}(object, ...)
 }
 \arguments{
-\item{object}{An \code{mvgam_formula} object created by
-\code{mvgam_formula()}.}
+\item{object}{An \code{\link[=mvgam_formula]{mvgam_formula()}}, or an \code{mvgam} model fitted or
+built with \code{run_model = FALSE}.}
 
-\item{data}{A data frame containing all variables referenced in the formula.}
+\item{data}{A data frame holding every variable the formulas use.}
 
 \item{family}{A description of the response distribution and link
 function, given as a family function, a call to one or its name.
@@ -60,57 +86,93 @@ Closure-unit and multi-response families (\code{\link[=occ]{occ()}}, \code{\link
 out by unit. Each models its response alone and cannot be one
 response of a multivariate model.}
 
-\item{prior}{An optional \code{brmsprior} object containing custom prior
-specifications. Can be created using \code{brms::prior()}.}
+\item{prior}{A \code{brmsprior} of priors to set, from \code{\link[brms:set_prior]{brms::prior()}}.
+\code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}} lists the classes.}
 
 \item{data2}{A named list of objects the model uses that are not
-variables in \code{data}, as in \code{\link[brms]{brm}}.}
+variables in \code{data}, as in \code{\link[brms:brm]{brms::brm()}}.}
 
-\item{sample_prior}{Character string indicating whether to sample from priors
-only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.}
+\item{sample_prior}{\code{"no"} (the default), \code{"yes"} or \code{"only"}, as in
+\code{\link[brms:brm]{brms::brm()}}.}
 
-\item{knots}{Optional named list of knot positions for spline terms, passed
-to the basis constructors for both the observation and trend formulas.}
+\item{knots}{Optional named list of knot positions for spline terms,
+used by the observation and trend formulas alike.}
 
-\item{drop_unused_levels}{Logical; should unused factor levels be dropped?
-Default is \code{TRUE}.}
+\item{drop_unused_levels}{Logical. \code{TRUE} (the default) drops factor
+levels without observations.}
 
-\item{backend}{Character string specifying Stan backend. Options:
-\code{"rstan"} (default) or \code{"cmdstanr"}.}
+\item{backend}{\code{"rstan"} (the default) or \code{"cmdstanr"}.}
 
-\item{threads}{Number of threads within each chain. Default is
-\code{1}.}
+\item{threads}{Number of threads within each chain. Defaults to 1.}
 
-\item{normalize}{Logical; should brms drop the normalising constants from
-its sampling statements? Default is \code{TRUE}.}
+\item{normalize}{Logical. \code{TRUE} (the default) keeps the normalising
+constants of the sampling statements.}
 
-\item{save_model}{File path to write the assembled Stan program to. If
-\code{NULL} (default), nothing is written.}
+\item{save_model}{File path to write the Stan program to, or \code{NULL}
+(the default) to write nothing.}
 
-\item{silent}{Integer controlling verbosity, following the
-\pkg{brms} convention. 0 prints Stan's exceptions as well as its
-progress, 1 (the default) prints progress alone, and 2 prints
-nothing.}
+\item{silent}{Integer verbosity, as in \code{\link[brms:brm]{brms::brm()}}. 0 prints
+Stan's exceptions and progress, 1 (the default) prints progress
+and 2 prints nothing.}
 
-\item{stanvars}{Optional \code{\link[brms]{stanvar}} object holding
-user Stan code to add to the program, merged with the stanvars
-mvgam generates for the trend.}
+\item{stanvars}{Optional \code{\link[brms:stanvar]{brms::stanvar()}} object of Stan code to
+add to the program, merged with the code mvgam writes for the
+trend.}
 
-\item{validate}{Logical; should the generated Stan code be validated?
-Default is \code{TRUE}.}
+\item{validate}{Logical. \code{TRUE} (the default) checks the program
+with the Stan parser.}
 
-\item{...}{Additional arguments passed to internal functions.}
+\item{...}{For an \code{\link[=mvgam_formula]{mvgam_formula()}}, other arguments of \code{\link[=mvgam]{mvgam()}}.
+A name \code{\link[=mvgam]{mvgam()}} does not take is refused. For an \code{mvgam} model,
+unused. Anything passed is refused.}
 }
 \value{
-A character string of the Stan program, observation and trend
-together. \code{mvgam()} compiles the same program from the same
-arguments.
+\code{stancode()} returns the Stan program as a character string
+of class \code{mvgamstancode}, which prints line by line. \code{standata()}
+returns the named list of Stan data.
 }
 \description{
-The Stan program \code{mvgam()} would compile for an \code{mvgam_formula},
-generated without fitting.
+The Stan program and data list of an mvgam model. For an
+\code{\link[=mvgam_formula]{mvgam_formula()}} they are generated without fitting, as \code{mvgam()}
+would build them from the same arguments. For an \code{mvgam} model they
+are the ones the model was built with. Pass the two to \pkg{rstan}
+or \pkg{cmdstanr} to run the model outside mvgam. The program
+shows how the trend enters the linear predictor.
+}
+\examples{
+set.seed(1)
+dat <- sim_mvgam(family = poisson(), n_series = 2L,
+                 n_timepoints = 40L, trend_model = AR())$data_train
+mf <- mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1))
+
+# The program of the model, before any fitting. The trend's
+# parameters carry a `_trend` suffix.
+code <- stancode(mf, data = dat, family = poisson())
+code
+
+# The data passed to that program: 60 observations of 2 series
+# over 30 time points
+sdata <- standata(mf, data = dat, family = poisson())
+sdata[c("N", "N_series_trend", "N_time_trend")]
+
+# Next, fit the model with mvgam(), which compiles this program
+
 }
 \seealso{
-\code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
-\code{\link[brms]{standata}}, \code{\link{mvgam}}
+\code{\link[=mvgam]{mvgam()}}, \code{\link[=mvgam_formula]{mvgam_formula()}}, \code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}}.
+\code{\link[=methods_md]{methods_md()}} writes the same model as equations for a methods
+section.
+
+Other model fitting: 
+\code{\link{check_newdata}()},
+\code{\link{jsdgam}()},
+\code{\link{mvgam}()},
+\code{\link{mvgam_data}()},
+\code{\link{mvgam_formula}()},
+\code{\link{mvgam_multiple}()},
+\code{\link{pivot_detection_array}()},
+\code{\link{pivot_species_matrix}()},
+\code{\link{series_to_mvgam}()},
+\code{\link{update.mvgam}()}
 }
+\concept{model fitting}

@@ -83,6 +83,7 @@
 #' head(series_to_mvgam(wide))
 #'
 #' @author Nicholas J Clark
+#' @family model fitting
 #' @export
 series_to_mvgam <- function(series,
                             freq = NULL,

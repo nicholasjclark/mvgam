@@ -2,24 +2,18 @@
 % Please edit documentation in R/mcmc_plot.mvgam.R
 \name{mcmc_plot.mvgam}
 \alias{mcmc_plot.mvgam}
-\title{MCMC plots of \pkg{mvgam} parameters, as implemented in \pkg{bayesplot}}
+\title{MCMC plots of mvgam parameters with bayesplot}
 \usage{
 \method{mcmc_plot}{mvgam}(object, type = "intervals", variable = NULL, regex = FALSE, ...)
 }
 \arguments{
 \item{object}{An \R object typically of class \code{brmsfit}}
 
-\item{type}{The type of the plot.
-Supported types are (as names) \code{hist}, \code{dens},
-\code{hist_by_chain}, \code{dens_overlay},
-\code{violin}, \code{intervals}, \code{areas},
-\code{areas_ridges}, \code{combo}, \code{acf},
-\code{acf_bar}, \code{trace}, \code{trace_highlight},
-\code{scatter}, \code{hex}, \code{pairs}, \code{violin},
-\code{rhat}, \code{rhat_hist}, \code{neff}, \code{neff_hist}
-and \code{nuts_energy}.
-For an overview on the various plot types see
-\code{\link[bayesplot:MCMC-overview]{MCMC-overview}}.}
+\item{type}{The plot type, the name of a bayesplot \verb{mcmc_*()} function
+without its prefix. \code{bayesplot::available_mcmc()} lists them. The
+default \code{"intervals"} shows posterior intervals. \code{"trace"} and
+\code{"rank_overlay"} check mixing. \code{"nuts_energy"} and the other
+\code{"nuts_*"} types diagnose the sampler.}
 
 \item{variable}{Names of the variables (parameters) to plot, as given by a
 character vector or a regular expression (if \code{regex = TRUE}). By
@@ -28,17 +22,18 @@ default, a hopefully not too large selection of variables is plotted.}
 \item{regex}{Logical; Indicates whether \code{variable} should
 be treated as regular expressions. Defaults to \code{FALSE}.}
 
-\item{...}{Additional arguments passed to the plotting functions.
-See \code{\link[bayesplot:MCMC-overview]{MCMC-overview}} for
-more details.}
+\item{...}{Further arguments to the bayesplot function, such as
+\code{prob} for \code{"intervals"} or \code{true} for the \code{"recover_*"} types.}
 }
 \value{
-A \code{\link[ggplot2:ggplot]{ggplot}} object
-that can be further customized using the \pkg{ggplot2} package.
+A \code{ggplot} object, or a \code{bayesplot_grid} for \code{"pairs"} and
+\code{"combo"}.
 }
 \description{
-Convenient way to call MCMC plotting functions
-implemented in the \pkg{bayesplot} package for \pkg{mvgam} models
+Draws any \pkg{bayesplot} MCMC plot of the posterior, as
+\code{\link[brms:mcmc_plot.brmsfit]{brms::mcmc_plot()}} does. Without \code{variable}, the plot shows the
+parameters \code{\link[=pairs.mvgam]{pairs.mvgam()}} shows: the population coefficients, the
+trend parameters and the family parameters.
 }
 \examples{
 \dontrun{
@@ -50,12 +45,33 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Trend-dynamics intervals (sigma_trend, ar1_trend, ...).
+# Posterior intervals of the trend parameters
 mcmc_plot(mod, variable = "trend_params", type = "intervals")
+
+# Rank histograms of the same parameters check that the chains mix
+mcmc_plot(mod, variable = "trend_params", type = "rank_overlay")
+
+# Next, pairs() shows how the parameters covary
 }
 
 }
 \seealso{
-\code{\link{mvgam_draws}} for an overview of some of the shortcut strings
-that can be used for argument \code{variable}
+\link{mvgam_draws} lists the shortcuts \code{variable} accepts, such as
+\code{"trend_params"}. \code{\link[=pairs.mvgam]{pairs.mvgam()}} plots the joint posterior. See
+the \href{https://mc-stan.org/bayesplot/reference/MCMC-overview.html}{bayesplot MCMC overview}.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
+\concept{posterior summaries}

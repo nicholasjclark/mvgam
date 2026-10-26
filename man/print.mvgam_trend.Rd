@@ -9,11 +9,13 @@
 \arguments{
 \item{x}{A mvgam_trend object}
 
-\item{...}{Additional arguments (not currently used)}
+\item{...}{Ignored.}
 }
 \value{
 The \code{mvgam_trend} object \code{x}, returned invisibly.
 }
 \description{
-Provides informative printing of trend specifications.
+Shows the trend label a fit would print, such as \verb{AR(\{1, 12\})}, with
+the columns and settings the constructor holds. Settings left at
+their defaults are omitted.
 }

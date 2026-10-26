@@ -12,11 +12,17 @@
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A tibble with columns \code{group}, \code{elpd}, \code{pareto_k},
-\code{refit}.
+A tibble with one row per held-out group.
+\describe{
+\item{\code{group}}{The group label.}
+\item{\code{elpd}, \code{elpd_share}}{The group's ELPD and its share of
+the total.}
+\item{\code{elpd_psis}, \code{lift}}{For a refitted group, the PSIS
+estimate before the refit and the refit's change from it.}
+\item{\code{pareto_k}, \code{refit}}{The Pareto k of the PSIS estimate and
+whether the group's fold was refitted.}
+}
 }
 \description{
-Long-format tibble with one row per group, carrying the
-per-group ELPD, Pareto-k (NA for refit folds), and a refit
-flag. Useful for downstream filtering / plotting.
+Tibble summary of an \code{mvgam_kfold} object
 }

@@ -1,35 +1,31 @@
-# Adaptive PSIS Pareto-k threshold from Vehtari, Simpson, Gelman,
-# Yao & Gabry (2024, JMLR 25:72). Loo ships the same formula
-# internally as `loo:::ps_khat_threshold` but does not export it,
-# so mvgam re-hosts the one-liner rather than reach into loo's
-# namespace via `:::`.
-#
-# The rule tightens the threshold when the posterior draw count
-# `S` is small (PSIS is less reliable there) and clamps at 0.7
-# once `S` is large enough for the classical guarantee to hold.
-# Used by `lfo_cv.mvgam()` and `kfold.mvgam()` when the caller
-# leaves `pareto_k_threshold = NULL`.
-#
-#'@noRd
+#' Adaptive Pareto k threshold for PSIS
+#'
+#' The rule of Vehtari, Simpson, Gelman, Yao and Gabry (2024, JMLR
+#' 25:72), `min(1 - 1 / log10(S), 0.7)`. It is stricter for few draws
+#' and stops at 0.7. loo computes it in the unexported
+#' `ps_khat_threshold()`.
+#'
+#' @param S Integer number of posterior draws, at least 2. The formula
+#'   divides by zero at `S = 1`.
+#' @return Numeric scalar threshold
+#' @noRd
 mvgam_ps_khat_threshold <- function(S) {
-  # Reason: at S = 1, log10(S) = 0 gives a divide-by-zero and a
-  # threshold of -Inf. In practice mvgam fits have S >> 100, so
-  # rejecting S < 2 keeps the formula well defined without ruling
-  # out any realistic call.
   checkmate::assert_int(S, lower = 2L)
   min(1 - 1 / log10(S), 0.7)
 }
 
 
-# The threshold a refit gate will apply, given what the caller asked
-# for and how many draws the posterior holds. `NULL` means the
-# caller left the choice to the adaptive rule above.
-#
-# `lfo_cv()` and `kfold()` both gate their refits on this and each
-# resolved it for itself, so the rule was written twice in two files
-# and had to be kept in step by hand.
-#'@noRd
+#' The Pareto k threshold that triggers a refit
+#'
+#' Used by `lfo_cv()` and `kfold()`.
+#'
+#' @param pareto_k_threshold Numeric threshold, or `NULL` for the
+#'   adaptive rule of `mvgam_ps_khat_threshold()`
+#' @param n_draws Integer number of posterior draws
+#' @return Numeric scalar threshold
+#' @noRd
 resolve_pareto_k_threshold <- function(pareto_k_threshold, n_draws) {
+  checkmate::assert_number(pareto_k_threshold, null.ok = TRUE)
   if (is.null(pareto_k_threshold)) {
     mvgam_ps_khat_threshold(n_draws)
   } else {
@@ -38,26 +34,57 @@ resolve_pareto_k_threshold <- function(pareto_k_threshold, n_draws) {
 }
 
 
-# Diagnostic columns for a paired ELPD comparison table,
-# following Sivula, Magnusson, Matamoros & Vehtari (2025,
-# Bayesian Analysis, DOI 10.1214/25-BA1569). The paper is
-# diagnostic rather than corrective: the classical
-# `sqrt(N) * sd(pointwise_diff)` SE is retained, but three
-# named regimes indicate when it should be distrusted:
-#
-#   * `p_worse` = normal-CDF probability that the true elpd
-#     difference is less than zero (i.e. the candidate is worse
-#     than the reference), given the point estimate and SE. NA
-#     for the reference row where `se_diff = 0`.
-#   * `diag_diff` = "|elpd_diff| < 4" when the point estimate
-#     sits inside the small-effect regime where the normal SE
-#     underestimates uncertainty most.
-#   * `diag_elpd` = "N < 100" when the pointwise count is too
-#     small for the SE bias to shrink at the sqrt-N rate, plus
-#     "k_psis > 0.7" when any Pareto-k exceeds 0.7 (unstable
-#     PSIS).
-#
-#'@noRd
+#' The Pareto k threshold of a cross-validation result, for printing
+#'
+#' @param x An `mvgam_lfo` or `mvgam_kfold` object
+#' @param digits Integer number of decimal places
+#' @return Character scalar, marked `(adaptive)` for the default rule
+#' @noRd
+pareto_k_threshold_label <- function(x, digits) {
+  checkmate::assert_number(x$pareto_k_threshold)
+  checkmate::assert_int(digits, lower = 0L)
+  paste0(
+    formatC(x$pareto_k_threshold, digits = digits, format = "f"),
+    if (isTRUE(x$pareto_k_threshold_adaptive)) " (adaptive)"
+  )
+}
+
+
+#' Standard error of a sum of pointwise ELPDs
+#'
+#' `sqrt(n) * sd(x)` over the `n` observed values, as in
+#' `loo::loo_compare()`.
+#'
+#' @param x Numeric vector of pointwise ELPDs or their differences
+#' @return Numeric scalar
+#' @noRd
+se_of_sum <- function(x) {
+  checkmate::assert_numeric(x)
+  sqrt(sum(!is.na(x))) * stats::sd(x, na.rm = TRUE)
+}
+
+
+#' Diagnostic columns of a paired ELPD comparison table
+#'
+#' Sivula, Magnusson, Matamoros and Vehtari (2025, Bayesian Analysis,
+#' \doi{10.1214/25-BA1569}) keep the normal approximation to the ELPD
+#' difference, with SE `sqrt(N) * sd(pointwise_diff)`. They name three
+#' conditions under which that SE understates the uncertainty.
+#'
+#' @param elpd_diff Numeric vector of ELPD differences from the best
+#'   model
+#' @param se_diff Numeric vector of their standard errors, zero for the
+#'   best model
+#' @param n_pointwise Integer number of pointwise contributions, one
+#'   per model or shared, or `NULL`
+#' @param pareto_k_list List of Pareto k vectors, one per model, or
+#'   `NULL`
+#' @return Data frame with columns `p_worse` (the normal probability
+#'   that the difference is below zero, `NA` for the best model),
+#'   `diag_diff` (`"|elpd_diff| < 4"` for a small difference) and
+#'   `diag_elpd` (`"N < 100"` for few observations, `"k_psis > 0.7"` for
+#'   an unreliable PSIS approximation)
+#' @noRd
 mvgam_loo_compare_diagnostics <- function(elpd_diff, se_diff,
                                           n_pointwise = NULL,
                                           pareto_k_list = NULL) {

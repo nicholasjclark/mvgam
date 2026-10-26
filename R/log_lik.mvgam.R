@@ -1,72 +1,53 @@
 #' Pointwise log-likelihoods from a fitted mvgam model
 #'
-#' Compute the per-observation log-likelihood for each posterior draw,
-#' matching `brms::log_lik` semantics. The result is an `S x N` matrix where
-#' `S` is the number of posterior draws and `N` is the number of observations
-#' in `newdata` (or the training data when `newdata = NULL`). Used by
-#' [loo::loo()], [loo::waic()], [loo::psis()] and bayesplot PSIS-PIT helpers.
+#' The log density of each observation under each posterior draw, as
+#' [brms::log_lik.brmsfit()] returns it. [loo.mvgam()], [waic.mvgam()],
+#' [lfo_cv.mvgam()] and [kfold.mvgam()] score models from it.
 #'
-#' @param object An mvgam fit.
-#' @param newdata Optional data frame containing the response and all
-#'   covariates referenced by the model. `NULL` (default) uses the original
-#'   training data.
-#' @param re_formula Group-level terms to include: `NULL` (the default)
-#'   for every one, `NA` for none. A formula choosing some of them is not
-#'   supported.
-#' @param resp Character; response name for multivariate models. Ignored for
-#'   univariate fits.
-#' @param ndraws Optional integer; subsample to `ndraws` posterior draws.
-#' @param draw_ids Optional integer vector of draw indices to use (mutually
-#'   exclusive with `ndraws`).
-#' @param incl_autocor Logical. When `TRUE` (default) the linear
-#'   predictor carries the latent trend state the model inferred at
-#'   each time, so the density describes the observation that was
-#'   actually seen there. This is the conditional surface, the one
-#'   [hindcast.mvgam()] and [residuals.mvgam()] read. When `FALSE`
-#'   the trend contributes
-#'   only its deterministic submodel, giving a density that leaves the
-#'   autocorrelation out. The marginal surface, which integrates over
-#'   the trend dynamics, belongs to [posterior_epred.mvgam()] and is
-#'   not a basis for an ELPD.
+#' @inheritParams posterior_epred.mvgam
+#' @param object A fitted `mvgam` object.
+#' @param newdata Optional data frame holding the response and every
+#'   covariate of the model. `NULL` (the default) takes the training
+#'   data.
+#' @param resp Optional name of one response of a multivariate model.
+#' @param incl_autocor Logical. `TRUE` (the default) evaluates each
+#'   density under the latent trend state the model inferred at that
+#'   time, the state [hindcast.mvgam()] returns. The ELPD then describes
+#'   the series that was observed. `FALSE` keeps only the trend's
+#'   deterministic terms and leaves the autocorrelation out.
 #' @param process_error Superseded by `incl_autocor` and still
-#'   accepted, so calls written against it keep working. `TRUE` maps
-#'   to `incl_autocor = TRUE` and `FALSE` to `incl_autocor = FALSE`.
-#'   When only `process_error` is given it decides; when both are
-#'   given `incl_autocor` decides and `process_error` is ignored.
-#' @param allow_new_levels Logical. Score rows whose grouping level
-#'   the training data did not carry, which is what `kfold.mvgam()`
-#'   needs when a fold holds out whole groups. Defaults to `FALSE`.
+#'   accepted. `incl_autocor` takes precedence when both are given.
+#' @param allow_new_levels Logical. `TRUE` scores rows whose grouping
+#'   level the training data lacked, as [kfold.mvgam()] needs when a
+#'   fold holds out whole groups. Defaults to `FALSE`.
 #' @param sample_new_levels How a new level's coefficients are drawn:
 #'   `"uncertainty"` (the default), `"gaussian"` or `"old_levels"`.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return Numeric matrix \[ndraws x nobs\] of pointwise log densities.
-#'   For multi-response (mvbf) fits with `resp = NULL`, the returned
-#'   matrix is the joint per-observation log density: each column
-#'   sums the pointwise densities across every response arm for that
-#'   observation row (this matches `brms::log_lik.brmsfit()`
-#'   semantics). Pass `resp = "<name>"` to scope to a single arm.
+#' @return A numeric `[ndraws, nobs]` matrix of log densities. A missing
+#'   response gives a column of `NA`. For a multivariate fit with
+#'   `resp = NULL`, each column sums the densities of the responses
+#'   measured in that row, as brms does. An occupancy, N-mixture or
+#'   composition family has one density per site, carried on the site's
+#'   first row.
 #'
 #' @details
-#' The implementation dispatches by `object$family$family` to per-family log
-#' density helpers. brms's parameterisations are reproduced verbatim
-#' (`negbinomial` uses the `neg_binomial_2` mean-shape parameterisation;
-#' `beta` uses `(mu, phi)`; `hurdle_*` and `zero_inflated_*` mix a point mass
-#' at zero with the corresponding base family). Trials for `binomial` /
-#' `beta_binomial` are extracted from `newdata` or from the model object via
-#' the existing `extract_trials_for_family()` helper.
+#' Each family uses the brms parameterisation. For example,
+#' `negbinomial()` takes a mean and shape, `Beta()` a mean and precision.
+#' Hurdle and zero-inflated families mix a mass at zero with their base
+#' family. The `weights()`, `cens()` and `trunc()` addition terms change
+#' each row's contribution as they do in the Stan model.
 #'
-#' A density is evaluated under the latent trend state the model
-#' inferred at that time, which is the state [hindcast.mvgam()] returns
-#' and [residuals.mvgam()] scores against. That is what lets [loo()],
-#' [waic()] and the importance weights built from them describe the
-#' series that was observed. The `posterior_*` methods answer a
-#' different question, integrating over the trend dynamics so that a
-#' covariate effect reads the same whatever time it is asked at, and
-#' they should not be used to build an ELPD.
+#' The [posterior_epred.mvgam()] family of methods integrates over the
+#' trend dynamics. A covariate effect then has the same meaning at every
+#' time. Those predictions describe no particular observed series and
+#' do not give an ELPD.
 #'
-#' @seealso [loo.mvgam()], [waic.mvgam()], [hindcast.mvgam()],
-#'   [posterior_linpred.mvgam()].
+#' @seealso [loo.mvgam()] and [waic.mvgam()] estimate the ELPD from this
+#'   matrix. [hindcast.mvgam()] returns the latent states it conditions
+#'   on. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   compares models by cross-validation.
 #'
 #' @examples
 #' \dontrun{
@@ -80,12 +61,19 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Pointwise posterior log-densities; rows are draws, columns
-#' # are observations. Feeds straight into loo::loo().
+#' # One row per draw, one column per observation
 #' ll <- log_lik(mod)
 #' dim(ll)
+#'
+#' # Without the latent trend, the densities are far lower. The trend
+#' # explains most of the series
+#' ll_fixed <- log_lik(mod, incl_autocor = FALSE)
+#' c(with_trend = mean(rowSums(ll)), without = mean(rowSums(ll_fixed)))
+#'
+#' # Next, loo() estimates the ELPD from these densities
 #' }
 #'
+#' @family model comparison
 #' @method log_lik mvgam
 #' @export
 log_lik.mvgam <- function(object,
@@ -125,12 +113,9 @@ log_lik.mvgam <- function(object,
     ndraws <- NULL
   }
 
-  # Link-scale linear predictor carrying the state the model inferred,
-  # rather than a fresh draw from the trend's marginal dynamics: a
-  # density for an observation at a given time has to be evaluated
-  # under the state the model put there, which is what makes the
-  # importance weights `loo()` builds from it describe that
-  # observation.
+  # The link-scale predictor under the inferred trend state. The
+  # density of an observation is evaluated under the state the model
+  # holds at its time.
   linpred <- get_combined_linpred(
     mvgam_fit = object,
     newdata = newdata,
@@ -143,19 +128,15 @@ log_lik.mvgam <- function(object,
     resp = resp
   )
 
-  # Multivariate fits return a named list of [ndraws x nobs] matrices,
-  # one per response. brms's log_lik returns the JOINT per-observation
-  # log density when resp is NULL: a [ndraws x nobs] matrix where each
-  # column sums the per-response log densities for that observation
-  # row (verified against brms::log_lik on mvbind Gaussian fixtures).
-  # Subset to a single response when resp is named.
+  # A multivariate fit returns one matrix per response. With
+  # `resp = NULL` brms sums them into the joint density of each row.
   if (is.list(linpred) && !is.matrix(linpred)) {
     if (!is.null(resp)) {
       linpred <- linpred[[resp]]
     } else {
-      # Every response here scores at the row grain: a closure-unit
-      # family cannot be one response of several, which
-      # `resolve_observation_family()` refuses at build.
+      # Every response here is scored per row.
+      # `resolve_observation_family()` refuses a closure-unit family as
+      # one response of several.
       resp_names <- names(linpred)
       per_resp <- lapply(resp_names, function(r) {
         log_lik_single_response(
@@ -235,9 +216,18 @@ mv_response_family_pars <- function(object, newdata, linpred,
 }
 
 
-# Univariate log-lik path. Pulled out so the multivariate branch can
-# loop over responses and stitch the [ndraws x sum(nobs)] matrix back
-# together.
+#' Log densities of one response
+#'
+#' @param object Fitted `mvgam` object
+#' @param newdata Data frame of the rows to score
+#' @param linpred Numeric linear predictor matrix of the response
+#' @param resp Response name, or `NULL`
+#' @param draw_ids Integer vector of draw indices, or `NULL`
+#' @param re_formula,allow_new_levels,sample_new_levels As in
+#'   `log_lik.mvgam()`
+#' @return Numeric `[ndraws, nobs]` matrix, or `[ndraws, n_units]` for
+#'   a closure-unit family
+#' @noRd
 log_lik_single_response <- function(object, newdata, linpred, resp,
                                     draw_ids,
                                     re_formula = NULL,
@@ -247,23 +237,17 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   family_name <- resolve_family_name(family_obj)
   family_link <- family_obj$link
 
-  # Observed response on the data scale
   y <- extract_response_for_log_lik(object, newdata, resp)
 
-  # Closure-unit families (nmix and successors) return at the
-  # closure-unit grain rather than the visit grain. The Stan
-  # lpdf marginalises latent N analytically across all visits
-  # within a unit, so the unit is the conditionally iid block
-  # that loo/waic must score (Vehtari, Gelman, Gabry 2017).
-  # Closure-unit data prep is re-run from the (possibly new)
-  # data here so cap edits at predict time take effect.
+  # A closure-unit family is scored per unit. The Stan likelihood
+  # marginalises the latent abundance or occupancy over the unit's
+  # visits. The units are the conditionally independent blocks. The
+  # unit arrays are rebuilt from `newdata`, which may change the caps.
   if (uses_closure_unit_layout(family_obj)) {
     # The families with several responses per unit have no latent
-    # count to marginalise. `mvn` and `mvt` score a per-row density,
-    # independent given the factor contribution in mu; `diri`, `multi`
-    # and `categ` score one joint density per unit and carry it on the
-    # unit's first row. All of them read their parameters through
-    # `mv_response_family_pars()`.
+    # count. `mvn` and `mvt` score each row, independent given the
+    # factors in the mean. `diri`, `multi` and `categ` score one joint
+    # density per unit on its first row.
     if (is_multi_response_family(family_obj)) {
       family_pars_mv <- mv_response_family_pars(
         object, newdata, linpred, family_obj, family_name, draw_ids
@@ -276,8 +260,7 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
         trials      = NULL
       ))
     }
-    # The unit key and the family's cap declarations are resolved by
-    # the accessor, so this call cannot leave one of them out.
+    # The accessor resolves the unit key and the family's caps.
     arrays <- closure_unit_arrays_for(object, newdata)
     # The detection probability per visit, a scalar or a predictor of
     # its own under `bf(p ~ ...)`, as `resolve_family_pars()` gives it.
@@ -337,9 +320,8 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
     )
   }
 
-  # `weights()`, `cens()` and `trunc()` each change what a row
-  # contributes, and every information criterion reads this matrix, so
-  # they are applied here rather than in each caller.
+  # `weights()`, `cens()` and `trunc()` change a row's contribution.
+  # Every information criterion takes this matrix.
   apply_addition_terms(
     ll = ll,
     object = object,
@@ -353,41 +335,48 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   )
 }
 
-# Generic re-export so users can call log_lik() without attaching brms first
 #' @importFrom rstantools log_lik
 #' @export
 rstantools::log_lik
 
 
-# Pull the response column out of newdata (or the training data) for the
-# requested response.
+#' The observed response of the rows to score
+#'
+#' @param object Fitted `mvgam` object
+#' @param newdata Data frame of the rows to score
+#' @param resp Response name, or `NULL`
+#' @return Numeric vector of the response
+#' @noRd
 extract_response_for_log_lik <- function(object, newdata, resp) {
   y_name <- response_column(object, resp)
   if (!y_name %in% names(newdata)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Response variable {.val {y_name}} not found in {.field newdata}."
-      )
-    ))
+    stop(insight::format_error(c(
+      paste0("Response '", y_name, "' is missing from 'newdata'."),
+      i = "A log likelihood needs the observed response."
+    )), call. = FALSE)
   }
   as.numeric(newdata[[y_name]])
 }
 
 
-# Family dispatcher for the families scored one row at a time. Returns
-# [ndraws x nobs] matrix of log densities. The closure-unit and ordinal
-# families are scored before it is reached, by
-# `dispatch_closure_unit_method()` and `ordinal_log_lik()`.
-#
-# A family with its own `log_lik_<family>()` kernel is scored by it.
-# Every other family is scored by the density `family_dist_spec()`
-# names, the one its censoring, truncation and residuals also use.
+#' Log densities of a family scored row by row
+#'
+#' A family with a `log_lik_<family>()` kernel is scored by it. Any
+#' other family takes the distribution `family_dist_spec()` names, the
+#' one its censoring, truncation and residuals use. Closure-unit and
+#' ordinal families are scored before this is reached.
+#'
+#' @param family_name Character family name
+#' @param link Character link name
+#' @param linpred Numeric linear predictor matrix
+#' @param y Numeric response vector
+#' @param family_pars Named list of distributional parameter matrices
+#' @param trials Numeric vector of trials, or `NULL`
+#' @return Numeric `[ndraws, nobs]` matrix
+#' @noRd
 dispatch_log_lik <- function(family_name, link, linpred, y,
                              family_pars, trials) {
   fn_name <- paste0("log_lik_", family_name)
-  # Asked rather than attempted: `exists()` answers the question the
-  # caller has, where catching the error of a failed `get()` treats a
-  # missing kernel and a broken one alike.
   if (!exists(fn_name, mode = "function", envir = asNamespace("mvgam"))) {
     spec <- family_dist_spec(family_name, link, linpred, family_pars,
                              trials)
@@ -407,207 +396,197 @@ dispatch_log_lik <- function(family_name, link, linpred, y,
 }
 
 
-# -------------------------------------------------------------------------
-# Per-family log densities
-# -------------------------------------------------------------------------
-# Each helper receives `linpred` [ndraws x nobs] on the link scale, the
-# observed `y`, the distributional parameters as a named list of
-# [ndraws x nobs] matrices, the `trials` vector for binomial-family, and the
-# link string. Returns [ndraws x nobs] of log densities matching brms's
-# *_lpdf / *_lpmf parameterisations.
-
-# Wrap a per-observation function call to keep return shape [ndraws x nobs]
-# regardless of the underlying density signature.
+#' Log densities of one response, column by column
+#'
+#' Every per-family kernel takes `linpred` as an `[ndraws, nobs]` link
+#' scale matrix, the observed `y`, the distributional parameters as a
+#' list of `[ndraws, nobs]` matrices, the trials and the link name. It
+#' returns the `[ndraws, nobs]` log densities of the brms `_lpdf` or
+#' `_lpmf`.
+#'
+#' A missing response has no density. Its column stays `NA`, which
+#' `clean_ll()` drops. The hurdle and zero-inflated kernels branch on
+#' the response value and never see an `NA`.
+#'
+#' @param linpred Numeric linear predictor matrix
+#' @param y Numeric response vector, one value per column
+#' @param fn Function of one response value and its column index,
+#'   returning the log density of each draw
+#' @return Numeric `[ndraws, nobs]` matrix
+#' @noRd
 .apply_log_density <- function(linpred, y, fn) {
   out <- matrix(NA_real_, nrow = nrow(linpred), ncol = ncol(linpred))
-  for (j in seq_along(y)) {
-    # A missing response has no density. The hurdle and zero-inflated
-    # kernels branch on the response value and would otherwise
-    # evaluate `if (NA)`, aborting the whole call. The column is left
-    # `NA` instead, and `clean_ll()` drops it downstream.
-    if (is.na(y[j])) {
-      next
-    }
+  for (j in which(!is.na(y))) {
     out[, j] <- fn(y[j], j)
   }
   out
 }
 
-# Hurdle Poisson: P(Y=0) = hu; P(Y=k>0) = (1 - hu) * dpois(k|mu) /
-# (1 - exp(-mu))
+
+#' Log density of a hurdle family
+#'
+#' A zero has probability `hu`. A positive value has the base density,
+#' scaled by `1 - hu`. A discrete base is truncated at zero, dividing
+#' by its probability of a positive value.
+#'
+#' @param linpred Numeric linear predictor matrix
+#' @param y Numeric response vector
+#' @param hu Numeric hurdle probability matrix
+#' @param log_base Function of `(yj, j)` giving the base log density
+#' @param log_p0 Function of `j` giving the base log probability of
+#'   zero, or `NULL` for a continuous base
+#' @return Numeric `[ndraws, nobs]` matrix
+#' @noRd
+hurdle_log_density <- function(linpred, y, hu, log_base, log_p0 = NULL) {
+  .apply_log_density(linpred, y, function(yj, j) {
+    if (yj == 0) {
+      return(log(hu[, j]))
+    }
+    out <- log1p(-hu[, j]) + log_base(yj, j)
+    if (is.null(log_p0)) out else out - log1mexp(-log_p0(j))
+  })
+}
+
+
+#' Log density of a zero-inflated family
+#'
+#' A zero comes from the inflation, with probability `zi`, or from the
+#' base distribution. A base without mass at zero, such as the beta,
+#' gives a zero the probability `zi` alone.
+#'
+#' @param linpred Numeric linear predictor matrix
+#' @param y Numeric response vector
+#' @param zi Numeric zero-inflation probability matrix
+#' @param log_base Function of `(yj, j)` giving the base log density
+#' @param base_has_zero Logical. Whether the base gives zero a mass
+#' @return Numeric `[ndraws, nobs]` matrix
+#' @noRd
+zero_inflated_log_density <- function(linpred, y, zi, log_base,
+                                      base_has_zero = TRUE) {
+  .apply_log_density(linpred, y, function(yj, j) {
+    if (yj == 0 && !base_has_zero) {
+      return(log(zi[, j]))
+    }
+    from_base <- log1p(-zi[, j]) + log_base(yj, j)
+    if (yj == 0) log_add_exp(log(zi[, j]), from_base) else from_base
+  })
+}
+
+
 log_lik_hurdle_poisson <- function(linpred, link, y, family_pars, trials) {
   mu <- inv_link(linpred, link)
-  hu <- family_pars$hu
-  .apply_log_density(linpred, y, function(yj, j) {
-    if (yj == 0) {
-      log(hu[, j])
-    } else {
-      log1p(-hu[, j]) +
-        stats::dpois(yj, lambda = mu[, j], log = TRUE) -
-        log1p(-exp(-mu[, j]))
-    }
-  })
+  hurdle_log_density(
+    linpred, y, family_pars$hu,
+    log_base = function(yj, j) stats::dpois(yj, mu[, j], log = TRUE),
+    log_p0 = function(j) -mu[, j]
+  )
 }
 
-# Hurdle NegBin: P(Y=0) = hu; P(Y=k>0) = (1 - hu) * dnbinom(k|mu, shape) /
-# (1 - P(Y_NB = 0))
-log_lik_hurdle_negbinomial <- function(linpred, link, y, family_pars, trials) {
+log_lik_hurdle_negbinomial <- function(linpred, link, y, family_pars,
+                                       trials) {
   mu <- inv_link(linpred, link)
-  hu <- family_pars$hu
   shape <- family_pars$shape
-  .apply_log_density(linpred, y, function(yj, j) {
-    if (yj == 0) {
-      log(hu[, j])
-    } else {
-      p0 <- stats::dnbinom(0, mu = mu[, j], size = shape[, j])
-      log1p(-hu[, j]) +
-        stats::dnbinom(yj, mu = mu[, j], size = shape[, j], log = TRUE) -
-        log1p(-p0)
-    }
-  })
+  log_nb <- function(yj, j) {
+    stats::dnbinom(yj, mu = mu[, j], size = shape[, j], log = TRUE)
+  }
+  hurdle_log_density(
+    linpred, y, family_pars$hu,
+    log_base = log_nb, log_p0 = function(j) log_nb(0, j)
+  )
 }
 
-# Hurdle Gamma: P(Y=0) = hu; P(Y>0) density = (1 - hu) * dgamma(y|shape, rate)
 log_lik_hurdle_gamma <- function(linpred, link, y, family_pars, trials) {
   mu <- inv_link(linpred, link)
-  hu <- family_pars$hu
   shape <- family_pars$shape
-  .apply_log_density(linpred, y, function(yj, j) {
-    if (yj == 0) {
-      log(hu[, j])
-    } else {
-      log1p(-hu[, j]) +
-        stats::dgamma(yj, shape = shape[, j],
-                      rate = shape[, j] / mu[, j], log = TRUE)
+  hurdle_log_density(
+    linpred, y, family_pars$hu,
+    log_base = function(yj, j) {
+      stats::dgamma(yj, shape = shape[, j], rate = shape[, j] / mu[, j],
+                    log = TRUE)
     }
-  })
+  )
 }
 
-log_lik_hurdle_lognormal <- function(linpred, link, y, family_pars, trials) {
-  mu <- linpred
-  hu <- family_pars$hu
+log_lik_hurdle_lognormal <- function(linpred, link, y, family_pars,
+                                     trials) {
   sigma <- family_pars$sigma
-  .apply_log_density(linpred, y, function(yj, j) {
-    if (yj == 0) {
-      log(hu[, j])
-    } else {
-      log1p(-hu[, j]) +
-        stats::dlnorm(yj, meanlog = mu[, j], sdlog = sigma[, j],
-                      log = TRUE)
+  hurdle_log_density(
+    linpred, y, family_pars$hu,
+    log_base = function(yj, j) {
+      stats::dlnorm(yj, meanlog = linpred[, j], sdlog = sigma[, j],
+                    log = TRUE)
     }
-  })
+  )
 }
 
-# Zero-inflated Poisson: P(Y=0) = zi + (1 - zi) * exp(-mu);
-# P(Y=k>0) = (1 - zi) * dpois(k|mu)
 log_lik_zero_inflated_poisson <- function(linpred, link, y,
                                           family_pars, trials) {
   mu <- inv_link(linpred, link)
-  zi <- family_pars$zi
-  .apply_log_density(linpred, y, function(yj, j) {
-    if (yj == 0) {
-      # log(zi + (1-zi) * exp(-mu)) computed with log-sum-exp
-      log_zi <- log(zi[, j])
-      log_pois0 <- log1p(-zi[, j]) + stats::dpois(0, lambda = mu[, j],
-                                                  log = TRUE)
-      pmax <- pmax(log_zi, log_pois0)
-      pmax + log(exp(log_zi - pmax) + exp(log_pois0 - pmax))
-    } else {
-      log1p(-zi[, j]) + stats::dpois(yj, lambda = mu[, j], log = TRUE)
-    }
-  })
+  zero_inflated_log_density(
+    linpred, y, family_pars$zi,
+    log_base = function(yj, j) stats::dpois(yj, mu[, j], log = TRUE)
+  )
 }
 
 log_lik_zero_inflated_negbinomial <- function(linpred, link, y,
                                               family_pars, trials) {
   mu <- inv_link(linpred, link)
-  zi <- family_pars$zi
   shape <- family_pars$shape
-  .apply_log_density(linpred, y, function(yj, j) {
-    if (yj == 0) {
-      log_zi <- log(zi[, j])
-      log_nb0 <- log1p(-zi[, j]) +
-        stats::dnbinom(0, mu = mu[, j], size = shape[, j], log = TRUE)
-      pmax <- pmax(log_zi, log_nb0)
-      pmax + log(exp(log_zi - pmax) + exp(log_nb0 - pmax))
-    } else {
-      log1p(-zi[, j]) +
-        stats::dnbinom(yj, mu = mu[, j], size = shape[, j], log = TRUE)
+  zero_inflated_log_density(
+    linpred, y, family_pars$zi,
+    log_base = function(yj, j) {
+      stats::dnbinom(yj, mu = mu[, j], size = shape[, j], log = TRUE)
     }
-  })
+  )
 }
 
 log_lik_zero_inflated_binomial <- function(linpred, link, y,
                                            family_pars, trials) {
   prob <- inv_link(linpred, link)
-  zi <- family_pars$zi
   trials <- as.integer(trials)
-  .apply_log_density(linpred, y, function(yj, j) {
-    if (yj == 0) {
-      log_zi <- log(zi[, j])
-      log_bin0 <- log1p(-zi[, j]) +
-        stats::dbinom(0, size = trials[j], prob = prob[, j], log = TRUE)
-      pmax <- pmax(log_zi, log_bin0)
-      pmax + log(exp(log_zi - pmax) + exp(log_bin0 - pmax))
-    } else {
-      log1p(-zi[, j]) +
-        stats::dbinom(yj, size = trials[j], prob = prob[, j], log = TRUE)
+  zero_inflated_log_density(
+    linpred, y, family_pars$zi,
+    log_base = function(yj, j) {
+      stats::dbinom(yj, size = trials[j], prob = prob[, j], log = TRUE)
     }
-  })
+  )
 }
 
 log_lik_zero_inflated_beta <- function(linpred, link, y,
                                        family_pars, trials) {
   mu <- inv_link(linpred, link)
-  zi <- family_pars$zi
   phi <- family_pars$phi
-  .apply_log_density(linpred, y, function(yj, j) {
-    if (yj == 0) {
-      log(zi[, j])
-    } else {
+  zero_inflated_log_density(
+    linpred, y, family_pars$zi,
+    log_base = function(yj, j) {
       shapes <- beta_shapes(mu[, j], phi[, j])
-      a <- shapes$shape1
-      b <- shapes$shape2
-      log1p(-zi[, j]) + stats::dbeta(yj, shape1 = a, shape2 = b, log = TRUE)
-    }
-  })
+      stats::dbeta(yj, shapes$shape1, shapes$shape2, log = TRUE)
+    },
+    base_has_zero = FALSE
+  )
 }
 
 
 #' Log-likelihood of a fitted mvgam model
 #'
-#' Method for the `stats::logLik` generic so that `AIC()` and `BIC()`
-#' dispatch on `mvgam` objects. Returns the posterior mean of the
-#' summed pointwise log-likelihood (across observations) as a numeric
-#' scalar with the `df` and `nobs` attributes the [stats::AIC()] /
-#' [stats::BIC()] machinery expects.
+#' The posterior mean of the summed log likelihood, with the `df` and
+#' `nobs` attributes that [stats::AIC()] and [stats::BIC()] use.
 #'
-#' @param object A fitted \[mvgam\]\[mvgam\] object.
-#' @param pointwise Logical. When `FALSE` (default) a single scalar
-#'   `logLik` value is returned for compatibility with `AIC` and `BIC`.
-#'   When `TRUE` the underlying \[ndraws x nobs\] pointwise matrix from
-#'   [log_lik.mvgam()] is returned (matches the historical mvgam
-#'   return shape).
-#' @param ... Additional arguments forwarded to [log_lik.mvgam()]
-#'   (e.g. `newdata`, `ndraws`, `process_error`).
+#' @param object A fitted `mvgam` object.
+#' @param pointwise Logical. `TRUE` returns the `[ndraws, nobs]` matrix
+#'   of [log_lik.mvgam()]. Defaults to `FALSE`.
+#' @param ... Further arguments to [log_lik.mvgam()], such as `newdata`
+#'   or `ndraws`.
 #'
-#' @return When `pointwise = FALSE`, a length-1 `logLik` object with
-#'   `df` (number of sampled parameters, excluding sampler
-#'   diagnostics) and `nobs` attributes. When `pointwise = TRUE`, a
-#'   \[ndraws x nobs\] numeric matrix of pointwise log densities.
+#' @return A `logLik` object. `df` counts the parameters [variables()]
+#'   lists. With `pointwise = TRUE`, the matrix of [log_lik.mvgam()].
 #'
 #' @details
-#' The scalar returned is the posterior mean, across draws, of the
-#' summed pointwise log-likelihood over the observations that carry a
-#' density. Those are every row for most families, and one row per
-#' closure unit for the detection and composition families, whose
-#' likelihood is written per unit.
-#' For Bayesian state-space models AIC and BIC are coarse
-#' instruments because every latent state inflates the parameter count;
-#' [loo()] / [waic()] are usually the better model-selection tools and
-#' are recommended in preference.
+#' Each latent state counts as a parameter, which makes AIC and BIC
+#' coarse for a state-space model. [loo.mvgam()] estimates the ELPD
+#' with diagnostics for its reliability.
 #'
-#' @seealso [log_lik.mvgam()], [loo.mvgam()], [waic.mvgam()].
+#' @seealso [log_lik.mvgam()] returns the pointwise matrix.
 #'
 #' @method logLik mvgam
 #' @export
@@ -621,14 +600,10 @@ logLik.mvgam <- function(object, pointwise = FALSE, ...) {
     return(ll_mat)
   }
 
-  # Summed over the columns that carry a density, which is what
-  # `clean_ll()` selects and what `loo()` and `waic()` score. A
-  # column with none is missing rather than zero -- a composition
-  # scores one joint density per site and carries it on the site's
-  # first row -- so summing the raw matrix returned `NA` for every
-  # `diri()`, `multi()` and `categ()` fit, and `AIC()` and `BIC()`
-  # with it.
-  per_draw_sum <- rowSums(clean_ll(object, ll_mat))
+  # The columns `clean_ll()` keeps, which `loo()` and `waic()` score.
+  # A composition carries each site's density on its first row and
+  # leaves the others `NA`.
+  per_draw_sum <- rowSums(clean_ll(ll_mat))
   ll_scalar <- mean(per_draw_sum)
 
   # The parameters `variables()` lists. That list leaves out `lp__`,
@@ -647,12 +622,9 @@ logLik.mvgam <- function(object, pointwise = FALSE, ...) {
 
 #' Resolve the autocorrelation switch from its two spellings
 #'
-#' `incl_autocor` is the name brms uses and the one mvgam documents.
-#' `process_error` and `incl_dynamics` are the names mvgam used before
-#' and are still accepted, so calls written against them keep working.
-#' Supplying both spellings is not an error: the brms one wins, which
-#' is what the documentation promises, and the superseded value is
-#' ignored rather than silently combined with it.
+#' `incl_autocor` is the brms name. `process_error` and `incl_dynamics`
+#' are the mvgam 1.x names, still accepted. A supplied `incl_autocor`
+#' takes precedence.
 #'
 #' @param incl_autocor Value of the documented argument
 #' @param legacy Value of the superseded argument, or `NULL` when the

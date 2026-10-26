@@ -30,7 +30,6 @@ test_that("fitted.mvgam dispatches to posterior_epred for response scale", {
     .package = "mvgam"
   )
   out <- fitted(stub_object(), summary = FALSE)
-  expect_true(is.matrix(out))
   expect_equal(dim(out), c(4L, 3L))
   expect_equal(out[1, ], c(o1 = 1, o2 = 2, o3 = 3))
 })

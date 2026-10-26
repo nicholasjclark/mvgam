@@ -25,13 +25,13 @@ array of summary statistics
 defined by \code{probs}). If \code{FALSE}, return the raw draws as a
 \verb{[n_draws x n_levels x n_coefs]} array per group.}
 
-\item{robust}{Logical. When \code{summary = TRUE} and \code{robust = TRUE},
-the median and MAD give the centre and spread. The default
-\code{FALSE} uses the mean and SD.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
-\item{probs}{Numeric vector of length 2 with the quantiles to
-report when \code{summary = TRUE}. Defaults to
-\code{c(0.025, 0.975)}.}
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
 
 \item{pars}{Optional character vector. When set, restrict the
 returned coefficients to those whose name matches one of the
@@ -96,7 +96,22 @@ re$series[, , "Intercept"]
 \seealso{
 \code{\link[brms:ranef.brmsfit]{brms::ranef.brmsfit()}}, \code{\link[=VarCorr.mvgam]{VarCorr.mvgam()}},
 \code{\link[=fixef.mvgam]{fixef.mvgam()}}, \code{\link[=variables.mvgam]{variables.mvgam()}}.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

@@ -247,17 +247,15 @@ plot(fcs, series = 1) +
 For Vector Autoregressions fit in `mvgam`, we can inspect <a
 href="https://ecogambler.netlify.app/blog/vector-autoregressions/#impulse-response-functions"
 target="_blank">impulse response functions and forecast error variance
-decompositions</a>. The `irf()` function runs an Impulse Response
-Function (IRF) simulation whereby a positive “shock” is generated for a
-target process at time `t = 0`. All else remaining stable, it then
-monitors how each of the remaining processes in the latent VAR would be
-expected to respond over the forecast horizon `h`. The function computes
-impulse responses for all processes in the object and returns them in an
-array that can be plotted using the S3 `plot()` function. Here we will
-use the generalized IRF, which makes no assumptions about the order in
-which the series appear in the VAR process, and inspect how each process
-is expected to respond to a sudden, positive pulse from the other
-processes over a horizon of 12 timepoints.
+decompositions</a>. `irf()` runs an Impulse Response Function (IRF)
+simulation in which a positive “shock” hits a target process at time
+`t = 0`. Holding all else stable, it computes how each remaining process
+in the latent VAR would be expected to respond over the forecast horizon
+`h`. It returns the impulse responses for every process in an array that
+the S3 `plot()` method draws. Here we use the generalized IRF, which
+makes no assumption about the order of the series in the VAR process.
+The plots show how each process is expected to respond to a sudden,
+positive pulse from the other processes over 12 timepoints.
 
 ``` r
 irfs <- irf(mod, 
@@ -276,15 +274,13 @@ plot(irfs,
 
 <img src="man/figures/README-unnamed-chunk-15-2.png" alt="Impulse response functions computed using mvgam in R" width="100%" />
 
-Using the same logic as above, we can inspect forecast error variance
-decompositions (FEVDs) for each process using`fevd()`. This type of
-analysis asks how orthogonal shocks to all process in the system
-contribute to the variance of forecast uncertainty for a focal process
-over increasing horizons. In other words, the proportion of the forecast
-variance of each latent time series can be attributed to the effects of
-the other series in the VAR process. FEVDs are useful because some
-shocks may not be expected to cause variations in the short-term but may
-cause longer-term fluctuations
+`fevd()` computes forecast error variance decompositions (FEVDs) for
+each process. An FEVD measures how orthogonal shocks to every process in
+the system contribute to the forecast variance of a focal process over
+increasing horizons. It splits the forecast variance of each latent
+series into the shares attributable to each series in the VAR process.
+FEVDs are useful because some shocks cause little short-term variation
+but larger fluctuations over longer horizons.
 
 ``` r
 fevds <- fevd(mod, 
@@ -387,17 +383,24 @@ description
     #>   Computation and Simulation, 90(14), 2499-2523.
     #>   https://doi.org/10.1080/00949655.2020.1783262
 
-The post-processing methods we have shown above are just the tip of the
-iceberg. For a full list of methods to apply on fitted model objects,
-type `methods(class = "mvgam")`.
+`methods_md()` writes the same model as Markdown equations, with a
+glossary of every symbol and the priors, for a methods section or an
+appendix
+
+``` r
+methods_md(mod)
+```
+
+The methods shown above are a small selection. For a full list of
+methods for fitted model objects, type `methods(class = "mvgam")`.
 
 ## Extended observation families
 
-`mvgam` began as a tool for forecasting ecological counts, and counts
-are still where its most specialised machinery sits. Successive releases
-have widened what the observation model will accept, so the choice of
-`family` now spans most of the response types met in ecological and
-environmental monitoring.
+`mvgam` began as a tool for forecasting ecological counts. Its most
+specialised families still model counts. Successive releases have
+widened the observation families it accepts. The choice of `family` now
+spans most of the response types met in ecological and environmental
+monitoring.
 
 For continuous responses:
 
@@ -422,10 +425,9 @@ For counts and binary outcomes:
   super-dispersed relative to a binomial
 
 A further group of families operates on *closure units*, where several
-rows of the data share a single latent state. Rows belonging to a unit
-are recognised from their `series` and `time` values, so replicate
-visits to a site, or the species that together make up one assemblage,
-need no reshaping:
+rows of the data share a single latent state. Because `mvgam` groups the
+rows of a unit by their `series` and `time` values, replicate visits to
+a site or the species of one assemblage need no reshaping:
 
 - `nmix()` for repeat counts of an unknown abundance seen with imperfect
   detection
@@ -523,7 +525,7 @@ summary(mod)
 #>   - `forecast(fit, newdata = ...)`: out-of-sample forecasts
 #>   - `lfo_cv(fit)`: leave-future-out model comparison
 #>   - `conditional_effects(fit)`: covariate effects
-#> Use `how_to_cite(fit)` for a citation-ready model description.
+#> Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.
 ```
 
 Plot the hindcast and forecast distributions for each series
@@ -558,8 +560,7 @@ troubleshoot.
 
 Research software is written and maintained by people whose only
 currency is citation. If `mvgam` contributed to an analysis, please cite
-it, and cite the packages it builds on as well. A ⭐ on the repository
-is welcome too.
+it and the packages it depends on. A ⭐ on the repository is welcome too.
 
 When using `mvgam`, please cite the following:
 
@@ -581,8 +582,8 @@ appropriate citations for your software setup.
 ## Getting help
 
 Bug reports belong on the [issue
-tracker](https://github.com/nicholasjclark/mvgam/issues), and a minimal
-reproducible example is what makes them fixable. Questions about model
+tracker](https://github.com/nicholasjclark/mvgam/issues). A minimal
+reproducible example makes a report fixable. Questions about model
 syntax, priors or interpretation are better suited to the [`mvgam`
 Discussion Board](https://github.com/nicholasjclark/mvgam/discussions),
 where an earlier thread has often covered the same ground already. The

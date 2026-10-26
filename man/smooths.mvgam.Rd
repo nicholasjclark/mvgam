@@ -26,6 +26,22 @@ given a formula, and the trend. Useful for picking a term to
 pass to \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} or
 \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.
 }
+\seealso{
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{summary.mvgam}()}
+}
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

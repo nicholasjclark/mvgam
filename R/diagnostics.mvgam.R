@@ -1,9 +1,15 @@
-#' Diagnostic quantities for mvgam models
+#' Posterior summaries and sampler diagnostics of mvgam models
 #'
-#' S3 methods that surface Stan / NUTS diagnostics for fitted
-#' [`mvgam`] objects. Each method delegates either to `bayesplot::`
-#' on the underlying stanfit (`nuts_params`, `log_posterior`) or to
-#' `posterior::` summaries on the draws array.
+#' The \pkg{brms} and \pkg{bayesplot} accessors for a fitted model.
+#' `fixef()`, `coef()` and `vcov()` summarise the population-level
+#' coefficients of the observation formula, or of the trend formula
+#' with `trend_effects = TRUE`. `posterior_summary()` summarises any
+#' parameters. `rhat()` and `neff_ratio()` report convergence.
+#' `nuts_params()` and `log_posterior()` return the sampler's own
+#' quantities.
+#' `bayes_R2()` is the Bayesian R^2 of Gelman et al. (2019).
+#' `ndraws()`, `nchains()`, `niterations()` and `nvariables()` count
+#' the posterior.
 #'
 #' @name mvgam_diagnostics
 #' @aliases coef.mvgam rhat.mvgam neff_ratio.mvgam nuts_params.mvgam
@@ -12,45 +18,39 @@
 #'   posterior_summary.mvgam getCall.mvgam vcov.mvgam
 #'
 #' @param object,x A fitted `mvgam` object.
-#' @param pars Optional character vector of parameter names. For
-#'   `nuts_params` these are sampler-parameter names; otherwise they
-#'   are model-parameter names. `NULL` returns all parameters.
-#' @param variable Model-parameter names for `posterior_summary()`,
-#'   as \pkg{brms} names the argument. Takes precedence over `pars`.
-#' @param summary Logical. If `TRUE` (the default), summary statistics
-#'   are returned; if `FALSE`, the raw posterior draws are returned.
-#'   `coef` summarises to posterior means rather than to the
-#'   Estimate / Est.Error / quantile matrix its siblings return.
-#' @param robust Logical. If `TRUE`, use median + median absolute
-#'   deviation instead of mean + standard deviation. Default `FALSE`.
-#' @param probs Numeric vector of length 2 giving the lower and upper
-#'   quantile probabilities for credible intervals. Defaults to
-#'   `c(0.025, 0.975)` (95% CI).
-#' @param resp Character. Response name for multivariate models.
-#'   Ignored for univariate fits.
+#' @param pars Optional character vector of parameter names, or of
+#'   sampler parameters such as `"divergent__"` for `nuts_params()`.
+#'   `NULL` takes all of them.
+#' @param variable Parameter names for `posterior_summary()`, the
+#'   \pkg{brms} name of the argument. It takes precedence over `pars`.
+#' @param summary Logical. `TRUE` (the default) returns a summary.
+#'   `FALSE` returns the draws. `coef()` summarises to posterior means.
+#' @param robust Logical. `TRUE` summarises by the median and the median
+#'   absolute deviation. Defaults to `FALSE`, the mean and the standard
+#'   deviation.
+#' @param probs Numeric vector of the two interval probabilities,
+#'   `c(0.025, 0.975)` by default.
+#' @param resp Optional name of one response of a multivariate model.
 #' @param trend_effects Logical. `coef()`, `fixef()` and `vcov()`
 #'   report the coefficients of the observation formula by default.
 #'   `TRUE` reports those of the `trend_formula` instead. Their names
 #'   end in `_trend`.
-#' @param ... Unused by these methods, and refused, except on
-#'   `nuts_params()` and `log_posterior()`, which forward what they
-#'   are given to \pkg{bayesplot}.
+#' @param ... Further arguments. `nuts_params()` and `log_posterior()`
+#'   pass them to \pkg{bayesplot}. `bayes_R2()` passes them to
+#'   [posterior_epred.mvgam()]. The other methods refuse them.
 #'
-#' @return Shape depends on the method (see method details).
+#' @return `fixef()`, `posterior_summary()` and `bayes_R2()` return a
+#'   matrix with columns `Estimate`, `Est.Error` and one per quantile,
+#'   or the draws with `summary = FALSE`. `coef()` returns the posterior
+#'   means. `vcov()` returns the covariance matrix of the coefficients.
+#'   `rhat()` and `neff_ratio()` return a named vector with one value
+#'   per parameter. `nuts_params()` and `log_posterior()` return the
+#'   long data frames of \pkg{bayesplot}. The counting methods return
+#'   an integer.
 #'
-#' @seealso
-#'   [mvgam_draws] for raw posterior-draw extraction,
-#'   [summary.mvgam()] for a printed model summary,
-#'   [mcmc_plot.mvgam()] for diagnostic visualisations,
-#'   [pp_check.mvgam()] for posterior predictive checks,
-#'   [loo.mvgam()], [waic.mvgam()] for information criteria,
-#'   [conditional_effects.mvgam()] for partial-effect plots,
-#'   [posterior_epred.mvgam()], [posterior_linpred.mvgam()],
-#'   [posterior_predict.mvgam()] for prediction primitives,
-#'   \code{\link[bayesplot:bayesplot-extractors]{bayesplot-extractors}},
-#'   [posterior::rhat()], [posterior::ess_bulk()],
-#'   [brms::bayes_R2.brmsfit()], [brms::fixef.brmsfit()],
-#'   [brms::prior_summary.brmsfit()].
+#' @seealso [summary.mvgam()] prints these summaries for every
+#'   parameter. [mcmc_plot.mvgam()] plots the draws. [mvgam_draws]
+#'   extracts them. [loo_R2.mvgam()] is the leave-one-out R^2.
 #'
 #' @references
 #' Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and
@@ -58,6 +58,10 @@
 #' localization: An improved Rhat for assessing convergence of
 #' MCMC. \emph{Bayesian Analysis}, 16(2):667-718.
 #' \doi{10.1214/20-BA1221}
+#'
+#' Gelman, A., Goodrich, B., Gabry, J. and Vehtari, A. (2019).
+#' R-squared for Bayesian regression models. \emph{The American
+#' Statistician}, 73(3):307-309. \doi{10.1080/00031305.2018.1549100}
 #'
 #' @examples
 #' \dontrun{
@@ -69,13 +73,21 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' coef(mod)
+#' # The population coefficients with 95% intervals
 #' fixef(mod)
-#' vcov(mod)
+#'
+#' # Rhat near 1 and effective sample ratios above 0.1 indicate mixing
+#' rhat(mod, pars = c("ar1_trend", "sigma_trend"))
+#' neff_ratio(mod, pars = c("ar1_trend", "sigma_trend"))
+#'
+#' # The share of variance in the counts the model explains
 #' bayes_R2(mod)
+#'
+#' # Next, mcmc_plot() draws the posterior of these parameters
 #' }
 #'
 #' @author Nicholas J Clark
+#' @family model checking
 NULL
 
 
@@ -85,10 +97,8 @@ NULL
 #' quantile column per probability. A column holding a missing value
 #' gets missing quantiles.
 #'
+#' @inheritParams predict.mvgam
 #' @param draws Numeric matrix of draws, one column per quantity
-#' @param robust Logical flag to report the median and MAD in place of
-#'   the mean and SD
-#' @param probs Numeric vector of quantile probabilities
 #' @return Numeric matrix with one row per column of `draws`
 #' @noRd
 mvgam_post_summary <- function(draws, robust = FALSE,
@@ -103,17 +113,12 @@ mvgam_post_summary <- function(draws, robust = FALSE,
     centre <- colMeans(draws)
     spread <- apply(draws, 2L, stats::sd)
   }
-  # A column with no value to summarise gives NA, which is what
-  # `colMeans()` and `sd()` above already answer for one. `quantile()`
-  # raises instead, so the four statistics on one row disagreed about
-  # the same column: a closure unit that lost every visit leaves rows
-  # belonging to no unit, and `fitted()` and `augment()` stopped on a
-  # message naming neither the row nor the column.
+  # `quantile()` errors on a missing value where `colMeans()` and
+  # `sd()` return NA. A closure unit without visits leaves such
+  # columns. Their quantiles are set to NA to match.
   #
-  # Built column by column at a fixed width so one probability gives
-  # a one-column matrix rather than a vector. `apply()` drops that
-  # dimension, and the `cbind()` below then recycled the estimates
-  # against it and failed on the dimnames.
+  # The matrix is filled at a fixed width. `apply()` would drop the
+  # dimension of a single probability.
   q <- matrix(
     vapply(
       seq_len(ncol(draws)),
@@ -167,7 +172,7 @@ median_interval_cols <- function(draws, probs, prefix) {
 coef.mvgam <- function(object, summary = TRUE, trend_effects = FALSE,
                        ...) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_logical(summary, len = 1L)
+  checkmate::assert_flag(summary)
   rlang::check_dots_empty()
   draws_mat <- population_draws(object, trend_effects)
   if (ncol(draws_mat) == 0L) {
@@ -185,16 +190,7 @@ coef.mvgam <- function(object, summary = TRUE, trend_effects = FALSE,
 #' @method nuts_params mvgam
 #' @export
 nuts_params.mvgam <- function(object, pars = NULL, ...) {
-  checkmate::assert_class(object, "mvgam")
-  refuse_unread_dots(
-    list(...),
-    names(formals(utils::getS3method(
-      "nuts_params", "stanfit",
-      envir = asNamespace("bayesplot")
-    ))),
-    "nuts_params"
-  )
-  bayesplot::nuts_params(object$fit, pars = pars, ...)
+  forward_to_stanfit("nuts_params", object, pars = pars, ...)
 }
 
 
@@ -203,18 +199,27 @@ nuts_params.mvgam <- function(object, pars = NULL, ...) {
 #' @method log_posterior mvgam
 #' @export
 log_posterior.mvgam <- function(object, ...) {
+  forward_to_stanfit("log_posterior", object, ...)
+}
+
+
+#' Call a bayesplot extractor on the fit's stanfit
+#'
+#' A name outside the method's formals is refused. bayesplot would
+#' otherwise ignore it.
+#'
+#' @param generic Name of the bayesplot generic
+#' @param object Fitted `mvgam` object
+#' @param ... Arguments to the `stanfit` method
+#' @return The value of the `stanfit` method
+#' @noRd
+forward_to_stanfit <- function(generic, object, ...) {
+  checkmate::assert_string(generic)
   checkmate::assert_class(object, "mvgam")
-  # bayesplot raised on an unknown name here by its own accident of
-  # argument matching, which is not a signal mvgam controls.
-  refuse_unread_dots(
-    list(...),
-    names(formals(utils::getS3method(
-      "log_posterior", "stanfit",
-      envir = asNamespace("bayesplot")
-    ))),
-    "log_posterior"
-  )
-  bayesplot::log_posterior(object$fit, ...)
+  method <- utils::getS3method(generic, "stanfit",
+                               envir = asNamespace("bayesplot"))
+  refuse_unread_dots(list(...), names(formals(method)), generic)
+  method(object$fit, ...)
 }
 
 
@@ -248,14 +253,12 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
     ess_bulk = posterior::ess_bulk,
     ess_tail = posterior::ess_tail
   ))
-  # min(ess_bulk, ess_tail) mirrors bayesplot's neff_ratio convention.
+  # The smaller of the bulk and tail ESS, as in brms
   ess <- pmin(summ$ess_bulk, summ$ess_tail)
   names(ess) <- summ$variable
   ess / posterior::ndraws(drws)
 }
 
-
-# ---- Tier 1 additions -----------------------------------------------
 
 #' @rdname mvgam_diagnostics
 #' @importFrom brms fixef
@@ -265,8 +268,8 @@ fixef.mvgam <- function(object, summary = TRUE, robust = FALSE,
                          probs = c(0.025, 0.975), pars = NULL,
                          trend_effects = FALSE, ...) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_logical(summary, len = 1L)
-  checkmate::assert_logical(robust, len = 1L)
+  checkmate::assert_flag(summary)
+  checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L)
   rlang::check_dots_empty()
   mat <- select_fixef_draws(population_draws(object, trend_effects), pars)
@@ -290,45 +293,74 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
                             probs = c(0.025, 0.975), ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_string(resp, null.ok = TRUE)
-  checkmate::assert_logical(summary, len = 1L)
-  checkmate::assert_logical(robust, len = 1L)
+  checkmate::assert_flag(summary)
+  checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L)
-  is_mv <- brms::is.mvbrmsformula(object$formula)
   resolve_resp(object, resp, required = TRUE, caller = "bayes_R2()")
-  # Bayesian R^2 of Gelman et al. (2019): var(epred) / (var(epred) +
-  # var(residual)) per draw, where residuals are y - epred. The
-  # expectation is taken conditional on the latent state, because the
-  # residual it is measured against is the one the observed series
-  # leaves; marginalising over the trend would score the fit against a
-  # series the model never saw. The `resp` argument is only meaningful for
-  # multivariate fits; passing it to a univariate posterior_epred is
-  # a hard error.
-  epred <- if (is_mv) {
-    posterior_epred(object, resp = resp, incl_autocor = TRUE, ...)
-  } else {
-    posterior_epred(object, incl_autocor = TRUE, ...)
-  }
+  y <- r2_response(object, resp, "bayes_R2()")
+  # The expectation conditions on the inferred latent state. Its
+  # residual is then the one the observed series leaves.
+  epred <- do.call(posterior_epred, c(
+    list(object), r2_resp_arg(object, resp), list(incl_autocor = TRUE),
+    list(...)
+  ))
+  # As brms does, the rows without a response are left out
+  observed <- !is.na(y)
+  epred <- epred[, observed, drop = FALSE]
+  resid <- sweep(epred, 2L, y[observed], FUN = "-")
+  var_ep <- apply(epred, 1L, stats::var)
+  r2_result(var_ep / (var_ep + apply(resid, 1L, stats::var)),
+            summary, robust, probs)
+}
+
+
+#' The `resp` argument of a prediction for an R-squared
+#'
+#' A univariate prediction method refuses `resp`.
+#'
+#' @param object Fitted `mvgam` object
+#' @param resp Response name, or `NULL`
+#' @return List holding `resp` for a multivariate fit, otherwise empty
+#' @noRd
+r2_resp_arg <- function(object, resp) {
+  if (is_multivariate_formula(object$formula)) list(resp = resp) else list()
+}
+
+
+#' The observed response of an R-squared
+#'
+#' @param object Fitted `mvgam` object
+#' @param resp Response name, or `NULL`
+#' @param caller Name of the calling function, for the message
+#' @return Numeric vector of the response, one value per row
+#' @noRd
+r2_response <- function(object, resp, caller) {
+  checkmate::assert_string(caller)
   y_col <- response_column(object, resp)
   y <- object$data[[y_col]]
   if (!is.numeric(y)) {
     stop(insight::format_error(c(
-      "'bayes_R2()' requires a numeric response.",
+      paste0("'", caller, "' requires a numeric response."),
       x = paste0("Response '", y_col, "' has class '", class(y)[1L], "'."),
-      i = "Bayesian R^2 is undefined for ordinal and categorical fits."
+      i = "R^2 is undefined for ordinal and categorical fits."
     )), call. = FALSE)
   }
-  resid <- sweep(epred, 2L, y, FUN = "-")
-  # A row with no response has no residual, so the variances are taken
-  # over the observations that do.
-  var_ep <- apply(epred, 1L, stats::var, na.rm = TRUE)
-  var_re <- apply(resid, 1L, stats::var, na.rm = TRUE)
-  r2 <- var_ep / (var_ep + var_re)
-  if (!isTRUE(summary)) {
+  y
+}
+
+
+#' The draws or the summary of an R-squared
+#'
+#' @param r2 Numeric vector of R-squared draws
+#' @param summary,robust,probs As in `bayes_R2()`
+#' @return A one-column matrix of draws, or a one-row summary
+#' @noRd
+r2_result <- function(r2, summary, robust, probs) {
+  r2 <- matrix(r2, ncol = 1L, dimnames = list(NULL, "R2"))
+  if (!summary) {
     return(r2)
   }
-  mat <- matrix(r2, ncol = 1L)
-  colnames(mat) <- "R2"
-  out <- mvgam_post_summary(mat, robust = robust, probs = probs)
+  out <- mvgam_post_summary(r2, robust = robust, probs = probs)
   rownames(out) <- "R2"
   out
 }
@@ -345,50 +377,48 @@ prior_summary.mvgam <- function(object, ...) {
 }
 
 
-# ---- Tier 2 additions -----------------------------------------------
+#' A posterior count method for mvgam fits
+#'
+#' @param count A posterior counting function, such as
+#'   `posterior::ndraws`
+#' @return An S3 method of `x` and `...`
+#' @noRd
+posterior_count_method <- function(count) {
+  force(count)
+  function(x, ...) {
+    checkmate::assert_class(x, "mvgam")
+    rlang::check_dots_empty()
+    count(as_draws_array(x))
+  }
+}
+
 
 #' @rdname mvgam_diagnostics
 #' @importFrom posterior ndraws
 #' @method ndraws mvgam
 #' @export
-ndraws.mvgam <- function(x, ...) {
-  checkmate::assert_class(x, "mvgam")
-  rlang::check_dots_empty()
-  posterior::ndraws(as_draws_array(x))
-}
+ndraws.mvgam <- posterior_count_method(posterior::ndraws)
 
 
 #' @rdname mvgam_diagnostics
 #' @importFrom posterior nchains
 #' @method nchains mvgam
 #' @export
-nchains.mvgam <- function(x, ...) {
-  checkmate::assert_class(x, "mvgam")
-  rlang::check_dots_empty()
-  posterior::nchains(as_draws_array(x))
-}
+nchains.mvgam <- posterior_count_method(posterior::nchains)
 
 
 #' @rdname mvgam_diagnostics
 #' @importFrom posterior niterations
 #' @method niterations mvgam
 #' @export
-niterations.mvgam <- function(x, ...) {
-  checkmate::assert_class(x, "mvgam")
-  rlang::check_dots_empty()
-  posterior::niterations(as_draws_array(x))
-}
+niterations.mvgam <- posterior_count_method(posterior::niterations)
 
 
 #' @rdname mvgam_diagnostics
 #' @importFrom posterior nvariables
 #' @method nvariables mvgam
 #' @export
-nvariables.mvgam <- function(x, ...) {
-  checkmate::assert_class(x, "mvgam")
-  rlang::check_dots_empty()
-  posterior::nvariables(as_draws_array(x))
-}
+nvariables.mvgam <- posterior_count_method(posterior::nvariables)
 
 
 #' @rdname mvgam_diagnostics
@@ -398,13 +428,11 @@ nvariables.mvgam <- function(x, ...) {
 posterior_summary.mvgam <- function(x, pars = NULL, variable = NULL,
                                      probs = c(0.025, 0.975),
                                      robust = FALSE, ...) {
-  object <- x
-  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(pars, null.ok = TRUE)
   checkmate::assert_character(variable, null.ok = TRUE)
   rlang::check_dots_empty()
-  drws <- as_draws_array(object, variable = variable %||% pars)
-  mat <- posterior::as_draws_matrix(drws)
+  mat <- as_draws_matrix(x, variable = variable %||% pars)
   mvgam_post_summary(mat, robust = robust, probs = probs)
 }
 
@@ -420,15 +448,14 @@ getCall.mvgam <- function(x, ...) {
 
 
 #' @rdname mvgam_diagnostics
-#' @param correlation Logical. If `TRUE`, return the correlation
-#'   matrix of fixed-effect coefficients; otherwise the covariance
-#'   matrix. Defaults to `FALSE`.
+#' @param correlation Logical. `TRUE` returns the correlation matrix of
+#'   the coefficients. Defaults to `FALSE`, the covariance matrix.
 #' @method vcov mvgam
 #' @export
 vcov.mvgam <- function(object, correlation = FALSE, pars = NULL,
                        trend_effects = FALSE, ...) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_logical(correlation, len = 1L)
+  checkmate::assert_flag(correlation)
   checkmate::assert_character(pars, null.ok = TRUE)
   rlang::check_dots_empty()
   mat <- select_fixef_draws(population_draws(object, trend_effects), pars)
@@ -467,9 +494,8 @@ population_draws <- function(object, trend_effects = FALSE) {
 
 #' The fixed-effect draws a caller named
 #'
-#' A name the fit has no coefficient for is refused. Dropping it
-#' returned a smaller matrix than the caller asked for, and a
-#' misspelt term lost its row without a message.
+#' A name the fit has no coefficient for is refused. A misspelt term
+#' would otherwise lose its row without a message.
 #'
 #' @param mat Draws matrix of the population-level coefficients
 #' @param pars Coefficient names as `fixef_name()` gives them, or
@@ -524,22 +550,16 @@ flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
   if (md$n_lv_for_grain != md$axes$series$n) {
     return(FALSE)
   }
-  # Reason: `uses_loadings_prior()` returns TRUE only for the
-  # structured prior families (MGP via `N_features_trend`, kernel via
-  # `dist_*`). Iid Z leaves both markers absent, so the funnel
-  # only applies when this helper returns FALSE.
+  # The MGP and kernel loadings priors shrink the loadings. The funnel
+  # arises under the independent prior alone.
   if (isTRUE(uses_loadings_prior(mvgam_fit))) return(FALSE)
 
-  # Both signals below are properties of an MCMC run. An
-  # approximation carries neither, and a stub carries no draws at
-  # all, so the state is tested rather than the failure caught: the
-  # advisor has nothing to read and says nothing.
+  # Divergences and Rhat exist only for an MCMC run
   if (is.null(mvgam_fit$fit) ||
       !identical(mvgam_fit$algorithm, "sampling")) {
     return(FALSE)
   }
 
-  # Divergent-transition early signal.
   np <- bayesplot::nuts_params(mvgam_fit$fit)
   if (!is.null(np) && "Parameter" %in% names(np)) {
     div_rows <- np[np$Parameter == "divergent__", , drop = FALSE]
@@ -548,17 +568,15 @@ flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
     }
   }
 
-  rh <- bayesplot::rhat(mvgam_fit$fit)
-  if (length(rh) == 0L) return(FALSE)
   watched <- grep(
     paste0(
       "^(init_trend|lv_trend|sigma_trend|Sigma_trend|",
       "L_Sigma_trend|L_Omega_trend|Phi_trend)\\["
     ),
-    names(rh)
+    names(mvgam_fit$fit), value = TRUE
   )
   if (length(watched) == 0L) return(FALSE)
-  any(rh[watched] > 1.05, na.rm = TRUE)
+  any(rhat(mvgam_fit, pars = watched) > 1.05, na.rm = TRUE)
 }
 
 

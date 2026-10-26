@@ -2,7 +2,7 @@
 % Please edit documentation in R/waic.mvgam.R
 \name{waic.mvgam}
 \alias{waic.mvgam}
-\title{Widely Applicable Information Criterion for mvgam models}
+\title{Widely applicable information criterion for mvgam models}
 \usage{
 \method{waic}{mvgam}(
   x,
@@ -17,44 +17,41 @@
 )
 }
 \arguments{
-\item{x}{An mvgam fit.}
+\item{x}{A fitted \code{mvgam} or \code{jsdgam} object.}
 
-\item{...}{Additional arguments passed to \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} (e.g.
-\code{newdata}, \code{ndraws}, \code{draw_ids}).}
+\item{...}{Further arguments to \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}, such as \code{ndraws}.}
 
-\item{compare, resp, pointwise, model_names}{Accepted for
-\link[brms:waic.brmsfit]{brms::waic.brmsfit} parity. \code{resp} scopes a multivariate fit to
-one response and is honoured. \code{pointwise} streams the density,
-which mvgam does not do, and \code{compare} with \code{model_names} ranks
-several models, which \code{\link[=loo_compare]{loo_compare()}} does. Supplying one of
-those three raises an error naming it.}
+\item{compare, resp, pointwise, model_names}{The arguments of
+\link[brms:waic.brmsfit]{brms::waic.brmsfit}. \code{resp} scopes a multivariate fit to one
+response. Supplying one of the others raises an error.
+\code{\link[=loo_compare]{loo_compare()}} ranks several \code{waic()} results.}
 
 \item{incl_autocor}{Logical, default \code{TRUE}. Passed to
-\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} as its argument of the same name, so each
-observation is scored on the conditional surface, under the latent
-trend state the model inferred at that time.}
+\code{\link[=log_lik.mvgam]{log_lik.mvgam()}}. \code{TRUE} scores each observation under the latent
+trend state the model inferred at that time. The ELPD then
+describes the series that was observed. \code{FALSE} scores the
+deterministic submodel alone.}
 
 \item{incl_dynamics}{Superseded by \code{incl_autocor} and still
-accepted, so calls written against it keep working. \code{TRUE} maps
-to \code{incl_autocor = TRUE} and \code{FALSE} to \code{incl_autocor = FALSE}.
-When only \code{incl_dynamics} is given it decides; when both are
-given \code{incl_autocor} decides and \code{incl_dynamics} is ignored.}
+accepted. \code{TRUE} maps to \code{incl_autocor = TRUE} and \code{FALSE} to
+\code{incl_autocor = FALSE}. \code{incl_autocor} takes precedence when both
+are given.}
 
-\item{by_series}{Logical, default \code{FALSE}. When \code{TRUE}, return a
-data frame with one row per series (\code{series} column) and per-
-series WAIC estimates instead of a single \code{loo::waic} object.
-Matches the \code{spOccupancy::waicOcc(by.sp = TRUE)} workflow for
-ranking per-series fit in joint-species distribution models.
-See \code{\link[=loo.mvgam]{loo.mvgam()}} for the column-to-series mapping convention.}
+\item{by_series}{Logical, default \code{FALSE}. \code{TRUE} returns a data
+frame with one row per series and columns \code{series}, \code{elpd},
+\code{se_elpd}, \code{p} and \code{n_obs}, as \code{spOccupancy::waicOcc(by.sp = TRUE)}
+ranks species. An occupancy or N-mixture fit is scored per site,
+each site counted in its species.}
 }
 \value{
-A \code{loo::waic} object.
+A \code{waic} object (see \code{\link[loo:waic]{loo::waic()}}), or with
+\code{by_series = TRUE} a data frame of per-series estimates.
 }
 \description{
-Compute the WAIC by passing pointwise log-likelihoods from
-\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} to \code{\link[loo:waic]{loo::waic()}}. Provided for brms parity; the
-\code{\link[=loo.mvgam]{loo.mvgam()}} method (LOO-PSIS) is usually preferred for posterior
-model comparison.
+Passes the pointwise log likelihood of \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} to
+\code{\link[loo:waic]{loo::waic()}}. \code{\link[=loo.mvgam]{loo.mvgam()}} estimates the same ELPD by PSIS and
+reports Pareto k diagnostics that say when to distrust it. Vehtari
+et al. (2017) recommend it over WAIC.
 }
 \examples{
 \dontrun{
@@ -68,7 +65,15 @@ mod <- mvgam(y ~ s(x),
               family  = poisson(),
               chains  = 2, silent = 2)
 
+# The WAIC estimate of the ELPD, with its effective number of
+# parameters p_waic
 waic(mod)
+
+# The PSIS estimate of the same ELPD. Its Pareto k diagnostics mark
+# the observations it estimates poorly
+loo(mod)
+
+# Next, loo_compare() ranks several models by either estimate
 }
 
 }
@@ -79,7 +84,20 @@ and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
 \doi{10.1007/s11222-016-9696-4}
 }
 \seealso{
-\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}},
-\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} for rolling-time CV,
-\code{\link[=kfold.mvgam]{kfold.mvgam()}} for grouped k-fold CV with selective refit.
+\code{\link[=loo.mvgam]{loo.mvgam()}} estimates the same ELPD by PSIS.
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} scores forecasts from rolling origins. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+compares models by approximate and exact cross-validation.
+
+Other model comparison: 
+\code{\link{bridge_sampler.mvgam}()},
+\code{\link{compare_elpds}()},
+\code{\link{kfold.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{log_lik.mvgam}()},
+\code{\link{loo.mvgam}()},
+\code{\link{loo_compare.mvgam_lfo}()},
+\code{\link{mvgam_loo_extras}},
+\code{\link{posterior_average.mvgam}()}
 }
+\concept{model comparison}

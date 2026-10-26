@@ -96,7 +96,7 @@ plot_factors <- function(
     stats::setNames(contrib$Factor, contrib$Factor)
   }
 
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   layers <- list()
   for (k in seq_len(n_lv)) {
     label <- paste0("Factor ", k)
@@ -187,7 +187,7 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
   # The band helpers pool the columns that share a time. A
   # multi-season fit has one column per site at each time. Its bands
   # cover site and posterior uncertainty together.
-  set_color_scheme_local("red")
+  set_color_scheme_local()
   series_levels <- levels(unit_meta$series)
   layers <- list()
   for (sp in series_levels) {

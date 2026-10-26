@@ -1,7 +1,5 @@
-# CI-safe tests for the thin brms-parity wrappers in
-# `R/brms_wrappers.mvgam.R`. Locks in S3 dispatch, signature
-# parity, return shapes, and a few semantic edge cases. Numerical
-# concordance against brms lives in tests/local/.
+# The methods of brms and rstantools generics, on stub fits. Their
+# agreement with brms on real fits is checked in tests/local/.
 
 
 make_wrapper_stub <- function(with_re = FALSE) {
@@ -39,44 +37,15 @@ make_wrapper_stub <- function(with_re = FALSE) {
 }
 
 
-# ---- Dispatch + signature parity -----------------------------------
+# ---- Signature parity ----------------------------------------------
 
-test_that("Tier-7 methods have S3 entries on mvgam", {
+test_that("each method takes every argument its brmsfit method takes", {
   for (m in c("posterior_interval", "predictive_interval", "ngrps",
-              "predictive_error")) {
-    expect_true(
-      !is.null(getS3method(m, "mvgam", optional = TRUE)),
-      label = paste0("getS3method('", m, "', 'mvgam')")
-    )
+              "predictive_error", "loo", "waic")) {
+    expected <- names(formals(getS3method(m, "brmsfit")))
+    actual <- names(formals(getS3method(m, "mvgam")))
+    expect_identical(setdiff(expected, actual), character(0L), label = m)
   }
-})
-
-
-test_that("posterior_interval.mvgam matches brms signature", {
-  expected <- names(formals(getS3method("posterior_interval", "brmsfit")))
-  actual <- names(formals(getS3method("posterior_interval", "mvgam")))
-  expect_true(all(expected %in% actual))
-})
-
-
-test_that("predictive_interval.mvgam matches brms signature", {
-  expected <- names(formals(getS3method("predictive_interval", "brmsfit")))
-  actual <- names(formals(getS3method("predictive_interval", "mvgam")))
-  expect_true(all(expected %in% actual))
-})
-
-
-test_that("ngrps.mvgam matches brms signature", {
-  expected <- names(formals(getS3method("ngrps", "brmsfit")))
-  actual <- names(formals(getS3method("ngrps", "mvgam")))
-  expect_true(all(expected %in% actual))
-})
-
-
-test_that("predictive_error.mvgam matches brms signature", {
-  expected <- names(formals(getS3method("predictive_error", "brmsfit")))
-  actual <- names(formals(getS3method("predictive_error", "mvgam")))
-  expect_true(all(expected %in% actual))
 })
 
 
@@ -103,15 +72,12 @@ test_that("ngrps.mvgam returns NULL on a no-RE fit", {
 
 test_that("posterior_interval.mvgam respects pars / variable / prob", {
   stub <- make_wrapper_stub()
-  pi_default <- posterior_interval(stub)
-  expect_identical(ncol(pi_default), 2L)
-  # Default brms prob = 0.95 -> columns are 2.5% / 97.5%.
-  expect_identical(colnames(pi_default), c("2.5%", "97.5%"))
-  pi_50 <- posterior_interval(stub, prob = 0.5)
-  expect_identical(colnames(pi_50), c("25%", "75%"))
-  pi_one <- posterior_interval(stub, variable = "b_x")
-  expect_identical(nrow(pi_one), 1L)
-  expect_identical(rownames(pi_one), "b_x")
+  # The brms default `prob = 0.95`
+  expect_identical(colnames(posterior_interval(stub)), c("2.5%", "97.5%"))
+  expect_identical(colnames(posterior_interval(stub, prob = 0.5)),
+                   c("25%", "75%"))
+  expect_identical(rownames(posterior_interval(stub, variable = "b_x")),
+                   "b_x")
 })
 
 
@@ -145,17 +111,10 @@ test_that("response_column returns the LHS variable", {
 
 # ---- hypothesis.mvgam ----------------------------------------------
 
-test_that("hypothesis.mvgam returns a brmshypothesis on a single test", {
+test_that("hypothesis.mvgam tests a coefficient by its formula name", {
   stub <- make_wrapper_stub()
   h <- hypothesis(stub, "x > 0")
-  expect_s3_class(h, "brmshypothesis")
-  expect_named(
-    h$hypothesis,
-    c("Hypothesis", "Estimate", "Est.Error", "CI.Lower",
-      "CI.Upper", "Evid.Ratio", "Post.Prob", "Star")
-  )
-  expect_identical(nrow(h$hypothesis), 1L)
-  # Estimate equals the posterior mean of b_x drawn from the stub.
+  # The estimate is the posterior mean of `b_x`
   draws_df <- as.data.frame(posterior::as_draws_df(stub$fit))
   expect_equal(
     h$hypothesis$Estimate,
@@ -168,15 +127,13 @@ test_that("hypothesis.mvgam returns a brmshypothesis on a single test", {
 test_that("hypothesis.mvgam accepts multiple hypotheses", {
   stub <- make_wrapper_stub()
   h <- hypothesis(stub, c("x > 0", "Intercept < 1"))
-  expect_s3_class(h, "brmshypothesis")
-  expect_identical(nrow(h$hypothesis), 2L)
-  # As brms does, the default class tests `b_Intercept`, and
-  # `class = NULL` takes any parameter by its full name
+  # As in brms, the default class tests `b_Intercept`. `class = NULL`
+  # takes any parameter by its full name.
   draws_df <- as.data.frame(posterior::as_draws_df(stub$fit))
   expect_equal(h$hypothesis$Estimate[2L] + 1, mean(draws_df$b_Intercept),
                tolerance = 1e-8)
-  expect_s3_class(hypothesis(stub, "b_x > 0", class = NULL),
-                  "brmshypothesis")
+  expect_equal(hypothesis(stub, "sigma > 0", class = NULL)$hypothesis$Estimate,
+               mean(draws_df$sigma), tolerance = 1e-8)
 })
 
 
@@ -192,35 +149,20 @@ test_that("hypothesis.mvgam validates input types", {
 
 # ---- bridge_sampler.mvgam gate -------------------------------------
 
-test_that("bridge_sampler.mvgam rejects un-normalized Stan (_lupdf)", {
-  stub <- make_wrapper_stub()
-  stub$stancode <- "model { target += normal_lupdf(y | mu, sigma); }"
-  expect_error(bridge_sampler(stub), "normalized")
-})
-
-
-test_that("bridge_sampler.mvgam rejects un-normalized Stan (_lupmf)", {
-  stub <- make_wrapper_stub()
-  stub$stancode <- "model { target += poisson_lupmf(y | lambda); }"
-  expect_error(bridge_sampler(stub), "normalized")
-})
-
-
-test_that("bridge_sampler.mvgam surfaces the offending token", {
+test_that("bridge_sampler.mvgam refuses and names an unnormalised density", {
   stub <- make_wrapper_stub()
   stub$stancode <- "model { target += normal_lupdf(y | mu, sigma); }"
   expect_error(bridge_sampler(stub), "_lupdf")
+  stub$stancode <- "model { target += poisson_lupmf(y | lambda); }"
+  expect_error(bridge_sampler(stub), "_lupmf")
 })
 
 
 test_that("bridge_sampler.mvgam rejects an mvgam tilde and names it", {
-  # `_lupdf` is how brms signals a dropped constant. mvgam signals
-  # it by writing a tilde, which Stan strips the constant from just
-  # as silently, so the gate has to read both. Naming the parameter
-  # is what tells a user which prior to look at.
+  # brms drops a constant with `_lupdf`. A Stan tilde drops it too.
+  # The parameter named tells the user which prior to look at.
   stub <- make_wrapper_stub()
   stub$stancode <- "model { sigma_trend ~ exponential(2); }"
-  expect_error(bridge_sampler(stub), "normalized")
   expect_error(bridge_sampler(stub), "sigma_trend")
 })
 

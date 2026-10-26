@@ -9,13 +9,13 @@
 \arguments{
 \item{object}{An object of class \code{mvgam_pooled}.}
 
-\item{probs}{Numeric vector of length 2 specifying quantile
-probabilities for credible intervals. Default is \code{c(0.025,
-  0.975)} for 95\% intervals.}
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
 
-\item{robust}{Logical; if \code{TRUE}, the median and MAD measure
-central tendency and spread. The default \code{FALSE} uses the
-mean and SD.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
 \item{...}{Additional arguments passed to \code{\link{summary.mvgam}}.}
 }

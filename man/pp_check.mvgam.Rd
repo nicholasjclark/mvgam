@@ -199,7 +199,13 @@ Gelman, A. (2019). Visualization in Bayesian workflow.
 }
 \seealso{
 \code{\link{predict.mvgam}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}
+
+Other model checking: 
+\code{\link{mvgam_diagnostics}},
+\code{\link{plot.mvgam}()},
+\code{\link{residuals.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model checking}

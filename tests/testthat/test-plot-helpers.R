@@ -1,6 +1,4 @@
-# Internal helpers shared by every plot method on the branch.
-# Tests exercise quantile math, band ordering, layer counts, and
-# palette / theme composition; no rendering is required.
+# The helpers every plot method builds from. Nothing is rendered.
 
 # Fixed-seed (n_draws x n_time) draws matrix used across tests.
 .make_draws_mat <- function(seed = 1L, n_draws = 200L, n_time = 25L) {
@@ -10,17 +8,12 @@
 
 test_that("mvgam_palette returns the bayesplot scheme vector", {
   red <- mvgam:::mvgam_palette("red")
-  expect_length(red, 6L)
-  expect_equal(red[1L], "#DCBCBC")
-  expect_equal(red[5L], "#8F2727")
-  blue <- mvgam:::mvgam_palette("blue")
-  expect_length(blue, 6L)
-  expect_false(identical(red, blue))
+  expect_equal(red[c(1L, 5L)], c("#DCBCBC", "#8F2727"))
 })
 
 test_that("with_color_scheme restores the prior scheme on exit", {
   local_color_scheme("blue")
-  out <- mvgam:::with_color_scheme("red", mvgam:::mvgam_palette())
+  out <- mvgam:::with_color_scheme(mvgam:::mvgam_palette())
   expect_equal(out[1L], "#DCBCBC")
   prior <- attr(bayesplot::color_scheme_get(), "scheme_name")
   expect_equal(prior, "blue")
@@ -29,18 +22,16 @@ test_that("with_color_scheme restores the prior scheme on exit", {
 test_that("with_color_scheme restores on expression error", {
   local_color_scheme("red")
   expect_error(
-    mvgam:::with_color_scheme("blue", stop("boom"))
+    mvgam:::with_color_scheme(stop("boom"), "blue")
   )
   prior <- attr(bayesplot::color_scheme_get(), "scheme_name")
   expect_equal(prior, "red")
 })
 
-test_that("mvgam_theme returns a ggplot2 theme", {
-  th <- mvgam:::mvgam_theme()
-  expect_true(inherits(th, "theme"))
-  # axis.title weight comes from the theme; sanity check the
-  # element is set rather than inheriting.
-  expect_false(inherits(th$axis.title, "element_blank"))
+test_that("mvgam_theme sets the strips and font size of every figure", {
+  th <- mvgam:::mvgam_theme(base_size = 14)
+  expect_identical(th$strip.background$fill, "grey85")
+  expect_identical(th$axis.title$size, 14)
 })
 
 test_that("mvgam_band_fills shapes match n", {
@@ -59,11 +50,7 @@ test_that("mvgam_band_layer returns one ribbon per probability", {
     probs = c(0.5, 0.8, 0.95)
   )
   expect_length(layers, 3L)
-  expect_true(all(vapply(
-    layers, inherits, logical(1L), what = "LayerInstance"
-  )))
-  # Outer band (95%) is drawn first, so its fill is the lightest
-  # palette entry.
+  # The 95% band is drawn first, in the lightest palette entry
   outer_fill <- layers[[1L]]$aes_params$fill
   inner_fill <- layers[[3L]]$aes_params$fill
   expect_equal(outer_fill, mvgam:::mvgam_palette()[1L])
@@ -105,7 +92,6 @@ test_that("mvgam_median_layer plots the per-column median", {
   mat <- .make_draws_mat()
   times <- seq_len(ncol(mat))
   layer <- mvgam:::mvgam_median_layer(mat, times)
-  expect_true(inherits(layer, "LayerInstance"))
   expect_equal(layer$data$med, unname(apply(mat, 2L, median)))
   expect_equal(layer$aes_params$colour, mvgam:::mvgam_palette()[5L])
 })
@@ -130,22 +116,7 @@ test_that("mvgam_cut_layer is a no-op when t_cut is NULL or NA", {
   expect_null(mvgam:::mvgam_cut_layer(NULL))
   expect_null(mvgam:::mvgam_cut_layer(NA_real_))
   expect_null(mvgam:::mvgam_cut_layer(integer(0L)))
-  cut <- mvgam:::mvgam_cut_layer(t_cut = 42)
-  expect_true(inherits(cut, "LayerInstance"))
-})
-
-test_that("mvgam_facet_series wraps by series", {
-  fct <- mvgam:::mvgam_facet_series()
-  expect_true(inherits(fct, "FacetWrap"))
-})
-
-test_that("mvgam_repel_layer falls back to geom_text without ggrepel", {
-  layer <- mvgam:::mvgam_repel_layer(
-    data = data.frame(x = 1, y = 1, label = "a"),
-    mapping = ggplot2::aes(x = x, y = y, label = label),
-    type = "text"
-  )
-  expect_true(inherits(layer, "LayerInstance"))
+  expect_equal(mvgam:::mvgam_cut_layer(t_cut = 42)$data$xintercept, 42)
 })
 
 test_that("plot_helpers compose into a valid ggplot", {
@@ -157,7 +128,6 @@ test_that("plot_helpers compose into a valid ggplot", {
     mvgam:::mvgam_obs_layer(times = times[c(5, 10)], y = c(1, -1)) +
     mvgam:::mvgam_cut_layer(t_cut = 15) +
     mvgam:::mvgam_theme()
-  expect_true(inherits(p, "ggplot"))
   # 2 band ribbons + 1 median line + 2 obs points + 1 cut line.
   expect_equal(length(p$layers), 6L)
 })
@@ -224,15 +194,9 @@ test_that("resolve_factor_loadings errors on incomplete inputs", {
 })
 
 
-# One theme, one palette, no call site restating either.
-#
-# The package draws roughly twenty figures. Four of them applied
-# `theme_bw()` or `theme_classic()` directly instead of
-# `mvgam_theme()`, so the same impulse response came out under one
-# look from its summary and another from its draws. Twelve hex codes
-# across four files were bayesplot scheme entries written by hand,
-# which meant those panels ignored a user's `color_scheme_set()`
-# while every other panel followed it.
+# One theme and one palette. Every figure takes `mvgam_theme()` and
+# its colours from the scheme the plot method sets, with no theme or
+# scheme colour written at a call site.
 
 test_that("mvgam_colour reads a scheme entry by its role", {
   local_color_scheme("red")
@@ -268,8 +232,8 @@ test_that("no plot applies a ggplot2 theme of its own", {
 })
 
 test_that("no plot writes a scheme colour as a literal", {
-  # Every hex the bayesplot schemes carry, so a call site cannot
-  # freeze one and stop following `color_scheme_set()`.
+  # Every hex the bayesplot schemes carry. A colour comes from the
+  # scheme by its role.
   schemes <- c("red", "blue", "green", "purple", "teal", "gray",
                "yellow", "orange")
   scheme_hex <- unique(toupper(unlist(lapply(
@@ -297,14 +261,14 @@ test_that("no plot writes a scheme colour as a literal", {
 
 
 test_that("legend breaks stay readable when limits come from data", {
-  # A precision heatmap scales to its own entries, and the exact
-  # arithmetic sequence then labelled the legend to seven decimals.
+  # A precision heatmap scales to its own entries. Its breaks are
+  # rounded.
   expect_equal(
     mvgam:::pretty_symmetric_breaks(c(-1, 1)),
     c(-1, -0.5, 0, 0.5, 1)
   )
-  # The endpoints stay inside the limits. ggplot2 dropped a 0.58
-  # rounded past them, which left three breaks on the legend.
+  # The endpoints stay inside the limits. ggplot2 drops a break
+  # rounded past them.
   expect_equal(
     mvgam:::pretty_symmetric_breaks(c(-0.5764995, 0.5764995)),
     c(-0.57, -0.29, 0, 0.29, 0.57)
@@ -321,11 +285,9 @@ test_that("legend breaks stay readable when limits come from data", {
 
 
 test_that("the plotting default holds the parameters a reader reads", {
-  # `mcmc_plot()` and `pairs()` ask one question, so they read one
-  # answer, and it is the taxonomy's. Each response's own family
-  # parameters come with it, which a `^shape$` pattern missed on a
-  # multivariate fit, and the names are the ones `as.array()` hands
-  # back, which raw Stan names are not.
+  # `mcmc_plot()` and `pairs()` take their default from the parameter
+  # taxonomy. It holds each response's family parameters, such as
+  # `shape_pos`, under the names `as.array()` returns.
   raw <- c(
     "b_Intercept", "Intercept", "b_x", "bs_sx_1", "simo_mo1[1]",
     "shape_pos", "shape_cnt", "sds_1[1]", "sdgp_1[1]", "lscale_1[1]",
@@ -340,9 +302,8 @@ test_that("the plotting default holds the parameters a reader reads", {
     ))),
     class = "mvgam"
   )
-  # The loadings a free-Z fit is rotated to are drawn and the raw
-  # basis beside them is not, which is the same filter `variables()`
-  # and `summary()` apply.
+  # The rotated loadings are drawn and the raw `Z` is not, as in
+  # `variables()` and `summary()`.
   expect_setequal(
     mvgam:::default_plot_variables(stub),
     c("b_Intercept", "b_x", "bs_sx_1", "simo_mo1[1]", "shape_pos",

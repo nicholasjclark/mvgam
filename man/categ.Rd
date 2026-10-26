@@ -8,7 +8,7 @@ categ()
 }
 \value{
 A \code{brms::custom_family} object tagged with the
-\code{mvgam_closure_unit}, \code{mvgam_multi_response}, and
+\code{mvgam_closure_unit}, \code{mvgam_multi_response} and
 \code{mvgam_simplex_response} attributes.
 }
 \description{
@@ -23,7 +23,7 @@ the one-hot K-vector and calls Stan's
 }
 \details{
 Categorical is one-trial multinomial: per-site information
-content is at most \code{log2(K)} bits, so recovery of \verb{Z Z'} from
+content is at most \code{log2(K)} bits. Recovery of \verb{Z Z'} from
 single-trial categorical data is intrinsically weaker than
 multinomial or dirichlet at comparable site counts. Stats
 review recommends fixtures with at least 100 sites for K = 4
@@ -48,15 +48,14 @@ corresponding to the observed category for that site and
 }
 \section{Post-fit conventions}{
 
-\code{log_lik()}, \code{loo()}, and \code{waic()} score at the \strong{site grain},
+\code{log_lik()}, \code{loo()} and \code{waic()} score at the \strong{site grain},
 not the (site, species) row grain. The Stan lpdf evaluates the
-joint K-vector Dirichlet density once per closure unit, so the
-per-unit log-density is attributed to the first row of the unit
-and the remaining K - 1 rows return \code{NA} for \code{log_lik()}, which
-is how a row carrying no density of its own is spelled: a \code{0}
-there would assert a density of one, and \code{loo()} would score the
-site once per species. This is
-the only correct grain for joint multi-row outcomes and matches
+joint K-vector Dirichlet density once per closure unit. The per-unit
+log-density is attributed to the first row of the unit. The remaining
+K - 1 rows return \code{NA} for \code{log_lik()}. A row with no density of its
+own is spelled \code{NA}. A \code{0} there would assert a density of one.
+\code{loo()} would then score the site once per species. This is the
+correct grain for joint multi-row outcomes. It matches
 the flocker / ubms convention for closure-unit families;
 Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
 for PSIS-LOO whenever the per-row likelihoods are not
@@ -82,3 +81,17 @@ variables: joint modeling in community ecology. \emph{Trends in
 Ecology and Evolution}, 30(12):766-779.
 \doi{10.1016/j.tree.2015.09.007}
 }
+\seealso{
+Other observation families: 
+\code{\link{beta_nb}()},
+\code{\link{com_binomial}()},
+\code{\link{diri}()},
+\code{\link{multi}()},
+\code{\link{mvgam_families}},
+\code{\link{mvn}()},
+\code{\link{mvt}()},
+\code{\link{nmix}()},
+\code{\link{occ}()},
+\code{\link{tweedie}()}
+}
+\concept{observation families}

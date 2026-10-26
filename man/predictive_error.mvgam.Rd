@@ -18,41 +18,69 @@
 )
 }
 \arguments{
-\item{object}{A fitted \code{mvgam} object.}
+\item{object}{A fitted mvgam object from \code{\link[=mvgam]{mvgam()}}.}
 
-\item{newdata}{Optional \code{data.frame} to compute errors on.
-\code{NULL} (the default) uses the training data.}
+\item{newdata}{Optional data frame with covariates for prediction. If
+NULL, uses original training data stored in the model object.}
 
-\item{method}{One of \code{"posterior_predict"} (default) or
-\code{"posterior_epred"}. Selects the predicted-value primitive
-from which errors are taken.}
+\item{re_formula}{Group-level terms to include: \code{NULL} (the default)
+for every one, \code{NA} for none. A formula choosing some of them is not
+supported.}
 
-\item{resp, re_formula, re.form, ndraws, draw_ids, sort}{Forwarded to the prediction primitive; matched to brms's
-signature.}
+\item{re.form}{The \pkg{lme4} name for \code{re_formula}.}
 
-\item{...}{Unused; present for S3 / brms-parity.}
+\item{method}{\code{"posterior_predict"} (the default) takes the errors
+from predictive draws, \code{"posterior_epred"} from expected values.}
+
+\item{resp}{Character specifying which response variable for
+multivariate models. NULL (default) returns predictions for all
+responses.}
+
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
+
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
+
+\item{sort}{Logical. \code{TRUE} orders the columns by the observed
+response. Defaults to \code{FALSE}.}
+
+\item{...}{Further arguments of the \code{method} function, such as
+\code{incl_autocor} or \code{allow_new_levels}.}
 }
 \value{
-A numeric matrix of dimension
-\verb{[n_draws x n_observations]} containing observed minus
-predicted for each draw and observation.
+An \verb{[ndraws, nobs]} matrix of observed minus predicted
+values.
 }
 \description{
-Returns posterior draws of the response-scale prediction
-error (observed minus predicted) for each observation.
-Mirrors \code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}}.
+Posterior draws of the prediction error, observed minus predicted,
+of each observation on the response scale. The arguments are those
+of \code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}}.
 }
 \details{
-This is the quantity \code{\link[=residuals.mvgam]{residuals.mvgam()}} returns under
-\code{type = "ordinary"}, and it reads the same surface: in sample the
-prediction carries the latent trend state the model inferred at
-that time, while \code{newdata} the fit never saw integrates over the
-trend dynamics instead.
+The errors are those \code{\link[=residuals.mvgam]{residuals.mvgam()}} returns with
+\code{type = "ordinary"}. In sample, each prediction carries the latent
+trend state the model inferred at that time. A prediction for
+\code{newdata} integrates over the trend dynamics.
 }
 \seealso{
 \code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}}, \code{\link[=residuals.mvgam]{residuals.mvgam()}},
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}.
+
+Other predictions: 
+\code{\link{conditional_effects.mvgam}()},
+\code{\link{conditional_smooths.mvgam}()},
+\code{\link{fitted.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{posterior_epred.mvgam}()},
+\code{\link{posterior_linpred.mvgam}()},
+\code{\link{posterior_predict.mvgam}()},
+\code{\link{posterior_smooths.mvgam}()},
+\code{\link{predict.mvgam}()},
+\code{\link{predictive_interval.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{predictions}

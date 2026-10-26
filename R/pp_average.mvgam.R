@@ -1,19 +1,20 @@
-# brms-parity Bayesian model averaging for `mvgam` fits.
-# `posterior_average.mvgam` resamples posterior draws across two
-# or more fits in proportion to model weights;
-# `pp_average.mvgam` does the same on the response/expected/linear
-# predictor scale. Both compose the shared multi-model helpers in
-# `R/mvgam_model_helpers.R` so future combined-forecasting methods
-# can reuse the same plumbing.
+# Bayesian model averaging for `mvgam` fits, as brms provides it.
+# `posterior_average.mvgam` resamples posterior draws across two or
+# more fits in proportion to model weights. `pp_average.mvgam` does
+# the same for predictions. Both use the multi-model helpers in
+# `R/mvgam_model_helpers.R`.
 
 
-#' Model-averaged posterior draws across \pkg{mvgam} fits
+#' Model-averaged posterior draws and predictions across \pkg{mvgam}
+#' fits
 #'
-#' Returns Bayesian model-averaged samples from the posterior of
-#' two or more `mvgam` fits, in proportion to the supplied (or
-#' computed) model weights. Mirrors
-#' [brms::posterior_average.brmsfit()].
+#' Bayesian model averaging of two or more `mvgam` fits, as in
+#' [brms::posterior_average.brmsfit()] and [brms::pp_average.brmsfit()].
+#' Each fit contributes draws in proportion to its model weight.
+#' `posterior_average()` averages parameter draws. `pp_average()`
+#' averages predictions.
 #'
+#' @inheritParams compare_scores
 #' @param x A fitted `mvgam` object. Further fits are passed via
 #'   `...`.
 #' @param ... Additional fitted `mvgam` objects to average over,
@@ -39,40 +40,51 @@
 #'   list keyed by parameter name supplies per-parameter
 #'   defaults; a single numeric is broadcast across every
 #'   missing parameter in every fit that lacks it.
-#' @param model_names Optional character vector naming the fits
-#'   in the same order they were passed.
 #' @param control A list of extra arguments passed to
 #'   [loo::loo_model_weights()] when computing stacking /
 #'   pseudo-BMA weights.
-#' @param seed Optional integer seed for reproducibility.
+#' @param seed Optional integer seed. The session's random state is
+#'   restored when the call returns.
 #'
-#' @return A `data.frame` of model-averaged posterior draws.
-#'   Attributes `weights` and `ndraws` record the per-model
-#'   weight and the integer draw count drawn from each fit.
+#' @return `posterior_average()` returns a `data.frame` of
+#'   model-averaged posterior draws. `pp_average()` returns a numeric
+#'   matrix of averaged predictions. With `summary = TRUE` its rows are
+#'   observations and its columns summary statistics. Otherwise its
+#'   rows are draws and its columns observations. Attribute `weights`
+#'   holds the weight of each fit. Attribute `ndraws` holds the number
+#'   of draws taken from each fit.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [brms::posterior_average.brmsfit()],
-#'   [pp_average.mvgam()], [mvgam_loo_extras].
+#' @seealso [loo_model_weights.mvgam()] computes the weights.
+#'   [ensemble()] averages forecasts. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   weights and combines competing models.
 #'
 #' @examples
 #' \dontrun{
+#' # Two models of one count series: with and without a smooth of x
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
+#'                     n_timepoints = 120L, trend_model = AR())
 #' mod1 <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-#'                data    = simdat$data_train, family = poisson(),
-#'                chains  = 2, silent = 2)
-#' mod2 <- mvgam(y ~ 1,    trend_formula = ~ AR(p = 1),
-#'                data    = simdat$data_train, family = poisson(),
-#'                chains  = 2, silent = 2)
+#'               data   = simdat$data_train, family = poisson(),
+#'               chains = 2, silent = 2)
+#' mod2 <- update(mod1, formula = y ~ 1)
 #'
-#' # 50:50 average of one trend parameter across the two fits.
-#' pa <- posterior_average(mod1, mod2, variable = "ar1_trend",
-#'                          weights = c(0.5, 0.5))
+#' # Stacking weights from approximate leave-one-out cross-validation
+#' loo_model_weights(mod1, mod2)
+#'
+#' # The trend coefficient, averaged over both fits under those weights
+#' pa <- posterior_average(mod1, mod2, variable = "ar1_trend")
+#' attr(pa, "weights")
 #' summary(pa)
+#'
+#' # Averaged expected counts, one row per observation
+#' head(pp_average(mod1, mod2, method = "posterior_epred"))
 #' }
 #'
+#' @family model comparison
 #' @method posterior_average mvgam
 #' @export
 posterior_average.mvgam <- function(x, ..., variable = NULL,
@@ -90,8 +102,8 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
   ndraws <- mvgam_use_alias(ndraws, nsamples)
   split <- mvgam_split_models(x, ..., model_names = model_names)
   models <- split$models
-  # Draws come straight off each `$fit` below, which met an unfitted
-  # stub with "Don't know how to transform an object of class 'NULL'".
+  # Draws come straight off each `$fit` below. An unfitted stub has
+  # none.
   require_fitted_models(models, "posterior_average")
   vars_list <- lapply(models, variables)
   all_vars <- unique(unlist(vars_list))
@@ -153,24 +165,20 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
       )
     }
   }
-  if (is.null(ndraws)) {
-    ndraws <- posterior::ndraws(
-      posterior::as_draws(models[[1L]]$fit)
-    )
-  }
-  ndraws <- as.integer(ndraws)
-  w <- mvgam_validate_weights(weights, models, control = control)
-  ndraws_per <- mvgam_round_largest_remainder(w * ndraws)
-  names(w) <- names(ndraws_per) <- names(models)
+  w <- stats::setNames(
+    mvgam_validate_weights(weights, models, control = control),
+    names(models)
+  )
+  ndraws_per <- mvgam_round_largest_remainder(
+    w * (ndraws %||% posterior::ndraws(models[[1L]]))
+  )
   out <- stats::setNames(
     vector("list", length(models)), names(models)
   )
   for (i in seq_along(models)) {
     if (ndraws_per[i] > 0L) {
-      n_avail <- posterior::ndraws(
-        posterior::as_draws(models[[i]]$fit)
-      )
-      draw_ids <- resolve_draw_indices(n_avail, ndraws_per[i], NULL)
+      draw_ids <- resolve_draw_indices(posterior::ndraws(models[[i]]),
+                                       ndraws_per[i], NULL)
       found <- intersect(variable, variables(models[[i]]))
       if (length(found) > 0L) {
         out[[i]] <- as.data.frame(
@@ -205,55 +213,16 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
 brms::posterior_average
 
 
-#' Model-averaged posterior predictions across \pkg{mvgam} fits
+#' @inheritParams predict.mvgam
+#' @param method Which prediction function `pp_average()` calls on each
+#'   fit before averaging: `"posterior_predict"` (the default),
+#'   `"posterior_epred"` or `"posterior_linpred"`.
+#' @param summary Logical. If `TRUE` (the default), `pp_average()`
+#'   summarises the averaged predictions with
+#'   [posterior_summary.mvgam()] as a mean, an error and two quantiles.
+#'   `FALSE` returns the averaged draws.
 #'
-#' Returns Bayesian model-averaged posterior predictions from
-#' two or more `mvgam` fits, in proportion to the supplied (or
-#' computed) model weights. Mirrors [brms::pp_average.brmsfit()].
-#'
-#' @inheritParams posterior_average.mvgam
-#' @param method Which prediction primitive to call on each fit
-#'   before averaging. One of `"posterior_predict"` (the
-#'   default), `"posterior_epred"`, `"posterior_linpred"`.
-#' @param summary Logical. If `TRUE` (the default), summarise the
-#'   averaged predictions with [posterior_summary.mvgam()] (mean
-#'   / Est.Error / two quantiles); otherwise return the full
-#'   averaged draw matrix.
-#' @param probs Numeric length-2 vector of quantile probabilities
-#'   for the summary path. Defaults to `c(0.025, 0.975)`.
-#' @param robust Logical. If `TRUE`, summarise via median / MAD
-#'   rather than mean / SD on the summary path.
-#'
-#' @return A numeric matrix of averaged predictions. When
-#'   `summary = TRUE`, rows are observations and columns are
-#'   summary statistics; otherwise rows are draws and columns
-#'   are observations. Attributes `weights` and `ndraws` record
-#'   the per-model weight and integer draw count drawn from each
-#'   fit.
-#'
-#' @author Nicholas J Clark
-#'
-#' @seealso [brms::pp_average.brmsfit()],
-#'   [posterior_average.mvgam()], [mvgam_loo_extras].
-#'
-#' @examples
-#' \dontrun{
-#' set.seed(13)
-#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
-#' mod1 <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-#'                data    = simdat$data_train, family = poisson(),
-#'                chains  = 2, silent = 2)
-#' mod2 <- mvgam(y ~ 1,    trend_formula = ~ AR(p = 1),
-#'                data    = simdat$data_train, family = poisson(),
-#'                chains  = 2, silent = 2)
-#'
-#' # 50:50 averaged posterior-predict; summary matrix has
-#' # Estimate / Est.Error / Q2.5 / Q97.5 columns.
-#' head(pp_average(mod1, mod2, weights = c(0.5, 0.5),
-#'                  method = "posterior_predict"))
-#' }
-#'
+#' @rdname posterior_average.mvgam
 #' @method pp_average mvgam
 #' @export
 pp_average.mvgam <- function(x, ..., weights = "stacking",
@@ -270,8 +239,8 @@ pp_average.mvgam <- function(x, ..., weights = "stacking",
   ndraws <- mvgam_use_alias(ndraws, nsamples)
   split <- mvgam_split_models(x, ..., model_names = model_names)
   models <- split$models
-  # Draws come straight off each `$fit` below, which met an unfitted
-  # stub with "Don't know how to transform an object of class 'NULL'".
+  # Draws come straight off each `$fit` below. An unfitted stub has
+  # none.
   require_fitted_models(models, "pp_average")
   other <- split$other
   reserved <- intersect(c("draw_ids", "subset"), names(other))
@@ -289,15 +258,13 @@ pp_average.mvgam <- function(x, ..., weights = "stacking",
       "Can only average models that predict the same response."
     ))
   }
-  if (is.null(ndraws)) {
-    ndraws <- posterior::ndraws(
-      posterior::as_draws(models[[1L]]$fit)
-    )
-  }
-  ndraws <- as.integer(ndraws)
-  w <- mvgam_validate_weights(weights, models, control = control)
-  ndraws_per <- mvgam_round_largest_remainder(w * ndraws)
-  names(w) <- names(ndraws_per) <- names(models)
+  w <- stats::setNames(
+    mvgam_validate_weights(weights, models, control = control),
+    names(models)
+  )
+  ndraws_per <- mvgam_round_largest_remainder(
+    w * (ndraws %||% posterior::ndraws(models[[1L]]))
+  )
   pred_fun <- match.fun(method)
   out <- vector("list", length(models))
   for (i in seq_along(models)) {

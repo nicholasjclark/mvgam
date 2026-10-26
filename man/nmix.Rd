@@ -24,10 +24,10 @@ counts \code{y ~ Poisson(N * p)} with log-link per-individual
 encounter rate \code{p}.}
 
 \item{multi_season}{Logical. When \code{TRUE}, closure units are
-defined by \verb{(series, site, time)} instead of the default
-\verb{(series, time)}. The data must carry a \code{site} column;
-produce it from a 4-axis observation array with
-\code{\link[=pivot_detection_array]{pivot_detection_array()}} (set \code{multi_season = "hierarchical"}).
+defined by \verb{(series, site, time)}. The default is \verb{(series, time)}.
+The data must carry a \code{site} column. Produce it from a 4-axis
+observation array with \code{\link[=pivot_detection_array]{pivot_detection_array()}} (set
+\code{multi_season = "hierarchical"}).
 Per-unit \code{Y_max[g]} and the K_max buffer (\code{Y_max[g] + 100} for
 PB and PPM by default; static \code{K_max = 25} for RN) are
 computed from the visits in unit \code{g} only. With few visits per
@@ -79,15 +79,14 @@ guidance from Kery (2018, \emph{Ecology}): with 3 or more visits
 per unit the model is reliably identified for detection
 probabilities above 0.1; with 2 visits identification is
 marginal below \code{p = 0.3}. \code{validate_closure_unit_data()}
-warns when the average visit count is below 2 and errors when
-every unit has only one visit alongside no covariates.
+warns when the average visit count is below 2. It errors when every
+unit has only one visit and the model has no covariates.
 
-Under overdispersed counts (negative-binomial truth instead
-of Poisson), the detection probability is biased downward
-and the abundance is biased upward; the product \code{lambda * p}
-remains approximately consistent (Knape et al. 2018,
-\emph{Methods in Ecology and Evolution}). Use posterior
-predictive checks to detect this; refit with a richer
+Under overdispersed counts (negative-binomial truth in place of
+Poisson), the detection probability is biased downward. The abundance
+is biased upward. The product \code{lambda * p} stays approximately
+consistent (Knape et al. 2018, \emph{Methods in Ecology and Evolution}).
+Use posterior predictive checks to detect this. Refit with a richer
 abundance distribution if overdispersion is present.
 
 Data shape. A long-format data frame, one row per visit, with
@@ -97,11 +96,10 @@ within a closure unit), plus any covariates referenced in the
 formulae. Multiple rows sharing the same (series, time) pair
 encode replicate visits to one closure unit.
 
-Prediction at different caps. \code{cap} is carried as a data
-column, not stored only as a Stan scalar. Predicting via
-\code{predict(fit, newdata = X)} re-extracts the closure-unit
-arrays from \code{newdata}, so users can request latent-abundance
-draws under arbitrary upper truncations by supplying
+Prediction at different caps. \code{cap} is stored as a data column as well
+as in the Stan data. Predicting via \code{predict(fit, newdata = X)}
+re-extracts the closure-unit arrays from \code{newdata}. Users can request
+latent-abundance draws under arbitrary upper truncations by supplying
 \code{newdata} with different \code{cap} values. Set \code{cap} higher than
 the fit-time cap to expand the latent-state support;
 fit-time caps are reused when \code{newdata} is \code{NULL}.
@@ -125,19 +123,19 @@ visit, \code{y ~ Bernoulli(1 - (1 - r)^N)}. Requires \code{y} to be
 0 / 1. Fits surveys where the response is detect /
 not-detect: camera-trap photos collapsed over an interval,
 occupancy-style replicates, eDNA samples scored as binary.
-Detection is per-individual, so two individuals at a site
-can each push the visit-level probability up.}
+Detection is per-individual. Two individuals at a site can each
+push the visit-level probability up.}
 \item{\code{"poisson_poisson"} (Neyman Type A; Neyman 1939)}{Counts
-\code{y ~ Poisson(N * p)}. \code{y} is unbounded and can exceed \code{N}
-because each individual contributes an independent Poisson
-encounter rate. Fits encounter surveys where the same
+\code{y ~ Poisson(N * p)}. \code{y} is unbounded and can exceed \code{N}. Each
+individual contributes an independent Poisson encounter rate.
+Fits encounter surveys where the same
 individual can be recorded multiple times per visit:
 camera-trap event counts, acoustic detection counts,
 mark-resight encounters. Log-link on both \code{lambda} and
 \code{p}.}
 }
 
-Pick the variant from the survey, not the data: 0 / 1 visits
+Pick the variant from the survey design: 0 / 1 visits
 need \code{royle_nichols}; counts that cap at abundance need
 \code{poisson_binomial}; counts that can re-detect the same
 individual need \code{poisson_poisson}. PB and RN have the same
@@ -190,21 +188,20 @@ intercept is tighter than the Poisson-binomial default
 \verb{(0.1, 10)} encounters per individual per visit) for the same
 reason. The truncated-N marginalisation is required: the
 closed-form Poisson(\code{lambda * p}) marginal is mean-equivalent
-but distribution-wrong (it drops the Neyman Type A over-
-dispersion, which is the only handle on separating \code{lambda}
-from \code{p}; under the closed form the likelihood depends only
-on the product \code{lambda * p}, so individual posteriors on
-\code{lambda} and \code{p} are prior-dominated and
-\code{predict(type = "latent_state")} returns the prior on \code{N}
-rather than a data-informed posterior).
+but distribution-wrong. It drops the Neyman Type A over-dispersion,
+which is what separates \code{lambda} from \code{p}. Under the
+closed form the likelihood depends only on the product \code{lambda * p}.
+Individual posteriors on \code{lambda} and \code{p} are dominated by the prior.
+\code{predict(type = "latent_state")} returns the prior on \code{N} in place of
+a data-informed posterior.
 }
 
 \section{Priors (Poisson-Poisson)}{
 
 For Poisson-Poisson fits the recommended starting prior on
-the log-scale \code{p} intercept is \code{Normal(0, 1)}, which puts
-most prior mass on encounter rates between \code{exp(-2) ~ 0.14}
-and \code{exp(2) ~ 7.4} per individual per visit. Pass this prior
+the log-scale \code{p} intercept is \code{Normal(0, 1)}. That prior puts most of
+its mass on encounter rates between \code{exp(-2) ~ 0.14} and
+\code{exp(2) ~ 7.4} per individual per visit. Pass this prior
 via the \code{prior} argument of \code{\link[=mvgam]{mvgam()}}:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(y ~ elev,
@@ -220,15 +217,14 @@ should shift down (e.g. \code{Normal(-2, 0.5)}); for passive
 acoustic monitors logging many detections per individual the
 centre should shift up (e.g. \code{Normal(2, 0.5)}). The
 identifiability validator emits a \code{rlang::warn(...)} only at
-the fully intercept-only configuration; with one-sided
-covariates the intercept of the formula without a covariate
-is still weakly identified, so an informative prior on that
-intercept remains advisable.
+the fully intercept-only configuration. With one-sided covariates,
+the intercept of the formula without a covariate is still weakly
+identified. An informative prior on that intercept remains advisable.
 }
 
 \section{K_max defaults and saturation}{
 
-Each variant has a default that fires when the user supplies no
+Each variant has a default that applies when the user supplies no
 \code{cap} column on the input data:
 \itemize{
 \item Poisson-binomial and Poisson-Poisson default to
@@ -242,37 +238,35 @@ the marginalisation when abundance is known to be low.
 no per-unit floor.
 }
 Whenever a user supplies a \code{cap} column whose value is below
-the observed maximum \code{y} for a unit, the validator errors with
-the offending unit identifier; the marginalisation floor
-(\code{max(y)}) would otherwise exceed the ceiling (\code{K_max}) and the
-likelihood would silently degenerate to an empty sum.
+the observed maximum \code{y} for a unit, the validator errors and names
+the offending unit identifier. Otherwise the marginalisation floor
+(\code{max(y)}) would exceed the ceiling (\code{K_max}). The likelihood would
+then degenerate to an empty sum silently.
 
-Post-fit, \code{\link[=latent_N_saturation]{latent_N_saturation()}} reports the share of the
-conditional posterior that sits at \code{K_max[g]} for each unit;
-units flagged there should have their cap raised to remove
-truncation bias in \code{lambda}. The Royle-Nichols default is the
-most likely to need overriding because of the static fallback;
-Poisson-Poisson should also satisfy
-\code{ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4} for
-the tail to be negligible.
+Post-fit, \code{\link[=latent_N_saturation]{latent_N_saturation()}} reports the share of the conditional
+posterior at \code{K_max[g]} for each unit. Units with a high share should
+have their cap raised, which removes truncation bias in \code{lambda}. The
+Royle-Nichols default is most likely to need overriding, owing to its
+static fallback. A Poisson-Poisson cap should also satisfy
+\code{ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4} for the tail
+to be negligible.
 }
 
 \section{JSDM with imperfect detection}{
 
 Passing \code{nmix()} to \code{\link[=jsdgam]{jsdgam()}} with \code{n_lv > 0} composes the
-closure-unit marginalisation with the Heaps factor model so the
-user gets a hierarchical JSDM whose three levels each live in
-a distinct dpar:
+closure-unit marginalisation with the Heaps factor model. The user
+then gets a hierarchical JSDM. Its three levels each occupy a distinct
+dpar:
 
 \describe{
 \item{\strong{lowest level}: env-driven latent factors.}{
 \code{factor_formula = ~ s(env, by = lv_axis())} makes each
 latent factor a smooth of an environmental covariate. The
-factors are identified by their environmental signature
-rather than by being free draws, which removes the
-intercept-vs-Z*lv competition that otherwise hampers
-identification when site-level intercepts are also fit on
-\code{mu}.}
+factors are identified by their environmental signature. They
+are not free draws. That removes the intercept-versus-Z*lv
+competition, which otherwise hampers identification when
+site-level intercepts are also fit on \code{mu}.}
 \item{\strong{middle level}: species loadings.}{Each species \code{s}
 loads on the \code{K} factors via the row \verb{Z[s, :]}, so
 \verb{log_lambda[s, i] = b_X(species) + Z[s, :] \%*\% lv[i, :]}
@@ -282,14 +276,12 @@ Jermyn (2024) post-hoc QR.}
 carries its own brms sub-formula (e.g.,
 \code{bf(y ~ species, p ~ visit_effort)}) so the detection
 process is modelled independently of the latent abundance.
-The lpmf marginalises latent \code{N} per closure unit; nothing
-about the factor model has to be aware of the
-marginalisation, and nothing about the marginalisation has
-to be aware of the factor model.}
+The lpmf marginalises latent \code{N} per closure unit. No part of
+the factor model depends on the marginalisation. No part of the
+marginalisation depends on the factor model.}
 }
 
-Recovery on this composition is documented in
-\code{tests/local/jsdgam_mv_nmix.R}. See \code{\link[=jsdgam]{jsdgam()}} for the
+See \code{\link[=jsdgam]{jsdgam()}} for the
 wrapper-level API and \code{\link[=lv_axis]{lv_axis()}} for the \code{by = lv_axis()}
 sentinel that turns smooths into per-factor regressors.
 }
@@ -297,42 +289,41 @@ sentinel that turns smooths into per-factor regressors.
 \section{Importing array data}{
 
 Detection-history data from \code{unmarked::unmarkedFramePCount},
-\code{spOccupancy}, \code{ubms}, and \code{flocker} arrives as a 2D \verb{[J, K]}
-matrix (single-species), 3D \verb{[N, J, K]} array (multi-species),
-4D \verb{[N, J, T, K]} array (multi-season multi-species), or named
-list of \verb{[J, K]} matrices (\code{unmarkedFrameOccuMulti}). Use
-\code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert any of these into the
-long-format \code{data} that \code{mvgam(family = nmix())} /
-\code{jsdgam(family = nmix())} expects, with \code{site_covs},
-\code{season_covs}, \code{site_season_covs}, and \code{obs_covs} broadcast
-across the right grid axes.
+\code{spOccupancy} or \code{ubms} takes the form of a 2D \verb{[J, K]} matrix
+(single-species), 3D \verb{[N, J, K]} array (multi-species), 4D
+\verb{[N, J, T, K]} array (multi-season multi-species), or named list of
+\verb{[J, K]} matrices (\code{unmarkedFrameOccuMulti}). Use
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert any of these into the long-format
+\code{data} that \code{mvgam(family = nmix())} and \code{jsdgam(family = nmix())}
+expect. The covariates \code{site_covs}, \code{season_covs}, \code{site_season_covs}
+and \code{obs_covs} are broadcast across the right grid axes.
 }
 
 \section{Performance and threading}{
 
-The Stan emission for \code{nmix()} carries three optimisations
-beyond a naive K-loop enumeration:
+The Stan emission for \code{nmix()} has three optimisations beyond a naive
+K-loop enumeration:
 \itemize{
 \item \strong{Analytic ratio recurrence.} The Poisson-binomial
 marginalisation uses the log-space Horner form of the
 ratio recurrence \verb{T_N / T_\{N-1\}}, evaluated backward from
-\code{K_max} to \code{K_min + 1}. Avoids per-\code{k} re-evaluation of
-\code{binomial_logit_lpmf} that the naive \code{log_sum_exp} form
-pays.
+\code{K_max} to \code{K_min + 1}. This avoids the per-\code{k} re-evaluation
+of \code{binomial_logit_lpmf} that the naive \code{log_sum_exp} form
+incurs.
 \item \strong{Cached log(N) lookup.} \code{log(N)} and
 \code{log(N - counts[j])} values come from a \code{log_n_lookup}
 vector precomputed once in \verb{transformed data}, replacing
 scalar \code{log()} calls per inner iteration.
 \item \strong{partial_sum + reduce_sum.} The per-closure-unit
-body lives in \code{partial_sum_nmix_lpmf} and the lpmf
-wrapper calls \code{reduce_sum} over the closure-unit index.
+body is the function \code{partial_sum_nmix_lpmf}. The lpmf wrapper
+calls \code{reduce_sum} over the closure-unit index.
 With \code{mvgam(threads = N)} for \code{N > 1} the model is
 compiled with \code{stan_threads = TRUE} and TBB splits the
 closure-unit slice across \code{N} threads. Without
 \code{threads}, \code{reduce_sum} falls back to a serial loop.
-Grainsize is set to \code{max(1, N_unit \%/\% 8)} so single-
-threaded fits pay only ~8 dispatch calls per leapfrog
-and multi-threaded fits see ~8 chunks across cores.
+Grainsize is set to \code{max(1, N_unit \%/\% 8)}. Single-threaded
+fits then pay about 8 dispatch calls per leapfrog. Multi-threaded
+fits see about 8 chunks across cores.
 }
 On a 150-unit fixture (n_rep = 6, lambda ~ 4, K_max = 14),
 the stack delivers roughly 2x sampling throughput vs the
@@ -396,12 +387,23 @@ from repeated presence-absence data or point counts.
 \doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}.
 }
 \seealso{
-\code{\link[=occ]{occ()}} for the related joint-occupancy family,
-\code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for the closure-unit goodness-of-fit
-surface. The online article at
-\url{https://nicholasjclark.github.io/mvgam/articles/nmix.html}
-introduces N-mixture and joint-occupancy modelling in mvgam
-end-to-end; see also \code{vignette("data", package = "mvgam")}
-for the closure-unit data-shape requirements that \code{nmix()}
-consumes.
+\code{\link[=occ]{occ()}} for the related joint-occupancy family and
+\code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for closure-unit goodness-of-fit checks. The
+\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} fits N-mixture and
+occupancy models from data preparation to inference. The
+\href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data article} sets out the row layout
+that \code{nmix()} expects.
+
+Other observation families: 
+\code{\link{beta_nb}()},
+\code{\link{categ}()},
+\code{\link{com_binomial}()},
+\code{\link{diri}()},
+\code{\link{multi}()},
+\code{\link{mvgam_families}},
+\code{\link{mvn}()},
+\code{\link{mvt}()},
+\code{\link{occ}()},
+\code{\link{tweedie}()}
 }
+\concept{observation families}

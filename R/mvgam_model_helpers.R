@@ -203,18 +203,18 @@ mvgam_validate_weights <- function(weights, models,
 #' function `round_largest_remainder()`.
 #'
 #' @param x Non-negative numeric vector of fractional counts
-#' @return Integer vector of counts summing to `round(sum(x))`
+#' @return Integer vector of counts summing to `round(sum(x))`, with the
+#'   names of `x`
 #' @noRd
 mvgam_round_largest_remainder <- function(x) {
   checkmate::assert_numeric(x, lower = 0, any.missing = FALSE)
-  x <- as.numeric(x)
   total <- round(sum(x))
   out <- floor(x)
   diff <- x - out
   J <- order(diff, decreasing = TRUE)
   I <- seq_len(total - floor(sum(out)))
   out[J[I]] <- out[J[I]] + 1L
-  as.integer(out)
+  stats::setNames(as.integer(out), names(x))
 }
 
 

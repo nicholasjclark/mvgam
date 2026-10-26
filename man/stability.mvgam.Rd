@@ -19,8 +19,8 @@ stability(object, ...)
 )
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call
-to \code{\link[=mvgam]{mvgam()}} that used a \code{VAR(p = 1)} latent process model}
+\item{object}{An object of class \code{mvgam} fitted with a
+\code{VAR(p = 1)} latent process model}
 
 \item{...}{Unused. Anything passed here is refused.}
 
@@ -29,12 +29,12 @@ by name or by index into the levels of \code{gr}. The default \code{NULL}
 summarises every panel. A non-hierarchical fit accepts \code{NULL}
 alone.}
 
-\item{ndraws}{Optional integer; the number of posterior draws to use.
-Each draw costs a Lyapunov solve. A subset of draws shortens the
-computation on a wide panel. Default \code{NULL} uses every draw.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Optional integer vector naming the posterior draws to
-use, in place of \code{ndraws}.}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
 \item{summary}{Logical. \code{TRUE} (the default) returns the posterior
 median and interval of each metric. \code{FALSE} returns the metrics of
@@ -43,11 +43,12 @@ each draw. \code{plot()} draws histograms of either form.}
 \item{probs}{The lower and upper percentiles of the interval reported
 with the median when \code{summary = TRUE}.}
 
-\item{future}{\code{Logical}. When \code{TRUE}, per-draw stability
-computation runs under whatever
-\code{\link[future:plan]{future::plan()}} the caller has set;
-see \code{\link[=irf]{irf()}} for details. Requires the \code{future} package
-(mvgam Suggests).}
+\item{future}{\code{Logical}. When \code{TRUE}, the per-draw computation
+runs under the \code{\link[future:plan]{future::plan()}} the caller
+has set. The default \code{sequential} plan runs as base \code{lapply()}
+does. \code{plan(multisession, workers = N)} splits the draws across
+\code{N} R processes. Without the \pkg{future} package the draws
+run in turn, with a message.}
 }
 \value{
 A \code{data.frame} with the posterior median and interval of
@@ -136,6 +137,8 @@ stab[stab$metric \%in\% c("reactivity", "mean_return_rate"), ]
 
 # The full posterior of each metric
 plot(stability(var_mod, summary = FALSE))
+
+# Next: irf() traces a shock through the system over time
 }
 
 }
@@ -152,15 +155,23 @@ autoregressions. \emph{Journal of Computational and Graphical
 Statistics}, 32, 74-83.
 }
 \seealso{
-\code{\link{VAR}}, \code{\link{irf}}, \code{\link{fevd}},
-\code{\link{plot.mvgam_stability}},
-\code{\link{plot.mvgam_irf}},
-\code{\link{plot.mvgam_fevd}},
-\code{\link{plot.mvgam_forecast}}.
-The article at
-\url{https://nicholasjclark.github.io/mvgam/articles/var.html}
-runs \code{stability()} on a plankton community.
+\code{\link[=irf]{irf()}} and \code{\link[=fevd]{fevd()}} summarise the same VAR dynamics.
+The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{stability()} on
+a plankton community. The
+\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
+reports the metrics for each group of a hierarchical VAR.
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{fevd.mvgam}()},
+\code{\link{irf.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{residual_cor}()},
+\code{\link{shared_variation}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

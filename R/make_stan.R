@@ -38,7 +38,8 @@ write_stan_program <- function(stancode, path) {
 #' @param sample_prior,knots,drop_unused_levels,normalize brms code
 #'   generation options, gathered by `mvgam_codegen_options()`
 #' @param backend "rstan" or "cmdstanr"
-#' @param threads Threads per chain
+#' @param threads Threads per chain: a count, a `brms::threading()`
+#'   object or `NULL` for one
 #' @param save_model Path to write the assembled program to, or NULL
 #' @param silent Verbosity, 0 to 2
 #' @param stanvars User stanvars, or NULL
@@ -56,14 +57,13 @@ build_stan_components <- function(formula, data, family = gaussian(),
                                  sample_prior = "no",
                                  knots = NULL, drop_unused_levels = TRUE,
                                  backend = "rstan",
-                                 threads = 1L,
+                                 threads = NULL,
                                  normalize = TRUE, save_model = NULL,
                                  silent = 1L,
                                  stanvars = NULL, validate = TRUE,
                                  trend_map = NULL,
                                  loadings_prior = NULL, ...) {
 
-  # Input validation
   checkmate::assert_class(formula, "mvgam_formula")
   checkmate::assert_data_frame(data, min.rows = 1)
   if (!is.null(data2)) {
@@ -77,19 +77,17 @@ build_stan_components <- function(formula, data, family = gaussian(),
   checkmate::assert_class(stanvars, "stanvars", null.ok = TRUE)
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
-  checkmate::assert_int(threads, lower = 1)
+  threads <- thread_count(threads)
   checkmate::assert_int(silent, lower = 0, upper = 2)
   # `stancode()` and `standata()` reach here without passing through
-  # `mvgam()`, which records `silent` for its own call. The mock brms
-  # fit below takes its verbosity from the option.
-  old_silent <- options(mvgam.silent = silent)
-  on.exit(options(old_silent), add = TRUE)
+  # `mvgam()`. The mock brms fit below takes its verbosity from the
+  # option.
+  local_mvgam_silent(silent)
 
-  # One list carries the brms code-generation options from here to
-  # the mock fit and on to every regeneration underneath it, so the
-  # program, its data and the prior table cannot be built under
-  # different bases or different factor levels. It validates its own
-  # arguments.
+  # One list carries the brms code-generation options to the mock fit
+  # and to every later regeneration. The program, its data and the
+  # prior table then share one set of bases and factor levels.
+  # `mvgam_codegen_options()` validates its own arguments.
   codegen <- mvgam_codegen_options(
     knots = knots,
     sample_prior = sample_prior,
@@ -147,8 +145,8 @@ build_stan_components <- function(formula, data, family = gaussian(),
     )
   }
 
-  # Each response's family, read once the closure-unit family above
-  # carries its data.
+  # Each response's family, taken after `prepare_closure_unit_family()`
+  # has attached its data.
   families <- formula_families(obs_formula, family)
 
   # A custom family such as `tweedie()` carries its function block and
@@ -195,7 +193,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
       feature = "'sum_to_zero_vector[K]' for simplex families"
     )
   }
-  # `com_binomial()` reads its denominator from its own response's
+  # `com_binomial()` takes its denominator from its own response's
   # `trials()` term.
   forms <- response_formulas(obs_formula)
   for (key in names(families)) {
@@ -212,11 +210,10 @@ build_stan_components <- function(formula, data, family = gaussian(),
   )
   obs_priors <- filter_priors_by_side(prior, "obs")
 
-  # What both submodels are built under. Named once, because the two
-  # calls below differ only in their formula, data, family, priors and
-  # stanvars, and an argument added to one and not the other builds the
-  # observation and trend halves under different settings without
-  # saying so.
+  # The settings both submodels are built under. The two calls below
+  # differ only in their formula, data, family, priors and stanvars. A
+  # setting given to one call alone would build the observation and
+  # trend halves under different settings without a message.
   shared_setup <- list(
     data2 = data2,
     codegen = codegen,
@@ -243,12 +240,13 @@ build_stan_components <- function(formula, data, family = gaussian(),
     trend_priors <- filter_priors_by_side(prior, "trend")
 
     # Each response's column, named by the key brms suffixes its data
-    # and parameters with: the frame is read by the one and the
-    # program is written with the other.
+    # and parameters with. The frame takes the column names. The
+    # program takes the keys.
     response_vars <- response_columns(obs_formula)
 
-    # The axes are resolved here once, and the dimensions they give
-    # travel on the spec
+    # The axes are resolved here once.
+    # `extract_and_validate_trend_components()` stores the dimensions
+    # they give on the spec.
     components <- extract_and_validate_trend_components(
       data, mv_spec, response_vars, family = family
     )
@@ -303,12 +301,11 @@ build_stan_components <- function(formula, data, family = gaussian(),
     collapse = "\n"
   )
 
-  # Parse the polished program, which is the one compiled. Polishing
-  # moves statements between blocks, and a parse of the unpolished
-  # program cannot see a statement moved away from the scope it needs.
-  # `backend` picks the parser the user compiles with: simplex families
-  # need Stan >= 2.36 through cmdstanr and fail under rstan's bundled
-  # parser.
+  # Parse the polished program, the one compiled. Polishing moves
+  # statements between blocks. A parse of the unpolished program misses
+  # a statement moved away from the scope it needs. `backend` picks the
+  # parser the user compiles with. Simplex families need Stan >= 2.36
+  # through cmdstanr and fail under rstan's bundled parser.
   if (isTRUE(validate)) {
     validate_stan_code(
       combined_components$stancode,
@@ -338,13 +335,13 @@ build_stan_components <- function(formula, data, family = gaussian(),
 
 #' Generate the Stan components for an `mvgam_formula`
 #'
-#' The single code-generation entry point behind `mvgam()`,
-#' `stancode()` and `standata()`. Delegates to
-#' `build_stan_components()`, which runs brms's code generator three
-#' times: once for the lightweight skeleton, once for the base Stan
-#' code and once for the base Stan data. All three validate the same
-#' data frame, so anything brms reports about that data would
-#' otherwise reach the user three times over for one model.
+#' The code-generation entry point of `mvgam()`, `stancode()` and
+#' `standata()`. Delegates to `build_stan_components()`, which runs
+#' brms's code generator three times: once for the lightweight
+#' skeleton, once for the base Stan code and once for the base Stan
+#' data. All three validate the same data frame. Each brms notice
+#' about that data would otherwise reach the user three times for one
+#' model.
 #'
 #' @inheritParams build_stan_components
 #' @inherit build_stan_components return
@@ -357,13 +354,12 @@ generate_stan_components_mvgam_formula <- function(...) {
 
 #' Is the trend scale confounded with the observation scale?
 #'
-#' `ZMVN()` gives the latent state no temporal structure, so on a
-#' single series its innovations and the observation residuals are
-#' both iid draws with nothing to tell them apart: only
-#' `sigma_trend^2 + sigma^2` is identified and the split between
-#' them is whatever the priors say. Two series are enough to break
-#' the tie, since `Sigma_trend` then carries a cross-series
-#' covariance the observation noise cannot produce.
+#' `ZMVN()` gives the latent state no temporal structure. On a single
+#' series its innovations and the observation residuals are then both
+#' iid draws. The data cannot tell them apart. Only
+#' `sigma_trend^2 + sigma^2` is identified. The priors set the split
+#' between them. Two series break the tie: `Sigma_trend` then carries a
+#' cross-series covariance the observation noise cannot produce.
 #'
 #' A family with no residual scale is unaffected: a Poisson has no
 #' `sigma` for the trend to trade against.
@@ -454,13 +450,13 @@ stacked_design_matrix <- function(sdata, trend_intercept = FALSE) {
       nrow(sdata[[nm]]) == n
   }, nms)
   # One observation design named `X`. A multivariate formula keys its
-  # designs by response, and those belong to separate likelihoods.
+  # designs by response. Each belongs to a separate likelihood.
   if (!("X" %in% obs_nms) || !(length(trend_nms) || trend_intercept)) {
     return(NULL)
   }
-  # A block carries its own column names where brms wrote them, and
-  # a basis column is numbered otherwise, which keeps every column of
-  # the result nameable in the notice.
+  # A block keeps the column names brms wrote. A block without them
+  # has its columns numbered. Every column of the result is then
+  # named in the notice.
   labelled <- function(nm, rows) {
     block <- as.matrix(sdata[[nm]])
     if (!is.null(rows)) {
@@ -580,52 +576,73 @@ brms_threading_case <- function(threads, family, mv_spec) {
 }
 
 
-#' Stan code of an mvgam model
+#' Stan code and data of an mvgam model
 #'
-#' The Stan program `mvgam()` would compile for an \code{mvgam_formula},
-#' generated without fitting.
+#' The Stan program and data list of an mvgam model. For an
+#' [mvgam_formula()] they are generated without fitting, as `mvgam()`
+#' would build them from the same arguments. For an `mvgam` model they
+#' are the ones the model was built with. Pass the two to \pkg{rstan}
+#' or \pkg{cmdstanr} to run the model outside mvgam. The program
+#' shows how the trend enters the linear predictor.
 #'
-#' @param object An \code{mvgam_formula} object created by
-#'   \code{mvgam_formula()}.
-#' @param data A data frame containing all variables referenced in the formula.
 #' @inheritParams mvgam
-#' @param prior An optional \code{brmsprior} object containing custom prior
-#'   specifications. Can be created using \code{brms::prior()}.
+#' @param object An [mvgam_formula()], or an `mvgam` model fitted or
+#'   built with `run_model = FALSE`.
+#' @param data A data frame holding every variable the formulas use.
+#' @param prior A `brmsprior` of priors to set, from [brms::prior()].
+#'   [get_prior.mvgam_formula()] lists the classes.
 #' @param data2 A named list of objects the model uses that are not
-#'   variables in \code{data}, as in \code{\link[brms]{brm}}.
-#' @param sample_prior Character string indicating whether to sample from priors
-#'   only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.
-#' @param knots Optional named list of knot positions for spline terms, passed
-#'   to the basis constructors for both the observation and trend formulas.
-#' @param drop_unused_levels Logical; should unused factor levels be dropped?
-#'   Default is \code{TRUE}.
-#' @param backend Character string specifying Stan backend. Options:
-#'   \code{"rstan"} (default) or \code{"cmdstanr"}.
-#' @param threads Number of threads within each chain. Default is
-#'   \code{1}.
-#' @param normalize Logical; should brms drop the normalising constants from
-#'   its sampling statements? Default is \code{TRUE}.
-#' @param save_model File path to write the assembled Stan program to. If
-#'   \code{NULL} (default), nothing is written.
-#' @param silent Integer controlling verbosity, following the
-#'   \pkg{brms} convention. 0 prints Stan's exceptions as well as its
-#'   progress, 1 (the default) prints progress alone, and 2 prints
-#'   nothing.
-#' @param stanvars Optional \code{\link[brms]{stanvar}} object holding
-#'   user Stan code to add to the program, merged with the stanvars
-#'   mvgam generates for the trend.
-#' @param validate Logical; should the generated Stan code be validated?
-#'   Default is \code{TRUE}.
-#' @param ... Additional arguments passed to internal functions.
+#'   variables in `data`, as in [brms::brm()].
+#' @param sample_prior `"no"` (the default), `"yes"` or `"only"`, as in
+#'   [brms::brm()].
+#' @param knots Optional named list of knot positions for spline terms,
+#'   used by the observation and trend formulas alike.
+#' @param drop_unused_levels Logical. `TRUE` (the default) drops factor
+#'   levels without observations.
+#' @param backend `"rstan"` (the default) or `"cmdstanr"`.
+#' @param threads Number of threads within each chain. Defaults to 1.
+#' @param normalize Logical. `TRUE` (the default) keeps the normalising
+#'   constants of the sampling statements.
+#' @param save_model File path to write the Stan program to, or `NULL`
+#'   (the default) to write nothing.
+#' @param silent Integer verbosity, as in [brms::brm()]. 0 prints
+#'   Stan's exceptions and progress, 1 (the default) prints progress
+#'   and 2 prints nothing.
+#' @param stanvars Optional [brms::stanvar()] object of Stan code to
+#'   add to the program, merged with the code mvgam writes for the
+#'   trend.
+#' @param validate Logical. `TRUE` (the default) checks the program
+#'   with the Stan parser.
+#' @param ... For an [mvgam_formula()], other arguments of [mvgam()].
+#'   A name [mvgam()] does not take is refused. For an `mvgam` model,
+#'   unused. Anything passed is refused.
 #'
-#' @return A character string of the Stan program, observation and trend
-#'   together. \code{mvgam()} compiles the same program from the same
-#'   arguments.
+#' @return `stancode()` returns the Stan program as a character string
+#'   of class `mvgamstancode`, which prints line by line. `standata()`
+#'   returns the named list of Stan data.
 #'
-#' @seealso
-#' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
-#' \code{\link[brms]{standata}}, \code{\link{mvgam}}
+#' @examples
+#' set.seed(1)
+#' dat <- sim_mvgam(family = poisson(), n_series = 2L,
+#'                  n_timepoints = 40L, trend_model = AR())$data_train
+#' mf <- mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1))
 #'
+#' # The program of the model, before any fitting. The trend's
+#' # parameters carry a `_trend` suffix.
+#' code <- stancode(mf, data = dat, family = poisson())
+#' code
+#'
+#' # The data passed to that program: 60 observations of 2 series
+#' # over 30 time points
+#' sdata <- standata(mf, data = dat, family = poisson())
+#' sdata[c("N", "N_series_trend", "N_time_trend")]
+#'
+#' # Next, fit the model with mvgam(), which compiles this program
+#'
+#' @seealso [mvgam()], [mvgam_formula()], [get_prior.mvgam_formula()].
+#'   [methods_md()] writes the same model as equations for a methods
+#'   section.
+#' @family model fitting
 #' @export
 stancode.mvgam_formula <- function(object, data, family = gaussian(),
                                    prior = NULL, data2 = NULL,
@@ -643,17 +660,15 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
     knots, drop_unused_levels, backend, threads, normalize,
     save_model, silent, stanvars, validate, ...
   )
-  class(stancode) <- c("mvgamstancode", "stancode", "character")
-  return(stancode)
+  as_mvgam_stancode(stancode)
 }
 
 
 #' One component of the program an `mvgam_formula` describes
 #'
 #' `stancode()` and `standata()` take different components of one
-#' generated object and agree on everything reaching the generator:
-#' the same arguments in the same order, and the same refusal when
-#' the result arrives without the component named.
+#' generated object. Both pass the generator the same arguments in the
+#' same order.
 #'
 #' @param component `"stancode"` or `"standata"`.
 #' @param object,data,family,prior,data2,sample_prior,knots Arguments
@@ -685,8 +700,8 @@ mvgam_formula_component <- function(component, object, data, family,
 #' @description
 #' `stancode()` and `standata()` delegate a plain formula to
 #' \pkg{brms}. A `trend_formula` in the same call names an mvgam
-#' model, and these methods build the \code{\link{mvgam_formula}} that
-#' call describes before generating the program. A call supplying no
+#' model. These methods then build the \code{\link{mvgam_formula}} that
+#' call describes and generate its program. A call supplying no
 #' `trend_formula` delegates to \pkg{brms} unchanged.
 #'
 #' @param object A `formula`, or a `brmsformula` or `mvbrmsformula`
@@ -712,13 +727,7 @@ stancode.formula <- function(object, ...) {
 
 #' @rdname trend_formula_generation
 #' @export
-stancode.bform <- function(object, ...) {
-  dots <- list(...)
-  if (is.null(dots$trend_formula)) {
-    return(NextMethod())
-  }
-  route_trend_formula(object, dots, stancode)
-}
+stancode.bform <- stancode.formula
 
 #' @rdname trend_formula_generation
 #' @export
@@ -732,58 +741,9 @@ standata.formula <- function(object, ...) {
 
 #' @rdname trend_formula_generation
 #' @export
-standata.bform <- function(object, ...) {
-  dots <- list(...)
-  if (is.null(dots$trend_formula)) {
-    return(NextMethod())
-  }
-  route_trend_formula(object, dots, standata)
-}
+standata.bform <- standata.formula
 
-#' Stan data of an mvgam model
-#'
-#' The data list `mvgam()` would pass to Stan for an
-#' \code{mvgam_formula}, generated without fitting.
-#'
-#' @param object An \code{mvgam_formula} object created by
-#'   \code{mvgam_formula()}.
-#' @param data A data frame containing all variables referenced in the formula.
-#' @inheritParams mvgam
-#' @param prior An optional \code{brmsprior} object containing custom prior
-#'   specifications. Can be created using \code{brms::prior()}.
-#' @param data2 A named list of objects the model uses that are not
-#'   variables in \code{data}, as in \code{\link[brms]{brm}}.
-#' @param sample_prior Character string indicating whether to sample from priors
-#'   only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.
-#' @param knots Optional named list of knot positions for spline terms, passed
-#'   to the basis constructors for both the observation and trend formulas.
-#' @param drop_unused_levels Logical; should unused factor levels be dropped?
-#'   Default is \code{TRUE}.
-#' @param stanvars Optional \code{stanvars} object containing additional Stan
-#'   variables, parameters, or functions.
-#' @param backend Character string specifying Stan backend. Options:
-#'   \code{"rstan"} (default) or \code{"cmdstanr"}.
-#' @param threads Number of threads within each chain. Default is
-#'   \code{1}.
-#' @param normalize Logical; should brms drop the normalising constants
-#'   from its sampling statements? Default is \code{TRUE}.
-#' @param save_model File path to write the assembled Stan program to.
-#'   If \code{NULL} (default), nothing is written.
-#' @param silent Integer controlling verbosity, following the \pkg{brms}
-#'   convention. 0 prints Stan's exceptions as well as its progress, 1
-#'   (the default) prints progress alone, and 2 prints nothing.
-#' @param validate Logical; should the assembled Stan code be validated?
-#'   Default is \code{TRUE}.
-#' @param ... Additional arguments passed to internal functions.
-#'
-#' @return A named list of the Stan data, observation and trend
-#'   together. \code{mvgam()} passes the same list to Stan from the same
-#'   arguments.
-#'
-#' @seealso
-#' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
-#' \code{\link[brms]{stancode}}, \code{\link{mvgam}}
-#'
+#' @rdname stancode.mvgam_formula
 #' @export
 standata.mvgam_formula <- function(object, data, family = gaussian(),
                                    prior = NULL, data2 = NULL,
@@ -810,5 +770,35 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
     )
   }
 
-  return(standata)
+  standata
+}
+
+
+#' @rdname stancode.mvgam_formula
+#' @export
+stancode.mvgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam")
+  rlang::check_dots_empty()
+  as_mvgam_stancode(object$stancode)
+}
+
+
+#' @rdname stancode.mvgam_formula
+#' @export
+standata.mvgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam")
+  rlang::check_dots_empty()
+  object$standata
+}
+
+
+#' Class a Stan program for printing
+#'
+#' @param code Character string of Stan code
+#' @return `code` with class `c("mvgamstancode", "stancode",
+#'   "character")`
+#' @noRd
+as_mvgam_stancode <- function(code) {
+  checkmate::assert_string(code)
+  structure(code, class = c("mvgamstancode", "stancode", "character"))
 }

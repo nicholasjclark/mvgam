@@ -13,14 +13,12 @@
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A named list of integer scalars, or \code{NULL} if no
-group-level effects are present.
+A named list of integers, one per grouping factor, or
+\code{NULL} for a model without group-level effects.
 }
 \description{
-Returns a named list of integer counts: one entry per
-grouping factor with the number of levels it contains.
-Mirrors \code{\link[brms:ngrps.brmsfit]{brms::ngrps.brmsfit()}} and returns \code{NULL} when the
-fit has no observation-side random effects.
+The number of levels of each grouping factor of the observation
+formula, as \code{\link[brms:ngrps.brmsfit]{brms::ngrps.brmsfit()}} gives it.
 }
 \seealso{
 \code{\link[brms:ngrps.brmsfit]{brms::ngrps.brmsfit()}}, \code{\link[=ranef.mvgam]{ranef.mvgam()}},

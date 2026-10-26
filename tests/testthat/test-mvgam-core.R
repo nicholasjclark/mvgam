@@ -1,16 +1,11 @@
-# Multiple imputation forwarding.
-#
 # `mvgam()` hands a list of imputed frames to `mvgam_multiple()`. Its
-# model-defining arguments are formals rather than dots, so they reach
-# that call only by being named there. `family` was not, and every
-# imputation was fitted under the default gaussian while the user had
-# asked for something else. Nothing in the output said so.
+# model-defining arguments are formals, which reach that call only by
+# name.
 
 
 test_that("the imputation path forwards every formal a fit needs", {
-  # The guard against the same thing happening to the next argument
-  # someone adds: the forwarded set and `mvgam()`'s own formals have
-  # to agree, minus the two the call supplies itself.
+  # The forwarded set is `mvgam()`'s formals, less the two the call
+  # supplies itself. A formal added later must join it.
   supplied_by_the_call <- c("data", "combine")
   needed <- setdiff(
     names(formals(mvgam)), c(supplied_by_the_call, "...")
@@ -19,7 +14,7 @@ test_that("the imputation path forwards every formal a fit needs", {
 })
 
 
-test_that("a requested family reaches the imputation fits", {
+test_that("a requested family and combine reach the imputation fits", {
   captured <- NULL
   testthat::local_mocked_bindings(
     mvgam_multiple = function(...) {
@@ -32,64 +27,25 @@ test_that("a requested family reaches the imputation fits", {
     y = c(1L, 3L, 2L, 5L, 4L, 6L), x = seq(-1, 1, length.out = 6L),
     time = 1:6, series = factor("s1")
   )
-  out <- mvgam(y ~ x, data = list(d, d), family = poisson())
-  expect_s3_class(out, "mvgam_stub")
+  mvgam(y ~ x, data = list(d, d), family = poisson(), combine = FALSE)
   expect_equal(captured$family$family, "poisson")
-  # The list itself and the combine setting come from the call.
-  expect_length(captured$data_list, 2L)
-  expect_true(captured$combine)
-})
-
-
-test_that("combine = FALSE reaches the imputation fits", {
-  captured <- NULL
-  testthat::local_mocked_bindings(
-    mvgam_multiple = function(...) {
-      captured <<- list(...)
-      structure(list(), class = "mvgam_stub")
-    },
-    .package = "mvgam"
-  )
-  d <- data.frame(
-    y = c(1.2, 0.4, -0.3, 0.9, 1.1, 0.2), x = seq(-1, 1, length.out = 6L),
-    time = 1:6, series = factor("s1")
-  )
-  mvgam(y ~ x, data = list(d, d), combine = FALSE)
   expect_false(captured$combine)
 })
 
 
-test_that("threads travels only when it was set", {
-  # `threads = NULL` trips an integer assertion downstream, so the
-  # default must not be forwarded as an explicit NULL.
-  captured <- NULL
-  testthat::local_mocked_bindings(
-    mvgam_multiple = function(...) {
-      captured <<- list(...)
-      structure(list(), class = "mvgam_stub")
-    },
-    .package = "mvgam"
-  )
-  d <- data.frame(
-    y = c(1.2, 0.4, -0.3, 0.9, 1.1, 0.2), x = seq(-1, 1, length.out = 6L),
-    time = 1:6, series = factor("s1")
-  )
-  mvgam(y ~ x, data = list(d, d))
-  expect_false("threads" %in% names(captured))
-
-  mvgam(y ~ x, data = list(d, d), threads = 2L)
-  expect_equal(captured$threads, 2L)
+test_that("every form of threads gives a thread count", {
+  # `NULL` reaches the code generator from `mvgam()` and `jsdgam()`
+  expect_identical(mvgam:::thread_count(NULL), 1L)
+  expect_identical(mvgam:::thread_count(2), 2L)
+  expect_identical(mvgam:::thread_count(brms::threading(3)), 3L)
+  expect_error(mvgam:::thread_count("two"), "threads")
 })
 
 
 test_that("a refusal names the caller's own value", {
-  # `as_one_logical()` builds its refusal with
-  # `deparse0(s, max_char = 100L)`. `deparse0()` forwarded `...`
-  # straight to `base::deparse()`, which takes no `max_char`. Every
-  # caller supplying a bad value then met "unused argument
-  # (max_char = 100)". The message naming their own value never
-  # appeared. Good input never reaches that branch, and the whole
-  # error path went unexercised.
+  # `as_one_logical()` names the value with
+  # `deparse0(s, max_char = 100L)`. `base::deparse()` takes no
+  # `max_char`, which `deparse0()` must not pass on.
   expect_true(mvgam:::as_one_logical(TRUE))
   err <- expect_error(mvgam:::as_one_logical(c(TRUE, FALSE)))
   expect_false(
@@ -100,7 +56,6 @@ test_that("a refusal names the caller's own value", {
   long <- str2lang(paste(rep("aaaaaaaaaa", 30L), collapse = " + "))
   full <- mvgam:::deparse0(long)
   cut <- mvgam:::deparse0(long, max_char = 50L)
-  expect_gt(nchar(full), 50L)
   expect_equal(nchar(cut), 53L)
   expect_true(endsWith(cut, "..."))
   expect_equal(substr(cut, 1L, 50L), substr(full, 1L, 50L))
@@ -127,10 +82,8 @@ test_that("a misspelt argument is refused before the model is built", {
 
 
 test_that("imputations are pooled only when they share an axis", {
-  # The check once compared columns literally named `time` and
-  # `series`. A model whose axis came from other columns was pooled
-  # whatever the imputations did to them. The pooled draws are indexed
-  # by the fits' own axes, and those are compared.
+  # The pooled draws are indexed by the fits' own axes, whatever
+  # columns those come from. The axes are compared.
   stub <- function(times) {
     axes <- list(
       series = list(levels = "s1", source = "explicit", n = 1L,

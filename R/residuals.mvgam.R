@@ -129,23 +129,16 @@
 #'   fewer visits; interpret QQ-plots against simulated N(0, 1)
 #'   envelopes rather than the analytic line in that regime.
 #'
+#' @inheritParams predict.mvgam
 #' @param object An object of class `mvgam`.
 #' @param newdata Optional `data.frame` to compute residuals on
 #'   (defaults to the training data).
 #' @param type Character. Either `"quantile"` (default) or
 #'   `"ordinary"`.
-#' @param ndraws Positive integer; subsample this many posterior
-#'   draws. `NULL` (the default) uses every draw.
-#' @param draw_ids Integer vector selecting specific posterior
-#'   draws. Mutually exclusive with `ndraws`.
 #' @param summary Logical. If `TRUE` (the default), return a
 #'   per-observation summary matrix; if `FALSE`, return the full
 #'   `ndraws x nobs` matrix of per-draw residuals (which can be
 #'   handed to `DHARMa::createDHARMa()` for further diagnostics).
-#' @param robust Logical. If `TRUE`, the per-observation summary
-#'   uses the median and MAD instead of the mean and SD.
-#' @param probs Length-2 numeric. Quantile probabilities for the
-#'   per-observation summary intervals.
 #' @param ... Additional arguments forwarded to
 #'   [posterior_predict.mvgam()].
 #'
@@ -254,6 +247,7 @@
 #' head(r)
 #' }
 #'
+#' @family model checking
 #' @export
 residuals.mvgam <- function(object,
                               newdata = NULL,

@@ -95,8 +95,7 @@ validate_supported_family <- function(family) {
       "Mixture families are not supported by mvgam.",
       x = paste0("mvgam's summaries, predictions and log-likelihoods ",
                  "each take a single family per response."),
-      i = paste0("Request support at ",
-                 "https://github.com/nicholasjclark/mvgam/issues.")
+      i = paste0("Request support at ", mvgam_issues_url(), ".")
     )), call. = FALSE)
   }
   # mvgam's own multi-response families (diri / multi / categ / mvn /
@@ -3429,7 +3428,6 @@ parse_base_formula_safe <- function(trend_formula, trend_terms) {
 #'   trend term
 #' @noRd
 remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
-  # Input validation
   checkmate::assert_character(trend_patterns)
   checkmate::assert_int(depth, lower = 0)
 
@@ -3487,7 +3485,6 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
 #' @return Logical indicating if expression is a trend term
 #' @noRd
 is_trend_term <- function(expr, trend_patterns) {
-  # Input validation
   checkmate::assert_character(trend_patterns)
 
   # Match by the name of the function called. A match on the full
@@ -3970,7 +3967,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
       isTRUE(as.integer(parsed_trend$n_lv) >= 1L)
     explicit <- identical(attr(data, "mvgam_series_source"), "explicit")
     target <- if (factor_active) {
-      ".trend"
+      factor_axis_column
     } else if (explicit) {
       series_var
     } else {
@@ -4326,12 +4323,9 @@ trend_cell_frame <- function(data, covariates, time_vals, series_vals,
       dplyr::group_by(.data$time) %>%
       dplyr::summarise(dplyr::across(dplyr::all_of(columns), dplyr::first),
                        .groups = "drop")
-    cells <- tidyr::expand_grid(
-      time = time_level$time,
-      .trend = factor(seq_len(n_lv_for_grain))
-    ) %>%
+    cells <- expand_factor_axis(n_lv_for_grain, time = time_level$time) %>%
       dplyr::left_join(time_level, by = "time") %>%
-      dplyr::arrange(.data$time, .data$.trend)
+      dplyr::arrange(.data$time, .data[[factor_axis_column]])
   }
   remove_mvgam_variables(cells)
 }

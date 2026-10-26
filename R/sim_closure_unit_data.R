@@ -39,7 +39,8 @@
 #' @param K_max Integer; per-unit cap on the latent abundance
 #'   `N`. Only used when `family` is an `nmix()` variant. Defaults
 #'   to `30L`.
-#' @param seed Optional integer seed for reproducibility.
+#' @param seed Optional integer seed. The session's random state is
+#'   restored when the call returns.
 #'
 #' @details
 #' Both recipes carry a per-site (state-level) and a per-visit
@@ -156,6 +157,7 @@
 #' head(simdat$data_train)
 #' summary(simdat)
 #'
+#' @family simulation
 #' @export
 sim_closure_unit_data <- function(type = 1L,
                                     family = occ(),
@@ -601,10 +603,9 @@ summary.mvgam_sim_closure_unit <- function(object, ...) {
 
 #' Print method for sim_closure_unit_data() summary output
 #'
+#' @inheritParams print.mvgam_sim_summary
 #' @param x A `mvgam_sim_closure_unit_summary` object.
-#' @param digits Integer; significant digits for printed numbers.
-#'   Default `3`.
-#' @param ... Currently ignored.
+#' @param ... Ignored.
 #'
 #' @return The `mvgam_sim_closure_unit_summary` object `x`, returned
 #'   invisibly.

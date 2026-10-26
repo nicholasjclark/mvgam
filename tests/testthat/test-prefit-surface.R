@@ -29,8 +29,8 @@ build_prefit <- function() {
   )
   mvgam(
     y ~ x, data = dat, family = poisson(),
-    run_model = FALSE, silent = 2
-  , validate = FALSE)
+    run_model = FALSE, silent = 2, validate = FALSE
+  )
 }
 
 test_that("a prefit failure names the state it is in", {
@@ -75,13 +75,14 @@ test_that("a prefit failure names the state it is in", {
 test_that("a prefit states what it has and what it lacks", {
   pf <- build_prefit()
 
-  # The program and its data are why the mode exists.
-  expect_type(stancode(pf), "character")
+  # The program and its data are why the mode exists
+  expect_identical(unclass(stancode(pf)), pf$stancode)
+  expect_identical(standata(pf), pf$standata)
   expect_identical(nobs(pf), 40L)
   expect_identical(nrow(model.frame(pf)), 40L)
 
   # A method needing draws names the state and the argument that
-  # produced it. It once failed inside posterior.
+  # produced it
   err <- expect_error(summary(pf))
   expect_match(conditionMessage(err), "run_model", fixed = TRUE)
   expect_match(conditionMessage(err), "requires a fitted model",
@@ -99,8 +100,8 @@ test_that("a VAR prefit names its trend and the posterior it needs", {
   )
   pf <- mvgam(
     y ~ 1, trend_formula = ~ VAR(cor = TRUE), data = dat,
-    family = gaussian(), run_model = FALSE, silent = 2
-  , validate = FALSE)
+    family = gaussian(), run_model = FALSE, silent = 2, validate = FALSE
+  )
 
   # A prefit records its trend type as a fit does.
   expect_identical(get_trend_type(pf), "VAR")
@@ -133,8 +134,8 @@ test_that("mvgam_multiple gives one prefit when run_model is FALSE", {
   for (comb in c(TRUE, FALSE)) {
     pf <- mvgam_multiple(
       y ~ 1, data_list = list(mk(), mk()), family = poisson(),
-      combine = comb, run_model = FALSE, silent = 2
-    , validate = FALSE)
+      combine = comb, run_model = FALSE, silent = 2, validate = FALSE
+    )
     expect_s3_class(pf, "mvgam_prefit")
     expect_false(inherits(pf, "mvgam_pooled"))
     expect_identical(nobs(pf), 20L)
@@ -159,8 +160,8 @@ test_that("a prefit built inside a function omits that function's locals", {
     ballast <- rnorm(5e5)
     mvgam(
       y ~ x, trend_formula = ~ AR(p = 1), data = d,
-      family = poisson(), run_model = FALSE, silent = 2
-    , validate = FALSE)
+      family = poisson(), run_model = FALSE, silent = 2, validate = FALSE
+    )
   }
   pf <- build(dat)
 

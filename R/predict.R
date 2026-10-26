@@ -1,37 +1,16 @@
 #' Draws from the Posterior Distribution of an mvgam Model
 #'
-#' Compute posterior predictions for mvgam models. Dispatches by `type`
-#' to the appropriate prediction surface:
-#' [posterior_predict.mvgam()] for `"response"` (default),
-#' [posterior_linpred.mvgam()] for `"link"`,
-#' [posterior_epred.mvgam()] for `"expected"`, and an internal
-#' family-aware helper for `"variance"`.
+#' Posterior predictions for mvgam models. `type` selects the
+#' quantity: [posterior_predict.mvgam()] for `"response"` (the
+#' default), [posterior_linpred.mvgam()] for `"link"` and
+#' [posterior_epred.mvgam()] for `"expected"`. `"variance"` gives the
+#' family's conditional variance.
 #'
 #' @param object An object of class `mvgam`.
-#' @param newdata An optional data.frame containing new predictor values.
-#'   If `NULL` (the default), the original training data is used.
 #' @param type Character; one of `"response"` (default), `"link"`,
 #'   `"expected"`, `"variance"`, `"terms"`, `"latent_state"`,
 #'   `"detection"`. See Details.
 #' @inheritParams posterior_epred.mvgam
-#' @param ndraws Positive integer specifying the number of posterior draws
-#'   to use. If `NULL` (the default), all draws are used.
-#' @param draw_ids Integer vector specifying which draws to use. If `NULL`,
-#'   draws are selected based on `ndraws`.
-#' @param re_formula Group-level terms to include: `NULL` (the default)
-#'   for every one, `NA` for none. A formula choosing some of them is not
-#'   supported.
-#' @param allow_new_levels Logical; accepted for brms compatibility.
-#'   A grouping level the model never saw is refused whatever this is
-#'   set to, because a new level has no fitted random effect and, for
-#'   a new series, no latent state to propagate. Predict for levels
-#'   the fit knows, or refit with the new levels included.
-#' @param sample_new_levels Character; accepted for brms
-#'   compatibility and not used, since new levels are refused. See
-#'   `allow_new_levels`.
-#' @param resp Character specifying which response variable to predict for
-#'   multivariate models. If `NULL`, predictions are returned for all
-#'   responses.
 #' @param summary Logical. If `TRUE` (the default), returns summary
 #'   statistics. If `FALSE`, returns the full matrix of posterior draws.
 #' @param robust Logical. If `FALSE` (the default), uses mean and standard
@@ -40,72 +19,58 @@
 #' @param probs Numeric vector of probabilities for quantile computation.
 #'   Default is `c(0.025, 0.975)` for 95% credible intervals. Can be a
 #'   single value or multiple values.
-#' @param ... Unused. Anything passed here is refused; every argument
-#'   this method passes to `posterior_predict` / `posterior_epred` /
-#'   `posterior_linpred` it names above.
+#' @param ... Unused. Anything passed here is refused.
 #'
-#' @return If `summary = FALSE`, returns a numeric matrix of posterior
-#'   draws with dimensions ``\\[ndraws x nobs\\]``. For multivariate fits with
-#'   `resp = NULL`, returns a named list of such matrices.
-#'
-#'   If `summary = TRUE`, returns a matrix with columns:
+#' @return With `summary = FALSE`, an `[ndraws, nobs]` matrix of
+#'   draws. With `summary = TRUE`, a matrix with one row per
+#'   observation and the columns:
 #'   \itemize{
-#'     \item `Estimate`: point estimate (mean or median depending on
-#'       `robust`)
-#'     \item `Est.Error`: uncertainty estimate (sd or mad depending on
-#'       `robust`)
-#'     \item `Q*`: quantile columns corresponding to values in `probs`
+#'     \item `Estimate`: the posterior mean, or the median under
+#'       `robust = TRUE`.
+#'     \item `Est.Error`: the posterior SD, or the MAD under
+#'       `robust = TRUE`.
+#'     \item `Q*`: one quantile column per value of `probs`.
 #'   }
+#'   A multivariate model with `resp = NULL` gives a named list of
+#'   these, one per response.
 #'
 #' @details
-#' The `type` argument selects which posterior summary to return:
+#' `type` selects the quantity returned:
 #' \itemize{
 #'   \item `"response"` (default): draws from the posterior predictive
-#'     distribution on the outcome scale. Routes through
+#'     distribution on the outcome scale, from
 #'     [posterior_predict.mvgam()].
-#'   \item `"link"`: linear predictor draws on the link scale (no
-#'     inverse-link applied). Routes through
+#'   \item `"link"`: the linear predictor on the link scale, from
 #'     [posterior_linpred.mvgam()].
-#'   \item `"expected"`: posterior expectation E\[Y | X\] on the response
-#'     scale. Routes through [posterior_epred.mvgam()].
-#'   \item `"variance"`: conditional variance Var\[Y | theta\] per draw,
-#'     using family-specific mean-variance formulas. Supported
-#'     families: gaussian, student, lognormal, poisson, bernoulli,
-#'     binomial, negbinomial, gamma, beta. Other families raise an
-#'     informative error. Under the default the variance is
-#'     conditional on the parameter draw alone, so it is the
-#'     observation noise around the mean the two submodels give.
-#'     `process_error = TRUE` conditions on that draw's sampled
-#'     trend innovation as well, giving the observation noise at
-#'     the trend-integrated mean.
-#'   \item `"terms"`: accepted so that a call carried over from
-#'     [mgcv::predict.gam()] is answered rather than silently
-#'     mismatched. mvgam splits the decomposition across
-#'     [posterior_smooths.mvgam()] for per-smooth draws and
-#'     [fixef.mvgam()] / [ranef.mvgam()] for the parametric and
-#'     random-effect components, so the call errors with a pointer
-#'     at those.
-#'   \item `"latent_state"`: closure-unit families. Family-aware
-#'     posterior of the latent state per closure unit, conditioned
-#'     on the observed detection history:
+#'   \item `"expected"`: the expectation E\[Y | X\] on the response
+#'     scale, from [posterior_epred.mvgam()].
+#'   \item `"variance"`: the conditional variance Var\[Y | theta\] per
+#'     draw, from the family's mean-variance relation. It covers the
+#'     gaussian, student, lognormal, poisson, bernoulli, binomial,
+#'     negbinomial, gamma and beta families. Other families raise an
+#'     error. By default the variance is the observation noise around
+#'     the mean of the two submodels. `process_error = TRUE` also
+#'     conditions on each draw's sampled trend innovation.
+#'   \item `"terms"`: refused with a pointer to the functions that
+#'     decompose a prediction. [posterior_smooths.mvgam()] returns
+#'     per-smooth draws. [fixef.mvgam()] and [ranef.mvgam()] return the
+#'     parametric and random-effect components.
+#'   \item `"latent_state"`: for closure-unit families, the posterior of
+#'     the latent state of each closure unit given its detection
+#'     history:
 #'     \itemize{
-#'       \item `nmix()`: posterior latent abundance `N`
-#'         conditional on the observed visit counts, via
-#'         `posterior_latent_N()` (Royle 2004).
-#'       \item `occ()`: posterior occupancy probability
-#'         `P(z = 1 | y_g)` via `posterior_occupancy()`. Returns
-#'         the probability matrix by default; use
-#'         `posterior_occupancy(draw = TRUE)` directly for 0/1 z
-#'         draws.
+#'       \item `nmix()`: the latent abundance `N` given the observed
+#'         visit counts (Royle 2004).
+#'       \item `occ()`: the occupancy probability `P(z = 1 | y_g)`.
 #'     }
-#'   \item `"detection"`: closure-unit families (nmix(), occ()).
-#'     Per-visit detection probability \eqn{p_{g,j}} on the response
-#'     scale.
+#'   \item `"detection"`: for `nmix()` and `occ()`, the per-visit
+#'     detection probability \eqn{p_{g,j}} on the response scale.
 #' }
 #'
-#' @seealso [posterior_predict.mvgam()], [posterior_epred.mvgam()],
-#'   [posterior_linpred.mvgam()], [fitted.mvgam()],
-#'   [posterior_smooths.mvgam()].
+#' @seealso [fitted.mvgam()] returns expected values with the inferred
+#'   trend state. [forecast.mvgam()] predicts future times from the
+#'   fitted state. [conditional_effects.mvgam()] plots predictions
+#'   against a covariate.
 #'
 #' @examples
 #' \dontrun{
@@ -130,8 +95,12 @@
 #'
 #' # `summary = FALSE` returns the draws, one row per draw
 #' dim(predict(mod, summary = FALSE))
+#'
+#' # Next: forecast() predicts beyond the training times from the
+#' # fitted trend state
 #' }
 #'
+#' @family predictions
 #' @export
 predict.mvgam <- function(object,
                           newdata = NULL,
@@ -151,7 +120,6 @@ predict.mvgam <- function(object,
                           probs = c(0.025, 0.975),
                           ...) {
 
-  # Input validation
   checkmate::assert_class(object, "mvgam")
   require_fitted_model(object, "predict")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
@@ -516,22 +484,14 @@ predict_variance <- function(object, newdata, process_error,
 }
 
 
-#' Summarize Posterior Prediction Draws
+#' Summaries of prediction draws, one per observation
 #'
-#' Computes summary statistics from posterior draws following the brms
-#'   output format.
+#' @inheritParams mvgam_post_summary
+#' @param draws An `[ndraws, nobs]` matrix of draws or, for the ordinal
+#'   and categorical families, an `[ndraws, nobs, ncat]` array
 #'
-#' @param draws Posterior draws, either a matrix
-#'   ``\\[ndraws x nobs\\]`` or, for the ordinal and categorical
-#'   families, an array ``\\[ndraws x nobs x ncat\\]``.
-#' @param probs Numeric vector of probabilities for quantile computation.
-#' @param robust Logical. If `FALSE`, uses mean and sd. If `TRUE`, uses
-#'   median and mad.
-#'
-#' @return For matrix input, a matrix with columns for point estimate,
-#'   uncertainty and quantiles. For array input, an array
-#'   ``\\[nobs x nstat x ncat\\]`` holding the same columns for each
-#'   category.
+#' @return The matrix of `mvgam_post_summary()`. An array input gives
+#'   an `[nobs, nstat, ncat]` array holding that matrix per category.
 #'
 #' @noRd
 summarize_predictions <- function(draws, probs, robust) {
@@ -571,10 +531,5 @@ summarize_predictions <- function(draws, probs, robust) {
     min.cols = 1
   )
 
-  # The same summary `mvgam_post_summary()` builds: the robust and
-  # mean branches, the quantiles and brms's own column names were
-  # written out a second time here, so a column the two treated
-  # differently gave one answer through `predict()` and another
-  # through every other accessor.
   mvgam_post_summary(draws, robust = robust, probs = probs)
 }

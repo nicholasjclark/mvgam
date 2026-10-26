@@ -7,41 +7,46 @@
 \method{loo_compare}{mvgam_lfo}(x, ..., model_names = NULL)
 }
 \arguments{
-\item{x}{A \code{mvgam_lfo} object.}
+\item{x}{An \code{mvgam_lfo} object.}
 
-\item{...}{Additional \code{mvgam_lfo} objects to compare against \code{x}.}
+\item{...}{Further \code{mvgam_lfo} objects.}
 
 \item{model_names}{Optional character vector of model labels;
-defaults to the deparsed call names.}
+overrides the names inferred from the call.}
 }
 \value{
-A \code{data.frame} (subclass \code{compare.loo}) with one row per
-model, sorted by \code{elpd_diff} descending. Columns:
+A \code{compare.loo} table with one row per model, best first.
 \describe{
-\item{\code{elpd_diff}}{Sum-ELPD difference vs. the best model
-(zero for the best).}
-\item{\code{se_diff}}{Standard error of \code{elpd_diff} using the
-per-fold paired-difference SE, scaled by \code{sqrt(N)}. Zero
-for the best model.}
-\item{\code{elpd_lfo}}{Sum of per-fold ELPDs.}
+\item{\code{elpd_diff}}{Summed ELPD difference from the best model,
+zero for the best.}
+\item{\code{se_diff}}{Standard error of \code{elpd_diff},
+\code{sqrt(N) * sd(fold_diff)} over the \code{N} folds.}
+\item{\code{p_worse}, \code{diag_diff}, \code{diag_elpd}}{The diagnostics of
+\code{\link[=loo_compare.mvgam]{loo_compare.mvgam()}}, with folds in place of observations.}
+\item{\code{elpd_lfo}}{Summed per-fold ELPD.}
 \item{\code{se_elpd_lfo}}{Standard error of \code{elpd_lfo}.}
 }
 }
 \description{
-Pairwise ELPD comparison for two or more \code{mvgam_lfo} objects,
-modelled after \code{loo::loo_compare()} but operating on the per-fold
-ELPDs accumulated by \code{\link[=lfo_cv]{lfo_cv()}}. Returns a comparison table sorted
-from best to worst by sum ELPD, with the standard error of the
-difference computed pair-wise against the best model using the
-aligned per-fold differences.
-}
-\details{
-All compared \code{mvgam_lfo} objects must have been built
-over the same evaluation grid (same \code{eval_timepoints} and same
-\code{fc_horizon}). Models with non-aligned grids raise an error
-because paired differences would mix observations.
+Ranks two or more \code{\link[=lfo_cv]{lfo_cv()}} results by their summed ELPD, in the
+layout of \code{\link[loo:loo_compare]{loo::loo_compare()}}. The standard error of each
+difference comes from the paired per-fold differences with the best
+model. The results must share one evaluation grid, with the same
+\code{min_t}, \code{fc_horizon} and data.
 }
 \seealso{
 \code{\link[=lfo_cv]{lfo_cv()}}, \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}},
 \code{\link[=compare_elpds]{compare_elpds()}}, \code{\link[=plot.mvgam_compare_elpds]{plot.mvgam_compare_elpds()}}
+
+Other model comparison: 
+\code{\link{bridge_sampler.mvgam}()},
+\code{\link{compare_elpds}()},
+\code{\link{kfold.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{log_lik.mvgam}()},
+\code{\link{loo.mvgam}()},
+\code{\link{mvgam_loo_extras}},
+\code{\link{posterior_average.mvgam}()},
+\code{\link{waic.mvgam}()}
 }
+\concept{model comparison}

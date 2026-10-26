@@ -138,6 +138,7 @@ sim_jsdm_draw <- function(eta, family, pars = list()) {
 #'                  seed = 2L)
 #' rowSums(comp$y_array)[1:3]
 #'
+#' @family simulation
 #' @export
 sim_jsdm <- function(family = brms::negbinomial(),
                      n_species = 5L,
@@ -289,10 +290,9 @@ summary.mvgam_sim_jsdm <- function(object, ...) {
 
 #' Print method for sim_jsdm() summary output
 #'
+#' @inheritParams print.mvgam_sim_summary
 #' @param x A `mvgam_sim_jsdm_summary` object.
-#' @param digits Integer; significant digits for printed numbers.
-#'   Default `3`.
-#' @param ... Currently ignored.
+#' @param ... Ignored.
 #'
 #' @return The `mvgam_sim_jsdm_summary` object `x`, returned
 #'   invisibly.

@@ -10,6 +10,7 @@
 #' state through the trend's dynamics. The observation family then
 #' maps the trend to the response scale.
 #'
+#' @inheritParams posterior_epred.mvgam
 #' @param object A fitted [mvgam][mvgam::mvgam] object.
 #' @param newdata Optional `data.frame` with the columns of the
 #'   training data, holding the time and series cells to forecast.
@@ -28,22 +29,13 @@
 #'   `ZMVN()` has no temporal dynamics and takes any later times.
 #'   `ZMVN()` and `PW()` need one set of forecast times shared by
 #'   every series.
-#' @param ... Unused. A misspelt argument would land here and is
-#'   refused.
-#' @param type One of `"response"`, `"link"`, `"expected"`,
-#'   `"trend"`. `"response"` samples from the observation family
-#'   (the default); `"expected"` returns the family's mean, which
-#'   carries any further parameter the expectation needs (a binomial
-#'   mean is `trials * p`, a zero-inflated mean `(1 - zi) * mu`);
-#'   `"link"` returns the link-scale linear predictor; `"trend"`
-#'   returns the latent-trend trajectory on the link scale.
-#' @param ndraws Optional integer; the number of posterior draws
-#'   to use, taken at random. Defaults to all available draws.
-#' @param draw_ids Optional integer vector of the posterior draws to
-#'   use, in the order given. Supply one of `ndraws` or `draw_ids`.
-#'   Passing the same `draw_ids` to another method, such as
-#'   `posterior_predict()` or `stability()`, pairs each forecast draw
-#'   with the same iteration there.
+#' @param ... Unused. Anything passed here is refused.
+#' @param type The scale of the draws:
+#'   * `"response"` (the default) samples from the observation family.
+#'   * `"expected"` returns the family's mean. A binomial mean is
+#'     `trials * p` and a zero-inflated mean is `(1 - zi) * mu`.
+#'   * `"link"` returns the linear predictor on the link scale.
+#'   * `"trend"` returns the latent trend on the link scale.
 #' @param coef_uncertainty Logical. When `FALSE`, every forecast
 #'   draw uses the first posterior draw of every coefficient in the
 #'   observation and trend formulas: population-level effects, smooth
@@ -59,21 +51,19 @@
 #'   observation-family sampling for `type = "response"`,
 #'   returning the family mean instead.
 #'   Defaults to `TRUE`.
-#' @param resp For multivariate (multiple-response) models, the
-#'   name of a single response variable to return results for.
-#'   `NULL` (the default) returns results for all responses.
 #'
 #' @return An object of class [mvgam_forecast-class][mvgam].
 #'   Hindcasts and forecasts are returned as named lists of
 #'   `[ndraws, n_times]` matrices, one per series.
 #'
-#' @seealso [mvgam_forecast-class][mvgam], [hindcast.mvgam].
-#'   [posterior_predict.mvgam] and [posterior_epred.mvgam] predict by
-#'   integrating over the trend's stochastic dynamics. `forecast()`
-#'   extrapolates the fitted latent state. The online article
-#'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
-#'   walks through `forecast()` together with `score()`,
-#'   `lfo_cv()` and `ensemble()` on a worked count-data example.
+#' @seealso [hindcast.mvgam()] returns the fitted latent states.
+#'   [posterior_predict.mvgam()] and [posterior_epred.mvgam()] predict
+#'   by integrating over the trend's stochastic dynamics. `forecast()`
+#'   extrapolates the fitted latent state. [score.mvgam_forecast()]
+#'   scores a forecast against held-out data. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   scores, compares and combines the forecasts of three models of
+#'   rodent counts.
 #' @examples
 #' \dontrun{
 #' set.seed(11)
@@ -90,12 +80,22 @@
 #'   chains  = 2, silent = 2
 #' )
 #'
-#' # The held-out data given to mvgam() drive the forecast horizon.
+#' # The held-out data given to mvgam() set the forecast horizon
 #' fc <- forecast(mod)
 #' plot(fc)
+#'
+#' # The latent AR(1) trend alone, on the log scale
+#' plot(forecast(mod, type = "trend"))
+#'
+#' # The expected counts, without the Poisson sampling noise
+#' plot(forecast(mod, type = "expected"))
+#'
+#' # Next, score the forecast against the held-out counts
+#' head(score(fc, score = "crps")[[1]])
 #' }
 #'
 #' @importFrom generics forecast
+#' @family forecasting
 #' @method forecast mvgam
 #' @export
 forecast.mvgam <- function(object,
@@ -175,10 +175,8 @@ forecast.mvgam <- function(object,
     assert_forecast_times_steppable(fc_grid$times, object)
   }
 
-  # The hindcast slot inside a forecast() result uses the same
-  # deterministic-state convention as hindcast()
-  # (process_error = FALSE) so the two surfaces agree at
-  # the training grid.
+  # The hindcast slot holds the fitted states, as hindcast() does with
+  # `process_error = FALSE`. The two then agree on the training grid.
   hindcasts <- build_hindcast_arms(
     object, training, type, draw_idx, obs_uncertainty,
     process_error = FALSE, resp = resp, series_levels = reported
@@ -763,7 +761,8 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 #' hindcast. A fit without a trend takes a zero trend. A closure-unit
 #' family's `expected` and `response` marginalise over the latent state
 #' of each unit. `posterior_epred()` and `posterior_predict()` give
-#' those per visit row. `process_error` applies to them alone.
+#' those per visit row. `process_error = TRUE` takes the marginal draws
+#' of those functions for every family.
 #'
 #' @inheritParams build_hindcast_arms
 #' @param sub_data The series' rows of the training frame
@@ -777,11 +776,25 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
   checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
   sample_family <- type == "response" && obs_uncertainty
   if (hindcast_per_row(object, type, resp)) {
-    predictor <- if (sample_family) posterior_predict else posterior_epred
-    full <- predictor(
+    full <- predictor_for_type(type, sample_family)(
       object, newdata = sub_data, draw_ids = draw_idx,
       process_error = process_error, resp = resp
     )
+  } else if (process_error) {
+    # The marginal draws, with fresh innovations in place of the fitted
+    # states. The trend alone is the linear predictor less the
+    # observation predictor.
+    lp_type <- if (type == "trend") "link" else type
+    full <- predictor_for_type(lp_type, sample_family)(
+      object, newdata = sub_data, draw_ids = draw_idx,
+      process_error = TRUE, resp = resp
+    )
+    if (type == "trend") {
+      full <- full - extract_component_linpred(
+        mvgam_fit = object, newdata = sub_data, component = "obs",
+        resp = resp, draw_ids = draw_idx
+      )
+    }
   } else {
     fitted_states <- extract_trend_latent_states(
       mvgam_fit = object, newdata = sub_data,
@@ -815,6 +828,25 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
 }
 
 
+#' The prediction function that gives draws of a type
+#'
+#' @param type `"link"`, `"expected"` or `"response"`
+#' @param sample_family Whether `"response"` samples the family
+#' @return `posterior_linpred`, `posterior_predict` or `posterior_epred`
+#' @noRd
+predictor_for_type <- function(type, sample_family) {
+  checkmate::assert_choice(type, c("link", "expected", "response"))
+  checkmate::assert_flag(sample_family)
+  if (type == "link") {
+    posterior_linpred
+  } else if (sample_family) {
+    posterior_predict
+  } else {
+    posterior_epred
+  }
+}
+
+
 # ----- Forecasts --------------------------------------------------
 
 #' The forecast draws of each series of a trendless fit
@@ -841,16 +873,10 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
   checkmate::assert_choice(type, c("link", "expected", "response"))
   checkmate::assert_list(fc_grid)
   fc_data <- fc_grid$data
-  predictor <- if (type == "link") {
-    posterior_linpred
-  } else if (type == "response" && obs_uncertainty) {
-    posterior_predict
-  } else {
-    posterior_epred
-  }
   # Scoped to one response, which gives one draws matrix
-  full <- predictor(object, newdata = fc_data, draw_ids = draw_idx,
-                    resp = resp)
+  full <- predictor_for_type(type, type == "response" && obs_uncertainty)(
+    object, newdata = fc_data, draw_ids = draw_idx, resp = resp
+  )
   slice_per_series(
     full, fc_grid,
     get_observation_structure(object, newdata = fc_data, resp = resp),

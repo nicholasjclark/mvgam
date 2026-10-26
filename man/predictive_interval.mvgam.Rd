@@ -20,14 +20,27 @@ A numeric matrix with one row per observation and two
 columns reporting the lower and upper interval bounds.
 }
 \description{
-Returns quantile-based credible intervals for posterior
-predictive draws. Mirrors \code{\link[brms:predictive_interval.brmsfit]{brms::predictive_interval.brmsfit()}}
-and routes through \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}.
+Quantile credible intervals of the posterior predictive draws of
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, as
+\code{\link[brms:predictive_interval.brmsfit]{brms::predictive_interval.brmsfit()}} gives them.
 }
 \seealso{
 \code{\link[brms:predictive_interval.brmsfit]{brms::predictive_interval.brmsfit()}},
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=posterior_interval.mvgam]{posterior_interval.mvgam()}}.
+
+Other predictions: 
+\code{\link{conditional_effects.mvgam}()},
+\code{\link{conditional_smooths.mvgam}()},
+\code{\link{fitted.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{posterior_epred.mvgam}()},
+\code{\link{posterior_linpred.mvgam}()},
+\code{\link{posterior_predict.mvgam}()},
+\code{\link{posterior_smooths.mvgam}()},
+\code{\link{predict.mvgam}()},
+\code{\link{predictive_error.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{predictions}

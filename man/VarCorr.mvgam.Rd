@@ -84,7 +84,22 @@ VarCorr(mod)$series$sd
 \seealso{
 \code{\link[brms:VarCorr.brmsfit]{brms::VarCorr.brmsfit()}}, \code{\link[=ranef.mvgam]{ranef.mvgam()}},
 \code{\link[=fixef.mvgam]{fixef.mvgam()}}.
+
+Other posterior summaries: 
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()},
+\code{\link{summary.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{posterior summaries}

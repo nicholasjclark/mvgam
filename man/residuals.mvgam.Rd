@@ -25,22 +25,25 @@
 \item{type}{Character. Either \code{"quantile"} (default) or
 \code{"ordinary"}.}
 
-\item{ndraws}{Positive integer; subsample this many posterior
-draws. \code{NULL} (the default) uses every draw.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Integer vector selecting specific posterior
-draws. Mutually exclusive with \code{ndraws}.}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
 \item{summary}{Logical. If \code{TRUE} (the default), return a
 per-observation summary matrix; if \code{FALSE}, return the full
 \verb{ndraws x nobs} matrix of per-draw residuals (which can be
 handed to \code{DHARMa::createDHARMa()} for further diagnostics).}
 
-\item{robust}{Logical. If \code{TRUE}, the per-observation summary
-uses the median and MAD instead of the mean and SD.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
-\item{probs}{Length-2 numeric. Quantile probabilities for the
-per-observation summary intervals.}
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
 
 \item{...}{Additional arguments forwarded to
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}.}
@@ -287,7 +290,13 @@ R package.
 \seealso{
 \code{\link[=augment.mvgam]{augment.mvgam()}}, \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}},
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}
+
+Other model checking: 
+\code{\link{mvgam_diagnostics}},
+\code{\link{plot.mvgam}()},
+\code{\link{pp_check.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model checking}

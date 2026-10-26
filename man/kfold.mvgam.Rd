@@ -20,40 +20,34 @@
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}
 
-\item{K}{Integer fold count. When \code{group} is supplied and \code{K}
-is \code{NULL} (the default), uses one group per fold
-(leave-one-group-out). When \code{K} is set and smaller than the
-number of distinct groups, \code{\link[loo:kfold-helpers]{loo::kfold_split_grouped()}} bins
-groups into \code{K} folds. Without \code{group}, defaults to \code{K = 10}.}
+\item{K}{Integer number of folds. With \code{group} and \code{K = NULL} (the
+default), each group is a fold. A \code{K} below the number of groups
+bins the groups into \code{K} folds with \code{\link[loo:kfold-helpers]{loo::kfold_split_grouped()}}.
+Without \code{group}, \code{K} defaults to 10.}
 
-\item{group}{Optional character vector naming columns in the
-training data that define the fold partitioning unit. All
-observations sharing a \code{group} tuple stay in the same fold.
-Default \code{NULL} partitions by closure unit on closure-unit
-families (via \code{closure_unit_grouping(family)}) and by row
+\item{group}{Optional character vector of training-data columns
+whose combinations define the groups. \code{NULL} (the default) takes
+the closure unit of an \code{\link[=occ]{occ()}} or \code{\link[=nmix]{nmix()}} model and the row
 otherwise.}
 
-\item{folds}{Optional integer vector with one fold assignment
-per row of the training data. Overrides \code{K}, \code{group}, and
-\code{fold_split}. Escape hatch for designs not expressible via
-the built-in splitters.}
+\item{folds}{Optional integer vector of one fold per training row,
+replacing \code{K} and \code{fold_split}. Each fold is then held out and
+scored as one group. A fold never splits a group, which is a
+closure unit by default.}
 
-\item{exact}{Logical. When \code{TRUE}, refit every fold and skip
-the PSIS path. Default \code{FALSE} uses the hybrid mode.}
+\item{exact}{Logical. \code{TRUE} refits every fold. Defaults to \code{FALSE}.}
 
-\item{pareto_k_threshold}{Numeric in \verb{[0, Inf]}. Folds whose
-PSIS Pareto-k exceeds this trigger a refit. \code{NULL} (default)
-uses the adaptive threshold \code{min(1 - 1 / log10(S), 0.7)},
-where \code{S} is the number of posterior draws. Pass an explicit
-numeric to override, or \code{Inf} for pure PSIS (no refits ever).}
+\item{pareto_k_threshold}{Numeric. A fold whose Pareto-k exceeds
+it is refitted. \code{NULL} (the default) takes
+\code{min(1 - 1 / log10(S), 0.7)} for \code{S} posterior draws. \code{Inf}
+refits nothing.}
 
-\item{fold_split}{One of \code{"grouped"}, \code{"stratified"},
-\code{"random"}. The \verb{loo::kfold_split_*} helper used when
-\code{K < n_groups}. Ignored when \code{K == n_groups} (one group per
-fold) or when \code{folds} is supplied. Default \code{"grouped"}.}
+\item{fold_split}{\code{"grouped"} (the default), \code{"stratified"} or
+\code{"random"}: the \verb{loo::kfold_split_*()} function binning groups
+into \code{K} folds when there are more groups than folds.}
 
-\item{seed}{Optional integer. Forwarded to \code{set.seed()} before
-the fold split so the partition is reproducible.}
+\item{seed}{Optional integer seed for the fold split and the refits.
+The session's random state is restored when the call returns.}
 
 \item{silent}{Integer in \verb{\\\{0, 1, 2\\\}}. \code{0} prints each refit
 and its sampler start and finish lines. \code{1} (default) prints
@@ -62,48 +56,45 @@ the refit count. \code{2} prints nothing.}
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-An object of class \code{c("mvgam_kfold", "kfold", "loo")}
-carrying \code{estimates} (elpd_kfold, p_kfold, kfoldic with SE),
-\code{pointwise} (per-group elpd contributions), \code{pareto_k}
-(per-group PSIS shape values, NA for refit folds), plus
-diagnostic slots:
+A \code{c("mvgam_kfold", "kfold", "loo")} object, which
+\code{\link[loo:loo_compare]{loo::loo_compare()}} takes as it takes \code{\link[=loo.mvgam]{loo.mvgam()}} results. It
+holds:
 \itemize{
-\item \code{n_refits} --- number of folds refit.
-\item \code{refit_groups} --- character vector of refit fold
-labels.
-\item \code{K}, \code{group}, \code{exact} --- echoed call arguments.
-\item \code{pareto_k_threshold} --- the numeric threshold the
-refit gate applied, and \code{pareto_k_threshold_adaptive},
-\code{TRUE} when the adaptive rule chose it.
+\item \code{estimates}: \code{elpd_kfold}, \code{p_kfold} and \code{kfoldic} with
+their standard errors.
+\item \code{pointwise}: the ELPD of each group. \code{pointwise_psis} holds
+the PSIS estimates before any refit.
+\item \code{pareto_k}: the Pareto-k of each group's PSIS estimate, all
+\code{NA} under \code{exact = TRUE}.
+\item \code{n_refits} and \code{refit_groups}: the number of refitted folds
+and the groups they hold.
+\item \code{K} and \code{exact}: the number of folds and the mode.
+\item \code{group}: the grouping columns, \code{"fold"} when \code{folds} was
+given, or \code{NULL} for single rows.
+\item \code{pareto_k_threshold}: the threshold applied, with
+\code{pareto_k_threshold_adaptive} \code{TRUE} when the default rule set
+it.
 }
-The \code{loo} parent class lets \code{\link[loo:loo_compare]{loo::loo_compare()}} and
-\code{print.loo()} consume the result directly.
 }
 \description{
-Hierarchical / grouped k-fold cross-validation. Generalises the
-PSIS-with-selective-refit pattern of \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} from
-rolling time blocks to arbitrary groups. One function covers
-three modes:
+Estimates the expected log predictive density of held-out groups of
+rows. A fold that importance sampling approximates well takes the
+PSIS estimate of \code{\link[loo:loo]{loo::loo()}} on the fold's summed log likelihood.
+The rest are refitted without the fold, as \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} refits
+the time blocks it cannot approximate. Three settings cover the
+range:
 }
 \details{
 \itemize{
-\item \strong{Pure PSIS} (\code{pareto_k_threshold = Inf}): no refits.
-Cheapest, leave-one-group-out PSIS-LOO via \code{loo::loo()} on
-the group-aggregated log-lik matrix. Pareto-k diagnostics
-warn when the approximation is unreliable.
-\item \strong{Hybrid} (default): PSIS first; refit only those
-folds whose Pareto-k exceeds \code{pareto_k_threshold}. Typical
-case is a handful of refits over K folds.
-\item \strong{Exact} (\code{exact = TRUE}): refit every fold,
-brms-style. Most expensive; the gold standard when PSIS
-diagnostics are uniformly bad.
+\item \code{pareto_k_threshold = Inf} refits nothing. Pareto-k
+warnings mark folds the approximation fits poorly.
+\item The default refits the folds whose Pareto-k exceeds
+\code{pareto_k_threshold}, which is often a handful.
+\item \code{exact = TRUE} refits every fold, as \code{brms::kfold()} does.
 }
 
-Better than \code{brms::kfold} in two ways: (1) \code{group} accepts a
-character vector (multi-column composite key, e.g.
-\code{c("site", "season")}) and (2) the hybrid mode amortises the
-refit cost. Both extensions sit cleanly on top of the existing
-\code{loo} package fold helpers.
+\code{group} takes several columns, such as \code{c("site", "season")}. Every
+row of one combination stays in the same fold.
 }
 \examples{
 \dontrun{
@@ -117,8 +108,17 @@ mod <- mvgam(y ~ s(season, bs = "cc"),
               family  = gaussian(),
               chains  = 2, silent = 2)
 
-k <- kfold(mod, K = 3L)
-k$estimates
+# Neighbouring times share information through the trend. Folds of
+# contiguous time blocks hold each block out whole. Folds that PSIS
+# approximates poorly are refitted.
+blocks <- cut(simdat$data_train$time, breaks = 4L, labels = FALSE)
+k <- kfold(mod, folds = blocks)
+k
+
+# The ELPD and Pareto k of each block
+plot(k)
+
+# Next, lfo_cv() scores forecasts made from rolling origins
 }
 
 }
@@ -134,9 +134,25 @@ evaluation using leave-one-out cross-validation and WAIC.
 \doi{10.1007/s11222-016-9696-4}.
 }
 \seealso{
-\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}},
-\code{\link[=update.mvgam]{update.mvgam()}}, \code{\link[loo:kfold-helpers]{loo::kfold_split_grouped()}}
+\code{\link[=loo.mvgam]{loo.mvgam()}} approximates leave-one-out cross-validation.
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} scores forecasts from rolling origins.
+\code{\link[=summary.mvgam_kfold]{summary.mvgam_kfold()}} and \code{\link[=plot.mvgam_kfold]{plot.mvgam_kfold()}} report each group.
+The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+compares models by cross-validation.
+
+Other model comparison: 
+\code{\link{bridge_sampler.mvgam}()},
+\code{\link{compare_elpds}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{log_lik.mvgam}()},
+\code{\link{loo.mvgam}()},
+\code{\link{loo_compare.mvgam_lfo}()},
+\code{\link{mvgam_loo_extras}},
+\code{\link{posterior_average.mvgam}()},
+\code{\link{waic.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model comparison}

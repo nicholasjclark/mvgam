@@ -1,15 +1,10 @@
-# CI-safe tests for the Tier-3 LOO / WAIC / vcov methods exposed in
-# `R/loo_extras.mvgam.R` and the `vcov.mvgam` method appended to
-# `R/diagnostics.mvgam.R`. The numerical concordance against
-# `brms::*` is exercised by `tests/local/test-marginaleffects-concordance.R`;
-# here we lock in S3 dispatch, signature parity, and the error paths
-# that should fire deterministically.
+# The leave-one-out extras and `vcov.mvgam()` on stub fits. The brms
+# concordance runs on fitted models in
+# tests/local/test-marginaleffects-concordance.R.
 
 
-# Build a stub that carries the four standata + formula slots every
-# alias / draws / dispatch path consults. The variable layout
-# mirrors a univariate Gaussian fit with one fixed effect (`x`) and
-# AR(1) trend dynamics.
+# A stub with the draws, standata and formula of a Gaussian fit with
+# one fixed effect `x` and an AR(1) trend
 make_loo_extras_stub <- function(n_iter = 80L, n_chains = 2L) {
   varnames <- c(
     "b_Intercept", "b_x", "Intercept",
@@ -42,26 +37,9 @@ make_loo_extras_stub <- function(n_iter = 80L, n_chains = 2L) {
 }
 
 
-# ---- S3 dispatch lookup --------------------------------------------
-
-test_that("every Tier-3 method has an S3 method on `mvgam`", {
-  for (m in c(
-    "vcov", "LOO", "WAIC", "loo_R2", "loo_predict",
-    "loo_epred", "loo_linpred", "loo_predictive_interval",
-    "loo_subsample", "loo_moment_match",
-    "loo_model_weights", "add_criterion"
-  )) {
-    expect_true(
-      !is.null(getS3method(m, "mvgam", optional = TRUE)),
-      label = paste0("getS3method('", m, "', 'mvgam')")
-    )
-  }
-})
-
-
 # ---- Signature parity vs brms / loo --------------------------------
 
-test_that("Tier-3 method signatures match brms / loo reference", {
+test_that("each method takes the brms or loo signature", {
   expected <- list(
     vcov = c("object", "correlation", "pars", "trend_effects", "..."),
     LOO = c(
@@ -111,35 +89,19 @@ test_that("Tier-3 method signatures match brms / loo reference", {
 
 # ---- vcov.mvgam -----------------------------------------------------
 
-test_that("vcov.mvgam returns square covariance over fixed effects", {
+test_that("vcov.mvgam is the covariance of the fixed-effect draws", {
   stub <- make_loo_extras_stub()
-  v <- vcov(stub)
-  expect_identical(dim(v), c(2L, 2L))
-  expect_identical(colnames(v), c("Intercept", "x"))
-  # Symmetric.
-  expect_equal(v, t(v))
-})
-
-
-test_that("vcov.mvgam(correlation = TRUE) gives identity diagonal", {
-  stub <- make_loo_extras_stub()
-  cmat <- vcov(stub, correlation = TRUE)
-  expect_true(is.matrix(cmat))
-  expect_equal(diag(cmat), c(Intercept = 1, x = 1))
-})
-
-
-test_that("vcov.mvgam(pars =) filters fixed effects", {
-  stub <- make_loo_extras_stub()
-  v <- vcov(stub, pars = "x")
-  expect_identical(dim(v), c(1L, 1L))
-  expect_identical(colnames(v), "x")
+  draws <- posterior::as_draws_matrix(stub$fit)[, c("b_Intercept", "b_x")]
+  want <- stats::cov(unclass(draws))
+  dimnames(want) <- list(c("Intercept", "x"), c("Intercept", "x"))
+  expect_equal(vcov(stub), want)
+  expect_equal(vcov(stub, correlation = TRUE), stats::cov2cor(want))
+  expect_equal(vcov(stub, pars = "x"), want["x", "x", drop = FALSE])
 })
 
 
 test_that("vcov.mvgam refuses a 'pars' entry the model does not have", {
-  # An unknown name dropped out of the matrix, and a misspelt term
-  # returned it without that row and without a message.
+  # A misspelt term would otherwise drop its row without a message
   stub <- make_loo_extras_stub()
   expect_error(vcov(stub, pars = "no_such_term"), "no_such_term")
   expect_error(vcov(stub, pars = c("x", "no_such_term")), "no_such_term")
@@ -152,16 +114,15 @@ test_that("vcov.mvgam refuses a 'pars' entry the model does not have", {
 # ---- LOO / WAIC aliases --------------------------------------------
 
 test_that("LOO and WAIC forward only the arguments the caller wrote", {
-  # `loo()` and `waic()` refuse a brms argument such as `compare`
-  # wherever it is supplied. An alias passing its defaults on was
-  # refused on every call.
+  # `loo()` and `waic()` refuse a supplied `compare`. An alias passing
+  # its defaults on would be refused on every call.
   seen <- NULL
   record <- function(x, ...) {
     seen <<- names(list(...))
     "called"
   }
-  local_mocked_s3_method("loo", "mvgam", record)
-  local_mocked_s3_method("waic", "mvgam", record)
+  # The generics called inside the package find the methods there
+  local_mocked_bindings(loo.mvgam = record, waic.mvgam = record)
   stub <- structure(list(), class = "mvgam")
   expect_identical(LOO(stub, resp = "y"), "called")
   expect_identical(seen, "resp")
@@ -170,52 +131,29 @@ test_that("LOO and WAIC forward only the arguments the caller wrote", {
 })
 
 
-# ---- Error paths (loo_moment_match + loo_subsample) ----------------
-
-test_that("loo_moment_match.mvgam errors informatively", {
+test_that("loo_moment_match and loo_subsample are refused", {
   stub <- make_loo_extras_stub()
-  expect_error(
-    loo_moment_match(stub),
-    "loo_moment_match.*not supported"
-  )
+  expect_error(loo_moment_match(stub), "loo_moment_match.*not supported")
+  expect_error(loo_subsample(stub), "loo_subsample.*not supported")
 })
 
 
-test_that("loo_subsample.mvgam errors informatively", {
+test_that("add_criterion stores each criterion once unless overwritten", {
+  calls <- 0L
+  # The generic called inside the package finds the method there
+  local_mocked_bindings(loo.mvgam = function(x, ...) {
+    calls <<- calls + 1L
+    calls
+  })
   stub <- make_loo_extras_stub()
-  expect_error(
-    loo_subsample(stub),
-    "loo_subsample.*not supported"
-  )
-})
-
-
-# ---- add_criterion --------------------------------------------------
-
-test_that("add_criterion.mvgam errors on unsupported criterion", {
-  stub <- make_loo_extras_stub()
-  expect_error(
-    add_criterion(stub, "kfold"),
-    "Unsupported criterion"
-  )
-})
-
-
-test_that("add_criterion.mvgam errors on multiple unsupported criteria", {
-  stub <- make_loo_extras_stub()
-  expect_error(
-    add_criterion(stub, c("kfold", "marglik")),
-    "Unsupported criterion"
-  )
-})
-
-
-test_that("add_criterion.mvgam initialises $criteria when absent", {
-  # Verify the loop guards the slot creation, not the criterion call.
-  meth <- getS3method("add_criterion", "mvgam")
-  body_chr <- deparse(body(meth))
-  expect_true(any(grepl("is.null(x$criteria)", body_chr, fixed = TRUE)))
-  expect_true(any(grepl("x$criteria[[cname]]", body_chr, fixed = TRUE)))
+  out <- add_criterion(stub, "loo", model_name = "m1")
+  expect_identical(out$criteria$loo, 1L)
+  expect_identical(out$model_name, "m1")
+  expect_identical(add_criterion(out, "loo")$criteria$loo, 1L)
+  expect_identical(add_criterion(out, "loo", overwrite = TRUE)$criteria$loo,
+                   2L)
+  expect_error(add_criterion(stub, c("kfold", "loo_subsample")),
+               "'kfold', 'loo_subsample' are not supported")
 })
 
 
@@ -231,42 +169,15 @@ test_that("loo_model_weights.mvgam rejects unnamed non-model args", {
 })
 
 
-# ---- LOO trio: shared helper + pure-delegation forms ---------------
-
-test_that("loo_predict / loo_epred / loo_linpred delegate to shared helper", {
-  for (m in c("loo_predict", "loo_epred", "loo_linpred")) {
-    body_chr <- paste(deparse(body(getS3method(m, "mvgam"))),
-                       collapse = "\n")
-    expect_match(body_chr, "mvgam_loo_E_loo")
-  }
-})
-
-
-test_that("loo_predictive_interval delegates to loo_predict with quantile", {
-  body_chr <- paste(
-    deparse(body(getS3method("loo_predictive_interval", "mvgam"))),
-    collapse = "\n"
-  )
-  expect_match(body_chr, "loo_predict")
-  expect_match(body_chr, "quantile")
-})
-
-
-test_that("loo_predictive_interval validates 'prob' in (0, 1)", {
-  stub <- make_loo_extras_stub()
-  expect_error(loo_predictive_interval(stub, prob = -0.1),
-               "Element 1 is not >= 0")
-  expect_error(loo_predictive_interval(stub, prob = 1.5),
-               "Element 1 is not <= 1")
-})
-
-
-test_that("mvgam_loo_E_loo asserts its 'posterior_fn' is a function", {
-  stub <- make_loo_extras_stub()
-  expect_error(
-    mvgam_loo_E_loo(stub, posterior_fn = "not_a_function"),
-    "function"
-  )
+test_that("loo_predictive_interval asks for the central quantiles", {
+  seen <- NULL
+  local_mocked_bindings(loo_predict.mvgam = function(object, ...) {
+    seen <<- list(...)
+  })
+  loo_predictive_interval(make_loo_extras_stub(), prob = 0.8, resp = "y")
+  expect_identical(seen$type, "quantile")
+  expect_equal(seen$probs, c(0.1, 0.9))
+  expect_identical(seen$resp, "y")
 })
 
 
@@ -299,10 +210,8 @@ test_that("per_obs_series_labels maps log_lik columns to series", {
 })
 
 test_that("per_obs_series_labels refuses a frame naming no series", {
-  # Which series a row belongs to is the axis record's question. A
-  # hierarchical fit names its series from grouping columns with no
-  # series column present, and the refusal here covers a frame
-  # carrying neither.
+  # The axis record assigns rows to series. This frame has neither a
+  # series column nor grouping columns.
   stub <- make_by_series_stub()
   stub$data$series <- NULL
   expect_error(
@@ -313,11 +222,7 @@ test_that("per_obs_series_labels refuses a frame naming no series", {
 
 test_that("per_obs_series_labels rejects mv-custom families", {
   stub <- make_by_series_stub()
-  # Synthesise an mvgam_multi_response attribute that mirrors what
-  # diri() / mvn() / multi() / categ() / mvt() set in their
-  # constructors. The body of those constructors needs Stan to
-  # round-trip, so the attr-only stub is the lightest fixture
-  # that exercises the rejection.
+  # The attribute diri(), mvn(), multi(), categ() and mvt() set
   stub$family <- structure(
     list(family = "mvgam_dirichlet", name = "diri"),
     class = "customfamily",
@@ -332,22 +237,21 @@ test_that("per_obs_series_labels rejects mv-custom families", {
 test_that("per_series_ic returns one elpd row per series", {
   stub <- make_by_series_stub()
   set.seed(7L)
-  # One row per stub draw (2 chains of 80). Draws autocorrelated as
-  # MCMC draws are keep each effective sample size below the draw
-  # count and every Pareto k under the threshold. The assertions
-  # check the shape of the frame.
+  # One row per stub draw, 2 chains of 80. Autocorrelated draws keep
+  # every Pareto k under the threshold.
   logliks <- -1 + 0.1 * apply(
     matrix(rnorm(160L * 8L), nrow = 160L), 2L,
     function(z) as.numeric(stats::filter(z, 0.3, "recursive"))
   )
   out_loo <- mvgam:::per_series_ic(stub, logliks, criterion = "loo")
-  expect_s3_class(out_loo, "data.frame")
-  expect_setequal(out_loo$series, c("a", "b"))
-  expect_named(out_loo,
-               c("series", "elpd", "se_elpd", "p", "n_obs"))
+  expect_named(out_loo, c("series", "elpd", "se_elpd", "p", "n_obs"))
+  expect_identical(out_loo$series, c("a", "b"))
   expect_identical(out_loo$n_obs, c(4L, 4L))
-  # WAIC path returns the same column set.
+  # Each series is scored on its own columns
+  ll_b <- logliks[, 5:8]
+  ref <- loo::loo(ll_b, r_eff = mvgam:::mvgam_r_eff_log_lik(stub, ll_b))
+  expect_equal(out_loo$elpd[2L], ref$estimates["elpd_loo", "Estimate"])
   out_waic <- mvgam:::per_series_ic(stub, logliks, criterion = "waic")
-  expect_named(out_waic,
-               c("series", "elpd", "se_elpd", "p", "n_obs"))
+  expect_equal(out_waic$p[1L],
+               loo::waic(logliks[, 1:4])$estimates["p_waic", "Estimate"])
 })

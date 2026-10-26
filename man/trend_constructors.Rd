@@ -2,6 +2,7 @@
 % Please edit documentation in R/trend_system.R
 \name{RW}
 \alias{RW}
+\alias{trend_constructors}
 \alias{AR}
 \alias{CAR}
 \alias{VAR}
@@ -97,7 +98,7 @@ degree of partial pooling).
 
 A grouped trend estimates correlations among the \code{subgr} units
 within each level of \code{gr}. \code{cor} defaults to \code{TRUE} for such a
-trend, and an explicit \code{cor = FALSE} is refused.
+trend. An explicit \code{cor = FALSE} is refused.
 
 Within a \code{VAR()} it sets up a hierarchical panel vector
 autoregression. Each group learns its autoregressive, moving-average
@@ -105,15 +106,14 @@ and correlation matrices from shared hyperparameters. The groups do
 not interact. Without \code{subgr}, the series column names the units
 within each group.
 
-Two constraints currently apply to hierarchical trend models:
+Two constraints apply to hierarchical trend models:
 \itemize{
 \item \code{gr} must be constant within each series (each series belongs to
 a single group). Models with \code{gr} varying within a series are
 rejected at validation time.
 \item Every group must hold the same number of series. The Stan
 program sizes each group's correlation block from one shared
-count, and validation refuses unbalanced groups before
-fitting.
+count. Validation refuses unbalanced groups before fitting.
 }}
 
 \item{subgr}{A subgrouping \code{factor} variable naming the time series
@@ -129,8 +129,8 @@ within regions, specify \code{gr = region} and \code{subgr = species}.
 \verb{series = interaction(gr, subgr, drop = TRUE, sep = "_",}
 \verb{lex.order = TRUE)}
 
-A region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}, and
-the levels sort lexically. \code{summary()}, \code{plot()} and \code{forecast()}
+A region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}. The
+levels sort lexically. \code{summary()}, \code{plot()} and \code{forecast()}
 all label that series \code{"r1_sp1"}. A \code{series} column that disagrees
 with the derived series is replaced by it, with a warning.}
 
@@ -153,15 +153,15 @@ estimate them, or supply a number above \code{2} to fix them.
 Finite degrees of freedom let the latent process absorb an
 occasional large shock while \code{sigma_trend} stays at the scale
 of ordinary variation. That suits boom-and-bust population series
-and outbreak dynamics. The innovations follow a multivariate t,
-which shares one innovation \emph{scale} across the series at each
-time point, and large innovations tend to occur together as a
-result. Each series keeps its own direction and magnitude. A shock
-in one series says nothing about the sign of the others, and one
-series can stay unmoved by an event that moves its neighbours.
-\code{cor} sets the correlation between series exactly as it does
-for Gaussian innovations, and the degrees of freedom control how
-heavy the tails of the innovations are.
+and outbreak dynamics. The innovations follow a multivariate t.
+Because it shares one innovation \emph{scale} across the series at
+each time point, large innovations tend to occur together. Each
+series keeps its own direction and magnitude. A shock in one series
+says nothing about the sign of the others. One series can also stay
+unmoved by an event that moves its neighbours. \code{cor} sets the
+correlation between series exactly as it does for Gaussian
+innovations. The degrees of freedom set how heavy the tails of the
+innovations are.
 
 When \code{df = NA} the degrees of freedom are estimated as
 \code{nu_trend}, with a default \code{gamma(4, 0.3)} prior. The
@@ -170,18 +170,18 @@ When \code{df = NA} the degrees of freedom are estimated as
 \code{\link{get_prior}} lists \code{nu_trend} with the other trend
 classes.
 
-Three caveats. The bound of \code{2} is required: below it the
-innovations have no finite variance, and an autoregressive trend
-has no stationary covariance to start from. Above it, the first
-states of an autoregressive trend take the stationary mean and
-covariance. Their distribution matches the stationary law exactly
-under Gaussian innovations alone. A finite mix of t variates has
-heavier tails than the infinite sum that defines that law. The
-degrees of freedom are informed only through the tail of the
-latent process and are weakly identified in short series: below
-roughly 200 time points, the posterior stays close to its prior.
-Not available for \code{VAR()}, which samples its states directly,
-or \code{PW()}, which has no innovations.}
+Three caveats apply. The bound of \code{2} is required. Below it
+the innovations have no finite variance. An autoregressive trend
+then has no stationary covariance to start from. Above it, the
+first states of an autoregressive trend take the stationary mean
+and covariance. Their distribution matches the stationary law
+exactly under Gaussian innovations alone. A finite mix of t
+variates has heavier tails than the infinite sum that defines that
+law. The degrees of freedom are informed only through the tail of
+the latent process. They are weakly identified in short series:
+below roughly 200 time points, the posterior stays close to its
+prior. \code{VAR()} samples its states directly and \code{PW()}
+has no innovations. Neither takes \code{df}.}
 
 \item{p}{The autoregressive lags. The accepted form depends on the
 trend type:
@@ -204,17 +204,14 @@ the same identified stationary covariance. Use
 series.
 }}
 
-\item{coef_sharing}{Character string, one of \code{"none"},
-\code{"shared"}, or \code{"hierarchical"}, controlling how AR
-coefficients vary across latent series in \code{AR()}. The
-default \code{"none"} estimates an independent coefficient
-vector per series (one \verb{ar\{lag\}_trend} entry per latent
-process per lag). \code{"shared"} collapses to a single
-\verb{shared_ar\{lag\}_trend} scalar per lag, broadcast across all
-series in \verb{transformed parameters}. \code{"hierarchical"} adds
-per-lag population-mean (\verb{mu_ar\{lag\}_trend}) and scale
-(\verb{sigma_ar\{lag\}_trend}) hyperparameters with a pooled
-\verb{ar\{lag\}_trend[j] ~ normal(mu_ar\{lag\}_trend, sigma_ar\{lag\}_trend)}.}
+\item{coef_sharing}{How the coefficients of \code{AR()} vary across the
+latent series. \code{"none"} (the default) estimates each series'
+coefficients independently. \code{"shared"} estimates one coefficient
+per lag for every series. \code{"hierarchical"} pools each series'
+coefficient toward a mean for its lag, as
+\verb{ar\{lag\}_trend[j] ~ normal(mu_ar\{lag\}_trend, sigma_ar\{lag\}_trend)}.
+The section on AR coefficient sharing lists the parameters each
+setting samples.}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of
@@ -242,72 +239,60 @@ weekly and monthly lags
 \code{p >= 2} is sampled as partial autocorrelations,
 \code{ar1_pacf_trend} through \code{ark_pacf_trend}, each
 declared on \code{(-1, 1)}. The Levinson-Durbin recursion derives
-\code{ar1_trend} through \code{ark_trend} from them, and every
+\code{ar1_trend} through \code{ark_trend} from them. Every
 summary, forecast and hypothesis test uses those coefficients.
 Any vector of partial autocorrelations in \code{(-1, 1)} gives a
 stationary process. Bounding the coefficients directly admits
-explosive draws: \code{ar1_trend} and \code{ar2_trend} both at
-0.9 satisfy the declared bounds, and that process grows without
+explosive draws. With \code{ar1_trend} and \code{ar2_trend} both
+at 0.9 the declared bounds hold, yet that process grows without
 limit. Priors for these models name the \code{ar{k}_pacf_trend}
 classes.
 
 \code{AR(p = 1)} samples \code{ar1_trend} directly. At one lag
 the declared interval is already the stationary region. A sparse
 lag set such as \code{AR(p = c(1, 12))} also samples
-\code{ar{k}_trend} directly and fixes its intermediate
-coefficients at zero, a constraint the recursion cannot express,
-and carries no stationarity guarantee. Both take priors on the
+\code{ar{k}_trend} directly. It fixes its intermediate
+coefficients at zero, a constraint the recursion cannot express. It
+carries no stationarity guarantee. Both take priors on the
 \code{ar{k}_trend} classes.
 
 \code{CAR()} steps a continuous-time AR(1) over the gaps the data
 records. A gap \code{dt} is measured in units of the median gap
 between two consecutive observations of one series.
 \code{ar1_trend} and \code{sigma_trend} then describe a typical
-step, and the model does not depend on the unit the time column is
-recorded in. Across a gap \code{dt} the decay is
+step. The model is the same whatever unit the time column records.
+Across a gap \code{dt} the decay is
 \code{ar1_trend^dt} and the innovation standard deviation is
 \code{sigma_trend * sqrt((1 - ar1_trend^(2 dt)) /
 (1 - ar1_trend^2))}. The decay and the innovation scale together.
 The marginal variance is then
 \code{sigma_trend^2 / (1 - ar1_trend^2)} at every occasion of an
-irregular grid, and the first state comes from that marginal.
+irregular grid. The first state comes from that marginal.
 
 \code{CAR(cor = TRUE)} correlates the innovations of several
 series. \code{Sigma_trend} is their covariance over a gap of one.
 Series \code{a} and \code{b} have stationary covariance
-\code{Sigma_trend[a, b] / (1 - ar1_trend[a] * ar1_trend[b])}, and
-the innovations across a gap \code{dt} have that covariance times
+\code{Sigma_trend[a, b] / (1 - ar1_trend[a] * ar1_trend[b])}. The
+innovations across a gap \code{dt} have that covariance times
 \code{1 - (ar1_trend[a] * ar1_trend[b])^dt}. This is the exact
 transition of the continuous-time process. A time point added
 between two others leaves the model for the remaining times
 unchanged. \code{L_Omega_trend} is the Cholesky factor of the
-correlation between the series' shocks over an instant, and its
-prior is placed there. The correlation of \code{Sigma_trend} is
+correlation between the series' shocks over an instant. Its prior
+is placed there. The correlation of \code{Sigma_trend} is
 closer to zero than that correlation when the series damp at
 different rates. On a regular grid the likelihood is that of
 \code{AR(p = 1, cor = TRUE)} with positive coefficients.
 
 The series of a \code{CAR()} trend may be observed at their own
 times. The trend has a state for every series at each time any
-series was observed, and a series contributes to the likelihood at
-the times it has a row. This is the model a frame gives when every
+series was observed. A series contributes to the likelihood at the
+times it has a row. This is the model a frame gives when every
 unobserved time of a series has a row with a missing response.
 \code{forecast()} takes each series at its own future times.
-\code{df} needs the series on shared times: a multivariate t has
-one mixing scale per time, and the times of one series would
-change the trend of another.
-
-Use \code{vignette("mvgam_overview")} to see the full details of
-available stochastic trend types in \pkg{mvgam}, or view the rendered
-version on the package website at:
-https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
-
-For a worked example that interrogates a fitted \code{VAR()} trend
-with \code{irf()}, \code{fevd()} and \code{stability()}, see
-\url{https://nicholasjclark.github.io/mvgam/articles/var.html}.
-For the \code{trend_map} shortcut used to fit dynamic factor models
-with fewer latent processes than observed series, see
-\code{vignette("dfm", package = "mvgam")}.
+\code{df} needs the series on shared times. With one mixing scale
+per time, a multivariate t would let the times of one series change
+the trend of another.
 }
 \note{
 \strong{VAR fits and \code{init = 0}}: the stationary map of Heaps
@@ -320,11 +305,9 @@ and the first gradient is not finite. Leave \code{init} at its default
 random draws for \code{VAR()} fits. \code{AR()}, \code{RW()}, \code{CAR()} and \code{ZMVN()}
 are unaffected.
 }
-\section{AR coefficient-sharing surface}{
+\section{AR coefficient sharing}{
 
-The \code{coef_sharing} argument selects how AR coefficients
-vary across the latent series. The three settings and the
-Stan parameters each declares are:
+Each \code{coef_sharing} setting samples its own Stan parameters:
 \tabular{ll}{
 \strong{coef_sharing} \tab \strong{Stan parameters with priors} \cr
 \code{"none"}         \tab \verb{ar\{lag\}\{stem\}_trend} per series \cr
@@ -338,8 +321,8 @@ and empty for \code{p = 1} and for a sparse lag set such as
 \code{p = c(1, 3)}. \code{AR(p = 2)} samples \code{ar1_pacf_trend} and
 \code{AR(p = 1)} samples \code{ar1_trend}.
 Every setting defines the same \verb{ar\{lag\}_trend[j]} in
-\verb{transformed parameters}, and forecasting, IRF, FEVD and summaries
-use that quantity whatever the setting. A prior on any sampled
+\verb{transformed parameters}. Forecasting, IRF, FEVD and summaries use
+that quantity whatever the setting. A prior on any sampled
 parameter is set with \code{brms::set_prior(class = "<name>")}.
 \code{get_prior(mvgam_formula(...))} lists the parameters the chosen
 \code{coef_sharing} samples.
@@ -353,28 +336,29 @@ innovation scale is \code{sigma_trend}, the moving-average
 coefficient \code{theta1_trend}, the autoregressive coefficients
 \code{ar1_trend} to \code{ark_trend} and the VAR coefficient
 matrices \code{Phi_trend}. Priors take these class names, as in
-\code{prior(normal(0, 1), class = sigma_trend)}, and parameter
+\code{prior(normal(0, 1), class = sigma_trend)}. Parameter
 extraction takes the same names.
 }
 
 \section{Identification}{
 
 A factor model with sampled loadings fits equally well under any
-reordering or sign change of its factors, and some models under any
-rotation. mvgam reports one version, chosen by the dynamics of the
-factors:
+reordering or sign change of its factors. Some models also fit
+equally well under any rotation. mvgam reports one version, chosen
+by the dynamics of the factors:
 \itemize{
-\item \code{AR()} factors, and \code{RW()} or \code{AR()}
-factors with \code{ma = TRUE}, each take their own coefficients,
-and a rotation would mix them. After sampling, the factors of
-every draw are reordered and signed to agree with one reference,
-and the loadings \code{Z}, the factor paths \code{lv_trend} and the
+\item \code{AR()} factors take their own coefficients, as do
+\code{RW()} and \code{AR()} factors with \code{ma = TRUE}. A
+rotation would mix those coefficients. After sampling, the
+factors of every draw are reordered and signed to agree with one
+reference. The loadings \code{Z}, the factor paths \code{lv_trend} and the
 coefficients \code{ar1_trend} or \code{theta1_trend} move together.
 Factors are numbered by the variance they explain, largest
 first.
-\item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors, and
-\code{AR()} factors with \code{coef_sharing = "shared"}, are
-unchanged by rotation when they carry no moving-average term.
+\item \code{RW()}, \code{VAR()} and \code{ZMVN()} factors
+without a moving-average term are unchanged by rotation. So are
+\code{AR()} factors with \code{coef_sharing = "shared"} and no
+moving-average term.
 Following Heaps & Jermyn (2024), generated quantities rotate each
 draw to lower-triangular loadings \code{Z_tilde} with a non-negative
 diagonal. The factor paths rotate to \code{lv_trend_tilde}. A VAR
@@ -384,7 +368,7 @@ Post-fit methods use the identified loadings and factor paths.
 \code{shared_variation()} and \code{residual_cor()} are the same under every
 version.
 
-A \code{trend_map} keeps its fixed entries on \code{Z} exactly, and a
+A \code{trend_map} keeps its fixed entries on \code{Z} exactly. A
 \code{by = lv_axis()} smooth ties each factor to its own covariate
 effect. Neither takes a rotation. For a model with every loading
 sampled, the \code{loadings_prior}
@@ -404,38 +388,31 @@ the posterior distribution of the number of active columns.
 
 \examples{
 \dontrun{
-# Three Gaussian series driven by a VAR(1)
-set.seed(0)
-simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
-                    n_timepoints = 120L, trend_model = VAR(),
-                    prop_trend = 0.95)
+# A constructor records a trend before any data are seen. Printing
+# one shows the settings the model will use
+AR(p = c(1, 12))
+VAR(p = 2, ma = TRUE)
+RW(gr = region, subgr = species)
 
-# The constructor goes inside `trend_formula`
-mod <- mvgam(
-  y ~ 1,
-  trend_formula = ~ VAR(p = 1),
-  data          = simdat$data_train,
-  family        = gaussian(),
-  chains        = 2,
-  silent        = 2
-)
-summary(mod)
-
-# Every trend parameter, through the `trend_params` keyword
-mcmc_plot(mod, variable = "trend_params", type = "intervals")
-
-# The forecast carries the cross-series dynamics forward
-fc <- forecast(mod, newdata = simdat$data_test)
-plot(fc, series = 1)
-
-# A continuous-time AR(1) takes series observed at their own
-# irregular times. Each series here keeps 60 percent of the surveys.
+# Three Poisson series, each surveyed at its own irregular times.
+# Every series keeps about 60 percent of the occasions
 set.seed(11)
-simdat_car <- sim_mvgam(type = 6L, family = poisson(), n_series = 3L,
-                        n_timepoints = 80L)
-own_times <- simdat_car$data_train
+simdat <- sim_mvgam(type = 6L, family = poisson(), n_series = 3L,
+                    n_timepoints = 80L)
+own_times <- simdat$data_train
 own_times <- own_times[runif(nrow(own_times)) < 0.6, ]
-mod_car <- mvgam(
+
+# The parameters a trend adds, with their default priors, before
+# any fitting
+get_prior(
+  mvgam_formula(y ~ s(season, bs = "cc", k = 6),
+                trend_formula = ~ CAR(cor = TRUE)),
+  data   = own_times,
+  family = poisson()
+)
+
+# A continuous-time AR(1) steps each series over its own gaps
+mod <- mvgam(
   y ~ s(season, bs = "cc", k = 6),
   trend_formula = ~ CAR(cor = TRUE),
   data          = own_times,
@@ -443,38 +420,16 @@ mod_car <- mvgam(
   chains        = 2,
   silent        = 2
 )
-residual_cor(mod_car)
-plot(forecast(mod_car, newdata = simdat_car$data_test), series = 2)
+summary(mod)
 
-# A hierarchical VAR: two outcomes in each of two regions. `gr`
-# names the region and `subgr` the outcome within it. The outcomes
-# share a correlation of 0.6. `alpha_cor_trend` sets how strongly
-# each region's correlation is pooled toward the shared one.
-set.seed(3)
-n_t <- 30L
-L <- chol(matrix(c(1, 0.6, 0.6, 1), 2L, 2L))
-hdat <- do.call(rbind, lapply(c("A", "B"), function(r) {
-  eps <- matrix(rnorm(n_t * 2L), n_t, 2L) \%*\% L
-  data.frame(
-    time    = rep(seq_len(n_t), 2L),
-    region  = factor(r, levels = c("A", "B")),
-    outcome = factor(rep(c("gdp", "cons"), each = n_t),
-                     levels = c("gdp", "cons")),
-    y       = c(eps[, 1L], eps[, 2L])
-  )
-}))
-mod_hv <- mvgam(
-  y ~ 1,
-  trend_formula = ~ VAR(p = 1, gr = region, subgr = outcome,
-                        cor = TRUE),
-  data   = hdat,
-  family = gaussian(),
-  chains = 2,
-  silent = 2
-)
-# The shared correlation, then each region's
-residual_cor(mod_hv)
-residual_cor(mod_hv, by_group = TRUE)
+# Correlations among the series' latent states
+residual_cor(mod)
+
+# Each series is forecast at its own future times
+plot(forecast(mod, newdata = simdat$data_test), series = 2)
+
+# Next: hindcast() returns the fitted latent trends. The articles
+# under 'See Also' fit VAR, hierarchical and factor trends
 }
 
 }
@@ -495,9 +450,27 @@ White, E. P., Yenni, G. M. and Karunarathna, K. A. N. K.
 for ecological predictability. \emph{PeerJ}, 13:e18929.
 }
 \seealso{
-\code{\link[=LLT]{LLT()}}, \code{\link[=PW]{PW()}}, \code{\link[=ZMVN]{ZMVN()}}, \code{\link[=get_prior]{get_prior()}} for the default
-priors
+\code{\link[=get_prior]{get_prior()}} lists the parameters a trend adds and their
+default priors. \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}} and
+\code{\link[=stability]{stability()}} interpret fitted latent dynamics. \code{\link[=forecast]{forecast()}}
+propagates them forward. The
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview vignette} compares
+the trend types. The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article}
+interprets a fitted \code{VAR()} with \code{irf()}, \code{fevd()} and
+\code{stability()}. The
+\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
+fits \code{gr} and \code{subgr}. The
+\href{https://nicholasjclark.github.io/mvgam/articles/dfm.html}{dynamic factor vignette} fits \code{n_lv} and
+\code{trend_map}.
+
+Other trend models: 
+\code{\link{LLT}()},
+\code{\link{PW}()},
+\code{\link{ZMVN}()},
+\code{\link{list_trend_types}()},
+\code{\link{lv_axis}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{trend models}

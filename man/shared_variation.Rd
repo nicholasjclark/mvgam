@@ -13,17 +13,15 @@ shared_variation(object, ...)
 \item{object}{A fitted \code{mvgam} object whose trend model
 includes latent factors (\code{n_lv < n_series}).}
 
-\item{...}{Additional arguments for S3 dispatch (currently
-unused).}
+\item{...}{Unused. Anything passed here is refused.}
 
-\item{probs}{Numeric vector of length 2 giving the quantile
-probabilities used for the credible bounds. Defaults to
-\code{c(0.025, 0.975)} (95\% intervals).}
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
 
-\item{robust}{Logical. When \code{TRUE}, point estimates use the
-posterior median and spread uses the median absolute
-deviation; when \code{FALSE} (default) the posterior mean and
-standard deviation are used.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 }
 \value{
 An object of class \code{mvgam_shared_variation}, a list
@@ -34,7 +32,8 @@ with:
 \item \code{delta_se}: posterior spread per entry.
 \item \code{delta_lower}, \code{delta_upper}: per-entry credible
 bounds at \code{probs}.
-\item \code{delta_ess}: per-entry bulk effective sample size.
+\item \code{delta_ess}: per-entry effective sample size, from
+\code{\link[posterior:ess_basic]{posterior::ess_basic()}}.
 \item \code{n_series}, \code{series_names}, \code{n_lv}: model
 dimensions and series labels.
 \item \code{probs}: quantile probabilities used.
@@ -127,7 +126,18 @@ models. \emph{Statistics and Computing}, 34:143.
 correlation matrix \code{cov2cor(Delta)}, \code{\link{mvgam}}
 for the \code{loadings_prior} argument that lets \code{Phi} shape
 \code{E(Delta)}.
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{fevd.mvgam}()},
+\code{\link{irf.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{residual_cor}()},
+\code{\link{stability.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

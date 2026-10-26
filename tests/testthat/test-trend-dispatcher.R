@@ -483,20 +483,16 @@ test_that("validation system handles edge cases", {
 
 # Test print method edge cases
 test_that("print method handles all configurations", {
-  
-  # Test minimal configuration
-  minimal_trend <- RW()
-  expect_output(print(minimal_trend), "mvgam trend specification")
-  expect_output(print(minimal_trend), "Type: RW")
+  expect_output(print(RW()), "Type: RW")
 
-  # Test maximal configuration, with the expected warnings muted
-  complex_trend <- AR(p = c(1, 12), ma = FALSE, cor = TRUE, n_lv = 2)
-  output <- capture.output(print(complex_trend))
-  expect_true(any(grepl("Dynamic factors: 2", output)))
-  expect_true(any(grepl("Correlation: enabled", output)))
-
-  # Test hierarchical grouping display
-  # (Would need to create such an object through the constructor)
+  # A sparse lag set prints as the fitted model's label does
+  output <- capture.output(print(
+    AR(p = c(1, 12), cor = TRUE, n_lv = 2, coef_sharing = "hierarchical")
+  ))
+  expect_true(all(c(
+    "  Type: AR({1, 12})", "  Correlated innovations",
+    "  Dynamic factors: 2", "  AR coefficients: hierarchical"
+  ) %in% output))
 })
 
 # Test complex real-world scenarios
@@ -888,7 +884,6 @@ test_that("PW records every constructor argument in the spec", {
   )
   for (case in cases) {
     expect_s3_class(case$spec, "mvgam_trend")
-    expect_true(is.mvgam_trend(case$spec))
     for (fld in names(case$want)) {
       expect_equal(case$spec[[fld]], case$want[[fld]])
     }

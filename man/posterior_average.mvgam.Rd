@@ -2,7 +2,9 @@
 % Please edit documentation in R/pp_average.mvgam.R
 \name{posterior_average.mvgam}
 \alias{posterior_average.mvgam}
-\title{Model-averaged posterior draws across \pkg{mvgam} fits}
+\alias{pp_average.mvgam}
+\title{Model-averaged posterior draws and predictions across \pkg{mvgam}
+fits}
 \usage{
 \method{posterior_average}{mvgam}(
   x,
@@ -13,6 +15,21 @@
   ndraws = NULL,
   nsamples = NULL,
   missing = NULL,
+  model_names = NULL,
+  control = list(),
+  seed = NULL
+)
+
+\method{pp_average}{mvgam}(
+  x,
+  ...,
+  weights = "stacking",
+  method = "posterior_predict",
+  ndraws = NULL,
+  nsamples = NULL,
+  summary = TRUE,
+  probs = c(0.025, 0.975),
+  robust = FALSE,
   model_names = NULL,
   control = list(),
   seed = NULL
@@ -52,49 +69,91 @@ list keyed by parameter name supplies per-parameter
 defaults; a single numeric is broadcast across every
 missing parameter in every fit that lacks it.}
 
-\item{model_names}{Optional character vector naming the fits
-in the same order they were passed.}
+\item{model_names}{Optional character vector of model labels;
+overrides the names inferred from the call.}
 
 \item{control}{A list of extra arguments passed to
 \code{\link[loo:loo_model_weights]{loo::loo_model_weights()}} when computing stacking /
 pseudo-BMA weights.}
 
-\item{seed}{Optional integer seed for reproducibility.}
+\item{seed}{Optional integer seed. The session's random state is
+restored when the call returns.}
+
+\item{method}{Which prediction function \code{pp_average()} calls on each
+fit before averaging: \code{"posterior_predict"} (the default),
+\code{"posterior_epred"} or \code{"posterior_linpred"}.}
+
+\item{summary}{Logical. If \code{TRUE} (the default), \code{pp_average()}
+summarises the averaged predictions with
+\code{\link[=posterior_summary.mvgam]{posterior_summary.mvgam()}} as a mean, an error and two quantiles.
+\code{FALSE} returns the averaged draws.}
+
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
+
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 }
 \value{
-A \code{data.frame} of model-averaged posterior draws.
-Attributes \code{weights} and \code{ndraws} record the per-model
-weight and the integer draw count drawn from each fit.
+\code{posterior_average()} returns a \code{data.frame} of
+model-averaged posterior draws. \code{pp_average()} returns a numeric
+matrix of averaged predictions. With \code{summary = TRUE} its rows are
+observations and its columns summary statistics. Otherwise its
+rows are draws and its columns observations. Attribute \code{weights}
+holds the weight of each fit. Attribute \code{ndraws} holds the number
+of draws taken from each fit.
 }
 \description{
-Returns Bayesian model-averaged samples from the posterior of
-two or more \code{mvgam} fits, in proportion to the supplied (or
-computed) model weights. Mirrors
-\code{\link[brms:posterior_average.brmsfit]{brms::posterior_average.brmsfit()}}.
+Bayesian model averaging of two or more \code{mvgam} fits, as in
+\code{\link[brms:posterior_average.brmsfit]{brms::posterior_average.brmsfit()}} and \code{\link[brms:pp_average.brmsfit]{brms::pp_average.brmsfit()}}.
+Each fit contributes draws in proportion to its model weight.
+\code{posterior_average()} averages parameter draws. \code{pp_average()}
+averages predictions.
 }
 \examples{
 \dontrun{
+# Two models of one count series: with and without a smooth of x
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
+                    n_timepoints = 120L, trend_model = AR())
 mod1 <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-               data    = simdat$data_train, family = poisson(),
-               chains  = 2, silent = 2)
-mod2 <- mvgam(y ~ 1,    trend_formula = ~ AR(p = 1),
-               data    = simdat$data_train, family = poisson(),
-               chains  = 2, silent = 2)
+              data   = simdat$data_train, family = poisson(),
+              chains = 2, silent = 2)
+mod2 <- update(mod1, formula = y ~ 1)
 
-# 50:50 average of one trend parameter across the two fits.
-pa <- posterior_average(mod1, mod2, variable = "ar1_trend",
-                         weights = c(0.5, 0.5))
+# Stacking weights from approximate leave-one-out cross-validation
+loo_model_weights(mod1, mod2)
+
+# The trend coefficient, averaged over both fits under those weights
+pa <- posterior_average(mod1, mod2, variable = "ar1_trend")
+attr(pa, "weights")
 summary(pa)
+
+# Averaged expected counts, one row per observation
+head(pp_average(mod1, mod2, method = "posterior_epred"))
 }
 
 }
 \seealso{
-\code{\link[brms:posterior_average.brmsfit]{brms::posterior_average.brmsfit()}},
-\code{\link[=pp_average.mvgam]{pp_average.mvgam()}}, \link{mvgam_loo_extras}.
+\code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}} computes the weights.
+\code{\link[=ensemble]{ensemble()}} averages forecasts. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+weights and combines competing models.
+
+Other model comparison: 
+\code{\link{bridge_sampler.mvgam}()},
+\code{\link{compare_elpds}()},
+\code{\link{kfold.mvgam}()},
+\code{\link{lfo_cv.mvgam}()},
+\code{\link{log_lik.mvgam}()},
+\code{\link{loo.mvgam}()},
+\code{\link{loo_compare.mvgam_lfo}()},
+\code{\link{mvgam_loo_extras}},
+\code{\link{waic.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{model comparison}

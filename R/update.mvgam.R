@@ -1,77 +1,59 @@
 #' Update a fitted \pkg{mvgam} model
 #'
-#' Refit a fitted `mvgam` object with new data, an updated formula,
-#' new priors, different sampler settings, or any other argument
-#' accepted by [`mvgam()`]. The signature mirrors
-#' [brms::update.brmsfit()] so users familiar with brms can drop
-#' into the same workflow.
+#' Refit a fitted `mvgam` object with new data, an updated formula, new
+#' priors, different sampler settings or any other argument [mvgam()]
+#' accepts. The signature follows [brms::update.brmsfit()].
 #'
 #' @param object A fitted `mvgam` object.
-#' @param formula. A new observation-side formula, or a formula
-#'   update specification such as `~ . + new_term`. `NULL` (the
-#'   default) reuses `object$formula`. Routed through
-#'   [stats::update.formula()] so all of `~ . + z`, `~ . - z`,
-#'   `y2 ~ x`, and `. ~ .` work via R's standard mechanics.
-#' @param newdata An optional new training data frame. `NULL`
-#'   (the default) reuses `object$data`. Passing `data = ...` in
-#'   `...` is an error; use `newdata`.
-#' @param recompile Optional logical. Controls Stan recompilation
-#'   behaviour. Both supported backends (`cmdstanr`, `rstan`) cache
-#'   compiled models by stancode hash, so an unchanged stancode
-#'   skips the compile step transparently. `NULL` (the default)
-#'   and `TRUE` both delegate to `mvgam()` and let the cache
-#'   decide. `FALSE` regenerates the prospective stancode, compares
-#'   it byte-for-byte against the cached `object$stancode`, and
-#'   errors if they diverge (so the caller is alerted to a needed
-#'   recompile rather than silently paying compile cost). When
-#'   `FALSE` and the stancodes match, the cache is guaranteed to
-#'   hit.
-#' @param ... Any other argument accepted by [`mvgam()`], or by
-#'   [`jsdgam()`] for a `jsdgam` fit (e.g.
-#'   `trend_formula`, `family`, `prior`, `chains`, `iter`,
-#'   `warmup`, `cores`, `threads`, `algorithm`, `backend`,
-#'   `silent`, `seed`, `init`, `control`). Each value overrides
-#'   the matching slot inherited from `object`. A `prior` joins
-#'   the priors the original fit set. See "Prior inheritance and
-#'   Stan model reuse" in Details.
+#' @param formula. A new observation formula, or an update to the
+#'   fitted one such as `~ . + new_term`. `NULL` (the default) keeps
+#'   `object$formula`. [stats::update.formula()] applies the update.
+#'   `~ . + z`, `~ . - z`, `y2 ~ x` and `. ~ .` all work.
+#' @param newdata An optional new training data frame. `NULL` (the
+#'   default) keeps `object$data`. A `data` argument in `...` is an
+#'   error.
+#' @param recompile Optional logical. `NULL` (the default) and `TRUE`
+#'   refit through `mvgam()`. Both backends cache compiled models by
+#'   their Stan code. A refit with unchanged code skips compilation.
+#'   `FALSE` builds the new Stan code first and compares it with
+#'   `object$stancode`. A difference is an error. A refit that passes
+#'   the check compiles nothing.
+#' @param ... Any other argument [mvgam()] accepts, or [jsdgam()] for a
+#'   `jsdgam` fit (e.g. `trend_formula`, `family`, `prior`, `chains`,
+#'   `iter`, `warmup`, `cores`, `threads`, `algorithm`, `backend`,
+#'   `silent`, `seed`, `init`, `control`). Each value overrides the one
+#'   inherited from `object`. A `prior` joins the priors the original
+#'   fit set, as Details describes.
 #'
 #' @return A refit `mvgam` object.
 #'
 #' @details
-#' Argument inheritance: every `mvgam()` argument is taken from
-#' the corresponding slot on `object` unless the caller overrides
-#' via `...`. This means
-#' `update(fit, iter = 4000)` reuses the original formula, data,
-#' family, trend, prior, and backend, and only bumps the iteration
-#' count.
+#' Every `mvgam()` argument comes from `object` unless `...` overrides
+#' it. `update(fit, iter = 4000)` keeps the original formula, data,
+#' family, trend, prior and backend. Only the iteration count changes.
 #'
-#' Sampler settings follow [brms::update.brmsfit()]. `chains`,
-#' `iter`, `warmup`, `thin` and `control` carry over when the refit
-#' keeps the original `algorithm`, and `control` also needs the
-#' original `backend`. A new `iter` without a `warmup` takes the
-#' default warmup of `iter / 2`. `control` merges entry by entry:
-#' `update(fit, adapt_delta = 0.99)` keeps the original
-#' `max_treedepth`.
+#' Sampler settings follow [brms::update.brmsfit()]. `chains`, `iter`,
+#' `warmup`, `thin` and `control` carry over when the refit keeps the
+#' original `algorithm`. `control` also needs the original `backend`. A
+#' new `iter` without a `warmup` takes the default warmup of
+#' `iter / 2`. `control` merges entry by entry:
+#' `update(fit, adapt_delta = 0.99)` keeps the original `max_treedepth`.
 #'
-#' New training data passed as `newdata` keeps the fit's held-out
-#' data when that lies after the new training times. Held-out data
+#' New training data passed as `newdata` keeps the fit's held-out data
+#' when that lies after the new training times. Held-out data
 #' overlapping them is dropped with a message.
 #'
-#' Prior inheritance and Stan model reuse. The fitted object's
-#' `prior` table is reused on every `update()` call by default.
-#' The `brms` adaptive priors (e.g. the response-centred Intercept
-#' prior, response-scaled `sigma` prior) carry their literal
-#' constants from the original fit rather than being regenerated
-#' from new training data, so a refit with a different
-#' `newdata` window does not change the stancode and the compiled
-#' Stan model is reused. This is what makes [`lfo_cv()`] and other
-#' refit-heavy workflows fast: subsequent refits skip the (slow)
-#' compile step and only repeat sampling. To override the inherited
-#' priors for a single refit (e.g. swap a coefficient's prior or
-#' loosen a constraint) pass `prior = ...` directly to
-#' [`update()`]. As in [brms::update.brmsfit()], the new rows join
-#' the priors the user set on the original fit, and a new row
-#' replaces an old one for the same parameter:
+#' A refit reuses the fitted prior table. The adaptive priors of brms,
+#' such as the Intercept prior centred on the response, keep the
+#' constants of the original fit. Because the constants stay fixed, a
+#' refit on a different `newdata` window has the same Stan code and
+#' reuses the compiled model. [lfo_cv()] and other workflows that refit
+#' many times then repeat only the sampling. An inherited row for a
+#' parameter the refit lacks, such as the smooth of a dropped term, is
+#' left out of the refit. A `prior` passed to
+#' `update()` joins the priors the user set on the original fit, as in
+#' [brms::update.brmsfit()]. A new row replaces an old one for the same
+#' parameter:
 #'
 #' ```r
 #' new_priors <- c(
@@ -81,55 +63,52 @@
 #' refit <- update(mod, prior = new_priors)
 #' ```
 #'
-#' A change in priors that alters the Stan model will cause a
-#' recompile (and a `recompile = FALSE` call would error). Use
-#' `stancode(refit)` after the call to confirm the model surface
-#' you intended.
+#' A prior change that alters the Stan code recompiles the model. With
+#' `recompile = FALSE` it is an error. `stancode(refit)` shows the
+#' model the refit compiled.
 #'
 #' Multivariate fits take a complete new formula as `formula.`. A
 #' formula update written with `.` is refused, as brms refuses it.
 #'
-#' `jsdgam()` fits refit through [`jsdgam()`] with the arguments the
+#' A `jsdgam()` fit refits through [jsdgam()] with the arguments the
 #' original call evaluated, including `factor_formula`, `n_lv`,
-#' `traits`, `trait_slopes` and `phylo`. Any of them can be overridden
-#' through `...`.
+#' `traits`, `trait_slopes` and `phylo`. `...` overrides any of them.
 #'
-#' Multiple-imputation fits (produced by `mvgam_multiple(combine =
-#' TRUE)`) are not supported by `update()`. Refit each imputation with
-#' [`mvgam()`] and pool them again.
+#' `update()` refuses multiple-imputation fits from
+#' `mvgam_multiple(combine = TRUE)`. Refit each imputation with
+#' [mvgam()] and pool them again.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [`mvgam()`], [stats::update.formula()],
-#'   [brms::update.brmsfit()],
-#'   [stancode.mvgam()] for inspecting the cached Stan model,
-#'   [mvgam_diagnostics] / [mvgam_loo_extras] for diagnostics and
-#'   model comparison on the refit object.
+#' @seealso [loo.mvgam()] and [loo_compare.mvgam()] compare a refit with the
+#'   original. [stancode.mvgam()] shows the compiled model. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   compares competing models by their forecasts.
 #'
 #' @examples
 #' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
+#'                     n_timepoints = 120L, trend_model = AR())
 #' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = poisson(),
-#'               chains  = 2, silent = 2)
+#'              data   = simdat$data_train,
+#'              family = poisson(),
+#'              chains = 2, silent = 2)
 #'
-#' # Refit with a richer obs-side formula (adding a smooth of
-#' # `time`). `update()` reuses the original family, trend
-#' # constructor, priors, and data when the call doesn't override
-#' # them, so only the new term has to be named.
-#' upd <- update(mod, formula. = ~ . + s(time, k = 5), silent = 2)
+#' # Add a smooth of time to the observation formula. The family,
+#' # trend, priors, data and sampler settings carry over
+#' upd <- update(mod, formula. = ~ . + s(time, k = 5))
 #'
-#' # Compare the two fits via leave-one-out cross-validation. A
-#' # positive `elpd_diff` for the richer model indicates the smooth
-#' # on time raised expected log predictive density; check that
-#' # the difference exceeds its standard error before drawing a
-#' # firm conclusion.
-#' loo_compare(loo(mod), loo(upd))
+#' # Compare the two fits by approximate leave-one-out cross-validation.
+#' # The better model has elpd_diff = 0. A difference smaller than about
+#' # two of its standard errors favours neither model
+#' loo_compare(mod, upd)
+#'
+#' # A change of sampler settings alone reuses the compiled model
+#' longer <- update(mod, iter = 3000, recompile = FALSE)
 #' }
 #'
+#' @family model fitting
 #' @method update mvgam
 #' @export
 update.mvgam <- function(object, formula. = NULL, newdata = NULL,
@@ -143,6 +122,7 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
   # `samples` and `burnin` would contradict
   dots <- translate_samples_burnin(list(...))
   attr(dots, "translated") <- NULL
+  dots <- normalise_prior_arg_alias(dots)
   if ("data" %in% names(dots)) {
     stop(insight::format_error(c(
       "'update()' takes new training data as 'newdata'.",
@@ -157,9 +137,9 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
     )), call. = FALSE)
   }
   plan <- update_refit_plan(object, formula., newdata, dots)
-  # Both supported backends cache compiled models by stancode hash, and
-  # an unchanged stancode costs no compile. `recompile = FALSE` turns a
-  # changed stancode into an error.
+  # Both supported backends cache compiled models by their Stan code.
+  # Unchanged code costs no compile. `recompile = FALSE` turns changed
+  # code into an error.
   if (isFALSE(recompile) &&
       !identical(mvgam_normalise_stancode(refit_stancode(plan)),
                  mvgam_normalise_stancode(object$stancode))) {
@@ -172,8 +152,8 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
   }
   fit <- do.call(plan$fn, plan$args)
   # The fitting function stamps the call of the frame that reached it.
-  # Under `do.call()` every argument arrives as its value, and the
-  # recorded call would inline the whole data frame. The refit's call
+  # Under `do.call()` every argument arrives as its value. The recorded
+  # call would then inline the whole data frame. The refit's call
   # is the original with the changed arguments written over it. It
   # keeps every symbol the user typed and can be handed to `update()`.
   fit$call <- restate_updated_call(getCall(object), match.call())
@@ -292,22 +272,21 @@ mvgam_normalise_stancode <- function(stancode) {
 mvgam_update_inheritance <- list(
   trend_formula = list(slot = "trend_call"),
   family = list(slot = "family"),
-  # mvgam lifts its own priors out of the generated Stan so a fit can
-  # report what it sampled under, and regenerates them from the trend
-  # spec on every fit. Handing them back to brms, which knows no
-  # parameter called `theta_features` or `Z`, is an error rather than
-  # a no-op, so only what a user or brms set travels.
-  # Wrapped rather than named directly: this list is built when the
-  # package loads, before the function below is bound.
+  # mvgam lifts its own priors out of the generated Stan to report what
+  # a fit sampled under. It regenerates them from the trend spec on
+  # every fit. brms has no parameter called `theta_features` or `Z` and
+  # refuses those rows. Only the rows a user or brms set travel.
+  # The normaliser is wrapped in a function because this list is built
+  # when the package loads, before `drop_mvgam_sourced_priors()` is
+  # bound.
   prior = list(
     slot = "prior",
     normaliser = function(value) drop_mvgam_sourced_priors(value)
   ),
   backend = list(slot = "backend"),
   # A `run_model = FALSE` stub records `algorithm = "none"`, which no
-  # backend lists, and handing it back refused the refit that turns a
-  # prefit into a fit. Reported as absent, the loop below skips it and
-  # the default applies.
+  # backend accepts. Reported as absent, the loop below skips it. The
+  # refit of a prefit then takes the default algorithm.
   algorithm = list(
     getter = function(object) {
       value <- object$algorithm
@@ -317,16 +296,14 @@ mvgam_update_inheritance <- list(
   init = list(slot = "init"),
   save_pars = list(slot = "save_pars"),
   newdata = list(getter = function(object) object$test_data),
-  # brms keeps this as a `brmsthreads` object, present whether or not
-  # the user asked for threading, with a NULL count when they did not.
-  # `mvgam()` takes the count, so that is what travels.
+  # brms stores a `brmsthreads` object on every fit. Its count is NULL
+  # when the user asked for no threading. `mvgam()` takes the count.
   threads = list(
     getter = function(object) object$obs_model$threads$threads
   ),
   # A `trend_map` written on the trend constructor travels inside
-  # `trend_call`, and supplying it at the top level as well is a
-  # collision `mvgam()` refuses outright. Only a fit that set it at
-  # the top level needs it handed back.
+  # `trend_call`. `mvgam()` refuses one given in both places. Only a
+  # fit that set it at the top level gets it back there.
   trend_map = list(
     getter = function(object) {
       if (trend_call_names_arg(object$trend_call, "trend_map")) {
@@ -349,10 +326,10 @@ mvgam_update_inheritance <- list(
 # The four brms code-generation options all come off one slot and
 # join the registry through one loop.
 #
-# Reason: built on first read rather than at load, because the names
-# come from `mvgam_codegen_options()` in another file and DESCRIPTION
-# sets no `Collate`, so which file is sourced first is a property of
-# the locale.
+# Reason: the names come from `mvgam_codegen_options()` in another
+# file. Without a `Collate` field in DESCRIPTION, the locale sets the
+# order files are sourced in. A function builds the entries at call
+# time, after every file is sourced.
 codegen_inheritance_entries <- function() {
   entries <- lapply(names(mvgam_codegen_options()), function(nm) {
     list(getter = function(object) object$codegen[[nm]])
@@ -367,30 +344,28 @@ update_inheritance_table <- function() {
 }
 
 
-# Arguments a refit does not carry over, each with the reason: some
-# because the fit does not store them, others because they change
-# nothing about the model. An argument is either inherited above or
-# named here, and `tests/testthat/test-update.R` asserts that every
-# argument reaching the code generator appears in one of the two.
-# Silence is what let `loadings_prior` go missing: a refit dropped the
-# whole structured prior and nothing said so.
+# Arguments a refit does not carry over, each with the reason. The fit
+# stores some of them nowhere. The others change nothing about the
+# model. An argument is either inherited above or named here.
+# `tests/testthat/test-update.R` asserts that every argument reaching
+# the code generator appears in one of the two lists.
 mvgam_update_uninherited <- c(
   data2 = "stored, but empty on every fit examined",
   stanvars = paste0("stored with mvgam's own mixed in; passing them ",
                     "again injects them twice"),
-  combine = "multiple-imputation only, and a pooled fit is refused",
+  combine = "multiple imputation only; update() refuses a pooled fit",
   run_model = "a fitted object is by definition the run_model = TRUE case",
   save_model = "writes the Stan file out; the model is unchanged",
-  validate = "whether the assembled code is checked, not what it holds"
+  validate = "whether the assembled code is checked; the code is the same"
 )
 
 
 #' Turn a resolved loadings-prior spec back into user-facing arguments
 #'
-#' `normalise_loadings_prior()` allow-lists the names a user writes
-#' and rejects the rest, so the resolved spec cannot be handed back as
-#' it stands. This maps the two that were renamed and drops the sizes
-#' the normaliser recomputes.
+#' `normalise_loadings_prior()` accepts only the names a user writes.
+#' The resolved spec holds two fields under other names, plus sizes the
+#' normaliser recomputes. This maps the two fields back to their
+#' argument names and drops the sizes.
 #'
 #' @param spec A `loadings_prior_spec`, or NULL.
 #' @return A list `mvgam(loadings_prior = )` accepts, or NULL.
@@ -402,10 +377,9 @@ denormalise_loadings_prior <- function(spec) {
     distances = spec$distance_mats,
     column_shrinkage = spec$column_shrinkage
   )
-  # The spec carries the MGP hyperparameters whatever the shrinkage,
-  # while `normalise_loadings_prior()` refuses them unless the
-  # shrinkage is `"mgp"`, so they travel only when they mean
-  # something.
+  # The spec records the MGP hyperparameters for every shrinkage.
+  # `normalise_loadings_prior()` accepts them only with
+  # `column_shrinkage = "mgp"`. They travel only then.
   if (loadings_spec_traits(spec)$mgp) {
     out$mgp_a1 <- spec$mgp_a1
     out$mgp_a2 <- spec$mgp_a2
@@ -444,9 +418,9 @@ mvgam_sampler_inheritance <- function(object) {
 
 #' Visit every named argument of a stored trend call
 #'
-#' `all.vars()` and `all.names()` see the values an argument was given
-#' but never the argument's own name, so the call has to be walked.
-#' Both readers below want the same walk.
+#' `all.vars()` and `all.names()` return the values an argument was
+#' given. Neither returns the argument's own name. This walks the call
+#' for the two functions below that need the names.
 #'
 #' @param trend_call The `trend_call` slot, or NULL.
 #' @param visit Called as `visit(name, value)` for each named
@@ -488,10 +462,9 @@ trend_call_names_arg <- function(trend_call, arg) {
 
 #' Drop the prior rows mvgam lifted from its own generated Stan
 #'
-#' Those rows exist to report what the compiled model sampled under.
-#' They name mvgam parameters rather than brms ones, so a refit
-#' regenerates them from the trend spec and brms rejects them if they
-#' are passed in.
+#' Those rows report what the compiled model sampled under. They name
+#' mvgam parameters, which brms refuses. A refit regenerates them from
+#' the trend spec.
 #'
 #' @param prior A `brmsprior`, or NULL.
 #' @return The same table without its mvgam-sourced rows.
@@ -517,7 +490,7 @@ identical_source <- function(source, value) {
 #' The rule follows `brms::update.brmsfit()`. A new `prior` joins the
 #' rows the user set on the original fit. A new row replaces an old one
 #' with the same `brmsprior_key_cols`. An unbounded row is `NA` from
-#' `prior()` and `""` in a fitted table, and the two compare equal.
+#' `prior()` and `""` in a fitted table. The two compare equal.
 #'
 #' @param new The `prior` passed to `update()`.
 #' @param old_user The rows the user set on the original fit, or NULL.
@@ -530,15 +503,57 @@ merge_update_priors <- function(new, old_user) {
     return(new)
   }
   combined <- bind_brmsprior_rows(list(new, old_user))
-  keys <- combined[, intersect(brmsprior_key_cols, names(combined)),
-                   drop = FALSE]
-  keys[] <- lapply(keys, function(x) {
-    x <- as.character(x)
-    x[is.na(x)] <- ""
-    x
-  })
+  keys <- brmsprior_row_keys(combined, brmsprior_key_cols)
   structure(combined[!duplicated(keys), , drop = FALSE],
             class = c("brmsprior", "data.frame"))
+}
+
+
+#' Keep the inherited prior rows the refit has a parameter for
+#'
+#' `brms::update.brmsfit()` marks the inherited table
+#' `allow_invalid_prior` for the same purpose. A refit that drops a term
+#' would otherwise carry that term's rows. brms refuses such a row on
+#' the observation side. `check_trend_priors()` refuses it on the trend
+#' side. The refit's own prior table names the parameters it has.
+#' Bounds are left out of the match. A fitted table and a fresh one can
+#' record the same bound differently.
+#'
+#' @param prior The inherited `brmsprior`, or NULL.
+#' @param refit_table The prior table of the refitted model.
+#' @return `prior` without the rows that match no parameter.
+#' @noRd
+priors_in_refit <- function(prior, refit_table) {
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  checkmate::assert_data_frame(refit_table)
+  if (is.null(prior) || nrow(prior) == 0L) {
+    return(prior)
+  }
+  cols <- setdiff(brmsprior_key_cols, c("lb", "ub"))
+  keep <- brmsprior_row_keys(prior, cols) %in%
+    brmsprior_row_keys(refit_table, cols)
+  structure(prior[keep, , drop = FALSE], class = class(prior))
+}
+
+
+#' The prior table of an `mvgam()` refit
+#'
+#' `get_prior()` builds it from the refit's arguments without
+#' generating the Stan program.
+#'
+#' @param args The refit's arguments to `mvgam()`.
+#' @return A `brmsprior`.
+#' @noRd
+mvgam_refit_prior_table <- function(args) {
+  checkmate::assert_list(args)
+  get_prior(
+    mvgam_formula(args$formula, args$trend_formula),
+    data = args$data,
+    family = args$family %||% gaussian(),
+    loadings_prior = args$loadings_prior,
+    data2 = args$data2,
+    trend_map = args$trend_map
+  )
 }
 
 
@@ -574,9 +589,9 @@ updated_formula <- function(old, formula.) {
 #'
 #' A refit keeps the fit's held-out frame when it lies after the new
 #' training data, as the refits of `kfold()` and `lfo_cv()` need. New
-#' training data reaching into the held-out times leaves a frame
-#' `forecast()` would start inside the training window, and the refit
-#' drops it.
+#' training data reaching into the held-out times would leave
+#' `forecast()` starting inside the training window. The refit drops
+#' such a frame.
 #'
 #' @param object The fit being refitted.
 #' @param training The refit's training data.
@@ -605,27 +620,25 @@ inherited_holdout <- function(object, training, silent) {
 
 
 # Trend-constructor arguments whose resolved value the fitted object
-# already carries, keyed by the `trend_metadata` slot holding it.
-# `update()` rebuilds the trend side from the expression the user
-# wrote, so an argument they passed by name has to be put back within
-# reach of that expression.
+# holds, keyed by the `trend_metadata` slot holding it. `update()`
+# rebuilds the trend side from the expression the user wrote. An
+# argument they passed by name must then resolve from that
+# expression.
 trend_arg_metadata <- c(trend_map = "fixed_Z", n_lv = "n_lv")
 
 
 #' Make a stored trend call evaluable again
 #'
-#' A formula keeps the expression, not the value, and carries the
-#' environment it was written in. Written inside a function, or read
-#' back from an `.rds` in a fresh session, that environment no longer
-#' holds what the constructor referred to:
-#' `~ AR(p = 1, trend_map = Z)` fails with `object 'Z' not found`.
-#' The values are on the fit, so they are bound into a child of the
-#' formula's own environment, leaving the expression as the user wrote
-#' it while making it resolvable.
+#' A formula keeps the expression and the environment it was written
+#' in. Written inside a function, or loaded from an `.rds` in a fresh
+#' session, that environment may lack what the constructor names.
+#' `~ AR(p = 1, trend_map = Z)` then fails with
+#' `object 'Z' not found`. The fit stores the values in
+#' `trend_metadata`. They are bound into a child of the formula's own
+#' environment. The expression stays as the user wrote it.
 #'
-#' A name the fit does not carry is left alone, so it reaches
-#' `mvgam()` and fails there against the user's own argument rather
-#' than somewhere inside the rebuild.
+#' A name the fit does not store is left alone. `mvgam()` then refuses
+#' it against the user's own argument.
 #'
 #' @param trend_call The `trend_call` slot, or NULL.
 #' @param metadata The `trend_metadata` slot, or NULL.
@@ -657,28 +670,26 @@ restore_trend_call_env <- function(trend_call, metadata) {
 }
 
 
-# Of the arguments `trend_arg_metadata` maps, those a refit has to
-# state outright rather than merely bring back into scope. The slot
-# each one is read from stays in that table, so the two cannot drift.
+# Of the arguments `trend_arg_metadata` maps, those a refit must write
+# on the constructor. Binding them in scope is not enough. The slot
+# holding each one stays in `trend_arg_metadata`.
 #
-# `n_lv` is the case: a top-level `trend_map` sets the factor count
-# just as a constructor argument does, and `mvgam()` has no top-level
-# `n_lv` for it to travel back on. `trend_map` itself is absent here
-# because it does travel that way, through `mvgam_update_inheritance`.
+# A top-level `trend_map` sets the factor count as a constructor
+# argument does. `mvgam()` has no top-level `n_lv` to pass it back
+# through. `trend_map` itself travels at the top level, through
+# `mvgam_update_inheritance`.
 trend_args_stated_on_rebuild <- "n_lv"
 
 
 #' State a resolved trend argument the user's own expression omits
 #'
-#' A refit rebuilds the trend side by re-evaluating the expression the
-#' user wrote, which is right for everything that expression settles.
-#' It is wrong for a value the fit resolved from somewhere else. A
-#' factor count set by a top-level `trend_map` lives only on the fit,
-#' and rebuilding without it changes the model rather than failing:
-#' `by = lv_axis()` reads the series axis instead of the factor axis,
-#' so a fit with two per-factor smooths comes back with one smooth per
-#' series. Measured on a five-series, two-factor fit, that is
-#' `N_lv_trend` 5 against 2 and `N_trend` 300 against 120.
+#' A refit rebuilds the trend side by evaluating the expression the
+#' user wrote. A value the fit resolved elsewhere is absent from that
+#' expression. A factor count set by a top-level `trend_map` is held
+#' only by the fit. Rebuilt without it, the model changes with no
+#' error. `by = lv_axis()` then takes the series axis in place of the
+#' factor axis. A fit with two per-factor smooths would come back with
+#' one smooth per series.
 #'
 #' @param trend_call The `trend_call` slot, or NULL.
 #' @param metadata The `trend_metadata` slot, or NULL.
@@ -728,7 +739,7 @@ state_resolved_trend_args <- function(trend_call, metadata) {
 
 #' Add named arguments to every trend constructor in an expression
 #'
-#' The registry is what decides which calls those are, so a newly
+#' The trend registry decides which calls are constructors. A newly
 #' registered trend needs no change here.
 #'
 #' @param expr Current expression node.
@@ -773,11 +784,11 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
   resolved <- list()
   resolved$formula <- updated_formula(object$formula, formula.)
   resolved$data <- if (is.null(newdata)) object$data else newdata
-  # A refit reaches brms like any prediction does, and an empty
-  # observation formula names a placeholder column that `mvgam()`
-  # strips from the frame it stores. Stamping it back is what the two
-  # prediction paths already do; without it brms refuses the refit for
-  # a variable the user never wrote and cannot supply.
+  # A refit reaches brms as a prediction does. An empty observation
+  # formula names a placeholder column that `mvgam()` strips from the
+  # frame it stores. The two prediction paths add the column back. A
+  # refit does the same. brms would otherwise refuse it for a variable
+  # the user never wrote.
   resolved$data <- ensure_obs_placeholder(resolved$data, object)
   inheritance <- update_inheritance_table()
   for (arg_name in names(inheritance)) {
@@ -794,9 +805,9 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
     if (!is.null(entry$normaliser)) {
       value <- entry$normaliser(value)
     }
-    # A getter finding nothing means the fit did not use the argument,
-    # which is not the same as passing it NULL: `threads = NULL` trips
-    # the integer assertion downstream.
+    # A getter returning NULL means the fit did not use the argument.
+    # Passing NULL would differ: `threads = NULL` fails the integer
+    # assertion downstream.
     if (is.null(value) && !is.null(entry$getter)) next
     resolved[[arg_name]] <- value
   }
@@ -804,29 +815,17 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
     resolved$newdata <- inherited_holdout(object, resolved$data,
                                           resolved$silent %||% 1L)
   }
-  if (!is.null(dots$prior)) {
-    old <- object$prior
-    old_user <- if (!is.null(old) && "source" %in% names(old)) {
-      old[identical_source(old$source, "user"), , drop = FALSE]
-    }
-    resolved$prior <- merge_update_priors(dots$prior, old_user)
-  }
-  # The held-out frame reaches brms alongside the training one, so it
-  # carries the placeholder on the same terms.
+  # The held-out frame reaches brms with the training frame. It takes
+  # the placeholder column too.
   resolved$newdata <- ensure_obs_placeholder(resolved$newdata, object)
-  # The column alone is not the whole of what the injection produced.
-  # Its pin holds the coefficient at zero, and the stored table does
-  # not carry it, so a refit would sample free what the fit held
-  # fixed.
-  resolved$prior <- ensure_obs_placeholder_pin(resolved$prior, object)
-  # The trend call came back as the user wrote it, which may name a
-  # matrix or a count that is no longer in scope.
+  # The trend call stays as the user wrote it. It may name a matrix or
+  # a count that is out of scope.
   resolved$trend_formula <- restore_trend_call_env(
     resolved$trend_formula, object$trend_metadata
   )
-  # A trend formula the caller supplied states its own structure, and
-  # the fit's resolved values describe the model being replaced. Only
-  # the inherited call needs what the fit settled outside it.
+  # A trend formula the caller supplied states its own structure. The
+  # fit's resolved values describe the model being replaced. Only the
+  # inherited call needs what the fit settled outside it.
   if (!"trend_formula" %in% names(dots)) {
     resolved$trend_formula <- state_resolved_trend_args(
       resolved$trend_formula, object$trend_metadata
@@ -836,6 +835,29 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
   # Pass through any remaining user dots (cores, threads, seed,
   # control, init, silent, ...) that are not already resolved.
   resolved <- c(resolved, dots[!names(dots) %in% names(resolved)])
+
+  # A new `prior` joins the rows the user set on the original fit.
+  # Without one, the refit inherits the whole fitted table.
+  inherited <- resolved$prior
+  if (!is.null(dots$prior)) {
+    old <- object$prior
+    inherited <- if (!is.null(old) && "source" %in% names(old)) {
+      old[identical_source(old$source, "user"), , drop = FALSE]
+    }
+  }
+  if (!is.null(inherited) && nrow(inherited) > 0L) {
+    inherited <- priors_in_refit(inherited,
+                                 mvgam_refit_prior_table(resolved))
+  }
+  resolved$prior <- if (is.null(dots$prior)) {
+    inherited
+  } else {
+    merge_update_priors(dots$prior, inherited)
+  }
+  # The placeholder column comes with a prior that pins its
+  # coefficient at zero. The stored prior table lacks that row. Without
+  # it a refit would sample the coefficient the fit held fixed.
+  resolved$prior <- ensure_obs_placeholder_pin(resolved$prior, object)
   inherit_sampler_args(resolved, object, dots)
 }
 
@@ -871,8 +893,18 @@ jsdgam_update_call <- function(object, formula., newdata, dots) {
                       dots$silent %||% object$silent %||% 1L)
   }
   args[names(dots)] <- dots
-  if (!is.null(dots$prior)) {
-    args$prior <- merge_update_priors(dots$prior, stored_prior)
+  if (!is.null(stored_prior)) {
+    # `jsdgam()` builds its formulas from these arguments. A prefit of
+    # the refit gives the parameters it has.
+    prefit <- do.call(jsdgam, utils::modifyList(
+      args, list(prior = NULL, run_model = FALSE, silent = 2L)
+    ))
+    stored_prior <- priors_in_refit(stored_prior, prefit$prior)
+  }
+  args$prior <- if (is.null(dots$prior)) {
+    stored_prior
+  } else {
+    merge_update_priors(dots$prior, stored_prior)
   }
   inherit_sampler_args(args, object, dots)
 }
@@ -890,8 +922,8 @@ jsdgam_update_call <- function(object, formula., newdata, dots) {
 #' `iter` would leave Stan no sampling iterations.
 #'
 #' `control` also needs the fit's backend, whose defaults it holds.
-#' It merges entry by entry: a NUTS setting the caller names, bare or
-#' inside `control`, replaces the fit's own, and the rest stay.
+#' It merges entry by entry. A NUTS setting the caller names, bare or
+#' inside `control`, replaces the fit's own. The others stay.
 #'
 #' @param args The refit's argument list.
 #' @param object The fit being refitted.

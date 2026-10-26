@@ -3,80 +3,71 @@
 
 #' K-fold cross-validation for `mvgam` fits
 #'
-#' Hierarchical / grouped k-fold cross-validation. Generalises the
-#' PSIS-with-selective-refit pattern of [lfo_cv.mvgam()] from
-#' rolling time blocks to arbitrary groups. One function covers
-#' three modes:
+#' Estimates the expected log predictive density of held-out groups of
+#' rows. A fold that importance sampling approximates well takes the
+#' PSIS estimate of [loo::loo()] on the fold's summed log likelihood.
+#' The rest are refitted without the fold, as [lfo_cv.mvgam()] refits
+#' the time blocks it cannot approximate. Three settings cover the
+#' range:
 #'
 #' \itemize{
-#'   \item **Pure PSIS** (`pareto_k_threshold = Inf`): no refits.
-#'     Cheapest, leave-one-group-out PSIS-LOO via `loo::loo()` on
-#'     the group-aggregated log-lik matrix. Pareto-k diagnostics
-#'     warn when the approximation is unreliable.
-#'   \item **Hybrid** (default): PSIS first; refit only those
-#'     folds whose Pareto-k exceeds `pareto_k_threshold`. Typical
-#'     case is a handful of refits over K folds.
-#'   \item **Exact** (`exact = TRUE`): refit every fold,
-#'     brms-style. Most expensive; the gold standard when PSIS
-#'     diagnostics are uniformly bad.
+#'   \item `pareto_k_threshold = Inf` refits nothing. Pareto-k
+#'     warnings mark folds the approximation fits poorly.
+#'   \item The default refits the folds whose Pareto-k exceeds
+#'     `pareto_k_threshold`, which is often a handful.
+#'   \item `exact = TRUE` refits every fold, as `brms::kfold()` does.
 #' }
 #'
-#' Better than `brms::kfold` in two ways: (1) `group` accepts a
-#' character vector (multi-column composite key, e.g.
-#' `c("site", "season")`) and (2) the hybrid mode amortises the
-#' refit cost. Both extensions sit cleanly on top of the existing
-#' `loo` package fold helpers.
+#' `group` takes several columns, such as `c("site", "season")`. Every
+#' row of one combination stays in the same fold.
 #'
 #' @param x A fitted `mvgam` object.
-#' @param K Integer fold count. When `group` is supplied and `K`
-#'   is `NULL` (the default), uses one group per fold
-#'   (leave-one-group-out). When `K` is set and smaller than the
-#'   number of distinct groups, [loo::kfold_split_grouped()] bins
-#'   groups into `K` folds. Without `group`, defaults to `K = 10`.
-#' @param group Optional character vector naming columns in the
-#'   training data that define the fold partitioning unit. All
-#'   observations sharing a `group` tuple stay in the same fold.
-#'   Default `NULL` partitions by closure unit on closure-unit
-#'   families (via `closure_unit_grouping(family)`) and by row
+#' @param K Integer number of folds. With `group` and `K = NULL` (the
+#'   default), each group is a fold. A `K` below the number of groups
+#'   bins the groups into `K` folds with [loo::kfold_split_grouped()].
+#'   Without `group`, `K` defaults to 10.
+#' @param group Optional character vector of training-data columns
+#'   whose combinations define the groups. `NULL` (the default) takes
+#'   the closure unit of an [occ()] or [nmix()] model and the row
 #'   otherwise.
-#' @param folds Optional integer vector with one fold assignment
-#'   per row of the training data. Overrides `K`, `group`, and
-#'   `fold_split`. Escape hatch for designs not expressible via
-#'   the built-in splitters.
-#' @param exact Logical. When `TRUE`, refit every fold and skip
-#'   the PSIS path. Default `FALSE` uses the hybrid mode.
-#' @param pareto_k_threshold Numeric in `[0, Inf]`. Folds whose
-#'   PSIS Pareto-k exceeds this trigger a refit. `NULL` (default)
-#'   uses the adaptive threshold `min(1 - 1 / log10(S), 0.7)`,
-#'   where `S` is the number of posterior draws. Pass an explicit
-#'   numeric to override, or `Inf` for pure PSIS (no refits ever).
-#' @param fold_split One of `"grouped"`, `"stratified"`,
-#'   `"random"`. The `loo::kfold_split_*` helper used when
-#'   `K < n_groups`. Ignored when `K == n_groups` (one group per
-#'   fold) or when `folds` is supplied. Default `"grouped"`.
-#' @param seed Optional integer. Forwarded to `set.seed()` before
-#'   the fold split so the partition is reproducible.
+#' @param folds Optional integer vector of one fold per training row,
+#'   replacing `K` and `fold_split`. Each fold is then held out and
+#'   scored as one group. A fold never splits a group, which is a
+#'   closure unit by default.
+#' @param exact Logical. `TRUE` refits every fold. Defaults to `FALSE`.
+#' @param pareto_k_threshold Numeric. A fold whose Pareto-k exceeds
+#'   it is refitted. `NULL` (the default) takes
+#'   `min(1 - 1 / log10(S), 0.7)` for `S` posterior draws. `Inf`
+#'   refits nothing.
+#' @param fold_split `"grouped"` (the default), `"stratified"` or
+#'   `"random"`: the `loo::kfold_split_*()` function binning groups
+#'   into `K` folds when there are more groups than folds.
+#' @param seed Optional integer seed for the fold split and the refits.
+#'   The session's random state is restored when the call returns.
 #' @param silent Integer in `\{0, 1, 2\}`. `0` prints each refit
 #'   and its sampler start and finish lines. `1` (default) prints
 #'   the refit count. `2` prints nothing.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return An object of class `c("mvgam_kfold", "kfold", "loo")`
-#'   carrying `estimates` (elpd_kfold, p_kfold, kfoldic with SE),
-#'   `pointwise` (per-group elpd contributions), `pareto_k`
-#'   (per-group PSIS shape values, NA for refit folds), plus
-#'   diagnostic slots:
+#' @return A `c("mvgam_kfold", "kfold", "loo")` object, which
+#'   [loo::loo_compare()] takes as it takes [loo.mvgam()] results. It
+#'   holds:
 #'   \itemize{
-#'     \item `n_refits` --- number of folds refit.
-#'     \item `refit_groups` --- character vector of refit fold
-#'       labels.
-#'     \item `K`, `group`, `exact` --- echoed call arguments.
-#'     \item `pareto_k_threshold` --- the numeric threshold the
-#'       refit gate applied, and `pareto_k_threshold_adaptive`,
-#'       `TRUE` when the adaptive rule chose it.
+#'     \item `estimates`: `elpd_kfold`, `p_kfold` and `kfoldic` with
+#'       their standard errors.
+#'     \item `pointwise`: the ELPD of each group. `pointwise_psis` holds
+#'       the PSIS estimates before any refit.
+#'     \item `pareto_k`: the Pareto-k of each group's PSIS estimate, all
+#'       `NA` under `exact = TRUE`.
+#'     \item `n_refits` and `refit_groups`: the number of refitted folds
+#'       and the groups they hold.
+#'     \item `K` and `exact`: the number of folds and the mode.
+#'     \item `group`: the grouping columns, `"fold"` when `folds` was
+#'       given, or `NULL` for single rows.
+#'     \item `pareto_k_threshold`: the threshold applied, with
+#'       `pareto_k_threshold_adaptive` `TRUE` when the default rule set
+#'       it.
 #'   }
-#'   The `loo` parent class lets [loo::loo_compare()] and
-#'   `print.loo()` consume the result directly.
 #'
 #' @references
 #' Burkner P-C, Gabry J, Vehtari A (2020). Approximate
@@ -89,8 +80,12 @@
 #'   *Statistics and Computing*, 27, 1413--1432.
 #'   \doi{10.1007/s11222-016-9696-4}.
 #'
-#' @seealso [loo.mvgam()], [lfo_cv.mvgam()], [log_lik.mvgam()],
-#'   [update.mvgam()], [loo::kfold_split_grouped()]
+#' @seealso [loo.mvgam()] approximates leave-one-out cross-validation.
+#'   [lfo_cv.mvgam()] scores forecasts from rolling origins.
+#'   [summary.mvgam_kfold()] and [plot.mvgam_kfold()] report each group.
+#'   The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   compares models by cross-validation.
 #'
 #' @examples
 #' \dontrun{
@@ -104,11 +99,21 @@
 #'               family  = gaussian(),
 #'               chains  = 2, silent = 2)
 #'
-#' k <- kfold(mod, K = 3L)
-#' k$estimates
+#' # Neighbouring times share information through the trend. Folds of
+#' # contiguous time blocks hold each block out whole. Folds that PSIS
+#' # approximates poorly are refitted.
+#' blocks <- cut(simdat$data_train$time, breaks = 4L, labels = FALSE)
+#' k <- kfold(mod, folds = blocks)
+#' k
+#'
+#' # The ELPD and Pareto k of each block
+#' plot(k)
+#'
+#' # Next, lfo_cv() scores forecasts made from rolling origins
 #' }
 #'
 #' @author Nicholas J Clark
+#' @family model comparison
 #' @method kfold mvgam
 #' @importFrom loo kfold kfold_split_grouped kfold_split_random
 #'   kfold_split_stratified psis pareto_k_values
@@ -137,10 +142,7 @@ kfold.mvgam <- function(x,
   checkmate::assert_int(silent, lower = 0L, upper = 2L)
   fold_split <- match.arg(fold_split)
   rlang::check_dots_empty()
-  if (!is.null(seed)) {
-    checkmate::assert_int(seed)
-    set.seed(seed)
-  }
+  local_seed(seed)
 
   data <- x$data
   if (is.null(data)) {
@@ -151,25 +153,21 @@ kfold.mvgam <- function(x,
     )), call. = FALSE)
   }
 
-  # Resolve group columns + per-row group key. Closure-unit fits
-  # default to closure_unit_grouping(family); other fits default
-  # to row-level partitioning.
   group_info <- resolve_kfold_group(x, group, data)
-  group_key <- group_info$key
-  n_groups <- group_info$n_groups
-
-  # Partition group_key into fold IDs (one per row of data).
   fold_ids <- build_kfold_partition(
-    group_key = group_key, K = K, folds = folds,
+    group_key = group_info$key, K = K, folds = folds,
     fold_split = fold_split
   )
+  # A supplied fold is held out and scored as one group. PSIS then
+  # approximates leaving the whole fold out.
+  if (!is.null(folds)) {
+    group_info <- list(key = as.character(fold_ids), group_names = "fold")
+  }
+  group_key <- group_info$key
   K_actual <- length(unique(fold_ids))
 
-  # log_lik(x) on the full data: one matrix at the family's natural
-  # grain (per-row or per-closure-unit). Reused for both the PSIS
-  # path and as the diagnostic baseline. Each column is mapped to
-  # its group and fold at that full width, before any narrowing, so
-  # the mapping is grain-aware.
+  # One column per row, or per unit for a closure-unit family. Columns
+  # are mapped to groups and folds before `clean_ll()` drops any.
   loglik_full <- log_lik(x)
   col_meta <- map_loglik_cols_to_groups(
     object = x, data = data,
@@ -177,36 +175,23 @@ kfold.mvgam <- function(x,
     loglik_ncol = NCOL(loglik_full)
   )
 
-  # `clean_ll()` then drops the columns with no density and records
-  # which survived. The mapping is narrowed to match, because
-  # pairing a scored matrix with the frame's full width makes the
-  # two describe different observations.
-  loglik_full <- clean_ll(x, loglik_full)
-  col_meta <- lapply(col_meta, function(v) {
-    narrow_to_scored(v, loglik_full)
-  })
+  # The column groups are narrowed to the columns `clean_ll()` keeps.
+  # `group_to_fold` has one entry per group and is left whole.
+  loglik_full <- clean_ll(loglik_full)
+  col_meta$col_group <- narrow_to_scored(col_meta$col_group, loglik_full)
 
-  # Aggregate per-column log-lik into per-group log-lik
-  # [draws x n_groups]. Sum log-lik across rows belonging to each
-  # group (independence at the row grain).
   loglik_grouped <- aggregate_loglik_by_group(
     loglik_full, col_meta$col_group
   )
   group_labels <- colnames(loglik_grouped)
 
-  # The number the refit gate compares against, resolved by the
-  # same rule `lfo_cv()` applies.
   pareto_k_threshold_used <- resolve_pareto_k_threshold(
     pareto_k_threshold, nrow(loglik_grouped)
   )
 
-  # Build the per-fold -> groups mapping (which group labels live
-  # in which fold). Used for both the PSIS refit-trigger loop and
-  # the exact refit loop.
   groups_per_fold <- split(group_labels, col_meta$group_to_fold)
 
   if (exact) {
-    # Every-fold-refit mode: skip the PSIS pre-pass entirely.
     pointwise <- rep(NA_real_, length(group_labels))
     names(pointwise) <- group_labels
     pareto_k <- rep(NA_real_, length(group_labels))
@@ -221,9 +206,9 @@ kfold.mvgam <- function(x,
       pointwise = pointwise, silent = silent
     )
   } else {
-    # Hybrid mode: PSIS-LOO on the aggregated matrix gives a
-    # per-group elpd + Pareto-k. Refit only folds containing
-    # high-k groups.
+    # PSIS on the group sums gives each group's ELPD and Pareto k. A
+    # fold holding a group above the threshold is refitted. Its
+    # Pareto k is kept for the plot.
     psis_loo <- with_pareto_k_handled(loo::loo(loglik_grouped, r_eff = 1))
     pointwise <- psis_loo$pointwise[, "elpd_loo"]
     names(pointwise) <- group_labels
@@ -238,9 +223,8 @@ kfold.mvgam <- function(x,
     refit_groups <- unlist(groups_per_fold[refit_folds],
                            use.names = FALSE)
 
-    # Snapshot the PSIS estimates BEFORE the refit splice so
-    # `summary()` can report per-group lift (refit_elpd - psis_elpd)
-    # and surface which folds the PSIS approximation got most wrong.
+    # `summary()` reports the change from the PSIS estimate to the
+    # refit
     pointwise_psis <- pointwise
     if (length(refit_folds) > 0L) {
       pointwise <- kfold_refit_folds(
@@ -248,11 +232,6 @@ kfold.mvgam <- function(x,
         group_key = group_key, refit_fold_ids = refit_folds,
         pointwise = pointwise, silent = silent
       )
-      # Refit ELPDs replace the PSIS estimate exactly, but we
-      # KEEP the original PSIS Pareto-k values on `pareto_k` as a
-      # diagnostic record. The plot then shows which folds had
-      # high k (i.e. why the refit was triggered) instead of
-      # silently dropping them from the Pareto-k panel.
     }
   }
 
@@ -279,9 +258,8 @@ kfold.mvgam <- function(x,
 #' @param object Fitted `mvgam` object
 #' @param group Character vector of grouping columns, or `NULL`
 #' @param data Data frame of training data
-#' @return List holding the per-row character `key`, the number of
-#'   distinct keys in `n_groups` and the grouping columns in
-#'   `group_names`
+#' @return List holding the per-row character `key` and the grouping
+#'   columns in `group_names`
 #' @noRd
 resolve_kfold_group <- function(object, group, data) {
   checkmate::assert_list(object)
@@ -294,7 +272,6 @@ resolve_kfold_group <- function(object, group, data) {
     } else {
       return(list(
         key = as.character(seq_len(NROW(data))),
-        n_groups = NROW(data),
         group_names = NULL
       ))
     }
@@ -307,13 +284,11 @@ resolve_kfold_group <- function(object, group, data) {
                  paste(missing_cols, collapse = ", "), "."),
       i = paste0("Available columns: ",
                  paste(names(data), collapse = ", "), ".")
-    )))
+    )), call. = FALSE)
   }
   vals <- lapply(group, function(g) as.character(data[[g]]))
-  key <- do.call(paste, c(vals, list(sep = "_")))
   list(
-    key = key,
-    n_groups = length(unique(key)),
+    key = do.call(paste, c(vals, list(sep = "_"))),
     group_names = group
   )
 }
@@ -322,7 +297,8 @@ resolve_kfold_group <- function(object, group, data) {
 #' The fold of each training row
 #'
 #' Binning goes through the `loo::kfold_split_*()` functions. Every row
-#' of a group lands in the same fold.
+#' of a group lands in the same fold. Supplied `folds` must keep each
+#' group whole.
 #'
 #' @param group_key Character vector of per-row group keys
 #' @param K Integer number of folds, or `NULL` for a default
@@ -341,10 +317,23 @@ build_kfold_partition <- function(group_key, K = NULL,
   if (!is.null(folds)) {
     if (length(folds) != length(group_key)) {
       stop(insight::format_error(c(
-        "'folds' length does not match the number of training rows.",
-        x = paste0("folds: ", length(folds),
-                   ", rows: ", length(group_key), ".")
-      )))
+        "'folds' must give one fold per training row.",
+        x = paste0("Got ", length(folds), " folds for ",
+                   length(group_key), " rows.")
+      )), call. = FALSE)
+    }
+    split_groups <- names(which(
+      tapply(folds, group_key, function(f) length(unique(f))) > 1L
+    ))
+    if (length(split_groups)) {
+      stop(insight::format_error(c(
+        "'folds' must keep every row of a group in one fold.",
+        x = paste0("Split across folds: ",
+                   paste0("'", utils::head(split_groups, 5L), "'",
+                          collapse = ", "), "."),
+        i = paste0("An occupancy or N-mixture likelihood is written per ",
+                   "site, which a fold holds out whole.")
+      )), call. = FALSE)
     }
     return(as.integer(folds))
   }
@@ -361,14 +350,14 @@ build_kfold_partition <- function(group_key, K = NULL,
       "'K' exceeds the number of distinct groups.",
       x = paste0("K: ", K, ", groups: ", n_groups, "."),
       i = "Reduce 'K' or partition by a finer 'group' key."
-    )))
+    )), call. = FALSE)
   }
   if (K < 2L) {
-    stop(insight::format_error("'K' must be at least 2."))
+    stop(insight::format_error(
+      "Cross-validation needs at least 2 groups."
+    ), call. = FALSE)
   }
-  # loo::kfold_split_* returns numeric; coerce to integer so
-  # downstream vapply(..., integer(1L)) calls land on the
-  # expected storage mode.
+  # `loo::kfold_split_*()` returns doubles
   as.integer(switch(
     fold_split,
     "grouped"    = loo::kfold_split_grouped(K = K, x = group_key),
@@ -405,9 +394,8 @@ map_loglik_cols_to_groups <- function(object, data, group_key,
   checkmate::assert_int(loglik_ncol, lower = 0L)
   col_group <- loglik_col_values(object, data, group_key, loglik_ncol)
   unique_groups <- unique(col_group)
-  # For each unique group, look up its fold via the first row
-  # carrying that group key. Group integrity (all rows of a group
-  # in the same fold) is guaranteed by build_kfold_partition.
+  # `build_kfold_partition()` keeps each group in one fold. The fold
+  # of its first row is the fold of the group.
   group_to_fold <- vapply(
     unique_groups,
     function(g) fold_ids[match(g, group_key)],
@@ -481,38 +469,26 @@ refit_score_one_fold <- function(object, data, fold_ids,
 
   refit <- refit_on_held_out(object, train_data, silent)
 
-  # Held data may contain factor levels the refit never saw (the
-  # whole point of leave-one-group-out is that the group was
-  # excluded from the refit). Two valid responses:
-  #   re_formula = NA  -> drop random effects from prediction
-  #                       (score the marginal / fixed-effects model)
-  #   allow_new_levels + sample_new_levels -> sample new REs from
-  #                       the population (more honest but brittle
-  #                       for non-Gaussian RE structures).
-  # Default to the safer marginal path; users can override via
-  # the `...` plumbed through kfold -> here.
+  # A held-out group may hold grouping levels the refit never saw.
+  # `re_formula = NA` scores it without the group-level effects.
   held_loglik <- log_lik(
     refit, newdata = held_data,
     re_formula = NA,
     allow_new_levels = TRUE
   )
-  # Mapped at the width `log_lik()` answered on, then narrowed with
-  # the matrix, exactly as the full-data path above does. Narrowing
-  # first and mapping afterwards pairs a matrix that has dropped its
-  # unscorable columns against a frame that still holds every row, so
-  # a fold carrying a missing response reported the two counts as a
-  # mismatch rather than scoring the rows it did observe.
+  # The groups are mapped at the width `log_lik()` returned and then
+  # narrowed with the matrix, as on the full-data path above. A fold
+  # with a missing response then scores the rows it observed.
   held_col_group <- loglik_col_values(
     object, held_data, group_key[held_rows], NCOL(held_loglik)
   )
-  held_loglik <- clean_ll(refit, held_loglik)
+  held_loglik <- clean_ll(held_loglik)
   held_col_group <- narrow_to_scored(held_col_group, held_loglik)
 
   held_grouped <- aggregate_loglik_by_group(
     held_loglik, held_col_group
   )
 
-  # Per-group ELPD: log_mean_exp over draws.
   apply(held_grouped, 2L, log_mean_exp)
 }
 
@@ -540,18 +516,17 @@ mask_heldout_response <- function(object, data, held_rows) {
     return(data)
   }
   # Every response is masked or none is. A response left unmasked
-  # keeps the held-out rows in the likelihood, and the fold is then
-  # scored on data the refit was trained on.
+  # would keep the held-out rows in the refit's likelihood. The fold
+  # would then be scored on its own training data.
   resp <- insight::find_response(object)
   absent <- setdiff(resp, names(data))
   if (length(absent)) {
     stop(insight::format_error(c(
-      "Could not find a response column to hold a fold out on.",
+      "A response column is missing from the training data.",
       x = paste0("Missing: ", paste0("'", absent, "'", collapse = ", "),
                  "."),
-      x = paste0("The training frame has columns ",
-                 paste(names(data), collapse = ", "), ".")
-    )))
+      i = "Every response is masked in a held-out fold."
+    )), call. = FALSE)
   }
   for (r in resp) {
     data[[r]][held_rows] <- NA
@@ -598,144 +573,59 @@ kfold_refit_folds <- function(object, data, fold_ids, group_key,
 }
 
 
-#' Pretty-print an `mvgam_kfold` object
+#' Print an `mvgam_kfold` object
 #'
-#' One-screen summary: total ELPD with SE, fold count, refit
-#' count, group key, and Pareto-k summary stats for the PSIS
-#' folds that were NOT refit. Falls back to `print.loo()` style
-#' for the headline numbers.
+#' Prints the ELPD with its standard error, the folds and refits and
+#' the Pareto k of the PSIS estimates. The first list below names the
+#' groups with the lowest ELPD. The second names the refitted groups
+#' whose ELPD moved most from the PSIS estimate.
 #'
 #' @param x An `mvgam_kfold` object.
-#' @param digits Integer; significant digits for ELPD / SE.
-#'   Default `2`.
-#' @param ... Ignored.
+#' @param digits Integer number of decimal places. Defaults to 2.
+#' @param ... Unused.
 #'
-#' @return `invisible(x)`.
+#' @return `x`, invisibly.
 #'
 #' @method print mvgam_kfold
 #' @export
 print.mvgam_kfold <- function(x, digits = 2L, ...) {
-  cat("mvgam k-fold cross-validation\n")
-  cat(sprintf(
-    "  elpd_kfold = %s  (SE %s)\n",
-    formatC(x$elpd_kfold, digits = digits, format = "f"),
-    formatC(x$se_elpd_kfold, digits = digits, format = "f")
-  ))
-  cat(sprintf(
-    "  kfoldic    = %s  (SE %s)\n",
-    formatC(-2 * x$elpd_kfold, digits = digits, format = "f"),
-    formatC(2 * x$se_elpd_kfold, digits = digits, format = "f")
-  ))
-  cat(sprintf("  K          = %d folds\n", x$K))
-  group_lbl <- if (is.null(x$group)) {
-    "<per row>"
-  } else {
-    paste(x$group, collapse = " x ")
-  }
-  cat(sprintf("  group      = %s\n", group_lbl))
-  cat(sprintf(
-    "  mode       = %s\n",
-    if (isTRUE(x$exact)) "exact (every fold refit)" else "hybrid"
-  ))
-  cat(sprintf(
-    "  refits     = %d of %d folds\n",
-    x$n_refits, x$K
-  ))
+  checkmate::assert_int(digits, lower = 0L)
+  fmt <- function(v) formatC(v, digits = digits, format = "f")
+  s <- summary(x)
+  rows <- c(
+    elpd_kfold = paste0(fmt(x$elpd_kfold), " (SE ", fmt(x$se_elpd_kfold),
+                        ")"),
+    kfoldic = paste0(fmt(-2 * x$elpd_kfold), " (SE ",
+                     fmt(2 * x$se_elpd_kfold), ")"),
+    groups = paste0(NROW(s), " (",
+                    if (is.null(x$group)) "row" else
+                      paste(x$group, collapse = " x "), ")"),
+    refits = paste0(x$n_refits, " of ", x$K, " folds",
+                    if (isTRUE(x$exact)) " (exact)")
+  )
   psis_k <- x$pareto_k[!is.na(x$pareto_k)]
   if (length(psis_k) > 0L) {
-    threshold_val <- x$pareto_k_threshold
-    threshold_lbl <- if (isTRUE(x$pareto_k_threshold_adaptive)) {
-      paste0(formatC(threshold_val, digits = digits, format = "f"),
-             " (adaptive)")
-    } else {
-      formatC(threshold_val, digits = digits, format = "f")
-    }
-    cat(sprintf(
-      "  Pareto-k   = max %s, median %s (PSIS folds, threshold %s)\n",
-      formatC(max(psis_k), digits = digits, format = "f"),
-      formatC(stats::median(psis_k),
-              digits = digits, format = "f"),
-      threshold_lbl
-    ))
-  }
-
-  # Truncated diagnostic lists: top ~15% of folds (min 3, max 10)
-  # by lowest ELPD contribution (worst-fit groups) and by largest
-  # |refit lift| (where the cheap PSIS approximation would have
-  # been most misleading). The second list is only shown when the
-  # hybrid mode actually triggered refits.
-  n_show <- max(3L, min(10L, ceiling(x$K * 0.15)))
-  s <- summary(x)
-  worst_idx <- order(s$elpd, na.last = TRUE)[seq_len(
-    min(n_show, NROW(s))
-  )]
-  cat(sprintf(
-    "\n  Worst-fit folds%s:\n",
-    if (NROW(s) > n_show)
-      sprintf(" (top %d of %d)", length(worst_idx), x$K)
-    else ""
-  ))
-  for (i in worst_idx) {
-    cat(sprintf(
-      "    %-20s  elpd = %s  (%s%% of total)\n",
-      s$group[i],
-      formatC(s$elpd[i], digits = digits, format = "f"),
-      formatC(100 * s$elpd_share[i], digits = 1L, format = "f")
-    ))
-  }
-  # Lift is only defined when pointwise_psis was captured before
-  # the refit splice; some build paths (tests, exact-mode refits)
-  # omit it, so guard the loop on the actual count of non-NA lifts.
-  n_lift <- sum(!is.na(s$lift))
-  if (isTRUE(x$n_refits > 0L) && n_lift > 0L) {
-    lift_idx <- order(abs(s$lift), decreasing = TRUE,
-                      na.last = TRUE)
-    lift_idx <- lift_idx[!is.na(s$lift[lift_idx])][
-      seq_len(min(n_show, n_lift))
-    ]
-    cat(sprintf(
-      "\n  Most-influential folds%s:\n",
-      if (n_lift > n_show)
-        sprintf(" (top %d of %d refits)",
-                length(lift_idx), n_lift)
-      else ""
-    ))
-    for (i in lift_idx) {
-      sign_lift <- if (s$lift[i] >= 0) "+" else ""
-      cat(sprintf(
-        "    %-20s  lift = %s%s  (PSIS %s, refit %s)\n",
-        s$group[i], sign_lift,
-        formatC(s$lift[i], digits = digits, format = "f"),
-        formatC(s$elpd_psis[i], digits = digits, format = "f"),
-        formatC(s$elpd[i], digits = digits, format = "f")
-      ))
-    }
-  }
-
-  # Footnote-style definitions (mirrors the summary.mvgam Rhat /
-  # Bulk_ESS footer pattern). Plain-language so an ecologist can
-  # lift the wording into a manuscript without translation.
-  group_word <- if (is.null(x$group)) "fold" else x$group[1L]
-  cat("\n")
-  footer <- c(
-    paste0(
-      "Worst-fit ", group_word, "s were the held-out groups the ",
-      "model predicted least accurately and so contributed most ",
-      "to the negative cross-validation score. These are the ",
-      "groups whose data the current model structure cannot ",
-      "reproduce well, suggesting unmeasured covariates or local ",
-      "processes the global model is averaging over."
-    ),
-    paste0(
-      "Most-influential ", group_word, "s were the groups whose ",
-      "predictive score changed most when the model was refit ",
-      "without them. The fitted model is noticeably tuned to ",
-      "their data. Dropping them shifts the inference."
+    rows["Pareto k"] <- paste0(
+      "max ", fmt(max(psis_k)), ", median ", fmt(stats::median(psis_k)),
+      ", threshold ", pareto_k_threshold_label(x, digits)
     )
-  )
-  for (para in footer) {
-    cat(strwrap(para, width = 72), sep = "\n")
-    cat("\n")
+  }
+  cat_field_rows("mvgam k-fold cross-validation", rows)
+
+  # About 15% of the groups, between 3 and 10
+  n_show <- max(3L, min(10L, ceiling(NROW(s) * 0.15)))
+  worst <- utils::head(order(s$elpd), n_show)
+  cat("\nLowest ELPD (share of the total):\n")
+  cat(sprintf("  %-20s %s (%s%%)\n", s$group[worst], fmt(s$elpd[worst]),
+              formatC(100 * s$elpd_share[worst], digits = 1L,
+                      format = "f")), sep = "")
+  # An exact run has no PSIS estimate to compare with
+  lifted <- which(!is.na(s$lift))
+  if (length(lifted) > 0L) {
+    moved <- utils::head(lifted[order(-abs(s$lift[lifted]))], n_show)
+    cat("\nLargest change from PSIS to refit:\n")
+    cat(sprintf("  %-20s %s -> %s\n", s$group[moved],
+                fmt(s$elpd_psis[moved]), fmt(s$elpd[moved])), sep = "")
   }
   invisible(x)
 }
@@ -743,15 +633,19 @@ print.mvgam_kfold <- function(x, digits = 2L, ...) {
 
 #' Tibble summary of an `mvgam_kfold` object
 #'
-#' Long-format tibble with one row per group, carrying the
-#' per-group ELPD, Pareto-k (NA for refit folds), and a refit
-#' flag. Useful for downstream filtering / plotting.
-#'
 #' @param object An `mvgam_kfold` object.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A tibble with columns `group`, `elpd`, `pareto_k`,
-#'   `refit`.
+#' @return A tibble with one row per held-out group.
+#'   \describe{
+#'     \item{`group`}{The group label.}
+#'     \item{`elpd`, `elpd_share`}{The group's ELPD and its share of
+#'       the total.}
+#'     \item{`elpd_psis`, `lift`}{For a refitted group, the PSIS
+#'       estimate before the refit and the refit's change from it.}
+#'     \item{`pareto_k`, `refit`}{The Pareto k of the PSIS estimate and
+#'       whether the group's fold was refitted.}
+#'   }
 #'
 #' @method summary mvgam_kfold
 #' @export
@@ -766,8 +660,6 @@ summary.mvgam_kfold <- function(object, ...) {
   } else {
     rep(NA_real_, length(group))
   }
-  # Lift = exact refit ELPD - PSIS ELPD. Only defined for folds
-  # that triggered a refit; NA for everything else.
   refit_flag <- group %in% object$refit_groups
   lift <- ifelse(refit_flag, elpd - elpd_psis, NA_real_)
   tibble::tibble(
@@ -784,12 +676,10 @@ summary.mvgam_kfold <- function(object, ...) {
 
 #' Diagnostic plot for an `mvgam_kfold` object
 #'
-#' Faceted ggplot matching the [plot.mvgam_lfo()] convention: one
-#' panel per diagnostic with outlier folds highlighted. The Pareto-k
-#' panel flags groups above `pareto_k_threshold` (PSIS approximation
-#' unreliable, refit recommended); the ELPD panel flags groups below
-#' the 15% quantile (poorest-fit folds). Inlier groups are drawn in
-#' grey, outliers in the package red.
+#' One panel for the ELPD of each group and one for its Pareto k, as
+#' in [plot.mvgam_lfo()]. Dark red points mark a Pareto k above the
+#' dashed threshold, where PSIS is unreliable. In the ELPD panel they
+#' mark the groups below the 15% quantile.
 #'
 #' @param x An `mvgam_kfold` object.
 #' @param ... Unused. Anything passed here is refused.
@@ -802,68 +692,16 @@ summary.mvgam_kfold <- function(object, ...) {
 #' @export
 plot.mvgam_kfold <- function(x, ...) {
   rlang::check_dots_empty()
-  # Pin the scheme the way every other mvgam figure does, so a
-  # user's own `bayesplot::color_scheme_set()` does not leave this
-  # panel the odd one out.
-  set_color_scheme_local("red")
   group <- rownames(x$pointwise) %||% names(x$pareto_k)
-  elpd <- as.numeric(x$pointwise[, "elpd_kfold"])
-  elpd_threshold <- stats::quantile(
-    elpd, probs = 0.15, na.rm = TRUE
+  group <- factor(group, levels = group)
+  long <- rbind(
+    cv_panel(group, as.numeric(x$pointwise[, "elpd_kfold"]), "ELPD",
+             probs = 0.15, worse_above = FALSE),
+    pareto_k_panel(group, as.numeric(x$pareto_k), x$pareto_k_threshold)
   )
-  elpd_dat <- data.frame(
-    group = group, value = elpd,
-    threshold = as.numeric(elpd_threshold),
-    facet = "ELPD"
-  )
-  threshold_val <- x$pareto_k_threshold
-  k_dat <- data.frame(
-    group = group,
-    value = as.numeric(x$pareto_k),
-    threshold = threshold_val,
-    facet = "Pareto k"
-  )
-  long <- rbind(elpd_dat, k_dat)
-  long$group <- factor(long$group, levels = group)
-  long$colour <- ifelse(
-    (long$facet == "Pareto k" &
-       !is.na(long$value) & long$value > long$threshold) |
-      (long$facet == "ELPD" & long$value < long$threshold),
-    "outlier", "inlier"
-  )
-
-  ggplot2::ggplot(
-    long,
-    ggplot2::aes(x = .data$group, y = .data$value)
-  ) +
-    ggplot2::facet_wrap(~ .data$facet, ncol = 1L,
-                        scales = "free_y") +
-    ggplot2::geom_hline(
-      ggplot2::aes(yintercept = .data$threshold),
-      colour = mvgam_colour("mid_highlight"),
-      linetype = "dashed", linewidth = 1,
-      na.rm = TRUE
-    ) +
-    ggplot2::geom_line(
-      ggplot2::aes(group = .data$facet),
-      linewidth = 0.5, colour = "grey30", na.rm = TRUE
-    ) +
-    ggplot2::geom_point(shape = 16, colour = "white", size = 2,
-                        na.rm = TRUE) +
-    ggplot2::geom_point(
-      ggplot2::aes(colour = .data$colour),
-      shape = 16, show.legend = FALSE, size = 1.5,
-      na.rm = TRUE
-    ) +
-    ggplot2::scale_colour_manual(
-      values = c(inlier = "grey30", outlier = mvgam_colour("dark"))
-    ) +
-    ggplot2::labs(
-      x = if (is.null(x$group)) "row" else
-        paste(x$group, collapse = " x "),
-      y = NULL
-    ) +
-    mvgam_theme() +
+  cv_diagnostic_plot(long) +
+    ggplot2::labs(x = if (is.null(x$group)) "row" else
+      paste(x$group, collapse = " x ")) +
     ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)
     )
@@ -884,9 +722,9 @@ plot.mvgam_kfold <- function(x, ...) {
 #' @param group Character vector of grouping columns, or `NULL`
 #' @param n_refit_folds Integer number of refitted folds
 #' @param pareto_k_threshold Numeric Pareto-k threshold applied
-#' @param pareto_k_threshold_adaptive Logical flag for a threshold
+#' @param pareto_k_threshold_adaptive Logical. `TRUE` for a threshold
 #'   derived from the draw count
-#' @param exact Logical flag for exact mode, which refits every fold
+#' @param exact Logical. `TRUE` when every fold was refitted
 #' @return Object of class `c("mvgam_kfold", "kfold", "loo")`
 #' @noRd
 build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
@@ -906,7 +744,7 @@ build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
   checkmate::assert_flag(pareto_k_threshold_adaptive)
   checkmate::assert_flag(exact)
   elpd <- sum(pointwise)
-  se_elpd <- sqrt(length(pointwise) * stats::var(pointwise))
+  se_elpd <- se_of_sum(pointwise)
 
   estimates <- matrix(
     c(elpd, se_elpd,
@@ -926,10 +764,8 @@ build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
     elpd_kfold = elpd,
     se_elpd_kfold = se_elpd,
     pareto_k = pareto_k,
-    # How many folds were refit, which is what `print()` reports
-    # against `K`. Counting `refit_groups` instead counted the
-    # groups inside those folds, so a two-fold run over 180 rows
-    # printed "180 of 2 folds".
+    # Folds, as `print()` reports against `K`. `refit_groups` holds
+    # the groups inside them.
     n_refits = n_refit_folds,
     refit_groups = refit_groups,
     K = K,
@@ -953,11 +789,11 @@ build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
 #' muffles that one warning by its text. Every other warning from the
 #' refit reaches the caller.
 #'
-#' A refit runs one verbosity level below the calling method, and its
+#' A refit runs one verbosity level below the calling method. Its
 #' sampler prints no iteration lines (`refresh = 0`, as brms sets for
-#' its own refits). At the default `silent = 1` the method's own
-#' progress lines are the only output. At `silent = 0` each refit adds
-#' its sampler start and finish lines.
+#' its own refits). At the default `silent = 1` the method prints its
+#' progress lines alone. At `silent = 0` each refit adds its sampler
+#' start and finish lines.
 #'
 #' @param object The fitted model to refit.
 #' @param train_data The training frame, held-out responses masked.

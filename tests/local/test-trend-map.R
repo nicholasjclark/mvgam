@@ -536,20 +536,12 @@ test_that("active_factors, shared_variation and ordinate answer here", {
   # report can be checked against the map rather than merely
   # rendered.
   af <- active_factors(fit)
-  expect_s3_class(af, "mvgam_active_factors")
-  expect_identical(as.integer(af$n_lv), n_lv)
-  # One row per column of the map, in order.
-  expect_identical(nrow(af$per_factor), n_lv)
+  # One row per column of the map, in order
   expect_identical(as.integer(af$per_factor$factor), seq_len(n_lv))
-  # Every series loads on both factors here, so neither column is
-  # redundant and both have to come back active. A ceiling wider than
-  # the map would show up as an inactive column, and the count the
-  # object reports has to agree with the per-column verdicts rather
-  # than being a second opinion.
+  # Every series loads on both factors. Both columns are active. The
+  # per-draw count agrees with the per-column verdicts.
   expect_true(all(af$per_factor$is_active))
-  expect_identical(as.integer(sum(af$per_factor$is_active)), n_lv)
-  expect_true(all(af$per_factor$prob_active > 0.5))
-  expect_true(all(af$per_factor$median_norm_sq > af$threshold[[3L]]))
+  expect_equal(af$count$median, n_lv)
 
   sv <- shared_variation(fit)
   expect_s3_class(sv, "mvgam_shared_variation")

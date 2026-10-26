@@ -46,17 +46,10 @@
 #' fitted model asserts, and calibrate `Phi` against the pattern
 #' rather than against these values entry for entry.
 #'
+#' @inheritParams predict.mvgam
 #' @param object A fitted `mvgam` object whose trend model
 #'   includes latent factors (`n_lv < n_series`).
-#' @param probs Numeric vector of length 2 giving the quantile
-#'   probabilities used for the credible bounds. Defaults to
-#'   `c(0.025, 0.975)` (95% intervals).
-#' @param robust Logical. When `TRUE`, point estimates use the
-#'   posterior median and spread uses the median absolute
-#'   deviation; when `FALSE` (default) the posterior mean and
-#'   standard deviation are used.
-#' @param ... Additional arguments for S3 dispatch (currently
-#'   unused).
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An object of class `mvgam_shared_variation`, a list
 #'   with:
@@ -66,7 +59,8 @@
 #'     \item `delta_se`: posterior spread per entry.
 #'     \item `delta_lower`, `delta_upper`: per-entry credible
 #'       bounds at `probs`.
-#'     \item `delta_ess`: per-entry bulk effective sample size.
+#'     \item `delta_ess`: per-entry effective sample size, from
+#'       [posterior::ess_basic()].
 #'     \item `n_series`, `series_names`, `n_lv`: model
 #'       dimensions and series labels.
 #'     \item `probs`: quantile probabilities used.
@@ -109,6 +103,7 @@
 #' }
 #'
 #' @author Nicholas J Clark
+#' @family latent dynamics
 #' @export
 shared_variation <- function(object, ...) {
   UseMethod("shared_variation")
@@ -235,7 +230,7 @@ plot.mvgam_shared_variation <- function(x,
     )
   }
   matrix_heatmap(
-    gather_matrix(mat, drop_diag = FALSE, drop_upper = FALSE),
+    matrix_panel(mat),
     fill_scale
   )
 }

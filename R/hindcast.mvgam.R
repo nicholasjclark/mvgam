@@ -1,19 +1,5 @@
-# hindcast.mvgam: posterior hindcasts at the training time grid.
-# Thin wrapper around the existing build_hindcast_arms() helper
-# in R/forecast.mvgam.R; returns an mvgam_forecast object with
-# train_* / hindcasts slots populated and test_* / forecasts
-# slots NULL.
-#
-# Semantic note: by default hindcasts take the Stan-fitted latent
-# state directly from the posterior (`process_error = FALSE`).
-# `trend[t, s]` is stored in the Stan output and already carries
-# the trend formula's predictor. Reconstruction is exact.
-# This surfaces overfit-vs-predict gaps directly: a random walk
-# with sigma -> 0 absorbs the response into the trend, so its
-# hindcast response draws hug the training values even when the
-# corresponding forecast() would be flat. Set
-# `process_error = TRUE` to draw fresh innovations on top of the
-# linpred instead.
+# hindcast.mvgam: posterior hindcasts at the training times, built by
+# `build_hindcast_arms()` from the fitted latent states.
 
 
 #' Generic for posterior hindcasts
@@ -31,48 +17,39 @@ hindcast <- function(object, ...) {
 
 #' Posterior hindcasts for an mvgam state-space model
 #'
-#' Draw posterior hindcasts at the training time points. The
-#' fitted latent state is read directly from the posterior draws
-#' and the observation family then maps the trajectory back to
-#' the response scale. For predictions at unseen times use
-#' [forecast.mvgam].
+#' Posterior draws at the training time points. Each draw takes the
+#' latent state the model inferred at each time. The observation
+#' family maps it to the response scale. A hindcast shows how closely
+#' the fitted states track the data. [forecast.mvgam()] predicts
+#' unseen times.
 #'
-#' @param object A fitted [mvgam][mvgam::mvgam] object.
-#' @param ... Currently unused.
-#' @param type One of `"response"`, `"link"`, `"expected"`,
-#'   `"trend"`, `"latent_state"`. `"response"` samples from the
-#'   observation family (the default); `"expected"` returns the
-#'   family's mean, which carries any further parameter the
-#'   expectation needs (a binomial mean is `trials * p`, a
-#'   zero-inflated mean `(1 - zi) * mu`); `"link"` returns the
-#'   link-scale linpred; `"trend"` returns the latent-trend
-#'   trajectory on the link scale. `"latent_state"` is only valid
-#'   for closure-unit families (`occ()`, `nmix()` variants) and
-#'   returns the posterior latent state (`psi` for `occ()`, `N`
-#'   for the `nmix` variants) at each closure unit as an
-#'   `mvgam_latent_state` object with its own `print()`,
-#'   `summary()`, `as.data.frame()` and `plot()` methods.
-#' @param process_error Logical. When `FALSE` (the default),
-#'   hindcasts take the Stan-fitted latent state directly
-#'   (`trend[t, s]` from the posterior), and
-#'   `type = "response"` samples only observation-family noise on
-#'   top of that exact state. When `TRUE`, fresh innovations are
-#'   drawn from the trend's covariance structure and added to the
-#'   linear predictor instead, which is what
-#'   `posterior_epred()` and `posterior_predict()` do under the
-#'   same argument.
 #' @inheritParams forecast.mvgam
+#' @param object A fitted [mvgam][mvgam::mvgam] object.
+#' @param ... Unused. Anything passed here is refused.
+#' @param type The scale of the draws, as in [forecast.mvgam()], or
+#'   `"latent_state"` for a closure-unit family. `"latent_state"`
+#'   returns the occupancy probability `psi` of an [occ()] model or the
+#'   abundance `N` of an [nmix()] model at each closure unit, as an
+#'   `mvgam_latent_state` object with `print()`, `summary()`,
+#'   `as.data.frame()` and `plot()` methods.
+#' @param process_error Logical. `FALSE` (the default) takes the
+#'   fitted latent state of each draw. `type = "response"` then adds
+#'   the observation noise alone. `TRUE` adds fresh trend innovations
+#'   to the linear predictor, as [posterior_epred.mvgam()] does with
+#'   the same argument.
 #'
-#' @return An object of class [mvgam_forecast-class][mvgam].
-#'   Hindcasts are returned as a named list of `[ndraws, n_times]`
-#'   matrices, one per series; `forecasts` / `test_*` slots are
-#'   `NULL`.
+#' @return An [mvgam_forecast-class][mvgam] object. Its hindcasts are a
+#'   named list of `[ndraws, n_times]` matrices, one per series. Its
+#'   forecast slots are `NULL`.
 #'
-#' @seealso [mvgam_forecast-class][mvgam], [forecast.mvgam],
-#'   [posterior_predict.mvgam] and [posterior_epred.mvgam] for the
-#'   alternative marginal-MC prediction surface that integrates
-#'   over the trend's stochastic dynamics instead of reading the
-#'   fitted latent state.
+#' @seealso [forecast.mvgam()] extrapolates the fitted state.
+#'   [posterior_predict.mvgam()] and [posterior_epred.mvgam()] predict
+#'   by integrating over the trend's dynamics. The
+#'   `r mvgam_article("mvbf", "multivariate article")` compares
+#'   `type = "trend"` hindcasts of one latent state from a joint model
+#'   and from each data source alone. The
+#'   `r mvgam_article("nmix", "N-mixture article")` summarises
+#'   `type = "latent_state"` hindcasts of abundance.
 #' @examples
 #' \dontrun{
 #' set.seed(11)
@@ -87,10 +64,22 @@ hindcast <- function(object, ...) {
 #'   chains  = 2, silent = 2
 #' )
 #'
+#' # The fitted states track the training counts
 #' hc <- hindcast(mod)
 #' plot(hc)
+#'
+#' # The AR(1) trend on the log scale
+#' plot(hindcast(mod, type = "trend"))
+#'
+#' # Fresh innovations in place of the fitted states give the wider
+#' # spread a model without the observed history would predict
+#' plot(hindcast(mod, process_error = TRUE))
+#'
+#' # Next, forecast the held-out times with forecast()
 #' }
 #'
+#' @family predictions
+#' @family forecasting
 #' @method hindcast mvgam
 #' @export
 hindcast.mvgam <- function(object,
@@ -106,11 +95,8 @@ hindcast.mvgam <- function(object,
   checkmate::assert_class(object, "mvgam")
   require_fitted_model(object, "hindcast")
   require_series_axis(object, "hindcast")
-  # Both methods take every argument by name after `...`, so a
-  # misspelling lands in `...` and the method proceeds on the default
-  # it was trying to override. That is how `incl_autocor` went
-  # unnoticed on `posterior_predict()`, and it is silent by
-  # construction, so refuse what nothing reads.
+  # The arguments follow `...` and are matched by name only. A
+  # misspelt name would land in `...` and leave its default in place.
   rlang::check_dots_empty()
   type <- match.arg(type)
   validate_draw_selectors(ndraws, draw_ids)
@@ -118,23 +104,18 @@ hindcast.mvgam <- function(object,
   checkmate::assert_flag(process_error)
   checkmate::assert_string(resp, null.ok = TRUE)
 
-  # latent_state branch: closure-unit families only; returns the
-  # standalone mvgam_latent_state object built on per-unit draws
-  # from posterior_latent_N() / posterior_occupancy(). The
-  # mvgam_forecast container does not fit here because the
-  # closure-unit latent state lives on a unit grid, not a
-  # time-indexed series (single-season designs have no time axis
-  # at all). Routing latent_state through hindcast() keeps the
-  # user-facing entry point consistent while the return class
-  # honours the unit grain.
+  # The latent state of a closure-unit family is indexed by unit. A
+  # single-season design has no time axis. The result is then an
+  # `mvgam_latent_state` of the per-unit draws of
+  # `posterior_latent_N()` or `posterior_occupancy()`.
   if (type == "latent_state") {
     return(hindcast_latent_state(object, ndraws = ndraws,
                                  draw_ids = draw_ids, resp = resp))
   }
 
   # Multivariate fan-out: one `mvgam_forecast` per response, in a
-  # wrapper of the same class so `plot()`, `print()` and `score()`
-  # dispatch on it as on a single answer.
+  # wrapper of the same class. `plot()`, `print()` and `score()`
+  # dispatch on it as on a single forecast.
   fan <- mv_resp_fan_out(object, resp, class = "mvgam_forecast")
   if (!is.null(fan)) {
     return(fan)
@@ -180,7 +161,7 @@ hindcast_latent_state <- function(object, ndraws = NULL,
   # hold no latent state.
   require_closure_unit_predict_type(object$family, "latent_state")
 
-  total_draws <- nrow(posterior::as_draws_matrix(object$fit))
+  total_draws <- posterior::ndraws(object)
   draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
 
   kernel <- dispatch_closure_unit_method(object$family,

@@ -251,31 +251,21 @@ test_that("inv_link inverts every link brms offers", {
 # loo.mvgam / waic.mvgam — brms-parity argument validation
 # -------------------------------------------------------------------------
 
-# These tests assert the rejection paths fire before any model machinery
-# touches the object, so a bare-class stub is sufficient.
-
-test_that("loo.mvgam: pointwise = TRUE errors", {
+# The refusals run before the fit is used. A bare-class stub replaces
+# the fit.
+test_that("loo and waic refuse the brms arguments mvgam does not run", {
   stub <- structure(list(), class = "mvgam")
-  expect_error(loo(stub, pointwise = TRUE),
-               regexp = "pointwise = TRUE")
-})
-
-test_that("loo.mvgam: moment_match = TRUE errors", {
-  stub <- structure(list(), class = "mvgam")
-  expect_error(loo(stub, moment_match = TRUE),
-               regexp = "moment_match")
-})
-
-test_that("loo.mvgam: reloo = TRUE errors", {
-  stub <- structure(list(), class = "mvgam")
-  expect_error(loo(stub, reloo = TRUE),
-               regexp = "reloo")
-})
-
-test_that("waic.mvgam: pointwise = TRUE errors", {
-  stub <- structure(list(), class = "mvgam")
+  expect_error(loo(stub, moment_match = TRUE), "'moment_match' and 'reloo'")
+  expect_error(loo(stub, reloo = TRUE), "'moment_match' and 'reloo'")
+  expect_error(loo(stub, pointwise = TRUE, k_threshold = 1),
+               "'pointwise', 'k_threshold' are not supported by 'loo")
+  expect_error(loo(stub, reloo_args = list(cores = 1)),
+               "'reloo_args' is not supported")
+  # Ranking arguments point to loo_compare()
+  expect_error(loo(stub, model_names = "m"), "Rank models")
+  expect_error(waic(stub, compare = FALSE), "Rank models")
   expect_error(waic(stub, pointwise = TRUE),
-               regexp = "pointwise = TRUE")
+               "'pointwise' is not supported by 'waic")
 })
 
 

@@ -9,13 +9,14 @@
 \arguments{
 \item{x}{An object of class \code{mvgam_lfo}.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused.}
 }
 \value{
 The \code{mvgam_lfo} object \code{x}, returned invisibly.
 }
 \description{
-Prints a compact overview of the LFO run: horizon,
-threshold, number of refits, and per-score totals / means.
-For the full per-fold table, call \code{\link[=summary.mvgam_lfo]{summary.mvgam_lfo()}}.
+Prints the horizon, the Pareto k threshold and the
+counts of evaluations and refits. Each score is given as its sum
+and mean over folds.
+\code{\link[=summary.mvgam_lfo]{summary.mvgam_lfo()}} returns the per-fold table.
 }

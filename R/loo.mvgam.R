@@ -4,46 +4,46 @@
 #'
 #' @importFrom loo loo is.loo
 #'
-#' @param x Object of class `mvgam` or `jsdgam`
-#'
+#' @param x A fitted `mvgam` or `jsdgam` object.
 #' @param compare,resp,pointwise,moment_match,reloo,k_threshold,save_psis,moment_match_args,reloo_args
-#'   Accepted for [brms::loo.brmsfit] parity. Two are honoured: `resp`
-#'   scopes a multivariate fit to one response, and `save_psis` keeps
-#'   the smoothing object. The rest name machinery mvgam does not
-#'   have. `pointwise` streams the density, `moment_match` and `reloo`
-#'   refit the model and `k_threshold` with the `*_args` lists
-#'   configure those refits, while `compare` and `model_names` rank
-#'   several models, which [loo_compare()] does. Supplying any of them
-#'   raises an error naming it.
+#'   The arguments of [brms::loo.brmsfit]. mvgam uses two of them.
+#'   `resp` scopes a multivariate fit to one response. `save_psis`
+#'   keeps the smoothing object. `pointwise` would stream the density.
+#'   `moment_match` and `reloo` would refit the model, configured by
+#'   `k_threshold` and the `*_args` lists. `compare` and `model_names`
+#'   would rank several models, which [loo_compare.mvgam()] does.
+#'   mvgam runs none of these. Supplying one raises an error naming
+#'   it.
 #'
 #' @param incl_autocor Logical, default `TRUE`. Passed to
-#'   [log_lik.mvgam()] as its argument of the same name, so each
-#'   observation is scored on the conditional surface, under the latent
-#'   trend state the model inferred at that time. That is what makes an
-#'   ELPD describe the series that was observed; `FALSE` scores the
+#'   [log_lik.mvgam()]. `TRUE` scores each observation under the latent
+#'   trend state the model inferred at that time. The ELPD then
+#'   describes the series that was observed. `FALSE` scores the
 #'   deterministic submodel alone.
 #' @param incl_dynamics Superseded by `incl_autocor` and still
-#'   accepted, so calls written against it keep working. `TRUE` maps
-#'   to `incl_autocor = TRUE` and `FALSE` to `incl_autocor = FALSE`.
-#'   When only `incl_dynamics` is given it decides; when both are
-#'   given `incl_autocor` decides and `incl_dynamics` is ignored.
+#'   accepted. `TRUE` maps to `incl_autocor = TRUE` and `FALSE` to
+#'   `incl_autocor = FALSE`. `incl_autocor` takes precedence when both
+#'   are given.
 #'
-#' @param by_series Logical, default `FALSE`. When `TRUE`, return a
-#'   data frame with one row per series (`series` column) and per-series
-#'   ELPD estimates instead of a single `psis_loo` object. Matches the
-#'   `spOccupancy::waicOcc(by.sp = TRUE)` workflow for ranking species-
-#'   level fit in joint-species distribution models. Requires a `series`
-#'   column on the fit's data. For closure-unit families the log_lik
-#'   columns are at the per-unit grain; each unit is mapped to a series
-#'   via the first row of its visit block.
+#' @param by_series Logical, default `FALSE`. `TRUE` returns a data
+#'   frame with one row per series and columns `series`, `elpd`,
+#'   `se_elpd`, `p` and `n_obs`, as `spOccupancy::waicOcc(by.sp = TRUE)`
+#'   ranks species. An occupancy or N-mixture fit is scored per site,
+#'   each site counted in its species.
 #'
-#' @param ... Further arguments passed to [loo::loo()]
-#'
+#' @param ... For `loo()`, further arguments to [loo::loo()]. For
+#'   `loo_compare()`, further fitted models.
 #' @rdname loo.mvgam
 #'
-#' @return For `loo.mvgam`, an object of class `psis_loo` (see [loo::loo()]
-#' for details). For `loo_compare.mvgam`, an object of class `compare.loo`
-#' (see [loo::loo_compare()] for details).
+#' @return For `loo.mvgam`, an object of class `psis_loo` (see
+#'   [loo::loo()]). For `loo_compare.mvgam`, a `compare.loo` table with
+#'   one row per model, best first (see [loo::loo_compare()]). Three
+#'   columns follow Sivula et al. (2025). `p_worse` is the normal
+#'   probability that the model predicts worse than the best one.
+#'   `diag_diff` holds `"|elpd_diff| < 4"` for a difference too small
+#'   for its SE to be trusted. `diag_elpd` holds `"N < 100"` for too
+#'   few observations and `"k_psis > 0.7"` for an unreliable PSIS
+#'   approximation.
 #'
 #' @details
 #' When comparing two (or more) fitted `mvgam` models, we can estimate the
@@ -56,18 +56,16 @@
 #' See [loo::loo()] and [loo::loo_compare()] for further details on how this
 #' importance sampling works.
 #'
-#' A fit carrying a latent trend strains this approximation, and not
-#' occasionally. Leaving an observation out does not remove its
-#' influence on the state the model inferred at that time, so the
-#' density being re-weighted still conditions on a state that saw it.
-#' The ELPD then describes conditional in-sample fit rather than
-#' out-of-sample accuracy, and the effective number of parameters
-#' climbs towards the number of observations. Read the Pareto \eqn{k}
-#' diagnostics before trusting a comparison, and prefer
-#' [lfo_cv.mvgam()], which refits along the time axis and scores each
-#' window against data the model has not seen. [forecast.mvgam()] with
-#' [score.mvgam_forecast()] serves the same purpose on a held-out
-#' horizon.
+#' A fit with a latent trend routinely strains this approximation.
+#' Leaving an observation out keeps its influence on the state the
+#' model inferred at that time. The re-weighted density still
+#' conditions on a state estimated from that observation. The ELPD
+#' then measures conditional in-sample fit. The effective number of
+#' parameters climbs towards the number of observations. Check the
+#' Pareto \eqn{k} diagnostics before trusting a comparison.
+#' [lfo_cv.mvgam()] refits along the time axis and scores each window
+#' against data the model has not seen. [forecast.mvgam()] with
+#' [score.mvgam_forecast()] scores a held-out horizon.
 #'
 #' @references
 #' Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical
@@ -81,39 +79,46 @@
 #' Simulation}, 90(14):2499-2523.
 #' \doi{10.1080/00949655.2020.1783262}
 #'
+#' Sivula, T., Magnusson, M., Matamoros, A. A. and Vehtari, A. (2025).
+#' Uncertainty in Bayesian leave-one-out cross-validation based model
+#' comparison. \emph{Bayesian Analysis}. \doi{10.1214/25-BA1569}
+#'
 #' @author Nicholas J Clark
 #'
-#' @seealso [waic.mvgam()], [log_lik.mvgam()],
-#'   [lfo_cv.mvgam()] for time-block (rolling) CV,
-#'   [kfold.mvgam()] for grouped k-fold CV with optional
-#'   selective refit.
+#' @seealso [lfo_cv.mvgam()] scores forecasts by refitting along the
+#'   time axis. [kfold.mvgam()] runs grouped k-fold cross-validation.
+#'   [loo_model_weights.mvgam()] weights models by their predictions.
+#'   The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   compares models by approximate and exact cross-validation.
 #'
 #' @examples
 #' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
+#'                     n_timepoints = 120L, trend_model = AR())
 #'
+#' # Two models of one count series: with and without a smooth of x
 #' mod1 <- mvgam(y ~ s(x),
-#'                trend_formula = ~ AR(p = 1),
-#'                data    = simdat$data_train,
-#'                family  = poisson(),
-#'                chains  = 2, silent = 2)
-#' mod2 <- mvgam(y ~ 1,
-#'                trend_formula = ~ AR(p = 1),
-#'                data    = simdat$data_train,
-#'                family  = poisson(),
-#'                chains  = 2, silent = 2)
+#'               trend_formula = ~ AR(p = 1),
+#'               data   = simdat$data_train,
+#'               family = poisson(),
+#'               chains = 2, silent = 2)
+#' mod2 <- update(mod1, formula. = y ~ 1)
 #'
+#' # The ELPD estimate, with Pareto k diagnostics for each observation
 #' loo(mod1)
 #'
-#' # `loo_compare()` lists the better model, here the one with the
-#' # effect of x, first
+#' # The better model comes first, with elpd_diff = 0. The diagnostic
+#' # columns say how far the difference can be trusted
 #' loo_compare(mod1, mod2)
+#'
+#' # Next: lfo_cv() scores each model's forecasts of data it has not
+#' # seen
 #' }
 #'
+#' @family model comparison
 #' @export
-
 loo.mvgam <- function(x, ...,
                       compare = TRUE,
                       resp = NULL,
@@ -134,65 +139,30 @@ loo.mvgam <- function(x, ...,
     legacy = incl_dynamics,
     autocor_supplied = !missing(incl_autocor)
   )
-  # brms-parity arguments that need machinery we do not yet have. Fail
-  # fast rather than silently ignoring; users picking these flags expect
-  # them to do something.
-  if (isTRUE(pointwise)) {
-    stop(insight::format_error(c(
-      cli::format_inline(paste0(
-        "{.field pointwise = TRUE} streaming log-likelihood is not ",
-        "supported on mvgam."
-      )),
-      i = cli::format_inline(
-        "Compute LOO in-memory by leaving {.field pointwise = FALSE}."
-      )
-    )))
-  }
+  # `moment_match` and `reloo` refit the model at each high-k
+  # observation. The other brms arguments configure those refits,
+  # stream the density or rank several models.
   if (isTRUE(moment_match) || isTRUE(reloo)) {
     stop(insight::format_error(c(
-      cli::format_inline(paste0(
-        "{.field moment_match} and {.field reloo} are not ",
-        "supported on mvgam."
-      )),
+      "'moment_match' and 'reloo' are not supported.",
       x = "Each option refits the model once per high-k observation.",
       i = paste0("Inspect the Pareto k diagnostics from 'loo()' and ",
                  "refit on the remaining observations if needed.")
     )), call. = FALSE)
   }
-
-  # The remaining brms-parity arguments describe machinery this
-  # method does not run: `k_threshold` and the `*_args` lists
-  # configure the refits refused above, and `compare` / `model_names`
-  # rank several models, which `loo_compare()` does. Each is refused
-  # where supplied.
-  unhonoured <- c(
+  refuse_unsupported_ic_args(c(
+    pointwise = isTRUE(pointwise),
     compare = !missing(compare),
     k_threshold = !missing(k_threshold),
     moment_match_args = length(moment_match_args) > 0L,
     reloo_args = length(reloo_args) > 0L,
     model_names = !is.null(model_names)
-  )
-  if (any(unhonoured)) {
-    stop(insight::format_error(c(
-      "Arguments this method cannot honour were supplied.",
-      x = paste0(
-        "Supplied: ",
-        paste0("'", names(unhonoured)[unhonoured], "'", collapse = ", "),
-        "."
-      ),
-      i = "Rank models with 'loo_compare()'.",
-      i = paste0(
-        "'k_threshold' and the '*_args' lists configure refits mvgam ",
-        "does not run."
-      )
-    )))
-  }
+  ), "loo")
 
-  # The refusals above name the arguments this method declines by
-  # design. What remains of `...` reaches `loo::loo()`, whose matrix
-  # method drops a name it does not read, so a misspelling returned an
-  # ELPD computed on the defaults with nothing said. The receiver's
-  # own formals are the set that survives a change in its signature.
+  # The rest of `...` reaches `loo::loo()`. Its matrix
+  # method ignores a name it does not take. A misspelt argument would
+  # give an ELPD on the defaults with no message. Taking the accepted
+  # names from its formals follows any change in its signature.
   refuse_unread_dots(
     list(...),
     names(formals(utils::getS3method(
@@ -202,16 +172,14 @@ loo.mvgam <- function(x, ...,
     "loo"
   )
 
-  # An ELPD is a statement about the observations in hand, so each
-  # column is scored under the state the model inferred at that time
-  # rather than under a fresh draw from the trend's marginal
-  # dynamics. Marginalising instead leaves the weights describing a
-  # series the model never saw, which is what drove an effective
-  # parameter count above the number of observations.
+  # An ELPD describes the observations in hand. Each column is scored
+  # under the state the model inferred at that time. Scoring under a
+  # fresh draw from the trend's marginal dynamics would describe a
+  # series the model never saw. The effective parameter count then
+  # exceeds the number of observations.
   logliks <- log_lik(x, incl_autocor = incl_autocor, resp = resp)
-  logliks <- clean_ll(x, logliks)
+  logliks <- clean_ll(logliks)
 
-  # Compute relative effective sample size for PSIS.
   releffs <- mvgam_r_eff_log_lik(x, logliks)
   if (isTRUE(by_series)) {
     return(per_series_ic(x, logliks, criterion = "loo"))
@@ -228,23 +196,9 @@ loo.mvgam <- function(x, ...,
   out
 }
 
-#' @importFrom loo loo_compare
-#'
-#' @param x Object of class `mvgam`
-#'
-#' @param ... More \code{mvgam} objects
-#'
-#' @param model_names If `NULL` (the default) will use model names derived
-#' from deparsing the call. Otherwise will use the passed values as model names
-#'
-#' @param criterion Information criterion used for comparison. One of
-#'   `"loo"` (default) or `"waic"`.
-#'
-#' @param incl_autocor Logical, passed through to [loo.mvgam()] /
-#'   [waic.mvgam()]. Default `TRUE` to match [loo.mvgam()].
-#'
-#' @param incl_dynamics Superseded by `incl_autocor` and still
-#'   accepted; ignored when `incl_autocor` is also given.
+#' @param model_names Character vector of row names for the comparison,
+#'   one per model. `NULL` takes them from the call.
+#' @param criterion `"loo"` (the default) or `"waic"`.
 #'
 #' @rdname loo.mvgam
 #'
@@ -290,9 +244,8 @@ loo_compare.mvgam <- function(
     n_pointwise = n_pw,
     pareto_k_list = pareto_k_list
   )
-  # `cmp` is a `compare.loo` matrix; preserve its class + row
-  # names but widen into a data.frame so string diagnostic
-  # columns can sit alongside the numeric ones.
+  # `cmp` is a `compare.loo` matrix. A data frame keeps its class and
+  # row names and also holds the character diagnostic columns.
   out <- data.frame(
     cmp[, , drop = FALSE],
     p_worse = diag_cols$p_worse,
@@ -314,39 +267,66 @@ loo::loo
 #' @importFrom loo loo_compare
 loo::loo_compare
 
-# Compute per-series information criterion estimates from a
-# pointwise log-likelihood matrix. Used by both loo.mvgam(by_series
-# = TRUE) and waic.mvgam(by_series = TRUE) so the column-to-series
-# mapping logic lives in one place. Returns a data frame with one
-# row per series: (series, elpd, se_elpd, p, n_obs), where
-# `elpd` / `p` come from the selected criterion. Closure-unit
-# log_lik matrices are at the per-unit grain; each unit is mapped
-# to a series via the first row of its visit block (closure units
-# are defined within a series, so every row in a unit shares the
-# same series label).
-#'@noRd
+#' Refuse the brms information-criterion arguments mvgam does not run
+#'
+#' @param supplied Named logical vector, `TRUE` for each argument the
+#'   caller supplied
+#' @param fn Name of the calling generic
+#' @return `TRUE`, invisibly, or an error
+#' @noRd
+refuse_unsupported_ic_args <- function(supplied, fn) {
+  checkmate::assert_logical(supplied, any.missing = FALSE,
+                            names = "unique")
+  checkmate::assert_string(fn)
+  if (!any(supplied)) {
+    return(invisible(TRUE))
+  }
+  used <- names(supplied)[supplied]
+  stop(insight::format_error(c(
+    paste0(
+      paste0("'", used, "'", collapse = ", "),
+      if (length(used) > 1L) " are" else " is",
+      " not supported by '", fn, "()'."
+    ),
+    if (any(c("compare", "model_names") %in% used)) {
+      c(i = "Rank models with 'loo_compare()'.")
+    },
+    i = paste0("'?", fn, ".mvgam' lists the arguments mvgam uses.")
+  )), call. = FALSE)
+}
+
+#' Information criteria for each series
+#'
+#' Used by `loo(by_series = TRUE)` and `waic(by_series = TRUE)`. A
+#' closure-unit log-likelihood matrix holds one column per unit. Each
+#' unit belongs to one series.
+#'
+#' @param x Fitted `mvgam` object
+#' @param logliks Log-likelihood matrix returned by `clean_ll()`
+#' @param criterion `"loo"` or `"waic"`
+#' @return Data frame with columns `series`, `elpd`, `se_elpd`, `p` and
+#'   `n_obs`, one row per series
+#' @noRd
 per_series_ic <- function(x, logliks,
                             criterion = c("loo", "waic")) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_matrix(logliks)
   criterion <- match.arg(criterion)
   col_series <- per_obs_series_labels(x)
-  # `clean_ll()` drops the columns with no density and records
-  # which survived. Narrow the labels the same way rather than
-  # pairing them with the frame's full width: an observation with
-  # no response contributes nothing to score and is not an
-  # arithmetic mismatch to report to the user.
+  # `clean_ll()` drops the columns with no density and records which
+  # remain. The labels are narrowed the same way. An observation with
+  # no response has nothing to score.
   col_series <- narrow_to_scored(col_series, logliks)
   if (length(col_series) != ncol(logliks)) {
     stop(insight::format_error(c(
-      "Cannot split log_lik by series.",
+      "The log likelihood could not be split by series.",
       x = paste0(
-        "log_lik has ", ncol(logliks), " scored columns but the ",
-        "data implies ", length(col_series), " observations."
+        "The log likelihood has ", ncol(logliks), " scored columns. ",
+        "The data hold ",
+        length(col_series), " scored observations."
       ),
-      i = paste0(
-        "The fit's stored data may not match the layout the model ",
-        "was fitted with."
-      )
-    )))
+      i = "The fit's stored data may differ from the data it was fitted to."
+    )), call. = FALSE)
   }
   by_idx <- split(seq_along(col_series),
                   factor(col_series, levels = unique(col_series)))
@@ -374,27 +354,25 @@ per_series_ic <- function(x, logliks,
   out
 }
 
-# Map each log_lik column to a series label, matching the grain
-# log_lik returns. For detection-family closure-unit fits (occ /
-# nmix variants) log_lik is per-unit; every visit row in a unit
-# carries the same species, and the first visit row of each unit
-# names it. Which series a row belongs to is a property of the
-# model, and the axis record states it: a hierarchical fit names
-# its series from grouping columns, with no series column present.
-# Multi-response custom families (mvn / mvt / diri / multi /
-# categ) place species on the K-vector axis WITHIN a unit. No
-# species there has rows of its own, and by_series is rejected up
-# front.
-
-#'@noRd
+#' The series of each log-likelihood column
+#'
+#' The axis record assigns rows to series. A hierarchical fit derives
+#' them from its grouping columns. A closure-unit fit has one column
+#' per unit, labelled by the unit's first visit. Multi-response
+#' families hold every species in each row and are refused.
+#'
+#' @param x Fitted `mvgam` object
+#' @return Character vector of series labels, one per column of
+#'   `log_lik(x)`
+#' @noRd
 per_obs_series_labels <- function(x) {
+  checkmate::assert_class(x, "mvgam")
   if (is_multi_response_family(x$family)) {
     stop(insight::format_error(c(
       "'by_series = TRUE' is not supported for multi-response families.",
       x = paste0("Family '", resolve_family_name(x$family) %||% "?",
-                 "' places species on the K-vector axis of each closure ",
-                 "unit."),
-      i = "Call 'loo()' or 'waic()' with 'by_series = FALSE' to score per unit."
+                 "' holds every species in each row."),
+      i = "Use 'by_series = FALSE'."
     )), call. = FALSE)
   }
   data <- x$data %||% data.frame()
@@ -403,26 +381,28 @@ per_obs_series_labels <- function(x) {
     stop(insight::format_error(c(
       "'by_series = TRUE' is not supported for a response-keyed fit.",
       x = "The series of this model are its responses.",
-      x = "Each row contains every response."
+      x = "Each row contains every response.",
+      i = "Pass 'resp' to score one response."
     )), call. = FALSE)
   }
-  # `loglik_col_values()` settles the closure-unit grain for every
-  # caller, and `kfold()` puts its fold keys through the same call.
+  # `loglik_col_values()` sets the closure-unit grain for every
+  # caller. `kfold()` passes its fold keys through the same call.
   loglik_col_values(x, data, as.character(series))
 }
 
 #' Drop unscorable columns from a log-likelihood matrix
 #'
-#' A row whose response is missing contributes no density, so its
-#' column is all `NA` and cannot be scored. Which columns survived is
-#' recorded on the result: anything paired with the scored matrix
-#' afterwards, such as a prediction weighted by the PSIS object built
-#' from it, has to be narrowed to the same columns or the two describe
-#' different observations.
+#' A row whose response is missing contributes no density. Its column
+#' has no finite value and is dropped. The `scored_columns` attribute
+#' records the columns kept. A prediction weighted by the PSIS object
+#' is narrowed to the same columns with `narrow_to_scored()`.
 #'
-#'@noRd
-clean_ll <- function(x, logliks) {
-  # First remove any columns that are all NA (these had missing observations)
+#' @param logliks Numeric log-likelihood matrix, one row per draw
+#' @return `logliks` without its unscorable columns, its other
+#'   non-finite values refilled
+#' @noRd
+clean_ll <- function(logliks) {
+  checkmate::assert_matrix(logliks, mode = "numeric")
   scored <- which(!apply(logliks, 2, function(x) all(!is.finite(x))))
   logliks <- logliks[, scored, drop = FALSE]
 
@@ -432,25 +412,22 @@ clean_ll <- function(x, logliks) {
     return(logliks)
   }
 
-  # A column that is finite for most draws and not for a few says the
-  # model gave those draws no support for that observation. Dropping
-  # the column would discard an observation the rest of the posterior
-  # scores perfectly well, so the draws are refilled from the finite
-  # ones, which keeps the column's own spread.
+  # A column that is finite for most draws and not for a few means
+  # those draws give the observation no support. The rest of the
+  # posterior scores it. Dropping the column would discard the
+  # observation. The bad draws are refilled from the finite ones,
+  # keeping the column's own spread.
   #
-  # Under a fixed seed, and restoring the caller's stream. Drawing
-  # from whatever state the session happened to be in made `loo()`
-  # answer differently on each call for the same fit, so a
-  # `loo_compare()` could not be reproduced, and re-running it could
-  # reorder the models.
-  samp_noinf = function(x) {
+  # The refill runs under a fixed seed and restores the caller's
+  # stream. `loo()` then returns the same value on every call for one
+  # fit. A `loo_compare()` is reproducible.
+  samp_noinf <- function(x) {
     x_finite <- x[is.finite(x)]
     bad <- !is.finite(x)
-    # Index rather than `sample(x_finite, ...)`: given a single
-    # finite value of 3.7, `sample()` reads it as `sample.int(3)`
-    # and returns integers from 1 to 3, which then enter `loo()`
-    # as log-densities. Only positive values take that branch, so
-    # it hides until a continuous family puts a density above e.
+    # Indexing avoids `sample(x_finite, ...)`. Given a single finite
+    # value of 3.7, `sample()` treats it as `sample.int(3)`. It returns
+    # integers from 1 to 3, which would enter `loo()` as
+    # log-densities.
     x[bad] <- x_finite[
       sample.int(length(x_finite), sum(bad), replace = TRUE)
     ]
@@ -459,9 +436,8 @@ clean_ll <- function(x, logliks) {
   local_seed(1L)
   logliks <- apply(logliks, 2, samp_noinf)
 
-  # The refill is a repair, and the elpd it feeds is optimistic by
-  # however much of the likelihood was unusable, so say so rather
-  # than let a number stand unqualified.
+  # An ELPD computed from refilled draws is optimistic by however much
+  # of the likelihood was unusable. The warning reports it.
   warn_once(
     c(
       paste0(
@@ -478,7 +454,6 @@ clean_ll <- function(x, logliks) {
     "mvgam_clean_ll_refill"
   )
 
-  # return
   attr(logliks, "scored_columns") <- scored
   logliks
 }

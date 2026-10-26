@@ -132,4 +132,17 @@ summary(fit_pooled)
 \seealso{
 \code{\link{summary.mvgam_pooled}},
 \code{\link{print.mvgam_pooled_summary}}, \code{\link{mvgam}}
+
+Other model fitting: 
+\code{\link{check_newdata}()},
+\code{\link{jsdgam}()},
+\code{\link{mvgam}()},
+\code{\link{mvgam_data}()},
+\code{\link{mvgam_formula}()},
+\code{\link{pivot_detection_array}()},
+\code{\link{pivot_species_matrix}()},
+\code{\link{series_to_mvgam}()},
+\code{\link{stancode.mvgam_formula}()},
+\code{\link{update.mvgam}()}
 }
+\concept{model fitting}

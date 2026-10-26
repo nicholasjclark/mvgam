@@ -273,10 +273,10 @@ test_that("missing series column on data errors", {
 test_that("AR / VAR / RW / ZMVN keep trend_map on the spec", {
   tm <- data.frame(series = c("s1", "s2"), trend = c(1, 1))
   Zmat <- matrix(c(1, 0.5, 0.5, 1), nrow = 2L, ncol = 2L)
-  for (spec in list(AR(trend_map = tm), VAR(trend_map = "shared"),
-                    RW(trend_map = Zmat), ZMVN(trend_map = "identity"))) {
-    expect_false(is.null(spec$trend_map))
-  }
+  expect_identical(AR(trend_map = tm)$trend_map, tm)
+  expect_identical(VAR(trend_map = "shared")$trend_map, "shared")
+  expect_identical(RW(trend_map = Zmat)$trend_map, Zmat)
+  expect_identical(ZMVN(trend_map = "identity")$trend_map, "identity")
 })
 
 test_that("PW refuses a factor request by either argument", {
@@ -336,8 +336,8 @@ test_that("mvgam(trend_map) reaches the Stan data through the trend", {
   )
   prefit <- mvgam(
     y ~ 1, trend_formula = ~ AR(p = 1), trend_map = tm, data = d,
-    family = poisson(), run_model = FALSE
-  , validate = FALSE)
+    family = poisson(), run_model = FALSE, validate = FALSE
+  )
   expect_equal(unname(prefit$standata$Z),
                matrix(c(1, 1, 0, 0, 0, 1), nrow = 3L))
 })

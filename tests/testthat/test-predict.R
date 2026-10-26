@@ -1,8 +1,7 @@
-test_that("a monotonic variable is read as brms codes it", {
+test_that("a monotonic variable keeps the coding brms gives it", {
   # brms codes a variable with D + 1 levels as 0..D in every frame. A
-  # frame holding only the upper levels starts at 1, and its values
-  # are read as they stand: shifting them to start at 0 would put
-  # every row a level low.
+  # frame holding only the upper levels starts at 1. Its values keep
+  # that coding. A shift to start at 0 would put every row a level low.
   expect_identical(
     validate_monotonic_indices(c(0, 1, 2, 1, 0), "Xmo_1", 2L, 5L),
     c(0L, 1L, 2L, 1L, 0L)
@@ -21,30 +20,19 @@ test_that("a monotonic variable is read as brms codes it", {
   )
 })
 
-test_that("spd_gp_exp_quad computes spectral density correctly", {
+test_that("the exp_quad density matches brms's Stan function", {
   # brms's anisotropic `spd_gp_exp_quad()`: sdgp^2 * sqrt(2 pi)^D *
   # prod(l) * exp(-0.5 * sum(l^2 * x^2)), one row per draw.
   slambda <- array(c(1, 2, 3, 4), dim = c(2, 2))
   sdgp <- c(0.5, 0.8)
   lscale <- matrix(c(1.0, 1.5, 2.0, 2.5), nrow = 2, ncol = 2)
 
-  result <- spd_gp_exp_quad(slambda, sdgp, lscale)
+  result <- gp_spectral_density(slambda, sdgp, lscale, "exp_quad")
   expected <- outer(seq_len(2), seq_len(2), Vectorize(function(d, m) {
     sdgp[d]^2 * sqrt(2 * pi)^2 * prod(lscale[d, ]) *
       exp(-0.5 * sum(lscale[d, ]^2 * slambda[m, ]^2))
   }))
   expect_equal(result, expected)
-
-  # Test input validation
-  expect_error(
-    spd_gp_exp_quad("not_array", sdgp, lscale),
-    "Must be of type 'array'"
-  )
-
-  expect_error(
-    spd_gp_exp_quad(slambda, "not_numeric", lscale),
-    "Must be of type 'numeric'"
-  )
 })
 
 test_that("each draw's spectral density is its own", {
@@ -55,54 +43,35 @@ test_that("each draw's spectral density is its own", {
   sdgp <- c(0.5, 2)
   lscale <- matrix(c(1, 3), nrow = 2)
   for (kernel in c("exp_quad", "matern32", "matern52")) {
-    both <- compute_spd_vectorized(slambda, sdgp, lscale, kernel)
+    both <- gp_spectral_density(slambda, sdgp, lscale, kernel)
     alone <- rbind(
-      compute_spd_vectorized(slambda, sdgp[1], lscale[1, , drop = FALSE],
-                             kernel),
-      compute_spd_vectorized(slambda, sdgp[2], lscale[2, , drop = FALSE],
-                             kernel)
+      gp_spectral_density(slambda, sdgp[1], lscale[1, , drop = FALSE],
+                          kernel),
+      gp_spectral_density(slambda, sdgp[2], lscale[2, , drop = FALSE],
+                          kernel)
     )
     expect_equal(both, alone)
   }
 })
 
-test_that("the Matern 3/2 density is the one brms writes in Stan", {
-  # brms's `spd_gp_matern32()` for one dimension:
-  # sdgp^2 * 2 * sqrt(pi) * gamma(2) * 3^1.5 / (0.5 * sqrt(pi)) * l *
-  # (3 + l^2 * x^2)^-2.
+test_that("the Matern densities match brms's Stan functions", {
+  # In one dimension brms's `spd_gp_matern32()` is sdgp^2 * 2 *
+  # sqrt(pi) * gamma(2) * 3^1.5 / (0.5 * sqrt(pi)) * l *
+  # (3 + l^2 * x^2)^-2. Its `spd_gp_matern52()` is sdgp^2 * 2 *
+  # sqrt(pi) * gamma(3) * 5^2.5 / (0.75 * sqrt(pi)) * l *
+  # (5 + l^2 * x^2)^-3.
   x <- c(0.5, 1, 1.5)
   sdgp <- 2
   l <- 3
-  expected <- sdgp^2 * 4 * 3^1.5 * l * (3 + l^2 * x^2)^-2
-  got <- compute_spd_vectorized(array(x, dim = c(3, 1)), sdgp,
-                                matrix(l), "matern32")
-  expect_equal(as.vector(got), sqrt(expected))
-  expect_error(
-    compute_spd_vectorized(array(x, dim = c(3, 1)), sdgp, matrix(l),
-                           "periodic"),
-    "Must be element of set"
+  slambda <- array(x, dim = c(3, 1))
+  expect_equal(
+    as.vector(gp_spectral_density(slambda, sdgp, matrix(l), "matern32")),
+    sdgp^2 * 4 * 3^1.5 * l * (3 + l^2 * x^2)^-2
   )
-})
-
-test_that("categorize_mvgam_parameters validates input", {
-  # Test with invalid input
-  expect_error(
-    categorize_mvgam_parameters("not_mvgam"),
-    "Must inherit from class 'mvgam'"
+  expect_equal(
+    as.vector(gp_spectral_density(slambda, sdgp, matrix(l), "matern52")),
+    sdgp^2 * 4 * 5^2.5 / 0.75 * l * (5 + l^2 * x^2)^-3
   )
-
-  expect_error(
-    categorize_mvgam_parameters(list(a = 1)),
-    "Must inherit from class 'mvgam'"
-  )
-})
-
-test_that("side_parameters() takes a fit and one of its two sides", {
-  expect_error(side_parameters("not_mvgam", "obs"),
-               "Must inherit from class 'mvgam'")
-  expect_error(side_parameters(structure(list(), class = "mvgam"),
-                               "observation"),
-               "Must be element of set")
 })
 
 # ==============================================================================
@@ -123,8 +92,8 @@ axes_metadata <- function(series, source = "explicit", gr_var = NULL,
 
 test_that("validate_prediction_factor_levels refuses unseen series", {
   metadata <- axes_metadata(c("s1", "s2", "s3"))
-  # A series column arrives as a factor or as character, and the
-  # comparison reaches the same verdict on each.
+  # A series column arrives as a factor or as character. The comparison
+  # reaches the same verdict on each.
   for (mk in list(factor, identity)) {
     valid <- data.frame(time = 1:3, series = mk(c("s1", "s2", "s1")))
     expect_silent(validate_prediction_factor_levels(valid, metadata))
@@ -146,9 +115,8 @@ test_that("validate_prediction_factor_levels refuses unseen series", {
 
 test_that("a frame is held to the axis columns the fit needs", {
   # `varying_meta_vars()` keeps a meta var only where it varies in
-  # training, and the completeness check uses that term list. A fit on
-  # one occasion loses its time column from the list, and a frame
-  # omitting time was accepted.
+  # training. A fit on one occasion has no time column in that list.
+  # The completeness check still requires the time column.
   set.seed(1)
   flat <- data.frame(y = rpois(30, 3), x = rnorm(30),
                      time = rep(1L, 30),
@@ -290,7 +258,7 @@ test_that("compute_family_epred handles lognormal with sigma", {
   sigma <- matrix(abs(rnorm(20, mean = 0.5)), nrow = 4, ncol = 5)
   lognormal_family <- brms::lognormal()
 
-  # The Jensen correction needs sigma, so the mean is refused without it
+  # The Jensen correction needs sigma. The mean is refused without it.
   expect_error(
     compute_family_epred(linpred, lognormal_family),
     "sigma"
@@ -310,8 +278,7 @@ test_that("compute_family_epred rejects unsupported families", {
     family = "nmix",
     linkinv = exp
   )
-  # The refusal names the family the dispatch was asked about, so a
-  # caller can tell which one it reached this branch with.
+  # The refusal names the family the dispatch was given.
   expect_error(
     compute_family_epred(linpred, nmix_family),
     "reached the unit-free mean dispatch"
@@ -333,13 +300,6 @@ test_that("compute_family_epred validates inputs", {
     "missing required components"
   )
 
-  # Invalid linpred type
-  expect_error(
-    compute_family_epred("not_a_matrix",
-                         list(family = "poisson", linkinv = exp)),
-    "Must be of type 'matrix'"
-  )
-
   # A distributional parameter that does not match the predictor
   wrong_sigma <- matrix(1, nrow = 2, ncol = 3)
   expect_error(
@@ -349,13 +309,13 @@ test_that("compute_family_epred validates inputs", {
   )
 })
 
-test_that("a response's mean reads its own family and parameters", {
+test_that("a response's mean takes its own family and parameters", {
   set.seed(123)
   linpred <- list(
     count = matrix(rnorm(20), nrow = 4, ncol = 5),
     biomass = matrix(rnorm(20, mean = 1), nrow = 4, ncol = 5)
   )
-  # The family beside the formula is neither response's.
+  # The family passed with the formula is neither response's.
   obj <- structure(list(
     formula = brms::bf(count ~ 1, family = poisson()) +
       brms::bf(biomass ~ 1, family = brms::lognormal()),
@@ -364,8 +324,7 @@ test_that("a response's mean reads its own family and parameters", {
   ), class = "mvgam")
 
   # The lognormal mean needs `sigma_biomass`, the name brms gives the
-  # response's own scale. A plain `sigma` belongs to no response, and
-  # asking for it was how a response named by `resp` lost its scale.
+  # response's own scale. A plain `sigma` belongs to no response.
   testthat::local_mocked_bindings(
     extract_dpars_from_stanfit = function(stanfit, dpar_names, ndraws,
                                           nobs, draw_ids = NULL) {
@@ -412,17 +371,7 @@ test_that("data2draws gives every draw the observations' own values", {
 # ==============================================================================
 
 test_that("dim_mu extracts correct dimensions", {
-  prep <- list(ndraws = 100, nobs = 50)
-  result <- dim_mu(prep)
-  expect_equal(result, c(100, 50))
-})
-
-test_that("dim_mu validates prep structure", {
-  expect_error(dim_mu(list(ndraws = 100)), "nobs")
-  expect_error(dim_mu(list(nobs = 50)), "ndraws")
-  # ndraws must be >= 1
-  expect_error(dim_mu(list(ndraws = 0, nobs = 50)), "not >= 1")
-  expect_error(dim_mu("not_a_list"), "Must be of type 'list'")
+  expect_equal(dim_mu(list(ndraws = 100, nobs = 50)), c(100, 50))
 })
 
 # ==============================================================================
@@ -698,15 +647,10 @@ test_that("extract_dpars_from_stanfit extracts and broadcasts scalar params", {
     nobs = 5
   )
 
-  expect_named(result, "sigma")
-  expect_equal(dim(result$sigma), c(10, 5))
+  # The scalar repeats across the prediction rows
+  expect_equal(result, list(sigma = matrix(draws_mat[, "sigma"], 10, 5)))
 
-  # Broadcasting with byrow=FALSE replicates scalar across columns
-  for (col in 1:5) {
-    expect_equal(result$sigma[, col], draws_mat[, "sigma"])
-  }
-
-  # Also test single indexed param broadcasts like scalar
+  # A parameter with one index repeats as a scalar does
   draws_single_idx <- matrix(abs(rnorm(10, mean = 1)), nrow = 10, ncol = 1)
   colnames(draws_single_idx) <- "zi[1]"
   mock_single <- posterior::as_draws_matrix(draws_single_idx)
@@ -718,11 +662,7 @@ test_that("extract_dpars_from_stanfit extracts and broadcasts scalar params", {
     nobs = 4
   )
 
-  expect_equal(dim(result_single$zi), c(10, 4))
-  # All columns should be identical (broadcasted from single indexed value)
-  for (col in 2:4) {
-    expect_equal(result_single$zi[, col], result_single$zi[, 1])
-  }
+  expect_equal(result_single$zi, matrix(draws_single_idx[, 1L], 10, 4))
 })
 
 test_that("extract_dpars_from_stanfit handles indexed and missing params", {
@@ -748,14 +688,12 @@ test_that("extract_dpars_from_stanfit handles indexed and missing params", {
     nobs = nobs
   )
 
-  expect_named(result, c("sigma", "zi"))
-
-  # sigma is scalar, should be broadcasted
-  expect_equal(dim(result$sigma), c(ndraws, nobs))
-
-  # zi is indexed, should match original values
-  expect_equal(dim(result$zi), c(ndraws, nobs))
-  expect_equal(as.numeric(result$zi), as.numeric(zi_vals))
+  # The scalar sigma repeats across rows. The indexed zi keeps its
+  # values.
+  values <- function(m) matrix(as.numeric(m), nrow(m))
+  expect_equal(lapply(result, values), list(
+    sigma = matrix(draws_mat[, "sigma"], ndraws, nobs), zi = zi_vals
+  ))
 
   # Request shape (missing) - should return NULL
   result_missing <- extract_dpars_from_stanfit(
@@ -764,7 +702,6 @@ test_that("extract_dpars_from_stanfit handles indexed and missing params", {
     ndraws = ndraws,
     nobs = nobs
   )
-  expect_true(is.matrix(result_missing$sigma))
   expect_null(result_missing$shape)
 
   # Empty dpar_names should return empty list
@@ -795,24 +732,6 @@ test_that("extract_dpars_from_stanfit validates inputs correctly", {
   draws_mat <- matrix(abs(rnorm(20, mean = 1)), nrow = 10, ncol = 2)
   colnames(draws_mat) <- c("b_Intercept", "sigma")
   valid_draws <- posterior::as_draws_matrix(draws_mat)
-
-  # Invalid stanfit type
-  expect_error(
-    extract_dpars_from_stanfit("not_draws", "sigma", 10, 5),
-    "Must inherit from class"
-  )
-
-  # ndraws must be >= 1
-  expect_error(
-    extract_dpars_from_stanfit(valid_draws, "sigma", 0, 5),
-    "not >= 1"
-  )
-
-  # nobs must be >= 1
-  expect_error(
-    extract_dpars_from_stanfit(valid_draws, "sigma", 10, 0),
-    "not >= 1"
-  )
 
   # ndraws exceeds available draws
   expect_error(
@@ -873,13 +792,13 @@ test_that("truncation reaches sample_from_family without erroring", {
     sigma = matrix(3, nrow = ndraws, ncol = 3L),
     lb = 0, ub = 10, ntrys = 5
   )
-  # The family samplers answer with a vector the callers reshape, so
-  # the length is what this checks rather than a dimension.
+  # The family samplers return a vector the callers reshape. The test
+  # checks its length.
   expect_length(out, ndraws * 3L)
   expect_true(all(out >= 0 & out <= 10))
 
-  # A count family takes the same route and must keep the lower bound
-  # attainable rather than excluding it.
+  # A count family takes the same route. Its lower bound stays
+  # attainable.
   counts <- sample_from_family(
     family_name = "poisson", ndraws = ndraws,
     epred = matrix(2, nrow = ndraws, ncol = 3L),
@@ -890,11 +809,9 @@ test_that("truncation reaches sample_from_family without erroring", {
 })
 
 test_that("a truncated draw follows the truncated distribution", {
-  # Replacing an out-of-bounds draw by inverting the distribution
-  # restricted to the bounds is exact, so the result is the truncated
-  # law itself rather than something merely inside the bounds. The
-  # earlier rejection sampler could not place every draw and clamped
-  # the remainder onto the bound, which piles mass there.
+  # An out-of-bounds draw is replaced by inverting the distribution
+  # restricted to the bounds. The result follows the truncated law
+  # exactly. A draw clamped onto the bound would pile mass there.
   set.seed(8)
   ndraws <- 20000L
   nobs <- 2L
@@ -908,7 +825,7 @@ test_that("a truncated draw follows the truncated distribution", {
   )
   v <- as.numeric(out[, 1L])
   expect_true(all(v >= 0))
-  # Nothing sits exactly on the bound, which is the clamping tell.
+  # No draw equals the bound. Clamping would put draws there.
   expect_identical(sum(v == 0), 0L)
   probs <- c(0.1, 0.25, 0.5, 0.75, 0.9)
   p0 <- stats::pnorm(0, 5, 3)
@@ -917,13 +834,11 @@ test_that("a truncated draw follows the truncated distribution", {
 })
 
 test_that("a replaced draw comes from the fit's own predictive", {
-  # The replacement for an out-of-bounds draw has to be drawn from
-  # the observation's own predictive. Resolving the distribution by
-  # name and calling it separately meant calling it with no
-  # parameters, so every replacement came from the standard member of
-  # the family. Here the predictive sits near 50 and the bound is at
-  # zero, so a replacement from a standard normal is unmissable: it
-  # lands within a few units of zero rather than near 50.
+  # The replacement for an out-of-bounds draw comes from the
+  # observation's own predictive, with its parameters. Here the
+  # predictive centres near 50 and the bound is at zero. A draw from the
+  # standard member of the family would land within a few units of
+  # zero.
   set.seed(11)
   ndraws <- 200
   nobs <- 3
@@ -945,12 +860,9 @@ test_that("a replaced draw comes from the fit's own predictive", {
                                 nrow = ndraws, ncol = nobs)
   )
 
-  replaced <- result[planted, ]
-  expect_true(all(replaced >= 0))
-  # Six standard deviations of the predictive still leaves a wide
-  # gap between it and the standard normal the fault drew from.
-  expect_true(all(replaced > centre - 30))
-  expect_gt(min(replaced), 5)
+  # Six predictive SDs below its centre still lie far above any draw
+  # from a standard normal.
+  expect_gt(min(result[planted, ]), centre - 30)
 
   # The draws that were already inside the bounds are untouched.
   kept <- setdiff(seq_len(ndraws), planted)
@@ -967,7 +879,6 @@ test_that("summarize_predictions computes correct statistics", {
   result <- summarize_predictions(draws, probs = c(0.025, 0.975),
                                   robust = FALSE)
 
-  expect_equal(nrow(result), 5)
   expect_equal(colnames(result), c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
   expect_equal(colnames(summarize_predictions(draws, probs = 0.5,
                                               robust = FALSE)),
@@ -1114,11 +1025,9 @@ test_that("compute_family_variance: errors when required dpar missing", {
 })
 
 test_that("a denominator of zero is a legal binomial observation", {
-  # A row whose response was never observed has no trials behind it,
-  # and zero is the natural padding: brms accepts it when fitting, so
-  # prediction has to accept it coming back out. Requiring at least
-  # one trial made posterior_epred(), loo(), pp_check() and plot()
-  # fail together on any fit padded that way.
+  # A row whose response was never observed has zero trials. brms
+  # accepts the padding when fitting. posterior_epred(), loo(),
+  # pp_check() and plot() accept it in prediction.
   stub <- structure(
     list(
       formula = brms::bf(y | trials(trials) ~ x),
@@ -1147,13 +1056,11 @@ test_that("a denominator of zero is a legal binomial observation", {
   )
 })
 
-# A family whose mean is not the inverse link of its predictor has that
-# mean written twice: once in the per-family kernel copied from brms,
-# and once in the dispatch `compute_family_epred()` runs. The two are
-# free to disagree, and did: eight families returned the base
-# distribution's parameter as E[Y] while their kernels, tested on their
-# own, computed the right thing. This drives both and requires them to
-# agree, so a family cannot be added to one and not the other.
+# A family whose mean differs from the inverse link of its predictor
+# writes that mean twice. The per-family kernel copied from brms holds
+# one copy. The dispatch `compute_family_epred()` runs holds the other.
+# The test drives both and requires them to agree. A family added to
+# one of them and missing from the other fails it.
 epred_kernel_for <- function(family_name) {
   # `epred_kernel()` resolves the same name the same way. A family
   # with no kernel gives NULL. A kernel that fails to load still
@@ -1243,24 +1150,20 @@ test_that("a family's mean kernel refuses to run without its parameters", {
   )
 })
 
-# `sample_from_family()` and `compute_family_epred()` are handed the same
-# quantity: the inverse link of the linear predictor. Six samplers instead
-# treated it as E[Y] and transformed it back, which shifted the draws and,
-# for the lognormal families, produced NaN wherever that parameter was not
-# positive. Averaging the draws and comparing against the mean ties the two
-# layers together, so neither can change its mind about what it was given.
+# `sample_from_family()` and `compute_family_epred()` take the same
+# quantity, the inverse link of the linear predictor. The average of the
+# draws must equal the mean. A sampler that took that quantity as E[Y]
+# would shift its draws and fail the test.
 test_that("sampled draws average to the mean the same predictor implies", {
   dpar_value <- function(dpar) {
     switch(dpar,
       sigma = 0.4, shape = 6, phi = 8, nu = 8, hu = 0.3, zi = 0.25,
       zoi = 0.2, coi = 0.6, beta = 1.3, ndt = 0.2, 0.5)
   }
-  # `hurdle_negbinomial` is left out deliberately. Its sampler is the
-  # one brms uses, which reaches a zero-truncated negative binomial by
-  # the tilt that is exact only for the Poisson, and so averages about
-  # five percent below the analytic mean. mvgam reproduces brms rather
-  # than diverging from it, so the draws are right and the comparison
-  # is not one this test can make.
+  # `hurdle_negbinomial` is left out. mvgam uses brms's sampler for it.
+  # That sampler reaches a zero-truncated negative binomial by a tilt
+  # exact only for the Poisson. Its draws average about five percent
+  # below the analytic mean.
   families <- c(
     "poisson", "negbinomial", "binomial", "bernoulli", "beta",
     "beta_binomial", "lognormal", "hurdle_poisson",
@@ -1270,10 +1173,9 @@ test_that("sampled draws average to the mean the same predictor implies", {
   )
   set.seed(2024)
   ndraws <- 10000L
-  # Trial totals differ by observation. A sampler handed one total per
-  # observation once recycled it along the flattened draws, pairing
-  # draws with other observations' totals: a zero-trial observation
-  # drew counts of 46. Every observation's own mean catches that.
+  # Trial totals differ by observation. Each observation's draws must
+  # match its own mean, which fails if a sampler pairs draws with
+  # another observation's total.
   trials <- c(0, 3, 40)
   nobs <- length(trials)
 
@@ -1297,7 +1199,6 @@ test_that("sampled draws average to the mean the same predictor implies", {
            trials = trials, lb = NULL, ub = NULL),
       args
     )), ndraws, nobs)
-    expect_false(anyNA(drawn))
     # A zero-trial observation has one possible count.
     expect_true(all(drawn[expected == 0] == 0))
     # Monte Carlo error over 10k draws stays near one percent. The

@@ -48,7 +48,8 @@ mirroring the structure \code{\link[=jsdgam]{jsdgam()}} estimates.}
 \code{N}. Only used when \code{family} is an \code{nmix()} variant. Defaults
 to \code{30L}.}
 
-\item{seed}{Optional integer seed for reproducibility.}
+\item{seed}{Optional integer seed. The session's random state is
+restored when the call returns.}
 }
 \value{
 A list with class
@@ -182,7 +183,12 @@ returned \code{y_array} with custom covariate layouts;
 \code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}} for the families this simulator targets;
 \code{\link[=jsdgam]{jsdgam()}} for the multi-species joint fitter the
 \code{n_lv > 0L} output feeds into.
+
+Other simulation: 
+\code{\link{sim_jsdm}()},
+\code{\link{sim_mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{simulation}

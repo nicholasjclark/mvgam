@@ -25,12 +25,14 @@ wiring is required.
 Tweedie distribution with power parameter \code{theta} in the open
 interval \verb{(1, 2)}, a.k.a. the compound Poisson-gamma. Models
 continuous-positive data with an exact mass at zero (e.g.
-CPUE, rainfall, claim totals), where the count of "events"
-is Poisson and each event contributes a Gamma-distributed
-amount. \code{theta = 1} is the scaled Poisson boundary; \code{theta = 2} is the Gamma boundary. Both endpoints are numerically
-unstable under the compound decomposition (division by \code{2 - theta} blows up; the Gamma shape \code{m * (2 - theta) / (theta - 1)} over- or underflows), so mvgam restricts \code{theta} to
-\verb{[1.001, 1.999]}. Values inside that interval give the
-continuous case with a point mass at zero.
+CPUE, rainfall, claim totals). The count of "events" is Poisson.
+Each event contributes a Gamma-distributed amount. \code{theta = 1} is the
+scaled Poisson boundary. \code{theta = 2} is the Gamma boundary. Both
+endpoints are numerically unstable under the compound decomposition.
+Division by \code{2 - theta} diverges. The Gamma shape
+\code{m * (2 - theta) / (theta - 1)} over- or underflows. mvgam restricts
+\code{theta} to \verb{[1.001, 1.999]} for this reason. Values inside that
+interval give the continuous case with a point mass at zero.
 }
 \details{
 Parameterised with three distributional parameters:
@@ -42,17 +44,15 @@ Parameterised with three distributional parameters:
 \verb{[1.001, 1.999]})}
 }
 
-The log link on \code{mu} is fixed: the compound Poisson-gamma
-construction strictly requires \code{mu > 0}, and identity /
-inverse links cannot enforce that when the linear predictor
-is driven by a latent stochastic trend. If a future use case
-demands a non-log link with a constrained linear predictor,
-open an issue.
+The log link on \code{mu} is fixed. The compound Poisson-gamma
+construction requires \code{mu > 0}. Identity and inverse links cannot
+enforce that when the linear predictor is driven by a latent
+stochastic trend.
 
-By default \code{mu} is the only dpar tied to the linear predictor
-(and therefore to the latent state-space trend in mvgam); the
-dispersion \code{mphi} and power \code{mtheta} are estimated as global
-scalars shared across all observations. Write a \code{brms::bf()}
+By default, \code{mu} is the dpar that depends on the linear predictor.
+Through \code{mu}, the latent state-space trend in mvgam enters the
+likelihood. The dispersion \code{mphi} and power \code{mtheta} are estimated
+as global scalars shared across all observations. Write a \code{brms::bf()}
 formula with \code{mphi ~ covs} to give the dispersion its own
 per-observation linear predictor on the log scale. Its
 intercept takes \code{student_t(3, 0, 2.5)} by default. \code{mtheta}
@@ -64,10 +64,10 @@ example,
 
 fits a Tweedie with site-varying dispersion. brms generates
 the \code{b_mphi_Intercept} and \verb{b_mphi_*} parameters and their
-design matrix. The Tweedie Stan lpdf has scalar and vector
-signatures for both cases. If the data display obvious heteroscedasticity
-(e.g. seasonal claim severity), prefer letting \code{mphi} vary
-via a sub-formula over the global default (Burkner 2018, brms
+design matrix. The Tweedie Stan lpdf has scalar and vector signatures
+for both cases. If the data show clear heteroscedasticity (e.g.
+seasonal claim severity), prefer letting \code{mphi} vary via a
+sub-formula over the global default (Burkner 2018, brms
 distributional regression vignette).
 
 The Stan likelihood is the compound Poisson-gamma
@@ -77,37 +77,38 @@ The mvgam implementation is adapted from the
 \pkg{brms::custom_family} definition packaged by the
 Australian Institute of Marine Science at
 \url{https://github.com/open-AIMS/tweedie}, with attribution
-to those authors for the Stan function block, the choice of
-the \code{mu} / \code{mphi} / \code{mtheta} parameterisation, and the
-default series-truncation count. Each non-zero observation
+to those authors for the Stan function block and the choice of the
+\code{mu} / \code{mphi} / \code{mtheta} parameterisation. Attribution also covers
+the default series-truncation count. Each non-zero observation
 contributes a \code{log_sum_exp} over \code{M} Poisson-gamma mixture
-components, where the truncation \code{M} covers the Poisson
-rate \code{lambda = mu^(2 - theta) / ((2 - theta) * phi)}. The
-tail mass at \code{m > M} decays geometrically when \verb{M >> lambda} and slowly otherwise; the default \code{M = 30} is
-adequate when the implied \code{max(lambda)} across non-zero
-observations stays well below \code{M}. \code{lambda} grows quickly
-as \code{theta} approaches 2 (the \code{1 / (2 - theta)} factor) and
-as \code{phi} approaches 0; for fits where \code{mtheta} is sampled
-near the upper boundary, raise \code{M} (e.g. \code{tweedie(M = 100L)})
-and re-fit if posterior predictive checks show systematic
-undershoot in the non-zero tail. The Dunn & Smyth (2005)
-convergence analysis discusses truncation bounds; see also
-the runtime advisory printed by \code{check_tweedie_truncation()}.
+components. The truncation \code{M} covers the Poisson rate
+\code{lambda = mu^(2 - theta) / ((2 - theta) * phi)}. The tail mass at
+\code{m > M} decays geometrically when \code{M} is large relative to \code{lambda}.
+Otherwise it decays slowly. The default \code{M = 30} is adequate when the
+implied \code{max(lambda)} across non-zero observations stays well below
+\code{M}. \code{lambda} grows quickly as \code{theta} approaches 2 (the
+\code{1 / (2 - theta)} factor) and as \code{phi} approaches 0. For fits where
+\code{mtheta} is sampled near the upper boundary, raise \code{M} (e.g.
+\code{tweedie(M = 100L)}). Re-fit if posterior predictive checks show
+systematic undershoot in the non-zero tail. The Dunn & Smyth (2005)
+convergence analysis discusses truncation bounds. See also the runtime
+advisory printed by \code{check_tweedie_truncation()}.
 
 Identifiability under a latent trend. Because \code{mu_t} is a
 stochastic latent process, the joint \verb{(mu_t, mphi, mtheta)}
 posterior can have a ridge along the marginal-variance
-relation \code{Var[Y] = phi * mu^theta}. If the data do not
-strongly distinguish Poisson-like from Gamma-like tail
-behaviour, place an informative prior on \code{mtheta} (a
-reasonable default is \code{prior(normal(1.5, 0.3), class = mtheta)}) and inspect \code{pairs(fit, variable = c("mphi", "mtheta"))} for funnel geometry.
+relation \code{Var[Y] = phi * mu^theta}. If the data do not strongly
+distinguish Poisson-like from Gamma-like tail behaviour, place an
+informative prior on \code{mtheta}. A reasonable default is
+\code{prior(normal(1.5, 0.3), class = mtheta)}. Inspect
+\code{pairs(fit, variable = c("mphi", "mtheta"))} for funnel geometry.
 
 R-side likelihood evaluation (\code{log_lik()}) and posterior
 predictive draws (\code{posterior_predict()}) use \pkg{mgcv}
-(already an mvgam dependency); \code{mgcv::ldTweedie()} returns
-log densities directly so LOO-IC and WAIC do not suffer the
-underflow-then-floor pattern that a \code{log(dtweedie(...))}
-two-step introduces.
+(already an mvgam dependency). \code{mgcv::ldTweedie()} returns log
+densities directly. LOO-IC and WAIC then avoid the
+underflow-then-floor pattern that a \code{log(dtweedie(...))} two-step
+introduces.
 }
 \examples{
 \dontrun{
@@ -129,7 +130,7 @@ mod <- mvgam(
 summary(mod)
 
 # The dispersion and power parameters
-mcmc_plot(mod, variable = c("mphi", "mtheta"), type = "hist")
+mcmc_plot(mod, variable = c("mphi", "mtheta"), type = "areas")
 
 # A covariate on the dispersion, on the log scale, takes the
 # formula `bf(y ~ 1, mphi ~ x)`
@@ -171,3 +172,17 @@ Burkner, P.-C. (2018). Advanced Bayesian multilevel modeling
 with the R package brms. \emph{The R Journal}, 10(1), 395-411.
 \doi{10.32614/RJ-2018-017}
 }
+\seealso{
+Other observation families: 
+\code{\link{beta_nb}()},
+\code{\link{categ}()},
+\code{\link{com_binomial}()},
+\code{\link{diri}()},
+\code{\link{multi}()},
+\code{\link{mvgam_families}},
+\code{\link{mvn}()},
+\code{\link{mvt}()},
+\code{\link{nmix}()},
+\code{\link{occ}()}
+}
+\concept{observation families}

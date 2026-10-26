@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{An mvgam_formula object}
 
-\item{...}{Ignored}
+\item{...}{Ignored.}
 }
 \value{
 The object invisibly

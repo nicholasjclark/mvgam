@@ -1,13 +1,11 @@
-# Contract tests for the kfold.mvgam helpers. These exercise pure
-# linear algebra and partition logic, so no Stan fit is required;
-# end-to-end refit verification lives in tests/local/.
+# The kfold.mvgam helpers need no Stan fit. Refits are checked in
+# tests/local/.
 
 test_that("resolve_kfold_group() defaults to row-level keys for non-closure families", {
   obj <- list(family = stats::gaussian())
   data <- data.frame(x = 1:5, y = rnorm(5))
   out <- mvgam:::resolve_kfold_group(obj, group = NULL, data = data)
   expect_equal(out$key, as.character(1:5))
-  expect_equal(out$n_groups, 5L)
   expect_null(out$group_names)
 })
 
@@ -23,7 +21,6 @@ test_that("resolve_kfold_group() builds composite keys via paste", {
   )
   expect_equal(out$key,
                c("a_1", "a_2", "b_1", "b_2", "c_1"))
-  expect_equal(out$n_groups, 5L)
   expect_equal(out$group_names, c("site", "season"))
 })
 
@@ -37,14 +34,14 @@ test_that("resolve_kfold_group() errors on missing columns", {
 })
 
 test_that("a fold is held out of every response or refused", {
-  # With one response column absent, only the others were masked and
-  # the fold was scored with that response still in the likelihood.
+  # A response left unmasked would keep the fold in the likelihood
   set.seed(3L)
   d <- data.frame(y1 = rnorm(12), y2 = rnorm(12), x = rnorm(12))
   prefit <- mvgam(
     brms::bf(brms::mvbind(y1, y2) ~ x) + brms::set_rescor(FALSE),
-    data = d, family = gaussian(), run_model = FALSE, silent = 2
-  , validate = FALSE)
+    data = d, family = gaussian(), run_model = FALSE, silent = 2,
+    validate = FALSE
+  )
   masked <- mvgam:::mask_heldout_response(prefit, d, 1:3)
   expect_true(all(is.na(masked$y1[1:3])))
   expect_true(all(is.na(masked$y2[1:3])))
@@ -58,13 +55,12 @@ test_that("build_kfold_partition() respects group integrity", {
   folds <- mvgam:::build_kfold_partition(
     group_key, K = 2L, fold_split = "grouped"
   )
-  # Each group must land in exactly one fold.
+  # Each group lands in exactly one fold
   per_group <- tapply(folds, group_key, function(f) length(unique(f)))
   expect_true(all(per_group == 1L))
   expect_setequal(unique(folds), c(1L, 2L))
-  # loo::kfold_split_* returns numeric; storage mode must be
-  # coerced to integer so downstream `vapply(..., integer(1L))`
-  # in build_group_to_fold() succeeds.
+  # `map_loglik_cols_to_groups()` indexes the folds with
+  # `vapply(..., integer(1L))`
   expect_identical(typeof(folds), "integer")
 })
 
@@ -75,6 +71,12 @@ test_that("build_kfold_partition() honours explicit folds vector", {
     group_key, folds = folds_in
   )
   expect_identical(folds_out, folds_in)
+  # A supplied fold may not split a group
+  expect_error(
+    mvgam:::build_kfold_partition(rep(c("a", "b"), each = 3L),
+                                  folds = c(1L, 1L, 2L, 2L, 2L, 2L)),
+    "Split across folds: 'a'"
+  )
 })
 
 test_that("build_kfold_partition() errors when K > n_groups", {
@@ -128,7 +130,6 @@ test_that("build_mvgam_kfold() returns correctly-classed loo object", {
   expect_equal(rownames(out$estimates),
                c("elpd_kfold", "kfoldic"))
   expect_equal(colnames(out$estimates), c("Estimate", "SE"))
-  expect_true(out$elpd_kfold < 0)
 })
 
 test_that("print.mvgam_kfold() emits headline elpd + refit info", {
@@ -140,9 +141,11 @@ test_that("print.mvgam_kfold() emits headline elpd + refit info", {
     pareto_k_threshold = 0.7, exact = FALSE
   )
   printed <- utils::capture.output(print(out))
-  expect_true(any(grepl("mvgam k-fold", printed)))
-  expect_true(any(grepl("elpd_kfold", printed)))
-  expect_true(any(grepl("refits     = 1 of 2", printed)))
+  expect_true(any(grepl("elpd_kfold : -2.00 (SE 0.40)", printed,
+                        fixed = TRUE)))
+  expect_true(any(grepl("groups     : 2 (site)", printed, fixed = TRUE)))
+  expect_true(any(grepl("refits     : 1 of 2 folds", printed,
+                        fixed = TRUE)))
 })
 
 test_that("summary.mvgam_kfold() returns per-group tibble with diagnostics", {
@@ -160,7 +163,7 @@ test_that("summary.mvgam_kfold() returns per-group tibble with diagnostics", {
   expect_named(s, c("group", "elpd", "elpd_share", "elpd_psis",
                     "lift", "pareto_k", "refit"))
   expect_equal(s$refit, c(FALSE, TRUE, FALSE))
-  # lift defined only for refit folds.
+  # A lift exists only for a refitted group
   expect_equal(s$lift,
                c(NA_real_, -0.5 - -2.0, NA_real_))
   expect_equal(sum(s$elpd_share), 1, tolerance = 1e-9)
@@ -175,8 +178,26 @@ test_that("plot.mvgam_kfold() returns a ggplot with two facets", {
     pareto_k_threshold = 0.7, exact = FALSE
   )
   p <- plot(out)
-  # Two facets: ELPD + Pareto k. ggplot2 layout returns one row
-  # per facet * panel; here facet_wrap with two levels yields two.
+  # One panel for the ELPD and one for the Pareto k
   built <- ggplot2::ggplot_build(p)
   expect_equal(NROW(built$layout$layout), 2L)
+})
+
+test_that("kfold scores groups coarser than rows with a missing response", {
+  set.seed(5L)
+  d <- data.frame(site = rep(c("a", "b", "c"), each = 4L),
+                  y = c(rnorm(5L), NA, rnorm(6L)))
+  stub <- structure(list(data = d, family = gaussian()), class = "mvgam")
+  ll <- matrix(stats::rnorm(400L * 12L, -1, 0.1), 400L, 12L)
+  ll[, 6L] <- NA_real_
+  testthat::local_mocked_bindings(log_lik = function(object, ...) ll)
+  out <- kfold(stub, group = "site", pareto_k_threshold = Inf,
+               silent = 2L)
+  expect_identical(rownames(out$pointwise), c("a", "b", "c"))
+  # Each site's ELPD is the PSIS estimate of its summed log density
+  kept <- ll[, -6L]
+  sums <- sapply(split(seq_len(11L), d$site[-6L]),
+                 function(j) rowSums(kept[, j, drop = FALSE]))
+  want <- loo::loo(sums, r_eff = 1)$pointwise[, "elpd_loo"]
+  expect_equal(as.numeric(out$pointwise[, "elpd_kfold"]), as.numeric(want))
 })

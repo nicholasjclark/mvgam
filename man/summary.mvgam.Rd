@@ -9,13 +9,13 @@
 \arguments{
 \item{object}{An object of class \code{mvgam}.}
 
-\item{probs}{Numeric vector of length 2 specifying quantile
-probabilities for credible intervals. Default is
-\code{c(0.025, 0.975)} for 95\% intervals.}
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
 
-\item{robust}{Logical; if \code{TRUE}, the median and MAD measure
-central tendency and spread. The default \code{FALSE} uses the mean
-and SD.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
 \item{matrices}{Logical; if \code{TRUE}, also print every cell of
 the matrices a correlated, VAR or hierarchical trend derives
@@ -85,6 +85,28 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               chains = 2, silent = 2)
 
 summary(mod)
+
+# Next, how_to_cite() drafts the methods paragraph
 }
 
 }
+\seealso{
+\code{\link[=how_to_cite]{how_to_cite()}} drafts a methods paragraph for the model.
+\code{\link[=methods_md]{methods_md()}} writes its equations, glossary and priors.
+\code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} plots the draws of these parameters.
+
+Other posterior summaries: 
+\code{\link{VarCorr.mvgam}()},
+\code{\link{bibtex}()},
+\code{\link{how_to_cite.mvgam}()},
+\code{\link{hypothesis.mvgam}()},
+\code{\link{index-mvgam}},
+\code{\link{mcmc_plot.mvgam}()},
+\code{\link{methods_md}()},
+\code{\link{mvgam_draws}},
+\code{\link{pairs.mvgam}()},
+\code{\link{posterior_interval.mvgam}()},
+\code{\link{ranef.mvgam}()},
+\code{\link{smooths.mvgam}()}
+}
+\concept{posterior summaries}

@@ -125,4 +125,5 @@
 #'
 #' @name mvgam_families
 #' @rdname mvgam_families
+#' @family observation families
 NULL

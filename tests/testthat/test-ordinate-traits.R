@@ -232,8 +232,9 @@ test_that("the sites are labelled by the fit's own time axis", {
   prefit <- mvgam(
     y ~ 1,
     trend_formula = ~ AR(p = 1, n_lv = 2, time = year, series = sp),
-    data = d, family = gaussian(), run_model = FALSE, silent = 2
-  , validate = FALSE)
+    data = d, family = gaussian(), run_model = FALSE, silent = 2,
+    validate = FALSE
+  )
   # The draws are the one thing a prefit lacks. The rotation is
   # replaced with scores of the right size, and the plot builder
   # hands back the labels it was given.

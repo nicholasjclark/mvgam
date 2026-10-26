@@ -27,30 +27,30 @@ latent process model}
 \item{h}{Positive integer. The number of forecast horizons to
 decompose.}
 
-\item{ndraws}{Optional integer; the number of posterior draws to
-summarise over. A decomposition is built from one transition
-matrix per draw, so a wide panel is worth answering from a subset.
-Default \code{NULL} uses every draw.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Optional integer vector naming the posterior draws
-to use, in place of \code{ndraws}.}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
 \item{summary}{Logical; return the posterior median and interval of
 each decomposition (the default), or the per-draw decompositions
 themselves.}
 
-\item{probs}{The lower and upper percentiles to report alongside the
-median when \code{summary = TRUE}.}
+\item{probs}{The lower and upper percentiles of the interval reported
+with the median when \code{summary = TRUE}.}
 
-\item{future}{\code{Logical}. When \code{TRUE}, per-draw FEVD
-computation runs under whatever
-\code{\link[future:plan]{future::plan()}} the caller has set;
-see \code{\link[=irf]{irf()}} for details. Requires the \code{future} package
-(mvgam Suggests).}
+\item{future}{\code{Logical}. When \code{TRUE}, the per-draw computation
+runs under the \code{\link[future:plan]{future::plan()}} the caller
+has set. The default \code{sequential} plan runs as base \code{lapply()}
+does. \code{plan(multisession, workers = N)} splits the draws across
+\code{N} R processes. Without the \pkg{future} package the draws
+run in turn, with a message.}
 }
 \value{
-See \code{\link{mvgam_fevd-class}} for the quantities
-computed and returned, with references.
+An object of \code{\link{mvgam_fevd-class}}, which describes
+the quantities computed, with references.
 }
 \description{
 Compute forecast error variance decompositions from
@@ -70,6 +70,8 @@ var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
 # shock, over an eight-step horizon
 fevd_obj <- fevd(var_mod, h = 8L)
 plot(fevd_obj)
+
+# Next: irf() traces each shock through the system over time
 }
 
 }
@@ -78,14 +80,21 @@ Lutkepohl H (2005). New Introduction to Multiple Time Series
 Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 }
 \seealso{
-\code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}},
-\code{\link{mvgam_fevd-class}}, \code{\link[=plot.mvgam_fevd]{plot.mvgam_fevd()}},
-\code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=plot.mvgam_stability]{plot.mvgam_stability()}},
-\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}.
-The article at
-\url{https://nicholasjclark.github.io/mvgam/articles/var.html}
-runs \code{fevd()} on a plankton community.
+\code{\link[=irf]{irf()}} and \code{\link[=stability]{stability()}} summarise the same VAR dynamics.
+The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{fevd()} on a
+plankton community.
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{irf.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{residual_cor}()},
+\code{\link{shared_variation}()},
+\code{\link{stability.mvgam}()}
 }
 \author{
 Nicholas J Clark
 }
+\concept{latent dynamics}

@@ -9,41 +9,31 @@
 \arguments{
 \item{x}{An \code{mvgam_lfo} object.}
 
-\item{...}{Further \code{mvgam_lfo} objects. Models are weighted in
-the order they are passed.}
+\item{...}{Further \code{mvgam_lfo} objects, weighted in the order given.}
 
-\item{method}{Character. Either \code{"pseudo-BMA"} (default) or
-\code{"stacking"}. See description.}
+\item{method}{\code{"pseudo-BMA"} (the default) or \code{"stacking"}.}
 
-\item{model_names}{Optional character vector of model names.
-Defaults to the deparsed argument names.}
+\item{model_names}{Optional character vector of model labels;
+overrides the names inferred from the call.}
 }
 \value{
-A named numeric vector of class \code{"pseudobma_weights"}
-(method = pseudo-BMA) or \code{"stacking_weights"} (method =
-stacking) summing to 1, with one entry per model.
+A named numeric vector of weights summing to 1, of class
+\code{"pseudobma_weights"} or \code{"stacking_weights"}.
 }
 \description{
-Derives ensemble weights from a set of \code{mvgam_lfo}
-objects. Two methods are supported (Yao et al. 2018):
+Weights for combining models evaluated by \code{\link[=lfo_cv]{lfo_cv()}}
+on one rolling-origin grid, for example in
+\code{\link[=ensemble.mvgam_forecast]{ensemble.mvgam_forecast()}}. Yao et al. (2018) describe both
+methods.
 \itemize{
-\item \code{"pseudo-BMA"} (default): softmax of total LFO ELPD
-across models. Cheap, requires only the per-step ELPDs
-that every \code{mvgam_lfo} already carries. Collapses to a
-near-degenerate vector when models differ by more than
-~10 ELPD units.
-\item \code{"stacking"}: convex optimisation on the pointwise
-LFO log-density matrix. Gives much softer weights than
-pseudo-BMA and is generally preferred. Requires the
-\verb{$log_lik} matrix, which \code{lfo_cv()} only populates when
-called with \code{save_log_lik = TRUE} (off by default
-because the matrix can be many megabytes for long
-rolling windows). Errors with a hint to refit if the
-matrix is missing on any input.
+\item \code{"pseudo-BMA"}: the softmax of each model's summed ELPD.
+A gap of more than about 10 ELPD units gives the better model
+nearly all the weight.
+\item \code{"stacking"}: weights that maximise the log score of the
+combined predictive over the held-out observations. They
+spread weight more evenly. Each result needs the pointwise
+matrix that \code{lfo_cv(save_log_lik = TRUE)} stores.
 }
-Useful for combining multiple forecasts via
-\code{\link[=ensemble.mvgam_forecast]{ensemble.mvgam_forecast()}} when the candidate models were
-evaluated on the same rolling-origin grid.
 }
 \references{
 Yao, Y., Vehtari, A., Simpson, D., Gelman, A. (2018). Using

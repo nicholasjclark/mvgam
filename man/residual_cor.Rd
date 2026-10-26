@@ -49,24 +49,25 @@ factors than series implies a singular covariance of rank \code{n_lv}.
 The call then stops with an error. \code{\link[=shared_variation]{shared_variation()}} reports
 the variation such a fit's series share.}
 
-\item{summary}{Logical. When \code{TRUE} (default) per-element summaries
-(point estimate, posterior SD, quantile CI, posterior probability
-mass) are returned. When \code{FALSE} the full per-draw arrays are
-returned for downstream analysis.}
+\item{summary}{Logical. \code{TRUE} (the default) returns a summary of
+each entry: the point estimate, spread, credible interval and
+posterior sign probabilities. \code{FALSE} returns the arrays of
+draws.}
 
-\item{robust}{Logical. When \code{FALSE} (default), the posterior mean
-is the point estimate; when \code{TRUE}, the posterior median is used.
-Only relevant when \code{summary = TRUE}.}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
-\item{probs}{Length-2 numeric vector giving the lower and upper
-probabilities for the quantile-based credible interval. Default
-\code{c(0.025, 0.975)}.}
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
 
-\item{ndraws}{Optional number of posterior draws to use. Default
-\code{NULL} uses every draw.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Optional integer vector naming the posterior draws
-to use, in place of \code{ndraws}.}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 }
 \value{
 An [mvgam_residcor-class] object when \code{summary = TRUE} and
@@ -140,7 +141,7 @@ For hierarchical trends, per-group correlations combine the global
 Cholesky factor and per-group deviations via
 \verb{alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])}.
 
-Credible intervals and posterior SDs for correlations are computed
+Credible intervals and spreads for correlations are computed
 on the Fisher z-transformed scale (\code{atanh(r)}) and back-transformed
 for display. The intervals then stay inside \verb{(-1, 1)} for
 correlations near the bounds. The reported matrix summarises each
@@ -204,4 +205,15 @@ Regression Analysis of Multivariate Abundance Data in R.
 \code{\link[=print.mvgam_residcor]{print.mvgam_residcor()}}, \code{\link[=ordinate]{ordinate()}} for a biplot view of
 the same loadings, \code{\link[=plot.mvgam]{plot.mvgam()}} with \code{type = "factors"}
 for per-factor posterior ribbons.
+
+Other latent dynamics: 
+\code{\link{active_factors}()},
+\code{\link{compare_loadings}()},
+\code{\link{fevd.mvgam}()},
+\code{\link{irf.mvgam}()},
+\code{\link{ordinate}()},
+\code{\link{posterior_transition_matrix}()},
+\code{\link{shared_variation}()},
+\code{\link{stability.mvgam}()}
 }
+\concept{latent dynamics}

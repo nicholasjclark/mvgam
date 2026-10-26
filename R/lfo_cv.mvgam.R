@@ -1,132 +1,94 @@
-# Approximate leave-future-out cross-validation for mvgam fits.
-#
-# Implements the PSIS-LFO algorithm of Burkner, Gabry & Vehtari
-# (2020): refit the model on the first `min_t` observations, then
-# roll forward one step at a time. Between refits, Pareto Smoothed
-# Importance Sampling (PSIS) reweights the posterior to
-# approximate a fresh fit; a refit only happens when the Pareto k
-# diagnostic crosses a stability threshold.
-#
-# ELPD uses the standard PSIS algorithm directly. Non-ELPD scores
-# (crps, drps, sis, brier, energy, variogram) are computed by
-# resampling forecast draws according to the PSIS weights before
-# routing through `score.mvgam_forecast`, which is the canonical
-# Monte Carlo equivalent of evaluating the score under the
-# PSIS-weighted posterior.
-#
-# Built on forecast.mvgam (F3 / F4 / F4b), score.mvgam_forecast
-# (F6) and log_lik.mvgam.
+# Approximate leave-future-out cross-validation for mvgam fits, by the
+# PSIS-LFO algorithm of Burkner, Gabry and Vehtari (2020). Scores other
+# than the ELPD resample the forecast draws by their PSIS weights and
+# pass them to `score.mvgam_forecast()`.
 
 
 #' Approximate leave-future-out cross-validation of fitted mvgam
 #' objects
 #'
-#' @description Approximate leave-future-out (LFO) cross-validation
-#'   uses an expanding training window to evaluate a model on its
-#'   forecasting ability. The algorithm mirrors the
-#'   [loo PSIS-LFO vignette](https://mc-stan.org/loo/articles/loo2-lfo.html)
-#'   of Burkner, Gabry and Vehtari (2020): refit the model on the
-#'   first `min_t` observations and compute an exact `fc_horizon`
-#'   -ahead score; for each subsequent time point, reweight the
-#'   posterior with Pareto Smoothed Importance Sampling (PSIS) and
-#'   only refit when the Pareto-k diagnostic exceeds
-#'   `pareto_k_threshold`.
+#' @description
+#' Scores a model on its forecasts. The model is fitted to the times up
+#' to `min_t` and scored on the next `fc_horizon` observed times. The
+#' origin then steps forward one time at a time. Pareto smoothed
+#' importance sampling (PSIS) reweights the posterior to each new
+#' origin. The model is refitted only where the Pareto k exceeds
+#' `pareto_k_threshold`. The algorithm is that of Burkner, Gabry and
+#' Vehtari (2020), as in the
+#' [loo PSIS-LFO vignette](https://mc-stan.org/loo/articles/loo2-lfo.html).
 #'
 #' @name lfo_cv.mvgam
 #' @importFrom stats update logLik quantile
 #'
 #' @param object A fitted [mvgam][mvgam::mvgam] object.
-#' @param newdata Optional `data.frame` containing the response,
-#'   `time`, `series` and any covariates required by the model
-#'   formula. When `NULL`, the original training data
-#'   (`object$data`) is used. All series must
-#'   share the same set of observed time values, except under
-#'   `CAR()`, which takes series observed at their own times.
+#' @param newdata Optional `data.frame` holding the response, the time
+#'   and series columns and the covariates. `NULL` (the default) takes
+#'   the training data. Every series must share its observed times,
+#'   except under `CAR()`, whose series may be observed at their own
+#'   times.
 #' @param data Deprecated. Use `newdata` instead.
-#' @param min_t Numeric; the time *value* at which the initial
-#'   training window ends. Must be one of the times present in the
-#'   data, which need not be whole: an irregular `CAR()` grid is
-#'   named by its own occasions. The first forecast window covers
-#'   the next `fc_horizon` observed times. When `NULL`, defaults to
-#'   the time value at
-#'   the 30th observed time point (ratcheted down for shorter
-#'   series) and adjusted to leave at least 10 evaluation folds
-#'   when possible.
-#' @param fc_horizon Integer; the number of *observed time steps*
-#'   ahead evaluated at each fold. For regular grids this is the
-#'   familiar forecast horizon; for irregular CAR grids it is the
-#'   next `fc_horizon` observed times (the CAR kernel absorbs the
-#'   gaps via `time_dis`). Default `1`.
-#' @param pareto_k_threshold Proportion in `[0, 1]`; the Pareto
-#'   shape value above which the PSIS approximation is considered
-#'   unstable and a refit is triggered. `NULL` (default) uses the
-#'   adaptive threshold `min(1 - 1 / log10(S), 0.7)`, where `S` is
-#'   the number of posterior draws (Vehtari, Simpson, Gelman, Yao
-#'   & Gabry 2024). The adaptive rule tightens the threshold for
-#'   fits with few posterior draws where PSIS is less reliable and
-#'   clamps at `0.7` once `S` is large enough for the classical
-#'   guarantee to hold. Pass an explicit numeric to override.
-#' @param score Character vector of scoring rules to compute at
-#'   each fold. Must be a subset of `c("elpd", "crps", "drps",
-#'   "sis", "brier", "energy", "variogram")`. ELPD uses the
-#'   PSIS log-likelihood approximation directly; the other
-#'   scores are computed by sampling forecast draws from the
-#'   PSIS-weighted posterior and routing through
-#'   [score.mvgam_forecast]. Defaults to `"elpd"`.
-#' @param save_log_lik Logical. If `TRUE`, retain the
-#'   per-observation held-out log-densities in an
-#'   `n_draws` by `n_eval_obs` matrix (under the LFO-weighted
-#'   posterior) so the result can feed `loo::loo_model_weights()`
-#'   for log-score stacking. Defaults to `FALSE` because the
-#'   matrix can be large.
+#' @param min_t The time at which the first training window ends. It
+#'   must be a time present in the data, which need not be whole for an
+#'   irregular `CAR()` grid. `NULL` (the default) takes the 30th
+#'   observed time, earlier for a shorter series, leaving at least 10
+#'   evaluation origins where the data allow.
+#' @param fc_horizon Integer number of observed times after each origin
+#'   that are scored, whatever the gaps between them. Defaults to 1.
+#' @param pareto_k_threshold Numeric. An origin whose Pareto k exceeds
+#'   it triggers a refit. `NULL` (the default) takes the adaptive
+#'   threshold `min(1 - 1 / log10(S), 0.7)` for `S` posterior draws
+#'   (Vehtari et al. 2024). It is stricter for a fit with few draws,
+#'   where PSIS is less reliable.
+#' @param score Character vector of scores to compute at each origin,
+#'   from `"elpd"` (the default), `"crps"`, `"drps"`, `"sis"`,
+#'   `"brier"`, `"energy"` and `"variogram"`. The ELPD takes the PSIS
+#'   log-likelihood. The others score forecast draws resampled by the
+#'   PSIS weights, with [score.mvgam_forecast()].
+#' @param save_log_lik Logical. `TRUE` keeps the held-out log densities
+#'   under the reweighted posterior, an `[ndraws, n_eval_obs]` matrix.
+#'   [loo_model_weights.mvgam_lfo()] stacks models by it. Defaults to
+#'   `FALSE`, the matrix being large.
 #' @param silent Integer in `\{0, 1, 2\}`. `0` prints each refit
 #'   and its sampler start and finish lines. `1` (default) and `2`
 #'   print nothing from the refits.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A `list` of class `mvgam_lfo` containing:
-#'   * `elpds`: vector of approximate ELPDs at each evaluation
-#'     time point (if `"elpd"` is in `score`).
-#'   * `scores`: named list of vectors, one per requested non-ELPD
-#'     score (`NULL` if no non-ELPD score requested).
-#'   * `pareto_ks`: Pareto-k diagnostic at each evaluation step.
-#'   * `eval_timepoints`: the times evaluated, as the data record
-#'     them.
-#'   * `n_obs`: the number of responses each fold scores. Folds of
-#'     series observed at their own times hold different numbers.
-#'   * `refits_at`: the times at which the model was refit, as the
-#'     data record them.
-#'   * `pareto_k_threshold`: the numeric threshold the refit gate
-#'     applied, whether it came from the argument or from the
-#'     adaptive rule.
-#'   * `pareto_k_threshold_adaptive`: `TRUE` when the adaptive rule
-#'     chose that number because `pareto_k_threshold` was `NULL`.
-#'   * `fc_horizon`: the horizon used at each fold.
+#' @return A list of class `mvgam_lfo`, with one element per origin in
+#'   each vector.
+#'   * `elpds`: the approximate ELPD of each origin, `NULL` unless
+#'     `"elpd"` is in `score`. `sum_ELPD` is their sum.
+#'   * `scores`: a named list with one vector for each other score.
+#'   * `pareto_ks`: the Pareto k of each origin's importance weights,
+#'     `NA` where the model was refitted.
+#'   * `eval_timepoints`: the first scored time of each origin.
+#'   * `n_obs`: the number of responses each origin scores.
+#'   * `refits_at`: the last training time of each refit.
+#'   * `refit_triggered`: `TRUE` at each origin scored on a refit.
+#'   * `pareto_k_threshold`: the threshold used. `TRUE` in
+#'     `pareto_k_threshold_adaptive` marks the adaptive rule.
+#'   * `fc_horizon`: the horizon.
+#'   * `log_lik`: the held-out log densities when `save_log_lik = TRUE`,
+#'     otherwise `NULL`.
 #'
 #' @references
 #' Paul-Christian Burkner, Jonah Gabry and Aki Vehtari (2020).
 #' Approximate leave-future-out cross-validation for Bayesian time
 #' series models. *Journal of Statistical Computation and
 #' Simulation*. 90:14, 2499-2523.
+#' \doi{10.1080/00949655.2020.1783262}
 #'
 #' Aki Vehtari, Daniel Simpson, Andrew Gelman, Yuling Yao and
 #' Jonah Gabry (2024). Pareto smoothed importance sampling.
 #' *Journal of Machine Learning Research*. 25(72), 1-58.
+#' <https://jmlr.org/papers/v25/19-556.html>
 #'
-#' @seealso [forecast.mvgam], [hindcast.mvgam],
-#'   [score.mvgam_forecast], [log_lik.mvgam], [update.mvgam],
-#'   [loo.mvgam()] for PSIS-LOO over individual observations,
-#'   [kfold.mvgam()] for grouped k-fold CV (the same selective-
-#'   refit pattern generalised to arbitrary grouping factors).
-#'   The online article
-#'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
-#'   walks through `lfo_cv()` end-to-end on rodent count data,
-#'   including the Pareto-k refit gate and ensemble weighting
-#'   via `loo_model_weights.mvgam_lfo()`. For guidance on
-#'   choosing `fc_horizon` when the misspecification you are
-#'   testing has a known timescale (e.g. an annual recurrence),
-#'   see the integrated distribution model article at
-#'   \url{https://nicholasjclark.github.io/mvgam/articles/idm.html}.
+#' @seealso [loo_compare.mvgam_lfo()] ranks models by their
+#'   leave-future-out ELPD. [loo_model_weights.mvgam_lfo()] weights
+#'   them. [loo.mvgam()] approximates leave-one-out cross-validation.
+#'   [kfold.mvgam()] runs grouped k-fold cross-validation. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   runs `lfo_cv()` on rodent counts, with its Pareto k refits and
+#'   stacking weights.
 #'
 #' @examples
 #' \dontrun{
@@ -142,16 +104,24 @@
 #'   chains  = 2, silent = 2
 #' )
 #'
-#' # `min_t` sets the first time index from which to predict; here
-#' # the model starts forecasting at t = 50 and steps forward one
-#' # observation at a time. Refits only fire when PSIS Pareto-k
-#' # diagnostic exceeds the threshold.
-#' lfo <- lfo_cv(mod, min_t = 50L, fc_horizon = 1L,
-#'                pareto_k_threshold = 0.7)
-#' sum(lfo$elpds)
+#' # Forecasts one time step after each origin from t = 60, scored by
+#' # ELPD and CRPS. The model is refitted only where the Pareto k is high.
+#' lfo <- lfo_cv(mod, min_t = 60L, score = c("elpd", "crps"))
+#' lfo
+#'
+#' # Pareto k, ELPD and CRPS at each origin. Points past the dashed
+#' # line are highlighted
+#' plot(lfo)
+#'
+#' # One row per origin, with the refits in 'refit_here'
+#' summary(lfo)
+#'
+#' # Next, rank models by their forecasts with loo_compare()
 #' }
 #'
 #' @author Nicholas J Clark
+#' @family forecasting
+#' @family model comparison
 #' @export
 lfo_cv <- function(object, ...) {
   UseMethod("lfo_cv", object)
@@ -177,11 +147,8 @@ lfo_cv.mvgam <- function(object,
   checkmate::assert_number(pareto_k_threshold,
                             lower = 0, upper = 1,
                             null.ok = TRUE)
-  # A time value, not a position. A CAR grid's occasions are rarely
-  # whole, so demanding an integer refused every occasion such a fit
-  # holds while admitting whole numbers it never had; membership in
-  # the observed grid is the check that means anything, and it is
-  # made below.
+  # A time value, which on a CAR grid is rarely whole. Membership in the
+  # observed times is checked below.
   checkmate::assert_number(min_t, null.ok = TRUE, finite = TRUE)
   checkmate::assert_flag(save_log_lik)
   checkmate::assert_int(silent, lower = 0L, upper = 2L)
@@ -191,7 +158,7 @@ lfo_cv.mvgam <- function(object,
   score <- unique(score)
   rlang::check_dots_empty()
 
-  # Backward-compat: accept the deprecated `data` arg.
+  # The `data` argument of mvgam 1.x
   if (!is.null(data)) {
     if (is.null(newdata)) {
       insight::format_warning(c(
@@ -211,22 +178,16 @@ lfo_cv.mvgam <- function(object,
   all_data <- prediction_frame(object, newdata)
 
   time_var <- axis_vars(object)$time_var
-  # Only the time is demanded. Which rows belong to which series is
-  # answered two lines below by `axis_row_series()`, from the record
-  # rather than from a column, so a hierarchical frame whose series
-  # is derived and a wide frame that cannot carry one both pass. The
-  # same guard was reasoned out of `resolve_forecast_grid()` and its
-  # comment says why; asking for the column here refused every
-  # `mvbf()` fit the frame it was fitted on.
+  # Only the time column is required. `axis_row_series()` assigns rows
+  # to series from the axis record. A hierarchical frame derives its
+  # series. A wide `mvbf()` frame has no series column.
   assert_axis_column(all_data, time_var, "time")
-  # A rolling origin needs every series on one time grid. The fit's
-  # axis record assigns rows to series, which covers a series a
-  # grouping defines. A response-keyed frame puts every response on
-  # every row, and the record returns `NULL` for it: its responses
-  # share the grid by construction.
+  # A rolling origin needs every series on one time grid. A
+  # response-keyed frame puts every response on every row. The record
+  # returns `NULL` for it, its responses sharing the grid.
   series_fac <- axis_row_series(object, all_data)
   # A trend that completes its grid holds a state for every series at
-  # every time, and each fold then scores the series observed in it.
+  # every time. Each fold then scores the series observed in it.
   if (!is.null(series_fac) &&
       !trend_completes_time_grid(first_trend_spec(object))) {
     refuse_ragged_trend_grid(
@@ -236,11 +197,9 @@ lfo_cv.mvgam <- function(object,
     )
   }
 
-  # The rolling origin walks every time the evaluation frame holds,
-  # which reaches past the training grid by design, so this is the
-  # union and not the fit's axis. The series identity above still
-  # comes from the fit, because who a row belongs to is a question
-  # about the model; when a row was observed is not.
+  # The origins run over every time the evaluation frame holds, which
+  # may extend past the training grid. The series assignment above
+  # comes from the fit.
   all_unique_times <- sort(unique(all_data[[time_var]]))
   n_times <- length(all_unique_times)
 
@@ -256,24 +215,21 @@ lfo_cv.mvgam <- function(object,
     )))
   }
 
-  # Resolve min_t to a time VALUE. Default picks a sensible training
-  # window from a ladder (30 / 20 / 10 / 1) and indexes into the
-  # observed times so it works for any integer start (1..T,
-  # 2010..2044, julian days, etc.).
+  # The default `min_t` is the 30th, 20th, 10th or first observed time,
+  # the largest the series allows. Indexing the observed times works for
+  # any time origin, such as years or Julian days.
   if (is.null(min_t)) {
     base_idx <- if (n_times > 30L) 30L else
       if (n_times > 20L) 20L else
         if (n_times > 10L) 10L else 1L
-    # Adjust to leave at least 10 evaluation folds when possible.
+    # At least 10 evaluation origins where the data allow
     base_idx <- max(1L, min(base_idx, n_times - 10L - fc_horizon))
     min_t <- all_unique_times[base_idx]
   }
 
   if (!min_t %in% all_unique_times) {
-    # Naming the range invited a value from inside it, which on an
-    # irregular grid is almost never an occasion the fit holds. The
-    # occasions themselves are what can be passed, so a few of them
-    # are shown.
+    # The first few occasions are listed. A value inside the range is
+    # rarely an occasion of an irregular grid.
     shown <- utils::head(all_unique_times, 6L)
     stop(insight::format_error(c(
       "'min_t' must be an observed time.",
@@ -303,18 +259,13 @@ lfo_cv.mvgam <- function(object,
     )))
   }
 
-  # Internal arithmetic is over observation POSITIONS in
-  # all_unique_times (the "k"th evaluation forecasts at the kth
-  # observed time after min_t). This decouples the algorithm from
-  # the user's integer time start and naturally accommodates
-  # irregular CAR grids: the CAR kernel absorbs time gaps via
-  # 'time_dis' downstream.
+  # The arithmetic below is over positions in `all_unique_times`. The
+  # CAR kernel takes the gaps between them from `time_dis`.
   eval_positions <- seq.int(idx_min_t + 1L,
                               n_times - fc_horizon + 1L)
   eval_timepoints <- all_unique_times[eval_positions]
   n_evals <- length(eval_positions)
 
-  # Pre-allocate per-score storage.
   elpds <- if ("elpd" %in% score) {
     rep(NA_real_, n_evals)
   } else {
@@ -333,14 +284,12 @@ lfo_cv.mvgam <- function(object,
   }
   pareto_ks <- rep(NA_real_, n_evals)
   refits_at <- all_unique_times[0L]
-  # Parallel to eval_timepoints: TRUE at each eval where a fresh
-  # refit was performed (initial fit at min_t plus any
-  # Pareto-k-threshold-triggered refits). Read by
-  # `summary.mvgam_lfo` to populate the `refit_here` tibble column.
+  # `TRUE` at each origin the model was refitted for. The first refit is
+  # at `min_t`. Later refits follow a Pareto k above the threshold.
+  # `summary.mvgam_lfo()` reports it as `refit_here`.
   refit_triggered <- logical(n_evals)
-  refit_triggered[1L] <- TRUE  # initial refit at min_t
+  refit_triggered[1L] <- TRUE
 
-  # Initial refit at min_t (training position = idx_min_t).
   if (silent < 1L) {
     cat("LFO refit at training time", min_t, "...\n")
   }
@@ -350,17 +299,17 @@ lfo_cv.mvgam <- function(object,
   fit_past <- refit_on_held_out(object, train_frame, silent)
   refits_at <- c(refits_at, min_t)
 
-  # log_lik on the FULL data so we can index into it at any
-  # future window. It scores each observation under the latent state
-  # the model inferred at that time, which is the density an ELPD is
-  # built from. The refit kept the held-out rows with their responses
-  # masked, and it inferred a state at each of their times.
+  # The log likelihood of every row, indexed by each later window. It
+  # scores each observation under the latent state inferred at its
+  # time, the density an ELPD is built from. The refit held the later
+  # rows with their responses masked. It inferred a state at each of
+  # their times.
   loglik_past <- log_lik(fit_past, newdata = all_data)
   idx_refit <- idx_min_t
 
-  # The responses each fold scores. Folds of series observed at their
-  # own times hold different numbers, and a fold's score is a sum over
-  # them.
+  # The responses each fold scores. A fold's score is a sum over them.
+  # Folds of series observed at their own times hold different
+  # numbers.
   eval_n_obs <- vapply(eval_positions, function(k) {
     rows <- rows_at_times(
       all_data, time_var, all_unique_times[k:(k + fc_horizon - 1L)]
@@ -368,15 +317,13 @@ lfo_cv.mvgam <- function(object,
     sum(!is.na(loglik_past[1L, rows]))
   }, integer(1L))
 
-  # The number the refit gate below compares against, and the one
-  # the result reports. The adaptive rule from Vehtari et al. (2024)
-  # tightens it when the posterior draw count is small and clamps at
-  # 0.7 once the classical guarantee holds.
+  # The threshold the refits are judged by, which the result reports.
+  # The adaptive rule of Vehtari et al. (2024) is stricter for few draws
+  # and stops at 0.7.
   pareto_k_threshold_used <- resolve_pareto_k_threshold(
     pareto_k_threshold, nrow(loglik_past)
   )
 
-  # Compute scores at the very first evaluation window.
   first_window_times <- all_unique_times[
     (idx_min_t + 1L):(idx_min_t + fc_horizon)
   ]
@@ -392,11 +339,8 @@ lfo_cv.mvgam <- function(object,
   elpds <- updates$elpds
   score_arrays <- updates$score_arrays
 
-  # Optional accumulator of per-observation log-densities at
-  # held-out points under the LFO-weighted posterior, in the
-  # n_draws x n_eval_obs shape that `loo::loo_model_weights()`
-  # consumes for proper log-score stacking. Only allocated when
-  # save_log_lik = TRUE because the matrix can be many megabytes.
+  # The held-out log densities under the reweighted posterior, an
+  # `[ndraws, n_eval_obs]` matrix for `loo::loo_model_weights()`
   log_lik_acc <- if (isTRUE(save_log_lik)) {
     lfo_collect_fold_loglik(
       loglik = loglik_past, all_data = all_data,
@@ -407,27 +351,17 @@ lfo_cv.mvgam <- function(object,
     NULL
   }
 
-  # Walk forward over observation positions in all_unique_times.
-  # Guard against the degenerate single-fold case (n_evals == 1L):
-  # seq.int(2L, 1L) is c(2L, 1L) descending, which would iterate
-  # with bogus k_eval. Skip the loop entirely when there's only
-  # the initial fold to score.
-  if (n_evals >= 2L) for (k_eval in seq.int(2L, n_evals)) {
+  for (k_eval in seq_len(n_evals)[-1L]) {
     k <- eval_positions[k_eval]
     eval_time <- all_unique_times[k]
     if (silent < 1L) {
       cat("LFO eval at time", eval_time, "...\n")
     }
 
-    # PSIS importance weights for moving from the idx_refit fit
-    # to one trained through position k - 1. The log-ratio is
-    # the cumulative log density of observations at positions
-    # (idx_refit + 1):(k - 1).
-    # Guarded on the bound rather than on the length of the
-    # sequence: `seq.int(6, 5)` counts down and returns two
-    # elements, so a window with nothing between the last refit and
-    # the evaluation point would have indexed observations in
-    # reverse instead of skipping them.
+    # PSIS weights from the last refit to a fit through position
+    # k - 1. The log ratio is the summed log density of the
+    # observations at positions (idx_refit + 1):(k - 1). The bound is
+    # checked because `seq.int()` counts down when it is empty.
     logratio <- if (k - 1L >= idx_refit + 1L) {
       last_obs_times <- all_unique_times[seq.int(idx_refit + 1L, k - 1L)]
       sum_measured(loglik_past[
@@ -465,7 +399,7 @@ lfo_cv.mvgam <- function(object,
       refits_at <- c(refits_at, refit_time)
       refit_triggered[k_eval] <- TRUE
       loglik_past <- log_lik(fit_past, newdata = all_data)
-      psis_lw <- NULL  # Fresh fit; no reweighting needed.
+      psis_lw <- NULL
     }
 
     window_times <- all_unique_times[k:(k + fc_horizon - 1L)]
@@ -548,18 +482,9 @@ lfo_collect_fold_loglik <- function(loglik, all_data, time_var,
   mat <- if (is.null(psis_log_weights)) {
     loglik[, fc_idx, drop = FALSE]
   } else {
-    n_draws <- nrow(loglik)
-    probs <- exp(psis_log_weights -
-                   log_sum_exp(psis_log_weights))
-    idx <- sample.int(n_draws, n_draws, replace = TRUE,
-                       prob = probs)
-    loglik[idx, fc_idx, drop = FALSE]
+    loglik[psis_resample(psis_log_weights), fc_idx, drop = FALSE]
   }
-  # Drop columns where every draw is NA. NAs arise at gaps in the
-  # observed time series (y is missing) and would crash loo's
-  # stacking optimiser, which rejects NAs in its log-likelihood
-  # input. Within-column NAs (rare) are similarly removed by
-  # dropping the column rather than imputing.
+  # A missing response leaves its column `NA`
   keep <- colSums(is.na(mat)) == 0L
   mat[, keep, drop = FALSE]
 }
@@ -605,7 +530,6 @@ scores_at_window <- function(fit, all_data, time_var,
     return(list(elpds = elpds, score_arrays = score_arrays))
   }
 
-  # ELPD.
   if ("elpd" %in% score_names) {
     per_draw_loglik <- sum_measured(loglik[, fc_idx, drop = FALSE],
                                     dims = 1L)
@@ -618,26 +542,14 @@ scores_at_window <- function(fit, all_data, time_var,
     }
   }
 
-  # Every other score needs predictive draws rather than a density,
-  # and it has to be the same state the ELPD above read. The window's
-  # occasions sit inside the refit's own grid, because the fold is
-  # held out by masking its response rather than by deleting its
-  # rows, so those draws are a hindcast of an unobserved stretch and
-  # not a forecast beyond the grid. Reaching for `forecast()` here
-  # asked the trend kernel to extend a grid the window is already
-  # inside, which is a second state derived a second way, and the
-  # horizon guard refused it besides.
+  # The other scores take predictive draws of the same latent states
+  # the ELPD used. `window_predictive()` explains why these are not
+  # `forecast()` draws.
   other_scores <- setdiff(score_names, "elpd")
   if (length(other_scores) > 0L) {
     fc <- window_predictive(fit, all_data[fc_idx, , drop = FALSE])
     if (!is.null(psis_log_weights)) {
-      # Resample draw rows under the PSIS weights, so the scored
-      # draws come from the reweighted posterior the ELPD used.
-      n_draws <- nrow(fc$forecasts[[1L]])
-      probs <- exp(psis_log_weights -
-                     log_sum_exp(psis_log_weights))
-      idx <- sample.int(n_draws, n_draws, replace = TRUE,
-                          prob = probs)
+      idx <- psis_resample(psis_log_weights)
       fc$forecasts <- lapply(fc$forecasts, function(m) {
         m[idx, , drop = FALSE]
       })
@@ -650,6 +562,22 @@ scores_at_window <- function(fit, all_data, time_var,
   }
 
   list(elpds = elpds, score_arrays = score_arrays)
+}
+
+
+#' Draw indices resampled by PSIS weight
+#'
+#' The resampled draws represent the reweighted posterior.
+#'
+#' @param log_weights Numeric vector of PSIS log weights, one per draw
+#' @return Integer vector of draw indices, as long as `log_weights`
+#' @noRd
+psis_resample <- function(log_weights) {
+  checkmate::assert_numeric(log_weights, any.missing = FALSE,
+                            min.len = 1L)
+  n_draws <- length(log_weights)
+  sample.int(n_draws, n_draws, replace = TRUE,
+             prob = exp(log_weights - log_sum_exp(log_weights)))
 }
 
 
@@ -736,12 +664,11 @@ rows_at_times <- function(data, time_var, times) {
 
 #' Plot Pareto-k and per-fold scores from an `mvgam_lfo` object
 #'
-#' @description Renders a faceted ggplot of the per-fold Pareto-k
-#'   diagnostic and every populated score (ELPD plus any non-ELPD
-#'   scores requested at fit time). Outlier points are highlighted
-#'   per these thresholds: Pareto-k above `pareto_k_threshold`, ELPD
-#'   below its 15% quantile and any other score above its 85%
-#'   quantile.
+#' @description One panel for the Pareto k of each fold and one for
+#'   each score. The dashed line in each panel is the threshold above
+#'   which points are highlighted. For Pareto k it is the threshold
+#'   [lfo_cv()] used. For ELPD it is the 15% quantile, with lower
+#'   values highlighted. For the other scores it is the 85% quantile.
 #'
 #' @param x An object of class `mvgam_lfo`.
 #' @param ... Unused. Anything passed here is refused.
@@ -750,109 +677,33 @@ rows_at_times <- function(data, time_var, times) {
 #' @export
 plot.mvgam_lfo <- function(x, ...) {
   rlang::check_dots_empty()
-  obj <- x
-  # Pin the scheme the way every other mvgam figure does, so a
-  # user's own `bayesplot::color_scheme_set()` does not leave this
-  # panel the odd one out.
-  set_color_scheme_local("red")
-  ks <- obj$pareto_ks
-  # An infinite k is loo declining to fit the tail rather than a
-  # diagnosis: `do_psis_i()` starts `khat` at `Inf` and replaces it
-  # only when the tail holds at least five draws. Those points are
-  # drawn at the largest finite k to keep the panel's scale. When no
-  # k is finite there is nothing to stand in for them, and taking a
-  # maximum over the empty set returned `-Inf`, which drew the least
-  # reliable evaluations as the most reliable.
-  finite_ks <- ks[is.finite(ks)]
-  if (length(finite_ks) > 0L) {
-    ks[is.infinite(ks)] <- max(finite_ks)
-  }
-
-  threshold_val <- obj$pareto_k_threshold
-  panels <- list()
-  panels$pareto_ks <- data.frame(
-    eval = obj$eval_timepoints,
-    value = ks,
-    threshold = threshold_val,
-    facet = "Pareto K",
-    worse_above = TRUE
+  t <- x$eval_timepoints
+  panels <- c(
+    list(pareto_k_panel(t, x$pareto_ks, x$pareto_k_threshold)),
+    if (!is.null(x$elpds)) {
+      list(cv_panel(t, x$elpds, "ELPD", probs = 0.15, worse_above = FALSE))
+    },
+    lapply(names(x$scores), function(sc) {
+      cv_panel(t, x$scores[[sc]], score_label(sc), probs = 0.85)
+    })
   )
-  if (!is.null(obj$elpds)) {
-    # `quantile()` names its result, and `data.frame()` reads a name
-    # on a length-one column as row names it then discards, with a
-    # notice on every call.
-    panels$elpds <- data.frame(
-      eval = obj$eval_timepoints,
-      value = obj$elpds,
-      threshold = unname(stats::quantile(obj$elpds, probs = 0.15,
-                                           na.rm = TRUE)),
-      facet = "ELPD",
-      worse_above = FALSE
-    )
-  }
-  if (!is.null(obj$scores)) {
-    for (sc in names(obj$scores)) {
-      panels[[sc]] <- data.frame(
-        eval = obj$eval_timepoints,
-        value = obj$scores[[sc]],
-        threshold = unname(stats::quantile(obj$scores[[sc]],
-                                             probs = 0.85,
-                                             na.rm = TRUE)),
-        facet = score_label(sc),
-        worse_above = TRUE
-      )
-    }
-  }
-  long <- do.call(rbind, panels)
-  # A fold scored on a fresh refit has no importance ratio and no
-  # Pareto k, and a score can be missing where a window held no
-  # observation. Neither has a point to draw.
-  long <- long[!is.na(long$value), , drop = FALSE]
-  long$colour <- ifelse(
-    ifelse(long$worse_above, long$value > long$threshold,
-           long$value < long$threshold),
-    "outlier", "inlier"
-  )
-
-  ggplot2::ggplot(
-    long,
-    ggplot2::aes(x = .data$eval, y = .data$value)
-  ) +
-    ggplot2::facet_wrap(~ .data$facet, ncol = 1,
-                         scales = "free_y") +
-    ggplot2::geom_hline(
-      ggplot2::aes(yintercept = .data$threshold),
-      colour = mvgam_colour("mid_highlight"), linetype = "dashed", linewidth = 1
-    ) +
-    ggplot2::geom_line(linewidth = 0.5, colour = "grey30") +
-    ggplot2::geom_point(shape = 16, colour = "white", size = 2) +
-    ggplot2::geom_point(
-      ggplot2::aes(colour = .data$colour),
-      shape = 16, show.legend = FALSE, size = 1.5
-    ) +
-    ggplot2::scale_colour_manual(
-      values = c(inlier = "grey30", outlier = mvgam_colour("dark"))
-    ) +
-    scale_x_steps("Evaluation time",
-                  whole = all(long$eval == round(long$eval))) +
-    ggplot2::labs(y = NULL) +
-    mvgam_theme()
+  cv_diagnostic_plot(do.call(rbind, panels)) +
+    scale_x_steps("Evaluation time", whole = all(t == round(t)))
 }
 
 
 #' Posterior summary of an `mvgam_lfo` object
 #'
-#' @description Returns a long-format tibble with one row per
-#'   evaluation time point. Columns include the Pareto-k
-#'   diagnostic, a refit flag, and the per-fold values of every
-#'   requested score (ELPD plus any non-ELPD scores). Mirrors the
-#'   single-layer summary convention used for `mvgam_forecast`,
-#'   `mvgam_irf` and `mvgam_fevd`.
+#' @description One row per evaluation time. `refit_here` is `TRUE`
+#'   where the model was refitted for that origin. `pareto_k` is the
+#'   Pareto k of the importance weights, `NA` at a refit. `n_obs`
+#'   counts the responses scored. One column follows for each score
+#'   requested from [lfo_cv()].
 #'
 #' @param object An object of class `mvgam_lfo`.
 #' @param ... Unused. Anything passed here is refused.
-#' @return A `tibble` (`tbl_df`) with one row per evaluation time
-#'   point.
+#' @return A `tibble` with columns `eval_time`, `refit_here`,
+#'   `pareto_k`, `n_obs` and one per score.
 #'
 #' @method summary mvgam_lfo
 #' @export
@@ -860,11 +711,6 @@ summary.mvgam_lfo <- function(object, ...) {
   rlang::check_dots_empty()
   out <- data.frame(
     eval_time = object$eval_timepoints,
-    # `refit_here` is TRUE when the evaluation at that time used
-    # a fresh fit (either the initial refit at min_t or a
-    # subsequent Pareto-k-triggered refit). Tracked as a parallel
-    # logical vector during the lfo loop so the flag is robust to
-    # irregular time grids.
     refit_here = object$refit_triggered,
     pareto_k = object$pareto_ks,
     # The number of responses the fold scores
@@ -886,39 +732,33 @@ summary.mvgam_lfo <- function(object, ...) {
 
 #' Compare leave-future-out evaluations across models
 #'
-#' Pairwise ELPD comparison for two or more `mvgam_lfo` objects,
-#' modelled after `loo::loo_compare()` but operating on the per-fold
-#' ELPDs accumulated by [lfo_cv()]. Returns a comparison table sorted
-#' from best to worst by sum ELPD, with the standard error of the
-#' difference computed pair-wise against the best model using the
-#' aligned per-fold differences.
+#' Ranks two or more [lfo_cv()] results by their summed ELPD, in the
+#' layout of [loo::loo_compare()]. The standard error of each
+#' difference comes from the paired per-fold differences with the best
+#' model. The results must share one evaluation grid, with the same
+#' `min_t`, `fc_horizon` and data.
 #'
-#' @param x A `mvgam_lfo` object.
-#' @param ... Additional `mvgam_lfo` objects to compare against `x`.
-#' @param model_names Optional character vector of model labels;
-#'   defaults to the deparsed call names.
+#' @inheritParams compare_scores
+#' @param x An `mvgam_lfo` object.
+#' @param ... Further `mvgam_lfo` objects.
 #'
-#' @return A `data.frame` (subclass `compare.loo`) with one row per
-#'   model, sorted by `elpd_diff` descending. Columns:
+#' @return A `compare.loo` table with one row per model, best first.
 #'   \describe{
-#'     \item{`elpd_diff`}{Sum-ELPD difference vs. the best model
-#'       (zero for the best).}
-#'     \item{`se_diff`}{Standard error of `elpd_diff` using the
-#'       per-fold paired-difference SE, scaled by `sqrt(N)`. Zero
-#'       for the best model.}
-#'     \item{`elpd_lfo`}{Sum of per-fold ELPDs.}
+#'     \item{`elpd_diff`}{Summed ELPD difference from the best model,
+#'       zero for the best.}
+#'     \item{`se_diff`}{Standard error of `elpd_diff`,
+#'       `sqrt(N) * sd(fold_diff)` over the `N` folds.}
+#'     \item{`p_worse`, `diag_diff`, `diag_elpd`}{The diagnostics of
+#'       [loo_compare.mvgam()], with folds in place of observations.}
+#'     \item{`elpd_lfo`}{Summed per-fold ELPD.}
 #'     \item{`se_elpd_lfo`}{Standard error of `elpd_lfo`.}
 #'   }
-#'
-#' @details All compared `mvgam_lfo` objects must have been built
-#'   over the same evaluation grid (same `eval_timepoints` and same
-#'   `fc_horizon`). Models with non-aligned grids raise an error
-#'   because paired differences would mix observations.
 #'
 #' @seealso [lfo_cv()], [loo_model_weights.mvgam_lfo()],
 #'   [compare_elpds()], [plot.mvgam_compare_elpds()]
 #'
 #' @importFrom loo loo_compare
+#' @family model comparison
 #' @method loo_compare mvgam_lfo
 #' @export
 loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
@@ -940,8 +780,6 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
     }
   }
 
-  # Build per-model sum ELPD + standard error of the sum, then
-  # paired-difference SE against the best model.
   elpd_mat <- vapply(models, function(m) m$elpds, numeric(length(ref_times)))
   if (!is.matrix(elpd_mat)) {
     elpd_mat <- matrix(elpd_mat, nrow = length(ref_times),
@@ -949,12 +787,12 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
   }
   n_folds <- nrow(elpd_mat)
   sum_elpd <- colSums(elpd_mat, na.rm = TRUE)
-  se_sum <- sqrt(n_folds) * apply(elpd_mat, 2L, stats::sd, na.rm = TRUE)
+  se_sum <- apply(elpd_mat, 2L, se_of_sum)
 
   best <- which.max(sum_elpd)
   diff_mat <- elpd_mat - elpd_mat[, best]
   elpd_diff <- colSums(diff_mat, na.rm = TRUE)
-  se_diff <- sqrt(n_folds) * apply(diff_mat, 2L, stats::sd, na.rm = TRUE)
+  se_diff <- apply(diff_mat, 2L, se_of_sum)
   se_diff[best] <- 0
   elpd_diff[best] <- 0
 
@@ -984,38 +822,27 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
 
 #' Model weights from `mvgam_lfo` objects
 #'
-#' @description Derives ensemble weights from a set of `mvgam_lfo`
-#'   objects. Two methods are supported (Yao et al. 2018):
+#' @description Weights for combining models evaluated by [lfo_cv()]
+#'   on one rolling-origin grid, for example in
+#'   [ensemble.mvgam_forecast()]. Yao et al. (2018) describe both
+#'   methods.
 #'   \itemize{
-#'     \item `"pseudo-BMA"` (default): softmax of total LFO ELPD
-#'       across models. Cheap, requires only the per-step ELPDs
-#'       that every `mvgam_lfo` already carries. Collapses to a
-#'       near-degenerate vector when models differ by more than
-#'       ~10 ELPD units.
-#'     \item `"stacking"`: convex optimisation on the pointwise
-#'       LFO log-density matrix. Gives much softer weights than
-#'       pseudo-BMA and is generally preferred. Requires the
-#'       `$log_lik` matrix, which `lfo_cv()` only populates when
-#'       called with `save_log_lik = TRUE` (off by default
-#'       because the matrix can be many megabytes for long
-#'       rolling windows). Errors with a hint to refit if the
-#'       matrix is missing on any input.
+#'     \item `"pseudo-BMA"`: the softmax of each model's summed ELPD.
+#'       A gap of more than about 10 ELPD units gives the better model
+#'       nearly all the weight.
+#'     \item `"stacking"`: weights that maximise the log score of the
+#'       combined predictive over the held-out observations. They
+#'       spread weight more evenly. Each result needs the pointwise
+#'       matrix that `lfo_cv(save_log_lik = TRUE)` stores.
 #'   }
-#'   Useful for combining multiple forecasts via
-#'   [ensemble.mvgam_forecast()] when the candidate models were
-#'   evaluated on the same rolling-origin grid.
 #'
+#' @inheritParams compare_scores
 #' @param x An `mvgam_lfo` object.
-#' @param ... Further `mvgam_lfo` objects. Models are weighted in
-#'   the order they are passed.
-#' @param method Character. Either `"pseudo-BMA"` (default) or
-#'   `"stacking"`. See description.
-#' @param model_names Optional character vector of model names.
-#'   Defaults to the deparsed argument names.
+#' @param ... Further `mvgam_lfo` objects, weighted in the order given.
+#' @param method `"pseudo-BMA"` (the default) or `"stacking"`.
 #'
-#' @return A named numeric vector of class `"pseudobma_weights"`
-#'   (method = pseudo-BMA) or `"stacking_weights"` (method =
-#'   stacking) summing to 1, with one entry per model.
+#' @return A named numeric vector of weights summing to 1, of class
+#'   `"pseudobma_weights"` or `"stacking_weights"`.
 #'
 #' @references
 #' Yao, Y., Vehtari, A., Simpson, D., Gelman, A. (2018). Using
@@ -1048,7 +875,6 @@ loo_model_weights.mvgam_lfo <- function(x, ...,
     return(stack_mvgam_lfo(models, model_names))
   }
 
-  # Pseudo-BMA: softmax of total LFO ELPD.
   total_elpd <- vapply(models, function(m) {
     if (is.null(m$elpds)) {
       stop(insight::format_error(c(
@@ -1108,9 +934,8 @@ stack_mvgam_lfo <- function(models, model_names) {
     }
   }
 
-  # Drop observations where any candidate's log-likelihood is NA
-  # (typically gaps in the observed time series). The comparison
-  # has to stay paired observation-for-observation across models.
+  # An observation missing from any model is dropped from all of them.
+  # Stacking pairs the models observation by observation.
   na_cols <- Reduce("|",
                      lapply(ll_list, function(m) {
                        colSums(is.na(m)) > 0L
@@ -1121,13 +946,10 @@ stack_mvgam_lfo <- function(models, model_names) {
     })
   }
 
-  # Collapse each model's per-draw matrix to the per-observation
-  # marginal LFO log-predictive density: log mean exp over draws.
-  # This bypasses the inner PSIS step that
-  # `loo::loo_model_weights()` runs on raw log-likelihood
-  # matrices, which would fire Pareto-k warnings because our rows
-  # are already LFO-resampled draws (not a posterior in the shape
-  # PSIS-LOO expects).
+  # The log predictive density of each observation is the log mean
+  # exp over the resampled draws. `loo::stacking_weights()` takes it
+  # directly. `loo::loo_model_weights()` would run PSIS-LOO on draws
+  # that are already reweighted.
   lpd_point <- vapply(ll_list, function(m) {
     apply(m, 2L, log_mean_exp)
   }, numeric(ncol(ll_list[[1L]])))
@@ -1140,12 +962,13 @@ stack_mvgam_lfo <- function(models, model_names) {
 
 #' Print headline summary of an `mvgam_lfo` object
 #'
-#' @description Prints a compact overview of the LFO run: horizon,
-#'   threshold, number of refits, and per-score totals / means.
-#'   For the full per-fold table, call [summary.mvgam_lfo()].
+#' @description Prints the horizon, the Pareto k threshold and the
+#'   counts of evaluations and refits. Each score is given as its sum
+#'   and mean over folds.
+#'   [summary.mvgam_lfo()] returns the per-fold table.
 #'
 #' @param x An object of class `mvgam_lfo`.
-#' @param ... Currently unused.
+#' @param ... Unused.
 #'
 #' @return The `mvgam_lfo` object `x`, returned invisibly.
 #'
@@ -1158,32 +981,40 @@ print.mvgam_lfo <- function(x, ...) {
   }
   rows <- c(
     fc_horizon = x$fc_horizon,
-    pareto_k_threshold = paste0(
-      format(round(x$pareto_k_threshold, 3)),
-      if (isTRUE(x$pareto_k_threshold_adaptive)) " (adaptive)"
-    ),
+    pareto_k_threshold = pareto_k_threshold_label(x, digits = 3L),
     `evaluation points` = length(x$eval_timepoints),
     refits = length(x$refits_at)
   )
   if (!is.null(x$elpds)) rows["ELPD"] <- totals(x$elpds)
   for (sc in names(x$scores)) rows[sc] <- totals(x$scores[[sc]])
-  cat("Approximate leave-future-out cross-validation\n")
-  cat(paste0("  ", format(names(rows)), " : ", rows, "\n"), sep = "")
+  cat_field_rows("Approximate leave-future-out cross-validation", rows)
   invisible(x)
+}
+
+
+#' Print a title and aligned `name : value` rows
+#'
+#' @param title Character title line
+#' @param rows Named character vector of values
+#' @return `NULL`, invisibly
+#' @noRd
+cat_field_rows <- function(title, rows) {
+  checkmate::assert_string(title)
+  checkmate::assert_atomic_vector(rows, names = "unique")
+  cat(title, "\n", sep = "")
+  cat(paste0("  ", format(names(rows)), " : ", rows, "\n"), sep = "")
+  invisible(NULL)
 }
 
 
 #' The predictive draws for one evaluation window
 #'
-#' A fold is held out by masking its response, so the window's
-#' occasions sit inside the refit's own grid and its states were drawn
-#' with the parameters. What every non-ELPD score needs is a sample
-#' from that same predictive, shaped the way [score.mvgam_forecast()]
-#' reads it, so the arms come from the pair `hindcast()` uses rather
-#' than from a second derivation written here.
-#'
-#' `forecast()` is the wrong instrument: it extends the grid beyond
-#' the last observed occasion, and this window is already inside it.
+#' A fold is held out by masking its response. The masked rows keep the
+#' window's occasions on the refit's time grid. Their latent states
+#' were sampled with the parameters. The draws come from the
+#' `hindcast()` builders and are returned as the `mvgam_forecast` that
+#' [score.mvgam_forecast()] takes. `forecast()` extends the grid past
+#' its last occasion and does not apply here.
 #'
 #' @param fit The refit for the current window.
 #' @param fc_data The window's rows of the evaluation frame, carrying
@@ -1192,6 +1023,8 @@ print.mvgam_lfo <- function(x, ...) {
 #'   of held-out observations per series.
 #' @noRd
 window_predictive <- function(fit, fc_data) {
+  checkmate::assert_class(fit, "mvgam")
+  checkmate::assert_data_frame(fc_data, min.rows = 1L)
   series_levels <- fitted_series_levels(fit)
   draws_mat <- posterior::as_draws_matrix(fit$fit)
   window <- build_training_arms(fit, series_levels, data = fc_data)
@@ -1200,8 +1033,8 @@ window_predictive <- function(fit, fc_data) {
     draw_idx = seq_len(nrow(draws_mat)),
     obs_uncertainty = TRUE
   )
-  # The window's own observations are what the arms are scored
-  # against, so they sit where a forecast keeps its held-out truths.
+  # The window's observations go where a forecast keeps its held-out
+  # truths. `score()` scores the draws against them.
   new_mvgam_forecast(
     fit, "response", resp = NULL, reported = series_levels,
     training = NULL, hindcasts = NULL, forecasts = arms,

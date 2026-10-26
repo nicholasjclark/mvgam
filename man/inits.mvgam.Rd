@@ -2,7 +2,7 @@
 % Please edit documentation in R/brms_wrappers.mvgam.R
 \name{inits.mvgam}
 \alias{inits.mvgam}
-\title{Extract initial values used in a fitted mvgam model}
+\title{Initial values of a fitted mvgam model}
 \usage{
 \method{inits}{mvgam}(x, ...)
 }
@@ -12,12 +12,8 @@
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-List with one element per chain, mirroring the \code{init}
-argument passed to the sampler.
+A list with one element per chain.
 }
 \description{
-Method on \code{brms::inits()} for mvgam fits. Reads the per-chain
-\code{init} argument from the underlying stanfit's \verb{@stan_args}
-slot. The brms default method only dispatches on \code{brmsfit},
-so without this method \code{inits(fit)} fails on an mvgam object.
+The \code{init} argument each chain started from.
 }

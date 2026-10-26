@@ -14,9 +14,9 @@ information criteria via \code{\link[=loo.mvgam]{loo.mvgam()}} and add \code{elp
 \code{se_elpd_loo}, \code{p_loo} and \code{looic} columns. Defaults to
 \code{FALSE} because computing \code{loo} can be slow on large fits.}
 
-\item{resp}{For multivariate (multiple-response) models, the
-name of a single response variable to return results for.
-\code{NULL} (the default) returns results for all responses.}
+\item{resp}{Character specifying which response variable for
+multivariate models. NULL (default) returns predictions for all
+responses.}
 
 \item{...}{Forwarded to \code{\link[=loo.mvgam]{loo.mvgam()}} when \code{looic = TRUE}.}
 }
@@ -51,10 +51,10 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# `glance()` summarises the fit's sampling configuration and
-# data dimensions in one row. `looic = TRUE` adds an
-# out-of-sample fit score, which takes longer.
+# The sampler and data dimensions of the fit, in one row
 glance(mod)
+
+# Leave-one-out criteria, which take longer to compute
 glance(mod, looic = TRUE)
 }
 

@@ -6,20 +6,21 @@
 #'
 #' @return The \code{mvgam} object is returned invisibly.
 #'
-#' @seealso \code{\link{summary.mvgam}}, \code{\link{mvgam}}
+#' @seealso [summary.mvgam()] summarises the posterior of each
+#'   parameter. [methods_md()] writes the model as equations.
+#'   [how_to_cite()] drafts its methods paragraph.
 #'
 #' @export
 print.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
   # This method prints structure: the formulas, the family, the axis
-  # counts and the sampler's state. No estimate is shown, so there is
-  # nothing for a `digits` argument to round; `summary()` prints the
-  # estimates and takes one.
+  # counts and the sampler's state. It prints no estimate and takes no
+  # `digits` argument. `summary()` prints the estimates and takes one.
   rlang::check_dots_empty()
 
-  # Section 1: Formulas (distinguish observation vs process). The
-  # trend line below names the constructor, and a process formula
-  # with no predictor is left out.
+  # Section 1: the observation and process formulas. The trend line
+  # below names the constructor. A process formula with no predictor
+  # is left out.
   if (!is.null(x$trend_formula)) {
     cat("GAM observation formula:\n")
     print_model_formula(formula(x))
@@ -70,7 +71,7 @@ print.mvgam <- function(x, ...) {
 #' Print method for mvgam_formula objects
 #'
 #' @param x An mvgam_formula object
-#' @param ... Ignored
+#' @param ... Ignored.
 #' @return The object invisibly
 #' @export
 print.mvgam_formula <- function(x, ...) {
@@ -121,10 +122,10 @@ printed_trend_label <- function(x) {
 }
 
 
-#' How many series and time points a model was built on
+#' How many series and time points a model holds
 #'
-#' Counted on the axes the fit records. A prefit carries the same
-#' record, and the two print alike.
+#' Counted on the axes the fit records. A prefit records the same axes
+#' and prints the same counts.
 #'
 #' @param x An `mvgam` or `mvgam_prefit` object
 #' @return List with `n_series` and `n_timepoints`, either possibly
@@ -160,8 +161,8 @@ named_family <- function(fam) {
 #'
 #' @param object mvgam object
 #' @param resp Optional name of one response of a multivariate model.
-#'   Without it, a model with several responses answers with one
-#'   family per response.
+#'   Without it, a model with several responses returns one family
+#'   per response.
 #' @param ... Unused. Anything passed here is refused.
 #' @return A family object, or a list of them named by response
 #' @importFrom stats family
@@ -169,8 +170,8 @@ named_family <- function(fam) {
 family.mvgam <- function(object, resp = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
   rlang::check_dots_empty()
-  # `$family` holds one family even on an `mvbf()` model, the last
-  # arm's, and reading it answered every response with that one.
+  # `$family` holds one family on an `mvbf()` model, that of its last
+  # response. `model_families()` gives each response its own.
   fams <- model_families(object, resp)
   if (inherits(fams, "family")) named_family(fams) else {
     lapply(fams, named_family)
@@ -209,12 +210,10 @@ nobs.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
   rlang::check_dots_empty()
 
-  # `standata$N` counts the rows contributing a density, a different
-  # quantity: 276 of 300 on a frame with unobserved cells, and on a
-  # wide frame one response's count rather than the model's (58,
-  # where the three responses have 57, 58 and 55). Using it as a
-  # fallback made one function report two quantities, chosen by
-  # which slot the object happened to carry.
+  # `standata$N` counts the rows that contribute a density. A frame
+  # with unobserved cells gives 276 of its 300 rows. A wide frame
+  # gives one response's count: 58, where the three responses have
+  # 57, 58 and 55. This method reports the rows of the data alone.
   if (is.null(object$data)) {
     stop(insight::format_error(c(
       "No data found in mvgam object.",
@@ -224,53 +223,14 @@ nobs.mvgam <- function(object, ...) {
   nrow(object$data)
 }
 
-#' Extract Stan Code from mvgam Objects
+#' Print the Stan program of an mvgam model
 #'
-#' Extract the Stan model code used to fit mvgam objects. This
-#' function follows brms conventions and returns a character vector
-#' with \code{stancode} class.
+#' Writes the program of [stancode.mvgam_formula()] one line at a time.
 #'
-#' @param object A fitted \code{mvgam} object or \code{mvgam_prefit} object.
-#' @param ... Unused. Anything passed here is refused.
+#' @param x An `mvgamstancode` object.
+#' @param ... Ignored.
 #'
-#' @return A character string containing the Stan model code with class
-#'   \code{c("stancode", "character")}.
-#'
-#' @details This method extracts the Stan code that was used to fit the model.
-#'   The returned object has the \code{stancode} class, making it compatible
-#'   with brms workflows and allowing users to inspect, modify, or save the
-#'   generated Stan code.
-#'
-#' @export
-stancode.mvgam <- function(object, ...) {
-  checkmate::assert_class(object, "mvgam")
-  rlang::check_dots_empty()
-
-  if (is.null(object$stancode)) {
-    stop(insight::format_error(c(
-      "Stan code not found in mvgam object.",
-      i = paste(
-        "The model may have been fitted with a version that did not",
-        "store Stan code."
-      )
-    )))
-  }
-
-  # Add mvgam-specific stancode class with brms compatibility
-  code <- object$stancode
-  class(code) <- c("mvgamstancode", "stancode", "character")
-  return(code)
-}
-
-#' Print mvgam Stan Code Objects
-#'
-#' Print method for mvgamstancode objects that displays Stan model code in a
-#' clean, readable format.
-#'
-#' @param x A mvgamstancode object.
-#' @param ... Currently unused.
-#'
-#' @return The mvgamstancode object is returned invisibly.
+#' @return `x`, invisibly.
 #'
 #' @export
 print.mvgamstancode <- function(x, ...) {

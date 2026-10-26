@@ -220,34 +220,18 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     prior <- injected$prior
   }
 
-  # Use mock backend for rapid setup (creates brmsfit object
-  # needed for prediction).
+  # A mock-backend brmsfit, which prediction needs. `data2` holds the
+  # objects brms specials look up outside `data`, such as a `car()`
+  # adjacency matrix or a `cov_ranef()` covariance matrix.
   #
-  # `data2` is forwarded explicitly so brms specials that reference
-  # objects living outside `data` (e.g. `car()` adjacency matrices,
-  # `cov_ranef()` covariance matrices) can resolve their lookups.
-  #
-  # `threads` is forwarded so brms emits its
-  # `partial_log_lik_lpmf` + `reduce_sum` instrumentation for
-  # brms-native families. Without this, the mock fit produces
-  # unthreaded stancode and the user-requested threading is
-  # silently dropped on every brms-native fit. Closure-unit
-  # families thread via their own `partial_sum_*_lpmf`
-  # stanvars and do not depend on this path.
+  # A brms family is threaded by brms's `partial_log_lik_lpmf` and
+  # `reduce_sum`, which brms writes only when given more than one
+  # thread. A single thread would add the wrapper and its compile
+  # time for nothing. Closure-unit families are threaded by their own
+  # `partial_sum_*_lpmf` stanvars.
   dots <- list(...)
-  # Threads are forwarded only when the user asked for more than one.
-  # brms otherwise wraps the fit in its `partial_log_lik_lpmf`, adding
-  # compile time for no gain.
-  raw_threads <- dots$threads
-  if (inherits(raw_threads, "brmsthreads")) {
-    raw_threads <- raw_threads$threads
-  }
-  brm_threads <- if (is.numeric(raw_threads) &&
-                       isTRUE(raw_threads > 1)) {
-    as.integer(raw_threads)
-  } else {
-    NULL
-  }
+  n_threads <- thread_count(dots$threads)
+  brm_threads <- if (n_threads > 1L) n_threads
   # The code-generation options travel with the mock fit and with every
   # later regeneration. The mock fit, the assembled Stan program and
   # the assembled Stan data then share their basis expansions, factor
@@ -273,7 +257,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
       codegen_args_for(codegen, mvgam_codegen_stancode_options)
     )),
     type = "message",
-    silent = isTRUE(getOption("mvgam.silent", 1L) >= 2L)
+    silent = mvgam_quiet()
   )
 
   # Add version metadata to prevent restructure() from calling update()

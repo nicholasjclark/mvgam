@@ -27,10 +27,8 @@
 \arguments{
 \item{object}{An object of class \code{mvgam}.}
 
-\item{newdata}{An optional data.frame of new predictor values. If
-\code{NULL} (the default), the training data stored in \code{object} is
-used. This is what makes the call "fitted" rather than a general
-prediction.}
+\item{newdata}{Optional data frame with covariates for prediction. If
+NULL, uses original training data stored in the model object.}
 
 \item{re_formula}{Group-level terms to include: \code{NULL} (the default)
 for every one, \code{NA} for none. A formula choosing some of them is not
@@ -62,118 +60,104 @@ argument so flocker users have a one-call equivalent.}
 
 \item{unit_level}{Logical or \code{NULL} (default). When \code{TRUE} for a
 closure-unit detection family and \code{components = "response"},
-aggregates the per-visit response matrix to the per-unit grain
-(sum across visits within a unit) via the shared
-\code{aggregate_closure_unit_visits()} helper. Ignored when
-\code{components != "response"} (those grains are fixed by the
-component definition) and when the family is not a
-visit-aggregating closure-unit family.}
+sums the per-visit response matrix over the visits of each unit.
+Other \code{components} have fixed grains and ignore it. So do families
+that do not aggregate visits.}
 
 \item{resp}{Character specifying which response variable for
-multivariate models. If \code{NULL}, fitted values are returned for
-all responses (a named list).}
+multivariate models. NULL (default) returns predictions for all
+responses.}
 
-\item{ndraws}{Positive integer specifying the number of posterior
-draws to use. If \code{NULL} (the default), all draws are used.}
+\item{ndraws}{Positive integer specifying number of posterior draws to
+use. NULL (default) uses all available draws.}
 
-\item{draw_ids}{Optional integer vector naming the posterior draws
-to use, indexed into the full posterior. Give one of \code{ndraws} or
-\code{draw_ids}.}
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
 \item{summary}{Logical. If \code{TRUE} (the default), returns summary
-statistics. If \code{FALSE}, returns the full matrix of posterior
-draws.}
+statistics. If \code{FALSE}, returns the full matrix of posterior draws.}
 
-\item{robust}{Logical. If \code{FALSE} (the default), uses mean and
-standard deviation for summaries. If \code{TRUE}, uses median and
-median absolute deviation (MAD).}
+\item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
+deviation for summaries. If \code{TRUE}, uses median and median absolute
+deviation (MAD).}
 
-\item{probs}{Numeric vector of probabilities for quantile
-computation. Default is \code{c(0.025, 0.975)} for 95\% credible
-intervals.}
+\item{probs}{Numeric vector of probabilities for quantile computation.
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
+single value or multiple values.}
 
 \item{process_error}{Logical; if \code{TRUE}, the trend adds a sampled
 innovation to its deterministic submodel. Each posterior draw
 takes one innovation from the distribution the trend settles
 into. An autoregressive trend settles into its stationary
-distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}, and
-the Jensen correction on a log link is
+distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}. The
+Jensen correction on a log link is
 \eqn{\sigma^2/(2(1-\rho^2))}. A random walk lacks a stationary
 distribution and a \code{ZMVN()} trend lacks dynamics. Both draw their
-innovations directly. \code{CAR()} holds one stationary covariance at
+innovations directly. \code{CAR()} uses one stationary covariance at
 every time of an irregular grid and draws from it. If \code{FALSE},
 the default, the trend contributes its deterministic submodel
 alone, at its own per-draw values. The argument applies under
 \code{incl_autocor = FALSE}. Conditioning on the fitted state already
 fixes every innovation.
 
-Each call draws new innovations, and two calls on one fit give
-different results. Set a seed to reproduce a result.}
+Each call draws new innovations. Two calls on one fit give different
+results. Set a seed to reproduce a result.}
 
 \item{incl_autocor}{Logical; whether the fitted values include the
 latent trend state the model inferred at each time. Defaults to
 \code{TRUE} for the training data, as in
-\code{\link[brms:fitted.brmsfit]{brms::fitted.brmsfit()}}, and to \code{FALSE}
-with \code{newdata}. Under \code{TRUE} the observed response minus the
-fitted value is the ordinary residual of \code{\link[=residuals.mvgam]{residuals.mvgam()}}.}
+\code{\link[brms:fitted.brmsfit]{brms::fitted.brmsfit()}}. Defaults to
+\code{FALSE} with \code{newdata}. Under \code{TRUE} the observed response minus
+the fitted value is the ordinary residual of \code{\link[=residuals.mvgam]{residuals.mvgam()}}.}
 
 \item{allow_new_levels}{Logical; accepted for brms compatibility.
 A grouping level the model never saw is refused whatever this is
-set to, because a new level has no fitted random effect and, for
-a new series, no latent state to propagate. Predict for levels
-the fit knows, or refit with the new levels included.}
+set to. A new level has no fitted random effect. For a new series,
+it has no latent state to propagate. Predict for levels the fit
+knows, or refit with the new levels included.}
 
 \item{sample_new_levels}{Character; accepted for brms
 compatibility and not used, since new levels are refused. See
 \code{allow_new_levels}.}
 
-\item{...}{Unused. Anything passed here is refused; every argument
-this method gives the posterior methods it names above.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-If \code{summary = FALSE}, returns a matrix of posterior draws
-with dimensions \verb{[ndraws x nobs]}.
-
-If \code{summary = TRUE}, returns a matrix with columns:
+With \code{summary = FALSE}, an \verb{[ndraws, nobs]} matrix of
+draws. With \code{summary = TRUE}, a matrix with one row per
+observation and the columns:
 \itemize{
-\item \code{Estimate}: Point estimate (mean or median depending on
-\code{robust})
-\item \code{Est.Error}: Uncertainty estimate (sd or mad depending on
-\code{robust})
-\item \verb{Q*}: Quantile columns corresponding to values in \code{probs}
+\item \code{Estimate}: the posterior mean, or the median under
+\code{robust = TRUE}.
+\item \code{Est.Error}: the posterior SD, or the MAD under
+\code{robust = TRUE}.
+\item \verb{Q*}: one quantile column per value of \code{probs}.
 }
-
-For multivariate models with \code{resp = NULL}, returns a named list
-of matrices (one per response variable), each summarised
-independently when \code{summary = TRUE}.
+A multivariate model with \code{resp = NULL} gives a named list of
+these, one per response.
 }
 \description{
-Compute fitted values for an mvgam model, returning the expected
-value E[Y | X] (or the linear predictor, with \code{scale = "linear"})
-at the training observations by default. Mirrors the brms
-\code{\link[brms:fitted.brmsfit]{fitted.brmsfit()}} interface as closely as
-the underlying mvgam posterior methods permit.
+Expected values E[Y | X] of an mvgam model, or its linear
+predictor with \code{scale = "linear"}, at the training observations by
+default. The interface follows
+\code{\link[brms:fitted.brmsfit]{fitted.brmsfit()}}.
 }
 \details{
-\code{fitted.mvgam()} follows the brms convention: it returns the
-expected value E[Y | X], or the linear predictor with \code{scale = "linear"}, and leaves out the observation-family noise that
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws on top. Use \code{predict()} for
-predictive samples that carry it.
+As in brms, fitted values leave out the observation noise.
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} adds it. Use \code{\link[=predict.mvgam]{predict.mvgam()}} for
+predictive draws.
 
-For the training data the fitted values include the trend state
-the model inferred at each time, which \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} also
-returns. With \code{newdata}, or under \code{incl_autocor = FALSE}, the
-fitted values describe the covariate structure. \code{process_error}
-then decides the trend's part: \code{FALSE} keeps its deterministic
-submodel, and \code{TRUE} samples a state per draw from the trend's
-dynamics.
+For the training data the fitted values include the trend state the
+model inferred at each time. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the same
+state. With \code{newdata}, or under \code{incl_autocor = FALSE}, the fitted
+values describe the covariate structure. \code{process_error} then sets
+the trend's part. \code{FALSE} keeps its deterministic submodel. \code{TRUE}
+samples a state per draw from the trend's dynamics.
 
-Two brms \code{fitted()} arguments have no counterpart here and are
-refused rather than dropped. \code{dpar} and \code{nlpar} name a
-distributional or non-linear parameter to return on its own scale,
-which is what \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} answers through its own
-\code{dpar}. \code{sort} orders the returned rows by series, and this method
-returns them in the order the frame supplied.
+The brms arguments \code{dpar}, \code{nlpar} and \code{sort} are refused.
+\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} returns a distributional parameter
+through its own \code{dpar}. Rows come back in the order of the frame.
 }
 \examples{
 \dontrun{
@@ -185,20 +169,35 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Summary matrix of fitted values on the response scale.
-ft <- fitted(mod)
-head(ft)
+# Expected counts at the training observations: the posterior mean,
+# error and 95\% interval of each
+head(fitted(mod))
 
-# Per-cell residuals on the response scale (observed minus
-# posterior mean). Use `pp_check(mod, type = "resid_ribbon")`
-# for a graphical view that respects the model family.
-resids <- simdat$data_train$y - ft[, "Estimate"]
-summary(resids)
+# The covariate effects alone, without the inferred trend state
+head(fitted(mod, incl_autocor = FALSE))
+
+# One row per posterior draw and one column per observation
+dim(fitted(mod, summary = FALSE))
+
+# Next: residuals() and pp_check() compare the fit with the data
 }
 
 }
 \seealso{
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}, \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}},
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=predict.mvgam]{predict.mvgam()}},
-\code{\link[brms:fitted.brmsfit]{brms::fitted.brmsfit()}}.
+\code{\link[=residuals.mvgam]{residuals.mvgam()}} compares the fitted values with the
+data. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the fitted latent states.
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} predicts future times.
+
+Other predictions: 
+\code{\link{conditional_effects.mvgam}()},
+\code{\link{conditional_smooths.mvgam}()},
+\code{\link{hindcast.mvgam}()},
+\code{\link{posterior_epred.mvgam}()},
+\code{\link{posterior_linpred.mvgam}()},
+\code{\link{posterior_predict.mvgam}()},
+\code{\link{posterior_smooths.mvgam}()},
+\code{\link{predict.mvgam}()},
+\code{\link{predictive_error.mvgam}()},
+\code{\link{predictive_interval.mvgam}()}
 }
+\concept{predictions}

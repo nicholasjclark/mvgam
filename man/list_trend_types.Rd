@@ -12,3 +12,12 @@ Data frame with trend types and their properties
 \description{
 List all registered trend types and their factor model support.
 }
+\seealso{
+Other trend models: 
+\code{\link{LLT}()},
+\code{\link{PW}()},
+\code{\link{RW}()},
+\code{\link{ZMVN}()},
+\code{\link{lv_axis}()}
+}
+\concept{trend models}

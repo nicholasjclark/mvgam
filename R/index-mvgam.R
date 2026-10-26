@@ -56,6 +56,8 @@
 #' # Two series' autoregressive coefficients compared
 #' hypothesis(mod, "ar1_trend[series_1] > ar1_trend[series_2]",
 #'            class = NULL)
+#'
+#' # Next, plot chosen parameters with mcmc_plot(mod, variable = ...)
 #' }
 #'
 #' @author Nicholas J Clark
@@ -63,11 +65,11 @@
 #' @name index-mvgam
 #' @aliases variables
 #' @importFrom posterior variables
+#' @family posterior summaries
 #' @method variables mvgam
 #' @export
 #' @export variables
 variables.mvgam <- function(x, ...) {
-  # Validate input
   checkmate::assert_class(x, "mvgam")
   require_fitted_model(x, "variables")
   rlang::check_dots_empty()

@@ -87,6 +87,7 @@
 #' }
 #'
 #' @author Nicholas J Clark
+#' @family model checking
 #' @method plot mvgam
 #' @export
 plot.mvgam <- function(
