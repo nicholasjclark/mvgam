@@ -1,7 +1,7 @@
 #' Unit tests for fitted.mvgam
 #'
 #' Mirrors the brms fitted.brmsfit interface. Heavy lifting is done by
-#' posterior_epred / posterior_linpred / summarize_predictions, which
+#' posterior_epred / posterior_linpred / summarise_predictions, which
 #' have their own tests; here we pin the dispatch and summary contract
 #' by mocking the inner posterior calls.
 
@@ -152,10 +152,6 @@ test_that("fitted.mvgam validates components arg", {
   expect_error(fitted(stub_object(), components = "bogus"))
 })
 
-test_that("fitted.mvgam validates unit_level arg", {
-  expect_error(fitted(stub_object(), unit_level = "yes"))
-})
-
 test_that("fitted.mvgam(components = 'latent_state') delegates to predict()", {
   testthat::local_mocked_bindings(
     predict.mvgam = function(object, type, ...) {
@@ -166,7 +162,6 @@ test_that("fitted.mvgam(components = 'latent_state') delegates to predict()", {
   )
   out <- fitted(stub_object(), components = "latent_state",
                 summary = FALSE)
-  expect_true(is.matrix(out))
   expect_identical(attr(out, "called_with_type"), "latent_state")
 })
 

@@ -1,24 +1,14 @@
-# Pre-fit data inspection. Composes the same validators mvgam()
-# runs at fit time (`ensure_mvgam_variables()` for the trend axes,
-# `validate_regular_time_intervals()`, `validate_closure_unit_data()`,
-# `validate_response_shapes()`, `validate_model_columns()`) so users
-# can verify their
-# long-format data has the columns / levels / response shape a
-# proposed model requires, without paying for a Stan compile.
-# Optionally returns the same observed-series plot that
-# plot.mvgam(type = "series") renders on a fitted object, via
-# the shared `series_obs_plot()` body in R/plot_mvgam_series.R.
+# Pre-fit data inspection. `mvgam_data()` runs the data checks of
+# `mvgam()` without building a model. `series_obs_plot()` draws its
+# plot and the plot of `plot(fit, type = "series")`.
 
 
 #' Inspect long-format data before fitting an `mvgam`
 #'
-#' Validates that `data` carries the columns, factor levels, and
-#' response shape `mvgam()` would expect for a given observation
-#' family, and optionally returns an exploratory time-series plot.
-#' Use this to verify data structure for a proposed observation
-#' family without paying for a Stan compile, and to surface the
-#' same friendly errors `mvgam()` raises at fit time. Mirrors the
-#' role of [mvgam_formula()] for the data side.
+#' Runs the checks `mvgam()` applies to its data before compiling a
+#' model. It tests the columns, factor levels, time spacing and
+#' response support of a proposed model. A failure raises the error
+#' `mvgam()` would raise. An optional plot shows each observed series.
 #'
 #' @param data Long-format `data.frame` (or list) carrying at
 #'   least the response column and a `time` column. A latent trend
@@ -26,30 +16,28 @@
 #'   the trend constructor's `series` argument names, or the `gr`
 #'   and `subgr` columns of a hierarchical trend. Closure-unit
 #'   families (`occ()`, `nmix()`) always require `series` and
-#'   `visit`, and `cap` where the family needs it.
-#' @param y Character. Name of the response column. Defaults to
-#'   `"y"`.
-#' @param family A `family`, `brmsfamily`, or mvgam-specific
-#'   family object. Defaults to `gaussian()`. Closure-unit
-#'   families dispatch to the same closure-unit validator
-#'   `mvgam()` uses internally (`visit` / `cap` columns, integer
-#'   / non-negative / binary checks, cap >= y, cap constant
-#'   within unit). Univariate non-closure-unit families run a
-#'   response-shape check against the family's support (e.g.
-#'   non-negative integers for Poisson, `(0, 1)` for Beta,
-#'   strictly positive for Gamma). Multi-response families
-#'   (`diri()`, `multi()`, `categ()`, `mvn()`, `mvt()`) are not
-#'   supported here; pass the data directly to [mvgam()] /
-#'   [jsdgam()].
-#' @param formula Optional observation formula (a `formula`,
-#'   `brmsformula`, or `bf()` two-arm specification for
-#'   closure-unit fits). Every column the formula uses must be in
-#'   `data`: covariates, offsets, random-effect grouping factors
-#'   and the columns of addition terms such as `trials()` and
-#'   `weights()`. Those columns may not hold `NA`, and a
-#'   `trials()` count may not fall below its response. Response
-#'   `NA`s are allowed, and `mvgam()` keeps their rows on the
-#'   time grid.
+#'   `visit` columns. A family without a default `cap` also requires
+#'   a `cap` column.
+#' @param y Optional name of the response column. `NULL` (default)
+#'   takes the response of `formula`, or `"y"` when `formula` is
+#'   `NULL`. A name that differs from the response of `formula` is
+#'   refused.
+#' @param family A `family`, `brmsfamily` or mvgam family object.
+#'   Defaults to `gaussian()`. The response must lie in the family's
+#'   support, such as non-negative integers for `poisson()` or
+#'   `(0, 1)` for `Beta()`. A `cap` column must hold integers no
+#'   smaller than the response and stay constant within a closure
+#'   unit. Multi-response families (`diri()`,
+#'   `multi()`, `categ()`, `mvn()`, `mvt()`) are refused. [mvgam()]
+#'   and [jsdgam()] check their data at fit time.
+#' @param formula Optional observation formula, as a `formula` or a
+#'   `brmsformula`. A closure-unit family takes a detection formula
+#'   in the same `bf()`. Every column the formula uses must be in
+#'   `data`. These include covariates, offsets, random-effect
+#'   grouping factors and the columns of addition terms such as
+#'   `trials()` and `weights()`. Those columns may not hold `NA`. A
+#'   `trials()` count may not fall below its response. A missing
+#'   response is allowed. `mvgam()` keeps its row on the time grid.
 #' @param trend_formula Optional trend formula (e.g.
 #'   `~ AR(time = week, series = species) + s(env)`), as passed to
 #'   [mvgam()]. Its trend constructor names the time and series
@@ -61,37 +49,36 @@
 #' @param data2 Optional named list of further model data, as passed
 #'   to [mvgam()]. A formula variable found here, such as a matrix
 #'   covariate, need not be a column of `data`.
-#' @param plot Logical. If `TRUE` (default), draw the
-#'   observed-series plot using the same panels as
-#'   `plot(fit, type = "series")`. Multi-series data render as a
-#'   faceted time-series plot; a single-series request returns
-#'   the 4-panel patchwork (time series, histogram, ACF, ECDF).
-#' @param newdata Optional held-out long-format `data.frame` /
-#'   list. Plotted overlaid in black with a dashed cut at the
-#'   training/test boundary.
-#' @param series One of `NULL`, `"all"`, or a positive integer
-#'   index into the series levels. `NULL` resolves to `"all"` for
-#'   multi-series data and `1L` for single-series. Data without a
-#'   series column plot as one series named after the response.
+#' @param plot Logical. `TRUE` (default) draws the observed series
+#'   with the panels of `plot(fit, type = "series")`. Several series
+#'   draw as one facet each. One series draws four panels: the time
+#'   series, a histogram, the ACF and the empirical CDF.
+#' @param newdata Optional held-out data in the long format of
+#'   `data`. The time series panels draw it in black after a dashed
+#'   line at the first test time. The histogram, ACF and CDF of one
+#'   series pool the training and test values.
+#' @param series Series to plot: `NULL`, `"all"`, a series name or
+#'   a positive index into the series levels. `NULL` draws every
+#'   series of multi-series data and the one series otherwise. Data
+#'   without a series column plot as one series named after the
+#'   response.
 #' @param lines Logical. Plot lines (default) or points.
 #' @param n_bins Optional histogram bin count.
-#' @param log_scale Logical. Plot the response as `log(y + 1)`
-#'   on the multi-series view, where different scales are common.
+#' @param log_scale Logical. Plot the response as `log(y + 1)`.
 #'
-#' @return Invisibly, an `mvgam_data` list with elements
-#'   `data` (the validated data), `family` (resolved family
-#'   object), `series_levels` (`NULL` when the data name no
-#'   series), `n_series`, `time_range`, `n_obs`, `n_missing`
-#'   (the count of missing responses), and
-#'   `plot` (the `ggplot` / `patchwork` object when
-#'   `plot = TRUE`, else `NULL`). When `plot = TRUE` the plot is
-#'   also drawn to the active device.
+#' @return Invisibly, an `mvgam_data` list with elements `data` (the
+#'   validated data), `family` (the resolved family), `series_levels`
+#'   (`NULL` when the data name no series), `n_series`, `time_range`,
+#'   `n_obs`, `n_missing` (the count of missing responses) and `plot`
+#'   (the `ggplot` or `patchwork` object when `plot = TRUE`, else
+#'   `NULL`). With `plot = TRUE` the plot is also drawn on the active
+#'   device.
 #'
 #' @author Nicholas J Clark
 #'
 #' @seealso [mvgam()], [mvgam_formula()], [jsdgam()],
 #'   [sim_mvgam()], [sim_closure_unit_data()],
-#'   [default_prior.mvgam_formula()].
+#'   [get_prior.mvgam_formula()].
 #'
 #' @examples
 #' set.seed(1)
@@ -102,8 +89,10 @@
 #' mvgam_data(simdat$data_train, family = poisson(),
 #'            trend_formula = ~ AR())
 #'
-#' # One series in four panels: time series, histogram, ACF and ECDF
-#' mvgam_data(simdat$data_train, family = poisson(), series = 1L)
+#' # One series in four panels: time series, histogram, ACF and ECDF.
+#' # The test data follow the dashed line.
+#' mvgam_data(simdat$data_train, family = poisson(), series = 1L,
+#'            newdata = simdat$data_test)
 #'
 #' # A response the family cannot take is refused before any Stan
 #' # compile. The error names the column, the values and the support.
@@ -121,7 +110,7 @@
 #' @family model fitting
 #' @export
 mvgam_data <- function(data,
-                       y = "y",
+                       y = NULL,
                        family = gaussian(),
                        formula = NULL,
                        trend_formula = NULL,
@@ -132,20 +121,24 @@ mvgam_data <- function(data,
                        lines = TRUE,
                        n_bins = NULL,
                        log_scale = FALSE) {
-  checkmate::assert_string(y)
+  checkmate::assert_string(y, null.ok = TRUE)
   checkmate::assert_flag(plot)
   checkmate::assert_formula(trend_formula, null.ok = TRUE)
   checkmate::assert_list(data2, names = "named", null.ok = TRUE)
-  if (is.list(data) && !is.data.frame(data)) {
-    data <- as.data.frame(data)
+  as_frame <- function(x) {
+    if (is.list(x) && !is.data.frame(x)) as.data.frame(x) else x
   }
+  data <- as_frame(data)
+  newdata <- as_frame(newdata)
   checkmate::assert_data_frame(data, min.rows = 1L)
+  checkmate::assert_data_frame(newdata, min.rows = 1L, null.ok = TRUE)
   # The family and the trend are resolved as mvgam() resolves them, so
   # a model this check passes is one mvgam() accepts.
-  obs_formula <- formula %||% stats::reformulate("1", response = y)
+  obs_formula <- formula %||% stats::reformulate("1", response = y %||% "y")
   resolved <- resolve_observation_family(obs_formula, family)
   obs_formula <- resolved$formula
   family <- resolved$family
+  y <- mvgam_data_response(obs_formula, y)
 
   if (is_multi_response_family(family)) {
     stop(insight::format_error(c(
@@ -154,7 +147,7 @@ mvgam_data <- function(data,
         "'mvgam_data()'."
       ),
       i = "mvgam() and jsdgam() validate these data themselves."
-    )))
+    )), call. = FALSE)
   }
 
   # The trend constructor names the axis columns and the spacing rule.
@@ -173,22 +166,21 @@ mvgam_data <- function(data,
   }
 
   if (uses_closure_unit_layout(family)) {
-    # validate_closure_unit_data() already enforces required
-    # columns (response + series + time + visit + cap when needed),
-    # integer / non-negative / binary checks, cap >= y,
-    # cap-constant-within-unit, and the >= 2 closure-unit minimum.
+    # The closure-unit validator checks the response, the axis, visit
+    # and cap columns and the minimum of two closure units.
     validate_closure_unit_data(
-      data           = data,
-      response_var   = y,
-      series_var     = series_var,
-      time_var       = time_var,
-      binary_y_check = is_binary_response_family(family),
-      cap_required   = is.null(closure_unit_default_cap(family))
+      data, family,
+      response_var = y,
+      series_var   = series_var,
+      time_var     = time_var
     )
   } else {
     validate_required_variables(data, y)
     assert_axis_column(data, time_var, "time")
     validate_response_shapes(data, obs_formula, family)
+  }
+  if (!is.null(newdata)) {
+    assert_axis_column(newdata, time_var, "time", frame = "newdata")
   }
 
   # Each row's series, resolved the way mvgam() resolves it: from the
@@ -196,16 +188,18 @@ mvgam_data <- function(data,
   # data that name no series. Without a trend and without the column,
   # the rows plot as one series labelled by the response.
   has_series <- !is.null(trend_spec) || series_var %in% names(data)
-  row_series <- function(df) {
+  row_series <- function(df, frame) {
     if (!has_series) {
       return(rep(y, nrow(df)))
     }
-    attr(ensure_mvgam_variables(df, trend_spec, time_var, series_var),
+    attr(ensure_mvgam_variables(df, trend_spec, time_var, series_var,
+                                frame = frame),
          "mvgam_series")
   }
-  train_series <- row_series(data)
-  # `mvgam()` drops a level no row holds, and the check reports the
-  # series the model will fit.
+  train_series <- row_series(data, "data")
+  new_series <- if (!is.null(newdata)) row_series(newdata, "newdata")
+  # `mvgam()` drops a level no row holds. The check reports the series
+  # the model will fit.
   series_levels <- if (has_series) {
     levels(droplevels(as.factor(train_series)))
   }
@@ -236,7 +230,6 @@ mvgam_data <- function(data,
   ))
 
   if (isTRUE(plot)) {
-    new_series <- if (!is.null(newdata)) row_series(newdata)
     p <- series_obs_plot(
       dat           = rbind(
         series_long_df(data, y, train_series, time_var, "train"),
@@ -254,6 +247,33 @@ mvgam_data <- function(data,
   }
 
   invisible(out)
+}
+
+
+#' The one response column a data check inspects
+#'
+#' @param formula Observation formula after family resolution
+#' @param y The `y` argument of `mvgam_data()`, or `NULL`
+#' @return Character name of the response column
+#' @noRd
+mvgam_data_response <- function(formula, y) {
+  columns <- unname(response_columns(formula))
+  if (length(columns) > 1L) {
+    stop(insight::format_error(c(
+      "'mvgam_data()' checks one response at a time.",
+      x = paste0("The formula names ", length(columns), " responses: ",
+                 paste0("'", columns, "'", collapse = ", "), "."),
+      i = "Call it once per response with that response's formula."
+    )), call. = FALSE)
+  }
+  if (!is.null(y) && !identical(y, columns)) {
+    stop(insight::format_error(c(
+      paste0("'y' names '", y, "' but the formula's response is '",
+             columns, "'."),
+      i = "Drop 'y' to check the formula's response."
+    )), call. = FALSE)
+  }
+  columns
 }
 
 
@@ -286,7 +306,8 @@ mvgam_data_summary_lines <- function(x) {
     if (is.null(x$series_levels)) {
       "series: all rows as one"
     } else {
-      paste0("series: ", x$n_series, " level(s)")
+      paste0("series: ", x$n_series,
+             ngettext(x$n_series, " level", " levels"))
     },
     paste0("time:   ", x$time_range[1L], " to ", x$time_range[2L]),
     paste0("n obs:  ", x$n_obs, " (", x$n_missing, " NA)")

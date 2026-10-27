@@ -140,56 +140,25 @@ predict.mvgam <- function(object,
   )
   rlang::check_dots_empty()
 
-  # A requested count becomes indices here, at the boundary, so that
-  # nothing below is ever handed a bare count and left to choose its
-  # own draws. Every extraction the answer is assembled from then
-  # reads the same iterations.
+  # Every extraction below takes the same draw indices. A requested
+  # count becomes indices here.
   draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
-  if (!is.null(draw_ids)) {
-    ndraws <- NULL
-  }
 
-  # Closure-unit family types: dispatch via the per-family
-  # extractors in families.R. Each family registers its valid
-  # `type` strings on `attr(family, "mvgam_predict_types")`. Both
-  # nmix() and occ() expose c("latent_state", "detection"). The
-  # generic "latent_state" token routes through
-  # `dispatch_closure_unit_method(family, "latent_state")` to the
-  # family-aware kernel: `posterior_latent_N()` for nmix returning
-  # posterior `N`; `posterior_occupancy()` for occ returning
-  # posterior `psi`.
   if (type %in% c("latent_state", "detection")) {
     require_closure_unit_predict_type(object$family, type)
     pred <- if (identical(type, "latent_state")) {
-      kernel <- dispatch_closure_unit_method(
-        object$family, "latent_state"
-      )
-      # posterior_occupancy() carries an extra `draw` arg:
-      # FALSE returns the probability matrix, TRUE returns 0/1
-      # z draws. At the predict() call site we want probability.
-      kernel_formals <- names(formals(kernel))
-      kernel_args <- list(
-        object   = object,
-        newdata  = newdata,
-        draw_ids = draw_ids,
-        conditional = TRUE
-      )
-      if ("draw" %in% kernel_formals) kernel_args$draw <- FALSE
-      do.call(kernel, kernel_args)
+      posterior_latent_N(object, newdata = newdata, draw_ids = draw_ids)
     } else {
-      posterior_detection(
-        object, newdata = newdata, draw_ids = draw_ids
-      )
+      posterior_detection(object, newdata = newdata, draw_ids = draw_ids)
     }
-    if (!summary) return(pred)
-    return(summarize_predictions(pred, probs = probs, robust = robust))
+    return(summarise_or_pass(pred, summary = summary, probs = probs,
+                             robust = robust))
   }
 
-  # mgcv answers `type = "terms"` with a per-term matrix. mvgam has
-  # no single equivalent because a term's draws come from different
-  # accessors, so the type is accepted and redirected rather than
-  # rejected as an unknown choice.
-  if (type == "terms") {
+  # mgcv's `predict(type = "terms")` returns one column per term. An
+  # mvgam fit takes each kind of term's draws from its own function.
+  # The message names them.
+  if (identical(type, "terms")) {
     stop(insight::format_error(c(
       "type = 'terms' has no single equivalent in mvgam.",
       i = paste0(
@@ -198,289 +167,153 @@ predict.mvgam <- function(object,
         "components and posterior_linpred.mvgam() for the combined ",
         "linear predictor."
       )
-    )))
+    )), call. = FALSE)
   }
 
-  # Dispatch by type. posterior_predict / posterior_epred /
-  # posterior_linpred each handle multivariate (resp = NULL returns
-  # a named list of matrices) the same way, so summary downstream
-  # treats them uniformly.
+  draws_from <- function(fun, ...) {
+    fun(object, newdata = newdata, process_error = process_error,
+        incl_autocor = incl_autocor, draw_ids = draw_ids,
+        re_formula = re_formula, allow_new_levels = allow_new_levels,
+        sample_new_levels = sample_new_levels, resp = resp, ...)
+  }
   draws <- switch(
     type,
-    "response" = posterior_predict(
-      object,
-      newdata = newdata,
-      process_error = process_error,
-      incl_autocor = incl_autocor,
-      ndraws = ndraws,
-      draw_ids = draw_ids,
-      re_formula = re_formula,
-      allow_new_levels = allow_new_levels,
-      sample_new_levels = sample_new_levels,
-      resp = resp
-    ),
-    "link" = posterior_linpred(
-      object,
-      newdata = newdata,
-      transform = FALSE,
-      process_error = process_error,
-      incl_autocor = incl_autocor,
-      ndraws = ndraws,
-      draw_ids = draw_ids,
-      re_formula = re_formula,
-      allow_new_levels = allow_new_levels,
-      sample_new_levels = sample_new_levels,
-      resp = resp
-    ),
-    "expected" = posterior_epred(
-      object,
-      newdata = newdata,
-      process_error = process_error,
-      incl_autocor = incl_autocor,
-      ndraws = ndraws,
-      draw_ids = draw_ids,
-      re_formula = re_formula,
-      allow_new_levels = allow_new_levels,
-      sample_new_levels = sample_new_levels,
-      resp = resp
-    ),
-    "variance" = predict_variance(
-      object,
-      newdata = newdata,
-      process_error = process_error,
-      incl_autocor = incl_autocor,
-      ndraws = ndraws,
-      draw_ids = draw_ids,
-      re_formula = re_formula,
-      allow_new_levels = allow_new_levels,
-      sample_new_levels = sample_new_levels,
-      resp = resp
-    )
+    response = draws_from(posterior_predict),
+    link = draws_from(posterior_linpred, transform = FALSE),
+    expected = draws_from(posterior_epred),
+    variance = draws_from(predict_variance)
   )
-
-  # Return raw draws if summary not requested
-  if (!summary) {
-    return(draws)
-  }
-
-  # Compute summary statistics. Multivariate paths return a named
-  # list of matrices (one per response); summarise each element
-  # separately to match brms's output convention.
-  if (is.list(draws) && !is.matrix(draws)) {
-    return(lapply(draws, summarize_predictions,
-                  probs = probs, robust = robust))
-  }
-  summarize_predictions(draws, probs = probs, robust = robust)
+  summarise_or_pass(draws, summary = summary, probs = probs,
+                    robust = robust)
 }
 
 
-#' Posterior conditional variance Var\[Y | theta\] for predict.mvgam
+#' Conditional variance of the response at each posterior draw
 #'
-#' Internal helper that computes per-draw conditional variances using
-#' family-specific mean-variance formulas. Called only from
-#' [predict.mvgam()] when `type = "variance"`.
+#' `Var[Y | theta]` from the family's mean-variance relation. The
+#' expected values and the distributional parameters come from the
+#' same draws. Each variance then pairs a mean with the dispersion of
+#' its own iteration.
 #'
-#' Draw alignment: `posterior_epred()` and the dpar extraction must
-#' index the same posterior rows; otherwise `mu` from draw `i` is
-#' paired with `sigma` from a different draw and the conditional
-#' variance is statistically incoherent. Because `posterior_epred()`
-#' subsamples randomly when `ndraws < total_draws`, we compute `mu`
-#' over the full posterior and then subsample `mu` and the dpar
-#' matrices with the same `draw_idx`. This approach is independent
-#' of draw_ids plumbing through `posterior_epred()`.
+#' @inheritParams predict.mvgam
+#' @param draw_ids Draw indices to use, or `NULL` for all
+#' @return An `[ndraws, nobs]` matrix
 #'
 #' @noRd
 predict_variance <- function(object, newdata, process_error,
-                             incl_autocor, ndraws, draw_ids,
-                             re_formula, allow_new_levels,
-                             sample_new_levels, resp) {
-  # A model written with `brms::mvbf()` gives each response its own
-  # family and its own dispersion, so a variance is defined for one
-  # response at a time and takes that response's family.
+                             incl_autocor, draw_ids, re_formula,
+                             allow_new_levels, sample_new_levels, resp) {
+  # Each response of a multivariate model has its own family and
+  # dispersion. A variance belongs to one response.
   resolve_resp(object, resp, required = TRUE,
                caller = "predict(type = 'variance')")
   family <- model_families(object, resp)
+  family_name <- resolve_family_name(family)
+  draw_ids <- resolve_draw_indices(posterior::ndraws(object), NULL,
+                                   draw_ids)
 
-  # Closure-unit families have closed-form per-visit marginal
-  # variances:
-  #   nmix Y_{g,j} | lambda_g, p_{g,j} ~ Poisson(lambda_g *
-  #     p_{g,j}) (thinned-Poisson property), so Var[Y] = E[Y].
-  #   occ  Y_{g,j} | psi_g, p_{g,j} ~ Bernoulli(psi_g * p_{g,j}),
-  #     so Var[Y] = E[Y] * (1 - E[Y]).
-  # Both route through posterior_epred and apply the
-  # family-specific variance formula; no dpar broadcasting needed.
-  if (uses_closure_unit_layout(family)) {
-    family_name <- resolve_family_name(family)
-    # mv-response families (mvn, mvt) carry per-row residual scale
-    # in Psi (and df in nu for mvt). The marginal per-row variance
-    # under the conditional gllvm parameterisation is the residual
-    # variance plus the row's contribution from the factor model;
-    # the latter is row-constant given the design, so the residual
-    # term carries the per-row variability.
-    if (is_multi_response_family(family)) {
-      comp <- mv_response_family_pars(
-        object, newdata, linpred = NULL, family_obj = family,
-        family_name = family_name, draw_ids = draw_ids, ndraws = ndraws
-      )
-      if (is_simplex_response_family(family)) {
-        # Per-cell variance follows from the softmax probability and
-        # the family's dispersion. Dirichlet:
-        # Var[X_k] = p_k (1 - p_k) / (phi + 1). Multinomial:
-        # Var[Y_k] = N * p_k (1 - p_k). Categorical: Bernoulli per
-        # cell, Var = p_k (1 - p_k).
-        prob <- comp$prob_row
-        base_var <- prob * (1 - prob)
-        if (identical(family_name, "diri")) {
-          # comp$phi is already `[ndraws x N_obs]` with per-unit-shared
-          # values (Stan's `phi[idx[1]]` collapse), so no broadcast.
-          return(base_var / (comp$phi + 1))
-        }
-        if (identical(family_name, "multi")) {
-          total_mat <- matrix(
-            multinomial_unit_totals(object, newdata, comp$arrays),
-            nrow = comp$ndraws, ncol = comp$N_obs, byrow = TRUE
-          )
-          return(base_var * total_mat)
-        }
-        # categ
-        return(base_var)
-      }
-      base_var <- comp$Psi_row^2
-      if (identical(family_name, "mvt")) {
-        nu_mat <- matrix(comp$nu, nrow = comp$ndraws,
-                          ncol = comp$N_obs)
-        return(base_var * nu_mat / (nu_mat - 2))
-      }
-      return(base_var)
-    }
-    # Only the detection families reach here, and their per-visit
-    # variance follows from the response support rather than from the
-    # family's name: a detection is Bernoulli, so Var = E(1 - E),
-    # while a thinned Poisson count has Var = E. The registry records
-    # which support a family has, so naming the families instead left
-    # `nmix("royle_nichols")` and `nmix("poisson_poisson")` with no
-    # branch and a refusal that asked the user to edit mvgam's source.
-    epred <- posterior_epred(
-      object,
-      newdata           = newdata,
-      process_error     = process_error,
-      incl_autocor      = incl_autocor,
-      ndraws            = ndraws,
-      draw_ids          = draw_ids,
-      re_formula        = re_formula,
-      allow_new_levels  = allow_new_levels,
-      sample_new_levels = sample_new_levels,
-      resp              = resp
+  # The multi-response families take their per-cell moments from the
+  # unit arrays.
+  if (is_multi_response_family(family)) {
+    comp <- mv_response_family_pars(
+      object, newdata, linpred = NULL, family_obj = family,
+      family_name = family_name, draw_ids = draw_ids
     )
-    if (is_binary_response_family(family)) {
-      return(epred * (1 - epred))
+    if (!is_simplex_response_family(family)) {
+      return(comp$variance_row)
     }
-    return(epred)
+    # A softmax probability p_k gives a categorical cell the variance
+    # p_k (1 - p_k). A multinomial cell scales it by the unit total N.
+    # A Dirichlet cell divides it by phi + 1. `comp$phi` already holds
+    # one column per row.
+    prob <- comp$prob_row
+    base_var <- prob * (1 - prob)
+    if (identical(family_name, "diri")) {
+      return(base_var / (comp$phi + 1))
+    }
+    if (identical(family_name, "multi")) {
+      total_mat <- matrix(
+        multinomial_unit_totals(object, newdata, comp$arrays),
+        nrow = comp$ndraws, ncol = comp$N_obs, byrow = TRUE
+      )
+      return(base_var * total_mat)
+    }
+    return(base_var)
   }
-  # Compute mu over the full posterior so row i of mu_full corresponds
-  # to draws_mat row i. Without this, posterior_epred(ndraws=K) would
-  # randomly subsample, and dpars (which we extract sequentially)
-  # would not align with mu.
-  mu_full <- posterior_epred(
+
+  mu <- posterior_epred(
     object,
     newdata = newdata,
     process_error = process_error,
     incl_autocor = incl_autocor,
+    draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,
     resp = resp
   )
 
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  total_draws <- nrow(draws_mat)
-
-  if (nrow(mu_full) != total_draws) {
-    stop_shape_fault("The expected-value draws", nrow(mu_full),
-                     total_draws)
+  # A detection is Bernoulli with variance E(1 - E). A thinned Poisson
+  # count has variance E.
+  if (uses_closure_unit_layout(family)) {
+    if (is_binary_response_family(family)) {
+      return(mu * (1 - mu))
+    }
+    return(mu)
   }
 
-  # Pick the draw subsample once, use it for both mu and dpars so they
-  # align.
-  draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
-
-  # An ordinal family predicts a probability per category rather than a
-  # mean, so its epred carries a third margin and none of the dispersion
-  # parameters below apply. posterior_predict() draws the ordered levels
-  # as the integers 1..K, so the variance of that draw is what the
-  # category probabilities imply.
+  # An ordinal family predicts a probability per category, which gives
+  # its expectation a third margin. posterior_predict() draws the
+  # ordered levels as the integers 1..K. The variance of that draw is
+  # the one the category probabilities imply.
   if (is_ordinal_family(family)) {
-    return(ordinal_category_variance(
-      mu_full[draw_idx, , , drop = FALSE]
-    ))
+    return(ordinal_category_variance(mu))
   }
 
-  mu <- mu_full[draw_idx, , drop = FALSE]
-  ndraws_mu <- nrow(mu)
-  nobs_mu <- ncol(mu)
-
-  # A distributional parameter can be written with a formula of its
-  # own, as `bf(y ~ x, sigma ~ z)`. Read off the stanfit by name it is
-  # not there at all, because it is computed per observation rather
-  # than sampled, and the variance then refused a gaussian fit for
-  # want of a `sigma` the model certainly has. This resolver answers
-  # for both spellings.
+  # Each parameter arrives as `[ndraws, nobs]`, from its own formula or
+  # from a scalar draw.
   fpars <- resolve_family_pars(
     object,
-    dpar_names = get_family_dpars(resolve_family_name(family)),
-    ndraws = ndraws_mu,
-    nobs = nobs_mu,
-    draw_ids = draw_idx,
+    dpar_names = get_family_dpars(family_name),
+    ndraws = nrow(mu),
+    nobs = ncol(mu),
+    draw_ids = draw_ids,
     newdata = newdata,
     resp = resp,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels
   )
-
-  # broadcast: dpar matrices arrive as [ndraws x n_series] for
-  # multivariate (already errored above) or [ndraws x 1] / [ndraws x
-  # nobs] for univariate. Expand to [ndraws x nobs] for the variance
-  # helper's dim check.
-  broadcast <- function(x, n_rows, n_cols) {
-    if (is.null(x)) return(NULL)
-    checkmate::assert_matrix(x)
-    if (nrow(x) != n_rows) {
-      stop_shape_fault("A distributional parameter", nrow(x), n_rows)
-    }
-    if (ncol(x) == n_cols) return(x)
-    if (ncol(x) == 1L) {
-      return(matrix(x[, 1L], nrow = n_rows, ncol = n_cols,
-                    byrow = FALSE))
-    }
-    stop_mvgam_fault(
-      "A distributional parameter must have 1 column or one per row.",
-      paste0("Got ", ncol(x), " columns for ", n_cols, " rows.")
-    )
-  }
-
-  sigma_mat <- broadcast(fpars$sigma, ndraws_mu, nobs_mu)
-  shape_mat <- broadcast(fpars$shape, ndraws_mu, nobs_mu)
-  phi_mat   <- broadcast(fpars$phi,   ndraws_mu, nobs_mu)
-  nu_mat    <- broadcast(fpars$nu,    ndraws_mu, nobs_mu)
-
-  family_name <- resolve_family_name(family)
-
-  # Binomial / beta_binomial need trial counts (per-observation).
-  trials_vec <- NULL
-  if (family_name %in% c("binomial", "beta_binomial")) {
-    trials_vec <- extract_trials_for_family(object, family, newdata)
-  }
-
   compute_family_variance(
     mu = mu,
     family = family,
-    sigma = sigma_mat,
-    shape = shape_mat,
-    phi = phi_mat,
-    nu = nu_mat,
-    trials = trials_vec
+    sigma = fpars$sigma,
+    shape = fpars$shape,
+    phi = fpars$phi,
+    nu = fpars$nu,
+    trials = extract_trials_for_family(object, family, newdata, resp)
   )
+}
+
+
+#' Prediction draws, summarised when asked
+#'
+#' @param draws Draws from a prediction function: one matrix or array,
+#'   or a list of them named by response
+#' @param summary Logical. `TRUE` summarises each element with
+#'   `summarise_predictions()`. `FALSE` returns `draws` unchanged.
+#' @inheritParams summarise_predictions
+#' @return `draws`, or its summaries in the same structure
+#' @noRd
+summarise_or_pass <- function(draws, summary, probs, robust) {
+  if (!summary) {
+    return(draws)
+  }
+  if (is_per_response(draws)) {
+    return(lapply(draws, summarise_predictions, probs = probs,
+                  robust = robust))
+  }
+  summarise_predictions(draws, probs = probs, robust = robust)
 }
 
 
@@ -494,14 +327,14 @@ predict_variance <- function(object, newdata, process_error,
 #'   an `[nobs, nstat, ncat]` array holding that matrix per category.
 #'
 #' @noRd
-summarize_predictions <- function(draws, probs, robust) {
+summarise_predictions <- function(draws, probs, robust) {
   checkmate::assert_numeric(probs, lower = 0, upper = 1, min.len = 1)
   checkmate::assert_logical(robust, len = 1)
 
   # The ordinal and categorical families predict a probability per
-  # category, so their draws carry a third margin. Each category is
+  # category. Their draws carry a third margin. Each category is
   # summarised on its own and the results are stacked back along that
-  # margin, which is the shape brms returns for the same families.
+  # margin.
   if (length(dim(draws)) == 3L) {
     checkmate::assert_array(draws, mode = "numeric", d = 3L)
     cats <- seq_len(dim(draws)[3L])
@@ -510,7 +343,7 @@ summarize_predictions <- function(draws, probs, robust) {
         draws[, , k], nrow = dim(draws)[1L], ncol = dim(draws)[2L],
         dimnames = dimnames(draws)[1:2]
       )
-      summarize_predictions(slice, probs = probs, robust = robust)
+      summarise_predictions(slice, probs = probs, robust = robust)
     })
     out <- array(
       unlist(per_cat, use.names = FALSE),

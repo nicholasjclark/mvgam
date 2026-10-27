@@ -2,7 +2,7 @@
 # mvgam core: model fitting and multiple imputation
 # ==============================================================================
 # `mvgam()` fits one data frame, or a list of imputed frames through
-# `mvgam_multiple()`. It returns an `mvgam` object for the post-fit
+# `fit_imputations()`. It returns an `mvgam` object for the post-fit
 # methods.
 
 #' Arguments of mvgam 1.x that 2.0 refuses
@@ -268,7 +268,9 @@ mvgam_imputation_forwarded <- c(
 #'   supported in a term of this formula. An exact `gp()` term here
 #'   also predicts in-sample alone. Forecasting a model that holds one
 #'   requires the approximate form.
-#' @param data Data frame or list of multiply imputed datasets
+#' @param data Data frame, or a list of multiply imputed data frames
+#'   or a `mids` object from \pkg{mice}. [mvgam_multiple()] describes
+#'   the imputation path.
 #' @param newdata Optional held-out `data.frame`, stored on the fit
 #'   as `object$test_data`. `forecast()` forecasts to it when called
 #'   without `newdata`. `plot(fit, type = "series")` overlays it.
@@ -392,7 +394,8 @@ mvgam_imputation_forwarded <- c(
 #'   }
 #' @param backend `"cmdstanr"` or `"rstan"`. Defaults to
 #'   `getOption("brms.backend", "cmdstanr")`.
-#' @param combine Logical, pool multiple imputation results (default TRUE)
+#' @param combine Logical. With imputed `data`, `TRUE` (default) pools
+#'   the imputation fits into one and `FALSE` returns them as a list.
 #' @param family A description of the response distribution and link
 #'   function, given as a family function, a call to one or its name.
 #'   Supports most brms families, including the ordinal families
@@ -641,12 +644,22 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 
   local_mvgam_silent(list(...)$silent %||% 1L)
 
+  if (inherits(data, "mids")) {
+    data <- lapply(seq_len(data$m), function(i) mice::complete(data, i))
+  }
   checkmate::assert(
     checkmate::check_data_frame(data),
     checkmate::check_list(data, types = "data.frame"),
     .var.name = "data"
   )
-  newdata <- check_newdata(newdata, data, trend_formula)
+  imputed <- !is.data.frame(data)
+  if (imputed) {
+    validate_multiple_imputation_datasets(data, trend_formula)
+  }
+  # The imputations share every column a prediction frame is checked
+  # against. The check uses the first.
+  newdata <- check_newdata(newdata, if (imputed) data[[1L]] else data,
+                           trend_formula)
 
   # `build_stan_components()` refuses an absent or missing covariate
   # in `data`. `newdata` does not reach it and is checked here. Its
@@ -686,26 +699,33 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   user_call <- match.call()
   data_name <- call_data_name(user_call)
 
-  # Handle multiple imputation input
-  if (is.list(data) && !is.data.frame(data)) {
+  # A positive mean under a link that admits zero needs the linear
+  # predictor to stay positive. A latent trend does not guarantee it.
+  # One notice covers every imputation.
+  warn_positive_mean_link_with_trend(formula, family, trend_formula)
+
+  if (imputed) {
     # The formals reach each imputation's fit only by name. Without
     # them every imputation would take the default family.
     forwarded <- mget(mvgam_imputation_forwarded, envir = environment())
-    return(do.call(
-      mvgam_multiple,
+    out <- do.call(
+      fit_imputations,
       c(
         list(data_list = data, combine = combine, data_name = data_name),
         forwarded,
         list(...)
       )
-    ))
+    )
+    if (inherits(out, "mvgam")) {
+      out$call <- user_call
+    } else {
+      out <- lapply(out, function(fit) {
+        fit$call <- user_call
+        fit
+      })
+    }
+    return(out)
   }
-
-  # A positive mean under a link that admits zero needs the linear
-  # predictor to stay positive. A latent trend does not guarantee it.
-  # The imputation branch returns earlier. `mvgam_multiple()` raises
-  # the same notice once for a whole list.
-  warn_positive_mean_link_with_trend(formula, family, trend_formula)
 
   mvgam_single_args <- list(
     formula = formula,
@@ -819,17 +839,9 @@ check_newdata <- function(newdata, data, trend_formula = NULL) {
     )
     return(invisible(newdata))
   }
-  checkmate::assert_formula(trend_formula, null.ok = TRUE)
-  spec <- if (!is.null(trend_formula)) {
-    parse_trend_formula(trend_formula)$trend_model
-  }
-  axis <- spec_axis_vars(spec)
+  axis <- trend_formula_axis_columns(trend_formula)
   series_var <- axis$series_var
-  gr <- spec_groupings(spec)
-  # `gr` alone takes the series column as its subgroup.
-  subgr <- gr$subgr %||% series_var
-  series_cols <- if (is.null(gr$gr)) series_var else c(gr$gr, subgr)
-  required <- intersect(c(axis$time_var, series_cols), names(data))
+  required <- intersect(c(axis$time_var, axis$series_cols), names(data))
   if (length(required)) {
     validate_required_variables(newdata, required, "newdata")
   }
@@ -1406,75 +1418,38 @@ create_mvgam_stub_from_stan_components <- function(
 #' Fit mvgam models to multiply imputed datasets
 #'
 #' @description
-#' Fits Bayesian state-space models to multiply imputed datasets,
-#' combining posteriors across imputations to carry the imputation
-#' uncertainty into the estimates.
+#' Fits one model to each of several imputed datasets and pools the
+#' draws, as `brms::brm_multiple()` does. The pooled posterior holds
+#' the uncertainty the imputations add. `mvgam(data = )` takes the
+#' same list and fits the same models.
 #'
 #' @details
-#' This function processes multiple imputed datasets in two modes:
+#' The imputations must hold the same columns, of the same classes, in
+#' the same order, with the same number of rows. The columns that place
+#' each row on the time and series axes must match exactly. Impute only
+#' the response and the covariates.
 #'
-#' **Combined Mode (combine=TRUE)**:
-#' Fits separate models to each imputed dataset, then combines
-#' posteriors using `rstan::sflist2stanfit()` to create a pooled
-#' posterior distribution. Returns an object of class
-#' `c("mvgam_pooled", "mvgam", "brmsfit")` with MI-specific
-#' attributes and methods.
+#' `rstan::sflist2stanfit()` concatenates the chains of every
+#' imputation fit. The pooled draws then hold both the within- and the
+#' between-imputation variance. Because chains from different
+#' imputations sample different posteriors, the R-hat of the pooled
+#' chains measures disagreement between imputations. `summary()`
+#' reports each parameter's largest R-hat and summed ESS over the
+#' imputation fits. It also tabulates the convergence of each fit.
 #'
-#' **List Mode (combine=FALSE)**:
-#' Returns a list of individual mvgam fits, one per imputation,
-#' allowing manual posterior combination or separate analysis.
+#' @inheritParams mvgam
+#' @param data_list A list of at least two imputed data frames, or a
+#'   `mids` object from \pkg{mice}.
+#' @param ... Further arguments to [mvgam()], such as `family`,
+#'   `backend`, `newdata`, `chains` or `iter`. Every imputation fit
+#'   stores `newdata`.
 #'
-#' **Posterior Combination Approach**:
-#' Uses `rstan::sflist2stanfit()`, as `brms::brm_multiple()` does, to
-#' concatenate draws from all imputations at the Stan level. The pooled
-#' draws then hold both the between-imputation and within-imputation
-#' variance.
-#'
-#' **MI Diagnostics**:
-#' Pooled objects include convergence diagnostics per imputation
-#' (Rhat, ESS) accessible via `summary()`. The print method
-#' displays MI diagnostics: total draws, draws per imputation and
-#' convergence summaries.
-#'
-#' @param formula Model formula (observation model). Supports brms
-#'   formula syntax including smooths and random effects.
-#' @param trend_formula Optional trend formula specifying
-#'   state-space dynamics. One trend formula applies to every response
-#'   of a multivariate model.
-#' @param data_list List of imputed data frames. Each element must
-#'   have identical structure (same variables, same ordering).
-#'   Alternatively, a `mids` object from the mice package.
-#' @param backend Character string specifying Stan backend:
-#'   "cmdstanr" or "rstan". Defaults to
-#'   `getOption("brms.backend", "cmdstanr")`.
-#' @param combine Logical; if `TRUE` (default), combines posteriors
-#'   into a pooled mvgam_pooled object. If `FALSE`, returns list of
-#'   individual fits.
-#' @param check_data Logical; if `TRUE` (default), validates
-#'   consistency across imputations (same column names, types,
-#'   rows).
-#' @param newdata Optional held-out `data.frame` persisted on
-#'   every imputation fit. Later plot and forecast methods can reach
-#'   it through any one of them. Defaults to `NULL`.
-#' @param ... Additional arguments passed to `mvgam()` for each
-#'   imputation (e.g., chains, iter, family, priors).
-#'
-#' @return
-#' If `combine=TRUE`: An object of class
-#' `c("mvgam_pooled", "mvgam", "brmsfit")` containing:
-#' \itemize{
-#'   \item{Pooled posterior draws from all imputations}
-#'   \item{Attribute `individual_fits`: List of per-imputation
-#'     mvgam objects}
-#'   \item{Attribute `n_imputations`: Number of imputations}
-#'   \item{Attribute `combination_method`: "sflist2stanfit"}
-#' }
-#'
-#' If `combine=FALSE`: A list of mvgam objects, one per imputation.
-#'
-#' If `run_model=FALSE`: a single unfitted stub built from the first
-#' dataset, whatever `combine` is set to. Pooling needs draws, which a
-#' stub does not have.
+#' @return With `combine = TRUE`, a pooled fit of class `mvgam_pooled`,
+#'   which inherits the class of the imputation fits. Its attribute
+#'   `individual_fits` holds those fits. With `combine = FALSE`, the
+#'   list of imputation fits. With `run_model = FALSE`, one unfitted
+#'   model built from the first dataset. Pooling needs draws, which an
+#'   unfitted model lacks.
 #'
 #' @examples
 #' \dontrun{
@@ -1503,203 +1478,145 @@ create_mvgam_stub_from_stan_components <- function(
 #'   silent = 2
 #' )
 #'
-#' # The pooled summary reports how much of each parameter's variance
-#' # comes from the imputations
+#' # The summary adds the convergence of each imputation fit
 #' summary(fit_pooled)
 #'
-#' # `combine = FALSE` returns the three fits as a list
+#' # Next, `combine = FALSE` returns the three fits as a list
 #' }
 #'
-#' @seealso \code{\link{summary.mvgam_pooled}},
-#'   \code{\link{print.mvgam_pooled_summary}}, \code{\link{mvgam}}
+#' @seealso [mvgam()], [summary.mvgam_pooled()]
 #'
 #' @family model fitting
 #' @export
-mvgam_multiple <- function(formula,
-                           trend_formula = NULL,
-                           data_list,
-                           backend = getOption("brms.backend", "cmdstanr"),
-                           combine = TRUE,
-                           check_data = TRUE,
-                           newdata = NULL,
-                           ...) {
-  checkmate::assert_list(data_list, min.len = 2)
-  checkmate::assert_string(backend)
-  checkmate::assert_flag(combine)
-  checkmate::assert_flag(check_data)
-  checkmate::assert_data_frame(newdata, null.ok = TRUE)
-
-  # This exported function reaches a fit without passing through
-  # `mvgam()`. It raises the notice itself. `family` arrives through
-  # `...`. Raising it once covers the whole list. The per-imputation
-  # fit would repeat it per dataset.
-  warn_positive_mean_link_with_trend(formula, list(...)$family,
-                                     trend_formula)
-
-  # Handle mids objects from mice package
-  if (inherits(data_list, "mids")) {
-    n_imp <- data_list$m
-    data_list <- lapply(seq_len(n_imp), function(i) {
-      mice::complete(data_list, i)
-    })
-  }
-
-  checkmate::assert_list(data_list, types = "data.frame", min.len = 2)
-
-  # Validate multiple imputation datasets
-  if (check_data) {
-    validate_multiple_imputation_datasets(data_list)
-  }
-
-  # A request for the program without a posterior is met from the
-  # first dataset, before any imputation is fitted. Pooling needs
-  # draws. A stub has none. `brms::brm_multiple()` returns one
-  # unfitted model the same way under its `chains = 0` spelling.
-  if (isFALSE(list(...)$run_model)) {
-    return(mvgam_single(
-      formula = formula,
-      trend_formula = trend_formula,
-      data = data_list[[1L]],
-      backend = backend,
-      newdata = newdata,
-      ...
-    ))
-  }
-
-  # Fit individual models to each imputed dataset. The same
-  # `newdata` is persisted on every imputation fit so downstream
-  # plot / forecast surfaces can reach it through any one of
-  # them.
-  individual_fits <- fit_multiple_imputation_models(
-    formula = formula,
-    trend_formula = trend_formula,
-    data_list = data_list,
-    backend = backend,
-    newdata = newdata,
-    ...
+mvgam_multiple <- function(formula, trend_formula = NULL, data_list,
+                           combine = TRUE, ...) {
+  checkmate::assert(
+    checkmate::check_list(data_list, types = "data.frame", min.len = 2L),
+    checkmate::check_class(data_list, "mids"),
+    .var.name = "data_list"
   )
-
-  # Return combined or individual results
-  if (combine) {
-    pooled_fit <- pool_mvgam_fits(individual_fits)
-    return(pooled_fit)
-  } else {
-    return(individual_fits)
-  }
+  # `mvgam()` validates the call and fits the imputations. It receives
+  # the caller's own expressions and names the data as the caller wrote
+  # it. An expression other than a name is passed as its value, which
+  # evaluates it once.
+  call <- match.call()
+  data_expr <- substitute(data_list)
+  call$data_list <- NULL
+  call$data <- if (is.name(data_expr)) data_expr else data_list
+  call[[1L]] <- quote(mvgam::mvgam)
+  eval(call, parent.frame())
 }
 
-# ------------------------------------------------------------------------------
-# Dataset validation
-# ------------------------------------------------------------------------------
-# Checks that the imputed datasets share one structure.
-
-#' Validate multiply imputed datasets
-#' @param data_list List of imputed datasets
-#' @return Invisible TRUE if valid, stops with error if invalid
+#' Refuse imputations that differ in more than their imputed values
+#'
+#' The imputations must share their columns, the classes of those
+#' columns and their rows. The columns that place each row on the time
+#' and series axes must match exactly. Pooled trend draws would
+#' otherwise mix different occasions or series under one label.
+#'
+#' @param data_list List of imputed data frames
+#' @param trend_formula The trend formula, which names the axis columns,
+#'   or `NULL`
+#' @return `TRUE`, invisibly
 #' @noRd
-validate_multiple_imputation_datasets <- function(data_list) {
-  checkmate::assert_list(data_list, types = "data.frame", min.len = 2)
-
-  # Get reference structure from first dataset
-  ref_data <- data_list[[1]]
-  ref_names <- names(ref_data)
-  ref_nrow <- nrow(ref_data)
-
-  # Validate consistency across datasets
-  for (i in seq_along(data_list)[-1]) {
-    current_data <- data_list[[i]]
-
-    # Check column names match
-    if (!identical(names(current_data), ref_names)) {
-      stop(insight::format_error(c(
-        paste("Dataset", i, "has different column names than dataset 1."),
-        x = "All imputed datasets must have identical structure."
-      )), call. = FALSE)
+validate_multiple_imputation_datasets <- function(data_list,
+                                                  trend_formula = NULL) {
+  checkmate::assert_list(data_list, types = "data.frame", min.len = 2L)
+  ref <- data_list[[1L]]
+  axis <- trend_formula_axis_columns(trend_formula)
+  axis_cols <- intersect(c(axis$time_var, axis$series_cols), names(ref))
+  quoted <- function(x) paste0("'", x, "'", collapse = ", ")
+  refuse <- function(i, problem, detail) {
+    stop(insight::format_error(c(
+      paste0("Imputed dataset ", i, " ", problem, "."),
+      x = detail,
+      i = "Impute only the response and covariates."
+    )), call. = FALSE)
+  }
+  for (i in seq_along(data_list)[-1L]) {
+    current <- data_list[[i]]
+    if (!identical(names(current), names(ref))) {
+      alone <- union(setdiff(names(current), names(ref)),
+                     setdiff(names(ref), names(current)))
+      refuse(i, "holds different columns from dataset 1",
+             if (length(alone)) {
+               paste0("Columns in one of the two alone: ", quoted(alone),
+                      ".")
+             } else {
+               "The same columns appear in a different order."
+             })
     }
-
-    # Check number of rows match
-    if (nrow(current_data) != ref_nrow) {
-      stop(insight::format_error(c(
-        paste("Dataset", i, "has", nrow(current_data), "rows, expected",
-             ref_nrow),
-        x = "All imputed datasets must have same number of observations."
-      )), call. = FALSE)
+    if (nrow(current) != nrow(ref)) {
+      refuse(i, paste0("has ", nrow(current), " rows"),
+             paste0("Dataset 1 has ", nrow(ref), "."))
+    }
+    changed <- names(ref)[!mapply(function(a, b) identical(class(a),
+                                                           class(b)),
+                                  current, ref)]
+    if (length(changed)) {
+      refuse(i, "changes the class of a column",
+             paste0("Changed: ", quoted(changed), "."))
+    }
+    moved <- axis_cols[!vapply(axis_cols, function(col) {
+      identical(current[[col]], ref[[col]])
+    }, logical(1L))]
+    if (length(moved)) {
+      refuse(i, "changes a column that places rows on the time or series axis",
+             paste0("Changed: ", quoted(moved), "."))
     }
   }
-  # `pool_mvgam_fits()` checks that the imputations share a time and
-  # series axis. The model resolves the columns naming the axis. They
-  # need not be called `time` or `series`.
-
   invisible(TRUE)
 }
 
-# ------------------------------------------------------------------------------
-# Fitting each imputed dataset
-# ------------------------------------------------------------------------------
-# Fits the same model specification to each imputed dataset.
-
-#' Fit models to multiply imputed datasets
-#' @param formula Main formula
-#' @param trend_formula Trend formula
-#' @param data_list List of datasets
-#' @param backend Stan backend
-#' @param ... Additional arguments
-#' @return List of fitted mvgam objects
+#' Fit the model to each imputed dataset
+#'
+#' `mvgam()` calls this with every formal a fit needs. An unfitted
+#' request is met from the first dataset. Pooling needs draws, which an
+#' unfitted model lacks. `brms::brm_multiple()` returns one unfitted
+#' model the same way under its `chains = 0` spelling.
+#'
+#' @param data_list List of validated imputed data frames
+#' @param combine Logical. `TRUE` pools the fits.
+#' @param run_model Logical. `FALSE` returns one unfitted model.
+#' @param ... Every other argument of `mvgam_single()`
+#' @return A pooled fit, a list of fits or one unfitted model
 #' @noRd
-fit_multiple_imputation_models <- function(formula, trend_formula, data_list,
-                                          backend, ...) {
-  checkmate::assert_list(data_list, types = "data.frame", min.len = 1L)
-  checkmate::assert_string(backend)
-  n_datasets <- length(data_list)
-
-  # Fit individual models
-  fits <- vector("list", n_datasets)
-  names(fits) <- paste0("imputation_", seq_len(n_datasets))
-
-  # `brms::brm_multiple()` reports each imputed fit as it starts,
-  # under the same `silent` setting.
-  silent <- list(...)$silent %||% 1L
-  for (i in seq_len(n_datasets)) {
-    if (silent < 2) {
-      rlang::inform(
-        paste0("Fitting imputed model ", i, " out of ", n_datasets)
-      )
-    }
-
-    # Fit model using standard mvgam_single function
-    fits[[i]] <- mvgam_single(
-      formula = formula,
-      trend_formula = trend_formula,
-      data = data_list[[i]],
-      backend = backend,
-      ...
-    )
-
-    # Add imputation metadata
-    fits[[i]]$imputation_id <- i
-    fits[[i]]$n_imputations <- n_datasets
+fit_imputations <- function(data_list, combine, run_model, ...) {
+  checkmate::assert_list(data_list, types = "data.frame", min.len = 2L)
+  checkmate::assert_flag(combine)
+  checkmate::assert_flag(run_model)
+  if (!run_model) {
+    return(mvgam_single(data = data_list[[1L]], run_model = FALSE, ...))
   }
-
-  return(fits)
+  n_imp <- length(data_list)
+  # `brms::brm_multiple()` reports each imputed fit as it starts, under
+  # the same `silent` setting.
+  silent <- list(...)$silent %||% 1L
+  fits <- lapply(seq_len(n_imp), function(i) {
+    if (silent < 2) {
+      rlang::inform(paste0("Fitting imputed model ", i, " out of ", n_imp))
+    }
+    mvgam_single(data = data_list[[i]], ...)
+  })
+  names(fits) <- paste0("imputation_", seq_len(n_imp))
+  if (combine) pool_mvgam_fits(fits) else fits
 }
 
-
-# ------------------------------------------------------------------------------
-# Posterior combination
-# ------------------------------------------------------------------------------
-# Combines the draws of the imputed fits at the Stan level with
-# `rstan::sflist2stanfit()`, as brms does.
-
-#' Pool mvgam fits by Stan-level combination
-#' @param fits List of individual mvgam fits
-#' @return mvgam_pooled object with combined posteriors
+#' Pool imputation fits by concatenating their chains
+#'
+#' Combines the chains with `rstan::sflist2stanfit()`, as brms does.
+#'
+#' @param fits List of imputation fits
+#' @return A fit of class `mvgam_pooled` holding the pooled draws, with
+#'   the fits in its attribute `individual_fits`
 #' @noRd
 pool_mvgam_fits <- function(fits) {
   checkmate::assert_list(fits, types = "mvgam", min.len = 2)
 
   # Pooled draws of `trend[t, s]` describe one cell only when every
-  # imputation put the same series and the same occasion there. An
-  # imputation that moved a time or a series value is refused.
+  # imputation put the same series and the same occasion there. A model
+  # whose axes come from its responses has no axis column to check
+  # before the fit.
   ref_axes <- mvgam_axes(fits[[1L]])
   for (i in seq_along(fits)[-1L]) {
     if (!identical(ref_axes, mvgam_axes(fits[[i]]))) {
@@ -1713,9 +1630,8 @@ pool_mvgam_fits <- function(fits) {
     }
   }
 
-  # Validate parameter consistency across fits
-  ref_vars <- sort(variables(fits[[1]]))
-  for (i in seq_along(fits)[-1]) {
+  ref_vars <- sort(variables(fits[[1L]]))
+  for (i in seq_along(fits)[-1L]) {
     current_vars <- sort(variables(fits[[i]]))
     if (!identical(ref_vars, current_vars)) {
       stop(insight::format_error(c(
@@ -1729,26 +1645,9 @@ pool_mvgam_fits <- function(fits) {
     }
   }
 
-  n_imp <- length(fits)
-
-  # Extract stanfit objects
-  sflist <- lapply(fits, function(fit) fit$fit)
-
-  # Combine using rstan::sflist2stanfit()
-  combined_stanfit <- rstan::sflist2stanfit(sflist)
-
-  # Create combined object using first fit as template
-  combined_fit <- fits[[1]]
-  combined_fit$fit <- combined_stanfit
-
-  # Store individual fits and metadata
-  attr(combined_fit, "individual_fits") <- fits
-  attr(combined_fit, "n_imputations") <- n_imp
-  attr(combined_fit, "combination_method") <- "sflist2stanfit"
-  attr(combined_fit, "combination_time") <- Sys.time()
-
-  # Set class
-  class(combined_fit) <- c("mvgam_pooled", "mvgam", "brmsfit")
-  combined_fit
+  pooled <- fits[[1L]]
+  pooled$fit <- rstan::sflist2stanfit(lapply(fits, function(fit) fit$fit))
+  attr(pooled, "individual_fits") <- fits
+  class(pooled) <- c("mvgam_pooled", class(fits[[1L]]))
+  pooled
 }
-

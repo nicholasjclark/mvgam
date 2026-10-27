@@ -2,78 +2,86 @@
 % Please edit documentation in R/families.R
 \name{categ}
 \alias{categ}
-\title{Closure-unit Categorical single-trial family}
+\title{Categorical family for one category observed per unit}
 \usage{
 categ()
 }
 \value{
-A \code{brms::custom_family} object tagged with the
-\code{mvgam_closure_unit}, \code{mvgam_multi_response} and
-\code{mvgam_simplex_response} attributes.
+A family object to pass to \code{\link[=jsdgam]{jsdgam()}} or \code{\link[=mvgam]{mvgam()}}.
 }
 \description{
-Composes Stan's native \code{categorical_logit_lpmf} with the mvgam
-factor-model trend. Each closure unit (site) carries K rows
-(one per category) whose binary responses encode the observed
-category in one-hot form: exactly one row per site has \code{y = 1}
-(the observed category) and the remaining K - 1 rows have
-\code{y = 0}. The custom lpmf finds the observed category code from
-the one-hot K-vector and calls Stan's
-\code{categorical_logit_lpmf(cat_code | mu_unit)} once per unit.
+For a single category recorded on each unit, such as the dominant
+species at a site. The data hold one row per category at each unit,
+with response 1 on the observed category and 0 on the others. The
+observed category is categorical with probabilities \code{softmax(mu)},
+where \code{mu} holds the categories' linear predictors.
 }
 \details{
-Categorical is one-trial multinomial: per-site information
-content is at most \code{log2(K)} bits. Recovery of \verb{Z Z'} from
-single-trial categorical data is intrinsically weaker than
-multinomial or dirichlet at comparable site counts. Stats
-review recommends fixtures with at least 100 sites for K = 4
-categories.
+\code{\link[=jsdgam]{jsdgam()}} fits the family, taking the unit and category columns
+and the number of latent factors \code{n_lv}. The constraints that
+identify the model are those of \code{\link[=diri]{diri()}}. A unit holds one trial.
+It informs the factor loadings less than a \code{\link[=multi]{multi()}} unit of many
+counts does. Recovering the residual correlations needs more
+units.
+}
+\section{Identification}{
 
-Distributional parameters:
-\describe{
-\item{\code{mu}}{per-row latent score on the unconstrained scale.
-Softmax inside the lpmf maps the K scores per unit to a
-simplex of cell probabilities. Default link is identity.}
+The softmax is unchanged when the same constant is added to every
+component. The data then identify neither a shift of the linear
+predictors that every component shares nor a shift of the loadings
+that every component shares. mvgam removes both:
+\itemize{
+\item The first component is the reference. Its linear predictor
+is subtracted from every component's before the softmax, as in
+brms's \code{dirichlet()} family. A term that acts on every
+component alike, such as \code{Intercept} or \code{env} in
+\code{y ~ env * series}, then cancels. Its posterior is its prior,
+\code{student_t(3, 0, 2.5)} by default. The \code{series} terms are
+contrasts with the first component. \code{jsdgam()} warns when the
+formula has no term that varies by component.
+\item Each column of the loadings \code{Z} sums to zero, through
+Stan's \code{sum_to_zero_vector} type.
+}
+A \code{loadings_prior} combines with that constraint.
 }
 
-Identification: identical to \code{\link[=diri]{diri()}} and \code{\link[=multi]{multi()}}. Each \code{Z}
-column is declared as \code{sum_to_zero_vector[K]} (Stan >= 2.36) and
-the lpdf subtracts \code{mu_unit[1]} from all entries before softmax.
-Both constraints are hard.
-
-Data layout: long format, one row per (site, category), exactly
-K rows per site. The response \code{y} is binary: \code{y = 1} on the row
-corresponding to the observed category for that site and
-\code{y = 0} on the K - 1 other rows.
-}
 \section{Post-fit conventions}{
 
-\code{log_lik()}, \code{loo()} and \code{waic()} score at the \strong{site grain},
-not the (site, species) row grain. The Stan lpdf evaluates the
-joint K-vector Dirichlet density once per closure unit. The per-unit
-log-density is attributed to the first row of the unit. The remaining
-K - 1 rows return \code{NA} for \code{log_lik()}. A row with no density of its
-own is spelled \code{NA}. A \code{0} there would assert a density of one.
-\code{loo()} would then score the site once per species. This is the
-correct grain for joint multi-row outcomes. It matches
-the flocker / ubms convention for closure-unit families;
-Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
-for PSIS-LOO whenever the per-row likelihoods are not
-conditionally independent given the parameters. To compare
-simplex fits via \code{loo_compare()} against models scored at the
-row grain, refit the row-grain model on the unit-aggregated
-response or use \code{waic()} on both fits at consistent grain.
+The density is joint over a unit's components, which makes the unit
+the grain of \code{log_lik()}, \code{loo()} and \code{waic()} (Vehtari et al.
+2017). \code{log_lik()} gives each unit's log density on its first row
+and \code{NA} on the others. \code{loo()} then counts each unit once.
+\code{loo_compare()} needs every model it compares scored at that grain.
 
-\code{posterior_linpred()} returns the \strong{uncentred} linear predictor
-\code{mu[i, k]} per row (the value brms emits before the lpdf body
-applies \code{mu_unit = mu[idx] - mu[idx[1]]} to remove the per-site
-K-shared shift). This is the natural scale for \code{marginaleffects}
-contrasts on the species axis. For probabilities on the simplex,
-use \code{posterior_epred()}, which applies the reference subtraction
-and softmax internally and returns one probability per (site,
-species) row summing to 1 within each site.
+\code{posterior_linpred()} gives \code{mu} per row before the reference
+subtraction. \code{posterior_epred()} gives the expected shares, which
+sum to one within each unit.
 }
 
+\examples{
+\dontrun{
+# The one category observed at each of 150 sites
+simdat <- sim_jsdgam(family = categ(), n_species = 3L,
+                     n_sites = 150L, seed = 4L)
+
+fit <- jsdgam(
+  formula        = y ~ env * series,
+  factor_formula = ~ -1,
+  data           = simdat$data_train,
+  unit           = time, species = series,
+  family         = categ(),
+  n_lv           = 1L,
+  chains         = 2L,
+  silent         = 2
+)
+
+# The probability of each category along the gradient
+conditional_effects(fit, effects = "env:series")
+
+# Next, pp_check(fit) compares observed and replicated categories
+}
+
+}
 \references{
 Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
 Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many

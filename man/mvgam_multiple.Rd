@@ -4,95 +4,65 @@
 \alias{mvgam_multiple}
 \title{Fit mvgam models to multiply imputed datasets}
 \usage{
-mvgam_multiple(
-  formula,
-  trend_formula = NULL,
-  data_list,
-  backend = getOption("brms.backend", "cmdstanr"),
-  combine = TRUE,
-  check_data = TRUE,
-  newdata = NULL,
-  ...
-)
+mvgam_multiple(formula, trend_formula = NULL, data_list, combine = TRUE, ...)
 }
 \arguments{
-\item{formula}{Model formula (observation model). Supports brms
-formula syntax including smooths and random effects.}
+\item{formula}{Main observation model formula (supports brms syntax).
+Smooth specials \code{s()}, \code{t2()}, \code{gp()}, varying intercepts and
+slopes, monotonic \code{mo()}, measurement-error \code{me()}, distributional
+\code{dpar} sub-formulas and \code{offset()} are all available. \code{gp()}
+accepts both the approximate Hilbert-space form
+(\code{gp(x, k = 20)}) and the exact full-covariance form
+(\code{gp(x)}, no \code{k}). Prediction at \code{newdata} requires the
+approximate form. An exact \code{gp()} term fits and scores
+in-sample. \code{mvgam()} says so once per session.}
 
-\item{trend_formula}{Optional trend formula specifying
-state-space dynamics. One trend formula applies to every response
-of a multivariate model.}
+\item{trend_formula}{A one-sided formula for the latent process:
+a trend constructor such as \code{AR()} with any predictors of the
+latent state. Write \code{\link[=lv_axis]{lv_axis()}} in a term to vary its effect by
+latent factor, or by series in a model without factors, as in
+\code{~ x:lv_axis() + AR()}. The series column itself is not
+supported in a term of this formula. An exact \code{gp()} term here
+also predicts in-sample alone. Forecasting a model that holds one
+requires the approximate form.}
 
-\item{data_list}{List of imputed data frames. Each element must
-have identical structure (same variables, same ordering).
-Alternatively, a \code{mids} object from the mice package.}
+\item{data_list}{A list of at least two imputed data frames, or a
+\code{mids} object from \pkg{mice}.}
 
-\item{backend}{Character string specifying Stan backend:
-"cmdstanr" or "rstan". Defaults to
-\code{getOption("brms.backend", "cmdstanr")}.}
+\item{combine}{Logical. With imputed \code{data}, \code{TRUE} (default) pools
+the imputation fits into one and \code{FALSE} returns them as a list.}
 
-\item{combine}{Logical; if \code{TRUE} (default), combines posteriors
-into a pooled mvgam_pooled object. If \code{FALSE}, returns list of
-individual fits.}
-
-\item{check_data}{Logical; if \code{TRUE} (default), validates
-consistency across imputations (same column names, types,
-rows).}
-
-\item{newdata}{Optional held-out \code{data.frame} persisted on
-every imputation fit. Later plot and forecast methods can reach
-it through any one of them. Defaults to \code{NULL}.}
-
-\item{...}{Additional arguments passed to \code{mvgam()} for each
-imputation (e.g., chains, iter, family, priors).}
+\item{...}{Further arguments to \code{\link[=mvgam]{mvgam()}}, such as \code{family},
+\code{backend}, \code{newdata}, \code{chains} or \code{iter}. Every imputation fit
+stores \code{newdata}.}
 }
 \value{
-If \code{combine=TRUE}: An object of class
-\code{c("mvgam_pooled", "mvgam", "brmsfit")} containing:
-\itemize{
-\item{Pooled posterior draws from all imputations}
-\item{Attribute \code{individual_fits}: List of per-imputation
-mvgam objects}
-\item{Attribute \code{n_imputations}: Number of imputations}
-\item{Attribute \code{combination_method}: "sflist2stanfit"}
-}
-
-If \code{combine=FALSE}: A list of mvgam objects, one per imputation.
-
-If \code{run_model=FALSE}: a single unfitted stub built from the first
-dataset, whatever \code{combine} is set to. Pooling needs draws, which a
-stub does not have.
+With \code{combine = TRUE}, a pooled fit of class \code{mvgam_pooled},
+which inherits the class of the imputation fits. Its attribute
+\code{individual_fits} holds those fits. With \code{combine = FALSE}, the
+list of imputation fits. With \code{run_model = FALSE}, one unfitted
+model built from the first dataset. Pooling needs draws, which an
+unfitted model lacks.
 }
 \description{
-Fits Bayesian state-space models to multiply imputed datasets,
-combining posteriors across imputations to carry the imputation
-uncertainty into the estimates.
+Fits one model to each of several imputed datasets and pools the
+draws, as \code{brms::brm_multiple()} does. The pooled posterior holds
+the uncertainty the imputations add. \code{mvgam(data = )} takes the
+same list and fits the same models.
 }
 \details{
-This function processes multiple imputed datasets in two modes:
+The imputations must hold the same columns, of the same classes, in
+the same order, with the same number of rows. The columns that place
+each row on the time and series axes must match exactly. Impute only
+the response and the covariates.
 
-\strong{Combined Mode (combine=TRUE)}:
-Fits separate models to each imputed dataset, then combines
-posteriors using \code{rstan::sflist2stanfit()} to create a pooled
-posterior distribution. Returns an object of class
-\code{c("mvgam_pooled", "mvgam", "brmsfit")} with MI-specific
-attributes and methods.
-
-\strong{List Mode (combine=FALSE)}:
-Returns a list of individual mvgam fits, one per imputation,
-allowing manual posterior combination or separate analysis.
-
-\strong{Posterior Combination Approach}:
-Uses \code{rstan::sflist2stanfit()}, as \code{brms::brm_multiple()} does, to
-concatenate draws from all imputations at the Stan level. The pooled
-draws then hold both the between-imputation and within-imputation
-variance.
-
-\strong{MI Diagnostics}:
-Pooled objects include convergence diagnostics per imputation
-(Rhat, ESS) accessible via \code{summary()}. The print method
-displays MI diagnostics: total draws, draws per imputation and
-convergence summaries.
+\code{rstan::sflist2stanfit()} concatenates the chains of every
+imputation fit. The pooled draws then hold both the within- and the
+between-imputation variance. Because chains from different
+imputations sample different posteriors, the R-hat of the pooled
+chains measures disagreement between imputations. \code{summary()}
+reports each parameter's largest R-hat and summed ESS over the
+imputation fits. It also tabulates the convergence of each fit.
 }
 \examples{
 \dontrun{
@@ -121,17 +91,15 @@ fit_pooled <- mvgam_multiple(
   silent = 2
 )
 
-# The pooled summary reports how much of each parameter's variance
-# comes from the imputations
+# The summary adds the convergence of each imputation fit
 summary(fit_pooled)
 
-# `combine = FALSE` returns the three fits as a list
+# Next, `combine = FALSE` returns the three fits as a list
 }
 
 }
 \seealso{
-\code{\link{summary.mvgam_pooled}},
-\code{\link{print.mvgam_pooled_summary}}, \code{\link{mvgam}}
+\code{\link[=mvgam]{mvgam()}}, \code{\link[=summary.mvgam_pooled]{summary.mvgam_pooled()}}
 
 Other model fitting: 
 \code{\link{check_newdata}()},

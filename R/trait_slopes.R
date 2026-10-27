@@ -213,18 +213,17 @@ build_trait_slopes_formula <- function(obs_formula, trait_slopes,
 }
 
 
-# Emit weakly-informative default priors over the nl parameters
-# the rewrite introduces: normal(0, 1) on each gamma coefficient
-# block and student_t(3, 0, 2.5) on each species-level SD. User-
-# supplied priors merge on top via the existing brms prior
-# pipeline (last-wins on matching class/coef/nlpar tuples).
+# Default priors over the non-linear parameters of the trait-slope
+# formula: std_normal() on each gamma coefficient block and
+# student_t(3, 0, 2.5) on each species-level SD. A user prior on the
+# same class, coefficient and nlpar replaces a default.
 default_trait_slopes_priors <- function(obs_formula) {
   spec <- trait_slopes_nlpar_spec(obs_formula)
   if (length(spec$nlpars) == 0L) {
     return(NULL)
   }
   pri <- lapply(spec$nlpars, function(nm) {
-    brms::prior_string("normal(0, 1)", nlpar = nm) +
+    brms::prior_string("std_normal()", nlpar = nm) +
       brms::prior_string(
         "student_t(3, 0, 2.5)",
         class = "sd", nlpar = nm

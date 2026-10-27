@@ -39,9 +39,9 @@ fits}
 \item{x}{A fitted \code{mvgam} object. Further fits are passed via
 \code{...}.}
 
-\item{...}{Additional fitted \code{mvgam} objects to average over,
-and (named) additional arguments passed through to
-\code{\link[=as.data.frame.mvgam]{as.data.frame.mvgam()}} / \code{\link[=variables.mvgam]{variables.mvgam()}}.}
+\item{...}{Further fitted \code{mvgam} objects to average over. For
+\code{pp_average()}, named arguments are passed to the prediction
+function \code{method} names.}
 
 \item{variable}{Optional character vector of parameter names
 to extract, as \code{\link[=variables.mvgam]{variables.mvgam()}} lists them. A bare vector name
@@ -51,23 +51,20 @@ shared across fits (or all parameters across the union when
 
 \item{pars}{Deprecated brms alias for \code{variable}.}
 
-\item{weights}{Either a numeric vector with one entry per fit
-(auto-normalised to sum to 1) or one of \code{"stacking"},
-\code{"pseudobma"}, \code{"pseudobma+"}, \code{"loo"}, \code{"waic"}. See
-\code{mvgam_loo_extras} for the per-strategy semantics.}
+\item{weights}{A numeric vector with one weight per fit, scaled to
+sum to one, or one of \code{"stacking"}, \code{"pseudobma"}, \code{"pseudobma+"},
+\code{"loo"} and \code{"waic"}. \link{mvgam_loo_extras} describes each.}
 
 \item{ndraws}{Total number of model-averaged draws to return.
 Defaults to the number of draws in the first fit.}
 
 \item{nsamples}{Deprecated brms alias for \code{ndraws}.}
 
-\item{missing}{Default values for parameters that are absent
-from some of the supplied fits. \code{NULL} (the default)
-restricts \code{variable} to the intersection across fits and
-errors if any requested parameter is not in every fit. A
-list keyed by parameter name supplies per-parameter
-defaults; a single numeric is broadcast across every
-missing parameter in every fit that lacks it.}
+\item{missing}{Values for parameters some fits lack. \code{NULL} (the
+default) restricts \code{variable} to the parameters every fit has and
+refuses a name outside them. A list keyed by parameter name gives
+each parameter its own value. A single number fills every
+parameter a fit lacks.}
 
 \item{model_names}{Optional character vector of model labels;
 overrides the names inferred from the call.}

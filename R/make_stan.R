@@ -141,7 +141,8 @@ build_stan_components <- function(formula, data, family = gaussian(),
       has_det_covariates = has_det_covs,
       prior              = prior,
       series_var         = axis_names$series_var,
-      time_var           = axis_names$time_var
+      time_var           = axis_names$time_var,
+      dpar_forms         = dpar_forms
     )
   }
 
@@ -699,10 +700,10 @@ mvgam_formula_component <- function(component, object, data, family,
 #'
 #' @description
 #' `stancode()` and `standata()` delegate a plain formula to
-#' \pkg{brms}. A `trend_formula` in the same call names an mvgam
-#' model. These methods then build the \code{\link{mvgam_formula}} that
-#' call describes and generate its program. A call supplying no
-#' `trend_formula` delegates to \pkg{brms} unchanged.
+#' \pkg{brms}. A `trend_formula` in the same call, or a family mvgam
+#' builds such as [tweedie()] or [nmix()], names an mvgam model. These
+#' methods then build the \code{\link{mvgam_formula}} that call
+#' describes and generate its program.
 #'
 #' @param object A `formula`, or a `brmsformula` or `mvbrmsformula`
 #'   (both of class `bform`).
@@ -719,10 +720,10 @@ mvgam_formula_component <- function(component, object, data, family,
 #' @export
 stancode.formula <- function(object, ...) {
   dots <- list(...)
-  if (is.null(dots$trend_formula)) {
+  if (!names_mvgam_model(object, dots)) {
     return(NextMethod())
   }
-  route_trend_formula(object, dots, stancode)
+  route_to_mvgam_formula(object, dots, stancode)
 }
 
 #' @rdname trend_formula_generation
@@ -733,10 +734,10 @@ stancode.bform <- stancode.formula
 #' @export
 standata.formula <- function(object, ...) {
   dots <- list(...)
-  if (is.null(dots$trend_formula)) {
+  if (!names_mvgam_model(object, dots)) {
     return(NextMethod())
   }
-  route_trend_formula(object, dots, standata)
+  route_to_mvgam_formula(object, dots, standata)
 }
 
 #' @rdname trend_formula_generation

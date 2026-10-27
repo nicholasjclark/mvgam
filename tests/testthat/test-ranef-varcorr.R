@@ -305,48 +305,36 @@ test_that("ranef.mvgam names what to do on a fit with no REs", {
          family = brms::brmsfamily("gaussian")),
     class = "mvgam"
   )
-  # cli soft-wraps the message body; match on a stable single
-  # token rather than a phrase that may straddle a wrap.
-  expect_error(ranef.mvgam(stub), "random effects")
-  expect_error(VarCorr.mvgam(stub), "random effects")
+  expect_error(ranef.mvgam(stub), "group-level")
+  expect_error(VarCorr.mvgam(stub), "group-level")
 })
 
-test_that("assemble_cor_array builds the correct symmetric structure", {
-  # 2 draws, M = 3, hand-crafted correlation packing
-  # (j=1,k=2)=0.5, (j=1,k=3)=0.4, (j=2,k=3)=0.3 in column-major
-  # upper-triangle order.
+test_that("ranef.mvgam refuses a grouping factor the model lacks", {
+  expect_error(ranef(make_ranef_stub(), groups = "site"), "'grp'")
+})
+
+test_that("assemble_cor_array unpacks the upper triangle column by column", {
+  # Pairs (1,2), (1,3), (2,3) for two draws
   cor_mat <- matrix(c(0.5, 0.4, 0.3, 0.6, 0.5, 0.4), nrow = 2,
                     byrow = TRUE)
   arr <- assemble_cor_array(cor_mat, size = 3L,
                             coef_names = c("a", "b", "c"))
-  expect_identical(dim(arr), c(2L, 3L, 3L))
-  # Diagonal is 1.
-  expect_identical(arr[1L, 1L, 1L], 1)
-  expect_identical(arr[1L, 2L, 2L], 1)
-  expect_identical(arr[1L, 3L, 3L], 1)
-  # Symmetric and packed in brms order.
-  expect_identical(arr[1L, 1L, 2L], arr[1L, 2L, 1L])
-  expect_identical(arr[1L, 1L, 2L], 0.5)
-  expect_identical(arr[1L, 1L, 3L], 0.4)
-  expect_identical(arr[1L, 2L, 3L], 0.3)
-  # Second draw differs.
+  first <- matrix(c(1, 0.5, 0.4, 0.5, 1, 0.3, 0.4, 0.3, 1), 3L,
+                  dimnames = list(c("a", "b", "c"), c("a", "b", "c")))
+  expect_identical(arr[1L, , ], first)
   expect_identical(arr[2L, 1L, 2L], 0.6)
 })
 
 test_that("assemble_cov_array yields D R D per draw", {
-  # 1 draw, M = 2 with sd = (2, 3) and cor = (1, 0.5; 0.5, 1).
-  # Expected cov: (4, 3; 3, 9).
-  sd_mat <- matrix(c(2, 3), nrow = 1)
-  colnames(sd_mat) <- c("a", "b")
+  sd_mat <- matrix(c(2, 3), nrow = 1, dimnames = list(NULL, c("a", "b")))
   cor_arr <- assemble_cor_array(
     matrix(0.5, nrow = 1), size = 2L, coef_names = c("a", "b")
   )
   cov_arr <- assemble_cov_array(sd_mat, cor_arr, c("a", "b"))
-  expect_identical(dim(cov_arr), c(1L, 2L, 2L))
-  expect_identical(cov_arr[1L, 1L, 1L], 4)
-  expect_identical(cov_arr[1L, 2L, 2L], 9)
-  expect_identical(cov_arr[1L, 1L, 2L], 3)
-  expect_identical(cov_arr[1L, 2L, 1L], 3)
+  expect_identical(
+    cov_arr[1L, , ],
+    matrix(c(4, 3, 3, 9), 2L, dimnames = list(c("a", "b"), c("a", "b")))
+  )
 })
 
 # ---- both sides of the group-level block --------------------------

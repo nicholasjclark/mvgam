@@ -514,14 +514,11 @@ ensure_registry_initialized <- function() {
 
 #' Does this trend sample an innovation standard deviation?
 #'
-#' Three things remove it. A deterministic trend is registered with
+#' Two things remove it. A deterministic trend is registered with
 #' covariance pattern `"none"`. `PW()` draws its path from
-#' changepoints. Its program declares no `sigma_trend`.
-#' Multiplicative gamma process shrinkage derives the scale as
-#' `sqrt(Psi_diag)`. A sampled `sigma_trend` would give each column a
-#' second magnitude. The likelihood identifies only the product of the
-#' two. Sampled factor loadings fix the factor scale at one, as
-#' `samples_factor_loadings()` describes.
+#' changepoints. Its program declares no `sigma_trend`. Sampled factor
+#' loadings fix the factor scale at one, as `samples_factor_loadings()`
+#' describes.
 #'
 #' The table that reports priors and the generator that emits them
 #' both call this function. Every prior the table offers is then one
@@ -535,7 +532,6 @@ samples_innovation_scale <- function(trend_spec) {
   ensure_registry_initialized()
   info <- get_trend_info(get_trend_name(trend_spec))
   !identical(info$covariance_pattern, "none") &&
-    !loadings_spec_traits(trend_spec$loadings_prior_spec)$mgp &&
     !samples_factor_loadings(trend_spec)
 }
 
@@ -1313,14 +1309,14 @@ print.mvgam_trend <- function(x, ...) {
 #'   degree of partial pooling).
 #'
 #'   A grouped trend estimates correlations among the `subgr` units
-#'   within each level of `gr`. `cor` defaults to `TRUE` for such a
-#'   trend. An explicit `cor = FALSE` is refused.
+#'   within each level of `gr`. Without `subgr`, the series column names
+#'   those units. `cor` defaults to `TRUE` for such a trend. An explicit
+#'   `cor = FALSE` is refused.
 #'
 #'   Within a `VAR()` it sets up a hierarchical panel vector
 #'   autoregression. Each group learns its autoregressive, moving-average
 #'   and correlation matrices from shared hyperparameters. The groups do
-#'   not interact. Without `subgr`, the series column names the units
-#'   within each group.
+#'   not interact.
 #'
 #'   Two constraints apply to hierarchical trend models:
 #'   \itemize{
@@ -1416,7 +1412,7 @@ print.mvgam_trend <- function(x, ...) {
 #' coefficient \code{theta1_trend}, the autoregressive coefficients
 #' \code{ar1_trend} to \code{ark_trend} and the VAR coefficient
 #' matrices \code{Phi_trend}. Priors take these class names, as in
-#' \code{prior(normal(0, 1), class = sigma_trend)}. Parameter
+#' \code{prior(inv_gamma(5, 1), class = sigma_trend)}. Parameter
 #' extraction takes the same names.
 #'
 #' @section Identification:
@@ -1461,7 +1457,7 @@ print.mvgam_trend <- function(x, ...) {
 #' Bhattacharya & Dunson (2011), which shrinks later columns of `Z`
 #' toward zero with increasing strength. `n_lv` is then a truncation
 #' ceiling on the factor count. \code{\link{active_factors}} reports
-#' the posterior distribution of the number of active columns.
+#' the posterior distribution of the number of active factors.
 #'
 #' @references
 #' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
@@ -1494,8 +1490,8 @@ print.mvgam_trend <- function(x, ...) {
 #' set.seed(11)
 #' simdat <- sim_mvgam(type = 6L, family = poisson(), n_series = 3L,
 #'                     n_timepoints = 80L)
-#' own_times <- simdat$data_train
-#' own_times <- own_times[runif(nrow(own_times)) < 0.6, ]
+#' keep_some <- function(d) d[runif(nrow(d)) < 0.6, ]
+#' own_times <- keep_some(simdat$data_train)
 #'
 #' # The parameters a trend adds, with their default priors, before
 #' # any fitting
@@ -1521,7 +1517,8 @@ print.mvgam_trend <- function(x, ...) {
 #' residual_cor(mod)
 #'
 #' # Each series is forecast at its own future times
-#' plot(forecast(mod, newdata = simdat$data_test), series = 2)
+#' plot(forecast(mod, newdata = keep_some(simdat$data_test)),
+#'      series = 2)
 #'
 #' # Next: hindcast() returns the fitted latent trends. The articles
 #' # under 'See Also' fit VAR, hierarchical and factor trends
@@ -1562,7 +1559,6 @@ AR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = NULL,
               gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL,
               coef_sharing = c("none", "shared", "hierarchical"),
               df = Inf) {
-  # Validate AR order parameter
   if (length(p) == 1) {
     checkmate::assert_int(p, lower = 1)
   } else {
@@ -1622,7 +1618,7 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
     stop(insight::format_error(c(
       "VAR(cor = FALSE) is not supported.",
       i = "'AR()' fits independent series."
-    )))
+    )), call. = FALSE)
   }
   # A scalar order `p` means the consecutive lags 1..p. The `p`
   # documentation in `?trend_constructors` gives the reason a sparse
@@ -1632,7 +1628,7 @@ VAR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
       "Sparse-lag VAR (vector 'p') is not supported.",
       x = paste0("Got 'p' = ", paste(p, collapse = ", "), "."),
       i = "'AR()' takes sparse lags."
-    )))
+    )), call. = FALSE)
   }
   checkmate::assert_int(p, lower = 1)
   assert_trend_map_input(trend_map)
@@ -1787,102 +1783,90 @@ LLT <- function(time = NA, series = NA, damped = FALSE, cor = NULL,
   )
 }
 
-#' Specify piecewise linear or logistic trends in \pkg{mvgam} models
+#' Piecewise linear or logistic trends
 #'
-#' Sets up a piecewise linear or logistic trend in \code{mvgam}. The
-#' constructor records its arguments. The model evaluates them against
-#' the data.
+#' A trend that grows at a constant rate between changepoints, as in
+#' Prophet (Taylor and Letham 2018). Linear growth is unbounded.
+#' Logistic growth saturates at a carrying capacity that `data`
+#' supplies. The constructor records its arguments. The model
+#' evaluates them against the data.
 #'
 #' @param cap The unquoted name of the variable in `data` that holds
 #'   the carrying capacity of a logistic model, on the response scale.
 #'   It is numeric and can vary by time and series. Defaults to `cap`. A
 #'   logistic model whose data lack the column is refused.
-#'
-#' @param n_changepoints A non-negative integer specifying the number of
-#'   potential changepoints. Potential changepoints are selected uniformly from
-#'   the first `changepoint_range` proportion of timepoints in \code{data}.
-#'   Default is `10`.
-#'
-#' @param changepoint_range Proportion of history in \code{data} in which trend
-#'   changepoints will be estimated. Defaults to `0.8` for the first 80%.
-#'
+#' @param n_changepoints A positive integer: the number of potential
+#'   changepoints, spaced evenly over the first `changepoint_range` of
+#'   the time points in `data`. Defaults to `10`.
+#' @param changepoint_range A number in `(0, 1]`: the share of the
+#'   series that holds the potential changepoints. The default `0.8`
+#'   leaves the last fifth with the growth rate of the last changepoint.
+#'   A changepoint among the final points would be estimated from too
+#'   few observations to trust in a forecast.
 #' @param changepoint_scale A positive number: the typical change in
-#'   growth at one changepoint over the whole series, as in Prophet, in
-#'   link units for linear growth and in logits for logistic growth.
-#'   For a series of `N` time points the prior on each per-step rate
-#'   change is `double_exponential(0, s * changepoint_scale / N)`,
-#'   where `s` is the factor [get_prior()] describes for linear growth
-#'   and 1 for logistic growth. Larger values give a more flexible
-#'   trend. The default of `0.3` gives the ten default changepoints a
-#'   prior median movement of the level of about half a unit over the
-#'   series, the movement the
-#'   [LLT()] slope prior allows. Prophet's own default of `0.05` holds a
-#'   link-scale trend close to a straight line.
-#'
-#' @param growth Character string, `'linear'` (the default) or
-#'   `'logistic'`. Logistic growth saturates the trend at the carrying
-#'   capacity in the `cap` column.
-#'
+#'   growth at one changepoint over the whole series, in link units for
+#'   linear growth and in logits for logistic growth. For a series of
+#'   `N` time points each per-step rate change takes
+#'   `double_exponential(0, s * changepoint_scale / N)`, where `s` is
+#'   the factor [get_prior()] describes for linear growth and 1 for
+#'   logistic growth. Larger values give a more flexible trend. The
+#'   default `0.3` gives the ten default changepoints a prior median
+#'   movement of the level of about half a unit over the series, the
+#'   movement the [LLT()] slope prior allows. Prophet's default of
+#'   `0.05` holds a link-scale trend close to a straight line.
+#' @param growth `'linear'` (the default) or `'logistic'`.
+#' @param n_lv,trend_map Factor models are not supported for `PW()`.
+#'   Supplying either is refused.
 #' @inheritParams AR
+#'
+#' @return An object of class `mvgam_trend`.
+#'
+#' @details
+#' *Intercepts*:
+#' A linear trend takes its level from the observation formula, as
+#' every other trend in \pkg{mvgam} does. `y ~ 1` is its ordinary
+#' observation formula.
+#'
+#' A logistic trend contributes `cap * inv_logit(...)` on the link
+#' scale. Its offset `m_trend` places the inflection in time. The
+#' expectation saturates at `cap` when the observation formula omits
+#' its intercept (`y ~ -1` or `y ~ 0 + ...`). An intercept raises the
+#' ceiling above `cap`.
+#'
+#' *Priors*:
+#' Time runs in steps `1, ..., N`. The base growth rate takes
+#' `k_trend ~ normal(0, 2 s / (N - 1))`, two units of growth over the
+#' series at one standard deviation. The logistic inflection takes
+#' `m_trend ~ normal((N + 1) / 2, N / 2)`, centred on the middle of the
+#' series. [get_prior()] shows the values for a given model.
+#'
+#' *The carrying capacity*:
+#' A market size, a population size or an ecological carrying capacity
+#' can bound a series. `growth = 'logistic'` takes it from the `cap`
+#' column, which can vary by series and by time. Every observation
+#' needs a value. Under a non-identity link the capacity is moved to
+#' the link scale, such as its log under `poisson()` or
+#' `negbinomial()`. Give it on the scale of the response.
 #'
 #' @author Nicholas J Clark
 #'
 #' @references
 #' Taylor, S. J. and Letham, B. (2018). Forecasting at scale.
-#' \emph{The American Statistician}, 72:37-45.
+#'   *The American Statistician*, 72, 37-45.
+#'   \doi{10.1080/00031305.2017.1380080}
 #'
-#' @seealso [LLT()] for a trend whose growth changes continuously,
-#'   [get_prior()] for the scale of the default priors
-#'
-#' @return An object of class `mvgam_trend`.
-#'
-#' @details
-#' *Offsets and intercepts*:
-#' A linear piecewise trend takes its level from the observation
-#' formula, as every other trend model in \pkg{mvgam} does. `y ~ 1` is
-#' the ordinary observation formula for it.
-#'
-#' A logistic piecewise trend estimates an offset (`m_trend`) that
-#' positions its curve along the time axis. It contributes
-#' `cap * inv_logit(...)` on the link scale, which saturates the
-#' expectation at the `cap` you supply when the observation formula
-#' omits its intercept (`y ~ -1` or `y ~ 0 + ...`). An intercept
-#' there raises the ceiling above `cap`.
-#'
-#' *Priors*:
-#' Time runs in steps `1, ..., N`. The default priors are set on the
-#' span of the series. The base growth rate takes
-#' `k_trend ~ normal(0, 2 s / (N - 1))`, two units of growth over the
-#' series at one standard deviation, where \eqn{s} is the factor
-#' [get_prior()] describes for linear growth and 1 for logistic
-#' growth. The logistic inflection takes
-#' `m_trend ~ normal((N + 1) / 2, N / 2)`, centred on the middle of the
-#' series. [get_prior()] shows the values for a given model.
-#'
-#' *Logistic growth and the cap variable*:
-#' Many growing series approach a ceiling, such as a total market size,
-#' a population size or an ecological carrying capacity.
-#' `growth = 'logistic'` saturates the trend at a capacity that `data`
-#' supplies in its `cap` column. The capacity can vary by series and by
-#' time. Every observation needs a `cap` value.
-#'
-#' For observation families that use a non-identity link function, the
-#' `cap` value is transformed to the link scale internally: it is
-#' log-transformed under a `poisson()` or `negbinomial()` family. Give
-#' `cap` on the scale of the outcome. No missing values are allowed in
-#' `cap`.
+#' @seealso [LLT()] for a trend whose growth changes continuously.
+#'   [get_prior()] lists the default priors. The
+#'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
+#'   compares a piecewise trend with other trends out of sample.
 #'
 #' @rdname piecewise_trends
 #'
 #' @examples
 #' \dontrun{
-#' # Linear PW on a single Poisson series. The observation
-#' # intercept supplies the level, matching the other trend
-#' # models in mvgam.
 #' set.seed(2024)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L)
-#'
 #' mod <- mvgam(
 #'   y ~ 1,
 #'   trend_formula = ~ PW(growth = "linear"),
@@ -1893,11 +1877,13 @@ LLT <- function(time = NA, series = NA, damped = FALSE, cor = NULL,
 #' )
 #' summary(mod)
 #'
-#' # A linear PW exposes the base growth rate (k_trend) and the
-#' # changepoint rate deltas (delta_trend[changepoint, series]).
-#' # A logistic PW adds the offset (m_trend). Visualise the full
-#' # set with the trend_params keyword.
-#' mcmc_plot(mod, variable = "trend_params", type = "intervals")
+#' # The base growth rate and the rate change at each changepoint
+#' mcmc_plot(mod, variable = "trend_params")
+#'
+#' # The forecast continues the growth rate of the last changepoint
+#' plot(forecast(mod, newdata = simdat$data_test))
+#'
+#' # Next, score() rates the forecast against the held-out points
 #' }
 #'
 #' @family trend models
@@ -1907,14 +1893,11 @@ PW <- function(time = NA, series = NA, cap = NA, n_changepoints = 10,
               growth = 'linear', n_lv = NULL, trend_map = NULL) {
   # Validate arguments
   growth <- match.arg(growth, choices = c('linear', 'logistic'))
-  checkmate::assert_number(changepoint_range, lower = 0, upper = 1)
+  checkmate::assert_number(changepoint_range, lower = .Machine$double.eps,
+                           upper = 1)
   checkmate::assert_int(n_changepoints, lower = 1)
-  if (!checkmate::test_number(changepoint_scale, finite = TRUE) ||
-      changepoint_scale <= 0) {
-    stop(insight::format_error(
-      "'changepoint_scale' must be a positive number."
-    ), call. = FALSE)
-  }
+  checkmate::assert_number(changepoint_scale, lower = .Machine$double.eps,
+                           finite = TRUE)
 
   # A factor request written on the constructor is refused here.
   # `CAR()` uses the same helper.
@@ -1956,36 +1939,17 @@ PW <- function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'   sampling grids.
 #'
 #' @param gr An optional grouping `factor` in `data` that sets up
-#'   hierarchical residual correlations. The correlation matrix of each
-#'   level of `gr` is
+#'   hierarchical residual correlations. Each level's correlation matrix
+#'   shrinks toward a global one by the weight `alpha_cor_trend`, as
+#'   [trend_constructors] sets out. Without `subgr`, the series column
+#'   names the units within each level.
 #'
-#'   \eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} +
-#'   (1 - \alpha_{cor})\Omega_{group, local}},
-#'
-#'   where \eqn{\Omega_{global}} is a *global* correlation matrix,
-#'   \eqn{\Omega_{group, local}} a *local deviation* correlation matrix
-#'   and \eqn{\alpha_{cor}} (`alpha_cor_trend`) the weight that shrinks
-#'   each group's matrix toward the global one. Supplying `gr` requires
-#'   `subgr`. `cor` defaults to `TRUE` for a grouped trend. An explicit
-#'   `cor = FALSE` is refused.
-#'
-#' @param subgr A subgrouping `factor` in `data` naming the
-#'   observational units within each level of `gr`. Defaults to
-#'   `series`. A model with hierarchical correlations builds its series
-#'   from `gr` and `subgr`. Its `data` then needs no `series` column.
-#'
-#'   For example, to model counts of several species (`species` in
-#'   `data`) at sampling sites (`site`) in three regions (`region`)
-#'   with residuals correlated within regions, specify `time = site`,
-#'   `gr = region` and `subgr = species`. `mvgam()` orders the data by
-#'   `site` and builds the series as
-#'
-#'   `series = interaction(gr, subgr, drop = TRUE, sep = "_",`
-#'   `lex.order = TRUE)`
-#'
-#'   A region `r1` and a species `sp1` give the series `"r1_sp1"`. A
-#'   `series` column that disagrees with the derived series is replaced
-#'   by it, with a warning.
+#' @param subgr A subgrouping `factor` in `data` naming the units within
+#'   each level of `gr`, from which the series are built as
+#'   [trend_constructors] describes. For species (`species`) counted at
+#'   sites (`site`) in regions (`region`), `time = site`, `gr = region`
+#'   and `subgr = species` correlate the species' residuals within each
+#'   region.
 #'
 #' @return An object of class `mvgam_trend`.
 #'
@@ -2028,12 +1992,12 @@ PW <- function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' )
 #' summary(mod)
 #'
-#' # The per-series latent SDs
-#' mcmc_plot(mod, variable = "sigma_trend", regex = TRUE,
-#'           type = "intervals")
-#'
 #' # The correlations among the series that ZMVN() estimates
-#' residual_cor(mod)
+#' rc <- residual_cor(mod)
+#' rc
+#' plot(rc)
+#'
+#' # Next: jsdgam() fits ZMVN() factors across many species
 #' }
 #'
 #' @family trend models
@@ -2050,7 +2014,7 @@ ZMVN <- function(time = NA, series = NA, gr = NA, subgr = NA,
       "'cor = FALSE' is not supported for 'ZMVN()'.",
       x = "ZMVN is a multivariate normal with correlated series.",
       i = "'AR()' and 'RW()' fit independent series."
-    )))
+    )), call. = FALSE)
   }
 
   create_mvgam_trend(

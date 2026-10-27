@@ -7,7 +7,7 @@
 ^LICENSE\.md$
 ^vignettes/articles$
 ^docs$
-^.claude$
+^\.claude$
 ^Claude\.md$
 ^CLAUDE\.md$
 ^claude\.exe$
@@ -18,12 +18,12 @@
 ^pkgdown$
 ^README\.Rmd$
 ^README-.*\.png$
-^\README_cache$
+^README_cache$
 ^man/figures/README-.*\.png$
-^index\.Rmd
-^index\.md
-^Meta
-^base_gam.txt
+^index\.Rmd$
+^index\.md$
+^Meta$
+^base_gam\.txt$
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
 ^tests/mvgam_examples\.R$
@@ -44,5 +44,4 @@
 ^completed-tasks$
 ^future-tasks$
 ^architecture$
-^claude\.exe$
 ^scratchpad_figs$

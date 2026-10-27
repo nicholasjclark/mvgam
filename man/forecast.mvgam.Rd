@@ -57,13 +57,14 @@ draw indices to use. NULL (default) uses all draws (subject to
 \code{ndraws}).}
 
 \item{coef_uncertainty}{Logical. When \code{FALSE}, every forecast
-draw uses the first posterior draw of every coefficient in the
+draw uses the first of the draws \code{ndraws} or \code{draw_ids} select
+for every coefficient in the
 observation and trend formulas: population-level effects, smooth
 bases, random effect levels and Hilbert-space \code{gp(x, k)} bases.
 Defaults to \code{TRUE}.}
 
 \item{trend_uncertainty}{Logical. When \code{FALSE}, every forecast
-draw uses the first posterior draw of the trend dynamics
+draw uses the first of the selected draws for the trend dynamics
 parameters (\code{sigma}, AR, MA and VAR coefficients), the last
 fitted state and the trend formula's predictor \code{mu_trend}. Each
 draw still takes fresh innovations. The spread then shows

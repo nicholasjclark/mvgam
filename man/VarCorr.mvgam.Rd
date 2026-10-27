@@ -2,8 +2,7 @@
 % Please edit documentation in R/ranef.mvgam.R
 \name{VarCorr.mvgam}
 \alias{VarCorr.mvgam}
-\title{Extract variance and correlation components of group-level
-(random) effects from a fitted \pkg{mvgam} model}
+\title{Standard deviations and correlations of group-level effects}
 \usage{
 \method{VarCorr}{mvgam}(
   x,
@@ -17,73 +16,62 @@
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}
 
-\item{sigma}{Accepted for compatibility with
-\code{\link[brms:VarCorr.brmsfit]{brms::VarCorr.brmsfit()}} and unused. \code{\link[=summary.mvgam]{summary.mvgam()}} reports
-the observation family's scale. Must be a single non-negative
-number.}
+\item{sigma}{A single non-negative number. It has no effect.
+\code{\link[=summary.mvgam]{summary.mvgam()}} reports the observation family's scale.}
 
-\item{summary}{Logical. If \code{TRUE} (the default), collapse each
-group's posterior draws to summary statistics; if \code{FALSE},
-return the raw draws.}
+\item{summary}{Logical. \code{TRUE} (the default) summarises the draws.
+\code{FALSE} returns them.}
 
-\item{robust}{Logical. When \code{summary = TRUE}, use the median /
-MAD as the centre / spread. Defaults to \code{FALSE}.}
+\item{robust}{Logical. \code{TRUE} summarises with the median and MAD.
+Defaults to \code{FALSE}.}
 
-\item{probs}{Numeric vector of length 2 with the quantiles to
-report when \code{summary = TRUE}.}
+\item{probs}{Numeric vector of the two quantiles to report.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A named list with one entry per grouping factor. Each
-entry is itself a list with up to three components:
+A named list with one entry per grouping factor. Each entry
+is a list of these components:
 \itemize{
-\item \code{sd} - matrix of standard deviations per coefficient.
-With \code{summary = TRUE}, dimensions
-\verb{[n_coefs, n_stats]}; with \code{summary = FALSE},
-\verb{[n_draws, n_coefs]}.
-\item \code{cor} - correlation matrices per posterior draw. Only
-emitted when the group has two or more coefficients with
-an estimated correlation block. With \code{summary = TRUE},
-dimensions \verb{[n_coefs, n_stats, n_coefs]}; with
-\code{summary = FALSE}, \verb{[n_draws, n_coefs, n_coefs]}.
-\item \code{cov} - covariance matrices per posterior draw with the
-same dimensions as \code{cor}.
+\item \code{sd}: the standard deviation of each coefficient, a matrix of
+coefficients by statistics, or of draws by coefficients under
+\code{summary = FALSE}.
+\item \code{cor}: correlation matrices, present when the factor carries two
+or more correlated coefficients. The array runs over
+coefficients, statistics and coefficients, or over draws and two
+coefficient axes under \code{summary = FALSE}.
+\item \code{cov}: covariance matrices, shaped as \code{cor}.
 }
 }
 \description{
-Pull posterior draws of the group-level standard deviations
-and (when estimated) correlation / covariance matrices on a
-fitted \code{mvgam} object, returned in the same shape as
-\code{\link[brms:VarCorr.brmsfit]{brms::VarCorr.brmsfit()}} so brms-trained users can drop into
-the same workflow.
+Posterior draws of the standard deviation of each group-level term
+of the observation formula, with the correlations and covariances of
+terms that share a grouping factor.
 }
 \details{
-Observation-side group-level effects only. A trend-side
-component is named with the \verb{_trend} suffix, as
-\code{sd_g__Intercept_trend}, and \code{as_draws()} returns its draws.
+A trend-side component is named with the \verb{_trend} suffix, as
+\code{sd_g__Intercept_trend}. \code{\link[=as_draws.mvgam]{as_draws.mvgam()}} returns its draws.
 }
 \examples{
 \dontrun{
 set.seed(14)
 simdat <- sim_mvgam(family = poisson(), n_series = 4L,
-                     n_timepoints = 120L, trend_model = AR())
+                    n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(y ~ s(x) + (1 | series),
-              trend_formula = ~ AR(p = 1),
-              data    = simdat$data_train,
-              family  = poisson(),
-              chains  = 2, silent = 2)
+             trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
 
-# The standard deviation of the series intercepts. A grouping
-# with several effects adds their correlations under `cor`.
-# `ranef()` gives each level's own estimate.
+# The standard deviation of the series intercepts
 VarCorr(mod)$series$sd
+
+# Next: ranef() gives each series' own deviation
 }
 
 }
 \seealso{
-\code{\link[brms:VarCorr.brmsfit]{brms::VarCorr.brmsfit()}}, \code{\link[=ranef.mvgam]{ranef.mvgam()}},
-\code{\link[=fixef.mvgam]{fixef.mvgam()}}.
+\code{\link[=ranef.mvgam]{ranef.mvgam()}} gives each level's deviation.
+\code{\link[=fixef.mvgam]{fixef.mvgam()}} summarises the population-level effects.
 
 Other posterior summaries: 
 \code{\link{bibtex}()},

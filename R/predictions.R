@@ -148,19 +148,33 @@ side_model <- function(mvgam_fit, side) {
 #' included, keep the names its brms model gives them. The trend's
 #' carry `_trend`, which its own brms model does not write.
 #'
-#' @param mvgam_fit A fitted `mvgam` object
-#' @param full_draws The fit's draws matrix, every parameter, at the
-#'   chosen draws
+#' @param full_draws The fit's draws matrix at the chosen draws, holding
+#'   at least the side's parameters
+#' @param pars The side's parameter names, as `side_parameters()` gives
 #' @param side `"obs"` or `"trend"`
 #' @return A draws matrix of that side's parameters
 #' @noRd
-side_draws <- function(mvgam_fit, full_draws, side) {
+side_draws <- function(full_draws, pars, side) {
   checkmate::assert_class(full_draws, "draws_matrix")
-  out <- full_draws[, side_parameters(mvgam_fit, side), drop = FALSE]
+  checkmate::assert_character(pars, any.missing = FALSE)
+  out <- full_draws[, pars, drop = FALSE]
   if (identical(side, "trend")) {
     colnames(out) <- strip_trend_infix(colnames(out))
   }
   out
+}
+
+
+#' Whether prediction draws hold one matrix per response
+#'
+#' A multivariate model predicted with `resp = NULL` gives a list of
+#' draws matrices named by response. Every other call gives one matrix.
+#'
+#' @param x Draws from a prediction function
+#' @return A single logical
+#' @noRd
+is_per_response <- function(x) {
+  is.list(x) && !is.matrix(x)
 }
 
 
@@ -231,11 +245,17 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # Draws arrive already chosen. The user-facing boundary converts their
   # count into indices. This extraction uses the same rows as every
   # extraction it is combined with.
-  full_draws <- subset_draws_rows(posterior::as_draws_matrix(mvgam_fit$fit),
-                                  draw_ids = draw_ids)
-  component_draws <- side_draws(mvgam_fit, full_draws, side)
+  # The side's own parameters, plus the loadings a `by = lv_axis()`
+  # trend projects its factor predictor through
+  by_lv <- is_trend && isTRUE(mvgam_fit$trend_metadata$has_by_lv)
+  pars <- side_parameters(mvgam_fit, side)
+  full_draws <- subset_draws_rows(
+    fit_draws(mvgam_fit$fit, c(pars, if (by_lv) c("Z", "Z_tilde"))),
+    draw_ids = draw_ids
+  )
+  component_draws <- side_draws(full_draws, pars, side)
 
-  if (is_trend && isTRUE(mvgam_fit$trend_metadata$has_by_lv)) {
+  if (by_lv) {
     return(compose_by_lv_trend_linpred(
       mvgam_fit = mvgam_fit,
       newdata = newdata,
@@ -271,7 +291,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # the terms the model has. The class is dropped on the way out, where
   # the predictor stops being posterior draws and becomes a value. An S4
   # slot declared to hold a plain matrix rejects the classed one.
-  if (is.list(linpred) && !is.matrix(linpred)) {
+  if (is_per_response(linpred)) {
     return(lapply(linpred, as_plain_matrix))
   }
   as_plain_matrix(linpred)
@@ -286,8 +306,8 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
 #' function composes the `dot(Z, mu_factor)` half. `mu_factor` is the
 #' trend model's predictor on a grid holding each row of `newdata` once
 #' per factor. `Z` is the loadings matrix, indexed by series. What comes
-#' back is `linpred[d, i] = sum_k Z[d, series_i, k] * mu_factor[d, i, k]`,
-#' mirroring `brms::posterior_linpred(incl_autocor = FALSE)`. The
+#' back is `linpred[d, i] = sum_k Z[d, series_i, k] * mu_factor[d, i, k]`.
+#' The
 #' `lv_trend` half is the latent state. A prediction receives it as the
 #' marginal envelope that `sample_process_errors()` adds. On the hindcast
 #' and forecast paths, `extract_trend_latent_states()` supplies it per
@@ -297,8 +317,8 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
 #'   lv_axis()`
 #' @param newdata Data frame to predict for, one row per `(time,
 #'   series)`
-#' @param full_draws The fit's draws, every parameter, at the chosen
-#'   draws
+#' @param full_draws The fit's draws at the chosen draws, holding the
+#'   loadings
 #' @param trend_draws The same draws of the trend's parameters, named
 #'   as the trend's brms model names them
 #' @param re_formula,allow_new_levels,sample_new_levels As
@@ -362,7 +382,7 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, full_draws,
     sample_new_levels = sample_new_levels
   )
   mu_factor_long <- extract_linpred_from_prep(prep, resp = NULL)
-  if (is.list(mu_factor_long) && !is.matrix(mu_factor_long)) {
+  if (is_per_response(mu_factor_long)) {
     stop(insight::format_error(
       "'by = lv_axis()' does not support a multivariate trend formula."
     ), call. = FALSE)

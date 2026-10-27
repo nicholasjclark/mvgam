@@ -150,11 +150,8 @@ reference:
   contents:
   - predict.mvgam
   - fitted.mvgam
-  - posterior_epred
   - posterior_epred.mvgam
-  - posterior_linpred
   - posterior_linpred.mvgam
-  - posterior_predict
   - posterior_predict.mvgam
   - hindcast
   - hindcast.mvgam

@@ -17,10 +17,10 @@
 )
 }
 \arguments{
-\item{object}{An object of class \code{mvgam}.}
+\item{object}{A fitted \code{mvgam} object.}
 
-\item{newdata}{Optional \code{data.frame} to compute residuals on
-(defaults to the training data).}
+\item{newdata}{Optional \code{data.frame} to compute residuals on. Defaults
+to the training data.}
 
 \item{type}{Character. Either \code{"quantile"} (default) or
 \code{"ordinary"}.}
@@ -32,10 +32,8 @@ use. NULL (default) uses all available draws.}
 draw indices to use. NULL (default) uses all draws (subject to
 \code{ndraws}).}
 
-\item{summary}{Logical. If \code{TRUE} (the default), return a
-per-observation summary matrix; if \code{FALSE}, return the full
-\verb{ndraws x nobs} matrix of per-draw residuals (which can be
-handed to \code{DHARMa::createDHARMa()} for further diagnostics).}
+\item{summary}{Logical. \code{TRUE} (the default) returns a summary per
+observation. \code{FALSE} returns the residual draws.}
 
 \item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
 deviation for summaries. If \code{TRUE}, uses median and median absolute
@@ -45,236 +43,143 @@ deviation (MAD).}
 Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
 single value or multiple values.}
 
-\item{...}{Additional arguments forwarded to
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}.}
+\item{...}{Further arguments of \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, such as
+\code{resp} or \code{re_formula}.}
 }
 \value{
-An array of residuals.
-\itemize{
-\item \code{summary = FALSE}: an \verb{ndraws x nobs} numeric matrix of
-per-draw residuals (the same shape as
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} output). A continuous family
-on the empirical route has one pooled interval per
-observation, so every row is identical and the matrix
-reduces to a single deterministic residual per
-observation; on the analytic route the interval moves
-with the draw and the column carries the posterior
-spread.
-\item \code{summary = TRUE}: an \verb{nobs x E} numeric matrix where
-\code{E = 2 + length(probs)}. Column \code{Estimate} is the mean
-(or median when \code{robust = TRUE}); column \code{Est.Error} is
-the standard deviation (or MAD); the remaining columns
-are quantile estimates labelled \verb{Q<min*100>} and
-\verb{Q<max*100>}.
-}
+With \code{summary = FALSE}, an \verb{[ndraws, nobs]} matrix of residual
+draws. A continuous family on the empirical route has one interval
+per observation. Its rows are then identical. With \code{summary = TRUE},
+an \verb{[nobs, 2 + length(probs)]} matrix. Its columns are \code{Estimate}
+(the mean, or the median with \code{robust = TRUE}), \code{Est.Error} (the
+standard deviation, or the MAD) and one quantile per \code{probs}.
 }
 \description{
-Extracts posterior draws of residuals for a fitted \code{mvgam}
-model, with two options for residual type:
+Posterior draws of the residuals of a fitted \code{mvgam} model, of two
+types:
 }
 \details{
 \itemize{
-\item \code{"quantile"} (default) -- randomized quantile residuals
-(Dunn & Smyth 1996), often also called Dunn-Smyth or PIT
-residuals. Each observation is transformed through the
-cumulative distribution function of its predictive
-distribution and then through the standard-normal quantile,
-so under a correctly-specified model the residuals are
-independent N(0, 1) draws regardless of the response
-family. The transform is evaluated \strong{per draw}, against
-that draw's own parameters, which is what makes the result
-standard normal: a PIT taken against the posterior
-predictive pooled over draws absorbs the uncertainty in the
-latent state and comes back too narrow.
-
-A family \pkg{mvgam} holds a distribution function for is
-transformed through that function directly. This covers the
-single-parameter and location-scale families, the counts,
-\code{beta} and \code{beta_binomial}, \code{com_binomial()} and \code{tweedie()},
-the ordinal families, and the multivariate \code{mvn()}, \code{mvt()},
-\code{diri()}, \code{multi()} and \code{categ()}. A composition family is
-transformed through the marginal of one component: a Beta for
-\code{diri()}, a Binomial against the site's own total for \code{multi()},
-and a Bernoulli for \code{categ()}. A discrete family randomises
-within the interval its atom occupies, \verb{[F(y - 1), F(y)]}; a
-continuous one has no atom and the interval collapses to \code{F(y)}.
-
-The mixtures and the detection families -- zero-inflated,
-hurdle, \code{mixture()}, \code{occ()} and \code{nmix()} -- have no single
-distribution function to name, and take an empirical PIT over
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws instead (the DHARMa / Hartig
-2024 approach). The \code{Details} below give what that route costs.
-\item \code{"ordinary"} -- the predictive error \code{y - posterior_predict(y)}
-per draw. Matches \code{type = "ordinary"} in
-\code{\link[brms:residuals.brmsfit]{brms::residuals.brmsfit()}}.
+\item \code{"quantile"} (default): randomised quantile residuals (Dunn and
+Smyth 1996), also called Dunn-Smyth or PIT residuals. Each
+observation passes through the distribution function of its
+predictive distribution, then through the standard normal quantile
+function. Under a correctly specified model the residuals are
+independent N(0, 1) draws for any response family.
+\item \code{"ordinary"}: the predictive error, \code{y} minus a
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draw, per draw.
 }
 
-Residuals are computed conditionally on each posterior draw
-of the model parameters so the returned object carries the
-full posterior uncertainty in the residual distribution.
+In sample, both types compare each observation with predictions that
+condition on the latent trend state the model inferred at that time,
+the state \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns. For \code{newdata} the fit has no
+such state. The prediction then integrates over the trend dynamics,
+which widens the residuals. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} and
+\code{\link[=predictive_error.mvgam]{predictive_error.mvgam()}} use the same predictions.
 
-Both types compare a prediction against the observation that was
-actually recorded, so in sample they read the latent trend state
-the model inferred at that time, the state \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}
-returns. Given \code{newdata} the fit never saw there is no such state,
-and the prediction integrates over the trend dynamics instead,
-which widens the residual as it should. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} and
-\code{\link[=predictive_error.mvgam]{predictive_error.mvgam()}} follow the same rule.
+Pearson residuals are not supported. A Pearson residual of a count or
+a bounded response is skewed and discrete even under a correctly
+specified model.
 
-Pearson residuals are not provided. In a state-space model
-with a stochastic trend the posterior absorbs most of the
-low-frequency residual structure, so the per-observation
-variance denominator standardises against the wrong
-quantity and Pearson residuals end up systematically too
-tight. Use \code{"quantile"} instead -- it is the correct
-diagnostic for this model class and is N(0, 1) under a
-correctly-specified model regardless of family.
+Each draw places an observation in a PIT interval
+\verb{[lower, upper]}. The residual is \code{qnorm(u)} for a \code{u} drawn
+uniformly from that interval. Two routes give the interval.
 
-Both routes end at the same construction. Each draw
-places the observation in a PIT interval, the residual is
-\code{qnorm(Uniform(lower, upper))} over that interval, and a
-degenerate interval returns its endpoint. What separates
-them is where the interval comes from.
+The analytic route evaluates the family's distribution function at
+each draw's parameters. A discrete family gives the interval of the
+observed atom, \verb{[F(y - 1), F(y)]}. A continuous family gives the
+point \code{F(y)}. A \code{tweedie()} zero gives \verb{[0, F(0)]}. Censored rows
+span their censoring interval. A truncated model renormalises over
+its truncation bounds. \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} takes its density from the
+same parameterisation. The route covers \code{gaussian}, \code{student},
+\code{asym_laplace}, \code{lognormal}, \code{gamma}, \code{weibull}, \code{exponential},
+\code{beta}, \code{bernoulli}, \code{binomial}, \code{beta_binomial}, \code{poisson},
+\code{negbinomial}, \code{geometric}, \code{com_binomial()}, \code{beta_nb()},
+\code{tweedie()}, the ordinal families, and the multivariate \code{mvn()},
+\code{mvt()}, \code{diri()}, \code{multi()} and \code{categ()}. A composition family uses
+the marginal of one component: a Beta for \code{diri()}, a Binomial
+against the site's own total for \code{multi()} and a Bernoulli for
+\code{categ()}.
 
-The analytic route reads the family's own distribution
-function at that draw's parameters, so the interval is
-\verb{[F(y_i - 1 | theta_d), F(y_i | theta_d)]} for a discrete
-family and the point \code{F(y_i | theta_d)} for a continuous
-one. The same parameterisation supplies the density
-\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} reads, so the residual and the likelihood
-cannot disagree about what a family is.
-
-The empirical route follows DHARMa (Hartig 2024): \code{lower}
-and \code{upper} are \code{mean(yrep < y_i)} and \code{mean(yrep <= y_i)}
-over the pooled draws. Pooling is what makes it work
-without a family CDF, and also what costs it: the pooled
-predictive carries the posterior uncertainty in the latent
-state, so the interval sits closer to 0.5 than the
-conditional one and the residuals come back narrower than
-standard normal. Read a QQ-plot from this route as
+Every other family takes the empirical route of DHARMa (Hartig 2024),
+among them the zero-inflated, hurdle and mixture families, \code{occ()}
+and \code{nmix()}. The bounds are \code{mean(yrep < y)} and \code{mean(yrep <= y)}
+over the pooled \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws. The pooled
+predictive carries the posterior uncertainty in the latent state.
+Its residuals are narrower than N(0, 1). A QQ-plot of them is
 conservative.
 
-The PIT u is clamped to \verb{[.Machine$double.eps, 1 - .Machine$double.eps]} before \code{qnorm} so the residual
-stays finite even when an observation lies in the extreme
-floating-point tail of the predictive distribution. This
-bound corresponds to \verb{|qnorm(u)| ~= 8.13}.
-
-\emph{ndraws sensitivity.} The two routes react differently to
-the posterior draw count:
-\itemize{
-\item The analytic route can produce isolated clamp events
-on individual posterior draws whose \verb{(mu_d, dpar_d)}
-happen to place the observed \code{y_i} more than ~38 SDs
-from the predictive mean -- \code{pnorm} underflows to exactly
-0 or 1 and the clamp triggers. These look like extreme
-\verb{+/-8.13} residuals in the per-draw matrix but are a
-property of the posterior, not a misfit signal. They get
-proportionally rarer with more draws but never vanish.
-\item The empirical route needs enough simulations for the
-empirical predictive CDF to cover the data. With small
-\code{ndraws} many observations land outside the simulated
-range entirely, so \code{u} is exactly 0 or 1 deterministically
-and the clamp turns every draw for that observation into
-\verb{+/-8.13}. Setting \code{ndraws >= 500} resolves the empirical
-PIT well enough that this artefact disappears in
-typical cases.
-}
-
-For diagnostic plotting via \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} with
-\code{type = "resid_*"}, use \code{ndraws >= 500} (the default for
-those types).
+The PIT value is clamped to \verb{[eps, 1 - eps]}, with
+\code{eps = .Machine$double.eps}, to keep the residual finite. The clamp
+bounds a residual at about +/-8.13. On the analytic route one draw
+can place an observation beyond that bound. Such isolated values
+describe that draw. A misfit shifts the residual across most draws.
+The empirical route reaches the clamp whenever an observation lies
+outside every simulated value, which few draws make common. Use
+\code{ndraws >= 500} there, the default of the residual histograms and
+ribbons of \code{\link[=pp_check.mvgam]{pp_check.mvgam()}}.
 }
 \section{Multivariate families (\code{mvn()}, \code{mvt()}, \code{diri()})}{
 
-These share the closure-unit data layout but not its grain:
-each row of a unit gets its own residual, because each row
-has its own distribution function. What that residual can be
-asked differs by family.
+Each row of a unit gets its own residual. Residuals of \code{mvn()} and
+\code{mvt()} condition on the latent factor scores and test the
+observation model. They stay N(0, 1) when the fit has too few
+factors. \code{\link[=active_factors]{active_factors()}} and \code{\link[=residual_cor.mvgam]{residual_cor.mvgam()}} judge the
+number of factors.
 
-\code{mvn()} and \code{mvt()} are row-wise conditional on the latent
-factor scores, so their residuals test the observation model
-rather than the factor structure. Too few factors still
-leaves them N(0, 1), because the fitted scores absorb the
-cross-species correlation a residual diagnostic would
-otherwise reveal; use \code{\link[=residual_cor.mvgam]{residual_cor.mvgam()}} to ask whether
-the factor dimension is adequate.
-
-\code{diri()}'s residual is the exact marginal of one component,
-\code{Beta(alpha_j, alpha_0 - alpha_j)}, so it answers how
-surprising that species' share is at that site. Each is
-standard normal on its own, but a unit's shares sum to one,
-so the rows of a unit are negatively dependent by
-construction and a unit of \code{K} species carries \code{K - 1}
-degrees of freedom. With \code{K = 2} the two residuals are
-exactly antithetic. Read a QQ-plot or an ACF at the unit
-grain rather than treating the rows of a unit as independent
-draws.
+A \code{diri()} residual is the exact marginal of one component,
+\code{Beta(alpha_j, alpha_0 - alpha_j)}. Each is N(0, 1) on its own.
+Because the shares of a unit sum to one, the residuals of a unit of
+\code{K} species are negatively dependent, with \code{K - 1} degrees of
+freedom. With \code{K = 2} the two residuals are exactly antithetic.
+Judge a QQ-plot or an ACF at the unit grain.
 }
 
 \section{Closure-unit families (\code{nmix()}, \code{occ()})}{
 
-Closure-unit observation families treat the closure unit
-(site x season) as the conditionally iid block: visits
-within a unit share the latent state (\code{N_g} for nmix,
-\code{z_g} for occ) and are only marginally independent.
-Per-visit residuals would carry an apparent within-unit
-correlation and bias every standard diagnostic (ACF, QQ,
-residual-vs-fitted), so \code{residuals()} returns one residual
-per closure unit:
-\itemize{
-\item The observed response is aggregated per unit by \code{sum()}.
-For nmix this is the unit's total observed count (the
-marginal sufficient statistic under fixed \code{N_g}); for
-occ this is the per-unit detection count (the sufficient
-statistic for the per-unit Bernoulli marginal under
-fixed \code{z_g}).
-\item The per-visit posterior predictive draws are aggregated
-the same way before the empirical PIT (\code{type = "quantile"})
-or the predictive error (\code{type = "ordinary"}) is computed.
-}
+Visits within a closure unit (site by season) share the latent state,
+\code{N} for \code{nmix()} and \code{z} for \code{occ()}. The visits are independent
+given that state, but dependent marginally. Because residuals per
+visit would carry that dependence into every diagnostic,
+\code{residuals()} returns one residual per closure unit. The observed
+counts or detections are summed within each unit. The visit-level
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws are summed the same way. Columns
+(\code{summary = FALSE}) or rows (\code{summary = TRUE}) are labelled by the
+unit's grouping values joined with \verb{_}.
 
-The returned matrix is shaped \verb{[ndraws x N_unit]}
-(\code{summary = FALSE}) or \verb{[N_unit x E]} (\code{summary = TRUE}),
-with rows / columns labelled by the unit IDs from
-\code{build_closure_unit_arrays()}.
+Each draw simulates the latent state from \code{lambda} or \code{psi} without
+conditioning on the unit's detection history. The residuals then
+test the model across the population of units.
+\code{predict(type = "latent_state")} gives the state given each unit's
+detection history.
 
-The PIT comparison is against the \strong{marginal} posterior
-predictive: each draw re-simulates the latent state
-(\code{z_g} for occ, \code{N_g} for nmix) from \code{psi_g} / \code{lambda_g}
-per draw, not conditional on the observed detection
-history for that unit. This is the DHARMa / flocker / ubms
-convention and tests model adequacy at the population
-level rather than site-level prediction accuracy; see
-\code{posterior_occupancy(conditional = TRUE)} and
-\code{posterior_latent_N(conditional = TRUE)} when the
-conditional state posterior is the quantity of interest.
-
-The empirical PIT randomises uniformly across the discrete
-support, so per-unit residuals on fits with small \code{n_rep}
-(~ 2-4 visits) have heavier QQ-tails than analytic
-\code{qnorm(N(0, 1))} lines under a correctly-specified model
-(Dunn & Smyth 1996 Section 3; Hartig 2024 DHARMa vignette). A
-one-time warning fires when any closure unit has 4 or
-fewer visits; interpret QQ-plots against simulated N(0, 1)
-envelopes rather than the analytic line in that regime.
+Under \code{occ()} a unit sum takes values in \verb{0, ..., n_rep}. With few
+visits the empirical PIT has coarse support. QQ-plot tails then look
+heavier than N(0, 1) under a correctly specified model. A
+once-per-session warning is raised when any unit has 4 or fewer visits.
+Compare QQ-plots with envelopes simulated from N(0, 1) in that case.
 }
 
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
+                    n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
 
-mod <- mvgam(y ~ s(x),
-              trend_formula = ~ AR(p = 1),
-              data    = simdat$data_train,
-              family  = poisson(),
-              chains  = 2, silent = 2)
-
-# Randomised quantile residuals on the response scale.
-# Summarised columns are Estimate, Est.Error, Q2.5, Q97.5.
+# Quantile residuals summarised per observation
 r <- residuals(mod)
 head(r)
+
+# One draw of the residuals should look like N(0, 1) draws
+r1 <- residuals(mod, summary = FALSE, draw_ids = 1)
+qqnorm(r1[1, ])
+qqline(r1[1, ])
+
+# Next: plot(mod, type = "residuals") draws the QQ-plot, ACF and
+# residuals against fitted values over many draws
 }
 
 }
@@ -289,7 +194,7 @@ R package.
 }
 \seealso{
 \code{\link[=augment.mvgam]{augment.mvgam()}}, \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}},
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}
+\code{\link[=pp_check.mvgam]{pp_check.mvgam()}}
 
 Other model checking: 
 \code{\link{mvgam_diagnostics}},

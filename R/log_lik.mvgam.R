@@ -130,7 +130,7 @@ log_lik.mvgam <- function(object,
 
   # A multivariate fit returns one matrix per response. With
   # `resp = NULL` brms sums them into the joint density of each row.
-  if (is.list(linpred) && !is.matrix(linpred)) {
+  if (is_per_response(linpred)) {
     if (!is.null(resp)) {
       linpred <- linpred[[resp]]
     } else {
@@ -210,8 +210,7 @@ mv_response_family_pars <- function(object, newdata, linpred,
     ))
   }
   extract_mv_response_components(
-    object, newdata, draw_ids, ndraws = ndraws,
-    needs_nu = identical(family_name, "mvt"), linpred = linpred
+    object, newdata, draw_ids, ndraws = ndraws, linpred = linpred
   )
 }
 
@@ -271,7 +270,8 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
       n_visit  = ncol(linpred),
       ndraws   = nrow(linpred)
     )
-    family_pars_cu <- list(closure_arrays = arrays, p = p_mat)
+    family_pars_cu <- list(closure_arrays = arrays, p = p_mat,
+                           family = family_obj)
     return(dispatch_closure_unit_method(family_obj, "log_lik")(
       linpred     = linpred,
       link        = family_link,
@@ -309,7 +309,7 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
       allow_new_levels = allow_new_levels,
       sample_new_levels = sample_new_levels
     )
-    trials <- extract_trials_for_family(object, family_obj, newdata)
+    trials <- extract_trials_for_family(object, family_obj, newdata, resp)
     ll <- dispatch_log_lik(
       family_name = family_name,
       link = family_link,
@@ -325,6 +325,7 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   apply_addition_terms(
     ll = ll,
     object = object,
+    frame = newdata,
     resp = resp,
     family_name = family_name,
     link = family_link,

@@ -1,17 +1,6 @@
-# Unit tests for the trait-overlay helpers added to ordinate(). These
-# do not fit a Stan model; the helpers are pure linear algebra on the
-# rotated species loadings, so a synthetic Z matrix plus a per-species
-# trait frame is enough to lock the contract.
-
-test_that("ordinate_trait_arrows() returns NULL when traits is NULL", {
-  Z <- matrix(rnorm(10L), nrow = 5L, ncol = 2L)
-  out <- mvgam:::ordinate_trait_arrows(
-    traits = NULL, loadings_2d = Z,
-    species_names = paste0("sp", 1:5),
-    arrow_scale = 1
-  )
-  expect_null(out)
-})
+# The trait-overlay helpers of ordinate() are linear algebra on the
+# rotated loadings. A synthetic Z and a trait frame exercise them
+# without a Stan fit.
 
 test_that("ordinate_trait_arrows() returns NULL when no numeric traits remain", {
   Z <- matrix(rnorm(10L), nrow = 5L, ncol = 2L)
@@ -91,7 +80,7 @@ test_that("ordinate_trait_arrows() errors when row count mismatches", {
       species_names = paste0("sp", 1:5),
       arrow_scale = 1
     ),
-    "Trait row count does not match species count"
+    "'traits' needs one row per training series"
   )
 })
 
@@ -105,7 +94,7 @@ test_that("ordinate_trait_arrows() errors when some species are missing", {
       species_names = c("sp1", "sp2", "sp3", "missing", "sp5"),
       arrow_scale = 1
     ),
-    "Some species are missing from 'traits' rownames"
+    "must list every training series exactly once"
   )
 })
 
@@ -140,61 +129,15 @@ test_that("ordinate_trait_arrows() respects trait_arrow_scale", {
   expect_equal(r_two / r_one, rep(2, length(r_one)), tolerance = 1e-8)
 })
 
-test_that("ordinate_trait_layers() returns NULL when trait_dat is NULL", {
-  expect_null(mvgam:::ordinate_trait_layers(NULL))
-})
-
-test_that("ordinate_trait_layers() returns layer list when trait_dat supplied", {
-  trait_dat <- data.frame(x = 0.5, y = -0.3, trait_name = "body_size")
-  layers <- mvgam:::ordinate_trait_layers(trait_dat)
-  # geom_segment + repel label layer.
-  expect_length(layers, 2L)
-})
-
-test_that("ordinate_extract_fit_traits() finds traits on a single-trend fit", {
-  features <- data.frame(body_size = c(1, 2, 3), row.names = paste0("sp", 1:3))
-  spec <- structure(
-    list(loadings_prior = list(features = features)),
-    class = "mvgam_trend"
-  )
-  stub_fit <- list(mv_spec = list(trend_specs = spec))
-  out <- mvgam:::ordinate_extract_fit_traits(stub_fit)
-  expect_equal(out, features)
-})
-
-test_that("ordinate_extract_fit_traits() finds traits on a multi-trend fit", {
-  features <- data.frame(body_size = c(1, 2, 3), row.names = paste0("sp", 1:3))
-  spec1 <- structure(list(), class = "mvgam_trend")
-  spec2 <- structure(
-    list(loadings_prior = list(features = features)),
-    class = "mvgam_trend"
-  )
-  stub_fit <- list(mv_spec = list(trend_specs = list(spec1, spec2)))
-  out <- mvgam:::ordinate_extract_fit_traits(stub_fit)
-  expect_equal(out, features)
-})
-
-test_that("ordinate_extract_fit_traits() returns NULL when no traits", {
-  spec <- structure(list(), class = "mvgam_trend")
-  stub_fit <- list(mv_spec = list(trend_specs = spec))
-  expect_null(mvgam:::ordinate_extract_fit_traits(stub_fit))
-})
-
-test_that("resolve_auto_traits() passes NULL through", {
-  stub_fit <- list()
-  expect_null(mvgam:::resolve_auto_traits(NULL, stub_fit))
-})
-
-test_that("resolve_auto_traits() passes data.frame through unchanged", {
+test_that("resolve_auto_traits() passes a trait frame through", {
   traits <- data.frame(body_size = c(1, 2, 3))
-  stub_fit <- list()
-  expect_identical(mvgam:::resolve_auto_traits(traits, stub_fit), traits)
+  expect_identical(mvgam:::resolve_auto_traits(traits, list()), traits)
 })
 
 test_that("resolve_auto_traits('auto') pulls from a trait-informed fit", {
   features <- data.frame(body_size = c(1, 2), row.names = c("sp1", "sp2"))
   spec <- structure(
-    list(loadings_prior = list(features = features)),
+    list(trend = "ZMVN", loadings_prior = list(features = features)),
     class = "mvgam_trend"
   )
   stub_fit <- list(mv_spec = list(trend_specs = spec))
@@ -203,7 +146,7 @@ test_that("resolve_auto_traits('auto') pulls from a trait-informed fit", {
 })
 
 test_that("resolve_auto_traits('auto') notices a fit with no traits", {
-  spec <- structure(list(), class = "mvgam_trend")
+  spec <- structure(list(trend = "ZMVN"), class = "mvgam_trend")
   stub_fit <- list(mv_spec = list(trend_specs = spec))
   # The overlay the caller asked for is absent from the returned
   # plot, so every call earns the notice and not just the first.
@@ -239,11 +182,11 @@ test_that("the sites are labelled by the fit's own time axis", {
   # replaced with scores of the right size, and the plot builder
   # hands back the labels it was given.
   local_mocked_bindings(
-    ordinate_factor_components = function(object, alpha, rotation) {
+    ordinate_factor_components = function(...) {
       list(scores = matrix(0, length(years), 2L),
            loadings = matrix(0, 3L, 2L), n_lv = 2L)
     },
-    ordinate_build_plot = function(svd_comp, which_lvs, biplot,
+    ordinate_build_plot = function(comp, which_lvs, biplot,
                                    label_sites, site_names, ...) {
       site_names
     }

@@ -140,6 +140,19 @@ test_that("mvgam_multiple gives one prefit when run_model is FALSE", {
     expect_false(inherits(pf, "mvgam_pooled"))
     expect_identical(nobs(pf), 20L)
   }
+  # A `mids` object and a held-out frame take the same route. The
+  # default family applies.
+  incomplete <- data.frame(
+    y = rpois(40L, 3), time = rep(1:20, 2L), x = rnorm(40L),
+    series = factor(rep(c("a", "b"), each = 20L))
+  )
+  incomplete$x[c(3L, 29L)] <- NA
+  imp <- mice::mice(incomplete, m = 2L, printFlag = FALSE, seed = 1L)
+  held_out <- data.frame(x = 0, time = 21L, series = factor("a"))
+  pf <- mvgam_multiple(y ~ x, data_list = imp, newdata = held_out,
+                       run_model = FALSE, silent = 2, validate = FALSE)
+  expect_identical(pf$family$family, "gaussian")
+  expect_identical(nrow(pf$test_data), 1L)
 })
 
 test_that("a prefit built inside a function omits that function's locals", {

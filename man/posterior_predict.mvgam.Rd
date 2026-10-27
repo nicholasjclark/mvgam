@@ -2,7 +2,7 @@
 % Please edit documentation in R/posterior_predict.R
 \name{posterior_predict.mvgam}
 \alias{posterior_predict.mvgam}
-\title{Extract Posterior Predictive Distribution from mvgam Models}
+\title{Posterior predictive draws of the response}
 \usage{
 \method{posterior_predict}{mvgam}(
   object,
@@ -87,46 +87,43 @@ responses.}
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-Matrix with dimensions \verb{[ndraws x nobs]}, one row per
-posterior draw and one column per observation, on the response
-scale. For multivariate models with \code{resp = NULL}, a named list of
-such matrices, one per response.
+An \verb{[ndraws, nobs]} matrix on the response scale, one row per
+draw and one column per row of \code{newdata}. A multivariate model
+with \code{resp = NULL} gives a named list, one element per response.
 }
 \description{
-Draws from the posterior predictive distribution of a fitted mvgam
-model. The draws include the observation noise. They suit posterior
-predictive checks and predictions on new data.
+Draws from the posterior predictive distribution: the family's
+observation noise around the parameters of each posterior draw.
+They suit posterior predictive checks and predictions for new data.
 }
 \details{
-Each draw adds the family's observation noise to the expected value
-E[Y | X] of the observation and trend models.
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} returns the expected value alone.
+Each family draws from its own distribution at the parameters
+\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} and \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} use. A
+\code{trunc()} term restricts the draws to its bounds.
 
-\code{posterior_predict()}, \code{posterior_epred()} and \code{posterior_linpred()}
-integrate over the trend's stochastic dynamics. At \code{newdata} times
-beyond the training grid, the latent state is stationary around its
-per-series posterior mean. \code{\link[=forecast.mvgam]{forecast.mvgam()}} and \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}
-use the fitted latent states. \code{hindcast()} returns them at the
-training times. \code{forecast()} propagates them to future times.
+Under \code{incl_autocor = FALSE} the trend contributes its deterministic
+submodel. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} draws under the fitted latent states at
+the training times. \code{\link[=forecast.mvgam]{forecast.mvgam()}} propagates them to future
+times.
 }
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
+                    n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-              data    = simdat$data_train,
-              family  = poisson(),
-              chains  = 2, silent = 2)
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
 
-# Posterior predictive samples on the response scale, integrating over
-# the trend's stochastic dynamics. forecast() extrapolates the
-# fitted latent state
-pp <- posterior_predict(mod, ndraws = 50L)
+# Simulated counts, one row per draw and one column per observation
+pp <- posterior_predict(mod)
 dim(pp)
 
-# The draws track the observed counts
-cor(colMeans(pp), simdat$data_train$y, use = "complete.obs")
+# The share of observed counts inside their 90 percent predictive
+# intervals
+bounds <- apply(pp, 2, quantile, probs = c(0.05, 0.95))
+y <- simdat$data_train$y
+mean(y >= bounds[1, ] & y <= bounds[2, ])
 
 # Next: pp_check() plots the draws against the observed counts
 }

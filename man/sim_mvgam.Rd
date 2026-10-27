@@ -19,142 +19,127 @@ sim_mvgam(
 }
 \arguments{
 \item{type}{Integer in \code{1:7} selecting the observation-side
-recipe. See \emph{Details} for the catalog.}
+recipe. See \emph{Details}.}
 
-\item{family}{A \code{family} or \code{brmsfamily} object specifying the
-observation likelihood. Supported: \code{gaussian()}, \code{student()},
-\code{poisson()}, \code{negbinomial()}, \code{binomial()}, \code{Beta()},
-\code{Gamma()}, \code{\link[=tweedie]{tweedie()}}, and \code{\link[=com_binomial]{com_binomial()}} (and the
-matching \code{brms::brmsfamily} equivalents). Defaults to
-\code{gaussian()}. For \code{com_binomial()} pass the dispersion \code{nu}
-and the per-row \code{trials} count via \code{family_pars} (e.g.
-\code{family_pars = list(nu = 0.5, trials = 30L)}).}
+\item{family}{The observation family: \code{gaussian()} (the default),
+\code{student()}, \code{poisson()}, \code{negbinomial()}, \code{bernoulli()},
+\code{binomial()}, \code{Beta()}, \code{Gamma()}, \code{\link[=tweedie]{tweedie()}}, \code{\link[=beta_nb]{beta_nb()}} or
+\code{\link[=com_binomial]{com_binomial()}}, or the matching \code{brms::brmsfamily()}.}
 
-\item{n_series}{Integer; number of time series to simulate.
-Defaults to \code{1L}.}
+\item{n_series}{Integer number of series. Defaults to \code{1L}.}
 
-\item{n_timepoints}{Integer; number of timepoints per series.
+\item{n_timepoints}{Integer number of time points per series.
 Defaults to \code{80L}.}
 
-\item{trend_model}{An optional \code{mvgam_trend} constructor (e.g.
-\code{AR(p = 1)}, \code{VAR(p = 2, cor = TRUE)}, \code{CAR()}, \code{ZMVN()}).
-\code{NULL} (the default) selects the type's preferred trend (see
-\emph{Details}), and \code{"None"} simulates no trend. Sparse-lag specs
-like \code{AR(p = c(1, 3, 12))} are supported natively.}
+\item{trend_model}{A trend constructor such as \code{AR(p = 1)},
+\code{AR(p = c(1, 12))}, \code{VAR(cor = TRUE)}, \code{CAR()}, \code{ZMVN()} or
+\code{PW()}. \code{NULL} (the default) takes the type's own trend. \code{"None"}
+simulates no trend.}
 
-\item{prop_trend}{Numeric in \verb{[0, 1]} controlling the fraction
-of total link-scale variance contributed by the latent
-trend. \code{NULL} uses a type-specific default
-(0.2 for type 5 / state-space, 0.5 elsewhere).}
+\item{prop_trend}{Share of the link-scale variance given to the
+trend, in \verb{[0, 1]}. \code{NULL} takes the type's default: 0.2 for type
+5, 0.6 for types 2, 3, 4 and 7, and 0.5 for types 1 and 6.}
 
-\item{proportional_train}{Numeric in \verb{(0, 1]}; the fraction of
-timepoints retained in \code{data_train}. Remainder goes to
-\code{data_test}. Defaults to \code{0.75}.}
+\item{proportional_train}{Share of the time points kept in
+\code{data_train}, between 0.1 and 1. The remaining, later time points
+form \code{data_test}. Defaults to \code{0.75}.}
 
-\item{prop_missing}{Numeric in \verb{[0, 1)}; fraction of training
-observations to mark as \code{NA}. Defaults to \code{0}.}
+\item{prop_missing}{Share of the training responses set to \code{NA},
+between 0 and 0.5. Defaults to \code{0}.}
 
-\item{family_pars}{Optional named list of additional family
-parameters (\code{sigma}, \code{nu}, \code{size}, \code{trials}, \code{phi},
-\code{shape}, \code{power}). Type-specific defaults are used when an
-entry is absent. \code{com_binomial()} reads \code{nu} (dispersion)
-and \code{trials}.}
+\item{family_pars}{Optional named list of family parameters:
+\code{sigma} and \code{nu} (gaussian, student), \code{size} (negative binomial),
+\code{trials} (binomial, com_binomial), \code{phi} (beta, tweedie), \code{shape}
+(gamma, beta_nb), \code{power} (tweedie), \code{mtail} (beta_nb) and \code{nu}
+(com_binomial dispersion). Unset entries take defaults.}
 
 \item{seed}{Optional integer seed. The session's random state is
 restored when the call returns.}
 }
 \value{
-A list of class \code{"mvgam_sim"} with elements:
+A list of class \code{"mvgam_sim"}:
 \describe{
-\item{\code{data_train}}{\code{data.frame} in long format: columns
-include \code{y}, \code{series}, \code{time}, and the type-specific
-covariates (\code{x}, \code{z}, \code{grp}, or \code{season}).}
-\item{\code{data_test}}{\code{data.frame} of held-out timepoints, or
-\code{NULL} when \code{proportional_train = 1}.}
-\item{\code{family}}{The \code{brmsfamily} used.}
-\item{\code{trend_model}}{The \code{mvgam_trend} used.}
-\item{\code{type}}{The catalog entry.}
-\item{\code{true_betas}}{Named numeric vector of population-
-level coefficients.}
-\item{\code{true_smooths}}{Named list of \code{data.frame(grid, f_true)} ground-truth smooth functions.}
-\item{\code{true_trend}}{Matrix \verb{[n_timepoints, n_series]} of
-latent trend realisations.}
-\item{\code{true_trend_sigma}}{Empirical SD of \code{true_trend}.}
-\item{\code{true_sigma_obs}}{Observation noise SD (or
-family-specific dispersion).}
+\item{\code{data_train}, \code{data_test}}{Long data frames with columns
+\code{y}, \code{series}, \code{time}, the recipe's covariates and, for
+binomial families, \code{trials}. \code{data_test} is \code{NULL} when
+\code{proportional_train = 1}.}
+\item{\code{family}, \code{trend_model}, \code{type}}{The simulation settings.}
+\item{\code{true_betas}}{Named population-level coefficients.}
+\item{\code{true_smooths}}{Named list of data frames holding each
+true smooth on a grid of its covariate, in column \code{f_true}.}
+\item{\code{true_trend}}{\verb{[n_timepoints, n_series]} matrix of the
+latent trend.}
+\item{\code{true_trend_sigma}}{Standard deviation of \code{true_trend}.}
+\item{\code{true_sigma_obs}}{The family's scale or dispersion, or
+\code{NA} for a family without one.}
 }
 }
 \description{
-Generates training (and optional testing) data under a fixed
-catalog of observation-side covariate recipes (the \code{type}
-argument) crossed with any of the supported trend dynamics
-(the \code{trend_model} argument). Inspired by \code{\link[mgcv:gamSim]{mgcv::gamSim()}}'s
-fixed-recipe pattern but extended to cover mvgam's state-space
-grammar (smooths + GPs + random effects + AR/RW/CAR/VAR
-dynamics).
+Simulates training and test data from one of seven
+observation-side recipes (\code{type}) combined with a latent trend
+(\code{trend_model}). The recipes cover smooths, Gaussian processes and
+random effects. Every generative quantity is returned for recovery
+checks.
 }
 \details{
-The seven recipes:
-
 \describe{
-\item{\code{type = 1}}{\code{y ~ s(x)} with \code{RW()} trend.
-Single smooth covariate + random-walk trend; the simplest
-mvgam recipe.}
+\item{\code{type = 1}}{\code{y ~ s(x)} with an \code{RW()} trend.}
 \item{\code{type = 2}}{\code{y ~ s(x) + s(z)} with an \code{AR(p = 1)} trend
-whose coefficient is 0.7. Two additive smooths.}
+whose coefficient is 0.7.}
 \item{\code{type = 3}}{\code{y ~ s(x) + (1 | grp)} with an \code{AR(p = 1)}
-trend whose coefficient is 0.7. Hierarchical: random
-intercept per group level (5 groups by default).}
+trend whose coefficient is 0.7. The random intercept has five
+levels.}
 \item{\code{type = 4}}{\code{y ~ gp(x)} with an \code{AR(p = 1)} trend whose
-coefficient is 0.7. Gaussian-process covariate.}
-\item{\code{type = 5}}{State-space: obs \code{y ~ x}, trend formula
-\code{~ s(z)}, and an \code{AR(p = 1)} trend whose coefficient is 0.6.
-The smooth enters the latent state. \code{prop_trend} defaults
-to \code{0.2} for this type, which keeps the AR component small
-relative to the smooth and makes the two identifiable.}
-\item{\code{type = 6}}{\code{y ~ s(season, bs = "cc")} with \code{CAR(time, series)}. Cyclic seasonal + continuous-time AR(1) on
-irregular time gaps (\verb{Delta t ~ Uniform(1, 6)}), with
-autocorrelation 0.7 over the median gap.}
-\item{\code{type = 7}}{\code{y ~ s(x)} with sparse
-\code{AR(p = c(1, 12))}. The latent state carries lag-1 momentum
-and lag-12 recurrence, with coefficients 0.55 and 0.40. The
-observation side holds a smooth of a covariate that is not
-periodic, which makes it identifiable from the latent state.
-\code{prop_trend} defaults to \code{0.6}.}
+coefficient is 0.7.}
+\item{\code{type = 5}}{\code{y ~ x} with \code{trend_formula = ~ s(z)} and an
+\code{AR(p = 1)} trend whose coefficient is 0.6. The smallest
+\code{prop_trend} default keeps the autoregression separable from the
+smooth.}
+\item{\code{type = 6}}{\code{y ~ s(season, bs = "cc")} with a \code{CAR()} trend
+on irregular gaps drawn from \code{Uniform(1, 6)}. The autocorrelation
+over the median gap is 0.7.}
+\item{\code{type = 7}}{\code{y ~ s(x)} with a sparse \code{AR(p = c(1, 12))}
+trend whose coefficients are 0.55 and 0.40. The covariate is not
+periodic. All of the seasonal recurrence comes from the lag-12
+coefficient.}
 }
 
-For multi-series simulations (\code{n_series > 1}), the observation
-covariates \code{x}, \code{z}, etc. are independently drawn per
-series-time cell; the trend dynamics follow \code{trend_model}
-(independent per series unless the constructor specifies
-\code{cor = TRUE} or \code{VAR()}).
+Covariates are drawn independently for each row. Series are
+independent unless the trend correlates them, as \code{VAR()}, \code{ZMVN()}
+and \code{cor = TRUE} do. The trend and the observation-side terms are
+each centred, then rescaled to their shares of a link-scale standard
+deviation that keeps the response in a plausible range for the
+family.
 }
 \examples{
-# Three Poisson series with an AR(1) latent trend.
-set.seed(0)
+# Three Poisson series with an AR(1) latent trend
 simdat <- sim_mvgam(
   family       = poisson(),
   n_series     = 3L,
   n_timepoints = 120L,
-  trend_model  = AR()
+  trend_model  = AR(),
+  seed         = 0L
 )
 head(simdat$data_train)
-summary(simdat)
+simdat
+
+# The true smooth of x
+plot(f_true ~ x, data = simdat$true_smooths$`s(x)`, type = "l")
+
+# Next: mvgam(y ~ s(x), trend_formula = ~ AR(),
+#   data = simdat$data_train, family = poisson())
 
 }
 \seealso{
-\code{\link[mgcv:gamSim]{mgcv::gamSim()}} for the conceptual inspiration;
-\code{\link[=mvgam]{mvgam()}} for the fitter the simulated data can be fed to.
-For detection-error families (\code{\link[=occ]{occ()}} / \code{\link[=nmix]{nmix()}} variants),
-use \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} instead: the closure-unit
-grain (sites x visits) does not fit the time-series layout
-\code{sim_mvgam()} produces. For multi-species site-by-species
-data with correlated species, use \code{\link[=sim_jsdm]{sim_jsdm()}}, which draws
-one row per species at each site.
+\code{\link[=mvgam]{mvgam()}} fits the simulated data. \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}}
+simulates occupancy and N-mixture data. \code{\link[=sim_jsdgam]{sim_jsdgam()}} simulates
+site-by-species data. The
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview article} fits a
+model to data from \code{sim_mvgam()}.
 
 Other simulation: 
 \code{\link{sim_closure_unit_data}()},
-\code{\link{sim_jsdm}()}
+\code{\link{sim_jsdgam}()}
 }
 \author{
 Nicholas J Clark

@@ -18,9 +18,7 @@ of per-unit detection and abundance summaries with its own
 \link[=print.mvgam_sim_closure_unit_summary]{print()} method.
 }
 \description{
-Specialised summary that prints the closure-unit dimensions,
-the recipe, the per-species recovery targets, and a one-line
-detection-rate diagnostic so users can sanity-check that the
-simulated data is non-degenerate (e.g. not all-zeros or all-
-detected).
+The dimensions, the recipe, the ranges of the true state and
+detection parameters and the share of non-zero observations. A share
+of 0 or 1 marks data with no information on detection.
 }

@@ -9,8 +9,7 @@
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}
 
-\item{pars}{The older brms name for \code{variable}, used when
-\code{variable} is \code{NULL}.}
+\item{pars}{Deprecated alias for \code{variable}.}
 
 \item{variable}{Either a keyword shortcut, a character vector of
 parameter names, or (when \code{regex = TRUE}) a vector of regular
@@ -29,27 +28,45 @@ coefficients (\verb{b_*_trend}, \verb{bs_*_trend} and \verb{bsp_*_trend}).
 \item \code{"trend_smooth_params"}: trend-side smooth SDs.
 }
 \code{NULL} (the default) returns every parameter. A bare vector name,
-such as \code{"sigma_trend"}, selects every element. \code{\link[=variables.mvgam]{variables.mvgam()}}
-lists the exact names and how they are formed.}
+such as \code{"sigma_trend"}, selects every element. Group-level
+effects, factor loadings and latent states have no keyword. Select
+them by name. \code{\link[=variables.mvgam]{variables.mvgam()}} lists the names a fit holds.}
 
-\item{prob}{Numeric in \verb{(0, 1)}. The credible-interval mass
-to report. Defaults to \code{0.95}.}
+\item{prob}{Numeric in \verb{(0, 1)}. The probability mass each interval
+holds. Defaults to \code{0.95}.}
 
 \item{...}{Further arguments of \code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}}, such as
 \code{regex}.}
 }
 \value{
-A numeric matrix with one row per parameter and two
-columns reporting the lower and upper interval bounds.
+A numeric matrix with one row per parameter and two columns,
+the lower and upper bounds.
 }
 \description{
-Quantile credible intervals of the posterior draws of parameters,
-as \code{\link[brms:posterior_interval.brmsfit]{brms::posterior_interval.brmsfit()}} gives them. The parameters
-are chosen as in \code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}}.
+Central quantile intervals of the posterior draws of parameters. The
+parameters are chosen as in \code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}}.
+}
+\examples{
+\dontrun{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
+
+# 90 percent intervals of the autoregression and its innovation SD
+posterior_interval(mod, variable = c("ar1_trend", "sigma_trend"),
+                   prob = 0.9)
+
+# Next: summary() reports these with convergence diagnostics
+}
+
 }
 \seealso{
-\code{\link[brms:posterior_interval.brmsfit]{brms::posterior_interval.brmsfit()}},
-\code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}}, \code{\link[=predictive_interval.mvgam]{predictive_interval.mvgam()}}.
+\code{\link[=predictive_interval.mvgam]{predictive_interval.mvgam()}} gives intervals of predictive
+draws. \code{\link[=summary.mvgam]{summary.mvgam()}} reports intervals with convergence
+diagnostics.
 
 Other posterior summaries: 
 \code{\link{VarCorr.mvgam}()},

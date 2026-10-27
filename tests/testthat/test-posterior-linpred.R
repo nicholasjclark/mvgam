@@ -597,7 +597,11 @@ test_that("dpar_link() reads the parameter's own link", {
 
   # A parameter the family has no link for anywhere is an error, not
   # a silent identity.
-  expect_error(dpar_link(poisson(), "sigma"), "No link is recorded")
+  expect_error(
+    dpar_link(poisson(), "sigma"),
+    "Family 'poisson' lacks a link for parameter 'sigma'",
+    fixed = TRUE
+  )
 })
 
 

@@ -59,6 +59,35 @@ test_that("a trend requires a series column", {
                trend_formula = ~ AR(), plot = FALSE)
   )
   expect_identical(res$n_series, 1L)
+  # A held-out frame is named in the refusal and its remedy
+  expect_error(
+    suppressMessages(mvgam_data(df, family = poisson(),
+                                trend_formula = ~ AR(),
+                                newdata = df[, c("y", "series")])),
+    "Add 'time' to 'newdata'"
+  )
+})
+
+test_that("the response comes from the formula", {
+  set.seed(7L)
+  df <- data.frame(time = seq_len(12L), x = rnorm(12L),
+                   count = c(NA, rpois(11L, 3)))
+  res <- suppressMessages(
+    mvgam_data(as.list(df), formula = count ~ x, family = poisson(),
+               newdata = as.list(df), series = 1L)
+  )
+  expect_identical(res$n_missing, 1L)
+  expect_s3_class(res$plot, "patchwork")
+  expect_error(
+    mvgam_data(df, y = "x", formula = count ~ x, plot = FALSE),
+    "'y' names 'x' but the formula's response is 'count'"
+  )
+  df$z <- rnorm(12L)
+  expect_error(
+    mvgam_data(df, formula = bf(count ~ 1) + bf(z ~ 1) + set_rescor(FALSE),
+               plot = FALSE),
+    "checks one response at a time"
+  )
 })
 
 test_that("the trend constructor names the axis columns", {
@@ -177,8 +206,8 @@ test_that("the trend link warning reaches a prefit", {
 })
 
 test_that("the trend link warning reaches mvgam_multiple", {
-  # `mvgam_multiple()` is exported and reaches a fit without passing
-  # through `mvgam()`, which is why it carries its own call.
+  # `mvgam_multiple()` replays the call through `mvgam()`, which raises
+  # the notice once for every imputation.
   set.seed(2)
   mk <- function() {
     data.frame(
@@ -553,11 +582,9 @@ test_that("newdata is held to the same support as the training data", {
 })
 
 test_that("time regularity is gated on the trend's own rules", {
-  # The rule was written twice: `validations.R` reads each trend's
-  # `validation_rules`, `mvgam_data()` named CAR directly. They
-  # disagreed on `ZMVN()`, whose covariance is indexed by series
-  # alone and so is exchangeable in time, and gappy data were
-  # refused for it in one place and accepted in the other.
+  # Each trend's `validation_rules` decide whether times must be
+  # evenly spaced. `ZMVN()` indexes its covariance by series alone and
+  # accepts gaps.
   set.seed(2)
   irregular <- sort(sample(seq_len(40), 25))
   dat <- data.frame(

@@ -148,11 +148,12 @@ has_factor_coefficients <- function(trend_spec) {
 # exactly these. A sign flip of a factor negates the `signed` ones.
 # Their factor index comes last. `Z_cols` holds it first. A new
 # per-factor parameter of a trend with its own coefficients is added
-# here. The multiplicative gamma process samples `varrho_inv`, whose
-# running product is `Psi_diag`. `relabel_chain()` recomputes it from
-# the relabelled `Psi_diag`.
+# here. The multiplicative gamma process samples the unit-scale
+# loadings `Z_raw` and `varrho_inv`, whose running product is
+# `Psi_diag`. `relabel_chain()` recomputes `varrho_inv` from the
+# relabelled `Psi_diag`.
 factor_indexed_pars <- list(
-  signed = c("Z", "lv_trend", "innovations_trend",
+  signed = c("Z", "Z_raw", "lv_trend", "innovations_trend",
              "scaled_innovations_trend", "ma_innovations_trend",
              "init_innovations_trend"),
   signed_first = "Z_cols",

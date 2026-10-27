@@ -2,59 +2,55 @@
 % Please edit documentation in R/marginaleffects.mvgam.R
 \name{mvgam_marginaleffects}
 \alias{mvgam_marginaleffects}
-\title{marginaleffects S3 methods for mvgam objects}
+\title{marginaleffects methods for mvgam objects}
 \description{
-Hook mvgam fits into the \code{marginaleffects} ecosystem. The current
-marginaleffects API (>= 0.20) requires only \code{get_predict},
-\code{get_coef}, \code{get_vcov} and \code{set_coef}. Bayesian models bypass the
-delta-method path and use the \code{posterior_draws} attribute attached
-by \code{get_predict}, so \code{get_coef} / \code{get_vcov} / \code{set_coef} exist
-only to satisfy the S3 surface. Neither predictions nor slopes
-read them.
+These methods let \code{\link[marginaleffects:predictions]{marginaleffects::predictions()}},
+\code{\link[marginaleffects:slopes]{marginaleffects::slopes()}} and \code{\link[marginaleffects:comparisons]{marginaleffects::comparisons()}}
+take an mvgam fit. \code{get_predict()} returns the posterior draws in
+the \code{posterior_draws} attribute. marginaleffects computes every
+summary from those draws. \code{get_coef()}, \code{get_vcov()} and
+\code{set_coef()} complete the methods marginaleffects calls. The draws
+carry the uncertainty. None of the three changes a result.
 }
 \section{Prediction scale}{
 
-The \code{type} tokens mvgam registers differ from the ones other model
-classes use, so it is worth naming them. \code{"expected"} is \code{E[Y]},
-the quantity most classes reach through \code{"response"}; \code{"response"}
-here is the outcome scale, carrying observation noise, and returns
-integers for a count family. \code{"link"} is the linear predictor.
-marginaleffects orders \code{"response"} first and takes its default
-from that. Pass \code{type = "expected"} when the expectation is wanted.
-\code{comparisons()} and \code{slopes()} on \code{"response"} return the contrast
-or slope of \code{E[Y]}, as \code{"expected"} does. Each contrasts two
-predictions. Observation noise in each prediction would widen the
-contrast. A slope also divides it by a small step and swamps the
-covariate effect. marginaleffects still labels the result
-\code{"response"}. \code{predictions()} on \code{"response"} keeps the observation
-noise. Results are
-summarised by the posterior median, which for a skewed predictive
-is below the mean.
+mvgam registers three \code{type} values with marginaleffects:
+\itemize{
+\item \code{"expected"}: the expectation \code{E[Y]}. Most other model
+classes call this \code{"response"}.
+\item \code{"response"}: predictive draws with observation noise, on
+the outcome scale. A count family gives integers.
+\item \code{"link"}: the linear predictor.
+}
+marginaleffects takes \code{"response"} as the default. Pass
+\code{type = "expected"} for the expectation. \code{comparisons()} and
+\code{slopes()} replace \code{"response"} with \code{"expected"}. A contrast
+differences two predictions. Observation noise in each would widen
+it. A slope also divides that noise by a small step. The result
+keeps the label \code{"response"}. \code{predictions()} on \code{"response"} keeps
+the observation noise. marginaleffects summarises the draws by
+their posterior median. For a right-skewed predictive distribution
+the median falls below the mean.
 }
 
 \section{The latent trend}{
 
-\code{process_error = FALSE}, the default, leaves the trend at its
-deterministic submodel, which is the counterfactual these surfaces
-are usually read for: a covariate effect with the latent process
-held out, drawn against a credible band that stays legible. It does
-not fix the trend at a posterior mean, and it does not condition on
-the state the model inferred; every coefficient still varies draw
-to draw.
+With \code{process_error = FALSE}, the default, the trend contributes its
+deterministic submodel. Each draw keeps its own coefficients. The
+result is a covariate effect with the latent process held out. Its
+credible band excludes the uncertainty of the latent state.
 
-The cost is that a slope or a comparison taken this way is biased
-low against the fitted model's own \code{E[Y]}, by
-\eqn{\exp(\sigma^2 / (2(1 - \rho^2)))} on a log link, since the
-trend's stationary spread is left out of the expectation being
-differentiated. Pass \code{process_error = TRUE} for the unbiased
-effect; the band widens with it, because the latent state's own
-uncertainty is then part of the answer.
+A slope or comparison taken this way is biased low against the
+model's own \code{E[Y]}. Its expectation leaves out the trend's
+stationary spread. Under a log link and an AR(1) trend the factor
+is \eqn{\exp(\sigma^2 / (2(1 - \rho^2)))}. \code{process_error = TRUE}
+gives the unbiased effect. Its band is wider because it includes
+the uncertainty of the latent state.
 
-A fit whose covariates carry little of the signal, with most of the
-series-level variation in a strong autoregressive process, has
-little for either setting to show. Read such a model through
-\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} instead, which return the
-state the model inferred rather than a covariate counterfactual.
+When an autoregressive process carries most of the series-level
+variation, a covariate effect shows little under either setting.
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} return the state the
+model inferred.
 }
 
 \references{

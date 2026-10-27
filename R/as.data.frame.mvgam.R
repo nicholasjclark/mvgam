@@ -3,8 +3,13 @@
 #' @name mvgam_draws
 #'
 #' @description
-#' Extract posterior draws in conventional formats as data.frames,
-#' matrices, arrays, or `posterior::draws_*` objects.
+#' Extract posterior draws as a data frame, matrix or array, or as one
+#' of the `posterior::draws_*` classes. Parameters take their brms
+#' names, such as `b_x` and `sd_grp__Intercept`. A trend parameter
+#' indexed by series takes the series name, as in
+#' `sigma_trend[series_1]`. The
+#' `r mvgam_article("idm", "integrated data model article")` contrasts
+#' intercepts drawn with `as_draws_df()`.
 #'
 #' @param x A fitted `mvgam` object.
 #' @param variable Either a keyword shortcut, a character vector of
@@ -24,17 +29,18 @@
 #'     \item `"trend_smooth_params"`: trend-side smooth SDs.
 #'   }
 #'   `NULL` (the default) returns every parameter. A bare vector name,
-#'   such as `"sigma_trend"`, selects every element. [variables.mvgam()]
-#'   lists the exact names and how they are formed.
+#'   such as `"sigma_trend"`, selects every element. Group-level
+#'   effects, factor loadings and latent states have no keyword. Select
+#'   them by name. [variables.mvgam()] lists the names a fit holds.
 #' @param regex Logical. When `TRUE`, each entry of `variable` is
 #'   treated as a regular expression and any parameter matching at
 #'   least one pattern is selected. Keyword shortcuts are still
 #'   honoured. Defaults to `FALSE`.
-#' @param draw For `as.data.frame.mvgam`, an optional integer
-#'   vector of draw indices (1-based) to subset after extraction.
-#'   `NULL` (the default) returns all draws.
+#' @param draw Optional positive integer indices of the draws to keep,
+#'   counted across chains. `NULL` (the default) keeps every draw.
 #' @param inc_warmup Logical. Include warmup draws? Defaults to
-#'   `FALSE`.
+#'   `FALSE`. A fit holds them only when sampled with
+#'   `save_warmup = TRUE`.
 #' @param row.names,optional Ignored.
 #' @param ... Unused. Anything passed here is refused.
 #'
@@ -65,10 +71,17 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Trend-dynamics parameters as a draws data frame.
-#' as.data.frame(mod, variable = "trend_params")
-#' # The same draws as a posterior::draws_array.
-#' as_draws_array(mod, variable = "trend_params")
+#' # Trend-dynamics parameters as a data frame of draws
+#' head(as.data.frame(mod, variable = "trend_params"))
+#'
+#' # Regular expressions select by pattern, here the smooth's basis
+#' # coefficients and its smoothing SD
+#' colnames(as.matrix(mod, variable = c("^s_", "^sds_"), regex = TRUE))
+#'
+#' # One random variable per parameter, printed as mean and SD
+#' as_draws_rvars(mod, variable = "trend_params")
+#'
+#' # Next, mcmc_plot(mod) plots the same draws
 #' }
 #'
 #' @author Nicholas J Clark
@@ -84,13 +97,20 @@ mvgam_keyword_shortcuts <- c(
 )
 
 
-# Resolve a single keyword to the names in `all_vars` it selects.
-# Each keyword is a (side, kind) pair from the one taxonomy.
-# `?mvgam_draws` documents `smooth_params` as the smoothing standard
-# deviations alone. The smooth bucket `tidy()` reports from also holds
-# the basis coefficients and the Gaussian-process hyperparameters.
-#'@noRd
+#' The parameter names a keyword shortcut selects
+#'
+#' Each keyword is a pair of side and kind from the parameter taxonomy.
+#' `smooth_params` selects the smoothing standard deviations alone. The
+#' smooth group `tidy()` reports also holds the basis coefficients and
+#' the Gaussian-process hyperparameters.
+#'
+#' @param keyword One of `mvgam_keyword_shortcuts`
+#' @param all_vars Character vector of user-facing parameter names
+#' @return Character vector of the names the keyword selects
+#' @noRd
 resolve_mvgam_keyword <- function(keyword, all_vars) {
+  checkmate::assert_choice(keyword, mvgam_keyword_shortcuts)
+  checkmate::assert_character(all_vars)
   kind <- mvgam_par_kind(all_vars)
   side <- mvgam_par_side(all_vars)
   pick <- function(k, sd) all_vars[kind %in% k & side == sd]
@@ -152,9 +172,9 @@ mvgam_beta_aliases <- function(x) {
     stats::setNames(old, new)
   }
   # brms stores a non-linear sub-formula in `pforms` under its nlpar
-  # name, and treats it as one only when the top-level formula has
-  # `attr(., "nl") = TRUE`. The per-block branch below tests the
-  # names found here.
+  # name. It treats the formula as non-linear only when the top-level
+  # formula carries `attr(., "nl") = TRUE`. The per-block branch below
+  # tests the names found here.
   obs_form <- x$formula
   is_nl <- isTRUE(attr(
     if (inherits(obs_form, "brmsformula")) obs_form$formula else obs_form,
@@ -190,8 +210,8 @@ mvgam_beta_aliases <- function(x) {
   # The unpenalised part of each smooth: `bs<p>[k]` maps to
   # `bs<p>_<colname>`, the column named in the matching `Xs<p>`
   # block, for every predictor `<p>` as the `X` sweep above names
-  # them. brms keeps no intercept column in `Xs`, and the index is
-  # direct.
+  # them. brms keeps no intercept column in `Xs`. Each index maps to
+  # the column at that position.
   Xs_blocks <- grep("^Xs(_.+)?$", names(x$standata), value = TRUE)
   bs_parts <- lapply(Xs_blocks, function(blk) {
     suffix <- sub("^Xs", "", blk)
@@ -568,7 +588,7 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_flag(all)
   checkmate::assert_character(pars, null.ok = TRUE)
-  raw <- pars %||% posterior::variables(posterior::as_draws(x$fit))
+  raw <- pars %||% fit_variables(x$fit)
   user <- apply_mvgam_aliases(
     raw, c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x),
            mvgam_smooth_aliases(x, raw), mvgam_special_aliases(x, raw),
@@ -607,8 +627,8 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   }
   raw <- raw[keep]
   user <- user[keep]
-  # brms orders a fitted object's parameters by class, and every
-  # reader of this projection inherits that order
+  # brms orders a fitted object's parameters by class. Every reader of
+  # this projection inherits that order.
   ord <- mvgam_par_order(user)
   stats::setNames(raw[ord], user[ord])
 }
@@ -716,17 +736,15 @@ mvgam_ranef_aliases_side <- function(x,
     n_coef <- length(coefs)
     has_cor <- isTRUE(rows$cor[1L]) && n_coef > 1L
     # The shared-ID syntax `(1 | sp | series)` puts two nlpars under
-    # one id. The names are built per row. Built from the first row
-    # alone, the second nlpar's names collided with the first's.
+    # one id. Each row builds its own names, which keeps the names of
+    # the two nlpars distinct.
     coef_alias <- rows$coef_alias
     group_token_per_coef <- rows$alias_key
-    # brms writes the per-level deviations twice: as the matrix
-    # `r_<id>[<level_idx>, <coef_idx>]` a correlated block is scaled
-    # into, and as the per-coefficient vectors
-    # `r_<id>_<coef_idx>[<level_idx>]` its own comment calls faster to
-    # index. A fit leaves the matrix out with the other working
-    # variables. The posterior holds the vectors, and brms renames
-    # the vectors too.
+    # brms writes the per-level deviations twice. A correlated block is
+    # scaled into the matrix `r_<id>[<level_idx>, <coef_idx>]`. The
+    # per-coefficient vectors `r_<id>_<coef_idx>[<level_idx>]` repeat
+    # it in a form brms finds faster to index. A fit saves the vectors
+    # alone. brms renames those.
     grid <- expand.grid(
       level_idx = seq_len(n_lvl),
       coef_idx = seq_len(n_coef),
@@ -795,77 +813,83 @@ mvgam_ranef_aliases_side <- function(x,
 #' @param x Fitted `mvgam` object
 #' @param variable Character vector of parameter names or regular
 #'   expressions, or `NULL` for the default set
-#' @param regex Logical flag to treat `variable` as regular expressions
-#' @param inc_warmup Logical flag to include warmup draws
+#' @param regex Logical. `TRUE` treats `variable` as regular expressions.
+#' @param inc_warmup Logical. `TRUE` includes the warmup draws.
 #' @return A `draws_array`
 #' @noRd
 extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
                                 inc_warmup = FALSE) {
   checkmate::assert_class(x, "mvgam")
-  checkmate::assert_character(variable, null.ok = TRUE)
-  checkmate::assert_logical(regex, len = 1L)
-  checkmate::assert_logical(inc_warmup, len = 1L)
-  # Every draws method in the package calls this function, and the
-  # one guard serves them all. A prefit has an empty `fit` slot, and
-  # the line below met it with "Don't know how to transform an object
-  # of class 'NULL'", naming neither the state nor the argument that
-  # made it.
+  checkmate::assert_character(variable, min.len = 1L, null.ok = TRUE)
+  checkmate::assert_flag(regex)
+  checkmate::assert_flag(inc_warmup)
+  # Every draws method reaches this guard. A prefit has an empty `fit`
+  # slot.
   require_fitted_model(x)
-  drws <- posterior::as_draws_array(x$fit, inc_warmup = inc_warmup)
   # One projection decides which parameters exist and what they are
-  # called. When the user did not name a `variable`, the
-  # rotation-indeterminate raw factor block is hidden as well: those
-  # have arbitrary Rhat and ESS because no rotation is fixed under
-  # the prior, and their QR-identified counterparts are in the same
-  # posterior. Naming one explicitly keeps it.
-  raw_vars <- posterior::variables(drws)
+  # called. Without a named `variable`, the rotation-indeterminate raw
+  # factor block is hidden as well. The prior fixes no rotation, which
+  # leaves their Rhat and ESS arbitrary. Their QR-identified
+  # counterparts are in the same posterior. Naming one explicitly
+  # keeps it. The selection is settled on the names. Only the selected
+  # parameters' draws are then converted.
+  raw_vars <- fit_variables(x$fit)
   reported_map <- mvgam_user_pars(x, pars = raw_vars)
   user_map <- if (is.null(variable)) {
     reported_map
   } else {
     mvgam_user_pars(x, pars = raw_vars, all = TRUE)
   }
-  renames <- user_map[names(user_map) != user_map]
+  selected <- if (is.null(variable)) {
+    names(user_map)
+  } else {
+    match_draws_variables(variable, regex, names(user_map),
+                          names(reported_map))
+  }
+  keep <- user_map[selected]
+  drws <- stanfit_draws(x$fit, inc_warmup, pars = unname(keep))
+  drws <- posterior::subset_draws(drws, variable = unname(keep))
+  renames <- keep[names(keep) != keep]
   if (length(renames) > 0L) {
     drws <- do.call(
       posterior::rename_variables,
       c(list(drws), as.list(renames))
     )
   }
-  drws <- posterior::subset_draws(drws, variable = names(user_map))
-  if (is.null(variable)) {
-    return(drws)
-  }
-  checkmate::assert_character(variable, min.len = 1L)
-  all_vars <- posterior::variables(drws)
-  # Split user input into keyword shortcuts and "free" patterns so
-  # both can compose in a single call (e.g. variable = c("betas",
-  # "^sd_", "Intercept")).
-  # A keyword names the reported parameters. Only an explicit name
-  # reaches a hidden one.
+  drws
+}
+
+
+#' The user-facing names a `variable` argument selects
+#'
+#' Keyword shortcuts and free names or patterns compose in one call,
+#' as `variable = c("betas", "^sd_", "Intercept")`. A keyword names
+#' the reported parameters. Only an explicit name reaches a hidden one.
+#'
+#' @param variable Character vector of keywords, names or regular
+#'   expressions
+#' @param regex Logical. `TRUE` treats the free entries as regular
+#'   expressions.
+#' @param all_vars Every user-facing name, hidden ones included
+#' @param reported The user-facing names of the reported parameters
+#' @return Character vector of selected names, possibly empty when only
+#'   keywords were given
+#' @noRd
+match_draws_variables <- function(variable, regex, all_vars, reported) {
   is_keyword <- variable %in% mvgam_keyword_shortcuts
-  matched <- character(0L)
-  if (any(is_keyword)) {
-    reported <- names(reported_map)
-    matched <- unlist(lapply(variable[is_keyword], function(k) {
-      resolve_mvgam_keyword(k, reported)
-    }))
-  }
+  matched <- unlist(lapply(variable[is_keyword], resolve_mvgam_keyword,
+                           reported))
   free <- variable[!is_keyword]
   free_matched <- character(0L)
   if (length(free) > 0L) {
     free_matched <- if (isTRUE(regex)) {
-      unique(unlist(lapply(free, function(p) {
-        grep(p, all_vars, value = TRUE)
-      })))
+      unique(unlist(lapply(free, grep, x = all_vars, value = TRUE)))
     } else {
       intersect(expand_variable_names(free, all_vars), all_vars)
     }
   }
-  # Keyword shortcuts may legitimately return an empty set (e.g.
-  # `obs_params` for Poisson, which has no distributional params).
-  # Only error when the user supplied free patterns / names that did
-  # not match, which is a typo signal worth catching.
+  # A keyword can resolve to nothing, as `obs_params` does for a
+  # Poisson model. Free names that match nothing signal a typo.
   if (length(free) > 0L && length(free_matched) == 0L) {
     stop(insight::format_error(c(
       "No parameters matched the supplied 'variable' argument.",
@@ -874,16 +898,100 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
         paste0("'", free, "'", collapse = ", "), "."
       ),
       i = "Call variables(x) to list available parameter names."
-    )))
+    )), call. = FALSE)
   }
-  matched <- unique(c(matched, free_matched))
-  if (length(matched) == 0L) {
-    # Every keyword resolved to empty (e.g. obs_params on Poisson).
-    # Return a zero-column draws_array so downstream coercions stay
-    # well-defined.
-    return(posterior::subset_draws(drws, variable = character(0L)))
+  unique(c(as.character(matched), free_matched))
+}
+
+
+#' The draws array of a fit's `stanfit`
+#'
+#' Without warmup this is the conversion every other draws reader
+#' uses. With warmup the chains come from `fit@sim$samples`, as the
+#' internal brms function `.as_draws_list()` takes them. Each chain
+#' begins with the saved warmup iterations, whose count
+#' `fit@sim$warmup2` records.
+#'
+#' @param fit A `stanfit` object, or a `draws` object, which holds no
+#'   warmup
+#' @param inc_warmup Logical. `TRUE` includes the warmup iterations
+#' @param pars Character vector of parameter names to convert, or
+#'   `NULL` for every saved quantity
+#' @return A `draws_array`
+#' @noRd
+stanfit_draws <- function(fit, inc_warmup = FALSE, pars = NULL) {
+  checkmate::assert(
+    checkmate::check_class(fit, "stanfit"),
+    checkmate::check_class(fit, "draws")
+  )
+  checkmate::assert_flag(inc_warmup)
+  checkmate::assert_character(pars, any.missing = FALSE, null.ok = TRUE)
+  if (!inc_warmup) {
+    if (!is.null(pars) && inherits(fit, "stanfit")) {
+      return(posterior::as_draws_array(stanfit_pars_array(fit, pars)))
+    }
+    return(posterior::as_draws_array(fit))
   }
-  posterior::subset_draws(drws, variable = matched)
+  n_warmup <- if (inherits(fit, "stanfit")) fit@sim$warmup2 else 0L
+  if (!any(n_warmup > 0L)) {
+    stop(insight::format_error(c(
+      "'inc_warmup = TRUE' needs the warmup draws of the fit.",
+      x = "The fit was sampled with 'save_warmup = FALSE'.",
+      i = "Refit with 'save_warmup = TRUE' to keep them."
+    )), call. = FALSE)
+  }
+  posterior::as_draws_array(posterior::as_draws_list(fit@sim$samples))
+}
+
+
+#' The names of the quantities a fit saved
+#'
+#' A stanfit records them. `posterior::variables()` on the converted
+#' draws gives the same names in the same order after copying every
+#' draw.
+#'
+#' @param fit A stanfit or draws object
+#' @return Character vector of variable names
+#' @noRd
+fit_variables <- function(fit) {
+  if (inherits(fit, "stanfit")) {
+    return(fit@sim$fnames_oi)
+  }
+  posterior::variables(posterior::as_draws_matrix(fit))
+}
+
+
+#' The draws of `lp__` alone, with the chains and iterations of the fit
+#'
+#' Counting draws, chains or iterations needs their shape. Converting
+#' the whole fit copies every saved quantity.
+#'
+#' @param fit A stanfit or draws object
+#' @return A draws array
+#' @noRd
+fit_draws_shape <- function(fit) {
+  stanfit_draws(fit, pars = character(0L))
+}
+
+
+#' Draws kept by their indices across chains
+#'
+#' A draw index counts across chains. `posterior::subset_draws()`
+#' merges the chains to apply it and prints a message saying so.
+#' Merging first applies the same index without the message.
+#'
+#' @param drws A `draws` object
+#' @param draw Positive integer draw indices, or `NULL` for every draw
+#' @return `drws`, subset when `draw` is given
+#' @noRd
+subset_draw_ids <- function(drws, draw = NULL) {
+  checkmate::assert_class(drws, "draws")
+  checkmate::assert_integerish(draw, lower = 1L, any.missing = FALSE,
+                               min.len = 1L, null.ok = TRUE)
+  if (is.null(draw)) {
+    return(drws)
+  }
+  posterior::subset_draws(posterior::merge_chains(drws), draw = draw)
 }
 
 
@@ -914,42 +1022,37 @@ as.data.frame.mvgam <- function(x, row.names = NULL, optional = TRUE,
                                  variable = NULL, draw = NULL,
                                  regex = FALSE, ...) {
   rlang::check_dots_empty()
-  drws <- posterior::as_draws_df(
-    extract_mvgam_draws(x, variable, regex)
-  )
-  if (!is.null(draw)) {
-    # A draw index counts across chains. `subset_draws()` merges the
-    # chains to apply it and prints a message saying so. Merging first
-    # applies the same index without the message.
-    drws <- posterior::subset_draws(posterior::merge_chains(drws),
-                                    draw = draw)
-  }
-  as.data.frame(drws)
-}
-
-
-#' @rdname mvgam_draws
-#' @export
-as.matrix.mvgam <- function(x, variable = NULL, regex = FALSE, ...) {
-  rlang::check_dots_empty()
-  # Unclassed, as `brms::as.matrix.brmsfit` unclasses: a caller
-  # asking for a matrix is handed one. A `draws_matrix` keeps its
-  # class through subsetting, arithmetic and `as.matrix()` alike, so
-  # anything typed to a bare matrix refuses it downstream.
-  unclass(posterior::as_draws_matrix(
-    extract_mvgam_draws(x, variable, regex)
+  as.data.frame(subset_draw_ids(
+    posterior::as_draws_df(extract_mvgam_draws(x, variable, regex)),
+    draw
   ))
 }
 
 
 #' @rdname mvgam_draws
 #' @export
-as.array.mvgam <- function(x, variable = NULL, regex = FALSE, ...) {
+as.matrix.mvgam <- function(x, variable = NULL, draw = NULL,
+                            regex = FALSE, ...) {
   rlang::check_dots_empty()
-  # Unclassed for the same reason `as.matrix.mvgam()` is, and to
-  # match `brms::as.array.brmsfit()`. `as_draws_array()` remains the
-  # way to ask for the draws object itself.
-  unclass(extract_mvgam_draws(x, variable, regex))
+  # Unclassed, as `brms::as.matrix.brmsfit()` unclasses. A
+  # `draws_matrix` keeps its class through subsetting, arithmetic and
+  # `as.matrix()` alike. Code expecting a bare matrix refuses it.
+  unclass(subset_draw_ids(
+    posterior::as_draws_matrix(extract_mvgam_draws(x, variable, regex)),
+    draw
+  ))
+}
+
+
+#' @rdname mvgam_draws
+#' @export
+as.array.mvgam <- function(x, variable = NULL, draw = NULL,
+                           regex = FALSE, ...) {
+  rlang::check_dots_empty()
+  # Unclassed for the reason `as.matrix.mvgam()` gives.
+  # `brms::as.array.brmsfit()` also returns a bare array.
+  # `as_draws_array()` returns the draws object itself.
+  unclass(subset_draw_ids(extract_mvgam_draws(x, variable, regex), draw))
 }
 
 

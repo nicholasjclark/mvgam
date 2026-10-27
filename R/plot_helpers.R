@@ -668,8 +668,7 @@ mvgam_facet_series <- function(scales = "free_y", ncol = NULL) {
 
 #' Repelled text or label layer for label-heavy plots
 #'
-#' Serves the ordination plots. Uses ggrepel when it is installed and
-#' plain `geom_text()` or `geom_label()` otherwise.
+#' Serves the ordination plots.
 #'
 #' @param data Data frame of the labels
 #' @param mapping Aesthetic mapping from [ggplot2::aes()]
@@ -684,17 +683,14 @@ mvgam_repel_layer <- function(
   ...
 ) {
   checkmate::assert_data_frame(data)
-  checkmate::assert_class(mapping, "uneval")
   type <- match.arg(type)
-  has_repel <- requireNamespace("ggrepel", quietly = TRUE)
-  fn <- if (has_repel && type == "text") {
+  insight::check_if_installed(
+    "ggrepel", reason = "to repel overlapping labels"
+  )
+  fn <- if (type == "text") {
     ggrepel::geom_text_repel
-  } else if (has_repel) {
-    ggrepel::geom_label_repel
-  } else if (type == "text") {
-    ggplot2::geom_text
   } else {
-    ggplot2::geom_label
+    ggrepel::geom_label_repel
   }
   fn(data = data, mapping = mapping, ...)
 }
@@ -1103,10 +1099,7 @@ resolve_factor_loadings <- function(object = NULL,
       n_lv <- object$trend_metadata$n_lv %||%
         (if (!is.null(fixed_Z)) ncol(fixed_Z) else NULL)
     }
-    if (is.null(n_series)) {
-      n_series <- mvgam_axes(object)$series$n %||%
-        (if (!is.null(fixed_Z)) nrow(fixed_Z) else NULL)
-    }
+    n_series <- n_series %||% loading_series_count(object)
   }
   checkmate::assert_int(n_lv, lower = 1L)
   checkmate::assert_int(n_series, lower = 1L)
@@ -1142,8 +1135,23 @@ resolve_factor_loadings <- function(object = NULL,
         "The caller passed 'object = NULL' and 'draws_mat = NULL'."
       )
     }
-    draws_mat <- posterior::as_draws_matrix(object$fit)
+    draws_mat <- fit_draws(object$fit, c("Z", "Z_tilde"))
   }
   extract_Z_loadings(draws_mat, n_obs_series = n_series,
                      n_lv = n_lv, basis = basis)
+}
+
+
+#' Posterior medians of a factor model's loadings
+#'
+#' @param object Fitted `mvgam` factor model
+#' @param n_lv Integer number of latent factors
+#' @return Numeric matrix `[n_series, n_lv]` with the fitted series as
+#'   row names
+#' @noRd
+factor_loading_medians <- function(object, n_lv) {
+  med <- apply(resolve_factor_loadings(object, n_lv = n_lv), c(2L, 3L),
+               stats::median)
+  rownames(med) <- fitted_series_levels(object)
+  med
 }

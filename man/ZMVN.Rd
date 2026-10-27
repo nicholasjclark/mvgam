@@ -33,36 +33,17 @@ names each row's series. Its levels fix the order of the series. A
 trend needs this column even for a single series. Defaults to \code{series}.}
 
 \item{gr}{An optional grouping \code{factor} in \code{data} that sets up
-hierarchical residual correlations. The correlation matrix of each
-level of \code{gr} is
+hierarchical residual correlations. Each level's correlation matrix
+shrinks toward a global one by the weight \code{alpha_cor_trend}, as
+\link{trend_constructors} sets out. Without \code{subgr}, the series column
+names the units within each level.}
 
-\eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} +
-  (1 - \alpha_{cor})\Omega_{group, local}},
-
-where \eqn{\Omega_{global}} is a \emph{global} correlation matrix,
-\eqn{\Omega_{group, local}} a \emph{local deviation} correlation matrix
-and \eqn{\alpha_{cor}} (\code{alpha_cor_trend}) the weight that shrinks
-each group's matrix toward the global one. Supplying \code{gr} requires
-\code{subgr}. \code{cor} defaults to \code{TRUE} for a grouped trend. An explicit
-\code{cor = FALSE} is refused.}
-
-\item{subgr}{A subgrouping \code{factor} in \code{data} naming the
-observational units within each level of \code{gr}. Defaults to
-\code{series}. A model with hierarchical correlations builds its series
-from \code{gr} and \code{subgr}. Its \code{data} then needs no \code{series} column.
-
-For example, to model counts of several species (\code{species} in
-\code{data}) at sampling sites (\code{site}) in three regions (\code{region})
-with residuals correlated within regions, specify \code{time = site},
-\code{gr = region} and \code{subgr = species}. \code{mvgam()} orders the data by
-\code{site} and builds the series as
-
-\verb{series = interaction(gr, subgr, drop = TRUE, sep = "_",}
-\verb{lex.order = TRUE)}
-
-A region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}. A
-\code{series} column that disagrees with the derived series is replaced
-by it, with a warning.}
+\item{subgr}{A subgrouping \code{factor} in \code{data} naming the units within
+each level of \code{gr}, from which the series are built as
+\link{trend_constructors} describes. For species (\code{species}) counted at
+sites (\code{site}) in regions (\code{region}), \code{time = site}, \code{gr = region}
+and \code{subgr = species} correlate the species' residuals within each
+region.}
 
 \item{n_lv}{The number of latent factors to estimate for dynamic
 factor models. When \code{n_lv} is smaller than the number of series,
@@ -177,7 +158,7 @@ the column scaling to the multiplicative gamma process prior of
 Bhattacharya & Dunson (2011), which shrinks later columns of \code{Z}
 toward zero with increasing strength. \code{n_lv} is then a truncation
 ceiling on the factor count. \code{\link{active_factors}} reports
-the posterior distribution of the number of active columns.
+the posterior distribution of the number of active factors.
 }
 
 \examples{
@@ -203,12 +184,12 @@ mod <- mvgam(
 )
 summary(mod)
 
-# The per-series latent SDs
-mcmc_plot(mod, variable = "sigma_trend", regex = TRUE,
-          type = "intervals")
-
 # The correlations among the series that ZMVN() estimates
-residual_cor(mod)
+rc <- residual_cor(mod)
+rc
+plot(rc)
+
+# Next: jsdgam() fits ZMVN() factors across many species
 }
 
 }

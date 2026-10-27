@@ -285,9 +285,9 @@ test_that("resolve_series_arg resolves each accepted form", {
 test_that("resolve_series_arg refuses what names no single series", {
   stub <- series_stub()
   expect_error(mvgam:::resolve_series_arg("not_a_series", stub),
-               "not one of the model's series levels")
+               "Unknown series name")
   expect_error(mvgam:::resolve_series_arg(99L, stub),
-               "'series' index is out of range")
+               "out of range")
   expect_error(mvgam:::resolve_series_arg(c("s1", "s2"), stub),
                "NULL, 'all', a series name")
   empty <- structure(

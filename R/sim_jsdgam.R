@@ -1,3 +1,12 @@
+# The parameters `sim_jsdgam()` gives the families `sim_family_rng()`
+# does not draw from. A caller's `family_pars` overrides them.
+sim_jsdgam_family_defaults <- list(
+  mvn = list(Psi = 0.5),
+  mvt = list(Psi = 0.5, nu = 5),
+  diri = list(phi = 30),
+  multi = list(unit_total = 30L)
+)
+
 #' One unit's simulated responses from a vector of linear predictors
 #'
 #' Families with independently drawn components go to `sim_family_rng()`.
@@ -8,28 +17,22 @@
 #'
 #' @param eta Numeric vector of `K` linear predictors, one per species
 #' @param family Family object of the simulated model
-#' @param pars Named list of family parameters, such as `Psi`, `nu`,
-#'   `phi` or `unit_total`
+#' @param pars Named list of family parameters, holding the
+#'   `sim_jsdgam_family_defaults` of the family
 #' @return Numeric vector of length `K` holding the unit's responses
 #' @noRd
-sim_jsdm_draw <- function(eta, family, pars = list()) {
-  checkmate::assert_numeric(eta, min.len = 1L)
-  checkmate::assert_list(family)
-  checkmate::assert_list(pars)
+sim_jsdgam_draw <- function(eta, family, pars) {
   K <- length(eta)
   switch(
     resolve_family_name(family),
-    "mvn" = eta + stats::rnorm(K, sd = pars$Psi %||% 0.5),
-    "mvt" = eta + (pars$Psi %||% 0.5) *
-      stats::rt(K, df = pars$nu %||% 5),
+    "mvn" = eta + stats::rnorm(K, sd = pars$Psi),
+    "mvt" = eta + pars$Psi * stats::rt(K, df = pars$nu),
     "diri" = {
-      shape <- softmax(eta) * (pars$phi %||% 30)
-      g <- stats::rgamma(K, shape = shape, rate = 1)
+      g <- stats::rgamma(K, shape = softmax(eta) * pars$phi, rate = 1)
       g / sum(g)
     },
-    "multi" = as.numeric(stats::rmultinom(
-      1L, pars$unit_total %||% 30L, softmax(eta)
-    )),
+    "multi" = as.numeric(stats::rmultinom(1L, pars$unit_total,
+                                          softmax(eta))),
     "categ" = {
       z <- numeric(K)
       z[sample.int(K, 1L, prob = softmax(eta))] <- 1
@@ -46,8 +49,8 @@ sim_jsdm_draw <- function(eta, family, pars = list()) {
 #' Draws a site-by-species response matrix from a latent factor model
 #' and returns it in the long format [jsdgam()] takes. Each species
 #' gets its own intercept and its own slope on a site-level
-#' covariate, and the species are tied together by `n_lv` latent
-#' factors whose loadings give the residual correlation between them.
+#' covariate. The species share `n_lv` latent factors, whose loadings
+#' set the residual correlation between them.
 #'
 #' This is the non-detection counterpart to [sim_closure_unit_data()],
 #' which simulates the same latent factor structure for the
@@ -64,10 +67,9 @@ sim_jsdm_draw <- function(eta, family, pars = list()) {
 #' Families whose species are drawn independently, such as
 #' [brms::negbinomial()] or [stats::poisson()], take one draw per
 #' species. [mvn()] and [mvt()] add a per-species residual. The
-#' composition families draw a site's species together: [diri()]
-#' takes gamma variates and normalises them, [multi()] takes counts
-#' against a fixed site total, and [categ()] takes one species per
-#' site as a one-hot row.
+#' composition families draw a site's species together. [diri()]
+#' normalises gamma variates. [multi()] draws counts against a fixed
+#' site total. [categ()] draws one species per site as a one-hot row.
 #'
 #' A composition family identifies its loadings only up to a shift
 #' shared by the species, which is the subspace mvgam's
@@ -76,15 +78,13 @@ sim_jsdm_draw <- function(eta, family, pars = list()) {
 #' same subspace a fit explores.
 #'
 #' How much of the factor structure survives into the response
-#' depends on the observation noise. [mvn()] and [mvt()] take their
-#' per-species scale from `Psi`, which defaults to 0.5 against
-#' loadings drawn at 0.7. Every other family takes the scale its own
-#' simulator defaults to, and a gaussian's is 1. Measured over eight
-#' seeds at 100 sites, the agreement between the loadings-implied
-#' residual correlation and the correlation present in the simulated
-#' data is 0.96 for [mvn()] and drops as low as -0.44 for a gaussian
-#' at that noise level. Pass `family_pars = list(sigma = 0.5)` for a
-#' gaussian whose species correlations are recoverable.
+#' depends on the observation noise. The loadings are drawn with
+#' standard deviation 0.7. [mvn()] and [mvt()] take their per-species
+#' scale from `Psi`, which defaults to 0.5. Every other family takes
+#' the scale its own simulator defaults to. A gaussian's `sigma`
+#' defaults to 1, which can hide the species correlations from the
+#' data. Pass `family_pars = list(sigma = 0.5)` for a gaussian whose
+#' correlations a fit can recover.
 #'
 #' @param family Observation family. Any family mvgam's response
 #'   simulator draws from, plus [mvn()], [mvt()], [diri()],
@@ -95,14 +95,13 @@ sim_jsdm_draw <- function(eta, family, pars = list()) {
 #' @param family_pars Optional named list of family parameters:
 #'   `Psi` (per-species scale for [mvn()] / [mvt()]), `nu` (degrees
 #'   of freedom for [mvt()]), `phi` (concentration for [diri()]),
-#'   `unit_total` (trial total per site for [multi()]), and the
-#'   dispersion or scale parameter the remaining families take,
-#'   such as `size` for a negative binomial or `sigma` for a
-#'   gaussian.
+#'   `unit_total` (trial total per site for [multi()]). Other
+#'   families take their dispersion or scale, such as `size` for a
+#'   negative binomial or `sigma` for a gaussian.
 #' @param seed Optional integer seed. The session's random state is
 #'   restored when the call returns.
 #'
-#' @return An object of class `mvgam_sim_jsdm`, inheriting
+#' @return An object of class `mvgam_sim_jsdgam`, inheriting
 #'   `mvgam_sim`, with elements:
 #'   \describe{
 #'     \item{`data_train`}{Long `data.frame` with columns `site`,
@@ -115,15 +114,19 @@ sim_jsdm_draw <- function(eta, family, pars = list()) {
 #'     \item{`n_species`, `n_sites`, `n_lv`}{The design.}
 #'     \item{`truth`}{List of the generative parameters: `loadings`,
 #'       `lv`, `intercepts`, `env_slopes`, `env`, `residual_cov`,
-#'       `residual_cor`, and the family parameters that were used.}
+#'       `residual_cor` and `family_pars`. For [mvn()], [mvt()],
+#'       [diri()] and [multi()] these include the defaults
+#'       `Psi = 0.5`, `nu = 5`, `phi = 30` and `unit_total = 30`.}
 #'   }
 #'
-#' @seealso [jsdgam()] for the model this simulates from;
-#'   [sim_closure_unit_data()] for the occupancy and N-mixture
-#'   counterpart; [sim_mvgam()] for time-series simulation.
+#' @seealso [jsdgam()] fits the model these data come from.
+#'   [sim_closure_unit_data()] simulates occupancy and N-mixture data.
+#'   [sim_mvgam()] simulates time series. The
+#'   `r mvgam_article("jsdgam", "joint species distribution article")`
+#'   fits and interprets models of this kind.
 #'
 #' @examples
-#' simdat <- sim_jsdm(
+#' simdat <- sim_jsdgam(
 #'   family    = brms::negbinomial(),
 #'   n_species = 4L,
 #'   n_sites   = 30L,
@@ -134,13 +137,16 @@ sim_jsdm_draw <- function(eta, family, pars = list()) {
 #' summary(simdat)
 #'
 #' # A composition family draws each site's species together
-#' comp <- sim_jsdm(family = diri(), n_species = 4L, n_sites = 20L,
-#'                  seed = 2L)
+#' comp <- sim_jsdgam(family = diri(), n_species = 4L, n_sites = 20L,
+#'                    seed = 2L)
 #' rowSums(comp$y_array)[1:3]
+#'
+#' # Next: fit with jsdgam(), then compare residual_cor() of the fit
+#' # with simdat$truth$residual_cor
 #'
 #' @family simulation
 #' @export
-sim_jsdm <- function(family = brms::negbinomial(),
+sim_jsdgam <- function(family = brms::negbinomial(),
                      n_species = 5L,
                      n_sites = 60L,
                      n_lv = 2L,
@@ -153,19 +159,23 @@ sim_jsdm <- function(family = brms::negbinomial(),
   family <- validate_family(family)
   local_seed(seed)
 
-  # `sim_family_rng()` names a negative binomial's dispersion `size`;
-  # the fitted side declares the same quantity as `shape`. Accepting
-  # either spelling here keeps one name from leaking into user code.
+  # `sim_family_rng()` names a negative binomial's dispersion `size`.
+  # The fitted model names it `shape`. Either name is accepted.
   if (is.null(family_pars$size) && !is.null(family_pars$shape)) {
     family_pars$size <- family_pars$shape
   }
+  family_name <- resolve_family_name(family)
+  family_pars <- utils::modifyList(
+    sim_jsdgam_family_defaults[[family_name]] %||% list(), family_pars
+  )
 
   species_levels <- paste0("sp_", seq_len(n_species))
   simplex <- is_simplex_response_family(family)
 
   loadings <- matrix(
     stats::rnorm(n_species * n_lv, sd = 0.7),
-    nrow = n_species, ncol = n_lv
+    nrow = n_species, ncol = n_lv,
+    dimnames = list(species_levels, NULL)
   )
   if (simplex) {
     loadings <- loadings -
@@ -182,20 +192,16 @@ sim_jsdm <- function(family = brms::negbinomial(),
     lv[i, ] <- stats::rnorm(n_lv)
     eta_i <- intercepts + env_slopes * env[i] +
       as.numeric(loadings %*% lv[i, ])
-    y_array[i, ] <- sim_jsdm_draw(eta_i, family, family_pars)
+    y_array[i, ] <- sim_jsdgam_draw(eta_i, family, family_pars)
   }
   colnames(y_array) <- species_levels
 
+  # A t residual with scale Psi has variance Psi^2 nu / (nu - 2)
   residual_cov <- tcrossprod(loadings)
-  if (resolve_family_name(family) %in% c("mvn", "mvt")) {
-    psi <- family_pars$Psi %||% 0.5
-    scale_sq <- if (identical(resolve_family_name(family), "mvt")) {
-      nu <- family_pars$nu %||% 5
-      psi^2 * nu / (nu - 2)
-    } else {
-      psi^2
-    }
-    residual_cov <- residual_cov + diag(scale_sq, n_species)
+  if (family_name %in% c("mvn", "mvt")) {
+    variance <- family_pars$Psi^2 *
+      if (family_name == "mvt") family_pars$nu / (family_pars$nu - 2) else 1
+    residual_cov <- residual_cov + diag(variance, n_species)
   }
 
   long <- data.frame(
@@ -211,7 +217,7 @@ sim_jsdm <- function(family = brms::negbinomial(),
   long$time <- long$site
   long <- long[order(long$time, long$series), ]
   rownames(long) <- NULL
-  if (family_uses_integers(resolve_family_name(family))) {
+  if (family_uses_integers(family_name)) {
     long$y <- as.integer(long$y)
   }
 
@@ -224,8 +230,8 @@ sim_jsdm <- function(family = brms::negbinomial(),
       env = env,
       residual_cov = residual_cov,
       # A composition family's loadings-implied covariance is
-      # singular by construction, and the jitter keeps `cov2cor()`
-      # defined without moving the correlations it reports.
+      # singular by construction. The jitter keeps `cov2cor()` defined
+      # without moving the correlations it reports.
       residual_cor = stats::cov2cor(
         residual_cov + diag(1e-8, n_species)
       )
@@ -244,28 +250,28 @@ sim_jsdm <- function(family = brms::negbinomial(),
       n_lv       = n_lv,
       truth      = truth
     ),
-    class = c("mvgam_sim_jsdm", "mvgam_sim")
+    class = c("mvgam_sim_jsdgam", "mvgam_sim")
   )
 }
 
 
-#' Summary method for sim_jsdm() output
+#' Summary method for sim_jsdgam() output
 #'
 #' Reports the simulated design, the per-species generative
 #' parameters and the range of the residual correlations the
 #' loadings imply, which is what a fit of these data is asked to
 #' recover.
 #'
-#' @param object A `mvgam_sim_jsdm` list returned by [sim_jsdm()].
+#' @param object A `mvgam_sim_jsdgam` list returned by [sim_jsdgam()].
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return An object of class `mvgam_sim_jsdm_summary`, with its own
-#'   [print()][print.mvgam_sim_jsdm_summary] method.
+#' @return An object of class `mvgam_sim_jsdgam_summary`, with its own
+#'   [print()][print.mvgam_sim_jsdgam_summary] method.
 #'
-#' @method summary mvgam_sim_jsdm
+#' @method summary mvgam_sim_jsdgam
 #' @export
-summary.mvgam_sim_jsdm <- function(object, ...) {
-  checkmate::assert_class(object, "mvgam_sim_jsdm")
+summary.mvgam_sim_jsdgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam_sim_jsdgam")
   rlang::check_dots_empty()
   cor_off <- object$truth$residual_cor[
     upper.tri(object$truth$residual_cor)
@@ -283,27 +289,27 @@ summary.mvgam_sim_jsdm <- function(object, ...) {
       response_range = range(object$y_array),
       zero_fraction = mean(object$y_array == 0)
     ),
-    class = "mvgam_sim_jsdm_summary"
+    class = "mvgam_sim_jsdgam_summary"
   )
 }
 
 
-#' Print method for sim_jsdm() summary output
+#' Print method for sim_jsdgam() summary output
 #'
 #' @inheritParams print.mvgam_sim_summary
-#' @param x A `mvgam_sim_jsdm_summary` object.
-#' @param ... Ignored.
+#' @param x A `mvgam_sim_jsdgam_summary` object.
+#' @param ... Unused.
 #'
-#' @return The `mvgam_sim_jsdm_summary` object `x`, returned
+#' @return The `mvgam_sim_jsdgam_summary` object `x`, returned
 #'   invisibly.
 #'
-#' @method print mvgam_sim_jsdm_summary
+#' @method print mvgam_sim_jsdgam_summary
 #' @export
-print.mvgam_sim_jsdm_summary <- function(x, digits = 3L, ...) {
-  checkmate::assert_class(x, "mvgam_sim_jsdm_summary")
+print.mvgam_sim_jsdgam_summary <- function(x, digits = 3L, ...) {
+  checkmate::assert_class(x, "mvgam_sim_jsdgam_summary")
   checkmate::assert_int(digits, lower = 0L)
   fmt <- function(v) format(round(v, digits), nsmall = digits)
-  cat("Simulated joint species distribution dataset (sim_jsdm)\n")
+  cat("Simulated joint species distribution dataset (sim_jsdgam)\n")
   cat("  Family        : ", x$family, "\n", sep = "")
   cat("  Species       : ", x$n_species, "\n", sep = "")
   cat("  Sites         : ", x$n_sites, "\n", sep = "")
@@ -317,8 +323,10 @@ print.mvgam_sim_jsdm_summary <- function(x, digits = 3L, ...) {
   cat("  Residual correlations: [", fmt(x$cor_range[1L]), ", ",
       fmt(x$cor_range[2L]), "]\n", sep = "")
   cat("\nSimulated response\n")
-  cat("  Range         : [", fmt(x$response_range[1L]), ", ",
-      fmt(x$response_range[2L]), "]\n", sep = "")
+  # A count range prints as whole numbers
+  rng <- x$response_range
+  if (all(rng == round(rng))) rng <- format(rng) else rng <- fmt(rng)
+  cat("  Range         : [", rng[1L], ", ", rng[2L], "]\n", sep = "")
   cat("  Zero fraction : ", fmt(x$zero_fraction), "\n", sep = "")
   invisible(x)
 }

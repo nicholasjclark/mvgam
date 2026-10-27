@@ -7,170 +7,99 @@
 tweedie(M = 30L)
 }
 \arguments{
-\item{M}{Positive integer; truncation of the Poisson-gamma
-mixture series in the Stan log-density. Default \code{30L}.
-Larger values cost linearly more compute per non-zero
-observation; values below the practical tail mass produce
-downward-biased likelihoods, which translate to bias in
-\verb{(mphi, mtheta)} posteriors. Use
-\code{check_tweedie_truncation()} after a fit to verify.}
+\item{M}{Positive integer number of series terms in the Stan log
+density. Defaults to \code{30L}. The cost grows linearly in \code{M}. Too
+small a value biases the likelihood down and the posteriors of
+\code{mphi} and \code{mtheta} with it.}
 }
 \value{
-A \code{brms::customfamily} object with mvgam-side
-stanvars attached as \code{attr(., "mvgam_stanvars")}. Pass
-directly to \code{mvgam(family = ...)}; no manual stanvars
-wiring is required.
+A \code{brms::customfamily} object for \code{mvgam(family = )}.
 }
 \description{
-Tweedie distribution with power parameter \code{theta} in the open
-interval \verb{(1, 2)}, a.k.a. the compound Poisson-gamma. Models
-continuous-positive data with an exact mass at zero (e.g.
-CPUE, rainfall, claim totals). The count of "events" is Poisson.
-Each event contributes a Gamma-distributed amount. \code{theta = 1} is the
-scaled Poisson boundary. \code{theta = 2} is the Gamma boundary. Both
-endpoints are numerically unstable under the compound decomposition.
-Division by \code{2 - theta} diverges. The Gamma shape
-\code{m * (2 - theta) / (theta - 1)} over- or underflows. mvgam restricts
-\code{theta} to \verb{[1.001, 1.999]} for this reason. Values inside that
-interval give the continuous case with a point mass at zero.
+The Tweedie distribution with power \code{mtheta} between 1 and 2, the
+compound Poisson-gamma. It models non-negative continuous data with
+a point mass at zero, such as catch per unit effort, rainfall or
+biomass. A Poisson number of events each contributes a Gamma amount.
+The variance is \code{mphi * mu^mtheta}.
 }
 \details{
-Parameterised with three distributional parameters:
+The family has three distributional parameters:
 \describe{
-\item{\code{mu}}{positive mean (log link, fixed; see below)}
-\item{\code{mphi}}{positive dispersion (log link, lower bound
-\code{1e-8})}
-\item{\code{mtheta}}{power parameter (identity link, bounded
-\verb{[1.001, 1.999]})}
+\item{\code{mu}}{The mean, on a fixed log link. The compound
+construction needs \code{mu > 0}, which an identity link driven by a
+latent trend cannot guarantee.}
+\item{\code{mphi}}{The dispersion, on a log link.}
+\item{\code{mtheta}}{The power, bounded to \verb{[1.001, 1.999]}. Near 1 the
+Poisson rate \verb{mu^(2 - mtheta) / ((2 - mtheta) mphi)} and near 2
+the Gamma shape \code{(2 - mtheta) / (mtheta - 1)} leave floating-point
+range.}
 }
 
-The log link on \code{mu} is fixed. The compound Poisson-gamma
-construction requires \code{mu > 0}. Identity and inverse links cannot
-enforce that when the linear predictor is driven by a latent
-stochastic trend.
+The latent trend enters through \code{mu}. \code{mphi} and \code{mtheta} are
+scalars by default. A formula such as \code{bf(y ~ x, mphi ~ site)} gives
+the dispersion its own linear predictor on the log scale, whose
+intercept takes a \code{student_t(3, 0, 2.5)} prior. \code{mtheta} takes no
+formula.
 
-By default, \code{mu} is the dpar that depends on the linear predictor.
-Through \code{mu}, the latent state-space trend in mvgam enters the
-likelihood. The dispersion \code{mphi} and power \code{mtheta} are estimated
-as global scalars shared across all observations. Write a \code{brms::bf()}
-formula with \code{mphi ~ covs} to give the dispersion its own
-per-observation linear predictor on the log scale. Its
-intercept takes \code{student_t(3, 0, 2.5)} by default. \code{mtheta}
-must stay in \verb{(1, 2)} and takes no sub-formula. For
-example,
+\code{mu}, \code{mphi} and \code{mtheta} trade off along \code{Var[Y] = mphi * mu^mtheta}.
+Data that weakly separate Poisson-like from Gamma-like tails leave a
+ridge in their joint posterior. An informative prior such as
+\code{prior(normal(1.5, 0.3), class = mtheta)} resolves it.
 
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(bf(y ~ x, mphi ~ site), family = tweedie(), ...)
-}\if{html}{\out{</div>}}
+The Stan log density sums \code{M} terms of the compound series for each
+non-zero observation (Dunn and Smyth 2005). The terms past \code{M} are
+negligible when \code{M} is well above the Poisson rate \code{lambda}, which
+grows as \code{mtheta} approaches 2 or \code{mphi} approaches 0. Raise \code{M} when
+\code{\link[=check_tweedie_truncation]{check_tweedie_truncation()}} reports a rate near it. \code{log_lik()} and
+\code{posterior_predict()} use \code{mgcv::ldTweedie()} and \code{mgcv::rTweedie()}.
 
-fits a Tweedie with site-varying dispersion. brms generates
-the \code{b_mphi_Intercept} and \verb{b_mphi_*} parameters and their
-design matrix. The Tweedie Stan lpdf has scalar and vector signatures
-for both cases. If the data show clear heteroscedasticity (e.g.
-seasonal claim severity), prefer letting \code{mphi} vary via a
-sub-formula over the global default (Burkner 2018, brms
-distributional regression vignette).
-
-The Stan likelihood is the compound Poisson-gamma
-decomposition of Spinkney (Stan Forums,
-\url{https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636}).
-The mvgam implementation is adapted from the
-\pkg{brms::custom_family} definition packaged by the
-Australian Institute of Marine Science at
-\url{https://github.com/open-AIMS/tweedie}, with attribution
-to those authors for the Stan function block and the choice of the
-\code{mu} / \code{mphi} / \code{mtheta} parameterisation. Attribution also covers
-the default series-truncation count. Each non-zero observation
-contributes a \code{log_sum_exp} over \code{M} Poisson-gamma mixture
-components. The truncation \code{M} covers the Poisson rate
-\code{lambda = mu^(2 - theta) / ((2 - theta) * phi)}. The tail mass at
-\code{m > M} decays geometrically when \code{M} is large relative to \code{lambda}.
-Otherwise it decays slowly. The default \code{M = 30} is adequate when the
-implied \code{max(lambda)} across non-zero observations stays well below
-\code{M}. \code{lambda} grows quickly as \code{theta} approaches 2 (the
-\code{1 / (2 - theta)} factor) and as \code{phi} approaches 0. For fits where
-\code{mtheta} is sampled near the upper boundary, raise \code{M} (e.g.
-\code{tweedie(M = 100L)}). Re-fit if posterior predictive checks show
-systematic undershoot in the non-zero tail. The Dunn & Smyth (2005)
-convergence analysis discusses truncation bounds. See also the runtime
-advisory printed by \code{check_tweedie_truncation()}.
-
-Identifiability under a latent trend. Because \code{mu_t} is a
-stochastic latent process, the joint \verb{(mu_t, mphi, mtheta)}
-posterior can have a ridge along the marginal-variance
-relation \code{Var[Y] = phi * mu^theta}. If the data do not strongly
-distinguish Poisson-like from Gamma-like tail behaviour, place an
-informative prior on \code{mtheta}. A reasonable default is
-\code{prior(normal(1.5, 0.3), class = mtheta)}. Inspect
-\code{pairs(fit, variable = c("mphi", "mtheta"))} for funnel geometry.
-
-R-side likelihood evaluation (\code{log_lik()}) and posterior
-predictive draws (\code{posterior_predict()}) use \pkg{mgcv}
-(already an mvgam dependency). \code{mgcv::ldTweedie()} returns log
-densities directly. LOO-IC and WAIC then avoid the
-underflow-then-floor pattern that a \code{log(dtweedie(...))} two-step
-introduces.
+The Stan code adapts the \code{custom_family} of the Australian Institute
+of Marine Science (2023), which uses the decomposition of Spinkney
+(2020).
 }
 \examples{
 \dontrun{
-# Tweedie generates non-negative continuous observations with a
-# point mass at zero. The dpars are `mphi` (dispersion) and
-# `mtheta` (power exponent on the open interval (1, 2)).
 set.seed(3)
 simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
-
+                    n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(
-  y ~ 1,
+  y ~ s(x),
   trend_formula = ~ AR(p = 1),
   data          = simdat$data_train,
   family        = tweedie(),
   chains        = 2,
   silent        = 2
 )
-summary(mod)
 
-# The dispersion and power parameters
+# The dispersion and power
 mcmc_plot(mod, variable = c("mphi", "mtheta"), type = "areas")
 
-# A covariate on the dispersion, on the log scale, takes the
-# formula `bf(y ~ 1, mphi ~ x)`
+# The share of zeros the model predicts against the share observed
+prop_zero <- function(y) mean(y == 0)
+pp_check(mod, type = "stat", stat = "prop_zero", binwidth = 0.02)
+
+# Next: check_tweedie_truncation(mod) checks the series length M
 }
 
 }
 \references{
-Australian Institute of Marine Science (AIMS) (2023).
-\code{open-AIMS/tweedie}: a brms \code{custom_family} implementation
-of the Tweedie compound Poisson-gamma distribution. GitHub,
+Australian Institute of Marine Science (2023). \code{open-AIMS/tweedie}: a
+brms \code{custom_family} implementation of the Tweedie compound
+Poisson-gamma distribution. GitHub,
 \url{https://github.com/open-AIMS/tweedie}. MIT licence.
-The Stan function block and the \code{mu} / \code{mphi} / \code{mtheta}
-parameterisation in this file are adapted from that
-project.
 
-Spinkney (2020). Tweedie likelihood (compound Poisson-gamma)
-in Stan. Stan Discourse,
+Spinkney (2020). Tweedie likelihood (compound Poisson-gamma) in Stan.
+Stan Discourse,
 \url{https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636}
-Source of the compound Poisson-gamma decomposition that
-underlies both
-the AIMS implementation and the Stan code shipped here.
 
 Dunn, P. K., & Smyth, G. K. (2005). Series evaluation of
 Tweedie exponential dispersion model densities.
 \emph{Statistics and Computing}, 15(4), 267-280.
-\doi{10.1007/s11222-005-4070-y}. Convergence analysis of
-the series truncation \code{M} used here.
-
-Dunn, P. K., & Smyth, G. K. (2008). Evaluation of Tweedie
-exponential dispersion model densities by Fourier inversion.
-\emph{Statistics and Computing}, 18(1), 73-86.
-\doi{10.1007/s11222-007-9039-6}.
+\doi{10.1007/s11222-005-4070-y}
 
 Jorgensen, B. (1987). Exponential dispersion models.
 \emph{Journal of the Royal Statistical Society: Series B}, 49(2),
 127-162. \doi{10.1111/j.2517-6161.1987.tb01685.x}
-
-Burkner, P.-C. (2018). Advanced Bayesian multilevel modeling
-with the R package brms. \emph{The R Journal}, 10(1), 395-411.
-\doi{10.32614/RJ-2018-017}
 }
 \seealso{
 Other observation families: 

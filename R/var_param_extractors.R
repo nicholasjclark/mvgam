@@ -75,12 +75,6 @@ var_draw_surfaces <- function(var_post, kernel, future) {
 }
 
 
-#' One draw of a `[ndraws, K, K, lags]` coefficient array
-#' @noRd
-draw_slice <- function(arr, draw) {
-  array(arr[draw, , , , drop = FALSE], dim = dim(arr)[-1L])
-}
-
 #' Extract VAR posterior draws of (A, D, Sigma) from a fitted mvgam
 #'
 #' Pulls the per-draw coefficient matrices `Phi_trend[l, , ]` of every
@@ -107,7 +101,8 @@ draw_slice <- function(arr, draw) {
 extract_var_posterior <- function(object, ndraws = NULL,
                                   draw_ids = NULL) {
   checkmate::assert_class(object, "mvgam")
-  draws_mat <- posterior::as_draws_matrix(object$fit)
+  draws_mat <- fit_draws(object$fit,
+                         c("Phi_trend", "Theta_trend", "Sigma_trend"))
   # Impulse responses and variance decompositions are built one
   # transition matrix per draw. Their cost and their size grow with the
   # number of draws multiplied by the square of the number of
@@ -120,10 +115,6 @@ extract_var_posterior <- function(object, ndraws = NULL,
   # identification the generated-quantities block also emits
   # `Phi_trend_tilde = Q Phi_trend Q'`. The QR-identified surface takes
   # `Phi_trend_tilde` and rotates `Sigma_trend` by the same Q.
-  # `N_lv_trend` is the Stan-side VAR dimension for every code
-  # path: factor VARs set it to the number of factors, non-factor
-  # VARs set it equal to `N_series_trend`. The Stan data hold the
-  # value the compiled model uses.
   K <- var_dim(object, "N_lv_trend")
 
   ndraws <- nrow(draws_mat)
@@ -256,74 +247,69 @@ var_process_labels <- function(object, K) {
   as.character(levs)
 }
 
-#' Posterior transition matrix for a VAR trend
+#' Posterior transition matrix of a VAR trend
 #'
 #' @description
-#' Extract a VAR transition matrix $A_l$ from a fitted `mvgam`
-#' object, either as a per-cell posterior summary (default) or as
-#' raw per-draw values. Row $i$ of $A_l$ gives the linear dependence
-#' of latent process $i$ at time $t$ on the vector of processes at
-#' time $t - l$; the diagonal is self-persistence, off-diagonals
-#' encode cross-outcome dependence at lag $l$.
+#' The coefficient matrix \eqn{A_l} of lag \eqn{l} of a `VAR()` trend.
+#' Row \eqn{i} holds the effects of the processes at time \eqn{t - l}
+#' on process \eqn{i} at time \eqn{t}. The diagonal holds each
+#' process's persistence. The off-diagonal cells hold the effects of
+#' one process on another.
 #'
 #' @details
-#' The extractor dispatches on whether the fit is hierarchical
-#' (`VAR(gr = <var>, ...)`) or single-panel.
+#' A hierarchical VAR (`VAR(gr = ...)`) has one matrix per panel.
+#' `groups` names a panel to return its matrix. With `groups = NULL`
+#' the function returns the mean of the panels' matrices, computed in
+#' each draw. The hyperparameters `Amu_trend` and `Aomega_trend` pool
+#' unconstrained matrices, which the stationarity map of Heaps (2023)
+#' turns into each panel's matrix. Their mean is no transition matrix.
+#' The mean over panels summarises the pool on the scale of the
+#' matrices.
 #'
-#' * On a **single-panel VAR** the routine returns the fitted
-#'   `Phi_trend` array.
-#' * On a **hierarchical VAR** with `groups = <int>` or
-#'   `groups = <name>` it returns the panel-specific matrix
-#'   `Phi_group_trend[c, l, , ]`, the transition matrix of the
-#'   requested panel.
-#' * On a **hierarchical VAR** with `groups = NULL` it returns the
-#'   mean of the panels' matrices, computed in each posterior draw.
-#'   The hyperparameters `Amu_trend` and `Aomega_trend` pool the
-#'   unconstrained matrices that the stationarity map of Heaps
-#'   (2023) turns into each panel's $A_c$. Their mean is no
-#'   transition matrix. The mean over panels summarises the pool on
-#'   the scale of $A_c$.
-#'
-#' With `summary = TRUE` (default) the per-cell summary uses the
-#' same machinery as `residual_cor()`. The printed and plotted output
-#' of the two extractors then agree:
-#' point estimates default to the posterior mean; intervals use
-#' `probs` on the raw draws; effective sample sizes come from
-#' `posterior::ess_basic()`; and
-#' `prob_positive` / `prob_negative` / `prob_nonzero` count the
-#' fraction of draws with each entry above or below zero. See
-#' the argument documentation for the median switch.
+#' Each cell is summarised as [residual_cor()] summarises a
+#' correlation. The estimate is the posterior mean, or the median with
+#' `robust = TRUE`. The interval takes the quantiles `probs`. The
+#' effective sample size comes from [posterior::ess_basic()].
+#' `prob_positive`, `prob_negative` and `prob_nonzero` are the shares of
+#' draws above zero, below zero and away from zero.
 #'
 #' @inheritParams predict.mvgam
 #' @param object A fitted `mvgam` object whose trend is a VAR.
-#' @param lag The lag whose transition matrix is returned, at most
-#'   the order `p` of the fitted `VAR(p)`. Defaults to `1`.
-#' @param groups Which panels of a hierarchical VAR fit to
-#'   return. `NULL` (the default) gives the mean of the panels'
-#'   matrices. A non-hierarchical fit accepts `NULL` alone. A single
-#'   panel, named by level or by integer index into the levels of
-#'   `gr`, returns that panel's matrix on its own. Several panels, or
-#'   `"all"`, return a named list of `mvgam_var_matrix` objects
-#'   classed as `mvgam_var_matrix_list`. Its `plot()` method draws a
-#'   faceted heatmap grid or a pointrange of each outcome's
-#'   self-persistence, see [plot.mvgam_var_matrix_list()].
-#' @param summary Logical. `TRUE` (default) returns an
-#'   `mvgam_var_matrix` object with per-cell point estimates,
-#'   credible intervals, standard errors, effective sample
-#'   sizes and sign probabilities. `FALSE` returns the raw
-#'   `[ndraws, K, K]` posterior array with dims 2-3 labelled by
-#'   the outcome names (levels of `subgr` on a hierarchical fit,
-#'   `series_names` on a single-panel fit) for downstream custom
-#'   summaries.
+#' @param lag The lag of the matrix, at most the order `p` of the
+#'   fitted `VAR(p)`.
+#' @param groups The panels of a hierarchical VAR, by level or by
+#'   index, or `"all"`. `NULL` gives the mean of the panels' matrices.
+#'   A single-panel fit takes `NULL` alone. One panel returns
+#'   its matrix. Several, or `"all"`, return a list whose `plot()`
+#'   method is [plot.mvgam_var_matrix_list()].
+#' @param summary Logical. `TRUE` returns the summary of each cell.
+#'   `FALSE` returns the draws as a `[ndraws, K, K]` array, with the
+#'   processes naming its second and third dimensions.
 #'
-#' @return One matrix, or a list of them when `groups` names more
-#'   than one panel. With `summary = TRUE`, an object of class
-#'   `mvgam_var_matrix` with slots `A`, `A_se`, `A_lower`,
-#'   `A_upper`, `A_ess`, `prob_positive`, `prob_negative`,
-#'   `prob_nonzero`, `n_series`, `series_names`, `group_label`,
-#'   `probs`, `lag`. Has `print()` and `plot()` methods. With
-#'   `summary = FALSE`, a `[ndraws, K, K]` numeric array with
-#'   dims 2-3 labelled by the outcome names.
+#' @return With `summary = TRUE`, an `mvgam_var_matrix`: a list of the
+#'   matrices `A`, `A_se`, `A_lower`, `A_upper`, `A_ess`,
+#'   `prob_positive`, `prob_negative` and `prob_nonzero`, with
+#'   `n_series`, `series_names`, `group_label`, `probs` and `lag`. It
+#'   has `print()` and `plot()` methods. With `summary = FALSE`, the
+#'   array of draws. Several panels give a list of either.
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(0)
+#' simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
+#'                     n_timepoints = 120L, trend_model = VAR(),
+#'                     prop_trend = 0.95)
+#' var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
+#'                  data = simdat$data_train, family = gaussian(),
+#'                  chains = 2, silent = 2)
+#'
+#' # Each series' persistence and its effects on the others
+#' A <- posterior_transition_matrix(var_mod)
+#' A
+#' plot(A)
+#'
+#' # Next, irf(var_mod) traces how a shock to one series spreads
+#' }
 #'
 #' @references Savage J (2016). Hierarchical Vector
 #'   Autoregression. RPubs, 27 November 2016.
@@ -346,10 +332,9 @@ posterior_transition_matrix <- function(object, groups = NULL,
                                          robust = FALSE,
                                          probs = c(0.025, 0.975),
                                          lag = 1L) {
-  checkmate::assert_flag(summary)
+  probs <- assert_var_surface_args(NULL, NULL, summary, probs,
+                                   future = FALSE)
   checkmate::assert_flag(robust)
-  checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
-                            any.missing = FALSE, unique = TRUE)
   require_fitted_model(object, "posterior_transition_matrix")
   assert_var_trend(object, surface = "posterior_transition_matrix()")
   checkmate::assert_int(lag, lower = 1L)
@@ -360,7 +345,6 @@ posterior_transition_matrix <- function(object, groups = NULL,
       x = paste0("Got 'lag' = ", lag, ".")
     )), call. = FALSE)
   }
-  probs <- sort(probs)
 
   one_matrix <- function(group) {
     arr <- extract_transition_matrix_draws(object, group, lag)
@@ -438,7 +422,7 @@ resolve_var_groups <- function(object, groups) {
 #' `"single-panel"`) for downstream summarisers to label the object.
 #' @noRd
 extract_transition_matrix_draws <- function(object, group, lag) {
-  draws_mat <- posterior::as_draws_matrix(object$fit)
+  draws_mat <- fit_draws(object$fit, c("Phi_group_trend", "Phi_trend"))
 
   if (!is.null(object$standata$N_groups_trend)) {
     K <- var_dim(object, "N_subgroups_trend")
@@ -469,11 +453,10 @@ extract_transition_matrix_draws <- function(object, group, lag) {
 
   # Non-hierarchical VAR: one Phi_trend matrix per lag
   K <- var_dim(object, "N_lv_trend")
-  labs <- var_process_labels(object, K)
   out <- extract_indexed_array_2d(
     draws_mat, "Phi_trend", K, K,
     prefix_ids   = lag,
-    labels       = labs[seq_len(K)],
+    labels       = var_process_labels(object, K),
     required_for = "the VAR transition matrix"
   )
   attr(out, "group_label") <- "single-panel"
@@ -516,14 +499,11 @@ finalise_transition_matrix <- function(arr, group_label,
   )
 }
 
-#' Print method for `mvgam_var_matrix`
+#' Print a VAR transition matrix
 #'
-#' Prints a compact header (group label, dimension, mean
-#' off-diagonal absolute entry magnitude) and the posterior
-#' point-estimate transition matrix rounded to `digits`. Reminds
-#' the reader that the per-cell credible interval is available in
-#' the `A_lower` / `A_upper` slots. The header follows the layout of
-#' [print.mvgam_residcor()].
+#' Prints the panel, the dimension, the mean absolute off-diagonal
+#' cell and the posterior estimate of the matrix. The interval of each
+#' cell is in `A_lower` and `A_upper`.
 #'
 #' @param x An `mvgam_var_matrix` object returned by
 #'   [posterior_transition_matrix()].
@@ -531,7 +511,7 @@ finalise_transition_matrix <- function(arr, group_label,
 #'   matrix.
 #' @param ... Ignored.
 #'
-#' @return `x`, invisibly, after side-effect printing.
+#' @return `x`, invisibly.
 #'
 #' @seealso [posterior_transition_matrix()],
 #'   [plot.mvgam_var_matrix()],
@@ -540,10 +520,9 @@ finalise_transition_matrix <- function(arr, group_label,
 #' @method print mvgam_var_matrix
 #' @export
 print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
-  cat("Lag-", x$lag %||% 1L, " VAR transition matrix from an mvgam fit\n",
+  cat("Lag-", x$lag, " VAR transition matrix from an mvgam fit\n",
       sep = "")
-  cat("  Group      : ", x$group_label %||% "(unlabelled)", "\n",
-      sep = "")
+  cat("  Group      : ", x$group_label, "\n", sep = "")
   cat("  Dimension  : ", x$n_series, " x ", x$n_series, "\n",
       sep = "")
   cat(sprintf("  Mean |A_ij| (i != j): %.2f\n", mean_abs_offdiag(x$A)))
@@ -555,23 +534,20 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
   invisible(x)
 }
 
-#' Plot method for `mvgam_var_matrix`
+#' Plot a VAR transition matrix
 #'
-#' Draws the point estimate of the transition matrix as a heatmap.
-#' Row \eqn{i}, column \eqn{j} is the effect of process \eqn{j} at
-#' time \eqn{t - 1} on process \eqn{i} at time \eqn{t}. A black
-#' outline marks each cell whose credible interval excludes zero. The
-#' colour scale is symmetric about zero and spans the largest absolute
-#' cell.
+#' Draws the posterior estimate of the matrix as a heatmap. Row
+#' \eqn{i}, column \eqn{j} is the effect of process \eqn{j} at time
+#' \eqn{t - l} on process \eqn{i} at time \eqn{t}. A black outline
+#' marks each cell whose interval excludes zero. The colour scale is
+#' symmetric about zero and spans the largest absolute cell.
 #'
 #' @inheritParams print.mvgam_var_matrix
-#' @param cluster Logical. If `TRUE`, reorder rows and columns
-#'   using approximate Robinson clustering on `1 - A` (only
-#'   meaningful when `A` is roughly symmetric).
+#' @param cluster Logical. `TRUE` orders the processes by a Robinson
+#'   clustering of `1 - A`, which suits a matrix close to symmetric.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A [ggplot2::ggplot] object, which can be further
-#'   customised with the \pkg{ggplot2} API.
+#' @return A [ggplot2::ggplot] object.
 #'
 #' @seealso [posterior_transition_matrix()],
 #'   [print.mvgam_var_matrix()],
@@ -583,8 +559,7 @@ plot.mvgam_var_matrix <- function(x, cluster = FALSE, ...) {
   checkmate::assert_flag(cluster)
   rlang::check_dots_empty()
   idx <- if (cluster) cluster_cormat(x$A) else seq_len(x$n_series)
-  panel <- var_matrix_panel(x, idx)
-  var_matrix_heatmap(panel)
+  var_matrix_heatmap(var_matrix_panel(x, idx), x$lag)
 }
 
 #' One transition matrix in long format, with its clear cells
@@ -606,33 +581,33 @@ var_matrix_panel <- function(x, idx = seq_len(x$n_series)) {
 #'
 #' @param panel Frame from `var_matrix_panel()`, optionally with a
 #'   `group` column
+#' @param lag Integer lag of the matrix, which labels the columns
 #' @param ncol Facet columns when `panel` has a `group` column
 #' @return A `ggplot` object
 #' @noRd
-var_matrix_heatmap <- function(panel, ncol = NULL) {
+var_matrix_heatmap <- function(panel, lag, ncol = NULL) {
   rng <- max(abs(range(panel$value, na.rm = TRUE, finite = TRUE)))
   matrix_heatmap(
     panel,
     mvgam_diverging_scale(name = "Posterior\nA", limits = c(-rng, rng)),
     layout = "matrix",
-    x_lab = "Process at t - 1",
+    x_lab = paste("Process at t -", lag),
     y_lab = "Process at t",
     ncol = ncol
   )
 }
 
-#' Print method for `mvgam_var_matrix_list`
+#' Print the VAR transition matrices of several panels
 #'
-#' Compact header naming the number of groups and matrix
-#' dimension, then the mean off-diagonal absolute A magnitude per
-#' group so the reader can see at a glance which panel carries
-#' the strongest cross-outcome dependence.
+#' Prints the number of panels, the dimension and the mean absolute
+#' off-diagonal cell of each panel. The panel with the largest mean
+#' has the strongest effects between processes.
 #'
 #' @param x An `mvgam_var_matrix_list` returned by
 #'   [posterior_transition_matrix()] with `groups` set.
 #' @param ... Ignored.
 #'
-#' @return `x`, invisibly, after side-effect printing.
+#' @return `x`, invisibly.
 #'
 #' @seealso [posterior_transition_matrix()],
 #'   [plot.mvgam_var_matrix_list()],
@@ -641,7 +616,7 @@ var_matrix_heatmap <- function(panel, ncol = NULL) {
 #' @method print mvgam_var_matrix_list
 #' @export
 print.mvgam_var_matrix_list <- function(x, ...) {
-  cat("Lag-", x[[1L]]$lag %||% 1L,
+  cat("Lag-", x[[1L]]$lag,
       " VAR transition matrices from an mvgam fit\n", sep = "")
   cat("  Groups     : ", length(x), "\n", sep = "")
   cat("  Dimension  : ", x[[1L]]$n_series, " x ",
@@ -652,25 +627,17 @@ print.mvgam_var_matrix_list <- function(x, ...) {
   invisible(x)
 }
 
-#' Plot method for `mvgam_var_matrix_list`
+#' Plot the VAR transition matrices of several panels
 #'
-#' Faceted view across the panels stored in the list. Two
-#' orientations are available:
-#'
-#' * `type = "heatmap"` (default): one heatmap per group, drawn as
-#'   by [plot.mvgam_var_matrix()]. The facets share fill limits.
-#' * `type = "diagonal"`: self-persistence pointrange with one
-#'   point per group per outcome (dodged by outcome). Up to three
-#'   outcomes take the dark, mid and light shades of the red
-#'   bayesplot scheme, as the fevd, irf and stability plots do.
-#'
-#' Both draw with [mvgam_theme()].
+#' `type = "heatmap"` draws one heatmap per panel, as
+#' [plot.mvgam_var_matrix()] draws one, with fill limits shared across
+#' panels. `type = "diagonal"` draws the persistence of each process in
+#' each panel as a point with its interval.
 #'
 #' @inheritParams print.mvgam_var_matrix_list
-#' @param type One of `"heatmap"` (default) or `"diagonal"`.
-#' @param ncol Optional integer. Number of facet columns for the
-#'   heatmap grid; defaults to `ceiling(sqrt(length(x)))`. Only
-#'   used when `type = "heatmap"`.
+#' @param type `"heatmap"` (default) or `"diagonal"`.
+#' @param ncol The number of facet columns of the heatmaps, or `NULL`
+#'   for `ceiling(sqrt(length(x)))`.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A [ggplot2::ggplot] object.
@@ -699,7 +666,7 @@ plot_var_matrix_list_heatmap <- function(x, ncol) {
     df$group <- g
     df
   }))
-  var_matrix_heatmap(panel, ncol)
+  var_matrix_heatmap(panel, x[[1L]]$lag, ncol)
 }
 
 #' Per-outcome self-persistence pointrange: one row per group, one

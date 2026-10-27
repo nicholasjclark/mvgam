@@ -379,16 +379,17 @@ prior_summary.mvgam <- function(object, ...) {
 
 #' A posterior count method for mvgam fits
 #'
-#' @param count A posterior counting function, such as
-#'   `posterior::ndraws`
+#' @param count A posterior function counting draws, chains or
+#'   iterations, such as `posterior::ndraws`
 #' @return An S3 method of `x` and `...`
 #' @noRd
 posterior_count_method <- function(count) {
   force(count)
   function(x, ...) {
     checkmate::assert_class(x, "mvgam")
+    require_fitted_model(x)
     rlang::check_dots_empty()
-    count(as_draws_array(x))
+    count(fit_draws_shape(x$fit))
   }
 }
 
@@ -418,7 +419,9 @@ niterations.mvgam <- posterior_count_method(posterior::niterations)
 #' @importFrom posterior nvariables
 #' @method nvariables mvgam
 #' @export
-nvariables.mvgam <- posterior_count_method(posterior::nvariables)
+nvariables.mvgam <- function(x, ...) {
+  length(variables(x, ...))
+}
 
 
 #' @rdname mvgam_diagnostics

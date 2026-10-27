@@ -32,8 +32,6 @@ parameter (NA if family is fully discrete).}
 }
 }
 \description{
-Returns a structured snapshot of a simulated dataset's design and
-true generative parameters so that ground-truth recovery checks
-downstream can be programmed against it without re-extracting
-fields manually.
+The design of a simulated data set and its true generative
+parameters.
 }

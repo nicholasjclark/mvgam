@@ -53,7 +53,7 @@ test_that("default_trait_slopes_priors covers every nlpar once", {
   )
   expect_identical(
     pri$prior,
-    rep(c("normal(0, 1)", "student_t(3, 0, 2.5)"), 3L)
+    rep(c("std_normal()", "student_t(3, 0, 2.5)"), 3L)
   )
 })
 

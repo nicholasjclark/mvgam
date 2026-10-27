@@ -51,10 +51,12 @@ get_covariance_pattern <- function(trend_type) {
 #'
 #' @param object A fitted `mvgam` object
 #' @param data A data frame to prepare
+#' @param frame Character name of the frame in the user's call, which
+#'   a missing axis column's error names
 #' @return `data` carrying the `mvgam_time` / `mvgam_series` attributes
 #'
 #' @noRd
-prepare_mvgam_frame <- function(object, data) {
+prepare_mvgam_frame <- function(object, data, frame = "data") {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_data_frame(data)
   meta <- object$trend_metadata
@@ -64,7 +66,8 @@ prepare_mvgam_frame <- function(object, data) {
     time_var = axis_vars(object)$time_var,
     series_var = axis_vars(object)$series_var,
     response_vars = response_columns(object),
-    metadata = meta
+    metadata = meta,
+    frame = frame
   )
 }
 
@@ -180,7 +183,7 @@ get_observation_structure <- function(object, newdata = NULL,
   # Otherwise the frame takes the standard time and series attributes.
   # A multivariate frame may lack an explicit `series` column. The
   # preparation rebuilds those series from the fit's responses.
-  data_prepared <- prepare_mvgam_frame(object, newdata)
+  data_prepared <- prepare_mvgam_frame(object, newdata, "newdata")
 
   time_indices <- get_time_for_grouping(data_prepared)
   series_indices <- get_series_for_grouping(data_prepared)
@@ -233,7 +236,7 @@ build_single_series_observation_structure <- function(newdata, time_var,
   checkmate::assert_data_frame(newdata)
   checkmate::assert_string(time_var)
   checkmate::assert_string(level_label)
-  assert_axis_column(newdata, time_var, "time")
+  assert_axis_column(newdata, time_var, "time", frame = "newdata")
   time_indices <- newdata[[time_var]]
   unique_times <- sort(unique(time_indices))
   n_obs <- nrow(newdata)
@@ -494,9 +497,8 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   n_series <- if (is_lv) as.integer(n_lv) else
     as.integer(n_obs_series)
 
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  draw_indices <- resolve_draw_indices(nrow(draws_mat), ndraws, draw_ids)
-  draws_mat <- draws_mat[draw_indices, , drop = FALSE]
+  draws_mat <- subset_draws_rows(fit_parameter_draws(object$fit),
+                                 ndraws, draw_ids)
 
   effective_pattern <- pattern
   if (pattern == "cholesky_scaled" && !has_correlations) {
@@ -553,7 +555,7 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     n_series = as.integer(n_series),
     hierarchical = hierarchical,
     has_correlations = has_correlations,
-    ndraws = length(draw_indices),
+    ndraws = nrow(draws_mat),
     params = params,
     group_info = group_info,
     is_lv = is_lv,
@@ -611,6 +613,66 @@ validate_covariance_inputs <- function(object, ndraws, draw_ids) {
 subset_draws_rows <- function(x, ndraws = NULL, draw_ids = NULL) {
   checkmate::assert_matrix(x)
   x[resolve_draw_indices(nrow(x), ndraws, draw_ids), , drop = FALSE]
+}
+
+
+#' The draws of the named parameters of a fit
+#'
+#' Converting a whole stanfit copies every saved quantity. A trend
+#' model saves its latent states, which can outnumber its parameters a
+#' thousandfold. This converts `lp__` and every index of each named
+#' parameter. Names the fit lacks are skipped.
+#' The rows are the draws of `posterior::as_draws_matrix()` on the
+#' whole fit, in the same order.
+#'
+#' @param fit A stanfit, or any object `posterior::as_draws_matrix()`
+#'   takes, which is converted whole
+#' @param pars Character vector of parameter names, with or without
+#'   indices
+#' @return A draws matrix
+#' @noRd
+fit_draws <- function(fit, pars) {
+  checkmate::assert_character(pars, any.missing = FALSE)
+  if (!inherits(fit, "stanfit")) {
+    return(posterior::as_draws_matrix(fit))
+  }
+  posterior::as_draws_matrix(stanfit_pars_array(fit, pars))
+}
+
+
+#' The draws of every parameter of a fit and the named states
+#'
+#' For a reader whose columns are many and fixed by the trend's
+#' structure. The states in `MVGAM_STATE_PARAMS` make up most of a
+#' trend fit's saved quantities. Only those in `states` are converted.
+#'
+#' @param fit A stanfit, or any object `posterior::as_draws_matrix()`
+#'   takes, which is converted whole
+#' @param states Character vector of the state names to keep
+#' @return A draws matrix
+#' @noRd
+fit_parameter_draws <- function(fit, states = character(0L)) {
+  checkmate::assert_character(states, any.missing = FALSE)
+  if (!inherits(fit, "stanfit")) {
+    return(posterior::as_draws_matrix(fit))
+  }
+  fit_draws(fit, c(setdiff(fit@model_pars, MVGAM_STATE_PARAMS), states))
+}
+
+
+#' The iterations-by-chains-by-variables array of named stanfit
+#' parameters
+#'
+#' @param fit A stanfit
+#' @param pars Character vector of parameter names, with or without
+#'   indices. `lp__` is always kept. Names the fit lacks are skipped.
+#' @return A numeric array, as `as.array()` gives for a stanfit
+#' @noRd
+stanfit_pars_array <- function(fit, pars) {
+  checkmate::assert_class(fit, "stanfit")
+  checkmate::assert_character(pars, any.missing = FALSE)
+  base <- unique(c(sub("\\[.*$", "", pars), "lp__"))
+  as.array(fit, pars = intersect(base, fit@model_pars))
 }
 
 
@@ -1274,9 +1336,11 @@ hidden_par_pattern <- function(pars) {
 #' @noRd
 is_hidden_par <- function(pars) {
   checkmate::assert_character(pars)
-  hide_pat <- hidden_par_pattern(pars)
-  if (is.null(hide_pat)) return(rep(FALSE, length(pars)))
-  grepl(hide_pat, pars)
+  by_par_stem(pars, function(stems) {
+    hide_pat <- hidden_par_pattern(stems)
+    if (is.null(hide_pat)) return(rep(FALSE, length(stems)))
+    grepl(hide_pat, stems)
+  })
 }
 
 #' Parameter names with the hidden ones dropped

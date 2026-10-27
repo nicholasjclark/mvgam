@@ -115,29 +115,12 @@ test_that("normalise_loadings_prior accepts pure MGP, also as a string", {
                    spec)
 })
 
-test_that("the MGP loadings stanvars leave the column scale alone", {
-  data <- make_test_data(4L)
-  spec <- normalise_loadings_prior(
-    list(column_shrinkage = "mgp"), data2 = NULL, data = data
-  )
-  sv <- make_loadings_prior_stanvars(spec)
-  sc <- paste(vapply(sv, function(s) s$scode, character(1L)),
-              collapse = "\n")
-  # Z is drawn at unit scale. Scaling its prior by sqrt(Psi_diag)
-  # here would give the column a second scale on top of
-  # `sigma_trend`, leaving only their product identified, and would
-  # put that scale on a centred parameter.
-  expect_match(sc, "to_vector(Z) ~ std_normal();", fixed = TRUE)
-  expect_false(grepl("sqrt(Psi_diag", sc, fixed = TRUE))
-  # The MGP parameters are still declared here; the cumulative
-  # product itself is written by whichever block consumes it.
-  expect_match(sc, "varrho_inv", fixed = TRUE)
-  expect_match(sc, "inv_gamma(mgp_a1, 1)", fixed = TRUE)
-})
-
-test_that("the MGP column scale reaches the trend through sigma_trend", {
-  # The program declares the cumulative product once and derives
-  # `sigma_trend` from it.
+test_that("MGP shrinkage scales the unit-scale loadings by column", {
+  # The program samples `Z_raw` at unit scale and builds
+  # `Z = diag_post_multiply(Z_raw, sqrt(Psi_diag))`. The factor
+  # innovations stay at unit scale, as under every other prior on
+  # sampled loadings. A scale on both would leave only their product
+  # identified.
   set.seed(1L)
   d <- sim_mvgam(family = poisson(), n_series = 6L,
                   n_timepoints = 20L)$data_train
@@ -146,18 +129,39 @@ test_that("the MGP column scale reaches the trend through sigma_trend", {
     loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE,
     validate = FALSE
   )
-  ln <- strsplit(paste(as.character(m$model_file %||% m$stancode),
-                        collapse = "\n"), "\n")[[1]]
-  expect_equal(sum(grepl("Psi_diag = exp(cumulative_sum", ln,
-                          fixed = TRUE)), 1L)
-  expect_true(any(grepl("sigma_trend = sqrt(Psi_diag)", ln, fixed = TRUE)))
-  # It is derived, so it is not also a sampled parameter. Both
-  # spellings of a sampling statement are named. A normalised program
-  # writes the density call in place of a tilde.
-  expect_false(any(grepl("] sigma_trend;", ln, fixed = TRUE)))
-  expect_false(any(grepl("sigma_trend ~", ln, fixed = TRUE)))
-  expect_false(any(grepl("_lpdf(sigma_trend", ln, fixed = TRUE)))
+  code <- gsub("\\s+", " ", paste(as.character(m$model_file %||%
+                                                  m$stancode),
+                                   collapse = " "))
+  expect_match(code, "Z = diag_post_multiply(Z_raw, sqrt(Psi_diag));",
+               fixed = TRUE)
+  expect_match(code, "std_normal_lpdf(to_vector(Z_raw))", fixed = TRUE)
+  expect_match(code, "scaled_innovations_trend = innovations_trend;",
+               fixed = TRUE)
+  expect_match(code, "sigma_trend = rep_vector(1.0, N_lv_trend);",
+               fixed = TRUE)
+
+  # A user prior on `Z` reaches the unit-scale loadings
+  m_user <- mvgam(
+    y ~ 1, trend_formula = ~ AR(n_lv = 3), data = d, family = poisson(),
+    loadings_prior = "mgp", prior = prior(normal(0, 2), class = Z),
+    run_model = FALSE, validate = FALSE
+  )
+  expect_match(paste(as.character(m_user$model_file %||% m_user$stancode),
+                     collapse = "\n"),
+               "normal_lpdf(to_vector(Z_raw) | 0, 2)", fixed = TRUE)
+
+  # A kernel fixes the loadings' prior and refuses one on `Z`
+  traits <- data.frame(series = factor(paste0("series_", 1:6)),
+                       t1 = rnorm(6))
+  expect_error(
+    mvgam(y ~ 1, trend_formula = ~ AR(n_lv = 3), data = d,
+          family = poisson(), loadings_prior = list(features = traits),
+          prior = prior(normal(0, 2), class = Z), run_model = FALSE,
+          validate = FALSE),
+    "A prior on 'Z' is not supported with a loadings kernel"
+  )
 })
+
 
 test_that("normalise_loadings_prior respects user-supplied mgp_a1/a2", {
   data <- make_test_data(3L)

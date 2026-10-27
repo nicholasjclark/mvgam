@@ -15,13 +15,10 @@
 #'   scale with observation-process noise), `"link"` (link-scale
 #'   linear predictor), `"expected"` (E\[Y\]; default), or one of
 #'   the family-specific scales handled by [predict.mvgam()]:
-#'   `"variance"`, `"latent_state"`, `"detection"`. For closure-unit
-#'   families (`occ()`, `nmix()` and variants), `"latent_state"`
-#'   returns the family-aware latent state on the response scale
-#'   (latent occupancy `psi` for `occ()`, latent abundance `N` for
-#'   `nmix()`), which is the natural marginal-effects display for
-#'   the ecological quantity of interest separate from detection
-#'   probability.
+#'   `"variance"`, `"latent_state"`, `"detection"`. For [occ()] and
+#'   [nmix()], `"latent_state"` plots the state apart from detection:
+#'   the probability of occupancy `psi`, or the expected abundance
+#'   `lambda`. `"detection"` plots the detection probability `p`.
 #' @param points Logical or numeric. If `TRUE` (or a non-zero alpha
 #'   between 0 and 1), raw observations are overlaid on the plot.
 #'   The overlay applies where the drawn quantity shares the
@@ -562,12 +559,9 @@ split_term_labels <- function(lab) {
 }
 
 
-# Resolve the user-facing `series` argument into a structured mode
-# the dispatch loop can branch on. Returns a list with
-#   kind   = "none" | "all" | "one"
-#   level  = NA_character_ | <resolved series factor level>
-# Validates against the model's series factor levels and surfaces a
-# targeted error when a non-existent level is requested.
+# The `series` argument as a mode the dispatch loop branches on. The
+# list holds `kind`, one of "none", "all" or "one". Its `level` names
+# the one series. `resolve_series()` checks a name or an index.
 resolve_series_arg <- function(series, x) {
   if (is.null(series)) {
     return(list(kind = "none", level = NA_character_))
@@ -591,38 +585,8 @@ resolve_series_arg <- function(series, x) {
   if (identical(series, "all")) {
     return(list(kind = "all", level = NA_character_))
   }
-  if (is.numeric(series)) {
-    n_levels <- length(series_levels)
-    checkmate::assert_integerish(series, len = 1L)
-    if (series < 1L || series > n_levels) {
-      stop(insight::format_error(c(
-        "'series' index is out of range.",
-        x = paste0("Got ", series, ", valid indices run from 1 to ",
-                   n_levels, "."),
-        i = paste0(
-          "Available levels: ",
-          paste(shQuote(series_levels), collapse = ", "), "."
-        )
-      )))
-    }
-    return(list(kind = "one", level = series_levels[as.integer(series)]))
-  }
-  if (is.character(series)) {
-    if (!series %in% series_levels) {
-      stop(insight::format_error(c(
-        "'series' is not one of the model's series levels.",
-        x = paste0("Got: '", series, "'."),
-        i = paste0(
-          "Available: ",
-          paste(shQuote(series_levels), collapse = ", "), "."
-        )
-      )))
-    }
-    return(list(kind = "one", level = series))
-  }
-  stop(insight::format_error(
-    "'series' must be NULL, 'all', a series name or a 1-based index."
-  ))
+  list(kind = "one",
+       level = series_levels[resolve_series(series, series_levels)])
 }
 
 

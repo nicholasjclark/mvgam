@@ -66,7 +66,7 @@ plot.mvgam_forecast <- function(
   if (!hindcast && !forecast) {
     stop(insight::format_error(
       "At least one of 'hindcast' or 'forecast' must be TRUE."
-    ))
+    ), call. = FALSE)
   }
 
   # The forecasts of a long-frame multivariate fit differ by response.
@@ -79,6 +79,13 @@ plot.mvgam_forecast <- function(
     })))
   }
   x <- parts
+  if (isTRUE(x$site_units)) {
+    stop(insight::format_error(c(
+      "Plotting a jsdgam() fit along time is not supported.",
+      x = "The units of a jsdgam() fit are sites, in arbitrary order.",
+      i = "Use ordinate(), residual_cor() or pp_check() to view the fit."
+    )), call. = FALSE)
+  }
 
   series_levels <- as.character(x$series_names)
   series_idx <- resolve_series(series, series_levels)
@@ -94,7 +101,7 @@ plot.mvgam_forecast <- function(
         "Was the source object constructed by hindcast() / ",
         "forecast()?"
       )
-    )))
+    )), call. = FALSE)
   }
 
   # Single training-grid cut value (same across series in the

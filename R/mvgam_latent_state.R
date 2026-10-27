@@ -1,34 +1,24 @@
-# mvgam_latent_state: posterior of the closure-unit latent state
-# (N for nmix variants, psi for occ()) at the training unit grid.
-# Produced by hindcast(fit, type = "latent_state"); standalone class
-# with its own print / summary / as.data.frame / plot methods so
-# users get a tidy frame to pipe into ggplot or dplyr without
-# wrestling with the per-series matrix-list layout that
-# `mvgam_forecast` uses for time-series quantities.
+# The posterior latent state of each closure unit of an `nmix()` or
+# `occ()` fit, which `hindcast(fit, type = "latent_state")` returns.
+# Its methods give a data frame with one row per unit, ready for
+# ggplot2 or dplyr.
 
 
-#' Constructor for the mvgam_latent_state object
+#' Build a `mvgam_latent_state` object
 #'
-#' Internal builder used by [hindcast.mvgam()] when
-#' `type = "latent_state"`. Closure-unit fits collapse the per-visit
-#' rows down to a per-unit grid; the latent state lives on that
-#' grid (one value per `(series, unit)` cell). Some closure-unit
-#' designs have a real time axis (multi-season occupancy, repeated
-#' visits across seasons), but many do not (single-season occupancy
-#' / N-mixture where `time` is just the unit identifier), so the
-#' object stores the unit grid and a `has_time` logical rather than
-#' assuming a temporal axis.
+#' [hindcast.mvgam()] builds one for `type = "latent_state"`, with one
+#' column of draws per closure unit. A multi-season design indexes
+#' seasons by `time`. A single-season design uses `time` only to key
+#' its units. `has_time` records which.
 #'
 #' @param draws Numeric matrix `[ndraws, n_unit]` of latent-state
-#'   posterior draws, in the row order returned by the
-#'   family-specific kernel (`posterior_latent_N()` /
-#'   `posterior_occupancy()`).
+#'   draws from `posterior_latent_N()`
 #' @param unit `data.frame` with one row per closure unit and
 #'   columns `series` (factor) and `time` (integer / numeric). Row
 #'   order matches the columns of `draws`.
 #' @param family The fitted family object.
-#' @param has_time Logical. `TRUE` when the fit carries a real time
-#'   dimension; `FALSE` when `time` is just the unit index.
+#' @param has_time Logical. `TRUE` when `time` indexes seasons or a
+#'   trend, `FALSE` when it only keys units.
 #'
 #' @return An object of class `mvgam_latent_state`.
 #'
@@ -61,14 +51,13 @@ new_mvgam_latent_state <- function(draws, unit, family,
 
 #' Axis labels of a closure-unit family's state and detection
 #'
-#' An `nmix()` variant holds a latent abundance `N`. Every other
-#' closure-unit family with a latent state holds an occupancy
-#' probability `psi`. `nmix("poisson_poisson")` models an encounter
-#' rate per individual. The other families model a probability of
-#' detection.
+#' An `nmix()` variant holds a latent abundance `N`. `occ()` holds a
+#' probability of occupancy. `nmix("poisson_poisson")` models an
+#' encounter rate per individual. The other families model a
+#' probability of detection.
 #'
 #' @param family A closure-unit family object
-#' @return List with the state's axis `label`, its `short` symbol and
+#' @return List with the state's axis `label`, its `short` name and
 #'   the `detection` axis label
 #' @noRd
 closure_unit_labels <- function(family) {
@@ -79,10 +68,10 @@ closure_unit_labels <- function(family) {
     "Detection probability (p)"
   }
   if (models_latent_count(family)) {
-    list(label = "Latent abundance (N)", short = "N",
+    list(label = "Latent abundance (N)", short = "abundance",
          detection = detection)
   } else {
-    list(label = "Occupancy probability (psi)", short = "psi",
+    list(label = "Occupancy probability", short = "occupancy",
          detection = detection)
   }
 }
@@ -150,11 +139,11 @@ as.data.frame.mvgam_latent_state <- function(x, ...) {
 #' @export
 print.mvgam_latent_state <- function(x, digits = 2L, ...) {
   checkmate::assert_class(x, "mvgam_latent_state")
-  fam_nm <- resolve_family_name(x$family) %||% "?"
   smry   <- summary(x)
   med_range <- range(smry$median, na.rm = TRUE)
   cat("Posterior latent state at training units\n")
-  cat("  Family:           ", fam_nm, "\n", sep = "")
+  cat("  Family:           ", resolve_family_name(x$family), "\n",
+      sep = "")
   cat("  State:            ", x$state_label, "\n", sep = "")
   cat("  Series:           ", nlevels(x$unit$series),
       " (", paste(levels(x$unit$series), collapse = ", "), ")\n",
@@ -179,8 +168,8 @@ print.mvgam_latent_state <- function(x, digits = 2L, ...) {
 #' single-season design, are drawn as points with interval bars.
 #'
 #' @param x A `mvgam_latent_state` object.
-#' @param series Optional integer / character; restrict to a subset
-#'   of the series. Defaults to all.
+#' @param series Names or indices of the series to plot, or `NULL`
+#'   for every series
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
@@ -193,11 +182,8 @@ plot.mvgam_latent_state <- function(x, series = NULL, ...) {
   set_color_scheme_local()
   smry <- summary(x)
   if (!is.null(series)) {
-    keep <- if (is.numeric(series)) {
-      levels(smry$series)[as.integer(series)]
-    } else {
-      as.character(series)
-    }
+    levs <- levels(smry$series)
+    keep <- levs[resolve_series(series, levs)]
     smry <- smry[smry$series %in% keep, , drop = FALSE]
     smry$series <- droplevels(smry$series)
   }

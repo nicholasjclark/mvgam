@@ -2,21 +2,25 @@
 % Please edit documentation in R/priors.R
 \name{get_prior.default}
 \alias{get_prior.default}
-\title{Default method for get_prior, delegating to brms}
+\alias{default_prior.default}
+\title{The priors of a model formula}
 \usage{
 \method{get_prior}{default}(object, ...)
+
+\method{default_prior}{default}(object, ...)
 }
 \arguments{
 \item{object}{Model specification object}
 
-\item{...}{Further arguments of \code{\link[brms:default_prior]{brms::get_prior()}}, such as
-\code{knots} or \code{drop_unused_levels}.}
+\item{...}{Arguments of \code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}}, such as
+\code{data}, \code{family} and \code{trend_formula}}
 }
 \value{
 A \code{brmsprior} data frame
 }
 \description{
-Covers a \code{formula}, \code{brmsformula} or \code{mvbrmsformula}. A
-\code{trend_formula} in the call builds the \code{\link{mvgam_formula}}
-it describes. A call without one delegates to \pkg{brms}.
+Covers a \code{formula}, \code{brmsformula} or \code{mvbrmsformula}, which it
+wraps in the \code{\link{mvgam_formula}} it describes with any
+\code{trend_formula} in the call. The table then carries the defaults
+mvgam gives its own families, with or without a trend.
 }

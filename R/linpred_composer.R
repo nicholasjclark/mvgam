@@ -229,11 +229,13 @@ linear_terms_pred <- function(prep, draws, rhs, resp, dpar, nlpar, n_obs) {
       i = "Drop the 'cs()' terms from the formula."
     )), call. = FALSE)
   }
-  eta <- fixed_pred(draws, sdata, sfx, n_obs) +
-    smooth_pred(draws, sdata, sfx, n_obs) +
-    group_level_pred(prep, draws, resp, dpar, nlpar, n_obs) +
-    gp_pred(draws, sdata, sfx, gp_kernels(rhs), n_obs) +
-    monotonic_pred(draws, sdata, sfx, n_obs)
+  # Each term adds into one matrix. A term the predictor lacks adds
+  # nothing and allocates nothing.
+  eta <- fixed_pred(draws, sdata, sfx, n_obs)
+  eta <- smooth_pred(draws, sdata, sfx, n_obs, eta = eta)
+  eta <- group_level_pred(prep, draws, resp, dpar, nlpar, n_obs, eta = eta)
+  eta <- gp_pred(draws, sdata, sfx, gp_kernels(rhs), n_obs, eta = eta)
+  eta <- monotonic_pred(draws, sdata, sfx, n_obs, eta = eta)
   offsets <- sdata[[paste0("offsets", sfx)]]
   if (!is.null(offsets)) {
     checkmate::assert_numeric(as.vector(offsets), any.missing = FALSE,
@@ -262,7 +264,8 @@ draw_columns <- function(draws, cols) {
              if (length(missing) > 3L) ", ...", ".")
     )
   }
-  draws[, cols, drop = FALSE]
+  # Unnamed, which leaves every product unnamed as well
+  unname(draws[, cols, drop = FALSE])
 }
 
 
@@ -311,21 +314,20 @@ term_numbers <- function(x, stem) {
 fixed_pred <- function(draws, sdata, sfx, n_obs) {
   intercept <- paste0("b", sfx, "_Intercept")
   has_intercept <- intercept %in% colnames(draws)
-  eta <- matrix(if (has_intercept) draws[, intercept] else 0,
-                nrow(draws), n_obs)
+  alpha <- if (has_intercept) as.numeric(draws[, intercept]) else 0
   X <- sdata[[paste0("X", sfx)]]
+  if (!is.null(X) && ncol(X) > 0L) {
+    checkmate::assert_matrix(X, nrows = n_obs, col.names = "named")
+    if (has_intercept) {
+      X <- X[, colnames(X) != "Intercept", drop = FALSE]
+    }
+  }
   if (is.null(X) || ncol(X) == 0L) {
-    return(eta)
-  }
-  checkmate::assert_matrix(X, nrows = n_obs, col.names = "named")
-  if (has_intercept) {
-    X <- X[, colnames(X) != "Intercept", drop = FALSE]
-  }
-  if (ncol(X) == 0L) {
-    return(eta)
+    return(matrix(alpha, nrow(draws), n_obs))
   }
   b <- draw_columns(draws, paste0("b", sfx, "[", seq_len(ncol(X)), "]"))
-  eta + b %*% t(X)
+  # The intercept recycles down each column, one value per draw
+  tcrossprod(b, unname(X)) + alpha
 }
 
 
@@ -341,10 +343,11 @@ fixed_pred <- function(draws, sdata, sfx, n_obs) {
 #' @inheritParams fixed_pred
 #' @param objects The numbers of the smooth objects to evaluate, or `NULL`
 #'   for every one
-#' @return A `[ndraws x n_obs]` matrix
+#' @param eta The `[ndraws x n_obs]` matrix the terms add into
+#' @return `eta` with the smooth terms added
 #' @noRd
-smooth_pred <- function(draws, sdata, sfx, n_obs, objects = NULL) {
-  eta <- matrix(0, nrow(draws), n_obs)
+smooth_pred <- function(draws, sdata, sfx, n_obs, objects = NULL,
+                        eta = matrix(0, nrow(draws), n_obs)) {
   Xs <- sdata[[paste0("Xs", sfx)]]
   if (is.null(objects)) {
     objects <- term_numbers(names(sdata), paste0("nb", sfx))
@@ -363,7 +366,7 @@ smooth_pred <- function(draws, sdata, sfx, n_obs, objects = NULL) {
   }
   if (length(cols) > 0L) {
     bs <- draw_columns(draws, paste0("bs", sfx, "[", cols, "]"))
-    eta <- eta + bs %*% t(Xs[, cols, drop = FALSE])
+    eta <- eta + tcrossprod(bs, unname(Xs[, cols, drop = FALSE]))
   }
   for (i in objects) {
     for (j in seq_len(sdata_entry(sdata, paste0("nb", sfx, "_", i)))) {
@@ -371,7 +374,7 @@ smooth_pred <- function(draws, sdata, sfx, n_obs, objects = NULL) {
       Zs <- sdata_entry(sdata, paste0("Zs", stem))
       checkmate::assert_matrix(Zs, nrows = n_obs)
       s <- draw_columns(draws, paste0("s", stem, "[", seq_len(ncol(Zs)), "]"))
-      eta <- eta + s %*% t(Zs)
+      eta <- eta + tcrossprod(s, unname(Zs))
     }
   }
   eta
@@ -389,10 +392,11 @@ smooth_pred <- function(draws, sdata, sfx, n_obs, objects = NULL) {
 #' a fault.
 #'
 #' @inheritParams linear_terms_pred
-#' @return A `[ndraws x n_obs]` matrix
+#' @param eta The `[ndraws x n_obs]` matrix the terms add into
+#' @return `eta` with the group-level terms added
 #' @noRd
-group_level_pred <- function(prep, draws, resp, dpar, nlpar, n_obs) {
-  eta <- matrix(0, nrow(draws), n_obs)
+group_level_pred <- function(prep, draws, resp, dpar, nlpar, n_obs,
+                             eta = matrix(0, nrow(draws), n_obs)) {
   ranef <- prep$ranef
   if (is.null(ranef) || nrow(ranef) == 0L ||
       checkmate::test_scalar_na(prep$re_formula)) {
@@ -445,8 +449,13 @@ group_level_pred <- function(prep, draws, resp, dpar, nlpar, n_obs) {
     }
     r <- draw_columns(draws, paste0("r_", id, sfx, "_", rows$cn[k], "[",
                                     seq_len(n_levels), "]"))
-    eta <- eta + r[, J, drop = FALSE] *
-      matrix(as.vector(Z), nrow(draws), n_obs, byrow = TRUE)
+    # A group-level intercept has a design of ones
+    Z <- as.vector(Z)
+    eta <- if (all(Z == 1)) {
+      eta + r[, J, drop = FALSE]
+    } else {
+      eta + r[, J, drop = FALSE] * rep(Z, each = nrow(draws))
+    }
   }
   eta
 }
@@ -479,10 +488,11 @@ gp_kernels <- function(rhs) {
 #'
 #' @inheritParams fixed_pred
 #' @param kernels What `gp_kernels()` gives for this predictor
-#' @return A `[ndraws x n_obs]` matrix
+#' @param eta The `[ndraws x n_obs]` matrix the terms add into
+#' @return `eta` with the Gaussian process terms added
 #' @noRd
-gp_pred <- function(draws, sdata, sfx, kernels, n_obs) {
-  eta <- matrix(0, nrow(draws), n_obs)
+gp_pred <- function(draws, sdata, sfx, kernels, n_obs,
+                    eta = matrix(0, nrow(draws), n_obs)) {
   sd_pattern <- paste0("^sdgp", sfx, "_([0-9]+)\\[[0-9]+\\]$")
   sd_cols <- grep(sd_pattern, colnames(draws), value = TRUE)
   for (i in sort(unique(as.integer(sub(sd_pattern, "\\1", sd_cols))))) {
@@ -559,10 +569,11 @@ gp_level_pred <- function(draws, sdata, stem, level, data_stem, kernel) {
 #' `me()` or `mi()` term breaks that and is refused.
 #'
 #' @inheritParams fixed_pred
-#' @return A `[ndraws x n_obs]` matrix
+#' @param eta The `[ndraws x n_obs]` matrix the terms add into
+#' @return `eta` with the monotonic terms added
 #' @noRd
-monotonic_pred <- function(draws, sdata, sfx, n_obs) {
-  eta <- matrix(0, nrow(draws), n_obs)
+monotonic_pred <- function(draws, sdata, sfx, n_obs,
+                           eta = matrix(0, nrow(draws), n_obs)) {
   n_sp <- sdata[[paste0("Ksp", sfx)]] %||% 0L
   if (n_sp == 0L) {
     return(eta)

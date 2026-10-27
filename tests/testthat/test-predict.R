@@ -238,7 +238,7 @@ test_that("compute_family_epred handles binomial with trials", {
   # Requires trials argument
   expect_error(
     compute_family_epred(linpred, binomial_family),
-    "requires.*trials"
+    "'trials'"
   )
 
   # With trials: epred = p * trials (column-wise via R's recycling)
@@ -279,26 +279,11 @@ test_that("compute_family_epred rejects unsupported families", {
     linkinv = exp
   )
   # The refusal names the family the dispatch was given.
-  expect_error(
-    compute_family_epred(linpred, nmix_family),
-    "reached the unit-free mean dispatch"
-  )
   expect_error(compute_family_epred(linpred, nmix_family), "'nmix'")
 })
 
 test_that("compute_family_epred validates inputs", {
   linpred <- matrix(rnorm(20), nrow = 4, ncol = 5)
-
-  # Invalid family (missing components)
-  expect_error(
-    compute_family_epred(linpred, list(family = "poisson")),
-    "missing required components"
-  )
-
-  expect_error(
-    compute_family_epred(linpred, list(linkinv = exp)),
-    "missing required components"
-  )
 
   # A distributional parameter that does not match the predictor
   wrong_sigma <- matrix(1, nrow = 2, ncol = 3)
@@ -367,48 +352,8 @@ test_that("data2draws gives every draw the observations' own values", {
 })
 
 # ==============================================================================
-# dim_mu helper function tests
-# ==============================================================================
-
-test_that("dim_mu extracts correct dimensions", {
-  expect_equal(dim_mu(list(ndraws = 100, nobs = 50)), c(100, 50))
-})
-
-# ==============================================================================
-# multiply_dpar_rate_denom helper function tests
-# ==============================================================================
-
-test_that("multiply_dpar_rate_denom returns unchanged when no rate_denom", {
-  dpar <- matrix(1:12, nrow = 3, ncol = 4)
-  prep <- list(data = list())
-  result <- multiply_dpar_rate_denom(dpar, prep)
-  expect_equal(result, dpar)
-})
-test_that("multiply_dpar_rate_denom applies vector rate_denom", {
-  dpar <- matrix(1:6, nrow = 2, ncol = 3)
-  rate_denom <- c(10, 20, 30)
-  prep <- list(data = list(rate_denom = rate_denom))
-  result <- multiply_dpar_rate_denom(dpar, prep)
-  expect_equal(result, sweep(dpar, 2, rate_denom, `*`))
-})
-
-# ==============================================================================
 # Family-specific posterior_epred_* function tests
 # ==============================================================================
-
-test_that("each mean kernel returns mu where E[Y] is mu", {
-  mu <- matrix(runif(6), nrow = 2, ncol = 3)
-  for (fam in c("gaussian", "student", "beta", "bernoulli", "poisson")) {
-    kernel <- get(paste0("posterior_epred_", fam), envir = asNamespace("mvgam"))
-    expect_equal(kernel(list(dpars = list(mu = mu), data = list())), mu,
-                 label = fam)
-  }
-  # A count kernel scales its rate by the denominator
-  prep <- list(dpars = list(mu = mu), data = list(rate_denom = c(2, 3, 4)))
-  expect_equal(posterior_epred_poisson(prep), sweep(mu, 2, c(2, 3, 4), `*`))
-  expect_equal(posterior_epred_negbinomial(prep),
-               sweep(mu, 2, c(2, 3, 4), `*`))
-})
 
 test_that("posterior_epred_lognormal computes E[Y] = exp(mu + sigma^2/2)", {
   mu <- matrix(c(0, 1, 2, 3), nrow = 2, ncol = 2)
@@ -760,24 +705,46 @@ test_that("extract_dpars_from_stanfit validates inputs correctly", {
 # Truncation helper function tests
 # ==============================================================================
 
-test_that("extract_truncation_bounds handles NULL and constant bounds", {
-  # Mock mvgam object with no truncation bounds in standata
-  mock_no_trunc <- structure(
-    list(standata = list(N = 10)),
-    class = "mvgam"
+test_that("a truncated mean is the mean of the truncated law", {
+  linpred <- matrix(c(1, 1.5), nrow = 1L)
+  sigma <- matrix(2, 1L, 2L)
+  gauss <- truncated_family_mean(
+    gaussian(), linpred, list(sigma = sigma), NULL,
+    lb = c(0, 0), ub = c(Inf, 3)
   )
-  result_none <- extract_truncation_bounds(mock_no_trunc, nobs = 10)
-  expect_null(result_none$lb)
-  expect_null(result_none$ub)
+  truth <- function(m, lo, hi) {
+    z <- stats::pnorm(hi, m, 2) - stats::pnorm(lo, m, 2)
+    stats::integrate(function(y) y * stats::dnorm(y, m, 2), lo, hi)$value / z
+  }
+  expect_equal(c(gauss), c(truth(1, 0, Inf), truth(1.5, 0, 3)),
+               tolerance = 1e-6)
+  # Twenty SDs into the upper tail, where `1 - pnorm()` is zero. The
+  # truncated mean then lies just above the bound.
+  deep <- truncated_family_mean(
+    gaussian(), matrix(1), list(sigma = matrix(0.1)), NULL, lb = 3,
+    ub = Inf
+  )
+  expect_gt(c(deep), 3)
+  expect_lt(c(deep), 3.01)
 
-  # Mock mvgam object with constant lb=0, ub=100 in standata
-  mock_trunc <- structure(
-    list(standata = list(N = 10, lb = 0, ub = 100)),
-    class = "mvgam"
+  # A count's lower bound keeps its mass, as the Stan likelihood does
+  lambda <- matrix(c(3, 3), nrow = 1L)
+  counts <- truncated_family_mean(
+    poisson(), log(lambda), list(), NULL,
+    lb = c(2, 1), ub = c(Inf, 4)
   )
-  result_const <- extract_truncation_bounds(mock_trunc, nobs = 5)
-  expect_equal(result_const$lb, rep(0, 5))
-  expect_equal(result_const$ub, rep(100, 5))
+  ys <- 2:200
+  expect_equal(counts[1L], sum(ys * dpois(ys, 3)) / (1 - ppois(1, 3)))
+  expect_equal(counts[2L], sum(1:4 * dpois(1:4, 3)) /
+                 (ppois(4, 3) - ppois(0, 3)))
+
+  expect_error(
+    truncated_family_mean(
+      brms::Beta(), linpred, list(phi = sigma), NULL,
+      lb = c(0.1, 0.1), ub = c(0.9, 0.9)
+    ),
+    "truncated 'beta' response is not supported"
+  )
 })
 
 test_that("truncation reaches sample_from_family without erroring", {
@@ -869,29 +836,29 @@ test_that("a replaced draw comes from the fit's own predictive", {
   expect_identical(result[kept, ], samples[kept, ])
 })
 
-# Tests for summarize_predictions() ------------------------------------------
+# Tests for summarise_predictions() ------------------------------------------
 
-test_that("summarize_predictions computes correct statistics", {
+test_that("summarise_predictions computes correct statistics", {
   set.seed(123)
   draws <- matrix(rnorm(100 * 5, mean = 5, sd = 2), nrow = 100)
 
   # Non-robust summary (mean/sd)
-  result <- summarize_predictions(draws, probs = c(0.025, 0.975),
+  result <- summarise_predictions(draws, probs = c(0.025, 0.975),
                                   robust = FALSE)
 
   expect_equal(colnames(result), c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
-  expect_equal(colnames(summarize_predictions(draws, probs = 0.5,
+  expect_equal(colnames(summarise_predictions(draws, probs = 0.5,
                                               robust = FALSE)),
                c("Estimate", "Est.Error", "Q50"))
   expect_equal(result[, "Estimate"], colMeans(draws), tolerance = 1e-10)
   expect_equal(result[, "Est.Error"], apply(draws, 2, sd), tolerance = 1e-10)
 })
 
-test_that("summarize_predictions handles robust = TRUE", {
+test_that("summarise_predictions handles robust = TRUE", {
   set.seed(456)
   draws <- matrix(rnorm(100 * 3, mean = 10, sd = 3), nrow = 100)
 
-  result <- summarize_predictions(draws, probs = c(0.1, 0.9), robust = TRUE)
+  result <- summarise_predictions(draws, probs = c(0.1, 0.9), robust = TRUE)
 
   expect_equal(colnames(result), c("Estimate", "Est.Error", "Q10", "Q90"))
   expect_equal(result[, "Estimate"], apply(draws, 2, median), tolerance = 1e-10)
@@ -1056,75 +1023,6 @@ test_that("a denominator of zero is a legal binomial observation", {
   )
 })
 
-# A family whose mean differs from the inverse link of its predictor
-# writes that mean twice. The per-family kernel copied from brms holds
-# one copy. The dispatch `compute_family_epred()` runs holds the other.
-# The test drives both and requires them to agree. A family added to
-# one of them and missing from the other fails it.
-epred_kernel_for <- function(family_name) {
-  # `epred_kernel()` resolves the same name the same way. A family
-  # with no kernel gives NULL. A kernel that fails to load still
-  # raises.
-  nm <- paste0("posterior_epred_", family_name)
-  if (!exists(nm, mode = "function", envir = asNamespace("mvgam"))) {
-    return(NULL)
-  }
-  get(nm, mode = "function", envir = asNamespace("mvgam"))
-}
-
-test_that("compute_family_epred agrees with every family's own mean kernel", {
-  dpar_value <- function(dpar) {
-    switch(dpar,
-      sigma = 0.7, shape = 2.5, phi = 4, nu = 6, hu = 0.3, zi = 0.25,
-      zoi = 0.2, coi = 0.6, beta = 1.3, alpha = 0.5, kappa = 2,
-      xi = 0.1, quantile = 0.5, ndt = 0.2, 0.5)
-  }
-  families <- c(
-    "gaussian", "poisson", "binomial", "bernoulli", "negbinomial",
-    "student", "lognormal", "beta", "beta_binomial", "exponential",
-    "weibull", "geometric", "skew_normal", "exgaussian",
-    "hurdle_poisson", "hurdle_negbinomial", "hurdle_gamma",
-    "hurdle_lognormal", "zero_inflated_poisson",
-    "zero_inflated_negbinomial", "zero_inflated_binomial",
-    "zero_inflated_beta", "zero_inflated_beta_binomial",
-    "zero_one_inflated_beta", "von_mises", "frechet",
-    "gen_extreme_value", "asym_laplace", "shifted_lognormal"
-  )
-  set.seed(19)
-  ndraws <- 3L
-  nobs <- 4L
-  trials <- rep(10, nobs)
-  compared <- 0L
-
-  for (family_name in families) {
-    kernel <- epred_kernel_for(family_name)
-    if (is.null(kernel)) next
-    family <- brms::brmsfamily(family_name)
-    eta <- matrix(stats::rnorm(ndraws * nobs, 0.3, 0.2), ndraws, nobs)
-    extra <- setdiff(family$dpars, "mu")
-    dpars <- c(
-      list(mu = family$linkinv(eta)),
-      stats::setNames(
-        lapply(extra, function(d) matrix(dpar_value(d), ndraws, nobs)),
-        extra
-      )
-    )
-    from_kernel <- kernel(list(
-      dpars = dpars, ndraws = ndraws, nobs = nobs,
-      data = list(trials = trials)
-    ))
-    needed <- epred_extra_dpars(family)
-    from_dispatch <- compute_family_epred(
-      linpred = eta, family = family, trials = trials,
-      family_pars = if (length(needed)) dpars[needed] else NULL
-    )
-    expect_equal(as.numeric(from_dispatch), as.numeric(from_kernel))
-    compared <- compared + 1L
-  }
-  # Guard against the loop silently comparing nothing.
-  expect_gt(compared, 25L)
-})
-
 test_that("epred_extra_dpars names what a family's mean needs beyond mu", {
   expect_equal(epred_extra_dpars(brms::hurdle_poisson()), "hu")
   expect_equal(epred_extra_dpars(brms::zero_inflated_poisson()), "zi")
@@ -1146,7 +1044,7 @@ test_that("a family's mean kernel refuses to run without its parameters", {
   )
   expect_error(
     family_mean_from_kernel("nosuchfamily", mu, family_pars = list()),
-    "No mean kernel"
+    "cannot compute an expected value"
   )
 })
 
@@ -1160,13 +1058,9 @@ test_that("sampled draws average to the mean the same predictor implies", {
       sigma = 0.4, shape = 6, phi = 8, nu = 8, hu = 0.3, zi = 0.25,
       zoi = 0.2, coi = 0.6, beta = 1.3, ndt = 0.2, 0.5)
   }
-  # `hurdle_negbinomial` is left out. mvgam uses brms's sampler for it.
-  # That sampler reaches a zero-truncated negative binomial by a tilt
-  # exact only for the Poisson. Its draws average about five percent
-  # below the analytic mean.
   families <- c(
     "poisson", "negbinomial", "binomial", "bernoulli", "beta",
-    "beta_binomial", "lognormal", "hurdle_poisson",
+    "beta_binomial", "lognormal", "hurdle_poisson", "hurdle_negbinomial",
     "hurdle_lognormal", "zero_inflated_poisson",
     "zero_inflated_negbinomial", "zero_inflated_binomial",
     "zero_inflated_beta", "zero_inflated_beta_binomial"

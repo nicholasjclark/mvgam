@@ -5,7 +5,7 @@
 # posterior_predict / posterior_epred, get_observation_structure)
 # are exercised by their own test files, so these tests stub
 # them via `local_mocked_bindings()` and assert on:
-#   * mvgam_forecast class shape (10 fields, list-of-matrices
+#   * mvgam_forecast class shape (11 fields, list-of-matrices
 #     for hindcasts / forecasts).
 #   * uncertainty-toggle semantics (coef_uncertainty,
 #     trend_uncertainty, obs_uncertainty).
@@ -125,7 +125,7 @@ make_obs_struct_for_grid <- function(times, series_int,
 
 # ----- Class shape + type dispatch --------------------------------
 
-test_that("Returns mvgam_forecast with 10 contractual fields", {
+test_that("Returns mvgam_forecast with 11 contractual fields", {
   fit <- make_mock_mvgam()
   draws <- make_draws_mat(ndraws = 3L)
   newdata <- data.frame(time = 11:12,
@@ -134,6 +134,7 @@ test_that("Returns mvgam_forecast with 10 contractual fields", {
 
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -151,7 +152,8 @@ test_that("Returns mvgam_forecast with 10 contractual fields", {
     propagate_trend = function(...) {
       matrix(c(0.5, 0.6), nrow = 2L, ncol = 1L)
     },
-    extract_last_state = function(...) {
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
       list(
         params = list(sigma = 0.1, ar = matrix(0.5, 1L, 1L)),
         last_state = list(
@@ -175,7 +177,7 @@ test_that("Returns mvgam_forecast with 10 contractual fields", {
   required <- c("family", "family_pars", "type", "series_names",
                 "train_observations", "train_times",
                 "test_observations", "test_times",
-                "hindcasts", "forecasts")
+                "hindcasts", "forecasts", "site_units")
   expect_equal(sort(names(fc)), sort(required))
   # Held-out data stored by `mvgam(newdata = )` drive the horizon
   # when `forecast()` is given none.
@@ -189,6 +191,7 @@ test_that("forecast needs newdata or held-out data stored at fit time", {
   draws <- make_draws_mat(ndraws = 3L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   # Standard families: hindcast pulls per-draw trend[t, s] from the
@@ -233,6 +236,7 @@ test_that("type = 'link' populates family_pars", {
                          y = NA_integer_)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -250,7 +254,8 @@ test_that("type = 'link' populates family_pars", {
     propagate_trend = function(...) {
       matrix(c(0.5, 0.6), nrow = 2L, ncol = 1L)
     },
-    extract_last_state = function(...) {
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
       list(
         params = list(sigma = 0.1, ar = matrix(0.5, 1L, 1L)),
         last_state = list(
@@ -275,6 +280,7 @@ test_that("ndraws beyond available draws errors informatively", {
   draws <- make_draws_mat(ndraws = 3L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   # `ndraws` is still checked against the posterior, on a call that
@@ -295,6 +301,7 @@ test_that("All multivariate / PW trend types flow through dispatch", {
   draws <- make_draws_mat(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -405,6 +412,7 @@ test_that("Trendless fit rejects type = 'trend' but accepts others", {
   draws <- make_draws_mat(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   newdata <- data.frame(
@@ -431,6 +439,7 @@ test_that("Newdata with unseen series levels errors crisply", {
                          y = NA_integer_)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -454,6 +463,7 @@ test_that("Newdata that names no time or no series errors", {
   draws <- make_draws_mat(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -560,6 +570,7 @@ test_that("the forecast centres the state and re-adds the mean", {
 
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -584,7 +595,8 @@ test_that("the forecast centres the state and re-adds the mean", {
       matrix(rep(as.numeric(last_state$trends), h),
                nrow = h, ncol = n_series, byrow = TRUE)
     },
-    extract_last_state = function(...) {
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
       list(
         params = list(sigma = 0.1, ar = matrix(0.5, 1L, 1L)),
         last_state = list(
@@ -628,6 +640,7 @@ test_that("a factor forecast projects with the sampled loadings", {
 
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -646,7 +659,8 @@ test_that("a factor forecast projects with the sampled loadings", {
                                  ...) {
       matrix(1, nrow = h, ncol = n_series)
     },
-    extract_last_state = function(...) {
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
       list(
         params = list(Sigma = diag(1)),
         last_state = list(

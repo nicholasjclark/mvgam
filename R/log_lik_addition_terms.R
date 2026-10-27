@@ -383,67 +383,117 @@ dist_log_density <- function(spec, linpred, y) {
 }
 
 
-#' The addition-term data brms recorded for one response
+#' The addition-term values of one response, row by row
 #'
-#' brms writes `weights`, `cens`, `rcens`, `lb` and `ub` into the Stan
-#' data, one value per observation. A multivariate fit suffixes each
-#' key with the response name. Bounds arrive expanded per row, covering
-#' constant and per-observation bounds alike.
+#' The Stan data hold each addition term's values for the observed rows
+#' of the training frame. A prediction or a score covers the rows of the
+#' frame it is asked for, including rows with a missing response and
+#' rows of new data. Each term is evaluated against that frame. A name
+#' the frame lacks resolves in the formula's environment.
 #'
-#' @param object Fitted `mvgam` object
-#' @param resp Character response name, or `NULL`
-#' @param nobs Integer number of likelihood columns
-#' @return Named list of the recorded terms, empty when the fit has no
-#'   Stan data
+#' @param form One response's `brmsformula`
+#' @param family That response's family
+#' @param frame Data frame of the rows
+#' @return Named list holding any of `trials`, `weights`, `cens`,
+#'   `rcens`, `lb` and `ub`, one value per row. A term the formula
+#'   lacks is left out. So is a term naming a variable that neither
+#'   `frame` nor the formula's environment holds.
 #' @noRd
-addition_term_data <- function(object, resp, nobs) {
-  checkmate::assert_list(object)
-  checkmate::assert_string(resp, null.ok = TRUE)
-  checkmate::assert_int(nobs, lower = 0L)
-  sdata <- object$standata
-  if (is.null(sdata)) {
-    return(list())
+addition_term_values <- function(form, family, frame) {
+  checkmate::assert_class(form, "brmsformula")
+  checkmate::assert_list(family)
+  checkmate::assert_data_frame(frame)
+  form$family <- family
+  adforms <- brms::brmsterms(form)$adforms
+  env <- environment(form$formula) %||% globalenv()
+  # brms's `resp_*()` constructors record each argument as a string.
+  term_spec <- function(term) {
+    if (is.null(adforms[[term]])) return(NULL)
+    eval(rlang::f_rhs(adforms[[term]]), envir = asNamespace("brms"))
   }
-  # A multivariate fit suffixes each key with the response. An
-  # unsuffixed key belongs to a univariate fit. A named response takes
-  # its suffixed key alone.
-  pick <- function(key) {
-    nm <- if (!is.null(resp)) paste0(key, "_", resp) else key
-    val <- sdata[[nm]]
-    if (is.null(val)) {
+  term_value <- function(spec, var) {
+    expr <- str2lang(spec$vars[[var]])
+    unbound <- setdiff(all.vars(expr), names(frame))
+    if (!all(vapply(unbound, exists, logical(1L), envir = env))) {
       return(NULL)
     }
-    val <- as.numeric(val)
-    if (length(val) == 1L) val <- rep(val, nobs)
-    if (length(val) != nobs) {
-      return(structure(val, mismatch = TRUE))
-    }
-    val
+    rep_len(eval(expr, frame, env), nrow(frame))
   }
-  out <- list(
-    weights = pick("weights"), cens = pick("cens"),
-    rcens = pick("rcens"), lb = pick("lb"), ub = pick("ub")
-  )
-  out <- out[!vapply(out, is.null, logical(1L))]
 
-  # A closure-unit family scores once per unit. Its addition terms are
-  # recorded per visit. Dropping them would report a wrong information
-  # criterion that looks ordinary. The mismatch is refused.
-  bad <- names(out)[vapply(out, function(v) isTRUE(attr(v, "mismatch")),
-                           logical(1L))]
-  if (length(bad)) {
+  out <- list()
+  if (!is.null(spec <- term_spec("trials"))) {
+    out$trials <- term_value(spec, "trials")
+  }
+  if (!is.null(spec <- term_spec("weights"))) {
+    w <- term_value(spec, "weights")
+    # `weights(w, scale = TRUE)` rescales the weights to sum to the row
+    # count.
+    if (isTRUE(spec$flags$scale) && !is.null(w)) {
+      w <- w / sum(w) * length(w)
+    }
+    out$weights <- w
+  }
+  if (!is.null(spec <- term_spec("cens"))) {
+    cens <- term_value(spec, "cens")
+    out$cens <- if (!is.null(cens)) censoring_codes(cens)
+    if (!identical(spec$vars$y2, "NA")) {
+      out$rcens <- term_value(spec, "y2")
+    }
+  }
+  if (!is.null(spec <- term_spec("trunc"))) {
+    out$lb <- as.numeric(term_value(spec, "lb"))
+    out$ub <- as.numeric(term_value(spec, "ub"))
+  }
+  Filter(length, out)
+}
+
+
+#' The addition-term values of one response of a fitted model
+#'
+#' @param object Fitted `mvgam` object
+#' @param frame Data frame of the rows
+#' @param resp Response key, or `NULL` on a model with one
+#' @param family That response's family
+#' @return As `addition_term_values()`
+#' @noRd
+response_addition_terms <- function(object, frame, resp = NULL,
+                                    family = model_families(object, resp)) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_string(resp, null.ok = TRUE)
+  addition_term_values(
+    response_formulas(object)[[resp %||% 1L]], family, frame
+  )
+}
+
+
+#' Censoring indicators as numeric codes
+#'
+#' `-1` is left, `0` none, `1` right and `2` interval censoring. A
+#' character value matches a prefix of `"left"`, `"none"`, `"right"` or
+#' `"interval"`. A logical `TRUE` is right censoring.
+#'
+#' @param x Censoring indicators as character, factor, logical or
+#'   numeric codes
+#' @return Numeric vector of codes
+#' @noRd
+censoring_codes <- function(x) {
+  if (is.factor(x)) x <- as.character(x)
+  if (is.logical(x) || is.numeric(x)) {
+    out <- as.numeric(x)
+  } else {
+    labels <- c(left = -1, none = 0, right = 1, interval = 2)
+    out <- vapply(x, function(v) {
+      hit <- labels[startsWith(names(labels), v)]
+      if (length(hit) == 1L) hit[[1L]] else NA_real_
+    }, numeric(1L), USE.NAMES = FALSE)
+  }
+  bad <- !is.na(x) & !out %in% -1:2
+  if (any(bad)) {
     stop(insight::format_error(c(
-      cli::format_inline(paste0(
-        "Addition term{?s} {.field {bad}} {?does/do} not line up ",
-        "with the likelihood."
-      )),
-      x = cli::format_inline(paste0(
-        "{length(out[[bad[1]]])} value{?s} recorded against ",
-        "{nobs} likelihood contribution{?s}."
-      )),
-      x = paste0("Per-visit weights, censoring and bounds are not ",
-                 "supported for a family that scores once per unit."),
-      i = "Record weights, censoring and bounds per unit."
+      "Censoring indicators must be 'left', 'none', 'right' or 'interval'.",
+      x = paste0("Got ", paste0("'", unique(x[bad]), "'", collapse = ", "),
+                 "."),
+      i = "Codes -1, 0, 1 and 2 and TRUE or FALSE are also accepted."
     )), call. = FALSE)
   }
   out
@@ -472,7 +522,7 @@ apply_censoring <- function(ll, cens, rcens, spec, linpred, y) {
   checkmate::assert_numeric(rcens, null.ok = TRUE)
   checkmate::assert_list(spec)
   checkmate::assert_matrix(linpred)
-  if (is.null(cens) || all(cens == 0)) {
+  if (is.null(cens) || isTRUE(all(cens == 0))) {
     return(ll)
   }
   right <- which(cens == 1)
@@ -505,12 +555,9 @@ apply_censoring <- function(ll, cens, rcens, spec, linpred, y) {
 
 #' Log-likelihood renormalised over the truncation bounds
 #'
-#' A truncated model places all its mass inside `[lb, ub]`. Each
-#' contribution loses `log(F(ub) - F(lb))`. A discrete family puts mass
-#' on the lower bound itself. Its excluded tail stops one step below the
-#' bound, as in the brms Stan program,
-#' `log_diff_exp(lcdf(ub), lcdf(lb - 1))`, under which the posterior
-#' was sampled.
+#' A truncated model places all its mass inside the window
+#' `truncation_window()` gives. Each contribution loses the log of that
+#' mass.
 #'
 #' @param ll Numeric log-likelihood matrix, one row per draw
 #' @param lb Numeric lower bounds, or `NULL`
@@ -523,27 +570,52 @@ apply_censoring <- function(ll, cens, rcens, spec, linpred, y) {
 apply_truncation_to_loglik <- function(ll, lb, ub, spec, linpred,
                                        discrete) {
   checkmate::assert_matrix(ll)
-  checkmate::assert_numeric(lb, null.ok = TRUE)
-  checkmate::assert_numeric(ub, null.ok = TRUE)
   checkmate::assert_list(spec)
   checkmate::assert_matrix(linpred)
-  checkmate::assert_flag(discrete)
-  has_lb <- !is.null(lb) && any(is.finite(lb))
-  has_ub <- !is.null(ub) && any(is.finite(ub))
-  if (!has_lb && !has_ub) {
+  window <- truncation_window(lb, ub, ncol(ll), discrete)
+  if (is.null(window)) {
     return(ll)
   }
-  log_cdf_ub <- if (has_ub) {
-    dist_cdf(spec, linpred, ub, log.p = TRUE)
-  } else {
-    matrix(0, nrow(ll), ncol(ll))
+  ll - log_interval_mass(spec_cdf(spec, linpred), window$lo, window$hi)
+}
+
+
+#' The `(lo, hi]` window a pair of truncation bounds keeps
+#'
+#' A count family keeps the mass at its lower bound, as the Stan
+#' likelihood `log_diff_exp(lcdf(ub), lcdf(lb - 1))` does. Its window
+#' then opens one step below `lb`.
+#'
+#' @param lb,ub Numeric bounds, one per observation, or `NULL`
+#' @param n Integer number of observations
+#' @param discrete Logical flag for an integer-valued family
+#' @return List holding `lo` and `hi`, one per observation, or `NULL`
+#'   when neither bound is finite
+#' @noRd
+truncation_window <- function(lb, ub, n, discrete) {
+  checkmate::assert_numeric(lb, null.ok = TRUE)
+  checkmate::assert_numeric(ub, null.ok = TRUE)
+  checkmate::assert_count(n)
+  checkmate::assert_flag(discrete)
+  if (!any(is.finite(lb)) && !any(is.finite(ub))) {
+    return(NULL)
   }
-  log_cdf_lb <- if (has_lb) {
-    dist_cdf(spec, linpred, if (discrete) lb - 1 else lb, log.p = TRUE)
-  } else {
-    matrix(-Inf, nrow(ll), ncol(ll))
+  lo <- rep_len(lb %||% -Inf, n)
+  list(lo = if (discrete) lo - 1 else lo, hi = rep_len(ub %||% Inf, n))
+}
+
+
+#' A spec's distribution function as a function of its quantiles
+#'
+#' @param spec Distribution spec from `family_dist_spec()`
+#' @param linpred Numeric linear predictor matrix, one row per draw
+#' @return Function of `(q, lower.tail, log.p)` returning the
+#'   `[ndraws, nobs]` matrix `dist_cdf()` gives
+#' @noRd
+spec_cdf <- function(spec, linpred) {
+  function(q, lower.tail = TRUE, log.p = FALSE) {
+    dist_cdf(spec, linpred, q, lower.tail = lower.tail, log.p = log.p)
   }
-  ll - log_diff_exp(log_cdf_ub, log_cdf_lb)
 }
 
 
@@ -559,7 +631,7 @@ apply_truncation_to_loglik <- function(ll, lb, ub, spec, linpred,
 apply_case_weights <- function(ll, weights) {
   checkmate::assert_matrix(ll)
   checkmate::assert_numeric(weights, null.ok = TRUE)
-  if (is.null(weights) || all(weights == 1)) {
+  if (is.null(weights) || isTRUE(all(weights == 1))) {
     return(ll)
   }
   sweep(ll, 2L, weights, `*`)
@@ -575,6 +647,7 @@ apply_case_weights <- function(ll, weights) {
 #'
 #' @param ll Numeric log-likelihood matrix, one row per draw
 #' @param object Fitted `mvgam` object
+#' @param frame Data frame of the scored rows
 #' @param resp Character response name, or `NULL`
 #' @param family_name Character family name
 #' @param link Character link name
@@ -584,29 +657,24 @@ apply_case_weights <- function(ll, weights) {
 #' @param trials Numeric vector of trials, or `NULL`
 #' @return `ll` with the addition terms applied
 #' @noRd
-apply_addition_terms <- function(ll, object, resp, family_name, link,
-                                 linpred, y, family_pars, trials) {
+apply_addition_terms <- function(ll, object, frame, resp, family_name,
+                                 link, linpred, y, family_pars, trials) {
   checkmate::assert_matrix(ll)
-  checkmate::assert_class(object, "mvgam")
-  checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_string(family_name)
-  terms <- addition_term_data(object, resp, nobs = ncol(ll))
+  terms <- response_addition_terms(object, frame, resp)
   if (!length(terms)) {
     return(ll)
   }
-  needs_cdf <- !is.null(terms$cens) && any(terms$cens != 0) ||
-    !is.null(terms$lb) && any(is.finite(terms$lb)) ||
-    !is.null(terms$ub) && any(is.finite(terms$ub))
+  needs_cdf <- any(terms$cens != 0, na.rm = TRUE) ||
+    any(is.finite(terms$lb)) || any(is.finite(terms$ub))
 
   if (needs_cdf) {
     spec <- family_dist_spec(family_name, link, linpred, family_pars,
                              trials)
     if (is.null(spec)) {
-      stop(insight::format_error(c(
-        cli::format_inline(paste0(
-          "'cens()' and 'trunc()' are unavailable for family ",
-          "{.val {family_name}}."
-        ))
+      stop(insight::format_error(paste0(
+        "'cens()' and 'trunc()' are not supported for family '",
+        family_name, "'."
       )), call. = FALSE)
     }
     ll <- apply_censoring(ll, terms$cens, terms$rcens, spec, linpred, y)

@@ -5,28 +5,28 @@
 \title{Observation families supported by mvgam}
 \description{
 \code{mvgam()} and \code{jsdgam()} accept the observation families that
-\pkg{brms} and \pkg{stats} define, together with a set that
-\pkg{mvgam} adds for data that ecological and epidemiological
-series tend to produce: counts observed with imperfect detection,
-compositions that sum to one, and counts whose dispersion a
-negative binomial cannot reach.
+\pkg{brms} and \pkg{stats} define. \pkg{mvgam} adds families for
+data that ecological and epidemiological series tend to produce.
+They cover counts observed with imperfect detection, compositions
+and counts whose dispersion a negative binomial cannot reach.
 
-Pass a family the same way you would in \code{brms::brm()} or
-\code{stats::glm()}, for example
-\code{mvgam(y ~ x, trend_formula = ~ AR(p = 1), family = nmix())}.
+Pass a family as you would to \code{brms::brm()} or \code{stats::glm()}, for
+example \code{mvgam(y ~ x, trend_formula = ~ AR(p = 1), family = nmix())}.
+The \href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} fits \code{\link[=nmix]{nmix()}}.
+The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits a joint species
+distribution model.
 }
 \section{Families mvgam adds}{
 
-Each fixes its link, and each takes the arguments listed here
-rather than a \code{link} argument.
+Each fixes its link. \code{com_binomial()} takes a \code{link} argument that
+accepts \code{"logit"} alone. The table lists every argument.
 
 \tabular{lll}{
 \strong{Family} \tab \strong{Link} \tab \strong{Arguments} \cr
 \code{\link[=tweedie]{tweedie()}} \tab log \tab \code{M}, the truncation point of the
 compound Poisson sum \cr
 \code{\link[=beta_nb]{beta_nb()}} \tab log \tab none \cr
-\code{\link[=com_binomial]{com_binomial()}} \tab logit \tab \code{link}, which accepts
-\code{"logit"} only \cr
+\code{\link[=com_binomial]{com_binomial()}} \tab logit \tab \code{link}, \code{"logit"} only \cr
 \code{\link[=nmix]{nmix()}} \tab log (state), logit (detection) \tab \code{type}, one of
 \code{"poisson_binomial"}, \code{"royle_nichols"} or
 \code{"poisson_poisson"}; \code{multi_season} \cr
@@ -47,41 +47,40 @@ compound Poisson sum \cr
 \code{\link[brms:brmsfamily]{brms::asym_laplace()}} and \code{\link[brms:brmsfamily]{brms::von_mises()}} for angles.}
 \item{Non-negative real-valued}{\code{\link[stats:family]{stats::Gamma()}},
 \code{\link[brms:brmsfamily]{brms::lognormal()}}, \code{\link[brms:brmsfamily]{brms::exponential()}},
-\code{\link[brms:brmsfamily]{brms::weibull()}}, \code{\link[brms:brmsfamily]{brms::frechet()}},
-\code{\link[stats:family]{stats::inverse.gaussian()}}, and \code{\link[=tweedie]{tweedie()}} when the data
-are continuous but carry a point mass at zero. Pair these
-with \code{link = "log"} whenever the model carries a trend:
-their mean has to stay positive, and under \code{identity},
-\code{inverse} or \code{1/mu^2} that holds only where the linear
-predictor is positive on every row. A latent trend is
-centred near zero and takes negative values, where the
-likelihood is undefined. \code{stats::Gamma()} supplies the
-\code{inverse} link, which is why the pairing is easy to reach by
-accident. \code{lognormal()} is the exception: its \code{mu} is a
-log-scale location that takes any sign, and \code{identity} is
-the right link for it.}
+\code{\link[brms:brmsfamily]{brms::weibull()}}, \code{\link[brms:brmsfamily]{brms::frechet()}} and
+\code{\link[stats:family]{stats::inverse.gaussian()}}. \code{\link[=tweedie]{tweedie()}} takes continuous data
+with a point mass at zero. With a trend, give these families
+\code{link = "log"}. Their mean must stay positive. Under the
+\code{identity}, \code{inverse} or \code{1/mu^2} link it stays positive only
+where the linear predictor is positive on every row. A latent
+trend is centred near zero and takes negative values, where the
+likelihood is undefined. \code{stats::Gamma()} defaults to the
+\code{inverse} link. \code{mvgam()} warns when a trend meets one of these
+links. \code{lognormal()} is the exception. Its \code{mu} is a log-scale
+location that takes any sign. \code{identity} is the right link for
+it.}
 \item{A single proportion on \verb{(0, 1)}}{\code{\link[=Beta]{Beta()}}, with
 \code{\link[brms:brmsfamily]{brms::zero_inflated_beta()}} or
 \code{\link[brms:brmsfamily]{brms::zero_one_inflated_beta()}} when the bounds are
 attainable.}
-\item{A vector of proportions summing to one}{\code{\link[=diri]{diri()}} for a
-Dirichlet, \code{\link[=multi]{multi()}} for a multinomial, \code{\link[=categ]{categ()}} for a
-categorical response.}
+\item{Compositions and choices among categories}{\code{\link[=diri]{diri()}} for
+proportions summing to one, \code{\link[=multi]{multi()}} for counts across
+categories and \code{\link[=categ]{categ()}} for one chosen category per unit.}
 \item{Binary}{\code{\link[brms:brmsfamily]{brms::bernoulli()}}.}
 \item{Counts out of a known number of trials}{
-\code{\link[stats:family]{stats::binomial()}}, \code{\link[brms:brmsfamily]{brms::beta_binomial()}} when trials are
-overdispersed, and \code{\link[=com_binomial]{com_binomial()}} when they are either
-under- or over-dispersed.}
+\code{\link[stats:family]{stats::binomial()}}. \code{\link[brms:brmsfamily]{brms::beta_binomial()}} takes overdispersed
+trials. \code{\link[=com_binomial]{com_binomial()}} takes trials that are under- or
+over-dispersed.}
 \item{Unbounded counts}{\code{\link[stats:family]{stats::poisson()}},
-\code{\link[brms:brmsfamily]{brms::negbinomial()}}, \code{\link[brms:brmsfamily]{brms::geometric()}}, their
+\code{\link[brms:brmsfamily]{brms::negbinomial()}}, \code{\link[brms:brmsfamily]{brms::geometric()}} and their
 zero-inflated and hurdle counterparts (see
-\code{\link[brms:brmsfamily]{brms::brmsfamily()}}), and \code{\link[=beta_nb]{beta_nb()}} for tails heavier
-than a negative binomial reaches.}
+\code{\link[brms:brmsfamily]{brms::brmsfamily()}}). \code{\link[=beta_nb]{beta_nb()}} takes tails heavier than a
+negative binomial reaches.}
 \item{Repeat visits to a site}{\code{\link[=nmix]{nmix()}} estimates latent
-abundance from repeated counts and \code{\link[=occ]{occ()}} estimates latent
+abundance from repeated counts. \code{\link[=occ]{occ()}} estimates latent
 occupancy from repeated detection histories.}
 \item{Several responses measured together}{\code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}},
-whose residual correlations are informed by a latent factor
+whose residual correlations come from a latent factor
 structure.}
 \item{Ordered}{\code{\link[brms:brmsfamily]{brms::cumulative()}}, \code{\link[brms:brmsfamily]{brms::sratio()}},
 \code{\link[brms:brmsfamily]{brms::cratio()}} and \code{\link[brms:brmsfamily]{brms::acat()}}.}
@@ -91,45 +90,50 @@ structure.}
 \section{Link functions}{
 
 A \pkg{brms} or \pkg{stats} family takes a \code{link} argument as
-usual, so \code{poisson(link = "sqrt")} and \code{Gamma(link = "log")} both
-work. The families in the table above fix their link, because the
-Stan code mvgam generates for them is written against that scale.
+usual. \code{poisson(link = "sqrt")} and \code{Gamma(link = "log")} both
+work. mvgam writes the Stan code for the families in the table
+against one scale. Those families fix their link.
 }
 
 \section{Data layout}{
 
-\code{\link[=nmix]{nmix()}} and \code{\link[=occ]{occ()}} are closure-unit families: they expect
-several rows per closure unit, one per visit, and model the state
-and the detection process separately. \code{bf()} supplies the second
-linear predictor, as in \code{bf(y ~ elev, p ~ tod)}. Use
-\code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} to see the layout they want, and
-\code{\link[=pivot_detection_array]{pivot_detection_array()}} to reshape a site-by-visit array into
-it. \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}, \code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}} also read
-several rows per unit, one per response category.
+\code{\link[=nmix]{nmix()}} and \code{\link[=occ]{occ()}} are closure-unit families. They expect several
+rows per closure unit, one per visit. They model the state and the
+detection process with separate linear predictors. \code{bf()} supplies
+the second, as in \code{bf(y ~ elev, p ~ tod)}.
+\code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} simulates the layout they take.
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} reshapes a site-by-visit array into it.
+\code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}, \code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}} also take
+several rows per unit, one per category or response.
 }
 
 \section{What the family changes after fitting}{
 
 A closure-unit family adds \code{predict(type = "latent_state")} and
-\code{predict(type = "detection")}, supports \code{pp_check(type = "fit_stat")}, and restricts the \code{pp_check()} types that work per
-row. Families on a discrete support are drawn from with the
-integer sampler, which \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} selects on its
-own.
+\code{predict(type = "detection")}. It supports
+\code{pp_check(type = "fit_stat")}. It refuses the \code{pp_check()} types
+that assume one observation per row.
 
-\code{brms::dirichlet()}, \code{brms::multinomial()}, \code{brms::categorical()}
-and \code{brms::logistic_normal()} are refused with a message pointing
-at \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}} and \code{\link[=mvn]{mvn()}}, which fit the same
-responses through mvgam's long-format layout.
+\code{brms::dirichlet()}, \code{brms::multinomial()} and \code{brms::categorical()}
+are refused with a pointer to \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}} and \code{\link[=categ]{categ()}}.
+These fit the same responses in mvgam's long-format layout.
+\code{brms::logistic_normal()} is refused with a pointer to \code{\link[=mvn]{mvn()}},
+which fits the additive log-ratios of the proportions.
 }
 
 \examples{
-# Families are constructed, then passed to `family`.
+# Families are constructed, then passed to `family`
 nmix(type = "royle_nichols")
 com_binomial()
 tweedie(M = 40L)
 
-# A brms or stats family still takes its own link.
+# A brms or stats family still takes its own link
 poisson(link = "sqrt")
+
+# The layout occ() takes: one row per visit to each site
+head(sim_closure_unit_data(family = occ())$data_train)
+
+# Next, get_prior() lists the priors a family's parameters take
 
 }
 \seealso{

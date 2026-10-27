@@ -1,13 +1,8 @@
-# Helpers for the `loadings_prior` user surface. All functions
-# here are internal and called from `normalise_loadings_prior()`
-# (R/validations.R) and `make_loadings_prior_stanvars()`
-# (R/stan_assembly.R). The helpers cover the four pieces of work
-# the surface needs: feature encoding into a numeric matrix
-# aligned to factor-level series ordering, pairwise-distance
-# validation, collinearity warning across length-scale dimensions
-# (feature-derived distance plus pairwise distances), and
-# warning for imbalanced one-hot columns whose length-scales the
-# data cannot identify.
+# Internal helpers of `normalise_loadings_prior()` (R/validations.R)
+# and `make_loadings_prior_stanvars()` (R/stan_assembly.R). They
+# encode the features as a numeric matrix in series-level order. They
+# validate the pairwise distances. They warn on collinear length-scale
+# dimensions and on one-hot columns too imbalanced to identify.
 
 
 # Encode a per-series feature matrix or data.frame into a numeric
@@ -17,18 +12,14 @@
 #   - unordered factor: one-hot, keep all levels
 #   - character: coerce to factor, then one-hot
 #
-# `features` can be a matrix (treated as all numeric) or a
-# data.frame. `series_levels` is the levels(data$series) vector.
-# Row alignment is decided by the first match of:
-#   1. data.frame has a 'series' column -> reorder by that column
-#   2. rownames match series_levels -> reorder by rownames
-#   3. nrow equals length(series_levels) -> assume caller-ordered
-# Returns the encoded p x c matrix with informative column names
-# (source column for numerics; source.level for one-hots).
+# `features` can be a numeric matrix or a data.frame. Its rows are put
+# in the order of `series_levels` by `align_feature_rows()`. Returns
+# the encoded p x c matrix, with columns named by their source column
+# (numerics) or source.level (one-hots).
 #'@noRd
 encode_loadings_features <- function(features, series_levels) {
-  checkmate::assert_character(series_levels, min.len = 1L, any.missing = FALSE)
-  n_series <- length(series_levels)
+  checkmate::assert_character(series_levels, min.len = 1L,
+                              any.missing = FALSE)
   if (is.matrix(features)) {
     if (!is.numeric(features)) {
       stop(insight::format_error(
@@ -39,7 +30,7 @@ encode_loadings_features <- function(features, series_levels) {
   }
   checkmate::assert_data_frame(features, min.cols = 1L)
   features <- align_feature_rows(features, series_levels)
-  feature_cols <- setdiff(names(features), "series")
+  feature_cols <- names(features)
   if (length(feature_cols) == 0L) {
     stop(insight::format_error(c(
       "'features' has no usable columns after dropping 'series'.",
@@ -66,41 +57,40 @@ encode_loadings_features <- function(features, series_levels) {
 }
 
 
-# Align rows of a feature data.frame to the requested
-# series_levels order. Three accepted layouts (probed in order):
-# 1. df has a 'series' column matching series_levels
-# 2. df has rownames matching series_levels
-# 3. df has exactly nrow == length(series_levels) rows
-#'@noRd
-align_feature_rows <- function(df, series_levels) {
-  n_series <- length(series_levels)
+#' Rows of a per-series data frame in the order of the series levels
+#'
+#' A `series` column names each row's series. Without one, row names
+#' name the series when any of them is a series level. Default row
+#' names name none. The rows are then taken in level order.
+#' `series_row_order()` refuses a missing, unknown or repeated series.
+#'
+#' @param df Data frame with one row per series
+#' @param series_levels The training series, in axis order
+#' @param subject The argument to name in a message
+#' @return `df` in level order, without its `series` column
+#' @noRd
+align_feature_rows <- function(df, series_levels, subject = "features") {
   if ("series" %in% names(df)) {
-    s <- as.character(df$series)
-    df <- df[
-      series_row_order(s, series_levels, "features$series"), ,
-      drop = FALSE
-    ]
+    df <- df[series_row_order(df$series, series_levels,
+                              paste0(subject, "$series")), , drop = FALSE]
     df$series <- NULL
     return(df)
   }
-  if (!is.null(rownames(df)) &&
-      setequal(rownames(df), series_levels)) {
-    return(df[series_levels, , drop = FALSE])
+  if (any(rownames(df) %in% series_levels)) {
+    return(df[series_row_order(rownames(df), series_levels,
+                               paste0("rownames(", subject, ")")), ,
+              drop = FALSE])
   }
-  if (nrow(df) == n_series) {
+  if (nrow(df) == length(series_levels)) {
     return(df)
   }
   stop(insight::format_error(c(
-    "Cannot align 'features' rows to training series.",
-    x = paste0(
-      "Got nrow(features) = ", nrow(df), ", expected ",
-      n_series, " (one row per series)."
-    ),
-    i = paste0(
-      "Add a 'series' column, set rownames(features) to the ",
-      "series levels or supply rows in factor-level order."
-    )
-  )))
+    paste0("'", subject, "' needs one row per training series."),
+    x = paste0("Got ", nrow(df), " rows for ", length(series_levels),
+               " series."),
+    i = paste0("Add a 'series' column, name the rows by series or give ",
+               "one row per series in level order.")
+  )), call. = FALSE)
 }
 
 
@@ -173,9 +163,9 @@ zscore_matrix <- function(x, name) {
 # off-diagonal entry is 1, matching Heaps & Jermyn (2024) Supps
 # S4.2.1 (which standardises distances "by scaling to make the
 # common root to tip distance one"). With the default
-# `standardise = TRUE`, the per-distance length-scale prior
-# `log(theta) ~ normal(0, 1)` lives on the standardised scale and
-# is meaningful out of the box. `name` flows into error messages
+# `standardise = TRUE`, the default length-scale prior
+# `lognormal(0, 1)` sets its scale against the standardised
+# distances. `name` flows into error messages
 # so users know which `loadings_prior$distances` entry tripped a
 # check.
 #'@noRd
@@ -263,4 +253,20 @@ validate_pairwise_distance <- function(mat, n_series, name,
     }
   }
   mat
+}
+
+
+#' Whether a fit used a structured `loadings_prior`
+#'
+#' The structured prior writes `N_features_trend` for trait features and
+#' a `dist_<name>` matrix for each pairwise distance into the Stan data.
+#' Either marks it.
+#'
+#' @param object A fitted `mvgam` object
+#' @return Logical scalar
+#' @noRd
+uses_loadings_prior <- function(object) {
+  sd <- object$standata
+  if (is.null(sd)) return(FALSE)
+  isTRUE(sd$N_features_trend > 0L) || any(grepl("^dist_", names(sd)))
 }

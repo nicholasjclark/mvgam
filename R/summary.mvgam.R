@@ -1,9 +1,5 @@
-# ==============================================================================
-# mvgam summary methods
-# ==============================================================================
-# Summary methods for mvgam fitted models following brms conventions.
-# The posterior package computes every summary. The output is
-# organised by parameter category.
+# Summary methods for mvgam fits. The posterior package computes every
+# summary. The output is organised by parameter category.
 
 #' Summary of mvgam model fits
 #'
@@ -27,7 +23,7 @@
 #'
 #' @return An object of class \code{mvgam_summary}. Each block is a
 #'   data frame of the columns below, one row per parameter, named as
-#'   \pkg{brms} prints it. A block is absent when the model has no such
+#'   `print()` shows it. A block is absent when the model has no such
 #'   parameter. The observation model's blocks are:
 #' \describe{
 #'   \item{\code{smooth}}{Smoothing standard deviations, one row per
@@ -54,14 +50,18 @@
 #' them.
 #'
 #' @details
-#' The summary includes the following columns:
+#' Each block has the columns:
 #' \describe{
-#'   \item{\code{Estimate}}{Posterior mean (or median if robust = TRUE)}
-#'   \item{\code{Est.Error}}{Posterior SD (or MAD if robust = TRUE)}
-#'   \item{Quantile bounds}{Credible interval limits based on probs argument}
-#'   \item{\code{Rhat}}{Potential scale reduction factor (should be < 1.05)}
-#'   \item{\code{Bulk_ESS}}{Bulk effective sample size}
-#'   \item{\code{Tail_ESS}}{Tail effective sample size}
+#'   \item{\code{Estimate}}{Posterior mean, or median with
+#'     `robust = TRUE`.}
+#'   \item{\code{Est.Error}}{Posterior standard deviation, or MAD with
+#'     `robust = TRUE`.}
+#'   \item{\code{l-95\% CI}, \code{u-95\% CI}}{Credible interval
+#'     bounds at `probs`, labelled by its coverage.}
+#'   \item{\code{Rhat}}{Potential scale reduction factor on split
+#'     chains, 1 at convergence.}
+#'   \item{\code{Bulk_ESS}, \code{Tail_ESS}}{Bulk and tail effective
+#'     sample sizes.}
 #' }
 #'
 #' @examples
@@ -76,7 +76,10 @@
 #'
 #' summary(mod)
 #'
-#' # Next, how_to_cite() drafts the methods paragraph
+#' # Each block is a data frame, such as the trend's dynamics
+#' round(summary(mod)$trend_spec, 2)
+#'
+#' # Next: how_to_cite() drafts the methods paragraph
 #' }
 #'
 #' @seealso [how_to_cite()] drafts a methods paragraph for the model.
@@ -103,21 +106,18 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 
   require_fitted_model(object, "summary")
 
-  # Summarise every parameter once, then split the table by category
+  # Summarise every parameter once, then split the table by category.
+  # The trend's own time-indexed states, one per time point and series,
+  # are left out. No summary block claims them. `hindcast(type =
+  # "trend")` returns them as a trajectory. `as.data.frame(variable =
+  # "^trend\\[", regex = TRUE)` returns them as draws.
+  pars <- variables(object)
   all_summaries <- compute_all_summaries(
     object,
     probs = probs,
-    robust = robust
+    robust = robust,
+    variable = pars[!is_trend_state_param(pars)]
   )
-
-  pars <- rownames(all_summaries)
-
-  # Drop the trend's own time-indexed states, one row per time point
-  # and series. No summary block claims them. `hindcast(type =
-  # "trend")` returns them as a trajectory. `as.data.frame(variable =
-  # "^trend\\[", regex = TRUE)` returns them as draws.
-  pars_to_keep <- !is_trend_state_param(pars)
-  all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
   pars <- rownames(all_summaries)
 
   # The matrices a trend derives from its sampled parameters print
@@ -148,8 +148,8 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     draw_counts(object)
   )
 
-  # The blocks brms reports, for each side of the model. A trend-side
-  # block takes the `trend_` prefix on its key.
+  # The blocks of each side of the model. A trend-side block takes the
+  # `trend_` prefix on its key.
   kind <- mvgam_par_kind(pars)
   for (side in c("observation", "trend")) {
     prefix <- if (identical(side, "trend")) "trend_" else ""
@@ -194,39 +194,28 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     ]
   }
 
-  # Store mvgam-specific metadata for print.summary.mvgam() to display
-  # model structure information (formula, trend type, dimensions)
+  # The model structure `print.mvgam_summary()` shows
   out$trend_formula <- object$trend_formula
   out$trend_predictors <- trend_predictors(object)
 
   trend_type <- get_trend_type(object)
   out$trend_model <- if (!identical(trend_type, "None")) trend_type
 
-  # `trend_model` is the bare constructor type, which a correlated
-  # `AR()` and an independent one share. Whether this fit estimates
-  # cross-series correlations comes from the trend metadata, where
-  # the trend spec recorded it.
+  # A correlated `AR()` and an independent one share the bare type
   out$trend_has_cor <- isTRUE(object$trend_metadata$has_cor)
 
-  # The `ZMVN` test in `build_next_steps()` matches the bare type.
-  # The printed line also names the order the trend was fitted at,
-  # which `printed_trend_label()` renders from the fit's own
-  # metadata. `summary()` stores the label because the helper,
-  # handed a summary object, reports a fitted ARMA as `None`.
+  # The printed label names the trend's order. It needs the fit's
+  # trend metadata, which the summary does not hold.
   out$trend_label <- printed_trend_label(object)
 
-  # The counts `print()` shows, from the same helper.
   counts <- printed_axis_counts(object)
   out$n_series <- counts$n_series
   out$n_timepoints <- counts$n_timepoints
 
-  # How many rows the model was given. `nobs()` counts these. A reader
-  # takes "Number of observations" to mean them. The product of the
-  # two axes above exceeds the frame on a ragged design. On a
-  # closure-unit family it counts units.
+  # The rows the model was given, or the units of a closure-unit
+  # family. On a ragged design this is fewer than series x times.
   out$nobs <- nobs(object)
 
-  # Store data name (captured at top-level mvgam() call)
   out$data_name <- object$data.name
 
   structure(out, class = "mvgam_summary")
@@ -239,34 +228,31 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 #' Compute posterior summaries for all parameters
 #'
 #' @description
-#' Internal helper that summarises every parameter in one
-#' `posterior::summarise_draws()` call, returning the full table for
-#' filtering by category.
+#' Summarises every parameter in one `posterior::summarise_draws()`
+#' call. The caller splits the table by category.
 #'
 #' @param object An mvgam fitted object
 #' @param probs Quantile probabilities (length 2)
 #' @param robust Logical for median/MAD vs mean/SD
+#' @param variable Character vector of the parameters to summarise,
+#'   by the names `variables()` gives
 #'
 #' @return Data frame with columns: variable, Estimate, Est.Error, quantiles,
 #'   Rhat, Bulk_ESS, Tail_ESS
 #'
 #' @noRd
-compute_all_summaries <- function(object, probs, robust) {
+compute_all_summaries <- function(object, probs, robust, variable) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1)
   checkmate::assert_flag(robust)
+  checkmate::assert_character(variable, min.len = 1L)
   # The draws come from the fitted object. Its method gives every
   # parameter the name `mvgam_user_pars()` assigns: `b_x` for the
-  # positional `b[1]` of the raw Stan model. The smooth,
-  # Gaussian-process and group-level blocks take brms's names.
-  draws <- posterior::as_draws_df(object)
+  # positional `b[1]` of the raw Stan model.
+  draws <- posterior::as_draws_df(object, variable = variable)
 
-  # Each element is named, which gives the column its name. It holds
-  # the function itself, which removes the lookup. An unnamed argument
-  # takes its column name from a deparse of what was passed. For a
-  # function object that is the whole body. A bare string is looked up
-  # in the calling namespace, where a same-named function defined here
-  # later would win.
+  # Each name sets its column's name. An unnamed function would be
+  # named by a deparse of its whole body.
   measures <- if (robust) {
     list(median = stats::median, mad = stats::mad)
   } else {
@@ -288,6 +274,14 @@ compute_all_summaries <- function(object, probs, robust) {
   rownames(out) <- out$variable
   out$variable <- NULL
 
+  if (inherits(object, "mvgam_pooled")) {
+    per_imp <- attr(object, "imputation_convergence") %||%
+      imputation_convergence(object)
+    out[c("Rhat", "Bulk_ESS", "Tail_ESS")] <- pooled_convergence(
+      per_imp, rownames(out)
+    )
+  }
+
   out
 }
 
@@ -298,7 +292,8 @@ compute_all_summaries <- function(object, probs, robust) {
 #' Rename summary columns for display
 #'
 #' @description
-#' Renames columns from posterior::summarise_draws() to match brms conventions.
+#' Renames the columns of `posterior::summarise_draws()`. The interval
+#' bounds become `l-95% CI` and `u-95% CI`, labelled by their coverage.
 #'
 #' @param col_names Character vector of column names
 #' @param probs Quantile probabilities used
@@ -311,7 +306,6 @@ rename_summary_cols <- function(col_names, probs, robust) {
   checkmate::assert_character(col_names)
   checkmate::assert_numeric(probs, len = 2L)
   checkmate::assert_flag(robust)
-  # Rename location and spread measures
   if (robust) {
     col_names[col_names == "median"] <- "Estimate"
     col_names[col_names == "mad"] <- "Est.Error"
@@ -320,14 +314,10 @@ rename_summary_cols <- function(col_names, probs, robust) {
     col_names[col_names == "sd"] <- "Est.Error"
   }
 
-  # Rename convergence diagnostics
   col_names[col_names == "rhat"] <- "Rhat"
   col_names[col_names == "ess_bulk"] <- "Bulk_ESS"
   col_names[col_names == "ess_tail"] <- "Tail_ESS"
 
-  # Rename quantile columns to credible interval format
-  # posterior returns "2.5%", "97.5%" etc., convert to "l-95% CI", "u-95% CI"
-  # CI coverage = (upper - lower) * 100 = (0.975 - 0.025) * 100 = 95
   ci_coverage <- (probs[2] - probs[1]) * 100
   ci_label <- paste0(ci_coverage, "% CI")
 
@@ -350,20 +340,17 @@ rename_summary_cols <- function(col_names, probs, robust) {
 
 #' The parameter blocks a summary reports for each side, in print order
 #'
-#' `brms:::summary.brmsfit()` reports these blocks and
-#' `brms:::print.brmssummary()` prints them in this order under these
-#' headings. Each block names its key in the summary object and the
-#' taxonomy kinds it holds. A distributional parameter's coefficients
-#' join the mean's, as brms reports `b_sigma_x` as `sigma_x`. The basis
+#' Each block names its key in the summary object, its printed heading
+#' and the taxonomy kinds it holds. A distributional parameter's
+#' coefficients join the mean's, as `sigma_x` for `b_sigma_x`. The basis
 #' coefficients of a smooth or a Gaussian process and the per-level
 #' group-level effects have no meaning one at a time. No block holds
 #' them. `as_draws()` returns them by name. `conditional_smooths()` and
 #' `ranef()` summarise them.
 #'
-#' `wrap` names a hyperparameter inside its class, as brms prints
-#' `sds(sx_1)`, `sdgp(gpx)` and `lscale(gpx)`. The group-level block
-#' splits by grouping factor, as brms prints `sd(Intercept)` under
-#' `~g`.
+#' `wrap` names a hyperparameter inside its class, as in `sds(sx_1)`,
+#' `sdgp(gpx)` and `lscale(gpx)`. The group-level block splits by
+#' grouping factor, printing `sd(Intercept)` under `~g`.
 #'
 #' @return A list of blocks
 #' @noRd
@@ -383,16 +370,15 @@ summary_blocks <- function() {
 }
 
 
-#' A block's rows under the names brms prints
+#' A block's rows under their printed names
 #'
 #' The block's heading and side name the class and the side. The class
 #' prefix and the trend suffix are dropped: `b_x`, `bs_sigma_sx_1`,
 #' `simo_moord1[1]` and `b_elev_trend` print as `x`, `sigma_sx_1`,
 #' `moord1[1]` and `elev`.
 #' A hyperparameter keeps its class around the rest, as `sds(sx_1)`.
-#' A group-level block becomes one table per grouping factor, as
-#' `brms:::summary.brmsfit()` builds it: the rows of each factor are
-#' those named `sd_<g>__` or `cor_<g>__`, with that prefix dropped and
+#' A group-level block becomes one table per grouping factor. The rows
+#' of each factor are those named `sd_<g>__` or `cor_<g>__`, with that prefix dropped and
 #' the coefficient pair of a correlation joined by a comma.
 #' `sd_g__Intercept` and `cor_g__Intercept__x` print as `sd(Intercept)`
 #' and `cor(Intercept,x)` under `g`.
@@ -434,8 +420,7 @@ summary_block_rows <- function(tab, block, groups = character()) {
 #' Observation-family parameters
 #'
 #' A distributional parameter given a formula of its own has no scalar
-#' of this kind: brms reports its coefficients with the regression
-#' coefficients.
+#' of this kind. Its coefficients join the regression coefficients.
 #'
 #' @param pars Character vector of all parameter names
 #' @return Logical vector
@@ -536,11 +521,10 @@ is_trend_matrix_param <- function(pars) {
 # Print method helpers
 # ==============================================================================
 
-#' Format a parameter table as brms prints one
+#' Format a parameter table for printing
 #'
-#' `brms:::print_format()` prints every column to `digits` places and
-#' the effective sample sizes as whole draws. An Rhat of 1.00 then
-#' prints as `1.00` and an ESS as a whole number.
+#' Every column prints to `digits` places, the effective sample sizes
+#' as whole draws.
 #'
 #' @param x Data frame of numeric columns, named by parameter
 #' @param digits Number of decimal places
@@ -560,9 +544,6 @@ format_param_table <- function(x, digits = 2) {
 }
 
 #' Print a parameter table section if present
-#'
-#' @description
-#' Helper to print a parameter table with header if the table exists.
 #'
 #' @param table Data frame or NULL
 #' @param header Character string for section header or NULL for no header
@@ -590,10 +571,9 @@ print_param_section <- function(table, header, digits = 2) {
 
 #' Print a model's family and links, one line pair per response
 #'
-#' brms's layout: a model with several responses prefixes each family
-#' and link with the response's key, aligned under the first. The
-#' family is named by `resolve_family_name()`, which returns "tweedie"
-#' where a customfamily stores "custom".
+#' A model with several responses prefixes each family and link with
+#' the response's key, aligned under the first. `resolve_family_name()`
+#' names a custom family such as `tweedie()`.
 #'
 #' @param x A fitted `mvgam`, a prefit or its summary.
 #' @return The families `model_families()` gives, invisibly.
@@ -620,7 +600,7 @@ print_family_links <- function(x) {
 #'
 #' @param x An object of class \code{mvgam_summary}.
 #' @param digits Integer for decimal places. Default is 2.
-#' @param ... Ignored.
+#' @param ... Unused.
 #'
 #' @return The \code{mvgam_summary} object invisibly.
 #'
@@ -629,16 +609,13 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   checkmate::assert_class(x, "mvgam_summary")
   checkmate::assert_int(digits, lower = 0)
 
-  # Section 1: Family and Links (aligned with fixed spacing)
   print_family_links(x)
 
-  # Section 2: Formula
   formulas <- format_model_formula(x$formula)
-  # Join with newline + 9 spaces to align with "Formula: "
+  # Continuation lines align under the text after "Formula: "
   cat("Formula: ", paste0(formulas, collapse = " \n         "), " \n",
       sep = "")
 
-  # Section 3: Data and dimensions (brms style)
   nobs <- x$nobs
   if (!is.null(x$data_name)) {
     cat("   Data: ", x$data_name, " (Number of observations: ", nobs, ") \n",
@@ -647,12 +624,10 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     cat("   Data: (Number of observations: ", nobs, ") \n", sep = "")
   }
 
-  # Add series count if multiple series
   if (!is.null(x$n_series) && x$n_series > 1) {
     cat(" Series: ", x$n_series, " \n", sep = "")
   }
 
-  # Section 4: Trend information
   trend_line <- format_trend_line(x)
   if (nzchar(trend_line)) {
     cat(trend_line, "\n", sep = "")
@@ -660,7 +635,6 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
 
   cat(format_draws_line(x), "\n\n", sep = "")
 
-  # Section 6: Observation Model Parameters
   blocks <- summary_blocks()
   side_blocks <- function(prefix) {
     Filter(Negate(is.null), stats::setNames(
@@ -669,7 +643,7 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     ))
   }
   # The group-level block is one table per grouping factor, each under
-  # its factor and level count, as brms prints it
+  # its factor and level count
   print_side <- function(tabs, ngrps) {
     for (heading in names(tabs)) {
       tab <- tabs[[heading]]
@@ -691,7 +665,6 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     print_param_section(x$spec, "Further Distributional Parameters", digits)
   }
 
-  # Section 7: Trend Model Parameters
   trend_tabs <- side_blocks("trend_")
   has_trend_params <- length(trend_tabs) > 0L || !is.null(x$trend_spec) ||
                       !is.null(x$loadings) || !is.null(x$loadings_prior)
@@ -704,7 +677,7 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     print_param_section(x$loadings_prior, "Loadings Prior", digits)
   }
   cat("Draws were sampled using ", x$sampler, ". ", sep = "")
-  # Rhat and ESS diagnose Markov chains alone, as in brms.
+  # Rhat and ESS diagnose Markov chains alone
   if (identical(x$sampler, sampler_label("sampling"))) {
     cat("For each parameter, Bulk_ESS\n",
         "and Tail_ESS are effective sample size measures, ",
@@ -738,7 +711,7 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
 #' @noRd
 draw_counts <- function(object) {
   checkmate::assert_class(object, "mvgam")
-  draws <- posterior::as_draws(object$fit)
+  draws <- fit_draws_shape(object$fit)
   sampler <- mvgam_sampler_inheritance(object)
   algorithm <- object$algorithm %||% "sampling"
   list(
@@ -754,9 +727,8 @@ draw_counts <- function(object) {
 
 #' The algorithm label `summary()` prints
 #'
-#' brms's `method(algorithm)` form. Each backend records the Stan
-#' method under its own name. The label comes from the algorithm the
-#' fit was run with.
+#' The `method(algorithm)` form, from the algorithm the fit was run
+#' with.
 #'
 #' @param algorithm One of `algorithm_choices()`
 #' @return A single string, such as `"variational(meanfield)"`
@@ -775,7 +747,7 @@ sampler_label <- function(algorithm) {
 
 #' The draws line `print()` and `summary()` show
 #'
-#' brms's two-line layout. A fit that recorded no warmup says so.
+#' Two lines. A fit that recorded no warmup says so.
 #'
 #' @param x The list `draw_counts()` returns, or a summary holding it
 #' @return A single string spanning two lines
@@ -811,7 +783,7 @@ format_trend_line <- function(x) {
   if (is.null(x$trend_model)) {
     return("")
   }
-  out <- paste0(" Trends: ", x$trend_label %||% x$trend_model)
+  out <- paste0(" Trends: ", x$trend_label)
   predictors <- x$trend_predictors
   if (!is.null(predictors)) {
     out <- paste0(out, "; formula: ", predictors)
@@ -888,7 +860,7 @@ build_next_steps <- function(x) {
   # posterior of its latent state and the per-(series, time) ribbon
   # plot. Every other fit takes the standard mvgam suggestions.
   pp_text <- if (is_cu) {
-    "`pp_check(fit, type = \"fit_stat\")`: goodness of fit per closure unit"
+    "`pp_check(fit, type = \"fit_stat\")`: goodness of fit of unit totals"
   } else {
     "`pp_check(fit)`: posterior predictive checks"
   }
@@ -937,231 +909,119 @@ build_next_steps <- function(x) {
 # Multiple imputation summary method
 # ==============================================================================
 
-#' Summary method for multiple imputation mvgam models
+#' Summary of a fit pooled over imputations
 #'
 #' @description
-#' Provides posterior summary statistics for multiple imputation mvgam
-#' models, with additional diagnostics about the imputation process and
-#' combined posterior draws.
+#' The summary of a fit from [mvgam_multiple()]. The estimates come from
+#' the pooled draws. Chains from different imputations sample different
+#' posteriors, which raises the R-hat of the pooled chains. Each
+#' parameter's `Rhat` is its largest over the imputation fits instead.
+#' `Bulk_ESS` and `Tail_ESS` are the sums over those fits. A table gives
+#' each fit's largest R-hat and smallest ESS over its parameters.
 #'
 #' @inheritParams summary.mvgam
-#' @param object An object of class \code{mvgam_pooled}.
-#' @param ... Additional arguments passed to \code{\link{summary.mvgam}}.
+#' @param object A fit of class `mvgam_pooled`.
+#' @param x An object of class `mvgam_pooled_summary`.
+#' @param digits Integer number of decimal places to print.
+#' @param ... Unused. Anything passed here is refused.
 #'
-#' @return An object of class \code{c("mvgam_pooled_summary",
-#'   "mvgam_summary")} containing standard summary components plus
-#'   multiple imputation diagnostics.
+#' @return `summary()` returns an object of class
+#'   `c("mvgam_pooled_summary", "mvgam_summary")`. It holds the blocks of
+#'   [summary.mvgam()] and `mi_diagnostics`, a list of the number of
+#'   imputations, the draws per imputation and the per-imputation
+#'   convergence table. `print()` returns `x` invisibly.
 #'
-#' @details
-#' This method extends the standard \code{summary.mvgam} output with
-#' multiple imputation specific information:
-#' \itemize{
-#'   \item{Number of imputations}
-#'   \item{Total posterior draws (combined across all imputations)}
-#'   \item{Per-imputation convergence summaries}
-#'   \item{Information about the combination method}
-#' }
-#'
-#' The combined posteriors are created using
-#' \code{rstan::sflist2stanfit()}, which concatenates posterior draws
-#' from all imputed datasets at the Stan level. Parameter estimates
-#' reflect uncertainty from both the model and the imputation process.
-#'
-#' @seealso \code{\link{summary.mvgam}}, \code{\link{mvgam_multiple}}
+#' @seealso [mvgam_multiple()], [summary.mvgam()]
 #'
 #' @export
 summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
-                                  robust = FALSE,
-                                  ...) {
+                                 robust = FALSE, matrices = FALSE, ...) {
   checkmate::assert_class(object, "mvgam_pooled")
-  checkmate::assert_numeric(probs, len = 2, lower = 0, upper = 1)
-  checkmate::assert_true(probs[1] < probs[2])
-  checkmate::assert_flag(robust)
-
-  # Call parent method to get standard summary
-  base_summary <- NextMethod("summary")
-
-  # `pool_mvgam_fits()` constructs this class and writes all three
-  # attributes.
-  individual_fits <- attr(object, "individual_fits")
-  n_imputations <- attr(object, "n_imputations")
-  combination_method <- attr(object, "combination_method")
-
-  # Calculate total draws across all imputations
-  total_draws <- posterior::ndraws(object)
-  draws_per_imp <- posterior::ndraws(individual_fits[[1L]])
-
-  # Extract per-imputation convergence diagnostics
-  imp_convergence <- lapply(seq_along(individual_fits), function(i) {
-    draws <- posterior::as_draws(individual_fits[[i]]$fit)
-
-    # The worst R-hat and smallest ESS reported here are the numbers a
-    # reader attributes to a model parameter. Over every saved variable
-    # a single latent state at one occasion could set both. A trend
-    # holds thousands of those. `mvgam_user_pars()` is the projection
-    # every user-facing reader shares.
-    keep <- intersect(
-      unname(mvgam_user_pars(individual_fits[[i]])),
-      posterior::variables(draws)
+  rlang::check_dots_empty()
+  per_imp <- imputation_convergence(object)
+  # `compute_all_summaries()` takes the convergence columns from here,
+  # which spares it a second pass over every imputation fit
+  attr(object, "imputation_convergence") <- per_imp
+  out <- NextMethod("summary")
+  fits <- attr(object, "individual_fits")
+  out$mi_diagnostics <- list(
+    n_imputations = length(fits),
+    draws_per_imputation = posterior::ndraws(fits[[1L]]),
+    per_imputation = data.frame(
+      Imputation = seq_along(per_imp),
+      Max_Rhat = vapply(per_imp, function(t) max(t$Rhat, na.rm = TRUE),
+                        numeric(1L)),
+      Min_Bulk_ESS = vapply(per_imp,
+                            function(t) min(t$Bulk_ESS, na.rm = TRUE),
+                            numeric(1L)),
+      Min_Tail_ESS = vapply(per_imp,
+                            function(t) min(t$Tail_ESS, na.rm = TRUE),
+                            numeric(1L))
     )
-    if (length(keep) > 0L) {
-      draws <- posterior::subset_draws(draws, variable = keep)
-    }
-    summ <- without_ess_cap_notice(posterior::summarise_draws(
-      draws,
-      posterior::default_convergence_measures()
-    ))
-
-    list(
-      imputation = i,
-      max_rhat = max(summ$rhat, na.rm = TRUE),
-      min_bulk_ess = min(summ$ess_bulk, na.rm = TRUE),
-      min_tail_ess = min(summ$ess_tail, na.rm = TRUE),
-      n_params = nrow(summ)
-    )
-  })
-
-  # Calculate summary statistics across imputations
-  max_rhat_across_imps <- max(
-    sapply(imp_convergence, function(x) x$max_rhat, USE.NAMES = FALSE),
-    na.rm = TRUE
   )
-  min_ess_across_imps <- min(
-    sapply(imp_convergence, function(x) x$min_bulk_ess,
-           USE.NAMES = FALSE),
-    na.rm = TRUE
-  )
-
-  # Add MI diagnostics to summary object
-  base_summary$mi_diagnostics <- list(
-    n_imputations = n_imputations,
-    total_draws = total_draws,
-    draws_per_imputation = draws_per_imp,
-    combination_method = combination_method,
-    per_imputation_convergence = imp_convergence,
-    max_rhat_across_imputations = max_rhat_across_imps,
-    min_ess_across_imputations = min_ess_across_imps
-  )
-
-  # Set summary class
-  class(base_summary) <- c("mvgam_pooled_summary", "mvgam_summary")
-
-  return(base_summary)
+  class(out) <- c("mvgam_pooled_summary", "mvgam_summary")
+  out
 }
 
-# ==============================================================================
-# Multiple imputation print method
-# ==============================================================================
 
-#' Print method for multiple imputation summary objects
+#' The convergence measures of each imputation fit
 #'
-#' @description
-#' Prints a summary of a multiple imputation mvgam model, including
-#' standard parameter estimates and multiple imputation diagnostics.
+#' @param object A fit of class `mvgam_pooled`
+#' @return A list with one data frame per imputation fit, holding
+#'   `Rhat`, `Bulk_ESS` and `Tail_ESS` with one row per parameter
+#' @noRd
+imputation_convergence <- function(object) {
+  checkmate::assert_class(object, "mvgam_pooled")
+  lapply(attr(object, "individual_fits"), function(fit) {
+    tab <- without_ess_cap_notice(posterior::summarise_draws(
+      posterior::as_draws_df(fit),
+      posterior::default_convergence_measures()
+    ))
+    data.frame(Rhat = tab$rhat, Bulk_ESS = tab$ess_bulk,
+               Tail_ESS = tab$ess_tail, row.names = tab$variable)
+  })
+}
+
+
+#' The convergence columns of a pooled summary
 #'
-#' @param x An object of class \code{mvgam_pooled_summary}.
-#' @param digits Integer indicating number of decimal places. Default 2.
-#' @param ... Additional arguments passed to
-#'   \code{\link{print.mvgam_summary}}.
+#' Each parameter's largest R-hat over the imputation fits. Its ESS is
+#' the sum over them.
 #'
-#' @return The \code{mvgam_pooled_summary} object is returned
-#'   invisibly.
-#'
-#' @details
-#' This method extends \code{print.mvgam_summary} by adding a footer
-#' section with multiple imputation diagnostics. The combined
-#' posteriors are created using \code{rstan::sflist2stanfit()}, which
-#' concatenates draws from all imputations at the Stan level.
-#'
-#' Diagnostics include:
-#' \itemize{
-#'   \item{Number of imputations and total draws}
-#'   \item{Per-imputation convergence summaries (Rhat, ESS)}
-#'   \item{Overall convergence metrics across imputations}
-#' }
-#'
-#' @seealso \code{\link{print.mvgam_summary}},
-#'   \code{\link{summary.mvgam_pooled}}
-#'
+#' @param per_imp The list `imputation_convergence()` returns
+#' @param pars Character vector of parameter names
+#' @return A data frame of `Rhat`, `Bulk_ESS` and `Tail_ESS`, one row
+#'   per element of `pars`
+#' @noRd
+pooled_convergence <- function(per_imp, pars) {
+  checkmate::assert_list(per_imp, types = "data.frame", min.len = 1L)
+  checkmate::assert_character(pars)
+  column <- function(col) lapply(per_imp, function(t) t[pars, col])
+  data.frame(
+    Rhat = do.call(pmax, c(column("Rhat"), na.rm = TRUE)),
+    Bulk_ESS = Reduce(`+`, column("Bulk_ESS")),
+    Tail_ESS = Reduce(`+`, column("Tail_ESS")),
+    row.names = pars
+  )
+}
+
+
+#' @rdname summary.mvgam_pooled
 #' @export
 print.mvgam_pooled_summary <- function(x, digits = 2, ...) {
   checkmate::assert_class(x, "mvgam_pooled_summary")
   checkmate::assert_int(digits, lower = 0)
-
-  # Print standard summary using parent method
   NextMethod()
-
-  # Add MI diagnostics section if available
-  if (!is.null(x$mi_diagnostics)) {
-    cat("\n")
-    cat(strrep("=", 70), "\n")
-    cat("Multiple Imputation Diagnostics\n")
-    cat(strrep("=", 70), "\n\n")
-
-    mi <- x$mi_diagnostics
-
-    # Basic imputation information
-    cat("  Number of imputations:", mi$n_imputations, "\n")
-    cat("  Total posterior draws:", mi$total_draws, "\n")
-
-    if (!is.na(mi$draws_per_imputation)) {
-      cat("  Draws per imputation:", mi$draws_per_imputation, "\n")
-    }
-
-    cat("  Combination method:", mi$combination_method, "\n\n")
-
-    # Overall convergence across imputations
-    cat("  Convergence Summary Across Imputations:\n")
-
-    if (!is.infinite(mi$max_rhat_across_imputations) &&
-        !is.na(mi$max_rhat_across_imputations)) {
-      cat(sprintf(
-        "    Maximum Rhat: %.3f\n",
-        mi$max_rhat_across_imputations
-      ))
-    }
-
-    if (!is.infinite(mi$min_ess_across_imputations) &&
-        !is.na(mi$min_ess_across_imputations)) {
-      cat(sprintf(
-        "    Minimum Bulk ESS: %.0f\n",
-        mi$min_ess_across_imputations
-      ))
-    }
-
-    # Per-imputation table if available
-    if (!is.null(mi$per_imputation_convergence) &&
-        length(mi$per_imputation_convergence) > 0) {
-
-      cat("\n  Per-Imputation Convergence:\n")
-
-      # Build table
-      imp_df <- do.call(rbind, lapply(
-        mi$per_imputation_convergence,
-        function(imp) {
-          data.frame(
-            Imputation = imp$imputation,
-            Max_Rhat = sprintf("%.3f", imp$max_rhat),
-            Min_Bulk_ESS = sprintf("%.0f", imp$min_bulk_ess),
-            Min_Tail_ESS = sprintf("%.0f", imp$min_tail_ess),
-            stringsAsFactors = FALSE
-          )
-        }
-      ))
-
-      # Print table with proper alignment
-      cat("    ")
-      print(imp_df, row.names = FALSE, right = TRUE)
-    }
-
-    cat("\n")
-    cat(strrep("-", 70), "\n")
-    cat("Note: Parameter estimates combine draws from all ",
-        "imputations.\n", sep = "")
-    cat("      Uncertainty reflects both model and imputation ",
-        "process.\n", sep = "")
-    cat(strrep("=", 70), "\n")
-  }
-
+  mi <- x$mi_diagnostics
+  cat("\nMultiple imputation: ", mi$n_imputations, " fits of ",
+      mi$draws_per_imputation, " draws each, pooled.\n", sep = "")
+  cat("Rhat is each parameter's largest and each ESS its sum over the",
+      "fits.\n")
+  tab <- mi$per_imputation
+  tab$Max_Rhat <- sprintf("%.3f", tab$Max_Rhat)
+  tab$Min_Bulk_ESS <- sprintf("%.0f", tab$Min_Bulk_ESS)
+  tab$Min_Tail_ESS <- sprintf("%.0f", tab$Min_Tail_ESS)
+  cat(paste0("  ", utils::capture.output(print(tab, row.names = FALSE))),
+      sep = "\n")
   invisible(x)
 }

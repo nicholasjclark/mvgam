@@ -1,8 +1,8 @@
-# Unit tests for `extract_last_state()` in
+# Unit tests for `extract_last_states()` and `last_state_of_draw()` in
 # `R/extract_last_state.R`. Each test builds a minimal mock
 # mvgam fit (deterministic posterior draws + standata +
 # enriched trend_metadata) and asserts the shape and values
-# of the (`params`, `last_state`) tuple the function returns.
+# of the (`params`, `last_state`) tuple one draw receives.
 #
 # Mocks let us exercise every branch of the per-trend
 # dispatcher (RW / AR consecutive / AR sparse / ARMA / AR
@@ -86,7 +86,7 @@ test_that("RW returns sigma + Sigma + 1-row trend history", {
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_named(res$params, c("sigma", "Sigma"))
   expect_equal(res$params$sigma, c(0.3, 0.7))
   expect_equal(diag(res$params$Sigma), c(0.09, 0.49))
@@ -112,7 +112,7 @@ test_that("RW with cor=TRUE builds Sigma from L_Omega", {
                has_cor = TRUE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   # sigma = c(1, 1) so Sigma = L L'.
   expected <- tcrossprod(L)
   expect_equal(unname(res$params$Sigma), expected,
@@ -135,7 +135,7 @@ test_that("AR(p = 1) pulls ar1_trend per series", {
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_named(res$params, c("sigma", "Sigma", "ar"))
   # ar is a [n_lags, n_series] matrix.
   expect_identical(dim(res$params$ar), c(1L, 2L))
@@ -159,7 +159,7 @@ test_that("AR(p = 3) pulls ar1/ar2/ar3 per series", {
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_identical(dim(res$params$ar), c(3L, 2L))
   expect_equal(as.numeric(res$params$ar[1, ]), c(0.1, 0.2))
   expect_equal(as.numeric(res$params$ar[2, ]), c(0.3, 0.4))
@@ -189,7 +189,7 @@ test_that("AR(p = c(1, 3, 12)) pulls only the active lag params", {
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_identical(dim(res$params$ar), c(3L, 2L))
   expect_equal(as.numeric(res$params$ar[1, ]), c(0.7, 0.5))
   expect_equal(as.numeric(res$params$ar[2, ]), c(-0.1, 0.05))
@@ -223,7 +223,7 @@ test_that("ARMA pulls theta and the last raw innovation row", {
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_equal(res$params$theta, c(0.2, -0.3))
   # The kernel multiplies its coefficient by a past innovation, which
   # makes the raw row the seed it needs. The formed moving average
@@ -257,7 +257,7 @@ test_that("VAR pulls Heaps-transformed Phi_trend with lag-first indexing", {
                has_cor = TRUE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_equal(res$params$A[, , 1], A1)
   # Unit scales leave the innovation covariance at L L'
   expect_equal(unname(res$params$Sigma), tcrossprod(L))
@@ -305,7 +305,7 @@ test_that("VARMA seeds the forecast with the last innovation it fitted", {
   meta <- list(trend_type = "VAR", ar_lags = 1:2, ma_lags = 1L,
                max_lag = 2L, has_cor = TRUE)
   fit <- make_mock_fit(draws, n, n_lv = n, n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_equal(res$params$theta_cube[, , 1L], D)
   expect_equal(as.numeric(res$last_state$errors), E[n_time + 2L, ],
                tolerance = 1e-12)
@@ -325,7 +325,7 @@ test_that("CAR pulls phi, sigma and the trend history", {
   meta <- list(trend_type = "CAR", ar_lags = 1L, ma_lags = integer(0),
                max_lag = 1L, has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L, n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_named(res$params, c("phi", "sigma"))
   expect_equal(res$params$phi, c(0.6, 0.8))
   expect_equal(res$params$sigma, c(0.3, 0.4))
@@ -342,10 +342,9 @@ test_that("CAR pulls phi, sigma and the trend history", {
     trend = matrix(0, nrow = n_time, ncol = n_series)
   ))
   meta$has_cor <- TRUE
-  res_cor <- extract_last_state(
-    make_mock_fit(draws_cor, n_series, n_lv = 2L, n_time, meta),
-    1L
-  )
+  res_cor <- last_state_of_draw(extract_last_states(
+    make_mock_fit(draws_cor, n_series, n_lv = 2L, n_time, meta)
+  ), 1L)
   expect_equal(unname(res_cor$params$Sigma),
                tcrossprod(L * c(0.3, 0.4)), tolerance = 1e-12)
   expect_identical(res_cor$params$df, 5)
@@ -360,10 +359,9 @@ test_that("CAR pulls phi, sigma and the trend history", {
     Sigma_trend = stored,
     trend = matrix(0, nrow = n_time, ncol = n_series)
   ))
-  res_stored <- extract_last_state(
-    make_mock_fit(draws_stored, n_series, n_lv = 2L, n_time, meta),
-    1L
-  )
+  res_stored <- last_state_of_draw(extract_last_states(
+    make_mock_fit(draws_stored, n_series, n_lv = 2L, n_time, meta)
+  ), 1L)
   expect_equal(unname(res_stored$params$Sigma), stored)
 })
 
@@ -385,7 +383,7 @@ test_that("LLT hands on the last level and slope and the slope covariance", {
   meta <- list(trend_type = "LLT", ar_lags = 1L, ma_lags = integer(0),
                max_lag = 1L, has_cor = TRUE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L, n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_equal(as.numeric(res$last_state$trends), c(4, 8))
   expect_equal(res$last_state$slope, c(0.4, -0.4))
   expect_equal(res$params$phi_slope, c(0.9, 0.7))
@@ -410,7 +408,7 @@ test_that("ZMVN returns the innovation covariance and an empty history", {
                max_lag = 0L, has_cor = TRUE)
   fit <- make_mock_fit(draws, n_series, n_lv = 2L,
                         n_time, meta)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_equal(res$params$Sigma, matrix(c(0.25, 0.3, 0.3, 4), 2L))
   expect_identical(nrow(res$last_state$trends), 0L)
 })
@@ -436,7 +434,7 @@ test_that("factor ZMVN keeps the latent scale it was fitted with", {
                  max_lag = 0L, has_cor = TRUE)
   fit <- make_mock_fit(draws, n_series, n_lv = n_lv, 5L, meta,
                         spec_n_lv = n_lv)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_identical(res$n_lv_active, n_lv)
   # Square in the latent dimension, not the series dimension.
   expect_identical(dim(res$params$Sigma), c(n_lv, n_lv))
@@ -469,7 +467,7 @@ test_that("Factor fits (n_lv < n_series) tag the LV grain", {
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series = n_series, n_lv = n_lv,
                         n_time = n_time, meta, spec_n_lv = n_lv)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_identical(res$n_lv_active, n_lv)
   expect_identical(dim(res$last_state$trends), c(1L, n_lv))
   expect_length(res$params$sigma, n_lv)
@@ -483,21 +481,42 @@ test_that("Hierarchical fits (n_lv > n_series) still error", {
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series = 2L, n_lv = 3L,
                         n_time = 5L, meta)
-  expect_error(extract_last_state(fit, 1L),
+  expect_error(extract_last_states(fit),
                 "more latent states than series")
 })
 
 
-test_that("draw_id beyond available draws errors informatively", {
-  draws <- make_draws(list(sigma_trend = c(1, 1),
-                            trend = matrix(0, 5L, 2L)))
-  meta <- list(trend_type = "RW", ar_lags = 1L,
+test_that("each draw receives its own parameters and state", {
+  # Two draws extracted together. A slice indexing the wrong draw would
+  # hand draw 2 a covariance or a history from draw 1.
+  n_series <- 2L; n_time <- 3L
+  values <- list(
+    list(sigma = c(1, 2), cor = 0, ar = c(0.4, 0.6), last = c(1, 2)),
+    list(sigma = c(3, 0.5), cor = 0.6, ar = c(-0.2, 0.1), last = c(7, 8))
+  )
+  rows <- lapply(values, function(v) {
+    L <- matrix(c(1, v$cor, 0, sqrt(1 - v$cor^2)), 2L)
+    make_draws(list(
+      sigma_trend = v$sigma, ar1_trend = v$ar, L_Omega_trend = L,
+      trend = rbind(matrix(0, n_time - 1L, n_series), v$last)
+    ))
+  })
+  draws <- posterior::as_draws_matrix(do.call(rbind, lapply(rows, unclass)))
+  meta <- list(trend_type = "AR", ar_lags = 1L,
                ma_lags = integer(0), max_lag = 1L,
-               has_cor = FALSE)
-  fit <- make_mock_fit(draws, n_series = 2L, n_lv = 2L,
-                        n_time = 5L, meta)
-  expect_error(extract_last_state(fit, 99L),
-                "exceeds the number of posterior draws")
+               has_cor = TRUE)
+  states <- extract_last_states(
+    make_mock_fit(draws, n_series, n_lv = 2L, n_time, meta)
+  )
+  for (d in 1:2) {
+    v <- values[[d]]
+    res <- last_state_of_draw(states, d)
+    L <- matrix(c(1, v$cor, 0, sqrt(1 - v$cor^2)), 2L)
+    expect_equal(res$params$Sigma, diag(v$sigma) %*% tcrossprod(L) %*%
+                   diag(v$sigma))
+    expect_equal(as.numeric(res$params$ar), v$ar)
+    expect_equal(as.numeric(res$last_state$trends), v$last)
+  }
 })
 
 
@@ -510,8 +529,7 @@ test_that("Unsupported trend type errors with the right message", {
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series = 2L, n_lv = 2L,
                         n_time = 5L, meta)
-  expect_error(extract_last_state(fit, 1L),
-                "BOGUS")
+  expect_error(extract_last_states(fit), "BOGUS")
 })
 
 
@@ -541,7 +559,7 @@ test_that("a logistic PW pulls k / m / delta and t_change from standata", {
   fit <- make_mock_fit(draws, n_series, n_lv, n_time, meta)
   fit$standata$N_change_trend <- n_change
   fit$standata$t_change_trend <- t_change_data
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_named(res$params,
                 c("k", "m", "delta", "t_change"))
   expect_equal(res$params$k, c(0.05, 0.15))
@@ -566,7 +584,7 @@ test_that("PW handles no-changepoint case gracefully", {
                         n_time = 10L, meta)
   fit$standata$N_change_trend <- 0L
   fit$standata$t_change_trend <- numeric(0L)
-  res <- extract_last_state(fit, 1L)
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
   expect_identical(dim(res$params$delta), c(0L, 2L))
   expect_length(res$params$t_change, 0L)
   # This stub omits the growth, which resolves to linear. A linear

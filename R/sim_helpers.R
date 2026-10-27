@@ -102,21 +102,13 @@ sim_family_rng <- function(eta, family, pars = list()) {
   checkmate::assert_numeric(eta, finite = TRUE)
   checkmate::assert_list(family)
   checkmate::assert_list(pars)
-  # `resolve_family_name()` returns the user-visible name for both
-  # base R / brms families and customfamily objects (where
-  # `family$family` is the literal string "custom"). Routing
-  # through it lets sim_family_rng dispatch on `tweedie` as well
-  # as the brms-native families with one code path.
+  # The name of a custom family such as `tweedie()` as well as of a
+  # brms family
   fam_name <- resolve_family_name(family)
   link <- family$link
-  # `inv_link()` holds every link the prediction surface applies. A
-  # five-entry switch here refused probit, cloglog and cauchit at
-  # simulation time while the same model predicted through them.
   mu <- inv_link(eta, link)
-  # A family on the positive line needs a positive mean. Under the
-  # inverse link a negative `eta` gives a negative `mu`, and
-  # `rgamma()` and `rpois()` return NaN with a warning a caller can
-  # miss. The refusal names the pairing the caller chose.
+  # An identity or inverse link can give a family on the positive line
+  # a mean at or below zero. `rgamma()` and `rpois()` would return NaN.
   positive_mean <- c("poisson", "negbinomial", "gamma", "tweedie",
                      "beta_nb")
   if (fam_name %in% positive_mean && any(mu <= 0)) {
@@ -137,10 +129,8 @@ sim_family_rng <- function(eta, family, pars = list()) {
     "student" = mu + (pars$sigma %||% 1) *
       stats::rt(length(eta), df = pars$nu %||% 4),
     "poisson" = stats::rpois(length(eta), lambda = mu),
-    "negbinomial" = sim_negbinom(mu, pars$size %||% 5),
-    # A Bernoulli is the binomial at one trial, and takes no trial
-    # count of its own, so the size is fixed here rather than read
-    # from `pars`.
+    "negbinomial" = stats::rnbinom(length(eta), size = pars$size %||% 5,
+                                   mu = mu),
     "bernoulli" = stats::rbinom(length(eta), size = 1L, prob = mu),
     "binomial" = stats::rbinom(
       length(eta), size = pars$trials %||% 1L, prob = mu
@@ -153,85 +143,27 @@ sim_family_rng <- function(eta, family, pars = list()) {
       length(eta), shape = pars$shape %||% 2,
       rate = (pars$shape %||% 2) / mu
     ),
-    "tweedie" = sim_tweedie(mu, pars$phi %||% 1, pars$power %||% 1.5),
+    "tweedie" = mgcv::rTweedie(mu, p = pars$power %||% 1.5,
+                               phi = pars$phi %||% 1),
     "beta_nb" = rbeta_nb_mvgam(
       n = length(eta), mu = mu,
       shape = pars$shape %||% 2, mtail = pars$mtail %||% 2
     ),
-    "com_binomial" = {
-      trials_vec <- if (length(pars$trials %||% 10L) == 1L) {
-        rep(as.integer(pars$trials %||% 10L), length(eta))
-      } else {
-        as.integer(pars$trials)
-      }
-      nu_vec <- if (length(pars$nu %||% 1) == 1L) {
-        rep(pars$nu %||% 1, length(eta))
-      } else {
-        pars$nu
-      }
-      rcmb_vec(mu = mu, nu = nu_vec, T = trials_vec)
-    },
+    "com_binomial" = rcmb_vec(
+      mu = mu,
+      nu = rep_len(pars$nu %||% 1, length(eta)),
+      T = rep_len(as.integer(pars$trials %||% 10L), length(eta))
+    ),
     stop(insight::format_error(c(
-      "Unsupported family in 'sim_family_rng'.",
-      x = paste0("Got: '", fam_name, "'."),
+      paste0("Simulating the '", fam_name, "' family is not supported."),
       i = paste0(
         "Supported: gaussian, student, poisson, negbinomial, ",
         "bernoulli, binomial, beta, gamma, tweedie, beta_nb, ",
         "com_binomial."
       )
-    )))
+    )), call. = FALSE)
   )
 }
-
-#' Tweedie draws from the compound Poisson-Gamma representation
-#'
-#' Valid for `1 < power < 2`. Each draw sums `N ~ Poisson(lambda)`
-#' Gamma summands, using the parametrisation `mvgam::tweedie()` fits.
-#' The `tweedie` package is not needed.
-#'
-#' @param mu Numeric vector of positive means
-#' @param phi Positive dispersion
-#' @param power Power parameter strictly between 1 and 2
-#' @return Numeric vector of draws, one per element of `mu`
-#' @noRd
-sim_tweedie <- function(mu, phi, power) {
-  checkmate::assert_numeric(mu, lower = .Machine$double.eps,
-                              finite = TRUE)
-  checkmate::assert_number(phi, lower = .Machine$double.eps)
-  checkmate::assert_number(power, lower = 1 + 1e-6,
-                            upper = 2 - 1e-6)
-  lambda <- mu^(2 - power) / (phi * (2 - power))
-  shape  <- (2 - power) / (power - 1)
-  rate   <- mu^(1 - power) / (phi * (power - 1))
-  n      <- length(mu)
-  N      <- stats::rpois(n, lambda)
-  out    <- numeric(n)
-  pos    <- N > 0L
-  if (any(pos)) {
-    out[pos] <- vapply(
-      which(pos),
-      function(i) sum(stats::rgamma(N[i], shape = shape, rate = rate[i])),
-      numeric(1)
-    )
-  }
-  out
-}
-
-
-#' Negative binomial draws in the NB2 parametrisation
-#'
-#' Matches the Stan `neg_binomial_2(mu, size)` density that brms fits.
-#'
-#' @param mu Numeric vector of non-negative means
-#' @param size Positive size, a scalar or one per element of `mu`
-#' @return Integer vector of draws, one per element of `mu`
-#' @noRd
-sim_negbinom <- function(mu, size) {
-  checkmate::assert_numeric(mu, lower = 0)
-  checkmate::assert_numeric(size, lower = 0, min.len = 1L)
-  stats::rnbinom(length(mu), size = size, mu = mu)
-}
-
 
 #' A balanced grouping factor
 #'

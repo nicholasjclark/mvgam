@@ -2771,9 +2771,7 @@ trend_samples_cor <- function(obj) {
 #'
 #' The stored prior table holds `sigma_trend` exactly when the model
 #' samples it. A grouped trend samples one scale vector per group.
-#' Multiplicative gamma process shrinkage derives the factor scales
-#' from the shrinkage product. Sampled loadings fix the factors' scale
-#' at 1.
+#' Sampled loadings fix the factors' scale at 1.
 #'
 #' @noRd
 innovation_sd <- function(obj, vector = FALSE) {
@@ -2795,26 +2793,16 @@ innovation_sd <- function(obj, vector = FALSE) {
   if ("sigma_group_trend" %in% obj$prior$class) {
     return(trend_symbols(obj)[["sigma_group_trend"]])
   }
-  spec <- first_trend_spec(obj)$loadings_prior_spec
-  if (!is.null(spec) && isTRUE(loadings_spec_traits(spec)$mgp)) {
-    return("\\sqrt{\\Psi_k}")
-  }
   "1"
 }
 
 #' The covariance of independent innovations with the given SDs
-#'
-#' Under multiplicative gamma process shrinkage the variances are the
-#' shrinkage products.
 #'
 #' @param sd Character LaTeX SD symbol from `innovation_sd()`
 #' @return Character LaTeX matrix
 #' @noRd
 diag_cov_text <- function(sd) {
   if (identical(sd, "1")) return("\\mathbf{I}")
-  if (identical(sd, "\\sqrt{\\Psi_k}")) {
-    return("\\text{diag}(\\boldsymbol{\\Psi})")
-  }
   paste0("\\text{diag}(", sd, "^2)")
 }
 
@@ -3331,14 +3319,19 @@ loadings_prior_rows <- function(spec, fixed_Z) {
   }
   if (is.null(spec)) return(list())
   traits <- loadings_spec_traits(spec)
+  # A kernel correlates each loadings column across the series.
+  # Shrinkage scales column k by the cumulative shrinkage Psi_k.
+  scale <- if (traits$mgp) "\\Psi_k \\, " else ""
   c(
     if (traits$kernel) kernel_assembly_rows(spec),
     if (traits$mgp) mgp_shrinkage_rows(),
-    # A kernel correlates each loadings column across the series, at
-    # unit scale. Shrinkage scales the factor innovations instead.
     if (traits$kernel) {
       list(list(lhs = "Z_{\\cdot,k}", op = "\\sim",
-                rhs = "\\text{MVNormal}(\\mathbf{0}, L_\\Phi L_\\Phi^\\top)"))
+                rhs = paste0("\\text{MVNormal}(\\mathbf{0}, ", scale,
+                             "L_\\Phi L_\\Phi^\\top)")))
+    } else if (traits$mgp) {
+      list(list(lhs = "Z_{i,k}", op = "\\sim",
+                rhs = "\\text{Normal}(0, \\sqrt{\\Psi_k})"))
     }
   )
 }
@@ -4115,7 +4108,7 @@ format_parameter_symbol_base <- function(row) {
 #' escaped, as a bare `mgp_a1` would set `a1` as a subscript. A
 #' distribution with no name of its own is set verbatim as text.
 #'
-#' @param prior_str Character brms prior, such as `"normal(0, 1)"`
+#' @param prior_str Character brms prior, such as `"std_normal()"`
 #' @param symbols Named character vector of hyperparameter symbols
 #' @return Character LaTeX expression
 #' @noRd

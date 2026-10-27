@@ -237,6 +237,31 @@ spec_axis_vars <- function(spec) {
   )
 }
 
+#' The columns a trend formula places each row by
+#'
+#' The time column and the columns naming the series: the series
+#' column, or the grouping a hierarchical trend builds its series from.
+#' `gr` alone takes the series column as its subgroup. A model without
+#' a trend takes the literal defaults.
+#'
+#' @param trend_formula The trend formula passed to [mvgam()], or `NULL`
+#' @return A list naming `time_var`, `series_var` and `series_cols`
+#' @noRd
+trend_formula_axis_columns <- function(trend_formula) {
+  checkmate::assert_formula(trend_formula, null.ok = TRUE)
+  spec <- if (!is.null(trend_formula)) {
+    parse_trend_formula(trend_formula)$trend_model
+  }
+  axis <- spec_axis_vars(spec)
+  gr <- spec_groupings(spec)
+  series_cols <- if (is.null(gr$gr)) {
+    axis$series_var
+  } else {
+    c(gr$gr, gr$subgr %||% axis$series_var)
+  }
+  c(axis, list(series_cols = series_cols))
+}
+
 #' Whether a fit's series are its responses
 #'
 #' A wide `mvbf()` frame holds one row per occasion and one column per

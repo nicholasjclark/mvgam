@@ -21,7 +21,7 @@ define the series and its index defines the time grid. Gaps in
 a regular \code{tsibble} become rows with a missing response, as
 \code{tsibble::fill_gaps(.full = TRUE)} builds them. Measured
 variables other than the response are carried over as
-covariates, and are missing on those rows. An irregular
+covariates, with missing values on those rows. An irregular
 \code{tsibble} keeps its own times, for use with \code{CAR()} or
 \code{ZMVN()}.
 \item A \code{ts}, \code{mts} or \code{msts} object (\code{forecast::msts()}). Each
@@ -53,10 +53,11 @@ training data, between 0 and 1. Only one of \code{h} and \code{train_prop}
 may be given.}
 }
 \value{
-A long \code{data.frame} with columns \code{series} (a factor), \code{time}
-(an integer for regular data), the response, the original index
-(\code{index} for a \code{ts}), any \code{tsibble} key and covariate columns, and
-one season column per period above 1. Rows are ordered by time,
+A long \code{data.frame}. Its columns are \code{series} (a factor),
+\code{time} (an integer for regular data), the response and the original
+index (\code{index} for a \code{ts}). Any \code{tsibble} key and covariate columns
+follow, then one season column per period above 1. Rows are ordered
+by time,
 then series. With \code{h} or \code{train_prop}, a list holding \code{data_train}
 and \code{data_test} instead.
 }
@@ -70,8 +71,8 @@ and a \code{time} column counting steps from the first index value.
 \code{time} counts steps from 1 at the first index value. The
 position within a seasonal period counts steps from the calendar
 origin of the index. A monthly index with \code{freq = 12} gives the
-month number, and a \code{ts} gives \code{cycle()}, whatever month the data
-start in. A single period produces a column named \code{season}. Several
+month number whatever month the data start in. A \code{ts} gives
+\code{cycle()}. A single period produces a column named \code{season}. Several
 periods produce \verb{season_<period>} columns, such as \code{season_7} and
 \code{season_365.25}.
 
@@ -81,7 +82,7 @@ with \code{tsibble::new_data()} and bound to the observed data, receive
 future rows together keeps the two aligned.
 
 Seasonal periods take the same numbers across packages. Monthly
-data carry \code{frequency = 12} in a \code{ts}, and a fable
+data carry \code{frequency = 12} in a \code{ts}. A fable
 \code{season(period = "year")} on a monthly \code{tsibble} resolves to 12
 steps. Both take \code{freq = 12}. Daily data with
 \code{seasonal.periods = c(7, 365.25)} in an \code{msts} take
@@ -104,8 +105,16 @@ wide <- data.frame(
 )
 head(series_to_mvgam(wide))
 
+# Next: fit the training data, for example with
+# mvgam(y ~ s(season, bs = "cc"), trend_formula = ~ AR(),
+#       data = air$data_train)
+
 }
 \seealso{
+The
+\href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data article} covers the long format
+and its conversion in more depth.
+
 Other model fitting: 
 \code{\link{check_newdata}()},
 \code{\link{jsdgam}()},

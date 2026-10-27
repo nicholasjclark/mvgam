@@ -1,50 +1,38 @@
 #' Posterior summary of the factor-implied shared variation matrix
 #'
-#' For a latent-factor `mvgam` fit, returns the posterior
-#' distribution of the shared variation matrix
-#' \eqn{\Delta = Z \Sigma Z^\top}, where `Z` is the
-#' `n_series x n_lv` loadings matrix and \eqn{\Sigma} is the
-#' covariance of the latent states. `Delta` is the cross-series
-#' covariance pattern the latent factors induce on the trends; its
-#' diagonal entries describe how strongly each series is captured
-#' by the factor structure, and the off-diagonal entries describe
-#' pairwise factor-driven coupling between series.
+#' For a latent-factor `mvgam` fit, returns the posterior of the shared
+#' variation matrix \eqn{\Delta = Z \Sigma Z^\top}. `Z` is the
+#' `n_series x n_lv` loadings matrix and \eqn{\Sigma} is the covariance
+#' of the latent states. `Delta` is the covariance the factors induce
+#' between the series' trends. Its diagonal gives the variance of each
+#' series that the factors capture. Its off-diagonal entries give the
+#' covariance between pairs of series.
 #'
-#' The latent covariance belongs between the loadings, not beside
-#' them. A factor column enters the trend as
-#' `sigma_trend[k] * Z[, k]`, so `Z Z'` alone reports a coupling
-#' pattern that weights every column equally when the model does
-#' not: under multiplicative gamma process shrinkage the column
-#' scales carry the whole of the shrinkage. For an autoregressive
-#' trend \eqn{\Sigma} is the stationary covariance of the latent
-#' states rather than the innovation covariance, which is the same
-#' convention [residual_cor()] reports.
+#' A factor column enters the trend as `sigma_trend[k] * Z[, k]`. `Z Z'`
+#' alone would weight every column equally, while the model scales each
+#' column by its latent standard deviation. Under multiplicative gamma
+#' process shrinkage those scales hold the whole of the shrinkage. For
+#' an autoregressive trend \eqn{\Sigma} is the stationary covariance of
+#' the latent states, as in [residual_cor()].
 #'
-#' `Delta` is rotation-invariant: an orthogonal `Z* = Z Q` with
-#' `Sigma* = Q' Sigma Q` leaves `Z* Sigma* Z*'` unchanged. The
-#' posterior summary is therefore the same whether it is computed
-#' from the raw sampled `Z` or from the QR-identified `Z_tilde`
-#' (Heaps & Jermyn 2024), and the sampled basis is used because
-#' that is the one \eqn{\Sigma} is stated in. For fully-fixed-Z
-#' fits (`trend_map` with no NAs) the loadings contribute no
-#' posterior spread of their own.
+#' `Delta` is invariant to rotation. An orthogonal `Z* = Z Q` with
+#' `Sigma* = Q' Sigma Q` leaves `Z* Sigma* Z*'` unchanged. The summary
+#' takes the same value for the sampled `Z` and for the QR-identified
+#' `Z_tilde` of Heaps and Jermyn (2024). It uses the sampled `Z`, the
+#' basis \eqn{\Sigma} is stated in. A `trend_map` without `NA` entries
+#' fixes `Z`. The posterior spread of `Delta` then comes from
+#' \eqn{\Sigma} alone.
 #'
-#' @section Key inferential property:
-#' Heaps & Jermyn (2024) Sect. 3 show that under the structured
-#' matrix-normal prior `Z | Phi, Psi ~ MN(0, Phi, Psi)`, the
-#' expectation of the loadings' own second moment `Z Z'` is
-#' proportional to the among-row scale matrix `Phi`. `Phi` is
-#' therefore a statement about the **prior expectation** of an
-#' observable coupling pattern, not about the prior expectation
-#' of `Z` itself, which is rotation-arbitrary. Encoding domain
-#' knowledge into `Phi` via `loadings_prior` shapes the prior on
-#' that pattern.
+#' @section Relation to `loadings_prior`:
+#' Under the matrix-normal prior `Z | Phi, Psi ~ MN(0, Phi, Psi)`, the
+#' prior expectation of `Z Z'` is `tr(Psi) Phi` (Heaps and Jermyn 2024,
+#' section 3). `Phi` sets the prior expectation of the coupling pattern
+#' between series, while `Z` itself is identified only up to rotation.
+#' A `loadings_prior` in [mvgam()] encodes domain knowledge about that
+#' pattern through `Phi`.
 #'
-#' The matrix returned here carries the latent covariance as well,
-#' so it is proportional to `Phi` only up to the scale the latent
-#' states contribute. Read it as the factor-implied covariance the
-#' fitted model asserts, and calibrate `Phi` against the pattern
-#' rather than against these values entry for entry.
+#' `Delta` also carries the latent covariance. Its scale includes the
+#' variance of the latent states. Compare its pattern with `Phi`.
 #'
 #' @inheritParams predict.mvgam
 #' @param object A fitted `mvgam` object whose trend model
@@ -63,7 +51,7 @@
 #'       [posterior::ess_basic()].
 #'     \item `n_series`, `series_names`, `n_lv`: model
 #'       dimensions and series labels.
-#'     \item `probs`: quantile probabilities used.
+#'     \item `probs`, `robust`: the summary settings.
 #'   }
 #'
 #' @references
@@ -72,23 +60,25 @@
 #' models. \emph{Statistics and Computing}, 34:143.
 #' \doi{10.1007/s11222-024-10454-0}
 #'
-#' @seealso \code{\link{residual_cor}} for the implied
-#'   correlation matrix `cov2cor(Delta)`, \code{\link{mvgam}}
-#'   for the `loadings_prior` argument that lets `Phi` shape
-#'   `E(Delta)`.
+#' @seealso [residual_cor()] for the implied correlation matrix,
+#'   `cov2cor(Delta)`. Under [mvn()] and [mvt()] it adds each series'
+#'   residual variance to the diagonal of `Delta` first. The
+#'   `r mvgam_article("jsdgam", "joint species distribution article")`
+#'   interprets both for a community of species.
 #'
 #' @examples
 #' \dontrun{
-#' set.seed(1)
+#' # Detections of 6 species whose occupancy shares two latent factors
 #' simdat <- sim_closure_unit_data(
 #'   family    = occ(),
-#'   n_species = 4L,
-#'   n_sites   = 50L,
+#'   n_species = 6L,
+#'   n_sites   = 80L,
 #'   n_visits  = 4L,
-#'   type      = 2L
+#'   n_lv      = 2L,
+#'   seed      = 1L
 #' )
 #' mod <- jsdgam(
-#'   formula        = bf(y ~ env, p ~ tod_c),
+#'   formula        = bf(y ~ series * env, p ~ series + tod_c),
 #'   factor_formula = ~ -1,
 #'   data           = simdat$data_train,
 #'   family         = occ(),
@@ -97,9 +87,12 @@
 #'   silent         = 2
 #' )
 #'
-#' # Posterior summary of the shared-variation matrix
-#' # (the implied species-by-species residual covariance).
-#' shared_variation(mod)
+#' # The species-by-species covariance the two factors induce
+#' sv <- shared_variation(mod)
+#' sv
+#' plot(sv)
+#'
+#' # Next: residual_cor() rescales Delta to correlations
 #' }
 #'
 #' @author Nicholas J Clark
@@ -126,10 +119,7 @@ shared_variation.mvgam <- function(object,
   n_lv <- require_factor_n_lv(object, "shared_variation()")
 
   series_names <- fitted_series_levels(object)
-  # `factor_implied_cov_draws()` owns the per-draw `Z Sigma Z'`,
-  # so `residual_cor()` and this summary cannot answer
-  # differently. It routes through `resolve_factor_loadings()`
-  # for the fixed-versus-sampled-Z decision.
+  # The per-draw `Z Sigma Z'`, shared with `residual_cor()`
   delta_draws <- factor_implied_cov_draws(
     object, n_lv = n_lv, n_series = length(series_names)
   )
@@ -182,7 +172,7 @@ print.mvgam_shared_variation <- function(x, digits = 3L, ...) {
     paste0("Q", format(100 * x$probs[2L], trim = TRUE))
   )
   print(round(diag_df, digits))
-  cat("\nUse `plot(x)` for the full posterior mean heatmap.\n")
+  cat("\nplot() draws the full matrix as a heatmap.\n")
   invisible(x)
 }
 
@@ -190,12 +180,11 @@ print.mvgam_shared_variation <- function(x, digits = 3L, ...) {
 #' Plot the factor-implied shared variation matrix
 #'
 #' Heatmap of the posterior point estimate of
-#' \eqn{\Delta = Z \Sigma Z^\top}. Diagonal cells show the per-series
-#' captured variance (always positive); off-diagonal cells show
-#' factor-driven cross-series covariance, which can be positive
-#' or negative. The diverging fill scale is symmetric around
-#' zero so positive and negative couplings read on equivalent
-#' colour intensities.
+#' \eqn{\Delta = Z \Sigma Z^\top}. Diagonal cells show the variance
+#' the factors capture in each series. Off-diagonal cells show the
+#' covariance between series, positive or negative. The fill scale is
+#' symmetric around zero. A positive and a negative covariance of equal
+#' size take colours of equal intensity.
 #'
 #' @param x A `mvgam_shared_variation` object returned by
 #'   [shared_variation()].

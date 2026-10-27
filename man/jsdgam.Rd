@@ -108,7 +108,7 @@ multiplicative gamma process prior (\code{loadings_prior = "mgp"} or
 \code{list(column_shrinkage = "mgp", ...)}) it is a ceiling. The prior
 shrinks later columns towards zero. A larger
 \code{loadings_prior$mgp_a2} shrinks them harder. \code{\link[=active_factors]{active_factors()}}
-counts the columns the data support.}
+counts the factors the data support.}
 
 \item{traits}{Optional species traits for a structured loadings
 prior: a \code{data.frame} or matrix with one row per species, or the
@@ -128,7 +128,7 @@ deviations of intercept and slope correlate under an LKJ prior
 constant within species. A smooth of a trait goes in
 \code{trait_slopes}, as \code{~ s(trait1)}. A smooth in \code{formula} is
 refused, because brms's top-level non-linear formula takes none.
-The defaults are \code{normal(0, 1)} on each trait coefficient and
+The defaults are \code{std_normal()} on each trait coefficient and
 \code{student_t(3, 0, 2.5)} on the species SD. \code{priors} overrides
 them.}
 
@@ -199,23 +199,23 @@ of a covariate, a constrained ordination.
 }
 \examples{
 \dontrun{
-# Detections of 4 species at 50 sites, 4 visits each. `type = 2L`
-# simulates site covariates of occupancy (`env`, `elev`) and visit
-# covariates of detection (`tod_c`, `effort`).
-set.seed(1)
+# Detections of 6 species at 80 sites, 4 visits each. Occupancy
+# responds to the site covariate `env` and detection to the time of
+# day `tod_c`. Two latent factors drive the species associations.
 simdat <- sim_closure_unit_data(
   family    = occ(),
-  n_species = 4L,
-  n_sites   = 50L,
+  n_species = 6L,
+  n_sites   = 80L,
   n_visits  = 4L,
-  type      = 2L
+  n_lv      = 2L,
+  seed      = 1L
 )
 
-# A joint occupancy model. `env` drives occupancy and `tod_c`
-# drives detection. Two latent factors carry the residual
-# association among species.
+# A joint occupancy model. Each species has its own occupancy
+# intercept and `env` slope, plus its own detection intercept. Two
+# latent factors take up the residual association.
 mod <- jsdgam(
-  formula        = bf(y ~ env, p ~ tod_c),
+  formula        = bf(y ~ series * env, p ~ series + tod_c),
   factor_formula = ~ -1,
   data           = simdat$data_train,
   family         = occ(),
@@ -267,7 +267,7 @@ models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
-\code{\link[=sim_jsdm]{sim_jsdm()}} simulates data this function fits.
+\code{\link[=sim_jsdgam]{sim_jsdgam()}} simulates data this function fits.
 \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} simulates the \code{occ()} and \code{nmix()}
 case. \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=ordinate]{ordinate()}}, \code{\link[=shared_variation]{shared_variation()}},
 \code{\link[=active_factors]{active_factors()}} and \code{\link[=compare_loadings]{compare_loadings()}} interpret the fitted

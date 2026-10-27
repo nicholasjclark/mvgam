@@ -2,7 +2,7 @@
 % Please edit documentation in R/trend_system.R
 \name{PW}
 \alias{PW}
-\title{Specify piecewise linear or logistic trends in \pkg{mvgam} models}
+\title{Piecewise linear or logistic trends}
 \usage{
 PW(
   time = NA,
@@ -29,95 +29,75 @@ the carrying capacity of a logistic model, on the response scale.
 It is numeric and can vary by time and series. Defaults to \code{cap}. A
 logistic model whose data lack the column is refused.}
 
-\item{n_changepoints}{A non-negative integer specifying the number of
-potential changepoints. Potential changepoints are selected uniformly from
-the first \code{changepoint_range} proportion of timepoints in \code{data}.
-Default is \code{10}.}
+\item{n_changepoints}{A positive integer: the number of potential
+changepoints, spaced evenly over the first \code{changepoint_range} of
+the time points in \code{data}. Defaults to \code{10}.}
 
-\item{changepoint_range}{Proportion of history in \code{data} in which trend
-changepoints will be estimated. Defaults to \code{0.8} for the first 80\%.}
+\item{changepoint_range}{A number in \verb{(0, 1]}: the share of the
+series that holds the potential changepoints. The default \code{0.8}
+leaves the last fifth with the growth rate of the last changepoint.
+A changepoint among the final points would be estimated from too
+few observations to trust in a forecast.}
 
 \item{changepoint_scale}{A positive number: the typical change in
-growth at one changepoint over the whole series, as in Prophet, in
-link units for linear growth and in logits for logistic growth.
-For a series of \code{N} time points the prior on each per-step rate
-change is \code{double_exponential(0, s * changepoint_scale / N)},
-where \code{s} is the factor \code{\link[=get_prior]{get_prior()}} describes for linear growth
-and 1 for logistic growth. Larger values give a more flexible
-trend. The default of \code{0.3} gives the ten default changepoints a
-prior median movement of the level of about half a unit over the
-series, the movement the
-\code{\link[=LLT]{LLT()}} slope prior allows. Prophet's own default of \code{0.05} holds a
-link-scale trend close to a straight line.}
+growth at one changepoint over the whole series, in link units for
+linear growth and in logits for logistic growth. For a series of
+\code{N} time points each per-step rate change takes
+\code{double_exponential(0, s * changepoint_scale / N)}, where \code{s} is
+the factor \code{\link[=get_prior]{get_prior()}} describes for linear growth and 1 for
+logistic growth. Larger values give a more flexible trend. The
+default \code{0.3} gives the ten default changepoints a prior median
+movement of the level of about half a unit over the series, the
+movement the \code{\link[=LLT]{LLT()}} slope prior allows. Prophet's default of
+\code{0.05} holds a link-scale trend close to a straight line.}
 
-\item{growth}{Character string, \code{'linear'} (the default) or
-\code{'logistic'}. Logistic growth saturates the trend at the carrying
-capacity in the \code{cap} column.}
+\item{growth}{\code{'linear'} (the default) or \code{'logistic'}.}
 
-\item{n_lv}{The number of latent factors to estimate for dynamic
-factor models. When \code{n_lv} is smaller than the number of series,
-the latent processes are modelled as \code{n_lv} factors with estimated
-loadings onto the series. Defaults to \code{NULL}, in which case one
-latent process is used per series.}
-
-\item{trend_map}{Optional specification of which latent process each
-series maps onto. It fixes the loadings of a dynamic factor model.
-See \code{\link{mvgam}} for the accepted formats. Defaults to
-\code{NULL}.}
+\item{n_lv, trend_map}{Factor models are not supported for \code{PW()}.
+Supplying either is refused.}
 }
 \value{
 An object of class \code{mvgam_trend}.
 }
 \description{
-Sets up a piecewise linear or logistic trend in \code{mvgam}. The
-constructor records its arguments. The model evaluates them against
-the data.
+A trend that grows at a constant rate between changepoints, as in
+Prophet (Taylor and Letham 2018). Linear growth is unbounded.
+Logistic growth saturates at a carrying capacity that \code{data}
+supplies. The constructor records its arguments. The model
+evaluates them against the data.
 }
 \details{
-\emph{Offsets and intercepts}:
-A linear piecewise trend takes its level from the observation
-formula, as every other trend model in \pkg{mvgam} does. \code{y ~ 1} is
-the ordinary observation formula for it.
+\emph{Intercepts}:
+A linear trend takes its level from the observation formula, as
+every other trend in \pkg{mvgam} does. \code{y ~ 1} is its ordinary
+observation formula.
 
-A logistic piecewise trend estimates an offset (\code{m_trend}) that
-positions its curve along the time axis. It contributes
-\code{cap * inv_logit(...)} on the link scale, which saturates the
-expectation at the \code{cap} you supply when the observation formula
-omits its intercept (\code{y ~ -1} or \code{y ~ 0 + ...}). An intercept
-there raises the ceiling above \code{cap}.
+A logistic trend contributes \code{cap * inv_logit(...)} on the link
+scale. Its offset \code{m_trend} places the inflection in time. The
+expectation saturates at \code{cap} when the observation formula omits
+its intercept (\code{y ~ -1} or \code{y ~ 0 + ...}). An intercept raises the
+ceiling above \code{cap}.
 
 \emph{Priors}:
-Time runs in steps \verb{1, ..., N}. The default priors are set on the
-span of the series. The base growth rate takes
+Time runs in steps \verb{1, ..., N}. The base growth rate takes
 \verb{k_trend ~ normal(0, 2 s / (N - 1))}, two units of growth over the
-series at one standard deviation, where \eqn{s} is the factor
-\code{\link[=get_prior]{get_prior()}} describes for linear growth and 1 for logistic
-growth. The logistic inflection takes
+series at one standard deviation. The logistic inflection takes
 \code{m_trend ~ normal((N + 1) / 2, N / 2)}, centred on the middle of the
 series. \code{\link[=get_prior]{get_prior()}} shows the values for a given model.
 
-\emph{Logistic growth and the cap variable}:
-Many growing series approach a ceiling, such as a total market size,
-a population size or an ecological carrying capacity.
-\code{growth = 'logistic'} saturates the trend at a capacity that \code{data}
-supplies in its \code{cap} column. The capacity can vary by series and by
-time. Every observation needs a \code{cap} value.
-
-For observation families that use a non-identity link function, the
-\code{cap} value is transformed to the link scale internally: it is
-log-transformed under a \code{poisson()} or \code{negbinomial()} family. Give
-\code{cap} on the scale of the outcome. No missing values are allowed in
-\code{cap}.
+\emph{The carrying capacity}:
+A market size, a population size or an ecological carrying capacity
+can bound a series. \code{growth = 'logistic'} takes it from the \code{cap}
+column, which can vary by series and by time. Every observation
+needs a value. Under a non-identity link the capacity is moved to
+the link scale, such as its log under \code{poisson()} or
+\code{negbinomial()}. Give it on the scale of the response.
 }
 \examples{
 \dontrun{
-# Linear PW on a single Poisson series. The observation
-# intercept supplies the level, matching the other trend
-# models in mvgam.
 set.seed(2024)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L)
-
 mod <- mvgam(
   y ~ 1,
   trend_formula = ~ PW(growth = "linear"),
@@ -128,21 +108,26 @@ mod <- mvgam(
 )
 summary(mod)
 
-# A linear PW exposes the base growth rate (k_trend) and the
-# changepoint rate deltas (delta_trend[changepoint, series]).
-# A logistic PW adds the offset (m_trend). Visualise the full
-# set with the trend_params keyword.
-mcmc_plot(mod, variable = "trend_params", type = "intervals")
+# The base growth rate and the rate change at each changepoint
+mcmc_plot(mod, variable = "trend_params")
+
+# The forecast continues the growth rate of the last changepoint
+plot(forecast(mod, newdata = simdat$data_test))
+
+# Next, score() rates the forecast against the held-out points
 }
 
 }
 \references{
 Taylor, S. J. and Letham, B. (2018). Forecasting at scale.
-\emph{The American Statistician}, 72:37-45.
+\emph{The American Statistician}, 72, 37-45.
+\doi{10.1080/00031305.2017.1380080}
 }
 \seealso{
-\code{\link[=LLT]{LLT()}} for a trend whose growth changes continuously,
-\code{\link[=get_prior]{get_prior()}} for the scale of the default priors
+\code{\link[=LLT]{LLT()}} for a trend whose growth changes continuously.
+\code{\link[=get_prior]{get_prior()}} lists the default priors. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+compares a piecewise trend with other trends out of sample.
 
 Other trend models: 
 \code{\link{LLT}()},

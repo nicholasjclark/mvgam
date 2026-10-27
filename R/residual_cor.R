@@ -1,134 +1,92 @@
-#' Extract residual correlations from a fitted mvgam model
+#' Residual correlations between the series of a fitted model
 #'
-#' Compute residual (cross-series) correlation, covariance and partial
-#' correlation summaries from a fitted \[mvgam\]\[mvgam::mvgam\] model. The
-#' three supported sources for the per-series covariance are:
+#' Posterior correlations, covariances and optional partial correlations
+#' between series, from the trend's covariance. Three trend structures
+#' carry one:
 #'
 #' \itemize{
-#'   \item Latent-factor trends (`n_lv` on the trend constructor). The
-#'     implied per-series covariance is `Sigma = Z Omega Z^T` per
-#'     draw, where `Omega` is the covariance of the latent states,
-#'     using the posterior loadings `Z` for the default sampled-Z
-#'     factor model, or the user-supplied loadings broadcast across
-#'     draws when `trend_map = ...` fixes Z (see [mvgam()] /
-#'     [AR()] / [VAR()] / [RW()] / [LLT()] / [ZMVN()]). `Z Z^T` alone
-#'     would drop the scale of each latent column. Under multiplicative
-#'     gamma shrinkage that scale holds the whole shrinkage.
-#'   \item Correlated process-error trends (`cor = TRUE` on `RW()` /
-#'     `AR()` / `ZMVN()`, or any `VAR()` trend).
-#'   \item Hierarchical correlation structures (grouping variable on
-#'     the trend via `gr = ...`).
+#'   \item A factor trend (`n_lv` on the trend constructor). Each draw
+#'     gives the series covariance `Z Omega Z'`, with `Z` the loadings
+#'     and `Omega` the covariance of the latent states. [mvn()] and
+#'     [mvt()] add each series' residual variance to the diagonal:
+#'     `Psi^2`, or `Psi^2 * nu / (nu - 2)` under [mvt()].
+#'   \item A trend with correlated innovations: `RW()`, `AR()`, `CAR()`
+#'     or `ZMVN()` with `cor = TRUE`, or `VAR()`.
+#'   \item A hierarchical trend (`gr` on the trend constructor).
 #' }
 #'
 #' @inheritParams predict.mvgam
-#' @param object A fitted \[mvgam\]\[mvgam::mvgam\] object.
-#' @param covariance Which covariance to summarise. `"stationary"`
-#'   (default) gives the covariance of the latent states over the whole
+#' @param object A fitted `mvgam` object.
+#' @param covariance Which covariance to summarise. `"stationary"` (the
+#'   default) gives the covariance of the latent states over the whole
 #'   series. `"innovation"` gives the covariance of one time step's
-#'   shocks, the quantity `cor = TRUE` estimates directly. The two
-#'   coincide for a trend whose states keep no memory between times.
-#' @param by_group Logical. Only relevant for hierarchical trends
-#'   (`gr = ...` supplied to the trend constructor). When `FALSE`
-#'   (default) the population-level correlation of the shocks
-#'   (`tcrossprod(L_Omega_global)`) is returned, whatever `covariance`
-#'   asks for. When `TRUE`, a named
-#'   list of `mvgam_residcor` objects is returned, one per group; each
-#'   group's correlation is reconstructed as
-#'   `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])`.
-#' @param partial Logical. When `TRUE`, also compute the residual
-#'   partial correlation matrix per draw via the inverse-correlation
-#'   identity `P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)`. This
-#'   is `O(p^3)` per draw and is omitted by default. Required if you
-#'   want the `prec*` fields populated. A factor fit with fewer
-#'   factors than series implies a singular covariance of rank `n_lv`.
-#'   The call then stops with an error. [shared_variation()] reports
-#'   the variation such a fit's series share.
-#' @param summary Logical. `TRUE` (the default) returns a summary of
-#'   each entry: the point estimate, spread, credible interval and
-#'   posterior sign probabilities. `FALSE` returns the arrays of
-#'   draws.
+#'   shocks. The two coincide for a trend whose states keep no memory
+#'   between times.
+#' @param by_group Logical, for a hierarchical trend. `FALSE` (the
+#'   default) returns the population correlation of the shocks,
+#'   `tcrossprod(L_Omega_global)`, under either `covariance`. `TRUE`
+#'   also returns each group's correlation,
+#'   `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev[g])`.
+#' @param partial Logical. `TRUE` also computes partial correlations,
+#'   `P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)`, for the `prec*`
+#'   fields. A factor fit with fewer factors than series has a singular
+#'   covariance of rank `n_lv` and is refused. [shared_variation()]
+#'   reports the variation its series share. The residual variances of
+#'   [mvn()] and [mvt()] make their covariance full rank.
+#' @param summary Logical. `TRUE` (the default) summarises each entry:
+#'   the point estimate, spread, credible interval and posterior sign
+#'   probabilities. `FALSE` returns the arrays of draws.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return An \[mvgam_residcor-class\] object when `summary = TRUE` and
-#'   `by_group = FALSE`. When `by_group = TRUE` on a hierarchical trend, an
-#'   `mvgam_residcor_list` (a classed named list of `mvgam_residcor`
-#'   objects, one per group plus the population-level matrix under
-#'   the name `"_global"`); this class carries a
-#'   [plot.mvgam_residcor_list()] method that renders a faceted
-#'   heatmap panel across groups. When `summary = FALSE`, a list of
-#'   per-draw arrays.
+#' @return An [mvgam_residcor-class] object. Under `by_group = TRUE` on a
+#'   hierarchical trend, an `mvgam_residcor_list` of them: the population
+#'   matrix as `"_global"` and one per group.
+#'   [plot.mvgam_residcor_list()] draws them as faceted heatmaps.
 #'
 #' @details
-#' For non-hierarchical correlated trends the per-draw correlation
-#' matrix is reconstructed from the trend's posterior covariance:
-#' \itemize{
-#'   \item Cholesky-scaled trends (`RW(cor = TRUE)`, `AR(cor = TRUE)`,
-#'     `ZMVN(cor = TRUE)`) reconstruct
-#'     `Sigma = diag(sigma) %*% L_Omega %*% t(L_Omega) %*% diag(sigma)`
-#'     per draw.
-#'   \item `VAR()` trends take the leading block of `Omega_trend`, the
-#'     stationary covariance the Stan model derives from `Phi_trend`,
-#'     `Sigma_trend` and, under `ma = TRUE`, `Theta_trend`.
-#' }
+#' A correlated-innovation trend gives each draw the covariance
+#' `diag(sigma) L_Omega L_Omega' diag(sigma)`. A `VAR()` trend takes the
+#' leading block of `Omega_trend`, the stationary covariance the Stan
+#' model derives from `Phi_trend`, `Sigma_trend` and, under `ma = TRUE`,
+#' `Theta_trend`.
 #'
-#' By default the covariance summarised is the stationary covariance of
-#' the latent states. A residual correlation describes the states over
-#' the whole series. An innovation covariance describes one step. The
-#' two coincide when the states keep no memory between times. An
-#' `AR(cor = TRUE)` trend takes the leading block of the stationary
-#' covariance of its companion state, a moving-average term included.
-#' At one lag that block is `Sigma[a, b] / (1 - ar_a * ar_b)`. A
-#' `CAR(cor = TRUE)` trend holds this covariance at every time of an
-#' irregular grid, whatever unit the times are recorded in. The
-#' correlation moves with the scales at every order and for every lag
-#' set. A sparse lag set such as `p = c(1, 12)` bounds its coefficients
-#' one at a time and admits a jointly explosive draw, which has no
-#' stationary covariance. Such a draw keeps its innovation covariance.
-#' A warning gives the count once per session. `ZMVN()` keeps no memory
-#' between times. `RW()` has no stationary distribution. Both report
-#' the innovation covariance. A hierarchical `AR()` lifts its per-group
-#' scales the same way before the global and per-group factors are
-#' mixed. Hierarchical `RW()` and `ZMVN()` report their innovation
-#' covariances.
+#' The stationary covariance describes the states over the whole series.
+#' An `AR(cor = TRUE)` trend takes the leading block of the stationary
+#' covariance of its companion state, a moving-average term included. At
+#' one lag that block is `Sigma[a, b] / (1 - ar_a * ar_b)`. A `CAR()`
+#' trend holds it at every time of an irregular grid. A draw whose
+#' autoregression is explosive has no stationary covariance and keeps
+#' its innovation covariance. A warning gives the count once per session.
+#' `ZMVN()` keeps no memory between times and `RW()` has no stationary
+#' distribution. Both report their innovation covariance. A hierarchical
+#' `AR()` lifts each group's scales the same way before the global and
+#' group factors are mixed.
 #'
-#' `covariance = "innovation"` skips that lift and summarises the
-#' *contemporaneous shocks*. A `VAR()` transition matrix `A`
-#' redistributes each shock across series at every step. On a fitted
-#' `VAR()` the two correlations can then differ substantially.
-#' For hierarchical trends, per-group correlations combine the global
-#' Cholesky factor and per-group deviations via
-#' `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])`.
+#' Under `covariance = "innovation"` a `VAR()` fit reports the
+#' contemporaneous shocks. Its transition matrix spreads each shock
+#' across series at every step. The two correlations can differ
+#' substantially.
 #'
-#' Credible intervals and spreads for correlations are computed
-#' on the Fisher z-transformed scale (`atanh(r)`) and back-transformed
-#' for display. The intervals then stay inside `(-1, 1)` for
-#' correlations near the bounds. The reported matrix summarises each
-#' element separately. It is no single posterior draw and need not be
-#' positive semi-definite. The gap appears where the implied
-#' correlation is close to degenerate, as when a few factors drive
-#' many series. A four-series fit on two factors can return a smallest
-#' eigenvalue near `-0.01`. Individual correlations can still be
-#' printed, plotted and tested. A function that factorises the matrix,
-#' such as [chol()], or a simulation that treats it as a covariance,
-#' needs `summary = FALSE`. Every per-draw matrix is a valid
-#' correlation matrix.
-#' Posterior probabilities
-#' (`prob_positive`, `prob_negative`) are computed on the native
-#' scale. `prob_nonzero = pmax(prob_positive, prob_negative)`
-#' summarises one-sided evidence; `sig_cor` is the correlation matrix
-#' with elements set to zero where `prob_nonzero <= 0.95` (the
-#' threshold is exposed via the returned object's
-#' `prob_threshold` metadata field).
+#' Intervals and spreads of correlations are computed on the Fisher-z
+#' scale, `atanh(r)`, then back-transformed. The intervals stay inside
+#' `(-1, 1)`. The reported matrix summarises each entry
+#' separately. It need not be positive semi-definite, most visibly when
+#' a few factors drive many series. A computation that factorises the
+#' matrix, such as [chol()], takes `summary = FALSE`, whose per-draw
+#' matrices are valid correlation matrices. `prob_positive` and
+#' `prob_negative` are posterior sign probabilities. `prob_nonzero` is
+#' the larger of the two. `sig_cor` keeps the correlations whose
+#' `prob_nonzero` exceeds `prob_threshold`, 0.95. Its other entries are
+#' zero.
 #'
-#' Joint species distribution models (`jsdgam` fits) inherit this
-#' method. `jsdgam()` fits the same sampled-loadings factor model as
-#' `mvgam()`. The species covariance is `Z Omega Z^T` per draw, as for
-#' any factor fit.
+#' [jsdgam()] fits the same factor model. Its species covariance follows
+#' the factor rule above.
 #'
-#' @seealso \[mvgam_residcor-class\], [summary.mvgam_residcor()],
-#'   [print.mvgam_residcor()], [ordinate()] for a biplot view of
-#'   the same loadings, [plot.mvgam()] with `type = "factors"`
-#'   for per-factor posterior ribbons.
+#' @seealso [plot.mvgam_residcor()] draws the matrix as a heatmap.
+#'   [summary.mvgam_residcor()] lists the pairs. [ordinate()] draws the
+#'   loadings as a biplot. The
+#'   `r mvgam_article("jsdgam", "joint species distribution article")`
+#'   interprets species correlations from a factor model.
 #'
 #' @references Hui, F. K. C. (2016). boral - Bayesian Ordination and
 #'   Regression Analysis of Multivariate Abundance Data in R.
@@ -137,28 +95,21 @@
 #'
 #' @examples
 #' \dontrun{
-#' # Multi-species occupancy factor model. The loadings give the
-#' # species-by-species residual covariance after the fixed effects.
-#' set.seed(1)
-#' simdat <- sim_closure_unit_data(
-#'   family    = occ(),
-#'   n_species = 4L,
-#'   n_sites   = 50L,
-#'   n_visits  = 4L,
-#'   type      = 2L
-#' )
-#' mod <- jsdgam(
-#'   formula        = bf(y ~ env, p ~ tod_c),
-#'   factor_formula = ~ -1,
-#'   data           = simdat$data_train,
-#'   family         = occ(),
-#'   n_lv           = 2L,
-#'   chains         = 2,
-#'   silent         = 2
-#' )
+#' # Detections of 6 species whose occupancy shares two latent factors
+#' simdat <- sim_closure_unit_data(family = occ(), n_species = 6L,
+#'                                 n_sites = 80L, n_visits = 4L,
+#'                                 n_lv = 2L, seed = 1L)
+#' mod <- jsdgam(formula = bf(y ~ series * env, p ~ series + tod_c),
+#'               factor_formula = ~ -1,
+#'               data = simdat$data_train, family = occ(),
+#'               n_lv = 2L, chains = 2, silent = 2)
 #'
+#' # Species correlations after the fixed effects
 #' rc <- residual_cor(mod)
 #' round(rc$cor, 2)
+#' plot(rc)
+#'
+#' # Next: summary(rc) lists the pairs by posterior sign probability
 #' }
 #'
 #' @family latent dynamics
@@ -240,12 +191,17 @@ compute_residual_cor <- function(object, covariance, by_group, partial,
   n_lv <- detect_factor_n_lv(object)
   if (!is.null(n_lv)) {
     series_names <- fitted_series_levels(object)
-    refuse_partial_on_rank_deficient(partial, n_lv,
-                                     length(series_names))
+    # A residual variance per series makes the covariance full rank
+    residual <- family_has_component_scale(object$family)
+    if (!residual) {
+      refuse_partial_on_rank_deficient(partial, n_lv,
+                                       length(series_names))
+    }
     cov_draws <- factor_implied_cov_draws(object, n_lv,
                                           length(series_names),
                                           stationary = stationary,
-                                          draw_ids = draw_ids)
+                                          draw_ids = draw_ids,
+                                          residual = residual)
     return(finalise_residcor(
       cov_draws = cov_draws,
       series_names = series_names,
@@ -308,28 +264,14 @@ compute_residual_cor <- function(object, covariance, by_group, partial,
 }
 
 
-# Predicate: did the fit use a structured `loadings_prior`?
-# Detection looks at the `standata` slot, where the structured
-# prior contract emits `N_features_trend` (for ARD features) and
-# `dist_<name>` (for each pairwise distance matrix). Either
-# marker is sufficient. Used by `summary.mvgam` and
-# `how_to_cite()` to surface Heaps citations only when the
-# structured prior is actually in effect.
-#'@noRd
-uses_loadings_prior <- function(object) {
-  sd <- object$standata
-  if (is.null(sd)) return(FALSE)
-  has_features <- !is.null(sd$N_features_trend) && sd$N_features_trend > 0L
-  has_distances <- any(grepl("^dist_", names(sd)))
-  has_features || has_distances
-}
-
-
 #' The cross-series covariance a factor model induces, per draw
 #'
 #' `residual_cor()` and `shared_variation()` both call this function.
 #' It takes the latent covariance from the extractor the non-factor
 #' trends use, then projects it onto the series through the loadings.
+#' `mvn()` and `mvt()` add a residual variance per series, which
+#' `residual = TRUE` adds to the diagonal. The shared part alone is
+#' rank-deficient whenever there are fewer factors than series.
 #'
 #' @param object A fitted `mvgam` with a factor trend.
 #' @param n_lv Number of latent factors.
@@ -337,19 +279,55 @@ uses_loadings_prior <- function(object) {
 #' @param stationary Passed to `get_trend_covariance_structure()`.
 #' @param draw_ids Posterior draws to use, or `NULL` for every draw.
 #'   The loadings come from the same draws as the latent covariance.
+#' @param residual Logical. `TRUE` adds each series' residual variance
+#'   for a family that estimates one.
 #' @return `[ndraws, n_series, n_series]` covariance draws.
 #' @noRd
 factor_implied_cov_draws <- function(object, n_lv, n_series,
-                                     stationary = TRUE, draw_ids = NULL) {
+                                     stationary = TRUE, draw_ids = NULL,
+                                     residual = FALSE) {
+  checkmate::assert_flag(residual)
+  parts <- factor_model_draws(object, n_lv, n_series,
+                              stationary = stationary, draw_ids = draw_ids)
+  out <- project_cov_through_loadings(parts$latent, parts$Z_arr)
+  if (residual && family_has_component_scale(object$family)) {
+    variance <- component_scale_draws(
+      parts$draws_mat, n_series, object$family
+    )$variance
+    for (d in seq_len(dim(out)[1L])) {
+      out[d, , ] <- out[d, , ] + diag(variance[d, ], nrow = n_series)
+    }
+  }
+  out
+}
+
+
+#' The loadings and latent covariance of a factor model, per draw
+#'
+#' Both come from the same draws. The latent covariance is stated in
+#' the basis of the loadings the model sampled.
+#'
+#' @inheritParams factor_implied_cov_draws
+#' @return A list:
+#'   \itemize{
+#'     \item `latent`: `[ndraws, n_lv, n_lv]` latent covariance draws.
+#'     \item `Z_arr`: `[ndraws, n_series, n_lv]` loadings draws.
+#'     \item `draws_mat`: the posterior draws both came from.
+#'   }
+#' @noRd
+factor_model_draws <- function(object, n_lv, n_series, stationary = TRUE,
+                               draw_ids = NULL) {
   cov_struct <- get_trend_covariance_structure(object,
                                                draw_ids = draw_ids,
                                                stationary = stationary)
-  latent <- extract_cov_draws_flat(cov_struct)
-  Z_arr <- resolve_factor_loadings(
-    object = object, draws_mat = cov_struct$draws_mat, n_lv = n_lv,
-    n_series = n_series, basis = "model"
+  list(
+    latent = extract_cov_draws_flat(cov_struct),
+    Z_arr = resolve_factor_loadings(
+      object = object, draws_mat = cov_struct$draws_mat, n_lv = n_lv,
+      n_series = n_series, basis = "model"
+    ),
+    draws_mat = cov_struct$draws_mat
   )
-  project_cov_through_loadings(latent, Z_arr)
 }
 
 
@@ -395,10 +373,9 @@ refuse_partial_on_rank_deficient <- function(partial, n_lv, n_series) {
 #' A factor model writes `trend[t, s] = Z[s, ] . lv[t, ]`. The
 #' covariance it induces between series is `Z Omega Z'`, where
 #' `Omega` is the covariance of the latent states. `Z Z'` alone drops
-#' the scale of each latent column. Under multiplicative gamma process
-#' shrinkage that scale holds the whole shrinkage. On a ten-factor fit
-#' the latent scales ran from 2.06 to 0.013 with the loadings at unit
-#' scale.
+#' the scale of each latent column, which a model with fixed loadings
+#' samples as `sigma_trend`. It also drops the stationary variance of
+#' autoregressive factors.
 #'
 #' `Omega` is stated in the basis of the loadings the model sampled.
 #' `Z` must be those loadings. The QR-identified `Z_tilde` is a
@@ -480,12 +457,10 @@ extract_cov_draws_flat <- function(cov_struct) {
     return(out)
   }
 
-  stop(insight::format_error(c(
-    paste0("Unsupported covariance pattern for residual_cor: '",
-           pattern, "'."),
-    i = paste0("Supported patterns: full_covariance, ",
-               "cholesky_scaled, diagonal.")
-  )), call. = FALSE)
+  stop_mvgam_fault(
+    paste0("Covariance pattern '", pattern, "' has no extractor."),
+    "Extractors cover full_covariance, cholesky_scaled and diagonal."
+  )
 }
 
 
@@ -503,12 +478,7 @@ compute_residcor_hierarchical <- function(object, cov_struct, covariance,
   ndraws <- cov_struct$ndraws
   n_sub <- as.integer(cov_struct$group_info$n_subgroups)
   n_groups <- as.integer(cov_struct$group_info$n_groups)
-  # Prefer real factor levels resolved upstream from object$data via
-  # the trend spec's `gr` variable; fall back to generic indices if
-  # the resolver could not recover them.
-  group_labels <- series_names$group_labels %||%
-    cov_struct$group_info$group_labels %||%
-    paste0("group_", seq_len(n_groups))
+  group_labels <- series_names$group_labels
   L_glob_arr <- cov_struct$params$L_Omega_global_trend
 
   # Population-level correlation matrix per draw.
@@ -548,13 +518,11 @@ compute_residcor_hierarchical <- function(object, cov_struct, covariance,
         group_trend_factor(cov_struct$params, d, g, n_sub)
       )
     }
-    # Each group's per-series labels reuse the subgroup names since
-    # subgroup defines the cor matrix dimension; group identity is
-    # carried by the entry name in the returned list.
-    grp_names <- global_names
+    # The subgroups label each group's matrix. The list entry names the
+    # group.
     per_group[[g]] <- finalise_residcor(
       cov_draws = grp_cov,
-      series_names = grp_names,
+      series_names = global_names,
       partial = partial,
       summary = summary,
       robust = robust,
@@ -987,7 +955,7 @@ summary.mvgam_residcor <- function(object, ...) {
 #' @param x An `mvgam_residcor` object.
 #' @param digits Integer; number of significant digits for printed
 #'   numbers. Default `2`.
-#' @param ... Ignored.
+#' @param ... Unused.
 #'
 #' @return The `mvgam_residcor` object `x`, returned invisibly.
 #'
@@ -999,12 +967,15 @@ print.mvgam_residcor <- function(x, digits = 2L, ...) {
 
   cor_mat <- x[["cor"]]
   cat("Residual correlations from an mvgam fit\n")
-  cat("  Pattern    : ", x[["pattern"]], "\n", sep = "")
+  source <- c(factor_loadings = "factor loadings",
+              full_covariance = "VAR innovation covariance",
+              cholesky_scaled = "correlated innovations",
+              hierarchical_cholesky = "hierarchical correlations")
+  cat("  Source     : ", source[[x[["pattern"]]]], "\n", sep = "")
   cat("  Covariance : ", x[["covariance"]], "\n", sep = "")
   cat("  Series     : ", x[["n_series"]], "\n", sep = "")
   if (isTRUE(x[["hierarchical"]])) {
-    cat("  Group      : ", x[["group_label"]] %||% "(unlabelled)",
-        "\n", sep = "")
+    cat("  Group      : ", x[["group_label"]], "\n", sep = "")
   }
   if (!is.null(x[["mean_abs_offdiag"]])) {
     mad_summary <- x[["mean_abs_offdiag"]]

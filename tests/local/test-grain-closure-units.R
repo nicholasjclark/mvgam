@@ -350,12 +350,11 @@ test_that("a covariate that moves inside a unit cannot group a check", {
   # constant within one. `tod_c` changes at every visit and `elev`
   # is a property of the site, which is the distinction the refusal
   # is drawing.
-  err <- expect_error(
+  expect_error(
     pp_check(fit, type = "bars_grouped", group = "tod_c",
              ndraws = 20L),
-    "not constant within every closure unit"
+    "'tod_c' varies within a closure unit"
   )
-  expect_match(conditionMessage(err), "tod_c", fixed = TRUE)
 
   got <- with_warnings(
     pp_check(fit, type = "bars_grouped", group = "elev", ndraws = 20L)
@@ -839,8 +838,7 @@ test_that("a fold holds out whole closure units", {
   keys <- mvgam:::resolve_kfold_group(obj$gappy, NULL, d)
 
   # One fold key per unit, not one per visit.
-  expect_identical(keys$n_groups, as.integer(arrays$N_unit))
-  expect_lt(keys$n_groups, nrow(d))
+  expect_identical(length(unique(keys$key)), as.integer(arrays$N_unit))
 
   # And each unit's visits carry the same key, so no split can put
   # them in different folds.
@@ -915,7 +913,7 @@ jsdm_lv_true <- function(env) {
 # The cached fit is keyed to this exact sequence of random calls, so
 # reordering or adding one invalidates it silently. Change the seed
 # and delete the cache together, or not at all.
-sim_jsdm_occ <- function() {
+sim_jsdgam_occ <- function() {
   set.seed(607L)
   n_sites <- 50L
   env <- sort(runif(n_sites, -2, 2))
@@ -1332,7 +1330,7 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
 }
 
 
-occ_jsdm <- sim_jsdm_occ()
+occ_jsdm <- sim_jsdgam_occ()
 occ_jsdm_fit <- fit_jsdm_closure("occ", occ_jsdm, occ())
 closure_jsdm_battery(
   "jsdgam occ", occ_jsdm, occ_jsdm_fit, threshold_cor = 0.5,

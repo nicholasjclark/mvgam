@@ -17,16 +17,12 @@
 #' `traits =` or `phylo =`, then plot the comparison to show how
 #' the trait or phylogeny similarity reshapes the latent positions.
 #'
-#' The comparison shows the pattern of the loadings. Procrustes
-#' alignment is orthogonal: it rotates and reflects the loadings with
-#' their scale unchanged. The plot gives each factor its own axis. A
-#' column the model has shrunk towards zero spans as much of the
-#' picture as the column that holds the signal. On a ten-factor fit
-#' whose column scales run from 2.06 down to 0.013, every column has
-#' a plotted norm near 41. The panel shows which species cluster
-#' together and how that arrangement moves between fits.
-#' [active_factors()] reports which factors carry signal under the
-#' loadings prior.
+#' Procrustes alignment is orthogonal: it rotates and reflects the
+#' loadings with their scale unchanged. A factor the model has shrunk
+#' towards zero has short loadings, close to the origin. The panel
+#' shows which species cluster together and how that arrangement moves
+#' between fits. [active_factors()] reports how many factors the data
+#' support.
 #'
 #' @param fit_a,fit_b Two fitted `mvgam` / `jsdgam` objects, each
 #'   with `n_lv >= 2` and the same species set in the same factor
@@ -100,12 +96,12 @@ compare_loadings <- function(
   checkmate::assert_flag(facet)
   label_species <- match.arg(label_species)
   rlang::check_dots_empty()
-  insight::check_if_installed(
-    "ggrepel", reason = "to label species without overplotting"
+  z_a <- factor_loading_medians(
+    fit_a, require_factor_n_lv(fit_a, "compare_loadings()")
   )
-
-  z_a <- extract_median_Z(fit_a)
-  z_b <- extract_median_Z(fit_b)
+  z_b <- factor_loading_medians(
+    fit_b, require_factor_n_lv(fit_b, "compare_loadings()")
+  )
   validate_loadings_alignment(z_a, z_b, which_lvs)
 
   z_a <- z_a[, which_lvs, drop = FALSE]
@@ -177,7 +173,7 @@ compare_loadings <- function(
   }
 
   if (label_species != "none") {
-    p <- p + ggrepel::geom_text_repel(
+    p <- p + mvgam_repel_layer(
       data = df[df$label != "", , drop = FALSE],
       mapping = ggplot2::aes(
         x = .data$LV1, y = .data$LV2,
@@ -203,32 +199,6 @@ compare_loadings <- function(
     ) +
     mvgam_theme()
 }
-
-
-#' Posterior-median factor loadings of a fit
-#'
-#' @param object Fitted `mvgam` object with a latent factor model
-#' @return Numeric matrix with one row per species and one column per
-#'   latent factor, with species names as row names
-#' @noRd
-extract_median_Z <- function(object) {
-  checkmate::assert_class(object, "mvgam")
-  n_lv <- require_factor_n_lv(object, "compare_loadings()")
-  n_series <- loading_series_count(object)
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  # A fixed-Z fit holds its loadings as data. The resolver repeats
-  # them for every draw.
-  z_arr <- resolve_factor_loadings(
-    object,
-    draws_mat,
-    n_series = as.integer(n_series),
-    n_lv = as.integer(n_lv)
-  )
-  med <- apply(z_arr, c(2L, 3L), stats::median)
-  rownames(med) <- fitted_series_levels(object)
-  med
-}
-
 
 #' Refuse two loading matrices that cannot be compared
 #'

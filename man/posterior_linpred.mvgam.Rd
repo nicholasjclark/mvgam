@@ -2,7 +2,7 @@
 % Please edit documentation in R/posterior_linpred.R
 \name{posterior_linpred.mvgam}
 \alias{posterior_linpred.mvgam}
-\title{Extract Posterior Linear Predictor from mvgam Models}
+\title{Linear predictor draws for each posterior draw}
 \usage{
 \method{posterior_linpred}{mvgam}(
   object,
@@ -23,15 +23,11 @@
 \arguments{
 \item{object}{A fitted mvgam object from \code{\link[=mvgam]{mvgam()}}.}
 
-\item{transform}{Logical; if \code{FALSE} (default), values are returned
-on the link scale. If \code{TRUE}, the inverse link of \code{mu} is applied,
-so the result is on that parameter's own scale. This is not the
-mean of the response: a binomial \code{mu} is a probability rather than
-a count, and a hurdle or zero-inflated \code{mu} is the base
-distribution's parameter before any mass is moved to zero. Use
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for \code{E[Y]}. Mirrors the \code{transform}
-argument of \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}, which sets \code{dpar = "mu"}
-and answers on the response scale.}
+\item{transform}{Logical. \code{FALSE} (the default) returns the link
+scale. \code{TRUE} applies the inverse link of \code{mu}. That gives \code{mu} on
+its own scale. A binomial \code{mu} is a probability. A hurdle or
+zero-inflated \code{mu} is the base distribution's parameter. Neither is
+the mean of the response, which \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} returns.}
 
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
@@ -97,77 +93,66 @@ multivariate models. NULL (default) returns predictions for all
 responses.}
 
 \item{dpar}{Character naming a distributional parameter, such as
-\code{"sigma"} or \code{"nu"}. The default \code{NULL} answers for the mean.
-Naming a parameter that carries a formula of its own returns its
-linear predictor, which has no latent trend term; naming one that
-was sampled as a scalar returns those draws across the rows.}
+\code{"sigma"} or \code{"nu"}. The default \code{NULL} returns the predictor of
+the mean. A parameter with a formula of its own returns its linear
+predictor. That predictor holds no trend term. A parameter sampled
+as a scalar has no link scale. Its draws fill every row on their
+own scale, whatever \code{transform} is.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-Matrix with dimensions \verb{\\\[ndraws x nobs\\\]} containing linear
-predictor values. Each row is one posterior draw, each column is
-one observation from newdata. Values are on link scale.
-
-For multivariate models with resp = NULL, returns a named list of
-matrices (one per response variable).
+An \verb{[ndraws, nobs]} matrix, one row per draw and one column
+per row of \code{newdata}. It is on the link scale unless \code{transform = TRUE} or \code{dpar} names a scalar parameter. A multivariate model
+with \code{resp = NULL} gives a named list, one element per response.
 }
 \description{
-Extract linear predictor values (eta, on link scale) from fitted mvgam
-models. Combines observation model effects with State-Space trend
-components. For Poisson models this is log-scale; for binomial models
-this is logit-scale.
+Draws of the linear predictor \eqn{\eta}, the sum of the observation
+and trend predictors on the link scale. A Poisson predictor is on the
+log scale and a binomial predictor on the logit scale.
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} maps it onto the response scale.
 }
 \details{
-The linear predictor combines:
-\itemize{
-\item Observation model effects: fixed effects, random effects,
-smooth terms, GP terms from the observation formula
-\item Trend effects: State-Space trend contributions from the
-trend formula (if present)
-}
-
-For models without a trend component (trend_formula = NULL), behavior
-matches \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.
-
-Innovations are sampled once, on the linear predictor, so
-\code{process_error = TRUE} here carries the same state that
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} and \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} carry
-under that setting; the latter two then apply the inverse link and
-the observation family on top. Under \code{FALSE} the predictor still
-varies draw to draw, because every coefficient in both submodels
-does; what it leaves out is the latent process.
+The observation predictor holds the fixed, group-level, smooth and
+Gaussian process terms of \code{formula}. The trend predictor holds the
+terms of \code{trend_formula}. \code{process_error = TRUE} adds one sampled
+innovation per posterior draw, on the link scale.
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} and \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} apply the
+family's mean and noise to that same predictor.
 }
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
+                    n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-              data    = simdat$data_train,
-              family  = poisson(),
-              chains  = 2, silent = 2)
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
 
-# Link-scale linear predictor draws (log lambda for the Poisson).
-lp <- posterior_linpred(mod, ndraws = 50L)
+# Log rates, one row per draw and one column per observation
+lp <- posterior_linpred(mod, draw_ids = 1:50)
 dim(lp)
 
-# Apply the inverse link manually to get the per-draw rate. With
-# `process_error = FALSE` on both sides this equals what
-# `posterior_epred()` returns (`process_error = TRUE` adds
-# marginal trend noise so the relationship is approximate).
-lp_det <- posterior_linpred(mod, ndraws = 50L, process_error = FALSE)
-ep_det <- posterior_epred(mod,  ndraws = 50L, process_error = FALSE)
-all.equal(colMeans(exp(lp_det)), colMeans(ep_det), tolerance = 1e-6)
+# A Poisson mean is the inverse link of the predictor
+all.equal(exp(lp), posterior_epred(mod, draw_ids = 1:50))
+
+# The predictor under the fitted trend state tracks the series
+lp_state <- posterior_linpred(mod, incl_autocor = TRUE)
+plot(log1p(simdat$data_train$y), pch = 16, col = "grey60",
+     ylab = "log(1 + count)")
+lines(colMeans(lp_state), lwd = 2)
+
+# Next: posterior_epred() maps the predictor to expected counts
 }
 
 }
 \seealso{
-\code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}} for the brms generic,
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for expected values on response scale,
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for posterior predictive samples,
-[forecast.mvgam] and [hindcast.mvgam] for the deterministic
-state-extrapolating prediction surface.
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} returns expected values.
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} returns predictive draws.
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} take the trend from its
+fitted state. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+scores predictions of held-out times.
 
 Other predictions: 
 \code{\link{conditional_effects.mvgam}()},

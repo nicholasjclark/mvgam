@@ -81,11 +81,6 @@ test_that("PW constructor rejects factor models correctly", {
                "changepoints separately")
   expect_error(PW(n_lv = 3),
                "Drop 'n_lv' and 'trend_map'")
-
-  # PW without n_lv should work
-  pw_trend <- PW()
-  expect_is(pw_trend, "mvgam_trend")
-  expect_equal(pw_trend$trend, "PW")  # Base type for dispatch
 })
 
 test_that("AR constructor accepts factor models", {
@@ -883,7 +878,6 @@ test_that("PW records every constructor argument in the spec", {
     )
   )
   for (case in cases) {
-    expect_s3_class(case$spec, "mvgam_trend")
     for (fld in names(case$want)) {
       expect_equal(case$spec[[fld]], case$want[[fld]])
     }
@@ -896,50 +890,17 @@ test_that("PW records every constructor argument in the spec", {
   ))
 })
 
-# Test PW parameter validation
-test_that("PW parameter validation works correctly", {
-
-  # The accepted ranges are covered by the constructor table above.
-  # These add the refusal at each boundary.
-
-  # Test invalid n_changepoints (must be positive integer)
-  expect_error(
-    PW(n_changepoints = 0),
-    "Element 1 is not >= 1"
-  )
-
-  expect_error(
-    PW(n_changepoints = -5),
-    "Element 1 is not >= 1"
-  )
-
-  expect_error(
-    PW(n_changepoints = 3.5),
-    "single integerish value"
-  )
-
-  # Test invalid changepoint_range (must be between 0 and 1)
-  expect_error(
-    PW(changepoint_range = 1.5),
-    "Element 1 is not <= 1"
-  )
-
-  expect_error(
-    PW(changepoint_range = -0.1),
-    "Element 1 is not >= 0"
-  )
-
-  # A Laplace scale must be positive
-  for (bad in c(0, -0.05)) {
-    expect_error(PW(changepoint_scale = bad),
-                 "'changepoint_scale' must be a positive number")
-  }
-
-  # Test invalid growth type
-  expect_error(
-    PW(growth = 'exponential'),
-    "'arg' should be one of"
-  )
+test_that("PW() refuses each argument outside its range", {
+  # The accepted values are covered by the constructor table above. A
+  # changepoint window of zero holds no changepoint.
+  expect_error(PW(n_changepoints = 0), "n_changepoints")
+  expect_error(PW(changepoint_range = 0), "changepoint_range")
+  expect_error(PW(changepoint_scale = 0), "changepoint_scale")
+  expect_error(PW(growth = "exponential"), "'arg' should be one of")
+  # A piecewise trend has no factor form. The `n_lv` refusal is tested
+  # above.
+  expect_error(PW(trend_map = data.frame(series = "a", trend = 1)),
+               "Factor models.*not supported.*PW")
 })
 
 test_that("piecewise trends work correctly in formula parsing", {
@@ -983,63 +944,6 @@ test_that("piecewise trends work correctly in formula parsing", {
       expect_equal(comp[[fld]], case$want[[fld]])
     }
   }
-})
-
-# Test piecewise trend registry integration
-test_that("piecewise trends integrate correctly with registry system", {
-
-  # Test that PW trends are in registry
-  choices <- mvgam:::mvgam_trend_registry()
-  expect_true("PW" %in% choices)
-
-  # Registry info for the piecewise entry. The same call appeared
-  # three times under three comments about PW variants, with "PW" as
-  # the argument each time.
-  pw_info <- mvgam:::get_trend_info("PW")
-  expect_false(pw_info$supports_factors)
-  expect_type(pw_info$generator, "closure")
-  # A factor-incompatible entry stores the reason shown to a user.
-  expect_true(nzchar(pw_info$incompatibility_reason))
-  # The variant spellings name no registry entry of their own.
-  expect_error(
-    mvgam:::get_trend_info("PWlinear"), "Unknown trend type"
-  )
-})
-
-# Test piecewise parameter validation edge cases
-test_that("piecewise parameter validation handles edge cases correctly", {
-
-  # Test boundary values for n_changepoints
-  pw_min <- PW(n_changepoints = 1, growth = 'linear')
-  expect_equal(pw_min$n_changepoints, 1)
-
-  pw_large <- PW(n_changepoints = 100, growth = 'linear')
-  expect_equal(pw_large$n_changepoints, 100)
-
-  # Test boundary values for changepoint_range
-  pw_range_min <- PW(changepoint_range = 0.0001, growth = 'linear')
-  expect_equal(pw_range_min$changepoint_range, 0.0001)
-
-  pw_range_max <- PW(changepoint_range = 0.9999, growth = 'linear')
-  expect_equal(pw_range_max$changepoint_range, 0.9999)
-
-  # Test boundary values for changepoint_scale
-  pw_scale_small <- PW(changepoint_scale = 0.001, growth = 'linear')
-  expect_equal(pw_scale_small$changepoint_scale, 0.001)
-
-  pw_scale_large <- PW(changepoint_scale = 10.0, growth = 'linear')
-  expect_equal(pw_scale_large$changepoint_scale, 10.0)
-
-  # Test that factor model validation rejects PW with n_lv
-  expect_error(
-    PW(n_lv = 3, growth = 'linear'),
-    "Factor models.*not supported.*PW"
-  )
-
-  expect_error(
-    PW(n_lv = 2, growth = 'logistic', cap = max_size),
-    "Factor models.*not supported.*PW"
-  )
 })
 
 

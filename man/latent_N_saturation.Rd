@@ -2,7 +2,7 @@
 % Please edit documentation in R/families.R
 \name{latent_N_saturation}
 \alias{latent_N_saturation}
-\title{Per-unit posterior saturation of the closure-unit K_max truncation}
+\title{How often each unit's latent state reaches its cap}
 \usage{
 latent_N_saturation(
   object,
@@ -13,46 +13,53 @@ latent_N_saturation(
 )
 }
 \arguments{
-\item{object}{A fitted \code{mvgam} with a closure-unit family.}
+\item{object}{A fitted \code{mvgam} with an \code{\link[=nmix]{nmix()}} or \code{\link[=occ]{occ()}} family}
 
-\item{newdata}{Optional \code{data.frame}. When \code{NULL} uses the fit's
+\item{newdata}{Optional \code{data.frame} of visits. \code{NULL} takes the
 training data.}
 
-\item{threshold}{Numeric in \verb{[0, 1]}. Units with
-a share of draws at \code{K_max} above \code{threshold} is marked \code{TRUE} in
-the returned \code{saturated} column. Default \code{0.05}.}
+\item{threshold}{Number in \verb{[0, 1]}. A unit whose share of draws at
+its cap exceeds \code{threshold} is marked \code{saturated}.}
 
-\item{ndraws, draw_ids}{Forwarded to the internal latent-N
-sampler. \code{ndraws} caps the per-unit posterior; \code{draw_ids}
-selects a draw subset.}
+\item{ndraws, draw_ids}{The number of posterior draws to use, or
+their indices. Give at most one. \code{NULL} for both uses every draw.}
 }
 \value{
-A \code{data.frame} with one row per closure unit and columns
+A \code{data.frame} with one row per closure unit:
 \describe{
-\item{\code{unit}}{Integer index \code{1:N_unit}.}
-\item{\code{label}}{Optional character label if the fit was built
-from a long-format frame with unique unit identifiers.}
-\item{\code{K_max}}{The per-unit upper truncation that bounded
-the marginalisation.}
-\item{\code{p_saturated}}{Posterior probability that latent \code{N}
-equals \code{K_max}.}
-\item{\code{saturated}}{Logical, \code{p_saturated > threshold}.}
+\item{\code{unit}}{The unit's index.}
+\item{\code{label}}{The unit's key values, joined by \verb{_}.}
+\item{\code{K_max}}{The unit's cap.}
+\item{\code{p_saturated}}{The posterior probability that the latent
+state equals \code{K_max}.}
+\item{\code{saturated}}{\code{p_saturated > threshold}.}
 }
-A 0-row \code{saturated} set means the configured \code{K_max} was
-sufficient for all units in the sampled posterior.
 }
 \description{
-For a fit using a closure-unit family, reports the share of
-conditional posterior latent-state draws that equal the per-unit
-upper truncation \code{K_max}. Under \code{nmix()} and its
-\code{royle_nichols} and \code{poisson_poisson} variants, \code{K_max} bounds a
-latent count. A unit whose posterior abundance reaches the bound
-shows truncation-induced downward bias. Its \code{cap} column should be
-raised. The default for \code{nmix("royle_nichols")} is \code{K_max = 25}.
-Supply \code{cap} when abundance may exceed it. Under \code{occ()} the latent
-state is binary and \code{K_max} is one. A saturated unit is then one
-that the species certainly occupies.
+The sum over a unit's latent abundance stops at its cap \code{K_max}. A
+unit whose posterior abundance often equals the cap is truncated,
+which biases its abundance down. A higher value in that unit's \code{cap}
+column, then a refit, removes the bias. Under \code{\link[=occ]{occ()}} the cap is one,
+and a unit at its cap is one the species occupies.
+}
+\examples{
+\dontrun{
+set.seed(5)
+simdat <- sim_closure_unit_data(family = nmix(), n_species = 1L,
+                                n_sites = 50L, n_visits = 4L,
+                                type = 1L)
+# A cap of 3 is low for these counts
+dat <- simdat$data_train
+dat$cap <- pmax(3L, ave(dat$y, dat$series, dat$time, FUN = max))
+mod <- mvgam(bf(y ~ env, p ~ tod_c), data = dat, family = nmix(),
+             chains = 2, silent = 2)
+saturation <- latent_N_saturation(mod)
+saturation[saturation$saturated, ]
+
+# Next, raise 'cap' for the saturated units and refit
+}
+
 }
 \seealso{
-\code{\link[=nmix]{nmix()}}, \code{\link[=occ]{occ()}}.
+\code{\link[=nmix]{nmix()}}, \code{\link[=occ]{occ()}}
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/posterior_epred.R
 \name{posterior_epred.mvgam}
 \alias{posterior_epred.mvgam}
-\title{Extract Posterior Expected Values from mvgam Models}
+\title{Expected values of the response for each posterior draw}
 \usage{
 \method{posterior_epred}{mvgam}(
   object,
@@ -87,70 +87,65 @@ responses.}
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-Matrix with dimensions \verb{\\\[ndraws x nobs\\\]} containing expected
-values on response scale. Each row is one posterior draw, each column
-is one observation from newdata.
-
-For multivariate models with resp = NULL, returns a named list of
-matrices (one per response variable).
+An \verb{[ndraws, nobs]} matrix of expected values on the response
+scale, one row per draw and one column per row of \code{newdata}. An
+ordinal response gives an \verb{[ndraws, nobs, ncat]} array of category
+probabilities. A multivariate model with
+\code{resp = NULL} gives a named list, one element per response.
 }
 \description{
-Extract expected values (on response scale) from fitted mvgam models.
-Combines observation and trend components, then applies the inverse link
-function to transform from link scale to response scale.
+Draws of \eqn{E[Y \mid X]}, the mean of the response given each
+posterior draw's parameters. The observation and trend predictors are
+summed on the link scale. The family's mean then maps the sum onto
+the response scale. \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} adds the observation
+noise around these means.
 }
 \details{
-Expected values are computed as E[Y|X] by applying the inverse link
-function to the linear predictor. For most families this is simply
-\code{linkinv(eta)}:
-\itemize{
-\item Gaussian, Poisson, Bernoulli, Beta, Gamma, NegBinomial, Student:
-E[Y] = linkinv(eta)
-}
+For most families the mean is the inverse link of the predictor. A binomial mean is
+\code{trials * p}, with the trials taken from the \code{trials()} term
+evaluated against \code{newdata}. A zero-inflated or hurdle mean scales
+the base mean by the probability of a non-zero draw. A lognormal mean
+carries the correction \code{exp(mu + sigma^2 / 2)}. A \code{trunc()} term
+gives the mean of the distribution truncated to its bounds.
 
-Some families require additional parameters:
-\itemize{
-\item Binomial, Beta-binomial: E[Y] = p * trials (requires trials)
-\item Lognormal: E[Y] = exp(mu + sigma^2/2) (requires sigma)
-}
-
-Unsupported families:
-\itemize{
-\item N-mixture, Tweedie: require specialized computation
-}
+The mean of an \code{nmix()} or \code{occ()} visit thins the latent abundance
+or occupancy by that visit's detection probability. A composition
+family normalises its means across the components of each unit.
 }
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
+                    n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-              data    = simdat$data_train,
-              family  = poisson(),
-              chains  = 2, silent = 2)
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
 
-# Posterior mean of the response, marginalised over the trend's
-# stochastic dynamics. See [forecast.mvgam()] for the
-# state-extrapolating alternative.
-ep <- posterior_epred(mod, ndraws = 50L)
+# One row per draw, one column per observation
+ep <- posterior_epred(mod)
 dim(ep)
 
-# Summarise across draws to get the posterior mean and 90\% CI
-# for each cell, then compare against the observed series.
-ep_summary <- t(apply(
-  ep, 2L, quantile, probs = c(0.05, 0.5, 0.95)
-))
-head(ep_summary)
+# The covariate surface (red) and the surface that follows the
+# fitted trend (black), against the observed counts
+plot(simdat$data_train$y, pch = 16, col = "grey60", ylab = "Count")
+lines(colMeans(ep), col = "darkred", lwd = 2)
+lines(colMeans(posterior_epred(mod, incl_autocor = TRUE)), lwd = 2)
+
+# Sampling trend innovations raises a log-link mean by the Jensen
+# correction
+c(fixed = mean(ep),
+  innovations = mean(posterior_epred(mod, process_error = TRUE)))
+
+# Next: posterior_predict() adds observation noise to these means
 }
 
 }
 \seealso{
-\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} for link scale predictions,
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for posterior predictive samples,
-[forecast.mvgam] and [hindcast.mvgam] for the deterministic
-state-extrapolating prediction surface. That surface takes the
-state from the fitted \code{lv_trend} posterior draws, with no Monte
-Carlo integration.
+\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} returns the predictor on the
+link scale. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} take the
+trend from its fitted state, in and beyond the training times. The
+\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+scores predictions of held-out times.
 
 Other predictions: 
 \code{\link{conditional_effects.mvgam}()},

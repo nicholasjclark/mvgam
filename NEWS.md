@@ -12,6 +12,7 @@ mvgam now uses 'brms' to build its models. The observation model takes the full 
 * `GP()`, `dynamic()` and the `"moi"` and `"mod"` smooth bases have been removed. Use `gp()` and `mo()`
 * `incl_autocor` now chooses the prediction surface, replacing `trend_state`. `hindcast(resample_innovations = )` is now `process_error`
 * Renamed arguments: `residual_cor(by_group = )`, `score(quantile_level = )`, `forecast(coef_uncertainty = )`, `posterior_transition_matrix(groups = )`
+* `score(score = "drps")` no longer takes `log = TRUE`. Use `"crps"` on the log scale
 * `irf()`, `fevd()` and `stability()` return posterior summaries by default. Pass `summary = FALSE` for draws
 * Removed `get_mvgam_priors()`, the `plot_mvgam_*()` functions, `compare_mvgams()`, `eval_mvgam()`, `roll_eval_mvgam()`, `lv_correlations()`, `add_residuals()`, `code()`, `ppc()` and `summary(include_states = )`. Use `get_prior()`, `plot()`, `loo_compare()`, `lfo_cv()`, `residual_cor()`, `augment()`, `stancode()` and `pp_check()`
 * mvgam no longer re-exports `te()` and `ti()`

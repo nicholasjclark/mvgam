@@ -2,8 +2,7 @@
 % Please edit documentation in R/ranef.mvgam.R
 \name{ranef.mvgam}
 \alias{ranef.mvgam}
-\title{Extract group-level (random) effects from a fitted \pkg{mvgam}
-model}
+\title{Group-level (random) effects of a fitted \pkg{mvgam} model}
 \usage{
 \method{ranef}{mvgam}(
   object,
@@ -18,12 +17,8 @@ model}
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}
 
-\item{summary}{Logical. If \code{TRUE} (the default), collapse each
-group's posterior draws to a \verb{[n_levels x n_stats x n_coefs]}
-array of summary statistics
-(\code{Estimate}, \code{Est.Error}, and the lower / upper quantiles
-defined by \code{probs}). If \code{FALSE}, return the raw draws as a
-\verb{[n_draws x n_levels x n_coefs]} array per group.}
+\item{summary}{Logical. \code{TRUE} (the default) summarises each
+coefficient's draws. \code{FALSE} returns the draws.}
 
 \item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
 deviation for summaries. If \code{TRUE}, uses median and median absolute
@@ -33,69 +28,55 @@ deviation (MAD).}
 Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
 single value or multiple values.}
 
-\item{pars}{Optional character vector. When set, restrict the
-returned coefficients to those whose name matches one of the
-supplied entries (matched against the brms \code{coef} column).
-\code{NULL} (the default) keeps every coefficient.}
+\item{pars}{Optional character vector of coefficient names, such as
+\code{"Intercept"}. \code{NULL} (the default) keeps every coefficient.}
 
-\item{groups}{Optional character vector. When set, restrict the
-returned grouping factors. \code{NULL} (the default) keeps every
-factor.}
+\item{groups}{Optional character vector of grouping factors. \code{NULL}
+(the default) keeps every factor.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A named list with one entry per grouping factor. Each
-entry is a 3D \code{array}:
-\itemize{
-\item \code{summary = TRUE} (default) - dimensions
-\verb{[n_levels, n_stats, n_coefs]} with dimnames
-\code{list(levels, c("Estimate", "Est.Error", "Q*", "Q*"), coefs)}.
-\item \code{summary = FALSE} - dimensions
-\verb{[n_draws, n_levels, n_coefs]} with dimnames
-\code{list(NULL, levels, coefs)} and an \code{nchains} attribute.
-}
-
-When the fit contains no group-level effects an error is
-raised; supply \code{groups = ...} for cases where only some
-factors are of interest.
+A named list with one 3D array per grouping factor. With
+\code{summary = TRUE} the dimensions are levels, statistics and
+coefficients. The statistics are \code{Estimate}, \code{Est.Error} and one
+quantile per element of \code{probs}. With \code{summary = FALSE} the
+dimensions are draws, levels and coefficients, and the array
+carries an \code{nchains} attribute. A grouping factor of a
+distributional parameter or of one response of several is keyed
+\verb{<group>__<parameter>}.
 }
 \description{
-Pull posterior draws of the group-level (random) effects on a
-fitted \code{mvgam} object and return them in the same shape as
-\code{\link[brms:ranef.brmsfit]{brms::ranef.brmsfit()}} so brms-trained users can drop into the
-same workflow. Names follow brms's \verb{r_<group>[<level>, <coef>]}
-convention; the underlying positional Stan parameters are
-aliased transparently.
+Posterior draws of each level's deviation for every group-level term
+of the observation formula, summarised or raw. Each element is named
+\verb{r_<group>[<level>,<coef>]}, as \code{\link[=variables.mvgam]{variables.mvgam()}} lists it.
 }
 \details{
-Observation-side group-level effects only. A \code{(1 | g)} inside
-\code{trend_formula} is named with the \verb{_trend} suffix, as
-\code{r_g_trend[a,Intercept]}, and \code{as_draws()} returns its draws.
+A group-level term in \code{trend_formula} is named with the \verb{_trend}
+suffix, as \code{r_g_trend[a,Intercept]}. \code{\link[=as_draws.mvgam]{as_draws.mvgam()}} returns its
+draws.
 }
 \examples{
 \dontrun{
 set.seed(14)
 simdat <- sim_mvgam(family = poisson(), n_series = 4L,
-                     n_timepoints = 120L, trend_model = AR())
+                    n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(y ~ s(x) + (1 | series),
-              trend_formula = ~ AR(p = 1),
-              data    = simdat$data_train,
-              family  = poisson(),
-              chains  = 2, silent = 2)
+             trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
 
-# `ranef()` returns a per-group nested list with one matrix per
-# level: rows are levels, columns are `Estimate`, `Est.Error`,
-# and the 95\% credible bounds.
-re <- ranef(mod)
-str(re, max.level = 2)
-re$series[, , "Intercept"]
+# Each series' intercept deviation, one row per series
+ranef(mod)$series[, , "Intercept"]
+
+# Next: VarCorr() gives the standard deviation of these deviations
 }
 
 }
 \seealso{
-\code{\link[brms:ranef.brmsfit]{brms::ranef.brmsfit()}}, \code{\link[=VarCorr.mvgam]{VarCorr.mvgam()}},
-\code{\link[=fixef.mvgam]{fixef.mvgam()}}, \code{\link[=variables.mvgam]{variables.mvgam()}}.
+\code{\link[=VarCorr.mvgam]{VarCorr.mvgam()}} summarises the standard deviations and
+correlations. \code{\link[=fixef.mvgam]{fixef.mvgam()}} summarises the population-level
+effects.
 
 Other posterior summaries: 
 \code{\link{VarCorr.mvgam}()},

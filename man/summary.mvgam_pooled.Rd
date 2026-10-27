@@ -2,12 +2,15 @@
 % Please edit documentation in R/summary.mvgam.R
 \name{summary.mvgam_pooled}
 \alias{summary.mvgam_pooled}
-\title{Summary method for multiple imputation mvgam models}
+\alias{print.mvgam_pooled_summary}
+\title{Summary of a fit pooled over imputations}
 \usage{
-\method{summary}{mvgam_pooled}(object, probs = c(0.025, 0.975), robust = FALSE, ...)
+\method{summary}{mvgam_pooled}(object, probs = c(0.025, 0.975), robust = FALSE, matrices = FALSE, ...)
+
+\method{print}{mvgam_pooled_summary}(x, digits = 2, ...)
 }
 \arguments{
-\item{object}{An object of class \code{mvgam_pooled}.}
+\item{object}{A fit of class \code{mvgam_pooled}.}
 
 \item{probs}{Numeric vector of probabilities for quantile computation.
 Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
@@ -17,33 +20,37 @@ single value or multiple values.}
 deviation for summaries. If \code{TRUE}, uses median and median absolute
 deviation (MAD).}
 
-\item{...}{Additional arguments passed to \code{\link{summary.mvgam}}.}
+\item{matrices}{Logical; if \code{TRUE}, also print every cell of
+the matrices a correlated, VAR or hierarchical trend derives
+from its sampled parameters (\code{Phi_trend}, \code{Sigma_trend},
+\code{Omega_trend}, \code{Phi_group_trend},
+\code{Sigma_group_trend}). The default \code{FALSE} prints the
+sampled parameters alone, among them \code{sigma_trend},
+\code{Amu_trend}, \code{Aomega_trend} and
+\code{alpha_cor_trend}. \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}} and
+\code{\link[=residual_cor]{residual_cor()}} summarise the matrices a cell at a time.}
+
+\item{...}{Unused. Anything passed here is refused.}
+
+\item{x}{An object of class \code{mvgam_pooled_summary}.}
+
+\item{digits}{Integer number of decimal places to print.}
 }
 \value{
-An object of class \code{c("mvgam_pooled_summary",
-  "mvgam_summary")} containing standard summary components plus
-multiple imputation diagnostics.
+\code{summary()} returns an object of class
+\code{c("mvgam_pooled_summary", "mvgam_summary")}. It holds the blocks of
+\code{\link[=summary.mvgam]{summary.mvgam()}} and \code{mi_diagnostics}, a list of the number of
+imputations, the draws per imputation and the per-imputation
+convergence table. \code{print()} returns \code{x} invisibly.
 }
 \description{
-Provides posterior summary statistics for multiple imputation mvgam
-models, with additional diagnostics about the imputation process and
-combined posterior draws.
-}
-\details{
-This method extends the standard \code{summary.mvgam} output with
-multiple imputation specific information:
-\itemize{
-\item{Number of imputations}
-\item{Total posterior draws (combined across all imputations)}
-\item{Per-imputation convergence summaries}
-\item{Information about the combination method}
-}
-
-The combined posteriors are created using
-\code{rstan::sflist2stanfit()}, which concatenates posterior draws
-from all imputed datasets at the Stan level. Parameter estimates
-reflect uncertainty from both the model and the imputation process.
+The summary of a fit from \code{\link[=mvgam_multiple]{mvgam_multiple()}}. The estimates come from
+the pooled draws. Chains from different imputations sample different
+posteriors, which raises the R-hat of the pooled chains. Each
+parameter's \code{Rhat} is its largest over the imputation fits instead.
+\code{Bulk_ESS} and \code{Tail_ESS} are the sums over those fits. A table gives
+each fit's largest R-hat and smallest ESS over its parameters.
 }
 \seealso{
-\code{\link{summary.mvgam}}, \code{\link{mvgam_multiple}}
+\code{\link[=mvgam_multiple]{mvgam_multiple()}}, \code{\link[=summary.mvgam]{summary.mvgam()}}
 }

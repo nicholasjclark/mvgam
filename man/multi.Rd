@@ -2,80 +2,84 @@
 % Please edit documentation in R/families.R
 \name{multi}
 \alias{multi}
-\title{Closure-unit Multinomial-on-the-simplex family}
+\title{Multinomial family for counts over several categories}
 \usage{
 multi()
 }
 \value{
-A \code{brms::custom_family} object tagged with the
-\code{mvgam_closure_unit}, \code{mvgam_multi_response} and
-\code{mvgam_simplex_response} attributes.
+A family object to pass to \code{\link[=jsdgam]{jsdgam()}} or \code{\link[=mvgam]{mvgam()}}.
 }
 \description{
-Composes Stan's native \code{multinomial_logit_lpmf} with the mvgam
-factor-model trend. Each closure unit (site) carries K rows
-(one per species / response component) whose integer counts sum
-to a per-site total \code{N_site = sum(Y_unit)}. The custom lpmf
-assembles the per-unit K-vectors of counts and linear predictor
-scores inside Stan, then calls Stan's native
-\code{multinomial_logit_lpmf(y_unit_int | mu_unit)} which applies
-\code{softmax} over \code{mu_unit} to obtain the K cell probabilities.
+For counts of several categories made together on each unit, such
+as the sequence counts of several taxa in a sample. The data hold
+one row per category at each unit. Each unit's vector of \code{K} counts
+is multinomial with probabilities \code{softmax(mu)}, where \code{mu} holds
+the categories' linear predictors. A unit's total is the sum of its
+counts and may differ between units.
 }
 \details{
-The multinomial total \code{N_site} varies freely across sites
-(each site has its own \code{sum(Y_unit)} as the implicit total
-trials), which is desirable for ecological count data and
-microbiome read-depth differences. No additional \code{N_site} data
-field is required because \code{sum(Y_unit)} is the sufficient
-statistic for the trial count.
+\code{\link[=jsdgam]{jsdgam()}} fits the family, taking the unit and category columns
+and the number of latent factors \code{n_lv}. The constraints that
+identify the model are those of \code{\link[=diri]{diri()}}.
+}
+\section{Identification}{
 
-Distributional parameters:
-\describe{
-\item{\code{mu}}{per-row latent score on the unconstrained scale.
-Softmax inside the lpmf maps the K scores per unit to a
-simplex of cell probabilities. Default link is identity.}
+The softmax is unchanged when the same constant is added to every
+component. The data then identify neither a shift of the linear
+predictors that every component shares nor a shift of the loadings
+that every component shares. mvgam removes both:
+\itemize{
+\item The first component is the reference. Its linear predictor
+is subtracted from every component's before the softmax, as in
+brms's \code{dirichlet()} family. A term that acts on every
+component alike, such as \code{Intercept} or \code{env} in
+\code{y ~ env * series}, then cancels. Its posterior is its prior,
+\code{student_t(3, 0, 2.5)} by default. The \code{series} terms are
+contrasts with the first component. \code{jsdgam()} warns when the
+formula has no term that varies by component.
+\item Each column of the loadings \code{Z} sums to zero, through
+Stan's \code{sum_to_zero_vector} type.
+}
+A \code{loadings_prior} combines with that constraint.
 }
 
-Identification: identical to \code{\link[=diri]{diri()}}. Each \code{Z} column is
-declared as \code{sum_to_zero_vector[K]} so column sums are exactly
-zero by construction (Stan >= 2.36). The lpdf body subtracts
-\code{mu_unit[1]} from all entries before softmax, which removes the
-K-shared fixed-effect shift. Both constraints are hard (no soft
-priors); the K species are kept symmetric in the loadings via
-the column-sum-zero manifold.
-
-Data layout: long format, one row per (site, species), exactly
-K rows per site. The integer count for that (site, species)
-cell is the response.
-}
 \section{Post-fit conventions}{
 
-\code{log_lik()}, \code{loo()} and \code{waic()} score at the \strong{site grain},
-not the (site, species) row grain. The Stan lpdf evaluates the
-joint K-vector Dirichlet density once per closure unit. The per-unit
-log-density is attributed to the first row of the unit. The remaining
-K - 1 rows return \code{NA} for \code{log_lik()}. A row with no density of its
-own is spelled \code{NA}. A \code{0} there would assert a density of one.
-\code{loo()} would then score the site once per species. This is the
-correct grain for joint multi-row outcomes. It matches
-the flocker / ubms convention for closure-unit families;
-Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
-for PSIS-LOO whenever the per-row likelihoods are not
-conditionally independent given the parameters. To compare
-simplex fits via \code{loo_compare()} against models scored at the
-row grain, refit the row-grain model on the unit-aggregated
-response or use \code{waic()} on both fits at consistent grain.
+The density is joint over a unit's components, which makes the unit
+the grain of \code{log_lik()}, \code{loo()} and \code{waic()} (Vehtari et al.
+2017). \code{log_lik()} gives each unit's log density on its first row
+and \code{NA} on the others. \code{loo()} then counts each unit once.
+\code{loo_compare()} needs every model it compares scored at that grain.
 
-\code{posterior_linpred()} returns the \strong{uncentred} linear predictor
-\code{mu[i, k]} per row (the value brms emits before the lpdf body
-applies \code{mu_unit = mu[idx] - mu[idx[1]]} to remove the per-site
-K-shared shift). This is the natural scale for \code{marginaleffects}
-contrasts on the species axis. For probabilities on the simplex,
-use \code{posterior_epred()}, which applies the reference subtraction
-and softmax internally and returns one probability per (site,
-species) row summing to 1 within each site.
+\code{posterior_linpred()} gives \code{mu} per row before the reference
+subtraction. \code{posterior_epred()} gives the expected shares, which
+sum to one within each unit.
 }
 
+\examples{
+\dontrun{
+# Counts of four categories at 60 sites, 30 per site
+simdat <- sim_jsdgam(family = multi(), n_species = 4L, n_sites = 60L,
+                     seed = 3L)
+
+fit <- jsdgam(
+  formula        = y ~ env * series,
+  factor_formula = ~ -1,
+  data           = simdat$data_train,
+  unit           = time, species = series,
+  family         = multi(),
+  n_lv           = 1L,
+  chains         = 2L,
+  silent         = 2
+)
+
+# The probability of each category along the gradient
+conditional_effects(fit, effects = "env:series")
+
+# Next, residual_cor(fit) gives the correlations the factor implies
+}
+
+}
 \references{
 Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
 Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many

@@ -36,71 +36,60 @@ bounds at \code{probs}.
 \code{\link[posterior:ess_basic]{posterior::ess_basic()}}.
 \item \code{n_series}, \code{series_names}, \code{n_lv}: model
 dimensions and series labels.
-\item \code{probs}: quantile probabilities used.
+\item \code{probs}, \code{robust}: the summary settings.
 }
 }
 \description{
-For a latent-factor \code{mvgam} fit, returns the posterior
-distribution of the shared variation matrix
-\eqn{\Delta = Z \Sigma Z^\top}, where \code{Z} is the
-\verb{n_series x n_lv} loadings matrix and \eqn{\Sigma} is the
-covariance of the latent states. \code{Delta} is the cross-series
-covariance pattern the latent factors induce on the trends; its
-diagonal entries describe how strongly each series is captured
-by the factor structure, and the off-diagonal entries describe
-pairwise factor-driven coupling between series.
+For a latent-factor \code{mvgam} fit, returns the posterior of the shared
+variation matrix \eqn{\Delta = Z \Sigma Z^\top}. \code{Z} is the
+\verb{n_series x n_lv} loadings matrix and \eqn{\Sigma} is the covariance
+of the latent states. \code{Delta} is the covariance the factors induce
+between the series' trends. Its diagonal gives the variance of each
+series that the factors capture. Its off-diagonal entries give the
+covariance between pairs of series.
 }
 \details{
-The latent covariance belongs between the loadings, not beside
-them. A factor column enters the trend as
-\code{sigma_trend[k] * Z[, k]}, so \verb{Z Z'} alone reports a coupling
-pattern that weights every column equally when the model does
-not: under multiplicative gamma process shrinkage the column
-scales carry the whole of the shrinkage. For an autoregressive
-trend \eqn{\Sigma} is the stationary covariance of the latent
-states rather than the innovation covariance, which is the same
-convention \code{\link[=residual_cor]{residual_cor()}} reports.
+A factor column enters the trend as \code{sigma_trend[k] * Z[, k]}. \verb{Z Z'}
+alone would weight every column equally, while the model scales each
+column by its latent standard deviation. Under multiplicative gamma
+process shrinkage those scales hold the whole of the shrinkage. For
+an autoregressive trend \eqn{\Sigma} is the stationary covariance of
+the latent states, as in \code{\link[=residual_cor]{residual_cor()}}.
 
-\code{Delta} is rotation-invariant: an orthogonal \verb{Z* = Z Q} with
-\verb{Sigma* = Q' Sigma Q} leaves \verb{Z* Sigma* Z*'} unchanged. The
-posterior summary is therefore the same whether it is computed
-from the raw sampled \code{Z} or from the QR-identified \code{Z_tilde}
-(Heaps & Jermyn 2024), and the sampled basis is used because
-that is the one \eqn{\Sigma} is stated in. For fully-fixed-Z
-fits (\code{trend_map} with no NAs) the loadings contribute no
-posterior spread of their own.
+\code{Delta} is invariant to rotation. An orthogonal \verb{Z* = Z Q} with
+\verb{Sigma* = Q' Sigma Q} leaves \verb{Z* Sigma* Z*'} unchanged. The summary
+takes the same value for the sampled \code{Z} and for the QR-identified
+\code{Z_tilde} of Heaps and Jermyn (2024). It uses the sampled \code{Z}, the
+basis \eqn{\Sigma} is stated in. A \code{trend_map} without \code{NA} entries
+fixes \code{Z}. The posterior spread of \code{Delta} then comes from
+\eqn{\Sigma} alone.
 }
-\section{Key inferential property}{
+\section{Relation to \code{loadings_prior}}{
 
-Heaps & Jermyn (2024) Sect. 3 show that under the structured
-matrix-normal prior \verb{Z | Phi, Psi ~ MN(0, Phi, Psi)}, the
-expectation of the loadings' own second moment \verb{Z Z'} is
-proportional to the among-row scale matrix \code{Phi}. \code{Phi} is
-therefore a statement about the \strong{prior expectation} of an
-observable coupling pattern, not about the prior expectation
-of \code{Z} itself, which is rotation-arbitrary. Encoding domain
-knowledge into \code{Phi} via \code{loadings_prior} shapes the prior on
-that pattern.
+Under the matrix-normal prior \verb{Z | Phi, Psi ~ MN(0, Phi, Psi)}, the
+prior expectation of \verb{Z Z'} is \verb{tr(Psi) Phi} (Heaps and Jermyn 2024,
+section 3). \code{Phi} sets the prior expectation of the coupling pattern
+between series, while \code{Z} itself is identified only up to rotation.
+A \code{loadings_prior} in \code{\link[=mvgam]{mvgam()}} encodes domain knowledge about that
+pattern through \code{Phi}.
 
-The matrix returned here carries the latent covariance as well,
-so it is proportional to \code{Phi} only up to the scale the latent
-states contribute. Read it as the factor-implied covariance the
-fitted model asserts, and calibrate \code{Phi} against the pattern
-rather than against these values entry for entry.
+\code{Delta} also carries the latent covariance. Its scale includes the
+variance of the latent states. Compare its pattern with \code{Phi}.
 }
 
 \examples{
 \dontrun{
-set.seed(1)
+# Detections of 6 species whose occupancy shares two latent factors
 simdat <- sim_closure_unit_data(
   family    = occ(),
-  n_species = 4L,
-  n_sites   = 50L,
+  n_species = 6L,
+  n_sites   = 80L,
   n_visits  = 4L,
-  type      = 2L
+  n_lv      = 2L,
+  seed      = 1L
 )
 mod <- jsdgam(
-  formula        = bf(y ~ env, p ~ tod_c),
+  formula        = bf(y ~ series * env, p ~ series + tod_c),
   factor_formula = ~ -1,
   data           = simdat$data_train,
   family         = occ(),
@@ -109,9 +98,12 @@ mod <- jsdgam(
   silent         = 2
 )
 
-# Posterior summary of the shared-variation matrix
-# (the implied species-by-species residual covariance).
-shared_variation(mod)
+# The species-by-species covariance the two factors induce
+sv <- shared_variation(mod)
+sv
+plot(sv)
+
+# Next: residual_cor() rescales Delta to correlations
 }
 
 }
@@ -122,10 +114,11 @@ models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
-\code{\link{residual_cor}} for the implied
-correlation matrix \code{cov2cor(Delta)}, \code{\link{mvgam}}
-for the \code{loadings_prior} argument that lets \code{Phi} shape
-\code{E(Delta)}.
+\code{\link[=residual_cor]{residual_cor()}} for the implied correlation matrix,
+\code{cov2cor(Delta)}. Under \code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}} it adds each series'
+residual variance to the diagonal of \code{Delta} first. The
+\href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{joint species distribution article}
+interprets both for a community of species.
 
 Other latent dynamics: 
 \code{\link{active_factors}()},

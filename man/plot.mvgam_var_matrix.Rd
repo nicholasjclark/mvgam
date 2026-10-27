@@ -2,7 +2,7 @@
 % Please edit documentation in R/var_param_extractors.R
 \name{plot.mvgam_var_matrix}
 \alias{plot.mvgam_var_matrix}
-\title{Plot method for \code{mvgam_var_matrix}}
+\title{Plot a VAR transition matrix}
 \usage{
 \method{plot}{mvgam_var_matrix}(x, cluster = FALSE, ...)
 }
@@ -10,23 +10,20 @@
 \item{x}{An \code{mvgam_var_matrix} object returned by
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}}.}
 
-\item{cluster}{Logical. If \code{TRUE}, reorder rows and columns
-using approximate Robinson clustering on \code{1 - A} (only
-meaningful when \code{A} is roughly symmetric).}
+\item{cluster}{Logical. \code{TRUE} orders the processes by a Robinson
+clustering of \code{1 - A}, which suits a matrix close to symmetric.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A \link[ggplot2:ggplot]{ggplot2::ggplot} object, which can be further
-customised with the \pkg{ggplot2} API.
+A \link[ggplot2:ggplot]{ggplot2::ggplot} object.
 }
 \description{
-Draws the point estimate of the transition matrix as a heatmap.
-Row \eqn{i}, column \eqn{j} is the effect of process \eqn{j} at
-time \eqn{t - 1} on process \eqn{i} at time \eqn{t}. A black
-outline marks each cell whose credible interval excludes zero. The
-colour scale is symmetric about zero and spans the largest absolute
-cell.
+Draws the posterior estimate of the matrix as a heatmap. Row
+\eqn{i}, column \eqn{j} is the effect of process \eqn{j} at time
+\eqn{t - l} on process \eqn{i} at time \eqn{t}. A black outline
+marks each cell whose interval excludes zero. The colour scale is
+symmetric about zero and spans the largest absolute cell.
 }
 \seealso{
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}},

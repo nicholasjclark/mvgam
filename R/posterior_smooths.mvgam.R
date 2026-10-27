@@ -1,59 +1,52 @@
-# Implementation of `posterior_smooths.mvgam` and
-# `conditional_smooths.mvgam`. A smooth is read the way the linear
-# predictor composer reads every term: its basis from the Stan data
-# brms writes for the prediction's frame, its coefficients from the
-# fit's draws, both under the suffix of the predictor it belongs to.
-# brms numbers the smooth objects of a predictor in order, one per
-# level of a `by` factor, and records each term and its levels on
-# `attr(Xs, "bylevels")`, which is where a term's objects are read
-# from.
+# `posterior_smooths.mvgam()` and `conditional_smooths.mvgam()`
+# evaluate a smooth as the linear predictor composer evaluates every
+# term. The basis comes from the Stan data brms writes for the
+# prediction frame. The coefficients come from the draws. Both carry
+# the suffix of the smooth's predictor. brms numbers the smooth objects
+# of a predictor in order, one per level of a `by` factor. It records
+# each term's levels on `attr(Xs, "bylevels")`.
 
 
-#' Compute posterior draws of a smooth term in a fitted
-#' \pkg{mvgam} model
+#' Posterior draws of one smooth term
 #'
-#' Returns the posterior draws of a single smooth term evaluated
-#' at the supplied prediction grid, matching the shape of
-#' [brms::posterior_smooths()]. Supports any smooth declared by
-#' `s()` or `t2()` on the observation formula, a distributional
-#' parameter's formula, a non-linear parameter's formula or the
-#' trend formula, including `by = factor` expansion.
+#' Evaluates one smooth at the rows of `newdata` for each posterior
+#' draw, in the shape [brms::posterior_smooths()] returns. The smooth
+#' can be any `s()` or `t2()` term of the observation formula, a
+#' distributional or non-linear parameter's formula, or the trend
+#' formula, `by` factors included.
 #'
 #' @param object A fitted `mvgam` object.
-#' @param smooth Character string naming the smooth term as it
-#'   appears in the formula (e.g. `"s(x)"`,
-#'   `"s(z, by = group)"`, `"t2(x, y)"`). Use
-#'   [smooths.mvgam()] to enumerate the available terms.
-#' @param newdata Optional `data.frame` to evaluate the smooth
-#'   at. `NULL` (the default) uses the training data. It needs to
-#'   carry only the smooth's own variables.
+#' @param smooth The smooth term as the formula writes it, such as
+#'   `"s(x)"`, `"s(z, by = group)"` or `"t2(x, y)"`. Spacing is ignored.
+#'   [smooths.mvgam()] lists the terms.
+#' @param newdata A `data.frame` holding the smooth's own variables, or
+#'   `NULL` for the training data.
 #' @param resp The response the smooth belongs to, required on a
 #'   model with several.
 #' @param dpar,nlpar The distributional or non-linear parameter the
-#'   smooth belongs to. Name at most one; the mean is read when both
-#'   are `NULL`.
-#' @param ndraws,draw_ids Optional posterior-draw subsetting,
-#'   matching the [brms::posterior_smooths()] semantics.
+#'   smooth belongs to. Name at most one. With both `NULL` the smooth
+#'   belongs to the mean.
+#' @param ndraws,draw_ids The number of posterior draws, or their
+#'   indices. Give at most one. `NULL` for both uses every draw.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A numeric matrix of dimension
-#'   \[n_draws x n_grid_points\] containing the posterior draws
-#'   of the smooth term's contribution to the linear predictor.
+#' @return A numeric matrix with one row per draw and one column per
+#'   row of `newdata`: the smooth's contribution to the linear
+#'   predictor.
 #'
 #' @details
 #' The smooth's contribution is its unpenalised basis times its
 #' fixed coefficients plus each penalised basis times its random
 #' coefficients, per draw. The bases come from [brms::standata()]
-#' evaluated on `newdata`, and the coefficients from the fit's
-#' draws. An offset is not part of any smooth and is left out,
-#' where [brms::posterior_smooths()] adds a predictor's offsets to
-#' each of its smooths.
+#' evaluated on `newdata`. The coefficients come from the draws.
+#' [brms::posterior_smooths()] adds a predictor's offsets to each of
+#' its smooths. This method leaves them out.
 #'
-#' A term written on both the observation formula and the trend
-#' formula is read from the observation formula.
+#' A term written in both the observation and the trend formula is
+#' taken from the observation formula.
 #'
-#' @seealso [brms::posterior_smooths()],
-#'   [conditional_smooths.mvgam()], [smooths.mvgam()].
+#' @seealso [conditional_smooths.mvgam()] summarises every smooth.
+#'   [smooths.mvgam()] lists the terms.
 #'
 #' @author Nicholas J Clark
 #'
@@ -67,9 +60,13 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Posterior draws of the s(x) smooth at the training x values.
-#' sm <- posterior_smooths(mod, smooth = "s(x)")
-#' dim(sm)
+#' # Twenty draws of s(x) over a grid of x
+#' grid <- data.frame(x = seq(-2, 2, length.out = 50))
+#' sm <- posterior_smooths(mod, smooth = "s(x)", newdata = grid)
+#' matplot(grid$x, t(sm[1:20, ]), type = "l", lty = 1, col = "grey60",
+#'         xlab = "x", ylab = "s(x)")
+#'
+#' # Next, conditional_smooths(mod) summarises every smooth in one call
 #' }
 #'
 #' @family predictions
@@ -90,7 +87,8 @@ posterior_smooths.mvgam <- function(object, smooth, newdata = NULL,
       "Supply only one of 'dpar' and 'nlpar'."
     ), call. = FALSE)
   }
-  resolve_resp(object, resp, required = TRUE, caller = "posterior_smooths()")
+  resolve_resp(object, resp, required = TRUE,
+               caller = "posterior_smooths()")
   hit <- resolve_mvgam_smooth(object, smooth, resp = resp, dpar = dpar,
                               nlpar = nlpar)
   # A count becomes indices here, at the boundary, and nothing below
@@ -107,69 +105,72 @@ posterior_smooths.mvgam <- function(object, smooth, newdata = NULL,
 brms::posterior_smooths
 
 
-#' Marginal smooth-effect plots for a fitted \pkg{mvgam} model
+#' Plots of each smooth term
 #'
-#' Compute and display posterior conditional effects for every
-#' smooth term in a fitted `mvgam` object, matching the shape of
-#' \code{\link[brms]{conditional_smooths.brmsfit}}. Returns a named list of
-#' `data.frame`s with the brms-style `estimate__` / `lower__` /
-#' `upper__` / `effect1__` / `effect2__` / `cond__` columns. The
-#' returned object carries the `mvgam_conditional_smooths` class;
-#' one-dimensional smooths render with the package's own theme via
-#' [plot.mvgam_conditional_smooths()], while two-dimensional cases
-#' are drawn as heatmap panels through the same method.
+#' Summarises the posterior of every smooth over a grid of its own
+#' variables, in the shape [brms::conditional_smooths()] returns. Its
+#' `plot()` method draws a smooth of one variable as a line and ribbon,
+#' and a smooth of two as a heatmap.
 #'
 #' @param x A fitted `mvgam` object.
-#' @param smooths Optional character vector restricting which
-#'   smooth terms to compute. `NULL` (default) returns every
-#'   smooth of every predictor, the trend's included.
-#' @param int_conditions Optional named list. Each name is a
-#'   covariate; each value either a numeric vector of conditioning
-#'   values or a function applied to the original covariate. Used
-#'   for non-focal covariates that appear in by-factor faceting.
-#' @param prob Numeric in `(0, 1)`. The credible-interval mass
-#'   reported via `lower__` / `upper__`. Defaults to `0.95`.
-#' @param spaghetti Logical. When `TRUE` (and the focal smooth is
-#'   one-dimensional, not a surface), individual posterior draws
-#'   are returned as an attribute for spaghetti-style overlays.
-#' @param surface Logical. For two-dimensional smooths, `TRUE`
-#'   (the default) returns a `resolution`-by-`resolution` grid for
-#'   surface / heatmap rendering; `FALSE` returns a faceted line
-#'   plot at three values of the second covariate (mean +/- 1 SD).
-#'   See `facets` for finer control.
-#' @param facets Optional positive integer. When `surface = FALSE`
-#'   and the smooth has two or more dimensions, controls how many
-#'   facet levels of the non-focal covariate(s) to use (default:
-#'   `3`, matching brms). Setting `facets = 5` produces 5 evenly
-#'   spaced facets across the non-focal range, an mvgam-only knob
-#'   for marginaleffects-style multidimensional displays.
-#' @param resolution Positive integer. Grid resolution per
-#'   covariate dimension. Defaults to `100`.
-#' @param too_far Numeric in \[0, 1\]. For surface smooths, grid
-#'   points further than this from the training data (measured in
-#'   the unit square) are dropped via
-#'   [mgcv::exclude.too.far()]. `0` (default) keeps all points.
-#' @param ndraws,draw_ids Optional posterior-draw subsetting.
-#' @param resp Optional response name. `NULL` (the default) returns
-#'   every response's smooths; naming one keeps that response's
-#'   smooths alone. A univariate fit names no response on its terms
-#'   and is unaffected.
+#' @param smooths The terms to summarise, as [smooths.mvgam()] lists
+#'   them, or `NULL` for every smooth of every predictor, the trend's
+#'   included.
+#' @param int_conditions A named list setting the grid of a variable:
+#'   a vector of values, or a function of the variable's training
+#'   values, such as [stats::quantile()].
+#' @param prob A number in `[0, 1]`: the mass of the interval in
+#'   `lower__` and `upper__`.
+#' @param spaghetti Logical. `TRUE` keeps the draws of a smooth of one
+#'   variable, which the plot draws as one line each.
+#' @param surface Logical. `TRUE` evaluates a smooth of two variables
+#'   on a `resolution` by `resolution` grid, drawn as a heatmap.
+#'   `FALSE` draws lines over the first variable at `facets` values of
+#'   the second.
+#' @param facets An integer of at least 2: the number of values taken
+#'   by the second variable and by a numeric `by` variable. They run
+#'   evenly from one standard deviation below the mean to one above.
+#' @param resolution An integer of at least 2: the number of grid
+#'   points along each variable.
+#' @param too_far A number in `[0, 1]`. On a surface, grid points
+#'   further than this from the training data, in the unit square, are
+#'   dropped by [mgcv::exclude.too.far()]. `0` keeps every point.
+#' @param ndraws,draw_ids The number of posterior draws, or their
+#'   indices. Give at most one. `NULL` for both uses every draw.
+#' @param resp The response whose smooths to summarise, or `NULL` for
+#'   every response.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A named list of class `mvgam_conditional_smooths` with
-#'   one element per smooth term. Each element is a `data.frame`
-#'   with the brms-style summary columns (`estimate__`, `se__`,
-#'   `lower__`, `upper__`, `effect1__` (optionally `effect2__`),
-#'   `cond__`) plus the focal covariate(s). Per-element attributes
-#'   `response`, `effects`, `surface`, `spaghetti`, and `points`
-#'   drive the plot method's layout choices (1D ribbon vs 2D
-#'   heatmap panel).
+#' @return A list of class `mvgam_conditional_smooths`, one data frame
+#'   per smooth, named by predictor and term. Each holds its grid with
+#'   the columns `estimate__`, `se__`, `lower__`, `upper__`,
+#'   `effect1__` and `cond__`. A smooth of two variables adds
+#'   `effect2__`.
 #'
-#' @seealso \code{\link[brms]{conditional_smooths.brmsfit}},
-#'   [posterior_smooths.mvgam()],
-#'   [conditional_effects.mvgam()].
+#' @seealso [posterior_smooths.mvgam()] gives the draws of one smooth.
+#'   [conditional_effects.mvgam()] plots covariate effects on the
+#'   response.
 #'
 #' @author Nicholas J Clark
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # The smooth with 30 of its draws
+#' cs <- conditional_smooths(mod, spaghetti = TRUE, ndraws = 30)
+#' plot(cs)
+#' head(cs[[1]])
+#'
+#' # Next, plot(mod, type = "smooths") draws the same panels in one
+#' # figure
+#' }
 #'
 #' @family predictions
 #' @method conditional_smooths mvgam
@@ -186,28 +187,19 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
   checkmate::assert_character(smooths, null.ok = TRUE)
   checkmate::assert_list(int_conditions, null.ok = TRUE)
   checkmate::assert_number(prob, lower = 0, upper = 1)
-  checkmate::assert_logical(spaghetti, len = 1L)
-  checkmate::assert_logical(surface, len = 1L)
+  checkmate::assert_flag(spaghetti)
+  checkmate::assert_flag(surface)
   checkmate::assert_int(facets, lower = 2L)
   checkmate::assert_int(resolution, lower = 2L)
   checkmate::assert_number(too_far, lower = 0, upper = 1)
   validate_draw_selectors(ndraws, draw_ids)
   resolve_resp(x, resp, caller = "conditional_smooths()")
   rlang::check_dots_empty()
-  terms_list <- mvgam_smooth_terms(x)
-  if (length(terms_list) == 0L) {
-    stop(insight::format_error(c(
-      "This 'mvgam' fit has no smooth terms.",
-      i = paste0(
-        "Smooth terms are introduced via 's()' or 't2()' in the ",
-        "observation or trend formula."
-      )
-    )), call. = FALSE)
-  }
+  terms_list <- require_smooth_terms(x)
   if (!is.null(resp)) {
-    # A univariate fit carries no response on its terms, and
-    # `resolve_resp()` refuses a name the model does not have, so a
-    # term with none belongs to the response that was named.
+    # A univariate fit carries no response on its terms.
+    # `resolve_resp()` has already refused a name the model lacks. A
+    # term without a response then belongs to the response named.
     keep <- vapply(
       terms_list, function(t) identical(t$resp %||% resp, resp),
       logical(1L)
@@ -226,7 +218,7 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
     terms_list <- terms_list[keep]
     if (length(terms_list) == 0L) {
       stop(insight::format_error(c(
-        "'smooth' must be a smooth term of the model.",
+        "'smooths' must name smooth terms of the model.",
         i = "Use 'smooths(x)' to list the available terms."
       )), call. = FALSE)
     }
@@ -269,11 +261,8 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
     attr(res, "points") <- mvgam_smooth_points(x, hit, grid_spec)
     out[[i]] <- res
   }
-  # `mvgam_conditional_smooths` owns its own plot method that
-  # renders 1D smooths with the house palette + theme. For 2D /
-  # surface cases the plot method reuses brms's plot code by
-  # re-classing each per-smooth data.frame internally; no brms
-  # class is exposed on the returned object.
+  # The plot method draws a smooth of one variable itself. It hands
+  # a smooth of two to brms's plot method, under brms's class.
   structure(
     out,
     class = c("mvgam_conditional_smooths", "list"),
@@ -286,14 +275,13 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
 #'
 #' @param x An object of class `mvgam_conditional_smooths`
 #'   returned by [conditional_smooths.mvgam()].
-#' @param plot Logical. If `TRUE` (default), draws each smooth's
-#'   ggplot; otherwise returns the list invisibly for post-processing.
-#' @param ask Logical. If `TRUE`, prompts before each new plot when
-#'   multiple smooths are drawn to the same device.
+#' @param plot Logical. `TRUE` draws each panel. `FALSE` only returns
+#'   them.
+#' @param ask Logical. `TRUE` prompts before each panel after the
+#'   first.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return Invisibly returns the list of ggplot objects, one per
-#'   smooth term in `x`.
+#' @return The list of `ggplot` panels, one per smooth, invisibly.
 #'
 #' @rdname conditional_smooths.mvgam
 #' @method plot mvgam_conditional_smooths
@@ -342,20 +330,17 @@ smooth_condition_facet <- function(df) {
 }
 
 
-# Build one mvgam-themed ggplot from a single smooth's summary
-# data.frame. A 1D smooth is drawn here as a ribbon and a median
-# line, with the optional spaghetti; a 2D surface or faceted lines
-# go to brms's own plotter.
+# The panel of one smooth. A smooth of one variable is drawn here as
+# a ribbon and a median line, with the optional spaghetti. A surface
+# or a smooth drawn as faceted lines goes to brms's plot method.
 #'@noRd
 build_mvgam_smooth_plot <- function(df, label) {
   effs <- attr(df, "effects")
   is_surface <- isTRUE(attr(df, "surface"))
   label <- label %||% attr(df, "response") %||% ""
-  # 2D or surface smooths: reuse brms's existing plot code by
-  # wrapping the single data.frame back into a length-1
-  # brms_conditional_effects and delegating. The mvgam theme
-  # is applied on top so the panel matches the rest of our
-  # dispatcher's output.
+  # brms draws a smooth of two variables from a one-element
+  # `brms_conditional_effects`. The mvgam theme then matches the panel
+  # to the others.
   if (length(effs) != 1L || is_surface) {
     single <- structure(
       list(df),
@@ -369,11 +354,9 @@ build_mvgam_smooth_plot <- function(df, label) {
   x_var <- effs[[1L]]
   pal <- mvgam_palette()
   # A smooth over a factor, `s(series, bs = "re")` say, has one grid
-  # point per level. A ribbon and a line each need two points before
-  # they draw anything, and a panel built from them comes out empty
-  # however many levels there are. An interval per level has something
-  # to show, and it is what brms draws for a categorical conditional
-  # effect.
+  # point per level. A ribbon or a line needs two points in a group.
+  # Built from them, the panel comes out empty. An interval per level
+  # shows each estimate, as brms draws a categorical effect.
   if (!is.numeric(df[[x_var]])) {
     return(
       ggplot2::ggplot(df, ggplot2::aes(x = .data[[x_var]])) +
@@ -403,9 +386,8 @@ build_mvgam_smooth_plot <- function(df, label) {
       inherit.aes = FALSE
     )
   }
-  # Median line uses palette slot 5 to match `mvgam_median_layer`
-  # (the shared plot_helpers primitive) so smooth panels sit in
-  # the same visual family as the forecast / trend hindcast plots.
+  # Palette slot 5 is the colour `mvgam_median_layer()` gives the
+  # median line of the forecast and trend plots.
   gg +
     ggplot2::geom_line(
       ggplot2::aes(y = estimate__),
@@ -422,21 +404,19 @@ build_mvgam_smooth_plot <- function(df, label) {
 brms::conditional_smooths
 
 
-#' Enumerate smooth terms in a fitted \pkg{mvgam} model
+#' The smooth terms of a fitted model
 #'
-#' Returns the canonical term labels for every `s()` or `t2()`
-#' smooth of every predictor of a fitted `mvgam` object: each
-#' response's mean, each distributional or non-linear parameter
-#' given a formula, and the trend. Useful for picking a term to
-#' pass to [posterior_smooths.mvgam()] or
-#' [conditional_smooths.mvgam()].
+#' Lists every `s()` and `t2()` term of every predictor. The
+#' predictors are each response's mean, each distributional or
+#' non-linear parameter with a formula and the trend.
+#' [posterior_smooths.mvgam()] and [conditional_smooths.mvgam()] take
+#' these labels.
 #'
 #' @param x A fitted `mvgam` object.
 #'
-#' @return A character vector of canonical smooth labels, one per
-#'   term of each predictor, in the order the panels of
-#'   [conditional_smooths.mvgam()] take. Empty if the fit has no
-#'   smooth terms.
+#' @return A character vector of term labels, one per term of each
+#'   predictor, in the order of the panels of
+#'   [conditional_smooths.mvgam()]. Empty for a fit without smooths.
 #'
 #' @author Nicholas J Clark
 #'
@@ -462,11 +442,11 @@ smooths <- function(x) {
 
 #' Every smooth term of a fit, as brms numbers it
 #'
-#' Each predictor's terms and the `by` levels of each are read from
-#' the Stan data brms writes for the fitted frame, which records them
-#' on `attr(Xs, "bylevels")`. A term with a `by` factor is one smooth
-#' object per level and any other term is one, numbered in order
-#' across the predictor's terms.
+#' The Stan data brms writes for the fitted frame records each
+#' predictor's terms and their `by` levels on `attr(Xs, "bylevels")`.
+#' A term with a `by` factor holds one smooth object per level. Any
+#' other term holds one. The objects are numbered in order across the
+#' predictor's terms.
 #'
 #' @param x A fitted `mvgam` object or a prefit
 #' @return A list with one entry per term of each predictor, observation
@@ -527,6 +507,23 @@ mvgam_smooth_terms <- function(x) {
 }
 
 
+#' Every smooth term of a fit, or an error for a fit without one
+#'
+#' @param x A fitted `mvgam` object
+#' @return The list `mvgam_smooth_terms()` returns
+#' @noRd
+require_smooth_terms <- function(x) {
+  terms_list <- mvgam_smooth_terms(x)
+  if (length(terms_list) == 0L) {
+    stop(insight::format_error(c(
+      "Smooth summaries require a smooth term in the model.",
+      i = "'s()' or 't2()' in either formula adds one."
+    )), call. = FALSE)
+  }
+  terms_list
+}
+
+
 #' The name a smooth's panel and listing carry
 #'
 #' The predictor, then the term, then whether it belongs to the trend:
@@ -546,10 +543,10 @@ smooth_panel_name <- function(hit) {
 #' The smooth term a caller named
 #'
 #' A label matches whatever its spacing, as brms matches it. The term
-#' has to belong to the predictor named by `dpar` or `nlpar`, the mean
-#' when neither is given, and to `resp` on a model with several. A trend
-#' shared by every response belongs to each of them. The observation
-#' side is searched first.
+#' has to belong to the predictor named by `dpar` or `nlpar`, or the
+#' mean when neither is given. On a model with several responses it
+#' has to belong to `resp`. A trend shared by every response belongs to
+#' each of them. The observation side is searched first.
 #'
 #' @param x A fitted `mvgam` object
 #' @param smooth The label the caller gave
@@ -559,7 +556,7 @@ smooth_panel_name <- function(hit) {
 #' @noRd
 resolve_mvgam_smooth <- function(x, smooth, resp = NULL, dpar = NULL,
                                  nlpar = NULL) {
-  terms_list <- mvgam_smooth_terms(x)
+  terms_list <- require_smooth_terms(x)
   norm <- function(s) gsub("[[:space:]]+", "", s)
   dpar <- if (!identical(dpar, "mu")) dpar
   for (hit in terms_list) {
@@ -576,28 +573,20 @@ resolve_mvgam_smooth <- function(x, smooth, resp = NULL, dpar = NULL,
            if (!is.null(dpar %||% nlpar)) {
              paste0(" for '", dpar %||% nlpar, "'")
            }, "."),
-    i = paste0(
-      "Available smooth terms: ",
-      if (length(available) > 0L) {
-        paste0("'", available, "'", collapse = ", ")
-      } else {
-        "<none>"
-      },
-      "."
-    )
+    i = paste0("Available smooth terms: ",
+               paste0("'", available, "'", collapse = ", "), ".")
   )), call. = FALSE)
 }
 
 
 #' The frame one side of the model was fitted on
 #'
-#' A smooth is drawn over, and evaluated on, the frame its own side
-#' carries. The observation side's is the frame the user supplied. The
-#' trend side's is the trend grid, which under `by = lv_axis()` holds
-#' one row per (time, latent factor) and the `.trend` factor a smooth
-#' is split by, a column the observation frame does not have. The grid
-#' builder, the evaluator and the rug of observed points all read the
-#' frame from here.
+#' A smooth is evaluated on the frame of its own side. The observation
+#' side's is the frame the user supplied. The trend side's is the trend
+#' grid. Under `by = lv_axis()` that grid holds one row per time and
+#' latent factor, with the `.trend` factor a smooth is split by. The
+#' observation frame lacks that column. The grid builder, the evaluator
+#' and the rug of observed points all take the frame from here.
 #'
 #' @param object A fitted `mvgam` object
 #' @param side Either `"trend"` or `"obs"`
@@ -607,19 +596,18 @@ mvgam_side_data <- function(object, side) {
   if (!identical(side, "trend")) {
     return(object$data)
   }
-  # A trend model reaches here without a stored frame only on an
-  # object assembled by hand, and the user's frame is the closest
-  # thing to a trend grid such an object has.
+  # Only an object assembled by hand reaches here with a trend model
+  # but no stored trend frame. It takes the user's frame instead.
   object$trend_model$data %||% object$data
 }
 
 
 #' Posterior draws of one smooth term's contribution
 #'
-#' The term is read by `smooth_pred()`, the reader the linear
-#' predictor composer sums every smooth with, from the Stan data brms
-#' writes for `newdata` and the draws of the term's own side. brms fills
-#' every variable the term does not read.
+#' `smooth_pred()`, which the linear predictor composer sums every
+#' smooth with, evaluates the term. It takes the Stan data brms writes
+#' for `newdata` and the draws of the term's side. brms fills every
+#' variable outside the term.
 #'
 #' @param object A fitted `mvgam` object
 #' @param hit One entry of `mvgam_smooth_terms()`
@@ -629,10 +617,13 @@ mvgam_side_data <- function(object, side) {
 #' @return A `[ndraws x nrow(newdata)]` matrix
 #' @noRd
 mvgam_smooth_eta <- function(object, hit, newdata, draw_ids = NULL) {
-  full_draws <- subset_draws_rows(posterior::as_draws_matrix(object$fit),
-                                  draw_ids = draw_ids)
+  pars <- side_parameters(object, hit$side)
+  full_draws <- subset_draws_rows(
+    fit_draws(object$fit, pars),
+    draw_ids = draw_ids
+  )
   prep <- prepare_linpred_data(
-    draws = side_draws(object, full_draws, hit$side),
+    draws = side_draws(full_draws, pars, hit$side),
     brmsfit = side_model(object, hit$side),
     newdata = newdata %||% mvgam_side_data(object, hit$side),
     re_formula = NA,
@@ -647,72 +638,45 @@ mvgam_smooth_eta <- function(object, hit, newdata, draw_ids = NULL) {
 }
 
 
-# Build the prediction grid for one smooth term. Mirrors brms's
-# conditional_smooths grid logic: 1D smooths sweep the focal
-# covariate; 2D smooths get a surface grid by default, or a
-# faceted-line layout when `surface = FALSE` (with `facets`
-# controlling the facet count); >2D smooths recursively move
-# non-focal covariates into the by-variable set so the facet
-# strip degrades to a discrete grouping.
+# The prediction grid of one smooth term, as brms builds it. A smooth
+# of one variable sweeps it. A smooth of two takes a surface, or lines
+# at `facets` values of the second variable with `surface = FALSE`.
+# Variables past the second join the `by` variables as facets.
 #'@noRd
 build_smooth_grid <- function(x, hit, surface, facets, resolution,
                                 int_conditions, too_far) {
   mf <- mvgam_side_data(x, hit$side)
   covars <- hit$covars
   byvars <- if (is.na(hit$by_var)) character(0L) else hit$by_var
-  # Promote excess covariates beyond the first two into facet
-  # variables to keep the plot dispatch sensible.
   if (length(covars) > 2L) {
     byvars <- c(covars[-(1:2)], byvars)
     covars <- covars[1:2]
   }
-  is_numeric <- vapply(covars, function(cv) {
-    is.numeric(mf[[cv]])
-  }, logical(1L))
-  values <- stats::setNames(vector("list", length(covars)), covars)
-  for (i in seq_along(covars)) {
-    cv <- covars[i]
-    if (!is.null(int_conditions) && cv %in% names(int_conditions)) {
+  # A variable's grid holds the user's values, an even sweep, the
+  # levels of a factor, or `facets` values from one standard deviation
+  # below the mean to one above.
+  grid_values <- function(cv, sweep) {
+    v <- mf[[cv]]
+    if (cv %in% names(int_conditions)) {
       ic <- int_conditions[[cv]]
-      if (is.function(ic)) ic <- ic(mf[[cv]])
-      values[[cv]] <- ic
-    } else if (is_numeric[i]) {
-      if (i == 2L && !isTRUE(surface)) {
-        m <- mean(mf[[cv]], na.rm = TRUE)
-        s <- stats::sd(mf[[cv]], na.rm = TRUE)
-        if (facets <= 1L) {
-          values[[cv]] <- m
-        } else {
-          q <- seq(-1, 1, length.out = facets)
-          values[[cv]] <- m + q * s
-        }
-      } else {
-        values[[cv]] <- seq(
-          min(mf[[cv]], na.rm = TRUE),
-          max(mf[[cv]], na.rm = TRUE),
-          length.out = resolution
-        )
-      }
-    } else {
-      values[[cv]] <- levels(factor(mf[[cv]]))
+      return(if (is.function(ic)) ic(v) else ic)
     }
-  }
-  for (cv in byvars) {
-    if (!is.null(int_conditions) && cv %in% names(int_conditions)) {
-      ic <- int_conditions[[cv]]
-      if (is.function(ic)) ic <- ic(mf[[cv]])
-      values[[cv]] <- ic
-    } else if (is.numeric(mf[[cv]])) {
-      m <- mean(mf[[cv]], na.rm = TRUE)
-      s <- stats::sd(mf[[cv]], na.rm = TRUE)
-      values[[cv]] <- m + seq(-1, 1, length.out = facets) * s
-    } else {
-      values[[cv]] <- levels(factor(mf[[cv]]))
+    if (!is.numeric(v)) return(levels(factor(v)))
+    if (sweep) {
+      return(seq(min(v, na.rm = TRUE), max(v, na.rm = TRUE),
+                 length.out = resolution))
     }
+    mean(v, na.rm = TRUE) +
+      seq(-1, 1, length.out = facets) * stats::sd(v, na.rm = TRUE)
   }
+  values <- c(
+    lapply(stats::setNames(seq_along(covars), covars), function(i) {
+      grid_values(covars[i], sweep = i == 1L || surface)
+    }),
+    lapply(stats::setNames(byvars, byvars), grid_values, sweep = FALSE)
+  )
   grid <- expand.grid(values, stringsAsFactors = FALSE)
-  # Drop grid points too far from the training data on a 2D
-  # surface (brms-parity).
+  # A surface drops the grid points far from the training data
   if (length(covars) == 2L && isTRUE(surface) && too_far > 0) {
     ex <- mgcv::exclude.too.far(
       g1 = grid[[covars[1L]]], g2 = grid[[covars[2L]]],
@@ -740,8 +704,8 @@ build_smooth_grid <- function(x, hit, surface, facets, resolution,
   } else {
     cond_data$cond__ <- factor(1L)
   }
-  # The grid holds the term's own variables alone. brms fills every
-  # other variable the model reads when the term is evaluated.
+  # The grid holds the term's own variables alone. brms fills the
+  # model's other variables when the term is evaluated.
   list(
     newdata = grid, cond_data = cond_data,
     effects = covars, surface = isTRUE(surface) &&
@@ -750,25 +714,21 @@ build_smooth_grid <- function(x, hit, surface, facets, resolution,
 }
 
 
-# Build the spaghetti-overlay data.frame brms's plot dispatch
-# consumes: one row per (draw, grid_point) with columns
-# (effect1__, estimate__, sample__).
+# The draws `build_mvgam_smooth_plot()` draws as spaghetti: one row
+# per draw and grid point, in the columns `effect1__`, `estimate__` and
+# `sample__`.
 #'@noRd
 build_spaghetti_data <- function(eta, cond_data, effects) {
-  n_draws <- nrow(eta)
-  n_grid <- ncol(eta)
-  out <- data.frame(
-    effect1__ = rep(cond_data[[effects[1L]]], times = n_draws),
+  data.frame(
+    effect1__ = rep(cond_data[[effects[1L]]], times = nrow(eta)),
     estimate__ = as.numeric(t(eta)),
-    sample__ = factor(rep(seq_len(n_draws), each = n_grid))
+    sample__ = factor(rep(seq_len(nrow(eta)), each = ncol(eta)))
   )
-  out
 }
 
 
-# The training values of a smooth's own variables, which the plot
-# method draws as points under the curve. They come from the frame
-# the term's side was fitted on, every row of it.
+# The training values of a smooth's own variables, from every row of
+# the frame its side was fitted on.
 #'@noRd
 mvgam_smooth_points <- function(x, hit, grid_spec) {
   mf <- mvgam_side_data(x, hit$side)

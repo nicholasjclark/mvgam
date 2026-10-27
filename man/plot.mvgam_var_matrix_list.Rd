@@ -2,7 +2,7 @@
 % Please edit documentation in R/var_param_extractors.R
 \name{plot.mvgam_var_matrix_list}
 \alias{plot.mvgam_var_matrix_list}
-\title{Plot method for \code{mvgam_var_matrix_list}}
+\title{Plot the VAR transition matrices of several panels}
 \usage{
 \method{plot}{mvgam_var_matrix_list}(x, type = c("heatmap", "diagonal"), ncol = NULL, ...)
 }
@@ -10,11 +10,10 @@
 \item{x}{An \code{mvgam_var_matrix_list} returned by
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}} with \code{groups} set.}
 
-\item{type}{One of \code{"heatmap"} (default) or \code{"diagonal"}.}
+\item{type}{\code{"heatmap"} (default) or \code{"diagonal"}.}
 
-\item{ncol}{Optional integer. Number of facet columns for the
-heatmap grid; defaults to \code{ceiling(sqrt(length(x)))}. Only
-used when \code{type = "heatmap"}.}
+\item{ncol}{The number of facet columns of the heatmaps, or \code{NULL}
+for \code{ceiling(sqrt(length(x)))}.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
@@ -22,20 +21,10 @@ used when \code{type = "heatmap"}.}
 A \link[ggplot2:ggplot]{ggplot2::ggplot} object.
 }
 \description{
-Faceted view across the panels stored in the list. Two
-orientations are available:
-}
-\details{
-\itemize{
-\item \code{type = "heatmap"} (default): one heatmap per group, drawn as
-by \code{\link[=plot.mvgam_var_matrix]{plot.mvgam_var_matrix()}}. The facets share fill limits.
-\item \code{type = "diagonal"}: self-persistence pointrange with one
-point per group per outcome (dodged by outcome). Up to three
-outcomes take the dark, mid and light shades of the red
-bayesplot scheme, as the fevd, irf and stability plots do.
-}
-
-Both draw with \code{\link[=mvgam_theme]{mvgam_theme()}}.
+\code{type = "heatmap"} draws one heatmap per panel, as
+\code{\link[=plot.mvgam_var_matrix]{plot.mvgam_var_matrix()}} draws one, with fill limits shared across
+panels. \code{type = "diagonal"} draws the persistence of each process in
+each panel as a point with its interval.
 }
 \seealso{
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}},

@@ -1296,9 +1296,9 @@ recorded_stan_args <- function(fit) {
 #' computed from. The draws are the fallback for a fit carrying no
 #' `stan_args`, such as a stub built from a draws array.
 #'
-#' `stan_args` has precedence because it costs constant time. Counting
-#' chains from draws materialises the whole posterior. Both count the
-#' chains that finished. They agree on every cached fixture.
+#' `stan_args` has precedence because it costs constant time. The draws
+#' route converts `lp__` alone. Both count the chains that finished.
+#' They agree on every cached fixture.
 #'
 #' @param fit A fitted Stan model, or a draws object
 #' @return Integer count of chains, or `NA_integer_` when neither
@@ -1310,7 +1310,7 @@ realised_chain_count <- function(fit) {
     return(n)
   }
   if (is.stanfit(fit) || inherits(fit, "draws")) {
-    return(as.integer(posterior::nchains(posterior::as_draws(fit))))
+    return(as.integer(posterior::nchains(fit_draws_shape(fit))))
   }
   NA_integer_
 }

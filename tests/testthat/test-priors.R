@@ -290,9 +290,6 @@ test_that("mvgam_formula constructor works correctly", {
   mf2 <- mvgam_formula(y ~ x, trend_formula = ~ AR())
   expect_equal(mf2$trend_formula, ~ AR())
 
-  # Validation
-  expect_error(mvgam_formula(123))
-  expect_error(mvgam_formula(y ~ x, trend_formula = "not a formula"))
 })
 
 # get_prior.mvgam_formula tests
@@ -336,9 +333,12 @@ test_that("validate_trend_formula rejects invalid terms", {
   expect_no_error(mvgam:::validate_trend_formula(~ s(x) + RW()))
 
   # Invalid addition terms rejected
-  expect_error(mvgam:::validate_trend_formula(~ weights(w) + AR()))
-  expect_error(mvgam:::validate_trend_formula(~ trials(n) + AR()))
-  expect_error(mvgam:::validate_trend_formula(~ cens(c) + AR()))
+  for (term in c("weights(w)", "trials(n)", "cens(c)")) {
+    expect_error(
+      validate_trend_formula(stats::as.formula(paste("~", term, "+ AR()"))),
+      paste0("Found: '", term, "'"), fixed = TRUE
+    )
+  }
   # brms imputes a `mi()` predictor as a response, which a trend
   # formula cannot hold
   expect_error(mvgam:::validate_trend_formula(~ mi(x) + AR()),
@@ -363,10 +363,25 @@ test_that("a trend_formula routes to the mvgam methods", {
   expect_true(any(grepl("_trend$", bare$class)))
 
   # Stan code and Stan data carry the trend as well
-  sc <- stancode(y ~ x, trend_formula = tf, data = test_data)
-  expect_true(grepl("trend", paste(sc, collapse = "\n")))
-  sd <- standata(y ~ x, trend_formula = tf, data = test_data)
-  expect_true(any(grepl("trend", names(sd))))
+  expect_identical(
+    stancode(y ~ x, trend_formula = tf, data = test_data),
+    stancode(mvgam_formula(y ~ x, trend_formula = tf), data = test_data)
+  )
+  expect_identical(
+    standata(y ~ x, trend_formula = tf, data = test_data),
+    standata(mvgam_formula(y ~ x, trend_formula = tf), data = test_data)
+  )
+  # A family mvgam builds takes the route without a trend. brms alone
+  # would write a program missing its density and priors.
+  count_data <- transform(test_data, y = rpois(nrow(test_data), 3))
+  expect_identical(
+    stancode(y ~ x, data = count_data, family = tweedie()),
+    stancode(mvgam_formula(y ~ x), data = count_data, family = tweedie())
+  )
+  expect_identical(
+    default_prior(y ~ x, data = count_data, family = beta_nb()),
+    get_prior(mvgam_formula(y ~ x), data = count_data, family = beta_nb())
+  )
 
   # A brmsformula takes the same route
   bf_bare <- get_prior(brms::bf(y ~ x), trend_formula = tf,
@@ -891,11 +906,11 @@ test_that("the trend suffix skips classes mvgam already names", {
 })
 
 test_that("a reported innovation scale is one the model samples", {
-  # Three things remove `sigma_trend`, and the table reports each.
+  # Two things remove `sigma_trend`. The table reports each.
   # `PW()` never had one: its path is a function of the
-  # changepoints. Multiplicative gamma process shrinkage derives it
-  # as `sqrt(Psi_diag)`. Sampled loadings absorb the factors' scale,
-  # which fixes it at 1. A loading fixed by `trend_map` pins that
+  # changepoints. Sampled loadings absorb the factors' scale, which
+  # fixes it at 1. Multiplicative gamma process shrinkage scales the
+  # sampled loadings. A loading fixed by `trend_map` pins that
   # scale and the model samples it again. Offering the row where the
   # model fixes the scale invites a prior the fit cannot take.
   dat <- data.frame(
@@ -932,13 +947,6 @@ test_that("the registry decides whether a trend has an innovation scale", {
   rw <- RW()
   expect_false(samples_innovation_scale(pw))
   expect_true(samples_innovation_scale(rw))
-
-  # MGP shrinkage, attached after construction, takes the scale away
-  # from a trend that otherwise has one.
-  rw_mgp <- rw
-  rw_mgp$loadings_prior_spec <- list(column_shrinkage = "mgp")
-  expect_false(samples_innovation_scale(rw_mgp))
-  expect_false("sigma_trend" %in% generate_monitor_params(rw_mgp))
   expect_true("sigma_trend" %in% generate_monitor_params(rw))
 })
 

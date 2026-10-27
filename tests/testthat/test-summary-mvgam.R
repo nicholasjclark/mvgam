@@ -4,7 +4,7 @@
 # or a vector of parameter names.
 
 
-test_that("a block's rows print under brms's names", {
+test_that("a block's rows print under their summary names", {
   pars <- c("bs_sigma_sz_1", "sds_sigma_sz_1_trend", "sd_g__Intercept",
             "cor_g__Intercept__x")
   tab <- data.frame(Estimate = seq_along(pars), row.names = pars)
@@ -22,16 +22,13 @@ test_that("a block's rows print under brms's names", {
 
 
 test_that("the summary header carries every formula and every link", {
-  # A distributional formula is printed under the response formula,
-  # as brms does, so a reader can see what was modelled.
+  # A distributional formula prints under the response formula
   expect_equal(
     format_model_formula(brms::bf(y ~ x, sigma ~ x)),
     c("y ~ x", "sigma ~ x")
   )
 
-  # A link is named for every parameter the family carries, not just
-  # the mean, so a coefficient in the sigma block can be read on the
-  # right scale.
+  # A link is named for every parameter the family carries
   expect_equal(format_family_links(brms::Beta()), "mu = logit; phi = log")
   expect_equal(format_family_links(com_binomial()),
                "mu = logit; nu = identity")
@@ -41,19 +38,11 @@ test_that("the summary header carries every formula and every link", {
 
 
 test_that("the trend line names the order and drops an empty formula", {
-  # A summary object carries no trend metadata, and the helper that
-  # renders the order needs it. `summary()` stores the rendered
-  # label. Without the stored label a fitted ARMA printed as
-  # `Trends: None`, denying a trend the sampler had estimated.
+  # The stored label names the order the bare type leaves out
   expect_equal(
     format_trend_line(list(trend_model = "AR",
                            trend_label = "ARMA(1, 1)")),
     " Trends: ARMA(1, 1) "
-  )
-  # A fit saved before the label existed still names its type.
-  expect_equal(
-    format_trend_line(list(trend_model = "AR")),
-    " Trends: AR "
   )
   # A formula with an intercept alone names no predictor, and a
   # two-sided one drops its response.
@@ -77,8 +66,7 @@ test_that("is_trend_state_param() names the states and nothing else", {
     "innovations_trend[1,1]", "mu_trend[4]",
     "scaled_innovations_trend[2,1]"
   ))))
-  # Trend hyperparameters and formula effects are summarised, so they
-  # must not be caught by the same predicate.
+  # Trend hyperparameters and formula effects are summarised
   expect_false(any(is_trend_state_param(c(
     "sigma_trend", "ar1_trend[1]", "Intercept_trend", "b_trend[1]",
     "Sigma_trend[1,1]", "L_Omega_trend[2,1]", "Z[1,2]"

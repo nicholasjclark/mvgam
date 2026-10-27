@@ -41,12 +41,8 @@ test_that("default type is 'residuals' and routes to mvgam_resid_panel", {
 })
 
 test_that("type = 'smooths' routes to conditional_smooths", {
-  # Mock conditional_smooths so the routing test does not need
-  # a real fit. Returning a minimal mvgam_conditional_smooths
-  # lets `wrap_effects_list()`'s S3 `plot(eff_list, plot = FALSE)`
-  # dispatch build a themed ggplot; asserting a ggplot class
-  # documents the contract that `plot(mod, type = "smooths")`
-  # returns a renderable plot object.
+  # A minimal mvgam_conditional_smooths in place of a fit. Its own
+  # plot method builds the panel, which plot() returns as a ggplot.
   dummy_df <- data.frame(
     env = seq(-1, 1, length.out = 5L),
     estimate__ = c(-0.4, 0.1, 0.5, 0.1, -0.4),

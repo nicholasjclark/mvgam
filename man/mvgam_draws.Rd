@@ -23,9 +23,9 @@
   ...
 )
 
-\method{as.matrix}{mvgam}(x, variable = NULL, regex = FALSE, ...)
+\method{as.matrix}{mvgam}(x, variable = NULL, draw = NULL, regex = FALSE, ...)
 
-\method{as.array}{mvgam}(x, variable = NULL, regex = FALSE, ...)
+\method{as.array}{mvgam}(x, variable = NULL, draw = NULL, regex = FALSE, ...)
 
 \method{as_draws}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 
@@ -61,12 +61,12 @@ coefficients (\verb{b_*_trend}, \verb{bs_*_trend} and \verb{bsp_*_trend}).
 \item \code{"trend_smooth_params"}: trend-side smooth SDs.
 }
 \code{NULL} (the default) returns every parameter. A bare vector name,
-such as \code{"sigma_trend"}, selects every element. \code{\link[=variables.mvgam]{variables.mvgam()}}
-lists the exact names and how they are formed.}
+such as \code{"sigma_trend"}, selects every element. Group-level
+effects, factor loadings and latent states have no keyword. Select
+them by name. \code{\link[=variables.mvgam]{variables.mvgam()}} lists the names a fit holds.}
 
-\item{draw}{For \code{as.data.frame.mvgam}, an optional integer
-vector of draw indices (1-based) to subset after extraction.
-\code{NULL} (the default) returns all draws.}
+\item{draw}{Optional positive integer indices of the draws to keep,
+counted across chains. \code{NULL} (the default) keeps every draw.}
 
 \item{regex}{Logical. When \code{TRUE}, each entry of \code{variable} is
 treated as a regular expression and any parameter matching at
@@ -76,7 +76,8 @@ honoured. Defaults to \code{FALSE}.}
 \item{...}{Unused. Anything passed here is refused.}
 
 \item{inc_warmup}{Logical. Include warmup draws? Defaults to
-\code{FALSE}.}
+\code{FALSE}. A fit holds them only when sampled with
+\code{save_warmup = TRUE}.}
 }
 \value{
 A \code{data.frame}, \code{matrix}, \code{array}, or one of the
@@ -85,8 +86,13 @@ A \code{data.frame}, \code{matrix}, \code{array}, or one of the
 dispatched.
 }
 \description{
-Extract posterior draws in conventional formats as data.frames,
-matrices, arrays, or \verb{posterior::draws_*} objects.
+Extract posterior draws as a data frame, matrix or array, or as one
+of the \verb{posterior::draws_*} classes. Parameters take their brms
+names, such as \code{b_x} and \code{sd_grp__Intercept}. A trend parameter
+indexed by series takes the series name, as in
+\code{sigma_trend[series_1]}. The
+\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated data model article} contrasts
+intercepts drawn with \code{as_draws_df()}.
 }
 \examples{
 \dontrun{
@@ -98,10 +104,17 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Trend-dynamics parameters as a draws data frame.
-as.data.frame(mod, variable = "trend_params")
-# The same draws as a posterior::draws_array.
-as_draws_array(mod, variable = "trend_params")
+# Trend-dynamics parameters as a data frame of draws
+head(as.data.frame(mod, variable = "trend_params"))
+
+# Regular expressions select by pattern, here the smooth's basis
+# coefficients and its smoothing SD
+colnames(as.matrix(mod, variable = c("^s_", "^sds_"), regex = TRUE))
+
+# One random variable per parameter, printed as mean and SD
+as_draws_rvars(mod, variable = "trend_params")
+
+# Next, mcmc_plot(mod) plots the same draws
 }
 
 }

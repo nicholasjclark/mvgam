@@ -20,11 +20,11 @@
 # count, an unbounded continuous vector, and a composition -- so a
 # fault in the shared machinery cannot hide behind one of them.
 #
-# The simulations are shared. `sim_jsdm()` draws the site-by-species
+# The simulations are shared. `sim_jsdgam()` draws the site-by-species
 # matrix for every family in this file, and each spec names the
 # species count, the site count, the seed and the family parameters
 # it takes. What differs between families is the observation draw,
-# which `sim_jsdm()` selects from the family object.
+# which `sim_jsdgam()` selects from the family object.
 #
 # Two of the shared claims are structural rather than
 # family-specific, so every family is held to them: that a frame maps
@@ -92,7 +92,7 @@ identical_species_pairs <- function(mats) {
 }
 
 
-# One simulation for every family in the file. `sim_jsdm()` draws
+# One simulation for every family in the file. `sim_jsdgam()` draws
 # the site-by-species matrix and returns the long frame `jsdgam()`
 # takes, and this maps its names onto the four fields the
 # assertions below use.
@@ -100,7 +100,7 @@ identical_species_pairs <- function(mats) {
 # Two latent factors for every family, which keeps the loadings
 # matrix the same shape across the file.
 jsdm_sim <- function(spec) {
-  s <- sim_jsdm(
+  s <- sim_jsdgam(
     family      = eval(spec$family),
     n_species   = spec$n_species,
     n_sites     = spec$n_sites,
@@ -775,7 +775,7 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     expect_gt(max(abs(post_off)), 0.05)
   })
 
-  test_that(says("a partial correlation says why it cannot be taken"), {
+  test_that(says("a partial correlation exists only at full rank"), {
     # `Z Sigma Z'` over K species and N_lv factors has rank N_lv, so
     # below K it has no inverse and the identity a partial
     # correlation is read off does not exist for this fit at any
@@ -783,6 +783,13 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # number, which says nothing about the model that produced it.
     # Every fit in this battery carries fewer factors than species.
     expect_lt(N_lv, K)
+    # mvn() and mvt() add each species' residual variance to the
+    # diagonal, which gives the covariance full rank
+    if (family_has_component_scale(fit$family)) {
+      pc <- residual_cor(fit, partial = TRUE)$cor
+      expect_true(all(is.finite(pc)))
+      return(invisible())
+    }
     expect_error(
       residual_cor(fit, partial = TRUE),
       "full-rank residual covariance"
@@ -1076,7 +1083,8 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # loadings and has no fixed value under rotation; a tidier that
     # reports it hands the user a number the package refuses to put
     # an r-hat on.
-    expect_true(all(td$term %in% v))
+    # Fixed effects drop their `b_` prefix, as broom.mixed names them
+    expect_true(all(td$term %in% c(v, sub("^b_", "", v))))
 
     gl <- glance(fit)
     expect_true(is.data.frame(gl))

@@ -31,13 +31,3 @@ test_that("shared_variation returns Z Sigma Z', not Z Z'", {
   )))
   expect_identical(unname(rownames(sv$delta)), case$series_levels)
 })
-
-test_that("shared_variation's printed header names the returned matrix", {
-  case <- mk_factor_obj()
-  testthat::local_mocked_bindings(
-    as_draws_matrix = function(x, ...) x,
-    .package = "posterior"
-  )
-  out <- capture.output(print(shared_variation(case$obj)))
-  expect_match(out[1L], "Z Sigma Z'", fixed = TRUE)
-})

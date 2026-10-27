@@ -60,6 +60,7 @@ test_that("hindcast.mvgam returns mvgam_forecast with NULL forecast slots", {
   draws <- make_hindcast_draws(ndraws = 3L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -79,7 +80,7 @@ test_that("hindcast.mvgam returns mvgam_forecast with NULL forecast slots", {
   required <- c("family", "family_pars", "type", "series_names",
                 "train_observations", "train_times",
                 "test_observations", "test_times",
-                "hindcasts", "forecasts")
+                "hindcasts", "forecasts", "site_units")
   expect_equal(sort(names(hc)), sort(required))
   expect_null(hc$forecasts)
   expect_null(hc$test_times)
@@ -94,6 +95,7 @@ test_that("hindcast.mvgam type dispatch flows through expected helpers", {
   draws <- make_hindcast_draws(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   # Standard families: trend pulled per-draw from stanfit via
@@ -156,6 +158,7 @@ test_that("obs_uncertainty = FALSE returns family mean for response", {
   draws <- make_hindcast_draws(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -188,6 +191,7 @@ test_that("type = 'link' populates family_pars", {
   fit$family <- brms::negbinomial()
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
@@ -210,6 +214,7 @@ test_that("ndraws beyond available draws errors informatively", {
   draws <- make_hindcast_draws(ndraws = 3L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   expect_error(
@@ -224,6 +229,7 @@ test_that("ndraws subset yields the requested rows", {
   draws <- make_hindcast_draws(ndraws = 5L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   # Each extraction returns the rows it is asked for
@@ -308,6 +314,7 @@ test_that("Multi-series hindcast returns one matrix per series", {
   draws <- make_hindcast_draws(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
     .package = "posterior"
   )
   testthat::local_mocked_bindings(

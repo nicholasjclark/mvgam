@@ -1,219 +1,120 @@
 #' Posterior draws of residuals from \pkg{mvgam} models
 #'
-#' Extracts posterior draws of residuals for a fitted `mvgam`
-#' model, with two options for residual type:
+#' Posterior draws of the residuals of a fitted `mvgam` model, of two
+#' types:
 #'
-#' * `"quantile"` (default) -- randomized quantile residuals
-#'   (Dunn & Smyth 1996), often also called Dunn-Smyth or PIT
-#'   residuals. Each observation is transformed through the
-#'   cumulative distribution function of its predictive
-#'   distribution and then through the standard-normal quantile,
-#'   so under a correctly-specified model the residuals are
-#'   independent N(0, 1) draws regardless of the response
-#'   family. The transform is evaluated **per draw**, against
-#'   that draw's own parameters, which is what makes the result
-#'   standard normal: a PIT taken against the posterior
-#'   predictive pooled over draws absorbs the uncertainty in the
-#'   latent state and comes back too narrow.
+#' * `"quantile"` (default): randomised quantile residuals (Dunn and
+#'   Smyth 1996), also called Dunn-Smyth or PIT residuals. Each
+#'   observation passes through the distribution function of its
+#'   predictive distribution, then through the standard normal quantile
+#'   function. Under a correctly specified model the residuals are
+#'   independent N(0, 1) draws for any response family.
+#' * `"ordinary"`: the predictive error, `y` minus a
+#'   [posterior_predict.mvgam()] draw, per draw.
 #'
-#'   A family \pkg{mvgam} holds a distribution function for is
-#'   transformed through that function directly. This covers the
-#'   single-parameter and location-scale families, the counts,
-#'   `beta` and `beta_binomial`, `com_binomial()` and `tweedie()`,
-#'   the ordinal families, and the multivariate `mvn()`, `mvt()`,
-#'   `diri()`, `multi()` and `categ()`. A composition family is
-#'   transformed through the marginal of one component: a Beta for
-#'   `diri()`, a Binomial against the site's own total for `multi()`,
-#'   and a Bernoulli for `categ()`. A discrete family randomises
-#'   within the interval its atom occupies, `[F(y - 1), F(y)]`; a
-#'   continuous one has no atom and the interval collapses to `F(y)`.
+#' In sample, both types compare each observation with predictions that
+#' condition on the latent trend state the model inferred at that time,
+#' the state [hindcast.mvgam()] returns. For `newdata` the fit has no
+#' such state. The prediction then integrates over the trend dynamics,
+#' which widens the residuals. [pp_check.mvgam()] and
+#' [predictive_error.mvgam()] use the same predictions.
 #'
-#'   The mixtures and the detection families -- zero-inflated,
-#'   hurdle, `mixture()`, `occ()` and `nmix()` -- have no single
-#'   distribution function to name, and take an empirical PIT over
-#'   [posterior_predict.mvgam()] draws instead (the DHARMa / Hartig
-#'   2024 approach). The `Details` below give what that route costs.
-#'
-#' * `"ordinary"` -- the predictive error `y - posterior_predict(y)`
-#'   per draw. Matches `type = "ordinary"` in
-#'   [brms::residuals.brmsfit()].
-#'
-#' Residuals are computed conditionally on each posterior draw
-#' of the model parameters so the returned object carries the
-#' full posterior uncertainty in the residual distribution.
-#'
-#' Both types compare a prediction against the observation that was
-#' actually recorded, so in sample they read the latent trend state
-#' the model inferred at that time, the state [hindcast.mvgam()]
-#' returns. Given `newdata` the fit never saw there is no such state,
-#' and the prediction integrates over the trend dynamics instead,
-#' which widens the residual as it should. [pp_check.mvgam()] and
-#' [predictive_error.mvgam()] follow the same rule.
-#'
-#' Pearson residuals are not provided. In a state-space model
-#' with a stochastic trend the posterior absorbs most of the
-#' low-frequency residual structure, so the per-observation
-#' variance denominator standardises against the wrong
-#' quantity and Pearson residuals end up systematically too
-#' tight. Use `"quantile"` instead -- it is the correct
-#' diagnostic for this model class and is N(0, 1) under a
-#' correctly-specified model regardless of family.
+#' Pearson residuals are not supported. A Pearson residual of a count or
+#' a bounded response is skewed and discrete even under a correctly
+#' specified model.
 #'
 #' @section Multivariate families (`mvn()`, `mvt()`, `diri()`):
-#'   These share the closure-unit data layout but not its grain:
-#'   each row of a unit gets its own residual, because each row
-#'   has its own distribution function. What that residual can be
-#'   asked differs by family.
+#'   Each row of a unit gets its own residual. Residuals of `mvn()` and
+#'   `mvt()` condition on the latent factor scores and test the
+#'   observation model. They stay N(0, 1) when the fit has too few
+#'   factors. [active_factors()] and [residual_cor.mvgam()] judge the
+#'   number of factors.
 #'
-#'   `mvn()` and `mvt()` are row-wise conditional on the latent
-#'   factor scores, so their residuals test the observation model
-#'   rather than the factor structure. Too few factors still
-#'   leaves them N(0, 1), because the fitted scores absorb the
-#'   cross-species correlation a residual diagnostic would
-#'   otherwise reveal; use [residual_cor.mvgam()] to ask whether
-#'   the factor dimension is adequate.
-#'
-#'   `diri()`'s residual is the exact marginal of one component,
-#'   `Beta(alpha_j, alpha_0 - alpha_j)`, so it answers how
-#'   surprising that species' share is at that site. Each is
-#'   standard normal on its own, but a unit's shares sum to one,
-#'   so the rows of a unit are negatively dependent by
-#'   construction and a unit of `K` species carries `K - 1`
-#'   degrees of freedom. With `K = 2` the two residuals are
-#'   exactly antithetic. Read a QQ-plot or an ACF at the unit
-#'   grain rather than treating the rows of a unit as independent
-#'   draws.
+#'   A `diri()` residual is the exact marginal of one component,
+#'   `Beta(alpha_j, alpha_0 - alpha_j)`. Each is N(0, 1) on its own.
+#'   Because the shares of a unit sum to one, the residuals of a unit of
+#'   `K` species are negatively dependent, with `K - 1` degrees of
+#'   freedom. With `K = 2` the two residuals are exactly antithetic.
+#'   Judge a QQ-plot or an ACF at the unit grain.
 #'
 #' @section Closure-unit families (`nmix()`, `occ()`):
-#'   Closure-unit observation families treat the closure unit
-#'   (site x season) as the conditionally iid block: visits
-#'   within a unit share the latent state (`N_g` for nmix,
-#'   `z_g` for occ) and are only marginally independent.
-#'   Per-visit residuals would carry an apparent within-unit
-#'   correlation and bias every standard diagnostic (ACF, QQ,
-#'   residual-vs-fitted), so `residuals()` returns one residual
-#'   per closure unit:
+#'   Visits within a closure unit (site by season) share the latent state,
+#'   `N` for `nmix()` and `z` for `occ()`. The visits are independent
+#'   given that state, but dependent marginally. Because residuals per
+#'   visit would carry that dependence into every diagnostic,
+#'   `residuals()` returns one residual per closure unit. The observed
+#'   counts or detections are summed within each unit. The visit-level
+#'   [posterior_predict.mvgam()] draws are summed the same way. Columns
+#'   (`summary = FALSE`) or rows (`summary = TRUE`) are labelled by the
+#'   unit's grouping values joined with `_`.
 #'
-#'   * The observed response is aggregated per unit by `sum()`.
-#'     For nmix this is the unit's total observed count (the
-#'     marginal sufficient statistic under fixed `N_g`); for
-#'     occ this is the per-unit detection count (the sufficient
-#'     statistic for the per-unit Bernoulli marginal under
-#'     fixed `z_g`).
-#'   * The per-visit posterior predictive draws are aggregated
-#'     the same way before the empirical PIT (`type = "quantile"`)
-#'     or the predictive error (`type = "ordinary"`) is computed.
+#'   Each draw simulates the latent state from `lambda` or `psi` without
+#'   conditioning on the unit's detection history. The residuals then
+#'   test the model across the population of units.
+#'   `predict(type = "latent_state")` gives the state given each unit's
+#'   detection history.
 #'
-#'   The returned matrix is shaped `[ndraws x N_unit]`
-#'   (`summary = FALSE`) or `[N_unit x E]` (`summary = TRUE`),
-#'   with rows / columns labelled by the unit IDs from
-#'   `build_closure_unit_arrays()`.
-#'
-#'   The PIT comparison is against the **marginal** posterior
-#'   predictive: each draw re-simulates the latent state
-#'   (`z_g` for occ, `N_g` for nmix) from `psi_g` / `lambda_g`
-#'   per draw, not conditional on the observed detection
-#'   history for that unit. This is the DHARMa / flocker / ubms
-#'   convention and tests model adequacy at the population
-#'   level rather than site-level prediction accuracy; see
-#'   `posterior_occupancy(conditional = TRUE)` and
-#'   `posterior_latent_N(conditional = TRUE)` when the
-#'   conditional state posterior is the quantity of interest.
-#'
-#'   The empirical PIT randomises uniformly across the discrete
-#'   support, so per-unit residuals on fits with small `n_rep`
-#'   (~ 2-4 visits) have heavier QQ-tails than analytic
-#'   `qnorm(N(0, 1))` lines under a correctly-specified model
-#'   (Dunn & Smyth 1996 Section 3; Hartig 2024 DHARMa vignette). A
-#'   one-time warning fires when any closure unit has 4 or
-#'   fewer visits; interpret QQ-plots against simulated N(0, 1)
-#'   envelopes rather than the analytic line in that regime.
+#'   Under `occ()` a unit sum takes values in `0, ..., n_rep`. With few
+#'   visits the empirical PIT has coarse support. QQ-plot tails then look
+#'   heavier than N(0, 1) under a correctly specified model. A
+#'   once-per-session warning is raised when any unit has 4 or fewer visits.
+#'   Compare QQ-plots with envelopes simulated from N(0, 1) in that case.
 #'
 #' @inheritParams predict.mvgam
-#' @param object An object of class `mvgam`.
-#' @param newdata Optional `data.frame` to compute residuals on
-#'   (defaults to the training data).
+#' @param object A fitted `mvgam` object.
+#' @param newdata Optional `data.frame` to compute residuals on. Defaults
+#'   to the training data.
 #' @param type Character. Either `"quantile"` (default) or
 #'   `"ordinary"`.
-#' @param summary Logical. If `TRUE` (the default), return a
-#'   per-observation summary matrix; if `FALSE`, return the full
-#'   `ndraws x nobs` matrix of per-draw residuals (which can be
-#'   handed to `DHARMa::createDHARMa()` for further diagnostics).
-#' @param ... Additional arguments forwarded to
-#'   [posterior_predict.mvgam()].
+#' @param summary Logical. `TRUE` (the default) returns a summary per
+#'   observation. `FALSE` returns the residual draws.
+#' @param ... Further arguments of [posterior_predict.mvgam()], such as
+#'   `resp` or `re_formula`.
 #'
-#' @details Both routes end at the same construction. Each draw
-#'   places the observation in a PIT interval, the residual is
-#'   `qnorm(Uniform(lower, upper))` over that interval, and a
-#'   degenerate interval returns its endpoint. What separates
-#'   them is where the interval comes from.
+#' @details Each draw places an observation in a PIT interval
+#'   `[lower, upper]`. The residual is `qnorm(u)` for a `u` drawn
+#'   uniformly from that interval. Two routes give the interval.
 #'
-#'   The analytic route reads the family's own distribution
-#'   function at that draw's parameters, so the interval is
-#'   `[F(y_i - 1 | theta_d), F(y_i | theta_d)]` for a discrete
-#'   family and the point `F(y_i | theta_d)` for a continuous
-#'   one. The same parameterisation supplies the density
-#'   [log_lik.mvgam()] reads, so the residual and the likelihood
-#'   cannot disagree about what a family is.
+#'   The analytic route evaluates the family's distribution function at
+#'   each draw's parameters. A discrete family gives the interval of the
+#'   observed atom, `[F(y - 1), F(y)]`. A continuous family gives the
+#'   point `F(y)`. A `tweedie()` zero gives `[0, F(0)]`. Censored rows
+#'   span their censoring interval. A truncated model renormalises over
+#'   its truncation bounds. [log_lik.mvgam()] takes its density from the
+#'   same parameterisation. The route covers `gaussian`, `student`,
+#'   `asym_laplace`, `lognormal`, `gamma`, `weibull`, `exponential`,
+#'   `beta`, `bernoulli`, `binomial`, `beta_binomial`, `poisson`,
+#'   `negbinomial`, `geometric`, `com_binomial()`, `beta_nb()`,
+#'   `tweedie()`, the ordinal families, and the multivariate `mvn()`,
+#'   `mvt()`, `diri()`, `multi()` and `categ()`. A composition family uses
+#'   the marginal of one component: a Beta for `diri()`, a Binomial
+#'   against the site's own total for `multi()` and a Bernoulli for
+#'   `categ()`.
 #'
-#'   The empirical route follows DHARMa (Hartig 2024): `lower`
-#'   and `upper` are `mean(yrep < y_i)` and `mean(yrep <= y_i)`
-#'   over the pooled draws. Pooling is what makes it work
-#'   without a family CDF, and also what costs it: the pooled
-#'   predictive carries the posterior uncertainty in the latent
-#'   state, so the interval sits closer to 0.5 than the
-#'   conditional one and the residuals come back narrower than
-#'   standard normal. Read a QQ-plot from this route as
+#'   Every other family takes the empirical route of DHARMa (Hartig 2024),
+#'   among them the zero-inflated, hurdle and mixture families, `occ()`
+#'   and `nmix()`. The bounds are `mean(yrep < y)` and `mean(yrep <= y)`
+#'   over the pooled [posterior_predict.mvgam()] draws. The pooled
+#'   predictive carries the posterior uncertainty in the latent state.
+#'   Its residuals are narrower than N(0, 1). A QQ-plot of them is
 #'   conservative.
 #'
-#'   The PIT u is clamped to `[.Machine$double.eps,
-#'   1 - .Machine$double.eps]` before `qnorm` so the residual
-#'   stays finite even when an observation lies in the extreme
-#'   floating-point tail of the predictive distribution. This
-#'   bound corresponds to `|qnorm(u)| ~= 8.13`.
+#'   The PIT value is clamped to `[eps, 1 - eps]`, with
+#'   `eps = .Machine$double.eps`, to keep the residual finite. The clamp
+#'   bounds a residual at about +/-8.13. On the analytic route one draw
+#'   can place an observation beyond that bound. Such isolated values
+#'   describe that draw. A misfit shifts the residual across most draws.
+#'   The empirical route reaches the clamp whenever an observation lies
+#'   outside every simulated value, which few draws make common. Use
+#'   `ndraws >= 500` there, the default of the residual histograms and
+#'   ribbons of [pp_check.mvgam()].
 #'
-#'   *ndraws sensitivity.* The two routes react differently to
-#'   the posterior draw count:
-#'
-#'   * The analytic route can produce isolated clamp events
-#'     on individual posterior draws whose `(mu_d, dpar_d)`
-#'     happen to place the observed `y_i` more than ~38 SDs
-#'     from the predictive mean -- `pnorm` underflows to exactly
-#'     0 or 1 and the clamp triggers. These look like extreme
-#'     `+/-8.13` residuals in the per-draw matrix but are a
-#'     property of the posterior, not a misfit signal. They get
-#'     proportionally rarer with more draws but never vanish.
-#'
-#'   * The empirical route needs enough simulations for the
-#'     empirical predictive CDF to cover the data. With small
-#'     `ndraws` many observations land outside the simulated
-#'     range entirely, so `u` is exactly 0 or 1 deterministically
-#'     and the clamp turns every draw for that observation into
-#'     `+/-8.13`. Setting `ndraws >= 500` resolves the empirical
-#'     PIT well enough that this artefact disappears in
-#'     typical cases.
-#'
-#'   For diagnostic plotting via [pp_check.mvgam()] with
-#'   `type = "resid_*"`, use `ndraws >= 500` (the default for
-#'   those types).
-#'
-#' @return An array of residuals.
-#'
-#'   * `summary = FALSE`: an `ndraws x nobs` numeric matrix of
-#'     per-draw residuals (the same shape as
-#'     [posterior_predict.mvgam()] output). A continuous family
-#'     on the empirical route has one pooled interval per
-#'     observation, so every row is identical and the matrix
-#'     reduces to a single deterministic residual per
-#'     observation; on the analytic route the interval moves
-#'     with the draw and the column carries the posterior
-#'     spread.
-#'   * `summary = TRUE`: an `nobs x E` numeric matrix where
-#'     `E = 2 + length(probs)`. Column `Estimate` is the mean
-#'     (or median when `robust = TRUE`); column `Est.Error` is
-#'     the standard deviation (or MAD); the remaining columns
-#'     are quantile estimates labelled `Q<min*100>` and
-#'     `Q<max*100>`.
+#' @return With `summary = FALSE`, an `[ndraws, nobs]` matrix of residual
+#'   draws. A continuous family on the empirical route has one interval
+#'   per observation. Its rows are then identical. With `summary = TRUE`,
+#'   an `[nobs, 2 + length(probs)]` matrix. Its columns are `Estimate`
+#'   (the mean, or the median with `robust = TRUE`), `Est.Error` (the
+#'   standard deviation, or the MAD) and one quantile per `probs`.
 #'
 #' @references
 #' Dunn, P. K. and Smyth, G. K. (1996). Randomized quantile
@@ -225,7 +126,7 @@
 #'   R package.
 #'
 #' @seealso [augment.mvgam()], [posterior_predict.mvgam()],
-#'   [posterior_epred.mvgam()]
+#'   [pp_check.mvgam()]
 #'
 #' @author Nicholas J Clark
 #'
@@ -233,18 +134,22 @@
 #' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
+#'                     n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
 #'
-#' mod <- mvgam(y ~ s(x),
-#'               trend_formula = ~ AR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = poisson(),
-#'               chains  = 2, silent = 2)
-#'
-#' # Randomised quantile residuals on the response scale.
-#' # Summarised columns are Estimate, Est.Error, Q2.5, Q97.5.
+#' # Quantile residuals summarised per observation
 #' r <- residuals(mod)
 #' head(r)
+#'
+#' # One draw of the residuals should look like N(0, 1) draws
+#' r1 <- residuals(mod, summary = FALSE, draw_ids = 1)
+#' qqnorm(r1[1, ])
+#' qqline(r1[1, ])
+#'
+#' # Next: plot(mod, type = "residuals") draws the QQ-plot, ACF and
+#' # residuals against fitted values over many draws
 #' }
 #'
 #' @family model checking
@@ -270,43 +175,22 @@ residuals.mvgam <- function(object,
                               any.missing = FALSE,
                               unique = TRUE)
 
-  # Multivariate fan-out: when no resp was given, return a named
-  # list of per-response residual matrices. Shared helper threads
-  # the user's call back through this method with resp scoped per
-  # response; downstream the body's `resp` argument captures it
-  # and the univariate machinery runs unchanged.
+  # A multivariate fit without 'resp' returns a named list, one
+  # residual matrix per response. Each element comes from a call back
+  # into this method with 'resp' set.
   dots <- list(...)
   resp <- dots$resp
   fan <- mv_resp_fan_out(object, resp)
   if (!is.null(fan)) return(fan)
 
-  # Pin draw_ids once so the analytic / empirical / closure-unit
-  # paths all see the same posterior subsample. Pinning is
-  # essential for `type = "quantile"` on continuous families
-  # (analytic PIT needs aligned mu_d, sigma_d) and matters on
-  # the closure-unit path too: `posterior_predict.mvgam`'s
-  # closure-unit intercept threads `draw_ids` through but
-  # silently ignores `ndraws`, so the conversion has to happen
-  # here for the requested subsample to take effect.
+  # The analytic PIT takes the predictor and the distributional
+  # parameters in separate calls. Fixed draw indices give every call
+  # the same posterior iterations.
   draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
   if (!is.null(draw_ids)) {
     ndraws <- NULL
   }
 
-  # Closure-unit families (nmix, occ) violate the per-visit
-  # exchangeability assumption: visits within a closure unit
-  # share the latent state and are only marginally independent.
-  # Residuals collapse to the unit grain (one residual per
-  # closure unit) using a sufficient summary statistic
-  # (per-unit detection / count totals); the empirical-PIT path
-  # then operates on the aggregated draws so DHARMa-style
-  # diagnostics on the returned matrix carry the correct
-  # exchangeability (Hartig 2024 Section 3; Vehtari et al. 2017 Section 4.2).
-  # Mv-response closure-unit families (mvn, mvt) have one
-  # observation per (site, species) row, so residuals at the row
-  # grain are conditionally independent given lv. Routes through
-  # the standard non-closure-unit residual path, which calls
-  # posterior_predict and subtracts y row-wise.
   if (is_closure_unit_family(object$family)) {
     resids <- compute_closure_unit_residuals(
       object   = object,
@@ -321,13 +205,7 @@ residuals.mvgam <- function(object,
   }
 
   d <- prediction_frame(object, newdata)
-  # `resp` is populated when the mv fan-out scoped this call (or
-  # the user supplied it explicitly via `...`); otherwise fall
-  # back to the single response on a univariate fit.
   y <- as.numeric(d[[response_column(object, resp)]])
-  # The prediction methods answer in draws; none of them takes a
-  # `summary` argument, so asking for one here reached `...` and was
-  # dropped.
   pp_args <- c(list(object = object, newdata = newdata,
                      ndraws = ndraws, draw_ids = draw_ids), dots)
 
@@ -337,13 +215,10 @@ residuals.mvgam <- function(object,
       object = object, y = y, pp_args = pp_args,
       d = d, draw_ids = draw_ids, resp = resp
     ),
-    "ordinary" = {
-      yrep <- do.call(
-        posterior_predict,
-        diagnostic_surface_args(pp_args, is.null(newdata))
-      )
-      sweep(yrep, 2L, y, FUN = function(yh, yi) yi - yh)
-    }
+    "ordinary" = -sweep(
+      do.call(posterior_predict, residuals_pred_args(pp_args, resp)),
+      2L, y
+    )
   )
   residuals_finalise(resids, summary = summary,
                        robust = robust, probs = probs)
@@ -352,13 +227,13 @@ residuals.mvgam <- function(object,
 
 #' Residuals of a closure-unit fit at the unit grain
 #'
-#' Visits within a closure unit share the latent state and are only
-#' marginally independent (MacKenzie et al. 2002; Royle 2004). The
-#' per-visit predictive draws are summed to unit totals with
-#' `aggregate_closure_unit_visits()`. The unit total of detections or
-#' counts is sufficient for the per-unit marginal. Quantile residuals
-#' then take the empirical PIT. Their support is coarse when a unit has
-#' few visits. A once-per-session warning reports that case.
+#' Visits within a closure unit share the latent state. They are
+#' independent given the state and dependent marginally (MacKenzie et
+#' al. 2002; Royle 2004). `aggregate_closure_unit_visits()` sums the
+#' observations and the per-visit predictive draws to unit totals.
+#' Quantile residuals take the empirical PIT of those totals. Their
+#' support is coarse when a unit has few visits. A once-per-session
+#' warning reports that case.
 #'
 #' @param object Fitted `mvgam` object with an `occ()` or `nmix()`
 #'   family
@@ -377,9 +252,7 @@ compute_closure_unit_residuals <- function(object, newdata, type,
   checkmate::assert_choice(type, c("quantile", "ordinary"))
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
-  # Whether the fit saw these rows is settled before the training
-  # frame is substituted for them, since afterwards every test on
-  # `newdata` answers as though the user had supplied new data.
+  # Recorded before the training frame replaces a NULL 'newdata'.
   in_sample <- is.null(newdata)
   newdata <- prediction_frame(object, newdata)
   pp_args <- c(
@@ -394,21 +267,15 @@ compute_closure_unit_residuals <- function(object, newdata, type,
   agg <- aggregate_closure_unit_visits(
     object, newdata = newdata, yrep_visit = yrep_visit
   )
-  # The empirical-PIT randomisation widens the per-residual
-  # variance above 1 whenever the discrete support is coarse
-  # (Dunn & Smyth 1996 Section 3; DHARMa vignette "Residuals for
-  # discrete distributions"). For closure-unit families that
-  # surfaces when n_rep is small: the per-unit sum lives on
-  # {0, ..., n_rep}, so QQ-tails can read as heavier than N(0, 1)
-  # under a correctly-specified model.
-  if (type == "quantile" &&
-        any(agg$arrays$n_rep <= 4L)) {
+  # An occupancy unit total takes values in 0, ..., n_rep. With few
+  # visits the randomised PIT has coarse support (Dunn and Smyth 1996,
+  # section 3).
+  if (type == "quantile" && any(agg$arrays$n_rep <= 4L)) {
     warn_once(
-      paste0(
-        "Quantile residuals at the unit grain of a closure-unit fit ",
-        "have coarse PIT support when 'n_rep' is small. ",
-        "Compare QQ-plots with simulated N(0, 1) envelopes ",
-        "when any closure unit has <= 4 visits."
+      c(
+        paste0("Quantile residuals of a closure-unit fit have coarse ",
+               "PIT support when a unit has 4 or fewer visits."),
+        i = "Compare QQ-plots with envelopes simulated from N(0, 1)."
       ),
       "mvgam_closure_unit_residuals_low_n_rep"
     )
@@ -418,10 +285,7 @@ compute_closure_unit_residuals <- function(object, newdata, type,
     "quantile" = compute_quantile_residuals_empirical(
       agg$y_unit, agg$yrep_unit
     ),
-    "ordinary" = sweep(
-      agg$yrep_unit, 2L, agg$y_unit,
-      FUN = function(yh, yi) yi - yh
-    )
+    "ordinary" = -sweep(agg$yrep_unit, 2L, agg$y_unit)
   )
 }
 
@@ -496,26 +360,21 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
   checkmate::assert_string(resp, null.ok = TRUE)
   family_obj <- model_families(object, resp)
   family_name <- resolve_family_name(family_obj)
-  ordinal <- is_ordinal_family(family_obj)
-  # Settled before the predictor is computed. A family without
-  # analytic bounds takes the empirical route and skips a prediction
-  # it would not use.
+  # Checked before the predictor is computed, which the empirical
+  # route does not use.
   if (!has_analytic_pit(family_obj)) {
     return(NULL)
   }
-  # The spec applies the family's own inverse link, so it takes the
-  # predictor on the link scale, which is the scale `log_lik()`
-  # hands it.
+  # The spec applies the family's inverse link itself. It takes the
+  # predictor on the link scale, as in `log_lik()`.
   linpred <- do.call(
     posterior_linpred,
     c(residuals_pred_args(pp_args, resp), list(transform = FALSE))
   )
-  # `residuals.mvgam()` fans a multivariate fit out before reaching
-  # here, so the response is always named and the prediction is one
-  # arm's matrix. Stating that is enough; a second code path to
-  # narrow a list would be a branch nothing takes.
+  # `residuals.mvgam()` splits a multivariate fit by response first,
+  # leaving one response and one predictor matrix.
   checkmate::assert_matrix(linpred)
-  if (ordinal) {
+  if (is_ordinal_family(family_obj)) {
     return(ordinal_pit_bounds(
       ordinal_category_probs(
         object, linpred, family_obj, draw_ids = draw_ids, newdata = d,
@@ -524,11 +383,9 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
       y
     ))
   }
-  # A multi-response family keeps its parameters somewhere else: a
-  # per-row scale and degrees of freedom, or a softmax probability
-  # and the units its rows are grouped into. `log_lik()` reads them
-  # through the same helper, so the residual and the density it is
-  # standardising cannot describe different models.
+  # A multi-response family holds per-row parameters: a scale and
+  # degrees of freedom, or a softmax probability and the unit of each
+  # row. `log_lik()` takes them from the same helper.
   family_pars <- if (is_multi_response_family(family_obj)) {
     mv_response_family_pars(
       object, d, linpred, family_obj, family_name, draw_ids
@@ -542,10 +399,8 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
       draw_ids = draw_ids,
       newdata = d,
       resp = resp,
-      # The group-level choices arrive with the prediction arguments,
-      # which is where `residuals.mvgam()` puts the user's `...`. The
-      # predictor above is built under them, and the parameters
-      # standardising it have to be built under them too.
+      # The predictor above used the user's group-level settings. The
+      # parameters take the same settings.
       re_formula = pp_args$re_formula,
       allow_new_levels = pp_args$allow_new_levels %||% FALSE,
       sample_new_levels = pp_args$sample_new_levels %||% "uncertainty"
@@ -556,23 +411,67 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
     family_obj$link,
     linpred,
     family_pars,
-    extract_trials_for_family(object, family_obj, d)
+    extract_trials_for_family(object, family_obj, d, resp)
   )
-  upper <- dist_cdf(spec, linpred, y)
-  lower <- if (family_uses_integers(family_name)) {
-    dist_cdf(spec, linpred, y - 1)
-  } else {
-    upper
-  }
-  # A family that is continuous except for a point mass, as a Tweedie
-  # is at zero, needs the interval that mass occupies wherever an
-  # observation lands on it. Treated as continuous there, every such
-  # observation sits at the top of its own interval rather than
-  # spread across it.
+  # Each observation occupies the interval `(q_lo, q_hi]` of the
+  # response. A count's interval spans its atom, `(y - 1, y]`. A
+  # family that is continuous except for a point mass, as a Tweedie is
+  # at zero, gives an observation on the mass the interval below it.
+  # Treated as continuous there, every such observation would take the
+  # PIT value F(0) exactly.
+  discrete <- family_uses_integers(family_name)
+  q_lo <- if (discrete) y - 1 else y
   if (!is.null(spec$atom)) {
-    on_atom <- !is.na(y) & y == spec$atom
-    if (any(on_atom)) lower[, on_atom] <- 0
+    q_lo[!is.na(y) & y == spec$atom] <- -Inf
   }
+  censored_pit_bounds(
+    spec, linpred, q_lo, y,
+    response_addition_terms(object, d, resp, family_obj), discrete
+  )
+}
+
+
+#' PIT bounds of each observation's interval of the response
+#'
+#' A censored value lies anywhere in its censoring interval, as the
+#' likelihood scores it. A right-censored row spans
+#' `(y, Inf]`, a left-censored row `(-Inf, y]` and an interval row
+#' `(y, rcens]`. A truncated model's distribution function is
+#' renormalised over the window `truncation_window()` gives.
+#'
+#' @param spec Distribution spec from `family_dist_spec()`
+#' @param linpred Numeric linear predictor matrix
+#' @param q_lo,q_hi Each observation's interval of the response
+#' @param terms Addition-term values from `addition_term_values()`
+#' @param discrete Logical flag for an integer-valued family
+#' @return List holding the `[ndraws x nobs]` `lower` and `upper` bound
+#'   matrices
+#' @noRd
+censored_pit_bounds <- function(spec, linpred, q_lo, q_hi, terms,
+                                discrete) {
+  checkmate::assert_list(spec)
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_list(terms)
+  cens <- terms$cens
+  right <- which(cens == 1 | cens == 2)
+  q_lo[right] <- q_hi[right]
+  q_hi[right] <- Inf
+  interval <- which(cens == 2)
+  q_hi[interval] <- terms$rcens[interval]
+  q_lo[which(cens == -1)] <- -Inf
+
+  cdf <- spec_cdf(spec, linpred)
+  window <- truncation_window(terms$lb, terms$ub, ncol(linpred), discrete)
+  log_mass <- if (is.null(window)) 0 else {
+    log_interval_mass(cdf, window$lo, window$hi)
+  }
+  window <- window %||% list(lo = -Inf, hi = Inf)
+  bound <- function(q) {
+    q <- pmin(pmax(q, window$lo), window$hi)
+    exp(log_interval_mass(cdf, window$lo, q) - log_mass)
+  }
+  upper <- bound(q_hi)
+  lower <- if (identical(q_lo, q_hi)) upper else bound(q_lo)
   list(lower = lower, upper = upper)
 }
 
@@ -709,11 +608,5 @@ residuals_finalise <- function(resids, summary, robust, probs) {
   checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, lower = 0, upper = 1)
   if (!summary) return(resids)
-  # The summary every other accessor reports, so a residual and a
-  # prediction describe their spread the same way. Under
-  # `robust = TRUE` that means `stats::mad()`, which carries the
-  # 1.4826 consistency constant a bare median absolute deviation
-  # does not, and it calls a column with any missing draw missing
-  # rather than summarising the draws that remain.
   mvgam_post_summary(resids, robust = robust, probs = probs)
 }

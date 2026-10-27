@@ -194,3 +194,12 @@ test_that("y-axis label names one series picked from several", {
   expect_identical(plot(fc, series = "b")$labels$y, "Predictions for b")
   expect_identical(plot(.make_fc(series = "a"))$labels$y, "Predictions")
 })
+
+test_that("a jsdgam forecast refuses a time axis", {
+  # The units of a jsdgam() fit are sites in arbitrary order. A line
+  # through them would draw dynamics the model does not have.
+  fc <- .make_fc()
+  fc$site_units <- TRUE
+  expect_error(plot(fc), "Plotting a jsdgam() fit along time",
+               fixed = TRUE)
+})

@@ -105,20 +105,25 @@ validate_supported_family <- function(family) {
     return(invisible(TRUE))
   }
   # `logistic_normal()` is also marked "simplex". Its entry comes
-  # first.
-  wrappers <- c(
-    logistic_normal = "mvn()",
-    categorical = "categ()",
-    multinomial = "multi()",
-    simplex = "diri()"
+  # first. A logistic-normal composition has multivariate normal
+  # additive log-ratios, which `mvn()` fits once transformed.
+  long_format <- function(wrapper) {
+    paste0("Use ", wrapper, ", the mvgam wrapper for a response in ",
+           "long format.")
+  }
+  hints <- c(
+    logistic_normal = paste0("Fit mvn() to the additive log-ratios of ",
+                             "the proportions, in long format."),
+    categorical = long_format("categ()"),
+    multinomial = long_format("multi()"),
+    simplex = long_format("diri()")
   )
-  pointer <- wrappers[intersect(names(wrappers), family$specials)][1L]
-  if (!is.na(pointer)) {
+  hint <- hints[intersect(names(hints), family$specials)][1L]
+  if (!is.na(hint)) {
     stop(insight::format_error(c(
       paste0("Family '", resolve_family_name(family),
              "' is not supported by mvgam directly."),
-      i = paste0("Use ", pointer, ", the mvgam wrapper for a response ",
-                 "in long format.")
+      i = unname(hint)
     )), call. = FALSE)
   }
   invisible(TRUE)
@@ -146,39 +151,16 @@ validate_supported_family <- function(family) {
 #'     (Solymos et al. 2012);
 #'   - more than 30% of units visited once warns once per session.
 #'
-#' @param data Long-format observation data frame.
-#' @param response_var Name of the response column.
-#' @param series_var Series factor column name (default
-#'   `"series"`).
-#' @param time_var Time column name (default `"time"`).
-#' @param cap_var Per-row upper-truncation column name (default
-#'   `"cap"`). For binary-response families this column is
-#'   optional; when missing a constant of 1 is used.
+#' @param data Long-format observation data frame
+#' @param family The detection family, which sets the binary check, the
+#'   default cap and the columns that key a unit
+#' @param response_var Name of the response column
+#' @param series_var,time_var Names of the series and time columns
+#' @param cap_var Name of the column bounding the latent state
 #' @param has_obs_covariates Logical; TRUE when the state formula
-#'   contains at least one covariate.
-#' @param has_det_covariates Logical; TRUE when a detection
-#'   sub-formula (e.g. `p ~ tod`) is supplied.
-#' @param binary_y_check Logical; TRUE when the family restricts
-#'   the response to {0, 1} (e.g. `occ()`,
-#'   `nmix("royle_nichols")`). Triggers the y-range check.
-#' @param default_cap Integer scalar, or `NULL`. The fixed bound the
-#'   family supplies when the frame has no `cap` column. `NULL`
-#'   means the family requires the column or derives the bound per
-#'   unit from the data. Neither case leaves a default to check.
-#' @param cap_required Logical; TRUE when the family requires the
-#'   `cap` data column to be present. FALSE for families that
-#'   default the per-unit upper truncation (e.g. `occ()` defaults
-#'   to `cap = 1`). Royle-Nichols carries binary response but
-#'   keeps `cap_required = TRUE` because its latent abundance can
-#'   exceed one.
-#' @param unit_grouping_vars Optional character vector of column
-#'   names identifying one closure unit. Defaults to
-#'   `c(series_var, time_var)`. Multi-season families
-#'   (`occ(multi_season = TRUE)`, `nmix(multi_season = TRUE)`) pass a
-#'   3-axis grouping such as `c("series", "site", "time")`. Each
-#'   (species, site, season) then forms one closure unit with replicate
-#'   visits inside. The cap-constancy and single-visit identifiability
-#'   checks generalise over the supplied grouping cardinality.
+#'   contains at least one covariate
+#' @param has_det_covariates Logical; TRUE when the detection formula
+#'   contains one
 #' @param identifiability Logical. Whether to run the checks that the
 #'   design separates state from detection: two units at minimum, then
 #'   the single-visit tests. They concern a design being fitted. A
@@ -188,48 +170,32 @@ validate_supported_family <- function(family) {
 #'   identifiability failure.
 #' @noRd
 validate_closure_unit_data <- function(data,
+                                       family,
                                        response_var,
                                        series_var = "series",
                                        time_var = "time",
                                        cap_var = "cap",
                                        has_obs_covariates = FALSE,
                                        has_det_covariates = FALSE,
-                                       binary_y_check = FALSE,
-                                       cap_required = TRUE,
-                                       default_cap = NULL,
-                                       unit_grouping_vars = NULL,
                                        identifiability = TRUE) {
   checkmate::assert_data_frame(data, min.rows = 1L)
-  checkmate::assert_string(response_var)
-  checkmate::assert_string(series_var)
-  checkmate::assert_string(time_var)
-  checkmate::assert_string(cap_var)
+  checkmate::assert_true(is_closure_unit_family(family))
   checkmate::assert_flag(has_obs_covariates)
   checkmate::assert_flag(has_det_covariates)
-  checkmate::assert_flag(binary_y_check)
-  checkmate::assert_flag(cap_required)
-  checkmate::assert_int(default_cap, lower = 1L, null.ok = TRUE)
   checkmate::assert_flag(identifiability)
-  if (is.null(unit_grouping_vars)) {
-    unit_grouping_vars <- closure_unit_key_vars(
-      NULL, series_var = series_var, time_var = time_var
-    )
-  }
-  checkmate::assert_character(unit_grouping_vars, min.len = 1L,
-                               any.missing = FALSE, unique = TRUE)
+  binary_y_check <- is_binary_response_family(family)
+  default_cap <- closure_unit_default_cap(family)
+  # A family with a fixed cap or a data-driven buffer needs no column
+  cap_required <- is.null(default_cap) &&
+    is.null(closure_unit_default_cap(family, buffer = TRUE))
+  unit_grouping_vars <- closure_unit_key_vars(family, series_var, time_var)
   # Pretty-print of the grouping tuple for messages, e.g.
   # "(species, site, season)".
   grouping_label <- paste0("(", paste(unit_grouping_vars, collapse = ", "),
                             ")")
 
-  # Required columns: response + grouping. The cap column is
-  # optional only for families that default the per-unit upper
-  # truncation (e.g. occ() defaults to 1); count-latent families
-  # such as nmix() and nmix("royle_nichols") always require it.
-  required_cols <- c(response_var, unit_grouping_vars)
-  if (cap_required) {
-    required_cols <- c(required_cols, cap_var)
-  }
+  required_cols <- c(response_var, unit_grouping_vars,
+                     if (cap_required) cap_var)
   assert_axis_column(data, series_var, "series")
   assert_axis_column(data, time_var, "time")
   assert_closure_unit_columns(
@@ -314,28 +280,10 @@ validate_closure_unit_data <- function(data,
   rep_counts <- idx$n_rep[idx$n_rep > 0L]
   n_unit <- length(rep_counts)
   if (!is.null(cap_int)) {
-    caps_per_unit <- tapply(cap_int, idx$unit, function(v) {
-      length(unique(v))
-    })
-    varying <- as.integer(names(caps_per_unit)[caps_per_unit > 1L])
-    if (length(varying)) {
-      rows_g <- which(idx$unit == varying[1L])
-      bad_tuple <- paste(
-        vapply(unit_grouping_vars, function(col) {
-          paste0(col, "=", as.character(data[[col]][rows_g[1L]]))
-        }, character(1L)),
-        collapse = ", "
-      )
-      stop(insight::format_error(c(
-        paste0("'", cap_var, "' must be constant within a closure unit."),
-        x = paste0(
-          "Closure unit (", bad_tuple, ") has differing '", cap_var,
-          "' values: ", paste(unique(cap_int[rows_g]), collapse = ", "),
-          "."
-        ),
-        i = paste0("Give '", cap_var, "' one value per closure unit.")
-      )), call. = FALSE)
-    }
+    refuse_unit_varying(
+      cap_int, list(row_unit = idx$unit, N_unit = length(idx$levels)),
+      cap_var, "The cap bounds the latent state of the unit."
+    )
   }
 
   if (!identifiability) {
@@ -1882,35 +1830,16 @@ validate_response_shapes <- function(data, formula, family) {
       next
     }
     column <- columns[[key]]
-    trials <- trials_expression(response_formulas(formula)[[key]], fam)
+    form <- response_formulas(formula)[[key]]
     for (frame in frames) {
       if (!column %in% names(frame)) next
       validate_response_for_family(frame[[column]], fam, y_name = column)
-      refuse_counts_above_trials(frame, column, trials)
+      refuse_counts_above_trials(
+        frame, column, addition_term_values(form, fam, frame)$trials
+      )
     }
   }
   invisible(TRUE)
-}
-
-
-#' The expression inside a response's `trials()` term
-#'
-#' @param form The response's `brmsformula`
-#' @param family The response's family
-#' @return A quosure in the formula's environment, or `NULL` when the
-#'   response has no `trials()` term
-#' @noRd
-trials_expression <- function(form, family) {
-  checkmate::assert_list(form)
-  checkmate::assert_list(family)
-  form$family <- family
-  ad <- brms::brmsterms(form)$adforms$trials
-  if (is.null(ad)) {
-    return(NULL)
-  }
-  # brms stores the term as `~ resp_trials(<expr>)`.
-  rlang::new_quosure(rlang::f_rhs(ad)[[2L]],
-                     environment(form$formula) %||% globalenv())
 }
 
 
@@ -1922,24 +1851,17 @@ trials_expression <- function(form, family) {
 #'
 #' @param frame Data frame holding the response
 #' @param column Character name of the response column
-#' @param trials Quosure of the `trials()` expression, or `NULL`
+#' @param n Trial counts, one per row of `frame`, or `NULL`
 #' @return `TRUE`, invisibly, or an error
 #' @noRd
-refuse_counts_above_trials <- function(frame, column, trials) {
+refuse_counts_above_trials <- function(frame, column, n) {
   checkmate::assert_data_frame(frame)
   checkmate::assert_string(column)
-  checkmate::assert_class(trials, "quosure", null.ok = TRUE)
-  if (is.null(trials)) {
-    return(invisible(TRUE))
-  }
-  # A name the frame lacks may be a constant the formula environment holds.
-  unbound <- setdiff(all.vars(rlang::quo_get_expr(trials)), names(frame))
-  env <- rlang::quo_get_env(trials)
-  if (!all(vapply(unbound, exists, logical(1L), envir = env))) {
+  checkmate::assert_numeric(n, null.ok = TRUE)
+  if (is.null(n)) {
     return(invisible(TRUE))
   }
   y <- frame[[column]]
-  n <- rep_len(rlang::eval_tidy(trials, frame), length(y))
   over <- !is.na(y) & !is.na(n) & y > n
   if (!any(over)) {
     return(invisible(TRUE))
@@ -2239,6 +2161,24 @@ validate_obs_formula_brms <- function(formula) {
                  "the time and series columns among them."),
       i = "List the covariates the model should use."
     )), call. = FALSE)
+  }
+
+  # The Stan likelihood includes a `rate()` denominator and an `se()`
+  # standard error. Predictions, residuals and log-likelihoods are
+  # computed in R from the predictor and the family's parameters. Those
+  # computations would leave both terms out.
+  for (aterm in c("rate", "se")) {
+    if (any(vapply(forms, function(f) {
+      !is.null(find_aterm_call(f, aterm))
+    }, logical(1L)))) {
+      stop(insight::format_error(c(
+        paste0("'", aterm, "()' is not supported in the observation ",
+               "'formula'."),
+        i = if (aterm == "rate") {
+          "Write the exposure as an offset, as in '+ offset(log(area))'."
+        }
+      )), call. = FALSE)
+    }
   }
 
   validate_exact_gp_usage(formula)
@@ -3097,14 +3037,19 @@ hierarchical_series_values <- function(data, gr_var, subgr_var) {
 #' @param axis Either `"time"` or `"series"`
 #' @param require_factor Logical. `TRUE` requires a factor series
 #'   column.
+#' @param frame Character name of the frame in the user's call, such
+#'   as `"newdata"`. The messages name it and use it in their remedies.
 #' @return `TRUE`, invisibly, or an error
 #' @noRd
 assert_axis_column <- function(data, column, axis = c("time", "series"),
-                               require_factor = TRUE) {
+                               require_factor = TRUE, frame = "data") {
   checkmate::assert_data_frame(data)
   checkmate::assert_string(column)
   checkmate::assert_flag(require_factor)
+  checkmate::assert_string(frame, min.chars = 1L)
   axis <- match.arg(axis)
+  where <- if (frame == "data") "the data" else paste0("'", frame, "'")
+  cell <- paste0(frame, "$", column)
   if (column %in% names(data)) {
     if (axis == "series" && require_factor &&
         !is.factor(data[[column]])) {
@@ -3112,8 +3057,7 @@ assert_axis_column <- function(data, column, axis = c("time", "series"),
         paste0("Column '", column, "' must be a factor."),
         x = paste0("Got class '", class(data[[column]])[1L], "'."),
         i = "A factor's levels fix the order of the series.",
-        i = paste0("Convert it with data$", column, " <- factor(data$",
-                   column, ").")
+        i = paste0("Convert it with ", cell, " <- factor(", cell, ").")
       )), call. = FALSE)
     }
     if (axis == "time" && !is.numeric(data[[column]])) {
@@ -3122,31 +3066,31 @@ assert_axis_column <- function(data, column, axis = c("time", "series"),
         x = paste0("Got class '", class(data[[column]])[1L], "'."),
         i = "mvgam orders and spaces the times by their values.",
         i = paste0(
-          "Convert it with data$", column, " <- ",
+          "Convert it with ", cell, " <- ",
           if (is.factor(data[[column]])) {
-            paste0("as.numeric(as.character(data$", column, ")).")
+            paste0("as.numeric(as.character(", cell, ")).")
           } else {
-            paste0("as.numeric(data$", column, ").")
+            paste0("as.numeric(", cell, ").")
           }
         )
       )), call. = FALSE)
     }
     return(invisible(TRUE))
   }
-  place <-c(time = "at one occasion", series = "on one series")[[axis]]
+  place <- c(time = "at one occasion", series = "on one series")[[axis]]
   hints <- c(
     i = paste0("A latent trend places each row ", place, "."),
     i = paste0(
-      "Add '", column, "' to the data or name its column with the ",
+      "Add '", column, "' to ", where, " or name its column with the ",
       "trend constructor's '", axis, "' argument."
     ),
     if (axis == "series") {
-      c(i = paste0("For a single time series: data$", column,
+      c(i = paste0("For a single time series: ", cell,
                    " <- factor(\"series_1\")"))
     }
   )
   stop(insight::format_error(c(
-    paste0("Column '", column, "' is absent from the data."),
+    paste0("Column '", column, "' is absent from ", where, "."),
     x = paste0(
       "Supplied: ", paste0("'", names(data), "'", collapse = ", "), "."
     ),
@@ -3516,13 +3460,16 @@ is_trend_term <- function(expr, trend_patterns) {
 #'   `response_columns()`, for multivariate series creation
 #' @param metadata A fit's trend metadata, or `NULL`. Used in the
 #'   prediction context.
+#' @param frame Character name of the frame in the user's call, which
+#'   a missing axis column's error names
 #' @return Data frame with mvgam time and series attributes added
 #' @noRd
 ensure_mvgam_variables <- function(data, parsed_trend = NULL,
                                    time_var = "time",
                                    series_var = "series",
                                    response_vars = NULL,
-                                   metadata = NULL) {
+                                   metadata = NULL,
+                                   frame = "data") {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(parsed_trend, null.ok = TRUE)
   checkmate::assert_string(time_var)
@@ -3542,7 +3489,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL,
   # real first time somewhere in the middle. The mapping would stay a
   # bijection and no downstream check could detect the error. Sorted
   # input is unaffected.
-  assert_axis_column(data, time_var, "time")
+  assert_axis_column(data, time_var, "time", frame = frame)
   unique_times <- time_axis_values(data[[time_var]])
   time_mapping <- setNames(seq_along(unique_times), unique_times)
   attr(data, "mvgam_time") <- time_mapping[as.character(data[[time_var]])]
@@ -3650,7 +3597,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL,
   # Strategy 4: the series column
   if (is.null(series_values)) {
     assert_axis_column(data, series_var, "series",
-                       require_factor = is.null(metadata))
+                       require_factor = is.null(metadata), frame = frame)
     series_values <- data[[series_var]]
     series_source <- "explicit"
   }
@@ -4942,45 +4889,6 @@ find_aterm_call <- function(formula, aterm) {
   lhs <- if (length(inner) >= 3L) inner[[2L]] else inner
   calls <- formula_calls(lhs, aterm)
   if (length(calls)) calls[[1L]] else NULL
-}
-
-
-#' Resolve a model's per-row binomial denominator for a data frame
-#'
-#' A model has two row spaces. The likelihood covers the observed
-#' responses only. Predictions cover every row of the target data,
-#' including those whose response was missing. The denominator brms
-#' places in `standata` belongs to the first. Reused for the second it
-#' misaligns as soon as any response is `NA`. Evaluating the `trials()`
-#' addition term against the data being predicted keeps them aligned.
-#' It also covers a constant denominator such as `trials(30)`, which
-#' has no column.
-#'
-#' @param formula The model's observation formula.
-#' @param data The data frame predictions are being made for.
-#' @return A vector with one element per row of `data`, or NULL when
-#'   the formula carries no `trials()` term or the term names a
-#'   column absent from `data`.
-#' @noRd
-resolve_trials_denominator <- function(formula, data) {
-  checkmate::assert_data_frame(data, min.rows = 1L)
-  if (!inherits(formula, c("formula", "brmsformula", "mvgam_formula"))) {
-    return(NULL)
-  }
-  trials_call <- find_aterm_call(formula, "trials")
-  if (is.null(trials_call) || length(trials_call) < 2L) {
-    return(NULL)
-  }
-  denominator <- trials_call[[2L]]
-  needed <- all.vars(denominator)
-  if (length(needed) && !all(needed %in% names(data))) {
-    return(NULL)
-  }
-  values <- eval(denominator, data)
-  if (length(values) == 1L) {
-    values <- rep(values, nrow(data))
-  }
-  values
 }
 
 

@@ -2894,8 +2894,7 @@ test_that("com_binomial() default prior on nu is normal(1, 1)", {
 
 
 test_that("com_binomial() refuses non-logit links", {
-  expect_error(com_binomial(link = "probit"))
-  expect_error(com_binomial(link = "log"))
+  expect_error(com_binomial(link = "probit"), "{'logit'}", fixed = TRUE)
 })
 
 

@@ -3,7 +3,7 @@
 \name{ordinate}
 \alias{ordinate}
 \alias{ordinate.mvgam}
-\title{Latent variable ordination plots from \code{mvgam} and \code{jsdgam} fits}
+\title{Ordination biplot of a latent factor model}
 \usage{
 ordinate(object, ...)
 
@@ -20,160 +20,119 @@ ordinate(object, ...)
 )
 }
 \arguments{
-\item{object}{A fitted \code{mvgam} or \code{jsdgam} object with latent
-dynamic factors (\code{n_lv} set on an \code{AR()} / \code{RW()} / \code{VAR()} /
-\code{ZMVN()} trend constructor, or a \code{trend_map} argument).}
+\item{object}{A fitted \code{mvgam} or \code{jsdgam} model with at least two
+latent factors, set by \code{n_lv} in \code{\link[=jsdgam]{jsdgam()}} or in a trend
+constructor}
 
 \item{...}{Unused. Anything passed here is refused.}
 
-\item{which_lvs}{Integer vector of length 2 indicating the
-two re-rotated latent variables to plot. Defaults to
-\code{c(1, 2)}.}
+\item{which_lvs}{Two distinct integers: the axes to plot}
 
-\item{biplot}{Logical. When \code{TRUE} (the default) both site
-scores and series loading arrows are drawn; when \code{FALSE},
-site scores only.}
+\item{biplot}{Logical. \code{TRUE} draws the series loadings with the site
+scores. \code{FALSE} draws the site scores alone.}
 
-\item{alpha}{Proportional numeric scalar in \verb{[0, 1]}
-controlling how the SVD singular value variance is split
-between site scores and series loadings. \code{alpha = 0.5}
-(default) splits equally; distances between sites and
-between series are approximately comparably scaled. Use
-\code{alpha} close to \code{1} to emphasise separation between time
-points, or close to \code{0} to emphasise separation between
-series. Matches the BORAL convention. Ignored for
-\code{rotation} values other than \code{"svd"}.}
+\item{alpha}{Number in \verb{[0, 1]}: the share of each singular value
+given to the site scores under \code{rotation = "svd"}. The loadings
+take the rest. \code{0.5} scales sites and series alike. Values near 1
+spread the sites, values near 0 spread the series (Hui 2016).}
 
-\item{rotation}{Character. Post-hoc rotation of the
-posterior-median LV trends and Z loadings before plotting.
-One of:
+\item{rotation}{The basis of the axes:
 \describe{
-\item{\code{"svd"} (default)}{BORAL convention: SVD of
-\code{LV \%*\% t(Z)} re-orders axes by singular-value variance.
-Most informative when \code{n_lv > 2} and you want the two
-leading gradients. Use \code{alpha} to split the variance
-between site scores and loadings.}
-\item{\code{"varimax"}}{Orthogonal rotation maximising loading
-sparsity (each series loads strongly on one factor and
-near-zero on others). Use this to give each factor an
-interpretable name. The axes have no variance ordering.
-Requires \code{n_lv >= 2}. \code{alpha} ignored.}
-\item{\code{"promax"}}{Oblique extension of varimax that allows
-correlated rotated factors. \code{alpha} ignored.}
-\item{\code{"none"}}{Plot the centred posterior medians of the
-identified latent variables and loadings, as described
-in Details. \code{alpha} ignored.}
+\item{\code{"svd"}}{Axes ordered by the variance of
+\code{LV \%*\% t(Z)} they explain. The first two show the leading
+gradients.}
+\item{\code{"varimax"}}{An orthogonal rotation under which each
+series loads on as few axes as it can. The axes then lend
+themselves to names.}
+\item{\code{"promax"}}{An oblique rotation, as varimax with
+correlated axes.}
+\item{\code{"none"}}{The identified factors themselves, centred.}
 }
-Varimax and promax axes have no variance ordering. Any pair of
-rotated factors is then a valid choice for \code{which_lvs}.}
+Varimax and promax axes carry no variance order. Any two of them
+make a valid \code{which_lvs}.}
 
-\item{label_sites}{Logical. When \code{TRUE}, site scores are
-drawn as text labels (the training time values); when
-\code{FALSE}, as points only.}
+\item{label_sites}{Logical. \code{TRUE} labels each site score with its
+unit or time value.}
 
-\item{traits}{Optional trait overlay. Accepts \code{NULL} (default,
-no overlay), the literal string \code{"auto"} (pull the trait
-frame off the fit if it was fitted with a trait-informed
-\code{loadings_prior}), or an explicit \code{data.frame} / \code{matrix}
-with one row per series. Numeric columns are regressed on
-the rotated series loadings to give each trait's direction
-in the LV space; the resulting arrows are overlaid in
-steelblue. Row alignment follows \code{rownames(traits)} when
-set; otherwise rows must match the fit's series-level order.
-Non-numeric columns are ignored. A fit carrying no traits
-warns and the overlay is skipped. Only meaningful when
-\code{biplot = TRUE}.}
+\item{traits}{\code{NULL}, \code{"auto"}, or a data frame or matrix of series
+traits. \code{"auto"} takes the traits a \code{jsdgam(traits = ...)} fit
+stores. Each numeric trait is regressed on the plotted loadings.
+Its arrow points the way the trait increases. Rows match the
+series by \code{rownames(traits)} when those name every series and by
+position otherwise. Drawn only with \code{biplot = TRUE}.}
 
-\item{trait_arrow_scale}{Positive numeric. Visual scaling
-factor for trait-arrow lengths. The default \code{1} matches the
-longest trait arrow to the longest series-loading radius;
-values \verb{> 1} lengthen, values \verb{< 1} shorten.}
+\item{trait_arrow_scale}{Positive number. The longest trait arrow is
+\code{trait_arrow_scale} times the longest loading arrow.}
 }
 \value{
-A \code{ggplot} object. The returned object carries a
-\code{"rotation"} attribute (a list with \code{method}, \code{n_lv},
-\code{scores}, \code{loadings}, \code{rotmat}) so users can extract the
-rotated factor scores and loadings without re-running
-\code{ordinate()}. Access via \code{attr(p, "rotation")}.
+A \code{ggplot} object. \code{attr(p, "rotation")} holds the rotated
+\code{scores} and \code{loadings}, the rotation matrix \code{rotmat} (\code{NULL} for
+\code{"svd"} and \code{"none"}), the \code{method} and \code{n_lv}.
 }
 \description{
-Plot an ordination of latent variables and their factor
-loadings from a fitted factor model. The two chosen latent
-variables are first re-rotated, then posterior medians of the
-variables and the series' loadings are scattered in the
-resulting 2-D space. "Sites" are the training time points and
-"species" are the model's series. Site labels and series
-loading arrows are drawn via the package-wide \pkg{ggrepel}
-helpers; when \pkg{ggarrow} and \pkg{ggpp} are installed the
-arrows are rendered as tapered loadings.
+Plots the site scores and series loadings of a factor model on two
+axes. Sites are the points on the fit's unit or time axis, labelled
+by their values. Series, such as the species of a \code{\link[=jsdgam]{jsdgam()}} fit,
+are arrows from the origin. Series that point the same way share
+their residual variation. Arrows are tapered when \pkg{ggarrow} and
+\pkg{ggpp} are installed.
 }
 \details{
-\code{ordinate()} starts from the identified loadings and latent
-variables of the fit. Factors that share their dynamics are
-identified by rotation to the lower-triangular \code{Z_tilde} and its
-factor paths \code{lv_trend_tilde} (Heaps and Jermyn 2024). Factors
-that take their own coefficients are identified by one ordering
-and orientation of \code{Z} and \code{lv_trend}. The Identification section
-of the trend constructors describes both. With
-\code{rotation = "svd"} (default) the axes are ordination gradients
-ordered by the variance they explain. With \code{"varimax"} or
-\code{"promax"} each axis loads on as few series as it can.
-\code{rotation = "none"} and \code{plot_factors()} show the identified
-factors themselves.
+The plot starts from the posterior medians of the identified factors
+and loadings. Factors with shared dynamics are identified by a
+rotation to lower-triangular loadings, \code{Z_tilde} and
+\code{lv_trend_tilde} (Heaps and Jermyn 2024). Factors with their own
+dynamics are identified by an ordering and orientation of \code{Z} and
+\code{lv_trend}. The Identification section of \link{trend_constructors}
+describes both. Every rotation keeps the product \code{LV \%*\% t(Z)} the
+model fitted.
 
-A \code{trend_map} supplies the loading pattern as data. Any rotation
-other than \code{"none"} replaces that pattern with one derived from the
-fitted covariance. Each such call warns and names the rotation it
-applied. \code{plot_factors(fit)} shows the loadings the map declared.
-}
-\note{
-This method needs a fitted factor model. It uses the
-identified latent variables and their loadings. A model
-identified by rotation supplies \code{lv_trend_tilde} and \code{Z_tilde}.
-Every other factor model supplies \code{lv_trend} and \code{Z}.
-}
-\section{Known limitations}{
+The medians carry no posterior uncertainty into the plot. Axis signs
+are arbitrary. Two fits may need an axis flipped before they agree.
+\code{\link[=compare_loadings]{compare_loadings()}} aligns the loadings of two fits.
 
-\itemize{
-\item Posterior-median plug-in: the rotation operates on
-per-element medians of \code{lv_trend} and \code{Z}. Uncertainty in
-site scores and loading positions is not propagated to
-the biplot.
-\item Sign indeterminacy: SVD and varimax columns have arbitrary
-signs. Ordinations from independently fitted models may need a
-manual sign flip to align.
+A \code{trend_map} supplies the loadings as data. A rotation other than
+\code{"none"} replaces them and warns on every call.
+\code{plot(object, type = "factors")} shows the loadings the map declared.
 }
-}
-
 \examples{
 \dontrun{
-set.seed(1)
-simdat <- sim_closure_unit_data(
-  family = occ(),
-  n_species = 4L,
-  n_sites = 50L,
-  n_visits = 4L,
-  type = 2L
-)
-mod <- jsdgam(
-  formula = bf(y ~ env, p ~ tod_c),
-  factor_formula = ~ -1,
-  data = simdat$data_train,
-  family = occ(),
-  n_lv = 2L,
-  chains = 2,
-  silent = 2
-)
+# Gaussian responses of 10 species at 60 sites, driven by two
+# latent factors
+simdat <- sim_jsdgam(family = gaussian(), n_species = 10L,
+                     n_sites = 60L, n_lv = 2L, seed = 3L)
+mod <- jsdgam(y ~ env * series, data = simdat$data_train,
+              family = gaussian(), n_lv = 2L, chains = 2, silent = 2)
 
-# SVD biplot of site + species scores in the two-factor space.
+# Sites as points and species loadings as arrows
 ordinate(mod)
+
+# Varimax axes, on which each species loads on as few as it can
+p <- ordinate(mod, rotation = "varimax", label_sites = FALSE)
+p
+attr(p, "rotation")$loadings
+
+# Next, residual_cor(mod) gives the species correlations the
+# factors imply
 }
 
+}
+\references{
+Hui, F. K. C. (2016). boral: Bayesian ordination and regression
+analysis of multivariate abundance data in R. \emph{Methods in Ecology
+and Evolution}, 7, 744-750. \doi{10.1111/2041-210X.12514}
+
+Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+distributions for the covariance matrix in latent factor models.
+\emph{Statistics and Computing}, 34, 143.
+\doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
-\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=residual_cor]{residual_cor()}},
-\code{\link[=plot.mvgam]{plot.mvgam()}} (especially \code{type = "factors"} and
-\code{type = "latent_state"})
+\code{\link[=plot.mvgam]{plot.mvgam()}} with \code{type = "factors"} plots each factor's
+path. \code{\link[=residual_cor]{residual_cor()}} gives the correlations among series the
+factors imply. The
+\href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} interprets a biplot
+of species loadings.
 
 Other latent dynamics: 
 \code{\link{active_factors}()},

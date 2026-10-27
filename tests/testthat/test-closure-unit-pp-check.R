@@ -1,6 +1,6 @@
 # Tests for the closure-unit pp_check helpers. Structural coverage
 # of the `closure_unit_pp_check_setup()` aggregation hook and
-# the `check_closure_unit_var_unit_constant()` group / x validator;
+# the `refuse_unit_varying()` group / x validator;
 # end-to-end MCMC integration on the cached occ fixture lives in
 # tests/local/test-closure-unit-pp-check.R.
 
@@ -93,7 +93,7 @@ test_that(
   for (t in blocked) {
     expect_error(
       pp_check(obj, type = t),
-      "not available for"
+      "not supported for\\s+closure-unit"
     )
   }
 })
@@ -104,26 +104,17 @@ test_that(
 # unit. The fixture `tod` varies within a unit; `elev` does not.
 # ------------------------------------------------------------
 
-test_that(
-  "check_closure_unit_var_unit_constant() rejects per-visit covariates", {
+test_that("refuse_unit_varying() refuses only a per-visit covariate", {
   d <- make_pp_check_grid()
   arrays <- build_closure_unit_arrays(
     d, response_var = "y", default_cap = 1L
   )
   expect_error(
-    check_closure_unit_var_unit_constant(d$tod, arrays, "tod"),
-    "not constant within every closure unit"
-  )
-})
-
-test_that(
-  "check_closure_unit_var_unit_constant() accepts unit-constant covars", {
-  d <- make_pp_check_grid()
-  arrays <- build_closure_unit_arrays(
-    d, response_var = "y", default_cap = 1L
+    refuse_unit_varying(d$tod, arrays, "tod", PP_CHECK_UNIT_REASON),
+    "'tod' varies within a closure unit"
   )
   expect_silent(
-    check_closure_unit_var_unit_constant(d$elev, arrays, "elev")
+    refuse_unit_varying(d$elev, arrays, "elev", PP_CHECK_UNIT_REASON)
   )
 })
 
@@ -145,11 +136,9 @@ test_that("pp_check(type = 'fit_stat') is refused where no unit aggregates", {
     structure(list(data = d, formula = y ~ x, family = fam),
               class = "mvgam")
   }
-  # A family with no closure unit at all. The pattern stops short of
-  # "families" because insight wraps the line there.
   expect_error(
     pp_check(stub(gaussian()), type = "fit_stat"),
-    "only available for the detection"
+    "applies to the detection"
   )
   # These five share the closure-unit layout but never sum the rows of
   # a unit. A composition's rows sum to one whatever the fit says. The
@@ -157,7 +146,7 @@ test_that("pp_check(type = 'fit_stat') is refused where no unit aggregates", {
   for (fam in list(diri(), multi(), categ(), mvn(), mvt())) {
     expect_error(
       pp_check(stub(fam), type = "fit_stat"),
-      "does not aggregate repeat visits"
+      "one observation per row"
     )
   }
 })

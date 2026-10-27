@@ -909,7 +909,7 @@ test_that("the series argument refuses what it cannot resolve", {
   n_lev <- nlevels(fit$data$series)
   expect_identical(n_lev, n_series)
   expect_error(conditional_effects(fit, series = "not_a_series"),
-               "not one of the model's series levels")
+               "Unknown series name")
   expect_error(conditional_effects(fit, series = n_lev + 1L), "out of range")
   expect_error(conditional_effects(fit, series = c("a", "b")),
                "NULL, 'all', a series name")

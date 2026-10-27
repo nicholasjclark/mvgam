@@ -318,8 +318,19 @@ series_time_plot <- function(dat, ylab, lines, facet = TRUE) {
 }
 
 
-#'@noRd
+#' Histogram panel of one observed series
+#'
+#' A missing `y` is dropped without the ggplot2 removal notice, as in
+#' `series_time_plot()`.
+#'
+#' @param y Numeric response values
+#' @param ylab Character x-axis label
+#' @param n_bins Integer bin count, or `NULL` for at least 20 bins
+#' @return A `ggplot` object
+#' @noRd
 series_hist_panel <- function(y, ylab, n_bins = NULL) {
+  checkmate::assert_numeric(y)
+  checkmate::assert_string(ylab)
   if (is.null(n_bins)) {
     n_bins <- max(
       length(graphics::hist(y, plot = FALSE)$breaks), 20L
@@ -327,15 +338,27 @@ series_hist_panel <- function(y, ylab, n_bins = NULL) {
   }
   ggplot2::ggplot(data.frame(y = y), ggplot2::aes(x = y)) +
     ggplot2::geom_histogram(
-      bins = n_bins, fill = mvgam_colour("dark"), colour = "white"
+      bins = n_bins, fill = mvgam_colour("dark"), colour = "white",
+      na.rm = TRUE
     ) +
+    # Counts take whole-number ticks
+    ggplot2::scale_y_continuous(breaks = function(limits) {
+      breaks <- pretty(limits)
+      breaks[breaks == round(breaks)]
+    }) +
     ggplot2::labs(title = "Histogram", x = ylab, y = "Count") +
     mvgam_theme()
 }
 
 
-#'@noRd
+#' Autocorrelation panel of one observed series
+#'
+#' @param y Numeric response values in time order. A missing value is
+#'   passed to `stats::acf()`, which skips the pairs it enters.
+#' @return A `ggplot` object with 95% bounds for white noise
+#' @noRd
 series_acf_panel <- function(y) {
+  checkmate::assert_numeric(y)
   acf_y <- stats::acf(y, plot = FALSE, na.action = stats::na.pass)
   df <- data.frame(
     lag = as.numeric(acf_y$lag[, 1, 1]),
@@ -358,8 +381,15 @@ series_acf_panel <- function(y) {
 }
 
 
-#'@noRd
+#' Empirical CDF panel of one observed series
+#'
+#' @param y Numeric response values. Missing values are dropped.
+#' @param ylab Character x-axis label
+#' @return A `ggplot` object
+#' @noRd
 series_ecdf_panel <- function(y, ylab) {
+  checkmate::assert_numeric(y)
+  checkmate::assert_string(ylab)
   y_clean <- y[!is.na(y)]
   rng <- range(y_clean)
   df <- data.frame(x = seq(rng[1L], rng[2L], length.out = 100L))

@@ -2,7 +2,7 @@
 % Please edit documentation in R/families.R
 \name{nmix}
 \alias{nmix}
-\title{Closure-unit Poisson-binomial N-mixture family}
+\title{N-mixture family for repeated counts of unmarked individuals}
 \usage{
 nmix(
   type = c("poisson_binomial", "royle_nichols", "poisson_poisson"),
@@ -10,326 +10,121 @@ nmix(
 )
 }
 \arguments{
-\item{type}{Character scalar selecting the N-mixture variant.
-\code{"poisson_binomial"} (default) is the canonical Royle (2004)
-model: latent abundance \code{N ~ Poisson(lambda)}, per-visit
-counts \code{y ~ Binomial(N, p)} with logit-link per-visit
-detection \code{p}. \code{"royle_nichols"} is the Royle and Nichols
-(2003) binary-detection variant: latent \code{N ~ Poisson(lambda)},
-per-visit binary outcomes \code{y ~ Bernoulli(1 - (1-r)^N)} with
-logit-link per-individual detection \code{r}. \code{"poisson_poisson"}
-is the Neyman Type A model used for encounter counts (e.g.
-camera-trap captures): latent \code{N ~ Poisson(lambda)}, per-visit
-counts \code{y ~ Poisson(N * p)} with log-link per-individual
-encounter rate \code{p}.}
+\item{type}{The variant, \code{"poisson_binomial"} by default. See
+\strong{Choosing a variant}.}
 
-\item{multi_season}{Logical. When \code{TRUE}, closure units are
-defined by \verb{(series, site, time)}. The default is \verb{(series, time)}.
-The data must carry a \code{site} column. Produce it from a 4-axis
-observation array with \code{\link[=pivot_detection_array]{pivot_detection_array()}} (set
-\code{multi_season = "hierarchical"}).
-Per-unit \code{Y_max[g]} and the K_max buffer (\code{Y_max[g] + 100} for
-PB and PPM by default; static \code{K_max = 25} for RN) are
-computed from the visits in unit \code{g} only. With few visits per
-(site, season) and a highly abundant species, that cap may
-bind and downward-bias \code{lambda}; inspect \code{standata(fit)$K_max}
-against \code{posterior_latent_N()} / \code{latent_N_saturation(fit)}
-after fitting and raise \code{cap} if needed. Sparse visits +
-low detection probability also produces prior-dominated
-posteriors; check marginal posteriors against the prior.}
+\item{multi_season}{Logical. \code{TRUE} keys a closure unit on
+\verb{(series, site, time)}, for several seasons of visits to each
+site. The data then need a \code{site} column, which
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} creates from a four-dimensional array
+with \code{multi_season = "hierarchical"}. Each unit holds the visits of
+one site in one season.}
 }
 \value{
-A \code{brms::customfamily} object with the
-\code{mvgam_closure_unit} attribute set; closure-unit data prep
-builds the unit arrays and attaches the Stan lpdf at fit
-time.
+A family object to pass to \code{\link[=mvgam]{mvgam()}} or \code{\link[=jsdgam]{jsdgam()}}.
 }
 \description{
-N-mixture model (Royle 2004, \emph{Biometrics}) with a Poisson
-latent abundance and binomial detection. Each observation
-row is one visit; closure is enforced over (series, time)
-pairs so multiple rows sharing the same (series, time)
-represent replicate visits to the same underlying abundance.
-The latent count \code{N_g} for closure unit \code{g} is marginalised
-analytically over the truncated range
-\verb{K_max[g] >= k >= max(y[g, ])} using a \code{log_sum_exp} over
-\code{poisson_log_lpmf(k | log_lambda_g)} plus
-\verb{binomial_logit_lpmf(y[g,] | k, logit_p_\{g,j\})} (Royle 2004).
+For counts made on repeated visits to sites whose abundance stays
+fixed across the visits, such as bird point counts within a season.
+The data hold one row per visit. The visits sharing a \code{series} and a
+\code{time} belong to one closure unit, whose latent abundance \code{N} is
+Poisson with mean \code{mu}. Each visit's count depends on \code{N} and the
+detection parameter \code{p}. The likelihood sums over \code{N} from the
+unit's largest count up to the cap \code{K_max} (Royle 2004).
 }
 \details{
-Parameterised with two distributional parameters:
-\describe{
-\item{\code{mu}}{positive abundance rate \eqn{\lambda} (log link, fixed)}
-\item{\code{p}}{per-visit detection probability (logit link, fixed)}
-}
-
-Distributional regression. brms \code{bf()} syntax handles
-covariate-dependent detection automatically:
-
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(bf(y ~ s(elev), p ~ s(tod)), family = nmix(), data = ...)
-}\if{html}{\out{</div>}}
-
-Identifiability. With a single visit per closure unit the
-likelihood reduces to a thinned Poisson with only
-\code{lambda * p} identified; the individual parameters are not.
-Information about the decomposition flows entirely from
-shared structure across units (covariates in either formula
-and the across-unit hierarchical pooling). Practical
-guidance from Kery (2018, \emph{Ecology}): with 3 or more visits
-per unit the model is reliably identified for detection
-probabilities above 0.1; with 2 visits identification is
-marginal below \code{p = 0.3}. \code{validate_closure_unit_data()}
-warns when the average visit count is below 2. It errors when every
-unit has only one visit and the model has no covariates.
-
-Under overdispersed counts (negative-binomial truth in place of
-Poisson), the detection probability is biased downward. The abundance
-is biased upward. The product \code{lambda * p} stays approximately
-consistent (Knape et al. 2018, \emph{Methods in Ecology and Evolution}).
-Use posterior predictive checks to detect this. Refit with a richer
-abundance distribution if overdispersion is present.
-
-Data shape. A long-format data frame, one row per visit, with
-columns: a response (count) column, \code{series} (factor),
-\code{time} (integer), \code{cap} (per-row upper truncation; constant
-within a closure unit), plus any covariates referenced in the
-formulae. Multiple rows sharing the same (series, time) pair
-encode replicate visits to one closure unit.
-
-Prediction at different caps. \code{cap} is stored as a data column as well
-as in the Stan data. Predicting via \code{predict(fit, newdata = X)}
-re-extracts the closure-unit arrays from \code{newdata}. Users can request
-latent-abundance draws under arbitrary upper truncations by supplying
-\code{newdata} with different \code{cap} values. Set \code{cap} higher than
-the fit-time cap to expand the latent-state support;
-fit-time caps are reused when \code{newdata} is \code{NULL}.
+\code{bf(y ~ elev, p ~ tod)} models abundance and detection, each with
+its own formula. \code{mu} takes the log link. \code{\link[=predict]{predict()}} with
+\code{type = "latent_state"} gives the expected abundance of each unit
+given its counts. \code{type = "detection"} gives the detection
+probability of each visit.
 }
 \section{Choosing a variant}{
 
-All three variants share the latent-abundance prior
-\code{N ~ Poisson(lambda)}; they differ in how \code{N} maps to the
-visit-level observation.
-
+All three variants take \code{N ~ Poisson(mu)} and differ in what a visit
+records.
 \describe{
-\item{\code{"poisson_binomial"} (default; Royle 2004)}{Per-visit
-counts \code{y ~ Binomial(N, p)}. \code{y} is bounded by \code{N} (each
-individual contributes at most one count per visit). Fits
-replicate effort-bounded surveys: bird point counts,
-electrofishing passes, plot-level vegetation tallies.
-Detection covariates attach to \code{p} via
-\code{bf(y ~ ..., p ~ visit_effort)}.}
-\item{\code{"royle_nichols"} (Royle and Nichols 2003)}{Binary per
-visit, \code{y ~ Bernoulli(1 - (1 - r)^N)}. Requires \code{y} to be
-0 / 1. Fits surveys where the response is detect /
-not-detect: camera-trap photos collapsed over an interval,
-occupancy-style replicates, eDNA samples scored as binary.
-Detection is per-individual. Two individuals at a site can each
-push the visit-level probability up.}
-\item{\code{"poisson_poisson"} (Neyman Type A; Neyman 1939)}{Counts
-\code{y ~ Poisson(N * p)}. \code{y} is unbounded and can exceed \code{N}. Each
-individual contributes an independent Poisson encounter rate.
-Fits encounter surveys where the same
-individual can be recorded multiple times per visit:
-camera-trap event counts, acoustic detection counts,
-mark-resight encounters. Log-link on both \code{lambda} and
-\code{p}.}
+\item{\code{"poisson_binomial"} (Royle 2004)}{Counts
+\code{y ~ Binomial(N, p)}, which never exceed \code{N}. Point counts,
+removal passes and plot tallies fit this design. \code{p} is the
+detection probability of each individual, on the logit link.}
+\item{\code{"royle_nichols"} (Royle and Nichols 2003)}{Detections
+\code{y ~ Bernoulli(1 - (1 - p)^N)} in 0 / 1. Camera-trap or eDNA
+detections scored as present or absent fit this design. \code{p} is
+the detection probability of each individual, on the logit
+link. A visit's detection probability rises with \code{N}.}
+\item{\code{"poisson_poisson"} (Neyman 1939)}{Counts
+\code{y ~ Poisson(N * p)}, which can exceed \code{N}. Camera-trap events
+and acoustic detections, where one individual is recorded
+several times, fit this design. \code{p} is the encounter rate of
+each individual per visit, on the log link.}
+}
 }
 
-Pick the variant from the survey design: 0 / 1 visits
-need \code{royle_nichols}; counts that cap at abundance need
-\code{poisson_binomial}; counts that can re-detect the same
-individual need \code{poisson_poisson}. PB and RN have the same
-visit-level variance at fixed \verb{(N, p)} and \verb{(N, r)} so the
-data cannot tell them apart after the fact; PPM separates from
-PB only via the upper tail (PPM has no \code{y <= N} ceiling).
+\section{Priors}{
+
+A detection probability \code{p} on the logit link takes \code{beta(1, 1)} as
+a scalar. With a formula, its intercept takes \code{normal(0, 1.5)},
+which puts most of the probability between 0.05 and 0.95. The
+encounter rate of \code{"poisson_poisson"} takes \code{lognormal(0, 1)} as a
+scalar. With a formula, its intercept takes \code{std_normal()}. Either
+puts most of the rate between 0.14 and 7.4 encounters per visit.
+\code{\link[=get_prior]{get_prior()}} lists these defaults. \code{prior(..., dpar = "p")}
+replaces one. A rare species might take
+\code{prior(normal(-2, 0.5), class = Intercept, dpar = "p")}.
 }
 
-\section{Identification (Royle-Nichols)}{
+\section{Identification}{
 
-The Stan code uses the logit link on per-individual detection
-\code{r}. A flat Uniform(0, 1) prior on \code{r} propagates to a near-
-saturated prior on the visit-level detection probability
-\code{p_visit = 1 - (1-r)^N} for any moderate \code{lambda} (e.g.
-\code{E[p_visit | r ~ U(0,1), lambda = 5] ~ 0.83}), creating a ridge
-where small \code{r} flattens the likelihood in \code{lambda}. The logit
-link with a \code{Normal(0, 1.5)} prior on the logit-r intercept
-places most prior mass on \code{r} between 0.05 and 0.95, while
-remaining workable on the logit scale even when the likelihood
-is nearly flat. The per-unit upper truncation \code{K_max[g]} must
-satisfy
-both (a) \code{ppois(K_max, lambda_hat, lower.tail=FALSE) < 1e-4}
-(Poisson tail negligible) and (b) \code{(1 - r_hat)^K_max < 1e-4}
-(Royle-Nichols detection function saturated). Condition (b) is
-specific to Royle-Nichols: under Poisson-binomial, too-small
-\code{K_max} only costs computation; under Royle-Nichols with low
-\code{r}, too-small \code{K_max} leaves non-negligible Poisson mass in
-cells where the detection function still varies, biasing the
-posterior on \code{lambda} upward.
+The counts identify abundance and detection apart through repeated
+visits and through covariates that act on one of them. With one
+visit per unit and no covariate, the data identify only the product
+\code{mu * p}. \code{nmix()} refuses that model. More than 30\% of units
+visited once raises a warning. A \code{"poisson_poisson"} model with
+intercepts alone separates \code{mu} from \code{p} only through the extra
+variance of its counts. It warns. An informative prior on one
+intercept separates them.
+
+Overdispersed abundance, such as negative binomial counts fitted by
+a Poisson \code{N}, biases abundance up and detection down, leaving their
+product close to the truth (Knape et al. 2018). \code{\link[=pp_check]{pp_check()}} with
+\code{type = "fit_stat"} tests the per-unit totals for such misfit.
 }
 
-\section{Identification (Poisson-Poisson)}{
+\section{The cap on abundance}{
 
-The Stan code uses the log link on per-individual encounter
-rate \code{p}. Bollen's \code{logit(p)} reparameterisation is rejected
-because under a flat Uniform(0, 1) prior on \code{p} the implied
-prior on the rate \code{mu / (1 - mu)} is Cauchy(0, 1) tailed,
-which is ecologically unmotivated and computationally unstable.
-Under intercept-only specifications on both \code{mu} and \code{p} only
-the product \code{lambda * p} is identified by the data; the
-marginal variance (Neyman Type A is over-dispersed Poisson)
-provides weak cross-identification only when at least one
-covariate separates the two parameters (Kery 2018; "Wild
-posteriors in the wild" arXiv 2503.00239). The fit-time
-validator emits a \code{rlang::warn(...)} when both formulae reduce
-to intercept-only, recommending an informative prior on at
-least one intercept. The default prior on the log-scale \code{p}
-intercept is tighter than the Poisson-binomial default
-(\code{Normal(0, 1)}, implying encounter rate mostly in
-\verb{(0.1, 10)} encounters per individual per visit) for the same
-reason. The truncated-N marginalisation is required: the
-closed-form Poisson(\code{lambda * p}) marginal is mean-equivalent
-but distribution-wrong. It drops the Neyman Type A over-dispersion,
-which is what separates \code{lambda} from \code{p}. Under the
-closed form the likelihood depends only on the product \code{lambda * p}.
-Individual posteriors on \code{lambda} and \code{p} are dominated by the prior.
-\code{predict(type = "latent_state")} returns the prior on \code{N} in place of
-a data-informed posterior.
+A \code{cap} column, constant within each unit and at least its largest
+count, sets the cap \code{K_max}. Without one, \code{"poisson_binomial"} and
+\code{"poisson_poisson"} take each unit's largest count plus 100, as
+\code{unmarked::pcount()} does. \code{"royle_nichols"} takes 25, as
+\code{unmarked::occuRN()} does. A detection gives no floor on \code{N}.
+A lower cap shortens the sum and speeds sampling. A cap that binds
+biases abundance down. \code{\link[=latent_N_saturation]{latent_N_saturation()}} reports, for each
+unit, the posterior probability that \code{N} equals its cap. A
+prediction frame may carry its own \code{cap}.
 }
 
-\section{Priors (Poisson-Poisson)}{
+\section{Joint species models}{
 
-For Poisson-Poisson fits the recommended starting prior on
-the log-scale \code{p} intercept is \code{Normal(0, 1)}. That prior puts most of
-its mass on encounter rates between \code{exp(-2) ~ 0.14} and
-\code{exp(2) ~ 7.4} per individual per visit. Pass this prior
-via the \code{prior} argument of \code{\link[=mvgam]{mvgam()}}:
-
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(y ~ elev,
-      family = nmix("poisson_poisson"),
-      data   = closure_unit_count_data,
-      prior  = c(brms::prior(normal(0, 1),
-                             class = "Intercept",
-                             dpar  = "p")))
-}\if{html}{\out{</div>}}
-
-For rare species with very low encounter rates the centre
-should shift down (e.g. \code{Normal(-2, 0.5)}); for passive
-acoustic monitors logging many detections per individual the
-centre should shift up (e.g. \code{Normal(2, 0.5)}). The
-identifiability validator emits a \code{rlang::warn(...)} only at
-the fully intercept-only configuration. With one-sided covariates,
-the intercept of the formula without a covariate is still weakly
-identified. An informative prior on that intercept remains advisable.
-}
-
-\section{K_max defaults and saturation}{
-
-Each variant has a default that applies when the user supplies no
-\code{cap} column on the input data:
-\itemize{
-\item Poisson-binomial and Poisson-Poisson default to
-\verb{K_max[g] = max(y in g) + 100}, the per-unit data-driven
-buffer used by \code{unmarked::pcount}. Conservative: pays a
-wider inner k-loop when counts are small (\code{K_max ~ 101}
-even with \code{N ~ 5}). Override via a \code{cap} column to tighten
-the marginalisation when abundance is known to be low.
-\item Royle-Nichols defaults to \code{K_max = 25} per unit (the
-\code{unmarked::occuRN} convention), because binary \code{y} carries
-no per-unit floor.
-}
-Whenever a user supplies a \code{cap} column whose value is below
-the observed maximum \code{y} for a unit, the validator errors and names
-the offending unit identifier. Otherwise the marginalisation floor
-(\code{max(y)}) would exceed the ceiling (\code{K_max}). The likelihood would
-then degenerate to an empty sum silently.
-
-Post-fit, \code{\link[=latent_N_saturation]{latent_N_saturation()}} reports the share of the conditional
-posterior at \code{K_max[g]} for each unit. Units with a high share should
-have their cap raised, which removes truncation bias in \code{lambda}. The
-Royle-Nichols default is most likely to need overriding, owing to its
-static fallback. A Poisson-Poisson cap should also satisfy
-\code{ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4} for the tail
-to be negligible.
-}
-
-\section{JSDM with imperfect detection}{
-
-Passing \code{nmix()} to \code{\link[=jsdgam]{jsdgam()}} with \code{n_lv > 0} composes the
-closure-unit marginalisation with the Heaps factor model. The user
-then gets a hierarchical JSDM. Its three levels each occupy a distinct
-dpar:
-
-\describe{
-\item{\strong{lowest level}: env-driven latent factors.}{
-\code{factor_formula = ~ s(env, by = lv_axis())} makes each
-latent factor a smooth of an environmental covariate. The
-factors are identified by their environmental signature. They
-are not free draws. That removes the intercept-versus-Z*lv
-competition, which otherwise hampers identification when
-site-level intercepts are also fit on \code{mu}.}
-\item{\strong{middle level}: species loadings.}{Each species \code{s}
-loads on the \code{K} factors via the row \verb{Z[s, :]}, so
-\verb{log_lambda[s, i] = b_X(species) + Z[s, :] \%*\% lv[i, :]}
-for site \code{i}. \code{Z} is identified up to sign via Heaps and
-Jermyn (2024) post-hoc QR.}
-\item{\strong{top level}: imperfect detection.}{The \code{p} dpar
-carries its own brms sub-formula (e.g.,
-\code{bf(y ~ species, p ~ visit_effort)}) so the detection
-process is modelled independently of the latent abundance.
-The lpmf marginalises latent \code{N} per closure unit. No part of
-the factor model depends on the marginalisation. No part of the
-marginalisation depends on the factor model.}
-}
-
-See \code{\link[=jsdgam]{jsdgam()}} for the
-wrapper-level API and \code{\link[=lv_axis]{lv_axis()}} for the \code{by = lv_axis()}
-sentinel that turns smooths into per-factor regressors.
+\code{\link[=jsdgam]{jsdgam()}} with \code{nmix()} or \code{occ()} fits several species at once.
+Latent factors shared by the species enter the state \code{mu}. \code{p}
+keeps its own formula. \code{factor_formula = ~ s(env, by = lv_axis())}
+lets each factor follow an environmental gradient.
 }
 
 \section{Importing array data}{
 
-Detection-history data from \code{unmarked::unmarkedFramePCount},
-\code{spOccupancy} or \code{ubms} takes the form of a 2D \verb{[J, K]} matrix
-(single-species), 3D \verb{[N, J, K]} array (multi-species), 4D
-\verb{[N, J, T, K]} array (multi-season multi-species), or named list of
-\verb{[J, K]} matrices (\code{unmarkedFrameOccuMulti}). Use
-\code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert any of these into the long-format
-\code{data} that \code{mvgam(family = nmix())} and \code{jsdgam(family = nmix())}
-expect. The covariates \code{site_covs}, \code{season_covs}, \code{site_season_covs}
-and \code{obs_covs} are broadcast across the right grid axes.
+Detection histories from \pkg{unmarked}, \pkg{spOccupancy} or
+\pkg{ubms} come as a site-by-visit matrix, an array with species or
+seasons as further dimensions, or a list of matrices.
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} converts any of these to the long format,
+broadcasting site, season and visit covariates to their rows.
 }
 
-\section{Performance and threading}{
+\section{Threading}{
 
-The Stan emission for \code{nmix()} has three optimisations beyond a naive
-K-loop enumeration:
-\itemize{
-\item \strong{Analytic ratio recurrence.} The Poisson-binomial
-marginalisation uses the log-space Horner form of the
-ratio recurrence \verb{T_N / T_\{N-1\}}, evaluated backward from
-\code{K_max} to \code{K_min + 1}. This avoids the per-\code{k} re-evaluation
-of \code{binomial_logit_lpmf} that the naive \code{log_sum_exp} form
-incurs.
-\item \strong{Cached log(N) lookup.} \code{log(N)} and
-\code{log(N - counts[j])} values come from a \code{log_n_lookup}
-vector precomputed once in \verb{transformed data}, replacing
-scalar \code{log()} calls per inner iteration.
-\item \strong{partial_sum + reduce_sum.} The per-closure-unit
-body is the function \code{partial_sum_nmix_lpmf}. The lpmf wrapper
-calls \code{reduce_sum} over the closure-unit index.
-With \code{mvgam(threads = N)} for \code{N > 1} the model is
-compiled with \code{stan_threads = TRUE} and TBB splits the
-closure-unit slice across \code{N} threads. Without
-\code{threads}, \code{reduce_sum} falls back to a serial loop.
-Grainsize is set to \code{max(1, N_unit \%/\% 8)}. Single-threaded
-fits then pay about 8 dispatch calls per leapfrog. Multi-threaded
-fits see about 8 chunks across cores.
-}
-On a 150-unit fixture (n_rep = 6, lambda ~ 4, K_max = 14),
-the stack delivers roughly 2x sampling throughput vs the
-naive enumeration baseline; the threaded variant
-(\code{threads = 4}) adds another ~38\% over the serial
-\code{reduce_sum} form.
+The density sums over units through Stan's \code{reduce_sum()}. Fitting
+with \code{threads = 2} or more splits the units across threads.
 }
 
 \examples{
@@ -365,26 +160,23 @@ pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
 Royle, J. A. (2004). N-mixture models for estimating
 population size from spatially replicated counts.
 \emph{Biometrics}, 60, 108-115.
-\doi{10.1111/j.0006-341X.2004.00142.x}.
+\doi{10.1111/j.0006-341X.2004.00142.x}
 
-Dennis, E. B., Morgan, B. J. T., & Ridout, M. S. (2015).
-Computational aspects of N-mixture models. \emph{Biometrics},
-71, 237-246. \doi{10.1111/biom.12246}.
-
-Kery, M. (2018). Identifiability in N-mixture models: a
-large-scale screening test with bird data. \emph{Ecology}, 99,
-281-288. \doi{10.1002/ecy.2093}.
-
-Knape, J., Arlt, D., Barraquand, F., Berg, A., Chevalier, M.,
-Part, T., Ruete, A., & Zmihorski, M. (2018). Sensitivity of
-binomial N-mixture models to overdispersion. \emph{Methods in
-Ecology and Evolution}, 9, 2102-2114.
-\doi{10.1111/2041-210X.13062}.
-
-Royle, J. A., and Nichols, J. D. (2003). Estimating abundance
+Royle, J. A. and Nichols, J. D. (2003). Estimating abundance
 from repeated presence-absence data or point counts.
 \emph{Ecology}, 84, 777-790.
-\doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}.
+\doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}
+
+Neyman, J. (1939). On a new class of "contagious" distributions,
+applicable in entomology and bacteriology. \emph{Annals of
+Mathematical Statistics}, 10, 35-57.
+\doi{10.1214/aoms/1177732245}
+
+Knape, J., Arlt, D., Barraquand, F., Berg, A., Chevalier, M.,
+Part, T., Ruete, A. and Zmihorski, M. (2018). Sensitivity of
+binomial N-mixture models to overdispersion. \emph{Methods in
+Ecology and Evolution}, 9, 2102-2114.
+\doi{10.1111/2041-210X.13062}
 }
 \seealso{
 \code{\link[=occ]{occ()}} for the related joint-occupancy family and

@@ -88,7 +88,7 @@ test_that("encode_loadings_features errors on wrong row count without alignment 
   feats <- data.frame(x = c(1, 2))
   expect_error(
     encode_loadings_features(feats, c("a", "b", "c")),
-    "Cannot align"
+    "one row per training series"
   )
 })
 

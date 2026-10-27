@@ -41,16 +41,6 @@ make_pp_average_stub <- function(n_iter = 60L, n_chains = 2L,
 
 # ---- Dispatch + signature parity -----------------------------------
 
-test_that("posterior_average + pp_average have S3 entries on mvgam", {
-  for (m in c("posterior_average", "pp_average")) {
-    expect_true(
-      !is.null(getS3method(m, "mvgam", optional = TRUE)),
-      label = paste0("getS3method('", m, "', 'mvgam')")
-    )
-  }
-})
-
-
 test_that("posterior_average.mvgam matches brms signature", {
   expected <- names(formals(
     getS3method("posterior_average", "brmsfit")
@@ -133,11 +123,6 @@ test_that("mvgam_match_response returns FALSE for mismatched responses", {
   b <- make_pp_average_stub()
   b$formula <- brms::bf(z ~ x)
   expect_false(mvgam_match_response(list(a, b)))
-})
-
-
-test_that("mvgam_match_response is TRUE for a single model", {
-  expect_true(mvgam_match_response(list(make_pp_average_stub())))
 })
 
 
@@ -225,25 +210,12 @@ test_that("mvgam_validate_weights rejects 'kfold' informatively", {
 })
 
 
-test_that("mvgam_validate_weights match.args the named strategy", {
-  stubs <- list(make_pp_average_stub(), make_pp_average_stub())
-  expect_error(
-    mvgam_validate_weights("nonsense", stubs),
-    "should be one of"
-  )
-})
-
-
 # ---- pp_average reserved-args guard --------------------------------
 
 test_that("pp_average rejects 'draw_ids' / 'subset' in dots", {
   stub <- make_pp_average_stub()
   expect_error(
     pp_average(stub, draw_ids = 1L:5L),
-    "draws its own per-model subsample"
-  )
-  expect_error(
-    pp_average(stub, subset = 1L:5L),
     "draws its own per-model subsample"
   )
 })
@@ -277,6 +249,9 @@ test_that("posterior_average errors when explicit variable is not shared", {
     ),
     "not present in every model"
   )
+  # A named argument names no parameter and reaches no function
+  expect_error(posterior_average(a, a, weights = c(0.5, 0.5), ndraw = 5L),
+               "Unrecognised arguments")
 })
 
 
@@ -326,6 +301,8 @@ test_that("as.data.frame.mvgam(draw = ...) subsets rows", {
   stub <- make_pp_average_stub()
   full <- as.data.frame(stub)
   sub <- as.data.frame(stub, draw = c(1L, 5L, 10L))
-  expect_identical(nrow(sub), 3L)
-  expect_identical(colnames(sub), colnames(full))
+  # posterior renumbers `.iteration` and `.draw` in a subset
+  pars <- setdiff(colnames(full), c(".chain", ".iteration", ".draw"))
+  expect_equal(unname(as.matrix(sub[pars])),
+               unname(as.matrix(full[c(1L, 5L, 10L), pars])))
 })

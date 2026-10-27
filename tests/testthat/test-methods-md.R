@@ -510,7 +510,7 @@ test_that("Factor model (n_lv > 0) emits factor dynamics and loadings", {
   ))
 })
 
-test_that("MGP loadings scale the factor innovations by sqrt(Psi_k)", {
+test_that("MGP shrinkage scales each loadings column by sqrt(Psi_k)", {
   set.seed(1L)
   d <- data.frame(
     time = rep(1:30, 4), series = factor(rep(paste0("s", 1:4), each = 30)),
@@ -520,12 +520,14 @@ test_that("MGP loadings scale the factor innovations by sqrt(Psi_k)", {
                family = poisson(), run_model = FALSE, silent = 2,
                loadings_prior = list(column_shrinkage = "mgp"),
                validate = FALSE)
-  # Stan draws Z at unit scale and scales the factor innovations by
-  # sqrt(Psi_k), with Psi_k the cumulative product of `varrho_inv`.
-  expect_contains(md_rows(methods_md(mod)), c(
+  # Stan scales column k of the unit-scale loadings by sqrt(Psi_k),
+  # with Psi_k the cumulative product of `varrho_inv`. The factor
+  # innovations stay at unit scale.
+  rows <- md_rows(methods_md(mod))
+  expect_contains(rows, c(
     "\\Psi_k &= \\prod_{h \\le k} \\varrho_h",
-    paste0("\\tilde\\epsilon^{(\\eta)}_{k,t} &\\sim ",
-           "\\text{Normal}(0, \\sqrt{\\Psi_k})"),
+    "Z_{i,k} &\\sim \\text{Normal}(0, \\sqrt{\\Psi_k})",
+    "\\tilde\\epsilon^{(\\eta)}_{k,t} &\\sim \\text{Normal}(0, 1)",
     "\\varrho_{1} &\\sim \\text{InvGamma}(a_1, 1)"
   ))
 })

@@ -491,8 +491,8 @@ stability_intervals <- function(dat, keep) {
 
 #' The stability metrics a plot was asked for
 #'
-#' A metric that is not there is refused by name. Plotting the ones
-#' that are drew fewer panels than were asked for.
+#' Every requested metric must be in the object. An absent one is
+#' refused by name.
 #'
 #' @param variables The metrics requested
 #' @param available The metrics the object holds

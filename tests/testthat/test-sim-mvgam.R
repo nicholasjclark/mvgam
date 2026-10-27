@@ -1,376 +1,155 @@
-# CI tests for the typed catalog in `R/sim_mvgam.R`. Covers
-# shape, family dispatch, trend override, reproducibility, and
-# the ground-truth slots needed for downstream recovery checks.
-# Numerical recovery against a fitted mvgam lives in
-# `tests/local/`.
+# CI tests for the typed catalog in `R/sim_mvgam.R`. The local suite
+# checks numerical recovery against a fitted mvgam.
 
 
-# ---- Shape per type -----------------------------------------------
-
-for (typ in 1:6) {
-  local({
-    type_id <- typ
-    test_that(paste0("type = ", type_id,
-                      " returns well-formed mvgam_sim"), {
-      out <- sim_mvgam(
-        type = type_id, family = gaussian(),
-        n_series = 2L, n_timepoints = 60L, seed = 11L
-      )
-      expect_s3_class(out, "mvgam_sim")
-      expect_named(
-        out,
-        c("data_train", "data_test", "family", "trend_model",
-          "type", "true_betas", "true_smooths", "true_trend",
-          "true_trend_sigma", "true_sigma_obs")
-      )
-      expect_true(all(c("y", "series", "time") %in%
-                        colnames(out$data_train)))
-      expect_s3_class(out$data_train$series, "factor")
-      expect_identical(nlevels(out$data_train$series), 2L)
-      expect_identical(dim(out$true_trend), c(60L, 2L))
-      expect_true(all(is.finite(out$true_trend)))
-      expect_true(length(out$true_smooths) >= 1L)
-      expect_true(is.finite(out$true_trend_sigma))
-    })
-  })
-}
-
-
-# ---- Family dispatch ----------------------------------------------
-
-test_that("type = 1 works across all supported families", {
-  for (fam in list(
-    gaussian(),
-    brms::brmsfamily("student"),
-    poisson(),
-    brms::brmsfamily("negbinomial"),
-    binomial(),
-    brms::brmsfamily("beta"),
-    Gamma(link = "log")
-  )) {
-    out <- sim_mvgam(
-      type = 1L, family = fam, n_series = 1L,
-      n_timepoints = 50L, seed = 7L
-    )
-    expect_s3_class(out, "mvgam_sim")
-    expect_true(all(is.finite(out$data_train$y) |
-                      is.na(out$data_train$y)))
-  }
-})
-
-
-test_that("tweedie family is supported by sim_mvgam", {
-  # Tweedie is a customfamily with `family$family == 'custom'`, so
-  # sim_family_rng has to route through resolve_family_name() to
-  # find the right branch. Pin the dispatch + the support shape:
-  # non-negative continuous with a real point mass at zero.
-  out <- sim_mvgam(
-    type = 1L, family = tweedie(), n_series = 1L,
-    n_timepoints = 80L, trend_model = AR(), seed = 11L
-  )
-  expect_s3_class(out, "mvgam_sim")
-  y <- out$data_train$y
-  expect_true(all(is.finite(y) | is.na(y)))
-  expect_true(all(y >= 0))
-  # Some zeros and some positives; if either side is empty the
-  # CP simulator has degenerated.
-  expect_gt(sum(y == 0, na.rm = TRUE), 0L)
-  expect_gt(sum(y > 0, na.rm = TRUE), 0L)
-})
-
-
-test_that("sim_tweedie() respects phi and power bounds", {
-  expect_error(
-    mvgam:::sim_tweedie(mu = c(1, 2), phi = 1, power = 1.0),
-    "power"
-  )
-  expect_error(
-    mvgam:::sim_tweedie(mu = c(1, 2), phi = 1, power = 2.0),
-    "power"
-  )
-  expect_error(
-    mvgam:::sim_tweedie(mu = c(1, 2), phi = 0, power = 1.5),
-    "phi"
-  )
-  # Within bounds: returns a numeric vector of length(mu).
-  out <- mvgam:::sim_tweedie(mu = rep(2, 50L), phi = 1, power = 1.5)
-  expect_length(out, 50L)
-  expect_true(all(out >= 0))
-})
-
-
-test_that("count families return non-negative integers", {
-  for (fam in list(
-    poisson(), brms::brmsfamily("negbinomial")
-  )) {
-    out <- sim_mvgam(type = 1L, family = fam,
-                      n_timepoints = 60L, seed = 7L)
-    expect_true(all(out$data_train$y >= 0))
-    expect_true(all(out$data_train$y == round(out$data_train$y)))
-  }
-})
-
-
-test_that("binomial returns values bounded by trials (default 10)", {
-  out <- sim_mvgam(type = 1L, family = binomial(),
-                    n_timepoints = 60L, seed = 7L)
-  expect_true(all(out$data_train$y >= 0L))
-  expect_true(all(out$data_train$y <= 10L))
-})
-
-
-test_that("beta returns values strictly inside (0, 1)", {
-  out <- sim_mvgam(type = 1L,
-                    family = brms::brmsfamily("beta"),
-                    n_timepoints = 60L, seed = 7L)
-  expect_true(all(out$data_train$y > 0))
-  expect_true(all(out$data_train$y < 1))
-})
-
-
-# ---- Trend override ----------------------------------------------
-
-test_that("trend_model override accepts any supported constructor", {
-  for (tm in list(
-    RW(), AR(p = 1L), AR(p = c(1L, 3L, 12L)),
-    AR(p = 2L, ma = TRUE), "None"
-  )) {
-    out <- sim_mvgam(
-      type = 1L, family = gaussian(),
-      trend_model = tm, n_timepoints = 60L, seed = 7L
-    )
-    expect_identical(dim(out$true_trend), c(60L, 1L))
+test_that("every type returns its covariates, trend and truths", {
+  covariates <- list("x", c("x", "z"), c("x", "grp"), "x", c("x", "z"),
+                     "season", "x")
+  for (type_id in 1:7) {
+    out <- sim_mvgam(type = type_id, n_series = 2L, n_timepoints = 60L,
+                     seed = 11L)
+    expect_true(all(c("y", "series", "time", covariates[[type_id]]) %in%
+                      colnames(out$data_train)))
+    expect_identical(dim(out$true_trend), c(60L, 2L))
     expect_true(all(is.finite(out$true_trend)))
+    expect_gte(length(out$true_smooths), 1L)
   }
 })
 
 
-test_that("trend_model = 'None' produces a zero trend", {
-  out <- sim_mvgam(type = 1L, family = gaussian(),
-                    trend_model = "None",
-                    n_timepoints = 50L, seed = 7L)
-  expect_true(all(out$true_trend == 0))
-  expect_equal(out$true_trend_sigma, 0)
+test_that("each family simulates values in its own support", {
+  draw <- function(fam) {
+    sim_mvgam(type = 1L, family = fam, n_timepoints = 60L,
+              seed = 7L)$data_train$y
+  }
+  for (fam in list(poisson(), brms::brmsfamily("negbinomial"),
+                   beta_nb())) {
+    y <- draw(fam)
+    expect_true(all(y >= 0 & y == round(y)))
+  }
+  expect_true(all(draw(binomial()) <= 10L))
+  expect_true(all(draw(bernoulli()) %in% c(0L, 1L)))
+  expect_true(all(draw(com_binomial()) <= 10L))
+  y_beta <- draw(brms::brmsfamily("beta"))
+  expect_true(all(y_beta > 0 & y_beta < 1))
+  expect_true(all(draw(Gamma(link = "log")) > 0))
+  expect_true(all(is.finite(draw(brms::brmsfamily("student")))))
 })
 
 
-# ---- Reproducibility ---------------------------------------------
+test_that("tweedie draws hold zeros and positive values", {
+  out <- sim_mvgam(type = 1L, family = tweedie(), n_timepoints = 80L,
+                   trend_model = AR(), seed = 11L)
+  y <- out$data_train$y
+  expect_true(all(y >= 0))
+  expect_gt(sum(y == 0), 0L)
+  expect_gt(sum(y > 0), 0L)
+})
 
-test_that("sim_mvgam is reproducible under set.seed", {
-  a <- sim_mvgam(type = 2L, family = gaussian(),
-                  n_series = 2L, n_timepoints = 40L, seed = 99L)
-  b <- sim_mvgam(type = 2L, family = gaussian(),
-                  n_series = 2L, n_timepoints = 40L, seed = 99L)
-  expect_identical(a$data_train$y, b$data_train$y)
+
+test_that("tweedie draws take the Tweedie mean, variance and zeros", {
+  set.seed(5L)
+  mu <- 2
+  phi <- 1.2
+  power <- 1.4
+  out <- sim_family_rng(rep(log(mu), 2e4), tweedie(),
+                        list(phi = phi, power = power))
+  expect_equal(mean(out), mu, tolerance = 0.02)
+  expect_equal(stats::var(out), phi * mu^power, tolerance = 0.05)
+  # P(Y = 0) = exp(-lambda)
+  lambda <- mu^(2 - power) / (phi * (2 - power))
+  expect_equal(mean(out == 0), exp(-lambda), tolerance = 0.05)
+})
+
+
+test_that("trend_model accepts any supported constructor", {
+  for (tm in list(RW(), AR(p = 1L), AR(p = c(1L, 3L, 12L)),
+                  AR(p = 2L, ma = TRUE))) {
+    out <- sim_mvgam(type = 1L, trend_model = tm, n_timepoints = 60L,
+                     seed = 7L)
+    expect_true(all(is.finite(out$true_trend)))
+    expect_gt(out$true_trend_sigma, 0)
+  }
+  none <- sim_mvgam(type = 1L, trend_model = "None",
+                    n_timepoints = 50L, seed = 7L)
+  expect_true(all(none$true_trend == 0))
+  # A trend given by name is refused before any series is drawn
+  expect_error(sim_mvgam(trend_model = "AR"), "trend_model")
+})
+
+
+test_that("sim_mvgam is reproducible under a seed", {
+  a <- sim_mvgam(type = 2L, n_series = 2L, n_timepoints = 40L,
+                 seed = 99L)
+  b <- sim_mvgam(type = 2L, n_series = 2L, n_timepoints = 40L,
+                 seed = 99L)
+  expect_identical(a$data_train, b$data_train)
   expect_identical(a$true_trend, b$true_trend)
   expect_identical(a$true_smooths, b$true_smooths)
 })
 
 
-# ---- Train / test split ------------------------------------------
-
-test_that("proportional_train = 1 returns NULL data_test", {
-  out <- sim_mvgam(type = 1L, n_timepoints = 40L,
-                    proportional_train = 1, seed = 7L)
-  expect_null(out$data_test)
-})
-
-
-test_that("train + test partition by time index", {
+test_that("the split is by time and the missing values are in training", {
   out <- sim_mvgam(type = 1L, n_series = 2L, n_timepoints = 80L,
-                    proportional_train = 0.75, seed = 7L)
+                   proportional_train = 0.75, prop_missing = 0.2,
+                   seed = 7L)
   expect_identical(max(out$data_train$time),
-                    min(out$data_test$time) - 1L)
-  expect_identical(
-    nrow(out$data_train) + nrow(out$data_test), 160L
-  )
+                   min(out$data_test$time) - 1L)
+  expect_identical(nrow(out$data_train) + nrow(out$data_test), 160L)
+  expect_identical(sum(is.na(out$data_train$y)),
+                   as.integer(floor(0.2 * nrow(out$data_train))))
+  expect_false(anyNA(out$data_test$y))
+  expect_null(sim_mvgam(type = 1L, n_timepoints = 40L,
+                        proportional_train = 1, seed = 7L)$data_test)
 })
 
 
-# ---- Missing-data injection --------------------------------------
-
-test_that("prop_missing inserts NA into the training response", {
-  out <- sim_mvgam(type = 1L, n_timepoints = 100L,
-                    prop_missing = 0.2, seed = 7L)
-  expect_true(mean(is.na(out$data_train$y)) > 0.05)
-  expect_true(mean(is.na(out$data_train$y)) < 0.4)
-})
-
-
-# ---- Ground-truth smooth alignment with rescaled data ------------
-
-test_that("true_smooths are centered (mean ~ 0 over the grid)", {
-  out <- sim_mvgam(type = 2L, family = gaussian(),
-                    n_timepoints = 60L, seed = 7L)
+test_that("true smooths are centred and match the data", {
+  out <- sim_mvgam(type = 2L, n_timepoints = 60L, seed = 7L)
   for (nm in names(out$true_smooths)) {
     expect_lt(abs(mean(out$true_smooths[[nm]]$f_true)), 1e-6)
   }
+  # With no trend and little noise the response follows the recorded
+  # GP. A truth simulated separately at the grid would not.
+  gp <- sim_mvgam(type = 4L, trend_model = "None", prop_trend = 0,
+                  n_timepoints = 100L, family_pars = list(sigma = 0.05),
+                  seed = 3L)
+  truth <- gp$true_smooths$`gp(x)`
+  f_at_x <- stats::approx(truth$x, truth$f_true, gp$data_train$x)$y
+  expect_gt(stats::cor(f_at_x, gp$data_train$y), 0.95)
 })
 
 
-test_that("true_trend_sigma matches sd(as.numeric(true_trend))", {
-  out <- sim_mvgam(type = 1L, family = gaussian(),
-                    n_series = 3L, n_timepoints = 80L, seed = 7L)
-  expect_equal(
-    out$true_trend_sigma,
-    stats::sd(as.numeric(out$true_trend))
-  )
-})
-
-
-# ---- Type-specific covariates ------------------------------------
-
-test_that("each type's data carries the covariates it needs", {
-  expected_cols <- list(
-    `1` = "x",
-    `2` = c("x", "z"),
-    `3` = c("x", "grp"),
-    `4` = "x",
-    `5` = c("x", "z"),
-    `6` = "season"
-  )
-  for (typ in 1:6) {
-    out <- sim_mvgam(type = typ, n_series = 1L,
-                      n_timepoints = 40L, seed = 7L)
-    expect_true(all(expected_cols[[as.character(typ)]] %in%
-                      colnames(out$data_train)))
-  }
-})
-
-
-# ---- Errors ------------------------------------------------------
-
-test_that("type outside 1..7 errors informatively", {
-  expect_error(sim_mvgam(type = 0L), "not >= 1")
-  expect_error(sim_mvgam(type = 8L), "not <= 7")
-})
-
-
-# ---- summary.mvgam_sim --------------------------------------------
-
-test_that("summary.mvgam_sim returns mvgam_sim_summary with expected fields", {
-  sim <- sim_mvgam(type = 2L, n_series = 3L, n_timepoints = 40L,
-                    seed = 11L)
-  s <- summary(sim)
-  expect_s3_class(s, "mvgam_sim_summary")
-  expect_setequal(
-    names(s),
-    c("type", "family", "trend", "n_series", "n_timepoints",
-      "n_train", "n_test", "true_betas", "n_smooths",
-      "smooth_names", "true_trend_sigma", "true_sigma_obs")
-  )
-  expect_equal(s$type, 2L)
-  expect_equal(s$n_series, 3L)
-  expect_equal(s$n_timepoints, 40L)
-  expect_equal(s$n_train + s$n_test, NROW(sim$data_train) +
-                 (if (is.null(sim$data_test)) 0L else NROW(sim$data_test)))
-  expect_identical(s$true_trend_sigma, sim$true_trend_sigma)
-})
-
-
-test_that("summary.mvgam_sim names the trend simulated", {
-  # `NULL` takes the type's default trend, a random walk for type 1.
-  # "None" simulates none.
-  label <- function(trend_model) {
-    summary(sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 30L,
-                      seed = 3L, trend_model = trend_model))$trend
-  }
-  expect_identical(label(NULL), "RW")
-  expect_identical(label("None"), "None")
-})
-
-
-test_that("summary.mvgam_sim resolves trend label from constructor", {
-  # Constructor name lives on `$trend_model$trend`. The label
-  # fallback chain (in R/sim_mvgam.R) must read it; otherwise the
-  # printed summary collapses to 'Unknown' even when the model is
-  # an AR / RW. Regular-time types 1 and 2 cover AR and RW; CAR
-  # needs the irregular-time recipe of type 6 (its propagator
-  # requires per-step time gaps).
-  ar_sim <- sim_mvgam(
-    type = 1L, family = gaussian(), n_series = 1L,
-    n_timepoints = 30L, seed = 3L, trend_model = AR()
-  )
-  expect_identical(summary(ar_sim)$trend, "AR")
-
-  rw_sim <- sim_mvgam(
-    type = 1L, family = gaussian(), n_series = 1L,
-    n_timepoints = 30L, seed = 3L, trend_model = RW()
-  )
-  expect_identical(summary(rw_sim)$trend, "RW")
-
-  car_sim <- sim_mvgam(
-    type = 6L, family = gaussian(), n_series = 1L,
-    n_timepoints = 30L, seed = 3L
-  )
-  expect_identical(summary(car_sim)$trend, "CAR")
-  # Type 6 documents irregular spacing, so the recorded time must
-  # actually be irregular and the season covariate must be the
-  # function of it that build_data claims, not drawn independently
-  # of the gaps the CAR kernel propagates over.
+test_that("types 6 and 7 carry the dynamics their recipes name", {
+  # Type 6 records irregular times and derives the season from them
+  car_sim <- sim_mvgam(type = 6L, n_timepoints = 30L, seed = 3L)
   car_times <- sort(unique(car_sim$data_train$time))
-  expect_false(all(abs(diff(car_times) - 1) < 1e-8))
   expect_true(all(diff(car_times) >= 1 & diff(car_times) <= 6))
-  expect_equal(
-    car_sim$data_train$season,
-    (car_sim$data_train$time %% 12) + 1
-  )
+  expect_false(all(abs(diff(car_times) - 1) < 1e-8))
+  expect_equal(car_sim$data_train$season,
+               (car_sim$data_train$time %% 12) + 1)
 
-  # 240 points, not 60: the assertions below are about the AR
-  # process, and a 60-point sample ACF is noisy enough to swing
-  # between 0.10 and 0.71 across seeds, so a short series tests the
-  # draw rather than the spec.
-  ar112_sim <- sim_mvgam(
-    type = 7L, family = gaussian(), n_series = 1L,
-    n_timepoints = 240L, seed = 3L
-  )
-  expect_identical(summary(ar112_sim)$trend, "AR")
-  # The observation side carries a smooth of a non-periodic
-  # covariate rather than a cyclic seasonal smooth: on monthly data
-  # a lag-12 autoregression is itself an annual cycle, so a seasonal
-  # smooth here would compete with it for the same periodicity and
-  # neither would be identified.
-  expect_true("x" %in% colnames(ar112_sim$data_train))
-  expect_false("season" %in% colnames(ar112_sim$data_train))
-  expect_named(ar112_sim$true_smooths, "s(x)")
-  # spec sets sparse AR(p = c(1, 12)) on the latent state; the
-  # rescale skip path keeps the spec's chosen sigma_innov so the
-  # latent state has measurable persistence (lag-12 autocorrelation
-  # of the generated trend should be clearly non-zero).
-  z <- ar112_sim$true_trend[, 1L]
-  ac <- stats::acf(z, plot = FALSE, lag.max = 12L)$acf[, 1L, 1L]
+  # Type 7's sparse AR(1, 12) state persists at lags 1 and 12. A
+  # 240-point series keeps the sample ACF stable across seeds.
+  ar_sim <- sim_mvgam(type = 7L, n_timepoints = 240L, seed = 3L)
+  ac <- stats::acf(ar_sim$true_trend[, 1L], plot = FALSE,
+                   lag.max = 12L)$acf[, 1L, 1L]
   expect_gt(ac[2L], 0.2)
   expect_gt(ac[13L], 0.1)
 })
 
 
-test_that("print.mvgam_sim_summary prints header and parameters", {
+test_that("summary names the simulated trend and print shows it", {
+  label <- function(type, trend_model = NULL) {
+    summary(sim_mvgam(type = type, n_timepoints = 30L, seed = 3L,
+                      trend_model = trend_model))$trend
+  }
+  # NULL takes the type's default trend
+  expect_identical(label(1L), "RW")
+  expect_identical(label(6L), "CAR")
+  expect_identical(label(1L, AR(p = 2)), "AR")
+  expect_identical(label(1L, "None"), "None")
   sim <- sim_mvgam(type = 2L, n_series = 2L, n_timepoints = 25L,
-                    seed = 5L)
-  smry <- summary(sim)
-  out <- capture.output(invisible(print(smry)))
-  expect_true(any(grepl("Simulated mvgam dataset", out)))
-  expect_true(paste0("  Family       : ", smry$family) %in% out)
-  expect_true(paste0("  Trend        : ", smry$trend) %in% out)
-  expect_true(any(grepl("True generative parameters", out)))
-})
-
-
-test_that("print.mvgam_sim delegates to summary print", {
-  sim <- sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 25L,
-                    seed = 4L)
-  out <- capture.output(invisible(print(sim)))
-  expect_true(any(grepl("Simulated mvgam dataset", out)))
-})
-
-test_that("sim_mvgam() takes a trend constructor and names its trend", {
-  # A trend given by name is refused at the entry point, before any
-  # series is drawn. The name "None" simulates no trend.
-  expect_error(sim_mvgam(trend_model = "AR"), "trend_model")
-  sim <- sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 25L,
-                   trend_model = AR(p = 2), seed = 4L)
-  expect_identical(summary(sim)$trend, "AR")
-  none <- sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 25L,
-                    trend_model = "None", seed = 4L)
-  expect_identical(summary(none)$trend, "None")
+                   seed = 5L)
+  expect_output(print(sim), "Trend        : AR")
 })

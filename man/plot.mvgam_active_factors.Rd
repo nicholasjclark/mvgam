@@ -17,11 +17,10 @@ A \code{ggplot} object.
 }
 \description{
 Bar plot of the posterior probability that each
-latent factor is active under the rule \code{\link[=active_factors]{active_factors()}} applied.
-A dashed horizontal line
-marks the active threshold (\code{1 - prob_threshold}, default
-\code{0.5}). The subtitle reports the posterior median active count
-with the 95\% credible interval.
+dimension of the factor covariance is active, largest first, under
+the rule \code{\link[=active_factors]{active_factors()}} applied. A dashed line marks \code{prob}.
+The subtitle reports the posterior median count with its 95\%
+credible interval.
 }
 \seealso{
 \code{\link[=active_factors]{active_factors()}}

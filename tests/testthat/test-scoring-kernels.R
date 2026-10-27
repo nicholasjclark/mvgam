@@ -59,7 +59,7 @@ test_that("stack_fcs_per_horizon groups the series at each horizon", {
 
 test_that("CRPS of a degenerate forecast (all draws equal truth) is 0", {
   fc <- matrix(2.5, nrow = 100L, ncol = 1L)
-  out <- crps_mcmc_object(truth = 2.5, fc = fc)
+  out <- univariate_score("crps", truth = 2.5, fc = fc)
   expect_equal(as.numeric(out[1, "score"]), 0)
   expect_equal(as.numeric(out[1, "in_interval"]), 1)
 })
@@ -72,8 +72,8 @@ test_that("CRPS of a wider forecast is larger than a narrower one", {
                        nrow = 1000L, ncol = 2L)
   fc_wide <- matrix(stats::rnorm(2000L, sd = 1),
                      nrow = 1000L, ncol = 2L)
-  s_narrow <- crps_mcmc_object(c(truth, truth), fc_narrow)
-  s_wide <- crps_mcmc_object(c(truth, truth), fc_wide)
+  s_narrow <- univariate_score("crps", c(truth, truth), fc_narrow)
+  s_wide <- univariate_score("crps", c(truth, truth), fc_wide)
   expect_true(as.numeric(s_wide[1, "score"]) >
               as.numeric(s_narrow[1, "score"]))
 })
@@ -83,16 +83,21 @@ test_that("CRPS of a wider forecast is larger than a narrower one", {
 
 test_that("DRPS of a degenerate count forecast equal to truth is 0", {
   fc <- matrix(7L, nrow = 100L, ncol = 1L)
-  out <- drps_mcmc_object(truth = 7L, fc = fc)
+  out <- univariate_score("drps", truth = 7L, fc = fc)
   expect_equal(as.numeric(out[1, "score"]), 0)
   expect_equal(as.numeric(out[1, "in_interval"]), 1)
+  # Terms above the largest of the truth and the draws vanish
+  fc <- matrix(c(0, 1, 2, 5), ncol = 1L)
+  brute <- sum((as.integer(0:50 >= 3) - stats::ecdf(fc[, 1])(0:50))^2)
+  expect_equal(as.numeric(univariate_score("drps", 3, fc)[1, "score"]),
+               brute)
 })
 
 
 test_that("DRPS skips NA truth and leaves the row NA", {
   set.seed(4L)
   fc <- matrix(rpois(200L, 5), nrow = 100L, ncol = 2L)
-  out <- drps_mcmc_object(truth = c(5L, NA), fc = fc)
+  out <- univariate_score("drps", truth = c(5L, NA), fc = fc)
   expect_false(is.na(out[1, "score"]))
   expect_true(is.na(out[2, "score"]))
 })
@@ -102,7 +107,7 @@ test_that("DRPS skips NA truth and leaves the row NA", {
 
 test_that("SIS with a degenerate forecast equal to truth is 0", {
   fc <- matrix(3, nrow = 100L, ncol = 1L)
-  out <- sis_mcmc_object(truth = 3, fc = fc)
+  out <- univariate_score("sis", truth = 3, fc = fc)
   expect_equal(as.numeric(out[1, "score"]), 0)
 })
 
@@ -112,8 +117,8 @@ test_that("SIS penalises a miss outside the PI", {
   # Forecast: tight around 0; truth at 10 (far above the 95% PI).
   fc <- matrix(stats::rnorm(1000L, sd = 0.1),
                 nrow = 1000L, ncol = 1L)
-  out_in <- sis_mcmc_object(0, fc)
-  out_miss <- sis_mcmc_object(10, fc)
+  out_in <- univariate_score("sis", 0, fc)
+  out_miss <- univariate_score("sis", 10, fc)
   expect_true(as.numeric(out_miss[1, "score"]) >
               as.numeric(out_in[1, "score"]))
   expect_equal(as.numeric(out_miss[1, "in_interval"]), 0)
@@ -128,7 +133,7 @@ test_that("Brier scores the forecast probability", {
   binary <- matrix(c(0, 1, 1, 1), ncol = 1L)
   probs <- matrix(c(0.6, 0.9), ncol = 1L)
   for (fc in list(binary, probs)) {
-    out <- brier_mcmc_object(truth = 1, fc = fc)
+    out <- univariate_score("brier", truth = 1, fc = fc)
     expect_equal(as.numeric(out[1, "score"]), 0.0625)
     expect_true(is.na(out[1, "in_interval"]))
   }
@@ -148,7 +153,7 @@ test_that("Energy score at each horizon is es_sample over the series", {
   direct <- vapply(1:3, function(h) {
     scoringRules::es_sample(truths[, h], rbind(fcs[[1]][, h], fcs[[2]][, h]))
   }, numeric(1L))
-  expect_equal(energy_mcmc_object(truths, fcs), direct)
+  expect_equal(multivariate_score("energy", truths, fcs), direct)
 })
 
 
@@ -158,7 +163,7 @@ test_that("Energy of a degenerate forecast (draws = truth) is ~0", {
   fcs <- lapply(seq_len(2L), function(s) {
     matrix(rep(truths[s, ], each = 50L), nrow = 50L)
   })
-  out <- energy_mcmc_object(truths, fcs)
+  out <- multivariate_score("energy", truths, fcs)
   expect_true(all(out < 1e-6))
 })
 
@@ -174,7 +179,7 @@ test_that("Variogram score of draws equal to the truth is 0", {
   degenerate <- lapply(seq_len(2L), function(s) {
     matrix(rep(truths[s, ], each = 20L), nrow = 20L)
   })
-  expect_equal(variogram_mcmc_object(truths, degenerate),
+  expect_equal(multivariate_score("variogram", truths, degenerate),
                rep(0, 3L), tolerance = 1e-8)
 })
 
@@ -186,28 +191,30 @@ test_that("Variogram score accepts per-series weights", {
     matrix(stats::rnorm(40L), nrow = 20L, ncol = 2L),
     matrix(stats::rnorm(40L), nrow = 20L, ncol = 2L)
   )
-  plain <- variogram_mcmc_object(truths, fcs)
+  plain <- multivariate_score("variogram", truths, fcs)
   # The weight matrix is `outer(w, w, (x + y) / 2)`. A pair of ones
   # reproduces the unweighted matrix of ones.
-  expect_equal(variogram_mcmc_object(truths, fcs, weights = c(1, 1)),
-               plain, tolerance = 1e-12)
+  expect_equal(
+    multivariate_score("variogram", truths, fcs, weights = c(1, 1)),
+    plain, tolerance = 1e-12
+  )
   # Uneven weights move the score away from the unweighted one.
-  uneven <- variogram_mcmc_object(truths, fcs, weights = c(0.5, 2))
+  uneven <- multivariate_score("variogram", truths, fcs,
+                               weights = c(0.5, 2))
   expect_false(isTRUE(all.equal(uneven, plain)))
 })
 
 
 # ----- Log score --------------------------------------------------
 
-test_that("Log score is finite and decreases as fc concentrates on truth", {
+test_that("Log score decreases as fc concentrates on truth", {
   set.seed(9L)
   fc_wide <- matrix(stats::rnorm(1000L, sd = 2),
                      nrow = 500L, ncol = 2L)
   fc_narrow <- matrix(stats::rnorm(1000L, sd = 0.3),
                        nrow = 500L, ncol = 2L)
-  s_wide <- logs_mcmc_object(truth = c(0, 0), fc = fc_wide)
-  s_narrow <- logs_mcmc_object(truth = c(0, 0), fc = fc_narrow)
-  expect_true(all(is.finite(s_wide[, "score"])))
+  s_wide <- univariate_score("logs", truth = c(0, 0), fc = fc_wide)
+  s_narrow <- univariate_score("logs", truth = c(0, 0), fc = fc_narrow)
   # Sharper forecast concentrated on truth -> lower (better) log score.
   expect_true(mean(s_narrow[, "score"]) <
               mean(s_wide[, "score"]))
@@ -221,7 +228,7 @@ test_that("DSS matches its analytic formula on Gaussian draws", {
   truth <- 0
   fc <- matrix(stats::rnorm(5000L, mean = 0, sd = 1),
                 nrow = 5000L, ncol = 1L)
-  out <- dss_mcmc_object(truth, fc)
+  out <- univariate_score("dss", truth, fc)
   mu <- mean(fc); s <- sd(fc)
   expected <- ((truth - mu) / s)^2 + 2 * log(s)
   # Sample-based estimator vs analytic: match within sampling
@@ -236,7 +243,8 @@ test_that("DSS matches its analytic formula on Gaussian draws", {
 test_that("Quantile score is 0 when truth equals the alpha quantile", {
   fc <- matrix(seq.int(1L, 100L), nrow = 100L, ncol = 1L)
   # 0.5 quantile of 1..100 is 50.5; pick truth at the median.
-  out <- qs_mcmc_object(truth = 50.5, fc = fc, quantile_level = 0.5)
+  out <- univariate_score("qs", truth = 50.5, fc = fc,
+                          quantile_level = 0.5)
   # Pinball at the alpha-quantile is identically zero.
   expect_lt(as.numeric(out[1, "score"]), 1e-8)
 })
@@ -252,8 +260,8 @@ test_that("Quantile score weights a miss by its quantile level", {
   # (1 - q) * negative_residual).
   fc <- matrix(stats::rnorm(1000L), nrow = 1000L, ncol = 1L)
   truth <- 3
-  s_lower <- qs_mcmc_object(truth, fc, quantile_level = 0.05)
-  s_upper <- qs_mcmc_object(truth, fc, quantile_level = 0.95)
+  s_lower <- univariate_score("qs", truth, fc, quantile_level = 0.05)
+  s_upper <- univariate_score("qs", truth, fc, quantile_level = 0.95)
   expect_true(as.numeric(s_upper[1, "score"]) >
               as.numeric(s_lower[1, "score"]))
 })
@@ -265,8 +273,8 @@ test_that("twCRPS with (a = -Inf, b = Inf) equals plain CRPS", {
   set.seed(12L)
   truth <- 1
   fc <- matrix(stats::rnorm(500L), nrow = 500L, ncol = 1L)
-  plain <- crps_mcmc_object(truth, fc)
-  tw <- twcrps_mcmc_object(truth, fc)
+  plain <- univariate_score("crps", truth, fc)
+  tw <- univariate_score("twcrps", truth, fc)
   expect_equal(as.numeric(tw[1, "score"]),
                 as.numeric(plain[1, "score"]),
                 tolerance = 1e-8)
@@ -277,11 +285,11 @@ test_that("twCRPS with a > truth focuses scoring on the upper tail", {
   set.seed(13L)
   truth <- 0
   fc <- matrix(stats::rnorm(500L), nrow = 500L, ncol = 1L)
-  plain <- crps_mcmc_object(truth, fc)
+  plain <- univariate_score("crps", truth, fc)
   # Threshold above truth -> the chaining function flattens
   # everything below it, reducing the contribution from the
   # bulk of the predictive distribution.
-  tw <- twcrps_mcmc_object(truth, fc, lower = 2)
+  tw <- univariate_score("twcrps", truth, fc, lower = 2)
   expect_true(as.numeric(tw[1, "score"]) <
               as.numeric(plain[1, "score"]))
 })
@@ -298,9 +306,11 @@ test_that("twEnergy is the energy score of the clamped values", {
   )
   # The chaining function is `min(max(x, a), b)`
   clamp <- function(x) pmin(pmax(x, -1), 2)
-  expect_equal(twenergy_mcmc_object(truths, fcs, lower = -1, upper = 2),
-               energy_mcmc_object(clamp(truths), lapply(fcs, clamp)))
+  expect_equal(
+    multivariate_score("twenergy", truths, fcs, lower = -1, upper = 2),
+    multivariate_score("energy", clamp(truths), lapply(fcs, clamp))
+  )
   # Infinite bounds make the chaining function the identity
-  expect_equal(twenergy_mcmc_object(truths, fcs),
-               energy_mcmc_object(truths, fcs), tolerance = 1e-8)
+  expect_equal(multivariate_score("twenergy", truths, fcs),
+               multivariate_score("energy", truths, fcs), tolerance = 1e-8)
 })

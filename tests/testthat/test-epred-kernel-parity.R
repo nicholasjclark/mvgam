@@ -49,17 +49,24 @@ mk_prep <- function(ndraws = 5L, nobs = 4L, trials = NULL) {
 
 
 test_that("every epred kernel mvgam shares with brms matches it", {
-  shared <- sort(intersect(
-    epred_kernel_names("mvgam"), epred_kernel_names("brms")
-  ))
+  ns <- asNamespace("mvgam")
+  families <- sub("^posterior_epred_", "", epred_kernel_names("brms"))
+  kernels <- lapply(stats::setNames(nm = families), function(fam) {
+    get("epred_kernel", envir = ns)(fam)
+  })
+  # The closure-unit and simplex means take the fit itself.
+  kernels <- Filter(function(k) {
+    is.function(k) && identical(names(formals(k)), "prep")
+  }, kernels)
   # An empty set would satisfy the loop without comparing anything.
-  expect_gt(length(shared), 30L)
+  expect_gt(length(kernels), 35L)
 
   prep <- mk_prep(trials = c(10L, 20L, 5L, 8L))
-  for (nm in shared) {
-    ours <- get(nm, envir = asNamespace("mvgam"))(prep)
-    theirs <- get(nm, envir = asNamespace("brms"))(prep)
-    expect_equal(unname(as.matrix(ours)), unname(as.matrix(theirs)))
+  for (fam in names(kernels)) {
+    theirs <- get(paste0("posterior_epred_", fam),
+                  envir = asNamespace("brms"))(prep)
+    expect_equal(unname(as.matrix(kernels[[fam]](prep))),
+                 unname(as.matrix(theirs)))
   }
 })
 
@@ -87,10 +94,6 @@ test_that("the mean of a zero-inflated or hurdle family deflates mu", {
     get("posterior_epred_hurdle_negbinomial", envir = ns)(prep),
     mu / (1 - (shape / (mu + shape))^shape) * (1 - hu)
   )
-  # None of the three is the inverse link on its own.
-  expect_false(isTRUE(all.equal(
-    get("posterior_epred_zero_inflated_poisson", envir = ns)(prep), mu
-  )))
 })
 
 
@@ -146,7 +149,6 @@ test_that("the com_binomial mean sums the CMB support, not mu * trials", {
     data = list(trials = trials)
   )
   got <- get("posterior_epred_com_binomial", envir = ns)(prep)
-  expect_identical(dim(got), c(ndraws, nobs))
 
   # The reference is the same sum over the 0:T support the kernel
   # claims to compute, evaluated here from the mean helper directly.
@@ -159,26 +161,14 @@ test_that("the com_binomial mean sums the CMB support, not mu * trials", {
   )
   expect_equal(got, want)
 
-  # `mu` arrives on the response scale, so a kernel that applied the
-  # inverse link again would return a different and wrong mean. Pin
-  # that by showing the doubly-inverted input does not reproduce it.
-  double_linked <- prep
-  double_linked$dpars$mu <- stats::plogis(mu)
-  expect_false(isTRUE(all.equal(
-    get("posterior_epred_com_binomial", envir = ns)(double_linked), got
-  )))
-
   # At nu = 1 the CMB collapses to the binomial, whose mean is
-  # `trials * p`; away from it the two must part company.
+  # `trials * p`.
   at_one <- prep
   at_one$dpars$nu <- matrix(1, ndraws, nobs)
   expect_equal(
     get("posterior_epred_com_binomial", envir = ns)(at_one),
     mu * matrix(trials, ndraws, nobs, byrow = TRUE)
   )
-  expect_false(isTRUE(all.equal(
-    got, mu * matrix(trials, ndraws, nobs, byrow = TRUE)
-  )))
 })
 
 

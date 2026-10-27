@@ -66,10 +66,8 @@ test_that(
   "validate_closure_unit_data() treats cap as optional for occ", {
   d <- make_occ_data()
   expect_invisible(validate_closure_unit_data(
-    d, response_var = "y",
-    has_obs_covariates = TRUE, has_det_covariates = TRUE,
-    binary_y_check = TRUE,
-    cap_required   = FALSE
+    d, occ(), response_var = "y",
+    has_obs_covariates = TRUE, has_det_covariates = TRUE
   ))
 })
 
@@ -78,10 +76,8 @@ test_that("validate_closure_unit_data() rejects non-binary y under occ", {
   d$y[1L] <- 3L
   expect_error(
     validate_closure_unit_data(
-      d, response_var = "y",
-      has_obs_covariates = TRUE, has_det_covariates = TRUE,
-      binary_y_check = TRUE,
-      cap_required   = FALSE
+      d, occ(), response_var = "y",
+      has_obs_covariates = TRUE, has_det_covariates = TRUE
     ),
     "closure-unit family with a binary response requires"
   )
@@ -97,10 +93,8 @@ test_that(
     # the single-visit no-covariates case).
     expect_warning(
       validate_closure_unit_data(
-        d, response_var = "y",
-        has_obs_covariates = FALSE, has_det_covariates = FALSE,
-        binary_y_check = TRUE,
-        cap_required   = FALSE
+        d, occ(), response_var = "y",
+        has_obs_covariates = FALSE, has_det_covariates = FALSE
       ),
       "Every closure unit has a single visit"
     )
@@ -108,7 +102,7 @@ test_that(
 })
 
 test_that(
-  "validate_closure_unit_data() hard-errors on N_unit < 2, both branches", {
+  "validate_closure_unit_data() refuses a single closure unit", {
   # Single closure unit with multiple visits: no draws from the
   # state distribution, structurally degenerate for any closure
   # family.
@@ -118,11 +112,7 @@ test_that(
     y      = c(1L, 0L, 1L)
   )
   expect_error(
-    validate_closure_unit_data(
-      d, response_var = "y",
-      binary_y_check = TRUE,
-      cap_required   = FALSE
-    ),
+    validate_closure_unit_data(d, occ(), response_var = "y"),
     "requires at least two closure units"
   )
 })
@@ -155,12 +145,11 @@ test_that(
   mf <- mvgam_formula(bf(y ~ elev, p ~ tod))
   sc <- as.character(stancode(mf, data = d, family = occ(), validate = FALSE))
   sd <- standata(mf, data = d, family = occ(), validate = FALSE)
-  # All four lpmf overloads emitted.
+  # The vector density and the overload brms calls for a scalar p
   expect_match(
     sc, "real occ_lpmf\\(\\s*array\\[\\] int y,\\s*vector mu,\\s*vector p,"
   )
   expect_match(sc, "rep_vector\\(p, N\\)")
-  expect_match(sc, "rep_vector\\(mu, N\\)")
   # target += occ_lpmf(Y | mu, p, N_unit, n_rep, Y_max, visit_idx)
   expect_match(sc, "occ_lpmf\\(Y \\| mu, p, N_unit, n_rep, Y_max, visit_idx\\)")
   # K_max is absent for occ (binary latent state, no truncation).
@@ -189,15 +178,15 @@ test_that(
   # one that gives occ the N-mixture sampler.
   expected <- list(
     nmix = list(
-      epred        = mvgam:::posterior_epred_nmix,
-      predict      = mvgam:::posterior_predict_nmix,
-      log_lik      = mvgam:::log_lik_nmix,
-      latent_state = mvgam:::posterior_latent_N_pb
+      epred        = mvgam:::posterior_epred_detection,
+      predict      = mvgam:::posterior_predict_detection,
+      log_lik      = mvgam:::log_lik_detection,
+      latent_state = mvgam:::posterior_latent_N_nmix
     ),
     occ = list(
-      epred        = mvgam:::posterior_epred_occ,
-      predict      = mvgam:::posterior_predict_occ,
-      log_lik      = mvgam:::log_lik_occ,
+      epred        = mvgam:::posterior_epred_detection,
+      predict      = mvgam:::posterior_predict_detection,
+      log_lik      = mvgam:::log_lik_detection,
       latent_state = mvgam:::posterior_occupancy
     )
   )
@@ -210,15 +199,27 @@ test_that(
       )
     }
   }
-  # The two families resolve to separate kernels wherever the latent
-  # state differs. They share the `epred` kernel, which the table
-  # above records by naming it for both.
-  for (kind in c("predict", "log_lik", "latent_state")) {
-    expect_false(identical(
-      dispatch_closure_unit_method(fams$nmix, kind),
-      dispatch_closure_unit_method(fams$occ, kind)
-    ))
-  }
+})
+
+test_that("log_lik_detection() marginalises each draw with its own p", {
+  # Two draws with different detection probabilities. A kernel that
+  # reused the first draw's p for every draw matched only row 1.
+  d <- make_occ_data(n_unit = 3, n_visit = 3)
+  arrays <- mvgam:::build_closure_unit_arrays(d, response_var = "y",
+                                              family = occ())
+  linpred <- matrix(c(0.3, -0.8), nrow = 2, ncol = nrow(d))
+  p <- rbind(rep(0.2, nrow(d)), rep(0.7, nrow(d)))
+  ll <- mvgam:::log_lik_detection(
+    linpred, "logit", d$y,
+    list(closure_arrays = arrays, p = p, family = occ()), NULL
+  )
+  rows <- mvgam:::closure_unit_visit_rows(arrays)
+  hand <- sapply(rows, function(r) {
+    psi <- plogis(linpred[, 1])
+    z1 <- psi * apply(p[, r], 1, function(pj) prod(dbinom(d$y[r], 1, pj)))
+    log(z1 + (1 - psi) * all(d$y[r] == 0))
+  })
+  expect_equal(ll, hand)
 })
 
 test_that("dispatch_closure_unit_method() errors on a non-closure family", {

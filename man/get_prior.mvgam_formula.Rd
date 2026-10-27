@@ -239,7 +239,7 @@ get_prior(mf, data = dat, family = poisson())
 
 # Replace three defaults. Each `prior()` call gives one row.
 my_priors <- c(
-  prior(normal(0, 1), class = b),
+  prior(std_normal(), class = b),
   prior(inv_gamma(5, 1), class = sigma_trend),
   prior(normal(0.5, 0.25), class = ar1_trend)
 )

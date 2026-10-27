@@ -17,175 +17,148 @@ sim_closure_unit_data(
 }
 \arguments{
 \item{type}{Integer in \code{1:2} selecting the covariate recipe.
-See \emph{Details} for the catalog.}
+See \emph{Details}.}
 
-\item{family}{A closure-unit family: \code{\link[=occ]{occ()}},
-\code{\link[=nmix]{nmix()}} (\code{"poisson_binomial"}, the default),
-\code{nmix("royle_nichols")}, or \code{nmix("poisson_poisson")}.
-Defaults to \code{occ()}.}
+\item{family}{A closure-unit family: \code{\link[=occ]{occ()}} (the default),
+\code{\link[=nmix]{nmix()}} (\code{"poisson_binomial"}), \code{nmix("royle_nichols")} or
+\code{nmix("poisson_poisson")}.}
 
-\item{n_species}{Integer; number of species to simulate.
-Defaults to \code{1L}. With \code{n_species > 1L} the per-species
-intercepts and slopes are sampled independently unless
-\code{n_lv > 0L}, in which case the state-level intercepts get a
-shared latent-factor structure (see \emph{Latent factors}).}
+\item{n_species}{Integer number of species. Defaults to \code{1L}.}
 
-\item{n_sites}{Integer; number of closure units per species.
-Defaults to \code{30L}.}
-
-\item{n_visits}{Integer; number of visits per closure unit.
-Defaults to \code{4L}. All units share the same visit count
-(every unit carries the same number of visits).}
-
-\item{n_lv}{Integer; number of latent factors for the
-multi-species joint species distribution model. Defaults to
-\code{0L} (independent species). When \code{n_lv > 0L} and
-\code{n_species > 1L}, the species intercepts share a low-rank
-loadings matrix \code{Z} over \code{n_lv} site-level latent factors,
-mirroring the structure \code{\link[=jsdgam]{jsdgam()}} estimates.}
-
-\item{K_max}{Integer; per-unit cap on the latent abundance
-\code{N}. Only used when \code{family} is an \code{nmix()} variant. Defaults
+\item{n_sites}{Integer number of closure units per species. Defaults
 to \code{30L}.}
+
+\item{n_visits}{Integer number of visits to every closure unit.
+Defaults to \code{4L}.}
+
+\item{n_lv}{Integer number of latent factors shared by the species'
+state intercepts. Defaults to \code{0L}, independent species. Requires
+\code{n_species > 1L}. See \emph{Latent factors}.}
+
+\item{K_max}{Integer cap on the latent abundance \code{N} of an \code{nmix()}
+family. Defaults to \code{30L}.}
 
 \item{seed}{Optional integer seed. The session's random state is
 restored when the call returns.}
 }
 \value{
-A list with class
-\code{c("mvgam_sim_closure_unit", "mvgam_sim")} carrying:
+A list of class \code{c("mvgam_sim_closure_unit", "mvgam_sim")}:
 \describe{
-\item{\code{data_train}}{long-format \code{data.frame} ready for
-\code{mvgam(family = family, data = ...)} / \code{jsdgam(...)}.
-Columns: \code{series} (species factor), \code{site} (1..n_sites),
-\code{time} (= \code{site} in single-season mode; this is the
-closure-unit identifier), \code{visit} (1..n_visits), \code{y},
-the state-level covariates (broadcast across visits),
-the detection-level covariates (per-visit), and \code{cap}
-(= 1 for occ, = K_max for nmix).}
-\item{\code{data_test}}{\code{NULL} (closure-unit fits do not split
-on timepoints; the slot exists for \code{sim_mvgam} API
-parity).}
-\item{\code{y_array}}{integer array \verb{[n_species, n_sites, 1, n_visits]} consumable by \code{\link[=pivot_detection_array]{pivot_detection_array()}}.}
-\item{\code{family}}{the closure-unit family used.}
-\item{\code{type}}{the recipe selected.}
-\item{\code{n_species}, \code{n_sites}, \code{n_visits}, \code{n_lv}}{the
-requested simulation dimensions.}
-\item{\code{truth}}{named list with all generative parameters
-(see \emph{Truth bundle} below).}
+\item{\code{data_train}}{Long \code{data.frame}. Its columns are \code{series}
+(the species), \code{site}, \code{time} (the site, which identifies the
+closure unit in a single season), \code{visit}, \code{y}, the site and
+visit covariates, then \code{cap}: 1 for \code{occ()}, \code{K_max} for
+\code{nmix()}.}
+\item{\code{data_test}}{\code{NULL}. Closure-unit data have no held-out
+times.}
+\item{\code{y_array}}{Integer array
+\verb{[n_species, n_sites, 1, n_visits]} for
+\code{\link[=pivot_detection_array]{pivot_detection_array()}}.}
+\item{\code{family}, \code{type}}{The family and recipe.}
+\item{\code{n_species}, \code{n_sites}, \code{n_visits}, \code{n_lv}}{The
+simulation dimensions.}
+\item{\code{truth}}{The generative parameters. See \emph{Truth bundle}.}
 }
 }
 \description{
-Generates training data for the closure-unit observation
-families (\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}} variants) under a small catalog of
-fixed covariate recipes. Each recipe carries BOTH a per-site
-state-level covariate set AND a per-visit detection-level
-covariate set, mirroring the standard occupancy / N-mixture
-single-season layout used in textbook examples.
+Simulates single-season data for the closure-unit families, \code{\link[=occ]{occ()}}
+and the \code{\link[=nmix]{nmix()}} variants. Each covariate recipe holds per-site
+covariates for the latent state and per-visit covariates for
+detection. \code{data_train} is the long frame \code{\link[=mvgam]{mvgam()}} and \code{\link[=jsdgam]{jsdgam()}}
+take. \code{y_array} is the four-dimensional layout of
+\code{\link[=pivot_detection_array]{pivot_detection_array()}}. \code{truth} holds every generative parameter
+for recovery checks.
 }
 \details{
-One function, switched on \code{family}. \code{data_train} is long-form
-and ready for \code{\link[=mvgam]{mvgam()}} / \code{\link[=jsdgam]{jsdgam()}} directly; \code{y_array} is
-the 4D layout consumable by \code{\link[=pivot_detection_array]{pivot_detection_array()}}. Every
-generative parameter is exposed on \verb{truth$} for recovery
-checks. Latent-factor multi-species dynamics (\code{n_lv > 0}) are
-supported for both \code{occ()} and \code{nmix()}.
-
-Both recipes carry a per-site (state-level) and a per-visit
-(detection-level) covariate set. State and detection coefs are
-drawn from \code{Normal(0, 0.5)} and exposed on \code{truth} so users
-can compare them against \code{predict(fit, type = "latent_state")}
-and \code{predict(fit, type = "detection")}.
-
 \describe{
-\item{\code{type = 1}}{\strong{Single covariate each side.} State
-linear predictor: \code{b0 + b1 * env} where \code{env ~ N(0, 1)}
-per site. Detection linear predictor: \code{c0 + c1 * tod_c}
-where \code{tod_c ~ U(-6, 6)} per visit (centred time of day).
-The simplest non-trivial occupancy / N-mixture recipe.}
-\item{\code{type = 2}}{\strong{Two covariates each side.} State linear
-predictor: \code{b0 + b1 * env + b2 * elev} where \code{env ~ N(0, 1)}
-and \code{elev ~ N(0, 1)} per site. Detection linear
-predictor: \code{c0 + c1 * tod_c + c2 * effort} where
-\code{tod_c ~ U(-6, 6)} and \code{effort ~ U(0.5, 1.5)} per visit.
-Exercises multi-covariate identifiability on both linear
-predictors.}
+\item{\code{type = 1}}{State predictor \code{b0 + b1 * env}, with
+\code{env ~ N(0, 1)} per site. Detection predictor \code{c0 + c1 * tod_c},
+with \code{tod_c ~ U(-6, 6)} per visit, a centred time of day.}
+\item{\code{type = 2}}{State predictor \code{b0 + b1 * env + b2 * elev}, with
+\code{env} and \code{elev} each \code{N(0, 1)} per site. Detection predictor
+\code{c0 + c1 * tod_c + c2 * effort}, with \code{tod_c ~ U(-6, 6)} and
+\code{effort ~ U(0.5, 1.5)} per visit.}
 }
 
-Each linear predictor is on the scale of the family's own link.
-The state predictor takes the logit for \code{occ()} and the log for
-every \code{nmix()} variant, where it sets the Poisson abundance mean
-\code{lambda}. The detection predictor takes the logit for \code{occ()},
-\code{nmix("poisson_binomial")} and \code{nmix("royle_nichols")}, whose
-per-individual detection \code{r} is a probability, and the log for
-\code{nmix("poisson_poisson")}, whose encounter rate \code{rho} is not.
+Each predictor is on the scale of the family's own link. The state
+predictor takes the logit for \code{occ()} and the log for every \code{nmix()}
+variant, where it sets the Poisson abundance mean \code{lambda}. The
+detection predictor takes the logit for \code{occ()},
+\code{nmix("poisson_binomial")} and \code{nmix("royle_nichols")}. It takes the
+log for \code{nmix("poisson_poisson")}, whose encounter rate \code{rho} is
+unbounded.
+
+Each species draws an intercept from a normal with mean zero. Each
+covariate draws one community mean. Each species then draws its
+slope around that mean. The standard deviations are:\tabular{llll}{
+   Predictor \tab Intercept \tab Community mean \tab Species slope \cr
+   \code{occ()} state \tab 0.75 \tab 1.5 \tab 0.5 \cr
+   \code{nmix()} state \tab 0.5 \tab 0.4 \tab 0.3 \cr
+   Detection \tab 0.5 \tab 0.2 \tab 0.15 \cr
+}
+
+
+The \code{nmix()} state scales keep \code{lambda} well below \code{K_max}. The
+detection scales keep detection away from 0 and 1 across the range of
+\code{tod_c}.
 }
 \section{Latent factors}{
 
-When \code{n_lv > 0L} and \code{n_species > 1L}, the state linear
-predictor for species \code{k} at site \code{i} carries an extra
-\verb{sum_l Z[k, l] * lv[i, l]} term where \code{Z ~ N(0, 0.7)} is the
-\verb{[n_species x n_lv]} loadings matrix and \code{lv ~ N(0, 1)} are
-the \verb{[n_sites x n_lv]} latent factor scores. Both are
-returned on \code{truth$loadings} / \code{truth$lv} so users can check
-that \code{\link[=jsdgam]{jsdgam()}} recovers the spectrum and the post-hoc QR
-identification (\code{ordinate()}) lines up with the truth.
+With \code{n_lv > 0L}, the state predictor of species \code{k} at site \code{i}
+gains \verb{sum_l Z[k, l] * lv[i, l]}. The \verb{[n_species x n_lv]}
+loadings \code{Z} are normal with standard deviation 0.7. The
+\verb{[n_sites x n_lv]} factor scores \code{lv} are standard normal.
+\code{truth$loadings} and \code{truth$lv} return both for comparison with
+\code{\link[=jsdgam]{jsdgam()}} estimates and \code{\link[=ordinate]{ordinate()}}.
 }
 
 \section{Truth bundle}{
 
-\verb{truth$} slots are aligned with the post-fit extractors so
-recovery checks read naturally:
 \describe{
-\item{\code{psi} (occ) / \code{lambda} (nmix)}{\verb{[n_species x n_sites]}
-matrix of true state probability / expected abundance.
-Matches \code{predict(fit, type = "latent_state", summary = TRUE)} aggregated to the unit grain.}
-\item{\code{z} (occ) / \code{N} (nmix)}{\verb{[n_species x n_sites]}
-matrix of true latent state realisations.}
-\item{\code{p}}{\verb{[n_species x n_sites x n_visits]} array of true
-per-visit detection probability (or RN per-individual
-\code{r} / PPM \code{rho}, depending on the nmix variant).}
-\item{\code{state_coefs}}{named numeric vector
-(\code{n_species == 1L}) or \verb{[n_species x p]} matrix
-(\code{n_species > 1L}) with \code{intercept} plus per-recipe
-state-level slopes.}
-\item{\code{detection_coefs}}{same shape, for the detection
-linear predictor.}
-\item{\code{loadings}}{\verb{[n_species x n_lv]} matrix \code{Z} (only
-when \code{n_lv > 0L}).}
-\item{\code{lv}}{\verb{[n_sites x n_lv]} site-level latent factor
-scores (only when \code{n_lv > 0L}).}
+\item{\code{psi} (occ) or \code{lambda} (nmix)}{\verb{[n_species x n_sites]}
+matrix of occupancy probabilities or expected abundances.}
+\item{\code{z} (occ) or \code{N} (nmix)}{\verb{[n_species x n_sites]} matrix of
+the realised latent states that
+\code{predict(fit, type = "latent_state")} estimates.}
+\item{\code{p}}{\verb{[n_species x n_sites x n_visits]} array of the
+detection parameter that \code{predict(fit, type = "detection")}
+estimates: the detection probability, the per-individual
+probability \code{r} of \code{nmix("royle_nichols")} or the encounter
+rate \code{rho} of \code{nmix("poisson_poisson")}.}
+\item{\code{state_coefs}, \code{detection_coefs}}{The intercept and slopes
+of each predictor. A named vector for one species, an
+\verb{[n_species x (1 + p)]} matrix for several.}
+\item{\code{loadings}, \code{lv}}{\code{Z} and the factor scores, when
+\code{n_lv > 0L}.}
 }
 }
 
 \examples{
-# Four-species occupancy fixture with state-level env / elev
-# covariates and visit-level tod_c / effort covariates
-# (recipe 2L).
-set.seed(1)
+# Four species with two site and two visit covariates
 simdat <- sim_closure_unit_data(
   family    = occ(),
   n_species = 4L,
   n_sites   = 50L,
   n_visits  = 4L,
-  type      = 2L
+  type      = 2L,
+  seed      = 1L
 )
 head(simdat$data_train)
 summary(simdat)
 
+# Next: fit these data with jsdgam(), as the shared_variation()
+# example does
+
 }
 \seealso{
-\code{\link[=sim_mvgam]{sim_mvgam()}} for state-space time-series
-simulation; \code{\link[=sim_jsdm]{sim_jsdm()}} for multi-species site-by-species
-data under a family with no detection process;
-\code{\link[=pivot_detection_array]{pivot_detection_array()}} to re-pivot the
-returned \code{y_array} with custom covariate layouts;
-\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}} for the families this simulator targets;
-\code{\link[=jsdgam]{jsdgam()}} for the multi-species joint fitter the
-\code{n_lv > 0L} output feeds into.
+\code{\link[=sim_mvgam]{sim_mvgam()}} simulates state-space time series.
+\code{\link[=sim_jsdgam]{sim_jsdgam()}} simulates site-by-species data without a detection
+process. The
+\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} fits occupancy and
+N-mixture models to data of this layout.
 
 Other simulation: 
-\code{\link{sim_jsdm}()},
+\code{\link{sim_jsdgam}()},
 \code{\link{sim_mvgam}()}
 }
 \author{

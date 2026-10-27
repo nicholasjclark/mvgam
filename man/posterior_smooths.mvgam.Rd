@@ -2,8 +2,7 @@
 % Please edit documentation in R/posterior_smooths.mvgam.R
 \name{posterior_smooths.mvgam}
 \alias{posterior_smooths.mvgam}
-\title{Compute posterior draws of a smooth term in a fitted
-\pkg{mvgam} model}
+\title{Posterior draws of one smooth term}
 \usage{
 \method{posterior_smooths}{mvgam}(
   object,
@@ -20,51 +19,47 @@
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}
 
-\item{smooth}{Character string naming the smooth term as it
-appears in the formula (e.g. \code{"s(x)"},
-\code{"s(z, by = group)"}, \code{"t2(x, y)"}). Use
-\code{\link[=smooths.mvgam]{smooths.mvgam()}} to enumerate the available terms.}
+\item{smooth}{The smooth term as the formula writes it, such as
+\code{"s(x)"}, \code{"s(z, by = group)"} or \code{"t2(x, y)"}. Spacing is ignored.
+\code{\link[=smooths.mvgam]{smooths.mvgam()}} lists the terms.}
 
-\item{newdata}{Optional \code{data.frame} to evaluate the smooth
-at. \code{NULL} (the default) uses the training data. It needs to
-carry only the smooth's own variables.}
+\item{newdata}{A \code{data.frame} holding the smooth's own variables, or
+\code{NULL} for the training data.}
 
 \item{resp}{The response the smooth belongs to, required on a
 model with several.}
 
 \item{dpar, nlpar}{The distributional or non-linear parameter the
-smooth belongs to. Name at most one; the mean is read when both
-are \code{NULL}.}
+smooth belongs to. Name at most one. With both \code{NULL} the smooth
+belongs to the mean.}
 
-\item{ndraws, draw_ids}{Optional posterior-draw subsetting,
-matching the \code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}} semantics.}
+\item{ndraws, draw_ids}{The number of posterior draws, or their
+indices. Give at most one. \code{NULL} for both uses every draw.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A numeric matrix of dimension
-[n_draws x n_grid_points] containing the posterior draws
-of the smooth term's contribution to the linear predictor.
+A numeric matrix with one row per draw and one column per
+row of \code{newdata}: the smooth's contribution to the linear
+predictor.
 }
 \description{
-Returns the posterior draws of a single smooth term evaluated
-at the supplied prediction grid, matching the shape of
-\code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}}. Supports any smooth declared by
-\code{s()} or \code{t2()} on the observation formula, a distributional
-parameter's formula, a non-linear parameter's formula or the
-trend formula, including \code{by = factor} expansion.
+Evaluates one smooth at the rows of \code{newdata} for each posterior
+draw, in the shape \code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}} returns. The smooth
+can be any \code{s()} or \code{t2()} term of the observation formula, a
+distributional or non-linear parameter's formula, or the trend
+formula, \code{by} factors included.
 }
 \details{
 The smooth's contribution is its unpenalised basis times its
 fixed coefficients plus each penalised basis times its random
 coefficients, per draw. The bases come from \code{\link[brms:standata]{brms::standata()}}
-evaluated on \code{newdata}, and the coefficients from the fit's
-draws. An offset is not part of any smooth and is left out,
-where \code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}} adds a predictor's offsets to
-each of its smooths.
+evaluated on \code{newdata}. The coefficients come from the draws.
+\code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}} adds a predictor's offsets to each of
+its smooths. This method leaves them out.
 
-A term written on both the observation formula and the trend
-formula is read from the observation formula.
+A term written in both the observation and the trend formula is
+taken from the observation formula.
 }
 \examples{
 \dontrun{
@@ -76,15 +71,19 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Posterior draws of the s(x) smooth at the training x values.
-sm <- posterior_smooths(mod, smooth = "s(x)")
-dim(sm)
+# Twenty draws of s(x) over a grid of x
+grid <- data.frame(x = seq(-2, 2, length.out = 50))
+sm <- posterior_smooths(mod, smooth = "s(x)", newdata = grid)
+matplot(grid$x, t(sm[1:20, ]), type = "l", lty = 1, col = "grey60",
+        xlab = "x", ylab = "s(x)")
+
+# Next, conditional_smooths(mod) summarises every smooth in one call
 }
 
 }
 \seealso{
-\code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}},
-\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, \code{\link[=smooths.mvgam]{smooths.mvgam()}}.
+\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}} summarises every smooth.
+\code{\link[=smooths.mvgam]{smooths.mvgam()}} lists the terms.
 
 Other predictions: 
 \code{\link{conditional_effects.mvgam}()},

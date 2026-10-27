@@ -328,5 +328,5 @@ test_that("the adaptive Pareto k threshold stops at 0.7", {
   expect_equal(mvgam:::mvgam_ps_khat_threshold(200L), 1 - 1 / log10(200))
   expect_equal(mvgam:::mvgam_ps_khat_threshold(5000L), 0.7)
   # The formula divides by zero at S = 1
-  expect_error(mvgam:::mvgam_ps_khat_threshold(1L))
+  expect_error(mvgam:::mvgam_ps_khat_threshold(1L), ">= 2")
 })

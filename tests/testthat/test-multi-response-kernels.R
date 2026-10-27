@@ -133,7 +133,7 @@ test_that("log_lik_categ refuses an observation that is not one-hot", {
 })
 
 
-test_that("log_lik_mvn sums to a diagonal multivariate normal", {
+test_that("the mvn log-likelihood sums to a diagonal multivariate normal", {
   # The kernel returns one normal log-density per row. Summed over a
   # unit those must equal the joint density under a diagonal Sigma,
   # which is what `Sigma = diag(Psi^2)` claims.
@@ -143,8 +143,8 @@ test_that("log_lik_mvn sums to a diagonal multivariate normal", {
   psi <- c(0.7, 1.3, 0.9)
   linpred <- matrix(mu, nrow = ndraws, ncol = 3L, byrow = TRUE)
   Psi_row <- matrix(psi, nrow = ndraws, ncol = 3L, byrow = TRUE)
-  out <- log_lik_mvn(linpred, "identity", y,
-                      list(Psi_row = Psi_row), NULL)
+  out <- spec_log_lik("mvn")(linpred, "identity", y,
+                              list(Psi_row = Psi_row), NULL)
   # A multivariate normal with diagonal covariance is the product
   # of its univariate margins, so base R gives the reference
   # without a dependency, and gives it independently.
@@ -154,7 +154,7 @@ test_that("log_lik_mvn sums to a diagonal multivariate normal", {
 })
 
 
-test_that("log_lik_mvt matches a scaled univariate t per element", {
+test_that("the mvt log-likelihood is a scaled univariate t per element", {
   # The kernel scales by Psi and corrects with the Jacobian, so each
   # element is a location-scale t. A multivariate t with diagonal
   # scale is not the product of those, so the per-element form is what
@@ -164,7 +164,7 @@ test_that("log_lik_mvt matches a scaled univariate t per element", {
   mu <- c(1.0, 0.0)
   psi <- c(0.7, 1.3)
   nu <- c(5, 5)
-  out <- log_lik_mvt(
+  out <- spec_log_lik("mvt")(
     linpred = matrix(mu, nrow = ndraws, ncol = 2L, byrow = TRUE),
     link = "identity", y = y,
     family_pars = list(

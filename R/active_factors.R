@@ -1,132 +1,97 @@
-# Posterior summary of how many latent factors the data use. It is
-# meaningful under the MGP column-shrinkage prior, which makes `n_lv`
-# a truncation ceiling. Each draw's scaled column norms decide which
-# columns are active under the chosen rule. The uncertainty in the
-# loadings and in the shrinkage both enter.
+# Posterior summary of how many latent factors the data use. Each
+# draw's factor covariance is decomposed into principal dimensions.
+# The rule chosen decides which dimensions are active in that draw.
+# The uncertainty in the loadings and in the latent covariance both
+# enter.
 
-#' The per-column innovation scale, as a draws-by-column matrix
+#' Posterior count of the latent factors a model uses
 #'
-#' A factor column contributes `sigma_trend[k] * Z[, k]`. The signal
-#' in a column depends on both terms. A fit with no per-column scale
-#' returns a `[ndraws, n_lv]` matrix of ones. Callers multiply by the
-#' result in every case.
+#' A factor model fitted with `n_lv` factors may need fewer. This
+#' function counts the factors whose variance the data support. It
+#' suits a fit under the multiplicative gamma process (MGP) prior,
+#' `loadings_prior = "mgp"` (Bhattacharya and Dunson 2011). That prior
+#' shrinks surplus factors toward zero. `n_lv` then acts as a ceiling.
+#' The function applies to every factor model. Under other loadings
+#' priors a surplus factor keeps the variance its prior gives it. The
+#' count can then exceed the number of factors the data need.
 #'
-#' @param object A fitted `mvgam`.
-#' @param draws_mat Posterior draws matrix.
-#' @param n_lv Number of latent factors.
-#' @return Numeric `[ndraws, n_lv]` matrix.
-#' @noRd
-resolve_column_scales <- function(object, draws_mat, n_lv) {
-  read_draws_vector(draws_mat, "sigma_trend", n_lv, required = FALSE) %||%
-    matrix(1, nrow = nrow(draws_mat), ncol = n_lv)
-}
-
-
-#' Posterior summary of active latent factors under MGP shrinkage
-#'
-#' For a fitted `mvgam` object with a multiplicative-gamma-process
-#' (MGP) loadings prior, returns the posterior distribution of the
-#' active factor count and per-factor activity probabilities. The
-#' MGP prior shrinks the columns of the loadings matrix `Z` toward
-#' zero as the column index grows. `n_lv` is then a truncation
-#' ceiling. This function reports how many columns the data use.
-#'
-#' Each posterior draw `s` gives the per-column squared norms
-#' \deqn{c_h^{(s)} = \sigma_h^{2(s)} \|Z[, h]^{(s)}\|^2,} where `Z`
-#' is the loadings matrix the model sampled and \eqn{\sigma_h} that
-#' column's own latent scale. A column enters the trend as
-#' `sigma_trend[h] * Z[, h]`. Multiplicative gamma process shrinkage
-#' acts on the scale. A rule on the loadings alone would call every
-#' column active. `c_h` sums to the trace of the innovation covariance
-#' the factors give the series.
+#' The factors give the series the covariance \eqn{Z \Omega Z^\top},
+#' where `Z` holds the loadings and \eqn{\Omega} the covariance of the
+#' latent states. Its eigenvalues \eqn{\lambda_1 \ge \lambda_2 \ge
+#' \dots} are the variances along its principal dimensions. Each
+#' posterior draw gives one set. The eigenvalues stay the same when the
+#' factors are rotated or relabelled, which the individual columns of
+#' `Z` do not.
 #'
 #' @details
-#' Three rules decide whether column `h` is active in draw `s`. Each
-#' tests a different question:
+#' Two rules decide whether dimension `k` is active in a draw:
 #' \describe{
-#'   \item{`"variance"`}{Does the column explain a share of at least
-#'     `threshold` of the latent innovation variance,
-#'     \eqn{c_h / \sum_k c_k}? The default `threshold` is `0.05`.}
-#'   \item{`"cumulative"`}{Is the column among the fewest columns
-#'     whose shares sum to at least `threshold`? The columns are ranked
-#'     by `c_h` within each draw. The default `threshold` is `0.95`.
-#'     The count is the number of factors the latent variance needs, as
-#'     in a scree plot.}
-#'   \item{`"relative"`}{Does the column hold at least `threshold`
-#'     times the posterior mean norm of the leading column? The default
-#'     `threshold` is `0.01`. The rule follows the cumulative shrinkage
-#'     criterion of Legramanti, Durante and Dunson (2020).}
+#'   \item{`"relative"`}{The dimension holds at least `threshold`
+#'     times the variance of the leading one,
+#'     \eqn{\lambda_k \ge} `threshold` \eqn{\lambda_1}. The default
+#'     `threshold` is `0.1`. The rule counts any number of factors of
+#'     similar size.}
+#'   \item{`"cumulative"`}{The dimension is among the fewest leading
+#'     dimensions whose variance reaches a share `threshold` of the
+#'     total. The default `threshold` is `0.9`. The count is the
+#'     number of factors a scree plot would keep.}
 #' }
-#' `prob_active` is the posterior probability that a column is active.
-#' A column with `prob_active >= 1 - prob_threshold` is reported
-#' active. The count is summarised over the per-draw counts.
+#' `prob_active` is the posterior probability that a dimension is
+#' active. A dimension with `prob_active >= prob` is reported active.
+#' The count is summarised over the per-draw counts.
 #'
-#' The MGP prior expects each column to be smaller than the one
-#' before. Under the default `mgp_a2 = 4` the prior median ratio of
-#' successive norms is about 0.28. A column the data say nothing about
-#' keeps that prior size. All three rules can then count it. A larger
-#' `mgp_a2` in the `loadings_prior` argument of [mvgam()] or [jsdgam()]
-#' shrinks such columns harder. Comparing `median_norm_sq` across
-#' columns with the prior ratio shows whether a column holds more than
-#' its prior.
+#' Both rules compare the factors with one another. The leading
+#' dimension is always active, which makes the count at least one. A
+#' model whose factors hold almost no variance still reports one.
+#' [shared_variation()] gives the size of that variance on the scale
+#' of the linear predictor.
 #'
-#' The rules use the sampled `Z`. The MGP shrinkage parameter
-#' `Psi_diag` is defined on its columns. The QR-identified `Z_tilde`
-#' orders its columns by Gram-Schmidt pivots. An active count of k
-#' means k of the `n_lv` columns hold posterior signal. It does not
-#' identify which k under the MGP ordering.
-#'
-#' @param object A fitted `mvgam` object whose trend includes
-#'   latent factors (`n_lv > 0`).
-#' @param criterion The activity rule: `"variance"` (the default),
-#'   `"cumulative"` or `"relative"`. Details describes each.
+#' @param object A fitted `mvgam` object whose trend includes at
+#'   least two latent factors (`n_lv >= 2`).
+#' @param criterion The activity rule: `"relative"` (the default) or
+#'   `"cumulative"`. Details describes each.
 #' @param threshold Numeric in `(0, 1]`, the cut-off of `criterion`.
-#'   `NULL` (the default) takes `0.05` for `"variance"`, `0.95` for
-#'   `"cumulative"` and `0.01` for `"relative"`.
-#' @param prob_threshold Numeric in `(0, 1)`. A column is active when
-#'   its posterior probability of activity is at least
-#'   `1 - prob_threshold`. Defaults to `0.5`.
+#'   `NULL` (the default) takes `0.1` for `"relative"` and `0.9` for
+#'   `"cumulative"`.
+#' @param prob Numeric in `(0, 1)`. A dimension is reported active
+#'   when its posterior probability of activity is at least `prob`.
+#'   Defaults to `0.5`.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A list with class `mvgam_active_factors` containing:
 #'   \itemize{
-#'     \item `count`: per-draw active count summary
-#'       (`median`, `q025`, `q975`).
-#'     \item `per_factor`: data frame with one row per sampled
-#'       column of `Z`. Its columns are the `factor` index, the
-#'       posterior `prob_active`, the posterior `median_norm_sq` (the
-#'       scaled squared norm `c_h`), the posterior `median_share` of
-#'       the latent variance and `is_active`.
-#'     \item `threshold`: list with `criterion`, `value` and
-#'       `prob_threshold`.
-#'     \item `n_lv`: the truncation ceiling specified at fit time.
+#'     \item `count`: the posterior `median`, `q025` and `q975` of the
+#'       per-draw count of active dimensions.
+#'     \item `per_factor`: data frame with one row per dimension,
+#'       largest first. Its columns are the `factor` rank, the
+#'       posterior `prob_active`, the posterior `median_variance`
+#'       \eqn{\lambda_k}, the posterior `median_share` of the total
+#'       variance and `is_active`.
+#'     \item `threshold`: list with `criterion`, `value` and `prob`.
+#'     \item `n_lv`: the number of factors the model was fitted with.
 #'   }
 #'
 #' @references
-#' Legramanti, S., Durante, D. and Dunson, D. B. (2020). Bayesian
-#'   cumulative shrinkage for infinite factorizations.
-#'   *Biometrika*, 107(3), 745-752.
-#'   \doi{10.1093/biomet/asaa008}.
-#'
 #' Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
 #'   infinite factor models. *Biometrika*, 98(2), 291-306.
 #'   \doi{10.1093/biomet/asr013}.
 #'
-#' @seealso [compare_loadings()] compares the loadings under two
-#'   priors. [shared_variation()] reports the variance the factors
-#'   share. The `r mvgam_article("jsdgam", "JSDM article")` fits an MGP
-#'   prior and counts its active factors.
+#' @seealso [shared_variation()] reports the covariance the factors
+#'   give the series. [compare_loadings()] compares the loadings under
+#'   two priors. The `r mvgam_article("jsdgam", "JSDM article")` fits
+#'   an MGP prior and counts its active factors.
 #'
 #' @examples
 #' \dontrun{
-#' # Counts of 20 species at 100 sites, driven by two latent factors
-#' simdat <- sim_jsdm(family = brms::negbinomial(), n_species = 20L,
-#'                    n_sites = 100L, n_lv = 2L, seed = 3L)
+#' # Counts of 20 species at 100 sites, driven by two latent factors.
+#' # Each species has its own intercept and response to `env`.
+#' simdat <- sim_jsdgam(family = brms::negbinomial(), n_species = 20L,
+#'                      n_sites = 100L, n_lv = 2L, seed = 3L)
 #'
-#' # Up to five factors under the multiplicative gamma process prior,
-#' # which shrinks each later column of the loadings toward zero
+#' # Up to five factors under the MGP prior, which shrinks the factors
+#' # the data do not need
 #' mod <- jsdgam(
-#'   y ~ env,
+#'   y ~ env * series,
 #'   data           = simdat$data_train,
 #'   family         = brms::negbinomial(),
 #'   n_lv           = 5L,
@@ -135,13 +100,12 @@ resolve_column_scales <- function(object, draws_mat, n_lv) {
 #'   silent         = 2
 #' )
 #'
-#' # Columns that explain at least 5 percent of the latent variance.
-#' # The third column's share is close to that cut
+#' # Dimensions holding at least a tenth of the leading one's variance
 #' af <- active_factors(mod)
 #' af
 #' plot(af)
 #'
-#' # The fewest columns that explain 95 percent of the latent variance
+#' # The fewest dimensions that explain 90 percent of the variance
 #' active_factors(mod, criterion = "cumulative")
 #'
 #' # Next: ordinate() plots the species on the leading factors
@@ -158,68 +122,45 @@ active_factors <- function(object, ...) {
 #' @method active_factors mvgam
 #' @export
 active_factors.mvgam <- function(object,
-                                 criterion = c("variance", "cumulative",
-                                               "relative"),
+                                 criterion = c("relative", "cumulative"),
                                  threshold = NULL,
-                                 prob_threshold = 0.5,
+                                 prob = 0.5,
                                  ...) {
   checkmate::assert_class(object, "mvgam")
   criterion <- match.arg(criterion)
   threshold <- threshold %||% active_factor_thresholds[[criterion]]
   checkmate::assert_number(threshold, lower = .Machine$double.eps,
                            upper = 1)
-  checkmate::assert_number(
-    prob_threshold,
-    lower = .Machine$double.eps,
-    upper = 1 - .Machine$double.eps
-  )
+  checkmate::assert_number(prob, lower = .Machine$double.eps,
+                           upper = 1 - .Machine$double.eps)
   rlang::check_dots_empty()
   n_lv <- require_factor_n_lv(object, "active_factors()")
-  n_series <- loading_series_count(object)
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  # A fixed-Z fit gets column norms constant across draws.
-  # The loadings are taken in the model basis. `sigma_trend[k]` scales
-  # the column `Z[, k]` the model sampled. Each column of `Z_tilde`
-  # mixes every sampled column. Pairing it with `sigma_trend[k]`
-  # would measure neither column.
-  Z_arr <- resolve_factor_loadings(
-    object,
-    draws_mat,
-    n_series = as.integer(n_series),
-    n_lv = as.integer(n_lv),
-    basis = "model"
-  )
-  # Z_arr: [ndraws, n_series, n_lv]. Per-column squared norm per
-  # draw, scaled by the column's own innovation scale.
-  #
-  # The rules measure the latent signal in a column,
-  # `sigma_trend[k] * Z[, k]`. Multiplicative gamma process shrinkage
-  # acts on `sigma_trend` and draws `Z` at unit scale. Every column of
-  # `Z` alone then has the same norm distribution. A shrunk column is
-  # visible only through its scale.
-  col_scale <- resolve_column_scales(object, draws_mat, n_lv)
-  norm_sq <- apply(Z_arr, c(1L, 3L), function(col) sum(col^2))
-  norm_sq <- norm_sq * col_scale^2
-  active <- active_factor_draws(norm_sq, criterion, threshold)
+  if (n_lv < 2L) {
+    stop(insight::format_error(c(
+      "'active_factors()' compares factors and needs 'n_lv' >= 2.",
+      i = "Refit with more factors to count how many the data use."
+    )), call. = FALSE)
+  }
+  parts <- factor_model_draws(object, n_lv,
+                              n_series = loading_series_count(object))
+  variance <- factor_eigenvalues(parts$latent, parts$Z_arr)
+  active <- active_factor_draws(variance, criterion, threshold)
   prob_active <- colMeans(active)
-  share <- norm_sq / rowSums(norm_sq)
   qs <- stats::quantile(
     rowSums(active), probs = c(0.025, 0.5, 0.975), names = FALSE
   )
   out <- list(
     count = list(median = qs[2L], q025 = qs[1L], q975 = qs[3L]),
     per_factor = data.frame(
-      factor          = seq_len(n_lv),
+      factor          = seq_len(ncol(variance)),
       prob_active     = prob_active,
-      median_norm_sq  = apply(norm_sq, 2L, stats::median),
-      median_share    = apply(share, 2L, stats::median),
-      is_active       = prob_active >= (1 - prob_threshold)
+      median_variance = apply(variance, 2L, stats::median),
+      median_share    = apply(variance / rowSums(variance), 2L,
+                              stats::median),
+      is_active       = prob_active >= prob
     ),
-    threshold = list(
-      criterion      = criterion,
-      value          = threshold,
-      prob_threshold = prob_threshold
-    ),
+    threshold = list(criterion = criterion, value = threshold,
+                     prob = prob),
     n_lv = n_lv
   )
   structure(out, class = "mvgam_active_factors")
@@ -228,53 +169,81 @@ active_factors.mvgam <- function(object,
 
 #' The default cut-off of each activity rule
 #' @noRd
-active_factor_thresholds <- c(variance = 0.05, cumulative = 0.95,
-                              relative = 0.01)
+active_factor_thresholds <- c(relative = 0.1, cumulative = 0.9)
 
 
-#' Which columns are active in each draw
+#' Variance along each principal dimension of the factor covariance
 #'
-#' @param norm_sq Numeric `[ndraws, n_lv]` matrix of scaled squared
-#'   column norms
+#' The nonzero eigenvalues of `Z Omega Z'` equal those of the
+#' `k x k` matrix `A' A`, with `A = Z V D^(1/2)` and `Omega = V D V'`.
+#' Each draw then costs two `k x k` decompositions, whatever the
+#' number of series.
+#'
+#' @param latent Numeric `[ndraws, k, k]` latent covariance draws
+#' @param Z_arr Numeric `[ndraws, n_series, k]` loadings draws
+#' @return Numeric `[ndraws, min(k, n_series)]` matrix of eigenvalues,
+#'   largest first in each row
+#' @noRd
+factor_eigenvalues <- function(latent, Z_arr) {
+  checkmate::assert_array(latent, mode = "numeric", d = 3L)
+  checkmate::assert_array(Z_arr, mode = "numeric", d = 3L)
+  ndraws <- dim(Z_arr)[1L]
+  n_series <- dim(Z_arr)[2L]
+  k <- dim(Z_arr)[3L]
+  if (!identical(dim(latent), c(ndraws, k, k))) {
+    stop_shape_fault("The latent covariance draws", dim(latent),
+                     c(ndraws, k, k))
+  }
+  n_dim <- min(k, n_series)
+  out <- matrix(0, nrow = ndraws, ncol = n_dim)
+  for (d in seq_len(ndraws)) {
+    omega <- eigen(matrix(latent[d, , ], nrow = k), symmetric = TRUE)
+    A <- matrix(Z_arr[d, , ], nrow = n_series) %*% omega$vectors %*%
+      diag(sqrt(pmax(omega$values, 0)), nrow = k)
+    out[d, ] <- eigen(crossprod(A), symmetric = TRUE,
+                      only.values = TRUE)$values[seq_len(n_dim)]
+  }
+  # Rounding can leave an eigenvalue of a rank-deficient covariance
+  # just below zero
+  pmax(out, 0)
+}
+
+
+#' Which dimensions are active in each draw
+#'
+#' @param variance Numeric `[ndraws, n_dim]` matrix of eigenvalues,
+#'   largest first in each row
 #' @param criterion One of `names(active_factor_thresholds)`
 #' @param threshold The rule's cut-off
-#' @return Logical `[ndraws, n_lv]` matrix
+#' @return Logical `[ndraws, n_dim]` matrix
 #' @noRd
-active_factor_draws <- function(norm_sq, criterion, threshold) {
-  checkmate::assert_matrix(norm_sq, mode = "numeric", min.cols = 1L)
+active_factor_draws <- function(variance, criterion, threshold) {
+  checkmate::assert_matrix(variance, mode = "numeric", min.cols = 1L)
   checkmate::assert_choice(criterion, names(active_factor_thresholds))
   checkmate::assert_number(threshold)
-  share <- norm_sq / rowSums(norm_sq)
   if (identical(criterion, "relative")) {
-    return(norm_sq >= threshold * mean(norm_sq[, 1L]))
+    return(variance >= threshold * variance[, 1L])
   }
-  if (identical(criterion, "variance")) {
-    return(share >= threshold)
+  # A dimension is needed while the larger ones before it fall short of
+  # `threshold`. The tolerance keeps shares that sum to `threshold` in
+  # floating point, such as 0.6 + 0.3 against 0.9, from taking another.
+  share <- variance / rowSums(variance)
+  before <- share
+  before[, 1L] <- 0
+  for (k in seq_len(ncol(share))[-1L]) {
+    before[, k] <- before[, k - 1L] + share[, k - 1L]
   }
-  # The fewest columns, largest first, whose shares reach `threshold`.
-  # The tolerance keeps shares that sum to `threshold` in floating
-  # point, such as 0.6 + 0.3 against 0.9, from taking another column.
-  tol <- sqrt(.Machine$double.eps)
-  n_needed <- apply(share, 1L, function(s) {
-    reached <- cumsum(sort(s, decreasing = TRUE)) < threshold - tol
-    min(length(s), sum(reached) + 1L)
-  })
-  ranks <- matrix(
-    apply(-share, 1L, rank, ties.method = "first"),
-    nrow = nrow(share), byrow = TRUE
-  )
-  ranks <= n_needed
+  before < threshold - sqrt(.Machine$double.eps)
 }
 
 
 #' Plot the posterior active-factor probabilities
 #'
 #' @description Bar plot of the posterior probability that each
-#' latent factor is active under the rule [active_factors()] applied.
-#' A dashed horizontal line
-#' marks the active threshold (`1 - prob_threshold`, default
-#' `0.5`). The subtitle reports the posterior median active count
-#' with the 95% credible interval.
+#' dimension of the factor covariance is active, largest first, under
+#' the rule [active_factors()] applied. A dashed line marks `prob`.
+#' The subtitle reports the posterior median count with its 95%
+#' credible interval.
 #'
 #' @param x An `mvgam_active_factors` object returned by
 #'   [active_factors()].
@@ -293,7 +262,7 @@ plot.mvgam_active_factors <- function(x, ...) {
   rlang::check_dots_empty()
   set_color_scheme_local()
   fill_col <- mvgam_colour("dark")
-  cutoff <- 1 - x$threshold$prob_threshold
+  cutoff <- x$threshold$prob
   subtitle <- sprintf(
     "Posterior median active count: %.1f  (95%% CI %.1f, %.1f)",
     x$count$median, x$count$q025, x$count$q975
@@ -309,10 +278,9 @@ plot.mvgam_active_factors <- function(x, ...) {
       limits = c(0, 1), expand = ggplot2::expansion(mult = c(0, 0.05))
     ) +
     ggplot2::labs(
-      x = "Factor index", y = "Posterior probability of being active",
-      title = sprintf(
-        "Active latent factors (n_lv ceiling = %d)", x$n_lv
-      ),
+      x = "Factor, largest variance first",
+      y = "Posterior probability of being active",
+      title = sprintf("Active latent factors (n_lv = %d)", x$n_lv),
       subtitle = subtitle
     ) +
     mvgam_theme()
@@ -323,22 +291,22 @@ plot.mvgam_active_factors <- function(x, ...) {
 print.mvgam_active_factors <- function(x, ...) {
   rule <- switch(
     x$threshold$criterion,
-    variance = "share of latent variance >= %g",
-    cumulative = "fewest columns reaching %g of latent variance",
-    relative = "norm >= %g x leading column's posterior mean norm"
+    relative = "variance at least %g times the leading factor's",
+    cumulative = "fewest factors reaching a %g share of the variance"
   )
   cat("Active latent factors\n")
   cat(sprintf(paste0("  Rule: ", rule, "\n"), x$threshold$value))
-  cat(sprintf("  Truncation ceiling: n_lv = %d\n", x$n_lv))
+  cat(sprintf("  Fitted with: n_lv = %d\n", x$n_lv))
   cat(sprintf(
     "  Posterior median active count: %.1f (95%% CI %.1f - %.1f)\n",
     x$count$median, x$count$q025, x$count$q975
   ))
-  cat("\nPer-column posterior probability of being active:\n")
+  cat("\nPosterior probability that each factor is active,",
+      "largest first:\n")
   pf <- x$per_factor
-  pf$prob_active    <- round(pf$prob_active,    3)
-  pf$median_norm_sq <- signif(pf$median_norm_sq, 3)
-  pf$median_share   <- round(pf$median_share,   3)
+  pf$prob_active     <- round(pf$prob_active, 3)
+  pf$median_variance <- signif(pf$median_variance, 3)
+  pf$median_share    <- round(pf$median_share, 3)
   print(pf, row.names = FALSE)
   invisible(x)
 }

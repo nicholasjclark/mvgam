@@ -9,8 +9,8 @@
 \arguments{
 \item{x}{A \code{mvgam_latent_state} object.}
 
-\item{series}{Optional integer / character; restrict to a subset
-of the series. Defaults to all.}
+\item{series}{Names or indices of the series to plot, or \code{NULL}
+for every series}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

@@ -75,8 +75,6 @@ test_that("conditional_smooths.mvgam matches brms-parity arg set", {
   # must be accepted by the mvgam method.
   required <- setdiff(brms_args, c("nsamples", "subset", "probs"))
   expect_true(all(required %in% mvgam_args))
-  # The mvgam-only `facets` knob must also be present.
-  expect_true("facets" %in% mvgam_args)
 })
 
 # ---- The smooth record ----------------------------------------------
@@ -99,9 +97,6 @@ test_that("a term's smooth objects are numbered as brms numbers them", {
   stub <- smooth_stub(brms::bf(y ~ s(x) + s(z, by = grp) + t2(x, w)))
   hits <- mvgam_smooth_terms(stub)
   expect_identical(lapply(hits, `[[`, "objects"), list(1L, 2:4, 5L))
-  sdata <- brms::standata(stub$obs_model, internal = TRUE)
-  expect_length(attr(sdata$Xs, "smcols"), 5L)
-  expect_true(all(paste0("Zs_", 1:5, "_1") %in% names(sdata)))
 
   expect_true(is.na(hits[[1L]]$by_var))
   expect_identical(hits[[2L]]$by_var, "grp")
@@ -219,9 +214,10 @@ test_that("posterior_smooths.mvgam takes one of 'dpar' and 'nlpar'", {
                "Supply only one of")
 })
 
-test_that("conditional_smooths.mvgam errors on no-smooth fits", {
-  expect_error(conditional_smooths(smooth_stub(brms::bf(y ~ x))),
-               "no smooth terms")
+test_that("both smooth summaries refuse a fit without smooths", {
+  stub <- smooth_stub(brms::bf(y ~ x))
+  expect_error(conditional_smooths(stub), "require a smooth term")
+  expect_error(posterior_smooths(stub, "s(x)"), "require a smooth term")
 })
 
 # ---- subset_draws_rows ---------------------------------------------
@@ -279,36 +275,6 @@ test_that("int_conditions sets the focal covariate's grid values", {
 })
 
 # ---- Drawing -------------------------------------------------------
-
-test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
-  # A 1D smooth's summary frame with the columns
-  # `conditional_smooths.mvgam` produces
-  grid <- seq(-2, 2, length.out = 25L)
-  df <- data.frame(
-    env = grid,
-    effect1__ = grid,
-    cond__ = 1L,
-    estimate__ = 1.5 * exp(-0.5 * (grid - 0.4)^2) - 0.4,
-    se__ = rep(0.25, length(grid)),
-    lower__ = 1.5 * exp(-0.5 * (grid - 0.4)^2) - 0.4 - 0.5,
-    upper__ = 1.5 * exp(-0.5 * (grid - 0.4)^2) - 0.4 + 0.5
-  )
-  attr(df, "response") <- "mu: s(env, k = 8) (trend)"
-  attr(df, "effects") <- "env"
-  attr(df, "surface") <- FALSE
-  attr(df, "spaghetti") <- NULL
-  attr(df, "points") <- NULL
-  cs <- structure(
-    list(df),
-    class = c("mvgam_conditional_smooths",
-              "brms_conditional_effects", "list"),
-    smooths_only = TRUE
-  )
-  names(cs) <- attr(df, "response")
-  ggs <- plot(cs, plot = FALSE)
-  expect_length(ggs, 1L)
-  expect_s3_class(ggs[[1L]], "ggplot")
-})
 
 test_that("spaghetti draws one line per draw from its own columns", {
   # The overlay is built by `build_spaghetti_data()` and drawn by

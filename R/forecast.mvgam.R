@@ -37,12 +37,13 @@
 #'   * `"link"` returns the linear predictor on the link scale.
 #'   * `"trend"` returns the latent trend on the link scale.
 #' @param coef_uncertainty Logical. When `FALSE`, every forecast
-#'   draw uses the first posterior draw of every coefficient in the
+#'   draw uses the first of the draws `ndraws` or `draw_ids` select
+#'   for every coefficient in the
 #'   observation and trend formulas: population-level effects, smooth
 #'   bases, random effect levels and Hilbert-space `gp(x, k)` bases.
 #'   Defaults to `TRUE`.
 #' @param trend_uncertainty Logical. When `FALSE`, every forecast
-#'   draw uses the first posterior draw of the trend dynamics
+#'   draw uses the first of the selected draws for the trend dynamics
 #'   parameters (`sigma`, AR, MA and VAR coefficients), the last
 #'   fitted state and the trend formula's predictor `mu_trend`. Each
 #'   draw still takes fresh innovations. The spread then shows
@@ -160,9 +161,8 @@ forecast.mvgam <- function(object,
   series_levels <- fitted_series_levels(object)
   reported <- reported_series(object, resp, series_levels)
 
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  total_draws <- nrow(draws_mat)
-  draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
+  draw_idx <- resolve_draw_indices(posterior::ndraws(object), ndraws,
+                                   draw_ids)
 
   training <- build_training_arms(object, series_levels, resp = resp)
   fc_grid <- resolve_forecast_grid(object, newdata, training,
@@ -202,7 +202,7 @@ forecast.mvgam <- function(object,
       training = training,
       fc_grid = fc_grid,
       type = type,
-      draws_mat = draws_mat,
+      draws_mat = forecast_draws(object, draw_idx),
       draw_idx = draw_idx,
       coef_uncertainty = coef_uncertainty,
       trend_uncertainty = trend_uncertainty,
@@ -214,8 +214,7 @@ forecast.mvgam <- function(object,
   }
 
   family_pars <- if (type == "link") {
-    extract_family_pars_for_draws(object, draws_mat, draw_idx,
-                                    resp = resp)
+    extract_family_pars_for_draws(object, draw_idx, resp = resp)
   } else {
     NULL
   }
@@ -281,7 +280,8 @@ new_mvgam_forecast <- function(object, type, resp, reported, training,
         pick(column_times(object, type, resp, fc_grid))
       },
       hindcasts = hindcasts,
-      forecasts = forecasts
+      forecasts = forecasts,
+      site_units = inherits(object, "jsdgam")
     ),
     class = "mvgam_forecast"
   )
@@ -321,7 +321,8 @@ response_axis_forecast <- function(x) {
       test_observations = arms("test_observations"),
       test_times = arms("test_times"),
       hindcasts = arms("hindcasts"),
-      forecasts = arms("forecasts")
+      forecasts = arms("forecasts"),
+      site_units = isTRUE(x[[1L]]$site_units)
     ),
     class = "mvgam_forecast"
   )
@@ -531,7 +532,7 @@ resolve_forecast_grid <- function(object, newdata, training,
   time_var <- training$time_var
   # `axis_row_series()` places the rows on the series. A grouping
   # names the series without a `series` column.
-  assert_axis_column(newdata, time_var, "time")
+  assert_axis_column(newdata, time_var, "time", frame = "newdata")
   # `NA > last_time` is `NA`, which would drop the row from the grid
   refuse_missing_times(newdata[[time_var]], time_var)
   # The validator that owns unknown levels gives one message for every
@@ -711,50 +712,57 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
   checkmate::assert_flag(obs_uncertainty)
   checkmate::assert_flag(process_error)
   time_var <- training$time_var
-  # On a wide frame each series is predicted as its own response
-  keyed <- is_response_keyed(object)
-  arm_resp <- function(lv) if (keyed) lv else resp
-  arm_rows <- training$series_rows[series_levels]
+  no_columns <- matrix(NA_real_, nrow = length(draw_idx), ncol = 0L)
+  predict_rows <- function(frame, arm_resp) {
+    hindcast_draws(object, frame, type, draw_idx, obs_uncertainty,
+                   process_error, resp = arm_resp)
+  }
 
   # A simplex family's expectation is a softmax across the rows of a
   # closure unit, whose rows are the series. One series alone gives a
   # softmax of width one, which is 1 whatever the predictor. The
   # `expected` and `response` draws come from the whole frame, cut
-  # afterwards. `trend` and `link` are per-row linear predictors and
-  # take the per-series cut.
+  # afterwards.
   if (type %in% c("expected", "response") &&
         is_simplex_response_family(model_families(object, resp))) {
-    full <- hindcast_one_series(
-      object, training$data, type, draw_idx, obs_uncertainty,
-      process_error, resp = resp
-    )
-    return(lapply(arm_rows, function(rows) full[, rows, drop = FALSE]))
+    full <- predict_rows(training$data, resp)
+    return(lapply(training$series_rows[series_levels], function(rows) {
+      full[, rows, drop = FALSE]
+    }))
   }
 
-  out <- vector("list", length(series_levels))
-  names(out) <- series_levels
-  for (s in seq_along(series_levels)) {
-    lv <- series_levels[s]
-    if (length(training$times[[lv]]) == 0L) {
-      out[[s]] <- matrix(NA_real_, nrow = length(draw_idx),
-                           ncol = 0L)
-      next
+  # One row per occasion unless the prediction varies by visit
+  series_frame <- function(lv, arm_resp) {
+    sub <- training$data[training$series_rows[[lv]], , drop = FALSE]
+    if (hindcast_per_row(object, type, arm_resp)) {
+      return(sub)
     }
-    sub <- training$data[arm_rows[[lv]], , drop = FALSE]
-    # One row per occasion unless the prediction varies by visit
-    if (!hindcast_per_row(object, type, arm_resp(lv))) {
-      sub <- sub[!duplicated(sub[[time_var]]), , drop = FALSE]
-    }
-    out[[s]] <- hindcast_one_series(
-      object, sub, type, draw_idx, obs_uncertainty,
-      process_error, resp = arm_resp(lv)
-    )
+    sub[!duplicated(sub[[time_var]]), , drop = FALSE]
   }
-  out
+
+  # A wide frame predicts each series as its own response
+  if (training$response_keyed) {
+    return(lapply(stats::setNames(nm = series_levels), function(lv) {
+      frame <- series_frame(lv, lv)
+      if (nrow(frame) == 0L) no_columns else predict_rows(frame, lv)
+    }))
+  }
+
+  # Each row is predicted independently given a draw. One call on the
+  # rows of every series serves them all, cut afterwards.
+  frames <- lapply(stats::setNames(nm = series_levels), series_frame,
+                   arm_resp = resp)
+  sizes <- vapply(frames, nrow, integer(1L))
+  if (sum(sizes) == 0L) {
+    return(lapply(frames, function(frame) no_columns))
+  }
+  full <- predict_rows(do.call(rbind, frames), resp)
+  Map(function(end, size) full[, end - size + seq_len(size), drop = FALSE],
+      cumsum(sizes), sizes)
 }
 
 
-#' The hindcast draws of one series
+#' The hindcast draws of the given training rows
 #'
 #' `extract_trend_latent_states()` gives the fitted `trend[t, s]` of
 #' each draw. The observation predictor added to it gives the `link`
@@ -765,10 +773,10 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 #' of those functions for every family.
 #'
 #' @inheritParams build_hindcast_arms
-#' @param sub_data The series' rows of the training frame
-#' @return Draws matrix, one column per row of `sub_data` or occasion
+#' @param sub_data Rows of the training frame
+#' @return Draws matrix, one column per row of `sub_data`
 #' @noRd
-hindcast_one_series <- function(object, sub_data, type, draw_idx,
+hindcast_draws <- function(object, sub_data, type, draw_idx,
                                 obs_uncertainty,
                                 process_error = FALSE,
                                 resp = NULL) {
@@ -799,7 +807,7 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
     fitted_states <- extract_trend_latent_states(
       mvgam_fit = object, newdata = sub_data,
       full_draws = subset_draws_rows(
-        posterior::as_draws_matrix(object$fit), draw_ids = draw_idx
+        fit_draws(object$fit, "trend"), draw_ids = draw_idx
       ),
       resp = resp
     ) %||% matrix(0, nrow = length(draw_idx), ncol = nrow(sub_data))
@@ -901,7 +909,8 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
 #' @param trend_model The trend specification
 #' @param meta The fit's trend metadata
 #' @param fc_grid The forecast grid
-#' @param draws_mat The fit's draws matrix
+#' @param draws_mat Matrix from `forecast_draws()`, one row per draw of
+#'   `draw_idx`
 #' @param coef_uncertainty,trend_uncertainty Whether coefficients and
 #'   trend quantities vary over draws
 #' @param series_levels Every fitted series
@@ -943,8 +952,8 @@ build_forecast_arms <- function(object, trend_model, meta,
                      per_row = per_row)
   }
 
-  # The linear predictors are computed once, over every draw, and the
-  # loop below takes a row of each per draw. Without
+  # The linear predictors are computed once, at the draws of
+  # `draw_idx`. The loop below takes a row of each per draw. Without
   # `coef_uncertainty` every row repeats the first draw.
   pin_coefs <- function(lp) {
     if (coef_uncertainty || is.null(lp)) {
@@ -953,17 +962,19 @@ build_forecast_arms <- function(object, trend_model, meta,
     matrix(lp[1L, ], nrow = nrow(lp), ncol = ncol(lp), byrow = TRUE)
   }
   trend_lp_fc <- pin_coefs(extract_component_linpred(
-    mvgam_fit = object, newdata = fc_grid$data, component = "trend"
+    mvgam_fit = object, newdata = fc_grid$data, component = "trend",
+    draw_ids = draw_idx
   ))
   trend_lp_tail <- if (!is.null(tail_data)) {
     pin_coefs(extract_component_linpred(
-      mvgam_fit = object, newdata = tail_data, component = "trend"
+      mvgam_fit = object, newdata = tail_data, component = "trend",
+      draw_ids = draw_idx
     ))
   }
   obs_full <- if (type != "trend") {
     pin_coefs(extract_component_linpred(
       mvgam_fit = object, newdata = fc_grid$data,
-      component = "obs", resp = resp
+      component = "obs", resp = resp, draw_ids = draw_idx
     ))
   }
 
@@ -973,11 +984,19 @@ build_forecast_arms <- function(object, trend_model, meta,
     meta$trend_type, trend_method_optional_templates[["forecast_context"]]
   )(object, training, fc_grid, series_levels)
 
+  # Without `trend_uncertainty`, the dynamics, the last state and the
+  # trend's mean all come from the first draw. The innovations alone
+  # vary. Each draw's parameters are extracted once, before the loop.
+  if (!trend_uncertainty) {
+    draws_mat <- draws_mat[1L, , drop = FALSE]
+  }
+  states <- extract_last_states(object, draws_mat)
+
   # A factor fit propagates its `n_lv` latent factors. Each draw's
   # loadings `Z` project the `[h, n_lv]` path onto the series. A factor
   # fit can have `n_lv = n_series`, under an MGP loadings prior or a
   # `by = lv_axis()` term. `detect_factor_n_lv()` tells the two kinds
-  # of fit apart here and in `extract_last_state()`.
+  # of fit apart here and in `extract_last_states()`.
   n_lv_trend <- as.integer(
     object$standata$N_lv_trend %||% n_series
   )
@@ -993,10 +1012,7 @@ build_forecast_arms <- function(object, trend_model, meta,
   # of the forecast grid, in the order of `obs_struct_fc`.
   trend_flat <- matrix(NA_real_, nrow = ndraws_use, ncol = nobs_fc)
   for (i in seq_len(ndraws_use)) {
-    # Without `trend_uncertainty`, the dynamics, the last state and
-    # the trend's mean all come from the first draw. The innovations
-    # alone vary.
-    d <- if (trend_uncertainty) draw_idx[i] else 1L
+    d <- if (trend_uncertainty) i else 1L
     # A single factor drops `Z[d, , ]` to a vector. The reshape keeps
     # it an `[n_series, n_lv]` matrix.
     Z_slice <- if (!is.null(Z_arr)) {
@@ -1006,7 +1022,7 @@ build_forecast_arms <- function(object, trend_model, meta,
       object = object,
       trend_model = trend_model,
       meta = meta,
-      draws_mat = draws_mat,
+      state = last_state_of_draw(states, d),
       d = d,
       h_max = h_max,
       n_series = n_series,
@@ -1023,7 +1039,7 @@ build_forecast_arms <- function(object, trend_model, meta,
   if (type == "trend") {
     return(arms_of(trend_flat))
   }
-  eta_full <- obs_full[draw_idx, , drop = FALSE] + trend_flat
+  eta_full <- obs_full + trend_flat
   if (type == "link") {
     return(arms_of(eta_full))
   }
@@ -1056,8 +1072,9 @@ build_forecast_arms <- function(object, trend_model, meta,
 #' @param object A fitted `mvgam` object
 #' @param trend_model The trend specification
 #' @param meta The fit's trend metadata
-#' @param draws_mat The fit's draws matrix
-#' @param d The draw to propagate
+#' @param state The draw's trend parameters and last state, from
+#'   `last_state_of_draw()`
+#' @param d The draw's row in `trend_lp_tail` and `trend_lp_fc`
 #' @param h_max Number of steps
 #' @param n_series Number of fitted series
 #' @param trend_lp_tail,trend_lp_fc The trend's predictor over the
@@ -1068,15 +1085,15 @@ build_forecast_arms <- function(object, trend_model, meta,
 #' @param Z_slice The draw's `[n_series, n_lv]` loadings, or NULL
 #' @return Numeric matrix `[h_max, n_series]`
 #' @noRd
-propagate_one_draw <- function(object, trend_model, meta, draws_mat, d,
+propagate_one_draw <- function(object, trend_model, meta, state, d,
                                h_max, n_series,
                                trend_lp_tail, trend_lp_fc,
                                obs_struct_tail, obs_struct_fc,
                                context = list(), Z_slice = NULL) {
+  checkmate::assert_list(state)
   checkmate::assert_int(d, lower = 1L)
   checkmate::assert_int(h_max, lower = 1L)
   checkmate::assert_matrix(Z_slice, nrows = n_series, null.ok = TRUE)
-  ls_d <- extract_last_state(object, d, draws_mat = draws_mat)
   max_lag <- as.integer(meta$max_lag %||% 0L)
   lp_forecast <- trend_linpred_grid(
     trend_lp_fc, obs_struct_fc, d, h_max, n_series
@@ -1086,17 +1103,17 @@ propagate_one_draw <- function(object, trend_model, meta, draws_mat, d,
   # `n_lv` columns. Every other fit stores `trend[t, s]`, which holds
   # `mu_trend`. Subtracting it leaves both advancing a zero-mean
   # state.
-  in_factor_mode <- !is.null(Z_slice) && !is.null(ls_d$n_lv_active)
+  in_factor_mode <- !is.null(Z_slice) && !is.null(state$n_lv_active)
   if (!in_factor_mode && max_lag > 0L) {
-    ls_d$last_state$trends <- ls_d$last_state$trends -
+    state$last_state$trends <- state$last_state$trends -
       trend_linpred_grid(trend_lp_tail, obs_struct_tail, d, max_lag,
                          n_series)
   }
 
   fc_state <- do.call(propagate_trend, c(
-    list(trend_model = trend_model, params = ls_d$params, h = h_max,
-         n_series = if (in_factor_mode) ls_d$n_lv_active else n_series,
-         last_state = ls_d$last_state),
+    list(trend_model = trend_model, params = state$params, h = h_max,
+         n_series = if (in_factor_mode) state$n_lv_active else n_series,
+         last_state = state$last_state),
     context
   ))
   if (in_factor_mode) {
@@ -1450,13 +1467,11 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
 #' The rows follow `draw_idx`, the rows of the hindcasts and forecasts.
 #'
 #' @param object A fitted `mvgam` object
-#' @param draws_mat The fit's draws matrix
 #' @param draw_idx Indices of the draws to keep
 #' @param resp A response name, or NULL
 #' @return Named list of draws matrices, one per sampled parameter
 #' @noRd
-extract_family_pars_for_draws <- function(object, draws_mat,
-                                          draw_idx, resp = NULL) {
+extract_family_pars_for_draws <- function(object, draw_idx, resp = NULL) {
   checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
   # Each response of a multivariate fit has its own family and
   # distributional parameters
@@ -1466,6 +1481,7 @@ extract_family_pars_for_draws <- function(object, draws_mat,
   # A response of a model with several carries its parameters under
   # its own key, as in `sigma_y1`.
   suffix <- response_suffix(object, resp)
+  draws_mat <- fit_draws(object$fit, paste0(dpar_names, suffix))
   out <- list()
   for (nm in dpar_names) {
     pat <- paste0("^", nm, suffix, "(\\[|$)")
@@ -1491,7 +1507,7 @@ extract_family_pars_for_draws <- function(object, draws_mat,
 #' @noRd
 assert_one_response_draws <- function(draws, what) {
   checkmate::assert_string(what)
-  if (is.list(draws) && !is.matrix(draws)) {
+  if (is_per_response(draws)) {
     stop_mvgam_fault(
       paste0(what, " must be one draws matrix."),
       paste0("Got a list over responses: ",

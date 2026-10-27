@@ -39,6 +39,10 @@ object, the corresponding test response vectors and time grids.
 
 \item \code{forecasts} Named list of posterior forecast draw matrices when
 produced by \code{forecast()}, otherwise \code{NULL}.
+
+\item \code{site_units} \code{TRUE} when the fit came from \code{\link[=jsdgam]{jsdgam()}}. Its
+units are sites, which \code{plot()} refuses to draw along a time
+axis.
 }
 }
 \seealso{

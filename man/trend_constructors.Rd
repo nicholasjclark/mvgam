@@ -97,14 +97,14 @@ correlation matrix \eqn{\Omega_{global}} (larger values of
 degree of partial pooling).
 
 A grouped trend estimates correlations among the \code{subgr} units
-within each level of \code{gr}. \code{cor} defaults to \code{TRUE} for such a
-trend. An explicit \code{cor = FALSE} is refused.
+within each level of \code{gr}. Without \code{subgr}, the series column names
+those units. \code{cor} defaults to \code{TRUE} for such a trend. An explicit
+\code{cor = FALSE} is refused.
 
 Within a \code{VAR()} it sets up a hierarchical panel vector
 autoregression. Each group learns its autoregressive, moving-average
 and correlation matrices from shared hyperparameters. The groups do
-not interact. Without \code{subgr}, the series column names the units
-within each group.
+not interact.
 
 Two constraints apply to hierarchical trend models:
 \itemize{
@@ -336,7 +336,7 @@ innovation scale is \code{sigma_trend}, the moving-average
 coefficient \code{theta1_trend}, the autoregressive coefficients
 \code{ar1_trend} to \code{ark_trend} and the VAR coefficient
 matrices \code{Phi_trend}. Priors take these class names, as in
-\code{prior(normal(0, 1), class = sigma_trend)}. Parameter
+\code{prior(inv_gamma(5, 1), class = sigma_trend)}. Parameter
 extraction takes the same names.
 }
 
@@ -383,7 +383,7 @@ the column scaling to the multiplicative gamma process prior of
 Bhattacharya & Dunson (2011), which shrinks later columns of \code{Z}
 toward zero with increasing strength. \code{n_lv} is then a truncation
 ceiling on the factor count. \code{\link{active_factors}} reports
-the posterior distribution of the number of active columns.
+the posterior distribution of the number of active factors.
 }
 
 \examples{
@@ -399,8 +399,8 @@ RW(gr = region, subgr = species)
 set.seed(11)
 simdat <- sim_mvgam(type = 6L, family = poisson(), n_series = 3L,
                     n_timepoints = 80L)
-own_times <- simdat$data_train
-own_times <- own_times[runif(nrow(own_times)) < 0.6, ]
+keep_some <- function(d) d[runif(nrow(d)) < 0.6, ]
+own_times <- keep_some(simdat$data_train)
 
 # The parameters a trend adds, with their default priors, before
 # any fitting
@@ -426,7 +426,8 @@ summary(mod)
 residual_cor(mod)
 
 # Each series is forecast at its own future times
-plot(forecast(mod, newdata = simdat$data_test), series = 2)
+plot(forecast(mod, newdata = keep_some(simdat$data_test)),
+     series = 2)
 
 # Next: hindcast() returns the fitted latent trends. The articles
 # under 'See Also' fit VAR, hierarchical and factor trends

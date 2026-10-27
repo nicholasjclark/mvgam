@@ -58,14 +58,14 @@ correlation matrix \eqn{\Omega_{global}} (larger values of
 degree of partial pooling).
 
 A grouped trend estimates correlations among the \code{subgr} units
-within each level of \code{gr}. \code{cor} defaults to \code{TRUE} for such a
-trend. An explicit \code{cor = FALSE} is refused.
+within each level of \code{gr}. Without \code{subgr}, the series column names
+those units. \code{cor} defaults to \code{TRUE} for such a trend. An explicit
+\code{cor = FALSE} is refused.
 
 Within a \code{VAR()} it sets up a hierarchical panel vector
 autoregression. Each group learns its autoregressive, moving-average
 and correlation matrices from shared hyperparameters. The groups do
-not interact. Without \code{subgr}, the series column names the units
-within each group.
+not interact.
 
 Two constraints apply to hierarchical trend models:
 \itemize{

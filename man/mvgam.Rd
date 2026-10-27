@@ -40,7 +40,9 @@ supported in a term of this formula. An exact \code{gp()} term here
 also predicts in-sample alone. Forecasting a model that holds one
 requires the approximate form.}
 
-\item{data}{Data frame or list of multiply imputed datasets}
+\item{data}{Data frame, or a list of multiply imputed data frames
+or a \code{mids} object from \pkg{mice}. \code{\link[=mvgam_multiple]{mvgam_multiple()}} describes
+the imputation path.}
 
 \item{newdata}{Optional held-out \code{data.frame}, stored on the fit
 as \code{object$test_data}. \code{forecast()} forecasts to it when called
@@ -169,7 +171,8 @@ The structured prior has no free parameters to act on.
 \item{backend}{\code{"cmdstanr"} or \code{"rstan"}. Defaults to
 \code{getOption("brms.backend", "cmdstanr")}.}
 
-\item{combine}{Logical, pool multiple imputation results (default TRUE)}
+\item{combine}{Logical. With imputed \code{data}, \code{TRUE} (default) pools
+the imputation fits into one and \code{FALSE} returns them as a list.}
 
 \item{family}{A description of the response distribution and link
 function, given as a family function, a call to one or its name.

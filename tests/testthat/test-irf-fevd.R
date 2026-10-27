@@ -1,5 +1,5 @@
-## Coverage for irf.mvgam / fevd.mvgam / stability.mvgam after the
-## brms-integration port. Three layers of test:
+## Coverage for irf.mvgam / fevd.mvgam / stability.mvgam. Three layers
+## of test:
 ##   1. Trend-type gate (`assert_var_trend`) on a non-VAR mock.
 ##   2. Posterior extractor (`extract_var_posterior`) on a mock
 ##      `posterior::draws_matrix` with the right Stan column names.
@@ -142,7 +142,6 @@ test_that("gen_fevd() rows sum to 1 across the columns for each horizon", {
   Sigma <- crossprod(matrix(stats::rnorm(K * K), K, K)) + diag(K)
   x <- var_kernel_input(K, A, Sigma)
   fevd <- gen_fevd(x, h = 5L)
-  expect_length(fevd, K)
   for (i in seq_len(K)) {
     # For each "responding" series i, the contributions across all K
     # shock origins should sum to 1 at every horizon.
@@ -244,6 +243,9 @@ test_that("posterior_transition_matrix(summary = FALSE) keeps the draws", {
   out$A_lower[1L, 2L] <- 0.1
   p <- plot(out)
   expect_identical(rlang::as_label(p$mapping$x), "Var2")
+  # The columns are labelled by the matrix's own lag
+  out$lag <- 2L
+  expect_identical(plot(out)$labels$x, "Process at t - 2")
   outlined <- p$layers[[2L]]$data
   expect_identical(
     as.character(c(outlined$Var1, outlined$Var2)),
@@ -253,31 +255,11 @@ test_that("posterior_transition_matrix(summary = FALSE) keeps the draws", {
 
 
 test_that("posterior_transition_matrix() takes one groups argument", {
-  # `group` and `groups` were mutually exclusive spellings of one
-  # idea. `groups` is now the only one, and on a non-hierarchical fit
-  # it is refused rather than silently ignored.
+  # A non-hierarchical fit refuses `groups`
   mock <- correlate_draws(build_var_mock(K = 3L, ndraws = 200L))
   expect_error(
     posterior_transition_matrix(mock, groups = "all"),
     "only applies to hierarchical VAR fits"
-  )
-  expect_error(
-    posterior_transition_matrix(mock, groups = 1L),
-    "only applies to hierarchical VAR fits"
-  )
-  # The default still answers on the same fit.
-  expect_s3_class(posterior_transition_matrix(mock), "mvgam_var_matrix")
-})
-
-
-test_that("posterior_transition_matrix() gates on the trend type", {
-  fake <- structure(
-    list(trend_metadata = list(trend_type = "RW")),
-    class = "mvgam"
-  )
-  expect_error(
-    posterior_transition_matrix(fake),
-    "requires a VAR latent trend"
   )
 })
 
@@ -327,8 +309,7 @@ test_that("the VAR posterior carries one label per process", {
 
 
 test_that("the variance decomposition plot keeps the processes in order", {
-  # Sorting the labels drew the legend, the colours and the panels in
-  # alphabetical order. The object carries the fit's own order.
+  # The legend, the colours and the panels follow the fit's order
   labels <- c("zeta", "alpha", "mu")
   draws <- lapply(1:2, function(i) {
     gen_fevd(var_kernel_input(3L, matrix(0.1 * i, 3L, 3L),
@@ -351,9 +332,7 @@ test_that("the variance decomposition plot keeps the processes in order", {
 
 
 test_that("impulse response draws and summary keep the processes in order", {
-  # The draws plot sorted its panels alphabetically and titled them
-  # with an arrow of its own. Both forms now follow the fit's order
-  # and label a pair as the summary does.
+  # Both forms follow the fit's order and label a pair alike
   labels <- c("zeta", "alpha", "mu")
   draws <- lapply(1:2, function(i) {
     gen_irf(var_kernel_input(3L, matrix(0.1 * i, 3L, 3L),
@@ -378,8 +357,7 @@ test_that("impulse response draws and summary keep the processes in order", {
 
 
 test_that("a stability metric that is not there is refused by name", {
-  # A misspelt metric is refused by name. Drawing the metrics that
-  # exist would drop it from the plot without a word.
+  # A misspelt metric is refused by name
   set.seed(5L)
   x <- data.frame(reactivity = rnorm(20), mean_return_rate = runif(20),
                   var_return_rate = runif(20))
@@ -435,4 +413,19 @@ test_that("a hierarchical VAR's stability is summarised panel by panel", {
   expect_identical(levels(p$data$row), c("south", "north"))
   expect_error(stability(build_var_mock(K = 2L), groups = 1L),
                "only applies to hierarchical VAR fits")
+})
+
+
+test_that("the stability metrics match their closed forms", {
+  B <- matrix(c(0.5, 0.2, 0, -0.1, 0.4, 0.1, 0.05, 0, 0.3), 3L)
+  Sigma <- matrix(c(1, 0.3, 0.1, 0.3, 0.8, 0.2, 0.1, 0.2, 0.5), 3L)
+  # The doubling solver agrees with the Kronecker solve of
+  # vec(X) = (I - B %x% B)^-1 vec(Sigma)
+  kron <- matrix(solve(diag(9L) - B %x% B, c(Sigma)), 3L)
+  expect_equal(solve_dlyap(B, Sigma), kron, tolerance = 1e-10)
+  m <- stability_metrics(B, Sigma)
+  expect_equal(m$prop_int, det(B)^2)
+  expect_equal(m$reactivity, log(max(svd(B)$d)))
+  expect_equal(m$var_return_rate,
+               max(Mod(eigen(B %x% B, only.values = TRUE)$values)))
 })

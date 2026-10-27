@@ -89,20 +89,14 @@ test_that("aggregate_closure_unit_visits() carries unit labels through colnames"
   agg <- aggregate_closure_unit_visits(
     obj, newdata = d, yrep_visit = yrep_visit
   )
-  expect_identical(length(agg$arrays$unit_labels), 2L)
-  expect_identical(colnames(agg$yrep_unit), agg$arrays$unit_labels)
-  expect_identical(names(agg$y_unit), agg$arrays$unit_labels)
+  expect_identical(colnames(agg$yrep_unit), c("A_1", "B_1"))
+  expect_identical(names(agg$y_unit), colnames(agg$yrep_unit))
 })
 
 # ------------------------------------------------------------
 # residuals.mvgam() / augment.mvgam() routing for closure-unit
 # families. The MCMC integration check lives in tests/local/.
 # ------------------------------------------------------------
-
-# augment.mvgam() recycles the per-unit residual rows back to the
-# per-visit obs frame and adds a `.unit` column making the grain
-# explicit. The MCMC integration cover for this path lives in
-# tests/local/test-closure-unit-residuals.R.
 
 test_that("compute_closure_unit_residuals() returns [ndraws x N_unit] for both type arms", {
   d <- make_closure_unit_grid(n_unit = 4, n_visit = 3, binary = TRUE)
@@ -135,16 +129,9 @@ test_that("compute_closure_unit_residuals() returns [ndraws x N_unit] for both t
   arrs <- build_closure_unit_arrays(d, response_var = "y",
                                       default_cap = 1L)
   expect_identical(dim(r_quant), c(ndraws, arrs$N_unit))
-  expect_identical(dim(r_ord), c(ndraws, arrs$N_unit))
-  # Quantile residuals are N(0, 1) under correctly specified model;
-  # the stub draws from the prior so the residual range stays inside
-  # the empirical-PIT clamp |8.13|.
-  expect_true(all(is.finite(r_quant)))
+  # The clamp bounds a quantile residual at about 8.13
   expect_true(all(abs(r_quant) < 9))
-  # Ordinary residuals = y_unit - yrep_unit, so each draw row equals
-  # the difference between the observed and that draw's aggregated yrep.
-  arrs <- build_closure_unit_arrays(d, response_var = "y",
-                                      default_cap = 1L)
+  # Ordinary residuals are y_unit - yrep_unit per draw
   y_unit <- vapply(seq_len(arrs$N_unit), function(g) {
     sum(d$y[arrs$visit_idx[g, seq_len(arrs$n_rep[g])]])
   }, numeric(1L))
@@ -153,9 +140,5 @@ test_that("compute_closure_unit_residuals() returns [ndraws x N_unit] for both t
       sum(fake_yrep[s, arrs$visit_idx[g, seq_len(arrs$n_rep[g])]])
     }, numeric(1L))
   }, numeric(arrs$N_unit)))
-  expected_ord <- sweep(yrep_unit, 2L, y_unit,
-                          function(yh, yi) yi - yh)
-  r_ord_unnamed <- unname(r_ord)
-  dimnames(r_ord_unnamed) <- NULL
-  expect_equal(r_ord_unnamed, expected_ord)
+  expect_equal(unname(r_ord), -sweep(yrep_unit, 2L, y_unit))
 })

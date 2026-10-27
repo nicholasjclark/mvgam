@@ -2,159 +2,84 @@
 % Please edit documentation in R/families.R
 \name{occ}
 \alias{occ}
-\title{Closure-unit single-season occupancy family}
+\title{Occupancy family for repeated detection and non-detection}
 \usage{
 occ(multi_season = FALSE)
 }
 \arguments{
-\item{multi_season}{Logical. When \code{TRUE}, closure units are
-defined by \verb{(series, site, time)}. The default is \verb{(series, time)}.
-The data must carry a \code{site} column. Produce it from a 4-axis
-observation array with \code{\link[=pivot_detection_array]{pivot_detection_array()}} (set
-\code{multi_season = "hierarchical"}).
-The per-unit visits shrink to those within a single
-(site, season): with few visits per unit and low detection
-probability the posterior occupancy can become prior-dominated;
-check marginal posteriors against the prior (e.g. via
-\code{pp_check(fit)}) and consider a hierarchical detection sub-
-formula (\code{p ~ ...}) to share detection information across units.}
+\item{multi_season}{Logical. \code{TRUE} keys a closure unit on
+\verb{(series, site, time)}, for several seasons of visits to each
+site. The data then need a \code{site} column, which
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} creates from a four-dimensional array
+with \code{multi_season = "hierarchical"}. Each unit holds the visits of
+one site in one season.}
 }
 \value{
-A \code{brms::customfamily} object with the
-\code{mvgam_closure_unit} and \code{mvgam_binary_response} attributes
-set; closure-unit data prep builds the unit arrays and
-attaches the Stan lpdf at fit time.
+A family object to pass to \code{\link[=mvgam]{mvgam()}} or \code{\link[=jsdgam]{jsdgam()}}.
 }
 \description{
-Bernoulli-binomial occupancy model (MacKenzie et al. 2002,
-\emph{Ecology}) with a Bernoulli latent occupancy state and a
-Bernoulli detection process. Each observation row is one
-visit; closure is enforced over (series, time) pairs so
-multiple rows sharing the same (series, time) represent
-replicate detection / non-detection visits to the same
-underlying occupancy state. The latent state \code{z_g} for
-closure unit \code{g} is marginalised analytically: at sites with
-at least one detection, \code{z_g = 1} is certain and no
-marginalisation is needed; at sites with all-zero detection
-histories, \code{log_sum_exp} combines the all-zero-given-occupied
-and unoccupied branches (Royle and Dorazio 2008, ch. 3;
-Kery and Royle 2016, ch. 10).
+For detections recorded on repeated visits to sites whose occupancy
+stays fixed across the visits, such as camera-trap or call surveys
+within a season. The data hold one row per visit with a 0 / 1
+response. The visits sharing a \code{series} and a \code{time} belong to one
+closure unit, which is occupied with probability \code{mu}. A visit to an
+occupied unit detects the species with probability \code{p}. The
+likelihood sums over the unit's two states. A unit with a detection
+is occupied for certain (MacKenzie et al. 2002).
 }
 \details{
-Parameterised with two distributional parameters:
-\describe{
-\item{\code{mu}}{per-site occupancy probability \eqn{\psi}
-(logit link, fixed)}
-\item{\code{p}}{per-visit detection probability (logit link,
-fixed)}
+\code{bf(y ~ elev, p ~ tod)} models occupancy and detection, each with
+its own formula on the logit link. \code{\link[=predict]{predict()}} with
+\code{type = "latent_state"} gives the probability that each unit is
+occupied given its detections. \code{type = "detection"} gives the
+detection probability of each visit. The data need no \code{cap} column.
+}
+\section{Priors}{
+
+The occupancy intercept takes brms's \code{student_t(3, 0, 2.5)} on the
+logit scale. A scalar \code{p} takes \code{beta(1, 1)}. With a formula, its
+intercept takes \code{normal(0, 1.5)}. \code{\link[=get_prior]{get_prior()}} lists the defaults,
+and \code{prior(..., dpar = "p")} replaces one.
 }
 
-Distributional regression. brms \code{bf()} syntax handles
-covariate-dependent detection automatically:
+\section{Identification}{
 
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(bf(y ~ s(elev), p ~ s(tod)), family = occ(), data = ...)
-}\if{html}{\out{</div>}}
-
-Identifiability. With a single visit per closure unit and no
-covariates the likelihood reduces to a Bernoulli with mean
-\code{psi * p} and only that product is identified; the individual
-parameters are prior-dominated (Royle and Dorazio 2008,
-ch. 3.5). The validator warns in this configuration but
-allows the fit. With 3 or more visits per unit and detection
-probability above 0.1, identification is reliable (the same
-Kery 2018 result for nmix extends to the
-Bernoulli-binomial form).
-
-Data shape. A long-format data frame, one row per visit, with
-columns: a binary response (0 = non-detection, 1 = detection),
-\code{series} (factor), \code{time} (integer), plus any covariates
-referenced in the formulae. Multiple rows sharing the same
-(series, time) pair encode replicate visits to one closure
-unit. The \code{cap} column required by \code{nmix()} is implicit at
-\code{1} for \code{occ()} and need not be supplied.
+The detections identify occupancy and detection apart through
+repeated visits and through covariates that act on one of them.
+With one visit per unit and no covariate, the data identify only
+the product \code{mu * p}. Only the priors then set the two apart (Royle
+and Dorazio 2008). \code{\link[=mvgam]{mvgam()}} warns on such data. It also warns when
+more than 30\% of units have a single visit.
 }
+
+\section{Joint species models}{
+
+\code{\link[=jsdgam]{jsdgam()}} with \code{nmix()} or \code{occ()} fits several species at once.
+Latent factors shared by the species enter the state \code{mu}. \code{p}
+keeps its own formula. \code{factor_formula = ~ s(env, by = lv_axis())}
+lets each factor follow an environmental gradient.
+}
+
 \section{Importing array data}{
 
-Detection-history data from \code{unmarked::unmarkedFrameOccu},
-\code{unmarkedFrameOccuMulti}, \code{spOccupancy}, \code{ubms} or \code{flocker} takes
-the form of a 2D \verb{[J, K]} matrix, 3D \verb{[N, J, K]} array, 4D
-\verb{[N, J, T, K]} array (multi-season), or named list of \verb{[J, K]}
-matrices per species. Use \code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert any of
-these into the long-format \code{data} that \code{mvgam(family = occ())} and
-\code{jsdgam(family = occ())} expect. The covariates \code{site_covs},
-\code{season_covs}, \code{site_season_covs} and \code{obs_covs} are broadcast across
-the right grid axes.
+Detection histories from \pkg{unmarked}, \pkg{spOccupancy} or
+\pkg{ubms} come as a site-by-visit matrix, an array with species or
+seasons as further dimensions, or a list of matrices.
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} converts any of these to the long format,
+broadcasting site, season and visit covariates to their rows.
 }
 
-\section{JSDM with imperfect detection}{
+\section{Threading}{
 
-Passing \code{occ()} to \code{\link[=jsdgam]{jsdgam()}} with \code{n_lv > 0} composes the
-single-season Bernoulli marginalisation with the Heaps factor
-model. The user then gets a hierarchical JSDM. Its three levels each
-occupy a distinct dpar:
-
-\describe{
-\item{\strong{lowest level}: env-driven latent factors.}{
-\code{factor_formula = ~ s(env, by = lv_axis())} makes each
-latent factor a smooth of an environmental covariate. The
-factors track env gradients. They are not free draws.}
-\item{\strong{middle level}: species loadings on occupancy.}{Each
-species \code{s} loads on the \code{K} factors via the row
-\verb{Z[s, :]}, so
-\verb{logit_psi[s, i] = b_X(species) + Z[s, :] \%*\% lv[i, :]}
-for site \code{i}. \code{Z} is identified up to sign via Heaps and
-Jermyn (2024) post-hoc QR.}
-\item{\strong{top level}: imperfect detection.}{The \code{p} dpar
-carries its own brms sub-formula (e.g.,
-\code{bf(y ~ species, p ~ s(tod))}) so the per-visit detection
-process is modelled independently of the latent occupancy
-state. The lpmf marginalises latent \code{z} per closure unit. No
-part of the factor model depends on the marginalisation. No part
-of the marginalisation depends on the factor model.}
-}
-
-See \code{\link[=jsdgam]{jsdgam()}} for the
-wrapper-level API and \code{\link[=lv_axis]{lv_axis()}} for the \code{by = lv_axis()}
-sentinel that turns smooths into per-factor regressors.
-}
-
-\section{Cross-reference with ubms / spOccupancy / flocker}{
-
-mvgam's \code{occ()} uses the long-form ecology vocabulary
-(\code{occupancy}, \code{detection}) in \code{predict(type = ...)}. The
-equivalents in adjacent packages:
-\itemize{
-\item ubms
-(\url{https://github.com/ecoverseR/ubms}):
-\code{predict(submodel = "state")} returns marginal psi;
-\code{predict(submodel = "det")} returns p;
-\code{posterior_predict(param = "z")} returns 0/1 latent
-occupancy draws conditioned on the observed history.
-\item spOccupancy
-(\url{https://github.com/ecoverseR/spOccupancy}):
-\code{psi.0.samples} (marginal psi), \code{z.0.samples} (latent z
-draws).
-\item flocker
-(\url{https://github.com/jsocolar/flocker}):
-\code{fitted_flocker(components = "occ" | "det")} for linpred
-extraction; \code{get_Z(history_condition = TRUE)} for
-conditional z draws.
-}
-
-mvgam: \code{predict(fit, type = "latent_state")} returns the
-conditional probability \code{P(z = 1 | y)} per site;
-\code{posterior_occupancy(fit, conditional = TRUE, draw = TRUE)}
-returns 0/1 z draws; \code{posterior_occupancy(conditional = FALSE)}
-returns marginal psi. \code{predict(fit, type = "detection")}
-returns the per-visit detection probability \eqn{p_{g,j}} on the
-response scale.
+The density sums over units through Stan's \code{reduce_sum()}. Fitting
+with \code{threads = 2} or more splits the units across threads.
 }
 
 \examples{
 \dontrun{
 # Detections at 50 sites, each visited four times, with covariates
 # on occupancy and on detection
-set.seed(4)
+set.seed(6)
 simdat <- sim_closure_unit_data(family = occ(), n_species = 1L,
                                 n_sites = 50L, n_visits = 4L,
                                 type = 1L)
@@ -167,31 +92,27 @@ mod <- mvgam(
 )
 summary(mod)
 
-# Occupancy along the gradient, on the logit scale
-conditional_effects(mod, type = "link")
+# Occupancy along the gradient and detection through the day
+conditional_effects(mod, effects = "env", type = "latent_state")
+conditional_effects(mod, effects = "tod_c", type = "detection")
 
 # Occupancy and detection, separated by the model
 head(predict(mod, type = "latent_state"))
 head(predict(mod, type = "detection"))
+
+# Next, pp_check(mod, type = "fit_stat") tests the fit of each unit
 }
 
 }
 \references{
 MacKenzie, D. I., Nichols, J. D., Lachman, G. B., Droege, S.,
-Royle, J. A., & Langtimm, C. A. (2002). Estimating site
+Royle, J. A. and Langtimm, C. A. (2002). Estimating site
 occupancy rates when detection probabilities are less than
 one. \emph{Ecology}, 83, 2248-2255.
-\doi{10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2}.
+\doi{10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2}
 
-Royle, J. A., & Dorazio, R. M. (2008). \emph{Hierarchical Modeling
+Royle, J. A. and Dorazio, R. M. (2008). \emph{Hierarchical Modeling
 and Inference in Ecology}. Academic Press.
-
-Kery, M., & Royle, J. A. (2016). \emph{Applied Hierarchical
-Modeling in Ecology, Vol. 1}. Academic Press.
-
-Socolar, J. B., & Mills, S. C. (2023). flocker: flexible
-occupancy estimation in R. \emph{bioRxiv}.
-\doi{10.1101/2023.10.26.564080}.
 }
 \seealso{
 \code{\link[=nmix]{nmix()}} for the related N-mixture family and

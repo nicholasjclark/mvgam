@@ -16,79 +16,50 @@
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}
 
-\item{type}{Character. The kind of plot to produce. One of:
+\item{type}{The plot to draw:
 \describe{
-\item{\code{"residuals"} (default)}{Four-panel Dunn-Smyth
-residual diagnostic for one series: residuals vs fitted,
-Q-Q, ACF, pACF, titled by the series. See \code{\link[=pp_check.mvgam]{pp_check.mvgam()}}
-for the underlying types (\code{resid_vs_fitted}, \code{resid_qq},
-\code{resid_acf}, \code{resid_pacf}). A closure-unit family (\code{occ()},
-\code{nmix()}) has one residual per closure unit and draws the
-Q-Q panel alone.}
-\item{\code{"smooths"}}{Conditional smooth posteriors via
-\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, combined into a single
-\code{patchwork} when more than one smooth is present.}
-\item{\code{"trend"}}{Latent trend over the training grid via
-\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}} on
-\code{hindcast(x, type = "trend")}.}
-\item{\code{"factors"}}{Latent dynamic factors. Errors clearly
-when the fit does not include latent factors. The
-returned ggplot carries a \code{"contribution"} attribute
-(data.frame with \code{Factor}, \code{PathVarShare}, \code{Lower},
-\code{Upper}) giving the loading-weighted variance partition
-across factors. Access via
-\code{attr(plot(fit, type = "factors"), "contribution")} if
-you want the numeric summary without the figure.
-The fit stores the per-draw factor paths as
-\code{lv_trend[t, k]}. \code{\link[posterior:draws_array]{posterior::as_draws_array()}} extracts
-them for custom summaries.}
-\item{\code{"series"}}{Exploratory plot of the observed data the
-fit carries. A long-frame multivariate fit stacks one plot
-per response. Use \code{\link[=mvgam_data]{mvgam_data()}} to plot data before a fit.}
-\item{\code{"latent_state"}}{Per-(series, time) ribbon of the
-marginal latent state for closure-unit families: latent
-abundance \code{N} for \code{nmix()} (and its variants) or
-occupancy \code{psi} for \code{occ()}. Pools across sites for
-multi-season fits so each ribbon summarises the marginal
-posterior at each (species, time) cell. Errors clearly
-for non-closure-unit fits.}
-}
-
-Forecasts, effects and custom conditional plots have dedicated
-functions:
-\itemize{
-\item Forecasts: \code{forecast(x, newdata = ...) |> plot()}.
-\item Parametric / random effects: \code{\link[=conditional_effects]{conditional_effects()}}
-(plus its \code{plot} method).
-\item Arbitrary conditional plots:
-\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}}.
+\item{\code{"residuals"} (default)}{Dunn-Smyth residuals of one
+series against the fitted values, their Q-Q plot, ACF and
+partial ACF, as \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} draws them. An \code{\link[=occ]{occ()}} or
+\code{\link[=nmix]{nmix()}} fit has one residual per closure unit and draws the
+Q-Q plot alone.}
+\item{\code{"smooths"}}{The posterior of each smooth, from
+\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, with several smooths combined
+into one figure.}
+\item{\code{"trend"}}{The latent trend over the training times, from
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}}. A \code{\link[=jsdgam]{jsdgam()}} fit has sites in place of
+times and refuses it.}
+\item{\code{"factors"}}{The path of each latent factor.
+\code{\link[=active_factors]{active_factors()}} reports the variance each factor carries.}
+\item{\code{"series"}}{The observed data the fit carries.
+\code{\link[=mvgam_data]{mvgam_data()}} plots data before a fit.}
+\item{\code{"latent_state"}}{The latent state of an \code{\link[=occ]{occ()}} or
+\code{\link[=nmix]{nmix()}} fit drawn from the covariates alone: occupancy \code{psi} or
+abundance \code{N}, by series and time. A multi-season fit pools the
+sites of each time.}
 }}
 
-\item{series}{Optional series subset, as an integer index or a
-series name. \code{"trend"} and \code{"series"} also take \code{"all"}, which
-they use by default. \code{"residuals"} draws one series,
-the first by default. Ignored by branches that summarise across
-series (\code{"smooths"}, \code{"factors"}).}
+\item{series}{A series index or name. \code{"trend"} and \code{"series"} also
+take \code{"all"}, their default. \code{"residuals"} draws one series, the
+first by default. \code{"smooths"}, \code{"factors"} and \code{"latent_state"}
+ignore it.}
 
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
 responses.}
 
-\item{ndraws}{Optional cap on posterior draws used by branches
-that subsample. Passed through to the relevant surface.}
+\item{ndraws}{The number of posterior draws, or \code{NULL} for every
+draw. \code{"residuals"} takes 100 by default. \code{"factors"} and
+\code{"series"} ignore it.}
 
-\item{...}{Additional arguments forwarded to the dispatched
-function (e.g. \code{smooths = ...} for \code{smooths}).}
+\item{...}{Further arguments to the function that draws the plot,
+such as \code{smooths} for \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.}
 }
 \value{
-A \code{ggplot} object (or \code{patchwork}, which inherits
-from \code{ggplot}).
+A \code{ggplot} object, or a \code{patchwork} of several.
 }
 \description{
-Plot method for fitted \code{mvgam} objects. A thin S3 dispatcher
-that routes by \code{type} to the canonical plotting surface for
-each kind of summary. No bespoke plotting code lives here:
-every branch forwards to a single dedicated function.
+Draws one of the standard views of a fitted model, chosen by \code{type}.
 }
 \examples{
 \dontrun{
@@ -100,16 +71,22 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Residual diagnostics, the default type.
+# Residual diagnostics, the default
 plot(mod)
+
+# The smooth of x and the latent AR(1) trend
+plot(mod, type = "smooths")
+plot(mod, type = "trend")
+
+# Next, plot(forecast(mod, newdata = simdat$data_test)) carries the
+# trend forward
 }
 
 }
 \seealso{
-\code{\link[=pp_check.mvgam]{pp_check.mvgam()}}, \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}},
-\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, \code{\link[=forecast.mvgam]{forecast.mvgam()}},
-\code{\link[=hindcast.mvgam]{hindcast.mvgam()}}, \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}},
-\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}}
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} and its \code{plot()} method draw forecasts.
+\code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} draws covariate effects.
+\code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} draws posterior diagnostics.
 
 Other model checking: 
 \code{\link{mvgam_diagnostics}},

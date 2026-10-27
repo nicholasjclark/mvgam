@@ -75,7 +75,7 @@
 #'   `list(column_shrinkage = "mgp", ...)`) it is a ceiling. The prior
 #'   shrinks later columns towards zero. A larger
 #'   `loadings_prior$mgp_a2` shrinks them harder. [active_factors()]
-#'   counts the columns the data support.
+#'   counts the factors the data support.
 #' @param priors Optional `brmsprior` of priors to set, from
 #'   [brms::prior()]. `prior`, the brms spelling, is accepted in `...`.
 #'   [get_prior.mvgam_formula()] lists the classes a model takes.
@@ -96,7 +96,7 @@
 #'   constant within species. A smooth of a trait goes in
 #'   `trait_slopes`, as `~ s(trait1)`. A smooth in `formula` is
 #'   refused, because brms's top-level non-linear formula takes none.
-#'   The defaults are `normal(0, 1)` on each trait coefficient and
+#'   The defaults are `std_normal()` on each trait coefficient and
 #'   `student_t(3, 0, 2.5)` on the species SD. `priors` overrides
 #'   them.
 #' @param phylo Optional phylogeny: an `ape::phylo` tree, whose
@@ -119,7 +119,7 @@
 #'   describe the factors. `update(fit, n_lv = 3)` refits it through
 #'   `jsdgam()` with the arguments given changed.
 #'
-#' @seealso [sim_jsdm()] simulates data this function fits.
+#' @seealso [sim_jsdgam()] simulates data this function fits.
 #'   [sim_closure_unit_data()] simulates the `occ()` and `nmix()`
 #'   case. [residual_cor()], [ordinate()], [shared_variation()],
 #'   [active_factors()] and [compare_loadings()] interpret the fitted
@@ -158,23 +158,23 @@
 #'
 #' @examples
 #' \dontrun{
-#' # Detections of 4 species at 50 sites, 4 visits each. `type = 2L`
-#' # simulates site covariates of occupancy (`env`, `elev`) and visit
-#' # covariates of detection (`tod_c`, `effort`).
-#' set.seed(1)
+#' # Detections of 6 species at 80 sites, 4 visits each. Occupancy
+#' # responds to the site covariate `env` and detection to the time of
+#' # day `tod_c`. Two latent factors drive the species associations.
 #' simdat <- sim_closure_unit_data(
 #'   family    = occ(),
-#'   n_species = 4L,
-#'   n_sites   = 50L,
+#'   n_species = 6L,
+#'   n_sites   = 80L,
 #'   n_visits  = 4L,
-#'   type      = 2L
+#'   n_lv      = 2L,
+#'   seed      = 1L
 #' )
 #'
-#' # A joint occupancy model. `env` drives occupancy and `tod_c`
-#' # drives detection. Two latent factors carry the residual
-#' # association among species.
+#' # A joint occupancy model. Each species has its own occupancy
+#' # intercept and `env` slope, plus its own detection intercept. Two
+#' # latent factors take up the residual association.
 #' mod <- jsdgam(
-#'   formula        = bf(y ~ env, p ~ tod_c),
+#'   formula        = bf(y ~ series * env, p ~ series + tod_c),
 #'   factor_formula = ~ -1,
 #'   data           = simdat$data_train,
 #'   family         = occ(),

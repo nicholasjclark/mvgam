@@ -793,7 +793,7 @@ test_that("bin_draws() keeps the shape of a posterior at a fraction of it", {
   expect_equal(bin_draws(numeric(0), bins = 10L)$counts, 0L)
 })
 
-# One posterior draw in the shape `extract_last_state()` passes its
+# One posterior draw in the shape `extract_last_states()` passes its
 # helpers: a one-row matrix named by Stan parameter.
 one_draw_matrix <- function(values) {
   matrix(values, nrow = 1L, dimnames = list(NULL, names(values)))
@@ -808,9 +808,9 @@ test_that("extract_sigma_and_cov: a single series gives a 1x1 covariance", {
   out <- extract_sigma_and_cov(one_draw, n_series = 1L, n_lv = 1L,
                                has_cor = TRUE)
 
-  expect_equal(dim(out$Sigma), c(1L, 1L))
+  expect_equal(dim(out$Sigma), c(1L, 1L, 1L))
   expect_equal(as.numeric(out$Sigma), 0.16)
-  expect_equal(out$sigma, 0.4, ignore_attr = TRUE)
+  expect_equal(as.numeric(out$sigma), 0.4)
 })
 
 test_that("extract_sigma_and_cov: two series scale the correlation both ways", {
@@ -826,8 +826,7 @@ test_that("extract_sigma_and_cov: two series scale the correlation both ways", {
 
   L <- matrix(c(1, 0.6, 0, 0.8), nrow = 2L)
   expected <- diag(c(2, 3)) %*% tcrossprod(L) %*% diag(c(2, 3))
-  expect_equal(out$Sigma, expected, ignore_attr = TRUE)
-  expect_equal(diag(out$Sigma), c(4, 9), ignore_attr = TRUE)
+  expect_equal(draw_slice(out$Sigma, 1L), expected)
 })
 
 test_that("extract_sigma_and_cov: a grouped trend reads its own parameters", {
@@ -864,12 +863,13 @@ test_that("extract_sigma_and_cov: a grouped trend reads its own parameters", {
 
   out <- extract_hierarchical_sigma_and_cov(one_draw_matrix(one_draw), 4L,
                                             group_info)
+  Sigma <- draw_slice(out$Sigma, 1L)
 
-  expect_equal(dim(out$Sigma), c(4L, 4L))
-  expect_equal(out$sigma, c(1, 2, 3, 0.5), ignore_attr = TRUE)
+  expect_equal(dim(Sigma), c(4L, 4L))
+  expect_equal(as.numeric(out$sigma), c(1, 2, 3, 0.5))
   # Groups are independent, so every cross-group entry is zero.
-  expect_true(all(out$Sigma[1:2, 3:4] == 0))
-  expect_true(all(out$Sigma[3:4, 1:2] == 0))
+  expect_true(all(Sigma[1:2, 3:4] == 0))
+  expect_true(all(Sigma[3:4, 1:2] == 0))
   # Each block is the covariance the shared helper builds.
   for (g in seq_len(n_groups)) {
     L_full <- hierarchical_group_cholesky(
@@ -877,10 +877,10 @@ test_that("extract_sigma_and_cov: a grouped trend reads its own parameters", {
       sigma = sigmas[[g]]
     )
     idx <- which(group_inds == g)
-    expect_equal(out$Sigma[idx, idx], tcrossprod(L_full),
+    expect_equal(Sigma[idx, idx], tcrossprod(L_full),
                  ignore_attr = TRUE)
   }
-  expect_equal(diag(out$Sigma), out$sigma^2, ignore_attr = TRUE)
+  expect_equal(diag(Sigma), as.numeric(out$sigma)^2)
 })
 
 test_that("hierarchical_group_cholesky weights by alpha", {

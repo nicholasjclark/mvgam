@@ -2,68 +2,54 @@
 % Please edit documentation in R/families.R
 \name{mvt}
 \alias{mvt}
-\title{Closure-unit Multivariate Student-t family}
+\title{Multivariate Student-t family for several continuous responses}
 \usage{
 mvt()
 }
 \value{
-A \code{brms::custom_family} object tagged with the
-\code{mvgam_closure_unit} and \code{mvgam_multi_response} attributes
-that route the closure-unit data prep, validation, and Stan
-emission. The \code{mvgam_simplex_response} attribute is NOT set.
+A family object to pass to \code{\link[=jsdgam]{jsdgam()}} or \code{\link[=mvgam]{mvgam()}}.
 }
 \description{
-Heavy-tailed continuous-response JSDM. Extends \code{mvn()} with a
-degrees-of-freedom parameter \code{nu} so the per-observation residual
-follows a Student-t distribution in place of a Gaussian. Each row
-of the linear predictor still receives the latent-factor
-contribution \verb{Z[k, :] * lv[i, :]} from the trend pipeline
-(conditional gllvm / boral parameterisation). The lpdf is
-independent Student-t per row with scale \code{Psi[k]} for species
-\code{k} and shared \code{nu}.
+\code{\link[=mvn]{mvn()}} with heavy-tailed residuals. Given the latent factors, each
+row follows a Student-t distribution with location \code{mu}, scale \code{Psi}
+and degrees of freedom \code{nu}, which every component shares. An outlying
+row then pulls less on the fit. The residual covariance is
+\verb{Z Z' + diag(Psi^2 * nu / (nu - 2))}. A unit's responses do not
+follow a multivariate Student-t law. Their factors stay normal.
 }
 \details{
-Under this parameterisation the marginal residual covariance is
-approximately \verb{Z Z' + diag(Psi^2 * nu / (nu - 2))} (Student-t
-variance scaling), which converges to the mv-normal target
-\verb{Z Z' + diag(Psi^2)} as \code{nu -> Inf}. The strict multivariate
-Student-t marginal would require a per-site scale-mixture
-latent, which would not compose cleanly with the existing trend
-pipeline; the conditional Student-t parameterisation is what
-gllvm uses for its \code{family = "tweedie"} / \code{"normal"} heavy-tail
-option and is the right operational fit for outlier robustness
-in JSDM use cases.
+\code{nu} is bounded below by 2, which keeps the residual variance finite.
+Its prior is \code{gamma(2, 0.1)}, as brms gives a Student-t \code{nu}. Above
+the bound it places the median of \code{nu} at 17 and 95\% of its mass
+between 3.2 and 56. \code{prior(..., class = nu)} and
+\code{prior(..., class = Psi)} set other priors. The data layout, the fit
+and the bound on \code{n_lv} follow \code{\link[=mvn]{mvn()}}.
+}
+\examples{
+\dontrun{
+simdat <- sim_jsdgam(family = mvt(), n_species = 5L, n_sites = 80L,
+                     n_lv = 2L, seed = 1L)
+fit <- jsdgam(
+  formula        = y ~ env * series,
+  factor_formula = ~ -1,
+  data           = simdat$data_train,
+  unit           = time, species = series,
+  family         = mvt(),
+  n_lv           = 2L,
+  chains         = 2L,
+  silent         = 2
+)
 
-Distributional parameters:
-\describe{
-\item{\code{mu}}{per-row response mean on the identity scale.
-Already includes the latent factor contribution from the
-trend pipeline. Default link is identity.}
+# The degrees of freedom, against 5 in the simulation
+posterior_summary(fit, variable = "nu")
 }
 
-Identification: identical to \code{mvn()}. Marginal covariance is
-invariant to \code{Z -> Z * Q} for orthogonal \code{Q}; the Heaps post-hoc
-QR fixes \code{Q}. The Student-t observation is NOT shift-invariant in
-\code{mu_unit}. No simplex-style constraints apply. The
-\code{nu} parameter has a hard lower bound of 2. That bound keeps the
-marginal residual variance finite. The prior is
-\code{(nu - 2) ~ gamma(2, 0.1)}, giving a weakly informative pull
-toward moderate heavy tails (prior median around \code{nu = 14},
-prior \code{Pr(nu < 5) ~ 0.18}).
-
-Data layout: long format, one row per \verb{(site, species)}, exactly
-K rows per site. Responses are continuous reals.
 }
 \references{
 Hui, F. K. C., Taskinen, S., Pledger, S., Foster, S. D. and
 Warton, D. I. (2015). Model-based approaches to unconstrained
 ordination. \emph{Methods in Ecology and Evolution}, 6(4):399-411.
 \doi{10.1111/2041-210X.12236}
-
-Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
-distributions for the covariance matrix in latent factor
-models. \emph{Statistics and Computing}, 34:143.
-\doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
 Other observation families: 

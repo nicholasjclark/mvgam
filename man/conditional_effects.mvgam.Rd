@@ -36,13 +36,10 @@ formula are detected automatically.}
 scale with observation-process noise), \code{"link"} (link-scale
 linear predictor), \code{"expected"} (E[Y]; default), or one of
 the family-specific scales handled by \code{\link[=predict.mvgam]{predict.mvgam()}}:
-\code{"variance"}, \code{"latent_state"}, \code{"detection"}. For closure-unit
-families (\code{occ()}, \code{nmix()} and variants), \code{"latent_state"}
-returns the family-aware latent state on the response scale
-(latent occupancy \code{psi} for \code{occ()}, latent abundance \code{N} for
-\code{nmix()}), which is the natural marginal-effects display for
-the ecological quantity of interest separate from detection
-probability.}
+\code{"variance"}, \code{"latent_state"}, \code{"detection"}. For \code{\link[=occ]{occ()}} and
+\code{\link[=nmix]{nmix()}}, \code{"latent_state"} plots the state apart from detection:
+the probability of occupancy \code{psi}, or the expected abundance
+\code{lambda}. \code{"detection"} plots the detection probability \code{p}.}
 
 \item{points}{Logical or numeric. If \code{TRUE} (or a non-zero alpha
 between 0 and 1), raw observations are overlaid on the plot.

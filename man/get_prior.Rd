@@ -2,9 +2,12 @@
 % Please edit documentation in R/priors.R
 \name{get_prior}
 \alias{get_prior}
+\alias{default_prior}
 \title{The priors of a model}
 \usage{
 get_prior(object, ...)
+
+default_prior(object, ...)
 }
 \arguments{
 \item{object}{An \code{\link[=mvgam_formula]{mvgam_formula()}}, an \code{mvgam} model, or a model
@@ -21,10 +24,10 @@ Methods:
 \item \code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}} lists the priors of a model
 before it is fitted.
 \item \code{\link[=get_prior.mvgam]{get_prior.mvgam()}} returns the prior table of a model.
-\item \code{\link[=get_prior.default]{get_prior.default()}} passes a \code{formula} or \code{brmsformula}
-to \code{\link[brms:default_prior]{brms::get_prior()}}, or builds the mvgam model a
-\code{trend_formula} argument describes.
+\item \code{\link[=get_prior.default]{get_prior.default()}} takes a \code{formula} or \code{brmsformula}
+with the arguments of \code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}}.
 }
+\code{default_prior()} is the same generic under the newer brms name.
 }
 \seealso{
 \code{\link[=mvgam_formula]{mvgam_formula()}}, \code{\link[brms:default_prior]{brms::get_prior()}}

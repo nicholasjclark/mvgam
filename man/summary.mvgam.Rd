@@ -32,7 +32,7 @@ sampled parameters alone, among them \code{sigma_trend},
 \value{
 An object of class \code{mvgam_summary}. Each block is a
 data frame of the columns below, one row per parameter, named as
-\pkg{brms} prints it. A block is absent when the model has no such
+\code{print()} shows it. A block is absent when the model has no such
 parameter. The observation model's blocks are:
 \describe{
 \item{\code{smooth}}{Smoothing standard deviations, one row per
@@ -64,14 +64,18 @@ organised by category (fixed effects, smooth terms, family
 parameters, trend parameters and factor loadings).
 }
 \details{
-The summary includes the following columns:
+Each block has the columns:
 \describe{
-\item{\code{Estimate}}{Posterior mean (or median if robust = TRUE)}
-\item{\code{Est.Error}}{Posterior SD (or MAD if robust = TRUE)}
-\item{Quantile bounds}{Credible interval limits based on probs argument}
-\item{\code{Rhat}}{Potential scale reduction factor (should be < 1.05)}
-\item{\code{Bulk_ESS}}{Bulk effective sample size}
-\item{\code{Tail_ESS}}{Tail effective sample size}
+\item{\code{Estimate}}{Posterior mean, or median with
+\code{robust = TRUE}.}
+\item{\code{Est.Error}}{Posterior standard deviation, or MAD with
+\code{robust = TRUE}.}
+\item{\code{l-95\% CI}, \code{u-95\% CI}}{Credible interval
+bounds at \code{probs}, labelled by its coverage.}
+\item{\code{Rhat}}{Potential scale reduction factor on split
+chains, 1 at convergence.}
+\item{\code{Bulk_ESS}, \code{Tail_ESS}}{Bulk and tail effective
+sample sizes.}
 }
 }
 \examples{
@@ -86,7 +90,10 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
 
 summary(mod)
 
-# Next, how_to_cite() drafts the methods paragraph
+# Each block is a data frame, such as the trend's dynamics
+round(summary(mod)$trend_spec, 2)
+
+# Next: how_to_cite() drafts the methods paragraph
 }
 
 }

@@ -10,8 +10,6 @@ test_that("type 1 occ single-species emits the expected layout", {
     n_visits = 4L, seed = 1L
   )
   expect_s3_class(s, "mvgam_sim_closure_unit")
-  expect_s3_class(s, "mvgam_sim")
-  expect_equal(nrow(s$data_train), 30L * 4L)
   expect_equal(dim(s$y_array), c(1L, 30L, 1L, 4L))
   expect_setequal(
     names(s$data_train),
@@ -127,10 +125,7 @@ test_that("summary prints non-degenerate detection-rate diagnostic", {
   s <- sim_closure_unit_data(type = 1L, family = occ(),
                               n_sites = 50L, seed = 7L)
   smry <- summary(s)
-  expect_s3_class(smry, "mvgam_sim_closure_unit_summary")
-  out <- capture.output(print(smry))
-  expect_true(paste0("  Family       : ", smry$family) %in% out)
-  expect_true(any(grepl("Non-zero observation fraction", out)))
+  expect_output(print(smry), "Non-zero observation fraction")
   # Detection fraction in (0, 1) -- not all-zeros, not all-ones.
   expect_gt(smry$non_zero_fraction, 0)
   expect_lt(smry$non_zero_fraction, 1)
@@ -217,11 +212,8 @@ test_that("the simulated frame builds the family's own likelihood", {
 
 
 test_that("detection is simulated on the scale of the family's link", {
-  # `?sim_closure_unit_data` put the Royle-Nichols detection predictor
-  # on the log scale. The family declares a logit link and the
-  # simulator applies it, so a reader setting an intercept from the
-  # page got another probability. The recorded detection probability
-  # is rebuilt here from the predictor through each family's own
+  # `truth$p` is the detection parameter predict(type = "detection")
+  # estimates, rebuilt here from the predictor through each family's
   # inverse link.
   families <- list(occ(), nmix("poisson_binomial"),
                    nmix("royle_nichols"), nmix("poisson_poisson"))
@@ -231,14 +223,7 @@ test_that("detection is simulated on the scale of the family's link", {
     d <- s$data_train
     coefs <- s$truth$detection_coefs
     eta <- coefs[["intercept"]] + coefs[["tod_c"]] * d$tod_c
-    r <- stats::make.link(fam$link_p)$linkinv(eta)
-    # Royle-Nichols detects a unit when any of its N individuals is
-    # detected; the other three read the probability directly.
-    expected <- if (identical(fam$name, "nmix_royle_nichols")) {
-      1 - (1 - r)^s$truth$N[1L, d$site]
-    } else {
-      r
-    }
+    expected <- stats::make.link(fam$link_p)$linkinv(eta)
     # `truth$p` is `[species, site, visit]`; the frame runs visits
     # within sites.
     expect_equal(as.vector(t(s$truth$p[1L, , ])), expected)

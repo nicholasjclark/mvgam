@@ -27,10 +27,10 @@ A character string of Stan code, or a list of Stan data.
 }
 \description{
 \code{stancode()} and \code{standata()} delegate a plain formula to
-\pkg{brms}. A \code{trend_formula} in the same call names an mvgam
-model. These methods then build the \code{\link{mvgam_formula}} that
-call describes and generate its program. A call supplying no
-\code{trend_formula} delegates to \pkg{brms} unchanged.
+\pkg{brms}. A \code{trend_formula} in the same call, or a family mvgam
+builds such as \code{\link[=tweedie]{tweedie()}} or \code{\link[=nmix]{nmix()}}, names an mvgam model. These
+methods then build the \code{\link{mvgam_formula}} that call
+describes and generate its program.
 }
 \seealso{
 \code{\link{mvgam_formula}},

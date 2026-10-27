@@ -117,7 +117,7 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
   rlang::check_dots_empty()
 
   obj_vars <- categorize_mvgam_parameters(x)
-  draws <- posterior::as_draws_array(x$fit)
+  draws <- stanfit_draws(x$fit, pars = unlist(obj_vars, use.names = FALSE))
 
   # `categorize_mvgam_parameters()` returns the names Stan wrote. The
   # table takes the names and the parameters `variables()` lists, both
@@ -464,7 +464,7 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   if (length(dim(fit_draws)) == 3L) {
     fit_draws <- ordinal_category_mean(fit_draws)
   }
-  fit_summ <- summarize_predictions(
+  fit_summ <- summarise_predictions(
     fit_draws, probs = probs, robust = robust
   ) |>
     tibble::as_tibble()

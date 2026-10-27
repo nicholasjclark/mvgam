@@ -284,9 +284,7 @@ test_that("the partial surface mirrors the correlation one", {
 
 test_that("the partial surface is absent unless it was asked for", {
   mock_cov_struct(mk_full_cov_struct(diag(3)))
-  res <- residual_cor(build_fake_mvgam())
-  expect_null(res$sig_prec)
-  expect_null(res$prec)
+  expect_null(residual_cor(build_fake_mvgam())$prec)
 })
 
 
@@ -414,10 +412,6 @@ test_that("residual_cor hierarchical with by_group = TRUE returns list", {
 # ---- error paths ------------------------------------------------------
 
 test_that("residual_cor.jsdgam errors when called on an unfitted object", {
-  # jsdgam now routes through the shared factor-loadings branch in
-  # `compute_residual_cor()`, so an empty / unfitted jsdgam object
-  # errors at the posterior-draws extraction step rather than
-  # raising the old "not yet implemented" message.
   obj <- structure(list(), class = c("jsdgam", "mvgam"))
   expect_error(residual_cor(obj), "no fitted posterior draws")
 })
@@ -443,10 +437,8 @@ test_that("prob_nonzero and sig_cor reflect off-zero pairs", {
   Sigma <- matrix(c(1.0, 0.6, 0.6, 1.0), 2, 2)
   mock_cov_struct(mk_full_cov_struct(Sigma))
   res <- residual_cor(build_fake_mvgam())
-  expect_equal(res$prob_positive[1, 2], 1)
-  expect_equal(res$prob_negative[1, 2], 0)
   expect_equal(res$prob_nonzero[1, 2], 1)
-  expect_true(res$sig_cor[1, 2] != 0)
+  expect_equal(res$sig_cor[1, 2], 0.6)
 })
 
 

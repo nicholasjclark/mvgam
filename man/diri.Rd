@@ -2,127 +2,78 @@
 % Please edit documentation in R/families.R
 \name{diri}
 \alias{diri}
-\title{Closure-unit Dirichlet-on-the-simplex family}
+\title{Dirichlet family for compositions}
 \usage{
 diri()
 }
 \value{
-A \code{brms::custom_family} object tagged with the
-\code{mvgam_closure_unit}, \code{mvgam_multi_response} and
-\code{mvgam_simplex_response} attributes. They route the downstream data
-prep, validation and Stan emission.
+A family object to pass to \code{\link[=jsdgam]{jsdgam()}} or \code{\link[=mvgam]{mvgam()}}.
 }
 \description{
-Composes Stan's native \code{dirichlet_logit_lpdf} with the mvgam
-factor-model trend. Each closure unit (site) carries K rows
-(one per species / response component) whose response values
-sum to 1 within the unit. The custom lpdf assembles the per-unit
-K-vectors of response and linear predictor inside Stan, then
-calls Stan's native \code{dirichlet_logit_lpdf(y_unit | mu_unit, phi)}
-which maps \code{mu_unit} through \code{softmax} and parameterises the
-Dirichlet by \code{softmax(mu_unit) * phi}.
+For proportions measured together on each unit that sum to one, such
+as the cover shares of several species at a site. The data hold one
+row per component at each unit, whose responses sum to one within
+the unit. Each unit's vector of \code{K} shares is Dirichlet with
+concentrations \code{softmax(mu) * phi}. \code{mu} holds the components'
+linear predictors. \code{phi} sets how tightly the shares gather around
+\code{softmax(mu)} (Aitchison 1982).
 }
 \details{
-Distributional parameters:
-\describe{
-\item{\code{mu}}{per-row latent score on the unconstrained scale.
-Softmax inside the lpdf maps the K scores per unit to a
-simplex. Default link is identity.}
-\item{\code{phi}}{Dirichlet concentration (positive). Larger \code{phi}
-concentrates draws near \code{softmax(mu_unit)}. Default link is
-log.}
+\code{\link[=jsdgam]{jsdgam()}} fits the family, taking the unit and component columns
+and the number of latent factors \code{n_lv}. The factors give the
+components correlated departures from their expected shares
+(Warton et al. 2015).
+}
+\section{Identification}{
+
+The softmax is unchanged when the same constant is added to every
+component. The data then identify neither a shift of the linear
+predictors that every component shares nor a shift of the loadings
+that every component shares. mvgam removes both:
+\itemize{
+\item The first component is the reference. Its linear predictor
+is subtracted from every component's before the softmax, as in
+brms's \code{dirichlet()} family. A term that acts on every
+component alike, such as \code{Intercept} or \code{env} in
+\code{y ~ env * series}, then cancels. Its posterior is its prior,
+\code{student_t(3, 0, 2.5)} by default. The \code{series} terms are
+contrasts with the first component. \code{jsdgam()} warns when the
+formula has no term that varies by component.
+\item Each column of the loadings \code{Z} sums to zero, through
+Stan's \code{sum_to_zero_vector} type.
+}
+A \code{loadings_prior} combines with that constraint.
 }
 
-Identification under the K-row free \code{Z} factor model: softmax
-is shift-invariant in \code{mu_unit} along two independent directions,
-both removed by HARD constraints (Stan >= 2.36). Each column of
-\code{Z} is declared as Stan's native \code{sum_to_zero_vector[K]} so
-column sums are exactly zero by construction (no soft prior,
-no scale to tune; see Mitzi Morris "The Sum-to-Zero Constraint
-in Stan" for the Helmert-style transform Stan uses internally).
-The per-site K-shared fixed-effect shift is eliminated inside
-the lpdf by subtracting \code{mu_unit[1]} from all entries before
-softmax, matching the brms-native dirichlet reference-category
-parameterisation. A weakly-informative \code{student_t(3, 0, 2.5)}
-population-effect default prior is also injected because brms
-\code{custom_family()} would otherwise emit flat improper priors;
-under the hard mode-2 reference subtraction, any K-shared
-coefficient (\code{b_Intercept}, \code{b_env}, etc.) has no likelihood
-contribution and samples from that prior. A once-per-session warning
-is raised by \code{jsdgam()} when the user's formula contains
-no per-\code{species} interaction term. The \code{loadings_prior}
-matrix-normal prior, when supplied, composes with the sum-to-zero
-constraint and is the recommended path when traits or phylogeny are
-available.
+\section{Regression on \code{phi}}{
 
-Data layout: long format, one row per (site, species), exactly
-K rows per site. The user passes the species axis via the
-\code{species} argument on \code{jsdgam()} (or labels it \code{series} in the
-data when using \code{mvgam()} directly); the closure-unit data prep
-groups by (series, time) so each site forms one closure unit.
-}
-\section{Distributional regression on \code{phi}}{
-
-A \code{phi ~ env} sub-formula in \code{bf()} (e.g.
-\code{bf(y ~ env * species, phi ~ env, family = diri())} through
-\code{mvgam()}. \code{jsdgam()} currently exposes only the response formula.
-The \code{phi} sub-formula IS supported at fit time: the lpdf
-dispatches \verb{vector phi} vs \verb{real phi} so brms can pass either.
-Per-row \code{phi[i, k]} is collapsed to one scalar per closure unit
-by taking \code{phi[idx[1]]}. This requires the \code{phi} covariate to be
-constant across the K rows of any site (site-level only). A
-species-level \code{phi} covariate is statistically ill-defined for a
-Dirichlet observation. If one is passed, the lpdf silently uses row
-1's value. No pre-fit validator checks this contract.
-
-Post-fit response-scale dispatchers
-(\code{posterior_predict()} / \code{posterior_epred()} / \code{log_lik()})
-extract the per-row \code{phi} linpred via \code{extract_phi_per_row()}
-when a \code{phi} sub-formula is present, composing it through the
-same dpar pipeline as \code{mu} and collapsing per unit to
-\code{phi[idx[1]]} to mirror the Stan lpdf.
-
-The default brms prior on \code{b_phi} regression coefficients is
-flat. Consider supplying \code{prior(student_t(3, 0, 2.5), class = b, dpar = phi)} via the \code{priors} argument to regularise the
-log-concentration slopes (matches the simplex population-effect
-default; flat priors leave room for implausible orders-of-magnitude
-phi shifts under modest sample sizes).
+\code{bf(y ~ env * series, phi ~ env)} models the concentration. A unit's
+density takes one \code{phi}. Its covariates must take one value per
+unit. mvgam refuses a covariate that varies within a unit.
+The coefficients of \code{phi} take a flat prior by default.
+\code{prior(student_t(3, 0, 2.5), class = b, dpar = phi)} regularises
+them.
 }
 
 \section{Post-fit conventions}{
 
-\code{log_lik()}, \code{loo()} and \code{waic()} score at the \strong{site grain},
-not the (site, species) row grain. The Stan lpdf evaluates the
-joint K-vector Dirichlet density once per closure unit. The per-unit
-log-density is attributed to the first row of the unit. The remaining
-K - 1 rows return \code{NA} for \code{log_lik()}. A row with no density of its
-own is spelled \code{NA}. A \code{0} there would assert a density of one.
-\code{loo()} would then score the site once per species. This is the
-correct grain for joint multi-row outcomes. It matches
-the flocker / ubms convention for closure-unit families;
-Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
-for PSIS-LOO whenever the per-row likelihoods are not
-conditionally independent given the parameters. To compare
-simplex fits via \code{loo_compare()} against models scored at the
-row grain, refit the row-grain model on the unit-aggregated
-response or use \code{waic()} on both fits at consistent grain.
+The density is joint over a unit's components, which makes the unit
+the grain of \code{log_lik()}, \code{loo()} and \code{waic()} (Vehtari et al.
+2017). \code{log_lik()} gives each unit's log density on its first row
+and \code{NA} on the others. \code{loo()} then counts each unit once.
+\code{loo_compare()} needs every model it compares scored at that grain.
 
-\code{posterior_linpred()} returns the \strong{uncentred} linear predictor
-\code{mu[i, k]} per row (the value brms emits before the lpdf body
-applies \code{mu_unit = mu[idx] - mu[idx[1]]} to remove the per-site
-K-shared shift). This is the natural scale for \code{marginaleffects}
-contrasts on the species axis. For probabilities on the simplex,
-use \code{posterior_epred()}, which applies the reference subtraction
-and softmax internally and returns one probability per (site,
-species) row summing to 1 within each site.
+\code{posterior_linpred()} gives \code{mu} per row before the reference
+subtraction. \code{posterior_epred()} gives the expected shares, which
+sum to one within each unit.
 }
 
 \examples{
 \dontrun{
 # Shares of three categories at 60 sites along an environmental
 # gradient
-simdat <- sim_jsdm(family = diri(), n_species = 3L, n_sites = 60L,
-                   seed = 2L)
+simdat <- sim_jsdgam(family = diri(), n_species = 3L, n_sites = 60L,
+                     seed = 2L)
 head(simdat$data_train)
 
 # `env * series` gives each category its own slope

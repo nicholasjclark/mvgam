@@ -1,4 +1,4 @@
-# `mvgam()` hands a list of imputed frames to `mvgam_multiple()`. Its
+# `mvgam()` hands a list of imputed frames to `fit_imputations()`. Its
 # model-defining arguments are formals, which reach that call only by
 # name.
 
@@ -17,7 +17,7 @@ test_that("the imputation path forwards every formal a fit needs", {
 test_that("a requested family and combine reach the imputation fits", {
   captured <- NULL
   testthat::local_mocked_bindings(
-    mvgam_multiple = function(...) {
+    fit_imputations = function(...) {
       captured <<- list(...)
       structure(list(), class = "mvgam_stub")
     },
@@ -96,4 +96,17 @@ test_that("imputations are pooled only when they share an axis", {
     mvgam:::pool_mvgam_fits(list(stub(1:5), stub(c(1:4, 6L)))),
     "different time or series axis"
   )
+  # Imputations that differ beyond their imputed values are refused
+  # before any fit
+  d <- data.frame(y = rnorm(6L), x = rnorm(6L), week = 1:6,
+                  series = factor("s1"))
+  moved <- d
+  moved$week[6L] <- 7L
+  expect_error(
+    mvgam_multiple(y ~ x, ~ AR(time = week), data_list = list(d, moved)),
+    "Changed: 'week'"
+  )
+  retyped <- d
+  retyped$x <- as.character(retyped$x)
+  expect_error(mvgam(y ~ x, data = list(d, retyped)), "Changed: 'x'")
 })

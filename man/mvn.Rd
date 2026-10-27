@@ -2,55 +2,40 @@
 % Please edit documentation in R/families.R
 \name{mvn}
 \alias{mvn}
-\title{Closure-unit Multivariate normal family}
+\title{Multivariate normal family for several continuous responses}
 \usage{
 mvn()
 }
 \value{
-A \code{brms::custom_family} object tagged with the
-\code{mvgam_closure_unit} and \code{mvgam_multi_response} attributes
-that route the closure-unit data prep, validation, and Stan
-emission. The \code{mvgam_simplex_response} attribute is NOT set
-so the simplex-only identification machinery is skipped.
+A family object to pass to \code{\link[=jsdgam]{jsdgam()}} or \code{\link[=mvgam]{mvgam()}}.
 }
 \description{
-Continuous-response JSDM with low-rank residual covariance
-\verb{Sigma = Z Z' + diag(Psi^2)}, parameterised conditionally
-(gllvm / boral style): each row of the linear predictor receives
-the latent-factor contribution \verb{Z[k, :] * lv[i, :]} from the
-trend pipeline (with \code{lv ~ N(0, I_n_lv)} sampled jointly with
-the model). The lpdf is then independent normal per row with
-SD \code{Psi[k]} for species \code{k}. Integrating out \code{lv} recovers the
-gllvm marginal covariance \code{Sigma}.
+For continuous responses measured together on each unit, such as the
+biomass of several species at a site. The data hold one row per
+response component at each unit. Latent factors shared by a unit's
+components give their residuals the covariance
+\verb{Z Z' + diag(Psi^2)}, where \code{Z} holds the factor loadings and \code{Psi}
+each component's residual standard deviation (Hui et al. 2015; Niku
+et al. 2019). Given the factors, each row is normal with mean \code{mu}
+and standard deviation \code{Psi}.
 }
 \details{
-Distributional parameters:
-\describe{
-\item{\code{mu}}{per-row response mean on the identity scale.
-Already includes the latent factor contribution from the
-trend pipeline. Default link is identity.}
-}
+\code{\link[=jsdgam]{jsdgam()}} fits the family, taking the unit and component columns
+and the number of factors \code{n_lv}. \code{\link[=residual_cor]{residual_cor()}} summarises the
+residual correlations and \code{\link[=shared_variation]{shared_variation()}} the part the factors
+share. \code{Psi} takes the prior \code{exponential(1)}, which suits responses
+near unit scale. \code{prior(..., class = Psi)} sets another.
 
-Identification: the marginal \verb{Sigma = Z Z' + diag(Psi^2)} is
-invariant to \code{Z -> Z * Q} for orthogonal \code{Q} (the gllvm / boral
-rotation invariance); the existing Heaps post-hoc QR rotation
-fixes \code{Q} and \verb{Z Z'} is identified. Unlike the simplex families,
-the multi-normal likelihood is NOT shift-invariant in \code{mu_unit},
-so neither a \code{sum_to_zero_vector} constraint on \code{Z} columns nor
-a \code{mu_unit[1]} reference subtraction is needed. \code{Z} is declared
-as a plain \code{matrix[K, n_lv]} free parameter by the trend
-pipeline.
-
-Data layout: long format, one row per \verb{(site, species)}, exactly
-K rows per site. Responses are continuous reals; the \code{Y} vector
-is assembled into the per-unit K-vector \code{y_unit} by the lpdf.
+With \code{K} components the data separate the factor part from the
+residual part only when \code{(K - n_lv)^2 >= K + n_lv}. Fewer factors or
+more components meet the bound. \code{jsdgam()} warns when it fails.
 }
 \examples{
 \dontrun{
 # Five species at 80 sites whose residuals share two latent
 # factors
-simdat <- sim_jsdm(family = mvn(), n_species = 5L, n_sites = 80L,
-                   n_lv = 2L, seed = 1L)
+simdat <- sim_jsdgam(family = mvn(), n_species = 5L, n_sites = 80L,
+                     n_lv = 2L, seed = 1L)
 
 fit <- jsdgam(
   formula        = y ~ env * series,
@@ -64,8 +49,12 @@ fit <- jsdgam(
 )
 summary(fit)
 
-# The species-by-species residual correlations the factors imply
+# The species-by-species residual correlations, against the values
+# the simulation used
 round(residual_cor(fit)$cor, 2)
+round(simdat$truth$residual_cor, 2)
+
+# Next, shared_variation(fit) gives the part the factors share
 }
 
 }

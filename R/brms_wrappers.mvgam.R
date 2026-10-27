@@ -5,26 +5,41 @@
 
 #' Posterior credible intervals on a fitted \pkg{mvgam} model
 #'
-#' Quantile credible intervals of the posterior draws of parameters,
-#' as [brms::posterior_interval.brmsfit()] gives them. The parameters
-#' are chosen as in [as.matrix.mvgam()].
+#' Central quantile intervals of the posterior draws of parameters. The
+#' parameters are chosen as in [as.matrix.mvgam()].
 #'
 #' @inheritParams as.matrix.mvgam
 #' @param object A fitted `mvgam` object.
-#' @param pars The older brms name for `variable`, used when
-#'   `variable` is `NULL`.
-#' @param prob Numeric in `(0, 1)`. The credible-interval mass
-#'   to report. Defaults to `0.95`.
+#' @param pars Deprecated alias for `variable`.
+#' @param prob Numeric in `(0, 1)`. The probability mass each interval
+#'   holds. Defaults to `0.95`.
 #' @param ... Further arguments of [as.matrix.mvgam()], such as
 #'   `regex`.
 #'
-#' @return A numeric matrix with one row per parameter and two
-#'   columns reporting the lower and upper interval bounds.
+#' @return A numeric matrix with one row per parameter and two columns,
+#'   the lower and upper bounds.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [brms::posterior_interval.brmsfit()],
-#'   [as.matrix.mvgam()], [predictive_interval.mvgam()].
+#' @seealso [predictive_interval.mvgam()] gives intervals of predictive
+#'   draws. [summary.mvgam()] reports intervals with convergence
+#'   diagnostics.
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                     n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
+#'
+#' # 90 percent intervals of the autoregression and its innovation SD
+#' posterior_interval(mod, variable = c("ar1_trend", "sigma_trend"),
+#'                    prob = 0.9)
+#'
+#' # Next: summary() reports these with convergence diagnostics
+#' }
 #'
 #' @family posterior summaries
 #' @method posterior_interval mvgam
@@ -34,9 +49,7 @@ posterior_interval.mvgam <- function(object, pars = NA,
                                       ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_number(prob, lower = 0, upper = 1)
-  if (is.null(variable) && !identical(pars, NA)) {
-    variable <- pars
-  }
+  variable <- mvgam_use_alias(variable, if (!identical(pars, NA)) pars)
   draws <- as.matrix(object, variable = variable, ...)
   rstantools::posterior_interval(draws, prob = prob)
 }
@@ -47,25 +60,44 @@ posterior_interval.mvgam <- function(object, pars = NA,
 rstantools::posterior_interval
 
 
-#' Posterior predictive credible intervals on a fitted
-#' \pkg{mvgam} model
+#' Posterior predictive intervals on a fitted \pkg{mvgam} model
 #'
-#' Quantile credible intervals of the posterior predictive draws of
-#' [posterior_predict.mvgam()], as
-#' [brms::predictive_interval.brmsfit()] gives them.
+#' Central quantile intervals of the draws [posterior_predict.mvgam()]
+#' returns, one per observation.
 #'
 #' @param object A fitted `mvgam` object.
-#' @param prob Numeric in `(0, 1)`. The credible-interval mass
-#'   to report. Defaults to `0.9` (matching brms).
-#' @param ... Forwarded to [posterior_predict.mvgam()].
+#' @param prob Numeric in `(0, 1)`. The probability mass each interval
+#'   holds. Defaults to `0.9`.
+#' @param ... Arguments of [posterior_predict.mvgam()], such as
+#'   `newdata` or `incl_autocor`.
 #'
 #' @return A numeric matrix with one row per observation and two
-#'   columns reporting the lower and upper interval bounds.
+#'   columns, the lower and upper bounds.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [brms::predictive_interval.brmsfit()],
-#'   [posterior_predict.mvgam()], [posterior_interval.mvgam()].
+#' @seealso [posterior_interval.mvgam()] gives intervals of parameters.
+#'   [pp_check.mvgam()] plots predictive draws against the data.
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                     n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
+#'
+#' # 90 percent intervals, one row per observation
+#' intervals <- predictive_interval(mod)
+#' head(intervals)
+#'
+#' # The share of observed counts the intervals cover
+#' y <- simdat$data_train$y
+#' mean(y >= intervals[, 1] & y <= intervals[, 2])
+#'
+#' # Next: pp_check() plots the predictive draws against the data
+#' }
 #'
 #' @family predictions
 #' @method predictive_interval mvgam
@@ -73,8 +105,8 @@ rstantools::posterior_interval
 predictive_interval.mvgam <- function(object, prob = 0.9, ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_number(prob, lower = 0, upper = 1)
-  preds <- posterior_predict(object, ...)
-  rstantools::predictive_interval(preds, prob = prob)
+  rstantools::predictive_interval(posterior_predict(object, ...),
+                                  prob = prob)
 }
 
 

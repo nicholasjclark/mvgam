@@ -4,7 +4,7 @@
 \alias{conditional_smooths.mvgam}
 \alias{plot.mvgam_conditional_smooths}
 \alias{print.mvgam_conditional_smooths}
-\title{Marginal smooth-effect plots for a fitted \pkg{mvgam} model}
+\title{Plots of each smooth term}
 \usage{
 \method{conditional_smooths}{mvgam}(
   x,
@@ -30,86 +30,89 @@
 \item{x}{An object of class \code{mvgam_conditional_smooths}
 returned by \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.}
 
-\item{smooths}{Optional character vector restricting which
-smooth terms to compute. \code{NULL} (default) returns every
-smooth of every predictor, the trend's included.}
+\item{smooths}{The terms to summarise, as \code{\link[=smooths.mvgam]{smooths.mvgam()}} lists
+them, or \code{NULL} for every smooth of every predictor, the trend's
+included.}
 
-\item{int_conditions}{Optional named list. Each name is a
-covariate; each value either a numeric vector of conditioning
-values or a function applied to the original covariate. Used
-for non-focal covariates that appear in by-factor faceting.}
+\item{int_conditions}{A named list setting the grid of a variable:
+a vector of values, or a function of the variable's training
+values, such as \code{\link[stats:quantile]{stats::quantile()}}.}
 
-\item{prob}{Numeric in \verb{(0, 1)}. The credible-interval mass
-reported via \code{lower__} / \code{upper__}. Defaults to \code{0.95}.}
+\item{prob}{A number in \verb{[0, 1]}: the mass of the interval in
+\code{lower__} and \code{upper__}.}
 
-\item{spaghetti}{Logical. When \code{TRUE} (and the focal smooth is
-one-dimensional, not a surface), individual posterior draws
-are returned as an attribute for spaghetti-style overlays.}
+\item{spaghetti}{Logical. \code{TRUE} keeps the draws of a smooth of one
+variable, which the plot draws as one line each.}
 
-\item{surface}{Logical. For two-dimensional smooths, \code{TRUE}
-(the default) returns a \code{resolution}-by-\code{resolution} grid for
-surface / heatmap rendering; \code{FALSE} returns a faceted line
-plot at three values of the second covariate (mean +/- 1 SD).
-See \code{facets} for finer control.}
+\item{surface}{Logical. \code{TRUE} evaluates a smooth of two variables
+on a \code{resolution} by \code{resolution} grid, drawn as a heatmap.
+\code{FALSE} draws lines over the first variable at \code{facets} values of
+the second.}
 
-\item{facets}{Optional positive integer. When \code{surface = FALSE}
-and the smooth has two or more dimensions, controls how many
-facet levels of the non-focal covariate(s) to use (default:
-\code{3}, matching brms). Setting \code{facets = 5} produces 5 evenly
-spaced facets across the non-focal range, an mvgam-only knob
-for marginaleffects-style multidimensional displays.}
+\item{facets}{An integer of at least 2: the number of values taken
+by the second variable and by a numeric \code{by} variable. They run
+evenly from one standard deviation below the mean to one above.}
 
-\item{resolution}{Positive integer. Grid resolution per
-covariate dimension. Defaults to \code{100}.}
+\item{resolution}{An integer of at least 2: the number of grid
+points along each variable.}
 
-\item{too_far}{Numeric in [0, 1]. For surface smooths, grid
-points further than this from the training data (measured in
-the unit square) are dropped via
-\code{\link[mgcv:exclude.too.far]{mgcv::exclude.too.far()}}. \code{0} (default) keeps all points.}
+\item{too_far}{A number in \verb{[0, 1]}. On a surface, grid points
+further than this from the training data, in the unit square, are
+dropped by \code{\link[mgcv:exclude.too.far]{mgcv::exclude.too.far()}}. \code{0} keeps every point.}
 
-\item{ndraws, draw_ids}{Optional posterior-draw subsetting.}
+\item{ndraws, draw_ids}{The number of posterior draws, or their
+indices. Give at most one. \code{NULL} for both uses every draw.}
 
-\item{resp}{Optional response name. \code{NULL} (the default) returns
-every response's smooths; naming one keeps that response's
-smooths alone. A univariate fit names no response on its terms
-and is unaffected.}
+\item{resp}{The response whose smooths to summarise, or \code{NULL} for
+every response.}
 
 \item{...}{Unused. Anything passed here is refused.}
 
-\item{plot}{Logical. If \code{TRUE} (default), draws each smooth's
-ggplot; otherwise returns the list invisibly for post-processing.}
+\item{plot}{Logical. \code{TRUE} draws each panel. \code{FALSE} only returns
+them.}
 
-\item{ask}{Logical. If \code{TRUE}, prompts before each new plot when
-multiple smooths are drawn to the same device.}
+\item{ask}{Logical. \code{TRUE} prompts before each panel after the
+first.}
 }
 \value{
-A named list of class \code{mvgam_conditional_smooths} with
-one element per smooth term. Each element is a \code{data.frame}
-with the brms-style summary columns (\code{estimate__}, \code{se__},
-\code{lower__}, \code{upper__}, \code{effect1__} (optionally \code{effect2__}),
-\code{cond__}) plus the focal covariate(s). Per-element attributes
-\code{response}, \code{effects}, \code{surface}, \code{spaghetti}, and \code{points}
-drive the plot method's layout choices (1D ribbon vs 2D
-heatmap panel).
+A list of class \code{mvgam_conditional_smooths}, one data frame
+per smooth, named by predictor and term. Each holds its grid with
+the columns \code{estimate__}, \code{se__}, \code{lower__}, \code{upper__},
+\code{effect1__} and \code{cond__}. A smooth of two variables adds
+\code{effect2__}.
 
-Invisibly returns the list of ggplot objects, one per
-smooth term in \code{x}.
+The list of \code{ggplot} panels, one per smooth, invisibly.
 }
 \description{
-Compute and display posterior conditional effects for every
-smooth term in a fitted \code{mvgam} object, matching the shape of
-\code{\link[brms]{conditional_smooths.brmsfit}}. Returns a named list of
-\code{data.frame}s with the brms-style \code{estimate__} / \code{lower__} /
-\code{upper__} / \code{effect1__} / \code{effect2__} / \code{cond__} columns. The
-returned object carries the \code{mvgam_conditional_smooths} class;
-one-dimensional smooths render with the package's own theme via
-\code{\link[=plot.mvgam_conditional_smooths]{plot.mvgam_conditional_smooths()}}, while two-dimensional cases
-are drawn as heatmap panels through the same method.
+Summarises the posterior of every smooth over a grid of its own
+variables, in the shape \code{\link[brms:conditional_smooths.brmsfit]{brms::conditional_smooths()}} returns. Its
+\code{plot()} method draws a smooth of one variable as a line and ribbon,
+and a smooth of two as a heatmap.
+}
+\examples{
+\dontrun{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
+
+# The smooth with 30 of its draws
+cs <- conditional_smooths(mod, spaghetti = TRUE, ndraws = 30)
+plot(cs)
+head(cs[[1]])
+
+# Next, plot(mod, type = "smooths") draws the same panels in one
+# figure
+}
+
 }
 \seealso{
-\code{\link[brms]{conditional_smooths.brmsfit}},
-\code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}},
-\code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}}.
+\code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} gives the draws of one smooth.
+\code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} plots covariate effects on the
+response.
 
 Other predictions: 
 \code{\link{conditional_effects.mvgam}()},

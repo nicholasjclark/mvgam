@@ -34,6 +34,10 @@
 #'
 #'   \item `forecasts` Named list of posterior forecast draw matrices when
 #'     produced by `forecast()`, otherwise `NULL`.
+#'
+#'   \item `site_units` `TRUE` when the fit came from [jsdgam()]. Its
+#'     units are sites, which `plot()` refuses to draw along a time
+#'     axis.
 #' }
 #'
 #' @seealso [mvgam], [hindcast.mvgam], [forecast.mvgam]

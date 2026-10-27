@@ -6,7 +6,7 @@
 \usage{
 mvgam_data(
   data,
-  y = "y",
+  y = NULL,
   family = gaussian(),
   formula = NULL,
   trend_formula = NULL,
@@ -26,33 +26,31 @@ also needs each row's series: a \code{series} column, the column
 the trend constructor's \code{series} argument names, or the \code{gr}
 and \code{subgr} columns of a hierarchical trend. Closure-unit
 families (\code{occ()}, \code{nmix()}) always require \code{series} and
-\code{visit}, and \code{cap} where the family needs it.}
+\code{visit} columns. A family without a default \code{cap} also requires
+a \code{cap} column.}
 
-\item{y}{Character. Name of the response column. Defaults to
-\code{"y"}.}
+\item{y}{Optional name of the response column. \code{NULL} (default)
+takes the response of \code{formula}, or \code{"y"} when \code{formula} is
+\code{NULL}. A name that differs from the response of \code{formula} is
+refused.}
 
-\item{family}{A \code{family}, \code{brmsfamily}, or mvgam-specific
-family object. Defaults to \code{gaussian()}. Closure-unit
-families dispatch to the same closure-unit validator
-\code{mvgam()} uses internally (\code{visit} / \code{cap} columns, integer
-/ non-negative / binary checks, cap >= y, cap constant
-within unit). Univariate non-closure-unit families run a
-response-shape check against the family's support (e.g.
-non-negative integers for Poisson, \verb{(0, 1)} for Beta,
-strictly positive for Gamma). Multi-response families
-(\code{diri()}, \code{multi()}, \code{categ()}, \code{mvn()}, \code{mvt()}) are not
-supported here; pass the data directly to \code{\link[=mvgam]{mvgam()}} /
-\code{\link[=jsdgam]{jsdgam()}}.}
+\item{family}{A \code{family}, \code{brmsfamily} or mvgam family object.
+Defaults to \code{gaussian()}. The response must lie in the family's
+support, such as non-negative integers for \code{poisson()} or
+\verb{(0, 1)} for \code{Beta()}. A \code{cap} column must hold integers no
+smaller than the response and stay constant within a closure
+unit. Multi-response families (\code{diri()},
+\code{multi()}, \code{categ()}, \code{mvn()}, \code{mvt()}) are refused. \code{\link[=mvgam]{mvgam()}}
+and \code{\link[=jsdgam]{jsdgam()}} check their data at fit time.}
 
-\item{formula}{Optional observation formula (a \code{formula},
-\code{brmsformula}, or \code{bf()} two-arm specification for
-closure-unit fits). Every column the formula uses must be in
-\code{data}: covariates, offsets, random-effect grouping factors
-and the columns of addition terms such as \code{trials()} and
-\code{weights()}. Those columns may not hold \code{NA}, and a
-\code{trials()} count may not fall below its response. Response
-\code{NA}s are allowed, and \code{mvgam()} keeps their rows on the
-time grid.}
+\item{formula}{Optional observation formula, as a \code{formula} or a
+\code{brmsformula}. A closure-unit family takes a detection formula
+in the same \code{bf()}. Every column the formula uses must be in
+\code{data}. These include covariates, offsets, random-effect
+grouping factors and the columns of addition terms such as
+\code{trials()} and \code{weights()}. Those columns may not hold \code{NA}. A
+\code{trials()} count may not fall below its response. A missing
+response is allowed. \code{mvgam()} keeps its row on the time grid.}
 
 \item{trend_formula}{Optional trend formula (e.g.
 \code{~ AR(time = week, series = species) + s(env)}), as passed to
@@ -67,46 +65,42 @@ factors get the same checks as those of \code{formula}.}
 to \code{\link[=mvgam]{mvgam()}}. A formula variable found here, such as a matrix
 covariate, need not be a column of \code{data}.}
 
-\item{plot}{Logical. If \code{TRUE} (default), draw the
-observed-series plot using the same panels as
-\code{plot(fit, type = "series")}. Multi-series data render as a
-faceted time-series plot; a single-series request returns
-the 4-panel patchwork (time series, histogram, ACF, ECDF).}
+\item{plot}{Logical. \code{TRUE} (default) draws the observed series
+with the panels of \code{plot(fit, type = "series")}. Several series
+draw as one facet each. One series draws four panels: the time
+series, a histogram, the ACF and the empirical CDF.}
 
-\item{newdata}{Optional held-out long-format \code{data.frame} /
-list. Plotted overlaid in black with a dashed cut at the
-training/test boundary.}
+\item{newdata}{Optional held-out data in the long format of
+\code{data}. The time series panels draw it in black after a dashed
+line at the first test time. The histogram, ACF and CDF of one
+series pool the training and test values.}
 
-\item{series}{One of \code{NULL}, \code{"all"}, or a positive integer
-index into the series levels. \code{NULL} resolves to \code{"all"} for
-multi-series data and \code{1L} for single-series. Data without a
-series column plot as one series named after the response.}
+\item{series}{Series to plot: \code{NULL}, \code{"all"}, a series name or
+a positive index into the series levels. \code{NULL} draws every
+series of multi-series data and the one series otherwise. Data
+without a series column plot as one series named after the
+response.}
 
 \item{lines}{Logical. Plot lines (default) or points.}
 
 \item{n_bins}{Optional histogram bin count.}
 
-\item{log_scale}{Logical. Plot the response as \code{log(y + 1)}
-on the multi-series view, where different scales are common.}
+\item{log_scale}{Logical. Plot the response as \code{log(y + 1)}.}
 }
 \value{
-Invisibly, an \code{mvgam_data} list with elements
-\code{data} (the validated data), \code{family} (resolved family
-object), \code{series_levels} (\code{NULL} when the data name no
-series), \code{n_series}, \code{time_range}, \code{n_obs}, \code{n_missing}
-(the count of missing responses), and
-\code{plot} (the \code{ggplot} / \code{patchwork} object when
-\code{plot = TRUE}, else \code{NULL}). When \code{plot = TRUE} the plot is
-also drawn to the active device.
+Invisibly, an \code{mvgam_data} list with elements \code{data} (the
+validated data), \code{family} (the resolved family), \code{series_levels}
+(\code{NULL} when the data name no series), \code{n_series}, \code{time_range},
+\code{n_obs}, \code{n_missing} (the count of missing responses) and \code{plot}
+(the \code{ggplot} or \code{patchwork} object when \code{plot = TRUE}, else
+\code{NULL}). With \code{plot = TRUE} the plot is also drawn on the active
+device.
 }
 \description{
-Validates that \code{data} carries the columns, factor levels, and
-response shape \code{mvgam()} would expect for a given observation
-family, and optionally returns an exploratory time-series plot.
-Use this to verify data structure for a proposed observation
-family without paying for a Stan compile, and to surface the
-same friendly errors \code{mvgam()} raises at fit time. Mirrors the
-role of \code{\link[=mvgam_formula]{mvgam_formula()}} for the data side.
+Runs the checks \code{mvgam()} applies to its data before compiling a
+model. It tests the columns, factor levels, time spacing and
+response support of a proposed model. A failure raises the error
+\code{mvgam()} would raise. An optional plot shows each observed series.
 }
 \examples{
 set.seed(1)
@@ -117,8 +111,10 @@ simdat <- sim_mvgam(family = poisson(), n_series = 3L,
 mvgam_data(simdat$data_train, family = poisson(),
            trend_formula = ~ AR())
 
-# One series in four panels: time series, histogram, ACF and ECDF
-mvgam_data(simdat$data_train, family = poisson(), series = 1L)
+# One series in four panels: time series, histogram, ACF and ECDF.
+# The test data follow the dashed line.
+mvgam_data(simdat$data_train, family = poisson(), series = 1L,
+           newdata = simdat$data_test)
 
 # A response the family cannot take is refused before any Stan
 # compile. The error names the column, the values and the support.
@@ -137,7 +133,7 @@ mvgam_data(gappy, family = poisson(), trend_formula = ~ CAR(),
 \seealso{
 \code{\link[=mvgam]{mvgam()}}, \code{\link[=mvgam_formula]{mvgam_formula()}}, \code{\link[=jsdgam]{jsdgam()}},
 \code{\link[=sim_mvgam]{sim_mvgam()}}, \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}},
-\code{\link[=default_prior.mvgam_formula]{default_prior.mvgam_formula()}}.
+\code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}}.
 
 Other model fitting: 
 \code{\link{check_newdata}()},

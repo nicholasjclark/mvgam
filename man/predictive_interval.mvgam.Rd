@@ -2,31 +2,51 @@
 % Please edit documentation in R/brms_wrappers.mvgam.R
 \name{predictive_interval.mvgam}
 \alias{predictive_interval.mvgam}
-\title{Posterior predictive credible intervals on a fitted
-\pkg{mvgam} model}
+\title{Posterior predictive intervals on a fitted \pkg{mvgam} model}
 \usage{
 \method{predictive_interval}{mvgam}(object, prob = 0.9, ...)
 }
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}
 
-\item{prob}{Numeric in \verb{(0, 1)}. The credible-interval mass
-to report. Defaults to \code{0.9} (matching brms).}
+\item{prob}{Numeric in \verb{(0, 1)}. The probability mass each interval
+holds. Defaults to \code{0.9}.}
 
-\item{...}{Forwarded to \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}.}
+\item{...}{Arguments of \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, such as
+\code{newdata} or \code{incl_autocor}.}
 }
 \value{
 A numeric matrix with one row per observation and two
-columns reporting the lower and upper interval bounds.
+columns, the lower and upper bounds.
 }
 \description{
-Quantile credible intervals of the posterior predictive draws of
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, as
-\code{\link[brms:predictive_interval.brmsfit]{brms::predictive_interval.brmsfit()}} gives them.
+Central quantile intervals of the draws \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}
+returns, one per observation.
+}
+\examples{
+\dontrun{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
+
+# 90 percent intervals, one row per observation
+intervals <- predictive_interval(mod)
+head(intervals)
+
+# The share of observed counts the intervals cover
+y <- simdat$data_train$y
+mean(y >= intervals[, 1] & y <= intervals[, 2])
+
+# Next: pp_check() plots the predictive draws against the data
+}
+
 }
 \seealso{
-\code{\link[brms:predictive_interval.brmsfit]{brms::predictive_interval.brmsfit()}},
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=posterior_interval.mvgam]{posterior_interval.mvgam()}}.
+\code{\link[=posterior_interval.mvgam]{posterior_interval.mvgam()}} gives intervals of parameters.
+\code{\link[=pp_check.mvgam]{pp_check.mvgam()}} plots predictive draws against the data.
 
 Other predictions: 
 \code{\link{conditional_effects.mvgam}()},

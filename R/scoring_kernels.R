@@ -1,29 +1,35 @@
 # Numeric scoring kernels for posterior forecast evaluation.
 #
-# Eleven scorers in two groups:
+# Eleven scores in two groups:
 #   Univariate, one cell per time : CRPS, DRPS, SIS, Brier, log score,
 #                                   DSS, quantile score, twCRPS
 #   Multivariate, one per horizon : energy, variogram, twenergy
 #
-# Each univariate scorer wraps a `(truth, fc_col, ...)` ->
-# `c(score, in_interval)` kernel in apply_univariate_score(). The
-# wrapper guards NA truths, shapes the output and names its columns.
-# Each multivariate scorer wraps a `(truth_at_h, fc_at_h, ...)` ->
-# scalar kernel in apply_multivariate_score(). That wrapper stacks the
-# per-series forecasts at each horizon.
+# `univariate_score()` applies a `(truth, fc_col, ...)` ->
+# `c(score, in_interval)` cell over the horizon of one series.
+# `multivariate_score()` applies a `(truth_at_h, fc_at_h, ...)` ->
+# scalar cell to the series stacked at each horizon.
 
 # ----- Shared utilities -------------------------------------------
 
-# Log offset for non-negative response variables so the `log =
-# TRUE` toggle on every scorer doesn't blow up at zero.
-#'@noRd
+#' The log transform of `log = TRUE`
+#'
+#' The offset keeps a zero count finite.
+#'
+#' @param x Numeric vector or matrix
+#' @param eps Numeric offset
+#' @return `log(x + eps)`
+#' @noRd
 log_offset <- function(x, eps = 0.001) log(x + eps)
 
 
-# Empirical central PI coverage indicator: 1 if `truth` falls
-# inside the [(1 - w)/2, 1 - (1 - w)/2] quantiles of `fc_col`,
-# 0 otherwise. Used by CRPS / DRPS / SIS cell kernels.
-#'@noRd
+#' Whether an observation lies in the central predictive interval
+#'
+#' @param fc_col Numeric vector of forecast draws
+#' @param truth Numeric observed value
+#' @param interval_width Numeric width of the central interval
+#' @return `1L` inside the interval, `0L` outside
+#' @noRd
 in_central_pi <- function(fc_col, truth, interval_width = 0.9) {
   alpha <- (1 - interval_width) / 2
   iv <- stats::quantile(
@@ -33,15 +39,21 @@ in_central_pi <- function(fc_col, truth, interval_width = 0.9) {
 }
 
 
-# Apply a per-cell scoring kernel across a forecast horizon.
-# `score_fn(truth_i, fc_col_i, ...)` must return a length-2
-# numeric `c(score, in_interval)`. NA truths are skipped (the
-# corresponding output row stays NA). Returns a `[h, 2]` matrix
-# with column names `score` / `in_interval`.
-#'@noRd
+#' A per-cell score applied over a forecast horizon
+#'
+#' A missing observation leaves its row missing.
+#'
+#' @param truth Numeric vector of observed values, one per horizon
+#' @param fc Numeric matrix of forecast draws, one column per horizon
+#' @param score_fn Function of `(truth_i, fc_col_i, ...)` returning
+#'   `c(score, in_interval)`
+#' @param ... Further arguments of `score_fn`
+#' @return `[h, 2]` matrix with columns `score` and `in_interval`
+#' @noRd
 apply_univariate_score <- function(truth, fc, score_fn, ...) {
   checkmate::assert_numeric(truth)
   checkmate::assert_matrix(fc, ncols = length(truth))
+  checkmate::assert_function(score_fn)
   out <- matrix(NA_real_, nrow = length(truth), ncol = 2L)
   keep <- which(!is.na(truth))
   for (i in keep) {
@@ -52,10 +64,11 @@ apply_univariate_score <- function(truth, fc, score_fn, ...) {
 }
 
 
-# Stack a list of per-series `[ndraws, h]` forecast matrices
-# into a list of `[n_series, ndraws]` matrices indexed by
-# horizon. Shared by the energy and variogram public scorers.
-#'@noRd
+#' Per-series forecast matrices regrouped by horizon
+#'
+#' @param fcs List of `[ndraws, h]` forecast matrices, one per series
+#' @return List of `[n_series, ndraws]` matrices, one per horizon
+#' @noRd
 stack_fcs_per_horizon <- function(fcs) {
   h <- ncol(fcs[[1L]])
   lapply(seq_len(h), function(t) {
@@ -64,108 +77,173 @@ stack_fcs_per_horizon <- function(fcs) {
 }
 
 
-# Apply a per-horizon multivariate kernel across the horizon.
-# `score_fn(truth_vec, fc_mat, ...)` must return a scalar
-# score; `truth_vec` is `[n_series]`, `fc_mat` is `[n_series,
-# ndraws]`. Returns a length-h numeric vector.
-#'@noRd
+#' A per-horizon multivariate score applied over the horizon
+#'
+#' @param truths Numeric `[n_series, h]` matrix of observed values
+#' @param fcs List of `[ndraws, h]` forecast matrices, one per series
+#' @param score_fn Function of `(truth_vec, fc_mat, ...)` returning a
+#'   scalar, with `fc_mat` shaped `[n_series, ndraws]`
+#' @param ... Further arguments of `score_fn`
+#' @return Numeric vector of scores, one per horizon
+#' @noRd
 apply_multivariate_score <- function(truths, fcs, score_fn, ...) {
   checkmate::assert_matrix(truths)
   checkmate::assert_list(fcs, min.len = 1L)
+  checkmate::assert_function(score_fn)
   fcs_per_h <- stack_fcs_per_horizon(fcs)
-  h <- ncol(truths)
-  vapply(seq_len(h), function(t) {
+  vapply(seq_len(ncol(truths)), function(t) {
     score_fn(truths[, t], fcs_per_h[[t]], ...)
   }, numeric(1L))
 }
 
 
+#' Require the scoringRules package for a score that uses it
+#'
+#' @param score Character name of a score
+#' @return `NULL`, invisibly, or an error
+#' @noRd
+require_scoring_rules <- function(score) {
+  checkmate::assert_string(score)
+  if (!score %in% c("drps", "sis", "brier")) {
+    insight::check_if_installed(
+      "scoringRules",
+      reason = paste0("to compute the '", score, "' score")
+    )
+  }
+  invisible(NULL)
+}
+
+
+#' One univariate score of one series over its horizon
+#'
+#' Each cell receives the arguments it uses.
+#'
+#' @param score Character name of a univariate score
+#' @param truth Numeric vector of observed values, one per horizon
+#' @param fc Numeric matrix of forecast draws, one column per horizon
+#' @param interval_width Numeric width of the central interval
+#' @param quantile_level Numeric quantile level of the `qs` score
+#' @param lower,upper Numeric thresholds of the `twcrps` score
+#' @param log Logical. `TRUE` scores on the log scale
+#' @return `[h, 2]` matrix with columns `score` and `in_interval`
+#' @noRd
+univariate_score <- function(score, truth, fc, interval_width = 0.9,
+                             quantile_level = 0.5, lower = -Inf,
+                             upper = Inf, log = FALSE) {
+  checkmate::assert_choice(score, univariate_forecast_scores)
+  require_scoring_rules(score)
+  cell <- switch(
+    score,
+    crps = crps_cell, drps = drps_cell, sis = sis_cell,
+    brier = brier_cell, logs = logs_cell, dss = dss_cell, qs = qs_cell,
+    twcrps = twcrps_cell
+  )
+  args <- switch(
+    score,
+    crps = , sis = list(interval_width = interval_width, log = log),
+    drps = list(interval_width = interval_width),
+    qs = list(alpha = quantile_level),
+    twcrps = list(lower = lower, upper = upper),
+    list()
+  )
+  do.call(apply_univariate_score, c(list(truth, fc, cell), args))
+}
+
+
+#' One multivariate score over the shared horizon
+#'
+#' @param score Character name of a multivariate score
+#' @param truths Numeric `[n_series, h]` matrix of observed values
+#' @param fcs List of `[ndraws, h]` forecast matrices, one per series
+#' @param lower,upper Numeric thresholds of the `twenergy` score
+#' @param log Logical. `TRUE` scores on the log scale
+#' @param weights Numeric per-series weights of the `variogram` score,
+#'   or `NULL`
+#' @return Numeric vector of joint scores, one per horizon
+#' @noRd
+multivariate_score <- function(score, truths, fcs, lower = -Inf,
+                               upper = Inf, log = FALSE,
+                               weights = NULL) {
+  checkmate::assert_choice(score, joint_forecast_scores)
+  require_scoring_rules(score)
+  switch(
+    score,
+    energy = apply_multivariate_score(truths, fcs, energy_cell,
+                                      log = log),
+    variogram = apply_multivariate_score(truths, fcs, variogram_cell,
+                                         log = log, weights = weights),
+    twenergy = apply_multivariate_score(truths, fcs, twenergy_cell,
+                                        lower = lower, upper = upper)
+  )
+}
+
+
 # ----- Per-cell univariate kernels --------------------------------
 
-# CRPS via the empirical-CDF method (equivalent to scoringRules'
-# `crps_sample` target).
-#'@noRd
-crps_cell <- function(truth, fc, interval_width = 0.9,
-                        log = FALSE) {
+#' CRPS of the empirical distribution of the draws
+#' @noRd
+crps_cell <- function(truth, fc, interval_width = 0.9, log = FALSE) {
   if (log) {
     truth <- log_offset(truth)
     fc <- log_offset(fc)
   }
-  s <- scoringRules::crps_sample(y = truth, dat = fc,
-                                    method = "edf")
+  s <- scoringRules::crps_sample(y = truth, dat = fc, method = "edf")
   c(s, in_central_pi(fc, truth, interval_width))
 }
 
 
-# DRPS for discrete (count) data. The empirical CDF of `fc` is
-# evaluated over an integer support extended past either the
-# log-transformed max (when `log = TRUE`) or the truth + a tail
-# offset large enough that the squared-difference tail is
-# negligible.
-#'@noRd
-drps_cell <- function(truth, fc, interval_width = 0.9,
-                        log = FALSE) {
-  if (log) {
-    truth <- log_offset(truth)
-    fc <- log_offset(fc)
-    upper <- max(c(truth, fc), na.rm = TRUE) + 5
-  } else {
-    upper <- max(
-      c(truth, stats::quantile(fc, 0.99, na.rm = TRUE)),
-      na.rm = TRUE
-    ) + 1000
-  }
-  ys <- 0:upper
+#' Discrete ranked probability score of a count
+#'
+#' The sum over `k >= 0` of `(1{k >= y} - F(k))^2`, with `F` the
+#' empirical distribution of the draws. Every term above the largest of
+#' the observation and the draws is zero.
+#' @noRd
+drps_cell <- function(truth, fc, interval_width = 0.9) {
+  ys <- 0:max(c(truth, fc), na.rm = TRUE)
   Fy <- stats::ecdf(fc)
-  s <- sum((as.integer(ys - truth >= 0L) - Fy(ys))^2)
+  s <- sum((as.integer(ys >= truth) - Fy(ys))^2)
   c(s, in_central_pi(fc, truth, interval_width))
 }
 
 
-# Scaled Interval Score (Gneiting-Raftery): width of the central
-# PI plus an `alpha`-scaled penalty for misses on either side.
-#'@noRd
-sis_cell <- function(truth, fc, interval_width = 0.9,
-                       log = FALSE) {
+#' Scaled interval score (Gneiting and Raftery 2007)
+#'
+#' The width of the central interval plus `2 / alpha` times the
+#' distance of an observation outside it.
+#' @noRd
+sis_cell <- function(truth, fc, interval_width = 0.9, log = FALSE) {
   if (log) {
     truth <- log_offset(truth)
     fc <- log_offset(fc)
   }
   alpha <- 1 - interval_width
-  lo_p <- alpha / 2
-  hi_p <- 1 - lo_p
   creds <- stats::quantile(
-    fc, probs = c(lo_p, hi_p), na.rm = TRUE
+    fc, probs = c(alpha / 2, 1 - alpha / 2), na.rm = TRUE
   )
-  lo <- creds[1L]
-  hi <- creds[2L]
-  err_up <- truth - hi
-  err_lo <- lo - truth
-  s <- (hi - lo) +
-    (2 / alpha) * (max(err_up, 0) + max(err_lo, 0))
-  c(unname(s), in_central_pi(fc, truth, interval_width))
+  lo <- creds[[1L]]
+  hi <- creds[[2L]]
+  s <- (hi - lo) + (2 / alpha) * (max(truth - hi, 0) + max(lo - truth, 0))
+  c(s, in_central_pi(fc, truth, interval_width))
 }
 
 
-# Brier score: squared error of the forecast probability against a
-# 0/1 truth. The mean of the draws estimates that probability from
-# 0/1 response draws and from expected-value draws alike. The mean of
-# the per-draw squared errors equals P(draw != truth) on 0/1 draws.
-# That quantity is linear in the probability and rewards a forecast
-# pushed to 0 or 1. The coverage cell is NA. A central interval of a
-# binary outcome has no useful width.
-#'@noRd
-brier_cell <- function(truth, fc, ...) {
+#' Brier score of a binary outcome
+#'
+#' The squared error of the forecast probability, which the mean of the
+#' draws estimates from 0/1 response draws and from expected values
+#' alike. The mean of the per-draw squared errors would be linear in
+#' the probability and would reward a forecast pushed to 0 or 1. The
+#' coverage cell is `NA`. A central interval of a binary outcome has no
+#' useful width.
+#' @noRd
+brier_cell <- function(truth, fc) {
   c((truth - mean(fc))^2, NA_real_)
 }
 
 
-# Logarithmic score: -log f(y) on a kernel density estimate of
-# the posterior draws. Strictly proper, density-local, and the
-# direct bridge to ELPD / LOO / WAIC summaries. Coverage cell is
-# NA -- the log score does not target a central PI.
-#'@noRd
-logs_cell <- function(truth, fc, ...) {
+#' Log score, `-log f(y)` for a kernel density estimate of the draws
+#' @noRd
+logs_cell <- function(truth, fc) {
   s <- scoringRules::logs_sample(
     y = truth, dat = fc, show_messages = FALSE
   )
@@ -173,22 +251,22 @@ logs_cell <- function(truth, fc, ...) {
 }
 
 
-# Dawid-Sebastiani score: ((y - mu) / sigma)^2 + 2 * log(sigma).
-# Cheap, moment-based, depends only on the first two predictive
-# moments. Useful as a calibration diagnostic that separates
-# sharpness (2 log sigma) from the standardised error term.
-#'@noRd
-dss_cell <- function(truth, fc, ...) {
+#' Dawid-Sebastiani score, `((y - mu) / sigma)^2 + 2 log(sigma)`
+#'
+#' It depends on the predictive mean and standard deviation alone.
+#' @noRd
+dss_cell <- function(truth, fc) {
   s <- scoringRules::dss_sample(y = truth, dat = fc)
   c(s, NA_real_)
 }
 
 
-# Quantile (pinball) score at level `alpha`. It is strictly proper
-# for the alpha-quantile. The CRPS integrates it over every alpha.
-# One level scores a single tail of the forecast.
-#'@noRd
-qs_cell <- function(truth, fc, alpha = 0.5, ...) {
+#' Quantile (pinball) score at level `alpha`
+#'
+#' It is strictly proper for the `alpha` quantile. The CRPS integrates
+#' it over every level.
+#' @noRd
+qs_cell <- function(truth, fc, alpha = 0.5) {
   s <- scoringRules::qs_sample(
     y = truth, dat = fc, alpha = alpha, show_messages = FALSE
   )
@@ -196,17 +274,14 @@ qs_cell <- function(truth, fc, alpha = 0.5, ...) {
 }
 
 
-# Threshold-weighted CRPS via the chaining function
-# v(x) = min(max(x, lower), upper). Defaults to plain CRPS;
-# raise `lower` or lower `upper` to focus scoring on the
-# corresponding tail (exceedance forecasts, management
-# thresholds).
-#'@noRd
-twcrps_cell <- function(truth, fc, lower = -Inf, upper = Inf,
-                          ...) {
+#' Threshold-weighted CRPS
+#'
+#' The chaining function `v(x) = min(max(x, lower), upper)` scores the
+#' forecast inside `[lower, upper]`. The default bounds give the CRPS.
+#' @noRd
+twcrps_cell <- function(truth, fc, lower = -Inf, upper = Inf) {
   s <- scoringRules::twcrps_sample(
-    y = truth, dat = fc, a = lower, b = upper,
-    show_messages = FALSE
+    y = truth, dat = fc, a = lower, b = upper, show_messages = FALSE
   )
   c(s, NA_real_)
 }
@@ -217,20 +292,18 @@ twcrps_cell <- function(truth, fc, lower = -Inf, upper = Inf,
 #' Forecast draws prepared for a multivariate score
 #'
 #' Drops every draw column holding a missing value and applies the log
-#' offset when `log = TRUE`. The energy, threshold-weighted energy and
-#' variogram score cells call it.
+#' offset when `log = TRUE`.
 #'
 #' @param truth Numeric vector of observed values, one per series
 #' @param fc Numeric matrix of forecast draws, one row per series
-#' @param log Logical flag to score on the log scale
+#' @param log Logical. `TRUE` scores on the log scale
 #' @return List holding the prepared `truth` and `fc`
 #' @noRd
 clean_fc_for_es <- function(truth, fc, log = FALSE) {
   checkmate::assert_atomic_vector(truth)
   checkmate::assert_matrix(fc)
   checkmate::assert_flag(log)
-  has_na <- apply(fc, 2L, function(x) any(is.na(x)))
-  fc <- fc[, !has_na, drop = FALSE]
+  fc <- fc[, colSums(is.na(fc)) == 0L, drop = FALSE]
   if (log) {
     truth <- log_offset(truth)
     fc <- log_offset(fc)
@@ -239,129 +312,36 @@ clean_fc_for_es <- function(truth, fc, log = FALSE) {
 }
 
 
-# Multivariate Energy score via scoringRules.
-#'@noRd
+#' Energy score
+#' @noRd
 energy_cell <- function(truth, fc, log = FALSE) {
-  insight::check_if_installed(
-    "scoringRules",
-    reason = "to calculate energy scores"
-  )
   cleaned <- clean_fc_for_es(truth, fc, log = log)
   scoringRules::es_sample(y = cleaned$truth, dat = cleaned$fc)
 }
 
 
-# Threshold-weighted multivariate Energy score. Same chaining
-# convention as twCRPS: focuses scoring on the joint region
-# whose components fall inside `[lower, upper]`.
-#'@noRd
+#' Threshold-weighted energy score
+#'
+#' The chaining function of the threshold-weighted CRPS, applied to
+#' each component.
+#' @noRd
 twenergy_cell <- function(truth, fc, lower = -Inf, upper = Inf) {
-  insight::check_if_installed(
-    "scoringRules",
-    reason = "to calculate threshold-weighted energy scores"
-  )
   cleaned <- clean_fc_for_es(truth, fc)
   scoringRules::twes_sample(
-    y = cleaned$truth, dat = cleaned$fc,
-    a = lower, b = upper
+    y = cleaned$truth, dat = cleaned$fc, a = lower, b = upper
   )
 }
 
 
-# Variogram score of order 0.5 via scoringRules (Scheuerer and Hamill
-# 2015). `weights` gives each pair of series the mean of their weights.
-#'@noRd
+#' Variogram score of order 0.5 (Scheuerer and Hamill 2015)
+#'
+#' Each pair of series takes the mean of their `weights`.
+#' @noRd
 variogram_cell <- function(truth, fc, log = FALSE, weights = NULL) {
-  insight::check_if_installed(
-    "scoringRules",
-    reason = "to calculate variogram scores"
-  )
   cleaned <- clean_fc_for_es(truth, fc, log = log)
   w_vs <- if (!is.null(weights)) {
     outer(weights, weights, function(x, y) (x + y) / 2)
   }
   scoringRules::vs_sample(y = cleaned$truth, dat = cleaned$fc,
                           w_vs = w_vs, p = 0.5)
-}
-
-
-# ----- Public per-horizon scorers ---------------------------------
-
-# Univariate scorers: pass-through to apply_univariate_score().
-# `truth` is a length-h numeric vector (the held-out responses
-# for one series at the forecast horizon); `fc` is a `[ndraws,
-# h]` matrix of posterior predictive draws for the same cells.
-#'@noRd
-crps_mcmc_object <- function(truth, fc, interval_width = 0.9,
-                               log = FALSE) {
-  apply_univariate_score(truth, fc, crps_cell,
-                           interval_width = interval_width,
-                           log = log)
-}
-
-#'@noRd
-drps_mcmc_object <- function(truth, fc, interval_width = 0.9,
-                               log = FALSE) {
-  apply_univariate_score(truth, fc, drps_cell,
-                           interval_width = interval_width,
-                           log = log)
-}
-
-#'@noRd
-sis_mcmc_object <- function(truth, fc, interval_width = 0.9,
-                              log = FALSE) {
-  apply_univariate_score(truth, fc, sis_cell,
-                           interval_width = interval_width,
-                           log = log)
-}
-
-#'@noRd
-brier_mcmc_object <- function(truth, fc, ...) {
-  apply_univariate_score(truth, fc, brier_cell)
-}
-
-#'@noRd
-logs_mcmc_object <- function(truth, fc, ...) {
-  apply_univariate_score(truth, fc, logs_cell)
-}
-
-#'@noRd
-dss_mcmc_object <- function(truth, fc, ...) {
-  apply_univariate_score(truth, fc, dss_cell)
-}
-
-#'@noRd
-qs_mcmc_object <- function(truth, fc, quantile_level = 0.5, ...) {
-  # `qs_cell()` keeps scoringRules' own spelling at that boundary.
-  apply_univariate_score(truth, fc, qs_cell, alpha = quantile_level)
-}
-
-#'@noRd
-twcrps_mcmc_object <- function(truth, fc, lower = -Inf,
-                                 upper = Inf, ...) {
-  apply_univariate_score(truth, fc, twcrps_cell,
-                           lower = lower, upper = upper)
-}
-
-
-# Multivariate scorers: pass-through to apply_multivariate_score().
-# `truths` is a `[n_series, h]` matrix; `fcs` is a length-
-# n_series list of `[ndraws, h]` forecast matrices.
-#'@noRd
-energy_mcmc_object <- function(truths, fcs, log = FALSE) {
-  apply_multivariate_score(truths, fcs, energy_cell, log = log)
-}
-
-#'@noRd
-variogram_mcmc_object <- function(truths, fcs, log = FALSE,
-                                    weights = NULL) {
-  apply_multivariate_score(truths, fcs, variogram_cell,
-                             log = log, weights = weights)
-}
-
-#'@noRd
-twenergy_mcmc_object <- function(truths, fcs, lower = -Inf,
-                                    upper = Inf) {
-  apply_multivariate_score(truths, fcs, twenergy_cell,
-                             lower = lower, upper = upper)
 }

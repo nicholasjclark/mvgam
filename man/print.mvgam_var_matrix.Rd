@@ -2,7 +2,7 @@
 % Please edit documentation in R/var_param_extractors.R
 \name{print.mvgam_var_matrix}
 \alias{print.mvgam_var_matrix}
-\title{Print method for \code{mvgam_var_matrix}}
+\title{Print a VAR transition matrix}
 \usage{
 \method{print}{mvgam_var_matrix}(x, digits = 2L, ...)
 }
@@ -16,15 +16,12 @@ matrix.}
 \item{...}{Ignored.}
 }
 \value{
-\code{x}, invisibly, after side-effect printing.
+\code{x}, invisibly.
 }
 \description{
-Prints a compact header (group label, dimension, mean
-off-diagonal absolute entry magnitude) and the posterior
-point-estimate transition matrix rounded to \code{digits}. Reminds
-the reader that the per-cell credible interval is available in
-the \code{A_lower} / \code{A_upper} slots. The header follows the layout of
-\code{\link[=print.mvgam_residcor]{print.mvgam_residcor()}}.
+Prints the panel, the dimension, the mean absolute off-diagonal
+cell and the posterior estimate of the matrix. The interval of each
+cell is in \code{A_lower} and \code{A_upper}.
 }
 \seealso{
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}},

@@ -68,10 +68,6 @@ brms::control_params
 #' @export
 brms::custom_family
 
-#' @importFrom brms default_prior
-#' @export
-brms::default_prior
-
 #' @importFrom brms empty_prior
 #' @export
 brms::empty_prior

@@ -193,8 +193,9 @@ test_that("thresholds are read in index order and per response", {
 # -------------------------------------------------------------------------
 
 test_that("brms's matrix-response families point at mvgam's own", {
-  # Each is refused by the special brms marks it with, which a list of
-  # names had missed for `dirichlet2()` and `dirichlet_multinomial()`.
+  # Each is refused by the special brms marks it with.
+  # `dirichlet2()` and `dirichlet_multinomial()` carry the specials of
+  # `dirichlet()` and `multinomial()`.
   expect_error(validate_supported_family(brms::dirichlet_multinomial()),
                "multi\\(\\)")
   expect_error(
@@ -202,7 +203,7 @@ test_that("brms's matrix-response families point at mvgam's own", {
     "diri\\(\\)"
   )
   expect_error(validate_supported_family(brms::logistic_normal()),
-               "mvn\\(\\)")
+               "mvn\\(\\) to the additive log-ratios")
   expect_error(validate_supported_family(brms::categorical()),
                "categ\\(\\)")
   expect_true(validate_supported_family(brms::cumulative()))
@@ -243,7 +244,7 @@ test_that("inv_link inverts every link brms offers", {
   expect_equal(inv_link(800, "softplus"), 800)
   x <- matrix(c(-1, 0, 1, 2), nrow = 2L)
   expect_equal(inv_link(x, "logit"), stats::plogis(x))
-  expect_error(inv_link(0, "magic"), "no inverse")
+  expect_error(inv_link(0, "magic"), "is not supported")
 })
 
 
@@ -273,15 +274,9 @@ test_that("loo and waic refuse the brms arguments mvgam does not run", {
 # log_lik.mvgam — argument validation that does not require a real fit
 # -------------------------------------------------------------------------
 
-test_that("log_lik.mvgam: invalid object class errors via checkmate", {
-  # Calling log_lik on a non-mvgam stub with class "mvgam" but no body
-  # should fire the checkmate assertions on newdata / ndraws etc.
-  # Calling the generic on a bare string fails at S3 dispatch before
-  # the checkmate; both error paths are acceptable as long as no
-  # silent success can happen.
+test_that("log_lik.mvgam needs 'newdata' for a fit without data", {
   stub <- structure(list(), class = "mvgam")
-  expect_error(log_lik(stub))  # no newdata, no $data
-  expect_error(log_lik("not an mvgam"))
+  expect_error(log_lik(stub), "'newdata' is required")
 })
 
 
@@ -400,11 +395,11 @@ test_that("ordinal_category_variance: matches the variance of the levels drawn",
   expect_equal(analytic, stats::var(drawn), tolerance = 0.02)
 })
 
-test_that("summarize_predictions: keeps the category margin of an ordinal epred", {
+test_that("summarise_predictions: keeps the category margin of an ordinal epred", {
   set.seed(12)
   draws <- array(stats::runif(50 * 4 * 3), dim = c(50L, 4L, 3L),
                  dimnames = list(NULL, paste0("obs", 1:4), c("lo", "mid", "hi")))
-  out <- summarize_predictions(draws, probs = c(0.025, 0.975), robust = FALSE)
+  out <- summarise_predictions(draws, probs = c(0.025, 0.975), robust = FALSE)
 
   # brms summarises each category separately and stacks along dim 3.
   expect_equal(dim(out), c(4L, 4L, 3L))
@@ -414,14 +409,14 @@ test_that("summarize_predictions: keeps the category margin of an ordinal epred"
   # Each slice equals the summary of that category on its own.
   expect_equal(
     out[, , 2L],
-    summarize_predictions(draws[, , 2L], probs = c(0.025, 0.975),
+    summarise_predictions(draws[, , 2L], probs = c(0.025, 0.975),
                           robust = FALSE)
   )
 })
 
-test_that("summarize_predictions: a single-observation category slice stays a matrix", {
+test_that("summarise_predictions: a single-observation category slice stays a matrix", {
   draws <- array(stats::rnorm(10 * 1 * 2), dim = c(10L, 1L, 2L))
-  out <- summarize_predictions(draws, probs = 0.5, robust = TRUE)
+  out <- summarise_predictions(draws, probs = 0.5, robust = TRUE)
   expect_equal(dim(out), c(1L, 3L, 2L))
 })
 

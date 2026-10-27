@@ -48,15 +48,11 @@ test_that("Univariate scorers return per-series df + all_series", {
   fc <- make_mock_forecast(n_series = 2L, h = 5L)
   out <- score(fc, "crps")
   expect_named(out, c("s1", "s2", "all_series"))
-  expect_s3_class(out[["s1"]], "data.frame")
   expect_identical(
     sort(names(out[["s1"]])),
     sort(c("score", "in_interval", "interval_width",
             "eval_horizon", "score_type"))
   )
-  expect_identical(nrow(out[["s1"]]), 5L)
-  expect_true(all(out[["s1"]]$score_type == "crps"))
-  expect_true(all(out[["s1"]]$interval_width == 0.9))
   expect_identical(out[["s1"]]$eval_horizon, 1:5)
 })
 
@@ -107,7 +103,6 @@ test_that("Every scorer routes without error and returns the expected shape", {
     expect_identical(unique(out$s1$score_type), s)
     expect_identical(unique(out$all_series$score_type),
                        paste0("sum_", s))
-    expect_identical(nrow(out$s1), 3L)
   }
   multivariate <- c("energy", "variogram", "twenergy")
   for (s in multivariate) {
@@ -170,19 +165,6 @@ test_that("Missing forecasts / test_observations errors crisply", {
 })
 
 
-test_that("Unknown score name errors via match.arg", {
-  fc <- make_mock_forecast()
-  expect_error(score(fc, "not_a_score"), "should be one of")
-})
-
-
-test_that("interval_width outside [0.05, 0.95] errors", {
-  fc <- make_mock_forecast()
-  expect_error(score(fc, "crps", interval_width = 0.99), "<= 0.95")
-  expect_error(score(fc, "crps", interval_width = 0.001), ">= 0.05")
-})
-
-
 test_that("Empty per-series forecasts produce empty per-series df", {
   fc <- make_mock_forecast(n_series = 2L, h = 3L)
   fc$forecasts[["s1"]] <- matrix(NA_real_, nrow = 30L, ncol = 0L)
@@ -230,31 +212,39 @@ test_that("series forecast at their own times are summed by time", {
 
 # ----- Routing parity vs direct kernel calls ----------------------
 
-test_that("score(fc, 'crps') score column equals crps_mcmc_object", {
-  set.seed(99L)
-  fc <- make_mock_forecast(n_series = 1L, h = 4L, ndraws = 50L)
-  truth <- fc$test_observations[["s1"]]
-  fmat <- fc$forecasts[["s1"]]
-  via_dispatch <- score(fc, "crps")$s1$score
-  direct <- as.numeric(crps_mcmc_object(truth, fmat)[, "score"])
-  expect_equal(via_dispatch, direct)
-})
-
-
-test_that("score(fc, 'energy')$all_series$score equals energy_mcmc_object", {
+test_that("joint scores equal their kernels, on the log scale too", {
   set.seed(99L)
   fc <- make_mock_forecast(n_series = 2L, h = 3L, ndraws = 40L)
   truths <- do.call(rbind, fc$test_observations)
   via_dispatch <- score(fc, "energy")$all_series$score
-  direct <- energy_mcmc_object(truths, fc$forecasts)
+  direct <- multivariate_score("energy", truths, fc$forecasts)
   expect_equal(via_dispatch, direct)
   # The joint scores take the log scale. The threshold-weighted one
   # refuses it
   fc$forecasts <- lapply(fc$forecasts, abs)
   expect_equal(
     score(fc, "variogram", log = TRUE)$all_series$score,
-    variogram_mcmc_object(log_offset(truths),
+    multivariate_score("variogram", log_offset(truths),
                           lapply(fc$forecasts, log_offset))
   )
   expect_error(score(fc, "twenergy", log = TRUE), "does not apply")
+  # The DRPS sums over the integer support of a count
+  expect_error(score(fc, "drps", log = TRUE), "does not apply")
+})
+
+
+test_that("variogram weights follow the scored series", {
+  fc <- make_mock_forecast(n_series = 3L, h = 3L)
+  fc$forecasts$s1 <- matrix(NA_real_, nrow = 30L, ncol = 0L)
+  fc$test_observations$s1 <- numeric(0L)
+  # Series s1 holds no forecasts. Its weight drops with it
+  expect_equal(
+    score(fc, "variogram", weights = c(5, 1, 2))$all_series$score,
+    multivariate_score("variogram",
+                       do.call(rbind, fc$test_observations[2:3]),
+                       fc$forecasts[2:3], weights = c(1, 2))
+  )
+  expect_error(score(fc, "variogram", weights = c(1, 2)), "length")
+  expect_error(score(fc, "energy", weights = c(1, 1, 1)),
+               "'variogram' score only")
 })

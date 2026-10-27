@@ -152,6 +152,14 @@ test_that("as.data.frame.mvgam returns a data.frame", {
   out <- as.data.frame(stub, variable = "betas")
   expect_s3_class(out, "data.frame")
   expect_true("b_Intercept" %in% names(out))
+  # A draw index counts across chains: draw 51 opens the second chain
+  full <- as.matrix(stub, variable = "betas")
+  expect_equal(unname(as.matrix(stub, variable = "betas", draw = c(1, 51))),
+               unname(full[c(1, 51), ]))
+  expect_equal(as.data.frame(stub, variable = "betas", draw = 51)$b_x,
+               full[51, "b_x"])
+  # The stub's draws hold no warmup
+  expect_error(as_draws_df(stub, inc_warmup = TRUE), "save_warmup = TRUE")
 })
 
 test_that("as.array.mvgam returns a plain array", {
@@ -241,8 +249,9 @@ test_that("compute_all_summaries() columns and measures match the draws", {
   draws <- posterior::as_draws_df(stub)
   v <- as.numeric(draws[["b_x"]])
 
+  pars <- variables(stub)
   robust_out <- compute_all_summaries(
-    stub, probs = c(0.025, 0.975), robust = TRUE
+    stub, probs = c(0.025, 0.975), robust = TRUE, variable = pars
   )
   # The columns `summary()` prints
   expect_equal(colnames(robust_out),
@@ -256,7 +265,7 @@ test_that("compute_all_summaries() columns and measures match the draws", {
   expect_equal(robust_out["b_x", "Est.Error"], stats::mad(v))
 
   plain_out <- compute_all_summaries(
-    stub, probs = c(0.025, 0.975), robust = FALSE
+    stub, probs = c(0.025, 0.975), robust = FALSE, variable = pars
   )
   expect_equal(colnames(plain_out), colnames(robust_out))
   expect_equal(plain_out["b_x", "Estimate"], base::mean(v))
@@ -264,7 +273,7 @@ test_that("compute_all_summaries() columns and measures match the draws", {
 
   # The interval columns take their label from `probs`.
   narrow <- compute_all_summaries(
-    stub, probs = c(0.1, 0.9), robust = FALSE
+    stub, probs = c(0.1, 0.9), robust = FALSE, variable = pars
   )
   expect_equal(colnames(narrow)[3:4], c("l-80% CI", "u-80% CI"))
 })

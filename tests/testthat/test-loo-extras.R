@@ -121,8 +121,13 @@ test_that("LOO and WAIC forward only the arguments the caller wrote", {
     seen <<- names(list(...))
     "called"
   }
-  # The generics called inside the package find the methods there
+  # The aliases replay their call on `loo::loo()` and `loo::waic()`
+  # from the caller's frame. Dispatch from a test frame can find the
+  # method in the package namespace or in the S3 registry, depending on
+  # what earlier tests called. Both are mocked.
   local_mocked_bindings(loo.mvgam = record, waic.mvgam = record)
+  local_mocked_s3_method("loo", "mvgam", record)
+  local_mocked_s3_method("waic", "mvgam", record)
   stub <- structure(list(), class = "mvgam")
   expect_identical(LOO(stub, resp = "y"), "called")
   expect_identical(seen, "resp")

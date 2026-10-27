@@ -1,70 +1,53 @@
-#' Extract group-level (random) effects from a fitted \pkg{mvgam}
-#' model
+#' Group-level (random) effects of a fitted \pkg{mvgam} model
 #'
-#' Pull posterior draws of the group-level (random) effects on a
-#' fitted `mvgam` object and return them in the same shape as
-#' [brms::ranef.brmsfit()] so brms-trained users can drop into the
-#' same workflow. Names follow brms's `r_<group>[<level>, <coef>]`
-#' convention; the underlying positional Stan parameters are
-#' aliased transparently.
+#' Posterior draws of each level's deviation for every group-level term
+#' of the observation formula, summarised or raw. Each element is named
+#' `r_<group>[<level>,<coef>]`, as [variables.mvgam()] lists it.
 #'
 #' @inheritParams predict.mvgam
 #' @param object A fitted `mvgam` object.
-#' @param summary Logical. If `TRUE` (the default), collapse each
-#'   group's posterior draws to a `[n_levels x n_stats x n_coefs]`
-#'   array of summary statistics
-#'   (`Estimate`, `Est.Error`, and the lower / upper quantiles
-#'   defined by `probs`). If `FALSE`, return the raw draws as a
-#'   `[n_draws x n_levels x n_coefs]` array per group.
-#' @param pars Optional character vector. When set, restrict the
-#'   returned coefficients to those whose name matches one of the
-#'   supplied entries (matched against the brms `coef` column).
-#'   `NULL` (the default) keeps every coefficient.
-#' @param groups Optional character vector. When set, restrict the
-#'   returned grouping factors. `NULL` (the default) keeps every
-#'   factor.
+#' @param summary Logical. `TRUE` (the default) summarises each
+#'   coefficient's draws. `FALSE` returns the draws.
+#' @param pars Optional character vector of coefficient names, such as
+#'   `"Intercept"`. `NULL` (the default) keeps every coefficient.
+#' @param groups Optional character vector of grouping factors. `NULL`
+#'   (the default) keeps every factor.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A named list with one entry per grouping factor. Each
-#'   entry is a 3D `array`:
-#'   * `summary = TRUE` (default) - dimensions
-#'     `[n_levels, n_stats, n_coefs]` with dimnames
-#'     `list(levels, c("Estimate", "Est.Error", "Q*", "Q*"), coefs)`.
-#'   * `summary = FALSE` - dimensions
-#'     `[n_draws, n_levels, n_coefs]` with dimnames
-#'     `list(NULL, levels, coefs)` and an `nchains` attribute.
-#'
-#'   When the fit contains no group-level effects an error is
-#'   raised; supply `groups = ...` for cases where only some
-#'   factors are of interest.
+#' @return A named list with one 3D array per grouping factor. With
+#'   `summary = TRUE` the dimensions are levels, statistics and
+#'   coefficients. The statistics are `Estimate`, `Est.Error` and one
+#'   quantile per element of `probs`. With `summary = FALSE` the
+#'   dimensions are draws, levels and coefficients, and the array
+#'   carries an `nchains` attribute. A grouping factor of a
+#'   distributional parameter or of one response of several is keyed
+#'   `<group>__<parameter>`.
 #'
 #' @details
-#' Observation-side group-level effects only. A `(1 | g)` inside
-#' `trend_formula` is named with the `_trend` suffix, as
-#' `r_g_trend[a,Intercept]`, and `as_draws()` returns its draws.
+#' A group-level term in `trend_formula` is named with the `_trend`
+#' suffix, as `r_g_trend[a,Intercept]`. [as_draws.mvgam()] returns its
+#' draws.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [brms::ranef.brmsfit()], [VarCorr.mvgam()],
-#'   [fixef.mvgam()], [variables.mvgam()].
+#' @seealso [VarCorr.mvgam()] summarises the standard deviations and
+#'   correlations. [fixef.mvgam()] summarises the population-level
+#'   effects.
 #'
 #' @examples
 #' \dontrun{
 #' set.seed(14)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 4L,
-#'                      n_timepoints = 120L, trend_model = AR())
+#'                     n_timepoints = 120L, trend_model = AR())
 #' mod <- mvgam(y ~ s(x) + (1 | series),
-#'               trend_formula = ~ AR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = poisson(),
-#'               chains  = 2, silent = 2)
+#'              trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
 #'
-#' # `ranef()` returns a per-group nested list with one matrix per
-#' # level: rows are levels, columns are `Estimate`, `Est.Error`,
-#' # and the 95% credible bounds.
-#' re <- ranef(mod)
-#' str(re, max.level = 2)
-#' re$series[, , "Intercept"]
+#' # Each series' intercept deviation, one row per series
+#' ranef(mod)$series[, , "Intercept"]
+#'
+#' # Next: VarCorr() gives the standard deviation of these deviations
 #' }
 #'
 #' @family posterior summaries
@@ -74,63 +57,45 @@ ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
                          probs = c(0.025, 0.975), pars = NULL,
                          groups = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_logical(summary, len = 1L)
-  checkmate::assert_logical(robust, len = 1L)
+  checkmate::assert_flag(summary)
+  checkmate::assert_flag(robust)
   checkmate::assert_numeric(
     probs, lower = 0, upper = 1, len = 2L, sorted = TRUE
   )
-  if (!is.null(pars)) {
-    checkmate::assert_character(pars, min.len = 1L)
-  }
-  if (!is.null(groups)) {
-    checkmate::assert_character(groups, min.len = 1L)
-  }
+  checkmate::assert_character(pars, min.len = 1L, null.ok = TRUE)
+  checkmate::assert_character(groups, min.len = 1L, null.ok = TRUE)
   rlang::check_dots_empty()
-  meta <- mvgam_ranef_metadata(object)
-  if (is.null(meta)) {
-    stop(insight::format_error(c(
-      paste0(
-        "Cannot extract group-level effects: the observation model ",
-        "of this 'mvgam' object has no random effects."
-      ),
-      i = paste0(
-        "Add group-level terms via '(1 | g)' / '(x | g)' / ",
-        "'gr(g, ...)' on the observation formula."
-      )
-    )))
-  }
+  meta <- require_ranef_metadata(object)
   reframe <- meta$reframe
-  group_levels <- meta$group_levels
-  all_groups <- unique(reframe$group)
   if (!is.null(groups)) {
-    all_groups <- intersect(all_groups, as.character(groups))
-  }
-  if (length(all_groups) == 0L) {
-    return(stats::setNames(list(), character(0L)))
+    unknown <- setdiff(groups, reframe$group)
+    if (length(unknown) > 0L) {
+      stop(insight::format_error(c(
+        "'groups' must name grouping factors of the model.",
+        x = paste0("Unknown: ", paste0("'", unknown, "'", collapse = ", "),
+                   "."),
+        i = paste0("Grouping factors: ",
+                   paste0("'", unique(reframe$group), "'", collapse = ", "),
+                   ".")
+      )), call. = FALSE)
+    }
+    reframe <- reframe[reframe$group %in% groups, , drop = FALSE]
   }
   drws <- extract_mvgam_draws(object)
-  n_chains <- posterior::nchains(drws)
-  # Each (group, predictor) pair is its own entry, keyed as the
-  # aliased draws name it: the bare group on a univariate fit and
+  # Each (group, predictor) pair is its own entry, keyed as the aliased
+  # draws name it: the bare group on a univariate fit and
   # `<group>__<prefix>` otherwise.
-  keys <- unique(reframe$alias_key)
-  if (!is.null(groups)) {
-    keys <- intersect(keys, as.character(groups))
-  }
-  out <- vector("list", length(keys))
-  names(out) <- keys
-  for (k in keys) {
+  out <- list()
+  for (k in unique(reframe$alias_key)) {
     rows <- reframe[reframe$alias_key == k, , drop = FALSE]
     coefs <- as.character(rows$coef)
     if (!is.null(pars)) {
-      coefs <- intersect(coefs, as.character(pars))
+      coefs <- intersect(coefs, pars)
     }
     if (length(coefs) == 0L) next
-    g_bare <- rows$group[1L]
-    levels <- group_levels[[g_bare]]
-    # outer() walks levels (rows) x coefs (cols); as.vector
-    # flattens column-major to match the (level-minor, coef-major)
-    # storage the alias map emits.
+    levels <- meta$group_levels[[rows$group[1L]]]
+    # `outer()` runs over levels within coefficients, the order of the
+    # aliased draws.
     rpars <- as.vector(outer(levels, coefs, function(l, c) {
       sprintf("r_%s[%s,%s]", k, l, c)
     }))
@@ -142,16 +107,32 @@ ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
       dim = c(nrow(mat), length(levels), length(coefs)),
       dimnames = list(NULL, levels, coefs)
     )
-    if (summary) {
-      arr <- brms::posterior_summary(
-        arr, probs = probs, robust = robust
-      )
+    out[[k]] <- if (summary) {
+      brms::posterior_summary(arr, probs = probs, robust = robust)
     } else {
-      attr(arr, "nchains") <- n_chains
+      structure(arr, nchains = posterior::nchains(drws))
     }
-    out[[k]] <- arr
   }
-  out[!vapply(out, is.null, logical(1L))]
+  out
+}
+
+
+#' The group-level metadata of a fit's observation model
+#'
+#' @param object Fitted `mvgam` object
+#' @return The list `mvgam_ranef_metadata()` returns. A fit without
+#'   observation-side group-level effects is refused.
+#' @noRd
+require_ranef_metadata <- function(object) {
+  meta <- mvgam_ranef_metadata(object)
+  if (is.null(meta)) {
+    stop(insight::format_error(c(
+      "The observation model has no group-level (random) effects.",
+      i = paste0("Add a term such as '(1 | g)' or '(x | g)' to the ",
+                 "observation formula.")
+    )), call. = FALSE)
+  }
+  meta
 }
 
 
@@ -160,68 +141,56 @@ ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
 brms::ranef
 
 
-#' Extract variance and correlation components of group-level
-#' (random) effects from a fitted \pkg{mvgam} model
+#' Standard deviations and correlations of group-level effects
 #'
-#' Pull posterior draws of the group-level standard deviations
-#' and (when estimated) correlation / covariance matrices on a
-#' fitted `mvgam` object, returned in the same shape as
-#' [brms::VarCorr.brmsfit()] so brms-trained users can drop into
-#' the same workflow.
+#' Posterior draws of the standard deviation of each group-level term
+#' of the observation formula, with the correlations and covariances of
+#' terms that share a grouping factor.
 #'
 #' @param x A fitted `mvgam` object.
-#' @param sigma Accepted for compatibility with
-#'   [brms::VarCorr.brmsfit()] and unused. [summary.mvgam()] reports
-#'   the observation family's scale. Must be a single non-negative
-#'   number.
-#' @param summary Logical. If `TRUE` (the default), collapse each
-#'   group's posterior draws to summary statistics; if `FALSE`,
-#'   return the raw draws.
-#' @param robust Logical. When `summary = TRUE`, use the median /
-#'   MAD as the centre / spread. Defaults to `FALSE`.
-#' @param probs Numeric vector of length 2 with the quantiles to
-#'   report when `summary = TRUE`.
+#' @param sigma A single non-negative number. It has no effect.
+#'   [summary.mvgam()] reports the observation family's scale.
+#' @param summary Logical. `TRUE` (the default) summarises the draws.
+#'   `FALSE` returns them.
+#' @param robust Logical. `TRUE` summarises with the median and MAD.
+#'   Defaults to `FALSE`.
+#' @param probs Numeric vector of the two quantiles to report.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A named list with one entry per grouping factor. Each
-#'   entry is itself a list with up to three components:
-#'   * `sd` - matrix of standard deviations per coefficient.
-#'     With `summary = TRUE`, dimensions
-#'     `[n_coefs, n_stats]`; with `summary = FALSE`,
-#'     `[n_draws, n_coefs]`.
-#'   * `cor` - correlation matrices per posterior draw. Only
-#'     emitted when the group has two or more coefficients with
-#'     an estimated correlation block. With `summary = TRUE`,
-#'     dimensions `[n_coefs, n_stats, n_coefs]`; with
-#'     `summary = FALSE`, `[n_draws, n_coefs, n_coefs]`.
-#'   * `cov` - covariance matrices per posterior draw with the
-#'     same dimensions as `cor`.
+#' @return A named list with one entry per grouping factor. Each entry
+#'   is a list of these components:
+#'   * `sd`: the standard deviation of each coefficient, a matrix of
+#'     coefficients by statistics, or of draws by coefficients under
+#'     `summary = FALSE`.
+#'   * `cor`: correlation matrices, present when the factor carries two
+#'     or more correlated coefficients. The array runs over
+#'     coefficients, statistics and coefficients, or over draws and two
+#'     coefficient axes under `summary = FALSE`.
+#'   * `cov`: covariance matrices, shaped as `cor`.
 #'
 #' @details
-#' Observation-side group-level effects only. A trend-side
-#' component is named with the `_trend` suffix, as
-#' `sd_g__Intercept_trend`, and `as_draws()` returns its draws.
+#' A trend-side component is named with the `_trend` suffix, as
+#' `sd_g__Intercept_trend`. [as_draws.mvgam()] returns its draws.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [brms::VarCorr.brmsfit()], [ranef.mvgam()],
-#'   [fixef.mvgam()].
+#' @seealso [ranef.mvgam()] gives each level's deviation.
+#'   [fixef.mvgam()] summarises the population-level effects.
 #'
 #' @examples
 #' \dontrun{
 #' set.seed(14)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 4L,
-#'                      n_timepoints = 120L, trend_model = AR())
+#'                     n_timepoints = 120L, trend_model = AR())
 #' mod <- mvgam(y ~ s(x) + (1 | series),
-#'               trend_formula = ~ AR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = poisson(),
-#'               chains  = 2, silent = 2)
+#'              trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
 #'
-#' # The standard deviation of the series intercepts. A grouping
-#' # with several effects adds their correlations under `cor`.
-#' # `ranef()` gives each level's own estimate.
+#' # The standard deviation of the series intercepts
 #' VarCorr(mod)$series$sd
+#'
+#' # Next: ranef() gives each series' own deviation
 #' }
 #'
 #' @family posterior summaries
@@ -232,25 +201,13 @@ VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,
                            ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_number(sigma, lower = 0)
-  checkmate::assert_logical(summary, len = 1L)
-  checkmate::assert_logical(robust, len = 1L)
+  checkmate::assert_flag(summary)
+  checkmate::assert_flag(robust)
   checkmate::assert_numeric(
     probs, lower = 0, upper = 1, len = 2L, sorted = TRUE
   )
   rlang::check_dots_empty()
-  meta <- mvgam_ranef_metadata(x)
-  if (is.null(meta)) {
-    stop(insight::format_error(c(
-      paste0(
-        "Cannot extract variance components: this 'mvgam' object ",
-        "has no observation-side random effects."
-      ),
-      i = paste0(
-        "Add group-level terms via '(1 | g)' / '(x | g)' / ",
-        "'gr(g, ...)' on the observation formula."
-      )
-    )))
-  }
+  meta <- require_ranef_metadata(x)
   reframe <- meta$reframe
   drws <- extract_mvgam_draws(x)
   keys <- unique(reframe$alias_key)

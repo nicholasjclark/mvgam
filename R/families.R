@@ -1,190 +1,98 @@
-# Custom observation families for mvgam.
-#
-# This file registers families that are not built in to brms. Each
-# constructor returns a `brms::custom_family()` object with the
-# mvgam-side stanvars (function block + any data inputs) attached
-# in `attr(family, "mvgam_stanvars")`. `attach_family_stanvars()`
-# in `R/make_stan.R` merges them into the brms call automatically,
-# so users can just write `mvgam(... family = tweedie())`.
-#
-# The Tweedie Stan function block is adapted from the
-# brms::custom_family definition packaged by the Australian
-# Institute of Marine Science at
-# https://github.com/open-AIMS/tweedie (MIT-licensed). The
-# underlying compound Poisson-gamma decomposition is due to
-# Spinkney on the Stan Forums:
-# https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636
-# Both sources are cited in the user-facing roxygen for
-# tweedie().
-#
-# R-side log_lik and posterior_predict both use mgcv (already a
-# hard mvgam dependency) for the Tweedie density and random
-# number routines. `mgcv::ldTweedie()` returns log densities
-# directly, avoiding the underflow-then-floor pattern that a
-# `log(dtweedie(...))` two-step would introduce into LOO/WAIC.
+# Custom observation families for mvgam, beyond those brms builds. Each
+# constructor returns a `brms::custom_family()` with its Stan code in
+# `attr(family, "mvgam_stanvars")`. `attach_family_stanvars()` in
+# `R/make_stan.R` adds that code to the model.
 
 #' Tweedie compound Poisson-gamma family for mvgam
 #'
-#' Tweedie distribution with power parameter `theta` in the open
-#' interval `(1, 2)`, a.k.a. the compound Poisson-gamma. Models
-#' continuous-positive data with an exact mass at zero (e.g.
-#' CPUE, rainfall, claim totals). The count of "events" is Poisson.
-#' Each event contributes a Gamma-distributed amount. `theta = 1` is the
-#' scaled Poisson boundary. `theta = 2` is the Gamma boundary. Both
-#' endpoints are numerically unstable under the compound decomposition.
-#' Division by `2 - theta` diverges. The Gamma shape
-#' `m * (2 - theta) / (theta - 1)` over- or underflows. mvgam restricts
-#' `theta` to `[1.001, 1.999]` for this reason. Values inside that
-#' interval give the continuous case with a point mass at zero.
+#' The Tweedie distribution with power `mtheta` between 1 and 2, the
+#' compound Poisson-gamma. It models non-negative continuous data with
+#' a point mass at zero, such as catch per unit effort, rainfall or
+#' biomass. A Poisson number of events each contributes a Gamma amount.
+#' The variance is `mphi * mu^mtheta`.
 #'
-#' Parameterised with three distributional parameters:
+#' The family has three distributional parameters:
 #' \describe{
-#'   \item{`mu`}{positive mean (log link, fixed; see below)}
-#'   \item{`mphi`}{positive dispersion (log link, lower bound
-#'     `1e-8`)}
-#'   \item{`mtheta`}{power parameter (identity link, bounded
-#'     `[1.001, 1.999]`)}
+#'   \item{`mu`}{The mean, on a fixed log link. The compound
+#'     construction needs `mu > 0`, which an identity link driven by a
+#'     latent trend cannot guarantee.}
+#'   \item{`mphi`}{The dispersion, on a log link.}
+#'   \item{`mtheta`}{The power, bounded to `[1.001, 1.999]`. Near 1 the
+#'     Poisson rate `mu^(2 - mtheta) / ((2 - mtheta) mphi)` and near 2
+#'     the Gamma shape `(2 - mtheta) / (mtheta - 1)` leave floating-point
+#'     range.}
 #' }
 #'
-#' The log link on `mu` is fixed. The compound Poisson-gamma
-#' construction requires `mu > 0`. Identity and inverse links cannot
-#' enforce that when the linear predictor is driven by a latent
-#' stochastic trend.
+#' The latent trend enters through `mu`. `mphi` and `mtheta` are
+#' scalars by default. A formula such as `bf(y ~ x, mphi ~ site)` gives
+#' the dispersion its own linear predictor on the log scale, whose
+#' intercept takes a `student_t(3, 0, 2.5)` prior. `mtheta` takes no
+#' formula.
 #'
-#' By default, `mu` is the dpar that depends on the linear predictor.
-#' Through `mu`, the latent state-space trend in mvgam enters the
-#' likelihood. The dispersion `mphi` and power `mtheta` are estimated
-#' as global scalars shared across all observations. Write a `brms::bf()`
-#' formula with `mphi ~ covs` to give the dispersion its own
-#' per-observation linear predictor on the log scale. Its
-#' intercept takes `student_t(3, 0, 2.5)` by default. `mtheta`
-#' must stay in `(1, 2)` and takes no sub-formula. For
-#' example,
+#' `mu`, `mphi` and `mtheta` trade off along `Var[Y] = mphi * mu^mtheta`.
+#' Data that weakly separate Poisson-like from Gamma-like tails leave a
+#' ridge in their joint posterior. An informative prior such as
+#' `prior(normal(1.5, 0.3), class = mtheta)` resolves it.
 #'
-#' ```r
-#' mvgam(bf(y ~ x, mphi ~ site), family = tweedie(), ...)
-#' ```
+#' The Stan log density sums `M` terms of the compound series for each
+#' non-zero observation (Dunn and Smyth 2005). The terms past `M` are
+#' negligible when `M` is well above the Poisson rate `lambda`, which
+#' grows as `mtheta` approaches 2 or `mphi` approaches 0. Raise `M` when
+#' [check_tweedie_truncation()] reports a rate near it. `log_lik()` and
+#' `posterior_predict()` use `mgcv::ldTweedie()` and `mgcv::rTweedie()`.
 #'
-#' fits a Tweedie with site-varying dispersion. brms generates
-#' the `b_mphi_Intercept` and `b_mphi_*` parameters and their
-#' design matrix. The Tweedie Stan lpdf has scalar and vector signatures
-#' for both cases. If the data show clear heteroscedasticity (e.g.
-#' seasonal claim severity), prefer letting `mphi` vary via a
-#' sub-formula over the global default (Burkner 2018, brms
-#' distributional regression vignette).
+#' The Stan code adapts the `custom_family` of the Australian Institute
+#' of Marine Science (2023), which uses the decomposition of Spinkney
+#' (2020).
 #'
-#' The Stan likelihood is the compound Poisson-gamma
-#' decomposition of Spinkney (Stan Forums,
-#' \url{https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636}).
-#' The mvgam implementation is adapted from the
-#' \pkg{brms::custom_family} definition packaged by the
-#' Australian Institute of Marine Science at
-#' \url{https://github.com/open-AIMS/tweedie}, with attribution
-#' to those authors for the Stan function block and the choice of the
-#' `mu` / `mphi` / `mtheta` parameterisation. Attribution also covers
-#' the default series-truncation count. Each non-zero observation
-#' contributes a `log_sum_exp` over `M` Poisson-gamma mixture
-#' components. The truncation `M` covers the Poisson rate
-#' `lambda = mu^(2 - theta) / ((2 - theta) * phi)`. The tail mass at
-#' `m > M` decays geometrically when `M` is large relative to `lambda`.
-#' Otherwise it decays slowly. The default `M = 30` is adequate when the
-#' implied `max(lambda)` across non-zero observations stays well below
-#' `M`. `lambda` grows quickly as `theta` approaches 2 (the
-#' `1 / (2 - theta)` factor) and as `phi` approaches 0. For fits where
-#' `mtheta` is sampled near the upper boundary, raise `M` (e.g.
-#' `tweedie(M = 100L)`). Re-fit if posterior predictive checks show
-#' systematic undershoot in the non-zero tail. The Dunn & Smyth (2005)
-#' convergence analysis discusses truncation bounds. See also the runtime
-#' advisory printed by `check_tweedie_truncation()`.
+#' @param M Positive integer number of series terms in the Stan log
+#'   density. Defaults to `30L`. The cost grows linearly in `M`. Too
+#'   small a value biases the likelihood down and the posteriors of
+#'   `mphi` and `mtheta` with it.
 #'
-#' Identifiability under a latent trend. Because `mu_t` is a
-#' stochastic latent process, the joint `(mu_t, mphi, mtheta)`
-#' posterior can have a ridge along the marginal-variance
-#' relation `Var[Y] = phi * mu^theta`. If the data do not strongly
-#' distinguish Poisson-like from Gamma-like tail behaviour, place an
-#' informative prior on `mtheta`. A reasonable default is
-#' `prior(normal(1.5, 0.3), class = mtheta)`. Inspect
-#' `pairs(fit, variable = c("mphi", "mtheta"))` for funnel geometry.
-#'
-#' R-side likelihood evaluation (`log_lik()`) and posterior
-#' predictive draws (`posterior_predict()`) use \pkg{mgcv}
-#' (already an mvgam dependency). `mgcv::ldTweedie()` returns log
-#' densities directly. LOO-IC and WAIC then avoid the
-#' underflow-then-floor pattern that a `log(dtweedie(...))` two-step
-#' introduces.
-#'
-#' @param M Positive integer; truncation of the Poisson-gamma
-#'   mixture series in the Stan log-density. Default `30L`.
-#'   Larger values cost linearly more compute per non-zero
-#'   observation; values below the practical tail mass produce
-#'   downward-biased likelihoods, which translate to bias in
-#'   `(mphi, mtheta)` posteriors. Use
-#'   `check_tweedie_truncation()` after a fit to verify.
-#'
-#' @return A `brms::customfamily` object with mvgam-side
-#'   stanvars attached as `attr(., "mvgam_stanvars")`. Pass
-#'   directly to `mvgam(family = ...)`; no manual stanvars
-#'   wiring is required.
+#' @return A `brms::customfamily` object for `mvgam(family = )`.
 #'
 #' @references
-#' Australian Institute of Marine Science (AIMS) (2023).
-#'   `open-AIMS/tweedie`: a brms `custom_family` implementation
-#'   of the Tweedie compound Poisson-gamma distribution. GitHub,
+#' Australian Institute of Marine Science (2023). `open-AIMS/tweedie`: a
+#'   brms `custom_family` implementation of the Tweedie compound
+#'   Poisson-gamma distribution. GitHub,
 #'   \url{https://github.com/open-AIMS/tweedie}. MIT licence.
-#'   The Stan function block and the `mu` / `mphi` / `mtheta`
-#'   parameterisation in this file are adapted from that
-#'   project.
 #'
-#' Spinkney (2020). Tweedie likelihood (compound Poisson-gamma)
-#'   in Stan. Stan Discourse,
+#' Spinkney (2020). Tweedie likelihood (compound Poisson-gamma) in Stan.
+#'   Stan Discourse,
 #'   \url{https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636}
-#'   Source of the compound Poisson-gamma decomposition that
-#'   underlies both
-#'   the AIMS implementation and the Stan code shipped here.
 #'
 #' Dunn, P. K., & Smyth, G. K. (2005). Series evaluation of
 #'   Tweedie exponential dispersion model densities.
 #'   *Statistics and Computing*, 15(4), 267-280.
-#'   \doi{10.1007/s11222-005-4070-y}. Convergence analysis of
-#'   the series truncation `M` used here.
-#'
-#' Dunn, P. K., & Smyth, G. K. (2008). Evaluation of Tweedie
-#'   exponential dispersion model densities by Fourier inversion.
-#'   *Statistics and Computing*, 18(1), 73-86.
-#'   \doi{10.1007/s11222-007-9039-6}.
+#'   \doi{10.1007/s11222-005-4070-y}
 #'
 #' Jorgensen, B. (1987). Exponential dispersion models.
 #'   *Journal of the Royal Statistical Society: Series B*, 49(2),
 #'   127-162. \doi{10.1111/j.2517-6161.1987.tb01685.x}
 #'
-#' Burkner, P.-C. (2018). Advanced Bayesian multilevel modeling
-#'   with the R package brms. *The R Journal*, 10(1), 395-411.
-#'   \doi{10.32614/RJ-2018-017}
-#'
 #' @examples
 #' \dontrun{
-#' # Tweedie generates non-negative continuous observations with a
-#' # point mass at zero. The dpars are `mphi` (dispersion) and
-#' # `mtheta` (power exponent on the open interval (1, 2)).
 #' set.seed(3)
 #' simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
-#'
+#'                     n_timepoints = 120L, trend_model = AR())
 #' mod <- mvgam(
-#'   y ~ 1,
+#'   y ~ s(x),
 #'   trend_formula = ~ AR(p = 1),
 #'   data          = simdat$data_train,
 #'   family        = tweedie(),
 #'   chains        = 2,
 #'   silent        = 2
 #' )
-#' summary(mod)
 #'
-#' # The dispersion and power parameters
+#' # The dispersion and power
 #' mcmc_plot(mod, variable = c("mphi", "mtheta"), type = "areas")
 #'
-#' # A covariate on the dispersion, on the log scale, takes the
-#' # formula `bf(y ~ 1, mphi ~ x)`
+#' # The share of zeros the model predicts against the share observed
+#' prop_zero <- function(y) mean(y == 0)
+#' pp_check(mod, type = "stat", stat = "prop_zero", binwidth = 0.02)
+#'
+#' # Next: check_tweedie_truncation(mod) checks the series length M
 #' }
 #'
 #' @family observation families
@@ -204,22 +112,12 @@ tweedie <- function(M = 30L) {
     loop = FALSE,
     vars = "M"
   )
-  # brms::custom_family() does not attach the standard
-  # `linkinv` / `linkfun` slots that base R's family objects
-  # carry; mvgam's downstream `compute_family_epred()` and
-  # other dispatchers expect them. Attach them now from the
-  # primary `link` so `family$linkinv(linpred)` works without
-  # a brms-internal lookup.
+  # The inverse link the prediction code applies to `mu`
   link_info <- stats::make.link(fam$link)
   fam$linkinv <- link_info$linkinv
   fam$linkfun <- link_info$linkfun
-  # brms keeps `family$family = "custom"` for any customfamily
-  # and stores the user-visible name in `family$name`. We do not
-  # overwrite `family$family` here because brms internals look
-  # up `.family_custom` to drive its dispatch and breaking that
-  # crashes the standata step. mvgam's dispatchers use
-  # `resolve_family_name()` (see below) to pick the right
-  # string instead.
+  # `family$family` stays "custom", which brms dispatches on.
+  # `resolve_family_name()` returns "tweedie".
   attr(fam, "mvgam_stanvars") <- make_tweedie_stanvars(M)
   fam
 }
@@ -242,11 +140,8 @@ resolve_family_name <- function(family) {
         !is.null(family$name) && nzchar(family$name)) {
     return(family$name)
   }
-  # stats::Gamma() reports family$family = "Gamma" with the capital
-  # initial, but brms normalises to lowercase internally and every
-  # mvgam dispatcher (log_lik_*, posterior_predict family switch)
-  # is keyed on the lowercase "gamma". Align here so the dispatchers
-  # find the right branch regardless of how the user spells the call.
+  # `stats::Gamma()` names itself "Gamma". Every dispatcher keys on
+  # "gamma".
   fam <- family$family
   if (identical(fam, "Gamma")) fam <- "gamma"
   fam
@@ -371,12 +266,7 @@ make_tweedie_stanvars <- function(M) {
     scode = tweedie_stan_funs(),
     block = "functions"
   ) +
-    brms::stanvar(
-      x = M,
-      name = "M",
-      scode = "int<lower=1> M;",
-      block = "data"
-    )
+    data_stanvar(M, "M", "int<lower=1>")
 }
 
 #' Stan code for the Tweedie function-block helpers
@@ -390,7 +280,7 @@ make_tweedie_stanvars <- function(M) {
 #' and Gamma (`theta = 2`) boundaries.
 #' @noRd
 tweedie_stan_funs <- function() {
-  paste(
+  paste(c(
     "  int num_non_zero_fun(vector y) {",
     "    int A = 0;",
     "    int N = num_elements(y);",
@@ -483,30 +373,13 @@ tweedie_stan_funs <- function() {
     "    }",
     "    return lp;",
     "  }",
-    "",
-    "  // Overloaded scalar entry points broadcast and dispatch.",
-    "  real tweedie_lpdf(vector y, vector mu, real mphi,",
-    "                    real mtheta, int M) {",
-    "    int N = num_elements(y);",
-    "    return tweedie_lpdf(y | mu, rep_vector(mphi, N),",
-    "                        rep_vector(mtheta, N), M);",
-    "  }",
-    "",
-    "  real tweedie_lpdf(vector y, vector mu, vector mphi,",
-    "                    real mtheta, int M) {",
-    "    int N = num_elements(y);",
-    "    return tweedie_lpdf(y | mu, mphi,",
-    "                        rep_vector(mtheta, N), M);",
-    "  }",
-    "",
-    "  real tweedie_lpdf(vector y, vector mu, real mphi,",
-    "                    vector mtheta, int M) {",
-    "    int N = num_elements(y);",
-    "    return tweedie_lpdf(y | mu, rep_vector(mphi, N),",
-    "                        mtheta, M);",
-    "  }",
-    sep = "\n"
-  )
+    broadcast_overloads(
+      "tweedie", "lpdf",
+      c(y = "vector", mu = "vector", mphi = "vector", mtheta = "vector",
+        M = "int"),
+      c("mphi", "mtheta")
+    )
+  ), collapse = "\n")
 }
 
 #' Diagnose whether the Tweedie series-truncation `M` is adequate
@@ -545,7 +418,7 @@ check_tweedie_truncation <- function(object, resp = NULL) {
   if (length(tweedie_resps) == 0L) {
     stop(insight::format_error(
       "'check_tweedie_truncation()' needs a response with family tweedie()."
-    ))
+    ), call. = FALSE)
   }
   # `M` is Stan data, taken from the stored Stan data.
   M <- object$standata$M
@@ -805,7 +678,7 @@ make_beta_nb_stanvars <- function() {
 beta_nb_stan_funs <- function() {
   paste(
     "  real beta_nb_lpmf(int y, real mu, real shape, real mtail) {",
-    "    // mtail = alpha - 1, so beta = mu * mtail / shape gives E[Y] = mu",
+    "    // With mtail = alpha - 1, beta = mu * mtail / shape gives E[Y] = mu",
     "    real alpha = 1 + mtail;",
     "    real beta = mu * mtail / shape;",
     "    return lgamma(y + shape) - lgamma(y + 1) - lgamma(shape)",
@@ -1054,6 +927,32 @@ default_com_binomial_population_priors <- function() {
 }
 
 
+#' Default priors on a detection family's `p`
+#'
+#' A logit-link `p` is a probability. As a scalar it takes the uniform
+#' `beta(1, 1)`. With a formula its intercept takes `normal(0, 1.5)`,
+#' which puts most of its mass between 0.05 and 0.95. The log-link `p`
+#' of `nmix("poisson_poisson")` is an encounter rate per individual per
+#' visit. As a scalar it takes `lognormal(0, 1)`. With a formula its
+#' intercept takes `std_normal()`. Either form puts most of the rate
+#' between 0.14 and 7.4.
+#'
+#' @param family A family object
+#' @return A named character vector holding the `scalar` and
+#'   `intercept` laws, or `NULL` for a family without detection
+#' @noRd
+detection_prior_laws <- function(family) {
+  if (!is_closure_unit_family(family)) {
+    return(NULL)
+  }
+  if (identical(family$link_p, "log")) {
+    c(scalar = "lognormal(0, 1)", intercept = "std_normal()")
+  } else {
+    c(scalar = "beta(1, 1)", intercept = "normal(0, 1.5)")
+  }
+}
+
+
 #' Merge mvgam's default priors with the user's
 #'
 #' mvgam injects class-level defaults for parameters whose brms
@@ -1144,8 +1043,9 @@ modelled_dpars <- function(formula, family) {
 #' brms gives the intercept of a modelled dpar `student_t(3, 0, 2.5)`
 #' on its link scale for its own families. A custom family's intercept
 #' gets no prior at all. Every modelled dpar of a custom family without a
-#' carried-over default gets the brms intercept default. A user prior
-#' on `class = "Intercept", dpar = <name>` replaces either.
+#' carried-over default gets the brms intercept default. A detection
+#' family's `p` takes the intercept law of `detection_prior_laws()`. A
+#' user prior on `class = "Intercept", dpar = <name>` replaces either.
 #'
 #' @param prior A `brmsprior` of injected defaults, or `NULL`
 #' @param formula The observation formula, possibly a `brmsformula`
@@ -1178,7 +1078,8 @@ adjust_modelled_dpar_priors <- function(prior, formula, family) {
     covered <- if (is.null(prior)) character(0) else
       prior$dpar[prior$class == "Intercept"]
     for (dp in setdiff(modelled, covered)) {
-      row <- brms::prior_string("student_t(3, 0, 2.5)",
+      law <- if (dp == "p") detection_prior_laws(family)[["intercept"]]
+      row <- brms::prior_string(law %||% "student_t(3, 0, 2.5)",
                                 class = "Intercept", dpar = dp)
       prior <- if (is.null(prior)) row else c(prior, row)
     }
@@ -1195,7 +1096,9 @@ adjust_modelled_dpar_priors <- function(prior, formula, family) {
 #' negative; `shape` and `mtail` for `beta_nb()` inherit a
 #' negative binomial default that concentrates mass where the
 #' Beta mixing scale diverges; the simplex families' shared
-#' population effects carry no likelihood information.
+#' population effects carry no likelihood information. A detection
+#' family's `p` would take a flat prior, which is improper for the
+#' unbounded encounter rate of `nmix("poisson_poisson")`.
 #'
 #' Stan code generation injects these before user priors. `get_prior()`
 #' reports them. Both resolve one definition and cannot drift apart.
@@ -1211,6 +1114,9 @@ family_default_priors <- function(family) {
     default_com_binomial_population_priors()
   } else if (is_beta_nb_family(family)) {
     default_beta_nb_population_priors()
+  } else if (!is.null(detection_prior_laws(family))) {
+    brms::prior_string(detection_prior_laws(family)[["scalar"]],
+                       class = "p")
   } else {
     NULL
   }
@@ -1307,18 +1213,18 @@ com_binomial_stan_funs <- function() {
     "       sum_{j=0..T} C(T, j)^nu * p^j * (1-p)^(T-j).",
     "     mu = logit(p); nu identity-link. nu = 1 recovers the binomial.",
     "     Writing theta = log(p) - log(1-p) and expanding C(T, j) into",
-    "     log factorials leaves lw(j) below; everything dropped is",
-    "     common to the numerator and to every term of Z, so it",
-    "     cancels in the ratio.",
+    "     log factorials leaves lw(j) below. Every dropped term is",
+    "     common to the numerator and to every term of Z. It cancels",
+    "     in the ratio.",
     "  */",
     "  real com_binomial_lw(int j, int T, real nu, real theta,",
     "                       data vector lfact) {",
     "    return theta * j - nu * (lfact[j + 1] + lfact[T - j + 1]);",
     "  }",
-    "  /* Largest integer in [0, T] not exceeding the continuous mode",
-    "     (T + 1) * inv_logit(theta / nu), by binary search: Stan has",
-    "     no real-to-int cast, and the argument depends on parameters",
-    "     so it cannot be computed in transformed data. */",
+    "  /* Largest integer in [0, T] at or below the continuous mode",
+    "     (T + 1) * inv_logit(theta / nu), found by binary search.",
+    "     Stan lacks a real-to-int cast. The mode depends on",
+    "     parameters, which keeps it out of transformed data. */",
     "  int com_binomial_mode(int T, real nu, real theta) {",
     "    real jr = (T + 1) * inv_logit(theta / nu);",
     "    int lo = 0;",
@@ -1348,16 +1254,16 @@ com_binomial_stan_funs <- function() {
     "    }",
     "    real theta = log(mu) - log1m(mu);",
     "    /* Relative tolerance on the omitted mass. Each branch below",
-    "       bounds the whole omitted sum, not merely the next term. */",
+    "       bounds the whole omitted sum, beyond the next term. */",
     "    real leps = log(1e-12);",
     "    real mx;",
     "    real s;",
     "    real f;",
     "    if (nu > 0) {",
-    "      /* lw is concave in j, so it has a single mode and its terms",
-    "         fall away monotonically on either side. Stopping at j",
-    "         therefore leaves at most (remaining count) * exp(lw(j)),",
-    "         and the tolerance is split between the two directions. */",
+    "      /* lw is concave in j. Its terms rise to a single mode and",
+    "         fall monotonically after it. Stopping at j leaves",
+    "         at most (remaining count) * exp(lw(j)). The tolerance is",
+    "         split between the two directions. */",
     "      real lhalf = leps - log(2);",
     "      int j0 = com_binomial_mode(T, nu, theta);",
     "      mx = com_binomial_lw(j0, T, nu, theta, lfact);",
@@ -1387,11 +1293,11 @@ com_binomial_stan_funs <- function() {
     "        }",
     "      }",
     "    } else {",
-    "      /* lw is convex in j (linear at nu = 0), so its maxima are",
-    "         the two endpoints. Whatever interval [L, R] is left",
-    "         unsummed is bounded by (R - L + 1) * exp(max(lw(L),",
-    "         lw(R))), so the two ends are consumed inward until that",
-    "         bound falls below tolerance. */",
+    "      /* lw is convex in j (linear at nu = 0). Its maxima are the",
+    "         two endpoints. An unsummed interval [L, R] is bounded by",
+    "         (R - L + 1) * exp(max(lw(L), lw(R))). The sum takes terms",
+    "         from both ends inward until that bound falls below",
+    "         tolerance. */",
     "      real f0 = com_binomial_lw(0, T, nu, theta, lfact);",
     "      real fT = com_binomial_lw(T, T, nu, theta, lfact);",
     "      int L = 1;",
@@ -1427,51 +1333,36 @@ com_binomial_stan_funs <- function() {
 
 
 # ============================================================
-# Closure-unit family helpers (nmix, occ, royle_nichols, ...)
+# Closure-unit family helpers
 # ============================================================
-# Every family in this group shares the same wire format: one
-# row per visit in the user's data; the (series, time) pair
-# identifies a closure unit; replicate rows are visits. The Stan
-# lpdf operates per closure unit, marginalising the discrete
-# latent state (abundance N for nmix, occupancy Z for occ). All
-# closure-unit families flow through four primitives:
+# A closure-unit family takes one row per visit. The rows sharing a
+# unit key are the visits to one unit. Its Stan density works per
+# unit. A detection family (`nmix()` and its variants, `occ()`)
+# marginalises the latent state of the unit. A multi-response family
+# (`diri()`, `multi()`, `categ()`, `mvn()`, `mvt()`) scores the unit's
+# rows as the components of one observation. Each family passes
+# through four steps:
 #
-#   1. `uses_closure_unit_layout()`: the predicate that downstream code
-#      checks to skip duplicate-time validation and to route prediction
-#      types.
-#   2. `build_closure_unit_arrays()`: long-format data to unit
-#      arrays (N_unit, n_rep, K_max, Y_max, visit_idx,
-#      visit_row, row_unit). Called
-#      both at fit time and at predict time with newdata so the
-#      cap column can vary per-call.
-#   3. `validate_closure_unit_data()`: cap column, integer
-#      counts, per-unit `cap >= max(y)`, identifiability
-#      warnings.
-#   4. Family-specific `make_*_stanvars(arrays, ...)`: Stan
-#      function block + per-family data block; emitted at fit
-#      time once the unit arrays are known.
+#   1. `uses_closure_unit_layout()` routes the family to this layout.
+#   2. `validate_closure_unit_data()` checks a detection family's
+#      response, cap and design.
+#   3. `build_closure_unit_arrays()` builds the unit arrays, at fit
+#      time and again for each prediction frame.
+#   4. The family's `make_*_stanvars()` writes its Stan functions and
+#      data from those arrays.
 #
-# `occ()`, `nmix("royle_nichols")` and `nmix("poisson_poisson")`
-# reuse all four primitives; only step 4 changes per family.
-#
-# Cap tracking. The per-unit upper truncation `K_max[g]` is
-# always taken from the `cap` column of the input data. At fit time it
-# is stored in standata as `K_max` and shapes the Stan marginalisation
-# loop. At prediction time, `newdata` must also carry a `cap` column.
-# predict.mvgam re-runs `build_closure_unit_arrays()` on the new data.
-# Users can request predictions under different upper truncations by
-# passing newdata with different cap values. Predictions at the fit-time
-# data reuse the stored K_max.
+# `K_max[g]` bounds the latent count of unit g. A `cap` column sets it
+# when the frame has one. The family's default sets it otherwise. A
+# prediction frame may carry its own `cap`.
 
 #' Detect whether a family uses the closure-unit data layout
 #'
-#' TRUE for the seven families whose data arrives one row per visit
-#' with a unit key: `occ()` and `nmix()` with its variants. The
-#' multi-response families `mvn()`, `mvt()`, `diri()`, `multi()` and
-#' `categ()` also have one. The value comes from the `mvgam_closure_unit`
-#' attribute that each constructor attaches. The data layout alone does
-#' not establish a detection process. `is_closure_unit_family()` tests
-#' for one.
+#' TRUE for the detection families: `occ()` and `nmix()` with its
+#' variants. TRUE also for the multi-response families `mvn()`,
+#' `mvt()`, `diri()`, `multi()` and `categ()`. The value comes from the
+#' `mvgam_closure_unit` attribute that each constructor attaches. The
+#' data layout alone does not establish a detection process.
+#' `is_closure_unit_family()` tests for one.
 #'
 #' @param family A family / brmsfamily / customfamily object.
 #' @return TRUE or FALSE.
@@ -1481,19 +1372,12 @@ uses_closure_unit_layout <- function(family) {
   isTRUE(attr(family, "mvgam_closure_unit", exact = TRUE))
 }
 
-#' Detect whether a family wires a multi-response per-unit lpdf
+#' Whether a family's density is joint over the rows of a unit
 #'
-#' Returns TRUE if the family is one of the multivariate-response
-#' families that aggregate K species rows per closure unit
-#' (`diri`, `mvgam_multinomial`, `mvgam_categorical`,
-#' `mvgam_mvnormal`, `mvgam_mvt`). Detected via the
-#' `mvgam_multi_response` attribute attached by each family
-#' constructor. These families use the closure-unit data prep pipeline
-#' (site = closure unit, K species rows per unit). They replace the
-#' per-row likelihood call with a per-unit K-vector
-#' multivariate likelihood (Stan's native `dirichlet_logit_lpdf`,
-#' `multinomial_logit_lpmf`, `categorical_logit_lpmf`,
-#' `multi_normal_cholesky_lpdf`, `multi_student_t_lpdf`).
+#' [diri()], [multi()], [categ()], [mvn()] and [mvt()] carry the
+#' `mvgam_multi_response` attribute. A unit's rows are the components
+#' of one observation. The family's Stan density scores them
+#' together.
 #'
 #' @param family A family / brmsfamily / customfamily object.
 #' @return TRUE or FALSE.
@@ -1542,20 +1426,13 @@ models_latent_count <- function(family) {
     startsWith(resolve_family_name(family) %||% "", "nmix")
 }
 
-#' Detect whether a multi-response family uses the softmax-based
-#' simplex likelihood. That likelihood needs the sum-to-zero soft
-#' constraint on each column of Z. The constraint removes the shift
-#' indeterminacy that softmax leaves unidentified.
+#' Whether a multi-response family takes its probabilities from a
+#' softmax
 #'
-#' Returns TRUE for `diri`, `mvgam_multinomial` and `mvgam_categorical`.
-#' Returns FALSE for `mvgam_mvnormal` and `mvgam_mvt`. Multivariate normal
-#' lpdfs are sensitive to absolute mu levels. The column-sum constraint is
-#' unnecessary for them and is over-restrictive.
-#'
-#' Detected via the `mvgam_simplex_response` attribute attached by the
-#' three simplex family constructors. The attribute is separate from
-#' `mvgam_multi_response`. MV-normal and MV-T can then use the
-#' multi-response wire format without the identification constraint.
+#' TRUE for [diri()], [multi()] and [categ()]. Their loadings columns
+#' sum to zero, which removes the shift a softmax leaves unidentified.
+#' [mvn()] and [mvt()] identify the level of `mu` and take no such
+#' constraint.
 #'
 #' @param family A family / brmsfamily / customfamily object.
 #' @return TRUE or FALSE.
@@ -1795,29 +1672,22 @@ default_simplex_population_priors <- function() {
   )
 }
 
-#' Default per-unit upper truncation for a closure-unit family
+#' The cap a closure-unit family gives a unit without a `cap` column
 #'
-#' Takes the value from the `mvgam_default_cap` family attribute. Returns
-#' the integer default (e.g. `1L` for `occ()`, whose latent state is
-#' binary) or `NULL` when the family requires the user to supply a `cap`
-#' column. That applies to `nmix("poisson_binomial")`,
-#' `nmix("royle_nichols")` and `nmix("poisson_poisson")`, whose latent
-#' abundance can exceed one.
+#' `occ()` caps every unit at 1, as its state is binary.
+#' `nmix("royle_nichols")` caps it at 25, as its binary detections give
+#' no per-unit floor. The other `nmix()` variants take a buffer of 100
+#' above each unit's largest count.
 #'
-#' The `mvgam_default_cap` attribute is distinct from
-#' `mvgam_binary_response`: the latter only controls the `y in
-#' {0, 1}` validation check. `nmix("royle_nichols")` sets the
-#' response indicator for binary detection input. It leaves the default cap
-#' unset. The bound on its latent `N` is the user-supplied `cap`.
-#'
-#' @param family A family / brmsfamily / customfamily object.
-#' @return Integer scalar default cap, or `NULL`.
+#' @param family A family object, or NULL
+#' @param buffer Logical. `TRUE` returns the buffer, `FALSE` the fixed
+#'   cap.
+#' @return An integer, or `NULL` when the family sets none
 #' @noRd
-closure_unit_default_cap <- function(family) {
-  if (is.null(family)) return(NULL)
-  default_cap <- attr(family, "mvgam_default_cap", exact = TRUE)
-  if (is.null(default_cap)) return(NULL)
-  as.integer(default_cap)
+closure_unit_default_cap <- function(family, buffer = FALSE) {
+  checkmate::assert_flag(buffer)
+  attr(family, if (buffer) "mvgam_default_cap_buffer" else
+    "mvgam_default_cap", exact = TRUE)
 }
 
 #' Closure-unit grouping vars of a family
@@ -1912,26 +1782,6 @@ fit_closure_unit_keys <- function(object) {
   closure_unit_key_vars(object$family, vars$series_var, vars$time_var)
 }
 
-
-#' Per-unit K_max buffer for count closure-unit families
-#'
-#' Takes the value from the `mvgam_default_cap_buffer` family attribute.
-#' When set on a count family (`nmix()` Poisson-binomial, `nmix("poisson_
-#' poisson")`), `build_closure_unit_arrays()` computes a per-unit default
-#' `K_max[g] = max(y in g) + buffer` whenever the user supplies no `cap`
-#' column. Returns `NULL` when no buffer is configured. `royle_nichols`
-#' takes its default from the static `mvgam_default_cap` instead. The
-#' multi-response families do not use K_max.
-#'
-#' @param family A `brmsfamily` (or family-like list).
-#' @return Positive integer or `NULL`.
-#' @noRd
-closure_unit_default_cap_buffer <- function(family) {
-  if (is.null(family)) return(NULL)
-  buf <- attr(family, "mvgam_default_cap_buffer", exact = TRUE)
-  if (is.null(buf)) return(NULL)
-  as.integer(buf)
-}
 
 #' The series levels of a closure-unit fit
 #'
@@ -2291,79 +2141,63 @@ assert_closure_unit_columns <- function(data, columns) {
 }
 
 
-#' Build per-closure-unit indexing arrays from long-format data
+#' Closure-unit index arrays from long-format data
 #'
-#' Walks the user's long-format observation data and groups rows
-#' by (series, time) into closure units. Returns the integer
-#' arrays needed to populate the Stan data block: number of
-#' visits per unit, per-unit upper truncation (`K_max`), per-unit
-#' maximum observed count (`Y_max`). It also returns a `[N_unit, max_rep]`
-#' matrix of visit-row indices, padded with `1L` on the right for units
-#' with fewer than `max_rep` visits. The Stan loop uses only the first
-#' `n_rep[g]` entries. The padding has no effect.
+#' Groups the rows of a frame into closure units and returns the
+#' integer arrays the Stan data block declares. `visit_idx` is a
+#' `[N_unit, max_rep]` matrix of row positions, padded on the right
+#' with `1L` for units of fewer than `max_rep` visits. The Stan loop
+#' takes the first `n_rep[g]` entries of a row.
 #'
-#' Called from two sites with identical signature:
-#' (a) at fit time, against the user's training data; and
-#' (b) at predict time, against `newdata`. The fit-time call
-#' fixes the Stan `K_max` in standata. The predict-time call
-#' lets users request latent-state predictions under a
-#' different upper truncation by supplying a different `cap`
-#' column in newdata.
+#' The fit takes the arrays of its training data, which fix `K_max` in
+#' the Stan data. A prediction takes those of `newdata`, whose `cap`
+#' column may set another truncation for the latent state.
 #'
-#' @param data Long-format observation data frame.
-#' @param response_var Name of the response column.
-#' @param series_var Name of the series factor (default
-#'   `"series"`).
-#' @param time_var Name of the time column (default `"time"`).
-#' @param cap_var Name of the per-row upper-truncation column
-#'   (default `"cap"`). Must be constant within each closure
-#'   unit; the constant value becomes `K_max[g]`. Optional when
-#'   `default_cap` is supplied (used by binary-response families
-#'   such as `occ()` where the upper truncation is always 1).
-#' @param default_cap Optional integer; when set, fills in `cap`
-#'   with this constant if the column is absent from `data`.
-#' @param compute_y_max Logical. When TRUE (default) coerce the
-#'   response to integer and compute per-unit `Y_max` + `K_max`
-#'   arrays used by the count-based closure-unit families
-#'   (`nmix()`, `occ()`). Multi-response families that aggregate
-#'   K species rows per unit (`diri()`,
-#'   `mvgam_multinomial()`, `mvgam_categorical()`,
-#'   `mvgam_mvnormal()`, `mvgam_mvt()`) set this FALSE because
-#'   their per-unit likelihood takes the response vector directly,
-#'   without a per-unit truncation bound. When FALSE, the slots `Y_max`,
-#'   `K_max` and `cap_vals` are returned as `NA`.
-#' @param drop_unobserved_units Logical. A unit whose every response
-#'   is missing contributes no density. Stan declares `n_rep` with a
-#'   lower bound of one. The fit-time call drops such units. It refuses
-#'   a frame whose units are all unobserved. A prediction frame is the
-#'   opposite case. A forecast grid carries no response at all. Each of
-#'   its rows still has a linear predictor and an expected value.
-#'   `closure_unit_arrays_for()` passes `FALSE` and keeps every unit.
-#'   Its `n_rep` stays at zero for units with no recorded visit.
-#' @param unit_grouping_vars Character vector of column names that
-#'   jointly identify a closure unit. Defaults to
-#'   `c(series_var, time_var)` for the count-based detection-error
-#'   families (each (species, site) pair is its own closure unit
-#'   with repeated visits). Multi-response families set this to
-#'   `time_var` only: one closure unit per site, with the K species
-#'   rows treated as the "visits" within that unit. The
-#'   `visit_row` matrix then maps each (unit, k) pair to the row
-#'   index of the k-th species row at that site.
+#' @param data Long-format observation data frame
+#' @param response_var Name of the response column
+#' @param series_var,time_var Names of the series and time columns
+#' @param cap_var Name of the column bounding the latent state. Its
+#'   value is `K_max[g]` and must be constant within a unit.
+#' @param default_cap Integer `K_max` for every unit when `data` has
+#'   no `cap_var` column, as `occ()` takes 1
+#' @param default_cap_buffer Integer added to each unit's `Y_max` for
+#'   its `K_max` when `data` has no `cap_var` column
+#' @param compute_y_max Whether to compute `Y_max` and `K_max`, which
+#'   bound the latent count of the detection families. A
+#'   multi-response family passes `FALSE`. Its density takes the
+#'   response vector with no truncation.
+#' @param unit_grouping_vars Columns that key a unit. The default,
+#'   `c(series_var, time_var)`, makes each (species, site) pair a unit
+#'   of replicate visits. A multi-response family keys on `time_var`
+#'   alone. Its unit is a site, whose visits are the components.
+#' @param series_levels The fitted series levels, which number the
+#'   components in `visit_component`. NULL takes the levels of
+#'   `data`.
+#' @param family A closure-unit family, or NULL. A family sets
+#'   `default_cap`, `default_cap_buffer` and `compute_y_max` in place
+#'   of those arguments. It also sets the default of
+#'   `unit_grouping_vars`.
+#' @param drop_unobserved_units Whether to drop a unit whose every
+#'   response is missing. Such a unit has no density. Stan bounds
+#'   `n_rep` below by one. The fit drops these units and refuses a
+#'   frame holding no other. A forecast grid holds no response.
+#'   `closure_unit_arrays_for()` passes `FALSE` for it, keeping every
+#'   unit with `n_rep` zero.
 #' @return Named list with elements `N_unit`, `n_rep`, `K_max`,
-#'   `Y_max`, `visit_idx`, `visit_row`, `row_unit`, `max_rep`,
-#'   `unit_labels`, `unit_grid` and `unit_vars`. `K_max` and `Y_max`
-#'   are `NA` when `compute_y_max = FALSE`. `unit_vars` records the
-#'   grouping this call resolved. A consumer takes the axis from that
-#'   record and does not repeat the default.
+#'   `Y_max`, `visit_idx`, `visit_row`, `visit_component`, `row_unit`,
+#'   `max_rep`, `unit_labels`, `unit_grid` and `unit_vars`. `K_max` and
+#'   `Y_max` are `NA` when `compute_y_max = FALSE`. `visit_component`
+#'   is NULL unless the key omits `series_var`. `unit_vars` records the
+#'   grouping this call resolved, for consumers that need the axis.
 #'
-#'   `visit_idx` and `visit_row` index the same visits in two coordinate
-#'   systems. They cannot be used interchangeably. `visit_idx` numbers the
-#'   rows brms retained. The Stan data indexes those rows, because brms
-#'   drops a row whose response is missing. `visit_row` numbers the rows
-#'   of the frame as supplied. Every post-fit path needs that numbering,
-#'   because `posterior_linpred()` gives one value per row of `newdata`.
-#'   `row_unit` gives the unit of every row, including a visit that never
-#'   happened. Such a visit has no density but still has an expected value.
+#'   `visit_idx` and `visit_row` index the same visits in two
+#'   numberings. `visit_idx` numbers the rows brms retained, which the
+#'   Stan data indexes. brms drops a row whose response is missing.
+#'   `visit_row` numbers the rows of the frame as supplied, which every
+#'   post-fit path takes, as `posterior_linpred()` gives one value per
+#'   row of `newdata`. `row_unit` gives the unit of every row,
+#'   including a visit that never happened. Such a visit has no density
+#'   and still has an expected value.
 #' @noRd
 build_closure_unit_arrays <- function(data,
                                        response_var,
@@ -2375,8 +2209,16 @@ build_closure_unit_arrays <- function(data,
                                        compute_y_max = TRUE,
                                        unit_grouping_vars = NULL,
                                        series_levels = NULL,
-                                       drop_unobserved_units = TRUE) {
+                                       drop_unobserved_units = TRUE,
+                                       family = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1L)
+  if (!is.null(family)) {
+    default_cap <- closure_unit_default_cap(family)
+    default_cap_buffer <- closure_unit_default_cap(family, buffer = TRUE)
+    compute_y_max <- !is_multi_response_family(family)
+    unit_grouping_vars <- unit_grouping_vars %||%
+      closure_unit_key_vars(family, series_var, time_var)
+  }
   checkmate::assert_string(response_var)
   checkmate::assert_string(series_var)
   checkmate::assert_string(time_var)
@@ -2533,26 +2375,26 @@ build_closure_unit_arrays <- function(data,
   # from a per-unit quantity without reconstructing the grouping. `NA`
   # marks a row whose unit had no observed visit and was dropped above.
   row_unit <- match(unit_int, which(visited))
-  if (!compute_y_max) {
-    # Multi-response path. Count families need Y_max and a cap-driven
-    # K_max for their per-unit truncation. Dirichlet, multinomial,
-    # categorical, mv-normal and mv-t take the K response components
-    # directly, without truncation. The cap column is not required for
-    # them. Y_max and K_max are returned as NA placeholders.
-    return(list(
-      N_unit      = n_unit,
-      n_rep       = rep_counts,
-      K_max       = NA_integer_,
-      Y_max       = NA_integer_,
-      visit_idx   = visit_idx,
+  arrays_with <- function(K_max, Y_max) {
+    list(
+      N_unit          = n_unit,
+      n_rep           = rep_counts,
+      K_max           = K_max,
+      Y_max           = Y_max,
+      visit_idx       = visit_idx,
       visit_component = visit_component,
-      visit_row   = visit_row,
-      row_unit    = row_unit,
-      max_rep     = as.integer(max_rep),
-      unit_labels = unit_labels,
-      unit_grid   = unit_grid,
-      unit_vars   = unit_grouping_vars
-    ))
+      visit_row       = visit_row,
+      row_unit        = row_unit,
+      max_rep         = as.integer(max_rep),
+      unit_labels     = unit_labels,
+      unit_grid       = unit_grid,
+      unit_vars       = unit_grouping_vars
+    )
+  }
+  # A multi-response density takes the K components of a unit with no
+  # truncation and needs neither bound
+  if (!compute_y_max) {
+    return(arrays_with(NA_integer_, NA_integer_))
   }
   # Missing entries stay in `y_vals` but are never indexed: every
   # per-unit lookup below runs over `rows_by_unit`, which holds
@@ -2595,21 +2437,12 @@ build_closure_unit_arrays <- function(data,
     # over observed rows alone would leave such a unit empty. Its `K_max[g]`
     # would then be `NA`. The comparison below treats that as a missing
     # condition.
-    rows_of_unit <- closure_unit_row_split(
-      list(row_unit = row_unit, N_unit = n_unit)
-    )
+    unit_rows <- list(row_unit = row_unit, N_unit = n_unit)
+    refuse_unit_varying(cap_vals, unit_rows, cap_var,
+                        "The cap bounds the latent state of the unit.")
+    rows_of_unit <- closure_unit_row_split(unit_rows)
     for (g in seq_len(n_unit)) {
-      rows_g <- rows_of_unit[[g]]
-      cap_g <- cap_vals[rows_g]
-      if (length(unique(cap_g)) > 1L) {
-        stop(insight::format_error(
-          paste0(
-            "'", cap_var,
-            "' must be constant within a closure unit."
-          )
-        ))
-      }
-      K_max[g] <- cap_g[1L]
+      K_max[g] <- cap_vals[rows_of_unit[[g]][1L]]
       # Closure-unit lpmf marginalises N from `max(y)` to K_max[g].
       # A cap below the observed maximum makes the floor exceed
       # the ceiling, producing an empty sum and a garbage
@@ -2638,351 +2471,131 @@ build_closure_unit_arrays <- function(data,
     # validator should have refused the call upstream.
     K_max <- rep(as.integer(default_cap), n_unit)
   }
-  list(
-    N_unit      = n_unit,
-    n_rep       = rep_counts,
-    K_max       = K_max,
-    Y_max       = Y_max,
-    visit_idx   = visit_idx,
-    visit_row   = visit_row,
-    row_unit    = row_unit,
-    max_rep     = as.integer(max_rep),
-    unit_labels = unit_labels,
-    unit_grid   = unit_grid,
-    unit_vars   = unit_grouping_vars
-  )
+  arrays_with(K_max, Y_max)
 }
 
-#' Closure-unit Poisson-binomial N-mixture family
+#' N-mixture family for repeated counts of unmarked individuals
 #'
-#' N-mixture model (Royle 2004, *Biometrics*) with a Poisson
-#' latent abundance and binomial detection. Each observation
-#' row is one visit; closure is enforced over (series, time)
-#' pairs so multiple rows sharing the same (series, time)
-#' represent replicate visits to the same underlying abundance.
-#' The latent count `N_g` for closure unit `g` is marginalised
-#' analytically over the truncated range
-#' `K_max[g] >= k >= max(y[g, ])` using a `log_sum_exp` over
-#' `poisson_log_lpmf(k | log_lambda_g)` plus
-#' `binomial_logit_lpmf(y[g,] | k, logit_p_{g,j})` (Royle 2004).
+#' For counts made on repeated visits to sites whose abundance stays
+#' fixed across the visits, such as bird point counts within a season.
+#' The data hold one row per visit. The visits sharing a `series` and a
+#' `time` belong to one closure unit, whose latent abundance `N` is
+#' Poisson with mean `mu`. Each visit's count depends on `N` and the
+#' detection parameter `p`. The likelihood sums over `N` from the
+#' unit's largest count up to the cap `K_max` (Royle 2004).
 #'
-#' Parameterised with two distributional parameters:
+#' `bf(y ~ elev, p ~ tod)` models abundance and detection, each with
+#' its own formula. `mu` takes the log link. [predict()] with
+#' `type = "latent_state"` gives the expected abundance of each unit
+#' given its counts. `type = "detection"` gives the detection
+#' probability of each visit.
+#'
+#' @param type The variant, `"poisson_binomial"` by default. See
+#'   **Choosing a variant**.
+#' @param multi_season Logical. `TRUE` keys a closure unit on
+#'   `(series, site, time)`, for several seasons of visits to each
+#'   site. The data then need a `site` column, which
+#'   [pivot_detection_array()] creates from a four-dimensional array
+#'   with `multi_season = "hierarchical"`. Each unit holds the visits of
+#'   one site in one season.
+#'
+#' @section Choosing a variant:
+#' All three variants take `N ~ Poisson(mu)` and differ in what a visit
+#' records.
 #' \describe{
-#'   \item{`mu`}{positive abundance rate \eqn{\lambda} (log link, fixed)}
-#'   \item{`p`}{per-visit detection probability (logit link, fixed)}
+#'   \item{`"poisson_binomial"` (Royle 2004)}{Counts
+#'     `y ~ Binomial(N, p)`, which never exceed `N`. Point counts,
+#'     removal passes and plot tallies fit this design. `p` is the
+#'     detection probability of each individual, on the logit link.}
+#'   \item{`"royle_nichols"` (Royle and Nichols 2003)}{Detections
+#'     `y ~ Bernoulli(1 - (1 - p)^N)` in 0 / 1. Camera-trap or eDNA
+#'     detections scored as present or absent fit this design. `p` is
+#'     the detection probability of each individual, on the logit
+#'     link. A visit's detection probability rises with `N`.}
+#'   \item{`"poisson_poisson"` (Neyman 1939)}{Counts
+#'     `y ~ Poisson(N * p)`, which can exceed `N`. Camera-trap events
+#'     and acoustic detections, where one individual is recorded
+#'     several times, fit this design. `p` is the encounter rate of
+#'     each individual per visit, on the log link.}
 #' }
 #'
-#' Distributional regression. brms `bf()` syntax handles
-#' covariate-dependent detection automatically:
+#' @section Priors:
+#' A detection probability `p` on the logit link takes `beta(1, 1)` as
+#' a scalar. With a formula, its intercept takes `normal(0, 1.5)`,
+#' which puts most of the probability between 0.05 and 0.95. The
+#' encounter rate of `"poisson_poisson"` takes `lognormal(0, 1)` as a
+#' scalar. With a formula, its intercept takes `std_normal()`. Either
+#' puts most of the rate between 0.14 and 7.4 encounters per visit.
+#' [get_prior()] lists these defaults. `prior(..., dpar = "p")`
+#' replaces one. A rare species might take
+#' `prior(normal(-2, 0.5), class = Intercept, dpar = "p")`.
 #'
-#' ```r
-#' mvgam(bf(y ~ s(elev), p ~ s(tod)), family = nmix(), data = ...)
-#' ```
+#' @section Identification:
+#' The counts identify abundance and detection apart through repeated
+#' visits and through covariates that act on one of them. With one
+#' visit per unit and no covariate, the data identify only the product
+#' `mu * p`. `nmix()` refuses that model. More than 30% of units
+#' visited once raises a warning. A `"poisson_poisson"` model with
+#' intercepts alone separates `mu` from `p` only through the extra
+#' variance of its counts. It warns. An informative prior on one
+#' intercept separates them.
 #'
-#' Identifiability. With a single visit per closure unit the
-#' likelihood reduces to a thinned Poisson with only
-#' `lambda * p` identified; the individual parameters are not.
-#' Information about the decomposition flows entirely from
-#' shared structure across units (covariates in either formula
-#' and the across-unit hierarchical pooling). Practical
-#' guidance from Kery (2018, *Ecology*): with 3 or more visits
-#' per unit the model is reliably identified for detection
-#' probabilities above 0.1; with 2 visits identification is
-#' marginal below `p = 0.3`. `validate_closure_unit_data()`
-#' warns when the average visit count is below 2. It errors when every
-#' unit has only one visit and the model has no covariates.
+#' Overdispersed abundance, such as negative binomial counts fitted by
+#' a Poisson `N`, biases abundance up and detection down, leaving their
+#' product close to the truth (Knape et al. 2018). [pp_check()] with
+#' `type = "fit_stat"` tests the per-unit totals for such misfit.
 #'
-#' Under overdispersed counts (negative-binomial truth in place of
-#' Poisson), the detection probability is biased downward. The abundance
-#' is biased upward. The product `lambda * p` stays approximately
-#' consistent (Knape et al. 2018, *Methods in Ecology and Evolution*).
-#' Use posterior predictive checks to detect this. Refit with a richer
-#' abundance distribution if overdispersion is present.
+#' @section The cap on abundance:
+#' A `cap` column, constant within each unit and at least its largest
+#' count, sets the cap `K_max`. Without one, `"poisson_binomial"` and
+#' `"poisson_poisson"` take each unit's largest count plus 100, as
+#' `unmarked::pcount()` does. `"royle_nichols"` takes 25, as
+#' `unmarked::occuRN()` does. A detection gives no floor on `N`.
+#' A lower cap shortens the sum and speeds sampling. A cap that binds
+#' biases abundance down. [latent_N_saturation()] reports, for each
+#' unit, the posterior probability that `N` equals its cap. A
+#' prediction frame may carry its own `cap`.
 #'
-#' Data shape. A long-format data frame, one row per visit, with
-#' columns: a response (count) column, `series` (factor),
-#' `time` (integer), `cap` (per-row upper truncation; constant
-#' within a closure unit), plus any covariates referenced in the
-#' formulae. Multiple rows sharing the same (series, time) pair
-#' encode replicate visits to one closure unit.
+#' @section Joint species models:
+#' [jsdgam()] with `nmix()` or `occ()` fits several species at once.
+#' Latent factors shared by the species enter the state `mu`. `p`
+#' keeps its own formula. `factor_formula = ~ s(env, by = lv_axis())`
+#' lets each factor follow an environmental gradient.
 #'
-#' Prediction at different caps. `cap` is stored as a data column as well
-#' as in the Stan data. Predicting via `predict(fit, newdata = X)`
-#' re-extracts the closure-unit arrays from `newdata`. Users can request
-#' latent-abundance draws under arbitrary upper truncations by supplying
-#' `newdata` with different `cap` values. Set `cap` higher than
-#' the fit-time cap to expand the latent-state support;
-#' fit-time caps are reused when `newdata` is `NULL`.
+#' @section Importing array data:
+#' Detection histories from \pkg{unmarked}, \pkg{spOccupancy} or
+#' \pkg{ubms} come as a site-by-visit matrix, an array with species or
+#' seasons as further dimensions, or a list of matrices.
+#' [pivot_detection_array()] converts any of these to the long format,
+#' broadcasting site, season and visit covariates to their rows.
 #'
-#' @return A `brms::customfamily` object with the
-#'   `mvgam_closure_unit` attribute set; closure-unit data prep
-#'   builds the unit arrays and attaches the Stan lpdf at fit
-#'   time.
+#' @section Threading:
+#' The density sums over units through Stan's `reduce_sum()`. Fitting
+#' with `threads = 2` or more splits the units across threads.
+#'
+#' @return A family object to pass to [mvgam()] or [jsdgam()].
 #'
 #' @references
 #' Royle, J. A. (2004). N-mixture models for estimating
 #'   population size from spatially replicated counts.
 #'   *Biometrics*, 60, 108-115.
-#'   \doi{10.1111/j.0006-341X.2004.00142.x}.
+#'   \doi{10.1111/j.0006-341X.2004.00142.x}
 #'
-#' Dennis, E. B., Morgan, B. J. T., & Ridout, M. S. (2015).
-#'   Computational aspects of N-mixture models. *Biometrics*,
-#'   71, 237-246. \doi{10.1111/biom.12246}.
-#'
-#' Kery, M. (2018). Identifiability in N-mixture models: a
-#'   large-scale screening test with bird data. *Ecology*, 99,
-#'   281-288. \doi{10.1002/ecy.2093}.
-#'
-#' Knape, J., Arlt, D., Barraquand, F., Berg, A., Chevalier, M.,
-#'   Part, T., Ruete, A., & Zmihorski, M. (2018). Sensitivity of
-#'   binomial N-mixture models to overdispersion. *Methods in
-#'   Ecology and Evolution*, 9, 2102-2114.
-#'   \doi{10.1111/2041-210X.13062}.
-#'
-#' @param type Character scalar selecting the N-mixture variant.
-#'   `"poisson_binomial"` (default) is the canonical Royle (2004)
-#'   model: latent abundance `N ~ Poisson(lambda)`, per-visit
-#'   counts `y ~ Binomial(N, p)` with logit-link per-visit
-#'   detection `p`. `"royle_nichols"` is the Royle and Nichols
-#'   (2003) binary-detection variant: latent `N ~ Poisson(lambda)`,
-#'   per-visit binary outcomes `y ~ Bernoulli(1 - (1-r)^N)` with
-#'   logit-link per-individual detection `r`. `"poisson_poisson"`
-#'   is the Neyman Type A model used for encounter counts (e.g.
-#'   camera-trap captures): latent `N ~ Poisson(lambda)`, per-visit
-#'   counts `y ~ Poisson(N * p)` with log-link per-individual
-#'   encounter rate `p`.
-#'
-#' @param multi_season Logical. When `TRUE`, closure units are
-#'   defined by `(series, site, time)`. The default is `(series, time)`.
-#'   The data must carry a `site` column. Produce it from a 4-axis
-#'   observation array with [pivot_detection_array()] (set
-#'   `multi_season = "hierarchical"`).
-#'   Per-unit `Y_max[g]` and the K_max buffer (`Y_max[g] + 100` for
-#'   PB and PPM by default; static `K_max = 25` for RN) are
-#'   computed from the visits in unit `g` only. With few visits per
-#'   (site, season) and a highly abundant species, that cap may
-#'   bind and downward-bias `lambda`; inspect `standata(fit)$K_max`
-#'   against `posterior_latent_N()` / `latent_N_saturation(fit)`
-#'   after fitting and raise `cap` if needed. Sparse visits +
-#'   low detection probability also produces prior-dominated
-#'   posteriors; check marginal posteriors against the prior.
-#'
-#' @section Choosing a variant:
-#' All three variants share the latent-abundance prior
-#' `N ~ Poisson(lambda)`; they differ in how `N` maps to the
-#' visit-level observation.
-#'
-#' \describe{
-#'   \item{`"poisson_binomial"` (default; Royle 2004)}{Per-visit
-#'     counts `y ~ Binomial(N, p)`. `y` is bounded by `N` (each
-#'     individual contributes at most one count per visit). Fits
-#'     replicate effort-bounded surveys: bird point counts,
-#'     electrofishing passes, plot-level vegetation tallies.
-#'     Detection covariates attach to `p` via
-#'     `bf(y ~ ..., p ~ visit_effort)`.}
-#'   \item{`"royle_nichols"` (Royle and Nichols 2003)}{Binary per
-#'     visit, `y ~ Bernoulli(1 - (1 - r)^N)`. Requires `y` to be
-#'     0 / 1. Fits surveys where the response is detect /
-#'     not-detect: camera-trap photos collapsed over an interval,
-#'     occupancy-style replicates, eDNA samples scored as binary.
-#'     Detection is per-individual. Two individuals at a site can each
-#'     push the visit-level probability up.}
-#'   \item{`"poisson_poisson"` (Neyman Type A; Neyman 1939)}{Counts
-#'     `y ~ Poisson(N * p)`. `y` is unbounded and can exceed `N`. Each
-#'     individual contributes an independent Poisson encounter rate.
-#'     Fits encounter surveys where the same
-#'     individual can be recorded multiple times per visit:
-#'     camera-trap event counts, acoustic detection counts,
-#'     mark-resight encounters. Log-link on both `lambda` and
-#'     `p`.}
-#' }
-#'
-#' Pick the variant from the survey design: 0 / 1 visits
-#' need `royle_nichols`; counts that cap at abundance need
-#' `poisson_binomial`; counts that can re-detect the same
-#' individual need `poisson_poisson`. PB and RN have the same
-#' visit-level variance at fixed `(N, p)` and `(N, r)` so the
-#' data cannot tell them apart after the fact; PPM separates from
-#' PB only via the upper tail (PPM has no `y <= N` ceiling).
-#'
-#' @section Identification (Royle-Nichols):
-#' The Stan code uses the logit link on per-individual detection
-#' `r`. A flat Uniform(0, 1) prior on `r` propagates to a near-
-#' saturated prior on the visit-level detection probability
-#' `p_visit = 1 - (1-r)^N` for any moderate `lambda` (e.g.
-#' `E[p_visit | r ~ U(0,1), lambda = 5] ~ 0.83`), creating a ridge
-#' where small `r` flattens the likelihood in `lambda`. The logit
-#' link with a `Normal(0, 1.5)` prior on the logit-r intercept
-#' places most prior mass on `r` between 0.05 and 0.95, while
-#' remaining workable on the logit scale even when the likelihood
-#' is nearly flat. The per-unit upper truncation `K_max[g]` must
-#' satisfy
-#' both (a) `ppois(K_max, lambda_hat, lower.tail=FALSE) < 1e-4`
-#' (Poisson tail negligible) and (b) `(1 - r_hat)^K_max < 1e-4`
-#' (Royle-Nichols detection function saturated). Condition (b) is
-#' specific to Royle-Nichols: under Poisson-binomial, too-small
-#' `K_max` only costs computation; under Royle-Nichols with low
-#' `r`, too-small `K_max` leaves non-negligible Poisson mass in
-#' cells where the detection function still varies, biasing the
-#' posterior on `lambda` upward.
-#'
-#' @section Identification (Poisson-Poisson):
-#' The Stan code uses the log link on per-individual encounter
-#' rate `p`. Bollen's `logit(p)` reparameterisation is rejected
-#' because under a flat Uniform(0, 1) prior on `p` the implied
-#' prior on the rate `mu / (1 - mu)` is Cauchy(0, 1) tailed,
-#' which is ecologically unmotivated and computationally unstable.
-#' Under intercept-only specifications on both `mu` and `p` only
-#' the product `lambda * p` is identified by the data; the
-#' marginal variance (Neyman Type A is over-dispersed Poisson)
-#' provides weak cross-identification only when at least one
-#' covariate separates the two parameters (Kery 2018; "Wild
-#' posteriors in the wild" arXiv 2503.00239). The fit-time
-#' validator emits a `rlang::warn(...)` when both formulae reduce
-#' to intercept-only, recommending an informative prior on at
-#' least one intercept. The default prior on the log-scale `p`
-#' intercept is tighter than the Poisson-binomial default
-#' (`Normal(0, 1)`, implying encounter rate mostly in
-#' `(0.1, 10)` encounters per individual per visit) for the same
-#' reason. The truncated-N marginalisation is required: the
-#' closed-form Poisson(`lambda * p`) marginal is mean-equivalent
-#' but distribution-wrong. It drops the Neyman Type A over-dispersion,
-#' which is what separates `lambda` from `p`. Under the
-#' closed form the likelihood depends only on the product `lambda * p`.
-#' Individual posteriors on `lambda` and `p` are dominated by the prior.
-#' `predict(type = "latent_state")` returns the prior on `N` in place of
-#' a data-informed posterior.
-#'
-#' @section Priors (Poisson-Poisson):
-#' For Poisson-Poisson fits the recommended starting prior on
-#' the log-scale `p` intercept is `Normal(0, 1)`. That prior puts most of
-#' its mass on encounter rates between `exp(-2) ~ 0.14` and
-#' `exp(2) ~ 7.4` per individual per visit. Pass this prior
-#' via the `prior` argument of [mvgam()]:
-#' ```r
-#' mvgam(y ~ elev,
-#'       family = nmix("poisson_poisson"),
-#'       data   = closure_unit_count_data,
-#'       prior  = c(brms::prior(normal(0, 1),
-#'                              class = "Intercept",
-#'                              dpar  = "p")))
-#' ```
-#' For rare species with very low encounter rates the centre
-#' should shift down (e.g. `Normal(-2, 0.5)`); for passive
-#' acoustic monitors logging many detections per individual the
-#' centre should shift up (e.g. `Normal(2, 0.5)`). The
-#' identifiability validator emits a `rlang::warn(...)` only at
-#' the fully intercept-only configuration. With one-sided covariates,
-#' the intercept of the formula without a covariate is still weakly
-#' identified. An informative prior on that intercept remains advisable.
-#'
-#' @section K_max defaults and saturation:
-#' Each variant has a default that applies when the user supplies no
-#' `cap` column on the input data:
-#' \itemize{
-#'   \item Poisson-binomial and Poisson-Poisson default to
-#'     `K_max[g] = max(y in g) + 100`, the per-unit data-driven
-#'     buffer used by `unmarked::pcount`. Conservative: pays a
-#'     wider inner k-loop when counts are small (`K_max ~ 101`
-#'     even with `N ~ 5`). Override via a `cap` column to tighten
-#'     the marginalisation when abundance is known to be low.
-#'   \item Royle-Nichols defaults to `K_max = 25` per unit (the
-#'     `unmarked::occuRN` convention), because binary `y` carries
-#'     no per-unit floor.
-#' }
-#' Whenever a user supplies a `cap` column whose value is below
-#' the observed maximum `y` for a unit, the validator errors and names
-#' the offending unit identifier. Otherwise the marginalisation floor
-#' (`max(y)`) would exceed the ceiling (`K_max`). The likelihood would
-#' then degenerate to an empty sum silently.
-#'
-#' Post-fit, [latent_N_saturation()] reports the share of the conditional
-#' posterior at `K_max[g]` for each unit. Units with a high share should
-#' have their cap raised, which removes truncation bias in `lambda`. The
-#' Royle-Nichols default is most likely to need overriding, owing to its
-#' static fallback. A Poisson-Poisson cap should also satisfy
-#' `ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4` for the tail
-#' to be negligible.
-#'
-#' @section JSDM with imperfect detection:
-#' Passing `nmix()` to [jsdgam()] with `n_lv > 0` composes the
-#' closure-unit marginalisation with the Heaps factor model. The user
-#' then gets a hierarchical JSDM. Its three levels each occupy a distinct
-#' dpar:
-#'
-#' \describe{
-#'   \item{**lowest level**: env-driven latent factors.}{
-#'     `factor_formula = ~ s(env, by = lv_axis())` makes each
-#'     latent factor a smooth of an environmental covariate. The
-#'     factors are identified by their environmental signature. They
-#'     are not free draws. That removes the intercept-versus-Z*lv
-#'     competition, which otherwise hampers identification when
-#'     site-level intercepts are also fit on `mu`.}
-#'   \item{**middle level**: species loadings.}{Each species `s`
-#'     loads on the `K` factors via the row `Z[s, :]`, so
-#'     `log_lambda[s, i] = b_X(species) + Z[s, :] %*% lv[i, :]`
-#'     for site `i`. `Z` is identified up to sign via Heaps and
-#'     Jermyn (2024) post-hoc QR.}
-#'   \item{**top level**: imperfect detection.}{The `p` dpar
-#'     carries its own brms sub-formula (e.g.,
-#'     `bf(y ~ species, p ~ visit_effort)`) so the detection
-#'     process is modelled independently of the latent abundance.
-#'     The lpmf marginalises latent `N` per closure unit. No part of
-#'     the factor model depends on the marginalisation. No part of the
-#'     marginalisation depends on the factor model.}
-#' }
-#'
-#' See [jsdgam()] for the
-#' wrapper-level API and [lv_axis()] for the `by = lv_axis()`
-#' sentinel that turns smooths into per-factor regressors.
-#'
-#' @section Importing array data:
-#' Detection-history data from `unmarked::unmarkedFramePCount`,
-#' `spOccupancy` or `ubms` takes the form of a 2D `[J, K]` matrix
-#' (single-species), 3D `[N, J, K]` array (multi-species), 4D
-#' `[N, J, T, K]` array (multi-season multi-species), or named list of
-#' `[J, K]` matrices (`unmarkedFrameOccuMulti`). Use
-#' [pivot_detection_array()] to convert any of these into the long-format
-#' `data` that `mvgam(family = nmix())` and `jsdgam(family = nmix())`
-#' expect. The covariates `site_covs`, `season_covs`, `site_season_covs`
-#' and `obs_covs` are broadcast across the right grid axes.
-#'
-#' @section Performance and threading:
-#' The Stan emission for `nmix()` has three optimisations beyond a naive
-#' K-loop enumeration:
-#' \itemize{
-#'   \item **Analytic ratio recurrence.** The Poisson-binomial
-#'     marginalisation uses the log-space Horner form of the
-#'     ratio recurrence `T_N / T_{N-1}`, evaluated backward from
-#'     `K_max` to `K_min + 1`. This avoids the per-`k` re-evaluation
-#'     of `binomial_logit_lpmf` that the naive `log_sum_exp` form
-#'     incurs.
-#'   \item **Cached log(N) lookup.** `log(N)` and
-#'     `log(N - counts[j])` values come from a `log_n_lookup`
-#'     vector precomputed once in `transformed data`, replacing
-#'     scalar `log()` calls per inner iteration.
-#'   \item **partial_sum + reduce_sum.** The per-closure-unit
-#'     body is the function `partial_sum_nmix_lpmf`. The lpmf wrapper
-#'     calls `reduce_sum` over the closure-unit index.
-#'     With `mvgam(threads = N)` for `N > 1` the model is
-#'     compiled with `stan_threads = TRUE` and TBB splits the
-#'     closure-unit slice across `N` threads. Without
-#'     `threads`, `reduce_sum` falls back to a serial loop.
-#'     Grainsize is set to `max(1, N_unit %/% 8)`. Single-threaded
-#'     fits then pay about 8 dispatch calls per leapfrog. Multi-threaded
-#'     fits see about 8 chunks across cores.
-#' }
-#' On a 150-unit fixture (n_rep = 6, lambda ~ 4, K_max = 14),
-#' the stack delivers roughly 2x sampling throughput vs the
-#' naive enumeration baseline; the threaded variant
-#' (`threads = 4`) adds another ~38% over the serial
-#' `reduce_sum` form.
-#'
-#' @references
-#' Royle, J. A., and Nichols, J. D. (2003). Estimating abundance
+#' Royle, J. A. and Nichols, J. D. (2003). Estimating abundance
 #'   from repeated presence-absence data or point counts.
 #'   *Ecology*, 84, 777-790.
-#'   \doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}.
+#'   \doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}
+#'
+#' Neyman, J. (1939). On a new class of "contagious" distributions,
+#'   applicable in entomology and bacteriology. *Annals of
+#'   Mathematical Statistics*, 10, 35-57.
+#'   \doi{10.1214/aoms/1177732245}
+#'
+#' Knape, J., Arlt, D., Barraquand, F., Berg, A., Chevalier, M.,
+#'   Part, T., Ruete, A. and Zmihorski, M. (2018). Sensitivity of
+#'   binomial N-mixture models to overdispersion. *Methods in
+#'   Ecology and Evolution*, 9, 2102-2114.
+#'   \doi{10.1111/2041-210X.13062}
 #'
 #' @examples
 #' \dontrun{
@@ -3025,270 +2638,86 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
                           "poisson_poisson"),
                  multi_season = FALSE) {
   type <- match.arg(type)
-  checkmate::assert_flag(multi_season)
-  variant_config <- switch(
+  # The count variants bound a unit's abundance a buffer above its
+  # largest count, as unmarked::pcount() does. Royle-Nichols detections
+  # give no floor and take unmarked::occuRN()'s fixed cap.
+  counts <- c("K_max", "Y_max", "visit_idx", "log_n_lookup")
+  fam <- switch(
     type,
-    poisson_binomial = list(
-      name  = "nmix",
-      links = c("log", "logit"),
-      lb    = c(0, 0),
-      ub    = c(NA, 1)
+    poisson_binomial = detection_family(
+      "nmix", c("log", "logit"), ub = c(NA, 1), vars = counts,
+      default_cap_buffer = 100L, multi_season = multi_season
     ),
-    royle_nichols = list(
-      name  = "nmix_royle_nichols",
-      links = c("log", "logit"),
-      lb    = c(0, 0),
-      ub    = c(NA, 1)
+    royle_nichols = detection_family(
+      "nmix_royle_nichols", c("log", "logit"), ub = c(NA, 1),
+      vars = c("K_max", "Y_max", "visit_idx"), binary = TRUE,
+      default_cap = 25L, multi_season = multi_season
     ),
-    # Poisson-Poisson: p is an encounter rate per individual per
-    # visit, unbounded above. A log link on both dpars keeps the
-    # rate positive. A logit(p) parameterisation would impose a
-    # Cauchy(0, 1)-tailed prior on the rate.
-    poisson_poisson = list(
-      name  = "nmix_poisson_poisson",
-      links = c("log", "log"),
-      lb    = c(0, 0),
-      ub    = c(NA, NA)
+    # The encounter rate is unbounded above
+    poisson_poisson = detection_family(
+      "nmix_poisson_poisson", c("log", "log"), ub = c(NA, NA),
+      vars = c(counts, "k_start_ppm"), default_cap_buffer = 100L,
+      multi_season = multi_season
     )
   )
-  fam <- brms::custom_family(
-    name  = variant_config$name,
-    dpars = c("mu", "p"),
-    links = variant_config$links,
-    # Bounds at the family level let brms declare the scalar-dpar
-    # case with the right constraints. The lpmf operates on the
-    # response-scale dpars (post-inv-link), with each per-variant
-    # function block converting back to the link scale internally
-    # for numerically stable likelihood evaluation.
-    lb    = variant_config$lb,
-    ub    = variant_config$ub,
-    type  = "int",
-    loop  = FALSE
-  )
-  link_info <- stats::make.link(fam$link)
-  fam$linkinv <- link_info$linkinv
-  fam$linkfun <- link_info$linkfun
-  attr(fam, "mvgam_closure_unit")  <- TRUE
-  attr(fam, "mvgam_nmix_type")     <- type
-  # K_max defaults mirror the conventions of unmarked. They keep the
-  # marginalisation conservative. The cost is wasted inner k-loop
-  # iterations. A posterior is not truncated by this default.
-  #   * Poisson-binomial and Poisson-Poisson take counts as input. The
-  #     per-unit floor is data-driven: `K_max[g] = max(y in g) + 100`.
-  #     This matches `unmarked::pcount(K = max(y) + 100)`. The default
-  #     runs high when counts are small (K_max ~ 101 even when N ~ 5).
-  #     Users with abundant data should set `cap` to a tighter value.
-  #     That avoids wasted likelihood evaluations.
-  #   * Royle-Nichols takes only 0 / 1 input. The default has no
-  #     data-driven floor. Default `K_max = 25` matches
-  #     `unmarked::occuRN(K = 25)`. Override via the `cap` column when
-  #     the latent_N_saturation() diagnostic reports truncation.
-  if (type == "royle_nichols") {
-    attr(fam, "mvgam_binary_response") <- TRUE
-    attr(fam, "mvgam_default_cap")     <- 25L
-  } else {
-    attr(fam, "mvgam_default_cap_buffer") <- 100L
-  }
-  attr(fam, "mvgam_predict_types") <- c("latent_state", "detection")
-  # The lpmf signature determines which data fields brms must
-  # pass through. Poisson-binomial and Poisson-Poisson use the
-  # transformed-data `log_n_lookup` cache to skip per-iter scalar
-  # log() calls in the inner marginalisation loop. Royle-Nichols
-  # does not (the inner k-loop is k * log_1m_r vector mult, with no
-  # log of an integer). Its vars list omits it. Poisson-
-  # Poisson additionally carries `k_start_ppm`, a per-unit lower
-  # bound on the latent-N k-loop that lets high-count units skip
-  # the deep Poisson tail; see make_nmix_poisson_poisson_stanvars
-  # for the derivation.
-  attr(fam, "mvgam_vars") <- switch(
-    type,
-    royle_nichols = c(
-      "N_unit", "n_rep", "K_max", "Y_max", "visit_idx"
-    ),
-    poisson_poisson = c(
-      "N_unit", "n_rep", "K_max", "Y_max", "visit_idx",
-      "log_n_lookup", "k_start_ppm"
-    ),
-    c(
-      "N_unit", "n_rep", "K_max", "Y_max", "visit_idx",
-      "log_n_lookup"
-    )
-  )
-  # Multi-season grouping. Closure units are defined by
-  # (series, site, season). The default is (series, time).
-  # The data must carry a `site` column. `pivot_detection_array`
-  # with `multi_season = "hierarchical"` emits it. Downstream
-  # readers (validator, array builder, log_lik, pp_check, tidier,
-  # plot_factors, kfold) all consume the attribute via
-  # closure_unit_grouping().
-  if (multi_season) {
-    attr(fam, "mvgam_unit_grouping") <- c("series", "site", "time")
-  }
-  # mvgam_stanvars is populated at data preparation time, once
-  # the closure-unit arrays from the user's data are known.
-  attr(fam, "mvgam_stanvars") <- NULL
+  attr(fam, "mvgam_nmix_type") <- type
   fam
 }
 
-#' Closure-unit single-season occupancy family
+#' Occupancy family for repeated detection and non-detection
 #'
-#' Bernoulli-binomial occupancy model (MacKenzie et al. 2002,
-#' *Ecology*) with a Bernoulli latent occupancy state and a
-#' Bernoulli detection process. Each observation row is one
-#' visit; closure is enforced over (series, time) pairs so
-#' multiple rows sharing the same (series, time) represent
-#' replicate detection / non-detection visits to the same
-#' underlying occupancy state. The latent state `z_g` for
-#' closure unit `g` is marginalised analytically: at sites with
-#' at least one detection, `z_g = 1` is certain and no
-#' marginalisation is needed; at sites with all-zero detection
-#' histories, `log_sum_exp` combines the all-zero-given-occupied
-#' and unoccupied branches (Royle and Dorazio 2008, ch. 3;
-#' Kery and Royle 2016, ch. 10).
+#' For detections recorded on repeated visits to sites whose occupancy
+#' stays fixed across the visits, such as camera-trap or call surveys
+#' within a season. The data hold one row per visit with a 0 / 1
+#' response. The visits sharing a `series` and a `time` belong to one
+#' closure unit, which is occupied with probability `mu`. A visit to an
+#' occupied unit detects the species with probability `p`. The
+#' likelihood sums over the unit's two states. A unit with a detection
+#' is occupied for certain (MacKenzie et al. 2002).
 #'
-#' Parameterised with two distributional parameters:
-#' \describe{
-#'   \item{`mu`}{per-site occupancy probability \eqn{\psi}
-#'     (logit link, fixed)}
-#'   \item{`p`}{per-visit detection probability (logit link,
-#'     fixed)}
-#' }
+#' `bf(y ~ elev, p ~ tod)` models occupancy and detection, each with
+#' its own formula on the logit link. [predict()] with
+#' `type = "latent_state"` gives the probability that each unit is
+#' occupied given its detections. `type = "detection"` gives the
+#' detection probability of each visit. The data need no `cap` column.
 #'
-#' Distributional regression. brms `bf()` syntax handles
-#' covariate-dependent detection automatically:
+#' @inheritParams nmix
 #'
-#' ```r
-#' mvgam(bf(y ~ s(elev), p ~ s(tod)), family = occ(), data = ...)
-#' ```
+#' @section Priors:
+#' The occupancy intercept takes brms's `student_t(3, 0, 2.5)` on the
+#' logit scale. A scalar `p` takes `beta(1, 1)`. With a formula, its
+#' intercept takes `normal(0, 1.5)`. [get_prior()] lists the defaults,
+#' and `prior(..., dpar = "p")` replaces one.
 #'
-#' Identifiability. With a single visit per closure unit and no
-#' covariates the likelihood reduces to a Bernoulli with mean
-#' `psi * p` and only that product is identified; the individual
-#' parameters are prior-dominated (Royle and Dorazio 2008,
-#' ch. 3.5). The validator warns in this configuration but
-#' allows the fit. With 3 or more visits per unit and detection
-#' probability above 0.1, identification is reliable (the same
-#' Kery 2018 result for nmix extends to the
-#' Bernoulli-binomial form).
+#' @section Identification:
+#' The detections identify occupancy and detection apart through
+#' repeated visits and through covariates that act on one of them.
+#' With one visit per unit and no covariate, the data identify only
+#' the product `mu * p`. Only the priors then set the two apart (Royle
+#' and Dorazio 2008). [mvgam()] warns on such data. It also warns when
+#' more than 30% of units have a single visit.
 #'
-#' Data shape. A long-format data frame, one row per visit, with
-#' columns: a binary response (0 = non-detection, 1 = detection),
-#' `series` (factor), `time` (integer), plus any covariates
-#' referenced in the formulae. Multiple rows sharing the same
-#' (series, time) pair encode replicate visits to one closure
-#' unit. The `cap` column required by `nmix()` is implicit at
-#' `1` for `occ()` and need not be supplied.
+#' @inheritSection nmix Joint species models
+#' @inheritSection nmix Importing array data
+#' @inheritSection nmix Threading
 #'
-#' @return A `brms::customfamily` object with the
-#'   `mvgam_closure_unit` and `mvgam_binary_response` attributes
-#'   set; closure-unit data prep builds the unit arrays and
-#'   attaches the Stan lpdf at fit time.
-#'
-#' @section Importing array data:
-#' Detection-history data from `unmarked::unmarkedFrameOccu`,
-#' `unmarkedFrameOccuMulti`, `spOccupancy`, `ubms` or `flocker` takes
-#' the form of a 2D `[J, K]` matrix, 3D `[N, J, K]` array, 4D
-#' `[N, J, T, K]` array (multi-season), or named list of `[J, K]`
-#' matrices per species. Use [pivot_detection_array()] to convert any of
-#' these into the long-format `data` that `mvgam(family = occ())` and
-#' `jsdgam(family = occ())` expect. The covariates `site_covs`,
-#' `season_covs`, `site_season_covs` and `obs_covs` are broadcast across
-#' the right grid axes.
+#' @return A family object to pass to [mvgam()] or [jsdgam()].
 #'
 #' @references
 #' MacKenzie, D. I., Nichols, J. D., Lachman, G. B., Droege, S.,
-#'   Royle, J. A., & Langtimm, C. A. (2002). Estimating site
+#'   Royle, J. A. and Langtimm, C. A. (2002). Estimating site
 #'   occupancy rates when detection probabilities are less than
 #'   one. *Ecology*, 83, 2248-2255.
-#'   \doi{10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2}.
+#'   \doi{10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2}
 #'
-#' Royle, J. A., & Dorazio, R. M. (2008). *Hierarchical Modeling
+#' Royle, J. A. and Dorazio, R. M. (2008). *Hierarchical Modeling
 #'   and Inference in Ecology*. Academic Press.
-#'
-#' Kery, M., & Royle, J. A. (2016). *Applied Hierarchical
-#'   Modeling in Ecology, Vol. 1*. Academic Press.
-#'
-#' Socolar, J. B., & Mills, S. C. (2023). flocker: flexible
-#'   occupancy estimation in R. *bioRxiv*.
-#'   \doi{10.1101/2023.10.26.564080}.
-#'
-#' @section JSDM with imperfect detection:
-#' Passing `occ()` to [jsdgam()] with `n_lv > 0` composes the
-#' single-season Bernoulli marginalisation with the Heaps factor
-#' model. The user then gets a hierarchical JSDM. Its three levels each
-#' occupy a distinct dpar:
-#'
-#' \describe{
-#'   \item{**lowest level**: env-driven latent factors.}{
-#'     `factor_formula = ~ s(env, by = lv_axis())` makes each
-#'     latent factor a smooth of an environmental covariate. The
-#'     factors track env gradients. They are not free draws.}
-#'   \item{**middle level**: species loadings on occupancy.}{Each
-#'     species `s` loads on the `K` factors via the row
-#'     `Z[s, :]`, so
-#'     `logit_psi[s, i] = b_X(species) + Z[s, :] %*% lv[i, :]`
-#'     for site `i`. `Z` is identified up to sign via Heaps and
-#'     Jermyn (2024) post-hoc QR.}
-#'   \item{**top level**: imperfect detection.}{The `p` dpar
-#'     carries its own brms sub-formula (e.g.,
-#'     `bf(y ~ species, p ~ s(tod))`) so the per-visit detection
-#'     process is modelled independently of the latent occupancy
-#'     state. The lpmf marginalises latent `z` per closure unit. No
-#'     part of the factor model depends on the marginalisation. No part
-#'     of the marginalisation depends on the factor model.}
-#' }
-#'
-#' See [jsdgam()] for the
-#' wrapper-level API and [lv_axis()] for the `by = lv_axis()`
-#' sentinel that turns smooths into per-factor regressors.
-#'
-#' @section Cross-reference with ubms / spOccupancy / flocker:
-#' mvgam's `occ()` uses the long-form ecology vocabulary
-#' (`occupancy`, `detection`) in `predict(type = ...)`. The
-#' equivalents in adjacent packages:
-#' \itemize{
-#'   \item ubms
-#'     (\url{https://github.com/ecoverseR/ubms}):
-#'     `predict(submodel = "state")` returns marginal psi;
-#'     `predict(submodel = "det")` returns p;
-#'     `posterior_predict(param = "z")` returns 0/1 latent
-#'     occupancy draws conditioned on the observed history.
-#'   \item spOccupancy
-#'     (\url{https://github.com/ecoverseR/spOccupancy}):
-#'     `psi.0.samples` (marginal psi), `z.0.samples` (latent z
-#'     draws).
-#'   \item flocker
-#'     (\url{https://github.com/jsocolar/flocker}):
-#'     `fitted_flocker(components = "occ" | "det")` for linpred
-#'     extraction; `get_Z(history_condition = TRUE)` for
-#'     conditional z draws.
-#' }
-#'
-#' mvgam: `predict(fit, type = "latent_state")` returns the
-#' conditional probability `P(z = 1 | y)` per site;
-#' `posterior_occupancy(fit, conditional = TRUE, draw = TRUE)`
-#' returns 0/1 z draws; `posterior_occupancy(conditional = FALSE)`
-#' returns marginal psi. `predict(fit, type = "detection")`
-#' returns the per-visit detection probability \eqn{p_{g,j}} on the
-#' response scale.
-#'
-#' @param multi_season Logical. When `TRUE`, closure units are
-#'   defined by `(series, site, time)`. The default is `(series, time)`.
-#'   The data must carry a `site` column. Produce it from a 4-axis
-#'   observation array with [pivot_detection_array()] (set
-#'   `multi_season = "hierarchical"`).
-#'   The per-unit visits shrink to those within a single
-#'   (site, season): with few visits per unit and low detection
-#'   probability the posterior occupancy can become prior-dominated;
-#'   check marginal posteriors against the prior (e.g. via
-#'   `pp_check(fit)`) and consider a hierarchical detection sub-
-#'   formula (`p ~ ...`) to share detection information across units.
 #'
 #' @examples
 #' \dontrun{
 #' # Detections at 50 sites, each visited four times, with covariates
 #' # on occupancy and on detection
-#' set.seed(4)
+#' set.seed(6)
 #' simdat <- sim_closure_unit_data(family = occ(), n_species = 1L,
 #'                                 n_sites = 50L, n_visits = 4L,
 #'                                 type = 1L)
@@ -3301,12 +2730,15 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' )
 #' summary(mod)
 #'
-#' # Occupancy along the gradient, on the logit scale
-#' conditional_effects(mod, type = "link")
+#' # Occupancy along the gradient and detection through the day
+#' conditional_effects(mod, effects = "env", type = "latent_state")
+#' conditional_effects(mod, effects = "tod_c", type = "detection")
 #'
 #' # Occupancy and detection, separated by the model
 #' head(predict(mod, type = "latent_state"))
 #' head(predict(mod, type = "detection"))
+#'
+#' # Next, pp_check(mod, type = "fit_stat") tests the fit of each unit
 #' }
 #'
 #' @seealso [nmix()] for the related N-mixture family and
@@ -3319,51 +2751,13 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' @family observation families
 #' @export
 occ <- function(multi_season = FALSE) {
-  checkmate::assert_flag(multi_season)
-  fam <- brms::custom_family(
-    name  = "occ",
-    dpars = c("mu", "p"),
-    links = c("logit", "logit"),
-    # mu (psi) and p are both probabilities. Setting both bounds
-    # at the family level lets brms declare the scalar-dpar case
-    # with the right constraints; the lpmf converts back to
-    # logit scale internally for `log_inv_logit` /
-    # `bernoulli_logit_lpmf` stability.
-    lb    = c(0, 0),
-    ub    = c(1, 1),
-    type  = "int",
-    loop  = FALSE
+  # The state is binary, which caps every unit at one. `Y_max` marks a
+  # unit with a detection, which the density treats as occupied.
+  detection_family(
+    "occ", c("logit", "logit"), ub = c(1, 1),
+    vars = c("Y_max", "visit_idx"), binary = TRUE, default_cap = 1L,
+    multi_season = multi_season
   )
-  link_info <- stats::make.link(fam$link)
-  fam$linkinv <- link_info$linkinv
-  fam$linkfun <- link_info$linkfun
-  attr(fam, "mvgam_closure_unit")    <- TRUE
-  attr(fam, "mvgam_binary_response") <- TRUE
-  # Latent z is binary. The per-unit upper truncation is always 1.
-  # closure_unit_default_cap() takes this attribute and makes the `cap`
-  # data column optional for occ() fits.
-  attr(fam, "mvgam_default_cap")     <- 1L
-  attr(fam, "mvgam_predict_types")   <- c("latent_state", "detection")
-  # Multi-season grouping. Closure units are defined by
-  # (series, site, season). The default is (series, time).
-  # The data must carry a `site` column. `pivot_detection_array`
-  # with `multi_season = "hierarchical"` emits it. Downstream
-  # readers (validator, array builder, log_lik, pp_check, tidier,
-  # plot_factors, kfold) all consume the attribute via
-  # closure_unit_grouping().
-  if (multi_season) {
-    attr(fam, "mvgam_unit_grouping") <- c("series", "site", "time")
-  }
-  # occ_lpmf drops K_max from the nmix signature because the
-  # latent z is binary. The lpmf takes Y_max directly as the per-unit
-  # `any detection?` indicator.
-  attr(fam, "mvgam_vars") <- c(
-    "N_unit", "n_rep", "Y_max", "visit_idx"
-  )
-  # mvgam_stanvars is populated at data preparation time, once
-  # the closure-unit arrays from the user's data are known.
-  attr(fam, "mvgam_stanvars") <- NULL
-  fam
 }
 
 #' Stan lines that dispatch a closure-unit partial sum to reduce_sum
@@ -3395,50 +2789,37 @@ closure_unit_reduce_sum_lines <- function(partial_sum, args) {
   )
 }
 
-#' Stan function block for the closure-unit single-season
-#' occupancy lpmf
+#' The comment above a closure-unit family's partial-sum function
 #'
-#' Implements the MacKenzie et al. (2002) Bernoulli-binomial
-#' marginalisation over the binary latent state `z` as a
-#' `log_sum_exp` of the occupied (`z = 1`) and unoccupied
-#' (`z = 0`) branches. For closure units with at least one
-#' detection (`Y_max[g] >= 1`), `z = 1` is certain and the
-#' marginalisation collapses to the occupied branch directly
-#' (flocker / ubms fast path).
+#' @param name The family's Stan name, such as `"nmix"`
+#' @param hoisted The link-scale vectors its wrapper computes once
+#' @return Lines of Stan comment
+#' @noRd
+partial_sum_header <- function(name, hoisted) {
+  c(
+    paste0("  // reduce_sum, called from ", name, "_lpmf(), passes this"),
+    "  // function a slice of the closure-unit index and sums the",
+    "  // slice's log likelihood. A model compiled with stan_threads",
+    "  // runs the slices on separate threads. The wrapper computes",
+    paste0("  // ", hoisted, " once for every slice.")
+  )
+}
+
+#' Stan functions for the `occ()` density
 #'
-#' Numerical-stability notes:
-#'   - `mu` arrives from brms as the inv-logit linear predictor
-#'     (probability); converting back to
-#'     `logit_psi = logit(mu)` lets us use `log_inv_logit`
-#'     and `log1m_inv_logit` for the two branches without
-#'     boundary underflow.
-#'   - `p` arrives from brms as the inv-logit linear predictor
-#'     (probability); converting back to
-#'     `logit_p = logit(p)` keeps `bernoulli_logit_lpmf` /
-#'     `log1m_inv_logit` stable at probabilities close to 0 or
-#'     1.
-#'   - `log_sum_exp` factors out the larger of the two log
-#'     contributions before exponentiating. The small-probability
-#'     branch can decay to a very large negative value without affecting
-#'     the result.
+#' A unit with a detection is occupied. Its log likelihood is
+#' `log(psi)` plus the Bernoulli detections. A unit without one sums
+#' the occupied and unoccupied branches through `log_sum_exp()`
+#' (MacKenzie et al. 2002). The wrapper converts `mu` and `p` back to
+#' the logit scale. `log_inv_logit()` and `log1m_inv_logit()` then stay
+#' finite at probabilities near 0 or 1.
 #'
-#' @param max_rep Positive integer maximum visit count across
-#'   closure units. Sets the column count of `visit_idx`. The
-#'   Stan loop uses only the first `n_rep[g]` columns per unit.
 #' @return Character scalar of Stan function code.
 #' @noRd
-occ_stan_funs <- function(max_rep) {
-  checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
+occ_stan_funs <- function() {
+  args <- closure_unit_density_args(occ())
   paste(c(
-    "  // Per-closure-unit partial sum body. reduce_sum (called from",
-    "  // the occ_lpmf wrapper) hands this function a slice [start:end]",
-    "  // of the closure-unit index and gets back the partial log-",
-    "  // likelihood for that chunk. When the model is compiled with",
-    "  // stan_threads (auto-set by `threads = N` on mvgam()), TBB",
-    "  // splits the slice across threads; otherwise reduce_sum runs",
-    "  // serially. Link-scale conversions live on the wrapper so per-",
-    "  // thread chunks see precomputed logit_psi / logit_p vectors",
-    "  // instead of redoing the dpar transform per chunk.",
+    partial_sum_header("occ", "logit_psi and logit_p"),
     "  real partial_sum_occ_lpmf(",
     "    array[] int g_slice,",
     "    int start, int end,",
@@ -3472,21 +2853,7 @@ occ_stan_funs <- function(max_rep) {
     "    return lp;",
     "  }",
     "",
-    "  // Per-visit implementation. brms passes `mu` and `p` as",
-    "  // vectors when either dpar carries a sub-formula (e.g.",
-    "  // bf(y ~ s(elev), p ~ s(tod))). The overloaded scalar",
-    "  // signatures below broadcast the static-dpar cases via",
-    "  // rep_vector and delegate to this entry point.",
-    "  real occ_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    vector p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx) {",
-    "    // Link-scale conversions hoisted to the wrapper so the",
-    "    // per-thread partial sum sees them precomputed.",
+    stan_density_header("occ", "lpmf", args),
     "    vector[num_elements(mu)] logit_psi = logit(mu);",
     "    vector[num_elements(p)]  logit_p   = logit(p);",
     closure_unit_reduce_sum_lines(
@@ -3494,180 +2861,364 @@ occ_stan_funs <- function(max_rep) {
       "      y, logit_psi, logit_p, n_rep, Y_max, visit_idx"
     ),
     "  }",
-    "",
-    "  // Scalar-p entry point: broadcasts to per-visit length",
-    "  // and dispatches to the vector implementation.",
-    "  real occ_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    real p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx) {",
-    "    int N = num_elements(mu);",
-    "    return occ_lpmf(y | mu, rep_vector(p, N), N_unit,",
-    "                    n_rep, Y_max, visit_idx);",
-    "  }",
-    "",
-    "  // Scalar-mu entry point: same broadcast for the static",
-    "  // occupancy case.",
-    "  real occ_lpmf(",
-    "    array[] int y,",
-    "    real mu,",
-    "    vector p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx) {",
-    "    int N = num_elements(p);",
-    "    return occ_lpmf(y | rep_vector(mu, N), p, N_unit,",
-    "                    n_rep, Y_max, visit_idx);",
-    "  }",
-    "",
-    "  // Both-scalar entry point: broadcasts both dpars.",
-    "  real occ_lpmf(",
-    "    array[] int y,",
-    "    real mu,",
-    "    real p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx) {",
-    "    int N = num_elements(y);",
-    "    return occ_lpmf(y | rep_vector(mu, N), rep_vector(p, N),",
-    "                    N_unit, n_rep, Y_max, visit_idx);",
-    "  }"
+    broadcast_overloads("occ", "lpmf", args, "p")
   ), collapse = "\n")
 }
 
-#' Build the closure-unit Stan stanvars for an `occ()` fit
+#' Stan code and data of an `occ()` fit
 #'
-#' Wraps the shared `make_closure_unit_arrays_stanvars()` with
-#' the occ-specific function block. `K_max` is omitted (latent z
-#' is binary) and `Y_max` is bounded at 1 to mirror the response
-#' support. The lpmf takes `Y_max[g] >= 1` as the per-unit
-#' "any detection?" indicator that drives the fast-path branch.
+#' The occupancy state is binary and takes no `K_max`. `Y_max` is
+#' bounded by 1, as the response is. `Y_max[g] = 1` marks a unit with
+#' at least one detection, which the density treats as occupied.
 #'
 #' @inheritParams make_closure_unit_arrays_stanvars
-#' @return A `brmsstanvars` object.
+#' @return A `brmsstanvars` object
 #' @noRd
 make_occ_stanvars <- function(arrays) {
   make_closure_unit_arrays_stanvars(
     arrays,
     family_funs_name = "occ_funs",
-    family_funs      = occ_stan_funs(arrays$max_rep),
-    y_max_upper      = 1L,
-    include_K_max    = FALSE
+    family_funs = occ_stan_funs(),
+    y_max_upper = 1L,
+    include_K_max = FALSE
   )
 }
 
-#' Closure-unit Dirichlet-on-the-simplex family
+#' A family whose likelihood takes a vector of responses per unit
 #'
-#' Composes Stan's native `dirichlet_logit_lpdf` with the mvgam
-#' factor-model trend. Each closure unit (site) carries K rows
-#' (one per species / response component) whose response values
-#' sum to 1 within the unit. The custom lpdf assembles the per-unit
-#' K-vectors of response and linear predictor inside Stan, then
-#' calls Stan's native `dirichlet_logit_lpdf(y_unit | mu_unit, phi)`
-#' which maps `mu_unit` through `softmax` and parameterises the
-#' Dirichlet by `softmax(mu_unit) * phi`.
+#' `diri()`, `multi()`, `categ()`, `mvn()` and `mvt()` share their
+#' construction. Each closure unit holds one row per response
+#' component. brms passes the indexing arrays in `mvgam_vars` to the
+#' family's Stan density, which assembles each unit's vector.
 #'
-#' Distributional parameters:
-#' \describe{
-#'   \item{`mu`}{per-row latent score on the unconstrained scale.
-#'     Softmax inside the lpdf maps the K scores per unit to a
-#'     simplex. Default link is identity.}
-#'   \item{`phi`}{Dirichlet concentration (positive). Larger `phi`
-#'     concentrates draws near `softmax(mu_unit)`. Default link is
-#'     log.}
+#' @param name Family name, which names its Stan density
+#' @param type `"real"` or `"int"`, the type of the response
+#' @param dpars,links,lb,ub The distributional parameters with their
+#'   links and bounds, as [brms::custom_family()] takes them
+#' @param simplex Logical. `TRUE` marks a family whose density applies
+#'   a softmax to each unit's linear predictors.
+#' @param binary Logical. `TRUE` marks a one-hot binary response.
+#' @param vars Character vector of the Stan arguments the density takes
+#'   after the indexing arrays
+#' @return A `customfamily` carrying the attributes that route the
+#'   closure-unit data preparation, validation and Stan code
+#' @noRd
+multi_response_family <- function(name, type, dpars = "mu",
+                                  links = "identity", lb = NA, ub = NA,
+                                  simplex = FALSE, binary = FALSE,
+                                  vars = character(0L)) {
+  checkmate::assert_flag(simplex)
+  fam <- closure_unit_family(
+    name, type, dpars = dpars, links = links, lb = lb, ub = ub,
+    binary = binary, vars = c("N_unit", "n_rep", "visit_idx", vars)
+  )
+  attr(fam, "mvgam_multi_response") <- TRUE
+  if (simplex) {
+    attr(fam, "mvgam_simplex_response") <- TRUE
+  }
+  fam
+}
+
+
+#' A custom family laid out in closure units
+#'
+#' The construction the detection and multi-response families share.
+#'
+#' @param name Family name, which names its Stan density
+#' @param type `"real"` or `"int"`, the type of the response
+#' @param dpars,links,lb,ub The distributional parameters with their
+#'   links and bounds, as [brms::custom_family()] takes them. The bounds
+#'   let brms declare a scalar parameter in its range.
+#' @param binary Logical. `TRUE` restricts the response to 0 / 1.
+#' @param vars Character vector of the Stan data the density takes
+#' @param predict_types The `predict()` types the family adds
+#' @return A `customfamily` carrying the attributes that route the
+#'   closure-unit data preparation, validation and Stan code
+#' @noRd
+closure_unit_family <- function(name, type, dpars, links, lb, ub,
+                                binary = FALSE, vars,
+                                predict_types = character(0L)) {
+  checkmate::assert_string(name)
+  checkmate::assert_choice(type, c("real", "int"))
+  checkmate::assert_flag(binary)
+  checkmate::assert_character(vars, min.len = 1L)
+  fam <- brms::custom_family(
+    name = name, dpars = dpars, links = links, lb = lb, ub = ub,
+    type = type, loop = FALSE
+  )
+  link_info <- stats::make.link(fam$link)
+  fam$linkinv <- link_info$linkinv
+  fam$linkfun <- link_info$linkfun
+  attr(fam, "mvgam_closure_unit") <- TRUE
+  if (binary) {
+    attr(fam, "mvgam_binary_response") <- TRUE
+  }
+  attr(fam, "mvgam_predict_types") <- predict_types
+  attr(fam, "mvgam_vars") <- vars
+  fam
+}
+
+
+#' A detection family over closure units
+#'
+#' `nmix()` and its variants and `occ()` share their construction. `mu`
+#' is the state parameter and `p` the detection parameter, both bounded
+#' below by zero.
+#'
+#' @param name Family name, which names its Stan density
+#' @param links,ub Links and upper bounds of `mu` and `p`
+#' @param vars The Stan data the density takes after `N_unit` and
+#'   `n_rep`, in its argument order
+#' @param binary Logical. `TRUE` restricts the response to 0 / 1.
+#' @param default_cap,default_cap_buffer The cap of a unit without a
+#'   `cap` column: a fixed value, or a buffer above its largest count
+#' @param multi_season Logical. `TRUE` keys a unit on
+#'   `(series, site, time)`.
+#' @return A `customfamily`
+#' @noRd
+detection_family <- function(name, links, ub, vars, binary = FALSE,
+                             default_cap = NULL, default_cap_buffer = NULL,
+                             multi_season = FALSE) {
+  checkmate::assert_int(default_cap, lower = 1L, null.ok = TRUE)
+  checkmate::assert_int(default_cap_buffer, lower = 0L, null.ok = TRUE)
+  checkmate::assert_flag(multi_season)
+  fam <- closure_unit_family(
+    name, "int", dpars = c("mu", "p"), links = links, lb = c(0, 0),
+    ub = ub, binary = binary, vars = c("N_unit", "n_rep", vars),
+    predict_types = c("latent_state", "detection")
+  )
+  attr(fam, "mvgam_default_cap") <- default_cap
+  attr(fam, "mvgam_default_cap_buffer") <- default_cap_buffer
+  if (multi_season) {
+    attr(fam, "mvgam_unit_grouping") <- c("series", "site", "time")
+  }
+  fam
+}
+
+# Stan types of the data and parameters a closure-unit density takes
+# after its distributional parameters
+CLOSURE_UNIT_ARG_TYPES <- c(
+  N_unit = "int", n_rep = "array[] int", visit_idx = "array[,] int",
+  visit_component = "array[,] int", K_max = "array[] int",
+  Y_max = "array[] int", log_n_lookup = "vector",
+  k_start_ppm = "array[] int", Psi = "vector", nu = "real"
+)
+
+#' The arguments of a closure-unit family's Stan density
+#'
+#' @param family A closure-unit family
+#' @return Named character vector of Stan types, in argument order:
+#'   the response, the distributional parameters, then `mvgam_vars`
+#' @noRd
+closure_unit_density_args <- function(family) {
+  vars <- attr(family, "mvgam_vars", exact = TRUE)
+  c(
+    y = if (identical(family$type, "int")) "array[] int" else "vector",
+    stats::setNames(rep("vector", length(family$dpars)), family$dpars),
+    CLOSURE_UNIT_ARG_TYPES[vars]
+  )
+}
+
+#' The opening lines of a Stan density
+#'
+#' @param name Family name
+#' @param kind `"lpdf"` or `"lpmf"`
+#' @param args Named character vector of Stan types, in argument order
+#' @return Character vector of Stan lines
+#' @noRd
+stan_density_header <- function(name, kind, args) {
+  checkmate::assert_character(args, min.len = 1L, names = "unique")
+  ends <- c(rep(",", length(args) - 1L), ") {")
+  c(paste0("  real ", name, "_", kind, "("),
+    paste0("    ", args, " ", names(args), ends))
+}
+
+#' Stan overloads taking scalar distributional parameters
+#'
+#' brms passes a distributional parameter as a scalar when it has no
+#' formula. One overload per subset of `scalar` declares those
+#' parameters `real` and calls the vector density with them repeated.
+#'
+#' @inheritParams stan_density_header
+#' @param scalar Names of the parameters that may arrive as scalars
+#' @return Character vector of Stan lines
+#' @noRd
+broadcast_overloads <- function(name, kind, args, scalar) {
+  checkmate::assert_subset(scalar, names(args))
+  subsets <- unlist(lapply(seq_along(scalar), function(k) {
+    utils::combn(scalar, k, simplify = FALSE)
+  }), recursive = FALSE)
+  unlist(lapply(subsets, function(sub) {
+    types <- args
+    types[sub] <- "real"
+    call <- ifelse(names(args) %in% sub,
+                   paste0("rep_vector(", names(args), ", N)"), names(args))
+    c(
+      "",
+      stan_density_header(name, kind, types),
+      "    int N = num_elements(y);",
+      paste0("    return ", name, "_", kind, "(", call[1L], " | ",
+             paste(call[-1L], collapse = ", "), ");"),
+      "  }"
+    )
+  }))
+}
+
+#' The Stan density of a family that takes a vector per unit
+#'
+#' The density loops over the closure units. In each it gathers the
+#' unit's responses and linear predictors through `visit_idx` and adds
+#' the unit's log density to `lp`.
+#'
+#' @param family The family, whose name, response type, parameters and
+#'   `mvgam_vars` set the density's signature
+#' @param unit_lines Stan statements run for each unit, after `Kg`,
+#'   `idx` and `y_unit` are declared
+#' @return Character vector of Stan lines
+#' @noRd
+closure_unit_density <- function(family, unit_lines) {
+  checkmate::assert_character(unit_lines, min.len = 1L)
+  kind <- if (identical(family$type, "int")) "lpmf" else "lpdf"
+  y_unit <- if (kind == "lpmf") {
+    "array[Kg] int y_unit  = y[idx];"
+  } else {
+    "vector[Kg] y_unit  = y[idx];"
+  }
+  c(
+    stan_density_header(family$name, kind,
+                        closure_unit_density_args(family)),
+    "    real lp = 0;",
+    "    for (g in 1:N_unit) {",
+    "      int Kg = n_rep[g];",
+    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
+    paste0("      ", c(y_unit, unit_lines)),
+    "    }",
+    "    return lp;",
+    "  }"
+  )
+}
+
+#' The linear predictors of a unit, shifted to the first component
+#'
+#' A softmax is unchanged by a shift shared across a unit's
+#' components. Subtracting the first component's predictor removes that
+#' shift, as brms's reference category does.
+#'
+#' @noRd
+SIMPLEX_MU_UNIT <- "vector[Kg] mu_unit = mu[idx] - mu[idx[1]];"
+
+#' The Stan statements of the families with a residual scale per
+#' component
+#'
+#' `mvn()` and `mvt()` give each component its own scale `Psi`.
+#'
+#' @param density The statement adding a unit's log density to `lp`
+#' @return Character vector of Stan lines
+#' @noRd
+component_scale_unit_lines <- function(density) {
+  c(
+    "vector[Kg] mu_unit = mu[idx];",
+    "vector[Kg] psi_unit = Psi[visit_component[g, 1:Kg]];",
+    density
+  )
+}
+
+#' The Stan code a multi-response family adds to a model
+#'
+#' The family's density and the closure-unit indexing arrays, with the
+#' residual parameters of `mvn()` and `mvt()` from
+#' `component_scale_stanvars()`. A unit's likelihood takes its whole
+#' response vector, which leaves no truncation bound to declare.
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @param family The family object
+#' @param prior A `brmsprior`, or `NULL`. A row with `class = "Psi"`
+#'   or `class = "nu"` sets the prior on that parameter.
+#' @return A `brmsstanvars` object
+#' @noRd
+make_multi_response_stanvars <- function(arrays, family, prior = NULL) {
+  checkmate::assert_true(is_multi_response_family(family))
+  name <- family$name
+  funs <- switch(
+    name,
+    diri = diri_stan_funs(),
+    multi = multi_stan_funs(),
+    categ = categ_stan_funs(),
+    mvn = mvn_stan_funs(),
+    mvt = mvt_stan_funs()
+  )
+  has_scale <- family_has_component_scale(family)
+  stanvars <- make_closure_unit_arrays_stanvars(
+    arrays,
+    family_funs_name = paste0(name, "_funs"),
+    family_funs = funs,
+    include_K_max = FALSE,
+    include_Y_max = FALSE,
+    include_component = has_scale
+  )
+  if (has_scale) {
+    stanvars <- combine_stanvars(
+      stanvars,
+      component_scale_stanvars(as.integer(arrays$max_rep), name, prior)
+    )
+  }
+  stanvars
+}
+
+#' Dirichlet family for compositions
+#'
+#' For proportions measured together on each unit that sum to one, such
+#' as the cover shares of several species at a site. The data hold one
+#' row per component at each unit, whose responses sum to one within
+#' the unit. Each unit's vector of `K` shares is Dirichlet with
+#' concentrations `softmax(mu) * phi`. `mu` holds the components'
+#' linear predictors. `phi` sets how tightly the shares gather around
+#' `softmax(mu)` (Aitchison 1982).
+#'
+#' [jsdgam()] fits the family, taking the unit and component columns
+#' and the number of latent factors `n_lv`. The factors give the
+#' components correlated departures from their expected shares
+#' (Warton et al. 2015).
+#'
+#' @section Identification:
+#' The softmax is unchanged when the same constant is added to every
+#' component. The data then identify neither a shift of the linear
+#' predictors that every component shares nor a shift of the loadings
+#' that every component shares. mvgam removes both:
+#' \itemize{
+#'   \item The first component is the reference. Its linear predictor
+#'     is subtracted from every component's before the softmax, as in
+#'     brms's `dirichlet()` family. A term that acts on every
+#'     component alike, such as `Intercept` or `env` in
+#'     `y ~ env * series`, then cancels. Its posterior is its prior,
+#'     `student_t(3, 0, 2.5)` by default. The `series` terms are
+#'     contrasts with the first component. `jsdgam()` warns when the
+#'     formula has no term that varies by component.
+#'   \item Each column of the loadings `Z` sums to zero, through
+#'     Stan's `sum_to_zero_vector` type.
 #' }
+#' A `loadings_prior` combines with that constraint.
 #'
-#' Identification under the K-row free `Z` factor model: softmax
-#' is shift-invariant in `mu_unit` along two independent directions,
-#' both removed by HARD constraints (Stan >= 2.36). Each column of
-#' `Z` is declared as Stan's native `sum_to_zero_vector[K]` so
-#' column sums are exactly zero by construction (no soft prior,
-#' no scale to tune; see Mitzi Morris "The Sum-to-Zero Constraint
-#' in Stan" for the Helmert-style transform Stan uses internally).
-#' The per-site K-shared fixed-effect shift is eliminated inside
-#' the lpdf by subtracting `mu_unit[1]` from all entries before
-#' softmax, matching the brms-native dirichlet reference-category
-#' parameterisation. A weakly-informative `student_t(3, 0, 2.5)`
-#' population-effect default prior is also injected because brms
-#' `custom_family()` would otherwise emit flat improper priors;
-#' under the hard mode-2 reference subtraction, any K-shared
-#' coefficient (`b_Intercept`, `b_env`, etc.) has no likelihood
-#' contribution and samples from that prior. A once-per-session warning
-#' is raised by `jsdgam()` when the user's formula contains
-#' no per-`species` interaction term. The `loadings_prior`
-#' matrix-normal prior, when supplied, composes with the sum-to-zero
-#' constraint and is the recommended path when traits or phylogeny are
-#' available.
-#'
-#' Data layout: long format, one row per (site, species), exactly
-#' K rows per site. The user passes the species axis via the
-#' `species` argument on `jsdgam()` (or labels it `series` in the
-#' data when using `mvgam()` directly); the closure-unit data prep
-#' groups by (series, time) so each site forms one closure unit.
-#'
-#' @section Distributional regression on `phi`:
-#' A `phi ~ env` sub-formula in `bf()` (e.g.
-#' `bf(y ~ env * species, phi ~ env, family = diri())` through
-#' `mvgam()`. `jsdgam()` currently exposes only the response formula.
-#' The `phi` sub-formula IS supported at fit time: the lpdf
-#' dispatches `vector phi` vs `real phi` so brms can pass either.
-#' Per-row `phi[i, k]` is collapsed to one scalar per closure unit
-#' by taking `phi[idx[1]]`. This requires the `phi` covariate to be
-#' constant across the K rows of any site (site-level only). A
-#' species-level `phi` covariate is statistically ill-defined for a
-#' Dirichlet observation. If one is passed, the lpdf silently uses row
-#' 1's value. No pre-fit validator checks this contract.
-#'
-#' Post-fit response-scale dispatchers
-#' (`posterior_predict()` / `posterior_epred()` / `log_lik()`)
-#' extract the per-row `phi` linpred via `extract_phi_per_row()`
-#' when a `phi` sub-formula is present, composing it through the
-#' same dpar pipeline as `mu` and collapsing per unit to
-#' `phi[idx[1]]` to mirror the Stan lpdf.
-#'
-#' The default brms prior on `b_phi` regression coefficients is
-#' flat. Consider supplying `prior(student_t(3, 0, 2.5), class = b,
-#' dpar = phi)` via the `priors` argument to regularise the
-#' log-concentration slopes (matches the simplex population-effect
-#' default; flat priors leave room for implausible orders-of-magnitude
-#' phi shifts under modest sample sizes).
+#' @section Regression on `phi`:
+#' `bf(y ~ env * series, phi ~ env)` models the concentration. A unit's
+#' density takes one `phi`. Its covariates must take one value per
+#' unit. mvgam refuses a covariate that varies within a unit.
+#' The coefficients of `phi` take a flat prior by default.
+#' `prior(student_t(3, 0, 2.5), class = b, dpar = phi)` regularises
+#' them.
 #'
 #' @section Post-fit conventions:
-#' `log_lik()`, `loo()` and `waic()` score at the **site grain**,
-#' not the (site, species) row grain. The Stan lpdf evaluates the
-#' joint K-vector Dirichlet density once per closure unit. The per-unit
-#' log-density is attributed to the first row of the unit. The remaining
-#' K - 1 rows return `NA` for `log_lik()`. A row with no density of its
-#' own is spelled `NA`. A `0` there would assert a density of one.
-#' `loo()` would then score the site once per species. This is the
-#' correct grain for joint multi-row outcomes. It matches
-#' the flocker / ubms convention for closure-unit families;
-#' Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
-#' for PSIS-LOO whenever the per-row likelihoods are not
-#' conditionally independent given the parameters. To compare
-#' simplex fits via `loo_compare()` against models scored at the
-#' row grain, refit the row-grain model on the unit-aggregated
-#' response or use `waic()` on both fits at consistent grain.
+#' The density is joint over a unit's components, which makes the unit
+#' the grain of `log_lik()`, `loo()` and `waic()` (Vehtari et al.
+#' 2017). `log_lik()` gives each unit's log density on its first row
+#' and `NA` on the others. `loo()` then counts each unit once.
+#' `loo_compare()` needs every model it compares scored at that grain.
 #'
-#' `posterior_linpred()` returns the **uncentred** linear predictor
-#' `mu[i, k]` per row (the value brms emits before the lpdf body
-#' applies `mu_unit = mu[idx] - mu[idx[1]]` to remove the per-site
-#' K-shared shift). This is the natural scale for `marginaleffects`
-#' contrasts on the species axis. For probabilities on the simplex,
-#' use `posterior_epred()`, which applies the reference subtraction
-#' and softmax internally and returns one probability per (site,
-#' species) row summing to 1 within each site.
+#' `posterior_linpred()` gives `mu` per row before the reference
+#' subtraction. `posterior_epred()` gives the expected shares, which
+#' sum to one within each unit.
 #'
-#' @return A `brms::custom_family` object tagged with the
-#'   `mvgam_closure_unit`, `mvgam_multi_response` and
-#'   `mvgam_simplex_response` attributes. They route the downstream data
-#'   prep, validation and Stan emission.
+#' @return A family object to pass to [jsdgam()] or [mvgam()].
 #'
 #' @references
 #' Aitchison, J. (1982). The statistical analysis of compositional
@@ -3694,8 +3245,8 @@ make_occ_stanvars <- function(arrays) {
 #' \dontrun{
 #' # Shares of three categories at 60 sites along an environmental
 #' # gradient
-#' simdat <- sim_jsdm(family = diri(), n_species = 3L, n_sites = 60L,
-#'                    seed = 2L)
+#' simdat <- sim_jsdgam(family = diri(), n_species = 3L, n_sites = 60L,
+#'                      seed = 2L)
 #' head(simdat$data_train)
 #'
 #' # `env * series` gives each category its own slope
@@ -3727,186 +3278,58 @@ make_occ_stanvars <- function(arrays) {
 #' @family observation families
 #' @export
 diri <- function() {
-  fam <- brms::custom_family(
-    name  = "diri",
-    dpars = c("mu", "phi"),
-    links = c("identity", "log"),
-    lb    = c(NA, 0),
-    ub    = c(NA, NA),
-    type  = "real",
-    loop  = FALSE
+  multi_response_family(
+    "diri", type = "real", dpars = c("mu", "phi"),
+    links = c("identity", "log"), lb = c(NA, 0), ub = c(NA, NA),
+    simplex = TRUE
   )
-  link_info_mu <- stats::make.link("identity")
-  fam$linkinv <- link_info_mu$linkinv
-  fam$linkfun <- link_info_mu$linkfun
-  attr(fam, "mvgam_closure_unit")      <- TRUE
-  attr(fam, "mvgam_multi_response")    <- TRUE
-  attr(fam, "mvgam_simplex_response")  <- TRUE
-  # Dirichlet has no latent-state predict surface; downstream
-  # `predict()` and `posterior_predict()` use the standard
-  # response-scale dispatch.
-  attr(fam, "mvgam_predict_types")     <- character(0L)
-  # brms threads these data arrays into the lpdf call site so the
-  # Stan function block can assemble the K-vector per unit.
-  attr(fam, "mvgam_vars") <- c(
-    "N_unit", "n_rep", "visit_idx"
-  )
-  attr(fam, "mvgam_stanvars") <- NULL
-  fam
 }
 
-#' Stan function block for the closure-unit Dirichlet lpdf
+#' Stan functions of the [diri()] density
 #'
-#' Assembles the per-unit K-vector of response values and linear
-#' predictor scores from the long-format `Y` and `mu` arrays via
-#' `visit_idx`, then calls Stan's native
-#' `dirichlet_logit_lpdf(y_unit | mu_unit, phi)` once per closure
-#' unit. The softmax over `mu_unit` parameterises the Dirichlet,
-#' so the K mu rows are interpretable on a common scale. The
-#' post-hoc Heaps QR identification of `Z` + the hard
-#' `sum_to_zero_vector[K]` constraint on Z columns + the per-unit
-#' `mu_unit = mu[idx] - mu[idx[1]]` reference subtraction together
-#' fix the three shift modes that softmax otherwise leaves in
-#' `mu_unit`.
+#' brms calls `diri_lpdf()` once per log density evaluation, with the
+#' long-format `Y` and `mu` and the closure-unit arrays `family$vars`
+#' names. Each unit's shares are Dirichlet with concentrations
+#' `softmax(mu_unit) * phi`, after the reference subtraction of
+#' `SIMPLEX_MU_UNIT`.
 #'
-#' brms calls this function ONCE per likelihood evaluation with
-#' the full `Y` and `mu` vectors plus the closure-unit indexing
-#' arrays, passed in via `family$vars`.
-#'
-#' @return A character scalar suitable for
-#'   `brms::stanvar(scode = ..., block = "functions")`.
+#' @return Stan code for the functions block
 #' @noRd
 diri_stan_funs <- function() {
-  # Stan's native `dirichlet_lpdf(y | alpha)` is the built-in for the
-  # Dirichlet density. `dirichlet_logit_lpdf(y | mu, phi)` is a helper
-  # that brms emits in its native Dirichlet code. The custom family does
-  # not trigger that emission. The logit parameterisation is applied
-  # explicitly via `softmax(mu_unit) * phi`. `dirichlet_lpdf` is then
-  # called on the result.
-  # Mode-2 identification: subtract `mu_unit[1]` from all entries
-  # before softmax. Softmax is shift-invariant. The likelihood is
-  # identical to the unshifted form. The subtraction removes the per-site
-  # K-shared shift mode by construction. Paired with the hard
-  # `sum_to_zero_vector` constraint on Z columns (mode-1), this
-  # leaves the K-shared population effects (`b_Intercept`, `b_env`,
-  # etc.) sampling from their `student_t(3, 0, 2.5)` default prior
-  # with no likelihood contribution, matching brms-native dirichlet's
-  # K-1 reference-category parameterisation while keeping `Z` fully
-  # K-row symmetric in the column space (Z[1, :] is determined by
-  # Z[2..K, :] through the sum-to-zero constraint).
-  #
-  # Per-unit phi: the Dirichlet concentration applies to the
-  # K-vector as a whole, so `phi` must be constant across the K
-  # rows of a closure unit. The vector-phi entry takes
-  # `phi[idx[1]]` for unit g; the scalar-phi entry broadcasts
-  # to the same value. brms emits the vector-phi entry when the
-  # user supplies a `phi ~ ...` sub-formula and the scalar-phi
-  # entry otherwise.
-  paste(
-    "  real diri_lpdf(",
-    "    vector y,",
-    "    vector mu,",
-    "    vector phi,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[,] int visit_idx) {",
-    "    real lp = 0;",
-    "    for (g in 1:N_unit) {",
-    "      int Kg = n_rep[g];",
-    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
-    "      vector[Kg] y_unit  = y[idx];",
-    "      vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
-    "      real phi_g = phi[idx[1]];",
-    "      lp += dirichlet_lpdf(y_unit | softmax(mu_unit) * phi_g);",
-    "    }",
-    "    return lp;",
-    "  }",
-    "",
-    "  // Scalar-phi entry point: broadcasts to vector phi for the",
-    "  // no-sub-formula case where brms emits a scalar phi dpar.",
-    "  real diri_lpdf(",
-    "    vector y,",
-    "    vector mu,",
-    "    real phi,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[,] int visit_idx) {",
-    "    int N = num_elements(y);",
-    "    return diri_lpdf(y | mu, rep_vector(phi, N), N_unit,",
-    "                    n_rep, visit_idx);",
-    "  }",
-    sep = "\n"
-  )
+  # `phi` is the concentration of the whole vector, which takes the
+  # value on the unit's first row. brms passes a vector `phi` when it
+  # has a formula and a scalar otherwise. The scalar form broadcasts.
+  paste(c(
+    closure_unit_density(
+      diri(),
+      unit_lines = c(
+        SIMPLEX_MU_UNIT,
+        "real phi_g = phi[idx[1]];",
+        "lp += dirichlet_lpdf(y_unit | softmax(mu_unit) * phi_g);"
+      )
+    ),
+    broadcast_overloads("diri", "lpdf", closure_unit_density_args(diri()),
+                        "phi")
+  ), collapse = "\n")
 }
 
-#' Build the closure-unit Stan stanvars for an diri() fit
+#' Multinomial family for counts over several categories
 #'
-#' Wraps the shared `make_closure_unit_arrays_stanvars()` with the
-#' Dirichlet function block. Skips `K_max` and `Y_max` because the
-#' per-unit Dirichlet likelihood takes the K-vector of responses directly,
-#' without truncation.
+#' For counts of several categories made together on each unit, such
+#' as the sequence counts of several taxa in a sample. The data hold
+#' one row per category at each unit. Each unit's vector of `K` counts
+#' is multinomial with probabilities `softmax(mu)`, where `mu` holds
+#' the categories' linear predictors. A unit's total is the sum of its
+#' counts and may differ between units.
 #'
-#' @inheritParams make_closure_unit_arrays_stanvars
-#' @return A `brmsstanvars` object.
-#' @noRd
-make_diri_stanvars <- function(arrays) {
-  # The mode-1 Z-column sum-to-zero constraint is enforced in the trend
-  # pipeline (generate_factor_model() in R/stan_assembly.R). The mode-2
-  # per-site mu_unit constraint is enforced in the lpdf function block
-  # (diri_stan_funs() above). Neither is bundled here. mvgam's
-  # sort_stanvars() block-reordering would place a family-bundle
-  # constraint before Z and N_lv_trend are declared.
-  make_closure_unit_arrays_stanvars(
-    arrays,
-    family_funs_name = "diri_funs",
-    family_funs      = diri_stan_funs(),
-    include_K_max    = FALSE,
-    include_Y_max    = FALSE
-  )
-}
-
-#' Closure-unit Multinomial-on-the-simplex family
+#' [jsdgam()] fits the family, taking the unit and category columns
+#' and the number of latent factors `n_lv`. The constraints that
+#' identify the model are those of [diri()].
 #'
-#' Composes Stan's native `multinomial_logit_lpmf` with the mvgam
-#' factor-model trend. Each closure unit (site) carries K rows
-#' (one per species / response component) whose integer counts sum
-#' to a per-site total `N_site = sum(Y_unit)`. The custom lpmf
-#' assembles the per-unit K-vectors of counts and linear predictor
-#' scores inside Stan, then calls Stan's native
-#' `multinomial_logit_lpmf(y_unit_int | mu_unit)` which applies
-#' `softmax` over `mu_unit` to obtain the K cell probabilities.
-#'
-#' The multinomial total `N_site` varies freely across sites
-#' (each site has its own `sum(Y_unit)` as the implicit total
-#' trials), which is desirable for ecological count data and
-#' microbiome read-depth differences. No additional `N_site` data
-#' field is required because `sum(Y_unit)` is the sufficient
-#' statistic for the trial count.
-#'
-#' Distributional parameters:
-#' \describe{
-#'   \item{`mu`}{per-row latent score on the unconstrained scale.
-#'     Softmax inside the lpmf maps the K scores per unit to a
-#'     simplex of cell probabilities. Default link is identity.}
-#' }
-#'
-#' Identification: identical to [diri()]. Each `Z` column is
-#' declared as `sum_to_zero_vector[K]` so column sums are exactly
-#' zero by construction (Stan >= 2.36). The lpdf body subtracts
-#' `mu_unit[1]` from all entries before softmax, which removes the
-#' K-shared fixed-effect shift. Both constraints are hard (no soft
-#' priors); the K species are kept symmetric in the loadings via
-#' the column-sum-zero manifold.
-#'
-#' Data layout: long format, one row per (site, species), exactly
-#' K rows per site. The integer count for that (site, species)
-#' cell is the response.
-#'
+#' @inheritSection diri Identification
 #' @inheritSection diri Post-fit conventions
 #'
-#' @return A `brms::custom_family` object tagged with the
-#'   `mvgam_closure_unit`, `mvgam_multi_response` and
-#'   `mvgam_simplex_response` attributes.
+#' @return A family object to pass to [jsdgam()] or [mvgam()].
 #'
 #' @references
 #' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
@@ -3914,133 +3337,71 @@ make_diri_stanvars <- function(arrays) {
 #'   variables: joint modeling in community ecology. *Trends in
 #'   Ecology and Evolution*, 30(12):766-779.
 #'   \doi{10.1016/j.tree.2015.09.007}
+#'
+#' @examples
+#' \dontrun{
+#' # Counts of four categories at 60 sites, 30 per site
+#' simdat <- sim_jsdgam(family = multi(), n_species = 4L, n_sites = 60L,
+#'                      seed = 3L)
+#'
+#' fit <- jsdgam(
+#'   formula        = y ~ env * series,
+#'   factor_formula = ~ -1,
+#'   data           = simdat$data_train,
+#'   unit           = time, species = series,
+#'   family         = multi(),
+#'   n_lv           = 1L,
+#'   chains         = 2L,
+#'   silent         = 2
+#' )
+#'
+#' # The probability of each category along the gradient
+#' conditional_effects(fit, effects = "env:series")
+#'
+#' # Next, residual_cor(fit) gives the correlations the factor implies
+#' }
 #'
 #' @family observation families
 #' @export
 multi <- function() {
-  fam <- brms::custom_family(
-    name  = "multi",
-    dpars = "mu",
-    links = "identity",
-    lb    = NA,
-    ub    = NA,
-    type  = "int",
-    loop  = FALSE
-  )
-  link_info <- stats::make.link("identity")
-  fam$linkinv <- link_info$linkinv
-  fam$linkfun <- link_info$linkfun
-  attr(fam, "mvgam_closure_unit")      <- TRUE
-  attr(fam, "mvgam_multi_response")    <- TRUE
-  attr(fam, "mvgam_simplex_response")  <- TRUE
-  attr(fam, "mvgam_predict_types")     <- character(0L)
-  attr(fam, "mvgam_vars") <- c(
-    "N_unit", "n_rep", "visit_idx"
-  )
-  attr(fam, "mvgam_stanvars") <- NULL
-  fam
+  multi_response_family("multi", type = "int", simplex = TRUE)
 }
 
-#' Stan function block for the closure-unit Multinomial lpmf
+#' Stan functions of the [multi()] density
 #'
-#' Assembles the per-unit K-vector of integer counts and linear
-#' predictor scores from the long-format `Y` and `mu` arrays via
-#' `visit_idx`, then calls Stan's native
-#' `multinomial_logit_lpmf(y_unit | mu_unit)` once per closure
-#' unit. Softmax over `mu_unit` parameterises the K cell
-#' probabilities; the multinomial total `sum(y_unit)` enters the
-#' lpmf via the response itself (sufficient statistic).
+#' Each unit's counts are multinomial with probabilities
+#' `softmax(mu_unit)`, after the reference subtraction of
+#' `SIMPLEX_MU_UNIT`. The unit's total is the sum of its counts.
 #'
-#' @return A character scalar suitable for
-#'   `brms::stanvar(scode = ..., block = "functions")`.
+#' @return Stan code for the functions block
 #' @noRd
 multi_stan_funs <- function() {
-  # See `diri_stan_funs()` for the rationale on the mode-2
-  # identification via subtraction of `mu_unit[1]`.
-  paste(
-    "  real multi_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[,] int visit_idx) {",
-    "    real lp = 0;",
-    "    for (g in 1:N_unit) {",
-    "      int Kg = n_rep[g];",
-    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
-    "      array[Kg] int y_unit  = y[idx];",
-    "      vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
-    "      lp += multinomial_logit_lpmf(y_unit | mu_unit);",
-    "    }",
-    "    return lp;",
-    "  }",
-    sep = "\n"
-  )
+  paste(closure_unit_density(
+    multi(),
+    unit_lines = c(SIMPLEX_MU_UNIT,
+                   "lp += multinomial_logit_lpmf(y_unit | mu_unit);")
+  ), collapse = "\n")
 }
 
-#' Build the closure-unit Stan stanvars for a multi() fit
+#' Categorical family for one category observed per unit
 #'
-#' Wraps `make_closure_unit_arrays_stanvars()` with the multinomial
-#' function block. The hard `sum_to_zero_vector[K]` constraint on
-#' the columns of `Z` is emitted from the trend pipeline; the
-#' per-site K-shared shift is removed inside the lpdf by subtracting
-#' `mu_unit[1]`.
+#' For a single category recorded on each unit, such as the dominant
+#' species at a site. The data hold one row per category at each unit,
+#' with response 1 on the observed category and 0 on the others. The
+#' observed category is categorical with probabilities `softmax(mu)`,
+#' where `mu` holds the categories' linear predictors.
 #'
-#' @inheritParams make_closure_unit_arrays_stanvars
-#' @return A `brmsstanvars` object.
-#' @noRd
-make_multi_stanvars <- function(arrays) {
-  # The mode-1 and mode-2 simplex shift constraints are enforced in the
-  # trend pipeline and in the lpdf source helper. See `make_diri_stanvars()`.
-  make_closure_unit_arrays_stanvars(
-    arrays,
-    family_funs_name = "multi_funs",
-    family_funs      = multi_stan_funs(),
-    include_K_max    = FALSE,
-    include_Y_max    = FALSE
-  )
-}
-
-#' Closure-unit Categorical single-trial family
+#' [jsdgam()] fits the family, taking the unit and category columns
+#' and the number of latent factors `n_lv`. The constraints that
+#' identify the model are those of [diri()]. A unit holds one trial.
+#' It informs the factor loadings less than a [multi()] unit of many
+#' counts does. Recovering the residual correlations needs more
+#' units.
 #'
-#' Composes Stan's native `categorical_logit_lpmf` with the mvgam
-#' factor-model trend. Each closure unit (site) carries K rows
-#' (one per category) whose binary responses encode the observed
-#' category in one-hot form: exactly one row per site has `y = 1`
-#' (the observed category) and the remaining K - 1 rows have
-#' `y = 0`. The custom lpmf finds the observed category code from
-#' the one-hot K-vector and calls Stan's
-#' `categorical_logit_lpmf(cat_code | mu_unit)` once per unit.
-#'
-#' Categorical is one-trial multinomial: per-site information
-#' content is at most `log2(K)` bits. Recovery of `Z Z'` from
-#' single-trial categorical data is intrinsically weaker than
-#' multinomial or dirichlet at comparable site counts. Stats
-#' review recommends fixtures with at least 100 sites for K = 4
-#' categories.
-#'
-#' Distributional parameters:
-#' \describe{
-#'   \item{`mu`}{per-row latent score on the unconstrained scale.
-#'     Softmax inside the lpmf maps the K scores per unit to a
-#'     simplex of cell probabilities. Default link is identity.}
-#' }
-#'
-#' Identification: identical to [diri()] and [multi()]. Each `Z`
-#' column is declared as `sum_to_zero_vector[K]` (Stan >= 2.36) and
-#' the lpdf subtracts `mu_unit[1]` from all entries before softmax.
-#' Both constraints are hard.
-#'
-#' Data layout: long format, one row per (site, category), exactly
-#' K rows per site. The response `y` is binary: `y = 1` on the row
-#' corresponding to the observed category for that site and
-#' `y = 0` on the K - 1 other rows.
-#'
+#' @inheritSection diri Identification
 #' @inheritSection diri Post-fit conventions
 #'
-#' @return A `brms::custom_family` object tagged with the
-#'   `mvgam_closure_unit`, `mvgam_multi_response` and
-#'   `mvgam_simplex_response` attributes.
+#' @return A family object to pass to [jsdgam()] or [mvgam()].
 #'
 #' @references
 #' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
@@ -4049,147 +3410,85 @@ make_multi_stanvars <- function(arrays) {
 #'   Ecology and Evolution*, 30(12):766-779.
 #'   \doi{10.1016/j.tree.2015.09.007}
 #'
+#' @examples
+#' \dontrun{
+#' # The one category observed at each of 150 sites
+#' simdat <- sim_jsdgam(family = categ(), n_species = 3L,
+#'                      n_sites = 150L, seed = 4L)
+#'
+#' fit <- jsdgam(
+#'   formula        = y ~ env * series,
+#'   factor_formula = ~ -1,
+#'   data           = simdat$data_train,
+#'   unit           = time, species = series,
+#'   family         = categ(),
+#'   n_lv           = 1L,
+#'   chains         = 2L,
+#'   silent         = 2
+#' )
+#'
+#' # The probability of each category along the gradient
+#' conditional_effects(fit, effects = "env:series")
+#'
+#' # Next, pp_check(fit) compares observed and replicated categories
+#' }
+#'
 #' @family observation families
 #' @export
 categ <- function() {
-  fam <- brms::custom_family(
-    name  = "categ",
-    dpars = "mu",
-    links = "identity",
-    lb    = NA,
-    ub    = NA,
-    type  = "int",
-    loop  = FALSE
-  )
-  link_info <- stats::make.link("identity")
-  fam$linkinv <- link_info$linkinv
-  fam$linkfun <- link_info$linkfun
-  attr(fam, "mvgam_closure_unit")      <- TRUE
-  attr(fam, "mvgam_multi_response")    <- TRUE
-  attr(fam, "mvgam_simplex_response")  <- TRUE
-  # Binary one-hot response; the per-row y value is 0 or 1. The
-  # shared closure-unit data prep treats it as integer counts and
-  # leaves a downstream attr-driven data validator to enforce the
-  # one-hot invariant.
-  attr(fam, "mvgam_binary_response")   <- TRUE
-  attr(fam, "mvgam_predict_types")     <- character(0L)
-  attr(fam, "mvgam_vars") <- c(
-    "N_unit", "n_rep", "visit_idx"
-  )
-  attr(fam, "mvgam_stanvars") <- NULL
-  fam
+  multi_response_family("categ", type = "int", simplex = TRUE,
+                        binary = TRUE)
 }
 
-#' Stan function block for the closure-unit Categorical lpmf
+#' Stan functions of the [categ()] density
 #'
-#' Finds the observed category code in the one-hot K-vector by
-#' scanning `y_unit` for the position of the 1, then calls Stan's
-#' native `categorical_logit_lpmf(cat_code | mu_unit)` once per
-#' closure unit. The scan is `O(K)` per unit per draw, which is
-#' negligible compared with the brms linear-predictor evaluation.
+#' The observed category is the position of the 1 in the unit's
+#' responses. `refuse_off_simplex_response()` admits only units with
+#' exactly one. The category is categorical with probabilities
+#' `softmax(mu_unit)`, after the reference subtraction of
+#' `SIMPLEX_MU_UNIT`.
 #'
-#' Validates the one-hot invariant inside Stan by setting
-#' `cat_code = 0` when no `1` is found; Stan's
-#' `categorical_logit_lpmf` rejects `cat_code = 0` with a domain
-#' error. A malformed (all-zero) site then appears as a sampler
-#' rejection. The fit does not run silently. The R-side data validator
-#' (run before Stan compile) catches the malformed case with a
-#' clearer error message.
-#'
-#' @return A character scalar suitable for
-#'   `brms::stanvar(scode = ..., block = "functions")`.
+#' @return Stan code for the functions block
 #' @noRd
 categ_stan_funs <- function() {
-  # See `diri_stan_funs()` for the rationale on the mode-2
-  # identification via subtraction of `mu_unit[1]`.
-  paste(
-    "  real categ_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[,] int visit_idx) {",
-    "    real lp = 0;",
-    "    for (g in 1:N_unit) {",
-    "      int Kg = n_rep[g];",
-    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
-    "      array[Kg] int y_unit  = y[idx];",
-    "      vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
-    "      int cat_code = 0;",
-    "      for (k in 1:Kg) {",
-    "        if (y_unit[k] == 1) {",
-    "          cat_code = k;",
-    "          break;",
-    "        }",
-    "      }",
-    "      lp += categorical_logit_lpmf(cat_code | mu_unit);",
-    "    }",
-    "    return lp;",
-    "  }",
-    sep = "\n"
-  )
+  paste(closure_unit_density(
+    categ(),
+    unit_lines = c(
+      SIMPLEX_MU_UNIT,
+      "int cat_code = 0;",
+      "for (k in 1:Kg) {",
+      "  if (y_unit[k] == 1) {",
+      "    cat_code = k;",
+      "    break;",
+      "  }",
+      "}",
+      "lp += categorical_logit_lpmf(cat_code | mu_unit);"
+    )
+  ), collapse = "\n")
 }
 
-#' Build the closure-unit Stan stanvars for a categ() fit
+#' Multivariate normal family for several continuous responses
 #'
-#' Wraps `make_closure_unit_arrays_stanvars()` with the Categorical
-#' function block. The hard `sum_to_zero_vector[K]` constraint on
-#' the columns of `Z` is emitted from the trend pipeline; the
-#' per-site K-shared shift is removed inside the lpdf by subtracting
-#' `mu_unit[1]`.
+#' For continuous responses measured together on each unit, such as the
+#' biomass of several species at a site. The data hold one row per
+#' response component at each unit. Latent factors shared by a unit's
+#' components give their residuals the covariance
+#' `Z Z' + diag(Psi^2)`, where `Z` holds the factor loadings and `Psi`
+#' each component's residual standard deviation (Hui et al. 2015; Niku
+#' et al. 2019). Given the factors, each row is normal with mean `mu`
+#' and standard deviation `Psi`.
 #'
-#' @inheritParams make_closure_unit_arrays_stanvars
-#' @return A `brmsstanvars` object.
-#' @noRd
-make_categ_stanvars <- function(arrays) {
-  # The mode-1 and mode-2 simplex shift constraints are enforced in the
-  # trend pipeline and in the lpdf source helper. See `make_diri_stanvars()`.
-  make_closure_unit_arrays_stanvars(
-    arrays,
-    family_funs_name = "categ_funs",
-    family_funs      = categ_stan_funs(),
-    include_K_max    = FALSE,
-    include_Y_max    = FALSE
-  )
-}
-
-#' Closure-unit Multivariate normal family
+#' [jsdgam()] fits the family, taking the unit and component columns
+#' and the number of factors `n_lv`. [residual_cor()] summarises the
+#' residual correlations and [shared_variation()] the part the factors
+#' share. `Psi` takes the prior `exponential(1)`, which suits responses
+#' near unit scale. `prior(..., class = Psi)` sets another.
 #'
-#' Continuous-response JSDM with low-rank residual covariance
-#' `Sigma = Z Z' + diag(Psi^2)`, parameterised conditionally
-#' (gllvm / boral style): each row of the linear predictor receives
-#' the latent-factor contribution `Z[k, :] * lv[i, :]` from the
-#' trend pipeline (with `lv ~ N(0, I_n_lv)` sampled jointly with
-#' the model). The lpdf is then independent normal per row with
-#' SD `Psi[k]` for species `k`. Integrating out `lv` recovers the
-#' gllvm marginal covariance `Sigma`.
+#' With `K` components the data separate the factor part from the
+#' residual part only when `(K - n_lv)^2 >= K + n_lv`. Fewer factors or
+#' more components meet the bound. `jsdgam()` warns when it fails.
 #'
-#' Distributional parameters:
-#' \describe{
-#'   \item{`mu`}{per-row response mean on the identity scale.
-#'     Already includes the latent factor contribution from the
-#'     trend pipeline. Default link is identity.}
-#' }
-#'
-#' Identification: the marginal `Sigma = Z Z' + diag(Psi^2)` is
-#' invariant to `Z -> Z * Q` for orthogonal `Q` (the gllvm / boral
-#' rotation invariance); the existing Heaps post-hoc QR rotation
-#' fixes `Q` and `Z Z'` is identified. Unlike the simplex families,
-#' the multi-normal likelihood is NOT shift-invariant in `mu_unit`,
-#' so neither a `sum_to_zero_vector` constraint on `Z` columns nor
-#' a `mu_unit[1]` reference subtraction is needed. `Z` is declared
-#' as a plain `matrix[K, n_lv]` free parameter by the trend
-#' pipeline.
-#'
-#' Data layout: long format, one row per `(site, species)`, exactly
-#' K rows per site. Responses are continuous reals; the `Y` vector
-#' is assembled into the per-unit K-vector `y_unit` by the lpdf.
-#'
-#' @return A `brms::custom_family` object tagged with the
-#'   `mvgam_closure_unit` and `mvgam_multi_response` attributes
-#'   that route the closure-unit data prep, validation, and Stan
-#'   emission. The `mvgam_simplex_response` attribute is NOT set
-#'   so the simplex-only identification machinery is skipped.
+#' @return A family object to pass to [jsdgam()] or [mvgam()].
 #'
 #' @references
 #' Hui, F. K. C., Taskinen, S., Pledger, S., Foster, S. D. and
@@ -4211,8 +3510,8 @@ make_categ_stanvars <- function(arrays) {
 #' \dontrun{
 #' # Five species at 80 sites whose residuals share two latent
 #' # factors
-#' simdat <- sim_jsdm(family = mvn(), n_species = 5L, n_sites = 80L,
-#'                    n_lv = 2L, seed = 1L)
+#' simdat <- sim_jsdgam(family = mvn(), n_species = 5L, n_sites = 80L,
+#'                      n_lv = 2L, seed = 1L)
 #'
 #' fit <- jsdgam(
 #'   formula        = y ~ env * series,
@@ -4226,99 +3525,44 @@ make_categ_stanvars <- function(arrays) {
 #' )
 #' summary(fit)
 #'
-#' # The species-by-species residual correlations the factors imply
+#' # The species-by-species residual correlations, against the values
+#' # the simulation used
 #' round(residual_cor(fit)$cor, 2)
+#' round(simdat$truth$residual_cor, 2)
+#'
+#' # Next, shared_variation(fit) gives the part the factors share
 #' }
 #'
 #' @family observation families
 #' @export
 mvn <- function() {
-  fam <- brms::custom_family(
-    name  = "mvn",
-    dpars = "mu",
-    links = "identity",
-    lb    = NA,
-    ub    = NA,
-    type  = "real",
-    loop  = FALSE
-  )
-  link_info <- stats::make.link("identity")
-  fam$linkinv <- link_info$linkinv
-  fam$linkfun <- link_info$linkfun
-  attr(fam, "mvgam_closure_unit")   <- TRUE
-  attr(fam, "mvgam_multi_response") <- TRUE
-  # No `mvgam_simplex_response` attribute: multi_normal_cholesky_lpdf
-  # is sensitive to absolute mu levels so the simplex-only
-  # identification machinery (sum_to_zero_vector on Z columns,
-  # mu_unit[1] reference subtraction) is skipped.
-  attr(fam, "mvgam_predict_types") <- character(0L)
-  # brms threads N_unit / n_rep / visit_idx into the lpdf via vint,
-  # plus the parameter `Psi` (per-species residual SD vector
-  # emitted by `make_mvn_stanvars()`). The loadings matrix `Z`
-  # enters via `mu` through the trend-pipeline contribution
-  # `Z[k, :] * lv[i, :]`. The lpdf does not need `Z` as a separate
-  # argument.
-  attr(fam, "mvgam_vars") <- c(
-    "N_unit", "n_rep", "visit_idx", "visit_component", "Psi"
-  )
-  attr(fam, "mvgam_stanvars") <- NULL
-  fam
+  multi_response_family("mvn", type = "real",
+                        vars = c("visit_component", "Psi"))
 }
 
-#' Stan function block for the closure-unit mv-normal lpdf
+#' The Stan density of `mvn()`
 #'
-#' Uses the conditional gllvm / boral parameterisation: the trend
-#' pipeline already adds `Z[k, :] * lv[i, :]` to `mu[i, k]` via the
-#' per-row trend computation, with the latent factor scores
-#' `lv ~ N(0, I_n_lv)` sampled as part of the model. Integrating out
-#' `lv` gives the marginal covariance
-#' `Sigma = Z Z' + diag(Psi .* Psi)` on the K-vector of responses at
-#' each site, which is the gllvm / boral target. The per-row
-#' conditional density `y_n | mu_n, Psi_{k(n)}` is independent normal.
-#' The lpdf reduces to one `normal_lpdf` call per closure unit,
-#' vectorised across the K rows of the unit. No Cholesky is needed at
-#' the lpdf level.
+#' The trend adds each row's factor term `Z[k, ] * lv[i, ]` to `mu`,
+#' with `lv ~ N(0, I)`. Given the factors the rows are independent
+#' normal with standard deviation `Psi[k]`. Integrating the factors out
+#' gives each unit the covariance `Z Z' + diag(Psi^2)`.
 #'
-#' `Psi` is declared on the SD scale by `make_mvn_stanvars()` so
-#' that the residual variance enters as `Psi[k]^2` and the marginal
-#' covariance entry `Sigma[k, k]` is `Z[k, :] * Z[k, :]' + Psi[k]^2`.
-#' The loadings prior on `Z` and the post-hoc Heaps QR
-#' identification stay unchanged from the rest of the factor-model
-#' pipeline.
-#'
-#' @return Character scalar suitable for
-#'   `brms::stanvar(scode = ..., block = "functions")`.
+#' @return Character scalar of Stan functions
 #' @noRd
 mvn_stan_funs <- function() {
-  paste(
-    "  real mvn_lpdf(",
-    "    vector y,",
-    "    vector mu,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[,] int visit_idx,",
-    "    array[,] int visit_component,",
-    "    vector Psi) {",
-    "    real lp = 0;",
-    "    for (g in 1:N_unit) {",
-    "      int Kg = n_rep[g];",
-    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
-    "      vector[Kg] y_unit  = y[idx];",
-    "      vector[Kg] mu_unit = mu[idx];",
-    "      vector[Kg] psi_unit = Psi[visit_component[g, 1:Kg]];",
-    "      lp += normal_lpdf(y_unit | mu_unit, psi_unit);",
-    "    }",
-    "    return lp;",
-    "  }",
-    sep = "\n"
-  )
+  paste(closure_unit_density(
+    mvn(),
+    unit_lines = component_scale_unit_lines(
+      "lp += normal_lpdf(y_unit | mu_unit, psi_unit);"
+    )
+  ), collapse = "\n")
 }
 
 #' Does this family estimate a residual scale per response component?
 #'
 #' TRUE for `mvn()` and `mvt()`, which declare
 #' `vector<lower=0>[K] Psi`, together with the loadings. A unit's
-#' covariance is `Z Sigma Z' + diag(Psi^2)`. FALSE for the simplex
+#' covariance is `Z Z' + diag(Psi^2)`. FALSE for the simplex
 #' families, whose spread is carried by the softmax and, for
 #' `diri()`, by a single concentration; and FALSE for the detection
 #' families, which have no continuous residual at all.
@@ -4409,8 +3653,8 @@ warn_unidentified_component_scale <- function(n_lv, n_species,
     x = paste0("Identifying the per-species part needs ",
                "(n_species - n_lv)^2 >= n_species + n_lv."),
     i = paste0(
-      "'residual_cor()', 'shared_variation()' and the predictions ",
-      "use the combined covariance and are unaffected."
+      "'residual_cor()' and the predictions use the combined ",
+      "covariance and are unaffected."
     ),
     i = paste0(
       "A poor Rhat on 'Psi' reflects this design and does not signal ",
@@ -4422,137 +3666,56 @@ warn_unidentified_component_scale <- function(n_lv, n_species,
 }
 
 
-#' The residual scale shared by the mvn and mvt families
+#' The residual parameters of the mvn and mvt families
 #'
-#' Both declare one positive scale per response component and give
-#' it the same prior. The declaration and the prior are written once
-#' here. Each builder calls this helper. `Psi` is on
-#' the standard-deviation scale, which is what
-#' `posterior_epred()` and the variance formulas expect.
+#' Both declare one positive scale per response component, `Psi`, on
+#' the standard-deviation scale. `mvt()` adds its degrees of freedom
+#' `nu`. Each takes its prior from `prior` or, without a row for its
+#' class, from `common_trend_priors`. Written as sampling statements,
+#' the priors reach the prior table through
+#' `lift_mvgam_stanvar_priors()`.
 #'
-#' @param K Number of response components per closure unit.
-#' @param prefix Stanvar name prefix, `"mvn"` or `"mvt"`.
-#' @param prior A `brmsprior`, or `NULL` to take the shared default.
-#'   A row with `class = "Psi"` names the distribution `Psi` is
-#'   sampled under. Otherwise `common_trend_priors` supplies it.
-#' @return A list of two `brms::stanvar` objects.
+#' @param K Number of response components per closure unit. It is a
+#'   literal. `N_series_trend` is declared after the family's stanvars
+#'   and is out of scope in the parameters block.
+#' @param name `"mvn"` or `"mvt"`, which prefixes the stanvar names
+#' @param prior A `brmsprior`, or `NULL`
+#' @return A `brmsstanvars` object
 #' @noRd
-make_psi_stanvars <- function(K, prefix, prior = NULL) {
+component_scale_stanvars <- function(K, name, prior = NULL) {
   checkmate::assert_int(K, lower = 1)
-  checkmate::assert_choice(prefix, c("mvn", "mvt"))
+  checkmate::assert_choice(name, c("mvn", "mvt"))
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
-  list(
-    param = brms::stanvar(
-      name  = paste0(prefix, "_Psi_param"),
-      scode = paste0("  vector<lower=0>[", K, "] Psi;"),
-      block = "parameters"
-    ),
-    prior = brms::stanvar(
-      name  = paste0(prefix, "_Psi_prior"),
-      scode = paste0(
-        "  Psi ~ ", get_trend_parameter_prior(prior, "Psi"), ";"
-      ),
-      block = "model"
-    )
-  )
-}
-
-
-#' Build the closure-unit Stan stanvars for an mvn() fit
-#'
-#' Wraps `make_closure_unit_arrays_stanvars()` with the mv-normal
-#' function block and adds a per-species residual SD parameter
-#' `vector<lower=0>[K] Psi` with an `exponential(1)` prior on the
-#' SD scale. `K` is the number of response components per closure
-#' unit (constant across sites for multi-response families) and is
-#' baked in as a literal at fit time so the declaration is
-#' self-contained and does not race with the trend pipeline's
-#' emission of `N_series_trend`.
-#'
-#' Prior choice: SD-scale priors are weakly informative across
-#' unstandardised response scales, whereas a variance-scale
-#' exponential prior would over-suppress residual variance and bias
-#' the inferred `Z Z'` covariance upward.
-#'
-#' `K_max` and `Y_max` are omitted because the mv-normal
-#' likelihood does not truncate the per-unit response support.
-#'
-#' @inheritParams make_closure_unit_arrays_stanvars
-#' @return A `brmsstanvars` object.
-#' @noRd
-make_mvn_stanvars <- function(arrays, prior = NULL) {
-  # K (number of response components per closure unit) is constant
-  # across sites for multi-response families. Bake the literal K
-  # into the `Psi` declaration so the parameter declaration is
-  # self-contained and does not race with the trend pipeline's
-  # emission of `N_series_trend` (which is declared in the data
-  # block but lands after the family-bundle stanvars in
-  # `sort_stanvars()` ordering, leaving `N_series_trend` out of
-  # scope when Stan parses the parameters block).
-  K <- as.integer(arrays$max_rep)
-  psi <- make_psi_stanvars(K, "mvn", prior)
-  psi_param <- psi$param
-  psi_prior <- psi$prior
   combine_stanvars(
-    make_closure_unit_arrays_stanvars(
-      arrays,
-      family_funs_name = "mvn_funs",
-      family_funs      = mvn_stan_funs(),
-      include_K_max    = FALSE,
-      include_Y_max    = FALSE,
-      include_component = TRUE
+    declared_parameter_stanvars(
+      "Psi", paste0("vector<lower=0>[", K, "]"), prior,
+      name = paste0(name, "_Psi")
     ),
-    psi_param,
-    psi_prior
+    if (identical(name, "mvt")) {
+      declared_parameter_stanvars("nu", "real<lower=2>", prior,
+                                  name = "mvt_nu")
+    }
   )
 }
 
-#' Closure-unit Multivariate Student-t family
+
+#' Multivariate Student-t family for several continuous responses
 #'
-#' Heavy-tailed continuous-response JSDM. Extends `mvn()` with a
-#' degrees-of-freedom parameter `nu` so the per-observation residual
-#' follows a Student-t distribution in place of a Gaussian. Each row
-#' of the linear predictor still receives the latent-factor
-#' contribution `Z[k, :] * lv[i, :]` from the trend pipeline
-#' (conditional gllvm / boral parameterisation). The lpdf is
-#' independent Student-t per row with scale `Psi[k]` for species
-#' `k` and shared `nu`.
+#' [mvn()] with heavy-tailed residuals. Given the latent factors, each
+#' row follows a Student-t distribution with location `mu`, scale `Psi`
+#' and degrees of freedom `nu`, which every component shares. An outlying
+#' row then pulls less on the fit. The residual covariance is
+#' `Z Z' + diag(Psi^2 * nu / (nu - 2))`. A unit's responses do not
+#' follow a multivariate Student-t law. Their factors stay normal.
 #'
-#' Under this parameterisation the marginal residual covariance is
-#' approximately `Z Z' + diag(Psi^2 * nu / (nu - 2))` (Student-t
-#' variance scaling), which converges to the mv-normal target
-#' `Z Z' + diag(Psi^2)` as `nu -> Inf`. The strict multivariate
-#' Student-t marginal would require a per-site scale-mixture
-#' latent, which would not compose cleanly with the existing trend
-#' pipeline; the conditional Student-t parameterisation is what
-#' gllvm uses for its `family = "tweedie"` / `"normal"` heavy-tail
-#' option and is the right operational fit for outlier robustness
-#' in JSDM use cases.
+#' `nu` is bounded below by 2, which keeps the residual variance finite.
+#' Its prior is `gamma(2, 0.1)`, as brms gives a Student-t `nu`. Above
+#' the bound it places the median of `nu` at 17 and 95% of its mass
+#' between 3.2 and 56. `prior(..., class = nu)` and
+#' `prior(..., class = Psi)` set other priors. The data layout, the fit
+#' and the bound on `n_lv` follow [mvn()].
 #'
-#' Distributional parameters:
-#' \describe{
-#'   \item{`mu`}{per-row response mean on the identity scale.
-#'     Already includes the latent factor contribution from the
-#'     trend pipeline. Default link is identity.}
-#' }
-#'
-#' Identification: identical to `mvn()`. Marginal covariance is
-#' invariant to `Z -> Z * Q` for orthogonal `Q`; the Heaps post-hoc
-#' QR fixes `Q`. The Student-t observation is NOT shift-invariant in
-#' `mu_unit`. No simplex-style constraints apply. The
-#' `nu` parameter has a hard lower bound of 2. That bound keeps the
-#' marginal residual variance finite. The prior is
-#' `(nu - 2) ~ gamma(2, 0.1)`, giving a weakly informative pull
-#' toward moderate heavy tails (prior median around `nu = 14`,
-#' prior `Pr(nu < 5) ~ 0.18`).
-#'
-#' Data layout: long format, one row per `(site, species)`, exactly
-#' K rows per site. Responses are continuous reals.
-#'
-#' @return A `brms::custom_family` object tagged with the
-#'   `mvgam_closure_unit` and `mvgam_multi_response` attributes
-#'   that route the closure-unit data prep, validation, and Stan
-#'   emission. The `mvgam_simplex_response` attribute is NOT set.
+#' @return A family object to pass to [jsdgam()] or [mvgam()].
 #'
 #' @references
 #' Hui, F. K. C., Taskinen, S., Pledger, S., Foster, S. D. and
@@ -4560,138 +3723,47 @@ make_mvn_stanvars <- function(arrays, prior = NULL) {
 #'   ordination. *Methods in Ecology and Evolution*, 6(4):399-411.
 #'   \doi{10.1111/2041-210X.12236}
 #'
-#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
-#'   distributions for the covariance matrix in latent factor
-#'   models. *Statistics and Computing*, 34:143.
-#'   \doi{10.1007/s11222-024-10454-0}
+#' @examples
+#' \dontrun{
+#' simdat <- sim_jsdgam(family = mvt(), n_species = 5L, n_sites = 80L,
+#'                      n_lv = 2L, seed = 1L)
+#' fit <- jsdgam(
+#'   formula        = y ~ env * series,
+#'   factor_formula = ~ -1,
+#'   data           = simdat$data_train,
+#'   unit           = time, species = series,
+#'   family         = mvt(),
+#'   n_lv           = 2L,
+#'   chains         = 2L,
+#'   silent         = 2
+#' )
+#'
+#' # The degrees of freedom, against 5 in the simulation
+#' posterior_summary(fit, variable = "nu")
+#' }
 #'
 #' @family observation families
 #' @export
 mvt <- function() {
-  fam <- brms::custom_family(
-    name  = "mvt",
-    dpars = "mu",
-    links = "identity",
-    lb    = NA,
-    ub    = NA,
-    type  = "real",
-    loop  = FALSE
-  )
-  link_info <- stats::make.link("identity")
-  fam$linkinv <- link_info$linkinv
-  fam$linkfun <- link_info$linkfun
-  attr(fam, "mvgam_closure_unit")   <- TRUE
-  attr(fam, "mvgam_multi_response") <- TRUE
-  # No `mvgam_simplex_response`: the Student-t observation is not
-  # shift-invariant in mu so the sum_to_zero / reference subtraction
-  # machinery does not apply.
-  attr(fam, "mvgam_predict_types") <- character(0L)
-  # brms threads N_unit / n_rep / visit_idx into the lpdf via vint,
-  # plus the parameters `Psi` (per-species residual scale) and `nu`
-  # (shared degrees of freedom), both emitted by
-  # `make_mvt_stanvars()`. `Z` enters via `mu` through the
-  # trend-pipeline contribution `Z[k, :] * lv[i, :]`.
-  attr(fam, "mvgam_vars") <- c(
-    "N_unit", "n_rep", "visit_idx", "visit_component", "Psi", "nu"
-  )
-  attr(fam, "mvgam_stanvars") <- NULL
-  fam
+  multi_response_family("mvt", type = "real",
+                        vars = c("visit_component", "Psi", "nu"))
 }
 
-#' Stan function block for the closure-unit mv-Student-t lpdf
+#' The Stan density of `mvt()`
 #'
-#' Same conditional gllvm parameterisation as `mvn_stan_funs()`:
-#' the per-row latent-factor contribution `Z[k, :] * lv[i, :]` is
-#' added to `mu` by the trend pipeline, the lpdf only sees the
-#' per-row residual. With `lv ~ N(0, I_n_lv)` and independent
-#' per-row Student-t residuals at degrees of freedom `nu` and scale
-#' `Psi[k]`, the marginal residual covariance is approximately
-#' `Z Z' + diag(Psi^2 * nu / (nu - 2))` (Student-t variance scaling).
+#' As `mvn_stan_funs()`, with Student-t rows of scale `Psi[k]` and
+#' degrees of freedom `nu`. Integrating the factors out gives each unit
+#' the covariance `Z Z' + diag(Psi^2 * nu / (nu - 2))`.
 #'
-#' `nu` is shared across species within a site; the per-species
-#' residual scale is carried by `Psi`. Both are declared by
-#' `make_mvt_stanvars()`.
-#'
-#' @return Character scalar suitable for
-#'   `brms::stanvar(scode = ..., block = "functions")`.
+#' @return Character scalar of Stan functions
 #' @noRd
 mvt_stan_funs <- function() {
-  paste(
-    "  real mvt_lpdf(",
-    "    vector y,",
-    "    vector mu,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[,] int visit_idx,",
-    "    array[,] int visit_component,",
-    "    vector Psi,",
-    "    real nu) {",
-    "    real lp = 0;",
-    "    for (g in 1:N_unit) {",
-    "      int Kg = n_rep[g];",
-    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
-    "      vector[Kg] y_unit  = y[idx];",
-    "      vector[Kg] mu_unit = mu[idx];",
-    "      vector[Kg] psi_unit = Psi[visit_component[g, 1:Kg]];",
-    "      lp += student_t_lpdf(y_unit | nu, mu_unit, psi_unit);",
-    "    }",
-    "    return lp;",
-    "  }",
-    sep = "\n"
-  )
-}
-
-#' Build the closure-unit Stan stanvars for an mvt() fit
-#'
-#' Wraps `make_closure_unit_arrays_stanvars()` with the mv-Student-t
-#' function block and adds two free parameters: a per-species
-#' residual scale `vector<lower=0>[K] Psi` (SD-scale exponential(1)
-#' prior, identical to `make_mvn_stanvars()`) and a shared degrees
-#' of freedom `real<lower=2> nu`. `nu` is hard-floored at 2 so the
-#' marginal residual variance stays finite; without that bound,
-#' posterior draws of nu in (0, 2) would produce infinite variance
-#' and contaminate downstream LOO PSIS weights and predictive
-#' summaries. The prior `(nu - 2) ~ gamma(2, 0.1)` is weakly
-#' informative (prior median around 14, prior 95% interval roughly
-#' \[2.3, 50\]) and matches the recommendation in Juarez & Steel
-#' (2010) for Bayesian Student-t regression.
-#'
-#' `K` is the number of response components per closure unit
-#' (constant across sites) and is baked in as a literal at fit time
-#' so the `Psi` declaration is self-contained.
-#'
-#' @inheritParams make_closure_unit_arrays_stanvars
-#' @return A `brmsstanvars` object.
-#' @noRd
-make_mvt_stanvars <- function(arrays, prior = NULL) {
-  K <- as.integer(arrays$max_rep)
-  psi <- make_psi_stanvars(K, "mvt", prior)
-  psi_param <- psi$param
-  psi_prior <- psi$prior
-  nu_param <- brms::stanvar(
-    name  = "mvt_nu_param",
-    scode = "  real<lower=2> nu;",
-    block = "parameters"
-  )
-  nu_prior <- brms::stanvar(
-    name  = "mvt_nu_prior",
-    scode = "  target += gamma_lpdf(nu - 2 | 2, 0.1);",
-    block = "model"
-  )
-  combine_stanvars(
-    make_closure_unit_arrays_stanvars(
-      arrays,
-      family_funs_name = "mvt_funs",
-      family_funs      = mvt_stan_funs(),
-      include_K_max    = FALSE,
-      include_Y_max    = FALSE,
-      include_component = TRUE
-    ),
-    psi_param,
-    psi_prior,
-    nu_param,
-    nu_prior
-  )
+  paste(closure_unit_density(
+    mvt(),
+    unit_lines = component_scale_unit_lines(
+      "lp += student_t_lpdf(y_unit | nu, mu_unit, psi_unit);"
+    )
+  ), collapse = "\n")
 }
 
 #' Stan function block for the closure-unit N-mixture lpmf
@@ -4729,29 +3801,17 @@ make_mvt_stanvars <- function(arrays, prior = NULL) {
 #' \eqn{T_{K_{\min}}} and is added once per closure unit; the
 #' recurrence supplies the additional `log_prob_n` contribution.
 #'
-#' @param max_rep Positive integer maximum visit count across
-#'   closure units. Sets the column count of `visit_idx`. The
-#'   Stan loop uses only the first `n_rep[g]` columns per unit.
 #' @return Character scalar of Stan function code.
 #' @noRd
-nmix_stan_funs <- function(max_rep) {
-  checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
+nmix_stan_funs <- function() {
+  args <- closure_unit_density_args(nmix())
   paste(c(
     "  // Per-visit implementation. brms passes `mu` and `p` as",
     "  // vectors when either dpar carries a sub-formula (e.g.",
     "  // bf(y ~ s(elev), p ~ s(tod))). The overloaded scalar",
     "  // signature below broadcasts the static-dpar case via",
     "  // rep_vector and delegates to this entry point.",
-    "  // Per-closure-unit partial sum body. reduce_sum (called",
-    "  // from the nmix_lpmf wrapper) hands this function a slice",
-    "  // [start:end] of the closure-unit index and gets back the",
-    "  // partial log-likelihood for that chunk. When the model is",
-    "  // compiled with stan_threads (auto-set by `threads = N`",
-    "  // on mvgam()), TBB splits the slice across threads;",
-    "  // otherwise reduce_sum runs serially. Link-scale conversions",
-    "  // live on the wrapper so per-thread chunks see precomputed",
-    "  // log_mu / logit_p / log1m_p vectors instead of redoing the",
-    "  // dpar transform per chunk.",
+    partial_sum_header("nmix", "log_mu, logit_p and log1m_p"),
     "  real partial_sum_nmix_lpmf(",
     "    array[] int g_slice,",
     "    int start, int end,",
@@ -4807,18 +3867,7 @@ nmix_stan_funs <- function(max_rep) {
     "    return lp;",
     "  }",
     "",
-    "  real nmix_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    vector p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int K_max,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx,",
-    "    vector log_n_lookup) {",
-    "    // Link-scale conversions hoisted to the wrapper so the",
-    "    // per-thread partial sum sees them precomputed.",
+    stan_density_header("nmix", "lpmf", args),
     "    vector[num_elements(mu)] log_mu  = log(mu);",
     "    vector[num_elements(p)]  logit_p = logit(p);",
     "    vector[num_elements(p)]  log1m_p = log1m(p);",
@@ -4828,55 +3877,26 @@ nmix_stan_funs <- function(max_rep) {
         "      K_max, Y_max, visit_idx, log_n_lookup")
     ),
     "  }",
-    "",
-    "  // Scalar-p entry point: broadcasts to the per-visit",
-    "  // vector and dispatches to the vector implementation.",
-    "  real nmix_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    real p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int K_max,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx,",
-    "    vector log_n_lookup) {",
-    "    int N = num_elements(mu);",
-    "    return nmix_lpmf(y | mu, rep_vector(p, N), N_unit,",
-    "                     n_rep, K_max, Y_max, visit_idx,",
-    "                     log_n_lookup);",
-    "  }"
+    broadcast_overloads("nmix", "lpmf", args, "p")
   ), collapse = "\n")
 }
 
-#' Stan function block for the Royle-Nichols nmix variant
+#' Stan functions of the [nmix()] Royle-Nichols density
 #'
-#' Marginalises latent abundance `N ~ Poisson(lambda)` over a
-#' per-unit upper truncation `K_max[g]`; per-visit binary outcomes
-#' have probability `1 - (1 - r)^N` where `r` is per-individual
-#' detection (logit link). Per-visit varying `r` is supported via
-#' the dpar sub-formula on `p` (matching how the Poisson-binomial
-#' lpmf handles per-visit `p`).
+#' The latent abundance `N ~ Poisson(mu)` is summed from `Y_max[g]` up
+#' to `K_max[g]`. A visit detects at least one individual with
+#' probability `1 - (1 - p)^N`, where `p` is the detection probability
+#' of each individual and may vary by visit. A unit with a detection
+#' never reaches the `N = 0` cell, which leaves `log(0)` out of the sum.
+#' A unit without one takes the closed form of the Poisson generating
+#' function.
 #'
-#' Avoids two artifacts present in the Bollen reference Stan code:
-#' the stray `+ 1` literal on a log-probability in the
-#' all-zero-history branch. It also avoids any `1e-9` regularisation around
-#' `log(0)` (with the logit link on `r` and the loop range
-#' `Y_max[g] : K_max[g]`, the `k = 0` cell is unreachable whenever
-#' the unit has any detection).
-#'
-#' @param max_rep Positive integer maximum visit count across
-#'   closure units; only used by the scalar-p overload's broadcast.
 #' @return Character scalar of Stan function code.
 #' @noRd
-nmix_royle_nichols_stan_funs <- function(max_rep) {
-  checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
+nmix_royle_nichols_stan_funs <- function() {
+  args <- closure_unit_density_args(nmix("royle_nichols"))
   paste(c(
-    "  // Per-closure-unit partial sum body. reduce_sum (called from",
-    "  // the nmix_royle_nichols_lpmf wrapper) hands this function a",
-    "  // slice [start:end] of the closure-unit index. When the model",
-    "  // is compiled with stan_threads, TBB splits the slice across",
-    "  // threads. log_mu and log_1m_r are precomputed on the wrapper.",
+    partial_sum_header("nmix_royle_nichols", "log_mu and log_1m_r"),
     "  real partial_sum_nmix_royle_nichols_lpmf(",
     "    array[] int g_slice,",
     "    int start, int end,",
@@ -4940,21 +3960,7 @@ nmix_royle_nichols_stan_funs <- function(max_rep) {
     "    return lp;",
     "  }",
     "",
-    "  // Per-visit implementation. Per-individual detection r is",
-    "  // logit-linked; brms passes p (= r) as a probability vector.",
-    "  // log(1 - r) is the per-individual non-detection log-prob",
-    "  // used in the marginalisation; log1m(p) computes it stably.",
-    "  real nmix_royle_nichols_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    vector p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int K_max,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx) {",
-    "    // Link-scale conversions hoisted to the wrapper so the",
-    "    // per-thread partial sum sees them precomputed.",
+    stan_density_header("nmix_royle_nichols", "lpmf", args),
     "    vector[num_elements(mu)] log_mu   = log(mu);",
     "    vector[num_elements(p)]  log_1m_r = log1m(p);",
     closure_unit_reduce_sum_lines(
@@ -4962,66 +3968,33 @@ nmix_royle_nichols_stan_funs <- function(max_rep) {
       "      y, log_mu, log_1m_r, n_rep, K_max, Y_max, visit_idx"
     ),
     "  }",
-    "",
-    "  // Scalar-p entry point: broadcasts to the per-visit",
-    "  // vector and dispatches to the vector implementation.",
-    "  real nmix_royle_nichols_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    real p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int K_max,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx) {",
-    "    int N = num_elements(mu);",
-    "    return nmix_royle_nichols_lpmf(",
-    "      y | mu, rep_vector(p, N), N_unit,",
-    "      n_rep, K_max, Y_max, visit_idx",
-    "    );",
-    "  }"
+    broadcast_overloads("nmix_royle_nichols", "lpmf", args, "p")
   ), collapse = "\n")
 }
 
-#' Stan function block for the Poisson-Poisson nmix variant
+#' Stan functions of the [nmix()] Poisson-Poisson density
 #'
-#' Per-unit log-likelihood marginalises latent abundance
-#' `N ~ Poisson(lambda)` over `0 : K_max[g]`; conditional on
-#' `N = k`, per-visit encounter counts are
-#' `y_t ~ Poisson(k * p_t)` with per-individual encounter rate
-#' `p` (log link). `Y_max[g]` does NOT bound `N` from below for
-#' Poisson-Poisson (`y_t` can exceed `N` because each individual
-#' contributes its own Poisson process per visit). The `k = 0`
-#' cell is only consistent with all-zero detection histories;
-#' the guard handles this without resorting to Bollen's `1e-9`
-#' regularisation, which is unnecessary under the log link.
+#' The latent abundance `N ~ Poisson(mu)` is summed over `0 : K_max[g]`.
+#' Given `N = k`, a visit's count is `Poisson(k * p_t)`, with `p` the
+#' encounter rate of each individual. A count can exceed `N`, which
+#' leaves `Y_max[g]` without a role as a floor. The `k = 0` cell holds
+#' mass only for a unit without counts.
 #'
-#' Efficient factored form. Stan's `poisson_log_lpmf` decomposes
-#' `sum_t poisson_log_lpmf(y_t | log(k) + log(p_t))` as
-#' `log(k) * sum(y) + sum(y * log(p)) - k * sum(p) - sum(lgamma(y + 1))`.
-#' The terms `sum(y)`, `sum(y * log(p))`, `sum(p)` and
-#' `sum(lgamma(y + 1))` are constant in `k`. The inner marginalisation
-#' loop costs `O(K_max[g])` per unit. Without this decomposition it costs
-#' `O(K_max[g] * n_rep[g])`. At realistic
-#' `K_max ~ 50, n_rep ~ 5` this is a 5x speed-up; at
-#' `K_max ~ 200, n_rep ~ 10` it is a 10x speed-up.
+#' The visit sum factors as
+#' `log(k) * sum(y) + sum(y * log(p)) - k * sum(p) - sum(lgamma(y + 1))`,
+#' whose terms other than `k` are constant across the sum. The inner
+#' loop then costs `O(K_max[g])` per unit, against
+#' `O(K_max[g] * n_rep[g])` for the visit-by-visit form.
 #'
-#' @param max_rep Positive integer maximum visit count across
-#'   closure units; only used by the scalar-p overload's broadcast.
 #' @return Character scalar of Stan function code.
 #' @noRd
-nmix_poisson_poisson_stan_funs <- function(max_rep) {
-  checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
+nmix_poisson_poisson_stan_funs <- function() {
+  args <- closure_unit_density_args(nmix("poisson_poisson"))
   paste(c(
-    "  // Per-closure-unit partial sum body. reduce_sum (called from",
-    "  // the nmix_poisson_poisson_lpmf wrapper) hands this function a",
-    "  // slice [start:end] of the closure-unit index. When the model",
-    "  // is compiled with stan_threads, TBB splits the slice across",
-    "  // threads. log_mu and log_p are precomputed on the wrapper.",
-    "  // log_n_lookup[k] = log(k) replaces the per-iter scalar log()",
-    "  // call inside the inner k loop. k_start_ppm[g] is the data-",
-    "  // precomputed lower bound on the latent-N loop; cells below",
-    "  // it carry negligible Poisson-tail mass (see make_*_stanvars).",
+    partial_sum_header("nmix_poisson_poisson", "log_mu and log_p"),
+    "  // log_n_lookup[k] holds log(k) for the inner k loop.",
+    "  // k_start_ppm[g] starts that loop where the Poisson tail below",
+    "  // holds negligible mass.",
     "  real partial_sum_nmix_poisson_poisson_lpmf(",
     "    array[] int g_slice,",
     "    int start, int end,",
@@ -5066,8 +4039,8 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "        // Factored sum_t poisson_log_lpmf(y_t|log(k)+log_p_v[t])",
     "        // = log(k) * sum_y + sum_y_log_p",
     "        //   - k * sum_p_v - lgamma_const.",
-    "        // log(k) read from transformed-data log_n_lookup; the",
-    "        // tdata vector is sized to K_max_global so k <= Kg fits.",
+    "        // log(k) comes from log_n_lookup, whose length",
+    "        // K_max_global bounds every Kg.",
     "        component_lps[k - kg_lo + 2] = poisson_log_lpmf(k | log_lam)",
     "          + log_n_lookup[k] * sum_counts + sum_y_log_p",
     "          - k * sum_p_v - lgamma_const;",
@@ -5077,22 +4050,7 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "    return lp;",
     "  }",
     "",
-    "  // Per-visit implementation. p is a positive encounter rate",
-    "  // per individual per visit (log link). log_p is the linear-",
-    "  // predictor scale; log_mu is the abundance log-rate.",
-    "  real nmix_poisson_poisson_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    vector p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int K_max,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx,",
-    "    vector log_n_lookup,",
-    "    array[] int k_start_ppm) {",
-    "    // Link-scale conversions hoisted to the wrapper so the",
-    "    // per-thread partial sum sees them precomputed.",
+    stan_density_header("nmix_poisson_poisson", "lpmf", args),
     "    vector[num_elements(mu)] log_mu = log(mu);",
     "    vector[num_elements(p)]  log_p  = log(p);",
     closure_unit_reduce_sum_lines(
@@ -5101,266 +4059,157 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
         "      log_n_lookup, k_start_ppm")
     ),
     "  }",
-    "",
-    "  // Scalar-p entry point: broadcasts to the per-visit",
-    "  // vector and dispatches to the vector implementation.",
-    "  real nmix_poisson_poisson_lpmf(",
-    "    array[] int y,",
-    "    vector mu,",
-    "    real p,",
-    "    int N_unit,",
-    "    array[] int n_rep,",
-    "    array[] int K_max,",
-    "    array[] int Y_max,",
-    "    array[,] int visit_idx,",
-    "    vector log_n_lookup,",
-    "    array[] int k_start_ppm) {",
-    "    int N = num_elements(mu);",
-    "    return nmix_poisson_poisson_lpmf(",
-    "      y | mu, rep_vector(p, N), N_unit,",
-    "      n_rep, K_max, Y_max, visit_idx, log_n_lookup, k_start_ppm",
-    "    );",
-    "  }"
+    broadcast_overloads("nmix_poisson_poisson", "lpmf", args, "p")
   ), collapse = "\n")
 }
 
-#' Assemble the shared closure-unit Stan stanvar bundle
+#' The Stan data shared by the closure-unit families
 #'
-#' Every closure-unit family emits the same `N_unit`, `n_rep`,
-#' `Y_max`, `visit_idx` integer arrays in the Stan data block,
-#' plus a family-specific function block. nmix() additionally
-#' carries `K_max` (per-unit latent abundance upper truncation);
-#' binary-response families (`occ()`) omit it because the latent
-#' state is binary.
+#' Every closure-unit family declares `N_unit`, `n_rep` and
+#' `visit_idx`, with its own function block. The `include_*` arguments
+#' add the data one family uses.
 #'
-#' This helper centralises the shared declarations so per-family
-#' wrappers only differ in (i) the function block, (ii) the
-#' Y_max upper bound (1 for binary y, unbounded for counts), and
-#' (iii) whether K_max is declared.
-#'
-#' @param arrays Named list returned by
-#'   `build_closure_unit_arrays()`.
-#' @param family_funs_name Stanvar name for the function block
-#'   (e.g. `"nmix_funs"`, `"occ_funs"`).
-#' @param family_funs Character scalar of Stan function-block
-#'   code (typically the output of `*_stan_funs(arrays$max_rep)`).
-#' @param y_max_upper Upper bound on the per-unit `Y_max`
-#'   declaration. Defaults to `NA` (unbounded). Set to `1L` for
-#'   binary-response families to mirror the response support.
-#' @param include_K_max Logical; emit the `K_max` data array
-#'   when `TRUE`. Defaults to `TRUE` for count families.
-#' @return A `brmsstanvars` object.
+#' @param arrays Named list from `build_closure_unit_arrays()`
+#' @param family_funs_name Stanvar name of the function block, such as
+#'   `"nmix_funs"`
+#' @param family_funs Stan code of the function block
+#' @param y_max_upper Upper bound on `Y_max`: `NA` for counts, 1 for a
+#'   binary response
+#' @param include_K_max Whether to declare `K_max`, the per-unit
+#'   truncation of the latent abundance. Occupancy states are binary
+#'   and take none.
+#' @param include_Y_max Whether to declare `Y_max`, the largest count
+#'   in each unit
+#' @param include_component Whether to declare `visit_component`, the
+#'   response component of each visit
+#' @param log_n_lookup Whether to declare the transformed-data vector
+#'   `log_n_lookup[k] = log(k)` for k up to `max(K_max)`. The
+#'   marginalisation over the latent abundance then indexes a vector
+#'   in its inner loop where it would call `log()`.
+#' @return A `brmsstanvars` object
 #' @noRd
 make_closure_unit_arrays_stanvars <- function(arrays,
-                                               family_funs_name,
-                                               family_funs,
-                                               y_max_upper   = NA_integer_,
-                                               include_K_max = TRUE,
-                                               include_Y_max = TRUE,
-                                               include_component = FALSE) {
-  checkmate::assert_list(arrays, names = "named")
-  checkmate::assert_string(family_funs_name)
-  checkmate::assert_string(family_funs)
-  checkmate::assert_integerish(y_max_upper, len = 1L, lower = 0L,
-                               null.ok = FALSE)
+                                              family_funs_name,
+                                              family_funs,
+                                              y_max_upper = NA_integer_,
+                                              include_K_max = TRUE,
+                                              include_Y_max = TRUE,
+                                              include_component = FALSE,
+                                              log_n_lookup = FALSE) {
+  checkmate::assert_integerish(y_max_upper, len = 1L, lower = 0L)
   checkmate::assert_flag(include_K_max)
   checkmate::assert_flag(include_Y_max)
   checkmate::assert_flag(include_component)
-  required <- c("N_unit", "n_rep", "visit_idx", "max_rep")
-  if (include_component) required <- c(required, "visit_component")
-  if (include_Y_max) required <- c(required, "Y_max")
-  if (include_K_max) required <- c(required, "K_max")
-  missing_fields <- setdiff(required, names(arrays))
-  if (length(missing_fields) > 0L) {
-    stop(insight::format_error(
-      paste0(
-        "Closure-unit arrays are missing fields: ",
-        paste(missing_fields, collapse = ", "), "."
-      )
-    ))
-  }
-  stanvars <- brms::stanvar(
-    name  = family_funs_name,
-    scode = family_funs,
-    block = "functions"
-  ) +
-    brms::stanvar(
-      x     = as.integer(arrays$N_unit),
-      name  = "N_unit",
-      scode = "int<lower=1> N_unit;",
-      block = "data"
-    ) +
-    brms::stanvar(
-      x     = as.integer(arrays$n_rep),
-      name  = "n_rep",
-      scode = "array[N_unit] int<lower=1> n_rep;",
-      block = "data"
-    ) +
-    brms::stanvar(
-      x     = arrays$visit_idx,
-      name  = "visit_idx",
-      scode = paste0(
-        "array[N_unit, ", arrays$max_rep,
-        "] int<lower=1> visit_idx;"
-      ),
-      block = "data"
+  checkmate::assert_flag(log_n_lookup)
+  if (log_n_lookup && !include_K_max) {
+    stop_mvgam_fault(
+      "'log_n_lookup' is bounded by 'K_max'.",
+      "'make_closure_unit_arrays_stanvars()' got 'include_K_max = FALSE'."
     )
-  if (include_component) {
-    # Emitted in the family's own bundle. The trend block's
-    # `obs_trend_series` carries the same fact. The family stanvars are
-    # parsed before the trend data lands. That identifier is not yet in
-    # scope here.
-    stanvars <- stanvars +
-      brms::stanvar(
-        x     = arrays$visit_component,
-        name  = "visit_component",
-        scode = paste0(
-          "array[N_unit, ", arrays$max_rep,
-          "] int<lower=1> visit_component;"
-        ),
-        block = "data"
-      )
   }
-  if (include_Y_max) {
-    y_max_scode <- if (is.na(y_max_upper)) {
-      "array[N_unit] int<lower=0> Y_max;"
-    } else {
-      paste0(
-        "array[N_unit] int<lower=0, upper=", y_max_upper,
-        "> Y_max;"
+  required <- c("N_unit", "n_rep", "visit_idx", "max_rep",
+                if (include_component) "visit_component",
+                if (include_Y_max) "Y_max",
+                if (include_K_max) "K_max")
+  missing_fields <- setdiff(required, names(arrays))
+  if (length(missing_fields)) {
+    stop_missing_fields("The closure-unit arrays", missing_fields)
+  }
+  per_unit <- "array[N_unit] int<lower=1>"
+  per_visit <- paste0("array[N_unit, ", arrays$max_rep, "] int<lower=1>")
+  y_max_upper <- if (is.na(y_max_upper)) "" else {
+    paste0(", upper=", y_max_upper)
+  }
+  combine_stanvars(
+    brms::stanvar(name = family_funs_name, scode = family_funs,
+                  block = "functions"),
+    data_stanvar(as.integer(arrays$N_unit), "N_unit", "int<lower=1>"),
+    data_stanvar(as.integer(arrays$n_rep), "n_rep", per_unit),
+    data_stanvar(arrays$visit_idx, "visit_idx", per_visit),
+    # The trend data's `obs_trend_series` carries the same fact. The
+    # family stanvars are parsed before the trend data, where that
+    # identifier is not yet in scope.
+    if (include_component) {
+      data_stanvar(arrays$visit_component, "visit_component", per_visit)
+    },
+    if (include_Y_max) {
+      data_stanvar(as.integer(arrays$Y_max), "Y_max",
+                   paste0("array[N_unit] int<lower=0", y_max_upper, ">"))
+    },
+    if (include_K_max) {
+      data_stanvar(as.integer(arrays$K_max), "K_max", per_unit)
+    },
+    if (log_n_lookup) {
+      brms::stanvar(
+        scode = paste(
+          "  int K_max_global = max(K_max);",
+          "  vector[K_max_global] log_n_lookup;",
+          "  for (n_lk in 1 : K_max_global) {",
+          "    log_n_lookup[n_lk] = log(n_lk);",
+          "  }",
+          sep = "\n"
+        ),
+        block = "tdata"
       )
     }
-    stanvars <- stanvars +
-      brms::stanvar(
-        x     = as.integer(arrays$Y_max),
-        name  = "Y_max",
-        scode = y_max_scode,
-        block = "data"
-      )
-  }
-  if (include_K_max) {
-    stanvars <- stanvars +
-      brms::stanvar(
-        x     = as.integer(arrays$K_max),
-        name  = "K_max",
-        scode = "array[N_unit] int<lower=1> K_max;",
-        block = "data"
-      )
-  }
-  stanvars
+  )
 }
 
-#' Build the closure-unit Stan stanvars for an nmix() fit
-#'
-#' Wraps the shared `make_closure_unit_arrays_stanvars()` with
-#' the nmix-specific function block and the `K_max` data array.
+#' Stan code and data of a binomial nmix() fit
 #'
 #' @inheritParams make_closure_unit_arrays_stanvars
-#' @return A `brmsstanvars` object.
+#' @return A `brmsstanvars` object
 #' @noRd
 make_nmix_stanvars <- function(arrays) {
-  base <- make_closure_unit_arrays_stanvars(
+  make_closure_unit_arrays_stanvars(
     arrays,
     family_funs_name = "nmix_funs",
-    family_funs      = nmix_stan_funs(arrays$max_rep),
-    y_max_upper      = NA_integer_,
-    include_K_max    = TRUE
-  )
-  # Precompute log(N) for N in 1..max(K_max) in transformed data.
-  # The Poisson-binomial marginalisation's inner ratio loop then
-  # indexes a vector in place of a scalar log() call per iteration.
-  # Saves ~possible_N * (1 + n_rep) scalar log evaluations per
-  # closure unit per leapfrog step. Indexed by integer N (Stan
-  # requires int for vector indexing) at the lpmf call site.
-  base + brms::stanvar(
-    scode = paste(
-      "  int K_max_global = max(K_max);",
-      "  vector[K_max_global] log_n_lookup;",
-      "  for (n_lk in 1 : K_max_global) {",
-      "    log_n_lookup[n_lk] = log(n_lk);",
-      "  }",
-      sep = "\n"
-    ),
-    block = "tdata"
+    family_funs = nmix_stan_funs(),
+    log_n_lookup = TRUE
   )
 }
 
-#' Build the closure-unit Stan stanvars for an nmix("royle_nichols")
-#' fit
+#' Stan code and data of an nmix("royle_nichols") fit
 #'
-#' Wraps the shared `make_closure_unit_arrays_stanvars()` with the
-#' Royle-Nichols function block, the per-unit `K_max` data array,
-#' and the binary `Y_max` upper bound (Royle-Nichols requires
-#' binary detection input, so `Y_max[g] in {0, 1}`).
+#' Royle-Nichols takes binary detections, which bounds `Y_max` by 1.
 #'
 #' @inheritParams make_closure_unit_arrays_stanvars
-#' @return A `brmsstanvars` object.
+#' @return A `brmsstanvars` object
 #' @noRd
 make_nmix_royle_nichols_stanvars <- function(arrays) {
   make_closure_unit_arrays_stanvars(
     arrays,
     family_funs_name = "nmix_royle_nichols_funs",
-    family_funs      = nmix_royle_nichols_stan_funs(arrays$max_rep),
-    y_max_upper      = 1L,
-    include_K_max    = TRUE
+    family_funs = nmix_royle_nichols_stan_funs(),
+    y_max_upper = 1L
   )
 }
 
-#' Build the closure-unit Stan stanvars for an
-#' `nmix("poisson_poisson")` fit
+#' Stan code and data of an nmix("poisson_poisson") fit
 #'
-#' Wraps the shared `make_closure_unit_arrays_stanvars()` with
-#' the Neyman Type A function block and the per-unit `K_max`
-#' data array. Y_max keeps the unbounded count declaration
-#' because Poisson-Poisson allows `y_t > N` (each individual
-#' contributes its own Poisson process per visit; the closure
-#' constraint does NOT bound `N` from below by `Y_max`).
+#' Each individual contributes its own Poisson count per visit, which
+#' lets a count exceed the abundance. `Y_max` then bounds nothing.
+#'
+#' `k_start_ppm[g]` starts the sum over the latent abundance about
+#' seven standard deviations below `Y_max[g]`. Given abundance k and
+#' detection p, a visit's count is Poisson(k p). With p near 1 its
+#' standard deviation is about `sqrt(Y_max)`. The log likelihood m
+#' standard deviations below the mode falls by m^2 / 2. At m = 7 the
+#' skipped terms hold a relative mass below 1e-11. The posterior is
+#' unchanged to round-off. A unit with a small count starts at 1.
 #'
 #' @inheritParams make_closure_unit_arrays_stanvars
-#' @return A `brmsstanvars` object.
+#' @return A `brmsstanvars` object
 #' @noRd
 make_nmix_poisson_poisson_stanvars <- function(arrays) {
-  base <- make_closure_unit_arrays_stanvars(
-    arrays,
-    family_funs_name = "nmix_poisson_poisson_funs",
-    family_funs      = nmix_poisson_poisson_stan_funs(arrays$max_rep),
-    y_max_upper      = NA_integer_,
-    include_K_max    = TRUE
-  )
-  # Precompute log(k) for k in 1..max(K_max) in transformed data.
-  # The Poisson-Poisson marginalisation's inner k loop then indexes a
-  # vector in place of a scalar log() call per iteration. This saves
-  # max(K_max) scalar log evaluations per closure unit per leapfrog
-  # step. Indexed by integer k at the lpmf call site; loop bounds
-  # k in kg_lo..Kg guarantee k <= K_max_global.
-  base <- base + brms::stanvar(
-    scode = paste(
-      "  int K_max_global = max(K_max);",
-      "  vector[K_max_global] log_n_lookup;",
-      "  for (n_lk in 1 : K_max_global) {",
-      "    log_n_lookup[n_lk] = log(n_lk);",
-      "  }",
-      sep = "\n"
-    ),
-    block = "tdata"
-  )
-  # Per-unit lower bound on the latent-N k-loop. Drops cells more
-  # than ~7 conservative SDs below Y_max[g] (max observed count).
-  # Reason: conditional on N = k, per-visit counts are Poisson(k*p)
-  # with worst-case p ~= 1 giving SD ~ sqrt(Y_max) around the MLE
-  # N_hat ~= Y_max/p. The log-likelihood at m SDs below the mode
-  # drops by m^2/2; m = 7 gives < 1e-11 relative mass, below
-  # double-precision noise once aggregated via log_sum_exp. Pure
-  # efficiency: posterior is identical up to round-off. Low-count
-  # units collapse to k_start = 1 (no skip).
   y_max <- as.integer(arrays$Y_max)
   k_start_ppm <- pmax(1L, y_max - 7L * as.integer(ceiling(sqrt(y_max))))
-  base + brms::stanvar(
-    x     = k_start_ppm,
-    name  = "k_start_ppm",
-    scode = "array[N_unit] int<lower=1> k_start_ppm;",
-    block = "data"
-  )
+  make_closure_unit_arrays_stanvars(
+    arrays,
+    family_funs_name = "nmix_poisson_poisson_funs",
+    family_funs = nmix_poisson_poisson_stan_funs(),
+    log_n_lookup = TRUE
+  ) + data_stanvar(k_start_ppm, "k_start_ppm", "array[N_unit] int<lower=1>")
 }
 
 #' Prepare a closure-unit family for fitting
@@ -5388,6 +4237,8 @@ make_nmix_poisson_poisson_stanvars <- function(arrays) {
 #'   prior through to them.
 #' @param series_var,time_var The series and time columns the trend
 #'   names, which key a closure unit.
+#' @param dpar_forms The distributional formulas of the observation
+#'   model, named by parameter
 #' @return The family with `mvgam_stanvars` attribute populated
 #'   and `vars` set.
 #' @noRd
@@ -5395,60 +4246,53 @@ prepare_closure_unit_family <- function(family, data, response_var,
                                          has_obs_covariates = FALSE,
                                          has_det_covariates = FALSE,
                                          prior = NULL,
-                                         series_var, time_var) {
+                                         series_var, time_var,
+                                         dpar_forms = list()) {
   family_name <- family$name
-  binary_y_check <- is_binary_response_family(family)
-  default_cap <- closure_unit_default_cap(family)
-  default_cap_buffer <- closure_unit_default_cap_buffer(family)
   multi_response <- is_multi_response_family(family)
-  # Which columns key a unit is the family's own fact. The accessor
-  # holds that fact. Callers do not restate it. A multi-response unit is
-  # a site keyed by `time` alone. Its rows are the K response components.
-  # A detection unit is keyed by `(series, time)`, with replicate visits
-  # inside.
-  unit_grouping_vars <- closure_unit_key_vars(family, series_var, time_var)
+  # A multi-response density takes its K components with no truncation
+  # and runs its own response check below
   if (!multi_response) {
-    # cap is required only when neither a scalar default nor a
-    # data-driven buffer is configured. Count families (PB / PPM)
-    # carry `mvgam_default_cap_buffer = 100L` so the validator
-    # accepts data without an explicit cap column. A multi-response
-    # family skips the integer-y / cap validation entirely: its
-    # per-unit likelihood takes the K response components directly,
-    # without per-unit truncation.
     validate_closure_unit_data(
-      data,
+      data, family,
       response_var       = response_var,
       has_obs_covariates = has_obs_covariates,
       has_det_covariates = has_det_covariates,
-      binary_y_check     = binary_y_check,
-      cap_required       = is.null(default_cap) &&
-                            is.null(default_cap_buffer),
-      default_cap        = default_cap,
-      unit_grouping_vars = unit_grouping_vars,
       series_var         = series_var,
       time_var           = time_var
     )
   }
   arrays <- build_closure_unit_arrays(
     data, response_var = response_var,
-    series_var         = series_var,
-    time_var           = time_var,
-    default_cap        = default_cap,
-    default_cap_buffer = default_cap_buffer,
-    compute_y_max      = !multi_response,
-    unit_grouping_vars = unit_grouping_vars
+    series_var = series_var, time_var = time_var, family = family
   )
+  # A multi-response density takes one value of each parameter other
+  # than `mu` per unit, from the unit's first row
+  if (multi_response) {
+    refuse_off_simplex_response(data[[response_var]], arrays, family_name,
+                                response_var)
+    for (dpar in setdiff(names(dpar_forms), "mu")) {
+      for (v in intersect(all.vars(dpar_forms[[dpar]]), names(data))) {
+        refuse_unit_varying(
+          data[[v]], arrays, v,
+          paste0("'", dpar, "' takes one value per unit, from covariates ",
+                 "constant within it.")
+        )
+      }
+    }
+  }
   family_stanvars <- switch(
     family_name,
     nmix                 = make_nmix_stanvars(arrays),
     nmix_royle_nichols   = make_nmix_royle_nichols_stanvars(arrays),
     nmix_poisson_poisson = make_nmix_poisson_poisson_stanvars(arrays),
     occ                  = make_occ_stanvars(arrays),
-    diri                 = make_diri_stanvars(arrays),
-    multi                = make_multi_stanvars(arrays),
-    categ                = make_categ_stanvars(arrays),
-    mvn                  = make_mvn_stanvars(arrays, prior),
-    mvt                  = make_mvt_stanvars(arrays, prior),
+    diri                 = ,
+    multi                = ,
+    categ                = ,
+    mvn                  = ,
+    mvt                  = make_multi_response_stanvars(arrays, family,
+                                                        prior),
     refuse_missing_family_dispatch(family_name, "its Stan code")
   )
   attr(family, "mvgam_stanvars") <- family_stanvars
@@ -5461,30 +4305,16 @@ prepare_closure_unit_family <- function(family, data, response_var,
     )
   }
   family$vars <- family_vars
-  # Poisson-Poisson identifiability guard. With intercept-only mu
-  # AND intercept-only p, the closed-form marginal would be a
-  # Poisson(lambda * p) ridge; the Neyman Type A over-dispersion
-  # in the truncated form gives only weak cross-identification. The
-  # lambda * p = constant ridge remains pronounced (Kery 2018;
-  # "Wild posteriors in the wild" arXiv 2503.00239). Warn once per
-  # session so the user has the option to constrain at least one
-  # intercept with an informative prior.
+  # With intercepts alone, only the extra variance of Neyman Type A
+  # counts separates the abundance from the encounter rate
   if (identical(family_name, "nmix_poisson_poisson") &&
       !has_obs_covariates && !has_det_covariates) {
     warn_once(
       c(
-        paste0(
-          "nmix(\"poisson_poisson\") with intercept-only mu and p ",
-          "is weakly identified."
-        ),
-        x = paste0(
-          "The data identify only the product `lambda * p`. The priors ",
-          "set `lambda` and `p` apart."
-        ),
-        i = paste0(
-          "Add a covariate to either formula, as in `y ~ x` or ",
-          "`bf(y ~ ..., p ~ x)`, or give one intercept an informative prior."
-        )
+        "nmix('poisson_poisson') with intercepts alone is weakly identified.",
+        x = "The data mainly identify the product of 'mu' and 'p'.",
+        i = "Add a covariate to the formula of 'mu' or of 'p'.",
+        i = "Or give one intercept an informative prior."
       ),
       "nmix_poisson_poisson_intercept_only"
     )
@@ -5879,28 +4709,22 @@ posterior_epred_com_binomial <- function(prep) {
 # ============================================================
 # Closure-unit family R-side downstream methods
 # ============================================================
-# All closure-unit families (nmix, occ, ...) share the
-# `extract_closure_unit_components()` extractor which yields
-# `$state` (per-unit, link-inverted), `$p` (per-visit) and the
-# closure-unit arrays. Per-family methods then apply the
-# family-specific likelihood / sampling formula. `predict.mvgam`,
-# `posterior_epred.mvgam`, `posterior_predict.mvgam` and
-# `log_lik.mvgam` route to per-family methods via the central
-# `dispatch_closure_unit_method()` switch defined below.
+# The detection families take the unit state, the visit `p` and the
+# closure-unit arrays from `extract_closure_unit_components()`.
+# `predict()`, `posterior_epred()`, `posterior_predict()` and
+# `log_lik()` reach their kernels through
+# `dispatch_closure_unit_method()`.
 
 #' Dispatch a closure-unit R-side method by family name
 #'
-#' Central routing table for the closure-unit families. Every downstream
-#' method (predict, posterior_epred, posterior_predict,
-#' posterior_detection, posterior_latent_N / posterior_occupancy) calls
-#' this helper. None hard-wires a family name.
-#' A new closure-unit family needs one branch per `method_kind` value.
+#' The routing table of the families on the closure-unit layout. The
+#' detection families share one kernel per method. Their latent states
+#' differ: an abundance under `nmix()`, an occupancy under `occ()`. A
+#' new family on the layout needs one branch per `method_kind` value.
 #'
-#' @param family A fitted mvgam family (must be a closure-unit
-#'   family per `uses_closure_unit_layout()`).
+#' @param family A family on the closure-unit layout
 #' @param method_kind One of `"epred"`, `"predict"`, `"log_lik"`,
-#'   `"latent_state"`. The `"latent_state"` method is family-specific
-#'   (latent_N for nmix, occupancy for occ).
+#'   `"latent_state"`
 #' @return A function with the per-family signature for that
 #'   method. Calls `stop()` for unknown families or methods. The error
 #'   message names the family.
@@ -5915,41 +4739,29 @@ dispatch_closure_unit_method <- function(family, method_kind) {
     ))
   }
   family_name <- resolve_family_name(family)
+  if (is_closure_unit_family(family)) {
+    latent <- if (models_latent_count(family)) {
+      posterior_latent_N_nmix
+    } else {
+      posterior_occupancy
+    }
+    return(switch(method_kind,
+                  epred        = posterior_epred_detection,
+                  predict      = posterior_predict_detection,
+                  log_lik      = log_lik_detection,
+                  latent_state = latent))
+  }
   fn <- switch(
     family_name,
-    nmix = switch(method_kind,
-                  epred        = posterior_epred_nmix,
-                  predict      = posterior_predict_nmix,
-                  log_lik      = log_lik_nmix,
-                  latent_state = posterior_latent_N_pb),
-    nmix_royle_nichols = switch(
-      method_kind,
-      epred        = posterior_epred_nmix_royle_nichols,
-      predict      = posterior_predict_nmix_royle_nichols,
-      log_lik      = log_lik_nmix_royle_nichols,
-      latent_state = posterior_latent_N_royle_nichols
-    ),
-    nmix_poisson_poisson = switch(
-      method_kind,
-      epred        = posterior_epred_nmix_poisson_poisson,
-      predict      = posterior_predict_nmix_poisson_poisson,
-      log_lik      = log_lik_nmix_poisson_poisson,
-      latent_state = posterior_latent_N_poisson_poisson
-    ),
-    occ  = switch(method_kind,
-                  epred        = posterior_epred_occ,
-                  predict      = posterior_predict_occ,
-                  log_lik      = log_lik_occ,
-                  latent_state = posterior_occupancy),
     mvn  = switch(method_kind,
-                  epred        = posterior_epred_mvn,
+                  epred        = posterior_epred_component_scale,
                   predict      = posterior_predict_mvn,
-                  log_lik      = log_lik_mvn,
+                  log_lik      = spec_log_lik("mvn"),
                   latent_state = NULL),
     mvt  = switch(method_kind,
-                  epred        = posterior_epred_mvt,
+                  epred        = posterior_epred_component_scale,
                   predict      = posterior_predict_mvt,
-                  log_lik      = log_lik_mvt,
+                  log_lik      = spec_log_lik("mvt"),
                   latent_state = NULL),
     diri  = switch(method_kind,
                    epred        = posterior_epred_diri,
@@ -6050,15 +4862,8 @@ extract_p_for_closure_unit <- function(object, newdata, draw_ids,
 #' a multi-season fit on `(series, time)` and drop the site axis. The unit
 #' count would then be wrong.
 #'
-#' For a multi-response family the K response components of a site
-#' are its "visits", so `compute_y_max` is FALSE: there is no
-#' per-unit truncation, which is also what makes the two cap
-#' declarations inert. Neither needs a branch of its own.
-#'
-#' Both of the family's cap declarations are passed. A count family has a
-#' data-driven buffer as well as a fixed cap. Passing only the fixed cap
-#' would leave the rebuild with neither declaration. It would then demand
-#' a `cap` column that the fit does not need.
+#' The family sets the cap declarations and whether the units carry a
+#' truncation.
 #'
 #' @param object A fitted `mvgam` with a closure-unit family.
 #' @param newdata Frame to build over; defaults to the fit's data.
@@ -6069,16 +4874,13 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
   # The frame the model was fitted on, through the accessor that
   # owns that question. Neither of the two spellings is used.
   newdata <- prediction_frame(object, newdata)
-  fam <- object$family
   vars <- axis_vars(object)
   build_closure_unit_arrays(
     newdata,
     response_var = response_column(object),
     series_var = vars$series_var,
     time_var = vars$time_var,
-    default_cap = closure_unit_default_cap(fam),
-    default_cap_buffer = closure_unit_default_cap_buffer(fam),
-    compute_y_max = !is_multi_response_family(fam),
+    family = object$family,
     unit_grouping_vars = fit_closure_unit_keys(object),
     # The series the model was fitted on. A frame missing one then
     # keeps every component on its own residual scale.
@@ -6125,41 +4927,22 @@ extract_closure_unit_components <- function(object, newdata = NULL,
                                              draw_ids = NULL,
                                              linpred = NULL) {
   checkmate::assert_class(object, "mvgam")
-  if (!uses_closure_unit_layout(object$family)) {
+  if (!is_closure_unit_family(object$family)) {
     stop(insight::format_error(c(
       "extract_closure_unit_components() requires a closure-unit fit.",
       i = "Use family = nmix() or family = occ()."
     )))
   }
   newdata <- closure_unit_frame(object, newdata)
-  response_var <- response_column(object)
-  binary_y_check <- is_binary_response_family(object$family)
-  default_cap <- closure_unit_default_cap(object$family)
-  default_cap_buffer <- closure_unit_default_cap_buffer(object$family)
-  # Re-run validation on newdata. Cap edits (nmix) and non-binary y
-  # (occ, royle_nichols) raise the friendly error. Otherwise they would
-  # produce silent garbage in downstream sampling. The identifiability
-  # checks are switched off here. They ask whether a design can separate
-  # state from detection, which is a question about a fit.
-  # Mv-response families (mvn / mvt) take continuous responses without a
-  # per-unit truncation. They share the closure-unit data layout (long
-  # format, K rows per site). Neither needs a cap column. Neither runs
-  # the binary-y check.
-  aggregates <- is_closure_unit_family(object$family)
+  # Cap edits and a non-binary response in `newdata` are refused here.
+  # The identifiability checks concern a fit and are switched off.
   vars <- axis_vars(object)
   validate_closure_unit_data(
-    newdata,
-    response_var       = response_var,
-    series_var         = vars$series_var,
-    time_var           = vars$time_var,
-    identifiability    = FALSE,
-    binary_y_check     = binary_y_check && aggregates,
-    # A family declaring a data-driven buffer needs no `cap` column
-    # here, for the same reason it needs none at fit time. Both
-    # declarations are used.
-    cap_required       = is.null(default_cap) &&
-                           is.null(default_cap_buffer) && aggregates,
-    default_cap        = default_cap
+    newdata, object$family,
+    response_var    = response_column(object),
+    series_var      = vars$series_var,
+    time_var        = vars$time_var,
+    identifiability = FALSE
   )
   arrays <- closure_unit_arrays_for(object, newdata)
   # Per-visit linpred for the state quantity. The linpred is
@@ -6200,6 +4983,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   list(
     state   = state,
     p       = p,
+    y       = as.integer(newdata[[response_column(object)]]),
     arrays  = arrays,
     ndraws  = ndraws,
     n_unit  = n_unit,
@@ -6207,35 +4991,34 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   )
 }
 
-#' A closure unit's expectation at the visit grain
+#' A detection family's expectation at the visit grain
 #'
-#' The unit carries one latent state, an abundance for `nmix()` or an
-#' occupancy for `occ()`. Every visit of the unit takes that state,
-#' thinned by the visit's detection probability.
-#' `visit_to_unit_lookup()` inverts the first-visit column of
-#' `arrays$row_unit`.
+#' Every visit of a unit takes the unit's `psi` or `lambda`. The mean
+#' of a visit is that state times the visit's `p` under `occ()`,
+#' `"poisson_binomial"` and `"poisson_poisson"`. Under
+#' `"royle_nichols"` a visit detects with probability
+#' `1 - exp(-p * lambda)`, the mean of `1 - (1 - p)^N` over
+#' `N ~ Poisson(lambda)` (Royle and Nichols 2003).
 #'
-#' @param object Fitted `mvgam` object with a closure-unit family
-#' @param newdata Data frame of visit rows
+#' @param object Fitted `mvgam` object with a detection family
+#' @param newdata Data frame of visit rows, or `NULL`
 #' @param draw_ids Integer vector of draw indices, or `NULL`
 #' @param linpred Numeric linear predictor matrix, or `NULL`
 #' @return Numeric matrix with one row per draw and one column per
 #'   visit
 #' @noRd
-closure_unit_visit_epred <- function(object, newdata, draw_ids,
-                                     linpred = NULL) {
-  checkmate::assert_list(object)
+posterior_epred_detection <- function(object, newdata = NULL,
+                                      draw_ids = NULL, linpred = NULL) {
   checkmate::assert_matrix(linpred, null.ok = TRUE)
   comp <- extract_closure_unit_components(object, newdata, draw_ids,
                                           linpred = linpred)
-  unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
-  comp$state[, unit_of_visit, drop = FALSE] * comp$p
-}
-
-
-posterior_epred_nmix <- function(object, newdata = NULL,
-                                  draw_ids = NULL, linpred = NULL) {
-  closure_unit_visit_epred(object, newdata, draw_ids, linpred)
+  state <- comp$state[, visit_to_unit_lookup(comp$arrays, comp$n_visit),
+                      drop = FALSE]
+  if (identical(resolve_family_name(object$family),
+                "nmix_royle_nichols")) {
+    return(-expm1(-comp$p * state))
+  }
+  state * comp$p
 }
 
 #' Take a per-unit quantity at the grain of the frame's rows
@@ -6295,102 +5078,59 @@ visit_to_unit_lookup <- function(arrays, n_visit) {
   out
 }
 
-#' A closure-unit family's per-visit predictive draws
+#' A detection family's per-visit predictive draws
 #'
-#' A unit draws one latent state. Each visit of the unit observes that
-#' state, thinned by its detection probability. The RNG calls run in
-#' one order, a unit's state and then its rows in frame order.
+#' Each draw takes the unit's state from its distribution given the
+#' covariates: `z ~ Bernoulli(psi)` under `occ()`, `N ~ Poisson(lambda)`
+#' under `nmix()`. Every visit of the unit shares that state. The
+#' within-unit dependence of the visits then reaches the replicates.
+#' `predict(type = "latent_state")` conditions the state on the visits
+#' instead. The random draws run in one order, a unit's state and then
+#' its rows in frame order.
 #'
-#' @param object Fitted `mvgam` object with a closure-unit family
-#' @param newdata Data frame of visit rows
-#' @param draw_ids Integer vector of draw indices, or `NULL`
-#' @param draw_state Function drawing a unit's state from its
-#'   per-draw parameter and the draw count
-#' @param draw_visit Function drawing a visit's response from the state,
-#'   the detection probability and the draw count
-#' @param linpred Numeric linear predictor matrix, or `NULL`
-#' @return Integer matrix with one row per draw and one column per
-#'   visit
+#' @inheritParams posterior_epred_detection
+#' @return `[S x N_visit]` integer matrix
 #' @noRd
-closure_unit_visit_draws <- function(object, newdata, draw_ids,
-                                     draw_state, draw_visit,
-                                     linpred = NULL) {
-  checkmate::assert_list(object)
-  checkmate::assert_function(draw_state)
-  checkmate::assert_function(draw_visit)
-  checkmate::assert_matrix(linpred, null.ok = TRUE)
+posterior_predict_detection <- function(object, newdata = NULL,
+                                        draw_ids = NULL,
+                                        linpred = NULL) {
   comp <- extract_closure_unit_components(object, newdata, draw_ids,
                                           linpred = linpred)
-  arrays <- comp$arrays
-  ndraws <- comp$ndraws
-  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
-  # Every row of the unit is included, including rows with no recorded
-  # response. A visit with no recorded response still has a detection
-  # probability and a predictive draw. On a forecast grid no row has a
-  # response. Walking only the observed rows would leave every column at
-  # its zero fill.
-  unit_rows <- closure_unit_row_split(arrays)
-  for (g in seq_len(arrays$N_unit)) {
-    idx <- unit_rows[[g]]
-    state_g <- draw_state(comp$state[, g], ndraws)
-    for (j in idx) {
-      out[, j] <- draw_visit(state_g, comp$p[, j], ndraws)
+  n <- comp$ndraws
+  draw_state <- if (models_latent_count(object$family)) {
+    function(lambda) stats::rpois(n, lambda)
+  } else {
+    function(psi) stats::rbinom(n, 1L, psi)
+  }
+  draw_visit <- switch(
+    resolve_family_name(object$family),
+    occ = function(z, p) stats::rbinom(n, 1L, z * p),
+    nmix_royle_nichols = function(N, r) {
+      stats::rbinom(n, 1L, -expm1(N * log1p(-r)))
+    },
+    nmix_poisson_poisson = function(N, p) stats::rpois(n, N * p),
+    function(N, p) stats::rbinom(n, size = N, prob = p)
+  )
+  out <- matrix(0L, nrow = n, ncol = comp$n_visit)
+  # Every row of a unit takes a draw, including rows with no recorded
+  # response. A forecast grid records none.
+  unit_rows <- closure_unit_row_split(comp$arrays)
+  for (g in seq_len(comp$arrays$N_unit)) {
+    state_g <- draw_state(comp$state[, g])
+    for (j in unit_rows[[g]]) {
+      out[, j] <- draw_visit(state_g, comp$p[, j])
     }
   }
   out
 }
 
-
-#' A unit's latent abundance under a Poisson state
+#' The detection probability of each visit, per draw
 #'
-#' All three `nmix()` parametrisations use it.
+#' `predict(type = "detection")` returns it. Under
+#' `nmix("poisson_poisson")` it is the encounter rate.
 #'
-#' @param lambda_g Numeric Poisson mean, a scalar or one per draw
-#' @param ndraws Integer number of draws
-#' @return Integer vector of `ndraws` abundances
-#' @noRd
-draw_poisson_abundance <- function(lambda_g, ndraws) {
-  checkmate::assert_numeric(lambda_g, lower = 0)
-  checkmate::assert_int(ndraws, lower = 1L)
-  stats::rpois(ndraws, lambda = lambda_g)
-}
-
-
-#' Per-visit response draws for an nmix() fit (unconditional)
-#'
-#' Draws latent abundances unconditionally from the Poisson prior
-#' (`N_g ~ Poisson(lambda_g)`) per posterior draw, then samples
-#' each visit's count from `Binomial(N_g, p_{g,j})`. This matches
-#' the Stan likelihood's marginalisation semantics. The model
-#' integrates N out. The unconditional prior predictive is the natural
-#' ppc target. Use `predict(object, type =
-#' "latent_state")` for the conditional posterior of N given the
-#' observed counts (Royle 2004).
-#'
-#' @inheritParams posterior_epred_nmix
-#' @return `[S x N_visit]` integer matrix of visit counts.
-#' @noRd
-posterior_predict_nmix <- function(object, newdata = NULL,
-                                    draw_ids = NULL, linpred = NULL) {
-  closure_unit_visit_draws(
-    object, newdata, draw_ids, draw_poisson_abundance,
-    function(N_draws, p_j, ndraws) {
-      stats::rbinom(ndraws, size = N_draws, prob = p_j)
-    },
-    linpred = linpred
-  )
-}
-
-#' Per-visit detection-probability draws for a closure-unit fit
-#'
-#' Wraps `extract_closure_unit_components()` for
-#' `predict(type = "detection")`. Returns a `[S x N_visit]`
-#' matrix of detection probabilities on the response (0-1)
-#' scale. Family-agnostic; works for any closure-unit family
-#' (nmix, occ, future royle_nichols / poisson_poisson).
-#'
-#' @inheritParams posterior_epred_nmix
-#' @return `[S x N_visit]` matrix.
+#' @inheritParams posterior_epred_detection
+#' @return `[S x N_visit]` matrix
 #' @noRd
 posterior_detection <- function(object, newdata = NULL,
                                  draw_ids = NULL) {
@@ -6470,12 +5210,10 @@ aggregate_closure_unit_visits <- function(object,
 
 #' The multinomial trial total of each row's closure unit
 #'
-#' `multi()` scores a site's K category counts against the site's
-#' own total, so `N_site` is the sum of the response over a unit's
-#' rows, carried back to every row of that unit. Three places built
-#' it with the same loop -- the epred kernel, the predict kernel and
-#' `predict(type = "variance")` -- and a fourth would have been
-#' written next.
+#' `multi()` scores a site's K category counts against the site's own
+#' total, the sum of the response over the unit's rows. A unit with no
+#' recorded counts, such as a site of a forecast grid, takes the
+#' training total of `multinomial_training_total()`.
 #'
 #' @param object Fitted `mvgam` object with a `multi()` family.
 #' @param newdata Long-format frame; the fit's own when `NULL`.
@@ -6485,17 +5223,10 @@ aggregate_closure_unit_visits <- function(object,
 multinomial_unit_totals <- function(object, newdata, arrays) {
   newdata <- prediction_frame(object, newdata)
   y <- as.numeric(newdata[[response_column(object)]])
-  # `N_site` is the multinomial's sample size, which is data. A site's
-  # counts sum to it. A site with no counts supplies none. Summing nothing
-  # reports a total of zero. Every category then has an expected count of
-  # zero. No individuals are drawn. A forecast grid is one such case. The
-  # comment says what it lacks.
   totals <- sum_within_closure_units(arrays, y)
-  # A forecast grid records no counts. Summing nothing gives a total of
-  # zero, which would draw no individuals at every category. The effort
-  # the training sites were surveyed under carries forward to such a
-  # site. A forecast states what the next survey of the same design
-  # would record.
+  # A unit with no counts sums to zero, which would draw no individuals.
+  # It takes the effort of the training design. Its forecast states what
+  # the next survey of that design would record.
   unseen <- which(arrays$n_rep == 0L)
   if (length(unseen)) {
     totals[unseen] <- multinomial_training_total(object)
@@ -6587,6 +5318,83 @@ closure_unit_row_split <- function(arrays) {
 }
 
 
+#' Refuse a composition response outside its family's support
+#'
+#' Each unit of a [diri()] fit holds shares that sum to one. Each unit
+#' of a [categ()] fit holds one `1` among its zeros. A [multi()] fit
+#' holds counts. Stan rejects a unit outside that support during
+#' sampling. A [categ()] unit with two `1`s would pass, scored as its
+#' first. Missing responses are skipped.
+#'
+#' @param y The response, one value per frame row
+#' @param arrays Closure-unit arrays carrying `row_unit` and `N_unit`
+#' @param family_name `"diri"`, `"multi"` or `"categ"`
+#' @param response_var The response's name, for the message
+#' @return `NULL`, invisibly, or an error
+#' @noRd
+refuse_off_simplex_response <- function(y, arrays, family_name,
+                                        response_var) {
+  units <- lapply(closure_unit_row_split(arrays), function(rows) {
+    y[rows][!is.na(y[rows])]
+  })
+  units <- units[lengths(units) > 0L]
+  bad <- switch(
+    family_name,
+    diri = vapply(units, function(v) {
+      any(v <= 0 | v >= 1) || abs(sum(v) - 1) > 1e-8
+    }, logical(1L)),
+    categ = vapply(units, function(v) {
+      !all(v %in% c(0, 1)) || sum(v) != 1
+    }, logical(1L)),
+    multi = vapply(units, function(v) any(v < 0), logical(1L)),
+    logical(length(units))
+  )
+  if (!any(bad)) {
+    return(invisible(NULL))
+  }
+  support <- switch(
+    family_name,
+    diri = "shares in (0, 1) that sum to one",
+    categ = "one 1 among zeros",
+    multi = "non-negative counts"
+  )
+  stop(insight::format_error(c(
+    paste0("'", response_var, "' must hold ", support, " in each unit."),
+    x = paste0(sum(bad), " of ", length(units), " units fall outside it."),
+    i = paste0("Each unit's rows are the components of one ",
+               family_name, "() observation."),
+    i = if (family_name == "diri") {
+      "Stan checks the sum to 1e-8. Divide each share by its unit's total."
+    }
+  )), call. = FALSE)
+}
+
+
+#' Refuse a variable that takes more than one value in a closure unit
+#'
+#' @param values The variable, one value per frame row
+#' @param arrays Closure-unit arrays carrying `row_unit` and `N_unit`
+#' @param var_name The variable's name, for the message
+#' @param reason Why the caller needs one value per unit
+#' @return `NULL`, invisibly, or an error
+#' @noRd
+refuse_unit_varying <- function(values, arrays, var_name, reason) {
+  checkmate::assert_atomic_vector(values, len = length(arrays$row_unit))
+  varying <- vapply(closure_unit_row_split(arrays), function(rows) {
+    length(unique(values[rows])) > 1L
+  }, logical(1L))
+  if (any(varying)) {
+    stop(insight::format_error(c(
+      paste0("'", var_name, "' varies within a closure unit."),
+      x = paste0(sum(varying), " of ", arrays$N_unit,
+                 " units hold more than one value."),
+      i = reason
+    )), call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+
 #' The first frame row of each closure unit
 #'
 #' A per-unit quantity is stored on one of the unit's rows. Four callers
@@ -6642,16 +5450,14 @@ complete_closure_units <- function(arrays,
 #' @return `x` summed within units, keeping its shape.
 #' @noRd
 sum_within_closure_units <- function(arrays, x) {
-  unit_rows <- function(g) arrays$visit_row[g, seq_len(arrays$n_rep[g])]
+  rows <- closure_unit_visit_rows(arrays)
   n_unit <- arrays$N_unit
   if (is.null(dim(x))) {
-    return(vapply(
-      seq_len(n_unit), function(g) sum(x[unit_rows(g)]), numeric(1L)
-    ))
+    return(vapply(rows, function(idx) sum(x[idx]), numeric(1L)))
   }
   out <- matrix(0, nrow = nrow(x), ncol = n_unit)
   for (g in seq_len(n_unit)) {
-    idx <- unit_rows(g)
+    idx <- rows[[g]]
     # Single-visit units short-circuit the row sum. Multi-visit
     # units sum across the chosen columns; rowSums is the vectorised
     # form and is materially faster than apply on the wide N_visit
@@ -6665,37 +5471,38 @@ sum_within_closure_units <- function(arrays, x) {
   out
 }
 
-#' Per-closure-unit latent-abundance draws for an nmix() fit
+#' Draws of each closure unit's latent state
 #'
-#' Thin dispatcher: routes to the per-variant kernel
-#' (`posterior_latent_N_pb` for `nmix("poisson_binomial")`,
-#' `posterior_latent_N_royle_nichols` for `nmix("royle_nichols")`)
-#' via the central `dispatch_closure_unit_method()` table.
-#' Public-facing call site (used by `predict(type = "latent_state")`
-#' for nmix() families).
+#' `dispatch_closure_unit_method()` picks the family's kernel:
+#' `posterior_latent_N_nmix()` or `posterior_occupancy()`.
+#' `predict(type = "latent_state")` and `latent_N_saturation()` take
+#' their draws from here.
 #'
-#' @param object Fitted `mvgam` object with an nmix() family.
-#' @param newdata Long-format observation data; defaults to
-#'   training data.
-#' @param draw_ids Optional vector of posterior draw indices.
-#' @param conditional Logical. If TRUE (default), reweight the
-#'   discrete N support by the per-visit likelihood at the
-#'   observed counts. If FALSE, sample N from the unconditional
-#'   Poisson prior.
-#' @return `[S x N_unit]` integer matrix of latent abundance
-#'   draws.
+#' @param object Fitted `mvgam` object with a detection family
+#' @param newdata Long-format visit data, or `NULL` for the training
+#'   data
+#' @param draw_ids Posterior draw indices, or `NULL` for every draw
+#' @param conditional Logical. `TRUE` draws the state given the
+#'   unit's observed counts. `FALSE` draws it from its distribution
+#'   given the covariates alone.
+#' @param draw Logical. The occupancy kernel returns the probability
+#'   of occupancy unless `draw = TRUE`, which draws the 0 / 1 state.
+#'   The abundance kernels always draw.
+#' @return `[S x N_unit]` matrix of latent state draws or occupancy
+#'   probabilities
 #' @noRd
 posterior_latent_N <- function(object, newdata = NULL,
                                 draw_ids = NULL,
-                                conditional = TRUE) {
+                                conditional = TRUE, draw = FALSE) {
+  checkmate::assert_flag(draw)
   # Sharing the closure-unit pipeline does not mean exposing a latent
   # state. The registry records which families do.
   require_closure_unit_predict_type(object$family, "latent_state")
   kernel <- dispatch_closure_unit_method(object$family, "latent_state")
-  kernel(
-    object, newdata = newdata,
-    draw_ids = draw_ids, conditional = conditional
-  )
+  args <- list(object, newdata = newdata, draw_ids = draw_ids,
+               conditional = conditional)
+  if ("draw" %in% names(formals(kernel))) args$draw <- draw
+  do.call(kernel, args)
 }
 
 
@@ -6719,52 +5526,58 @@ expected_latent_state <- function(object, newdata = NULL,
 }
 
 
-#' Per-unit posterior saturation of the closure-unit K_max truncation
+#' How often each unit's latent state reaches its cap
 #'
-#' For a fit using a closure-unit family, reports the share of
-#' conditional posterior latent-state draws that equal the per-unit
-#' upper truncation `K_max`. Under `nmix()` and its
-#' `royle_nichols` and `poisson_poisson` variants, `K_max` bounds a
-#' latent count. A unit whose posterior abundance reaches the bound
-#' shows truncation-induced downward bias. Its `cap` column should be
-#' raised. The default for `nmix("royle_nichols")` is `K_max = 25`.
-#' Supply `cap` when abundance may exceed it. Under `occ()` the latent
-#' state is binary and `K_max` is one. A saturated unit is then one
-#' that the species certainly occupies.
+#' The sum over a unit's latent abundance stops at its cap `K_max`. A
+#' unit whose posterior abundance often equals the cap is truncated,
+#' which biases its abundance down. A higher value in that unit's `cap`
+#' column, then a refit, removes the bias. Under [occ()] the cap is one,
+#' and a unit at its cap is one the species occupies.
 #'
-#' @param object A fitted `mvgam` with a closure-unit family.
-#' @param newdata Optional `data.frame`. When `NULL` uses the fit's
+#' @param object A fitted `mvgam` with an [nmix()] or [occ()] family
+#' @param newdata Optional `data.frame` of visits. `NULL` takes the
 #'   training data.
-#' @param threshold Numeric in `[0, 1]`. Units with
-#'   a share of draws at `K_max` above `threshold` is marked `TRUE` in
-#'   the returned `saturated` column. Default `0.05`.
-#' @param ndraws,draw_ids Forwarded to the internal latent-N
-#'   sampler. `ndraws` caps the per-unit posterior; `draw_ids`
-#'   selects a draw subset.
+#' @param threshold Number in `[0, 1]`. A unit whose share of draws at
+#'   its cap exceeds `threshold` is marked `saturated`.
+#' @param ndraws,draw_ids The number of posterior draws to use, or
+#'   their indices. Give at most one. `NULL` for both uses every draw.
 #'
-#' @return A `data.frame` with one row per closure unit and columns
+#' @return A `data.frame` with one row per closure unit:
 #'   \describe{
-#'     \item{`unit`}{Integer index `1:N_unit`.}
-#'     \item{`label`}{Optional character label if the fit was built
-#'       from a long-format frame with unique unit identifiers.}
-#'     \item{`K_max`}{The per-unit upper truncation that bounded
-#'       the marginalisation.}
-#'     \item{`p_saturated`}{Posterior probability that latent `N`
-#'       equals `K_max`.}
-#'     \item{`saturated`}{Logical, `p_saturated > threshold`.}
+#'     \item{`unit`}{The unit's index.}
+#'     \item{`label`}{The unit's key values, joined by `_`.}
+#'     \item{`K_max`}{The unit's cap.}
+#'     \item{`p_saturated`}{The posterior probability that the latent
+#'       state equals `K_max`.}
+#'     \item{`saturated`}{`p_saturated > threshold`.}
 #'   }
-#'   A 0-row `saturated` set means the configured `K_max` was
-#'   sufficient for all units in the sampled posterior.
 #'
-#' @seealso [nmix()], [occ()].
+#' @examples
+#' \dontrun{
+#' set.seed(5)
+#' simdat <- sim_closure_unit_data(family = nmix(), n_species = 1L,
+#'                                 n_sites = 50L, n_visits = 4L,
+#'                                 type = 1L)
+#' # A cap of 3 is low for these counts
+#' dat <- simdat$data_train
+#' dat$cap <- pmax(3L, ave(dat$y, dat$series, dat$time, FUN = max))
+#' mod <- mvgam(bf(y ~ env, p ~ tod_c), data = dat, family = nmix(),
+#'              chains = 2, silent = 2)
+#' saturation <- latent_N_saturation(mod)
+#' saturation[saturation$saturated, ]
 #'
+#' # Next, raise 'cap' for the saturated units and refit
+#' }
+#'
+#' @seealso [nmix()], [occ()]
 #' @export
 latent_N_saturation <- function(object, newdata = NULL,
-                                 threshold = 0.05,
-                                 ndraws = NULL,
-                                 draw_ids = NULL) {
+                                threshold = 0.05,
+                                ndraws = NULL,
+                                draw_ids = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_number(threshold, lower = 0, upper = 1)
+  validate_draw_selectors(ndraws, draw_ids)
   if (!is_closure_unit_family(object$family)) {
     stop(insight::format_error(c(
       paste0(
@@ -6775,34 +5588,20 @@ latent_N_saturation <- function(object, newdata = NULL,
         "Family '", resolve_family_name(object$family),
         "' marginalises no latent state over repeat visits."
       )
-    )))
+    )), call. = FALSE)
   }
-  # K_max comes from the per-unit array assembled at fit / predict
-  # time.
-  comp <- extract_closure_unit_components(
-    object, newdata = newdata, draw_ids = draw_ids
-  )
-  K_max <- comp$arrays$K_max
   draws <- posterior_latent_N(
     object, newdata = newdata,
-    draw_ids = draw_ids, conditional = TRUE
+    draw_ids = resolve_draw_ids(object, ndraws, draw_ids),
+    draw = TRUE
   )
-  if (!is.null(ndraws)) {
-    checkmate::assert_int(ndraws, lower = 1L)
-    n <- min(nrow(draws), as.integer(ndraws))
-    draws <- draws[seq_len(n), , drop = FALSE]
-  }
-  p_sat <- vapply(
-    seq_len(ncol(draws)),
-    function(g) mean(draws[, g] >= K_max[g]),
-    numeric(1L)
-  )
-  unit_labels <- comp$arrays$unit_labels %||%
-    as.character(seq_along(K_max))
+  arrays <- closure_unit_arrays_for(object,
+                                    closure_unit_frame(object, newdata))
+  p_sat <- colMeans(sweep(draws, 2L, arrays$K_max, ">="))
   out <- data.frame(
-    unit        = seq_along(K_max),
-    label       = unit_labels,
-    K_max       = as.integer(K_max),
+    unit        = seq_along(arrays$K_max),
+    label       = arrays$unit_labels,
+    K_max       = as.integer(arrays$K_max),
     p_saturated = p_sat,
     saturated   = p_sat > threshold,
     stringsAsFactors = FALSE
@@ -6811,318 +5610,258 @@ latent_N_saturation <- function(object, newdata = NULL,
   out
 }
 
-#' Per-closure-unit latent-abundance draws for an
-#' `nmix("poisson_binomial")` fit
+#' The frame rows of each closure unit's observed visits
 #'
-#' Conditional posterior of `N` given the observed visit counts
-#' (Royle 2004):
-#' \deqn{P(N_g = k | y_g, lambda_g, p_g) \propto
-#'   Poisson(k | lambda_g) \times \prod_j Binomial(y_{g,j} | k, p_{g,j})}
-#' for `k = max(y[g, ])..K_max[g]`. Weights are accumulated in log
-#' space and normalised via `log_sum_exp` before exponentiation. This
-#' avoids numerical underflow at large `K_max`.
+#' @param arrays The list `build_closure_unit_arrays()` returns
+#' @return A list of length `N_unit` of row indices into the frame
+#' @noRd
+closure_unit_visit_rows <- function(arrays) {
+  lapply(seq_len(arrays$N_unit), function(g) {
+    arrays$visit_row[g, seq_len(arrays$n_rep[g])]
+  })
+}
+
+#' Reduce the joint density of each unit's state and visits
 #'
-#' When `conditional = FALSE` (no observed y available, e.g. a
-#' fresh prediction grid), N is sampled directly from the prior
-#' `Poisson(lambda_g)` per draw.
+#' For each unit, `lw[s, i]` holds the log prior of the state at
+#' `k[i]` plus the log likelihood of the unit's visits given that
+#' state, under draw `s`. The `occ()` state is 0 or 1 with prior
+#' `Bernoulli(psi)`. An `nmix()` abundance takes `Poisson(lambda)` up
+#' to the unit's cap. A visit records `Binomial(N, p)` under `occ()`
+#' and `"poisson_binomial"`, `Bernoulli(1 - (1 - p)^N)` under
+#' `"royle_nichols"` and `Poisson(N * p)` under `"poisson_poisson"`.
+#' The grid starts at the unit's largest response, below which the
+#' visits have no support. A Poisson-Poisson count can exceed `N`. Its
+#' grid starts at 0.
+#'
+#' A row's log sum is the unit's log likelihood with the state
+#' marginalised, as the Stan density computes it. The normalised row is
+#' the state's posterior given the visits (Royle 2004). `reduce` takes
+#' `k` and `lw` and returns one value per draw. Reducing each unit as
+#' it is built keeps one `[S x K_max]` matrix in memory at a time.
+#'
+#' @param family A detection family
+#' @param y Integer vector of visit responses, in frame row order
+#' @param state `[S x N_unit]` matrix of `psi` or `lambda`
+#' @param p `[S x N_visit]` matrix of detection probabilities, or
+#'   encounter rates under `"poisson_poisson"`
+#' @param arrays The list `build_closure_unit_arrays()` returns
+#' @param reduce Function of `k` and `lw` returning a length-`S`
+#'   vector of `mode`
+#' @param mode Storage mode of the reduced values
+#' @return `[S x N_unit]` matrix
+#' @noRd
+reduce_closure_unit_joint <- function(family, y, state, p, arrays,
+                                      reduce, mode = "numeric") {
+  name <- resolve_family_name(family)
+  counts <- models_latent_count(family)
+  S <- nrow(state)
+  rows <- closure_unit_visit_rows(arrays)
+  out <- vapply(seq_len(arrays$N_unit), function(g) {
+    y_g <- rep(y[rows[[g]]], each = S)
+    p_g <- p[, rows[[g]], drop = FALSE]
+    lower <- if (name == "nmix_poisson_poisson") 0L else arrays$Y_max[g]
+    k <- lower:arrays$K_max[g]
+    lw <- vapply(k, function(n) {
+      prior <- if (counts) {
+        stats::dpois(n, state[, g], log = TRUE)
+      } else {
+        stats::dbinom(n, 1L, state[, g], log = TRUE)
+      }
+      visits <- switch(
+        name,
+        nmix_royle_nichols = stats::dbinom(
+          y_g, 1L, -expm1(n * log1p(-p_g)), log = TRUE
+        ),
+        nmix_poisson_poisson = stats::dpois(y_g, n * p_g, log = TRUE),
+        stats::dbinom(y_g, n, p_g, log = TRUE)
+      )
+      prior + rowSums(matrix(visits, nrow = S))
+    }, numeric(S))
+    reduce(k, matrix(lw, nrow = S))
+  }, vector(mode, S))
+  matrix(out, nrow = S)
+}
+
+#' Draws of each unit's abundance under an `nmix()` fit
+#'
+#' With `conditional = TRUE`, `N` is drawn from its posterior given the
+#' unit's visits. With `conditional = FALSE`, it is drawn from
+#' `Poisson(lambda)`, as at a new site without visits.
 #'
 #' @inheritParams posterior_latent_N
-#' @return `[S x N_unit]` integer matrix of latent abundance
-#'   draws.
+#' @return `[S x N_unit]` integer matrix
 #' @noRd
-posterior_latent_N_pb <- function(object, newdata = NULL,
-                                   draw_ids = NULL,
-                                   conditional = TRUE) {
-  checkmate::assert_flag(conditional)
+posterior_latent_N_nmix <- function(object, newdata = NULL,
+                                    draw_ids = NULL,
+                                    conditional = TRUE) {
   comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  arrays <- comp$arrays
-  ndraws <- comp$ndraws
-  N_unit <- arrays$N_unit
-  newdata <- prediction_frame(object, newdata)
-  response_var <- response_column(object)
-  y_vals <- as.integer(newdata[[response_var]])
-  out <- matrix(0L, nrow = ndraws, ncol = N_unit)
-  for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    lam_g <- comp$state[, g]
-    if (!conditional) {
-      out[, g] <- stats::rpois(ndraws, lambda = lam_g)
-      next
-    }
-    y_g <- y_vals[idx]
-    cmax <- arrays$Y_max[g]
-    K_g  <- arrays$K_max[g]
-    p_g  <- comp$p[, idx, drop = FALSE]
-    k_grid <- cmax:K_g
-    n_k <- length(k_grid)
-    # Per-draw log-weight matrix: rows are draws, columns are k.
-    # Computed entirely in log space; subtract log_sum_exp per
-    # draw to normalise before exponentiating, keeping the tail
-    # mass at extreme k numerically stable even at K_g of a few
-    # hundred.
-    lw <- matrix(NA_real_, nrow = ndraws, ncol = n_k)
-    for (kk in seq_along(k_grid)) {
-      k <- k_grid[kk]
-      lp_pois <- stats::dpois(k, lambda = lam_g, log = TRUE)
-      lp_binom <- rep(0, ndraws)
-      for (jj in seq_along(idx)) {
-        lp_binom <- lp_binom +
-          stats::dbinom(y_g[jj], size = k,
-                        prob = p_g[, jj], log = TRUE)
-      }
-      lw[, kk] <- lp_pois + lp_binom
-    }
-    out[, g] <- k_grid[sample_row_index(lw)]
+  if (!conditional) {
+    return(matrix(stats::rpois(length(comp$state), comp$state),
+                  nrow = comp$ndraws))
   }
-  out
-}
-
-#' Log-likelihood per closure unit for an nmix() fit
-#'
-#' Matches the Stan lpdf's per-unit marginal:
-#' \deqn{\log p(y_g | lambda_g, p_g) = \log \sum_{k = Y\_max_g}^{K\_max_g}
-#'   Poisson(k | lambda_g) \times \prod_j Binomial(y_{g,j} | k, p_{g,j})}
-#' Returned at the closure-unit grain (one column per unit) so
-#' `loo()` / `waic()` see one observation per conditionally iid
-#' block. Per-visit log-likelihoods would imply visits within a
-#' unit are exchangeable, which they are not (they share latent
-#' N_g).
-#'
-#' The closure-unit arrays and posterior `p` draws enter through the
-#' standard `dispatch_log_lik` signature. They are passed in
-#' `family_pars` by the upstream extension hook in
-#' `log_lik_single_response()`.
-#'
-#' @noRd
-log_lik_nmix <- function(linpred, link, y, family_pars, trials) {
-  checkmate::assert_matrix(linpred)
-  checkmate::assert_choice(link, "log")
-  arrays <- family_pars$closure_arrays
-  if (is.null(arrays)) {
-    stop(insight::format_error(
-      "log_lik_nmix() requires 'closure_arrays' in family_pars."
-    ))
-  }
-  p_mat <- family_pars$p
-  checkmate::assert_matrix(
-    p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
+  reduce_closure_unit_joint(
+    object$family, comp$y, comp$state, comp$p, comp$arrays,
+    function(k, lw) k[sample_row_index(lw)], mode = "integer"
   )
-  lambda_visit <- inv_link(linpred, link)
-  ndraws <- nrow(linpred)
-  N_unit <- arrays$N_unit
-  y_int  <- as.integer(y)
-  out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
-  for (g in seq_len(N_unit)) {
-    idx  <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    lam  <- lambda_visit[, idx[1L]]
-    y_g  <- y_int[idx]
-    p_g  <- p_mat[, idx, drop = FALSE]
-    cmax <- arrays$Y_max[g]
-    K_g  <- arrays$K_max[g]
-    k_grid <- cmax:K_g
-    lp_mat <- matrix(NA_real_, nrow = ndraws, ncol = length(k_grid))
-    for (kk in seq_along(k_grid)) {
-      k <- k_grid[kk]
-      lp_pois <- stats::dpois(k, lambda = lam, log = TRUE)
-      lp_binom <- rep(0, ndraws)
-      for (jj in seq_along(idx)) {
-        lp_binom <- lp_binom +
-          stats::dbinom(y_g[jj], size = k,
-                        prob = p_g[, jj], log = TRUE)
-      }
-      lp_mat[, kk] <- lp_pois + lp_binom
-    }
-    # log_sum_exp across the truncated k grid.
-    out[, g] <- row_log_sum_exp(lp_mat)
-  }
-  out
 }
 
-# ============================================================
-# nmix("royle_nichols") R-side downstream methods
-# ============================================================
-# Per-individual detection r enters as `p` on the family constructor
-# (logit link). The per-visit detection probability marginalised
-# over latent abundance N ~ Poisson(lambda) is
-# `1 - exp(-r_j * lambda_g)` (Royle and Nichols 2003), giving a
-# closed-form posterior_epred. Sampling and the conditional N
-# posterior need the truncated `1 - (1 - r_j)^k` form because they
-# condition on specific draws of N. `log1mexp()` evaluates it
-# stably, where subtracting `(1 - r)^k` from one directly loses
-# precision.
-
-#' Extract per-row mu and per-species Psi (and nu) draws for an
-#' mv-response fit
+#' Log likelihood of each closure unit under a detection family
 #'
-#' Helper for the `mvn()` and `mvt()` post-fit kernels. Returns `mu` on
-#' the response scale. The link is identity. The trend pipeline has
-#' already added the latent factor contribution `Z[k, :] * lv[i, :]`.
-#' The helper also returns `Psi`, the per-species residual scale
-#' broadcast to the per-row level. For mvt it returns `nu` as well.
+#' The unit's state is marginalised as the Stan density does it. The
+#' units are the conditionally independent blocks that `loo()` scores.
+#' The visits of a unit share its state.
 #'
-#' The mv-response closure-unit pattern groups rows by site, with K
-#' rows per site. `as.integer(as.factor(data$series))` gives the
-#' species index of each row. That index broadcasts `Psi` to the rows.
-#'
-#' @param object Fitted `mvgam` object with an mv-response family.
-#' @param newdata Long-format observation data; defaults to the
-#'   training data on `object`.
-#' @param draw_ids Optional posterior draw indices.
-#' @param needs_nu Logical; pull `nu` from the posterior. TRUE for
-#'   `mvt()`, FALSE for `mvn()`.
-#' @return Named list with `mu` `[ndraws x N_obs]`, `Psi_row`
-#'   `[ndraws x N_obs]` (per-row Psi after species lookup), `nu`
-#'   numeric vector of length `ndraws` (or `NULL`), `species_idx`
-#'   integer vector of length N_obs, `K`, `ndraws`.
+#' @param linpred `[S x N_visit]` linear predictor of the state
+#' @param link The state's link
+#' @param y Visit responses
+#' @param family_pars List of the closure-unit `closure_arrays`, the
+#'   `[S x N_visit]` matrix `p` and the `family`
+#' @param trials Unused
+#' @return `[S x N_unit]` matrix
 #' @noRd
-extract_mv_response_components <- function(object, newdata = NULL,
-                                            draw_ids = NULL,
-                                            ndraws = NULL,
-                                            needs_nu = FALSE,
-                                            linpred = NULL) {
-  checkmate::assert_class(object, "mvgam")
-  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
-  if (!is_multi_response_family(object$family)) {
-    stop(insight::format_error(
-      "extract_mv_response_components() requires an mv-response fit."
-    ))
-  }
-  newdata <- prediction_frame(object, newdata)
-  # `Psi` holds one entry per species, in the order the fit numbered
-  # them. The fitted model determines the entry each row uses.
-  # Re-factoring the frame's own column gives the right entry only when
-  # the frame carries every species, spelled the same way and in the
-  # same order. The fitted species axis gives the right entry for any
-  # subset or spelling.
-  series_fac <- axis_row_series(object, newdata)
-  if (is.null(series_fac)) {
-    stop(insight::format_error(c(
-      "mv-response families require a 'series' factor column in 'data'.",
-      i = "Each row of 'data' is one (site, species) observation."
-    )))
-  }
-  # A row naming a species the fit never saw is refused by
-  # `validate_prediction_factor_levels()`, which owns that condition
-  # for every family and names both the stranger and the levels that
-  # would have worked. It is not re-asked here.
-  species_idx <- as.integer(series_fac)
-  K <- nlevels(series_fac)
+log_lik_detection <- function(linpred, link, y, family_pars, trials) {
+  arrays <- family_pars$closure_arrays
+  state <- inv_link(linpred, link)[, closure_unit_first_rows(arrays),
+                                   drop = FALSE]
+  reduce_closure_unit_joint(
+    family_pars$family, as.integer(y), state, family_pars$p, arrays,
+    function(k, lw) row_log_sum_exp(lw)
+  )
+}
 
-  # The trend pipeline has already added the latent factor contribution
-  # Z[k, :] * lv[i, :] to mu. Closure-unit families run no stochastic
-  # trend layer. Set process_error to FALSE.
-  # When `linpred` is supplied (log_lik path), the caller's subsampled
-  # linpred is used directly. Psi is then subset to the same draw
-  # indices as mu.
-  # Resolve draw ids up front. mu and Psi then come from the same
-  # iterations. A count would subsample the linpred at random, while
-  # Psi would come from the first rows of the posterior. The two would
-  # describe different draws.
-  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
-  if (!is.null(draw_ids)) {
-    ndraws <- NULL
-  }
-  if (is.null(linpred)) {
-    linpred <- posterior_linpred(
-      object, newdata = newdata, draw_ids = draw_ids,
-      ndraws = ndraws, process_error = FALSE
-    )
-  }
-  mu <- object$family$linkinv(linpred)
-  ndraws_actual <- nrow(mu)
-  N_obs <- ncol(mu)
-
-  # Resolve which posterior draw indices the linpred is on so Psi
-  # (and nu) line up element-wise. nmix uses the same convention:
-  # draw_ids when supplied, else seq_len(ndraws_actual).
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  if (is.null(draw_ids)) {
-    draw_ids_local <- seq_len(ndraws_actual)
-  } else if (length(draw_ids) != ndraws_actual) {
-    draw_ids_local <- draw_ids[seq_len(ndraws_actual)]
-  } else {
-    draw_ids_local <- draw_ids
-  }
-
-  # Psi declared in Stan as `vector<lower=0>[K] Psi`.
+#' The residual scale of each response component, per draw
+#'
+#' `mvn()` and `mvt()` declare `vector<lower=0>[K] Psi`, one scale per
+#' component in the order of the fitted series. A component's residual
+#' variance is `Psi^2`. Under `mvt()` it is `Psi^2 * nu / (nu - 2)`,
+#' which the bound `nu > 2` keeps finite.
+#'
+#' @param draws_mat A draws matrix whose rows are the draws wanted
+#' @param K Number of response components
+#' @param family The `mvn()` or `mvt()` family
+#' @return A list of the `[ndraws, K]` matrices `Psi` and `variance`,
+#'   and `nu`, one value per draw or `NULL` under `mvn()`
+#' @noRd
+component_scale_draws <- function(draws_mat, K, family) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_int(K, lower = 1L)
+  checkmate::assert_true(family_has_component_scale(family))
   psi_cols <- paste0("Psi[", seq_len(K), "]")
   missing_cols <- setdiff(psi_cols, colnames(draws_mat))
   if (length(missing_cols) > 0L) {
     stop_missing_draws("Psi", missing_cols)
   }
-  # Return a plain numeric matrix. The posterior arrives as a
-  # `draws_matrix`. The class survives subsetting and `as.matrix()`.
-  # Arithmetic propagates it to every kernel result. The slot that
-  # `posterior_predict()` fills is typed as a matrix, which rejects a
-  # `draws_matrix`. Dropping the class here means no kernel has to
-  # restore it.
-  Psi_full <- matrix(
-    as.numeric(draws_mat[draw_ids_local, psi_cols, drop = FALSE]),
-    nrow = length(draw_ids_local), ncol = length(psi_cols)
-  )
-  # Broadcast Psi[, species_idx] to an [ndraws x N_obs] matrix.
-  # Downstream kernels then apply it element-wise to mu.
-  Psi_row <- Psi_full[, species_idx, drop = FALSE]
-
-  nu_draws <- NULL
-  if (needs_nu) {
+  # A plain matrix. A `draws_matrix` keeps its class through subsetting
+  # and arithmetic. A slot typed as a matrix refuses it.
+  Psi <- matrix(as.numeric(draws_mat[, psi_cols, drop = FALSE]),
+                nrow = nrow(draws_mat), ncol = K)
+  nu <- NULL
+  variance <- Psi^2
+  if (identical(family$name, "mvt")) {
     if (!"nu" %in% colnames(draws_mat)) {
-      stop(insight::format_error(
-        "Posterior is missing the 'nu' column for mvt() family."
-      ))
+      stop_missing_draws("nu", "nu")
     }
-    nu_draws <- as.numeric(draws_mat[draw_ids_local, "nu"])
+    nu <- as.numeric(draws_mat[, "nu"])
+    # `nu` holds one value per draw and recycles down each column
+    variance <- variance * nu / (nu - 2)
   }
+  list(Psi = Psi, variance = variance, nu = nu)
+}
 
+#' Per-row means and residual scales of an `mvn()` or `mvt()` fit
+#'
+#' The trend adds each row's latent factor term to `mu`. Given those
+#' factors the rows are independent. The fitted series axis gives each
+#' row its component, which indexes `Psi`.
+#'
+#' @param object Fitted `mvgam` object with an `mvn()` or `mvt()` family
+#' @param newdata Long-format data, defaulting to the training data
+#' @param draw_ids,ndraws Posterior draws to use
+#' @param linpred A linear predictor matrix on those draws, or `NULL`
+#'   to compute it
+#' @return Named list with `mu`, `Psi_row` and `variance_row`, each
+#'   `[ndraws x N_obs]`, `Psi` `[ndraws x K]`, `nu` (one value per draw,
+#'   or `NULL`), `species_idx`, `K`, `ndraws` and `N_obs`
+#' @noRd
+extract_mv_response_components <- function(object, newdata = NULL,
+                                            draw_ids = NULL,
+                                            ndraws = NULL,
+                                            linpred = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
+  checkmate::assert_true(family_has_component_scale(object$family))
+  newdata <- prediction_frame(object, newdata)
+  # The fitted species axis gives the right entry of `Psi` for any
+  # subset or spelling of the species. A species the fit never saw is
+  # refused by `validate_prediction_factor_levels()`.
+  series_fac <- axis_row_series(object, newdata, required = TRUE)
+  species_idx <- as.integer(series_fac)
+  K <- nlevels(series_fac)
+
+  # The draws are resolved once. `mu` and `Psi` then come from the same
+  # iterations.
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+  if (is.null(linpred)) {
+    linpred <- posterior_linpred(
+      object, newdata = newdata, draw_ids = draw_ids,
+      process_error = FALSE
+    )
+  }
+  mu <- object$family$linkinv(linpred)
+  ndraws_actual <- nrow(mu)
+  draws_mat <- fit_draws(object$fit, c("Psi", "nu"))
+  rows <- if (is.null(draw_ids)) {
+    seq_len(ndraws_actual)
+  } else {
+    draw_ids[seq_len(ndraws_actual)]
+  }
+  scale <- component_scale_draws(draws_mat[rows, , drop = FALSE], K,
+                                 object$family)
   list(
-    mu          = mu,
-    Psi_row     = Psi_row,
-    Psi         = Psi_full,
-    nu          = nu_draws,
-    species_idx = species_idx,
-    K           = K,
-    ndraws      = ndraws_actual,
-    N_obs       = N_obs
+    mu           = mu,
+    Psi_row      = scale$Psi[, species_idx, drop = FALSE],
+    variance_row = scale$variance[, species_idx, drop = FALSE],
+    Psi          = scale$Psi,
+    nu           = scale$nu,
+    species_idx  = species_idx,
+    K            = K,
+    ndraws       = ndraws_actual,
+    N_obs        = ncol(mu)
   )
 }
 
-#' Per-row expected value for an `mvn()` fit
+#' Per-row expected value for an `mvn()` or `mvt()` fit
 #'
-#' Identity link. The trend pipeline already adds the latent factor
-#' contribution `Z[k, :] * lv[i, :]` to `mu`. The conditional
-#' expectation `E[y | lv]` equals `mu`. The factor contribution has
-#' mean zero. Marginalising over `lv ~ N(0, I)` leaves the marginal
-#' mean unchanged.
+#' The latent factor term has mean zero, which leaves `mu` the
+#' expectation given or marginal over the factors. A Student-t residual
+#' has mean zero for `nu > 1`, which the bound `nu > 2` ensures.
 #'
 #' @inheritParams extract_mv_response_components
-#' @return `[ndraws x N_obs]` matrix of expected values.
+#' @return `[ndraws x N_obs]` matrix of expected values
 #' @noRd
-posterior_epred_mvn <- function(object, newdata = NULL,
-                                 draw_ids = NULL, ndraws = NULL,
-                                 linpred = NULL) {
+posterior_epred_component_scale <- function(object, newdata = NULL,
+                                            draw_ids = NULL,
+                                            ndraws = NULL,
+                                            linpred = NULL) {
   extract_mv_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_nu = FALSE,
-    linpred = linpred
+    object, newdata, draw_ids, ndraws = ndraws, linpred = linpred
   )$mu
 }
 
-#' Per-row response RNG for an `mvn()` fit
+#' Per-row response draws for an `mvn()` fit
 #'
-#' Draws `y[s, n] ~ N(mu[s, n], Psi[s, species(n)])`. The latent
-#' factor contribution to `mu` is sampled jointly with the model,
-#' so the per-row residual is conditionally independent normal.
-#' Marginalising over `lv ~ N(0, I)` recovers the gllvm/boral
-#' marginal `y_unit ~ MVN(mu_unit, Z Z' + diag(Psi^2))`.
+#' Draws `y[s, n] ~ N(mu[s, n], Psi[s, species(n)])`. The trend adds
+#' the factor term to `mu`, which leaves the rows independent.
 #'
-#' @inheritParams posterior_epred_mvn
-#' @return `[ndraws x N_obs]` numeric matrix of response draws.
+#' @inheritParams extract_mv_response_components
+#' @return `[ndraws x N_obs]` numeric matrix of response draws
 #' @noRd
 posterior_predict_mvn <- function(object, newdata = NULL,
                                    draw_ids = NULL, ndraws = NULL,
                                    linpred = NULL) {
   comp <- extract_mv_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_nu = FALSE,
-    linpred = linpred
+    object, newdata, draw_ids, ndraws = ndraws, linpred = linpred
   )
   matrix(
     stats::rnorm(
@@ -7134,116 +5873,20 @@ posterior_predict_mvn <- function(object, newdata = NULL,
   )
 }
 
-#' Refuse `mvn()` or `mvt()` log-likelihood inputs of the wrong shape
+#' Per-row response draws for an `mvt()` fit
 #'
-#' One response per column of `linpred`, a residual scale per draw and
-#' row and, for `mvt()`, one degrees-of-freedom value per draw.
+#' Draws `y[s, n] = mu[s, n] + Psi[s, species(n)] * t` with
+#' `t ~ Student-t(nu[s])`. The trend adds the factor term to `mu`,
+#' which leaves the rows independent.
 #'
-#' @param family Character family name, `"mvn"` or `"mvt"`
-#' @param linpred Numeric linear predictor matrix, one row per draw
-#' @param y Numeric responses, one per column of `linpred`
-#' @param Psi_row Numeric residual scale matrix shaped as `linpred`
-#' @param nu Numeric degrees of freedom, one per draw, or `NULL`
-#' @return `TRUE`, invisibly, or an error
-#' @noRd
-assert_mv_loglik_shapes <- function(family, linpred, y, Psi_row,
-                                    nu = NULL) {
-  checkmate::assert_string(family)
-  checkmate::assert_matrix(linpred)
-  expected <- dim(linpred)
-  shapes <- c(
-    y = length(y) == expected[2L],
-    Psi_row = identical(dim(Psi_row), expected),
-    nu = is.null(nu) || length(nu) == expected[1L]
-  )
-  if (!all(shapes)) {
-    stop_mvgam_fault(
-      paste0("The '", family, "()' log-likelihood received mismatched ",
-             "inputs."),
-      paste0("Mismatched against 'linpred' [",
-             paste(expected, collapse = " x "), "]: ",
-             paste0("'", names(shapes)[!shapes], "'", collapse = ", "),
-             ".")
-    )
-  }
-  invisible(TRUE)
-}
-
-#' Per-observation log-likelihood for `mvn()`
-#'
-#' Independent normal per row at the conditional gllvm
-#' parameterisation: `lp_n = dnorm(y_n | mu_n, Psi[species(n)],
-#' log = TRUE)` where `mu_n` already includes the per-draw latent
-#' factor contribution.
-#'
-#' loo / waic score at the (site, species) row grain. The K rows of a
-#' site are conditionally independent given `lv_i`. This makes the row
-#' grain the natural unit for scoring. Aggregating to the site grain
-#' (`loo` with `r_eff = relative_eff()` over sites) suits
-#' leave-one-site-out scoring. The default leave-one-row-out scoring
-#' targets the conditional-on-lv quantity.
-#'
-#' @param linpred Per-row linpred `[ndraws x N_obs]` already on the
-#'   identity scale (mu).
-#' @param link Family link ("identity" for mvn / mvt).
-#' @param y Numeric response vector of length N_obs.
-#' @param family_pars List with `Psi_row` `[ndraws x N_obs]` (and
-#'   `nu` numeric vector of length ndraws for mvt).
-#' @param trials Unused.
-#' @return `[ndraws x N_obs]` log-density matrix.
-#' @noRd
-log_lik_mvn <- function(linpred, link, y, family_pars, trials) {
-  Psi_row <- family_pars$Psi_row
-  ndraws <- nrow(linpred)
-  N_obs <- ncol(linpred)
-  assert_mv_loglik_shapes("mvn", linpred, y, Psi_row)
-  y_mat <- matrix(y, nrow = ndraws, ncol = N_obs, byrow = TRUE)
-  matrix(
-    stats::dnorm(
-      as.numeric(y_mat),
-      mean = as.numeric(linpred),
-      sd   = as.numeric(Psi_row),
-      log  = TRUE
-    ),
-    nrow = ndraws, ncol = N_obs
-  )
-}
-
-#' Per-row expected value for an `mvt()` fit
-#'
-#' Same as `posterior_epred_mvn()`. The Student-t residual has
-#' mean `mu` for `nu > 1` (always satisfied here because `nu` has
-#' a hard lower bound of 2 by Stan declaration).
-#'
-#' @inheritParams posterior_epred_mvn
-#' @return `[ndraws x N_obs]` matrix.
-#' @noRd
-posterior_epred_mvt <- function(object, newdata = NULL,
-                                 draw_ids = NULL, ndraws = NULL,
-                                 linpred = NULL) {
-  extract_mv_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_nu = TRUE,
-    linpred = linpred
-  )$mu
-}
-
-#' Per-row response RNG for an `mvt()` fit
-#'
-#' Draws `y[s, n] = mu[s, n] + Psi[s, species(n)] * t_nu` where
-#' `t_nu ~ Student-t(0, 1, nu[s])`. The conditional gllvm
-#' parameterisation puts the latent factor contribution in `mu`,
-#' so the per-row residual is conditionally Student-t with
-#' per-species scale.
-#'
-#' @inheritParams posterior_epred_mvn
-#' @return `[ndraws x N_obs]` numeric matrix.
+#' @inheritParams extract_mv_response_components
+#' @return `[ndraws x N_obs]` numeric matrix of response draws
 #' @noRd
 posterior_predict_mvt <- function(object, newdata = NULL,
                                    draw_ids = NULL, ndraws = NULL,
                                    linpred = NULL) {
   comp <- extract_mv_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_nu = TRUE,
-    linpred = linpred
+    object, newdata, draw_ids, ndraws = ndraws, linpred = linpred
   )
   # nu is per-draw; broadcast to per-cell with matrix() recycling.
   nu_row <- matrix(comp$nu, nrow = comp$ndraws, ncol = comp$N_obs)
@@ -7254,37 +5897,24 @@ posterior_predict_mvt <- function(object, newdata = NULL,
   comp$mu + comp$Psi_row * t_draws
 }
 
-#' Per-observation log-likelihood for `mvt()`
+#' A log-likelihood kernel from the distribution of `family_dist_spec()`
 #'
-#' Independent scaled Student-t per row at the conditional gllvm
-#' parameterisation: `lp_n = dt((y_n - mu_n) / Psi[species(n)],
-#' df = nu, log = TRUE) - log(Psi[species(n)])` (location-scale
-#' transform Jacobian).
+#' `mvn()` and `mvt()` are scored row by row. Given the latent factors in
+#' the mean a row is normal or location-scale Student-t, the density
+#' `family_dist_spec()` names for censoring, truncation and residuals.
 #'
-#' @param linpred Per-row linpred `[ndraws x N_obs]`.
-#' @param link Family link ("identity").
-#' @param y Numeric response vector of length N_obs.
-#' @param family_pars List with `Psi_row` `[ndraws x N_obs]` and
-#'   `nu` numeric vector of length `ndraws`.
-#' @param trials Unused.
-#' @return `[ndraws x N_obs]` log-density matrix.
+#' @param family_name Character family name
+#' @return A function of the arguments every closure-unit `log_lik`
+#'   kernel takes
 #' @noRd
-log_lik_mvt <- function(linpred, link, y, family_pars, trials) {
-  Psi_row <- family_pars$Psi_row
-  nu      <- family_pars$nu
-  ndraws <- nrow(linpred)
-  N_obs <- ncol(linpred)
-  assert_mv_loglik_shapes("mvt", linpred, y, Psi_row, nu)
-  y_mat <- matrix(y, nrow = ndraws, ncol = N_obs, byrow = TRUE)
-  nu_mat <- matrix(nu, nrow = ndraws, ncol = N_obs)
-  z <- (y_mat - linpred) / Psi_row
-  # dt is log density at z; Jacobian for the scale Psi is
-  # -log(Psi) so the unscaled-y log density is dt(z, log) - log(Psi).
-  dt_z <- matrix(
-    stats::dt(as.numeric(z), df = as.numeric(nu_mat), log = TRUE),
-    nrow = ndraws, ncol = N_obs
-  )
-  dt_z - log(Psi_row)
+spec_log_lik <- function(family_name) {
+  checkmate::assert_string(family_name)
+  function(linpred, link, y, family_pars, trials) {
+    dist_log_density(
+      family_dist_spec(family_name, link, linpred, family_pars, trials),
+      linpred, y
+    )
+  }
 }
 
 #' Extract per-row softmax probabilities + dpars for a simplex fit
@@ -7715,591 +6345,47 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
   out
 }
 
-#' Per-visit expected detection probability for an
-#' `nmix("royle_nichols")` fit
+#' Posterior occupancy of each closure unit of an `occ()` fit
 #'
-#' Closed-form marginal over the Poisson abundance prior:
-#' \deqn{E[Y_{g, j} | lambda_g, r_j] = 1 - exp(-r_j * lambda_g)}.
-#' (`E[(1-r)^N]` for `N ~ Poisson(lambda)` is the MGF of N at
-#' `log(1-r)`, which simplifies to `exp(-r * lambda)`.) No Jensen
-#' correction or truncation needed.
+#' With `conditional = TRUE`, the probability that a unit is occupied
+#' given its detections. A unit with a detection is occupied for
+#' certain. A unit without one is occupied with probability
+#' \deqn{P(z_g = 1 | y_g) =
+#'   \frac{\psi_g \prod_j (1 - p_{g,j})}
+#'        {\psi_g \prod_j (1 - p_{g,j}) + (1 - \psi_g)}}
+#' (Royle and Dorazio 2008, ch. 3). With `conditional = FALSE`, the
+#' occupancy probability `psi` given the covariates alone, as at a
+#' new site without detections.
 #'
-#' @inheritParams posterior_epred_nmix
-#' @return `[S x N_visit]` matrix of expected detection
-#'   probabilities in (0, 1).
-#' @noRd
-posterior_epred_nmix_royle_nichols <- function(object,
-                                                newdata = NULL,
-                                                draw_ids = NULL,
-                                                linpred = NULL) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids,
-                                          linpred = linpred)
-  unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
-  lambda_visit <- comp$state[, unit_of_visit, drop = FALSE]
-  r_visit <- comp$p
-  1 - exp(-r_visit * lambda_visit)
-}
-
-#' Per-visit binary response draws for an
-#' `nmix("royle_nichols")` fit (unconditional)
+#' `draw = TRUE` returns 0 / 1 draws of the state from these
+#' probabilities. Species richness and other sums over units need the
+#' draws to carry the uncertainty in each unit's state.
 #'
-#' Two-step generative simulation: per posterior draw, sample
-#' `N_g ~ Poisson(lambda_g)`, then for each visit `j` sample
-#' `y_{g, j} ~ Bernoulli(1 - (1 - r_j)^N_g)`. This preserves the
-#' within-unit correlation structure (every visit to a unit
-#' shares the same N draw), which a flat per-visit Bernoulli
-#' would discard.
-#'
-#' @inheritParams posterior_epred_nmix
-#' @return `[S x N_visit]` integer matrix of 0/1 detections.
-#' @noRd
-posterior_predict_nmix_royle_nichols <- function(object,
-                                                  newdata = NULL,
-                                                  draw_ids = NULL,
-                                                  linpred = NULL) {
-  closure_unit_visit_draws(
-    object, newdata, draw_ids, draw_poisson_abundance,
-    function(N_draws, r_j, ndraws) {
-      # 1 - (1 - r_j)^N_draws via log space avoids the catastrophic
-      # cancellation that hits for small r and small N_draws.
-      p_visit <- 1 - exp(N_draws * log1p(-r_j))
-      stats::rbinom(ndraws, size = 1L, prob = p_visit)
-    },
-    linpred = linpred
-  )
-}
-
-#' Per-closure-unit latent-abundance draws for an
-#' `nmix("royle_nichols")` fit
-#'
-#' Reverse-Bayes conditional posterior:
-#' \deqn{P(N_g = k | y_g, lambda_g, r_g) \propto
-#'   Poisson(k | lambda_g) \times
-#'   \prod_j (1 - (1 - r_{g, j})^k)^{y_{g, j}}
-#'         ((1 - r_{g, j})^k)^{1 - y_{g, j}}}
-#' for `k = Y_max[g]..K_max[g]`. Weights are accumulated in log
-#' space using `log1mexp()` for the detection term so the
-#' per-draw sample stays stable across realistic `K_max` and the
-#' small-`r` regime where `(1 - r)^k` is close to 1. The
-#' unconditional branch (`conditional = FALSE`) draws directly
-#' from the Poisson prior.
-#'
-#' @inheritParams posterior_latent_N
-#' @return `[S x N_unit]` integer matrix of latent abundance
-#'   draws.
-#' @noRd
-posterior_latent_N_royle_nichols <- function(object,
-                                              newdata = NULL,
-                                              draw_ids = NULL,
-                                              conditional = TRUE) {
-  checkmate::assert_flag(conditional)
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  arrays <- comp$arrays
-  ndraws <- comp$ndraws
-  N_unit <- arrays$N_unit
-  newdata <- prediction_frame(object, newdata)
-  response_var <- response_column(object)
-  y_vals <- as.integer(newdata[[response_var]])
-  out <- matrix(0L, nrow = ndraws, ncol = N_unit)
-  for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    lam_g <- comp$state[, g]
-    if (!conditional) {
-      out[, g] <- stats::rpois(ndraws, lambda = lam_g)
-      next
-    }
-    y_g <- y_vals[idx]
-    cmax <- arrays$Y_max[g]
-    K_g  <- arrays$K_max[g]
-    log_1m_r_g <- log1p(-comp$p[, idx, drop = FALSE])
-    detected_idx <- which(y_g == 1L)
-    nondet_idx   <- which(y_g == 0L)
-    sum_nondet_log_1m_r <- if (length(nondet_idx) > 0L) {
-      rowSums(log_1m_r_g[, nondet_idx, drop = FALSE])
-    } else {
-      rep(0, ndraws)
-    }
-    k_grid <- cmax:K_g
-    n_k <- length(k_grid)
-    lw <- matrix(NA_real_, nrow = ndraws, ncol = n_k)
-    for (kk in seq_along(k_grid)) {
-      k <- k_grid[kk]
-      lp_pois <- stats::dpois(k, lambda = lam_g, log = TRUE)
-      lp_nondet <- k * sum_nondet_log_1m_r
-      lp_det <- if (k > 0L && length(detected_idx) > 0L) {
-        rowSums(log1mexp(-k * log_1m_r_g[, detected_idx, drop = FALSE]))
-      } else if (k == 0L && length(detected_idx) > 0L) {
-        rep(-Inf, ndraws)
-      } else {
-        rep(0, ndraws)
-      }
-      lw[, kk] <- lp_pois + lp_nondet + lp_det
-    }
-    out[, g] <- k_grid[sample_row_index(lw)]
-  }
-  out
-}
-
-#' Log-likelihood per closure unit for an
-#' `nmix("royle_nichols")` fit
-#'
-#' Per-unit marginal mirroring the Stan emission:
-#' \deqn{\log p(y_g | lambda_g, r_g) = \log \sum_{k = Y\_max_g}^{K\_max_g}
-#'   Poisson(k | lambda_g) \times
-#'   \prod_j (1 - (1 - r_{g, j})^k)^{y_{g, j}}
-#'         ((1 - r_{g, j})^k)^{1 - y_{g, j}}}.
-#' Returned at the closure-unit grain (one column per unit) so
-#' `loo()` / `waic()` see one observation per conditionally iid
-#' block.
-#'
-#' @noRd
-log_lik_nmix_royle_nichols <- function(linpred, link, y,
-                                         family_pars, trials) {
-  checkmate::assert_matrix(linpred)
-  checkmate::assert_choice(link, "log")
-  arrays <- family_pars$closure_arrays
-  if (is.null(arrays)) {
-    stop(insight::format_error(
-      "log_lik_nmix_royle_nichols() requires 'closure_arrays' in family_pars."
-    ))
-  }
-  p_mat <- family_pars$p
-  checkmate::assert_matrix(
-    p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
-  )
-  lambda_visit <- inv_link(linpred, link)
-  ndraws <- nrow(linpred)
-  N_unit <- arrays$N_unit
-  y_int  <- as.integer(y)
-  out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
-  for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    lam <- lambda_visit[, idx[1L]]
-    y_g <- y_int[idx]
-    log_1m_r_g <- log1p(-p_mat[, idx, drop = FALSE])
-    detected_idx <- which(y_g == 1L)
-    nondet_idx   <- which(y_g == 0L)
-    sum_nondet_log_1m_r <- if (length(nondet_idx) > 0L) {
-      rowSums(log_1m_r_g[, nondet_idx, drop = FALSE])
-    } else {
-      rep(0, ndraws)
-    }
-    cmax <- arrays$Y_max[g]
-    K_g  <- arrays$K_max[g]
-    k_grid <- cmax:K_g
-    lp_mat <- matrix(NA_real_, nrow = ndraws, ncol = length(k_grid))
-    for (kk in seq_along(k_grid)) {
-      k <- k_grid[kk]
-      lp_pois <- stats::dpois(k, lambda = lam, log = TRUE)
-      lp_nondet <- k * sum_nondet_log_1m_r
-      lp_det <- if (k > 0L && length(detected_idx) > 0L) {
-        rowSums(log1mexp(-k * log_1m_r_g[, detected_idx, drop = FALSE]))
-      } else if (k == 0L && length(detected_idx) > 0L) {
-        rep(-Inf, ndraws)
-      } else {
-        rep(0, ndraws)
-      }
-      lp_mat[, kk] <- lp_pois + lp_nondet + lp_det
-    }
-    out[, g] <- row_log_sum_exp(lp_mat)
-  }
-  out
-}
-
-# ============================================================
-# nmix("poisson_poisson") R-side downstream methods
-# ============================================================
-# Encounter-count model. Per-individual encounter rate p is log-
-# linked; the marginal of `y_visit ~ Poisson(N * p), N ~
-# Poisson(lambda)` is Neyman Type A (over-dispersed Poisson).
-# The truncated-N likelihood and the conditional N posterior both
-# use the factored Poisson form
-#   sum_t poisson_log_pmf(y_t | log(k) + log(p_t))
-#   = log(k) * sum(y) + sum(y * log(p))
-#     - k * sum(p) - sum(lgamma(y + 1))
-# so the inner marginalisation loop is O(K_max[g]) per unit
-# with constant per-k work (an O(n_rep) precompute amortises
-# across all k values).
-
-#' Per-visit expected count for an `nmix("poisson_poisson")` fit
-#'
-#' Closed-form marginal mean: `E[y_t] = lambda * p_t`. No Jensen
-#' correction needed; the Poisson abundance prior contributes
-#' only its mean to the per-visit count expectation.
-#'
-#' @inheritParams posterior_epred_nmix
-#' @return `[S x N_visit]` matrix of expected counts.
-#' @noRd
-posterior_epred_nmix_poisson_poisson <- function(object,
-                                                  newdata = NULL,
-                                                  draw_ids = NULL,
-                                                  linpred = NULL) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids,
-                                          linpred = linpred)
-  unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
-  lambda_visit <- comp$state[, unit_of_visit, drop = FALSE]
-  lambda_visit * comp$p
-}
-
-#' Per-visit response draws for an `nmix("poisson_poisson")` fit
-#'
-#' Two-step generative simulation: sample `N_g ~ Poisson(lambda_g)`
-#' once per posterior draw, then sample each visit's count from
-#' `Poisson(N_g * p_t)`. Sharing one `N_g` across visits within a
-#' unit preserves the Neyman Type A within-unit dependence.
-#'
-#' @inheritParams posterior_epred_nmix
-#' @return `[S x N_visit]` integer matrix of visit counts.
-#' @noRd
-posterior_predict_nmix_poisson_poisson <- function(object,
-                                                    newdata = NULL,
-                                                    draw_ids = NULL,
-                                                    linpred = NULL) {
-  closure_unit_visit_draws(
-    object, newdata, draw_ids, draw_poisson_abundance,
-    function(N_draws, p_j, ndraws) {
-      stats::rpois(ndraws, lambda = N_draws * p_j)
-    },
-    linpred = linpred
-  )
-}
-
-#' Per-closure-unit latent-abundance draws for an
-#' `nmix("poisson_poisson")` fit
-#'
-#' Reverse-Bayes conditional posterior:
-#' \deqn{P(N_g = k | y_g, lambda_g, p_g) \propto
-#'   Poisson(k | lambda_g) \times \prod_j Poisson(y_{g,j} | k * p_{g,j})}
-#' for `k = 0..K_max[g]`. The `k = 0` cell is consistent only with
-#' all-zero detection histories. The factored log-weight
-#' (`log(k) * sum_y + sum_y_log_p - k * sum_p - lgamma_const`)
-#' makes the per-k cost `O(1)` after one `O(n_rep)` precompute.
-#'
-#' @inheritParams posterior_latent_N
-#' @return `[S x N_unit]` integer matrix of latent abundance
-#'   draws.
-#' @noRd
-posterior_latent_N_poisson_poisson <- function(object,
-                                                newdata = NULL,
-                                                draw_ids = NULL,
-                                                conditional = TRUE) {
-  checkmate::assert_flag(conditional)
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  arrays <- comp$arrays
-  ndraws <- comp$ndraws
-  N_unit <- arrays$N_unit
-  newdata <- prediction_frame(object, newdata)
-  response_var <- response_column(object)
-  y_vals <- as.integer(newdata[[response_var]])
-  out <- matrix(0L, nrow = ndraws, ncol = N_unit)
-  for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    lam_g <- comp$state[, g]
-    if (!conditional) {
-      out[, g] <- stats::rpois(ndraws, lambda = lam_g)
-      next
-    }
-    y_g <- y_vals[idx]
-    K_g <- arrays$K_max[g]
-    # comp$p arrives on the response (rate) scale already, post-
-    # inv-link from brms; log(p_g) recovers the linear predictor
-    # log_p for use in the factored Poisson form. Mirrors the Stan
-    # block which computes log_p = log(p) at the top of the lpmf.
-    p_g <- comp$p[, idx, drop = FALSE]
-    log_p_g <- log(p_g)
-    sum_counts <- sum(y_g)
-    sum_y_log_p <- as.numeric(log_p_g %*% y_g)
-    sum_p_g <- rowSums(p_g)
-    lgamma_const <- sum(lgamma(y_g + 1))
-    any_detection <- sum_counts > 0L
-    k_grid <- 0:K_g
-    n_k <- length(k_grid)
-    lw <- matrix(NA_real_, nrow = ndraws, ncol = n_k)
-    # k = 0 cell.
-    if (any_detection) {
-      lw[, 1L] <- -Inf
-    } else {
-      lw[, 1L] <- stats::dpois(0L, lambda = lam_g, log = TRUE)
-    }
-    if (K_g >= 1L) {
-      log_k_grid <- log(seq_len(K_g))
-      for (kk in seq_len(K_g)) {
-        k <- kk
-        log_k <- log_k_grid[kk]
-        lw[, kk + 1L] <- stats::dpois(k, lambda = lam_g, log = TRUE) +
-          log_k * sum_counts + sum_y_log_p -
-          k * sum_p_g - lgamma_const
-      }
-    }
-    out[, g] <- k_grid[sample_row_index(lw)]
-  }
-  out
-}
-
-#' Log-likelihood per closure unit for an
-#' `nmix("poisson_poisson")` fit
-#'
-#' Per-unit marginal mirroring the Stan emission:
-#' \deqn{\log p(y_g | lambda_g, p_g) = \log \sum_{k = 0}^{K\_max_g}
-#'   Poisson(k | lambda_g) \times \prod_j Poisson(y_{g,j} | k * p_{g,j})}.
-#' Uses the same factored Poisson form as the Stan code (constant
-#' per-k cost after one `O(n_rep)` precompute). Returned at the
-#' closure-unit grain (one column per unit) so `loo()` / `waic()`
-#' see one observation per conditionally iid block.
-#'
-#' @noRd
-log_lik_nmix_poisson_poisson <- function(linpred, link, y,
-                                          family_pars, trials) {
-  checkmate::assert_matrix(linpred)
-  checkmate::assert_choice(link, "log")
-  arrays <- family_pars$closure_arrays
-  if (is.null(arrays)) {
-    stop(insight::format_error(
-      "log_lik_nmix_poisson_poisson() requires 'closure_arrays' in family_pars."
-    ))
-  }
-  p_mat <- family_pars$p
-  checkmate::assert_matrix(
-    p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
-  )
-  lambda_visit <- inv_link(linpred, link)
-  ndraws <- nrow(linpred)
-  N_unit <- arrays$N_unit
-  y_int  <- as.integer(y)
-  out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
-  for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    lam <- lambda_visit[, idx[1L]]
-    y_g <- y_int[idx]
-    p_g <- p_mat[, idx, drop = FALSE]
-    log_p_g <- log(p_g)
-    sum_counts   <- sum(y_g)
-    sum_y_log_p  <- as.numeric(log_p_g %*% y_g)
-    sum_p_g      <- rowSums(p_g)
-    lgamma_const <- sum(lgamma(y_g + 1))
-    any_detection <- sum_counts > 0L
-    K_g <- arrays$K_max[g]
-    k_grid <- 0:K_g
-    lp_mat <- matrix(NA_real_, nrow = ndraws, ncol = length(k_grid))
-    # k = 0 cell.
-    if (any_detection) {
-      lp_mat[, 1L] <- -Inf
-    } else {
-      lp_mat[, 1L] <- stats::dpois(0L, lambda = lam, log = TRUE)
-    }
-    if (K_g >= 1L) {
-      log_k_grid <- log(seq_len(K_g))
-      for (kk in seq_len(K_g)) {
-        k <- kk
-        log_k <- log_k_grid[kk]
-        lp_mat[, kk + 1L] <- stats::dpois(k, lambda = lam, log = TRUE) +
-          log_k * sum_counts + sum_y_log_p -
-          k * sum_p_g - lgamma_const
-      }
-    }
-    out[, g] <- row_log_sum_exp(lp_mat)
-  }
-  out
-}
-
-# ============================================================
-# occ() R-side downstream methods
-# ============================================================
-# Mirror the nmix() pattern: every method delegates to
-# `extract_closure_unit_components()` for psi (state), p (per
-# visit) and the closure-unit arrays, then applies the
-# occupancy-specific likelihood / sampling formula.
-
-#' Per-visit expected detection probability for an occ() fit
-#'
-#' Returns the per-visit response-scale expectation
-#' `E[Y_{g, j} | psi_g, p_{g, j}] = psi_g * p_{g, j}`, which is
-#' the marginal Bernoulli rate over the latent occupancy state.
-#' No Jensen correction is needed: both factors are linear in
-#' their parameters at the per-draw level.
-#'
-#' @param object Fitted `mvgam` object with `family = occ()`.
-#' @param newdata Long-format observation data; defaults to
-#'   training data.
-#' @param draw_ids Optional vector of posterior draw indices.
-#' @return `[S x N_visit]` matrix of expected detection rates
-#'   in (0, 1).
-#' @noRd
-posterior_epred_occ <- function(object, newdata = NULL,
-                                 draw_ids = NULL, linpred = NULL) {
-  closure_unit_visit_epred(object, newdata, draw_ids, linpred)
-}
-
-#' Per-visit response draws for an occ() fit (unconditional)
-#'
-#' Two-step generative simulation: per posterior draw, sample
-#' `z_g ~ Bernoulli(psi_g)` then `y_{g, j} ~ Bernoulli(z_g *
-#' p_{g, j})`. This preserves the within-unit correlation
-#' structure (every visit to a site shares the same z draw),
-#' which a flat `Bernoulli(psi * p)` would discard. The
-#' marginal distribution of y is identical to Bernoulli(psi*p),
-#' but PPCs of within-unit detection patterns rely on the
-#' shared z (Kery and Royle 2016, ch. 10.3).
-#'
-#' @inheritParams posterior_epred_occ
-#' @return `[S x N_visit]` integer matrix of 0/1 detections.
-#' @noRd
-posterior_predict_occ <- function(object, newdata = NULL,
-                                   draw_ids = NULL, linpred = NULL) {
-  closure_unit_visit_draws(
-    object, newdata, draw_ids,
-    function(psi_g, ndraws) {
-      stats::rbinom(ndraws, size = 1L, prob = psi_g)
-    },
-    function(z_draws, p_j, ndraws) {
-      stats::rbinom(ndraws, size = 1L, prob = z_draws * p_j)
-    },
-    linpred = linpred
-  )
-}
-
-#' Per-site posterior occupancy for an occ() fit
-#'
-#' Returns the posterior of the latent occupancy state z at the
-#' per-closure-unit grain. Two regimes:
-#'
-#' * `conditional = TRUE` (default): Bayes-rule posterior given
-#'   the observed detection history. Sites with at least one
-#'   detection have `P(z = 1 | y) = 1`; sites with all-zero
-#'   histories use
-#'   \deqn{P(z_g = 1 | y_g) =
-#'     \frac{\psi_g \prod_j (1 - p_{g,j})}
-#'          {\psi_g \prod_j (1 - p_{g,j}) + (1 - \psi_g)}}
-#'   (Royle and Dorazio 2008, ch. 3).
-#' * `conditional = FALSE`: the marginal occupancy probability
-#'   psi_g returned directly (the prior occupancy at new
-#'   prediction sites without observed y).
-#'
-#' Output is a probability matrix by default. Set `draw = TRUE`
-#' to return 0/1 integer Bernoulli draws (matches ubms's
-#' `posterior_predict(param = "z")` semantics; required for
-#' downstream uses such as richness estimation or
-#' colonisation-extinction simulations where ignoring
-#' stochasticity in z would introduce bias).
-#'
-#' @param object Fitted `mvgam` object with `family = occ()`.
-#' @param newdata Long-format observation data; defaults to
-#'   training data.
-#' @param draw_ids Optional vector of posterior draw indices.
-#' @param conditional Logical. If TRUE (default), reweight
-#'   `psi` by the Bernoulli likelihood of the observed history.
-#'   If FALSE, return the marginal `psi`.
-#' @param draw Logical. If FALSE (default), return the
-#'   probability `P(z = 1)` per site per draw. If TRUE, return
-#'   0/1 Bernoulli draws from that probability.
-#' @return `[S x N_unit]` matrix; probability in (0, 1) when
-#'   `draw = FALSE`, integer 0/1 when `draw = TRUE`.
+#' @param object Fitted `mvgam` object with `family = occ()`
+#' @param newdata Long-format data, or `NULL` for the training data
+#' @param draw_ids Posterior draw indices, or `NULL`
+#' @param conditional Logical. `TRUE` conditions on the detections.
+#' @param draw Logical. `TRUE` returns 0 / 1 state draws.
+#' @return `[S x N_unit]` matrix of probabilities, or of integer 0 / 1
+#'   draws with `draw = TRUE`
 #' @noRd
 posterior_occupancy <- function(object, newdata = NULL,
-                                 draw_ids = NULL,
-                                 conditional = TRUE,
-                                 draw = FALSE) {
-  checkmate::assert_flag(conditional)
+                                draw_ids = NULL,
+                                conditional = TRUE,
+                                draw = FALSE) {
   checkmate::assert_flag(draw)
   comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  arrays <- comp$arrays
-  ndraws <- comp$ndraws
-  N_unit <- arrays$N_unit
-  if (!conditional) {
-    # Marginal psi at the unit grain. No use of observed y.
-    probs <- comp$state
+  probs <- if (conditional) {
+    # The grid ends at z = 1. A unit with a detection has no z = 0.
+    reduce_closure_unit_joint(
+      object$family, comp$y, comp$state, comp$p, comp$arrays,
+      function(k, lw) exp(lw[, ncol(lw)] - row_log_sum_exp(lw))
+    )
   } else {
-    probs <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
-    for (g in seq_len(N_unit)) {
-      idx   <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-      psi_g <- comp$state[, g]
-      if (arrays$Y_max[g] >= 1L) {
-        # Detected at least once: z = 1 with probability 1.
-        probs[, g] <- 1
-        next
-      }
-      # All-zero history: Bayes rule on the binary latent state.
-      # Computed in log space and exponentiated last so per-draw
-      # underflow at psi ~ 1 with many zero visits is safe.
-      p_g <- comp$p[, idx, drop = FALSE]
-      log_psi   <- log(psi_g)
-      log1m_psi <- log1p(-psi_g)
-      sum_log1m_p <- rowSums(log1p(-p_g))
-      ll_z1 <- log_psi + sum_log1m_p
-      ll_z0 <- log1m_psi
-      m <- pmax(ll_z1, ll_z0)
-      probs[, g] <- exp(ll_z1 - m) /
-        (exp(ll_z1 - m) + exp(ll_z0 - m))
-    }
+    comp$state
   }
   if (!draw) return(probs)
-  # Integer 0/1 draws via Bernoulli; preserved as integer matrix
-  # for downstream interop with richness / colonisation code.
-  out <- matrix(stats::rbinom(length(probs), size = 1L, prob = probs),
-                nrow = nrow(probs), ncol = ncol(probs))
-  storage.mode(out) <- "integer"
-  out
+  matrix(stats::rbinom(length(probs), size = 1L, prob = probs),
+         nrow = nrow(probs))
 }
 
-#' Log-likelihood per closure unit for an occ() fit
-#'
-#' Matches the Stan lpdf's per-unit marginal:
-#' \deqn{\log p(y_g | \psi_g, p_g) =
-#'   \log[\psi_g \prod_j p_{g,j}^{y_{g,j}} (1 - p_{g,j})^{1 - y_{g,j}}
-#'        + (1 - \psi_g) \mathbb{1}(\sum_j y_{g,j} = 0)]}
-#' Returned at the closure-unit grain (one column per unit) so
-#' `loo()` / `waic()` see one observation per conditionally iid
-#' block (visits within a unit share latent z; they are not
-#' exchangeable across units).
-#'
-#' The closure-unit arrays and posterior `p` draws enter through the
-#' standard `dispatch_log_lik` signature. They are passed in
-#' `family_pars` by the upstream extension hook in
-#' `log_lik_single_response()`.
-#'
-#' @noRd
-log_lik_occ <- function(linpred, link, y, family_pars, trials) {
-  checkmate::assert_matrix(linpred)
-  checkmate::assert_choice(link, "logit")
-  arrays <- family_pars$closure_arrays
-  if (is.null(arrays)) {
-    stop(insight::format_error(
-      "log_lik_occ() requires 'closure_arrays' in family_pars."
-    ))
-  }
-  p_mat <- family_pars$p
-  checkmate::assert_matrix(
-    p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
-  )
-  psi_visit <- inv_link(linpred, link)
-  ndraws <- nrow(linpred)
-  N_unit <- arrays$N_unit
-  y_int  <- as.integer(y)
-  out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
-  for (g in seq_len(N_unit)) {
-    idx   <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    psi   <- psi_visit[, idx[1L]]
-    y_g   <- y_int[idx]
-    p_g   <- p_mat[, idx, drop = FALSE]
-    log_psi   <- log(psi)
-    log1m_psi <- log1p(-psi)
-    # Bernoulli per-visit log-prob given z = 1.
-    log_p_y <- matrix(0, nrow = ndraws, ncol = length(idx))
-    for (jj in seq_along(idx)) {
-      log_p_y[, jj] <- ifelse(
-        y_g[jj] == 1L,
-        log(p_g[, jj]),
-        log1p(-p_g[, jj])
-      )
-    }
-    ll_z1 <- log_psi + rowSums(log_p_y)
-    if (arrays$Y_max[g] >= 1L) {
-      out[, g] <- ll_z1
-    } else {
-      ll_z0 <- log1m_psi
-      m <- pmax(ll_z1, ll_z0)
-      out[, g] <- m + log(exp(ll_z1 - m) + exp(ll_z0 - m))
-    }
-  }
-  out
-}

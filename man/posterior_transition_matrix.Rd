@@ -2,7 +2,7 @@
 % Please edit documentation in R/var_param_extractors.R
 \name{posterior_transition_matrix}
 \alias{posterior_transition_matrix}
-\title{Posterior transition matrix for a VAR trend}
+\title{Posterior transition matrix of a VAR trend}
 \usage{
 posterior_transition_matrix(
   object,
@@ -16,24 +16,15 @@ posterior_transition_matrix(
 \arguments{
 \item{object}{A fitted \code{mvgam} object whose trend is a VAR.}
 
-\item{groups}{Which panels of a hierarchical VAR fit to
-return. \code{NULL} (the default) gives the mean of the panels'
-matrices. A non-hierarchical fit accepts \code{NULL} alone. A single
-panel, named by level or by integer index into the levels of
-\code{gr}, returns that panel's matrix on its own. Several panels, or
-\code{"all"}, return a named list of \code{mvgam_var_matrix} objects
-classed as \code{mvgam_var_matrix_list}. Its \code{plot()} method draws a
-faceted heatmap grid or a pointrange of each outcome's
-self-persistence, see \code{\link[=plot.mvgam_var_matrix_list]{plot.mvgam_var_matrix_list()}}.}
+\item{groups}{The panels of a hierarchical VAR, by level or by
+index, or \code{"all"}. \code{NULL} gives the mean of the panels' matrices.
+A single-panel fit takes \code{NULL} alone. One panel returns
+its matrix. Several, or \code{"all"}, return a list whose \code{plot()}
+method is \code{\link[=plot.mvgam_var_matrix_list]{plot.mvgam_var_matrix_list()}}.}
 
-\item{summary}{Logical. \code{TRUE} (default) returns an
-\code{mvgam_var_matrix} object with per-cell point estimates,
-credible intervals, standard errors, effective sample
-sizes and sign probabilities. \code{FALSE} returns the raw
-\verb{[ndraws, K, K]} posterior array with dims 2-3 labelled by
-the outcome names (levels of \code{subgr} on a hierarchical fit,
-\code{series_names} on a single-panel fit) for downstream custom
-summaries.}
+\item{summary}{Logical. \code{TRUE} returns the summary of each cell.
+\code{FALSE} returns the draws as a \verb{[ndraws, K, K]} array, with the
+processes naming its second and third dimensions.}
 
 \item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
 deviation for summaries. If \code{TRUE}, uses median and median absolute
@@ -43,55 +34,59 @@ deviation (MAD).}
 Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
 single value or multiple values.}
 
-\item{lag}{The lag whose transition matrix is returned, at most
-the order \code{p} of the fitted \code{VAR(p)}. Defaults to \code{1}.}
+\item{lag}{The lag of the matrix, at most the order \code{p} of the
+fitted \code{VAR(p)}.}
 }
 \value{
-One matrix, or a list of them when \code{groups} names more
-than one panel. With \code{summary = TRUE}, an object of class
-\code{mvgam_var_matrix} with slots \code{A}, \code{A_se}, \code{A_lower},
-\code{A_upper}, \code{A_ess}, \code{prob_positive}, \code{prob_negative},
-\code{prob_nonzero}, \code{n_series}, \code{series_names}, \code{group_label},
-\code{probs}, \code{lag}. Has \code{print()} and \code{plot()} methods. With
-\code{summary = FALSE}, a \verb{[ndraws, K, K]} numeric array with
-dims 2-3 labelled by the outcome names.
+With \code{summary = TRUE}, an \code{mvgam_var_matrix}: a list of the
+matrices \code{A}, \code{A_se}, \code{A_lower}, \code{A_upper}, \code{A_ess},
+\code{prob_positive}, \code{prob_negative} and \code{prob_nonzero}, with
+\code{n_series}, \code{series_names}, \code{group_label}, \code{probs} and \code{lag}. It
+has \code{print()} and \code{plot()} methods. With \code{summary = FALSE}, the
+array of draws. Several panels give a list of either.
 }
 \description{
-Extract a VAR transition matrix $A_l$ from a fitted \code{mvgam}
-object, either as a per-cell posterior summary (default) or as
-raw per-draw values. Row $i$ of $A_l$ gives the linear dependence
-of latent process $i$ at time $t$ on the vector of processes at
-time $t - l$; the diagonal is self-persistence, off-diagonals
-encode cross-outcome dependence at lag $l$.
+The coefficient matrix \eqn{A_l} of lag \eqn{l} of a \code{VAR()} trend.
+Row \eqn{i} holds the effects of the processes at time \eqn{t - l}
+on process \eqn{i} at time \eqn{t}. The diagonal holds each
+process's persistence. The off-diagonal cells hold the effects of
+one process on another.
 }
 \details{
-The extractor dispatches on whether the fit is hierarchical
-(\verb{VAR(gr = <var>, ...)}) or single-panel.
-\itemize{
-\item On a \strong{single-panel VAR} the routine returns the fitted
-\code{Phi_trend} array.
-\item On a \strong{hierarchical VAR} with \verb{groups = <int>} or
-\verb{groups = <name>} it returns the panel-specific matrix
-\code{Phi_group_trend[c, l, , ]}, the transition matrix of the
-requested panel.
-\item On a \strong{hierarchical VAR} with \code{groups = NULL} it returns the
-mean of the panels' matrices, computed in each posterior draw.
-The hyperparameters \code{Amu_trend} and \code{Aomega_trend} pool the
-unconstrained matrices that the stationarity map of Heaps
-(2023) turns into each panel's $A_c$. Their mean is no
-transition matrix. The mean over panels summarises the pool on
-the scale of $A_c$.
+A hierarchical VAR (\code{VAR(gr = ...)}) has one matrix per panel.
+\code{groups} names a panel to return its matrix. With \code{groups = NULL}
+the function returns the mean of the panels' matrices, computed in
+each draw. The hyperparameters \code{Amu_trend} and \code{Aomega_trend} pool
+unconstrained matrices, which the stationarity map of Heaps (2023)
+turns into each panel's matrix. Their mean is no transition matrix.
+The mean over panels summarises the pool on the scale of the
+matrices.
+
+Each cell is summarised as \code{\link[=residual_cor]{residual_cor()}} summarises a
+correlation. The estimate is the posterior mean, or the median with
+\code{robust = TRUE}. The interval takes the quantiles \code{probs}. The
+effective sample size comes from \code{\link[posterior:ess_basic]{posterior::ess_basic()}}.
+\code{prob_positive}, \code{prob_negative} and \code{prob_nonzero} are the shares of
+draws above zero, below zero and away from zero.
+}
+\examples{
+\dontrun{
+set.seed(0)
+simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
+                    n_timepoints = 120L, trend_model = VAR(),
+                    prop_trend = 0.95)
+var_mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
+                 data = simdat$data_train, family = gaussian(),
+                 chains = 2, silent = 2)
+
+# Each series' persistence and its effects on the others
+A <- posterior_transition_matrix(var_mod)
+A
+plot(A)
+
+# Next, irf(var_mod) traces how a shock to one series spreads
 }
 
-With \code{summary = TRUE} (default) the per-cell summary uses the
-same machinery as \code{residual_cor()}. The printed and plotted output
-of the two extractors then agree:
-point estimates default to the posterior mean; intervals use
-\code{probs} on the raw draws; effective sample sizes come from
-\code{posterior::ess_basic()}; and
-\code{prob_positive} / \code{prob_negative} / \code{prob_nonzero} count the
-fraction of draws with each entry above or below zero. See
-the argument documentation for the median switch.
 }
 \references{
 Savage J (2016). Hierarchical Vector

@@ -29,37 +29,25 @@
 #' Common prior specifications for trend parameters
 #'
 #' @description
-#' Default priors for the trend parameters several trend types share,
-#' written once for all of them. Each specification holds a Stan
-#' distribution string, parameter bounds, a description and a
-#' dimension.
+#' Default priors for the parameters several trend types or families
+#' share, written once for all of them. A comment above each entry
+#' names its parameter.
 #'
-#' @format Named list with parameter specifications. Each element is a
-#'   list with:
+#' @format Named list with one element per parameter, a list holding
 #' \describe{
-#'   \item{default}{Character string of Stan distribution (e.g.,
-#'     "exponential(2)"), or a function of the data's spread on the
+#'   \item{default}{Character string of a Stan distribution, such as
+#'     `"exponential(2)"`, or a function of the data's spread on the
 #'     link scale returning one}
-#'   \item{bounds}{Numeric vector c(lower, upper) with NA for unbounded}
-#'   \item{description}{Character string describing the parameter}
-#'   \item{dimension}{Character string: "vector", "matrix", or "scalar"}
-#' }
-#'
-#' Available common parameters:
-#' \describe{
-#'   \item{sigma_trend}{Innovation standard deviation (RW, AR, CAR trends)}
-#'   \item{ar1_trend}{AR(1) coefficient (AR, CAR trends)}
-#'   \item{nu_trend}{Innovation degrees of freedom when `df = NA`}
-#'   \item{Z}{Factor loadings matrix for factor models}
+#'   \item{bounds}{Numeric vector `c(lower, upper)`, `NA` where
+#'     unbounded}
 #' }
 #'
 #' @noRd
 common_trend_priors <- list(
+  # Innovation standard deviation
   sigma_trend = list(
     default = function(unit) paste0("exponential(", signif(2 / unit, 4), ")"),
-    bounds = c(0, NA),
-    description = "Innovation standard deviation",
-    dimension = "vector"
+    bounds = c(0, NA)
   ),
 
   # The residual scale the mvn() and mvt() families declare. The
@@ -67,101 +55,94 @@ common_trend_priors <- list(
   # It resolves through the same chain as every entry here.
   Psi = list(
     default = "exponential(1)",
-    bounds = c(0, NA),
-    description = "Residual standard deviation per response component",
-    dimension = "vector"
+    bounds = c(0, NA)
   ),
 
+  # The residual degrees of freedom of the mvt() family. The bound
+  # keeps the residual variance finite. The default is brms's prior
+  # for a Student-t `nu`.
+  nu = list(
+    default = "gamma(2, 0.1)",
+    bounds = c(2, NA)
+  ),
+
+  # AR(1) coefficient
   ar1_trend = list(
     default = "normal(0, 0.5)",
-    bounds = c(-1, 1),
-    description = "AR(1) coefficient",
-    dimension = "vector"
+    bounds = c(-1, 1)
   ),
 
+  # Innovation degrees of freedom
   nu_trend = list(
     default = "gamma(4, 0.3)",
-    bounds = c(2, NA),
-    description = "Innovation degrees of freedom",
-    dimension = "scalar"
+    bounds = c(2, NA)
   ),
 
+  # Hierarchical correlation mixing parameter
   alpha_cor_trend = list(
     default = "beta(3, 2)",
-    bounds = c(0, 1),
-    description = "Hierarchical correlation mixing parameter",
-    dimension = "scalar"
+    bounds = c(0, 1)
   ),
 
+  # Per-group innovation standard deviation
   sigma_group_trend = list(
     default = function(unit) paste0("exponential(", signif(2 / unit, 4), ")"),
-    bounds = c(0, NA),
-    description = "Per-group innovation standard deviation",
-    dimension = "vector"
+    bounds = c(0, NA)
   ),
 
+  # Trend correlation Cholesky factor
   L_Omega_trend = list(
     default = "lkj_corr_cholesky(2)",
-    bounds = c(NA, NA),
-    description = "Trend correlation Cholesky factor",
-    dimension = "matrix"
+    bounds = c(NA, NA)
   ),
 
+  # Population correlation Cholesky factor, grouped trend
   L_Omega_global_trend = list(
     default = "lkj_corr_cholesky(1)",
-    bounds = c(NA, NA),
-    description = "Population correlation Cholesky factor, grouped trend",
-    dimension = "matrix"
+    bounds = c(NA, NA)
   ),
 
+  # Per-group deviation Cholesky factor, grouped trend
   L_deviation_group_trend = list(
     default = "lkj_corr_cholesky(6)",
-    bounds = c(NA, NA),
-    description = "Per-group deviation Cholesky factor, grouped trend",
-    dimension = "matrix"
+    bounds = c(NA, NA)
   ),
 
+  # Factor loadings matrix
   Z = list(
     default = function(unit) paste0("student_t(3, 0, ", signif(0.5 * unit, 4),
                                     ")"),
-    bounds = c(NA, NA),
-    description = "Factor loadings matrix",
-    dimension = "matrix"
+    bounds = c(NA, NA)
   ),
 
+  # MA(1) coefficient
   theta1_trend = list(
     default = "normal(0, 0.5)",
-    bounds = c(-1, 1),
-    description = "MA(1) coefficient",
-    dimension = "vector"
+    bounds = c(-1, 1)
   ),
 
+  # Mean of the VAR coefficients, diagonal and off
   Amu_trend = list(
     default = "normal(0, sqrt(0.455))",
-    bounds = c(NA, NA),
-    description = "Mean of the VAR coefficients, diagonal and off",
-    dimension = "vector"
+    bounds = c(NA, NA)
   ),
 
+  # Precision of the VAR coefficients, diagonal and off
   Aomega_trend = list(
     default = "gamma(1.365, 0.071175)",
-    bounds = c(0, NA),
-    description = "Precision of the VAR coefficients, diagonal and off",
-    dimension = "vector"
+    bounds = c(0, NA)
   ),
 
+  # Mean of the VARMA moving-average coefficients
   Dmu_trend = list(
-    default = "normal(0, 1)",
-    bounds = c(NA, NA),
-    description = "Mean of the VARMA moving-average coefficients",
-    dimension = "vector"
+    default = "std_normal()",
+    bounds = c(NA, NA)
   ),
 
+  # Precision of the VARMA moving-average coefficients
   Domega_trend = list(
     default = "gamma(2, 1)",
-    bounds = c(0, NA),
-    description = "Precision of the VARMA moving-average coefficients",
-    dimension = "vector"
+    bounds = c(0, NA)
   )
 )
 
@@ -287,17 +268,6 @@ create_trend_parameter_prior <- function(param_name, trend_obj) {
 
   prior_info <- get_default_trend_parameter_prior(param_name, trend_obj)
 
-  # `Z` takes one of three branches depending on the loadings prior.
-  # Only the unstructured branch matches the registry default. The
-  # branch and its statement come from the emitter's own helpers. The
-  # table then describes the prior the model samples.
-  if (identical(param_name, "Z")) {
-    branch_prior <- loadings_z_prior_string(
-      loadings_z_branch(trend_obj$loadings_prior_spec)
-    )
-    if (!is.null(branch_prior)) prior_info$prior <- branch_prior
-  }
-
   # `brms::set_prior()` gives the row the full brmsprior schema,
   # including columns such as `tag` that newer brms versions add.
   # mvgam-internal and brms-generated rows then share one schema.
@@ -327,6 +297,19 @@ get_default_trend_parameter_prior <- function(param_name,
                                              trend_obj = NULL) {
   checkmate::assert_string(param_name)
   checkmate::assert_class(trend_obj, "mvgam_trend", null.ok = TRUE)
+
+  # `Z` takes one of three branches depending on the loadings prior.
+  # Only the unstructured branch matches the shared default. The prior
+  # table and the Stan emitter both resolve the default here. Each
+  # then describes the prior the model samples.
+  if (identical(param_name, "Z")) {
+    branch_prior <- loadings_z_prior_string(
+      loadings_z_branch(trend_obj$loadings_prior_spec)
+    )
+    if (!is.null(branch_prior)) {
+      return(list(prior = branch_prior, lb = "", ub = ""))
+    }
+  }
 
   # A trend-specific resolver may only tighten a bound, as CAR's does
   # for its damping coefficient. The shared default then supplies the
@@ -1561,10 +1544,10 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 #'   \item [get_prior.mvgam_formula()] lists the priors of a model
 #'     before it is fitted.
 #'   \item [get_prior.mvgam()] returns the prior table of a model.
-#'   \item [get_prior.default()] passes a `formula` or `brmsformula`
-#'     to [brms::get_prior()], or builds the mvgam model a
-#'     `trend_formula` argument describes.
+#'   \item [get_prior.default()] takes a `formula` or `brmsformula`
+#'     with the arguments of [get_prior.mvgam_formula()].
 #' }
+#' `default_prior()` is the same generic under the newer brms name.
 #'
 #' @param object An [mvgam_formula()], an `mvgam` model, or a model
 #'   formula.
@@ -1578,28 +1561,60 @@ get_prior <- function(object, ...) {
   UseMethod("get_prior")
 }
 
-#' Build the `mvgam_formula` that a `trend_formula` names
+#' @rdname get_prior
+#' @export
+default_prior <- function(object, ...) {
+  UseMethod("default_prior")
+}
+
+#' Whether a formula call names a model only mvgam builds
 #'
-#' A `trend_formula` in the same call names an mvgam model. The brms
-#' path takes the formula and discards the rest. Its result would omit
-#' the trend without any sign. Building the `mvgam_formula` and
-#' dispatching on it covers the trend as well.
-#'
-#' Each caller handles its own no-trend case. `stancode()` and
-#' `standata()` fall through with `NextMethod()`, which works only
-#' when called from the method itself. `brms::make_stancode()` looks
-#' like a shared exit and is not one: it calls the `stancode()`
-#' generic, which dispatches back to the mvgam method and recurses
-#' until the C stack fills. `brms::get_prior()` is a plain function
-#' and returns directly.
+#' A `trend_formula` names one. So does a family mvgam builds, which
+#' carries `mvgam_` attributes and Stan code brms cannot write.
+#' The family is the call's `family` argument, its second positional
+#' argument after `data`, or one a response's `bf()` holds.
 #'
 #' @param object A formula or brmsformula
-#' @param dots The `...` of the calling method, as a list, carrying a
-#'   non-NULL `trend_formula`
+#' @param dots The `...` of the calling method, as a list
+#' @return TRUE or FALSE
+#' @noRd
+names_mvgam_model <- function(object, dots) {
+  if (!is.null(dots$trend_formula)) {
+    return(TRUE)
+  }
+  arg_names <- names(dots) %||% rep("", length(dots))
+  positional <- dots[!nzchar(arg_names)]
+  family <- dots$family %||% if (length(positional) >= 2L) positional[[2L]]
+  families <- formula_families(object, validate_family(family %||%
+                                                         gaussian()))
+  built <- vapply(families, function(f) {
+    any(startsWith(names(attributes(validate_family(f))), "mvgam_"))
+  }, logical(1L))
+  any(built)
+}
+
+#' Dispatch a formula call on the `mvgam_formula` it describes
+#'
+#' The brms path takes the formula and discards a `trend_formula`. It
+#' also writes no Stan code for a family mvgam builds. Its result would
+#' omit either without any sign. Building the `mvgam_formula` and
+#' dispatching on it covers both.
+#'
+#' `get_prior()` routes every call. `stancode()` and `standata()` route
+#' a call `names_mvgam_model()` accepts. Other calls go to brms through
+#' `NextMethod()`, which works only when called from the method
+#' itself.
+#' `brms::make_stancode()` calls the `stancode()` generic, which would
+#' dispatch back to the mvgam method and recurse until the C stack
+#' fills.
+#'
+#' @param object A formula or brmsformula
+#' @param dots The `...` of the calling method, as a list, carrying
+#'   any `trend_formula`
 #' @param mvgam_fun The mvgam generic to dispatch on
 #' @return Whatever `mvgam_fun` returns
 #' @noRd
-route_trend_formula <- function(object, dots, mvgam_fun) {
+route_to_mvgam_formula <- function(object, dots, mvgam_fun) {
   checkmate::assert(
     checkmate::check_formula(object),
     checkmate::check_list(object),
@@ -1616,23 +1631,26 @@ route_trend_formula <- function(object, dots, mvgam_fun) {
   )
 }
 
-#' Default method for get_prior, delegating to brms
+#' The priors of a model formula
 #'
-#' Covers a `formula`, `brmsformula` or `mvbrmsformula`. A
-#' `trend_formula` in the call builds the \code{\link{mvgam_formula}}
-#' it describes. A call without one delegates to \pkg{brms}.
+#' Covers a `formula`, `brmsformula` or `mvbrmsformula`, which it
+#' wraps in the \code{\link{mvgam_formula}} it describes with any
+#' `trend_formula` in the call. The table then carries the defaults
+#' mvgam gives its own families, with or without a trend.
 #'
 #' @param object Model specification object
-#' @param ... Further arguments of [brms::get_prior()], such as
-#'   `knots` or `drop_unused_levels`.
+#' @param ... Arguments of [get_prior.mvgam_formula()], such as
+#'   `data`, `family` and `trend_formula`
 #' @return A \code{brmsprior} data frame
 #' @export
 get_prior.default <- function(object, ...) {
-  dots <- list(...)
-  if (is.null(dots$trend_formula)) {
-    return(brms::get_prior(object, ...))
-  }
-  route_trend_formula(object, dots, get_prior)
+  route_to_mvgam_formula(object, list(...), get_prior)
+}
+
+#' @rdname get_prior.default
+#' @export
+default_prior.default <- function(object, ...) {
+  get_prior.default(object, ...)
 }
 
 #' The prior table of an mvgam model
@@ -1734,7 +1752,7 @@ default_prior.mvgam <- function(object, ...) {
 #'
 #' # Replace three defaults. Each `prior()` call gives one row.
 #' my_priors <- c(
-#'   prior(normal(0, 1), class = b),
+#'   prior(std_normal(), class = b),
 #'   prior(inv_gamma(5, 1), class = sigma_trend),
 #'   prior(normal(0.5, 0.25), class = ar1_trend)
 #' )

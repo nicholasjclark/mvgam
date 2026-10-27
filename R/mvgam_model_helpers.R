@@ -197,6 +197,31 @@ mvgam_validate_weights <- function(weights, models,
 }
 
 
+#' Each fit's weight and its share of the averaged draws
+#'
+#' @param models Named list of fitted `mvgam` objects
+#' @param weights Numeric weights or a weighting strategy
+#' @param ndraws Total number of draws, or `NULL` for the draws of the
+#'   first fit
+#' @param control List passed to [loo::loo_model_weights()]
+#' @return List of the named `weights` and the integer `ndraws` of each
+#'   fit
+#' @noRd
+averaging_draws <- function(models, weights, ndraws, control) {
+  checkmate::assert_count(ndraws, positive = TRUE, null.ok = TRUE)
+  w <- stats::setNames(
+    mvgam_validate_weights(weights, models, control = control),
+    names(models)
+  )
+  list(
+    weights = w,
+    ndraws = mvgam_round_largest_remainder(
+      w * (ndraws %||% posterior::ndraws(models[[1L]]))
+    )
+  )
+}
+
+
 #' Fractional draw counts rounded to integers with the same total
 #'
 #' Uses largest-remainder rounding, ported from the internal brms

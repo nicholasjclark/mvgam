@@ -140,8 +140,8 @@ mvgam_r_eff_log_lik <- function(x, ll, draw_ids = NULL) {
 
 #' How a fit's posterior divides into chains
 #'
-#' One conversion of the posterior gives both counts. A
-#' `run_model = FALSE` fit holds no posterior and returns `NULL`.
+#' The draws of `lp__` give both counts. A `run_model = FALSE` fit
+#' holds no posterior and returns `NULL`.
 #'
 #' @param x Fitted `mvgam` object
 #' @return List holding the number of `chains` and the `total` number
@@ -152,7 +152,7 @@ posterior_chain_layout <- function(x) {
   if (is.null(x$fit)) {
     return(NULL)
   }
-  arr <- posterior::as_draws_array(x$fit)
+  arr <- fit_draws_shape(x$fit)
   list(chains = posterior::nchains(arr), total = posterior::ndraws(arr))
 }
 
@@ -285,7 +285,7 @@ loglik_col_values <- function(object, data, x, n_cols = NULL) {
 }
 
 
-#' Put a per-row quantity on the grain `log_lik()` answers
+#' Put a per-row quantity on the grain `log_lik()` scores
 #'
 #' A prediction has one value per row. A detection family's likelihood
 #' has one per closure unit. The prediction is summed within each unit

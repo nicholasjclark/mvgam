@@ -1,76 +1,46 @@
 #' Default plots for \pkg{mvgam} models
 #'
-#' Plot method for fitted `mvgam` objects. A thin S3 dispatcher
-#' that routes by `type` to the canonical plotting surface for
-#' each kind of summary. No bespoke plotting code lives here:
-#' every branch forwards to a single dedicated function.
+#' Draws one of the standard views of a fitted model, chosen by `type`.
 #'
 #' @param x A fitted `mvgam` object.
-#' @param type Character. The kind of plot to produce. One of:
+#' @param type The plot to draw:
 #'   \describe{
-#'     \item{`"residuals"` (default)}{Four-panel Dunn-Smyth
-#'       residual diagnostic for one series: residuals vs fitted,
-#'       Q-Q, ACF, pACF, titled by the series. See [pp_check.mvgam()]
-#'       for the underlying types (`resid_vs_fitted`, `resid_qq`,
-#'       `resid_acf`, `resid_pacf`). A closure-unit family (`occ()`,
-#'       `nmix()`) has one residual per closure unit and draws the
-#'       Q-Q panel alone.}
-#'     \item{`"smooths"`}{Conditional smooth posteriors via
-#'       [conditional_smooths.mvgam()], combined into a single
-#'       `patchwork` when more than one smooth is present.}
-#'     \item{`"trend"`}{Latent trend over the training grid via
-#'       [plot.mvgam_forecast()] on
-#'       `hindcast(x, type = "trend")`.}
-#'     \item{`"factors"`}{Latent dynamic factors. Errors clearly
-#'       when the fit does not include latent factors. The
-#'       returned ggplot carries a `"contribution"` attribute
-#'       (data.frame with `Factor`, `PathVarShare`, `Lower`,
-#'       `Upper`) giving the loading-weighted variance partition
-#'       across factors. Access via
-#'       `attr(plot(fit, type = "factors"), "contribution")` if
-#'       you want the numeric summary without the figure.
-#'       The fit stores the per-draw factor paths as
-#'       `lv_trend[t, k]`. [posterior::as_draws_array()] extracts
-#'       them for custom summaries.}
-#'     \item{`"series"`}{Exploratory plot of the observed data the
-#'       fit carries. A long-frame multivariate fit stacks one plot
-#'       per response. Use [mvgam_data()] to plot data before a fit.}
-#'     \item{`"latent_state"`}{Per-(series, time) ribbon of the
-#'       marginal latent state for closure-unit families: latent
-#'       abundance `N` for `nmix()` (and its variants) or
-#'       occupancy `psi` for `occ()`. Pools across sites for
-#'       multi-season fits so each ribbon summarises the marginal
-#'       posterior at each (species, time) cell. Errors clearly
-#'       for non-closure-unit fits.}
+#'     \item{`"residuals"` (default)}{Dunn-Smyth residuals of one
+#'       series against the fitted values, their Q-Q plot, ACF and
+#'       partial ACF, as [pp_check.mvgam()] draws them. An [occ()] or
+#'       [nmix()] fit has one residual per closure unit and draws the
+#'       Q-Q plot alone.}
+#'     \item{`"smooths"`}{The posterior of each smooth, from
+#'       [conditional_smooths.mvgam()], with several smooths combined
+#'       into one figure.}
+#'     \item{`"trend"`}{The latent trend over the training times, from
+#'       [hindcast.mvgam()]. A [jsdgam()] fit has sites in place of
+#'       times and refuses it.}
+#'     \item{`"factors"`}{The path of each latent factor.
+#'       [active_factors()] reports the variance each factor carries.}
+#'     \item{`"series"`}{The observed data the fit carries.
+#'       [mvgam_data()] plots data before a fit.}
+#'     \item{`"latent_state"`}{The latent state of an [occ()] or
+#'       [nmix()] fit drawn from the covariates alone: occupancy `psi` or
+#'       abundance `N`, by series and time. A multi-season fit pools the
+#'       sites of each time.}
 #'   }
-#'
-#'   Forecasts, effects and custom conditional plots have dedicated
-#'   functions:
-#'   \itemize{
-#'     \item Forecasts: `forecast(x, newdata = ...) |> plot()`.
-#'     \item Parametric / random effects: [conditional_effects()]
-#'       (plus its `plot` method).
-#'     \item Arbitrary conditional plots:
-#'       [marginaleffects::plot_predictions()].
-#'   }
-#' @param series Optional series subset, as an integer index or a
-#'   series name. `"trend"` and `"series"` also take `"all"`, which
-#'   they use by default. `"residuals"` draws one series,
-#'   the first by default. Ignored by branches that summarise across
-#'   series (`"smooths"`, `"factors"`).
+#' @param series A series index or name. `"trend"` and `"series"` also
+#'   take `"all"`, their default. `"residuals"` draws one series, the
+#'   first by default. `"smooths"`, `"factors"` and `"latent_state"`
+#'   ignore it.
 #' @inheritParams forecast.mvgam
-#' @param ndraws Optional cap on posterior draws used by branches
-#'   that subsample. Passed through to the relevant surface.
-#' @param ... Additional arguments forwarded to the dispatched
-#'   function (e.g. `smooths = ...` for `smooths`).
+#' @param ndraws The number of posterior draws, or `NULL` for every
+#'   draw. `"residuals"` takes 100 by default. `"factors"` and
+#'   `"series"` ignore it.
+#' @param ... Further arguments to the function that draws the plot,
+#'   such as `smooths` for [conditional_smooths.mvgam()].
 #'
-#' @return A `ggplot` object (or `patchwork`, which inherits
-#'   from `ggplot`).
+#' @return A `ggplot` object, or a `patchwork` of several.
 #'
-#' @seealso [pp_check.mvgam()], [conditional_effects.mvgam()],
-#'   [conditional_smooths.mvgam()], [forecast.mvgam()],
-#'   [hindcast.mvgam()], [plot.mvgam_forecast()],
-#'   [marginaleffects::plot_predictions()]
+#' @seealso [forecast.mvgam()] and its `plot()` method draw forecasts.
+#'   [conditional_effects.mvgam()] draws covariate effects.
+#'   [mcmc_plot.mvgam()] draws posterior diagnostics.
 #'
 #' @examples
 #' \dontrun{
@@ -82,8 +52,15 @@
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
 #'
-#' # Residual diagnostics, the default type.
+#' # Residual diagnostics, the default
 #' plot(mod)
+#'
+#' # The smooth of x and the latent AR(1) trend
+#' plot(mod, type = "smooths")
+#' plot(mod, type = "trend")
+#'
+#' # Next, plot(forecast(mod, newdata = simdat$data_test)) carries the
+#' # trend forward
 #' }
 #'
 #' @author Nicholas J Clark
@@ -102,10 +79,6 @@ plot.mvgam <- function(
   checkmate::assert_class(x, "mvgam")
   require_fitted_model(x, "plot")
   type <- match.arg(type)
-  # `resp` is the per-response selector for multivariate fits
-  # (mvbind / mvbrmsformula). When NULL on a mv fit each branch below
-  # draws every response in one figure; when set to a single response
-  # name the plot is scoped to that response.
   checkmate::assert_string(resp, null.ok = TRUE)
 
   switch(
@@ -113,9 +86,14 @@ plot.mvgam <- function(
     residuals = mvgam_resid_panel(
       x, series = series, ndraws = ndraws %||% 100L, resp = resp, ...
     ),
-    smooths = wrap_effects_list(
-      conditional_smooths(x, ndraws = ndraws, resp = resp, ...)
-    ),
+    smooths = {
+      panels <- plot(
+        conditional_smooths(x, ndraws = ndraws, resp = resp, ...),
+        plot = FALSE
+      )
+      if (length(panels) == 1L) panels[[1L]] else
+        patchwork::wrap_plots(panels)
+    },
     trend = plot(
       hindcast(x, type = "trend", ndraws = ndraws, resp = resp),
       series = series,
@@ -126,28 +104,4 @@ plot.mvgam <- function(
                                ...),
     latent_state = plot_latent_state(x, ndraws = ndraws, ...)
   )
-}
-
-
-#' Conditional effects or smooths combined into one plot
-#'
-#' The `plot()` methods of both input classes return a list of ggplots
-#' when called with `plot = FALSE`. Several panels are combined with
-#' patchwork.
-#'
-#' @param eff_list Object from `conditional_effects()` or
-#'   `conditional_smooths()`
-#' @return A `ggplot` for one panel, or a `patchwork` for several
-#' @noRd
-wrap_effects_list <- function(eff_list) {
-  checkmate::assert_list(eff_list)
-  if (length(eff_list) == 0L) {
-    stop(insight::format_error(c(
-      "No effects to plot.",
-      i = "The fit has no parametric or random effects of that kind."
-    )))
-  }
-  ggs <- plot(eff_list, plot = FALSE)
-  if (length(ggs) == 1L) return(ggs[[1L]])
-  patchwork::wrap_plots(ggs)
 }

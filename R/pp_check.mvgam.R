@@ -1,8 +1,9 @@
-#' Posterior Predictive Checks for \code{mvgam} models
+#' Posterior predictive checks for \pkg{mvgam} models
 #'
-#' Perform unconditional posterior predictive checks with the help
-#' of the \pkg{bayesplot} package. Returns a \pkg{ggplot2} object that
-#' can be further customised.
+#' Compares the observed response with replicates drawn from the fitted
+#' model through the \pkg{bayesplot} `ppc_*` functions. Further types
+#' plot randomised quantile residuals and, for `nmix()` and `occ()`
+#' fits, a discrepancy statistic. Returns a \pkg{ggplot2} object.
 #'
 #' @aliases pp_check
 #'
@@ -15,23 +16,24 @@
 #'
 #' @param object An object of class \code{mvgam}
 #'
-#' @param type Type of the check, the name of a \pkg{bayesplot} `ppc_*`
-#'   function without its prefix or one of the residual types below.
-#'   The default is `"bars"` for a bernoulli or ordinal response and
-#'   `"dens_overlay"` otherwise. Multi-response families take the
-#'   defaults described under "Multi-response families".
+#' @param type Type of the check. A \pkg{bayesplot} `ppc_*` or `ppd_*`
+#'   function named without its prefix, or one of the residual types
+#'   mvgam adds: `"resid_hist"`, `"resid_hist_grouped"`,
+#'   `"resid_ribbon"`, `"resid_ribbon_grouped"`, `"resid_qq"`,
+#'   `"resid_vs_fitted"`, `"resid_acf"` and `"resid_pacf"`. Type
+#'   `"fit_stat"` serves `nmix()` and `occ()` fits. The default is
+#'   `"bars"` for a bernoulli or ordinal response and `"dens_overlay"`
+#'   otherwise. Multi-response families take the defaults under
+#'   "Multi-response families".
 #'
-#' @param newdata Optional \code{dataframe} or \code{list} of test data
-#'   containing the variables included in the linear predictor of
-#'   \code{formula}. If not supplied, predictions are generated for the
-#'   original observations used for the model fit. The residual types
-#'   describe the training data and refuse it.
+#' @param newdata Optional data frame of the variables in the model.
+#'   `NULL` (the default) checks the training data. The residual types
+#'   describe the training data and refuse `newdata`.
 #'
-#' @param per_obs Logical. For `type = 'resid_vs_fitted'`, whether each
-#'   observation collapses to its posterior median on both axes, giving
-#'   one point per observation. `FALSE` keeps the scatter of every draw
-#'   for every observation, which shows the posterior spread. Other
-#'   types ignore it.
+#' @param per_obs Logical. For `type = "resid_vs_fitted"`, `TRUE` (the
+#'   default) draws each observation at its posterior median on both
+#'   axes. `FALSE` draws every draw of every observation, which shows the
+#'   posterior spread.
 #'
 #' @param series For the residual types `resid_hist`, `resid_ribbon`,
 #'   `resid_qq`, `resid_vs_fitted`, `resid_acf` and `resid_pacf`, the
@@ -39,93 +41,65 @@
 #'   default is the first series. Its residuals are taken in time order.
 #'   `resid_acf` keeps missing responses in place. Its lags count time
 #'   steps. `resid_pacf` drops them. Its lags count observations. A
-#'   plot from a fit with several series names its series in the
-#'   subtitle.
+#'   fit with several series names its series in the subtitle.
 #'
-#' @param ... Further arguments passed to \code{\link{predict.mvgam}}
-#'   as well as to the PPC function specified in \code{type}. A name
-#'   belonging to neither is refused, naming the argument. Ten
-#'   bayesplot types take a `stat` of their own. `type = 'fit_stat'`
-#'   takes one here too, either `'chi_squared'` (default) or
-#'   `'freeman_tukey'`, naming the discrepancy it computes.
+#' @param ... Further arguments of [posterior_predict.mvgam()] and of
+#'   the \pkg{bayesplot} function `type` names. Any other name is
+#'   refused. `type = "fit_stat"` takes `stat`, either `"chi_squared"`
+#'   (the default) or `"freeman_tukey"`.
 #'
-#' @return A ggplot object that can be further
-#'   customized using the \pkg{ggplot2} package. A multivariate model
-#'   given no `resp` returns one figure with a panel per response, each
-#'   titled by its response.
+#' @return A ggplot object. A multivariate model given no `resp`
+#'   returns one figure with a panel per response. `type = "fit_stat"`
+#'   returns an `mvgam_ppc_fit_stat` object with print and plot methods.
 #'
 #' @details
-#' Replicates are drawn against the latent trend state the model
-#' inferred at each time. The check then compares the model's fitted
-#' trajectory with the series that produced it, on the same basis as
-#' [residuals.mvgam()] and [hindcast.mvgam()]. Supplying `newdata` the
-#' fit never saw integrates over the trend dynamics instead. The
-#' `loo_*` types always use the conditional state, whatever data they
-#' cover. Their importance weights come from the likelihood, which
-#' uses the conditional state too.
+#' Replicates of the training data are drawn under the latent trend
+#' state the model inferred at each time, as [residuals.mvgam()] and
+#' [hindcast.mvgam()] use. The check then compares the fitted
+#' trajectory with the series that produced it. Replicates of `newdata`
+#' take the covariate surface of [posterior_predict.mvgam()]. Passing
+#' `incl_autocor` sets the surface explicitly. The `loo_*` types always
+#' take the fitted state, which is the state their importance weights
+#' come from.
 #'
-#' The residual histograms and ribbons take their residuals from 500
-#' draws by default. `resid_hist` and `resid_hist_grouped` draw one
-#' histogram per draw and show the first eight.
+#' Overlay types default to 10 draws. Interval, ribbon and statistic
+#' types use every draw. The residual histograms and ribbons default to
+#' 500 draws, the other residual types to 100 and `fit_stat` to 500. A
+#' posterior with fewer draws gives all of them.
+#' `resid_hist` draws one histogram per draw and shows the first eight.
 #'
-#' For a detailed explanation of each of the ppc functions,
-#'   see the \code{\link[bayesplot:PPC-overview]{PPC}} documentation of the
-#'   \pkg{\link[bayesplot:bayesplot-package]{bayesplot}} package. LOO-PIT
-#'   bayesplot variants (\code{loo_pit}, \code{loo_pit_overlay},
-#'   \code{loo_pit_qq}, \code{loo_intervals}, \code{loo_ribbon}) compute
-#'   PSIS weights internally via [log_lik.mvgam()].
-#'
-#'   To produce conditional posterior predictive checks restricted to a
-#'   particular series or covariate slice, filter `newdata` to the rows
-#'   of interest and pass it to `pp_check()`. For series-grouped variants
-#'   use the `group = "series"` argument of the underlying bayesplot
-#'   functions (e.g. `type = "ecdf_overlay_grouped"`, `type =
-#'   "bars_grouped"`). For per-observation summaries against a covariate,
-#'   `marginaleffects::plot_predictions()` provides a complementary
-#'   conditional surface.
+#' The \code{\link[bayesplot:PPC-overview]{PPC}} documentation of
+#' \pkg{bayesplot} describes each `ppc_*` type. A check restricted to
+#' one series or covariate slice takes `newdata` filtered to those
+#' rows. The `_grouped` types take `group = "series"` to draw one panel
+#' per series.
 #'
 #' @section Multi-response families:
-#'   `diri()` / `multi()` / `categ()` / `mvn()` / `mvt()` place
-#'   K outcomes on each closure unit
-#'   (simplex families) or each (site, species) row (mv-normal /
-#'   mv-T). A pooled `dens_overlay` would collapse every
-#'   category / species into one curve and hide per-category
-#'   fit. When the user does not pass `group`, `pp_check()`
-#'   auto-groups by the per-family category axis (within-unit
-#'   position for the simplex families, the `series` column for
-#'   `mvn()` / `mvt()`) and switches `type` to its `_grouped`
-#'   variant so bayesplot facets per category. Default `type`
-#'   becomes `"ribbon"` for simplex families and `"dens_overlay"`
-#'   for `mvn()` / `mvt()`. To opt out and recover the pooled
-#'   plot, pass `group = "<existing-column>"` explicitly
-#'   (e.g. `group = "series"`).
+#'   `diri()`, `multi()`, `categ()`, `mvn()` and `mvt()` record several
+#'   outcomes per unit. A pooled density would merge them into one
+#'   curve. Without a `group` from the caller, `pp_check()` draws one
+#'   panel per species through the type's `_grouped` variant. The
+#'   default type is `"ribbon"` for a composition and `"dens_overlay"`
+#'   for `mvn()` and `mvt()`. Passing a column of `newdata` as `group`
+#'   draws the pooled plot.
 #'
-#' @section Closure-unit families (`nmix()`, `occ()`):
-#'   Closure-unit observation families compute predictions at
-#'   the closure-unit grain (one per site x season) because
-#'   visits within a unit share the latent state. `pp_check()`
-#'   aggregates the per-visit response and per-visit posterior
-#'   predictive draws to the unit grain (sum across visits) via
-#'   the shared `aggregate_closure_unit_visits()` helper, then
-#'   hands the resulting `(y_unit, yrep_unit)` to the relevant
-#'   `bayesplot::ppc_*` function. Discrete-friendly types are
-#'   the natural fit (`bars`, `bars_grouped`, `rootogram`,
-#'   `hist`, `freqpoly`, `freqpoly_grouped`); density / ECDF
-#'   variants (`dens_overlay`, `ecdf_overlay`,
-#'   `ecdf_overlay_grouped`), per-unit stats (`stat`, `stat_2d`,
-#'   `stat_grouped`), intervals / ribbons over a unit-constant
-#'   covariate (`intervals`, `ribbon`) and the residual
-#'   histograms (`resid_hist`, `resid_qq`) all work as
-#'   expected. Per-row scatter / fitted-vs-residual / per-row
-#'   time-axis types (`scatter_avg`, `error_binned`,
-#'   `resid_acf`, `resid_pacf`, `resid_vs_fitted`,
-#'   `resid_ribbon`) are blocked because they do not match the
-#'   closure-unit grain. `group =` and `x =` covariates must be
-#'   constant within every closure unit; per-visit covariates
-#'   (`tod`, observer, weather) are rejected with a clear
-#'   error.
+#' @section Detection families (`nmix()`, `occ()`):
+#'   The visits of a closure unit share one latent state. `pp_check()`
+#'   sums the observed and replicated visits of each unit and compares
+#'   the sums. The count types (`bars`, `rootogram`, `hist`,
+#'   `freqpoly`), the density and ECDF overlays, the statistic types,
+#'   `intervals`, `ribbon`, `resid_hist` and `resid_qq` apply. Types
+#'   that plot rows, residuals against fitted values or residuals over
+#'   time are refused. A `group` or `x` column must be constant within
+#'   each unit. `type = "fit_stat"` computes the chi-squared or
+#'   Freeman-Tukey discrepancy of Gelman et al. (1996) from the unit
+#'   sums.
 #'
-#' @seealso \code{\link{predict.mvgam}}, [log_lik.mvgam()]
+#' @seealso [residuals.mvgam()] returns the residuals the residual types
+#'   plot. [loo.mvgam()] scores the fit. The
+#'   `r mvgam_article("mvgam_overview", "overview article")` explains a
+#'   rootogram. The `r mvgam_article("nmix", "N-mixture article")` runs
+#'   the discrepancy check.
 #'
 #' @family model checking
 #' @export pp_check
@@ -136,29 +110,30 @@
 #' \emph{Journal of the Royal Statistical Society A}, 182:389-402.
 #' \doi{10.1111/rssa.12378}
 #'
+#' Gelman, A., Meng, X.-L. and Stern, H. (1996). Posterior predictive
+#' assessment of model fitness via realized discrepancies.
+#' \emph{Statistica Sinica}, 6:733-760.
+#'
 #' @author Nicholas J Clark
 #'
 #' @examples
 #' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
-#'
-#' mod <- mvgam(
-#'   y ~ s(x),
-#'   trend_formula = ~ AR(p = 1),
-#'   data    = simdat$data_train,
-#'   family  = poisson(),
-#'   chains  = 2, silent = 2
-#' )
+#'                     n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
 #'
 #' # Observed counts against the predictive distribution. A bar
-#' # hanging below zero marks a count the model under-predicts.
-#' pp_check(mod, type = "rootogram", ndraws = 50L)
+#' # hanging below zero marks a count the model under-predicts
+#' pp_check(mod, type = "rootogram")
 #'
-#' # Randomised quantile residuals over time, with predictive
-#' # ribbons. A trend the model missed shows as serial structure.
-#' pp_check(mod, type = "resid_ribbon", ndraws = 500L)
+#' # Randomised quantile residuals over time. A trend the model missed
+#' # shows as serial structure
+#' pp_check(mod, type = "resid_ribbon")
+#'
+#' # Next: plot(mod, type = "residuals") shows the residual grid
 #' }
 #'
 #' @export
@@ -178,30 +153,39 @@ pp_check.mvgam <- function(
 ) {
   require_fitted_model(object, "pp_check")
   set_color_scheme_local()
-
+  prefix <- match.arg(prefix)
+  validate_draw_selectors(ndraws, draw_ids)
+  checkmate::assert_flag(per_obs)
+  checkmate::assert_string(group, null.ok = TRUE)
+  checkmate::assert_string(x, null.ok = TRUE)
   dots <- list(...)
   type_missing <- missing(type)
   if (type_missing) {
     type <- "dens_overlay"
   }
+  checkmate::assert_string(type)
+  ndraws_given <- !missing(ndraws)
 
-  prefix <- match.arg(prefix)
-  validate_draw_selectors(ndraws, draw_ids)
-  ndraws_given <- "ndraws" %in% names(match.call())
-
-  # Residuals are computed on the rows the model was fitted to. The
-  # observed values of a frame the caller supplies belong to other
-  # rows.
-  if (grepl("resid", type) && !is.null(newdata)) {
-    stop(insight::format_error(c(
-      "The residual types describe the training data.",
-      i = "Drop 'newdata' from this call."
-    )))
-  }
+  resid_types <- c(
+    "resid_hist", "resid_hist_grouped", "resid_ribbon",
+    "resid_ribbon_grouped", "resid_acf", "resid_pacf", "resid_qq",
+    "resid_vs_fitted"
+  )
+  resid_pooled <- resid_types[1:4]
+  resid_diagnostic <- resid_types[5:8]
   resid_by_series <- c(
     "resid_hist", "resid_ribbon", "resid_acf", "resid_pacf",
     "resid_qq", "resid_vs_fitted"
   )
+  closure_unit <- is_closure_unit_family(object$family)
+
+  # Residuals are computed on the rows the model was fitted to.
+  if (type %in% resid_types && !is.null(newdata)) {
+    stop(insight::format_error(c(
+      "The residual types describe the training data.",
+      i = "Drop 'newdata' from this call."
+    )), call. = FALSE)
+  }
   if (!is.null(series)) {
     if (!type %in% resid_by_series) {
       stop(insight::format_error(c(
@@ -211,33 +195,18 @@ pp_check.mvgam <- function(
           "Use it with ", paste0("'", resid_by_series, "'", collapse = ", "),
           ", or subset 'newdata' for the other checks."
         )
-      )))
+      )), call. = FALSE)
     }
-    if (is_closure_unit_family(object$family)) {
-      stop(insight::format_error(c(
-        "'series' is not supported for closure-unit residuals.",
-        x = "A closure-unit family has one residual per closure unit."
-      )))
-    }
+    refuse_closure_unit_series(object, series)
   }
-  # Whether the fit saw these rows decides which surface every panel
-  # uses. The test runs before the training frame takes the place of
-  # `newdata` below. Run afterwards, it treated the training frame as
-  # new data. The residual axis was then conditional and the fitted
-  # axis marginal.
+  # Whether the fit saw these rows decides the surface of every panel.
   in_sample <- is.null(newdata)
   if (in_sample) {
     newdata <- object$data
   }
 
-  # Multi-response custom families (diri / multi / categ / mvn /
-  # mvt): a default `dens_overlay` would pool every category or
-  # species into a single curve and hide the per-category fit.
-  # Without a `group` from the caller, the function picks a default
-  # type for the family. It builds a category vector at the grain of
-  # the long-form predictions and attaches it to `newdata` under a
-  # reserved name. `type` becomes its `_grouped` variant. Passing
-  # `group = "<existing-column>"` keeps the pooled plot.
+  # A multi-response family draws one panel per species. A `group` from
+  # the caller keeps the pooled plot.
   mv_cat <- NULL
   if (is.null(group) && is_multi_response_family(object$family)) {
     mv_cat <- pp_check_mv_category(object, newdata)
@@ -250,8 +219,7 @@ pp_check.mvgam <- function(
         }
       }
       grouped_type <- paste0(type, "_grouped")
-      available <- as.character(bayesplot::available_ppc(""))
-      if (paste0("ppc_", grouped_type) %in% available) {
+      if (paste0("ppc_", grouped_type) %in% bayesplot::available_ppc("")) {
         type <- grouped_type
         newdata[["_mvgam_pp_category"]] <- mv_cat
         group <- "_mvgam_pp_category"
@@ -261,11 +229,8 @@ pp_check.mvgam <- function(
     }
   }
 
-  # Multivariate fits (mvbind / mvbrmsformula). When `resp` is
-  # NULL, fan out per response via the shared helper and return one
-  # figure with a panel per response. When the caller supplied
-  # `resp`, validate it and fall through to the univariate path
-  # scoped to that response.
+  # A model with several responses returns one figure with a panel per
+  # response when `resp` is `NULL`.
   fan <- mv_resp_fan_out(object, resp, combine = stack_response_plots)
   if (!is.null(fan)) return(fan)
   resolve_resp(object, resp)
@@ -280,67 +245,39 @@ pp_check.mvgam <- function(
     }
   }
 
-  if (prefix == "ppc") {
-    # No type checking for prefix 'ppd' yet
-    valid_types <- sort(
-      c(
-        as.character(bayesplot::available_ppc("")),
-        "ppc_resid_hist",
-        "ppc_resid_hist_grouped",
-        "ppc_resid_ribbon",
-        "ppc_resid_ribbon_grouped",
-        "ppc_resid_acf",
-        "ppc_resid_pacf",
-        "ppc_resid_qq",
-        "ppc_resid_vs_fitted",
-        # Chi-squared or Freeman-Tukey discrepancy for closure-unit
-        # families (Gelman et al. 1996). It returns a
-        # `mvgam_ppc_fit_stat` object with print and plot methods. The
-        # bayesplot dispatch does not apply to it.
-        "ppc_fit_stat"
-      )
-    )
-    valid_types <- sub("^ppc_", "", valid_types)
-    if (!type %in% valid_types) {
-      stop(insight::format_error(c(
-        "Argument 'type' must be a valid ppc type.",
-        x = paste0("Given: '", type, "'."),
-        i = paste0(
-          "Valid types are: ",
-          paste0("'", valid_types, "'", collapse = ", "), "."
-        )
-      )))
+  valid_types <- sub(
+    "^pp[cd]_", "",
+    if (prefix == "ppc") {
+      c(bayesplot::available_ppc(""), resid_types, "fit_stat")
+    } else {
+      bayesplot::available_ppd("")
     }
+  )
+  if (!type %in% valid_types) {
+    stop(insight::format_error(c(
+      paste0("'type' must be a valid '", prefix, "' type."),
+      x = paste0("Got '", type, "'."),
+      i = paste0("Valid types: ",
+                 paste0("'", sort(valid_types), "'", collapse = ", "), ".")
+    )), call. = FALSE)
   }
 
-  # The bayesplot kernel that draws this type. Its formals are the
-  # arguments it accepts. `fit_stat` and the four diagnostic residual
-  # types draw themselves. They name no kernel and skip the lookup. The
-  # split of `...` below needs both argument sets.
-  bptype <- type
-  if (bptype %in% c("resid_hist", "resid_hist_grouped")) {
-    bptype <- sub("resid", "error", bptype)
-  }
-  if (bptype %in% c("resid_ribbon", "resid_ribbon_grouped")) {
-    bptype <- sub("resid_", "", bptype)
-  }
-  ppc_fun <- if (type %in% c(
-    "fit_stat", "resid_acf", "resid_pacf", "resid_qq", "resid_vs_fitted"
-  )) {
+  # The bayesplot kernel that draws this type. `fit_stat` and the four
+  # diagnostic residual types draw themselves.
+  bptype <- sub("^resid_hist", "error_hist",
+                sub("^resid_ribbon", "ribbon", type))
+  ppc_fun <- if (type %in% c("fit_stat", resid_diagnostic)) {
     NULL
   } else {
     get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
   }
-  ppc_formals <- if (is.null(ppc_fun)) {
-    character(0L)
-  } else {
+  ppc_formals <- if (is.null(ppc_fun)) character(0L) else {
     names(formals(ppc_fun))
   }
 
-  # `...` holds two argument sets: the prediction method's for this
-  # type and those of the kernel that draws it. A name in neither set
-  # reached bayesplot. bayesplot named it in a warning and drew the
-  # plot on the default the caller meant to override.
+  # `...` holds the prediction method's arguments and the kernel's.
+  # `stat` stays in `...`. Ten bayesplot kernels declare one of their
+  # own.
   method <- if (identical(type, "error_binned")) {
     "posterior_epred"
   } else {
@@ -351,67 +288,11 @@ pp_check.mvgam <- function(
     posterior_epred = posterior_epred.mvgam,
     posterior_predict = posterior_predict.mvgam
   )))
-  # `stat` stays in `...`. Ten bayesplot kernels declare one of their
-  # own. A formal `stat` here bound it to mvgam. Then
-  # `pp_check(type = 'stat', stat = 'median')` drew the default.
-  # `type = 'fit_stat'` has no kernel to declare it. It is allowed here
-  # for that type alone.
-  allowed <- c(pred_formals, ppc_formals)
-  if (identical(type, "fit_stat")) {
-    allowed <- c(allowed, "stat")
-  }
+  allowed <- c(pred_formals, ppc_formals,
+               if (identical(type, "fit_stat")) "stat")
   refuse_unread_dots(dots, allowed, "pp_check")
 
-  # The closure-unit fit statistic computes a per-draw discrepancy
-  # from epred and yrep. It returns its own `mvgam_ppc_fit_stat`
-  # object outside the bayesplot dispatch.
-  if (identical(type, "fit_stat")) {
-    # The discrepancy is computed on a unit's aggregated visits. It
-    # applies to the families that aggregate, the ones the refusal's
-    # hint names. A test on the wire format admitted the composition
-    # families. Their units sum to one whatever the fit. Every model
-    # then returned a Bayesian p-value near 0.5.
-    if (!is_closure_unit_family(object$family)) {
-      stop(insight::format_error(c(
-        paste0(
-          "pp_check(type = 'fit_stat') is only available for the ",
-          "detection families."
-        ),
-        x = paste0(
-          "Family '", resolve_family_name(object$family),
-          "' does not aggregate repeat visits within a unit."
-        ),
-        i = "Use family = occ() or family = nmix() for this check."
-      )))
-    }
-    # The default below tests `is.null(draw_ids)`, as the residual
-    # default does. Without it a caller who named draws also received
-    # a count. The prediction refused the pair.
-    if (!ndraws_given && is.null(draw_ids)) {
-      ndraws <- 500L
-    }
-    stat <- dots$stat %||% "chi_squared"
-    return(closure_unit_fit_stat_ppc(
-      object   = object,
-      newdata  = newdata,
-      stat     = stat,
-      group    = group,
-      ndraws   = ndraws,
-      draw_ids = draw_ids
-    ))
-  }
-
-  # The detection families plot at the closure-unit grain. The
-  # aggregation below collapses a unit's visits (see
-  # `closure_unit_pp_check_setup()`). Per-row types that assume
-  # exchangeable observations or a per-row time axis are blocked.
-  #
-  # The gate tests the aggregation predicate. The aggregation creates
-  # the mismatch, whatever the wire format. `mvn()`, `mvt()`, `diri()`,
-  # `multi()` and `categ()` share the closure-unit pipeline without
-  # being aggregated here. Their plots stay per row, where these ten
-  # types apply. A test on the wire format refused all ten for them.
-  if (is_closure_unit_family(object$family)) {
+  if (closure_unit) {
     closure_unit_blocked <- c(
       "scatter_avg", "scatter_avg_grouped",
       "error_scatter_avg", "error_scatter_avg_vs_x",
@@ -422,103 +303,71 @@ pp_check.mvgam <- function(
     if (type %in% closure_unit_blocked) {
       stop(insight::format_error(c(
         paste0(
-          "pp_check(type = '", type, "') is not available for ",
-          "closure-unit family '",
-          resolve_family_name(object$family), "'."
+          "pp_check(type = '", type, "') is not supported for ",
+          "closure-unit family '", resolve_family_name(object$family), "'."
         ),
         x = paste0(
           "Row scatter plots, residuals against fitted values and ",
-          "residuals over time do not describe data aggregated to ",
-          "closure units."
+          "residuals over time need one value per row."
         ),
         i = paste0(
           "Use type = 'bars', 'rootogram', 'dens_overlay', ",
           "'ecdf_overlay', 'intervals', 'stat', 'resid_hist' ",
           "or 'resid_qq' for closure-unit fits."
         )
-      )))
+      )), call. = FALSE)
+    }
+  } else if (identical(type, "fit_stat")) {
+    # A composition's units sum to one whatever the fit. Its discrepancy
+    # would give a p-value near 0.5 for every model.
+    stop(insight::format_error(c(
+      "pp_check(type = 'fit_stat') applies to the detection families.",
+      x = paste0(
+        "Family '", resolve_family_name(object$family),
+        "' records one observation per row."
+      ),
+      i = "Use family = occ() or family = nmix() for this check."
+    )), call. = FALSE)
+  }
+
+  for (v in c(group, x)) {
+    if (!v %in% names(newdata)) {
+      stop(insight::format_error(
+        paste0("Variable '", v, "' is absent from the data.")
+      ), call. = FALSE)
     }
   }
-  # `group` and `x` are checked against the column names of newdata.
-  # The diagnostic residual types skip the check. They have no
-  # bayesplot formals to query.
-  valid_vars <- names(newdata)
-  # A `loo_*` check reweights its replicates by importance weights from
-  # the likelihood. The likelihood scores each observation under the
-  # latent state the model inferred at that time. The replicates are
-  # drawn under that same state. Otherwise the weights and the draws
-  # describe different series.
-  psis_weighted <- any(c("psis_object", "lw") %in% ppc_formals)
-  if ("group" %in% ppc_formals) {
-    if (is.null(group)) {
-      stop(insight::format_error(
-        paste0("Argument 'group' is required for ppc type '", type, "'.")
-      ))
-    }
-    if (!group %in% valid_vars) {
-      stop(insight::format_error(
-        paste0("Variable '", group, "' is absent from the data.")
-      ))
-    }
+  if ("group" %in% ppc_formals && is.null(group)) {
+    stop(insight::format_error(
+      paste0("Argument 'group' is required for ppc type '", type, "'.")
+    ), call. = FALSE)
   }
-  if ("x" %in% ppc_formals) {
-    if (!is.null(x) && !x %in% valid_vars) {
-      stop(insight::format_error(
-        paste0("Variable '", x, "' is absent from the data.")
-      ))
-    }
-  }
-  for_pred <- names(dots) %in% pred_formals
-  # Draw counts for the residual types. A family without a
-  # distribution spec takes its residuals from the empirical PIT,
-  # which needs about 50 draws or more. With fewer, observations in
-  # the predictive tail underflow the PIT support and clamp near
-  # +/-8, which looks like misfit. The ribbons and histograms default
-  # to 500 draws. A histogram draws one panel per draw and shows the
-  # first eight.
-  resid_hist_panels <- 8L
-  resid_pooled <- c(
-    "resid_hist", "resid_hist_grouped",
-    "resid_ribbon", "resid_ribbon_grouped"
-  )
-  resid_diagnostic <- c(
-    "resid_acf", "resid_pacf", "resid_qq", "resid_vs_fitted"
-  )
+
+  # Default draw counts. A family without a distribution spec takes its
+  # residuals from the empirical PIT. Below about 50 draws an
+  # observation in the predictive tail falls outside the PIT support.
+  # Its residual then clamps near 8 in magnitude.
   if (!ndraws_given && is.null(draw_ids)) {
-    aps_types <- c(
-      "error_scatter_avg",
-      "error_scatter_avg_vs_x",
-      "intervals",
-      "intervals_grouped",
-      "loo_intervals",
-      "loo_pit",
-      "loo_pit_overlay",
-      "loo_pit_qq",
-      "loo_ribbon",
-      "pit_ecdf",
-      "pit_ecdf_grouped",
-      "ribbon",
-      "ribbon_grouped",
-      "rootogram",
-      "scatter_avg",
-      "scatter_avg_grouped",
-      "stat",
-      "stat_2d",
-      "stat_freqpoly_grouped",
-      "stat_grouped",
-      "violin_grouped"
+    all_draw_types <- c(
+      "error_scatter_avg", "error_scatter_avg_vs_x", "intervals",
+      "intervals_grouped", "loo_intervals", "loo_pit", "loo_pit_overlay",
+      "loo_pit_qq", "loo_ribbon", "pit_ecdf", "pit_ecdf_grouped",
+      "ribbon", "ribbon_grouped", "rootogram", "scatter_avg",
+      "scatter_avg_grouped", "stat", "stat_2d", "stat_freqpoly_grouped",
+      "stat_grouped", "violin_grouped"
     )
-    # Each check type takes a default draw count without a message, as
-    # in `bayesplot` and `brms::pp_check()`. The returned object
-    # records the count.
-    if (type %in% aps_types) {
-      ndraws <- NULL
-    } else if (type %in% resid_pooled) {
-      ndraws <- 500L
+    ndraws <- if (type %in% all_draw_types) {
+      NULL
+    } else if (type %in% c(resid_pooled, "fit_stat")) {
+      500L
     } else if (type %in% resid_diagnostic) {
-      ndraws <- 100L
+      100L
     } else {
-      ndraws <- 10
+      10L
+    }
+    # A posterior smaller than the default gives every draw.
+    if (!is.null(ndraws) && ndraws >= posterior::ndraws(object)) {
+      ndraws <- NULL
     }
   } else if (type %in% resid_pooled &&
                !has_analytic_pit(model_families(object, resp))) {
@@ -536,116 +385,85 @@ pp_check.mvgam <- function(
       )
     }
   }
+  # Replicates, expectations, residuals and importance weights all take
+  # these draws.
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+
+  if (type %in% resid_diagnostic) {
+    return(resid_diagnostic_panels(
+      object, type, draw_ids = draw_ids, resp = resp, series = series,
+      per_obs = per_obs
+    )[[1L]])
+  }
+  if (identical(type, "fit_stat")) {
+    return(closure_unit_fit_stat_ppc(
+      object = object, newdata = newdata,
+      stat = dots$stat %||% "chi_squared", group = group,
+      draw_ids = draw_ids, in_sample = in_sample
+    ))
+  }
 
   y <- NULL
   if (prefix == "ppc") {
-    # y is ignored in prefix 'ppd' plots.
     y <- newdata[[response_column(object, resp)]]
-    # Ordinal responses arrive as ordered factors. bayesplot's ppc_*
-    # functions assert a numeric y. Factors become their integer codes
-    # (1..nlevels).
+    # bayesplot takes a numeric `y`. An ordered factor becomes its codes.
     if (is.factor(y)) {
       y <- as.integer(y)
     }
   }
 
-  # A subsample of draws is pinned once here. yrep and the PSIS
-  # log-weights below then use the same posterior draws.
-  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
-  if (!is.null(draw_ids)) {
-    ndraws <- NULL
-  }
-
+  # A `loo_*` check weights its replicates by importance weights from
+  # the likelihood. The likelihood scores each observation under the
+  # fitted latent state. The replicates take the same state.
+  psis_weighted <- any(c("psis_object", "lw") %in% ppc_formals)
+  for_pred <- names(dots) %in% pred_formals
   series_sel <- NULL
-  if (grepl("resid", type)) {
-    # A Dunn-Smyth residual plot takes y as zero and yrep as minus the
-    # residual. bayesplot's error convention then points each residual
-    # in its own direction.
+  if (type %in% resid_types) {
+    # A residual plot takes `y` as zero and `yrep` as minus the residual.
+    # bayesplot's error convention then points each residual its own way.
     y[!is.na(y)] <- 0
-    # residuals(summary = FALSE) returns [ndraws x nobs], as
-    # posterior_predict does below. `resp` holds one response here,
-    # from the fan-out or from the caller. residuals() then returns one
-    # matrix where a multivariate fit would return a list.
     yrep <- -1 * residuals(
-      object, summary = FALSE,
-      ndraws = if (!is.null(draw_ids)) NULL else ndraws,
-      draw_ids = draw_ids, resp = resp
+      object, summary = FALSE, draw_ids = draw_ids, resp = resp
     )
-    # Residual columns follow the rows of the training frame. Its
-    # series may be interleaved or shuffled. An autocorrelation or a
-    # residual ribbon describes one series in time order.
-    if (type %in% resid_by_series &&
-          !is_closure_unit_family(object$family)) {
+    # Residual columns follow the rows of the training frame. An
+    # autocorrelation or a ribbon describes one series in time order.
+    if (type %in% resid_by_series && !closure_unit) {
       series_sel <- resid_series_rows(object, newdata, series)
       y <- y[series_sel$rows]
       yrep <- yrep[, series_sel$rows, drop = FALSE]
     }
     if (type %in% c("resid_hist", "resid_hist_grouped")) {
-      yrep <- yrep[seq_len(min(nrow(yrep), resid_hist_panels)), ,
-                   drop = FALSE]
+      yrep <- yrep[seq_len(min(nrow(yrep), 8L)), , drop = FALSE]
     }
   } else {
     pred_args <- c(
-      list(
-        object,
-        newdata = newdata,
-        ndraws = ndraws,
-        draw_ids = draw_ids,
-        resp = resp
-      ),
+      list(object, newdata = newdata, draw_ids = draw_ids, resp = resp),
       dots[for_pred]
     )
-    pred_args <- diagnostic_surface_args(
+    yrep <- do_call(method, diagnostic_surface_args(
       pred_args, in_sample, weighted = psis_weighted
-    )
-    yrep <- do_call(method, pred_args)
+    ))
   }
 
-  # Closure-unit families: y and yrep collapse to the per-unit grain
-  # through the shared aggregator. For resid_* types yrep is already
-  # per unit (residuals.mvgam aggregates internally). Only y changes
-  # length then. `group` and `x` are checked to be constant within each
-  # unit. They map to the first visit of each unit, one value per
-  # closure unit for bayesplot.
+  # A detection family compares unit sums. Residuals arrive per unit
+  # already. `group` and `x` take each unit's first visit.
   closure_unit_lookup <- NULL
-  # The multivariate closure-unit families (mvn, mvt) hold one
-  # observation per (site, species) row. Their checks run at the row
-  # grain bayesplot expects. The per-unit aggregation in
-  # `closure_unit_pp_check_setup()` serves nmix and occ, whose visits
-  # within a site collapse to a sufficient statistic before scoring.
-  if (is_closure_unit_family(object$family)) {
+  if (closure_unit) {
     cu <- closure_unit_pp_check_setup(
-      object  = object,
-      newdata = newdata,
-      yrep    = yrep,
-      type    = type
+      object = object, newdata = newdata, yrep = yrep, type = type
     )
     y <- cu$y
     yrep <- cu$yrep
     closure_unit_lookup <- cu$first_visits
-    if (!is.null(group)) {
-      check_closure_unit_var_unit_constant(
-        newdata[[group]], cu$arrays, var_name = group
-      )
-    }
-    if (!is.null(x)) {
-      check_closure_unit_var_unit_constant(
-        newdata[[x]], cu$arrays, var_name = x
-      )
+    for (v in c(group, x)) {
+      refuse_unit_varying(newdata[[v]], cu$arrays, v, PP_CHECK_UNIT_REASON)
     }
   }
 
-  # Missing responses are dropped once, at the grain every object now
-  # shares. A closure-unit family has one value per unit. A unit keeps
-  # its place when one of its visits was never made. Dropping visits
-  # before the aggregation left the matrix one width and the frame
-  # another. For every other family the grain is the row.
-  # `build_resid_lag_panel()` handles missing responses itself. It
-  # keeps them in place for the ACF and drops them for the pACF.
-  # A missing response is usually a gap in the sampling design, such as
-  # one response of several recorded on fewer occasions. The omission
-  # is reported once per session.
-  if (anyNA(y) && !type %in% c("resid_acf", "resid_pacf")) {
+  # Missing responses are dropped at the grain `y` now has: the unit for
+  # a detection family, the row otherwise.
+  take <- NULL
+  if (anyNA(y)) {
     inform_once(
       "Observations with a missing response are omitted from the plot.",
       id = "mvgam_pp_check_missing_response"
@@ -653,150 +471,149 @@ pp_check.mvgam <- function(
     take <- !is.na(y)
     y <- y[take]
     yrep <- yrep[, take, drop = FALSE]
+  }
+  # A covariate column at the grain of `y`
+  column_at_grain <- function(v) {
+    out <- newdata[[v]]
+    if (!is.null(closure_unit_lookup)) out <- out[closure_unit_lookup]
+    if (!is.null(take)) out <- out[take]
+    out
+  }
+
+  ppc_args <- if (prefix == "ppc") {
+    list(y = y, yrep = yrep)
   } else {
-    take <- NULL
-  }
-
-  # Diagnostic resid types build their plot directly from the
-  # residual draws (and, for resid_vs_fitted, posterior_epred
-  # values at the same draw_ids). They never route through
-  # bayesplot's ppc_* dispatcher.
-  if (type %in% resid_diagnostic) {
-    # yrep currently holds -1 * residuals (bayesplot error
-    # convention); restore the natural-sign DS residual draws.
-    resid_draws <- -1 * yrep
-    if (type %in% c("resid_acf", "resid_pacf")) {
-      return(label_resid_series(build_resid_lag_panel(
-        resid_draws, lag_type = sub("resid_", "", type)
-      ), series_sel))
-    }
-    if (type == "resid_qq") {
-      return(label_resid_series(
-        build_resid_qq_panel(resid_draws), series_sel
-      ))
-    }
-    if (type == "resid_vs_fitted") {
-      # The fitted values take their surface from the same helper as
-      # the residuals. Both axes of the panel then describe one
-      # surface of the fit.
-      fitted_draws <- do.call(posterior_epred, diagnostic_surface_args(
-        list(
-          object, newdata = newdata,
-          ndraws = NULL, draw_ids = draw_ids,
-          resp = resp
-        ),
-        in_sample
-      ))
-      if (!is.null(series_sel)) {
-        fitted_draws <- fitted_draws[, series_sel$rows, drop = FALSE]
-      }
-      if (!is.null(take)) {
-        fitted_draws <- fitted_draws[, take, drop = FALSE]
-      }
-      # `per_obs` (default TRUE) collapses each observation to
-      # its posterior median for both fitted and residual,
-      # matching the one-dot-per-observation `plot.lm` style.
-      # Pass `per_obs = FALSE` to retain the pooled draw x obs
-      # scatter that exposes posterior uncertainty.
-      per_obs <- isTRUE(per_obs)
-      return(label_resid_series(build_resid_vs_fitted_panel(
-        resid_draws, fitted_draws, per_obs = per_obs
-      ), series_sel))
-    }
-  }
-
-  # Prepare plotting arguments
-  ppc_args <- list()
-  if (prefix == "ppc") {
-    ppc_args$y <- y
-    ppc_args$yrep <- yrep
-  } else if (prefix == "ppd") {
-    ppc_args$ypred <- yrep
+    list(ypred = yrep)
   }
   if (!is.null(group)) {
-    if (!exists(group, newdata)) {
-      stop(insight::format_error(
-        paste0("Variable '", group, "' is absent from 'newdata'.")
-      ))
-    }
-    ppc_args$group <- newdata[[group]]
-
-    # Closure-unit: one value per unit, from its first visit.
-    # `closure_unit_lookup` indexes the whole frame. It applies before
-    # any narrowing. `take` is at the grain the lookup produces.
-    if (!is.null(closure_unit_lookup)) {
-      ppc_args$group <- ppc_args$group[closure_unit_lookup]
-    }
-    if (!is.null(take)) {
-      ppc_args$group <- ppc_args$group[take]
-    }
+    ppc_args$group <- column_at_grain(group)
   }
-
-  is_like_factor <- function(x) {
-    is.factor(x) || is.character(x) || is.logical(x)
-  }
-
   if (!is.null(x)) {
-    ppc_args$x <- newdata[[x]]
-    if (!is_like_factor(ppc_args$x)) {
+    ppc_args$x <- column_at_grain(x)
+    if (!is.factor(ppc_args$x) && !is.character(ppc_args$x) &&
+          !is.logical(ppc_args$x)) {
       ppc_args$x <- as.numeric(ppc_args$x)
     }
-
-    if (!is.null(closure_unit_lookup)) {
-      ppc_args$x <- ppc_args$x[closure_unit_lookup]
-    }
-    if (!is.null(take)) {
-      ppc_args$x <- ppc_args$x[take]
-    }
+  }
+  if (psis_weighted) {
+    ll <- clean_ll(log_lik(object, newdata = newdata, incl_autocor = TRUE,
+                           resp = resp, draw_ids = draw_ids))
+    # `loo::psis()` warns on unusable weights. The LOO-PIT panel shows no
+    # other sign of them.
+    psis_obj <- loo::psis(
+      -ll, r_eff = mvgam_r_eff_log_lik(object, ll, draw_ids = draw_ids)
+    )
+    if ("psis_object" %in% ppc_formals) ppc_args$psis_object <- psis_obj
+    if ("lw" %in% ppc_formals) ppc_args$lw <- stats::weights(psis_obj)
   }
 
-  needs_psis <- any(c("psis_object", "lw") %in%
-                    setdiff(ppc_formals, names(ppc_args)))
-  if (needs_psis) {
-    ll <- log_lik(object, newdata = newdata, incl_autocor = TRUE,
-                  resp = resp, draw_ids = draw_ids)
-    # Importance sampling refuses a column with no density in it, so
-    # the unscorable rows a missing response leaves go first. The
-    # observed values and replicates were narrowed to the same rows
-    # above, where the NA responses were dropped from `y`.
-    ll <- clean_ll(ll)
-    r_eff <- mvgam_r_eff_log_lik(object, ll, draw_ids = draw_ids)
-    # The panel below is drawn from these weights. `loo()` on the same
-    # fit reports the Pareto diagnostic to the user. Muted here, the
-    # LOO-PIT plot gave no sign that its weights were unusable. The
-    # cached AR test fit has k above the threshold in 100 of its 160
-    # scored columns.
-    psis_obj <- loo::psis(-ll, r_eff = r_eff)
-    if ("psis_object" %in% ppc_formals) {
-      ppc_args$psis_object <- psis_obj
-    }
-    if ("lw" %in% ppc_formals) {
-      ppc_args$lw <- stats::weights(psis_obj)
-    }
-  }
-
-  ppc_args <- c(ppc_args, dots[!for_pred])
-
-  # Generate plot
-  out_plot <- do_call(ppc_fun, ppc_args)
-
+  out_plot <- do_call(ppc_fun, c(ppc_args, dots[!for_pred]))
   if ("x" %in% ppc_formals && !is.null(x)) {
-    out_plot <- out_plot +
-      ggplot2::labs(x = x)
+    out_plot <- out_plot + ggplot2::labs(x = x)
   }
-
-  # Improve labels for residual plots
   if (type %in% c("resid_hist", "resid_hist_grouped")) {
-    out_plot <- out_plot +
-      ggplot2::labs(x = "DS residuals")
+    out_plot <- out_plot + ggplot2::labs(x = "DS residuals")
   }
-
   if (type %in% c("resid_ribbon", "resid_ribbon_grouped")) {
     out_plot <- out_plot +
       ggplot2::theme(legend.position = "none") +
       ggplot2::labs(y = "DS residuals")
   }
   label_resid_series(out_plot, series_sel)
+}
+
+
+#' Refuse a series selection for a closure-unit fit
+#'
+#' @param object Fitted `mvgam` object
+#' @param series Series name or index, or `NULL`
+#' @return `NULL`, invisibly
+#' @noRd
+refuse_closure_unit_series <- function(object, series) {
+  if (!is.null(series) && is_closure_unit_family(object$family)) {
+    stop(insight::format_error(c(
+      "'series' is not supported for closure-unit residuals.",
+      x = "A closure-unit family has one residual per closure unit."
+    )), call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+
+#' The diagnostic residual panels of one series
+#'
+#' `pp_check()` draws one of these panels. `plot(type = "residuals")`
+#' draws all four. The randomised quantile residuals are drawn once.
+#' Every panel of the grid then shows the same residual draws.
+#'
+#' @param object Fitted `mvgam` object
+#' @param types Character vector of panel types: `"resid_vs_fitted"`,
+#'   `"resid_qq"`, `"resid_acf"` or `"resid_pacf"`
+#' @param draw_ids Integer draw indices, or `NULL` for every draw
+#' @param resp Character response name, or `NULL`
+#' @param series Series name or index, or `NULL`
+#' @param per_obs Logical flag passed to `build_resid_vs_fitted_panel()`
+#' @return List of `ggplot` objects named by type
+#' @noRd
+resid_diagnostic_panels <- function(object, types, draw_ids = NULL,
+                                    resp = NULL, series = NULL,
+                                    per_obs = TRUE) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_subset(
+    types, c("resid_vs_fitted", "resid_qq", "resid_acf", "resid_pacf"),
+    empty.ok = FALSE
+  )
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  checkmate::assert_flag(per_obs)
+  refuse_closure_unit_series(object, series)
+  data <- object$data
+  resid <- residuals(object, summary = FALSE, draw_ids = draw_ids,
+                     resp = resp)
+  # A closure-unit residual describes a unit. Its columns follow the
+  # units and none is missing.
+  series_sel <- NULL
+  observed <- rep(TRUE, ncol(resid))
+  if (!is_closure_unit_family(object$family)) {
+    # An autocorrelation describes one series in time order
+    series_sel <- resid_series_rows(object, data, series)
+    resid <- resid[, series_sel$rows, drop = FALSE]
+    observed <- !is.na(data[[response_column(object, resp)]][series_sel$rows])
+  }
+  # The lag panels keep a missing response in place. Its lags count
+  # time steps.
+  if (!all(observed) &&
+        any(types %in% c("resid_vs_fitted", "resid_qq"))) {
+    inform_once(
+      "Observations with a missing response are omitted from the plot.",
+      id = "mvgam_pp_check_missing_response"
+    )
+  }
+  panels <- lapply(stats::setNames(nm = types), function(type) {
+    switch(
+      type,
+      resid_acf = ,
+      resid_pacf = build_resid_lag_panel(
+        resid, lag_type = sub("resid_", "", type)
+      ),
+      resid_qq = build_resid_qq_panel(resid[, observed, drop = FALSE]),
+      resid_vs_fitted = {
+        # Both axes take the surface `residuals()` conditions on
+        fitted_draws <- do.call(posterior_epred, diagnostic_surface_args(
+          list(object, newdata = data, draw_ids = draw_ids, resp = resp),
+          in_sample = TRUE
+        ))
+        if (!is.null(series_sel)) {
+          fitted_draws <- fitted_draws[, series_sel$rows, drop = FALSE]
+        }
+        build_resid_vs_fitted_panel(
+          resid[, observed, drop = FALSE],
+          fitted_draws[, observed, drop = FALSE],
+          per_obs = per_obs
+        )
+      }
+    )
+  })
+  lapply(panels, label_resid_series, series_sel = series_sel)
 }
 
 
@@ -877,15 +694,9 @@ label_resid_series <- function(p, series_sel) {
 #' A posterior predictive check on a multi-response family draws one
 #' panel per category. A composition's categories (`diri()`, `multi()`,
 #' `categ()`) and a multivariate normal's responses (`mvn()`, `mvt()`)
-#' are its species. The species axis names them for all five families.
-#' Numbering each unit's rows 1..K took a position for an identity. A
-#' site missing one species shifted every later species onto another's
-#' label.
-#'
-#' The labels come from the species axis. `as.factor()` on the frame's
-#' column ordered the groups alphabetically over the values that frame
-#' held. A fit declaring its species in another order, or a frame
-#' missing one, then labelled the panels against the wrong species.
+#' are its species. The species axis of the fit names each row's
+#' species and orders the levels. A site missing one species keeps the
+#' labels of the others.
 #'
 #' @param object Fitted `mvgam` object
 #' @param newdata Data frame of the prediction rows
@@ -904,6 +715,9 @@ pp_check_mv_category <- function(object, newdata) {
   droplevels(series)
 }
 
+
+# Why `pp_check()` refuses a `group` or `x` that varies within a unit
+PP_CHECK_UNIT_REASON <- "A closure-unit check plots one value per unit."
 
 #' Observations and replicates of a closure-unit fit at the unit grain
 #'
@@ -930,14 +744,9 @@ closure_unit_pp_check_setup <- function(object, newdata, yrep,
   )
   checkmate::assert_matrix(yrep)
   checkmate::assert_string(type)
-  # Multi-season families return `c("series", "site", "time")` here;
-  # single-season families return NULL and fall back to the 2-axis
-  # default inside `build_closure_unit_arrays()`.
   arrays <- closure_unit_arrays_for(object, newdata)
   if (grepl("resid", type)) {
-    # `yrep` is already `[ndraws x N_unit]` (per-unit residuals).
-    # These plots take the observed side as zero. Only its length is
-    # set here.
+    # `yrep` holds per-unit residuals. The observed side is zero.
     y_unit <- rep(0, arrays$N_unit)
     yrep_unit <- yrep
   } else {
@@ -951,38 +760,6 @@ closure_unit_pp_check_setup <- function(object, newdata, yrep,
     y = y_unit, yrep = yrep_unit, arrays = arrays,
     first_visits = closure_unit_first_rows(arrays)
   )
-}
-
-
-#' Refuse a covariate that varies within a closure unit
-#'
-#' Guards the `group` and `x` arguments of `pp_check()` before they
-#' map to the unit grain.
-#'
-#' @param values Vector of covariate values, one per visit row
-#' @param arrays Closure-unit arrays holding `N_unit`, `n_rep` and
-#'   `visit_row`
-#' @param var_name Character name of the covariate, for the message
-#' @return `NULL`, invisibly, or an error
-#' @noRd
-check_closure_unit_var_unit_constant <- function(values, arrays,
-                                                   var_name) {
-  checkmate::assert_atomic_vector(values)
-  checkmate::assert_list(arrays)
-  checkmate::assert_string(var_name)
-  for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    if (length(unique(values[idx])) > 1L) {
-      stop(insight::format_error(c(
-        paste0(
-          "Covariate '", var_name,
-          "' is not constant within every closure unit."
-        ),
-        i = "Closure-unit checks plot one value per unit."
-      )))
-    }
-  }
-  invisible(NULL)
 }
 
 
@@ -1170,43 +947,35 @@ build_resid_vs_fitted_panel <- function(
 #' posterior probability of `T_rep >= T_obs`.
 #'
 #' @param object Fitted `mvgam` object with a closure-unit family
-#' @param newdata Data frame of new data, or `NULL` for the training
-#'   data
+#' @param newdata Data frame of the checked rows
 #' @param stat Character statistic, `"chi_squared"` or
 #'   `"freeman_tukey"`
-#' @param group Character name of a unit-constant grouping column, or
-#'   `NULL`
-#' @param ndraws Integer number of draws, or `NULL`
-#' @param draw_ids Integer vector of draw indices, or `NULL`
-#' @return A `ggplot` object
+#' @param group Name of a unit-constant grouping column, or `NULL`
+#' @param draw_ids Integer vector of draw indices, or `NULL` for all
+#' @param in_sample Logical flag for a check of the training data
+#' @return A `mvgam_ppc_fit_stat` list holding the discrepancies
+#'   `T_obs` and `T_rep` of each draw and the p-value `bayes_p`
 #' @noRd
-closure_unit_fit_stat_ppc <- function(object, newdata, stat,
-                                        group, ndraws, draw_ids) {
+closure_unit_fit_stat_ppc <- function(object, newdata, stat, group,
+                                      draw_ids, in_sample) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_data_frame(newdata, null.ok = TRUE)
+  checkmate::assert_data_frame(newdata)
   checkmate::assert_string(stat)
   checkmate::assert_string(group, null.ok = TRUE)
-  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  checkmate::assert_flag(in_sample)
   stat <- match.arg(stat, c("chi_squared", "freeman_tukey"))
-  newdata <- prediction_frame(object, newdata)
 
-  # Per-visit yrep + epred. Both arrive as [ndraws x N_visit] so they
-  # share the closure-unit aggregator below.
-  yrep_visit <- posterior_predict(
-    object, newdata = newdata,
-    ndraws = ndraws, draw_ids = draw_ids
+  # Each replicate is paired with the expectation of its own draw, on
+  # the surface the other checks use.
+  args <- diagnostic_surface_args(
+    list(object, newdata = newdata, draw_ids = draw_ids), in_sample
   )
-  epred_visit <- posterior_epred(
-    object, newdata = newdata,
-    ndraws = ndraws, draw_ids = draw_ids
-  )
+  yrep_visit <- do.call(posterior_predict, args)
+  epred_visit <- do.call(posterior_epred, args)
 
-  # aggregate_closure_unit_visits() is the single shared per-visit
-  # to per-unit summer used by every closure-unit post-fit surface
-  # (pp_check bars / dens_overlay / etc., log_lik, residuals). Calling
-  # it twice keeps the indexing and array bookkeeping in one place;
-  # the y_unit field on the second call is discarded.
+  # The second call sums the expectations to the unit grain. Its
+  # `y_unit` repeats the first call's.
   agg_y <- aggregate_closure_unit_visits(
     object, newdata = newdata, yrep_visit = yrep_visit
   )
@@ -1218,36 +987,17 @@ closure_unit_fit_stat_ppc <- function(object, newdata, stat,
   epred_unit <- agg_e$yrep_unit
   arrays     <- agg_y$arrays
 
-  # Optional further aggregation by user-supplied group columns.
-  # Group columns must be unit-constant; the existing guard surfaces
-  # a typed error if not.
   if (!is.null(group)) {
-    checkmate::assert_character(group, min.len = 1L, any.missing = FALSE)
-    bad <- setdiff(group, names(newdata))
-    if (length(bad) > 0L) {
-      stop(insight::format_error(c(
-        "Group column(s) not found in newdata.",
-        x = paste0(paste(bad, collapse = ", "), " missing.")
-      )))
-    }
-    first_visits <- closure_unit_first_rows(arrays)
-    for (g in group) {
-      check_closure_unit_var_unit_constant(
-        as.character(newdata[[g]]), arrays, g
-      )
-    }
-    group_keys <- do.call(paste, c(
-      lapply(group, function(g) {
-        as.character(newdata[[g]][first_visits])
-      }),
-      sep = "|"
-    ))
-    grp_levels <- unique(group_keys)
-    unit_to_grp <- match(group_keys, grp_levels)
+    refuse_unit_varying(newdata[[group]], arrays, group,
+                        PP_CHECK_UNIT_REASON)
+    group_keys <- as.character(
+      newdata[[group]][closure_unit_first_rows(arrays)]
+    )
+    unit_to_grp <- match(group_keys, unique(group_keys))
     y_unit     <- as.numeric(tapply(y_unit, unit_to_grp, sum))
     yrep_unit  <- t(rowsum(t(yrep_unit),  group = unit_to_grp))
     epred_unit <- t(rowsum(t(epred_unit), group = unit_to_grp))
-    grain <- paste(group, collapse = " x ")
+    grain <- group
   } else {
     grain <- "closure unit"
   }
@@ -1364,31 +1114,24 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
 #'
 #' @param object Fitted `mvgam` object
 #' @param series Series name or index, or `NULL`
-#' @param newdata Data frame of new data, or `NULL`
 #' @param ndraws Integer number of draws
 #' @param resp Character response name, or `NULL`
 #' @param ... Refused if supplied
 #' @return A `patchwork` object
 #' @noRd
 mvgam_resid_panel <- function(
-  object, series = NULL, newdata = NULL, ndraws = 100L, resp = NULL, ...
+  object, series = NULL, ndraws = 100L, resp = NULL, ...
 ) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_int(ndraws, lower = 1L)
   checkmate::assert_string(resp, null.ok = TRUE)
-  # The panels are built from this function's own arguments. `...` is
-  # refused. `plot.mvgam(type = "residuals")` calls this function. An
-  # argument accepted here would have no effect.
+  # `plot.mvgam(type = "residuals")` calls this function. The panels
+  # take its named arguments alone.
   rlang::check_dots_empty()
-  # The shared fan-out builds one grid per response, stacked into one
-  # figure. Without it each inner `pp_check()` call would return a
-  # figure per response. `patchwork::wrap_plots()` refuses nested
-  # lists.
+  # One grid per response, stacked into one figure.
   fan <- mv_resp_fan_out(object, resp, combine = stack_response_plots)
   if (!is.null(fan)) return(fan)
-  # Every panel uses the same posterior draws. Drawn separately, the
-  # Q-Q panel and the ACF described different subsets of the posterior.
+  # Every panel takes the same posterior draws.
   draw_ids <- resolve_draw_ids(object, ndraws, NULL)
   closure_unit <- is_closure_unit_family(object$family)
   types <- if (closure_unit) {
@@ -1396,15 +1139,11 @@ mvgam_resid_panel <- function(
   } else {
     c("resid_vs_fitted", "resid_qq", "resid_acf", "resid_pacf")
   }
-  # The panels run the same residual extraction over the same rows.
-  # A condition it raises about the data applies to the whole grid,
-  # and it is raised once.
-  panels <- warn_once_per_call(lapply(types, function(type) {
-    pp_check(
-      object, type = type, newdata = newdata, draw_ids = draw_ids,
-      resp = resp, series = series
-    ) + ggplot2::labs(subtitle = NULL)
-  }))
+  panels <- lapply(
+    resid_diagnostic_panels(object, types, draw_ids = draw_ids,
+                            resp = resp, series = series),
+    function(p) p + ggplot2::labs(subtitle = NULL)
+  )
   out <- patchwork::wrap_plots(panels, ncol = min(2L, length(panels)))
   label <- if (closure_unit) {
     NULL

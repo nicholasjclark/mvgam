@@ -188,7 +188,7 @@ fitted.mvgam <- function(object,
         "'unit_level = TRUE' ignored for this family.",
         i = "Per-unit aggregation applies to detection families (occ() / nmix())."
       ))
-    } else if (is.list(draws) && !is.matrix(draws)) {
+    } else if (is_per_response(draws)) {
       stop(insight::format_error(c(
         "'unit_level = TRUE' is not supported on multi-response fits.",
         i = "Pass `resp = '<name>'` to scope to one response first."
@@ -200,19 +200,5 @@ fitted.mvgam <- function(object,
   }
 
   summarise_or_pass(draws, summary = summary, probs = probs,
-                     robust = robust)
-}
-
-# Shared summary/pass-through used by both the response and the
-# component-delegated paths. Mirrors the original behaviour at the
-# tail of fitted.mvgam (named-list of matrices on mv fits, single
-# matrix otherwise).
-#'@noRd
-summarise_or_pass <- function(draws, summary, probs, robust) {
-  if (!summary) return(draws)
-  if (is.list(draws) && !is.matrix(draws)) {
-    return(lapply(draws, summarize_predictions, probs = probs,
-                  robust = robust))
-  }
-  summarize_predictions(draws, probs = probs, robust = robust)
+                    robust = robust)
 }

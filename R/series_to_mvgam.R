@@ -12,7 +12,7 @@
 #'       a regular `tsibble` become rows with a missing response, as
 #'       `tsibble::fill_gaps(.full = TRUE)` builds them. Measured
 #'       variables other than the response are carried over as
-#'       covariates, and are missing on those rows. An irregular
+#'       covariates, with missing values on those rows. An irregular
 #'       `tsibble` keeps its own times, for use with `CAR()` or
 #'       `ZMVN()`.
 #'     \item A `ts`, `mts` or `msts` object (`forecast::msts()`). Each
@@ -41,8 +41,8 @@
 #' @details `time` counts steps from 1 at the first index value. The
 #'   position within a seasonal period counts steps from the calendar
 #'   origin of the index. A monthly index with `freq = 12` gives the
-#'   month number, and a `ts` gives `cycle()`, whatever month the data
-#'   start in. A single period produces a column named `season`. Several
+#'   month number whatever month the data start in. A `ts` gives
+#'   `cycle()`. A single period produces a column named `season`. Several
 #'   periods produce `season_<period>` columns, such as `season_7` and
 #'   `season_365.25`.
 #'
@@ -52,16 +52,17 @@
 #'   future rows together keeps the two aligned.
 #'
 #'   Seasonal periods take the same numbers across packages. Monthly
-#'   data carry `frequency = 12` in a `ts`, and a fable
+#'   data carry `frequency = 12` in a `ts`. A fable
 #'   `season(period = "year")` on a monthly `tsibble` resolves to 12
 #'   steps. Both take `freq = 12`. Daily data with
 #'   `seasonal.periods = c(7, 365.25)` in an `msts` take
 #'   `freq = c(7, 365.25)`.
 #'
-#' @return A long `data.frame` with columns `series` (a factor), `time`
-#'   (an integer for regular data), the response, the original index
-#'   (`index` for a `ts`), any `tsibble` key and covariate columns, and
-#'   one season column per period above 1. Rows are ordered by time,
+#' @return A long `data.frame`. Its columns are `series` (a factor),
+#'   `time` (an integer for regular data), the response and the original
+#'   index (`index` for a `ts`). Any `tsibble` key and covariate columns
+#'   follow, then one season column per period above 1. Rows are ordered
+#'   by time,
 #'   then series. With `h` or `train_prop`, a list holding `data_train`
 #'   and `data_test` instead.
 #'
@@ -81,6 +82,14 @@
 #'   site_b = rpois(28, 8)
 #' )
 #' head(series_to_mvgam(wide))
+#'
+#' # Next: fit the training data, for example with
+#' # mvgam(y ~ s(season, bs = "cc"), trend_formula = ~ AR(),
+#' #       data = air$data_train)
+#'
+#' @seealso The
+#'   `r mvgam_article("data", "data article")` covers the long format
+#'   and its conversion in more depth.
 #'
 #' @author Nicholas J Clark
 #' @family model fitting
@@ -104,7 +113,7 @@ series_to_mvgam <- function(series,
   if (!is.null(h) && !is.null(train_prop)) {
     stop(insight::format_error(
       "Supply only one of 'h' and 'train_prop'."
-    ))
+    ), call. = FALSE)
   }
 
   out <- if (inherits(series, "tbl_ts")) {
@@ -120,7 +129,7 @@ series_to_mvgam <- function(series,
         "Got class ", paste(class(series), collapse = "/"), "."
       ),
       i = "Supply a 'tsibble', a 'ts', 'mts' or 'msts', or a data.frame."
-    )))
+    )), call. = FALSE)
   }
   rownames(out) <- NULL
   split_by_time(out, h = h, train_prop = train_prop)
@@ -143,7 +152,7 @@ ts_to_long <- function(series, freq) {
         "Duplicated: ",
         paste(unique(labels[duplicated(labels)]), collapse = ", "), "."
       )
-    )))
+    )), call. = FALSE)
   }
   freq <- freq %||% attr(series, "msts") %||% stats::frequency(series)
   ts_time <- as.numeric(stats::time(series))
@@ -184,7 +193,7 @@ wide_to_long <- function(series, index, freq) {
           "Found ", sum(is_date), " columns of class ",
           paste(date_classes, collapse = ", "), "."
         )
-      )))
+      )), call. = FALSE)
     }
     index <- names(series)[is_date]
   }
@@ -193,7 +202,7 @@ wide_to_long <- function(series, index, freq) {
   if (!length(labels)) {
     stop(insight::format_error(
       "The data.frame holds only its date column."
-    ))
+    ), call. = FALSE)
   }
   is_num <- vapply(series[labels], is.numeric, logical(1L))
   if (!all(is_num)) {
@@ -204,12 +213,12 @@ wide_to_long <- function(series, index, freq) {
         paste0("'", labels[!is_num], "'", collapse = ", "), "."
       ),
       i = "Drop those columns, or convert covariates through a 'tsibble'."
-    )))
+    )), call. = FALSE)
   }
   if (anyDuplicated(series[[index]])) {
     stop(insight::format_error(
       paste0("Date column '", index, "' holds repeated values.")
-    ))
+    ), call. = FALSE)
   }
 
   long <- data.frame(
@@ -243,23 +252,14 @@ tsibble_to_long <- function(series, response, freq) {
           "Measured variables: ",
           paste0("'", measured, "'", collapse = ", "), "."
         )
-      )))
+      )), call. = FALSE)
     }
     response <- measured
   }
   checkmate::assert_choice(response, measured, .var.name = "response")
-  reserved <- intersect(
-    c("series", "time"), setdiff(names(series), key_vars)
+  refuse_reserved_columns(
+    intersect(c("series", "time"), setdiff(names(series), key_vars))
   )
-  if (length(reserved)) {
-    stop(insight::format_error(c(
-      "The tsibble holds columns the output reserves.",
-      x = paste0(
-        "Reserved: ", paste0("'", reserved, "'", collapse = ", "), "."
-      ),
-      i = "Rename them before converting."
-    )))
-  }
 
   regular <- tsibble::is_regular(series)
   observed <- unique(series[[index_var]])
@@ -272,7 +272,7 @@ tsibble_to_long <- function(series, response, freq) {
   if (regular) {
     # A calendar period stored in a Date column, such as the first of
     # each month, has uneven day counts. tsibble then takes one day as
-    # the interval, and filling gaps adds a row for every day.
+    # the interval. Filling gaps would add a row for every day.
     min_gap <- min(diff(sort(as.numeric(observed))), Inf)
     if (min_gap > step) {
       stop(insight::format_error(c(
@@ -288,7 +288,7 @@ tsibble_to_long <- function(series, response, freq) {
           "Convert monthly, quarterly or weekly dates with ",
           "tsibble::yearmonth(), yearquarter() or yearweek()."
         )
-      )))
+      )), call. = FALSE)
     }
   }
   index_num <- as.numeric(series[[index_var]])
@@ -324,7 +324,7 @@ tsibble_to_long <- function(series, response, freq) {
     stop(insight::format_error(c(
       "Argument 'freq' needs a regular tsibble.",
       i = "Seasonal positions count steps on a regular grid."
-    )))
+    )), call. = FALSE)
   }
   for (covariate in setdiff(measured, response)) {
     out[[covariate]] <- frame[[covariate]]
@@ -347,7 +347,17 @@ season_columns <- function(steps, periods, taken) {
   } else {
     paste0("season_", as.character(periods))
   }
-  clash <- intersect(labels, taken)
+  refuse_reserved_columns(intersect(labels, taken))
+  out <- lapply(periods, function(p) as.integer(floor(steps %% p) + 1))
+  names(out) <- labels
+  as.data.frame(out)
+}
+
+# Refuse input columns that clash with columns the output creates.
+#
+# @noRd
+refuse_reserved_columns <- function(clash) {
+  checkmate::assert_character(clash)
   if (length(clash)) {
     stop(insight::format_error(c(
       "The data hold columns the output reserves.",
@@ -355,11 +365,9 @@ season_columns <- function(steps, periods, taken) {
         "Reserved: ", paste0("'", clash, "'", collapse = ", "), "."
       ),
       i = "Rename them before converting."
-    )))
+    )), call. = FALSE)
   }
-  out <- lapply(periods, function(p) as.integer(floor(steps %% p) + 1))
-  names(out) <- labels
-  as.data.frame(out)
+  invisible(NULL)
 }
 
 # Split a long frame at a time cut. Without 'h' or 'train_prop' the
@@ -380,10 +388,10 @@ split_by_time <- function(data, h, train_prop) {
     stop(insight::format_error(c(
       "The split leaves the training or the test data empty.",
       x = paste0(
-        "The data hold ", length(times), " time points, and the split ",
-        "keeps ", n_train, " for training."
+        "The split keeps ", n_train, " of ", length(times),
+        " time points for training."
       )
-    )))
+    )), call. = FALSE)
   }
   cut <- times[n_train]
   list(

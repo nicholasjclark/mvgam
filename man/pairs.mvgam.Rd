@@ -2,12 +2,12 @@
 % Please edit documentation in R/pairs.mvgam.R
 \name{pairs.mvgam}
 \alias{pairs.mvgam}
-\title{Create a matrix of output plots from a \code{mvgam} object}
+\title{Pairs plot of mvgam parameters}
 \usage{
 \method{pairs}{mvgam}(x, variable = NULL, regex = FALSE, ...)
 }
 \arguments{
-\item{x}{An object of class \code{mvgam} or \code{jsdgam}.}
+\item{x}{A fitted \code{mvgam} or \code{jsdgam} object}
 
 \item{variable}{Names of the variables (parameters) to plot, as given by a
 character vector or a regular expression (if \code{regex = TRUE}). By
@@ -16,24 +16,26 @@ default, a hopefully not too large selection of variables is plotted.}
 \item{regex}{Logical; Indicates whether \code{variable} should
 be treated as regular expressions. Defaults to \code{FALSE}.}
 
-\item{...}{Further arguments passed to
-\code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.}
+\item{...}{Further arguments to \code{\link[bayesplot:MCMC-scatterplots]{bayesplot::mcmc_pairs()}}, such as
+\code{off_diag_args}.}
 }
 \value{
-A \code{bayesplot_grid} object; see
-\code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.
+A \code{bayesplot_grid} object
 }
 \description{
-A \code{\link[graphics:pairs]{pairs}} method for MCMC output.
-With \code{variable} left at its default the panel holds the
-parameters a reader interprets: the intercept and the parametric
-coefficients, the family's parameters, the variance components,
-the smoothing penalties, and the trend's dynamics and loadings.
-The per-basis smooth coefficients (\verb{s_*} / \verb{zs_*}) and the
-per-level group-level deviations (\verb{r_*}) are left out, since a
-spline or hierarchical fit carries hundreds of them; name them in
-\code{variable} to draw them. \code{\link{mcmc_plot.mvgam}} takes the
-same default.
+Scatters the posterior draws of each pair of parameters, with each
+parameter's marginal posterior on the diagonal, as
+\code{\link[bayesplot:MCMC-scatterplots]{bayesplot::mcmc_pairs()}} draws them. Divergent transitions are
+marked. A ridge or a funnel between two parameters shows that the
+data separate them poorly.
+}
+\details{
+Without \code{variable}, the plot shows the parameters
+\code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} shows: the population coefficients, the family
+parameters, the variance components and the trend's dynamics and
+loadings. The per-basis smooth coefficients (\verb{s_*}) and the
+group-level deviations (\verb{r_*}) run to hundreds on a spline or
+hierarchical fit. They are drawn when \code{variable} names them.
 }
 \examples{
 \dontrun{
@@ -45,16 +47,18 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Default selection: intercept(s), smoothness penalties, trend
-# dynamics, family extras.
-pairs(mod)
+# The trend's autoregression against its innovation scale
+pairs(mod, variable = "trend_params")
 
-# Custom regex for a focused pairs panel.
-pairs(mod, variable = "^(sigma|ar1)_trend", regex = TRUE)
+# Next, mcmc_plot(mod, type = "rank_overlay") checks that the chains
+# mix
 }
 
 }
 \seealso{
+\code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} draws the other bayesplot MCMC plots.
+\link{mvgam_draws} lists the shortcuts \code{variable} accepts.
+
 Other posterior summaries: 
 \code{\link{VarCorr.mvgam}()},
 \code{\link{bibtex}()},

@@ -20,8 +20,8 @@
 #' @param n_series Integer number of series (dimensions).
 #' @param last_state Either `NULL` (default; the dispatcher
 #'   generates a 200-step burn-in from zero) or a list with
-#'   elements `trends` and `errors` as `extract_last_state()`
-#'   documents them. Forecast callers fill `trends` with posterior
+#'   elements `trends` and `errors` as `last_state_of_draw()`
+#'   returns them. Forecast callers fill `trends` with posterior
 #'   draws of the latent trend state, centred on the trend linear
 #'   predictor. The recursion advances a zero-mean process.
 #' @param time Required only for `CAR()` trends; length-`h`

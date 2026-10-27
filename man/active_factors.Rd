@@ -3,113 +3,101 @@
 \name{active_factors}
 \alias{active_factors}
 \alias{active_factors.mvgam}
-\title{Posterior summary of active latent factors under MGP shrinkage}
+\title{Posterior count of the latent factors a model uses}
 \usage{
 active_factors(object, ...)
 
 \method{active_factors}{mvgam}(
   object,
-  criterion = c("variance", "cumulative", "relative"),
+  criterion = c("relative", "cumulative"),
   threshold = NULL,
-  prob_threshold = 0.5,
+  prob = 0.5,
   ...
 )
 }
 \arguments{
-\item{object}{A fitted \code{mvgam} object whose trend includes
-latent factors (\code{n_lv > 0}).}
+\item{object}{A fitted \code{mvgam} object whose trend includes at
+least two latent factors (\code{n_lv >= 2}).}
 
 \item{...}{Unused. Anything passed here is refused.}
 
-\item{criterion}{The activity rule: \code{"variance"} (the default),
-\code{"cumulative"} or \code{"relative"}. Details describes each.}
+\item{criterion}{The activity rule: \code{"relative"} (the default) or
+\code{"cumulative"}. Details describes each.}
 
 \item{threshold}{Numeric in \verb{(0, 1]}, the cut-off of \code{criterion}.
-\code{NULL} (the default) takes \code{0.05} for \code{"variance"}, \code{0.95} for
-\code{"cumulative"} and \code{0.01} for \code{"relative"}.}
+\code{NULL} (the default) takes \code{0.1} for \code{"relative"} and \code{0.9} for
+\code{"cumulative"}.}
 
-\item{prob_threshold}{Numeric in \verb{(0, 1)}. A column is active when
-its posterior probability of activity is at least
-\code{1 - prob_threshold}. Defaults to \code{0.5}.}
+\item{prob}{Numeric in \verb{(0, 1)}. A dimension is reported active
+when its posterior probability of activity is at least \code{prob}.
+Defaults to \code{0.5}.}
 }
 \value{
 A list with class \code{mvgam_active_factors} containing:
 \itemize{
-\item \code{count}: per-draw active count summary
-(\code{median}, \code{q025}, \code{q975}).
-\item \code{per_factor}: data frame with one row per sampled
-column of \code{Z}. Its columns are the \code{factor} index, the
-posterior \code{prob_active}, the posterior \code{median_norm_sq} (the
-scaled squared norm \code{c_h}), the posterior \code{median_share} of
-the latent variance and \code{is_active}.
-\item \code{threshold}: list with \code{criterion}, \code{value} and
-\code{prob_threshold}.
-\item \code{n_lv}: the truncation ceiling specified at fit time.
+\item \code{count}: the posterior \code{median}, \code{q025} and \code{q975} of the
+per-draw count of active dimensions.
+\item \code{per_factor}: data frame with one row per dimension,
+largest first. Its columns are the \code{factor} rank, the
+posterior \code{prob_active}, the posterior \code{median_variance}
+\eqn{\lambda_k}, the posterior \code{median_share} of the total
+variance and \code{is_active}.
+\item \code{threshold}: list with \code{criterion}, \code{value} and \code{prob}.
+\item \code{n_lv}: the number of factors the model was fitted with.
 }
 }
 \description{
-For a fitted \code{mvgam} object with a multiplicative-gamma-process
-(MGP) loadings prior, returns the posterior distribution of the
-active factor count and per-factor activity probabilities. The
-MGP prior shrinks the columns of the loadings matrix \code{Z} toward
-zero as the column index grows. \code{n_lv} is then a truncation
-ceiling. This function reports how many columns the data use.
+A factor model fitted with \code{n_lv} factors may need fewer. This
+function counts the factors whose variance the data support. It
+suits a fit under the multiplicative gamma process (MGP) prior,
+\code{loadings_prior = "mgp"} (Bhattacharya and Dunson 2011). That prior
+shrinks surplus factors toward zero. \code{n_lv} then acts as a ceiling.
+The function applies to every factor model. Under other loadings
+priors a surplus factor keeps the variance its prior gives it. The
+count can then exceed the number of factors the data need.
 }
 \details{
-Each posterior draw \code{s} gives the per-column squared norms
-\deqn{c_h^{(s)} = \sigma_h^{2(s)} \|Z[, h]^{(s)}\|^2,} where \code{Z}
-is the loadings matrix the model sampled and \eqn{\sigma_h} that
-column's own latent scale. A column enters the trend as
-\code{sigma_trend[h] * Z[, h]}. Multiplicative gamma process shrinkage
-acts on the scale. A rule on the loadings alone would call every
-column active. \code{c_h} sums to the trace of the innovation covariance
-the factors give the series.
+The factors give the series the covariance \eqn{Z \Omega Z^\top},
+where \code{Z} holds the loadings and \eqn{\Omega} the covariance of the
+latent states. Its eigenvalues \eqn{\lambda_1 \ge \lambda_2 \ge
+\dots} are the variances along its principal dimensions. Each
+posterior draw gives one set. The eigenvalues stay the same when the
+factors are rotated or relabelled, which the individual columns of
+\code{Z} do not.
 
-Three rules decide whether column \code{h} is active in draw \code{s}. Each
-tests a different question:
+Two rules decide whether dimension \code{k} is active in a draw:
 \describe{
-\item{\code{"variance"}}{Does the column explain a share of at least
-\code{threshold} of the latent innovation variance,
-\eqn{c_h / \sum_k c_k}? The default \code{threshold} is \code{0.05}.}
-\item{\code{"cumulative"}}{Is the column among the fewest columns
-whose shares sum to at least \code{threshold}? The columns are ranked
-by \code{c_h} within each draw. The default \code{threshold} is \code{0.95}.
-The count is the number of factors the latent variance needs, as
-in a scree plot.}
-\item{\code{"relative"}}{Does the column hold at least \code{threshold}
-times the posterior mean norm of the leading column? The default
-\code{threshold} is \code{0.01}. The rule follows the cumulative shrinkage
-criterion of Legramanti, Durante and Dunson (2020).}
+\item{\code{"relative"}}{The dimension holds at least \code{threshold}
+times the variance of the leading one,
+\eqn{\lambda_k \ge} \code{threshold} \eqn{\lambda_1}. The default
+\code{threshold} is \code{0.1}. The rule counts any number of factors of
+similar size.}
+\item{\code{"cumulative"}}{The dimension is among the fewest leading
+dimensions whose variance reaches a share \code{threshold} of the
+total. The default \code{threshold} is \code{0.9}. The count is the
+number of factors a scree plot would keep.}
 }
-\code{prob_active} is the posterior probability that a column is active.
-A column with \code{prob_active >= 1 - prob_threshold} is reported
-active. The count is summarised over the per-draw counts.
+\code{prob_active} is the posterior probability that a dimension is
+active. A dimension with \code{prob_active >= prob} is reported active.
+The count is summarised over the per-draw counts.
 
-The MGP prior expects each column to be smaller than the one
-before. Under the default \code{mgp_a2 = 4} the prior median ratio of
-successive norms is about 0.28. A column the data say nothing about
-keeps that prior size. All three rules can then count it. A larger
-\code{mgp_a2} in the \code{loadings_prior} argument of \code{\link[=mvgam]{mvgam()}} or \code{\link[=jsdgam]{jsdgam()}}
-shrinks such columns harder. Comparing \code{median_norm_sq} across
-columns with the prior ratio shows whether a column holds more than
-its prior.
-
-The rules use the sampled \code{Z}. The MGP shrinkage parameter
-\code{Psi_diag} is defined on its columns. The QR-identified \code{Z_tilde}
-orders its columns by Gram-Schmidt pivots. An active count of k
-means k of the \code{n_lv} columns hold posterior signal. It does not
-identify which k under the MGP ordering.
+Both rules compare the factors with one another. The leading
+dimension is always active, which makes the count at least one. A
+model whose factors hold almost no variance still reports one.
+\code{\link[=shared_variation]{shared_variation()}} gives the size of that variance on the scale
+of the linear predictor.
 }
 \examples{
 \dontrun{
-# Counts of 20 species at 100 sites, driven by two latent factors
-simdat <- sim_jsdm(family = brms::negbinomial(), n_species = 20L,
-                   n_sites = 100L, n_lv = 2L, seed = 3L)
+# Counts of 20 species at 100 sites, driven by two latent factors.
+# Each species has its own intercept and response to `env`.
+simdat <- sim_jsdgam(family = brms::negbinomial(), n_species = 20L,
+                     n_sites = 100L, n_lv = 2L, seed = 3L)
 
-# Up to five factors under the multiplicative gamma process prior,
-# which shrinks each later column of the loadings toward zero
+# Up to five factors under the MGP prior, which shrinks the factors
+# the data do not need
 mod <- jsdgam(
-  y ~ env,
+  y ~ env * series,
   data           = simdat$data_train,
   family         = brms::negbinomial(),
   n_lv           = 5L,
@@ -118,13 +106,12 @@ mod <- jsdgam(
   silent         = 2
 )
 
-# Columns that explain at least 5 percent of the latent variance.
-# The third column's share is close to that cut
+# Dimensions holding at least a tenth of the leading one's variance
 af <- active_factors(mod)
 af
 plot(af)
 
-# The fewest columns that explain 95 percent of the latent variance
+# The fewest dimensions that explain 90 percent of the variance
 active_factors(mod, criterion = "cumulative")
 
 # Next: ordinate() plots the species on the leading factors
@@ -132,20 +119,15 @@ active_factors(mod, criterion = "cumulative")
 
 }
 \references{
-Legramanti, S., Durante, D. and Dunson, D. B. (2020). Bayesian
-cumulative shrinkage for infinite factorizations.
-\emph{Biometrika}, 107(3), 745-752.
-\doi{10.1093/biomet/asaa008}.
-
 Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
 infinite factor models. \emph{Biometrika}, 98(2), 291-306.
 \doi{10.1093/biomet/asr013}.
 }
 \seealso{
-\code{\link[=compare_loadings]{compare_loadings()}} compares the loadings under two
-priors. \code{\link[=shared_variation]{shared_variation()}} reports the variance the factors
-share. The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits an MGP
-prior and counts its active factors.
+\code{\link[=shared_variation]{shared_variation()}} reports the covariance the factors
+give the series. \code{\link[=compare_loadings]{compare_loadings()}} compares the loadings under
+two priors. The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits
+an MGP prior and counts its active factors.
 
 Other latent dynamics: 
 \code{\link{compare_loadings}()},

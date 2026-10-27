@@ -55,17 +55,6 @@ test_that("validate_supported_family() admits every supported family", {
   }
 })
 
-test_that(
-  "validate_supported_family() points naked brms families at the wrapper", {
-  expect_error(validate_supported_family(brms::dirichlet()), "diri\\(\\)")
-  expect_error(validate_supported_family(brms::multinomial()),
-               "multi\\(\\)")
-  expect_error(validate_supported_family(brms::categorical()),
-               "categ\\(\\)")
-  expect_error(validate_supported_family(brms::logistic_normal()),
-               "mvn\\(\\)")
-})
-
 # ------------------------------------------------------------
 # diri(): family registration, attribute tagging,
 # closure-unit grouping, and Stan emission round-trip
@@ -107,8 +96,6 @@ test_that("diri_stan_funs() emits the lpdf body with mu_unit[1] anchor", {
   # Two-signature dispatch: vector-phi primary (emits the
   # `phi_g = phi[idx[1]]` per-unit collapse) and scalar-phi
   # broadcast that forwards via `rep_vector(phi, N)`.
-  expect_match(sc, "vector phi,", fixed = TRUE)
-  expect_match(sc, "real phi,", fixed = TRUE)
   expect_match(sc, "real phi_g = phi[idx[1]];", fixed = TRUE)
   expect_match(
     sc, "diri_lpdf(y | mu, rep_vector(phi, N), N_unit",
@@ -146,7 +133,7 @@ make_multi_long_data <- function(n_sites = 6L, n_species = 4L,
 test_that("multi_stan_funs() emits the lpmf body with mu_unit[1] anchor", {
   sc <- mvgam:::multi_stan_funs()
   expect_match(sc, "real multi_lpmf(", fixed = TRUE)
-  expect_match(sc, "multinomial_logit_lpmf", fixed = TRUE)
+  expect_match(sc, "multinomial_logit_lpmf(y_unit | mu_unit)", fixed = TRUE)
   # multi() takes integer counts; the assembled y_unit must be int.
   expect_match(sc, "array[Kg] int y_unit", fixed = TRUE)
   expect_match(sc, "vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
@@ -182,9 +169,8 @@ make_categ_long_data <- function(n_sites = 8L, n_categories = 4L,
 test_that("categ_stan_funs() emits the lpmf body with mu_unit[1] anchor", {
   sc <- mvgam:::categ_stan_funs()
   expect_match(sc, "real categ_lpmf(", fixed = TRUE)
-  expect_match(sc, "categorical_logit_lpmf", fixed = TRUE)
-  # One-hot scan to recover the scalar cat_code from Y_unit.
-  expect_match(sc, "for (k in 1:Kg) {", fixed = TRUE)
+  expect_match(sc, "categorical_logit_lpmf(cat_code | mu_unit)",
+               fixed = TRUE)
   expect_match(sc, "vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
                fixed = TRUE)
 })
@@ -251,67 +237,46 @@ test_that("mvn_stan_funs() emits a per-unit normal_lpdf using Psi as the SD", {
   expect_false(grepl("mu[idx[1]]", sc, fixed = TRUE))
 })
 
-test_that("make_mvn_stanvars() declares the SD-scale Psi parameter and prior", {
+test_that("mvn() and mvt() declare their residual parameters and priors", {
   dat <- make_mvn_long_data()
   arrays <- mvgam:::build_closure_unit_arrays(
     dat, response_var = "y",
     compute_y_max = FALSE,
     unit_grouping_vars = "time"
   )
-  sv <- mvgam:::make_mvn_stanvars(arrays)
-  param_sc <- extract_block_scode(sv, "parameters")
-  model_sc <- extract_block_scode(sv, "model")
-  # `K` (max_rep on the closure-unit arrays) is baked in as a
-  # literal so the declaration does not depend on the trend
-  # pipeline's `N_series_trend` symbol being in scope.
-  expect_match(
-    param_sc,
-    "vector<lower=0>[4] Psi;",
-    fixed = TRUE
-  )
-  expect_match(model_sc, "Psi ~ exponential(1);", fixed = TRUE)
+  for (fam in list(mvn(), mvt())) {
+    sv <- mvgam:::make_multi_response_stanvars(arrays, fam)
+    param_sc <- extract_block_scode(sv, "parameters")
+    model_sc <- extract_block_scode(sv, "model")
+    # `K` (max_rep on the closure-unit arrays) is a literal. The trend's
+    # `N_series_trend` is out of scope where the family declares `Psi`.
+    expect_match(param_sc, "vector<lower=0>[4] Psi;", fixed = TRUE)
+    expect_match(model_sc, "Psi ~ exponential(1);", fixed = TRUE)
+  }
+  # The bound keeps the residual variance of mvt() finite
+  expect_match(param_sc, "real<lower=2> nu;", fixed = TRUE)
+  expect_match(model_sc, "nu ~ gamma(2, 0.1);", fixed = TRUE)
 })
 
-test_that("a user prior on Psi reaches the emitted statement", {
-  # `Psi` had no route from the `prior` argument to the stanvar. The
-  # statement was written as a literal while `prior_summary()` listed
-  # it, and a prior given with `class = "Psi"` was dropped in silence.
+test_that("a user prior on Psi or nu reaches the emitted statement", {
   dat <- make_mvn_long_data()
   arrays <- mvgam:::build_closure_unit_arrays(
     dat, response_var = "y",
     compute_y_max = FALSE,
     unit_grouping_vars = "time"
   )
-  user_sc <- extract_block_scode(
-    mvgam:::make_mvn_stanvars(
-      arrays, brms::prior("exponential(2)", class = "Psi")
-    ),
-    "model"
+  user <- brms::prior("exponential(2)", class = "Psi") +
+    brms::prior("gamma(3, 0.2)", class = "nu")
+  model_sc <- extract_block_scode(
+    mvgam:::make_multi_response_stanvars(arrays, mvt(), user), "model"
   )
-  expect_match(user_sc, "Psi ~ exponential(2);", fixed = TRUE)
-  # One route serves both families that declare the parameter.
-  mvt_sc <- extract_block_scode(
-    mvgam:::make_mvt_stanvars(
-      arrays, brms::prior("student_t(3, 0, 1)", class = "Psi")
-    ),
-    "model"
-  )
-  expect_match(mvt_sc, "Psi ~ student_t(3, 0, 1);", fixed = TRUE)
-  # The default comes from the shared table, the same source that
-  # builds the reported prior.
-  expect_identical(
-    mvgam:::get_default_trend_parameter_prior("Psi")$prior,
-    "exponential(1)"
-  )
+  expect_match(model_sc, "Psi ~ exponential(2);", fixed = TRUE)
+  expect_match(model_sc, "nu ~ gamma(3, 0.2);", fixed = TRUE)
 })
 
 # ------------------------------------------------------------
-# mvt(): family registration + Stan emission for the heavy-tailed
-# multivariate Student-t closure-unit family. Mirrors mvn(): the
-# trend pipeline adds `Z[k, :] * lv[i, :]` to mu and lv ~ N(0, I),
-# so the lpdf body is independent Student-t per row with scale
-# Psi[k] and shared df nu. The marginal residual covariance is
-# approximately Z Z' + diag(Psi^2 * nu / (nu - 2)).
+# mvt(): independent Student-t rows of scale Psi[k] and shared df nu,
+# given the factor term the trend adds to mu
 # ------------------------------------------------------------
 
 test_that("mvt_stan_funs() emits per-row student_t_lpdf with Psi and nu", {
@@ -326,34 +291,6 @@ test_that("mvt_stan_funs() emits per-row student_t_lpdf with Psi and nu", {
   )
   expect_match(
     sc, "student_t_lpdf(y_unit | nu, mu_unit, psi_unit)",
-    fixed = TRUE
-  )
-})
-
-test_that("make_mvt_stanvars() declares Psi, nu, and their priors", {
-  dat <- make_mvn_long_data()
-  arrays <- mvgam:::build_closure_unit_arrays(
-    dat, response_var = "y",
-    compute_y_max = FALSE,
-    unit_grouping_vars = "time"
-  )
-  sv <- mvgam:::make_mvt_stanvars(arrays)
-  param_sc <- extract_block_scode(sv, "parameters")
-  model_sc <- extract_block_scode(sv, "model")
-  # K (max_rep) is baked in as a literal so the Psi declaration is
-  # self-contained.
-  expect_match(
-    param_sc,
-    "vector<lower=0>[4] Psi;",
-    fixed = TRUE
-  )
-  # nu has a hard floor at 2 so the marginal variance stays finite
-  # under heavy-tailed posterior draws.
-  expect_match(param_sc, "real<lower=2> nu;", fixed = TRUE)
-  expect_match(model_sc, "Psi ~ exponential(1);", fixed = TRUE)
-  expect_match(
-    model_sc,
-    "target += gamma_lpdf(nu - 2 | 2, 0.1);",
     fixed = TRUE
   )
 })
@@ -421,7 +358,8 @@ test_that("prepare_closure_unit_family() groups each family's rows by site", {
       series_var = "series", time_var = "time"
     )
     expect_identical(fam_prep$vars, case$vars, label = nm)
-    sd <- brms::make_standata(
+    # The prepared family goes to brms itself, as mvgam's own call does
+    sd <- mvgam:::brms_generator("standata")(
       bf(y ~ env, family = fam_prep), data = case$data,
       stanvars = attr(fam_prep, "mvgam_stanvars", exact = TRUE)
     )
@@ -443,6 +381,30 @@ test_that("prepare_closure_unit_family() groups each family's rows by site", {
       expect_null(sd$visit_component, label = nm)
     }
   }
+})
+
+test_that("a composition unit outside its family's support is refused", {
+  prep <- function(fam, d, ...) {
+    mvgam:::prepare_closure_unit_family(
+      fam, d, response_var = "y", series_var = "series",
+      time_var = "time", ...
+    )
+  }
+  cases <- multi_response_cases()
+  two_hot <- cases$categ$data
+  two_hot$y[two_hot$time == 1] <- 1L
+  expect_error(prep(categ(), two_hot), "one 1 among zeros")
+  off_sum <- cases$diri$data
+  off_sum$y[1] <- off_sum$y[1] + 0.3
+  expect_error(prep(diri(), off_sum), "sum to one")
+  negative <- cases$multi$data
+  negative$y[1] <- -1L
+  expect_error(prep(multi(), negative), "non-negative counts")
+  # A unit's density takes one concentration
+  expect_error(
+    prep(diri(), cases$diri$data, dpar_forms = list(phi = phi ~ series)),
+    "'series' varies within a closure unit"
+  )
 })
 
 # ------------------------------------------------------------
@@ -550,7 +512,7 @@ test_that("build_closure_unit_arrays() returns correctly shaped arrays", {
   arrs <- build_closure_unit_arrays(d, response_var = "y")
   expect_named(arrs, c(
     "N_unit", "n_rep", "K_max", "Y_max",
-    "visit_idx", "visit_row", "row_unit", "max_rep",
+    "visit_idx", "visit_component", "visit_row", "row_unit", "max_rep",
     "unit_labels", "unit_grid", "unit_vars"
   ))
 
@@ -646,7 +608,7 @@ test_that("build_closure_unit_arrays() errors when cap varies within a unit", {
   d$cap[1L] <- 30L  # row 1 in unit 1
   expect_error(
     build_closure_unit_arrays(d, response_var = "y"),
-    "must be constant within a closure unit"
+    "'cap' varies within a closure unit"
   )
 })
 
@@ -676,10 +638,12 @@ test_that("build_closure_unit_arrays() still rejects a missing cap", {
 # validate_closure_unit_data()
 # ------------------------------------------------------------
 
-test_that("validate_closure_unit_data() accepts well-formed nmix data", {
+test_that("validate_closure_unit_data() accepts nmix data without a cap", {
+  # The count variants bound each unit from its largest count
   d <- make_nmix_data()
+  d$cap <- NULL
   expect_invisible(validate_closure_unit_data(
-    d, response_var = "y", has_obs_covariates = TRUE
+    d, nmix(), response_var = "y", has_obs_covariates = TRUE
   ))
 })
 
@@ -693,7 +657,7 @@ test_that("validate_closure_unit_data() errors on cap < observed count", {
   d$y[1L]   <- 5L
   expect_error(
     validate_closure_unit_data(
-      d, response_var = "y", has_obs_covariates = TRUE
+      d, nmix(), response_var = "y", has_obs_covariates = TRUE
     ),
     "below the observed counts"
   )
@@ -705,9 +669,9 @@ test_that("validate_closure_unit_data() errors on cap varying within a unit", {
   d$cap[1L] <- 50L
   expect_error(
     validate_closure_unit_data(
-      d, response_var = "y", has_obs_covariates = TRUE
+      d, nmix(), response_var = "y", has_obs_covariates = TRUE
     ),
-    "must be constant within a closure unit"
+    "'cap' varies within a closure unit"
   )
 })
 
@@ -716,7 +680,7 @@ test_that("validate_closure_unit_data() errors on non-integer counts", {
   d$y <- d$y + 0.5
   expect_error(
     validate_closure_unit_data(
-      d, response_var = "y", has_obs_covariates = TRUE
+      d, nmix(), response_var = "y", has_obs_covariates = TRUE
     ),
     "Non-integer values found in response"
   )
@@ -727,7 +691,7 @@ test_that("validate_closure_unit_data() errors on negative counts", {
   d$y[1L] <- -1L
   expect_error(
     validate_closure_unit_data(
-      d, response_var = "y", has_obs_covariates = TRUE
+      d, nmix(), response_var = "y", has_obs_covariates = TRUE
     ),
     "Negative counts found"
   )
@@ -743,7 +707,7 @@ test_that(
   # (occ) demote this to a warning per Royle and Dorazio 2008.
   expect_error(
     validate_closure_unit_data(
-      d,
+      d, nmix(),
       response_var       = "y",
       has_obs_covariates = FALSE,
       has_det_covariates = FALSE
@@ -758,7 +722,7 @@ test_that(
   # With at least one covariate in either layer the model is
   # identifiable from cross-unit shared structure.
   expect_invisible(validate_closure_unit_data(
-    d,
+    d, nmix(),
     response_var       = "y",
     has_obs_covariates = TRUE,
     has_det_covariates = FALSE
@@ -864,9 +828,7 @@ test_that("every detection family dispatches its units through reduce_sum", {
 test_that(
   "stancode under nmix() includes the lpdf signature and data decls", {
   sc <- detection_stancode("nmix")
-  # Function block: the vector and the scalar-p signatures
   expect_match(sc, "real nmix_lpmf\\(\\s*array\\[\\] int y,", fixed = FALSE)
-  expect_match(sc, "real p,", fixed = TRUE)
   # Log-space ratio recurrence: per-unit baseline at K_min_g plus
   # the Horner accumulation inside the marginalisation loop. The
   # recurrence avoids the per-k binomial_logit_lpmf re-evaluation
@@ -884,7 +846,6 @@ test_that(
                fixed = TRUE)
   expect_match(sc, "vector[num_elements(p)] log1m_p = log1m(p);",
                fixed = TRUE)
-  expect_match(sc, "for (i in 1 : possible_N)", fixed = TRUE)
   expect_match(
     sc,
     "log_prob_n = log_sum_exp(0, log_prob_n + log_ff + log_k_obs - log_N);",
@@ -909,11 +870,9 @@ test_that("stancode under occ() marginalises the binary state", {
   # log_sum_exp over {z = 0, z = 1}.
   expect_match(sc, "if (Y_max[g] >= 1)", fixed = TRUE)
   expect_match(sc, "log_sum_exp(loglik_z1, loglik_z0)", fixed = TRUE)
-  # All four signature overloads (vec/vec, vec/scalar, scalar/vec,
-  # scalar/scalar) must land so the brms emission resolves regardless
-  # of whether mu / p are dpars or constants.
-  for (sig in c("vector mu, vector p", "vector mu, real p",
-                "real mu, vector p", "real mu, real p")) {
+  # brms passes p as a scalar when it has no formula. It passes mu as
+  # a vector always.
+  for (sig in c("vector mu, vector p", "vector mu, real p")) {
     expect_match(
       sc, paste0("real occ_lpmf(array[] int y, ", sig, ", int N_unit,"),
       fixed = TRUE
@@ -931,7 +890,6 @@ test_that(
                fixed = TRUE)
   # Closure constraint: k < cmax pre-filled with -Inf so log_sum_exp
   # over the K_max marginalisation cells skips infeasible states.
-  expect_match(sc, "for (k in 0 : (cmax - 1))", fixed = TRUE)
   expect_match(sc, "component_lps[k + 1] = negative_infinity();",
                fixed = TRUE)
   # Inner k loop: k * sum_non_det_log_1m_r is the closed-form
@@ -1512,12 +1470,9 @@ test_that("a count family with a cap buffer needs no cap column", {
 
   # The bound the buffer gives, per unit, is the unit's own largest
   # count plus the buffer -- not a constant, and not one.
-  buffer <- mvgam:::closure_unit_default_cap_buffer(nmix())
-  arrays <- mvgam:::build_closure_unit_arrays(
-    d, response_var = "y", default_cap_buffer = buffer,
-    unit_grouping_vars = c("series", "time")
-  )
-  expect_identical(arrays$K_max, arrays$Y_max + buffer)
+  arrays <- mvgam:::build_closure_unit_arrays(d, response_var = "y",
+                                              family = nmix())
+  expect_identical(arrays$K_max, arrays$Y_max + 100L)
 
   # A cap column the user does supply is still checked.
   bad <- d

@@ -18,17 +18,20 @@ log1p_exp <- function(x) {
 
 #' Numerically stable `log(1 - exp(-a))` for `a >= 0`
 #'
-#' The branch at `log(2)` switches between `log(-expm1(-a))`, stable
-#' near `a = 0`, and `log1p(-exp(-a))`, stable for large `a`.
+#' Below `log(2)` the function takes `log(-expm1(-a))`, stable near
+#' `a = 0`. Above it the function takes `log1p(-exp(-a))`, stable for
+#' large `a`.
 #'
 #' @param a Non-negative numeric vector or matrix.
 #' @return `log(1 - exp(-a))`, with the dimensions of `a`.
 #' @noRd
 log1mexp <- function(a) {
   out <- a
-  small <- a <= log(2)
+  # `which()` leaves a `NaN` in place.
+  small <- which(a <= log(2))
+  large <- which(a > log(2))
   out[small] <- log(-expm1(-a[small]))
-  out[!small] <- log1p(-exp(-a[!small]))
+  out[large] <- log1p(-exp(-a[large]))
   out
 }
 
@@ -51,10 +54,43 @@ log_add_exp <- function(a, b) {
 #' Elementwise `log(exp(a) - exp(b))` for `a >= b`
 #'
 #' @param a,b Numeric vectors of log values.
-#' @return The log of the elementwise difference.
+#' @return The log of the elementwise difference. Two `-Inf` terms give
+#'   `-Inf`.
 #' @noRd
 log_diff_exp <- function(a, b) {
-  a + log1mexp(a - b)
+  out <- a + log1mexp(a - b)
+  out[which(a == -Inf)] <- -Inf
+  out
+}
+
+
+#' `log(P(lo < Y <= hi))` with precision in both tails
+#'
+#' `F(hi) - F(lo)` rounds to zero when both lie near one. For a `lo`
+#' above the median the function takes the mass as `S(lo) - S(hi)`
+#' from the survival function. The survival terms are computed only
+#' when some `lo` needs them. Without a lower bound the mass is `F(hi)`.
+#'
+#' @param cdf Function of `(q, lower.tail, log.p)` returning the
+#'   distribution function at `q`
+#' @param lo,hi Bounds, in the shape `cdf` takes
+#' @return Log masses, in the shape `cdf` returns
+#' @noRd
+log_interval_mass <- function(cdf, lo, hi) {
+  checkmate::assert_function(cdf)
+  if (isTRUE(all(lo == -Inf))) {
+    return(cdf(hi, lower.tail = TRUE, log.p = TRUE))
+  }
+  log_f_lo <- cdf(lo, lower.tail = TRUE, log.p = TRUE)
+  out <- log_diff_exp(cdf(hi, lower.tail = TRUE, log.p = TRUE), log_f_lo)
+  right <- which(log_f_lo > log(0.5))
+  if (length(right)) {
+    out[right] <- log_diff_exp(
+      cdf(lo, lower.tail = FALSE, log.p = TRUE),
+      cdf(hi, lower.tail = FALSE, log.p = TRUE)
+    )[right]
+  }
+  out
 }
 
 

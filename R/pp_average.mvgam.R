@@ -17,29 +17,26 @@
 #' @inheritParams compare_scores
 #' @param x A fitted `mvgam` object. Further fits are passed via
 #'   `...`.
-#' @param ... Additional fitted `mvgam` objects to average over,
-#'   and (named) additional arguments passed through to
-#'   [as.data.frame.mvgam()] / [variables.mvgam()].
+#' @param ... Further fitted `mvgam` objects to average over. For
+#'   `pp_average()`, named arguments are passed to the prediction
+#'   function `method` names.
 #' @param variable Optional character vector of parameter names
 #'   to extract, as [variables.mvgam()] lists them. A bare vector name
 #'   selects every element. `NULL` (the default) selects all parameters
 #'   shared across fits (or all parameters across the union when
 #'   `missing` is supplied), excluding `"lp__"`.
 #' @param pars Deprecated brms alias for `variable`.
-#' @param weights Either a numeric vector with one entry per fit
-#'   (auto-normalised to sum to 1) or one of `"stacking"`,
-#'   `"pseudobma"`, `"pseudobma+"`, `"loo"`, `"waic"`. See
-#'   `mvgam_loo_extras` for the per-strategy semantics.
+#' @param weights A numeric vector with one weight per fit, scaled to
+#'   sum to one, or one of `"stacking"`, `"pseudobma"`, `"pseudobma+"`,
+#'   `"loo"` and `"waic"`. [mvgam_loo_extras] describes each.
 #' @param ndraws Total number of model-averaged draws to return.
 #'   Defaults to the number of draws in the first fit.
 #' @param nsamples Deprecated brms alias for `ndraws`.
-#' @param missing Default values for parameters that are absent
-#'   from some of the supplied fits. `NULL` (the default)
-#'   restricts `variable` to the intersection across fits and
-#'   errors if any requested parameter is not in every fit. A
-#'   list keyed by parameter name supplies per-parameter
-#'   defaults; a single numeric is broadcast across every
-#'   missing parameter in every fit that lacks it.
+#' @param missing Values for parameters some fits lack. `NULL` (the
+#'   default) restricts `variable` to the parameters every fit has and
+#'   refuses a name outside them. A list keyed by parameter name gives
+#'   each parameter its own value. A single number fills every
+#'   parameter a fit lacks.
 #' @param control A list of extra arguments passed to
 #'   [loo::loo_model_weights()] when computing stacking /
 #'   pseudo-BMA weights.
@@ -101,6 +98,7 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
   variable <- mvgam_use_alias(variable, pars)
   ndraws <- mvgam_use_alias(ndraws, nsamples)
   split <- mvgam_split_models(x, ..., model_names = model_names)
+  refuse_unread_dots(split$other, character(0L), "posterior_average")
   models <- split$models
   # Draws come straight off each `$fit` below. An unfitted stub has
   # none.
@@ -165,13 +163,8 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
       )
     }
   }
-  w <- stats::setNames(
-    mvgam_validate_weights(weights, models, control = control),
-    names(models)
-  )
-  ndraws_per <- mvgam_round_largest_remainder(
-    w * (ndraws %||% posterior::ndraws(models[[1L]]))
-  )
+  shares <- averaging_draws(models, weights, ndraws, control)
+  ndraws_per <- shares$ndraws
   out <- stats::setNames(
     vector("list", length(models)), names(models)
   )
@@ -189,20 +182,15 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
           numeric(0L), nrow = ndraws_per[i], ncol = 0L
         ))
       }
-      if (!is.null(missing_resolved)) {
-        miss <- setdiff(variable, names(out[[i]]))
-        if (length(miss) > 0L) {
-          for (v in miss) {
-            out[[i]][[v]] <- missing_resolved[[v]]
-          }
-        }
+      for (v in setdiff(variable, names(out[[i]]))) {
+        out[[i]][[v]] <- missing_resolved[[v]]
       }
       out[[i]] <- out[[i]][, variable, drop = FALSE]
     }
   }
   out <- do.call(rbind, out)
   rownames(out) <- NULL
-  attr(out, "weights") <- w
+  attr(out, "weights") <- shares$weights
   attr(out, "ndraws") <- ndraws_per
   out
 }
@@ -234,6 +222,7 @@ pp_average.mvgam <- function(x, ..., weights = "stacking",
                               model_names = NULL,
                               control = list(), seed = NULL) {
   checkmate::assert_class(x, "mvgam")
+  checkmate::assert_flag(summary)
   local_seed(seed)
   method <- mvgam_validate_pp_method(method)
   ndraws <- mvgam_use_alias(ndraws, nsamples)
@@ -258,13 +247,8 @@ pp_average.mvgam <- function(x, ..., weights = "stacking",
       "Can only average models that predict the same response."
     ))
   }
-  w <- stats::setNames(
-    mvgam_validate_weights(weights, models, control = control),
-    names(models)
-  )
-  ndraws_per <- mvgam_round_largest_remainder(
-    w * (ndraws %||% posterior::ndraws(models[[1L]]))
-  )
+  shares <- averaging_draws(models, weights, ndraws, control)
+  ndraws_per <- shares$ndraws
   pred_fun <- match.fun(method)
   out <- vector("list", length(models))
   for (i in seq_along(models)) {
@@ -277,10 +261,10 @@ pp_average.mvgam <- function(x, ..., weights = "stacking",
     }
   }
   out <- do.call(rbind, out[!vapply(out, is.null, logical(1L))])
-  if (isTRUE(summary)) {
+  if (summary) {
     out <- mvgam_post_summary(out, robust = robust, probs = probs)
   }
-  attr(out, "weights") <- w
+  attr(out, "weights") <- shares$weights
   attr(out, "ndraws") <- ndraws_per
   out
 }

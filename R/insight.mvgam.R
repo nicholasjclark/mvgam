@@ -145,7 +145,14 @@ mvgam_brmsterms_parts <- function(bt) {
 }
 
 
-# One side of the model, parsed once.
+# Parses of one side of a model, keyed by `side_terms_key()`. A
+# prediction checks its frame against the terms of both formulas once
+# per component. Each check would parse them again.
+#'@noRd
+.side_terms_cache <- new.env(parent = emptyenv())
+
+
+# One side of the model, parsed once per session.
 #
 # The stored `brmsformula` holds no family. `brmsterms()` then
 # defaults to gaussian and refuses `trials()` as unsupported for it.
@@ -156,13 +163,48 @@ mvgam_brmsterms_parts <- function(bt) {
 #'@noRd
 mvgam_side_terms <- function(f, family = NULL, resp = NULL) {
   checkmate::assert_string(resp, null.ok = TRUE)
-  empty <- list(conditional = character(0L), random = character(0L),
+  if (is.null(f)) {
+    return(list(conditional = character(0L), random = character(0L),
                 slopes = character(0L),
                 aterms = character(0L), offset = character(0L),
-                labels = character(0L), all = character(0L))
-  if (is.null(f)) {
-    return(empty)
+                labels = character(0L), all = character(0L)))
   }
+  key <- side_terms_key(f, family, resp)
+  .side_terms_cache[[key]] %||%
+    (.side_terms_cache[[key]] <- parse_side_terms(f, family, resp))
+}
+
+
+#' The cache key of one side's parse
+#'
+#' A hash of the formula's structure, its attributes included. A
+#' nonlinear `bf()` differs from a linear one only in an attribute.
+#' Each formula's environment is dropped first. `brmsterms()` takes
+#' the variable names from the symbols. An environment holding the
+#' caller's data would make the hash slow.
+#'
+#' @inheritParams mvgam_side_terms
+#' @return A string
+#' @noRd
+side_terms_key <- function(f, family, resp) {
+  bare <- rapply(
+    list(f),
+    function(x) {
+      attr(x, ".Environment") <- NULL
+      x
+    },
+    classes = "formula", how = "replace"
+  )
+  rlang::hash(list(bare, family$family, family$name, family$link, resp))
+}
+
+
+#' The parse `mvgam_side_terms()` caches
+#'
+#' @inheritParams mvgam_side_terms
+#' @return The list `mvgam_side_terms()` returns
+#' @noRd
+parse_side_terms <- function(f, family, resp) {
   if (!is.null(family)) {
     if (inherits(f, "mvbrmsformula")) {
       # Each response of a multivariate formula holds its own family.

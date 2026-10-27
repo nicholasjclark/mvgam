@@ -3,7 +3,7 @@
 \name{smooths.mvgam}
 \alias{smooths.mvgam}
 \alias{smooths}
-\title{Enumerate smooth terms in a fitted \pkg{mvgam} model}
+\title{The smooth terms of a fitted model}
 \usage{
 \method{smooths}{mvgam}(x)
 
@@ -13,18 +13,16 @@ smooths(x)
 \item{x}{A fitted \code{mvgam} object.}
 }
 \value{
-A character vector of canonical smooth labels, one per
-term of each predictor, in the order the panels of
-\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}} take. Empty if the fit has no
-smooth terms.
+A character vector of term labels, one per term of each
+predictor, in the order of the panels of
+\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}. Empty for a fit without smooths.
 }
 \description{
-Returns the canonical term labels for every \code{s()} or \code{t2()}
-smooth of every predictor of a fitted \code{mvgam} object: each
-response's mean, each distributional or non-linear parameter
-given a formula, and the trend. Useful for picking a term to
-pass to \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} or
-\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.
+Lists every \code{s()} and \code{t2()} term of every predictor. The
+predictors are each response's mean, each distributional or
+non-linear parameter with a formula and the trend.
+\code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} and \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}} take
+these labels.
 }
 \seealso{
 Other posterior summaries: 

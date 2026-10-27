@@ -2,7 +2,7 @@
 % Please edit documentation in R/var_param_extractors.R
 \name{print.mvgam_var_matrix_list}
 \alias{print.mvgam_var_matrix_list}
-\title{Print method for \code{mvgam_var_matrix_list}}
+\title{Print the VAR transition matrices of several panels}
 \usage{
 \method{print}{mvgam_var_matrix_list}(x, ...)
 }
@@ -13,13 +13,12 @@
 \item{...}{Ignored.}
 }
 \value{
-\code{x}, invisibly, after side-effect printing.
+\code{x}, invisibly.
 }
 \description{
-Compact header naming the number of groups and matrix
-dimension, then the mean off-diagonal absolute A magnitude per
-group so the reader can see at a glance which panel carries
-the strongest cross-outcome dependence.
+Prints the number of panels, the dimension and the mean absolute
+off-diagonal cell of each panel. The panel with the largest mean
+has the strongest effects between processes.
 }
 \seealso{
 \code{\link[=posterior_transition_matrix]{posterior_transition_matrix()}},

@@ -21,12 +21,11 @@ A \code{ggplot} object.
 }
 \description{
 Heatmap of the posterior point estimate of
-\eqn{\Delta = Z \Sigma Z^\top}. Diagonal cells show the per-series
-captured variance (always positive); off-diagonal cells show
-factor-driven cross-series covariance, which can be positive
-or negative. The diverging fill scale is symmetric around
-zero so positive and negative couplings read on equivalent
-colour intensities.
+\eqn{\Delta = Z \Sigma Z^\top}. Diagonal cells show the variance
+the factors capture in each series. Off-diagonal cells show the
+covariance between series, positive or negative. The fill scale is
+symmetric around zero. A positive and a negative covariance of equal
+size take colours of equal intensity.
 }
 \seealso{
 \code{\link[=shared_variation]{shared_variation()}},

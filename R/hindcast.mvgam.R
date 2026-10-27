@@ -107,10 +107,10 @@ hindcast.mvgam <- function(object,
   # The latent state of a closure-unit family is indexed by unit. A
   # single-season design has no time axis. The result is then an
   # `mvgam_latent_state` of the per-unit draws of
-  # `posterior_latent_N()` or `posterior_occupancy()`.
+  # `posterior_latent_N()`.
   if (type == "latent_state") {
     return(hindcast_latent_state(object, ndraws = ndraws,
-                                 draw_ids = draw_ids, resp = resp))
+                                 draw_ids = draw_ids))
   }
 
   # Multivariate fan-out: one `mvgam_forecast` per response, in a
@@ -124,9 +124,8 @@ hindcast.mvgam <- function(object,
   series_levels <- fitted_series_levels(object)
   reported <- reported_series(object, resp, series_levels)
 
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  total_draws <- nrow(draws_mat)
-  draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
+  draw_idx <- resolve_draw_indices(posterior::ndraws(object), ndraws,
+                                   draw_ids)
 
   training <- build_training_arms(object, series_levels, resp = resp)
   hindcasts <- build_hindcast_arms(
@@ -137,8 +136,7 @@ hindcast.mvgam <- function(object,
   )
 
   family_pars <- if (type == "link") {
-    extract_family_pars_for_draws(object, draws_mat, draw_idx,
-                                    resp = resp)
+    extract_family_pars_for_draws(object, draw_idx, resp = resp)
   } else {
     NULL
   }
@@ -149,32 +147,16 @@ hindcast.mvgam <- function(object,
 
 
 # Build an mvgam_latent_state object from a fitted closure-unit
-# model. The family kernel (`posterior_latent_N()` or
-# `posterior_occupancy()`) gives the per-draw latent state. The
+# model. `posterior_latent_N()` gives the per-draw latent state. The
 # closure-unit arrays give the (`series`, `time`) label of each draw
 # column.
 #'@noRd
 hindcast_latent_state <- function(object, ndraws = NULL,
-                                  draw_ids = NULL, resp = NULL) {
-  checkmate::assert_string(resp, null.ok = TRUE)
-  # `mvn()`, `mvt()` and `diri()` share the closure-unit layout and
-  # hold no latent state.
-  require_closure_unit_predict_type(object$family, "latent_state")
-
+                                  draw_ids = NULL) {
   total_draws <- posterior::ndraws(object)
   draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
 
-  kernel <- dispatch_closure_unit_method(object$family,
-                                            "latent_state")
-  kernel_formals <- names(formals(kernel))
-  kernel_args <- list(
-    object      = object,
-    newdata     = NULL,
-    draw_ids    = draw_idx,
-    conditional = TRUE
-  )
-  if ("draw" %in% kernel_formals) kernel_args$draw <- FALSE
-  draws <- do.call(kernel, kernel_args)
+  draws <- posterior_latent_N(object, draw_ids = draw_idx)
 
   checkmate::assert_matrix(draws, mode = "numeric",
                             any.missing = FALSE,
@@ -183,7 +165,7 @@ hindcast_latent_state <- function(object, ndraws = NULL,
   # `build_closure_unit_arrays()` records the grouping values of each
   # unit in `unit_grid`, in the order of the draw columns.
   meta <- axis_vars(object)
-  unit_df <- extract_closure_unit_components(object)$arrays$unit_grid
+  unit_df <- closure_unit_arrays_for(object)$unit_grid
   names(unit_df)[match(c(meta$series_var, meta$time_var),
                          names(unit_df))] <- c("series", "time")
   rownames(unit_df) <- NULL

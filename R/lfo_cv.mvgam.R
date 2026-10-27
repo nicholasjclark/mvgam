@@ -1026,11 +1026,10 @@ window_predictive <- function(fit, fc_data) {
   checkmate::assert_class(fit, "mvgam")
   checkmate::assert_data_frame(fc_data, min.rows = 1L)
   series_levels <- fitted_series_levels(fit)
-  draws_mat <- posterior::as_draws_matrix(fit$fit)
   window <- build_training_arms(fit, series_levels, data = fc_data)
   arms <- build_hindcast_arms(
     fit, window, type = "response",
-    draw_idx = seq_len(nrow(draws_mat)),
+    draw_idx = seq_len(posterior::ndraws(fit)),
     obs_uncertainty = TRUE
   )
   # The window's observations go where a forecast keeps its held-out

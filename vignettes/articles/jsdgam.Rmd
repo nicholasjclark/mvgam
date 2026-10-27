@@ -314,12 +314,12 @@ mod_mgp <- jsdgam(
 )
 ```
 
-`active_factors()` applies the cumulative shrinkage criterion of
-Legramanti et al. ([2020](https://doi.org/10.1093/biomet/asaa008)): a
-column is active when its squared norm exceeds 1% of the leading
-column's with posterior probability above one half.
+`active_factors()` splits the covariance the factors give the
+species into principal dimensions. A dimension is active when its
+variance is at least a tenth of the leading dimension's, with
+posterior probability of at least one half.
 
-```{r active-factors, fig.asp = 0.5, fig.cap = "Posterior probability that each column of loadings is active. The dashed line marks the threshold."}
+```{r active-factors, fig.asp = 0.5, fig.cap = "Posterior probability that each factor, largest first, is active. The dashed line marks the threshold."}
 af <- active_factors(mod_mgp)
 plot(af)
 ```
@@ -329,7 +329,7 @@ n_active <- sum(af$per_factor$is_active)
 stopifnot(n_active > 2, n_active < 6)
 ```
 
-`r n_active` of the six columns are active. The earlier two-factor
+`r n_active` of the six factors are active. The earlier two-factor
 models held the residual structure in a smaller latent space than the
 data support.
 

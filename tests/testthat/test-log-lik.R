@@ -365,40 +365,59 @@ test_that("the COM-binomial distribution function is the binomial at nu = 1", {
 })
 
 
-test_that("addition-term keys are read per response", {
-  sdata <- list(weights = rep(2, 4L), weights_y1 = rep(5, 4L))
-  obj <- structure(list(standata = sdata), class = "mvgam")
-
-  # A univariate fit takes the bare key
-  uni <- mvgam:::addition_term_data(obj, NULL, nobs = 4L)
-  expect_equal(uni$weights, rep(2, 4L))
-
-  # A named response takes only its own suffixed key. One response of
-  # a multivariate fit never takes another's weights.
-  y1 <- mvgam:::addition_term_data(obj, "y1", nobs = 4L)
-  expect_equal(y1$weights, rep(5, 4L))
-  y2 <- mvgam:::addition_term_data(obj, "y2", nobs = 4L)
-  expect_null(y2$weights)
-})
-
-
-test_that("a scalar bound is recycled across observations", {
-  obj <- structure(list(standata = list(lb = 0)), class = "mvgam")
-  out <- mvgam:::addition_term_data(obj, NULL, nobs = 6L)
-  expect_equal(out$lb, rep(0, 6L))
-})
-
-
-test_that("terms recorded at the wrong grain are refused", {
-  # A closure-unit family is scored per unit. Terms recorded per visit
-  # would be misaligned with its columns.
-  obj <- structure(
-    list(standata = list(weights = rep(1.5, 12L))), class = "mvgam"
+test_that("addition terms are evaluated against the frame being scored", {
+  # `standata` holds only the observed rows of the training data. The
+  # scored frame carries a missing response in row 2.
+  frame <- data.frame(
+    y = c(1, NA, 4), w = c(1, 2, 3), cc = c("none", "right", "int"),
+    up = c(NA, NA, 6), lo = c(0, 1, 0)
   )
+  terms <- mvgam:::addition_term_values(
+    brms::bf(y | weights(w) + cens(cc, up) + trunc(lb = lo, ub = 10) ~ 1),
+    gaussian(), frame
+  )
+  expect_equal(terms$weights, c(1, 2, 3))
+  # A label matches by prefix, as in brms
+  expect_equal(terms$cens, c(0, 1, 2))
+  expect_equal(terms$rcens, c(NA, NA, 6))
+  expect_equal(terms$lb, c(0, 1, 0))
+  expect_equal(terms$ub, rep(10, 3L))
+
+  # `scale = TRUE` rescales the weights to sum to the row count
+  scaled <- mvgam:::addition_term_values(
+    brms::bf(y | weights(w, scale = TRUE) ~ 1), gaussian(), frame
+  )
+  expect_equal(scaled$weights, c(1, 2, 3) / 2)
+
   expect_error(
-    mvgam:::addition_term_data(obj, NULL, nobs = 4L),
-    "does not line up with the likelihood"
+    mvgam:::addition_term_values(
+      brms::bf(y | cens(cc) ~ 1), gaussian(),
+      transform(frame, cc = c("none", "above", "none"))
+    ),
+    "'above'"
   )
+})
+
+
+test_that("quantile residual bounds follow censoring and truncation", {
+  f <- addition_fixture()
+  cdf <- mvgam:::dist_cdf(f$spec, f$linpred, f$y)
+  out <- mvgam:::censored_pit_bounds(
+    f$spec, f$linpred, f$y, f$y, list(cens = c(1, -1, 0, 0, 0)),
+    discrete = FALSE
+  )
+  # A right-censored row spans (F(y), 1], a left-censored row [0, F(y)]
+  expect_equal(out$lower[, 1:2], cbind(cdf[, 1L], 0))
+  expect_equal(out$upper[, 1:2], cbind(1, cdf[, 2L]))
+  expect_equal(out$lower[, 3:5], cdf[, 3:5])
+
+  # Truncation below zero renormalises the distribution function
+  trunc <- mvgam:::censored_pit_bounds(
+    f$spec, f$linpred, f$y, f$y, list(lb = rep(0, 5L), ub = rep(Inf, 5L)),
+    discrete = FALSE
+  )
+  below <- stats::pnorm(0, f$linpred, f$pars$sigma)
+  expect_equal(trunc$upper, (cdf - below) / (1 - below))
 })
 
 

@@ -21,13 +21,15 @@ fit_ar <- function(..., iter = 300L) {
 
 
 test_that("sampler arguments reach cmdstanr", {
-  # Iteration lines were printed however `refresh` was set, and the
-  # warmup draws were dropped whatever `save_warmup` said.
+  # `refresh = 0` silences the iteration lines. The warmup draws reach
+  # the stanfit and the draws methods.
   out <- capture.output(
     fit <- suppressMessages(fit_ar(refresh = 0, save_warmup = TRUE))
   )
   expect_false(any(grepl("Iteration", out)))
   expect_identical(as.integer(fit$fit@sim$warmup2), c(150L, 150L))
+  expect_identical(nrow(as_draws_df(fit, inc_warmup = TRUE)), 600L)
+  expect_identical(nrow(as_draws_df(fit)), 300L)
 })
 
 
@@ -98,4 +100,33 @@ test_that("a trend with no design stores no mu_trend", {
   stored <- posterior::variables(posterior::as_draws(fit$fit))
   expect_false(any(grepl("^mu_trend\\[", stored)))
   expect_false(anyNA(rhat(fit)))
+})
+
+
+test_that("a pooled fit reports convergence per imputation", {
+  # The pooled chains sample two posteriors. Each parameter's R-hat is
+  # its largest over the imputation fits and its ESS their sum.
+  imputed <- lapply(1:2, function(i) {
+    d <- dat
+    d$y[c(5L, 45L)] <- c(i, i + 2L)
+    d
+  })
+  pooled <- suppressMessages(mvgam_multiple(
+    y ~ 1, trend_formula = ~ AR(), data_list = imputed,
+    family = poisson(), chains = 2L, iter = 300L, seed = 1L,
+    refresh = 0, silent = 2L
+  ))
+  expect_s3_class(pooled, c("mvgam_pooled", "mvgam"))
+  fits <- attr(pooled, "individual_fits")
+  expect_identical(posterior::ndraws(pooled),
+                   2L * posterior::ndraws(fits[[1L]]))
+  summ <- summary(pooled)
+  per_fit <- lapply(fits, function(fit) summary(fit)$fixed["Intercept", ])
+  expect_equal(summ$fixed["Intercept", "Rhat"],
+               max(vapply(per_fit, `[[`, numeric(1L), "Rhat")))
+  expect_equal(summ$fixed["Intercept", "Bulk_ESS"],
+               sum(vapply(per_fit, `[[`, numeric(1L), "Bulk_ESS")))
+  printed <- capture.output(print(summ))
+  expect_true(any(grepl("Multiple imputation: 2 fits", printed)))
+  expect_true(any(grepl("Data: imputed", printed)))
 })

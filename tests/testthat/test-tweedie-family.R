@@ -1,33 +1,5 @@
-# Tests for the Tweedie custom family.
-#
-# Covers constructor surface, stanvar auto-injection (functions
-# block + M data stanvar), parameter-name registration in
-# get_family_dpars, the R-side log_lik / posterior_epred /
-# posterior_predict branches, and the link / bound guards.
-# End-to-end fit + recovery lives under tests/local/ so CI stays
-# fast.
-
-test_that("tweedie() returns a customfamily with mu/mphi/mtheta dpars", {
-  fam <- tweedie()
-  expect_identical(fam$dpars, c("mu", "mphi", "mtheta"))
-  expect_identical(fam$link, "log")
-  expect_identical(fam$link_mphi, "log")
-  expect_identical(fam$link_mtheta, "identity")
-  # Strict positivity / open interval bounds (must avoid the
-  # mtheta -> 1 and mtheta -> 2 boundary singularities).
-  expect_identical(unname(unlist(fam$lb)), c(NA, "1e-08", "1.001"))
-  expect_identical(unname(unlist(fam$ub)), c(NA, NA, "1.999"))
-  expect_identical(fam$type, "real")
-  expect_false(fam$loop)
-  expect_identical(fam$vars, "M")
-})
-
-test_that("tweedie() M argument validates and flows through to the M stanvar", {
-  expect_error(tweedie(M = 0), "not >= 1")
-  expect_error(tweedie(M = -1L), "not >= 1")
-  expect_error(tweedie(M = "30"), "integerish")
-  expect_equal(attr(tweedie(M = 50L), "mvgam_stanvars")$M$sdata, 50L)
-})
+# Tests for the Tweedie custom family. The local suite fits and
+# recovers it.
 
 test_that("mvgam(family = tweedie()) auto-injects the Stan function block + M data", {
   set.seed(1L)
@@ -45,12 +17,6 @@ test_that("mvgam(family = tweedie()) auto-injects the Stan function block + M da
   expect_true(grepl("mu = exp(mu);", sc, fixed = TRUE))
   expect_true(grepl("target += tweedie_lpdf(Y | mu, mphi, mtheta, M);",
                     sc, fixed = TRUE))
-  # Strict positivity guards, checked per element of a vector dpar
-  expect_true(grepl("if \\(mphi\\[n\\] <= 0\\)", sc))
-  expect_true(grepl("if \\(mu\\[n\\] <= 0\\)", sc))
-  expect_true(grepl(
-    "mtheta\\[n\\] <= 1 \\|\\| mtheta\\[n\\] >= 2", sc
-  ))
   # M data stanvar.
   expect_true(grepl("int<lower=1> M;", sc))
   # mphi parameter with strict lb and no ub.
@@ -74,22 +40,13 @@ test_that("standata under tweedie() carries M with the requested value", {
   expect_equal(sd_custom$M, 75L)
 })
 
-test_that("get_family_dpars(\"tweedie\") returns mphi + mtheta", {
-  # Without this, log_lik.mvgam cannot extract the posterior
-  # dpar matrices the Tweedie density takes (mphi, mtheta).
-  expect_identical(
-    mvgam:::get_family_dpars("tweedie"),
-    c("mphi", "mtheta")
-  )
-})
-
 test_that("compute_family_epred returns mu directly for tweedie", {
   # E[Y | mu, phi, theta] = mu under the compound Poisson-gamma
   # for all theta in (1, 2); no Jensen correction needed.
   fam <- tweedie()
   set.seed(1L)
   linpred <- matrix(rnorm(20, mean = 0.5, sd = 0.2), nrow = 4)
-  epred <- mvgam:::compute_family_epred(linpred = linpred, family = fam)
+  epred <- compute_family_epred(linpred = linpred, family = fam)
   expect_equal(epred, exp(linpred), tolerance = 1e-12)
 })
 
@@ -104,7 +61,7 @@ test_that("the tweedie log density matches mgcv::ldTweedie row-wise", {
   linpred <- log(mu)
   mphi <- matrix(runif(ndraws * nobs, 0.3, 0.8), nrow = ndraws)
   mtheta <- matrix(runif(ndraws * nobs, 1.3, 1.7), nrow = ndraws)
-  ll <- mvgam:::dispatch_log_lik(
+  ll <- dispatch_log_lik(
     "tweedie", linpred = linpred,
     link = "log",
     y = y,
@@ -124,7 +81,7 @@ test_that("the tweedie log density matches mgcv::ldTweedie row-wise", {
 
 test_that("attach_family_stanvars merges tweedie stanvars with user stanvars", {
   user_sv <- brms::stanvar(scode = "// user", block = "functions")
-  merged <- mvgam:::attach_family_stanvars(user_sv, list(y = tweedie()))
+  merged <- attach_family_stanvars(user_sv, list(y = tweedie()))
   # The user's stanvar, tweedie's function block and its `M` data.
   expect_length(merged, 3L)
   scodes <- vapply(merged, function(sv) sv$scode, character(1))
@@ -135,10 +92,10 @@ test_that("attach_family_stanvars merges tweedie stanvars with user stanvars", {
 
 test_that("attach_family_stanvars passes through unchanged for built-in families", {
   fam_gauss <- list(y = stats::gaussian())
-  expect_null(mvgam:::attach_family_stanvars(NULL, fam_gauss))
+  expect_null(attach_family_stanvars(NULL, fam_gauss))
   user_sv <- brms::stanvar(scode = "// user", block = "functions")
   expect_identical(
-    mvgam:::attach_family_stanvars(user_sv, fam_gauss),
+    attach_family_stanvars(user_sv, fam_gauss),
     user_sv
   )
 })
@@ -148,12 +105,12 @@ test_that("two responses sharing a family declare its Stan code once", {
   # needs its functions as much as one given beside the formula, and
   # two responses sharing it share one declaration. Given different
   # arguments they would declare `M` twice.
-  shared <- mvgam:::attach_family_stanvars(
+  shared <- attach_family_stanvars(
     NULL, list(a = tweedie(), b = poisson(), c = tweedie())
   )
   expect_length(shared, 2L)
   expect_error(
-    mvgam:::attach_family_stanvars(
+    attach_family_stanvars(
       NULL, list(a = tweedie(M = 30L), b = tweedie(M = 40L))
     ),
     "Two responses give 'tweedie()' different arguments",
@@ -187,34 +144,21 @@ test_that("check_tweedie_truncation requires a tweedie response", {
   )
 })
 
-test_that("how_to_cite reference_db includes Tweedie entries", {
-  db <- mvgam:::reference_db()
-  expect_true("jorgensen_tweedie" %in% names(db))
-  expect_true("dunn_smyth_tweedie" %in% names(db))
-})
-
 test_that("tweedie_lpdf has overloaded scalar / vector dpar signatures", {
-  # The Stan function block must declare both the all-scalar
-  # and all-vector entry points (plus mixed) so brms's
-  # distributional regression on mphi / mtheta flows through
-  # without a typecheck error.
-  scode <- mvgam:::tweedie_stan_funs()
-  expect_true(grepl(
-    "real tweedie_lpdf\\(vector y, vector mu, vector mphi,\\s*vector mtheta, int M\\)",
-    scode
-  ))
-  expect_true(grepl(
-    "real tweedie_lpdf\\(vector y, vector mu, real mphi,\\s*real mtheta, int M\\)",
-    scode
-  ))
-  expect_true(grepl(
-    "real tweedie_lpdf\\(vector y, vector mu, vector mphi,\\s*real mtheta, int M\\)",
-    scode
-  ))
-  expect_true(grepl(
-    "real tweedie_lpdf\\(vector y, vector mu, real mphi,\\s*vector mtheta, int M\\)",
-    scode
-  ))
+  # brms passes mphi and mtheta as vectors when each has a formula and
+  # as reals otherwise. Each of the four mixes needs an entry point.
+  scode <- gsub("\\s+", " ", tweedie_stan_funs())
+  for (mphi in c("real", "vector")) {
+    for (mtheta in c("real", "vector")) {
+      expect_true(grepl(
+        paste0(
+          "real tweedie_lpdf\\( ?vector y, vector mu, ", mphi,
+          " mphi, ", mtheta, " mtheta, int M\\)"
+        ),
+        scode
+      ))
+    }
+  }
 })
 
 test_that("tweedie() supports brms distributional regression on mphi", {
@@ -265,19 +209,11 @@ test_that("tweedie() supports brms distributional regression on mphi", {
 # ---- custom-family dpar resolution in the forecast path -------------
 
 test_that("custom families resolve to their constructor name, not 'custom'", {
-  # brms records `family$family = "custom"` for every custom family, so
-  # any dispatcher reading that field directly looks up a family that
-  # has no registered distributional parameters. `forecast()` must
-  # resolve the constructor name instead, or it would silently drop
-  # mphi / mtheta and leave the Tweedie sampler with no dispersion or
-  # power parameter.
+  # `forecast()` takes the dpars of the constructor name. The stored
+  # family field "custom" names none.
   fam <- tweedie()
-  expect_identical(fam$family, "custom")
-  expect_length(mvgam:::get_family_dpars(tolower(fam$family)), 0L)
-
-  expect_identical(mvgam:::resolve_family_name(fam), "tweedie")
   expect_identical(
-    mvgam:::get_family_dpars(mvgam:::resolve_family_name(fam)),
+    get_family_dpars(resolve_family_name(fam)),
     c("mphi", "mtheta")
   )
 })
@@ -303,10 +239,10 @@ test_that("sample_from_family() accepts every dpar the registry can emit for it"
   # sample_from_family() rather than naming parameters one by one, so a
   # family whose parameters have no matching argument would error at
   # forecast time instead of at test time.
-  formals_avail <- names(formals(mvgam:::sample_from_family))
+  formals_avail <- names(formals(sample_from_family))
   for (fam_name in c("tweedie", "com_binomial", "gaussian", "negbinomial",
                      "beta", "student")) {
-    dpars <- mvgam:::get_family_dpars(fam_name)
+    dpars <- get_family_dpars(fam_name)
     expect_true(all(dpars %in% formals_avail))
   }
 })

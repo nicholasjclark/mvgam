@@ -23,103 +23,97 @@ on the scale of the forecasts.}
 
 \item{score}{Character; one of the names above.}
 
-\item{interval_width}{Width of the central PI that sets the
-per-series \code{in_interval} indicator. It also sets the SIS penalty
-width. Computed for \code{"crps"}, \code{"drps"} and \code{"sis"}; the other
-scores report \code{in_interval} as \code{NA}.}
+\item{interval_width}{Width of the central interval that sets the
+per-series \code{in_interval} indicator and the \code{"sis"} penalty. The
+indicator is computed for \code{"crps"}, \code{"drps"}, \code{"sis"} and the joint
+scores. The other scores report it as \code{NA}.}
 
-\item{quantile_level}{Quantile the \code{"qs"} pinball loss is
-taken at. Defaults to \code{0.5}, the median. Unrelated to the
-central interval the other scorers use, which
-\code{interval_width} sets.}
+\item{quantile_level}{Level of the \code{"qs"} score. Defaults to \code{0.5},
+the median.}
 
-\item{lower, upper}{Threshold bounds for \code{"twcrps"} /
-\code{"twenergy"}. Defaults \code{-Inf} / \code{Inf} recover the
-unweighted scores.}
+\item{lower, upper}{Thresholds of \code{"twcrps"} and \code{"twenergy"}. The
+defaults \code{-Inf} and \code{Inf} give the unweighted scores.}
 
-\item{log}{Logical; apply \code{log(x + 0.001)} to truth and
-forecast draws before scoring. Taken by \code{"crps"}, \code{"drps"},
-\code{"sis"}, \code{"energy"} and \code{"variogram"}. Passing \code{TRUE} with any
-other score is an error. \code{"brier"} scores a binary outcome.
-\code{"twcrps"} and \code{"twenergy"} set their thresholds on the
-untransformed scale.}
+\item{log}{Logical. \code{TRUE} applies \code{log(x + 0.001)} to observations
+and draws before scoring. Taken by \code{"crps"}, \code{"sis"}, \code{"energy"}
+and \code{"variogram"}. Passing \code{TRUE} with any other score is an error.}
 
-\item{weights}{Optional length-\code{n_series} numeric vector of
-per-series weights for \code{"variogram"}.}
+\item{weights}{Optional numeric vector of non-negative weights, one
+per series, for \code{"variogram"}.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-A named \code{list} with one entry per series plus a
-trailing \code{all_series} summary. Per-series entries are
-\code{data.frame}s with columns \code{score}, \code{in_interval},
-\code{interval_width}, \code{eval_horizon} and \code{score_type}. The
-\code{score_type} column echoes the requested \code{score}. The
-multivariate scorers' per-series rows hold coverage diagnostics
-only, with \code{score} set to \code{NA}. The \code{all_series} entry holds the
-per-horizon aggregate. For univariate scorers it sums the scores
-over the series at each forecast time, with \code{score_type}
-prefixed \code{"sum_"}. For multivariate scorers it holds the joint
-per-horizon score. Series forecast at their own times, as
-\code{CAR()} allows, are summed at the times they share. The
-\code{eval_horizon} column then counts the times any series is
-forecast at. A multivariate score needs every series at the same
+A named \code{list} with one data frame per series plus a trailing
+\code{all_series} summary. Each series' data frame has columns \code{score},
+\code{in_interval}, \code{interval_width}, \code{eval_horizon} and \code{score_type},
+the requested \code{score}. A joint score leaves the per-series \code{score}
+column \code{NA}.
+
+For a univariate score, \code{all_series} sums the scores over the
+series at each forecast time, with \code{score_type} prefixed \code{"sum_"}.
+Series forecast at their own times, as \code{CAR()} allows, are summed at
+the times they share. Its \code{eval_horizon} then counts the times any
+series is forecast at. For a joint score, \code{all_series} holds the
+score at each horizon. A joint score needs every series at the same
 forecast times.
 }
 \description{
-Compute one of eleven proper scoring rules on the held-out
-forecasts of an \code{mvgam_forecast} object returned by
-\link{forecast.mvgam} or \link{hindcast.mvgam}.
+Scores the held-out forecasts of an \code{mvgam_forecast} object from
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} or \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} against the observations,
+with one of eleven scoring rules. Lower scores are better.
 }
-\section{Available scorers}{
+\section{Available scores}{
 
 
 \describe{
-\item{\code{"crps"}}{Continuous Ranked Probability Score
-(Gneiting & Raftery, 2007); default proper score for
-continuous predictives.}
-\item{\code{"drps"}}{Discrete Ranked Probability Score; CRPS
-specialised to count outcomes.}
-\item{\code{"sis"}}{Scaled Interval Score; width of the central
-PI plus a penalty for misses scaled by its miscoverage
-rate, \code{1 - interval_width}.}
-\item{\code{"brier"}}{Brier score for a binary outcome: the squared
-difference between the observation and the mean of the draws,
-which estimates the forecast probability.}
-\item{\code{"logs"}}{Logarithmic score \verb{-log f(y)} via a kernel
-density estimate; bridges to ELPD / LOO.}
-\item{\code{"dss"}}{Dawid-Sebastiani score: cheap moment-based
-proper score depending only on predictive mean / SD.}
-\item{\code{"qs"}}{Quantile (pinball) loss at \code{quantile_level}.}
-\item{\code{"twcrps"}}{Threshold-weighted CRPS focusing scoring
-on the \verb{[lower, upper]} region.}
-\item{\code{"energy"}}{Multivariate Energy score across series.}
-\item{\code{"variogram"}}{Variogram score of order 0.5 across
-series (Scheuerer & Hamill, 2015).}
-\item{\code{"twenergy"}}{Threshold-weighted Energy score.}
+\item{\code{"crps"}}{Continuous ranked probability score (Gneiting and
+Raftery 2007) of the empirical distribution of the draws.}
+\item{\code{"drps"}}{Discrete ranked probability score, the CRPS of a
+count summed over its integer support.}
+\item{\code{"sis"}}{Scaled interval score: the width of the central
+interval plus a penalty for an observation outside it, scaled by
+\code{2 / (1 - interval_width)}.}
+\item{\code{"brier"}}{Brier score of a binary outcome: the squared
+difference between the observation and the mean of the draws.}
+\item{\code{"logs"}}{Log score, \verb{-log f(y)} for a kernel density
+estimate of the draws.}
+\item{\code{"dss"}}{Dawid-Sebastiani score, which depends on the
+predictive mean and standard deviation alone.}
+\item{\code{"qs"}}{Quantile (pinball) score at \code{quantile_level}.}
+\item{\code{"twcrps"}}{Threshold-weighted CRPS, which scores the
+forecast inside \verb{[lower, upper]}.}
+\item{\code{"energy"}}{Energy score of the series jointly.}
+\item{\code{"variogram"}}{Variogram score of order 0.5 of the series
+jointly (Scheuerer and Hamill 2015).}
+\item{\code{"twenergy"}}{Threshold-weighted energy score.}
 }
 }
 
 \examples{
 \dontrun{
 set.seed(11)
-simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR(),
-                     proportional_train = 0.75)
+simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+                    n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x),
+             trend_formula = ~ AR(p = 1),
+             data = simdat$data_train,
+             family = poisson(),
+             chains = 2, silent = 2)
 
-mod <- mvgam(
-  y ~ s(x),
-  trend_formula = ~ AR(p = 1),
-  data = simdat$data_train,
-  newdata = simdat$data_test,
-  family = poisson(),
-  chains = 2, silent = 2
-)
+# Forecast the held-out times, then score each series
+fc <- forecast(mod, newdata = simdat$data_test)
+sc <- score(fc, score = "drps")
+head(sc$series_1)
 
-# Score requires a forecast object with held-out test draws.
-fc <- forecast(mod)
-sc <- score(fc, score = "crps")
-head(sc[[1L]])
+# The DRPS summed over series at each forecast horizon
+plot(sc$all_series$eval_horizon, sc$all_series$score, type = "b",
+     xlab = "Horizon", ylab = "DRPS summed over series")
+
+# A joint score of both series at each horizon
+head(score(fc, score = "energy")$all_series)
+
+# Next: compare_scores() ranks several models by one rule
 }
 
 }

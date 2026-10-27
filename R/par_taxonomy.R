@@ -3,15 +3,14 @@
 # The `variable =` keyword resolver in `as.data.frame.mvgam.R`, the
 # summary blocks in `summary.mvgam.R` and the bucket builder
 # `categorize_mvgam_parameters()` in `index-mvgam.R` all ask what kind
-# of parameter a name is, and all ask here. With a regex of its own,
-# one caller counted `innovations_trend` as a parameter while another
-# counted it as a latent state.
+# of parameter a name is. All three call `mvgam_par_kind()` below,
+# which gives each name the same kind in every caller.
 #
-# The callers take different sets of kinds, by design. `?mvgam_draws`
-# documents the `smooth_params` keyword as the smoothing standard
-# deviations alone. The parameter buckets add the basis coefficients
-# and the Gaussian-process hyperparameters. The kinds below separate
-# all three, and no caller writes a regex to split them.
+# The callers take different sets of kinds, by design. The
+# `smooth_params` keyword selects the smoothing standard deviations
+# alone. The parameter buckets add the basis coefficients and the
+# Gaussian-process hyperparameters. The kinds below separate all
+# three. No caller needs a regex of its own to split them.
 #
 # Every parameter name has a side of the model and a kind.
 # `mvgam_par_side()` and `mvgam_par_kind()` decide both.
@@ -20,7 +19,7 @@
 #' Which side of the model a parameter belongs to
 #'
 #' The observation model or the latent trend. mvgam suffixes every
-#' trend-side parameter with `_trend`, and the suffix decides the side.
+#' trend-side parameter with `_trend`. The suffix decides the side.
 #' The factor loadings and their prior's hyperparameters have no
 #' suffix. `mvgam_par_kind()` classifies them before it consults the
 #' side.
@@ -43,14 +42,12 @@ mvgam_par_side <- function(pars) {
 #' coefficient `b_pre_trend_score`. The test matches the suffix only at
 #' the end of the name or before its index.
 #'
-#' A posterior name has an index, and `sigma_trend[1]` must match. A
-#' prior class has none, and the prior tables test the bare suffix
-#' themselves.
+#' A posterior name has an index. `sigma_trend[1]` must match. A prior
+#' class has none. The prior tables test the bare suffix themselves.
 #'
 #' A rotated companion ends in `_trend_tilde`, as `Phi_trend_tilde` does
-#' for `Phi_trend`. Testing the bare suffix filed those on the
-#' observation side, where `mvgam_par_kind()` classified them as
-#' `other`.
+#' for `Phi_trend`. The pattern matches that ending too, which keeps the
+#' companion on the trend side.
 #'
 #' @param pars Character vector of parameter names
 #' @return Logical vector
@@ -66,7 +63,7 @@ is_trend_parameter <- function(pars) {
 #' An `AR(p)` trend emits one coefficient per lag, `ar1_trend` through
 #' `ar<p>_trend`. The hierarchical mean and standard deviation of a
 #' coefficient, `mu_ar1_trend` and `sigma_ar1_trend`, are different
-#' parameters, and the pattern's leading `^` excludes them.
+#' parameters. The pattern's leading `^` excludes them.
 #'
 #' @param pars Character vector of parameter names
 #' @return Logical vector
@@ -92,6 +89,39 @@ is_ar_coefficient <- function(pars) {
 #' @noRd
 is_ar_partial <- function(pars) {
   grepl("^ar[0-9]+_pacf_trend$", pars)
+}
+
+
+#' The stem of a parameter name
+#'
+#' The base name with the opening bracket of its index, as `Z[` for
+#' `Z[3,1]`. Every name pattern of this file and of
+#' `hidden_par_pattern()` tests the stem and ignores the index
+#' contents.
+#'
+#' @param pars Character vector of parameter names
+#' @return Character vector of stems
+#' @noRd
+par_stem <- function(pars) {
+  sub("\\[.*$", "[", pars)
+}
+
+
+#' Classify parameter names one distinct stem at a time
+#'
+#' A trend fit saves thousands of state cells under a handful of
+#' stems. A classifier applied to the distinct stems runs each of its
+#' patterns over a few dozen names.
+#'
+#' @param pars Character vector of parameter names
+#' @param classify Function of a character vector of distinct stems,
+#'   returning one value per stem
+#' @return The values of `classify`, one per element of `pars`
+#' @noRd
+by_par_stem <- function(pars, classify) {
+  stem <- par_stem(pars)
+  stems <- unique(stem)
+  classify(stems)[match(stem, stems)]
 }
 
 
@@ -136,6 +166,16 @@ is_ar_partial <- function(pars) {
 #' @noRd
 mvgam_par_kind <- function(pars) {
   checkmate::assert_character(pars)
+  by_par_stem(pars, par_stem_kind)
+}
+
+
+#' The kind of each distinct parameter stem
+#'
+#' @param pars Character vector of distinct stems, as `par_stem()` gives
+#' @return Character vector of kinds, one per stem
+#' @noRd
+par_stem_kind <- function(pars) {
   if (length(pars) == 0L) {
     return(character(0L))
   }
@@ -150,20 +190,20 @@ mvgam_par_kind <- function(pars) {
   }
 
   # Working arrays the generated Stan declares at the top level of
-  # transformed parameters. Stan saves every such variable, and each
-  # one has meaning only inside the transformation that produced it.
+  # transformed parameters. Stan saves every such variable. Each one
+  # has meaning only inside the transformation that produced it.
   take(grepl(MVGAM_PAR_INTERNAL_PATTERN, pars), "internal")
 
   # The trend's own time-indexed states, in every spelling the
-  # generated Stan emits. A fit has one per time point and series,
-  # and no summary block claims them.
+  # generated Stan emits. A fit has one per time point and series. No
+  # summary block claims them.
   take(grepl(MVGAM_PAR_STATE_PATTERN, pars), "state")
 
-  # Factor loadings bridge the two sides and their names lack a
-  # side suffix, which puts them here before the side is consulted.
-  # A rotated fit has both bases and both are loadings;
-  # `is_hidden_par()` settles which one a reader sees, leaving this
-  # line to classify the raw block.
+  # Factor loadings bridge the two sides. Their names lack a side
+  # suffix, which puts them here before the side is consulted. A
+  # rotated fit has both bases and both are loadings.
+  # `is_hidden_par()` settles which one a reader sees. This line
+  # classifies the raw block.
   take(grepl("^Z(_tilde)?\\[", pars), "loading")
   take(grepl(MVGAM_PAR_LOADINGS_PRIOR_PATTERN, pars), "loadings_prior")
 
@@ -176,10 +216,10 @@ mvgam_par_kind <- function(pars) {
 
   # The population block proper, the smooth and special-term
   # coefficients brms reports with it, the monotonic simplexes and the
-  # centred intercept. Consumers take different combinations of them:
-  # `fixef()` takes the first two, `summary()` prints the simplexes
-  # in a block of their own, and the parameter buckets `tidy()` builds
-  # from group all four.
+  # centred intercept. Consumers take different combinations of them.
+  # `fixef()` takes the first two. `summary()` prints the simplexes in
+  # a block of their own. The parameter buckets `tidy()` builds from
+  # group all four.
   take(grepl(MVGAM_PAR_BETA_PATTERN, pars), "beta")
   take(grepl(MVGAM_PAR_BASIS_PATTERN, pars), "basis")
   take(grepl(MVGAM_PAR_SIMPLEX_PATTERN, pars), "simplex")
@@ -200,11 +240,11 @@ mvgam_par_kind <- function(pars) {
 #' The order a reader meets a fit's parameters in
 #'
 #' `brms:::reorder_pars()` orders a fitted object's parameters by
-#' class, and the classes run from the population coefficients through
-#' the scales to the quantities Stan keeps for itself. The kinds below
-#' are that order, stated once: the bucket a name belongs to decides
-#' where it goes and names within a bucket keep the order the program
-#' declares them in.
+#' class. The classes run from the population coefficients through the
+#' scales to the quantities Stan keeps for itself. The kinds below
+#' state that order once. The bucket a name belongs to decides where
+#' it goes. Names within a bucket keep the order the program declares
+#' them in.
 #'
 #' @param pars Character vector of parameter names
 #' @return Integer vector ordering `pars`
@@ -212,8 +252,8 @@ mvgam_par_kind <- function(pars) {
 mvgam_par_order <- function(pars) {
   checkmate::assert_character(pars)
   # An intercept opens its own class, as brms reports it. Stan's two
-  # accumulators have an order of their own, and every other name
-  # keeps the order the program declares it in.
+  # accumulators have an order of their own. Every other name keeps
+  # the order the program declares it in.
   intercept_last <- !grepl("_Intercept(_[0-9]+)?$", pars)
   within_kind <- match(pars, MVGAM_PAR_BOOKKEEPING_ORDER, nomatch = 0L)
   class_rank <- match(sub("[_[].*$", "", pars), MVGAM_PAR_CLASS_ORDER,
@@ -225,7 +265,7 @@ mvgam_par_order <- function(pars) {
 
 # The classes brms orders a fitted object by, as the kinds this
 # taxonomy names. Stan's own accumulators come last, as they do in
-# brms, and a name of no named kind sorts before them.
+# brms. A name of no named kind sorts just before them.
 #'@noRd
 MVGAM_PAR_KIND_ORDER <- c(
   "beta", "basis", "ranef_sd", "smooth_sd", "gp", "family", "intercept",
@@ -235,55 +275,57 @@ MVGAM_PAR_KIND_ORDER <- c(
 
 
 # The brms classes that share a kind, in the order
-# `brms:::reorder_pars()` gives them: the unpenalised smooth
-# coefficients before the special-term ones, the group-level standard
-# deviations before their correlations, and a Gaussian process's
-# marginal deviation before its length-scale.
+# `brms:::reorder_pars()` gives them. The unpenalised smooth
+# coefficients precede the special-term ones. The group-level standard
+# deviations precede their correlations. A Gaussian process's marginal
+# deviation precedes its length-scale.
 #'@noRd
 MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "sd", "cor", "sdgp", "lscale")
 
 
 # The name patterns, written once. A trend-side name matches the
-# same pattern as its observation-side counterpart, and the side is
-# what tells the two apart. Writing a second `.*_trend` variant of
-# each pattern is what let the two accounts drift.
-# The intermediates of the VAR stationarity transformation, the
-# moving-average innovations an `AR(ma = TRUE)` or `RW(ma = TRUE)`
-# forms from the scaled ones, and the Cholesky factors a correlated
-# trend samples. Stan saves every variable declared at the top level
-# of transformed parameters, and these reach the posterior of any
-# VAR, VARMA or ARMA fit without naming a quantity a reader
+# same pattern as its observation-side counterpart. The side tells the
+# two apart.
+#
+# The first alternation of the internal pattern lists Stan working
+# arrays. They are the intermediates of the VAR stationarity
+# transformation, the moving-average innovations an `AR(ma = TRUE)` or
+# `RW(ma = TRUE)` forms from the scaled ones and the Cholesky factors a
+# correlated trend samples. Stan saves every variable declared at the
+# top level of transformed parameters. These reach the posterior of
+# any VAR, VARMA or ARMA fit without naming a quantity a reader
 # interprets. A Cholesky factor carries a unit diagonal and a
-# structurally zero upper triangle, both of which print as a row
-# with no posterior width. `A_trend` is the unconstrained matrix
-# the stationarity transform turns into `Phi_trend`, and `Z_cols` the
-# sum-to-zero columns `Z` is assembled from. A structured loadings
+# structurally zero upper triangle. Both print as a row with no
+# posterior width. `A_trend` is the unconstrained matrix the
+# stationarity transform turns into `Phi_trend`. `Z_cols` holds the
+# sum-to-zero columns `Z` is assembled from. Multiplicative gamma
+# process shrinkage samples `Z_raw`, the loadings before their column
+# scales. A structured loadings
 # prior builds its correlation `Phi_loadings` and that matrix's
-# Cholesky factor from the length-scales `summary()` reports, and its
-# column scales `Psi_diag` from the increments `varrho_inv`. `residual_cor()`
-# and `shared_variation()` take all of them from
-# `posterior::as_draws_matrix(object$fit)`, which reaches the draws
-# without this projection. A local linear trend samples its slope
+# Cholesky factor from the length-scales `summary()` reports. It builds
+# its column scales `Psi_diag` from the increments `varrho_inv`.
+# `residual_cor()` and `shared_variation()` take all of them from
+# `fit_parameter_draws()`. That conversion keeps the Stan names this
+# classification hides. A local linear trend samples its slope
 # scale as `sigma_slope_raw_trend`, in units of the default prior's
-# scale, and reports `sigma_slope_trend`. `scaled_innovations_trend`
-# is the innovation a forecast seed needs and is classified a state.
+# scale. It reports `sigma_slope_trend`. `scaled_innovations_trend` is
+# the innovation a forecast seed needs. It is classified a state.
 #
 # The second alternation is brms's own group-level workspace, as
 # `brms:::exclude_pars_re()` lists it. brms computes the scaled
 # effects from the standardised deviates `z_<id>`, the correlation
-# Cholesky `L_<id>` and the correlation matrix `Cor_<id>`, and drops
-# all three unless the user asks for them with
-# `save_pars(all = TRUE)`. mvgam writes its own Stan, and without this
-# pattern `variables()` listed `z_1[1,1]` with the
-# `r_grp[a,Intercept]` computed from it. The trend side spells the
-# same names with `_trend` after the id. The lower-case `cor_<id>`
-# vector is a different parameter, which is aliased and kept.
+# Cholesky `L_<id>` and the correlation matrix `Cor_<id>`. It always
+# drops `Cor_<id>`. It drops `z_<id>` and `L_<id>` unless the user asks
+# for them with `save_pars(all = TRUE)`. mvgam writes its own Stan and
+# hides all three here. The trend side spells the same names with
+# `_trend` after the id. The lower-case `cor_<id>` vector is a
+# different parameter, which is aliased and kept.
 #'@noRd
 MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "^(ma_innovations_trend|A_trend|A_group_trend|D_trend|D_group_trend|",
   "L_Omega_trend|L_Sigma_trend|L_Omega_global_trend|",
   "L_Omega_group_trend|L_deviation_group_trend|L_group_trend|",
-  "Z_cols|varrho_inv|Phi_loadings|L_Phi_loadings|",
+  "Z_cols|Z_raw|varrho_inv|Phi_loadings|L_Phi_loadings|",
   "sigma_slope_raw_trend)\\[",
   "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\["
 )
@@ -309,7 +351,7 @@ MVGAM_PAR_STATE_PATTERN <- paste0(
 )
 
 # The per-cell matrix arrays a correlated or hierarchical trend
-# derives. A high-dimensional fit has hundreds of cells of them, and
+# derives. A high-dimensional fit has hundreds of their cells.
 # `summary()` prints them only with `matrices = TRUE`. The Cholesky
 # factors they are built from carry the kind `internal` and never
 # reach a printed summary.
@@ -366,20 +408,20 @@ MVGAM_PAR_SMOOTH_SD_PATTERN <- "^sds_"
 #'@noRd
 MVGAM_PAR_SMOOTH_COEF_PATTERN <- "^(s_|zs_)"
 
-# Gaussian-process marginal deviations and length-scales, and the
-# standardised basis coefficients they scale. Grouped with the
-# smooths by the parameter buckets and reported apart from them by
-# `summary()`.
+# Gaussian-process marginal deviations and length-scales. The second
+# pattern matches the standardised basis coefficients they scale. The
+# parameter buckets group these with the smooths. `summary()` reports
+# them apart.
 #'@noRd
 MVGAM_PAR_GP_PATTERN <- "^(sdgp_|lscale_)"
 #'@noRd
 MVGAM_PAR_GP_COEF_PATTERN <- "^zgp_"
 
-# The group-level block as brms spells it after renaming: the
-# standard deviations and the correlation vector, and the scaled
-# effects they govern. The workspace those are built from carries a
-# bare `L_` or `z_` prefix and is claimed by the internal pattern
-# above. Matching either prefix here would take the trend's own
+# The group-level block as brms spells it after renaming. The first
+# pattern matches the standard deviations and the correlation vector.
+# The second matches the scaled effects they govern. The workspace
+# those are built from carries a bare `L_` or `z_` prefix. The
+# internal pattern above claims it. Matching either prefix here would take the trend's own
 # innovation Cholesky (`L_Omega_trend`) for a group-level effect.
 #'@noRd
 MVGAM_PAR_RANEF_SD_PATTERN <- "^(sd_|cor_)"
@@ -432,14 +474,14 @@ MVGAM_FAMILY_DPARS <- list(
   mvt = c("Psi", "nu")
 )
 
-# The family parameters as the posterior names them: any parameter
-# of `MVGAM_FAMILY_DPARS`, and the discrimination `disc` brms saves
-# for the ordinal families. A response of a model with several takes
-# its key after an underscore, as `sigma_y2`. A mixture gives each
-# component's parameters the component's number, as `sigma1` and
-# `theta2`. The mixing proportions are a family parameter only in
-# that spelling: a bare `theta` is the simplex the program is
-# identified by, and `theta_features` is the trend's own loading-prior
+# The family parameters as the posterior names them. These are the
+# parameters of `MVGAM_FAMILY_DPARS` and the discrimination `disc`
+# brms saves for the ordinal families. A response of a model with
+# several takes its key after an underscore, as `sigma_y2`. A mixture
+# gives each component's parameters the component's number, as
+# `sigma1` and `theta2`. The mixing proportions are a family parameter
+# only in that spelling. A bare `theta` is the simplex the program is
+# identified by. `theta_features` is the trend's own loading-prior
 # length-scale.
 #'@noRd
 MVGAM_PAR_FAMILY_PATTERN <- paste0(

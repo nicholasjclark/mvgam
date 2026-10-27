@@ -1,165 +1,8 @@
-#' Posterior Predictive Distribution for mvgam Models
-#'
-#' @description
-#' Generate posterior predictive samples from fitted mvgam models with
-#' observation-level noise. Combines expected values with family-specific
-#' random draws.
-#'
-#' @name posterior_predict
-NULL
-
-
-# ============ Truncation Helper Functions ============
-#
-# These functions reimplement brms' internal truncation sampling logic
-# (rcontinuous, rdiscrete, check_discrete_trunc_bounds). Reimplementation
-# is necessary because:
-#
-# 1. brms does NOT export these functions (no @export tag)
-# 2. Using brms:::rcontinuous() violates R package best practices
-# 3. brms maintainers have indicated these are internal implementation
-#    details subject to change without notice
-#
-# The implementations follow brms' approach:
-# - Inverse CDF transformation for continuous distributions
-# - Rejection sampling for discrete distributions
-# - Warning threshold of 1% for invalid samples
-#
-# Verified against brms version 2.22.9 as reference implementation.
-
-
-#' Extract Truncation Bounds for Posterior Prediction
-#'
-#' Extracts constant lower and upper truncation bounds from fitted mvgam
-#' model. Variable bounds (observation-specific) are not yet supported.
-#'
-#' @param object A fitted mvgam object
-#' @param nobs Integer; number of observations for bounds replication
-#'
-#' @return Named list with two elements: `lb` (numeric vector of length
-#'   nobs or NULL if no lower bound) and `ub` (numeric vector of length
-#'   nobs or NULL if no upper bound). Both NULL if model has no truncation.
-#'
-#' @details
-#' Truncation bounds are specified via `trunc()` in the model formula,
-#' e.g., `y | trunc(lb = 0, ub = 10) ~ x`. Bounds are stored in standata.
-#'
-#' Constant bounds: All observations share the same lb/ub values.
-#' Variable bounds: Observation-specific bounds from data columns.
-#' Variable bounds trigger a warning and are not yet supported.
-#'
-#' @noRd
-extract_truncation_bounds <- function(object, nobs) {
-  checkmate::assert_class(object, "mvgam")
-  checkmate::assert_int(nobs, lower = 1)
-
-  if (is.null(object$standata)) {
-    return(list(lb = NULL, ub = NULL))
-  }
-
-  lb <- object$standata$lb
-  ub <- object$standata$ub
-
-  if (is.null(lb) && is.null(ub)) {
-    return(list(lb = NULL, ub = NULL))
-  }
-
-  # Validate extracted bounds are numeric
-  if (!is.null(lb)) {
-    checkmate::assert_numeric(lb, any.missing = FALSE)
-  }
-
-  if (!is.null(ub)) {
-    checkmate::assert_numeric(ub, any.missing = FALSE)
-  }
-
-  # Validate no mixed finite/infinite within bounds vector
-  if (!is.null(lb)) {
-    has_finite <- any(is.finite(lb))
-    has_infinite <- any(!is.finite(lb))
-    if (has_finite && has_infinite) {
-      stop(insight::format_error(c(
-        "Mixed finite and infinite lower bounds not supported.",
-        i = "All lb values must be either finite or all infinite (-Inf)."
-      )))
-    }
-  }
-  if (!is.null(ub)) {
-    has_finite <- any(is.finite(ub))
-    has_infinite <- any(!is.finite(ub))
-    if (has_finite && has_infinite) {
-      stop(insight::format_error(c(
-        "Mixed finite and infinite upper bounds not supported.",
-        i = "All ub values must be either finite or all infinite (Inf)."
-      )))
-    }
-  }
-
-  # Fail-fast: validate lb < ub for constant bounds
-  if (!is.null(lb) && !is.null(ub)) {
-    finite_lb <- lb[is.finite(lb)]
-    finite_ub <- ub[is.finite(ub)]
-    if (length(finite_lb) > 0 && length(finite_ub) > 0) {
-      lb_vals <- unique(finite_lb)
-      ub_vals <- unique(finite_ub)
-      if (length(lb_vals) == 1 && length(ub_vals) == 1 && lb_vals >= ub_vals) {
-        stop(insight::format_error(paste0(
-          "Truncation bound 'lb' (", lb_vals, ") must be below 'ub' (",
-          ub_vals, ")."
-        )), call. = FALSE)
-      }
-    }
-  }
-
-  # Process lower bound
-  if (!is.null(lb)) {
-    finite_lb <- lb[is.finite(lb)]
-    if (length(finite_lb) == 0) {
-      lb <- NULL
-    } else if (length(unique(finite_lb)) == 1) {
-      lb <- rep(unique(finite_lb), nobs)
-    } else {
-      warn_once(
-        c(
-          "Variable truncation bounds are not supported for predictions.",
-          "i" = "Truncation will be ignored for posterior_predict."
-        ),
-        "mvgam_variable_trunc_lb"
-      )
-      lb <- NULL
-    }
-  }
-
-  # Process upper bound
-  if (!is.null(ub)) {
-    finite_ub <- ub[is.finite(ub)]
-    if (length(finite_ub) == 0) {
-      ub <- NULL
-    } else if (length(unique(finite_ub)) == 1) {
-      ub <- rep(unique(finite_ub), nobs)
-    } else {
-      warn_once(
-        c(
-          "Variable truncation bounds are not supported for predictions.",
-          "i" = "Truncation will be ignored for posterior_predict."
-        ),
-        "mvgam_variable_trunc_ub"
-      )
-      ub <- NULL
-    }
-  }
-
-  list(lb = lb, ub = ub)
-}
-
-
-#' Determine if Family Uses Integer Values
-#'
-#' Returns TRUE for count/discrete families that produce integer samples.
+#' Whether a family's draws are whole numbers
 #'
 #' @param family_name Character; distribution family name
 #'
-#' @return Logical; TRUE if family produces integer samples
+#' @return Logical scalar
 #'
 #' @noRd
 family_uses_integers <- function(family_name) {
@@ -173,7 +16,7 @@ family_uses_integers <- function(family_name) {
     "hurdle_poisson", "hurdle_negbinomial", "hurdle_cumulative",
     "discrete_weibull", "com_poisson", "beta_nb", "com_binomial",
     # A multinomial's counts and a categorical's one-hot row are both
-    # whole numbers. Each observed value carries an atom, and the
+    # whole numbers. Each observed value is an atom of the law. The
     # quantile residual randomises across that atom's interval.
     "multi", "categ"
   )
@@ -182,30 +25,25 @@ family_uses_integers <- function(family_name) {
 }
 
 
-#' Apply Truncation to Samples Matrix
+#' Draws restricted to their truncation bounds
 #'
-#' Applies truncation bounds to samples by resampling out-of-bounds values
-#' or clamping to bounds when resampling fails.
+#' A family with a quantile function replaces each out-of-bounds draw
+#' exactly, by inverting its distribution restricted to the bounds. A
+#' family without one, such as a Tweedie or a COM-binomial, redraws
+#' from itself up to `ntrys` times. A draw that never lands inside is
+#' clamped onto the nearer bound. A warning reports clamping of more
+#' than one percent of the draws.
 #'
-#' @param samples Matrix `\\[ndraws x nobs\\]` or vector of samples
-#' @param family_name Character; distribution family name
-#' @param lb Numeric; lower bound(s) - scalar or vector of length nobs
-#' @param ub Numeric; upper bound(s) - scalar or vector of length nobs
-#' @param ntrys Integer; rejection sampling attempts for discrete families
-#' @param ndraws Integer; number of draws (needed if samples is vector)
-#' @param nobs Integer; number of observations (needed if samples is vector)
+#' @param samples Matrix `\\[ndraws x nobs\\]` or vector of draws
+#' @param lb,ub Numeric bounds, scalar or one per observation, or `NULL`
+#' @param ntrys Integer; redraw attempts for a family without a quantile
+#'   function
+#' @param ndraws,nobs Integer dimensions of the draws
+#' @param redraw Function returning fresh draws of the same family
+#' @param spec Distribution spec from `family_dist_spec()`, or `NULL`
+#' @param discrete Logical. `TRUE` for an integer-valued family
 #'
-#' @return Matrix `\\[ndraws x nobs\\]` of truncated samples
-#'
-#' @details
-#' The function works column-by-column to handle observation-specific bounds.
-#' For efficiency, columns with no out-of-bounds samples are skipped.
-#'
-#' Uses inverse CDF for continuous distributions when possible, falls back
-#' to rejection sampling. For discrete distributions, uses rejection sampling.
-#'
-#' When resampling fails (after ntrys for rejection), samples are clamped
-#' to bounds with a warning if >1% of samples were clamped.
+#' @return The draws, in the shape `samples` arrived in
 #'
 #' @noRd
 apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
@@ -217,39 +55,17 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
   checkmate::assert_int(nobs, lower = 1)
   checkmate::assert_function(redraw)
 
-  # Convert vector to matrix for consistent handling
   is_vector <- !is.matrix(samples)
   if (is_vector) {
     samples <- matrix(samples, nrow = ndraws, ncol = nobs)
   }
-
-  # Handle NULL bounds
-  if (is.null(lb) || all(is.infinite(lb) & lb < 0)) {
-    lb <- rep(-Inf, nobs)
-  }
-  if (is.null(ub) || all(is.infinite(ub) & ub > 0)) {
-    ub <- rep(Inf, nobs)
-  }
-  if (length(lb) == 1) lb <- rep(lb, nobs)
-  if (length(ub) == 1) ub <- rep(ub, nobs)
-
+  lb <- rep_len(lb %||% -Inf, nobs)
+  ub <- rep_len(ub %||% Inf, nobs)
   lb_mat <- data2draws(lb, dim(samples))
   ub_mat <- data2draws(ub, dim(samples))
   outside <- function(x) !is.na(x) & (x < lb_mat | x > ub_mat)
-
   invalid <- outside(samples)
-  total_samples <- ndraws * nobs
 
-  # Where the family's own quantile function is known, an
-  # out-of-bounds draw is replaced exactly, by inverting the
-  # distribution restricted to the bounds. Nothing is rejected and
-  # nothing needs clamping.
-  #
-  # An earlier version resolved the distribution by name and called
-  # it with no parameters at all, so a replacement came from the
-  # standard member of the family rather than from the observation's
-  # own predictive: on a gaussian centred at 50 truncated below at
-  # zero, every replaced draw landed inside [0, 2].
   if (any(invalid) && !is.null(spec)) {
     exact <- truncated_dist_draws(spec, invalid, lb, ub, discrete)
     if (!is.null(exact)) {
@@ -258,54 +74,31 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
       invalid <- invalid & !usable
     }
   }
-
-  # A family with no quantile function, such as a Tweedie or a
-  # COM-binomial, is redrawn from itself instead, and whatever will
-  # not fall inside the bounds is clamped onto them.
   for (i in seq_len(ntrys)) {
     if (!any(invalid)) break
-    fresh <- redraw()
-    if (!is.matrix(fresh)) {
-      fresh <- matrix(fresh, nrow = nrow(samples), ncol = nobs)
-    }
+    fresh <- matrix(redraw(), nrow = ndraws, ncol = nobs)
     usable <- invalid & !is.na(fresh) & !outside(fresh)
     samples[usable] <- fresh[usable]
     invalid <- invalid & !usable
   }
 
-  # Clamp whatever no redraw could place inside the bounds.
   n_clamped <- sum(invalid)
   if (n_clamped > 0) {
-    too_low <- invalid & samples < lb_mat
-    too_high <- invalid & samples > ub_mat
-    samples[too_low] <- lb_mat[too_low]
-    samples[too_high] <- ub_mat[too_high]
+    samples[invalid] <- pmin(pmax(samples[invalid], lb_mat[invalid]),
+                             ub_mat[invalid])
   }
-
-  # Warn if significant clamping occurred (>1% matches brms threshold)
-  clamp_frac <- n_clamped / total_samples
-  if (clamp_frac > 0.01) {
+  if (n_clamped > 0.01 * ndraws * nobs) {
     warn_once(
       c(
-        paste0(
-          round(clamp_frac * 100, 1), "% of samples (",
-          n_clamped, " of ", total_samples, ") were clamped."
-        ),
-        "i" = paste(
-          "The model places this share of its predictive draws",
-          "outside the truncation bounds."
-        )
+        paste0(round(100 * n_clamped / (ndraws * nobs), 1),
+               " percent of predictive draws (", n_clamped, " of ",
+               ndraws * nobs, ") were clamped onto a truncation bound."),
+        i = "The model places that share of its draws outside the bounds."
       ),
       "mvgam_truncation_clamp"
     )
   }
-
-  # Convert back to vector if input was vector
-  if (is_vector) {
-    samples <- as.vector(samples)
-  }
-
-  samples
+  if (is_vector) as.vector(samples) else samples
 }
 
 
@@ -330,15 +123,13 @@ rbeta_binomial_draws <- function(n, size, mu, phi) {
 }
 
 
-#' Sample from a Probability Distribution
-#'
-#' Internal helper that samples from a specified distribution using
-#' appropriate parameters. Used to add observation noise to predicted
-#' expected values.
+#' Predictive draws of one family at its parameters
 #'
 #' @param family_name Character name of the distribution (e.g., "poisson")
 #' @param ndraws Integer; number of draws per observation
-#' @param epred Matrix `\\[ndraws x nobs\\]` of expected values
+#' @param epred Matrix `\\[ndraws x nobs\\]` of the inverse link of the
+#'   predictor, the base distribution's `mu`. A lognormal's `mu` is its
+#'   `meanlog`. A hurdle or zero-inflated `mu` excludes the mass at zero.
 #' @param sigma Optional matrix `\\[ndraws x nobs\\]` of scale/dispersion.
 #'   Required for: gaussian, student, lognormal, hurdle_lognormal,
 #'   skew_normal, exgaussian, gen_extreme_value, asym_laplace.
@@ -381,14 +172,12 @@ rbeta_binomial_draws <- function(n, size, mu, phi) {
 #' @param bias Optional matrix `\\[ndraws x nobs\\]` of starting point bias (0-1).
 #'   Required for: wiener
 #'
-#' @return Vector of sampled values with length = length(epred). Values are
-#'   integers for count families, doubles for continuous. Used internally
-#'   by posterior_predict.mvgam() which reshapes to `\\[ndraws x nobs\\]` matrix.
+#' @return Vector of `length(epred)` draws, in the column order of
+#'   `epred`
 #'
 #' @details
-#' An ordinal family never reaches this sampler. Its predictive
-#' distribution is its category probabilities, and `ordinal_draws()`
-#' draws from those.
+#' An ordinal family draws from its category probabilities through
+#' `ordinal_draws()`.
 #'
 #' @noRd
 sample_from_family <- function(family_name, ndraws, epred,
@@ -417,8 +206,15 @@ sample_from_family <- function(family_name, ndraws, epred,
   # `data2draws()` gives every draw its own observation's count.
   trial_draws <- if (is.null(trials)) NULL else data2draws(trials, dim(epred))
 
-  # Named so truncation can ask the same family for another draw
-  # rather than reaching for a second account of what the family is.
+  # A count law restricted to positive values. Inverting its survival
+  # function on `(0, S(0))` is exact for any count law. The survival
+  # scale keeps a small mean, whose `S(0)` is near zero, accurate.
+  positive_draw <- function(pfun, qfun, ...) {
+    v <- stats::runif(length(epred), 0, pfun(0, ..., lower.tail = FALSE))
+    qfun(v, ..., lower.tail = FALSE)
+  }
+
+  # Truncation redraws through the same function.
   draw_once <- function() switch(
     family_name,
 
@@ -442,29 +238,23 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "exponential" = {
-      # E[X] = 1/rate, so rate = 1/epred
       stats::rexp(length(epred), rate = 1 / epred)
     },
 
     "gamma" = {
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
-      # E[X] = shape * scale, so scale = epred / shape
       scale <- epred / shape
       stats::rgamma(length(epred), shape = shape, scale = scale)
     },
 
     "weibull" = {
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
-      # E[X] = scale * gamma(1 + 1/shape)
-      # scale = epred / gamma(1 + 1/shape)
       scale <- epred / gamma(1 + 1 / shape)
       stats::rweibull(length(epred), shape = shape, scale = scale)
     },
 
     "frechet" = {
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
-      # E[X] = scale * gamma(1 - 1/shape)
-      # scale = epred / gamma(1 - 1/shape)
       scale <- epred / gamma(1 - 1 / shape)
       extraDistr::rfrechet(length(epred), scale = scale, shape = shape)
     },
@@ -481,10 +271,6 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "tweedie" = {
-      # Compound Poisson-gamma; uses mgcv::rTweedie (already an
-      # mvgam hard dependency) so no Suggests check is needed.
-      # mphi and mtheta arrive as [ndraws x nobs] matrices from
-      # the custom-family dpars.
       checkmate::assert_matrix(mphi, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(mtheta, nrows = ndraws, ncols = ncol(epred))
       mgcv::rTweedie(
@@ -495,10 +281,6 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "beta_nb" = {
-      # Beta negative binomial. `epred` is the mean mu; the Stan side
-      # sets the Beta mixing scale to mu * mtail / shape so drawing
-      # the success probability from Beta(1 + mtail, that scale) and
-      # then a negative binomial reproduces the fitted distribution.
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(mtail, nrows = ndraws, ncols = ncol(epred))
       rbeta_nb_mvgam(
@@ -510,19 +292,12 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "com_binomial" = {
-      # Conway-Maxwell-Binomial. `epred` here is the probability
-      # `p = plogis(linpred)`, populated by `family$linkinv` in
-      # the upstream pipeline. Reuses
-      # `posterior_predict_com_binomial()` so the CMB drawing
-      # logic lives in one place (same kernel as
-      # `predict(type = "response")`).
+      # `posterior_predict_com_binomial()` holds the CMB sampler.
       checkmate::assert_matrix(nu, nrows = ndraws,
                                 ncols = ncol(epred))
       checkmate::assert_numeric(trials, lower = 0L,
                                  len = ncol(epred))
-      # `epred` is on the probability scale. `qlogis` rebuilds the
-      # link-scale predictor `posterior_predict_com_binomial()` takes,
-      # the scale every family kernel takes.
+      # The kernel takes the link-scale predictor.
       linpred_cmb <- stats::qlogis(epred)
       posterior_predict_com_binomial(
         linpred     = linpred_cmb,
@@ -540,18 +315,12 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "lognormal" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
-      # `epred` here is the inverse link of the predictor, which for a
-      # lognormal is `meanlog` itself and not `E[Y]`. brms samples from
-      # the same parameter; correcting it to the mean would both shift
-      # the draws and produce NaN wherever `meanlog` is not positive.
       stats::rlnorm(length(epred), meanlog = epred, sdlog = sigma)
     },
 
     "shifted_lognormal" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(ndt, nrows = ndraws, ncols = ncol(epred))
-      # As for the lognormal, `epred` is `meanlog` rather than `E[Y]`,
-      # so it is the shift's own parameter and needs no correction.
       brms::rshifted_lnorm(
         length(epred),
         meanlog = epred,
@@ -597,13 +366,11 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "negbinomial2" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
-      # sigma is sqrt(1/shape), so shape = 1/sigma^2
-      shape <- 1 / (sigma^2)
-      stats::rnbinom(length(epred), mu = epred, size = shape)
+      # `sigma` is `1 / sqrt(shape)`
+      stats::rnbinom(length(epred), mu = epred, size = 1 / sigma^2)
     },
 
     "geometric" = {
-      # Geometric is negbinomial with shape = 1
       stats::rnbinom(length(epred), mu = epred, size = 1)
     },
 
@@ -621,17 +388,12 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "binomial" = {
       checkmate::assert_numeric(trials, min.len = 1)
-      # epred from linkinv is probability (0-1), use directly as prob
-      # (matches brms behavior in posterior_predict_binomial)
       stats::rbinom(length(epred), size = trial_draws, prob = epred)
     },
 
     "beta_binomial" = {
       checkmate::assert_numeric(trials, min.len = 1)
       checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
-      # `epred` is the inverse link of the predictor, so it is already
-      # the per-trial probability the sampler wants, as it is for the
-      # plain binomial above.
       rbeta_binomial_draws(length(epred), size = trial_draws, mu = epred,
                            phi = phi)
     },
@@ -689,7 +451,6 @@ sample_from_family <- function(family_name, ndraws, epred,
       checkmate::assert_matrix(zoi, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(coi, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
-      # zoi = P(Y in {0,1}), coi = P(Y=1 | Y in {0,1})
       tmp <- stats::runif(length(epred))
       one_or_zero <- stats::runif(length(epred))
       shapes <- beta_shapes(epred, phi)
@@ -717,8 +478,7 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "wiener" = {
-      # Wiener diffusion model: epred is drift rate (delta)
-      # bs=boundary separation, ndt=non-decision time, bias=starting point
+      # `epred` is the drift rate
       checkmate::assert_matrix(bs, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(ndt, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(bias, nrows = ndraws, ncols = ncol(epred))
@@ -735,18 +495,16 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "hurdle_poisson" = {
       checkmate::assert_matrix(hu, nrows = ndraws, ncols = ncol(epred))
-      tmp <- stats::runif(length(epred))
-      # Sample from truncated Poisson
-      t_val <- -log(1 - stats::runif(length(epred)) * (1 - exp(-epred)))
-      ifelse(tmp < hu, 0L, stats::rpois(length(epred), lambda = epred - t_val) + 1)
+      ifelse(stats::runif(length(epred)) < hu, 0L,
+             positive_draw(stats::ppois, stats::qpois, lambda = epred))
     },
 
     "hurdle_negbinomial" = {
       checkmate::assert_matrix(hu, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
-      tmp <- stats::runif(length(epred))
-      t_val <- -log(1 - stats::runif(length(epred)) * (1 - exp(-epred)))
-      ifelse(tmp < hu, 0L, stats::rnbinom(length(epred), mu = epred - t_val, size = shape) + 1)
+      ifelse(stats::runif(length(epred)) < hu, 0L,
+             positive_draw(stats::pnbinom, stats::qnbinom, mu = epred,
+                           size = shape))
     },
 
     "hurdle_gamma" = {
@@ -765,26 +523,14 @@ sample_from_family <- function(family_name, ndraws, epred,
              stats::rlnorm(length(epred), meanlog = epred, sdlog = sigma))
     },
 
-    # ============ Unsupported families ============
-
-    stop(insight::format_error(c(
-      cli::format_inline(
-        paste0("Posterior predictive sampling is unavailable for ",
-               "family {.val {family_name}}.")
-      ),
-      i = paste0(
-        "See ?mvgam_families for the families mvgam can draw from."
-      )
-    )))
+    refuse_missing_family_dispatch(family_name, "predictive draws")
   )
 
   samples <- draw_once()
 
-  # Apply truncation if bounds are specified
   if (has_truncation) {
-    # `epred` is already on the parameter's own scale, which is what
-    # the spec calls `mu`, so the identity link is the honest one to
-    # name here.
+    # `epred` is `mu` on its own scale. The spec takes it under the
+    # identity link.
     samples <- apply_truncation(
       samples = samples,
       lb = lb,
@@ -807,38 +553,15 @@ sample_from_family <- function(family_name, ndraws, epred,
 }
 
 
-#' Get Distributional Parameters Required by Family
+#' The distributional parameters a family declares other than `mu`
 #'
-#' Returns a character vector of distributional parameter names (dpars) that
-#' a given family requires for posterior prediction sampling.
+#' `MVGAM_FAMILY_DPARS` lists them for every brms and mvgam family. A
+#' trial count is data and stays out of the list.
 #'
-#' @param family_name Character name of the family (e.g., "gaussian", "poisson")
+#' @param family_name Character name of the family (e.g., "gaussian")
 #'
-#' @return Character vector of parameter names. Possible values:
-#'   \itemize{
-#'     \item "sigma" - scale/dispersion (gaussian, student, lognormal, etc.)
-#'     \item "shape" - shape parameter (gamma, negbinomial, weibull, etc.)
-#'     \item "nu" - degrees of freedom (student-t)
-#'     \item "phi" - precision parameter (beta families)
-#'     \item "zi" - zero-inflation probability
-#'     \item "hu" - hurdle probability
-#'     \item "zoi" - zero-one inflation probability
-#'     \item "coi" - conditional one-inflation probability
-#'     \item "ndt" - non-decision time (shifted_lognormal, wiener, exgaussian)
-#'     \item "xi" - tail parameter (gen_extreme_value)
-#'     \item "quantile" - quantile parameter (asym_laplace)
-#'     \item "kappa" - concentration (von_mises)
-#'     \item "bs" - boundary separation (wiener)
-#'     \item "bias" - starting point bias (wiener)
-#'     \item "beta" - rate of exponential component (exgaussian)
-#'   }
-#'   Note: "trials" is NOT returned as it comes from data, not posterior.
-#'
-#' @details
-#' Covers the brms families, whether or not
-#' \code{sample_from_family()} can draw from them; one it cannot draw
-#' from errors at sampling time rather than here. A family absent from
-#' the mapping returns an empty character vector.
+#' @return Character vector of parameter names, empty for a family the
+#'   list lacks
 #'
 #' @noRd
 get_family_dpars <- function(family_name) {
@@ -850,18 +573,15 @@ get_family_dpars <- function(family_name) {
 
 #' Resolve every distributional parameter a fitted family declares
 #'
-#' brms settles a distributional parameter one of two ways, in
-#' `prepare_predictions.brmsframe()`: either the user gave it a formula
-#' of its own, in which case it is a linear predictor evaluated per
-#' observation, or it was sampled as a scalar (or one scalar per
-#' series) and can be read straight off the draws. This does the same,
-#' and is the single seam the prediction paths go through so the two
-#' cases never have to be told apart at a call site.
+#' A parameter with a formula of its own is a linear predictor,
+#' evaluated per observation. Any other parameter was sampled as a
+#' scalar, or one scalar per series. Its values come from the draws. Every
+#' prediction path calls this function for both kinds.
 #'
 #' Names are the bare parameter names throughout. A model with several
-#' responses stores each response's parameters under its key,
-#' `response_suffix()` applies that on the way in and the result is
-#' keyed by the bare name again.
+#' responses stores each response's parameters under its key.
+#' `response_suffix()` adds the key on the way in. The result is keyed
+#' by the bare name.
 #'
 #' @param object An `mvgam` model object
 #' @param dpar_names Bare names of the parameters the family declares
@@ -886,11 +606,8 @@ resolve_family_pars <- function(object, dpar_names, ndraws, nobs,
     return(list())
   }
 
-  # The prediction paths resolve the count before they compute the
-  # mean, so `draw_ids` normally arrives already settled. Resolving
-  # again here is idempotent and makes the seam safe to call on its
-  # own: the two branches below read from different extractors, and a
-  # bare count would let each choose its own draws.
+  # The two branches below call separate extractors. A bare count would
+  # let each choose its own draws. Resolving it again is idempotent.
   draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
 
   predicted <- predicted_dpar_names(object, dpar_names, resp = resp)
@@ -916,7 +633,7 @@ resolve_family_pars <- function(object, dpar_names, ndraws, nobs,
       draw_ids = draw_ids
     )
     # `extract_dpars_from_stanfit()` leaves out a parameter it cannot
-    # find, and each name it returns is matched back to its bare one.
+    # find. Each name it returns is matched back to its bare one.
     names(found) <- sampled[match(names(found), suffixed)]
     out[names(found)] <- found
   }
@@ -928,11 +645,10 @@ resolve_family_pars <- function(object, dpar_names, ndraws, nobs,
 #' Names of the distributional parameters carrying their own formula
 #'
 #' A distributional submodel such as `sigma ~ x` or `nu ~ z` is
-#' recorded by brms in `pforms` on the model formula. Such a parameter
-#' has no scalar counterpart in the posterior: it is a linear predictor
-#' evaluated per observation, rebuilt from its coefficients. Non-linear
-#' parameters also live in `pforms`, and the names returned are only
-#' those the family declares.
+#' recorded in `pforms` on the model formula. Such a parameter is a
+#' linear predictor evaluated per observation. `pforms` also holds
+#' non-linear parameters. The function returns the names the family
+#' declares.
 #'
 #' @param object An `mvgam` model object
 #' @param dpar_names Distributional parameters the family declares
@@ -950,15 +666,12 @@ predicted_dpar_names <- function(object, dpar_names, resp = NULL) {
 }
 
 
-#' Draws of a distributional parameter that carries its own formula
+#' Draws of a distributional parameter with a formula of its own
 #'
-#' A parameter given a formula of its own is a linear predictor, not a
-#' sampled scalar, so it is rebuilt from its coefficients and then put
-#' on the parameter's own scale. `extract_component_linpred()` already
-#' composes such a predictor from its parametric, smooth,
-#' random-effect and Gaussian-process terms; this adds the inverse
-#' link, so the result matches the scale a non-distributional fit
-#' would have sampled the scalar on.
+#' `extract_component_linpred()` composes the parameter's predictor
+#' from its parametric, smooth, group-level and Gaussian process terms.
+#' This function applies the parameter's inverse link. The result is on
+#' the scale a scalar draw of the parameter takes.
 #'
 #' @param object An `mvgam` model object
 #' @param dpar Name of the distributional parameter
@@ -986,16 +699,16 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels
   )
-  if (is.list(linpred) && !is.matrix(linpred)) {
+  if (is_per_response(linpred)) {
     stop(insight::format_error(c(
       paste0(
         "Distributional parameter '", dpar,
         "' resolved to one predictor per response."
       ),
       i = "Scope the call to a single response with 'resp'."
-    )))
+    )), call. = FALSE)
   }
-  # The link is the one this response's family gives the parameter.
+  # This response's family gives the parameter its link.
   out <- as.matrix(inv_link(linpred,
                             dpar_link(model_families(object, resp), dpar)))
   if (!is.null(ndraws) && nrow(out) != ndraws) {
@@ -1022,15 +735,13 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
 
 #' Link of one distributional parameter
 #'
-#' brms keeps the mean's link on `family$link` and every other
-#' parameter's on `family$link_<dpar>`. A family built by
-#' `stats::gaussian()` or `stats::Gamma()` carries no per-parameter
-#' links at all, so brms's own constructor is asked for the default it
-#' would have applied. Guessing is not an option here: assuming an
-#' identity where a log belongs hands back a parameter still on the
-#' link scale, and every value derived from it is then wrong by an
-#' exponential, with nothing to show for it. Custom families declare
-#' every link when they are built and so never reach the fallback.
+#' A family object records the mean's link in `family$link` and each
+#' other parameter's in `family$link_<dpar>`. A family built by
+#' `stats::gaussian()` or `stats::Gamma()` records no per-parameter
+#' links. `brms::brmsfamily()` then supplies the default link. An
+#' assumed identity link would leave a log-linked parameter on the
+#' link scale. Every value derived from it would be wrong by an
+#' exponential. Custom families declare every link when built.
 #'
 #' @param family A family object
 #' @param dpar Name of the distributional parameter
@@ -1045,16 +756,12 @@ dpar_link <- function(family, dpar) {
   name <- resolve_family_name(family)
   link <- brms::brmsfamily(name)[[paste0("link_", dpar)]]
   if (is.null(link)) {
-    stop(insight::format_error(c(
-      paste0(
-        "No link is recorded for distributional parameter '", dpar,
-        "' of family '", name, "'."
-      ),
-      i = paste0(
-        "The family needs a 'link_", dpar, "' entry before the ",
-        "parameter can be put on its own scale."
-      )
-    )))
+    stop_mvgam_fault(
+      paste0("Family '", name, "' lacks a link for parameter '", dpar,
+             "'."),
+      paste0("The family object and brms::brmsfamily('", name,
+             "') both lack 'link_", dpar, "'.")
+    )
   }
   link
 }
@@ -1062,10 +769,9 @@ dpar_link <- function(family, dpar) {
 
 #' Inverse of a brms link
 #'
-#' The one table of link inverses, covering every link brms offers,
-#' written as brms writes them. A `family$linkinv` is not always there
-#' to be asked: a distributional parameter's link lives in
-#' `link_<dpar>` as a name alone.
+#' Covers every link brms offers. A distributional parameter's link is
+#' recorded in `link_<dpar>` as a name alone, with no `linkinv`
+#' function.
 #'
 #' @param x Numeric vector, matrix or array on the link scale
 #' @param link Name of the link
@@ -1096,38 +802,28 @@ inv_link <- function(x, link) {
       y / (1 + y)
     },
     stop(insight::format_error(paste0(
-      "Link '", link, "' has no inverse defined in mvgam."
+      "Link '", link, "' is not supported."
     )), call. = FALSE)
   )
 }
 
 
-#' Extract Distributional Parameters from Stanfit Object
+#' Draws of sampled distributional parameters, one column per row
 #'
-#' Extracts posterior draws for distributional parameters (dpars) required by
-#' family-specific sampling. Returns matrices in the format expected by
-#' \code{sample_from_family()}.
-#'
-#' @param stanfit A stanfit or draws object containing posterior samples
-#' @param dpar_names Character vector of distributional parameter names to
-#'   extract (e.g., c("sigma", "shape", "zi"))
-#' @param ndraws Integer; number of draws to extract
-#' @param nobs Integer; number of observations for matrix dimensions
-#' @param draw_ids Optional integer vector of specific draw indices to use.
-#'   If provided, overrides ndraws.
-#'
-#' @return Named list of matrices, each with dimensions `\\[ndraws x nobs\\]`.
-#'   Scalar parameters are broadcast to full `\\[ndraws x nobs\\]` matrices.
-#'   Parameters not found in the posterior return NULL.
-#'
-#' @details
 #' A scalar parameter such as `sigma`, or one written with a single
-#' index, is broadcast to `\\[ndraws x nobs\\]`. An indexed parameter
-#' with `nobs` columns is read one column per row. Any other width is
-#' refused, since none of its columns is a given row's value.
+#' index, fills every column. An indexed parameter with `nobs` columns
+#' gives one column per row. Any other width belongs to another axis
+#' and is refused.
 #'
-#' @seealso `get_family_dpars()` for family-to-dpar mapping,
-#'   `sample_from_family()` which consumes these matrices.
+#' @param stanfit A stanfit or draws object
+#' @param dpar_names Character vector of parameter names, each carrying
+#'   any response suffix
+#' @param ndraws Integer; number of draws when `draw_ids` is `NULL`
+#' @param nobs Integer; number of prediction rows
+#' @param draw_ids Optional integer vector of draw indices
+#'
+#' @return Named list of `\\[ndraws x nobs\\]` matrices. A parameter the
+#'   posterior lacks is left out.
 #'
 #' @noRd
 extract_dpars_from_stanfit <- function(stanfit,
@@ -1135,7 +831,6 @@ extract_dpars_from_stanfit <- function(stanfit,
                                        ndraws,
                                        nobs,
                                        draw_ids = NULL) {
-  # Validate stanfit can be converted to draws
   checkmate::assert_multi_class(
     stanfit,
     c("stanfit", "CmdStanMCMC", "draws", "draws_matrix", "draws_array")
@@ -1144,136 +839,73 @@ extract_dpars_from_stanfit <- function(stanfit,
   checkmate::assert_int(ndraws, lower = 1)
   checkmate::assert_int(nobs, lower = 1)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
-
-  # Return empty list if no dpars needed
   if (length(dpar_names) == 0) {
     return(list())
   }
 
-  # Convert stanfit to draws matrix
-  draws_mat <- posterior::as_draws_matrix(stanfit)
+  draws_mat <- subset_draws_rows(fit_draws(stanfit, dpar_names),
+                                 ndraws = ndraws, draw_ids = draw_ids)
   all_cols <- colnames(draws_mat)
-  total_draws <- nrow(draws_mat)
-
-  # Determine which draw indices to use
-  if (!is.null(draw_ids)) {
-    if (max(draw_ids) > total_draws) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Requested {.field draw_ids} exceed available draws."
-        ),
-        x = cli::format_inline(
-          "Max requested: {max(draw_ids)}, available: {total_draws}."
-        )
-      )))
-    }
-    draw_indices <- draw_ids
-    ndraws <- length(draw_ids)
-  } else {
-    draw_indices <- resolve_draw_indices(total_draws, ndraws, NULL)
-    ndraws <- length(draw_indices)
-  }
-
-  # Extract each dpar
-  dpars_list <- list()
-
+  out <- list()
   for (dpar in dpar_names) {
-    # `dpar_names` arrive already carrying any response suffix.
-    scalar_pattern <- paste0("^", dpar, "$")
-    indexed_pattern <- paste0("^", dpar, "\\[")
-
-    # Find matching columns
-    scalar_cols <- grep(scalar_pattern, all_cols, value = TRUE)
-    indexed_cols <- grep(indexed_pattern, all_cols, value = TRUE)
-
-    if (length(scalar_cols) > 0) {
-      # Scalar parameter - extract and broadcast to [ndraws x nobs]
-      scalar_draws <- as.numeric(draws_mat[draw_indices, scalar_cols[1]])
-      dpars_list[[dpar]] <- matrix(
-        scalar_draws,
-        nrow = ndraws,
-        ncol = nobs,
-        byrow = FALSE
-      )
-    } else if (length(indexed_cols) > 0) {
-      # Indexed parameters - extract and validate dimensions
-      # Sort columns by index to ensure correct ordering
-      indices <- as.integer(gsub(".*\\[(\\d+)\\].*", "\\1", indexed_cols))
-
-      if (anyNA(indices)) {
+    cols <- if (dpar %in% all_cols) {
+      dpar
+    } else {
+      grep(paste0("^", dpar, "\\["), all_cols, value = TRUE)
+    }
+    if (length(cols) == 0L) next
+    if (length(cols) > 1L) {
+      one_index <- "^[^[]*\\[(\\d+)\\]$"
+      if (!all(grepl(one_index, cols))) {
         stop_mvgam_fault(
           "A per-row parameter must carry one index per column.",
-          paste0("Got ", paste(indexed_cols[is.na(indices)],
-                              collapse = ", "), ".")
+          paste0("Got ", paste(cols[!grepl(one_index, cols)],
+                               collapse = ", "), ".")
         )
       }
-
-      indexed_cols <- indexed_cols[order(indices)]
-
-      # Extract as matrix
-      dpar_matrix <- as.matrix(
-        draws_mat[draw_indices, indexed_cols, drop = FALSE]
-      )
-
-      # One column is a scalar written with an index and is broadcast.
-      # Any other width has to be one value per row. A width that is
-      # neither belongs to some other axis, and no column of it is this
-      # row's value: keeping the first column put a trend's scale where
-      # the residual scale belonged.
-      if (ncol(dpar_matrix) == 1) {
-        dpars_list[[dpar]] <- matrix(
-          dpar_matrix[, 1],
-          nrow = ndraws,
-          ncol = nobs,
-          byrow = FALSE
-        )
-      } else if (ncol(dpar_matrix) == nobs) {
-        dpars_list[[dpar]] <- dpar_matrix
-      } else {
-        stop_mvgam_fault(
-          paste0("Parameter '", dpar, "' must have one column per ",
-                 "prediction row."),
-          paste0("Found ", ncol(dpar_matrix), " columns for ", nobs,
-                 " rows.")
-        )
-      }
+      cols <- cols[order(as.integer(sub(one_index, "\\1", cols)))]
+    }
+    values <- as.matrix(draws_mat[, cols, drop = FALSE])
+    if (ncol(values) == 1L) {
+      out[[dpar]] <- matrix(values[, 1L], nrow = nrow(values), ncol = nobs)
+    } else if (ncol(values) == nobs) {
+      out[[dpar]] <- unname(values)
     } else {
-      # Parameter not found - return NULL (caller handles defaults)
-      dpars_list[[dpar]] <- NULL
+      stop_mvgam_fault(
+        paste0("Parameter '", dpar, "' must have one column per ",
+               "prediction row."),
+        paste0("Found ", ncol(values), " columns for ", nobs, " rows.")
+      )
     }
   }
-
-  dpars_list
+  out
 }
 
 
-#' Extract Posterior Predictive Distribution from mvgam Models
+#' Posterior predictive draws of the response
 #'
 #' @description
-#' Draws from the posterior predictive distribution of a fitted mvgam
-#' model. The draws include the observation noise. They suit posterior
-#' predictive checks and predictions on new data.
+#' Draws from the posterior predictive distribution: the family's
+#' observation noise around the parameters of each posterior draw.
+#' They suit posterior predictive checks and predictions for new data.
 #'
 #' @param object A fitted mvgam object from [mvgam()].
 #' @inheritParams posterior_epred.mvgam
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return Matrix with dimensions `[ndraws x nobs]`, one row per
-#'   posterior draw and one column per observation, on the response
-#'   scale. For multivariate models with `resp = NULL`, a named list of
-#'   such matrices, one per response.
+#' @return An `[ndraws, nobs]` matrix on the response scale, one row per
+#'   draw and one column per row of `newdata`. A multivariate model
+#'   with `resp = NULL` gives a named list, one element per response.
 #'
 #' @details
-#' Each draw adds the family's observation noise to the expected value
-#' E\[Y | X\] of the observation and trend models.
-#' [posterior_epred.mvgam()] returns the expected value alone.
+#' Each family draws from its own distribution at the parameters
+#' [posterior_linpred.mvgam()] and [posterior_epred.mvgam()] use. A
+#' `trunc()` term restricts the draws to its bounds.
 #'
-#' `posterior_predict()`, `posterior_epred()` and `posterior_linpred()`
-#' integrate over the trend's stochastic dynamics. At `newdata` times
-#' beyond the training grid, the latent state is stationary around its
-#' per-series posterior mean. [forecast.mvgam()] and [hindcast.mvgam()]
-#' use the fitted latent states. `hindcast()` returns them at the
-#' training times. `forecast()` propagates them to future times.
+#' Under `incl_autocor = FALSE` the trend contributes its deterministic
+#' submodel. [hindcast.mvgam()] draws under the fitted latent states at
+#' the training times. [forecast.mvgam()] propagates them to future
+#' times.
 #'
 #' @seealso [pp_check.mvgam()] compares these draws with the data.
 #'   [forecast.mvgam()] predicts future times from the fitted state.
@@ -1282,20 +914,20 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR())
+#'                     n_timepoints = 120L, trend_model = AR())
 #' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = poisson(),
-#'               chains  = 2, silent = 2)
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
 #'
-#' # Posterior predictive samples on the response scale, integrating over
-#' # the trend's stochastic dynamics. forecast() extrapolates the
-#' # fitted latent state
-#' pp <- posterior_predict(mod, ndraws = 50L)
+#' # Simulated counts, one row per draw and one column per observation
+#' pp <- posterior_predict(mod)
 #' dim(pp)
 #'
-#' # The draws track the observed counts
-#' cor(colMeans(pp), simdat$data_train$y, use = "complete.obs")
+#' # The share of observed counts inside their 90 percent predictive
+#' # intervals
+#' bounds <- apply(pp, 2, quantile, probs = c(0.05, 0.95))
+#' y <- simdat$data_train$y
+#' mean(y >= bounds[1, ] & y <= bounds[2, ])
 #'
 #' # Next: pp_check() plots the draws against the observed counts
 #' }
@@ -1314,36 +946,25 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
                                     sample_new_levels = "uncertainty",
                                     resp = NULL,
                                     ...) {
-  # Validate all parameters
   checkmate::assert_class(object, "mvgam")
   require_fitted_model(object, "posterior_predict")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
-  checkmate::assert_logical(process_error, len = 1)
-  checkmate::assert_logical(incl_autocor, len = 1,
-                            any.missing = FALSE)
+  checkmate::assert_flag(process_error)
+  checkmate::assert_flag(incl_autocor)
   validate_draw_selectors(ndraws, draw_ids)
   validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
   checkmate::assert_string(resp, null.ok = TRUE)
   rlang::check_dots_empty()
 
   newdata <- prediction_frame(object, newdata)
-
-  # The linear predictor and the distributional parameters are drawn
-  # by separate extractions, so a requested count is materialised as
-  # concrete indices before either runs; otherwise the two subsample
-  # independently and answer from unrelated iterations.
+  # The predictor and the distributional parameters come from separate
+  # extractions. Both take these indices.
   draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
-  if (!is.null(draw_ids)) {
-    ndraws <- NULL
-  }
 
   # Sampling starts from the predictor. A hurdle or zero-inflated
-  # family draws its mixture from `mu` itself, which its mean
-  # `E[Y] = (1 - zi) * mu` no longer carries. `posterior_linpred()`
-  # is a sibling method and takes the user-facing `incl_autocor`.
-  # Under `process_error = TRUE` the predictor already carries the
-  # trend's innovations, and adding a second set here doubled the
-  # process variance.
+  # family draws its mixture from `mu`, which its mean excludes. Under
+  # `process_error = TRUE` the predictor already carries the trend's
+  # innovations.
   linpred <- posterior_linpred(
     object,
     newdata = newdata,
@@ -1356,9 +977,9 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     resp = resp
   )
 
-  # A model with several responses answers for each when `resp` names
-  # none, every response drawn at the same iterations.
-  if (is.list(linpred) && !is.matrix(linpred)) {
+  # A model with several responses returns each response's draws when
+  # `resp` is `NULL`, every response at the same iterations.
+  if (is_per_response(linpred)) {
     if (is.null(resp)) {
       return(lapply(stats::setNames(nm = names(linpred)), function(r) {
         draw_observations(object, linpred[[r]], newdata, draw_ids,
@@ -1378,17 +999,14 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
 
 #' Draw one response's observations at its predictor
 #'
-#' The one sampler `posterior_predict()`, `hindcast()` and `forecast()`
-#' share. A closure-unit family draws each unit's latent state and its
-#' visits together, and its kernel is handed the caller's predictor. A
-#' predictor the kernel rebuilt from the frame would lose the latent
-#' state a forecast carries past the grid, along with the trend and
-#' group-level choices `posterior_predict()` was given. An ordinal family
-#' draws a level from the category probabilities
-#' `ordinal_category_probs()` gives. Every other family draws from its
-#' own distribution at the inverse link of the predictor, with its
-#' distributional parameters, trials and truncation bounds read at the
-#' same draws.
+#' `posterior_predict()`, `hindcast()` and `forecast()` share this
+#' sampler. A closure-unit family draws each unit's latent state and
+#' its visits together. Its kernel takes the caller's predictor, which
+#' keeps the latent state a forecast carries past the grid. An ordinal
+#' family draws a level from `ordinal_category_probs()`. Every other
+#' family draws from its own distribution at the inverse link of the
+#' predictor. Its distributional parameters, trials and truncation
+#' bounds come from the same draws and rows.
 #'
 #' @param object A fitted `mvgam` object
 #' @param linpred `[ndraws x nobs]` link-scale predictor, its rows the
@@ -1438,11 +1056,10 @@ draw_observations <- function(object, linpred, newdata, draw_ids,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels
   )
-  trunc_bounds <- extract_truncation_bounds(object, nobs)
+  bounds <- response_addition_terms(object, newdata, resp)
 
-  # Every parameter the registry resolved is forwarded, so a family
-  # added later cannot lose one to a hand-written list. A name with no
-  # matching argument belongs to a family drawn through another path.
+  # Every resolved parameter with a matching sampler argument is
+  # forwarded. A family added later then keeps all of its parameters.
   dpar_args <- dpars[intersect(names(dpars),
                                names(formals(sample_from_family)))]
   samples <- do.call(sample_from_family, c(
@@ -1450,9 +1067,9 @@ draw_observations <- function(object, linpred, newdata, draw_ids,
       family_name = family_name,
       ndraws = ndraws,
       epred = family$linkinv(linpred),
-      trials = extract_trials_for_family(object, family, newdata),
-      lb = trunc_bounds$lb,
-      ub = trunc_bounds$ub
+      trials = extract_trials_for_family(object, family, newdata, resp),
+      lb = bounds$lb,
+      ub = bounds$ub
     ),
     dpar_args
   ))

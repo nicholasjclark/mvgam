@@ -4,7 +4,7 @@
 ##
 ## Two surfaces under test:
 ##   1. Observation side: each brms special that mvgam claims to
-##      support (`mm()`, `me()`, `cs()`, `se()`, `cens()`,
+##      support (`mm()`, `me()`, `cs()`, `cens()`,
 ##      `trials()`, `car()`) plumbs through to specific standata
 ##      keys and stancode markers via the mvgam dispatch path.
 ##   2. Trend side: `mvgam_formula()` refuses every brms
@@ -61,12 +61,17 @@ test_that("trials() plumbs through to mvgam stancode and standata", {
   expect_match(prog$code, "binomial.*\\|.*trials")
 })
 
-test_that("se() plumbs through and combines with sigma in the likelihood", {
-  d <- make_specials_data()
-  prog <- specials_program(y | se(sex, sigma = TRUE) ~ x, gaussian(), d)
-  expect_identical(as.numeric(prog$data$se), as.numeric(d$sex))
-  # brms emits `sqrt(square(sigma) + se2)` when sigma = TRUE.
-  expect_match(prog$code, "sqrt\\(square\\(sigma\\) \\+ se2\\)")
+# mvgam computes predictions and log-likelihoods in R without either
+# term. A fit would report predictions that leave them out.
+test_that("se() and rate() are refused in the observation formula", {
+  expect_error(
+    specials_program(y | se(sex, sigma = TRUE) ~ x, gaussian()),
+    "'se\\(\\)' is not supported"
+  )
+  expect_error(
+    specials_program(ybin | rate(ntrials) ~ x, poisson()),
+    "offset\\(log"
+  )
 })
 
 test_that("cens() plumbs through and produces censored-likelihood blocks", {
@@ -263,26 +268,19 @@ test_that("an addition term is matched as a call, not as a name", {
 })
 
 test_that("the trials denominator resolves against the prediction data", {
-  # A model has two row spaces: the likelihood covers observed
-  # responses only, predictions cover every row. The denominator
-  # brms stores in `standata` belongs to the first, so the
-  # prediction path resolves it from the data instead.
+  # The likelihood covers observed responses only. Predictions cover
+  # every row. The denominator is evaluated against the rows predicted.
   dat <- data.frame(y = 1:4, n_trials = c(5L, 6L, 7L, 8L))
-  expect_identical(
-    mvgam:::resolve_trials_denominator(bf(y | trials(n_trials) ~ 1), dat),
-    c(5L, 6L, 7L, 8L)
-  )
-  # A constant denominator has no column and is recycled to fit.
-  expect_identical(
-    mvgam:::resolve_trials_denominator(bf(y | trials(30) ~ 1), dat),
-    rep(30, 4L)
-  )
-  # Nothing to resolve when the term is absent or its column is not
-  # carried by the data being predicted.
-  expect_null(mvgam:::resolve_trials_denominator(bf(y ~ 1), dat))
-  expect_null(
-    mvgam:::resolve_trials_denominator(bf(y | trials(absent) ~ 1), dat)
-  )
+  values <- function(f) {
+    mvgam:::addition_term_values(f, binomial(), dat)$trials
+  }
+  expect_identical(values(bf(y | trials(n_trials) ~ 1)), c(5L, 6L, 7L, 8L))
+  # A constant has no column and is recycled to every row. One held in
+  # the formula's environment resolves there.
+  n_fixed <- 30
+  expect_identical(values(bf(y | trials(n_fixed) ~ 1)), rep(30, 4L))
+  # A column the data lacks leaves nothing to resolve.
+  expect_null(values(bf(y | trials(absent) ~ 1)))
 })
 
 test_that("an addition term is not counted as a response", {
@@ -293,7 +291,6 @@ test_that("an addition term is not counted as a response", {
   expect_equal(response_columns(y | trials(n) ~ x), c(y = "y"))
   expect_equal(response_columns(y | weights(w) + cens(c) ~ x), c(y = "y"))
   expect_equal(response_columns(y | trunc(lb = 0) ~ x), c(y = "y"))
-  expect_equal(response_columns(y | se(s, sigma = TRUE) ~ x), c(y = "y"))
   # A multivariate response keeps every outcome past its aterms
   expect_equal(
     response_columns(mvbind(y1, y2) | weights(w) ~ x),

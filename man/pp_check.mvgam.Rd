@@ -3,7 +3,7 @@
 \name{pp_check.mvgam}
 \alias{pp_check.mvgam}
 \alias{pp_check}
-\title{Posterior Predictive Checks for \code{mvgam} models}
+\title{Posterior predictive checks for \pkg{mvgam} models}
 \usage{
 \method{pp_check}{mvgam}(
   object,
@@ -23,11 +23,15 @@
 \arguments{
 \item{object}{An object of class \code{mvgam}}
 
-\item{type}{Type of the check, the name of a \pkg{bayesplot} \verb{ppc_*}
-function without its prefix or one of the residual types below.
-The default is \code{"bars"} for a bernoulli or ordinal response and
-\code{"dens_overlay"} otherwise. Multi-response families take the
-defaults described under "Multi-response families".}
+\item{type}{Type of the check. A \pkg{bayesplot} \verb{ppc_*} or \verb{ppd_*}
+function named without its prefix, or one of the residual types
+mvgam adds: \code{"resid_hist"}, \code{"resid_hist_grouped"},
+\code{"resid_ribbon"}, \code{"resid_ribbon_grouped"}, \code{"resid_qq"},
+\code{"resid_vs_fitted"}, \code{"resid_acf"} and \code{"resid_pacf"}. Type
+\code{"fit_stat"} serves \code{nmix()} and \code{occ()} fits. The default is
+\code{"bars"} for a bernoulli or ordinal response and \code{"dens_overlay"}
+otherwise. Multi-response families take the defaults under
+"Multi-response families".}
 
 \item{ndraws}{Positive integer indicating how many
 posterior draws should be used.
@@ -48,11 +52,9 @@ ppc \code{*_grouped} types and ignored otherwise.}
 Only used for ppc types having an \code{x} argument
 and ignored otherwise.}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data
-containing the variables included in the linear predictor of
-\code{formula}. If not supplied, predictions are generated for the
-original observations used for the model fit. The residual types
-describe the training data and refuse it.}
+\item{newdata}{Optional data frame of the variables in the model.
+\code{NULL} (the default) checks the training data. The residual types
+describe the training data and refuse \code{newdata}.}
 
 \item{resp}{Optional names of response variables. If specified, predictions
 are performed only for the specified response variables.}
@@ -60,11 +62,10 @@ are performed only for the specified response variables.}
 \item{draw_ids}{An integer vector specifying the posterior draws to be used.
 If \code{NULL} (the default), all draws are used.}
 
-\item{per_obs}{Logical. For \code{type = 'resid_vs_fitted'}, whether each
-observation collapses to its posterior median on both axes, giving
-one point per observation. \code{FALSE} keeps the scatter of every draw
-for every observation, which shows the posterior spread. Other
-types ignore it.}
+\item{per_obs}{Logical. For \code{type = "resid_vs_fitted"}, \code{TRUE} (the
+default) draws each observation at its posterior median on both
+axes. \code{FALSE} draws every draw of every observation, which shows the
+posterior spread.}
 
 \item{series}{For the residual types \code{resid_hist}, \code{resid_ribbon},
 \code{resid_qq}, \code{resid_vs_fitted}, \code{resid_acf} and \code{resid_pacf}, the
@@ -72,122 +73,89 @@ one series whose residuals are drawn, as a name or an index. The
 default is the first series. Its residuals are taken in time order.
 \code{resid_acf} keeps missing responses in place. Its lags count time
 steps. \code{resid_pacf} drops them. Its lags count observations. A
-plot from a fit with several series names its series in the
-subtitle.}
+fit with several series names its series in the subtitle.}
 
-\item{...}{Further arguments passed to \code{\link{predict.mvgam}}
-as well as to the PPC function specified in \code{type}. A name
-belonging to neither is refused, naming the argument. Ten
-bayesplot types take a \code{stat} of their own. \code{type = 'fit_stat'}
-takes one here too, either \code{'chi_squared'} (default) or
-\code{'freeman_tukey'}, naming the discrepancy it computes.}
+\item{...}{Further arguments of \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and of
+the \pkg{bayesplot} function \code{type} names. Any other name is
+refused. \code{type = "fit_stat"} takes \code{stat}, either \code{"chi_squared"}
+(the default) or \code{"freeman_tukey"}.}
 }
 \value{
-A ggplot object that can be further
-customized using the \pkg{ggplot2} package. A multivariate model
-given no \code{resp} returns one figure with a panel per response, each
-titled by its response.
+A ggplot object. A multivariate model given no \code{resp}
+returns one figure with a panel per response. \code{type = "fit_stat"}
+returns an \code{mvgam_ppc_fit_stat} object with print and plot methods.
 }
 \description{
-Perform unconditional posterior predictive checks with the help
-of the \pkg{bayesplot} package. Returns a \pkg{ggplot2} object that
-can be further customised.
+Compares the observed response with replicates drawn from the fitted
+model through the \pkg{bayesplot} \verb{ppc_*} functions. Further types
+plot randomised quantile residuals and, for \code{nmix()} and \code{occ()}
+fits, a discrepancy statistic. Returns a \pkg{ggplot2} object.
 }
 \details{
-Replicates are drawn against the latent trend state the model
-inferred at each time. The check then compares the model's fitted
-trajectory with the series that produced it, on the same basis as
-\code{\link[=residuals.mvgam]{residuals.mvgam()}} and \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}. Supplying \code{newdata} the
-fit never saw integrates over the trend dynamics instead. The
-\verb{loo_*} types always use the conditional state, whatever data they
-cover. Their importance weights come from the likelihood, which
-uses the conditional state too.
+Replicates of the training data are drawn under the latent trend
+state the model inferred at each time, as \code{\link[=residuals.mvgam]{residuals.mvgam()}} and
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} use. The check then compares the fitted
+trajectory with the series that produced it. Replicates of \code{newdata}
+take the covariate surface of \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}. Passing
+\code{incl_autocor} sets the surface explicitly. The \verb{loo_*} types always
+take the fitted state, which is the state their importance weights
+come from.
 
-The residual histograms and ribbons take their residuals from 500
-draws by default. \code{resid_hist} and \code{resid_hist_grouped} draw one
-histogram per draw and show the first eight.
+Overlay types default to 10 draws. Interval, ribbon and statistic
+types use every draw. The residual histograms and ribbons default to
+500 draws, the other residual types to 100 and \code{fit_stat} to 500. A
+posterior with fewer draws gives all of them.
+\code{resid_hist} draws one histogram per draw and shows the first eight.
 
-For a detailed explanation of each of the ppc functions,
-see the \code{\link[bayesplot:PPC-overview]{PPC}} documentation of the
-\pkg{\link[bayesplot:bayesplot-package]{bayesplot}} package. LOO-PIT
-bayesplot variants (\code{loo_pit}, \code{loo_pit_overlay},
-\code{loo_pit_qq}, \code{loo_intervals}, \code{loo_ribbon}) compute
-PSIS weights internally via \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}.
-
-To produce conditional posterior predictive checks restricted to a
-particular series or covariate slice, filter \code{newdata} to the rows
-of interest and pass it to \code{pp_check()}. For series-grouped variants
-use the \code{group = "series"} argument of the underlying bayesplot
-functions (e.g. \code{type = "ecdf_overlay_grouped"}, \code{type = "bars_grouped"}). For per-observation summaries against a covariate,
-\code{marginaleffects::plot_predictions()} provides a complementary
-conditional surface.
+The \code{\link[bayesplot:PPC-overview]{PPC}} documentation of
+\pkg{bayesplot} describes each \verb{ppc_*} type. A check restricted to
+one series or covariate slice takes \code{newdata} filtered to those
+rows. The \verb{_grouped} types take \code{group = "series"} to draw one panel
+per series.
 }
 \section{Multi-response families}{
 
-\code{diri()} / \code{multi()} / \code{categ()} / \code{mvn()} / \code{mvt()} place
-K outcomes on each closure unit
-(simplex families) or each (site, species) row (mv-normal /
-mv-T). A pooled \code{dens_overlay} would collapse every
-category / species into one curve and hide per-category
-fit. When the user does not pass \code{group}, \code{pp_check()}
-auto-groups by the per-family category axis (within-unit
-position for the simplex families, the \code{series} column for
-\code{mvn()} / \code{mvt()}) and switches \code{type} to its \verb{_grouped}
-variant so bayesplot facets per category. Default \code{type}
-becomes \code{"ribbon"} for simplex families and \code{"dens_overlay"}
-for \code{mvn()} / \code{mvt()}. To opt out and recover the pooled
-plot, pass \code{group = "<existing-column>"} explicitly
-(e.g. \code{group = "series"}).
+\code{diri()}, \code{multi()}, \code{categ()}, \code{mvn()} and \code{mvt()} record several
+outcomes per unit. A pooled density would merge them into one
+curve. Without a \code{group} from the caller, \code{pp_check()} draws one
+panel per species through the type's \verb{_grouped} variant. The
+default type is \code{"ribbon"} for a composition and \code{"dens_overlay"}
+for \code{mvn()} and \code{mvt()}. Passing a column of \code{newdata} as \code{group}
+draws the pooled plot.
 }
 
-\section{Closure-unit families (\code{nmix()}, \code{occ()})}{
+\section{Detection families (\code{nmix()}, \code{occ()})}{
 
-Closure-unit observation families compute predictions at
-the closure-unit grain (one per site x season) because
-visits within a unit share the latent state. \code{pp_check()}
-aggregates the per-visit response and per-visit posterior
-predictive draws to the unit grain (sum across visits) via
-the shared \code{aggregate_closure_unit_visits()} helper, then
-hands the resulting \verb{(y_unit, yrep_unit)} to the relevant
-\verb{bayesplot::ppc_*} function. Discrete-friendly types are
-the natural fit (\code{bars}, \code{bars_grouped}, \code{rootogram},
-\code{hist}, \code{freqpoly}, \code{freqpoly_grouped}); density / ECDF
-variants (\code{dens_overlay}, \code{ecdf_overlay},
-\code{ecdf_overlay_grouped}), per-unit stats (\code{stat}, \code{stat_2d},
-\code{stat_grouped}), intervals / ribbons over a unit-constant
-covariate (\code{intervals}, \code{ribbon}) and the residual
-histograms (\code{resid_hist}, \code{resid_qq}) all work as
-expected. Per-row scatter / fitted-vs-residual / per-row
-time-axis types (\code{scatter_avg}, \code{error_binned},
-\code{resid_acf}, \code{resid_pacf}, \code{resid_vs_fitted},
-\code{resid_ribbon}) are blocked because they do not match the
-closure-unit grain. \verb{group =} and \verb{x =} covariates must be
-constant within every closure unit; per-visit covariates
-(\code{tod}, observer, weather) are rejected with a clear
-error.
+The visits of a closure unit share one latent state. \code{pp_check()}
+sums the observed and replicated visits of each unit and compares
+the sums. The count types (\code{bars}, \code{rootogram}, \code{hist},
+\code{freqpoly}), the density and ECDF overlays, the statistic types,
+\code{intervals}, \code{ribbon}, \code{resid_hist} and \code{resid_qq} apply. Types
+that plot rows, residuals against fitted values or residuals over
+time are refused. A \code{group} or \code{x} column must be constant within
+each unit. \code{type = "fit_stat"} computes the chi-squared or
+Freeman-Tukey discrepancy of Gelman et al. (1996) from the unit
+sums.
 }
 
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 120L, trend_model = AR())
-
-mod <- mvgam(
-  y ~ s(x),
-  trend_formula = ~ AR(p = 1),
-  data    = simdat$data_train,
-  family  = poisson(),
-  chains  = 2, silent = 2
-)
+                    n_timepoints = 120L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
 
 # Observed counts against the predictive distribution. A bar
-# hanging below zero marks a count the model under-predicts.
-pp_check(mod, type = "rootogram", ndraws = 50L)
+# hanging below zero marks a count the model under-predicts
+pp_check(mod, type = "rootogram")
 
-# Randomised quantile residuals over time, with predictive
-# ribbons. A trend the model missed shows as serial structure.
-pp_check(mod, type = "resid_ribbon", ndraws = 500L)
+# Randomised quantile residuals over time. A trend the model missed
+# shows as serial structure
+pp_check(mod, type = "resid_ribbon")
+
+# Next: plot(mod, type = "residuals") shows the residual grid
 }
 
 }
@@ -196,9 +164,17 @@ Gabry, J., Simpson, D., Vehtari, A., Betancourt, M. and
 Gelman, A. (2019). Visualization in Bayesian workflow.
 \emph{Journal of the Royal Statistical Society A}, 182:389-402.
 \doi{10.1111/rssa.12378}
+
+Gelman, A., Meng, X.-L. and Stern, H. (1996). Posterior predictive
+assessment of model fitness via realized discrepancies.
+\emph{Statistica Sinica}, 6:733-760.
 }
 \seealso{
-\code{\link{predict.mvgam}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}
+\code{\link[=residuals.mvgam]{residuals.mvgam()}} returns the residuals the residual types
+plot. \code{\link[=loo.mvgam]{loo.mvgam()}} scores the fit. The
+\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview article} explains a
+rootogram. The \href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} runs
+the discrepancy check.
 
 Other model checking: 
 \code{\link{mvgam_diagnostics}},

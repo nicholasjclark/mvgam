@@ -1,9 +1,7 @@
-# Public S3 surface for posterior forecast scoring. Wraps the
-# per-cell / per-horizon kernels in `R/scoring_kernels.R` with
-# input-shape handling (per-series for univariate scorers, joint
-# stacking for multivariate ones), validation, and a tidy
-# `data.frame`-per-series return shape with an `all_series`
-# summary row at the end.
+# score() for forecast objects. It validates the forecast and scores
+# each series, or every series jointly, with the kernels of
+# `R/scoring_kernels.R`. The result holds one data frame per series
+# and an `all_series` summary.
 
 
 #' Generic for posterior forecast scoring
@@ -21,12 +19,20 @@ score <- function(object, ...) UseMethod("score")
 
 #' The scores that take `log = TRUE`
 #'
-#' The `brier` score grades a binary outcome. The threshold-weighted
-#' scores set their thresholds on the untransformed scale. The `logs`,
-#' `dss` and `qs` scores grade the draws as they are.
+#' The `brier` score grades a binary outcome. The `drps` score sums over
+#' the integer support of a count. The threshold-weighted scores set
+#' their thresholds on the untransformed scale. The `logs`, `dss` and
+#' `qs` scores grade the draws as they are.
 #'
 #' @noRd
-scores_honouring_log <- c("crps", "drps", "sis", "energy", "variogram")
+scores_honouring_log <- c("crps", "sis", "energy", "variogram")
+
+
+#' The scores that grade each series on its own
+#'
+#' @noRd
+univariate_forecast_scores <- c("crps", "drps", "sis", "brier", "logs",
+                                "dss", "qs", "twcrps")
 
 
 #' The scores that grade every series jointly
@@ -57,76 +63,66 @@ score_label <- function(score) {
 
 #' Proper scoring rules for `mvgam_forecast` objects
 #'
-#' Compute one of eleven proper scoring rules on the held-out
-#' forecasts of an `mvgam_forecast` object returned by
-#' [forecast.mvgam] or [hindcast.mvgam].
+#' Scores the held-out forecasts of an `mvgam_forecast` object from
+#' [forecast.mvgam()] or [hindcast.mvgam()] against the observations,
+#' with one of eleven scoring rules. Lower scores are better.
 #'
-#' @section Available scorers:
+#' @section Available scores:
 #'
 #' \describe{
-#'   \item{`"crps"`}{Continuous Ranked Probability Score
-#'     (Gneiting & Raftery, 2007); default proper score for
-#'     continuous predictives.}
-#'   \item{`"drps"`}{Discrete Ranked Probability Score; CRPS
-#'     specialised to count outcomes.}
-#'   \item{`"sis"`}{Scaled Interval Score; width of the central
-#'     PI plus a penalty for misses scaled by its miscoverage
-#'     rate, `1 - interval_width`.}
-#'   \item{`"brier"`}{Brier score for a binary outcome: the squared
-#'     difference between the observation and the mean of the draws,
-#'     which estimates the forecast probability.}
-#'   \item{`"logs"`}{Logarithmic score `-log f(y)` via a kernel
-#'     density estimate; bridges to ELPD / LOO.}
-#'   \item{`"dss"`}{Dawid-Sebastiani score: cheap moment-based
-#'     proper score depending only on predictive mean / SD.}
-#'   \item{`"qs"`}{Quantile (pinball) loss at `quantile_level`.}
-#'   \item{`"twcrps"`}{Threshold-weighted CRPS focusing scoring
-#'     on the `[lower, upper]` region.}
-#'   \item{`"energy"`}{Multivariate Energy score across series.}
-#'   \item{`"variogram"`}{Variogram score of order 0.5 across
-#'     series (Scheuerer & Hamill, 2015).}
-#'   \item{`"twenergy"`}{Threshold-weighted Energy score.}
+#'   \item{`"crps"`}{Continuous ranked probability score (Gneiting and
+#'     Raftery 2007) of the empirical distribution of the draws.}
+#'   \item{`"drps"`}{Discrete ranked probability score, the CRPS of a
+#'     count summed over its integer support.}
+#'   \item{`"sis"`}{Scaled interval score: the width of the central
+#'     interval plus a penalty for an observation outside it, scaled by
+#'     `2 / (1 - interval_width)`.}
+#'   \item{`"brier"`}{Brier score of a binary outcome: the squared
+#'     difference between the observation and the mean of the draws.}
+#'   \item{`"logs"`}{Log score, `-log f(y)` for a kernel density
+#'     estimate of the draws.}
+#'   \item{`"dss"`}{Dawid-Sebastiani score, which depends on the
+#'     predictive mean and standard deviation alone.}
+#'   \item{`"qs"`}{Quantile (pinball) score at `quantile_level`.}
+#'   \item{`"twcrps"`}{Threshold-weighted CRPS, which scores the
+#'     forecast inside `[lower, upper]`.}
+#'   \item{`"energy"`}{Energy score of the series jointly.}
+#'   \item{`"variogram"`}{Variogram score of order 0.5 of the series
+#'     jointly (Scheuerer and Hamill 2015).}
+#'   \item{`"twenergy"`}{Threshold-weighted energy score.}
 #' }
 #'
 #' @param object An `mvgam_forecast` object whose `type` is
 #'   `"response"` or `"expected"`. The held-out observations are then
 #'   on the scale of the forecasts.
 #' @param score Character; one of the names above.
-#' @param interval_width Width of the central PI that sets the
-#'   per-series `in_interval` indicator. It also sets the SIS penalty
-#'   width. Computed for `"crps"`, `"drps"` and `"sis"`; the other
-#'   scores report `in_interval` as `NA`.
-#' @param quantile_level Quantile the `"qs"` pinball loss is
-#'   taken at. Defaults to `0.5`, the median. Unrelated to the
-#'   central interval the other scorers use, which
-#'   `interval_width` sets.
-#' @param lower,upper Threshold bounds for `"twcrps"` /
-#'   `"twenergy"`. Defaults `-Inf` / `Inf` recover the
-#'   unweighted scores.
-#' @param log Logical; apply `log(x + 0.001)` to truth and
-#'   forecast draws before scoring. Taken by `"crps"`, `"drps"`,
-#'   `"sis"`, `"energy"` and `"variogram"`. Passing `TRUE` with any
-#'   other score is an error. `"brier"` scores a binary outcome.
-#'   `"twcrps"` and `"twenergy"` set their thresholds on the
-#'   untransformed scale.
-#' @param weights Optional length-`n_series` numeric vector of
-#'   per-series weights for `"variogram"`.
+#' @param interval_width Width of the central interval that sets the
+#'   per-series `in_interval` indicator and the `"sis"` penalty. The
+#'   indicator is computed for `"crps"`, `"drps"`, `"sis"` and the joint
+#'   scores. The other scores report it as `NA`.
+#' @param quantile_level Level of the `"qs"` score. Defaults to `0.5`,
+#'   the median.
+#' @param lower,upper Thresholds of `"twcrps"` and `"twenergy"`. The
+#'   defaults `-Inf` and `Inf` give the unweighted scores.
+#' @param log Logical. `TRUE` applies `log(x + 0.001)` to observations
+#'   and draws before scoring. Taken by `"crps"`, `"sis"`, `"energy"`
+#'   and `"variogram"`. Passing `TRUE` with any other score is an error.
+#' @param weights Optional numeric vector of non-negative weights, one
+#'   per series, for `"variogram"`.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A named `list` with one entry per series plus a
-#'   trailing `all_series` summary. Per-series entries are
-#'   `data.frame`s with columns `score`, `in_interval`,
-#'   `interval_width`, `eval_horizon` and `score_type`. The
-#'   `score_type` column echoes the requested `score`. The
-#'   multivariate scorers' per-series rows hold coverage diagnostics
-#'   only, with `score` set to `NA`. The `all_series` entry holds the
-#'   per-horizon aggregate. For univariate scorers it sums the scores
-#'   over the series at each forecast time, with `score_type`
-#'   prefixed `"sum_"`. For multivariate scorers it holds the joint
-#'   per-horizon score. Series forecast at their own times, as
-#'   `CAR()` allows, are summed at the times they share. The
-#'   `eval_horizon` column then counts the times any series is
-#'   forecast at. A multivariate score needs every series at the same
+#' @return A named `list` with one data frame per series plus a trailing
+#'   `all_series` summary. Each series' data frame has columns `score`,
+#'   `in_interval`, `interval_width`, `eval_horizon` and `score_type`,
+#'   the requested `score`. A joint score leaves the per-series `score`
+#'   column `NA`.
+#'
+#'   For a univariate score, `all_series` sums the scores over the
+#'   series at each forecast time, with `score_type` prefixed `"sum_"`.
+#'   Series forecast at their own times, as `CAR()` allows, are summed at
+#'   the times they share. Its `eval_horizon` then counts the times any
+#'   series is forecast at. For a joint score, `all_series` holds the
+#'   score at each horizon. A joint score needs every series at the same
 #'   forecast times.
 #'
 #' @seealso [forecast.mvgam()] produces the forecast.
@@ -147,23 +143,27 @@ score_label <- function(score) {
 #' @examples
 #' \dontrun{
 #' set.seed(11)
-#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 120L, trend_model = AR(),
-#'                      proportional_train = 0.75)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+#'                     n_timepoints = 120L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x),
+#'              trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train,
+#'              family = poisson(),
+#'              chains = 2, silent = 2)
 #'
-#' mod <- mvgam(
-#'   y ~ s(x),
-#'   trend_formula = ~ AR(p = 1),
-#'   data = simdat$data_train,
-#'   newdata = simdat$data_test,
-#'   family = poisson(),
-#'   chains = 2, silent = 2
-#' )
+#' # Forecast the held-out times, then score each series
+#' fc <- forecast(mod, newdata = simdat$data_test)
+#' sc <- score(fc, score = "drps")
+#' head(sc$series_1)
 #'
-#' # Score requires a forecast object with held-out test draws.
-#' fc <- forecast(mod)
-#' sc <- score(fc, score = "crps")
-#' head(sc[[1L]])
+#' # The DRPS summed over series at each forecast horizon
+#' plot(sc$all_series$eval_horizon, sc$all_series$score, type = "b",
+#'      xlab = "Horizon", ylab = "DRPS summed over series")
+#'
+#' # A joint score of both series at each horizon
+#' head(score(fc, score = "energy")$all_series)
+#'
+#' # Next: compare_scores() ranks several models by one rule
 #' }
 #'
 #' @family forecasting
@@ -188,18 +188,25 @@ score.mvgam_forecast <- function(object,
       object, score.mvgam_forecast,
       score = score, interval_width = interval_width,
       quantile_level = quantile_level, lower = lower, upper = upper,
-      log = log, weights = weights, ...
+      log = log, weights = weights
     ))
   }
-  univariate <- c("crps", "drps", "sis", "brier",
-                   "logs", "dss", "qs", "twcrps")
-  score <- match.arg(score, c(univariate, joint_forecast_scores))
+  score <- match.arg(score,
+                     c(univariate_forecast_scores, joint_forecast_scores))
   checkmate::assert_number(interval_width,
                              lower = 0.05, upper = 0.95)
   checkmate::assert_number(quantile_level, lower = 0, upper = 1)
   checkmate::assert_number(lower)
   checkmate::assert_number(upper)
   checkmate::assert_flag(log)
+  checkmate::assert_numeric(weights, lower = 0, any.missing = FALSE,
+                            len = length(object$series_names),
+                            null.ok = TRUE)
+  if (!is.null(weights) && !identical(score, "variogram")) {
+    stop(insight::format_error(
+      "'weights' applies to the 'variogram' score only."
+    ), call. = FALSE)
+  }
 
   if (isTRUE(log) && !score %in% scores_honouring_log) {
     stop(insight::format_error(c(
@@ -217,7 +224,7 @@ score.mvgam_forecast <- function(object,
 
   series_names <- as.character(object$series_names)
 
-  if (score %in% univariate) {
+  if (score %in% univariate_forecast_scores) {
     return(score_univariate(
       object, series_names, score,
       interval_width = interval_width,
@@ -313,7 +320,7 @@ score_univariate <- function(object, series_names, score,
     if (!has_heldout(truth, fc)) {
       return(empty_score_df())
     }
-    kernel_out <- dispatch_univariate_score(
+    kernel_out <- univariate_score(
       score, truth, fc,
       interval_width = interval_width,
       quantile_level = quantile_level, lower = lower,
@@ -508,9 +515,9 @@ score_multivariate <- function(object, series_names, score,
   names(series_score) <- series_names
 
   truths <- do.call(rbind, truths_list[ok])
-  joint <- dispatch_multivariate_score(
+  joint <- multivariate_score(
     score, truths, fcs[ok],
-    lower = lower, upper = upper, log = log, weights = weights
+    lower = lower, upper = upper, log = log, weights = weights[ok]
   )
   series_score$all_series <- data.frame(
     score = joint,
@@ -519,88 +526,4 @@ score_multivariate <- function(object, series_names, score,
     stringsAsFactors = FALSE
   )
   series_score
-}
-
-
-# ----- Per-score routing ------------------------------------------
-
-#' One univariate score computed by its kernel
-#'
-#' Each kernel receives the arguments it uses.
-#'
-#' @param score Character name of a univariate score
-#' @param truth Numeric vector of observed values over the horizon
-#' @param fc Numeric matrix of forecast draws, one column per horizon
-#' @param interval_width Numeric width of the central interval
-#' @param quantile_level Numeric quantile level of the `qs` score
-#' @param lower Numeric lower threshold of the `twcrps` score
-#' @param upper Numeric upper threshold of the `twcrps` score
-#' @param log Logical. `TRUE` scores on the log scale
-#' @return Numeric matrix holding the `score` and `in_interval` columns
-#' @noRd
-dispatch_univariate_score <- function(score, truth, fc,
-                                        interval_width, quantile_level,
-                                        lower, upper, log) {
-  checkmate::assert_string(score)
-  checkmate::assert_atomic_vector(truth)
-  checkmate::assert_matrix(fc)
-  checkmate::assert_number(interval_width)
-  checkmate::assert_number(quantile_level)
-  checkmate::assert_number(lower)
-  checkmate::assert_number(upper)
-  checkmate::assert_flag(log)
-  switch(
-    score,
-    "crps" = crps_mcmc_object(
-      truth, fc, interval_width = interval_width, log = log
-    ),
-    "drps" = drps_mcmc_object(
-      truth, fc, interval_width = interval_width, log = log
-    ),
-    "sis" = sis_mcmc_object(
-      truth, fc, interval_width = interval_width, log = log
-    ),
-    "brier" = brier_mcmc_object(truth, fc),
-    "logs" = logs_mcmc_object(truth, fc),
-    "dss" = dss_mcmc_object(truth, fc),
-    "qs" = qs_mcmc_object(truth, fc, quantile_level = quantile_level),
-    "twcrps" = twcrps_mcmc_object(
-      truth, fc, lower = lower, upper = upper
-    )
-  )
-}
-
-
-#' One multivariate score computed by its kernel
-#'
-#' @param score Character name of a multivariate score
-#' @param truths Numeric matrix of observed values, one row per series
-#' @param fcs List of forecast draw matrices, one per series
-#' @param lower Numeric lower threshold of the `twenergy` score
-#' @param upper Numeric upper threshold of the `twenergy` score
-#' @param log Logical. `TRUE` scores on the log scale
-#' @param weights Numeric per-series weights of the `variogram` score, or
-#'   `NULL`
-#' @return Numeric vector of joint scores, one per horizon
-#' @noRd
-dispatch_multivariate_score <- function(score, truths, fcs,
-                                          lower, upper, log,
-                                          weights) {
-  checkmate::assert_string(score)
-  checkmate::assert_matrix(truths)
-  checkmate::assert_list(fcs)
-  checkmate::assert_number(lower)
-  checkmate::assert_number(upper)
-  checkmate::assert_flag(log)
-  checkmate::assert_numeric(weights, null.ok = TRUE)
-  switch(
-    score,
-    "energy" = energy_mcmc_object(truths, fcs, log = log),
-    "variogram" = variogram_mcmc_object(
-      truths, fcs, log = log, weights = weights
-    ),
-    "twenergy" = twenergy_mcmc_object(
-      truths, fcs, lower = lower, upper = upper
-    )
-  )
 }

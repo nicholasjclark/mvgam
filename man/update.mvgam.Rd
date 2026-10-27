@@ -69,7 +69,7 @@ left out of the refit. A \code{prior} passed to
 parameter:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{new_priors <- c(
-  prior(normal(0, 1), class = "b"),
+  prior(std_normal(), class = "b"),
   prior(exponential(1), class = "sigma")
 )
 refit <- update(mod, prior = new_priors)

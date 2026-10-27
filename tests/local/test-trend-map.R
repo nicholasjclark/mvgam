@@ -536,7 +536,7 @@ test_that("active_factors, shared_variation and ordinate answer here", {
   # report can be checked against the map rather than merely
   # rendered.
   af <- active_factors(fit)
-  # One row per column of the map, in order
+  # One row per factor, largest first
   expect_identical(as.integer(af$per_factor$factor), seq_len(n_lv))
   # Every series loads on both factors. Both columns are active. The
   # per-draw count agrees with the per-column verdicts.
