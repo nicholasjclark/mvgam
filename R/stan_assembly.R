@@ -1115,6 +1115,27 @@ combine_stanvars <- function(...) {
 # correlation, grouped correlations and heavy tails from here. The
 # trend's own generator applies a moving-average term.
 
+#' Do a trend's scaled innovations make up its states?
+#'
+#' A shared-innovation trend whose states are independent over time has
+#' its scaled innovations as its states. The shared system
+#' then writes them into `lv_trend` with no copy. A grouped trend fills
+#' `scaled_innovations_trend` in its group loop and keeps the copy.
+#'
+#' @param trend_specs The trend specification
+#' @param data_info Data information list
+#' @return Logical scalar
+#' @noRd
+shared_innovations_are_states <- function(trend_specs, data_info) {
+  checkmate::assert_list(trend_specs)
+  checkmate::assert_list(data_info)
+  trend_type <- trend_specs$trend
+  trend_property(trend_type, "shared_innovations") &&
+    trend_property(trend_type, "independent_states") &&
+    !isTRUE(extract_hierarchical_info(data_info, trend_specs)$has_groups)
+}
+
+
 #' Stanvars of the shared innovations
 #'
 #' The standard innovations with their scale and correlation. They
@@ -1127,16 +1148,26 @@ combine_stanvars <- function(...) {
 #'   zero correlation (see `samples_factor_loadings()`)
 #' @param hierarchical_info List with hierarchical structure info, or
 #'   NULL
+#' @param states Name of the matrix the scaled innovations fill:
+#'   `"scaled_innovations_trend"`, or `"lv_trend"` for a trend whose
+#'   states are its scaled innovations (see
+#'   `shared_innovations_are_states()`). Unit factors then make the
+#'   standard innovations the states, sampled as `lv_trend`.
 #' @return A stanvars object
 #' @noRd
 generate_shared_innovation_stanvars <- function(cor = FALSE,
                                                unit_factors = FALSE,
-                                               hierarchical_info = NULL) {
+                                               hierarchical_info = NULL,
+                                               states =
+                                                 "scaled_innovations_trend") {
   checkmate::assert_flag(cor)
   checkmate::assert_flag(unit_factors)
+  checkmate::assert_choice(states, c("scaled_innovations_trend",
+                                     "lv_trend"))
 
   effective_dim <- "N_lv_trend"
   is_hierarchical <- isTRUE(hierarchical_info$has_groups)
+  sampled_states <- unit_factors && identical(states, "lv_trend")
 
   # A grouped trend scales its innovations by `sigma_group_trend`, from
   # `generate_hierarchical_correlation_parameters()`. Sampled loadings
@@ -1156,10 +1187,11 @@ generate_shared_innovation_stanvars <- function(cor = FALSE,
     innovation_correlation_stanvars(effective_dim, sampled = !unit_factors,
                                     covariance = !scaled_cor)
   }
+  innovations <- if (sampled_states) "lv_trend" else "innovations_trend"
   innovations_trend_stanvar <- brms::stanvar(
-    name = "innovations_trend",
-    scode = paste0("matrix[N_time_trend, ", effective_dim,
-                   "] innovations_trend;"),
+    name = innovations,
+    scode = paste0("matrix[N_time_trend, ", effective_dim, "] ",
+                   innovations, ";"),
     block = "parameters"
   )
 
@@ -1177,9 +1209,11 @@ generate_shared_innovation_stanvars <- function(cor = FALSE,
     )
   }
   scaled_decl <- paste0(
-    "\n    matrix[N_time_trend, ", effective_dim, "] scaled_innovations_trend;"
+    "\n    matrix[N_time_trend, ", effective_dim, "] ", states, ";"
   )
-  final_innovations_code <- if (is_hierarchical) {
+  final_innovations_code <- if (sampled_states) {
+    ""
+  } else if (is_hierarchical) {
     paste0("\n    // Innovations scaled by each group's Cholesky factor,",
            " filled below", scaled_decl)
   } else if (scaled_cor) {
@@ -1192,21 +1226,23 @@ generate_shared_innovation_stanvars <- function(cor = FALSE,
       "] L_Sigma_trend\n",
       "        = diag_pre_multiply(sigma_trend, L_Omega_trend);\n",
       "      Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);\n",
-      "      scaled_innovations_trend = innovations_trend * L_Sigma_trend';\n",
+      "      ", states, " = innovations_trend * L_Sigma_trend';\n",
       "    }"
     )
   } else {
     paste0(
       scaled_decl, "\n    ",
       if (unit_factors) {
-        "scaled_innovations_trend = innovations_trend;"
+        paste0(states, " = innovations_trend;")
       } else {
-        independent_scaling_stancode()
+        independent_scaling_stancode(states)
       }
     )
   }
+  # A stanvar named for the matrix it declares. The assembly then finds
+  # the states declared here. Sampled states leave the unit scale.
   scaled_innovations_stanvar <- brms::stanvar(
-    name = "scaled_innovations_trend",
+    name = if (sampled_states) "unit_factor_scale" else states,
     scode = paste0(sigma_decl, final_innovations_code),
     block = "tparameters"
   )
@@ -1339,9 +1375,11 @@ innovation_vector_prior <- function(target, effective_dim, df = Inf) {
 #' @param effective_dim Number of latent series
 #' @param df `Inf` for Gaussian innovations, `NA` to estimate the
 #'   degrees of freedom, or a finite number above 2 to fix them
+#' @param innovations Name of the standard innovations matrix
 #' @return Character vector of Stan statements
 #' @noRd
-innovation_sampling_code <- function(effective_dim, df = Inf) {
+innovation_sampling_code <- function(effective_dim, df = Inf,
+                                     innovations = "innovations_trend") {
   # `effective_dim` is either a Stan dimension name such as
   # "N_lv_trend" or a literal count, depending on the call site.
   checkmate::assert(
@@ -1349,12 +1387,13 @@ innovation_sampling_code <- function(effective_dim, df = Inf) {
     checkmate::check_integerish(effective_dim, lower = 1L, len = 1L),
     .var.name = "effective_dim"
   )
+  checkmate::assert_string(innovations, min.chars = 1L)
   if (is_gaussian_df(df)) {
-    return("to_vector(innovations_trend) ~ std_normal();")
+    return(paste0("to_vector(", innovations, ") ~ std_normal();"))
   }
   c(
     "for (t_inn in 1 : N_time_trend) {",
-    paste0("  ", innovation_vector_prior("innovations_trend[t_inn]'",
+    paste0("  ", innovation_vector_prior(paste0(innovations, "[t_inn]'"),
                                          effective_dim, df)),
     "}"
   )
@@ -1405,13 +1444,15 @@ nu_trend_stanvars <- function(df, prior = NULL) {
 #'   factor scale and correlation
 #' @param trend_obj The trend specification, for the default
 #'   `sigma_trend` prior
+#' @param innovations Name of the standard innovations matrix
 #' @return A stanvars object
 #' @noRd
 generate_innovation_model <- function(effective_dim, cor = FALSE,
                                       is_hierarchical = FALSE,
                                       prior = NULL, df = Inf,
                                       unit_factors = FALSE,
-                                      trend_obj = NULL) {
+                                      trend_obj = NULL,
+                                      innovations = "innovations_trend") {
   checkmate::assert_flag(cor)
   checkmate::assert_flag(is_hierarchical)
   checkmate::assert_flag(unit_factors)
@@ -1429,7 +1470,8 @@ generate_innovation_model <- function(effective_dim, cor = FALSE,
       prior_code <- c(prior_code, trend_prior_line("L_Omega_trend", prior))
     }
   }
-  prior_code <- c(prior_code, innovation_sampling_code(effective_dim, df))
+  prior_code <- c(prior_code,
+                  innovation_sampling_code(effective_dim, df, innovations))
 
   combine_stanvars(
     brms::stanvar(
@@ -1667,7 +1709,8 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv,
 #' - whatever the trend's linear predictor is built from, which the
 #'   names that predictor references identify
 #' - the linear predictor `mu_trend` itself
-#' - the latent states, the scaled innovations and the factor loadings
+#' - the latent states, the scaled innovations, the factor loadings and
+#'   a fixed `sigma_trend`
 #' - the arrays indexing those dimensions, then everything else
 #' - the trend matrix, which the states and `mu_trend` produce
 #'
@@ -1723,7 +1766,8 @@ sort_stanvars <- function(stanvars) {
   is_foundation <- grepl(paste0(
     "matrix\\s*\\[\\s*N_time_trend\\s*,\\s*N_lv_trend\\s*\\]\\s+",
     "(lv_trend|scaled_innovations_trend)\\s*[;=]",
-    "|\\bmatrix\\s*\\[[^]]*\\]\\s+Z\\s*[;=]"
+    "|\\bmatrix\\s*\\[[^]]*\\]\\s+Z\\s*[;=]",
+    "|\\bvector<lower=0>\\s*\\[[^]]*\\]\\s+sigma_trend\\s*="
   ), scodes)
   is_trend_matrix <- grepl(paste0(
     "matrix\\s*\\[\\s*N_time_trend\\s*,\\s*N_series_trend\\s*\\]\\s+",
@@ -2686,11 +2730,17 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info,
     cor <- trend_specs$cor %||% FALSE
     unit_factors <- samples_factor_loadings(trend_specs)
     refuse_unit_factor_priors(prior, unit_factors)
+    states <- if (shared_innovations_are_states(trend_specs, data_info)) {
+      "lv_trend"
+    } else {
+      "scaled_innovations_trend"
+    }
     shared_stanvars <- combine_stanvars(
       generate_shared_innovation_stanvars(
         cor = cor,
         unit_factors = unit_factors,
-        hierarchical_info = hierarchical_info
+        hierarchical_info = hierarchical_info,
+        states = states
       ),
       generate_innovation_model(
         effective_dim = "N_lv_trend",
@@ -2699,7 +2749,12 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info,
         prior = prior,
         df = trend_specs$df %||% Inf,
         unit_factors = unit_factors,
-        trend_obj = trend_specs
+        trend_obj = trend_specs,
+        innovations = if (unit_factors && identical(states, "lv_trend")) {
+          "lv_trend"
+        } else {
+          "innovations_trend"
+        }
       )
     )
   }
@@ -2710,9 +2765,11 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info,
     n_time = data_info$n_time
   )
   trend_stanvars <- generator_function(trend_specs, data_info, prior = prior)
-  # A generator that samples its states declares `lv_trend` itself.
-  # Every other trend builds them in transformed parameters.
-  lv_trend_stanvar <- if (!"lv_trend" %in% names(trend_stanvars)) {
+  # A generator that samples its states declares `lv_trend` itself, as
+  # does the shared system when the innovations are the states. Every
+  # other trend builds them in transformed parameters.
+  declared <- c(names(shared_stanvars), names(trend_stanvars))
+  lv_trend_stanvar <- if (!"lv_trend" %in% declared) {
     brms::stanvar(
       name = "shared_lv_trend",
       scode = "matrix[N_time_trend, N_lv_trend] lv_trend;",
@@ -3517,9 +3574,10 @@ refuse_unit_factor_priors <- function(prior, unit_factors) {
 #'
 #' @return Character scalar
 #' @noRd
-independent_scaling_stancode <- function() {
-  paste0("scaled_innovations_trend",
-         " = diag_post_multiply(innovations_trend, sigma_trend);")
+independent_scaling_stancode <- function(
+    states = "scaled_innovations_trend") {
+  checkmate::assert_string(states, min.chars = 1L)
+  paste0(states, " = diag_post_multiply(innovations_trend, sigma_trend);")
 }
 
 #' Stan text opening a loop over groups with each group's members
@@ -4854,11 +4912,15 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info,
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_list(data_info, names = "named")
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
-  dynamics <- brms::stanvar(
-    name = "zmvn_tparameters",
-    scode = "lv_trend = scaled_innovations_trend;",
-    block = "tparameters"
-  )
+  # A grouped trend fills `scaled_innovations_trend` in its group loop.
+  # Every other ZMVN writes its states in the shared system.
+  dynamics <- if (!shared_innovations_are_states(trend_specs, data_info)) {
+    brms::stanvar(
+      name = "zmvn_tparameters",
+      scode = "lv_trend = scaled_innovations_trend;",
+      block = "tparameters"
+    )
+  }
   assemble_shared_innovation_trend(
     list(dynamics), trend_specs, data_info, prior
   )

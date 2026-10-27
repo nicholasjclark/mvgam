@@ -162,7 +162,7 @@ SPECS <- list(
     fc_types = c("link", "expected", "trend", "response"),
     fc_response_ok = function(x) all(x >= 0) && all(x == floor(x)),
     pp_check_extra = "rootogram",
-    plot_types = c("residuals", "trend", "factors"),
+    plot_types = c("residuals", "factors"),
     optional_methods = c("linpred", "residuals", "mcmc_plot",
                          "marginaleffects"),
     ce_response_ok = NULL,
@@ -187,7 +187,7 @@ SPECS <- list(
     fc_types = c("link", "expected", "trend", "response"),
     fc_response_ok = NULL,
     pp_check_extra = "resid_qq",
-    plot_types = c("residuals", "trend", "factors"),
+    plot_types = c("residuals", "factors"),
     optional_methods = c("linpred", "residuals", "mcmc_plot",
                          "marginaleffects",
                          "forecast_response_agrees"),
@@ -206,7 +206,7 @@ SPECS <- list(
     fc_types = c("link", "expected", "trend", "response"),
     fc_response_ok = NULL,
     pp_check_extra = "resid_qq",
-    plot_types = c("residuals", "trend", "factors"),
+    plot_types = c("residuals", "factors"),
     optional_methods = c("linpred", "residuals", "mcmc_plot",
                          "marginaleffects",
                          "forecast_response_agrees"),
@@ -225,7 +225,7 @@ SPECS <- list(
     fc_types = c("link", "expected", "trend", "response"),
     fc_response_ok = function(x) all(x >= 0 & x <= 1),
     pp_check_extra = NULL,
-    plot_types = c("trend", "factors"),
+    plot_types = "factors",
     optional_methods = c("residuals", "forecast_response_agrees"),
     ce_response_ok = NULL,
     me_integer_tell = FALSE
@@ -242,7 +242,7 @@ SPECS <- list(
     fc_types = c("link", "expected", "trend", "response"),
     fc_response_ok = function(x) all(x >= 0) && all(x == floor(x)),
     pp_check_extra = NULL,
-    plot_types = c("trend", "factors"),
+    plot_types = "factors",
     optional_methods = c("residuals", "forecast_response_agrees"),
     ce_response_ok = NULL,
     me_integer_tell = FALSE
@@ -262,7 +262,7 @@ SPECS <- list(
     fc_types = c("link", "expected", "trend", "response"),
     fc_response_ok = function(x) all(x %in% c(0, 1)),
     pp_check_extra = NULL,
-    plot_types = c("trend", "factors"),
+    plot_types = "factors",
     optional_methods = c("residuals", "forecast_response_agrees"),
     ce_response_ok = NULL,
     me_integer_tell = FALSE
@@ -1041,14 +1041,11 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     }
   })
 
-  test_that(says("every time-axis panel draws the occasions supplied"), {
-    # The trend panel, the series panel and a hindcast all label
-    # their x axis `Time` and mean the occasions the user gave. The
-    # factor panel draws the occasion's rank under the same label. On
-    # a grid numbered from one the two coincide and nothing shows,
-    # which is why the multivariate-normal frame here is numbered
-    # from three: a reader comparing a factor trajectory against a
-    # series trajectory is otherwise off by the offset between them.
+  test_that(says("the factor panel draws the occasions supplied"), {
+    # The factor panel labels its x axis `Time`, the occasions the user
+    # gave. A panel drawing each occasion's rank matches it on a grid
+    # numbered from one. The multivariate-normal frame here is numbered
+    # from three, which separates the two.
     ut <- range(as.numeric(d$time))
     panel_x <- function(p) {
       xs <- unlist(lapply(
@@ -1057,11 +1054,14 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
       ))
       range(xs[is.finite(xs)])
     }
-    for (ty in intersect(spec$plot_types, c("trend", "factors"))) {
+    for (ty in intersect(spec$plot_types, "factors")) {
       expect_equal(panel_x(plot(fit, type = ty)), ut)
     }
-    expect_equal(panel_x(plot(hindcast(fit, ndraws = 20L), series = 1L)),
-                 ut)
+    # The units are sites in arbitrary order. A trend or hindcast drawn
+    # along them would look like a time series. Both plots refuse.
+    expect_error(plot(fit, type = "trend"), "along time is not supported")
+    expect_error(plot(hindcast(fit, ndraws = 20L), series = 1L),
+                 "along time is not supported")
   })
 
   test_that(says("the draws and the tidiers keep this fit's row order"), {

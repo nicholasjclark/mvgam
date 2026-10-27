@@ -455,7 +455,10 @@ test_that("a ZMVN factor program rotates its loadings after sampling", {
     "vector<lower=0>[N_lv_trend] sigma_trend = rep_vector(1.0, N_lv_trend);"
   ))
   expect_false(stan_pattern("sigma_trend ~", code_with_trend))
-  expect_true(line("lv_trend = scaled_innovations_trend;"))
+  # Unit factors sample the states themselves, with no copy
+  expect_true(line("matrix[N_time_trend, N_lv_trend] lv_trend;"))
+  expect_true(line("target += std_normal_lpdf(to_vector(lv_trend));"))
+  expect_false(grepl("innovations_trend", code_with_trend, fixed = TRUE))
   # The covariate enters the trend design, which takes no centring
   expect_true(line("mu_trend += X_trend * b_trend;"))
   expect_false(grepl("Xc_trend", code_with_trend, fixed = TRUE))

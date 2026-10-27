@@ -55,7 +55,8 @@ test_that("trend properties are validated", {
            covariance_pattern = "diagonal", stationary_source = "none",
            requires_regular_intervals = TRUE,
            per_factor_coefficients = FALSE, completes_time_grid = FALSE,
-           shared_innovations = TRUE, generator_func = generator),
+           independent_states = FALSE, shared_innovations = TRUE,
+           generator_func = generator),
       list(...)
     )
     do.call(register_trend_type, args)

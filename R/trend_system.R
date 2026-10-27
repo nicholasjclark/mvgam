@@ -37,6 +37,9 @@ trend_registry <- new.env(parent = emptyenv())
 #' @param completes_time_grid Logical; does the trend hold a latent
 #'   state for a series at a time the data has no row for? Such a
 #'   trend takes series observed at their own times.
+#' @param independent_states Logical; is the state at each time
+#'   independent of the states at every other time? Such a trend's
+#'   states are its scaled innovations.
 #' @param shared_innovations Logical; does the trend take its
 #'   innovations from the shared system, which emits `sigma_trend`,
 #'   `L_Omega_trend`, the grouped correlations and the multiplicative
@@ -53,6 +56,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
                                 requires_regular_intervals,
                                 per_factor_coefficients,
                                 completes_time_grid,
+                                independent_states,
                                 shared_innovations,
                                 generator_func,
                                 incompatibility_reason = NULL) {
@@ -66,6 +70,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
   checkmate::assert_flag(requires_regular_intervals)
   checkmate::assert_flag(per_factor_coefficients)
   checkmate::assert_flag(completes_time_grid)
+  checkmate::assert_flag(independent_states)
   checkmate::assert_flag(shared_innovations)
   checkmate::assert_function(generator_func,
                              args = c("trend_specs", "data_info"))
@@ -79,6 +84,7 @@ register_trend_type <- function(name, supports_factors, covariance_pattern,
     requires_regular_intervals = requires_regular_intervals,
     per_factor_coefficients = per_factor_coefficients,
     completes_time_grid = completes_time_grid,
+    independent_states = independent_states,
     shared_innovations = shared_innovations,
     generator = generator_func,
     incompatibility_reason = incompatibility_reason
@@ -275,7 +281,7 @@ validate_trend_properties <- function(trend_info, func_name) {
   missing_fields <- setdiff(
     c("supports_factors", "covariance_pattern", "stationary_source",
       "requires_regular_intervals", "per_factor_coefficients",
-      "completes_time_grid", "shared_innovations",
+      "completes_time_grid", "independent_states", "shared_innovations",
       "incompatibility_reason"),
     names(trend_info)
   )
@@ -302,6 +308,7 @@ ar_trend_properties <- function() {
     requires_regular_intervals = TRUE,
     per_factor_coefficients = TRUE,
     completes_time_grid = FALSE,
+    independent_states = FALSE,
     shared_innovations = TRUE,
     incompatibility_reason = NULL
   )
@@ -318,6 +325,7 @@ rw_trend_properties <- function() {
     requires_regular_intervals = TRUE,
     per_factor_coefficients = FALSE,
     completes_time_grid = FALSE,
+    independent_states = FALSE,
     shared_innovations = TRUE,
     incompatibility_reason = NULL
   )
@@ -335,6 +343,7 @@ var_trend_properties <- function() {
     requires_regular_intervals = TRUE,
     per_factor_coefficients = FALSE,
     completes_time_grid = FALSE,
+    independent_states = FALSE,
     shared_innovations = FALSE,
     incompatibility_reason = NULL
   )
@@ -356,6 +365,7 @@ llt_trend_properties <- function() {
     requires_regular_intervals = TRUE,
     per_factor_coefficients = FALSE,
     completes_time_grid = FALSE,
+    independent_states = FALSE,
     shared_innovations = TRUE,
     incompatibility_reason = NULL
   )
@@ -419,6 +429,9 @@ zmvn_trend_properties <- function() {
     requires_regular_intervals = FALSE,
     per_factor_coefficients = FALSE,
     completes_time_grid = FALSE,
+    # Each time takes its own draw, which makes the scaled innovations
+    # the states.
+    independent_states = TRUE,
     shared_innovations = TRUE,
     incompatibility_reason = NULL
   )
@@ -441,6 +454,7 @@ car_trend_properties <- function() {
     # Every series has a state at every time of the union grid. A time
     # added between two others leaves the model unchanged.
     completes_time_grid = TRUE,
+    independent_states = FALSE,
     shared_innovations = FALSE,
     incompatibility_reason = paste0(
       "Continuous-time AR dynamics follow each series' own irregular ",
@@ -461,6 +475,7 @@ pw_trend_properties <- function() {
     requires_regular_intervals = TRUE,
     per_factor_coefficients = FALSE,
     completes_time_grid = FALSE,
+    independent_states = FALSE,
     shared_innovations = FALSE,
     incompatibility_reason =
       "Piecewise trends model changepoints separately for each series."
@@ -606,6 +621,7 @@ trend_property <- function(trend_type,
                            field = c("stationary_source",
                                      "covariance_pattern",
                                      "per_factor_coefficients",
+                                     "independent_states",
                                      "shared_innovations",
                                      "supports_factors")) {
   checkmate::assert_string(trend_type, min.chars = 1)

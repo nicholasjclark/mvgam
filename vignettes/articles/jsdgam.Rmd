@@ -326,21 +326,23 @@ plot(af)
 
 ```{r af-numbers, include = FALSE}
 n_active <- sum(af$per_factor$is_active)
-stopifnot(n_active > 2, n_active < 6)
+# The prose below says the prior kept the two factors the earlier
+# models fixed
+stopifnot(n_active == 2)
 ```
 
-`r n_active` of the six factors are active. The earlier two-factor
-models held the residual structure in a smaller latent space than the
-data support.
+Two of the six factors are active, the number the earlier models
+fixed. Their two factors held all of the residual structure
+these counts support.
 
 ## Summary
 
-Traits and column shrinkage both changed what the ant community model
-concluded. The trait prior predicted held-out counts better than
-independent loadings, by `r fe_diff` in expected log predictive
-density against a standard error of `r fe_se`. The shrinkage prior
-found `r n_active` active factors where the first models assumed two.
-Each extension is one argument to a single `jsdgam()` call, as are
+The trait prior and column shrinkage tested two assumptions of the
+first ant community models: independent loadings and two factors. The
+trait prior predicted held-out counts better than independent
+loadings, by `r fe_diff` in expected log predictive density against a
+standard error of `r fe_se`. Given a ceiling of six factors, the
+shrinkage prior kept two active, the number the first models assumed. Each extension is one argument to a single `jsdgam()` call, as are
 the environmental slopes that gave all 41 species a canopy response
 from three covariates.
 
