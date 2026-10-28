@@ -350,7 +350,7 @@ test_that("extract_trend_latent_states: missing trend[t,s] column errors", {
   expect_error(
     extract_trend_latent_states(mock_fit, newdata,
                                 full_draws = full_draws),
-    regexp = "Latent trend state column missing from posterior draws"
+    regexp = "Missing: 'trend\\[3,1\\]'"
   )
   # A time outside the fitted times has no fitted state.
   expect_error(

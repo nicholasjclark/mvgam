@@ -13,7 +13,9 @@ LLT(
   subgr = NA,
   n_lv = NULL,
   trend_map = NULL,
-  df = Inf
+  df = Inf,
+  season = NULL,
+  harmonics = NULL
 )
 }
 \arguments{
@@ -143,6 +145,15 @@ the latent process. They are weakly identified in short series:
 below roughly 200 time points, the posterior stays close to its
 prior. \code{VAR()} samples its states directly and \code{PW()}
 has no innovations. Neither takes \code{df}.}
+
+\item{season}{Optional numeric vector of seasonal periods in time
+steps, each above 2, such as \code{12} for monthly data or \code{c(7, 365.25)} for daily data. Periods need not be whole. Default \code{NULL}
+fits no season.}
+
+\item{harmonics}{Optional integer vector with the number of
+trigonometric harmonics of each period, each below half its
+period. Fewer harmonics give a smoother seasonal shape. Defaults to
+the most each period allows, up to 10.}
 }
 \value{
 An object of class \code{mvgam_trend}.
@@ -184,14 +195,15 @@ scales, as \code{\link[=get_prior]{get_prior()}} describes. \code{sigma_slope_tr
 half-Student-t with 3 degrees of freedom. Under its scale, the
 trend's movement over the series from the slope shocks has a
 standard deviation with prior median \eqn{s}. The movement itself
-has a 90th percentile near \eqn{2.8 s}. The scale accounts for the damping at
-the median of its prior. \code{init_slope_trend ~ normal(0, 2 / r)},
-where \eqn{r = 1 + \phi + \dots + \phi^{N - 2}} is how far a unit
+has a 90th percentile near \eqn{2.8 s}. The scale accounts for the
+damping at the median of its prior.
+\code{init_slope_trend ~ normal(0, 2 / r)}, where
+\eqn{r = 1 + \phi + \dots + \phi^{N - 2}} is how far a unit
 initial slope moves the level by the end of the series, gives the
 initial slope \eqn{2 s} of growth over the series at one prior
-standard deviation. An undamped
-slope has \eqn{r = N - 1}. A factor model with every loading sampled
-measures both in units of its level's spread over the series,
+standard deviation. An undamped slope has \eqn{r = N - 1}. A factor
+model with every loading sampled measures both in units of its
+level's spread over the series,
 \eqn{\sqrt{N}}. Its loadings carry \eqn{s}. \code{ar1_slope_trend} takes
 \code{beta(18, 2)}, with median 0.91. \code{get_prior()} prints the resolved
 values.
@@ -213,35 +225,135 @@ rotation that \code{RW()} factors take identifies the loadings. A trend
 with no level noise would need an infinite slope scale. A factor
 model always keeps some level noise. A
 \code{trend_map} that fixes loadings keeps one slope scale per factor.
+
+\emph{Seasonality}:
+\code{season} adds a stochastic season \eqn{\gamma_t} to the level, the
+trigonometric form of Harvey (1989) with the non-integer and multiple
+periods of De Livera et al. (2011). The latent state is
+\eqn{\mu_t + \gamma_t}. Harmonic \eqn{j} of period \eqn{s}
+holds a state pair that turns by \eqn{\lambda_j = 2 \pi j / s} at
+each step and takes Gaussian shocks of scale \code{sigma_season_trend}:
+
+\deqn{\gamma_{j,t} = \cos\lambda_j \gamma_{j,t-1} +
+  \sin\lambda_j \gamma^*_{j,t-1} + \omega_{j,t}}
+\deqn{\gamma^*_{j,t} = \cos\lambda_j \gamma^*_{j,t-1} -
+  \sin\lambda_j \gamma_{j,t-1} + \omega^*_{j,t}}
+
+Common periods are 4 for quarterly data, 12 for monthly data, 52.18
+for weekly data over years, 7 and 365.25 for daily data and 24 and
+168 for hourly data. \code{LLT(season = 12, harmonics = K)} states the
+season that \code{AddTrig(period = 12, frequencies = 1:K)} states in
+\pkg{bsts}.
+
+The season is the sum of the first states over the harmonics. A
+small \code{sigma_season_trend} keeps the seasonal shape nearly fixed. A
+zero scale fixes it, as a cyclic smooth does. A larger scale lets
+the shape drift. Every harmonic of a process shares one scale.
+
+Each harmonic averages to zero over its period, which separates the
+season from the level and the observation intercept. Two periods
+sharing a harmonic, such as 6 and 12 with three or more harmonics,
+are refused. A period longer than the data overlaps the slope and
+draws a warning. The starting pairs \code{init_season_trend} are
+estimated under one prior for both states of every harmonic. A
+rotation of a pair leaves that prior unchanged, which places the
+phase at the first time point with no further choice. Seasonal
+shocks are independent across series. In a factor model each factor
+has its own season, mapped to the series through the loadings.
+
+\code{sigma_season_trend} takes a half-Student-t with 3 degrees of freedom
+whose scale puts the prior median of the season's drift over the
+series at \eqn{s}, as the slope's prior does for its movement. Each
+starting state takes \code{normal(0, s / sqrt(K))} over \eqn{K}
+harmonics, which gives the starting seasonal pattern a root mean
+square of \eqn{s}. \code{\link[=get_prior]{get_prior()}} prints the resolved values.
+
+\emph{Components}:
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}}, \code{\link[=forecast.mvgam]{forecast.mvgam()}} and \code{plot(type = "trend")}
+report the parts of the trend through \code{component}. \code{"level"} is the
+stochastic level and \code{"slope"} its growth per time step. \code{"season"}
+is the season. \code{"predictor"} holds the effects of the trend
+formula's covariates. Several names add their components:
+\code{component = c("level", "predictor")} gives the level with the
+covariate effects it moves with. Level, season and predictor sum to
+the trend. A factor model reports each component at the series
+grain, through its loadings. A rotation of the factors leaves them
+unchanged.
 }
 \examples{
 \dontrun{
-# A series that grows, then levels off: its slope shrinks by a
-# factor of 0.9 at each step
-set.seed(4)
-n_t <- 80
-slope <- 0.1 * 0.9^(0:(n_t - 1))
+# A series that grows fast, then slows: its slope starts at 0.25
+# and shrinks by a factor of 0.93 at each step
+set.seed(2)
+n_t <- 85
+slope <- 0.25 * 0.93^(0:(n_t - 1))
 dat <- data.frame(
   time = 1:n_t,
   series = factor("s1"),
   y = rpois(n_t, exp(1 + cumsum(slope) + cumsum(rnorm(n_t, 0, 0.03))))
 )
 
+# Fit the first 45 points, while the series is still growing
 mod <- mvgam(
   y ~ 1,
   trend_formula = ~ LLT(damped = TRUE),
-  data = dat[1:60, ],
+  data = dat[1:45, ],
   family = poisson(),
   chains = 2,
   silent = 2
 )
 
-# The posterior for `ar1_slope_trend` recovers the damping of 0.9
+# The posterior for `ar1_slope_trend` covers the simulated 0.93
 summary(mod)
 
-# The damped slope levels the forecast off
-fc <- forecast(mod, newdata = dat[61:80, ])
-plot(fc)
+# The slope decays toward zero over the fitted times and the horizon
+plot(forecast(mod, newdata = dat[46:85, ], type = "trend",
+              component = "slope"))
+
+# On the link scale the damped forecast levels off. An undamped slope
+# carries the last growth rate forward.
+plot(forecast(mod, newdata = dat[46:85, ], type = "link"))
+mod_undamped <- update(mod, trend_formula = ~ LLT())
+plot(forecast(mod_undamped, newdata = dat[46:85, ], type = "link"))
+
+# Ten years of monthly counts: a slow rise, a seasonal swing that
+# widens from 0.3 to 0.9 on the log scale and a rainfall effect
+set.seed(3)
+n_t <- 120
+season <- seq(0.3, 0.9, length.out = n_t) * sin(2 * pi * (1:n_t) / 12)
+dat_s <- data.frame(time = 1:n_t, series = factor("s1"),
+                    rain = rnorm(n_t))
+dat_s$y <- rpois(n_t, exp(2.5 + 0.008 * dat_s$time + season +
+                            0.3 * dat_s$rain))
+
+# Two harmonics of a twelve-month season, with rainfall acting on the
+# latent state. The last year is held out.
+mod_s <- mvgam(
+  y ~ 1,
+  trend_formula = ~ rain + LLT(season = 12, harmonics = 2),
+  data = dat_s[1:108, ],
+  family = poisson(),
+  chains = 2,
+  silent = 2
+)
+
+# A small `sigma_season_trend` lets the seasonal shape drift slowly
+summary(mod_s)
+
+# Simulated counts match the distribution of the observed ones
+pp_check(mod_s, type = "ecdf_overlay")
+
+# The rainfall effect on the expected count
+conditional_effects(mod_s, type = "expected")
+
+# The fitted season widens over the years and carries its shape into
+# the held-out year
+fc_s <- forecast(mod_s, newdata = dat_s[109:120, ], type = "trend",
+                 component = "season")
+plot(fc_s)
+
+# Draws of the seasonal shock scale
+head(as.data.frame(mod_s, variable = "sigma_season_trend"))
 }
 
 }
@@ -251,10 +363,18 @@ Models and the Kalman Filter}. Cambridge University Press.
 
 Gardner, E. S. and McKenzie, E. (1985). Forecasting trends in time
 series. \emph{Management Science}, 31:1237-1246.
+
+De Livera, A. M., Hyndman, R. J. and Snyder, R. D. (2011).
+Forecasting time series with complex seasonal patterns using
+exponential smoothing. \emph{Journal of the American Statistical
+Association}, 106:1513-1527.
 }
 \seealso{
 \code{\link[=RW]{RW()}}, \code{\link[=PW]{PW()}}, \link{trend_constructors}, \code{\link[=get_prior]{get_prior()}} for the
-scale of the default priors, \code{\link[=forecast.mvgam]{forecast.mvgam()}}
+scale of the default priors, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} for the level, the slope and the season,
+\code{\link[=series_to_mvgam]{series_to_mvgam()}} for the periods a \code{ts}, \code{msts} or \code{tsibble}
+carries
 
 Other trend models: 
 \code{\link{PW}()},

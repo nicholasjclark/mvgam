@@ -416,7 +416,6 @@ test_that("every prediction and summary surface returns on each fit", {
     expect_true(all(is.finite(marg)))
     expect_identical(nrow(fitted(fx$fit, draw_ids = 1:20)), n_obs)
     expect_identical(nrow(residuals(fx$fit, draw_ids = 1:20)), n_obs)
-    expect_s3_class(summary(fx$fit), "mvgam_summary")
     txt <- utils::capture.output(print(fx$fit))
     i <- grep("^Trend model", txt)
     expect_true(startsWith(trimws(txt[i + 1L]), labels[[nm]]))

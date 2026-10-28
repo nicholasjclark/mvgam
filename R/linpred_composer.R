@@ -1,8 +1,8 @@
 # Composing a linear predictor from a fitted model's draws.
 #
 # brms writes one linear predictor per response, per distributional
-# parameter and per non-linear parameter, and names every piece of each
-# by one rule, which `predictor_suffix()` states. Every term reader here
+# parameter and per non-linear parameter. One naming rule, which
+# `predictor_suffix()` states, covers every piece of each. Every term reader here
 # takes that suffix. One body of code composes the mean of a model with
 # one response, a response of a model with several, a distributional
 # parameter and a non-linear parameter. Each reader returns its own
@@ -57,9 +57,10 @@ null_if_blank <- function(x) {
 
 #' Every linear predictor a brms model writes
 #'
-#' One for each response's mean unless the mean is non-linear, one for
-#' each further distributional parameter it predicts, including each
-#' mixture component's mean, and one for each non-linear parameter. A
+#' brms writes one for each response's mean unless the mean is
+#' non-linear. It writes one for each further distributional parameter
+#' the response predicts, each mixture component's mean included. Each
+#' non-linear parameter has one of its own. A
 #' non-linear predictor is an expression over the parameters below it
 #' and declares no parameters itself.
 #'
@@ -194,8 +195,8 @@ predictor_nobs <- function(prep, resp) {
 
 #' The non-linear parameters of one response's formula
 #'
-#' A non-linear mean names its parameters in its expression, and each
-#' one has a formula of its own in `pforms`. Every other formula there
+#' A non-linear mean names its parameters in its expression. Each one
+#' has a formula of its own in `pforms`. Every other formula there
 #' belongs to a distributional parameter.
 #'
 #' @param form The response's `brmsformula`
@@ -334,10 +335,10 @@ fixed_pred <- function(draws, sdata, sfx, n_obs) {
 #' Smooth terms
 #'
 #' brms numbers the smooth objects of a predictor in order, one per
-#' level of a `by` factor, and splits each into an unpenalised part and
+#' level of a `by` factor. It splits each into an unpenalised part and
 #' one or more penalised parts. The unpenalised parts share `Xs`,
-#' multiplied by `bs`, and `attr(Xs, "smcols")` gives each object's
-#' columns of it. Object `i` has `nb_<i>` penalised parts, the
+#' multiplied by `bs`. `attr(Xs, "smcols")` gives each object's
+#' columns of `Xs`. Object `i` has `nb_<i>` penalised parts, the
 #' `Zs_<i>_<j>` bases multiplied by `s_<i>_<j>`.
 #'
 #' @inheritParams fixed_pred
@@ -384,12 +385,12 @@ smooth_pred <- function(draws, sdata, sfx, n_obs, objects = NULL,
 #' Group-level terms
 #'
 #' Each row of the fit's `ranef` table is one term of one grouping
-#' factor, and brms numbers it by its correlation block `id` and its
-#' place `cn` in that block: its design is `Z_<id><sfx>_<cn>`, its
-#' coefficients `r_<id><sfx>_<cn>[level]`, and its grouping index
-#' `J_<id>` suffixed by the response alone. `re_formula = NA` leaves
-#' every term out; otherwise every term is kept, and a missing design is
-#' a fault.
+#' factor. brms numbers the term by its correlation block `id` and its
+#' place `cn` in that block. Its design is `Z_<id><sfx>_<cn>`, its
+#' coefficients are `r_<id><sfx>_<cn>[level]` and its grouping index
+#' is `J_<id>` suffixed by the response alone. `re_formula = NA`
+#' leaves every term out. Any other value keeps every term. A kept
+#' term whose design is missing is an error.
 #'
 #' @inheritParams linear_terms_pred
 #' @param eta The `[ndraws x n_obs]` matrix the terms add into
@@ -481,9 +482,9 @@ gp_kernels <- function(rhs) {
 #' Each term uses its basis `Xgp`, its eigenvalues `slambda`, its
 #' marginal standard deviation `sdgp`, its length scales `lscale` and
 #' its basis coefficients `zgp`, all under `<sfx>_<i>`. A term with a
-#' factor `by` holds one of each per level, suffixed by the level, and
-#' places that level's rows with `Igp`. `Jgp` maps rows onto the unique
-#' covariate values brms computed the basis from, and `Cgp` scales a term by a
+#' factor `by` holds one of each per level, suffixed by the level. `Igp`
+#' places that level's rows. `Jgp` maps rows onto the unique covariate
+#' values brms computed the basis from. `Cgp` scales a term by a
 #' continuous `by`.
 #'
 #' @inheritParams fixed_pred
@@ -613,9 +614,10 @@ monotonic_pred <- function(draws, sdata, sfx, n_obs,
 #' A non-linear mean, evaluated at its non-linear parameters
 #'
 #' The mean is the formula's expression. Each name in it that has a
-#' formula of its own is a non-linear parameter, and is the linear
-#' predictor that formula describes; every other name is a covariate,
-#' which brms passes as `C_<i>` in the order the expression uses them.
+#' formula of its own is a non-linear parameter, evaluated as the
+#' linear predictor that formula describes. Every other name is a
+#' covariate. brms passes the covariates as `C_<i>` in the order the
+#' expression uses them.
 #'
 #' @inheritParams linear_terms_pred
 #' @param form The response's `brmsformula`

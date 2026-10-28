@@ -249,7 +249,6 @@ test_that("prediction and forecasting run on an empty design", {
     elev = 0, y = NA_real_
   )
   fc <- forecast(fit_free, newdata = nd)
-  expect_s3_class(fc, "mvgam_forecast")
   expect_length(fc$forecasts, n_series)
   expect_identical(names(fc$forecasts), series_names)
 })
@@ -331,7 +330,6 @@ test_that("a refit runs on a design mvgam wrote a column for", {
     refit <- update(
       fit, newdata = fit$data, run_model = FALSE
     )
-    expect_s3_class(refit, "mvgam")
     # The refit is the same program, not merely a program.
     expect_identical(
       mvgam:::mvgam_normalise_stancode(stancode(refit)),

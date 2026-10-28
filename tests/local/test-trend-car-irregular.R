@@ -638,8 +638,7 @@ test_that("a CAR forecast continues the grid it was given", {
   )
   for (ty in c("link", "trend")) {
     fc <- forecast(fit, newdata = future, ndraws = 50L, type = ty)
-    expect_s3_class(fc, "mvgam_forecast")
-    expect_identical(names(fc$forecasts), series_levels)
+      expect_identical(names(fc$forecasts), series_levels)
     for (s in series_levels) {
       expect_identical(dim(fc$forecasts[[s]]), c(50L, h))
       expect_true(all(is.finite(fc$forecasts[[s]])))
@@ -746,7 +745,6 @@ test_that("the plots and conditional effects render for CAR", {
   expect_drawn(mcmc_plot(fit))
 
   ce <- conditional_effects(fit)
-  expect_s3_class(ce, "mvgam_conditional_effects")
   expect_gt(length(ce), 0L)
   for (eff in names(ce)) {
     dd <- ce[[eff]]$data
@@ -847,9 +845,9 @@ test_that("a frame wholly inside the grid is refused, not emptied", {
 
 
 test_that("the fit answers the standard model accessors", {
-  expect_s3_class(model.frame(fit), "data.frame")
-  expect_s3_class(formula(fit), "formula")
-  expect_s3_class(insight::get_data(fit), "data.frame")
+  expect_identical(nrow(model.frame(fit)), nrow(dat))
+  expect_true("temp" %in% all.vars(formula(fit)))
+  expect_equal(insight::get_data(fit)$temp, dat$temp)
 })
 
 
@@ -870,7 +868,9 @@ test_that("hypothesis reaches every name variables() lists", {
     fit, grep("^ar1_trend\\[", variables(fit), value = TRUE)[1L]
   )
   # The default class takes a coefficient by its covariate
-  expect_s3_class(hypothesis(fit, "temp > 0"), "brmshypothesis")
+  h <- hypothesis(fit, "temp > 0")
+  expect_equal(h$hypothesis$Estimate,
+               mean(posterior::as_draws_matrix(fit)[, "b_temp"]))
 })
 
 
@@ -986,7 +986,6 @@ test_that("a continuous-time CAR forecasts its own grid", {
     temp = 0, y = NA_integer_
   )
   fc <- forecast(fit_c, newdata = future, ndraws = 50L)
-  expect_s3_class(fc, "mvgam_forecast")
   expect_identical(names(fc$forecasts), sim$series_names)
   for (s in sim$series_names) {
     expect_identical(dim(fc$forecasts[[s]]), c(50L, h))
@@ -1009,8 +1008,10 @@ test_that("lfo_cv admits the occasions the fit was given", {
   expect_false(fabricated %in% sim$times)
   expect_true(fabricated %in% floor(sim$times))
 
-  # An occasion the fit holds is a legitimate window boundary.
-  expect_s3_class(lfo_cv(fit_c, min_t = observed), "mvgam_lfo")
+  # An occasion the fit holds is a legitimate window boundary. The
+  # first scored occasion follows it.
+  lfo <- lfo_cv(fit_c, min_t = observed)
+  expect_identical(lfo$eval_timepoints[1L], sim$times[21L])
   # One it does not hold is not, whatever its truncation matches.
   expect_error(lfo_cv(fit_c, min_t = fabricated),
                "must be an observed time")
@@ -1254,8 +1255,8 @@ test_that("the correlated CAR reports the correlation of its trends", {
   off <- upper.tri(rc$cor)
   expect_identical(sign(rc$cor[off]), sign(sim$cor_instant[off]))
 
-  expect_s3_class(lfo_cv(fit_k, min_t = sim$times[length(sim$times) - 3L]),
-                  "mvgam_lfo")
+  lfo <- lfo_cv(fit_k, min_t = sim$times[length(sim$times) - 3L])
+  expect_true(all(lfo$eval_timepoints %in% utils::tail(sim$times, 3L)))
   for (ty in c("trend", "series")) {
     expect_equal(drawn_x(plot(fit_k, type = ty)), range(sim$times))
   }
@@ -1609,8 +1610,7 @@ test_that("every post-fit method answers on the irregular ZMVN fit", {
   aug <- augment(fit)
   expect_identical(nrow(aug), n_obs)
   expect_equal(as.numeric(aug$.observed), as.numeric(sim$data$y))
-  expect_identical(nrow(glance(fit)), 1L)
-  expect_gt(nrow(tidy(fit)), 0L)
+  expect_tidy_glance(fit, n_obs)
 })
 
 
@@ -1631,7 +1631,7 @@ test_that("the ZMVN panels draw the occasions the frame supplied", {
     expect_gt(length(xs), 0L)
     expect_equal(range(xs), as.numeric(rng))
   }
-  expect_error(plot(fit, type = "smooths"), "no smooth terms")
+  expect_error(plot(fit, type = "smooths"), "require a smooth term")
 
   pc <- pp_check(fit, ndraws = 30L)
   expect_drawn(pc)

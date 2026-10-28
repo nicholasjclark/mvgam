@@ -19,7 +19,8 @@ the median.}
 A long-format \code{tibble} with one row per series and time,
 holding the posterior median and the two quantiles of the
 predictions, the observed value for \code{type = 'response'} and the
-prediction type. A multivariate fit on a long frame adds a leading
+prediction type. State components of the trend add a \code{component}
+column, their names joined by \code{" + "}. A multivariate fit on a long frame adds a leading
 \code{resp} column naming the response.
 }
 \description{

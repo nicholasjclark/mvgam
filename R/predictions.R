@@ -489,21 +489,29 @@ trend_series_index <- function(object, series_int, resp) {
 
 #' Extract per-observation latent trend state draws
 #'
-#' Pulls the `trend\[t, s\]` posterior draws from the stanfit and
-#' aligns them to `newdata` rows via `(time, series)` mapping. Returns
-#' a ``\\[ndraws x nobs\\]`` matrix or NULL if the fit has no latent trend
-#' state.
+#' Takes the draws of a series-grain state `state[t, s]` and aligns
+#' them to the rows of `newdata` by `(time, series)`. The state is the
+#' fitted `trend` unless the caller names another, such as a state
+#' component from `series_path_draws()`.
 #'
+#' @param mvgam_fit A fitted `mvgam` object
+#' @param newdata The rows to align to
+#' @param full_draws Draws matrix holding the `state[t, s]` columns
+#' @param resp A response name, or NULL
+#' @param state Name of the `[time, series]` state
+#' @return `[ndraws, nrow(newdata)]` matrix, or NULL for a fit without
+#'   the state
 #' @noRd
 extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
-                                        resp = NULL) {
+                                        resp = NULL, state = "trend") {
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1)
   checkmate::assert_matrix(full_draws, min.rows = 1)
   checkmate::assert_string(resp, null.ok = TRUE)
+  checkmate::assert_string(state)
 
   par_names <- colnames(full_draws)
-  trend_cols <- grep("^trend\\[", par_names, value = TRUE)
+  trend_cols <- grep(paste0("^", state, "\\["), par_names, value = TRUE)
   if (length(trend_cols) == 0L) {
     return(NULL)
   }
@@ -542,10 +550,13 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
     match(obs_struct$time, obs_struct$unique_times)
   }
 
+  # `get_observation_structure()` refuses a series the fit never saw
   if (any(s_idx < 1L | s_idx > N_series_trend)) {
-    stop(insight::format_error(
-      "newdata contains series indices outside the fitted model's range."
-    ))
+    stop_mvgam_fault(
+      "Every prediction row needs a fitted series.",
+      paste0("Series indices outside 1 to ", N_series_trend,
+             " reached the state lookup.")
+    )
   }
 
   # A time outside the fitted grid has no fitted state. `forecast()`
@@ -568,20 +579,15 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   nobs <- length(t_idx)
   # Every cell is named and located in one pass. The cost grows with
   # the number of observations plus the number of parameters.
-  wanted <- paste0("trend[", t_idx, ",", s_idx, "]")
+  wanted <- paste0(state, "[", t_idx, ",", s_idx, "]")
   col <- match(wanted, par_names)
   absent <- is.na(col)
   if (any(absent)) {
-    stop(insight::format_error(c(
-      "Latent trend state column missing from posterior draws.",
-      x = cli::format_inline(
-        "Missing: {.val {wanted[which(absent)[1L]]}}."
-      ),
-      i = paste0(
-        "Stan output should contain trend[t, s] for every (t, s) ",
-        "pair covered by the fit."
-      )
-    )))
+    stop_mvgam_fault(
+      paste0("The draws must hold '", state, "[t, s]' for every fitted ",
+             "time and series."),
+      paste0("Missing: '", wanted[which(absent)[1L]], "'.")
+    )
   }
 
   latent_mat <- matrix(NA_real_, nrow = ndraws, ncol = nobs)

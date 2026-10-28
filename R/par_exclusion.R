@@ -1,18 +1,17 @@
 # Which parameters a fit does not keep
 #
-# brms computes this list before sampling and passes it to Stan, and a
-# model's working variables never reach the posterior: the
-# standardised deviates a group-level block is scaled from, the
-# unscaled coefficients a shrinkage prior scales, the ordered
-# intercepts a mixture is identified by. The model reports each of
-# these under another name, and a reader offered both would meet one
-# parameter twice.
+# brms computes this list before sampling and passes it to Stan. A
+# model's working variables never reach the posterior. They include
+# the standardised deviates a group-level block is scaled from, the
+# unscaled coefficients a shrinkage prior scales and the ordered
+# intercepts that identify a mixture. The model reports each of these
+# under another name. Keeping both would store one parameter twice.
 #
 # mvgam assembles its program from two brms models and applies the
-# same rules to each. The rules are `brms:::exclude_pars()`, which
-# brms does not export, and this file uses only brms's exported
-# functions. `brmsterms()` gives the response, distributional and
-# non-linear parameters whose names a working variable takes, and the
+# same rules to each. The rules are those of `brms:::exclude_pars()`.
+# Because brms does not export it, this file rebuilds them from brms's
+# exported functions. `brmsterms()` gives the response, distributional
+# and non-linear parameters whose names a working variable takes. The
 # stored brmsfit holds the group-level table. Every trend-side name
 # takes mvgam's `_trend` suffix.
 #
@@ -123,7 +122,7 @@ brms_working_pars <- function(bfit, standata, save_pars, suffix = "") {
 #' brms gives each penalised part of a smooth a standardised
 #' coefficient `zs<sfx>_<i>_<j>`, scales it into `s<sfx>_<i>_<j>` and
 #' keeps the scaled one. The data block holds the matching `Zs` basis
-#' for each part, and the program's own data name the parts.
+#' for each part. The program's own data name the parts.
 #'
 #' @param standata The combined Stan data.
 #' @param suffix `"_trend"` on the trend side, `""` otherwise.

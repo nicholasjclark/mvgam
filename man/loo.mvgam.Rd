@@ -56,10 +56,7 @@ trend state the model inferred at that time. The ELPD then
 describes the series that was observed. \code{FALSE} scores the
 deterministic submodel alone.}
 
-\item{incl_dynamics}{Superseded by \code{incl_autocor} and still
-accepted. \code{TRUE} maps to \code{incl_autocor = TRUE} and \code{FALSE} to
-\code{incl_autocor = FALSE}. \code{incl_autocor} takes precedence when both
-are given.}
+\item{incl_dynamics}{Deprecated alias for \code{incl_autocor}.}
 
 \item{by_series}{Logical, default \code{FALSE}. \code{TRUE} returns a data
 frame with one row per series and columns \code{series}, \code{elpd},

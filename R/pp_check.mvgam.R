@@ -1128,6 +1128,7 @@ mvgam_resid_panel <- function(
   # `plot.mvgam(type = "residuals")` calls this function. The panels
   # take its named arguments alone.
   rlang::check_dots_empty()
+  set_color_scheme_local()
   # One grid per response, stacked into one figure.
   fan <- mv_resp_fan_out(object, resp, combine = stack_response_plots)
   if (!is.null(fan)) return(fan)

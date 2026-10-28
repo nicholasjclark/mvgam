@@ -145,7 +145,8 @@ test_that("a burn-in hands on its final states and innovations", {
 
 test_that("an LLT forecast adds the slope to the level, damped by phi", {
   # The reference replays the recursion on the propagator's own draws:
-  # level shocks first, then slope shocks.
+  # level shocks first, then slope shocks. The slope path, row t the
+  # slope after step t, rides along as the `slope` component.
   state <- list(trends = matrix(c(1, 2), 1L), errors = NULL,
                 slope = c(0.5, -0.2))
   params <- list(sigma = c(0.3, 0.2), sigma_slope = c(0.1, 0.05),
@@ -158,13 +159,65 @@ test_that("an LLT forecast adds the slope to the level, damped by phi", {
   zeta <- rmvn(6L, c(0, 0), diag(c(0.01, 0.0025)))
   level <- c(1, 2)
   slope <- c(0.5, -0.2)
-  ref <- matrix(0, 6L, 2L)
+  ref <- slopes <- matrix(0, 6L, 2L)
   for (t in 1:6) {
     level <- level + slope + eta[t, ]
     slope <- c(0.8, 0.6) * slope + zeta[t, ]
     ref[t, ] <- level
+    slopes[t, ] <- slope
   }
+  expect_equal(attr(out, "components"), list(level = ref, slope = slopes))
+  attr(out, "components") <- NULL
   expect_equal(out, ref)
+})
+
+test_that("an LLT forecast turns each seasonal pair by its frequency", {
+  # The fitted trend holds the level plus the season. The reference
+  # replays the propagator's draws: level and slope shocks first, then
+  # the shocks of the first and second states at each step.
+  lam <- 2 * pi * (1:2) / 12
+  season0 <- matrix(c(0.3, -0.1, 0.2, 0.05, -0.2, 0.4, 0.1, -0.3), 4L)
+  state <- list(trends = matrix(c(1 + sum(season0[1:2, 1]),
+                                  2 + sum(season0[1:2, 2])), 1L),
+                errors = NULL, slope = c(0.1, -0.1), season = season0)
+  params <- list(sigma = c(0.3, 0.2), sigma_slope = c(0.1, 0.05),
+                 sigma_season = c(0.02, 0.04))
+  spec <- LLT(season = 12, harmonics = 2)
+  set.seed(5)
+  out <- propagate_trend(spec, params, h = 4L, n_series = 2L,
+                         last_state = state)
+  set.seed(5)
+  eta <- rmvn(4L, c(0, 0), diag(c(0.09, 0.04)))
+  zeta <- rmvn(4L, c(0, 0), diag(c(0.01, 0.0025)))
+  level <- c(1, 2)
+  slope <- c(0.1, -0.1)
+  g <- season0[1:2, ]
+  g_star <- season0[3:4, ]
+  ref <- slopes <- seasons <- matrix(0, 4L, 2L)
+  for (t in 1:4) {
+    level <- level + slope + eta[t, ]
+    slope <- slope + zeta[t, ]
+    w <- matrix(rnorm(4L, 0, rep(c(0.02, 0.04), each = 2L)), 2L)
+    w_star <- matrix(rnorm(4L, 0, rep(c(0.02, 0.04), each = 2L)), 2L)
+    g_last <- g
+    g <- cos(lam) * g_last + sin(lam) * g_star + w
+    g_star <- cos(lam) * g_star - sin(lam) * g_last + w_star
+    seasons[t, ] <- colSums(g)
+    slopes[t, ] <- slope
+    ref[t, ] <- level + seasons[t, ]
+  }
+  expect_equal(attr(out, "components"),
+               list(level = ref, slope = slopes, season = seasons))
+  attr(out, "components") <- NULL
+  expect_equal(out, ref)
+
+  # Without shocks the season repeats every period and sums to zero
+  # over one
+  params$sigma_season <- c(0, 0)
+  fixed <- attr(propagate_trend(spec, params, h = 24L, n_series = 2L,
+                                last_state = state), "components")$season
+  expect_equal(fixed[1:12, ], fixed[13:24, ])
+  expect_equal(colSums(fixed[1:12, ]), c(0, 0))
 })
 
 # ---- VAR ----------------------------------------------------------

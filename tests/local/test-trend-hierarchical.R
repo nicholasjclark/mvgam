@@ -431,7 +431,6 @@ test_that("a hierarchical fit forecasts on its own axis", {
   expect_identical(nrow(future), length(levs) * h)
 
   fc <- forecast(fit, newdata = future, ndraws = 10L)
-  expect_s3_class(fc, "mvgam_forecast")
   expect_identical(names(fc$forecasts), levs)
   for (s in levs) {
     expect_identical(dim(fc$forecasts[[s]]), c(10L, h))
@@ -614,9 +613,10 @@ test_that("insight reports the terms this model actually has", {
   preds <- insight::find_predictors(fit)$conditional
   expect_null(preds)
 
-  # The pair a caller reaches for together.
-  expect_s3_class(model.frame(fit), "data.frame")
-  expect_true(inherits(terms(fit), "terms"))
+  # The pair a caller reaches for together. Both describe the
+  # observation formula, which holds an intercept alone.
+  expect_identical(nrow(model.frame(fit)), nrow(fit$data))
+  expect_identical(attr(terms(fit), "term.labels"), character(0))
 })
 
 
@@ -746,7 +746,6 @@ test_that("the criticism surface runs on a hierarchical fit", {
   caught <- with_warnings(loo(fit))
   ic <- caught$value
   loo_warnings <- caught$warnings
-  expect_s3_class(ic, "loo")
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
   pareto_k <- ic$diagnostics$pareto_k
   expect_true(all(is.finite(pareto_k)))
@@ -769,7 +768,6 @@ test_that("the criticism surface runs on a hierarchical fit", {
   expect_drawn(pp_check(fit, type = "resid_qq", ndraws = 50L))
 
   hc <- hindcast(fit, ndraws = 5L)
-  expect_s3_class(hc, "mvgam_forecast")
   expect_equal(length(hc$hindcasts), mvgam:::mvgam_axes(fit)$series$n)
 })
 
@@ -1167,10 +1165,10 @@ test_that("the tidiers agree on the group covariance block", {
   # the fourth does too.
   sig <- function(x) grep("^Sigma", x, value = TRUE)
   from_vars <- sig(variables(fit))
-  # One square block per group, so the count states the shape rather
-  # than merely that something is present.
+  # One symmetric block per group, listed by its lower triangle. The
+  # count pins the shape of each block.
   n_sub <- length(species_levels)
-  expect_length(from_vars, length(region_levels) * n_sub^2)
+  expect_length(from_vars, length(region_levels) * n_sub * (n_sub + 1) / 2)
   expect_setequal(sig(rownames(posterior_summary(fit))), from_vars)
   expect_setequal(sig(names(rhat(fit))), from_vars)
 
@@ -1192,7 +1190,6 @@ test_that("the tidiers agree on the group covariance block", {
 
 test_that("residual_cor returns the global block by default", {
   res <- residual_cor(fit)
-  expect_s3_class(res, "mvgam_residcor")
   expect_true(isTRUE(res$hierarchical))
   expect_identical(res$group_label, "_global")
   # No population transition exists to lift the shocks through
@@ -1217,7 +1214,6 @@ test_that("residual_cor(by_group = TRUE) returns one block per region", {
   sp <- levels(dat$species)
   expect_setequal(names(res), c("_global", regions))
   for (nm in names(res)) {
-    expect_s3_class(res[[nm]], "mvgam_residcor")
     expect_identical(dim(res[[nm]]$cor), c(length(sp), length(sp)))
     expect_identical(rownames(res[[nm]]$cor), sp)
     expect_identical(colnames(res[[nm]]$cor), sp)

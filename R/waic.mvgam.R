@@ -60,8 +60,9 @@ waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
   require_fitted_model(x, "waic")
   incl_autocor <- resolve_incl_autocor(
     incl_autocor = incl_autocor,
-    legacy = incl_dynamics,
-    autocor_supplied = !missing(incl_autocor)
+    alias = incl_dynamics,
+    autocor_supplied = !missing(incl_autocor),
+    alias_name = "incl_dynamics"
   )
   refuse_unsupported_ic_args(c(
     pointwise = isTRUE(pointwise),

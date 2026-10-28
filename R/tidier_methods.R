@@ -464,14 +464,12 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   if (length(dim(fit_draws)) == 3L) {
     fit_draws <- ordinal_category_mean(fit_draws)
   }
-  fit_summ <- summarise_predictions(
+  fit_summ <- tibble::as_tibble(summarise_predictions(
     fit_draws, probs = probs, robust = robust
-  ) |>
-    tibble::as_tibble()
-  resid_summ <- residuals(
+  ))
+  resid_summ <- tibble::as_tibble(residuals(
     x, robust = robust, probs = probs, resp = resp
-  ) |>
-    tibble::as_tibble()
+  ))
   # A closure-unit family has one residual per unit and one fitted
   # value per visit. Each visit row repeats its unit's residual. The
   # `.unit` column names the unit. `is_closure_unit_family()` tests

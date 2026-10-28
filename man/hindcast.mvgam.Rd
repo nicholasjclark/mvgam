@@ -8,6 +8,7 @@
   object,
   ...,
   type = c("response", "link", "expected", "trend", "latent_state"),
+  component = NULL,
   ndraws = NULL,
   draw_ids = NULL,
   obs_uncertainty = TRUE,
@@ -27,6 +28,16 @@ abundance \code{N} of an \code{\link[=nmix]{nmix()}} model at each closure unit,
 \code{mvgam_latent_state} object with \code{print()}, \code{summary()},
 \code{as.data.frame()} and \code{plot()} methods.}
 
+\item{component}{\code{NULL} (the default) for the summed trend, or the
+names of state components of the trend, with \code{type = "trend"}.
+Several names give the sum of their components. \code{\link[=LLT]{LLT()}} has
+\code{"level"}, the stochastic level, and \code{"slope"}, its growth per time
+step. A seasonal \code{\link[=LLT]{LLT()}} adds \code{"season"}. \code{"predictor"} holds the
+effects of the trend formula's covariates. \code{c("level", "predictor")} gives the level with those effects. A factor model
+projects each component through its loadings, as it projects the
+trend. The result is an ordinary \link[=mvgam]{mvgam_forecast-class}
+with the components in its \code{component} slot.}
+
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}
 
@@ -43,7 +54,8 @@ Defaults to \code{TRUE}.}
 fitted latent state of each draw. \code{type = "response"} then adds
 the observation noise alone. \code{TRUE} adds fresh trend innovations
 to the linear predictor, as \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} does with
-the same argument.}
+the same argument. A \code{component} is a fitted state and needs
+\code{FALSE}.}
 
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
@@ -85,6 +97,10 @@ plot(hindcast(mod, type = "trend"))
 # Fresh innovations in place of the fitted states give the wider
 # spread a model without the observed history would predict
 plot(hindcast(mod, process_error = TRUE))
+
+# A local linear trend's slope, the level's growth per step
+mod_llt <- update(mod, trend_formula = ~ LLT())
+plot(hindcast(mod_llt, type = "trend", component = "slope"))
 
 # Next, forecast the held-out times with forecast()
 }

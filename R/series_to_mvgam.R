@@ -58,6 +58,11 @@
 #'   `seasonal.periods = c(7, 365.25)` in an `msts` take
 #'   `freq = c(7, 365.25)`.
 #'
+#'   A `season` column feeds a fixed seasonal shape, such as
+#'   `s(season, bs = "cc")`. The same periods give [LLT()] a season
+#'   whose shape drifts over the years, as
+#'   `trend_formula = ~ LLT(season = 12)`.
+#'
 #' @return A long `data.frame`. Its columns are `series` (a factor),
 #'   `time` (an integer for regular data), the response and the original
 #'   index (`index` for a `ts`). Any `tsibble` key and covariate columns
@@ -89,7 +94,8 @@
 #'
 #' @seealso The
 #'   `r mvgam_article("data", "data article")` covers the long format
-#'   and its conversion in more depth.
+#'   and its conversion in more depth. [LLT()] takes the same periods
+#'   for a season that drifts.
 #'
 #' @author Nicholas J Clark
 #' @family model fitting

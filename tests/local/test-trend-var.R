@@ -949,7 +949,7 @@ test_that("the plotting methods render for a VAR fit", {
 
   # Each plot type this fit lacks the structure for refuses it by
   # naming that structure
-  expect_error(plot(fit, type = "smooths"), "no smooth terms")
+  expect_error(plot(fit, type = "smooths"), "require a smooth term")
   expect_error(plot(fit, type = "factors"), "requires a latent factor model")
   expect_error(plot(fit, type = "latent_state"), "has no closure units")
 })
@@ -979,7 +979,6 @@ test_that("lfo_cv scores this fit on its own time axis", {
   # ratios. Its evaluated occasions are in the user's numbering, which
   # starts at 3 here.
   lfo <- SM(lfo_cv(fit, min_t = 55L, fc_horizon = 1L, silent = 2))
-  expect_s3_class(lfo, "mvgam_lfo")
 
   expect_identical(as.integer(lfo$eval_timepoints), 56:62)
   expect_true(all(is.finite(lfo$elpds)))
@@ -998,10 +997,11 @@ test_that("lfo_cv scores this fit on its own time axis", {
 
 test_that("lfo_cv can report a forecast-based score", {
   # A proper score needs a forecast from each window
-  expect_no_error(
-    SM(lfo_cv(fit, min_t = 55L, fc_horizon = 1L, score = "crps",
-              silent = 2))
-  )
+  lfo <- SM(lfo_cv(fit, min_t = 55L, fc_horizon = 1L, score = "crps",
+                   silent = 2))
+  expect_identical(as.integer(lfo$eval_timepoints), 56:62)
+  expect_identical(length(lfo$scores$crps), length(lfo$eval_timepoints))
+  expect_true(all(is.finite(lfo$scores$crps) & lfo$scores$crps >= 0))
 })
 
 

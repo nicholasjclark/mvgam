@@ -139,6 +139,25 @@ test_that("AR(p = c(1, 2)) emits both lag terms in the dynamics row", {
                fixed = TRUE)
 })
 
+test_that("a seasonal LLT writes the level plus each harmonic's turn", {
+  mod <- make_methods_md_prefit(
+    y ~ 1, trend_formula = ~ LLT(season = 12, harmonics = 2)
+  )
+  out <- methods_md(mod)
+  expect_contains(md_rows(out), c(
+    "\\eta_{i,t} &= \\ell_{i,t} + \\gamma_{i,t}",
+    paste0("\\ell_{i,t} &= \\ell_{i,t-1} + \\beta_{i,t-1} + ",
+           "\\epsilon^{(\\eta)}_{i,t}"),
+    "\\gamma_{i,t} &= \\sum_{j=1}^{K} \\gamma_{j,i,t}",
+    paste0("\\gamma_{j,i,t} &= \\cos(\\lambda_j) \\gamma_{j,i,t-1} + ",
+           "\\sin(\\lambda_j) \\gamma^*_{j,i,t-1} + \\omega_{j,i,t}"),
+    paste0("\\gamma^*_{j,i,t} &= \\cos(\\lambda_j) \\gamma^*_{j,i,t-1} - ",
+           "\\sin(\\lambda_j) \\gamma_{j,i,t-1} + \\omega^*_{j,i,t}")
+  ))
+  expect_match(out, "for $j = 1, \\dots, 2$ of period 12", fixed = TRUE)
+  expect_true("delivera_trig" %in% names(how_to_cite(mod)$bibtex))
+})
+
 test_that("Smooth term renders f_{x}(x) inline + basis decomposition", {
   mod <- make_methods_md_prefit(y ~ s(x, k = 5))
   rows <- md_rows(methods_md(mod))

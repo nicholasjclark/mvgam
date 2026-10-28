@@ -199,6 +199,22 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    delivera_trig = list(
+      text = "De Livera AM, Hyndman RJ and Snyder RD (2011). Forecasting time series with complex seasonal patterns using exponential smoothing. Journal of the American Statistical Association, 106(496), 1513-1527. https://doi.org/10.1198/jasa.2011.tm09771",
+      bibtex = paste(
+        "@article{delivera2011forecasting,",
+        "  title = {Forecasting time series with complex seasonal patterns using exponential smoothing},",
+        "  author = {De Livera, Alysha M. and Hyndman, Rob J. and Snyder, Ralph D.},",
+        "  journal = {Journal of the American Statistical Association},",
+        "  volume = {106},",
+        "  number = {496},",
+        "  pages = {1513--1527},",
+        "  year = {2011},",
+        "  doi = {10.1198/jasa.2011.tm09771}",
+        "}",
+        sep = "\n"
+      )
+    ),
     gardner_damped = list(
       text = "Gardner ES and McKenzie E (1985). Forecasting trends in time series. Management Science, 31(10), 1237-1246. https://doi.org/10.1287/mnsc.31.10.1237",
       bibtex = paste(
@@ -882,6 +898,11 @@ how_to_cite.mvgam <- function(object, ...) {
       detect = identical(trend_model, "LLT"),
       text = " The latent level followed a local linear trend with a time-varying slope (Harvey 1989).",
       refs = "harvey_llt"
+    ),
+    list(
+      detect = !is.null(first_trend_spec(object)$season),
+      text = " A stochastic season added trigonometric harmonics to the level, each a pair of states rotating at its frequency (Harvey 1989; De Livera et al. 2011).",
+      refs = c("harvey_llt", "delivera_trig")
     ),
     list(
       detect = "ar1_slope_trend" %in% object$prior$class,

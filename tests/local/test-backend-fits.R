@@ -34,19 +34,20 @@ test_that("sampler arguments reach cmdstanr", {
 
 
 test_that("sampler arguments reach rstan", {
-  # rstan's own convergence checks need more than 300 iterations here.
+  # rstan's own convergence checks warn on this model below 2000
+  # iterations.
   out <- capture.output(
-    fit <- suppressMessages(fit_ar(backend = "rstan", iter = 1000L,
+    fit <- suppressMessages(fit_ar(backend = "rstan", iter = 2000L,
                                    refresh = 0, save_warmup = TRUE))
   )
   expect_false(any(grepl("Iteration", out)))
-  expect_identical(as.integer(fit$fit@sim$warmup2), c(500L, 500L))
+  expect_identical(as.integer(fit$fit@sim$warmup2), c(1000L, 1000L))
 })
 
 
 test_that("an argument the sampler lacks is refused by name", {
   expect_error(fit_ar(silent = 2L, junk_arg = 1),
-               "Unknown argument for cmdstanr's '\\$sample\\(\\)': 'junk_arg'")
+               "hands the work to: 'junk_arg'")
 })
 
 

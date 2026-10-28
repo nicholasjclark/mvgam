@@ -4,10 +4,10 @@
 #' Run `methods(class = "mvgam")` to see an overview of available methods.
 #'
 #' @details A fit from [mvgam()] has class `c("mvgam", "brmsfit")`. The
-#'   accessors are the supported way in: `variables()`, `as_draws_df()`
-#'   and `as.data.frame()` return the posterior, `stancode()` and
-#'   `standata()` return the program and its data, and
-#'   `prior_summary()` returns the prior table. The elements are listed
+#'   accessors are the supported way in. `variables()`, `as_draws_df()`
+#'   and `as.data.frame()` return the posterior. `stancode()` and
+#'   `standata()` return the program and its data. `prior_summary()`
+#'   returns the prior table. The elements are listed
 #'   below.
 #'
 #'   The fit and its inputs:
@@ -89,7 +89,7 @@
 #'     - `axes$factor$n_lv` The number of latent factors, equal to the
 #'       number of columns of the loadings and of `lv_trend`
 #'     - `axes$grain` `lv` when a `by = lv_axis()` term puts the trend
-#'       design on the factor axis, and `series` otherwise
+#'       design on the factor axis, otherwise `series`
 #'     - `axes$vars` The column names for time, series, `gr` and
 #'       `subgr`: `time_var`, `series_var`, `gr_var` and `subgr_var`
 #'     - `axes$group_levels` The training levels of the `gr` and
@@ -135,7 +135,7 @@
 #'
 #'   - `jsdgam_args` The arguments of the `jsdgam()` call, with `unit`
 #'     and `species` as column names. [update()] refits through
-#'     `jsdgam()` with them, and prediction accepts a frame naming the
+#'     `jsdgam()` with them. Prediction accepts a frame naming the
 #'     `unit` and `species` columns alone
 #'
 #' @seealso [mvgam], [jsdgam], [mvgam_forecast-class]

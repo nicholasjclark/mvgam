@@ -38,8 +38,9 @@ for this dataset), leaving the SST smooth to absorb persistence
 that belongs to the latent state. \code{trend_formula = ~ CAR()}
 with the supplied \code{time} column measures the damping over the
 median gap between surveys, three months here. Its \code{ar1_trend}
-is then near \code{0.7^3 = 0.34}, the monthly \code{phi} of \code{0.7}, and the
-SST smooth is identifiable.
+is then near \code{0.7^3 = 0.34}, the monthly \code{phi} of \code{0.7} cubed.
+With persistence assigned to the latent state, the SST smooth is
+identifiable.
 
 True generative components:
 \itemize{

@@ -557,7 +557,7 @@ get_car_parameter_prior <- function(param_name, trend_obj) {
 #' A link unit is the responses' spread on their link scale where that
 #' exceeds one, as `trend_prior_unit()` measures it. Factors with
 #' sampled loadings have unit level shocks, whose path spreads by
-#' `sqrt(N)` over the series. Both priors take that spread as their
+#' `sqrt(N)` over the series. The priors take that spread as their
 #' unit. Their loadings carry the data's spread.
 #'
 #' @param param_name Character string parameter name
@@ -571,7 +571,9 @@ get_llt_parameter_prior <- function(param_name, trend_obj) {
   if (identical(param_name, "ar1_slope_trend")) {
     return(list(prior = "beta(18, 2)", lb = "0", ub = "1"))
   }
-  if (!param_name %in% c("sigma_slope_trend", "init_slope_trend")) {
+  scaled <- c("sigma_slope_trend", "init_slope_trend",
+              "sigma_season_trend", "init_season_trend")
+  if (!param_name %in% scaled) {
     return(NULL)
   }
   n_time <- trend_obj$dimensions$n_time
@@ -583,38 +585,77 @@ get_llt_parameter_prior <- function(param_name, trend_obj) {
   }
   scales <- llt_prior_scales(n_time, isTRUE(trend_obj$damped),
                              samples_factor_loadings(trend_obj),
-                             trend_prior_unit_of(trend_obj))
-  if (identical(param_name, "sigma_slope_trend")) {
-    return(list(prior = paste0("student_t(3, 0, ", scales$sigma, ")"),
-                lb = "0", ub = ""))
-  }
-  list(prior = paste0("normal(0, ", scales$init, ")"), lb = "", ub = "")
+                             trend_prior_unit_of(trend_obj),
+                             length(llt_season_frequencies(trend_obj)))
+  switch(
+    param_name,
+    sigma_slope_trend = list(
+      prior = paste0("student_t(3, 0, ", scales$sigma, ")"), lb = "0",
+      ub = ""
+    ),
+    init_slope_trend = list(
+      prior = paste0("normal(0, ", scales$init, ")"), lb = "", ub = ""
+    ),
+    sigma_season_trend = list(
+      prior = paste0("student_t(3, 0, ", scales$season_sigma, ")"),
+      lb = "0", ub = ""
+    ),
+    init_season_trend = list(
+      prior = paste0("normal(0, ", scales$season_init, ")"), lb = "",
+      ub = ""
+    )
+  )
 }
 
-#' The scales of the default LLT slope priors
+#' The scales of the default LLT priors
 #'
-#' The Stan program also samples both slope parameters in these units,
-#' which keeps a random start within a few prior scales of zero.
+#' The Stan program also samples the slope and season parameters in
+#' these units, which keeps a random start within a few prior scales of
+#' zero.
+#'
+#' A seasonal state pair keeps its length under rotation. Each step's
+#' shocks add `2 sigma_season^2` to its squared length. Over `N - 1`
+#' steps the `K` harmonics move the season by a standard deviation of
+#' `sigma_season sqrt(K (N - 1))`. `student_t(3, 0, 1.3 / sqrt(K (N -
+#' 1)))` puts the prior median of that drift at one link unit, as the
+#' slope prior does for the slope's movement. A starting pair at
+#' `normal(0, 1 / sqrt(K))` gives the starting seasonal pattern a mean
+#' square of one link unit squared.
 #'
 #' @param n_time Number of time points
 #' @param damped Whether the slope is damped
 #' @param unit_factors Whether every factor loading is sampled
 #' @param spread The responses' spread on their link scale
+#' @param n_harmonics Number of seasonal harmonics, zero without a
+#'   season
 #' @return List of `sigma` and `init`, each a scalar to four
-#'   significant digits
+#'   significant digits. With harmonics it adds `season_sigma` and
+#'   `season_init`.
 #' @noRd
-llt_prior_scales <- function(n_time, damped, unit_factors, spread = 1) {
+llt_prior_scales <- function(n_time, damped, unit_factors, spread = 1,
+                             n_harmonics = 0L) {
   checkmate::assert_int(n_time, lower = 3L)
   checkmate::assert_flag(damped)
   checkmate::assert_flag(unit_factors)
   checkmate::assert_number(spread, lower = 1)
+  checkmate::assert_int(n_harmonics, lower = 0L)
   unit <- if (unit_factors) sqrt(n_time) else spread
   phi <- if (damped) 0.913 else 1
   # How far a unit slope at time `t` moves the level at time `N`
   reach <- function(steps) sum(phi^(seq_len(steps) - 1L))
   shocks <- vapply(seq_len(n_time - 2L), reach, numeric(1L))
-  list(sigma = signif(1.3 * unit / sqrt(sum(shocks^2)), 4),
-       init = signif(2 * unit / reach(n_time - 1L), 4))
+  c(
+    list(sigma = signif(1.3 * unit / sqrt(sum(shocks^2)), 4),
+         init = signif(2 * unit / reach(n_time - 1L), 4)),
+    if (n_harmonics > 0L) {
+      list(
+        season_sigma = signif(
+          1.3 * unit / sqrt(n_harmonics * (n_time - 1L)), 4
+        ),
+        season_init = signif(unit / sqrt(n_harmonics), 4)
+      )
+    }
+  )
 }
 
 #' PW priors scaled to the number of time points
@@ -757,7 +798,7 @@ normalise_prior_arg_alias <- function(dots) {
   }
   if (!is.null(dots$prior) && !identical(dots$prior, dots$priors)) {
     stop(insight::format_error(c(
-      "Both 'prior' and 'priors' supplied with different values.",
+      "The arguments 'prior' and 'priors' hold different values.",
       i = "Pass priors once via 'prior =' (brms convention)."
     )), call. = FALSE)
   }

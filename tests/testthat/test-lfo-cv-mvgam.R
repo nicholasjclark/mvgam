@@ -65,12 +65,18 @@ test_that("lfo_cv refuses arguments it cannot evaluate", {
 })
 
 
-test_that("the data argument of mvgam 1.x is passed to newdata", {
+test_that("the data argument of mvgam 1.x is an alias of newdata", {
   fit <- make_lfo_mock()
   local_lfo_stubs(fit)
+  withr::local_envvar(TESTTHAT = "")
   expect_warning(
     lfo_cv(fit, min_t = 30L, data = fit$data, silent = 2L),
     "'data' is deprecated"
+  )
+  expect_error(
+    lfo_cv(fit, min_t = 30L, data = fit$data, newdata = fit$data,
+           silent = 2L),
+    "deprecated alias 'data'"
   )
 })
 

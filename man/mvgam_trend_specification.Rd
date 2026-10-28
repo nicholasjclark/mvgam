@@ -41,6 +41,8 @@ Gaussian, \code{NA} to estimate them.}
 \item{growth, n_changepoints, changepoint_range,
 changepoint_scale}{The arguments of \code{\link[=PW]{PW()}}.}
 \item{damped}{\code{TRUE} for an \code{\link[=LLT]{LLT()}} whose slope is damped.}
+\item{season, harmonics}{The seasonal periods of an \code{\link[=LLT]{LLT()}} and
+the number of harmonics of each, \code{NULL} without a season.}
 \item{cap}{The name of the carrying-capacity column that a
 logistic \code{\link[=PW]{PW()}} trend uses, \code{"cap"} unless given.}
 }

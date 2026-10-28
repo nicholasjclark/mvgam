@@ -692,7 +692,7 @@ test_that("trend_state = 'conditional' reads the fitted state", {
       }
     },
     extract_trend_latent_states = function(mvgam_fit, newdata,
-                                           full_draws, resp = NULL) {
+                                           full_draws, ...) {
       matrix(0.25, nrow = 4, ncol = 3)
     },
     has_stochastic_trend = function(object) TRUE,
@@ -738,7 +738,7 @@ test_that("a conditional read ignores process_error", {
       matrix(0, nrow = 4, ncol = 3)
     },
     extract_trend_latent_states = function(mvgam_fit, newdata,
-                                           full_draws, resp = NULL) {
+                                           full_draws, ...) {
       matrix(3, nrow = 4, ncol = 3)
     },
     has_stochastic_trend = function(object) TRUE,
@@ -764,7 +764,7 @@ test_that("a fit with no latent state falls back to the submodel", {
       if (component == "obs") matrix(1, 4, 3) else matrix(0.5, 4, 3)
     },
     extract_trend_latent_states = function(mvgam_fit, newdata,
-                                           full_draws, resp = NULL) {
+                                           full_draws, ...) {
       NULL
     },
     has_stochastic_trend = function(object) FALSE,

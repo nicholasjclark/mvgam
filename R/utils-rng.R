@@ -1,17 +1,16 @@
-#' Seed the RNG for the caller, and leave the session as it was
+#' Seed the RNG for the caller, then restore the session's state
 #'
 #' @description
-#' `set.seed()` writes to the global random-number state, so a
-#' function that seeds for its own reproducibility decides what its
-#' caller draws next. Putting the previous state back covers most of
-#' it, but not the case where there was no previous state: a session
-#' that has never drawn has no `.Random.seed`, and seeding creates
-#' one, so the variable has to be removed rather than reassigned.
-#' Restoring only when something was there leaves the caller with a
-#' stream it never started.
+#' `set.seed()` writes to the global random-number state. A function
+#' that seeds for its own reproducibility would otherwise decide what
+#' its caller draws next. Putting the previous state back covers most
+#' cases. A session that has never drawn has no `.Random.seed`.
+#' Seeding creates one, which the cleanup must remove. Restoring only
+#' when a state existed would leave the caller with a stream it never
+#' started.
 #'
-#' Call this at the top of a function that seeds. The cleanup is
-#' registered in the calling frame, so it runs when that function
+#' Call this at the top of a function that seeds. Because the cleanup
+#' is registered in the calling frame, it runs when that function
 #' returns, whether it returns normally or by error.
 #'
 #' @param seed Integer seed, or `NULL` to leave the RNG alone.
@@ -25,8 +24,8 @@ local_seed <- function(seed, frame = parent.frame()) {
   }
   checkmate::assert_int(seed)
   if (exists(".Random.seed", envir = .GlobalEnv)) {
-    # `bquote` puts the state itself into the expression, so the
-    # handler does not depend on this frame surviving.
+    # `bquote` puts the state itself into the expression. The handler
+    # then works after this frame is gone.
     restore <- bquote(
       assign(".Random.seed", .(get(".Random.seed", envir = .GlobalEnv)),
              envir = .GlobalEnv)

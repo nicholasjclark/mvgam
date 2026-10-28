@@ -306,9 +306,11 @@ MVGAM_PAR_CLASS_ORDER <- c("bs", "bsp", "sd", "cor", "sdgp", "lscale")
 # its column scales `Psi_diag` from the increments `varrho_inv`.
 # `residual_cor()` and `shared_variation()` take all of them from
 # `fit_parameter_draws()`. That conversion keeps the Stan names this
-# classification hides. A local linear trend samples its slope
-# scale as `sigma_slope_raw_trend`, in units of the default prior's
-# scale. It reports `sigma_slope_trend`. `scaled_innovations_trend` is
+# classification hides. A local linear trend samples its slope and
+# season scales as `sigma_slope_raw_trend` and
+# `sigma_season_raw_trend`, in units of the default priors' scales. It
+# reports `sigma_slope_trend` and `sigma_season_trend`.
+# `scaled_innovations_trend` is
 # the innovation a forecast seed needs. It is classified a state.
 #
 # The second alternation is brms's own group-level workspace, as
@@ -326,7 +328,7 @@ MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "L_Omega_trend|L_Sigma_trend|L_Omega_global_trend|",
   "L_Omega_group_trend|L_deviation_group_trend|L_group_trend|",
   "Z_cols|Z_raw|varrho_inv|Phi_loadings|L_Phi_loadings|",
-  "sigma_slope_raw_trend)\\[",
+  "sigma_slope_raw_trend|sigma_season_raw_trend)\\[",
   "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\["
 )
 
@@ -336,13 +338,15 @@ MVGAM_PAR_INTERNAL_PATTERN <- paste0(
 # summary block reports them. `init_trend` is the vector of states
 # before the first observed time. `init_innovations_trend` is the
 # vector of standard variates an ARMA start scales to its stationary
-# law.
+# law. `season_state_trend` holds a local linear trend's last
+# seasonal state pairs, the start of a forecast.
 #'@noRd
 MVGAM_STATE_PARAMS <- c(
   "trend", "lv_trend", "lv_trend_tilde", "innovations_trend",
   "scaled_innovations_trend", "init_trend", "init_innovations_trend",
   "mu_trend", "slope_trend", "slope_trend_tilde",
-  "innovations_slope_trend"
+  "innovations_slope_trend", "season_trend", "season_trend_tilde",
+  "season_state_trend", "innovations_season_trend"
 )
 
 #'@noRd

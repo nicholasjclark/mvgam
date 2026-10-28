@@ -38,6 +38,11 @@
 #'   \item `site_units` `TRUE` when the fit came from [jsdgam()]. Its
 #'     units are sites, which `plot()` refuses to draw along a time
 #'     axis.
+#'
+#'   \item `component` The state components of the trend the draws hold,
+#'     such as `"slope"`, or `NULL` for the summed trend. Set through
+#'     the `component` argument of [hindcast.mvgam()] and
+#'     [forecast.mvgam()].
 #' }
 #'
 #' @seealso [mvgam], [hindcast.mvgam], [forecast.mvgam]
@@ -65,7 +70,8 @@ NULL
 #' @return A long-format `tibble` with one row per series and time,
 #'   holding the posterior median and the two quantiles of the
 #'   predictions, the observed value for `type = 'response'` and the
-#'   prediction type. A multivariate fit on a long frame adds a leading
+#'   prediction type. State components of the trend add a `component`
+#'   column, their names joined by `" + "`. A multivariate fit on a long frame adds a leading
 #'   `resp` column naming the response.
 #'
 #' @method summary mvgam_forecast
@@ -100,6 +106,9 @@ summary.mvgam_forecast <- function(object, probs = c(0.025, 0.975), ...) {
                     object$test_observations[[s_name]])
     }
     df$type <- object$type
+    if (!is.null(object$component)) {
+      df$component <- component_label(object$component)
+    }
     df
   }))
   fc_preds$series <- factor(fc_preds$series, levels = object$series_names)
@@ -211,8 +220,13 @@ print.mvgam_forecast <- function(x, ...) {
     0L
   }
   ensemble_w <- attr(x, "weights", exact = TRUE)
+  scale <- paste0("type '", x$type %||% "response", "'",
+                  if (!is.null(x$component)) {
+                    paste0(", component '", component_label(x$component),
+                           "'")
+                  })
   lines <- c(
-    paste0("mvgam_forecast (type '", x$type %||% "response", "')"),
+    paste0("mvgam_forecast (", scale, ")"),
     paste0("  family:    ",
            paste(unique(x$family %||% "unknown"), collapse = ", ")),
     paste0("  series:    ", n_series),

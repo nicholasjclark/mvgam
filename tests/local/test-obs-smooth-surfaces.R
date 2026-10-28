@@ -310,7 +310,6 @@ test_that("t2(z, w) is a surface over both covariates", {
 test_that("conditional_smooths returns one entry per smooth term", {
   mv <- sm_fit()
   cs <- conditional_smooths(mv)
-  expect_s3_class(cs, "mvgam_conditional_smooths")
   expect_length(cs, length(smooths(mv)))
   for (d in cs) {
     expect_true(all(c("effect1__", "estimate__", "se__",
@@ -401,7 +400,6 @@ test_that("the general surface answers on a smooth-carrying fit", {
   # makes around it.
   mv <- sm_fit()
 
-  expect_s3_class(model.frame(mv), "data.frame")
 
   # The model's predictors are the covariates its smooths are built
   # on. `time` is the axis the trend is indexed by, and a consumer

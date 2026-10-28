@@ -36,7 +36,8 @@ hindcast <- function(object, ...) {
 #'   fitted latent state of each draw. `type = "response"` then adds
 #'   the observation noise alone. `TRUE` adds fresh trend innovations
 #'   to the linear predictor, as [posterior_epred.mvgam()] does with
-#'   the same argument.
+#'   the same argument. A `component` is a fitted state and needs
+#'   `FALSE`.
 #'
 #' @return An [mvgam_forecast-class][mvgam] object. Its hindcasts are a
 #'   named list of `[ndraws, n_times]` matrices, one per series. Its
@@ -75,6 +76,10 @@ hindcast <- function(object, ...) {
 #' # spread a model without the observed history would predict
 #' plot(hindcast(mod, process_error = TRUE))
 #'
+#' # A local linear trend's slope, the level's growth per step
+#' mod_llt <- update(mod, trend_formula = ~ LLT())
+#' plot(hindcast(mod_llt, type = "trend", component = "slope"))
+#'
 #' # Next, forecast the held-out times with forecast()
 #' }
 #'
@@ -87,6 +92,7 @@ hindcast.mvgam <- function(object,
                            type = c("response", "link",
                                     "expected", "trend",
                                     "latent_state"),
+                           component = NULL,
                            ndraws = NULL,
                            draw_ids = NULL,
                            obs_uncertainty = TRUE,
@@ -103,6 +109,14 @@ hindcast.mvgam <- function(object,
   checkmate::assert_flag(obs_uncertainty)
   checkmate::assert_flag(process_error)
   checkmate::assert_string(resp, null.ok = TRUE)
+  component <- resolve_trend_component(object, component, type)
+  if (!is.null(component) && process_error) {
+    stop(insight::format_error(c(
+      "'component' requires 'process_error = FALSE'.",
+      x = "A state component is the fitted state of each draw.",
+      i = "Drop 'process_error' to hindcast the component."
+    )), call. = FALSE)
+  }
 
   # The latent state of a closure-unit family is indexed by unit. A
   # single-season design has no time axis. The result is then an
@@ -132,7 +146,8 @@ hindcast.mvgam <- function(object,
     object, training, type, draw_idx, obs_uncertainty,
     process_error = process_error,
     resp = resp,
-    series_levels = reported
+    series_levels = reported,
+    component = component
   )
 
   family_pars <- if (type == "link") {
@@ -142,7 +157,8 @@ hindcast.mvgam <- function(object,
   }
 
   new_mvgam_forecast(object, type, resp, reported, training,
-                     hindcasts = hindcasts, family_pars = family_pars)
+                     hindcasts = hindcasts, family_pars = family_pars,
+                     component = component)
 }
 
 

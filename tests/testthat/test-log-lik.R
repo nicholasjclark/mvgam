@@ -432,17 +432,20 @@ test_that("a missing response leaves its column NA", {
 })
 
 
-test_that("resolve_incl_autocor takes the superseded spelling second", {
-  # With only the superseded argument named, its value is used
-  expect_false(resolve_incl_autocor(TRUE, legacy = FALSE,
-                                     autocor_supplied = FALSE))
-  expect_true(resolve_incl_autocor(FALSE, legacy = TRUE,
-                                    autocor_supplied = FALSE))
-  # With both named, the documented argument's value is used
-  expect_false(resolve_incl_autocor(FALSE, legacy = TRUE,
-                                     autocor_supplied = TRUE))
-  expect_true(resolve_incl_autocor(TRUE, legacy = NULL,
-                                    autocor_supplied = FALSE))
+test_that("resolve_incl_autocor resolves the deprecated spelling", {
+  # The alias alone overrides the default
+  expect_false(resolve_incl_autocor(TRUE, alias = FALSE,
+                                     autocor_supplied = FALSE,
+                                     alias_name = "process_error"))
+  # Without the alias, the default is used
+  expect_true(resolve_incl_autocor(TRUE, alias = NULL,
+                                    autocor_supplied = FALSE,
+                                    alias_name = "process_error"))
+  expect_error(
+    resolve_incl_autocor(FALSE, alias = TRUE, autocor_supplied = TRUE,
+                         alias_name = "incl_dynamics"),
+    "deprecated alias\\s+'incl_dynamics'"
+  )
 })
 
 

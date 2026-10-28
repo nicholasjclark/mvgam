@@ -10,7 +10,7 @@
 # `sum_k k w_k`, where `log w_k = shape * (k * log_mu - log(k!))`.
 # The sampler needs the first and the mean needs both. Vectorised over
 # recycled `log_mu` and `shape`. `M` caps the number of series terms.
-# `thres` sets the per-term convergence tolerance, and `converged`
+# `thres` sets the per-term convergence tolerance. `converged`
 # reports whether every element reached it.
 com_poisson_log_series <- function(log_mu, shape, M = 10000L,
                                    thres = 1e-16) {
@@ -73,10 +73,10 @@ rdiscrete_weibull_mvgam <- function(n, mu, shape) {
 }
 
 # Beta negative binomial variates under mvgam's mean parameterisation.
-# The Stan side computes the Beta mixing scale as mu * mtail / shape,
-# with the first Beta parameter shifted to 1 + mtail so that the mean is
-# exactly mu; drawing the success probability from that Beta and then a
-# negative binomial reproduces the same distribution. Vectorised over
+# The Stan side computes the Beta mixing scale as mu * mtail / shape and
+# shifts the first Beta parameter to 1 + mtail. With that shift the mean
+# is exactly mu. Drawing the success probability from that Beta and then
+# a negative binomial reproduces the same distribution. Vectorised over
 # recycled `mu`, `shape` and `mtail`.
 rbeta_nb_mvgam <- function(n, mu, shape, mtail) {
   checkmate::assert_int(n, lower = 0L)
@@ -105,8 +105,8 @@ dbeta_nb_mvgam <- function(x, mu, shape, mtail, log = FALSE) {
 # mass function through its term ratio
 # p(k+1)/p(k) = (r+k)(beta+k) / ((k+1)(alpha+beta+r+k)),
 # which is exact for counts and avoids re-evaluating log-gamma at every
-# step. All arguments recycle, and every element steps together up to
-# the largest quantile. A quantile below zero has no mass.
+# step. All arguments recycle. Every element steps together up to the
+# largest quantile. A quantile below zero has no mass.
 pbeta_nb_mvgam <- function(q, mu, shape, mtail, lower.tail = TRUE,
                            log.p = FALSE) {
   n <- max(length(q), length(mu), length(shape), length(mtail))

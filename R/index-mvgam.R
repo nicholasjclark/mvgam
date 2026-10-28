@@ -84,19 +84,19 @@ variables.mvgam <- function(x, ...) {
 
 #' The parameters a diagnostic plot shows when none is named
 #'
-#' `mcmc_plot()` and `pairs()` both start here. The set holds what a
-#' reader interprets: the population block with the basis
-#' coefficients brms writes beside it, the family's parameters, the
-#' trend's dynamics and its loadings, the smoothing and
-#' Gaussian-process scales, and the group-level scales. Left out are
-#' the per-level and per-basis coefficients (`r_*`, `s_*`, `zs_*`,
-#' `zgp_*`), which run to hundreds on a spline or hierarchical fit,
-#' the trend's states, and brms's centred intercept, which
-#' `b_Intercept` reports on the data's scale. Naming any of those in
-#' `variable` still selects it.
+#' `mcmc_plot()` and `pairs()` both start here. The set holds the
+#' parameters a user interprets. These are the population block with
+#' the basis coefficients brms writes for it, the family's parameters,
+#' the trend's dynamics and loadings, the smoothing and
+#' Gaussian-process scales and the group-level scales. The set leaves
+#' out three groups. The per-level and per-basis coefficients (`r_*`,
+#' `s_*`, `zs_*`, `zgp_*`) run to hundreds on a spline or hierarchical
+#' fit. The trend's states are latent quantities. `b_Intercept`
+#' reports brms's centred intercept on the data's scale. Naming any of
+#' those in `variable` still selects it.
 #'
 #' @param x A fitted `mvgam` object
-#' @return Character vector of the names a user reads
+#' @return Character vector of the parameter names to plot
 #' @noRd
 default_plot_variables <- function(x) {
   checkmate::assert_class(x, "mvgam")
@@ -110,11 +110,11 @@ default_plot_variables <- function(x) {
 #' The parameters of a fit, by side and by kind
 #'
 #' Sorts the Stan names the fit's draws carry into the buckets
-#' `tidy()` and `side_parameters()` read. Each side has the family's
+#' `tidy()` and `side_parameters()` use. Each side has the family's
 #' parameters or the trend's dynamics, its population block, its
-#' smooths and its group-level terms, all decided by
-#' `mvgam_par_kind()` and `mvgam_par_side()`. The factor loadings sit
-#' with the trend's dynamics. The trend's states are no parameter and
+#' smooths and its group-level terms. `mvgam_par_kind()` and
+#' `mvgam_par_side()` assign each name. The factor loadings belong to
+#' the trend's dynamics bucket. The trend's states are no parameter and
 #' belong to no bucket.
 #'
 #' @param x A fitted `mvgam` object

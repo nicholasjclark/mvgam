@@ -261,20 +261,30 @@ mvgam_validate_pp_method <- function(method) {
 
 #' An argument value resolved against its deprecated alias
 #'
-#' Supplying both the argument and its alias is an error.
+#' Supplying both the argument and its alias is an error. The alias
+#' alone warns once per session.
 #'
 #' @param x Value of the current argument, or `NULL`
 #' @param alias Value of the deprecated alias, or `NULL`
+#' @param names The argument's name, then the alias's
 #' @return `alias` when supplied, otherwise `x`
 #' @noRd
-mvgam_use_alias <- function(x, alias = NULL) {
-  if (!is.null(alias)) {
-    if (!is.null(x)) {
-      stop(insight::format_error(
-        "Specify only one of an argument and its deprecated alias."
-      ))
-    }
-    return(alias)
+mvgam_use_alias <- function(x, alias, names) {
+  checkmate::assert_character(names, len = 2L, any.missing = FALSE)
+  if (is.null(alias)) {
+    return(x)
   }
-  x
+  if (!is.null(x)) {
+    stop(insight::format_error(c(
+      paste0("The call supplies '", names[1L], "' and its deprecated ",
+             "alias '", names[2L], "'."),
+      i = paste0("Supply '", names[1L], "' alone.")
+    )), call. = FALSE)
+  }
+  warn_once(
+    c(paste0("'", names[2L], "' is deprecated."),
+      i = paste0("Use '", names[1L], "'.")),
+    paste0("mvgam_alias_", names[2L])
+  )
+  alias
 }

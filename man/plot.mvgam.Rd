@@ -10,6 +10,7 @@
   series = NULL,
   resp = NULL,
   ndraws = NULL,
+  component = NULL,
   ...
 )
 }
@@ -27,8 +28,8 @@ Q-Q plot alone.}
 \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, with several smooths combined
 into one figure.}
 \item{\code{"trend"}}{The latent trend over the training times, from
-\code{\link[=hindcast.mvgam]{hindcast.mvgam()}}. A \code{\link[=jsdgam]{jsdgam()}} fit has sites in place of
-times and refuses it.}
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}}, or the state component \code{component} names.
+A \code{\link[=jsdgam]{jsdgam()}} fit has sites in place of times and refuses it.}
 \item{\code{"factors"}}{The path of each latent factor.
 \code{\link[=active_factors]{active_factors()}} reports the variance each factor carries.}
 \item{\code{"series"}}{The observed data the fit carries.
@@ -51,6 +52,16 @@ responses.}
 \item{ndraws}{The number of posterior draws, or \code{NULL} for every
 draw. \code{"residuals"} takes 100 by default. \code{"factors"} and
 \code{"series"} ignore it.}
+
+\item{component}{\code{NULL} (the default) for the summed trend, or the
+names of state components of the trend, with \code{type = "trend"}.
+Several names give the sum of their components. \code{\link[=LLT]{LLT()}} has
+\code{"level"}, the stochastic level, and \code{"slope"}, its growth per time
+step. A seasonal \code{\link[=LLT]{LLT()}} adds \code{"season"}. \code{"predictor"} holds the
+effects of the trend formula's covariates. \code{c("level", "predictor")} gives the level with those effects. A factor model
+projects each component through its loadings, as it projects the
+trend. The result is an ordinary \link[=mvgam]{mvgam_forecast-class}
+with the components in its \code{component} slot.}
 
 \item{...}{Further arguments to the function that draws the plot,
 such as \code{smooths} for \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.}
@@ -77,6 +88,10 @@ plot(mod)
 # The smooth of x and the latent AR(1) trend
 plot(mod, type = "smooths")
 plot(mod, type = "trend")
+
+# The slope of a local linear trend
+mod_llt <- update(mod, trend_formula = ~ LLT())
+plot(mod_llt, type = "trend", component = "slope")
 
 # Next, plot(forecast(mod, newdata = simdat$data_test)) carries the
 # trend forward

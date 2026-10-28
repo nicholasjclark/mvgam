@@ -44,12 +44,12 @@
 #' @family posterior summaries
 #' @method posterior_interval mvgam
 #' @export
-posterior_interval.mvgam <- function(object, pars = NA,
+posterior_interval.mvgam <- function(object, pars = NULL,
                                       variable = NULL, prob = 0.95,
                                       ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_number(prob, lower = 0, upper = 1)
-  variable <- mvgam_use_alias(variable, if (!identical(pars, NA)) pars)
+  variable <- mvgam_use_alias(variable, pars, c("variable", "pars"))
   draws <- as.matrix(object, variable = variable, ...)
   rstantools::posterior_interval(draws, prob = prob)
 }

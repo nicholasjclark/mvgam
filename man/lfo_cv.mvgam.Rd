@@ -62,7 +62,7 @@ under the reweighted posterior, an \verb{[ndraws, n_eval_obs]} matrix.
 and its sampler start and finish lines. \code{1} (default) and \code{2}
 print nothing from the refits.}
 
-\item{data}{Deprecated. Use \code{newdata} instead.}
+\item{data}{Deprecated alias for \code{newdata}.}
 }
 \value{
 A list of class \code{mvgam_lfo}, with one element per origin in

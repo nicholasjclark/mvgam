@@ -21,6 +21,8 @@
 #   D: C's data under an undamped slope
 #   E: 4 series in 2 regions, poisson, damped slope, level and slope
 #      shocks correlated within each region (0.7 and -0.4)
+#   F: 2 series, poisson, a twelve-month season of two harmonics whose
+#      shape drifts
 #
 # Run with:
 #   testthat::test_file("tests/local/test-trend-llt.R")
@@ -140,6 +142,45 @@ fit_e <- cached_fit(
           init = "pathfinder")
   },
   key = level_e
+)
+
+# The trigonometric season: harmonic j of period s turns its state pair
+# by 2 pi j / s at each step and adds shocks of scale `sigma`
+sim_season <- function(n_t, K, s, n_harm, sigma, amp) {
+  freq <- 2 * pi * seq_len(n_harm) / s
+  g <- matrix(rnorm(n_harm * K, 0, amp), n_harm, K)
+  g_star <- matrix(rnorm(n_harm * K, 0, amp), n_harm, K)
+  season <- matrix(0, n_t, K)
+  season[1L, ] <- colSums(g)
+  for (t in 2:n_t) {
+    g_last <- g
+    g <- cos(freq) * g_last + sin(freq) * g_star + rnorm(n_harm * K, 0, sigma)
+    g_star <- cos(freq) * g_star - sin(freq) * g_last +
+      rnorm(n_harm * K, 0, sigma)
+    season[t, ] <- colSums(g)
+  }
+  season
+}
+
+# Nine years of monthly counts on two series, a drifting level and a
+# twelve-month season of two harmonics whose shape moves slowly. The
+# last year holds the truth the forecast is checked against.
+set.seed(61L)
+truth_f <- list(
+  level = sim_llt(108L, 2L, 0.04, 0.003, 1, slope0 = c(0.01, -0.01))$level,
+  season = sim_season(108L, 2L, 12, 2L, 0.02, 0.4)
+)
+dat_f <- long_frame(truth_f$level + truth_f$season, c("s1", "s2"))
+dat_f$y <- rpois(nrow(dat_f), exp(2 + dat_f$eta))
+train_f <- dat_f[dat_f$time <= 96L, ]
+fit_f <- cached_fit(
+  "val_mvgam_llt_season.rds",
+  function() {
+    mvgam(y ~ 1, trend_formula = ~ LLT(season = 12, harmonics = 2),
+          data = train_f, family = poisson(), chains = 2L, iter = 1000L,
+          warmup = 500L, silent = 2, backend = "cmdstanr")
+  },
+  key = truth_f
 )
 
 cells <- function(name, nr, nc) {
@@ -459,6 +500,169 @@ test_that("a grouped trend correlates its shocks within each region", {
   }
   expect_lt(abs(mean(zmat[, members[1L, 1L]] * zmat[, members[2L, 1L]])),
             5 / sqrt(n))
+})
+
+
+test_that("the hindcast components are the fitted level and slope", {
+  ids <- 1:40
+  dm <- as_draws_matrix(fit_a$fit)[ids, ]
+  levs <- levels(dat_a$series)
+  slope <- hindcast(fit_a, type = "trend", component = "slope",
+                    draw_ids = ids)
+  for (k in seq_along(levs)) {
+    cols <- sprintf("slope_trend[%d,%d]", 1:80, k)
+    expect_equal(unname(slope$hindcasts[[levs[k]]]),
+                 matrix(as.numeric(dm[, cols]), nrow = length(ids)))
+  }
+  # Without a season or trend covariates the level is the summed trend
+  expect_identical(
+    hindcast(fit_a, type = "trend", component = "level",
+             draw_ids = ids)$hindcasts,
+    hindcast(fit_a, type = "trend", draw_ids = ids)$hindcasts
+  )
+
+  # A factor fit reports each series' slope: the factor slopes through
+  # the sampled loadings, in every draw
+  dm <- as_draws_matrix(fit_b$fit)[ids, ]
+  slope <- hindcast(fit_b, type = "trend", component = "slope",
+                    draw_ids = ids)
+  worst <- 0
+  for (r in seq_along(ids)) {
+    want <- block(dm, r, "slope_trend", 60L, 2L) %*%
+      t(block(dm, r, "Z", 5L, 2L))
+    got <- sapply(1:5, function(s) slope$hindcasts[[paste0("s", s)]][r, ])
+    worst <- max(worst, abs(got - want))
+  }
+  expect_lt(worst, 1e-10)
+})
+
+
+test_that("the forecast components step the fitted level and slope", {
+  future <- future_frame(train_c, 40L, dat_c[, c("time", "series", "expo")])
+  for (fit in list(fit_c, fit_d)) {
+    dm <- as_draws_matrix(fit$fit)
+    ids <- seq_len(nrow(dm))
+    # With no trend covariates the level is the summed trend, draw for
+    # draw under one seed
+    expect_identical(
+      withr::with_seed(3L, forecast(fit, newdata = future, type = "trend",
+                                    component = "level",
+                                    draw_ids = ids))$forecasts,
+      withr::with_seed(3L, forecast(fit, newdata = future, type = "trend",
+                                    draw_ids = ids))$forecasts
+    )
+    # The lead-h slope of a draw is `phi^h` times its last slope plus
+    # shocks of variance `sigma_slope^2 (1 + phi^2 + ... + phi^(2h - 2))`.
+    # The undamped fit has `phi = 1`.
+    fc <- forecast(fit, newdata = future, type = "trend",
+                   component = "slope", draw_ids = ids)$forecasts$s1
+    phi <- per_series(dm, "ar1_slope_trend", 1L)[, 1L]
+    sd_s <- per_series(dm, "sigma_slope_trend", 1L)[, 1L]
+    last <- as.numeric(dm[, "slope_trend[45,1]"])
+    for (h in c(1L, 10L, 40L)) {
+      v <- sd_s^2 * Reduce(`+`, lapply(0:(h - 1L), function(j) phi^(2 * j)))
+      z <- (fc[, h] - phi^h * last) / sqrt(v)
+      expect_lt(abs(mean(z)), 5 / sqrt(length(z)))
+      expect_lt(abs(stats::sd(z) - 1), 0.08)
+    }
+  }
+})
+
+
+test_that("a component plots on its own axis and needs the trend scale", {
+  p <- plot(fit_c, type = "trend", component = "slope")
+  expect_drawn(p)
+  expect_identical(p$labels$y, "Latent slope")
+  expect_error(hindcast(fit_c, type = "link", component = "slope"),
+               "requires type = 'trend'")
+  expect_error(plot(fit_c, type = "residuals", component = "slope"),
+               "requires type = 'trend'")
+  expect_error(hindcast(fit_c, type = "trend", component = "slope",
+                        process_error = TRUE),
+               "requires 'process_error = FALSE'")
+})
+
+
+test_that("the seasonal states follow the rotation of each harmonic", {
+  # The program sums rotated shocks in closed form. The reference steps
+  # each pair one turn at a time.
+  dm <- as_draws_matrix(fit_f$fit)
+  lam <- 2 * pi * (1:2) / 12
+  worst <- 0
+  for (r in round(seq(1, nrow(dm), length.out = 6))) {
+    sig <- as.numeric(dm[r, sprintf("sigma_season_trend[%d]", 1:2)])
+    init <- block(dm, r, "init_season_trend", 4L, 2L)
+    shocks <- block(dm, r, "innovations_season_trend", 95L, 8L)
+    g <- init[1:2, ]
+    g_star <- init[3:4, ]
+    season <- matrix(0, 96L, 2L)
+    season[1L, ] <- colSums(g)
+    for (t in 2:96) {
+      w <- matrix(shocks[t - 1L, 1:4], 2L) * rep(sig, each = 2L)
+      w_star <- matrix(shocks[t - 1L, 5:8], 2L) * rep(sig, each = 2L)
+      g_last <- g
+      g <- cos(lam) * g_last + sin(lam) * g_star + w
+      g_star <- cos(lam) * g_star - sin(lam) * g_last + w_star
+      season[t, ] <- colSums(g)
+    }
+    worst <- max(worst,
+                 abs(season - block(dm, r, "season_trend", 96L, 2L)),
+                 abs(rbind(g, g_star) -
+                       block(dm, r, "season_state_trend", 4L, 2L)))
+  }
+  expect_lt(worst, 1e-5)
+  for (k in 1:2) {
+    q <- quantile(as.numeric(dm[, sprintf("sigma_season_trend[%d]", k)]),
+                  c(0.025, 0.975))
+    expect_true(q[[1L]] < 0.02 && 0.02 < q[[2L]])
+  }
+})
+
+
+test_that("the level and the season partition the seasonal trend", {
+  ids <- 1:40
+  dm <- as_draws_matrix(fit_f$fit)[ids, ]
+  parts <- lapply(stats::setNames(nm = c("level", "season")), function(cmp) {
+    hindcast(fit_f, type = "trend", component = cmp,
+             draw_ids = ids)$hindcasts
+  })
+  total <- hindcast(fit_f, type = "trend", draw_ids = ids)$hindcasts
+  for (k in 1:2) {
+    cols <- sprintf("season_trend[%d,%d]", 1:96, k)
+    expect_equal(unname(parts$season[[k]]),
+                 matrix(as.numeric(dm[, cols]), nrow = length(ids)))
+    expect_equal(parts$level[[k]] + parts$season[[k]], total[[k]])
+  }
+})
+
+
+test_that("the season's forecast turns its last pairs forward", {
+  # Lead h turns each pair by h lambda_j. Each step adds shocks of
+  # variance sigma^2 to both states. A rotation keeps that variance.
+  # The season's variance at lead h is then K h sigma^2.
+  dm <- as_draws_matrix(fit_f$fit)
+  lam <- 2 * pi * (1:2) / 12
+  fc <- forecast(fit_f, newdata = future_frame(train_f, 12L), type = "trend",
+                 component = "season", draw_ids = seq_len(nrow(dm)))
+  for (k in 1:2) {
+    pairs <- function(row) {
+      sapply(1:2, function(j) {
+        as.numeric(dm[, sprintf("season_state_trend[%d,%d]", row + j - 1L, k)])
+      })
+    }
+    g <- pairs(1L)
+    g_star <- pairs(3L)
+    sig <- as.numeric(dm[, sprintf("sigma_season_trend[%d]", k)])
+    for (h in c(1L, 5L, 12L)) {
+      mu <- g %*% cos(h * lam) + g_star %*% sin(h * lam)
+      z <- (fc$forecasts[[k]][, h] - mu) / sqrt(2 * h * sig^2)
+      expect_lt(abs(mean(z)), 5 / sqrt(length(z)))
+      expect_lt(abs(stats::sd(z) - 1), 0.08)
+    }
+  }
+  p <- plot(fit_f, type = "trend", component = "season")
+  expect_identical(p$labels$y, "Latent season")
+  expect_true("delivera_trig" %in% names(how_to_cite(fit_f)$bibtex))
 })
 
 

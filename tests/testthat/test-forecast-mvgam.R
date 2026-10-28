@@ -5,7 +5,7 @@
 # posterior_predict / posterior_epred, get_observation_structure)
 # are exercised by their own test files, so these tests stub
 # them via `local_mocked_bindings()` and assert on:
-#   * mvgam_forecast class shape (11 fields, list-of-matrices
+#   * mvgam_forecast class shape (12 fields, list-of-matrices
 #     for hindcasts / forecasts).
 #   * uncertainty-toggle semantics (coef_uncertainty,
 #     trend_uncertainty, obs_uncertainty).
@@ -125,7 +125,7 @@ make_obs_struct_for_grid <- function(times, series_int,
 
 # ----- Class shape + type dispatch --------------------------------
 
-test_that("Returns mvgam_forecast with 11 contractual fields", {
+test_that("Returns mvgam_forecast with 12 contractual fields", {
   fit <- make_mock_mvgam()
   draws <- make_draws_mat(ndraws = 3L)
   newdata <- data.frame(time = 11:12,
@@ -177,7 +177,7 @@ test_that("Returns mvgam_forecast with 11 contractual fields", {
   required <- c("family", "family_pars", "type", "series_names",
                 "train_observations", "train_times",
                 "test_observations", "test_times",
-                "hindcasts", "forecasts", "site_units")
+                "hindcasts", "forecasts", "site_units", "component")
   expect_equal(sort(names(fc)), sort(required))
   # Held-out data stored by `mvgam(newdata = )` drive the horizon
   # when `forecast()` is given none.
@@ -200,8 +200,7 @@ test_that("forecast needs newdata or held-out data stored at fit time", {
   # draw_observations.
   testthat::local_mocked_bindings(
     extract_trend_latent_states = function(mvgam_fit, newdata,
-                                             full_draws,
-                                             resp = NULL) {
+                                             full_draws, ...) {
       matrix(0, nrow = 3L, ncol = nrow(newdata))
     },
     extract_component_linpred = function(mvgam_fit, newdata,
@@ -306,8 +305,7 @@ test_that("All multivariate / PW trend types flow through dispatch", {
   )
   testthat::local_mocked_bindings(
     extract_trend_latent_states = function(mvgam_fit, newdata,
-                                             full_draws,
-                                             resp = NULL) {
+                                             full_draws, ...) {
       matrix(0, nrow = 2L, ncol = nrow(newdata))
     },
     extract_component_linpred = function(mvgam_fit, newdata,
@@ -326,7 +324,8 @@ test_that("All multivariate / PW trend types flow through dispatch", {
   for (tt in c("VAR", "CAR", "PW")) {
     fit_tt <- make_mock_mvgam(trend_type = tt)
     fit_tt$mv_spec$trend_specs$trend <- tt
-    expect_no_error(hindcast(fit_tt, ndraws = 2L))
+    hc <- hindcast(fit_tt, ndraws = 2L)
+    expect_identical(dim(hc$hindcasts$s1), c(2L, 10L))
   }
 })
 
@@ -884,4 +883,143 @@ test_that("a wide frame padded at the end is stepped from its grid", {
   # observation.
   tail_rows <- mvgam:::build_training_tail_data(prefit, training, 2L)
   expect_equal(tail_rows$time, c(11, 12))
+})
+
+
+# ----- state components of a trend --------------------------------
+
+test_that("a component request is checked against the trend and type", {
+  llt <- make_mock_mvgam(trend_type = "LLT")
+  expect_identical(resolve_trend_component(llt, "slope", "trend"), "slope")
+  expect_null(resolve_trend_component(llt, NULL, "link"))
+  expect_error(resolve_trend_component(llt, "slope", "link"),
+               "requires type = 'trend'")
+  expect_identical(
+    resolve_trend_component(llt, c("level", "predictor"), "trend"),
+    c("level", "predictor")
+  )
+  expect_error(resolve_trend_component(llt, c("level", "season"), "trend"),
+               "'season'.*'level', 'slope', 'predictor'")
+  # The trends that declare components come from the registry
+  err <- expect_error(
+    resolve_trend_component(make_mock_mvgam(), "slope", "trend"),
+    "not supported for a 'AR()' trend", fixed = TRUE
+  )
+  expect_match(conditionMessage(err), "'LLT()'", fixed = TRUE)
+})
+
+
+test_that("the components of a seasonal LLT partition its trend", {
+  # `lv_trend` holds the level plus the season. The predictor is the
+  # summed trend less `lv_trend`. The slope adds nothing to either.
+  llt <- trend_components_llt(list(season = 12, harmonics = 2L))
+  lv <- matrix(c(1, 2, 4, 8, 16, 32), 2L)
+  season <- matrix(0.5, 2L, 3L)
+  total <- lv + 0.25
+  parts <- list(level = lv, season = season, slope = matrix(9, 2L, 3L))
+  value <- function(component) {
+    trend_component_values(total, parts, component, llt)
+  }
+  expect_identical(component_parts(llt, "level"), c("level", "season"))
+  expect_identical(component_parts(llt, "predictor"), c("level", "season"))
+  expect_identical(value("level"), lv - season)
+  expect_identical(value("season"), season)
+  expect_identical(value("predictor"), total - lv)
+  # Several names add their components
+  expect_identical(value(c("level", "predictor")), total - season)
+  expect_identical(value(c("level", "season", "predictor")), total)
+  expect_identical(value(NULL), total)
+  expect_false(needs_total(llt, c("level", "season")))
+  # Without a season the level is `lv_trend` itself
+  plain <- trend_components_llt(NULL)
+  expect_identical(trend_component_values(total, list(level = lv),
+                                          "level", plain), lv)
+})
+
+
+test_that("project_lv_grid multiplies each draw's grid by its loadings", {
+  set.seed(4L)
+  grid <- matrix(stats::rnorm(12L), 2L)
+  Z <- array(stats::rnorm(16L), c(2L, 4L, 2L))
+  out <- project_lv_grid(grid, Z, n_times = 3L, n_lv = 2L,
+                         n_obs_series = 4L)
+  for (d in 1:2) {
+    expect_equal(matrix(out[d, ], 3L),
+                 matrix(grid[d, ], 3L) %*% t(Z[d, , ]))
+  }
+  # One factor keeps its loading matrix
+  one <- project_lv_grid(grid[, 1:3], Z[, , 1L, drop = FALSE], 3L, 1L, 4L)
+  expect_equal(matrix(one[2L, ], 3L), outer(grid[2L, 1:3], Z[2L, , 1L]))
+})
+
+
+test_that("a component forecast carries its own path and the trend's mean", {
+  # The fitted trend is 3 and its stochastic level 1.8. The trend
+  # formula's predictor, 1.5 over the horizon, adds to the propagated
+  # level of 2. The slope adds nothing to the trend and takes none.
+  fit <- make_mock_mvgam(trend_type = "LLT")
+  n_time <- 10L
+  draws <- posterior::as_draws_matrix(matrix(
+    rep(c(rep(3, n_time), rep(1.8, n_time), rep(0.25, n_time)),
+        each = 3L),
+    nrow = 3L,
+    dimnames = list(NULL, c(sprintf("trend[%d,1]", seq_len(n_time)),
+                            sprintf("lv_trend[%d,1]", seq_len(n_time)),
+                            sprintf("slope_trend[%d,1]", seq_len(n_time))))
+  ))
+  newdata <- mock_future_data(fit, h = 2L)
+
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    ndraws = function(...) nrow(draws),
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                         component, ...) {
+      value <- if (identical(component, "trend")) 1.5 else 0
+      matrix(value, nrow = 3L, ncol = nrow(newdata))
+    },
+    get_observation_structure = function(object, newdata, ...) {
+      make_obs_struct_for_grid(
+        as.integer(newdata$time),
+        rep(1L, nrow(newdata)),
+        levels(newdata$series)
+      )
+    },
+    propagate_trend = function(trend_model, params, h, n_series, ...) {
+      structure(matrix(2, nrow = h, ncol = n_series),
+                components = list(level = matrix(2, h, n_series),
+                                  slope = matrix(0.25, h, n_series)))
+    },
+    extract_last_states = function(...) list(),
+    last_state_of_draw = function(...) {
+      list(params = list(sigma = 0.1),
+           last_state = list(trends = matrix(0, 1L, 1L), errors = NULL))
+    }
+  )
+
+  fc <- function(component) {
+    forecast(fit, newdata = newdata, type = "trend", component = component)
+  }
+  level <- fc("level")
+  expect_equal(unname(as.numeric(level$forecasts$s1)), rep(2, 6L))
+  expect_equal(unname(as.numeric(level$hindcasts$s1)), rep(1.8, 30L))
+  predictor <- fc("predictor")
+  expect_equal(unname(as.numeric(predictor$forecasts$s1)), rep(1.5, 6L))
+  expect_equal(unname(as.numeric(predictor$hindcasts$s1)), rep(1.2, 30L))
+  both <- fc(c("level", "predictor"))
+  expect_equal(unname(as.numeric(both$forecasts$s1)), rep(3.5, 6L))
+  expect_identical(plot(both)$labels$y, "Latent level + predictor")
+  slope <- forecast(fit, newdata = newdata, type = "trend",
+                    component = "slope")
+  expect_equal(unname(as.numeric(slope$forecasts$s1)), rep(0.25, 6L))
+  expect_equal(unname(as.numeric(slope$hindcasts$s1)), rep(0.25, 30L))
+
+  # The record names the component on every surface
+  expect_identical(slope$component, "slope")
+  expect_identical(unique(summary(slope)$component), "slope")
+  expect_true(any(grepl("component 'slope'", capture.output(print(slope)),
+                        fixed = TRUE)))
+  expect_identical(plot(slope)$labels$y, "Latent slope")
 })

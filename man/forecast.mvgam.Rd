@@ -9,6 +9,7 @@
   newdata = NULL,
   ...,
   type = c("response", "link", "expected", "trend"),
+  component = NULL,
   ndraws = NULL,
   draw_ids = NULL,
   coef_uncertainty = TRUE,
@@ -48,6 +49,16 @@ every series.}
 \item \code{"link"} returns the linear predictor on the link scale.
 \item \code{"trend"} returns the latent trend on the link scale.
 }}
+
+\item{component}{\code{NULL} (the default) for the summed trend, or the
+names of state components of the trend, with \code{type = "trend"}.
+Several names give the sum of their components. \code{\link[=LLT]{LLT()}} has
+\code{"level"}, the stochastic level, and \code{"slope"}, its growth per time
+step. A seasonal \code{\link[=LLT]{LLT()}} adds \code{"season"}. \code{"predictor"} holds the
+effects of the trend formula's covariates. \code{c("level", "predictor")} gives the level with those effects. A factor model
+projects each component through its loadings, as it projects the
+trend. The result is an ordinary \link[=mvgam]{mvgam_forecast-class}
+with the components in its \code{component} slot.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}

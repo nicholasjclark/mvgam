@@ -15,8 +15,7 @@
 #'   time, the state [hindcast.mvgam()] returns. The ELPD then describes
 #'   the series that was observed. `FALSE` keeps only the trend's
 #'   deterministic terms and leaves the autocorrelation out.
-#' @param process_error Superseded by `incl_autocor` and still
-#'   accepted. `incl_autocor` takes precedence when both are given.
+#' @param process_error Deprecated alias for `incl_autocor`.
 #' @param allow_new_levels Logical. `TRUE` scores rows whose grouping
 #'   level the training data lacked, as [kfold.mvgam()] needs when a
 #'   fold holds out whole groups. Defaults to `FALSE`.
@@ -97,8 +96,9 @@ log_lik.mvgam <- function(object,
   rlang::check_dots_empty()
   incl_autocor <- resolve_incl_autocor(
     incl_autocor = incl_autocor,
-    legacy = process_error,
-    autocor_supplied = !missing(incl_autocor)
+    alias = process_error,
+    autocor_supplied = !missing(incl_autocor),
+    alias_name = "process_error"
   )
 
   newdata <- prediction_frame(object, newdata)
@@ -624,23 +624,22 @@ logLik.mvgam <- function(object, pointwise = FALSE, ...) {
 #' Resolve the autocorrelation switch from its two spellings
 #'
 #' `incl_autocor` is the brms name. `process_error` and `incl_dynamics`
-#' are the mvgam 1.x names, still accepted. A supplied `incl_autocor`
-#' takes precedence.
+#' are the mvgam 1.x names, deprecated aliases resolved by
+#' `mvgam_use_alias()`.
 #'
 #' @param incl_autocor Value of the documented argument
-#' @param legacy Value of the superseded argument, or `NULL` when the
+#' @param alias Value of the deprecated alias, or `NULL` when the
 #'   caller did not name it
 #' @param autocor_supplied Whether the caller named `incl_autocor`
+#' @param alias_name Name of the deprecated alias
 #' @return A single logical
 #'
 #' @noRd
-resolve_incl_autocor <- function(incl_autocor, legacy, autocor_supplied) {
-  checkmate::assert_logical(incl_autocor, len = 1L, any.missing = FALSE)
-  checkmate::assert_logical(legacy, len = 1L, any.missing = FALSE,
-                            null.ok = TRUE)
-  checkmate::assert_logical(autocor_supplied, len = 1L)
-  if (is.null(legacy) || isTRUE(autocor_supplied)) {
-    return(incl_autocor)
-  }
-  legacy
+resolve_incl_autocor <- function(incl_autocor, alias, autocor_supplied,
+                                 alias_name) {
+  checkmate::assert_flag(incl_autocor)
+  checkmate::assert_flag(alias, null.ok = TRUE)
+  checkmate::assert_flag(autocor_supplied)
+  mvgam_use_alias(if (autocor_supplied) incl_autocor, alias,
+                  c("incl_autocor", alias_name)) %||% incl_autocor
 }

@@ -45,14 +45,14 @@ single-species multi-season data, wrap in a length-1 list
 from the output.}
 
 \item{site_covs}{Optional \code{data.frame} of site-level covariates
-with \code{nrow == J_sites}. Broadcast across visits, seasons, and
+with \code{nrow == J_sites}. Broadcast across visits, seasons and
 species. The \code{unmarked::unmarkedFrameOccu} \code{siteCovs} slot,
-the spOccupancy \code{occ.covs}, and the \code{flocker} \code{unit_covs} map
+the spOccupancy \code{occ.covs} and the \code{flocker} \code{unit_covs} map
 here.}
 
 \item{season_covs}{Optional \code{data.frame} of season-level
 covariates with \code{nrow == T_seasons}. Broadcast across sites,
-visits, and species. Use for year-of-study effects,
+visits and species. Use for year-of-study effects,
 season-of-year covariates, or any covariate that varies across
 primary periods but is constant within a season.}
 
@@ -122,7 +122,7 @@ units may vary in the number of observed visits / seasons.
 }
 \description{
 Convert the multi-dimensional detection histories used by
-\code{unmarked}, \code{ubms}, \code{flocker}, and \code{spOccupancy} into the
+\code{unmarked}, \code{ubms}, \code{flocker} and \code{spOccupancy} into the
 long-format closure-unit layout \code{mvgam(family = occ() / nmix())}
 and \code{jsdgam(family = occ() / nmix())} expect. One row per
 \verb{(species, site, season, visit)} tuple. Single-species data
@@ -143,9 +143,9 @@ reference the \code{site} column in the observation \code{formula}
 (e.g. \code{s(site, bs = "re")}) so per-site variation enters the
 observation model while the trend pipeline operates on the
 season axis. See \code{?occ} for the multi-season scope and
-identification caveats (the model parameterizes joint
-cross-species occupancy dynamics, NOT explicit colonization
-and extinction rates).
+identification caveats. The model parameterizes joint
+cross-species occupancy dynamics. It has no explicit
+colonization or extinction rates.
 }
 }
 \seealso{

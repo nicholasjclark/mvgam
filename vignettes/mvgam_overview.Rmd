@@ -21,6 +21,13 @@ knitr::opts_chunk$set(
   warning = FALSE,
   eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
+# Inline results come from chunks a build without NOT_CRAN skips. Such a
+# build prints each inline expression as code.
+if (!isTRUE(knitr::opts_chunk$get("eval"))) {
+  knitr::knit_hooks$set(evaluate.inline = function(code, envir) {
+    paste0("`", code, "`")
+  })
+}
 ```
 
 ```{r setup, include = FALSE}
@@ -39,12 +46,13 @@ theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 
 `mvgam` fits Bayesian state-space models to time series, extending
 the dynamic generalised additive models of Clark and Wells (2023).
-The observation model is a `brms` formula (Bürkner 2017), and a
+The observation model is a `brms` formula (Bürkner 2017). A
 second formula, `trend_formula`, adds a latent state that evolves
 through time. Temporal structure that the covariates do not explain
-is estimated as part of the latent state, and forecasts carry that
-structure forward. Stan fits the model, and the fitted object works
-with the `brms`, `marginaleffects`, `loo` and `bayesplot` tooling.
+is estimated as part of the latent state. Forecasts carry that
+structure forward. Stan fits the model. The fitted object works
+with the post-processing tools of four packages: `brms`,
+`marginaleffects`, `loo`, `bayesplot`.
 
 For an observation $y_{i,t}$ on series $i$ at time $t$, with link
 function $g$ and a response distribution $\mathcal{F}$:
@@ -59,13 +67,13 @@ g(\mu_{i,t}) & = \alpha_i + \textstyle\sum_j f_j(x_{j,i,t})
 The $f_j$ are any terms a `brms` formula accepts: linear effects,
 smooths (Wood 2017), Gaussian processes, monotonic effects and random
 effects. The latent state $\eta$ follows one of the trend processes
-below, and the loadings $Z$ map it onto the series. Each series has
-its own state when $Z$ is the identity, and a few shared factors
+below. The loadings $Z$ map it onto the series. Each series has
+its own state when $Z$ is the identity. A few shared factors
 drive many series when $Z$ has fewer columns than there are series.
 
 ## What mvgam can model
 
-Every `brms` family works as the observation model, and `mvgam` adds
+Every `brms` family works as the observation model. `mvgam` adds
 families for ecological and count data:
 
 | Family | Use case |
@@ -78,13 +86,13 @@ families for ecological and count data:
 | `diri()`, `multi()`, `categ()` | Compositions and categorical outcomes |
 | `mvn()`, `mvt()` | Correlated continuous responses |
 
-`trend_formula` names the latent state with one constructor, and it
-can hold covariates and smooths that act on the state:
+`trend_formula` names the latent state with one constructor. It
+can also hold covariates and smooths that act on the state:
 
 | Constructor | Latent state | Typical use |
 |:------------|:-------------|:------------|
 | `RW()` | Random walk | Series with no fixed mean |
-| `LLT(damped = )` | Level with a time-varying slope | Growth that changes rate, or levels off when damped |
+| `LLT(damped = , season = )` | Level with a time-varying slope and an optional season | Growth that changes rate or levels off, and seasonal shapes that drift |
 | `AR(p = )` | Autoregression, including sparse lags such as `p = c(1, 12)` | Momentum and seasonal recurrence |
 | `VAR(p = )` | Vector autoregression | Series that drive one another |
 | `CAR()` | Continuous-time AR(1) | Irregular times, and series observed at their own times |
@@ -92,12 +100,14 @@ can hold covariates and smooths that act on the state:
 | `PW()` | Piecewise linear or logistic growth | Trends with changepoints |
 
 The constructors share a set of options. `cor = TRUE` correlates the
-innovations across series, and `gr` with `subgr` pools correlation
+innovations across series. `gr` with `subgr` pools correlation
 matrices across groups. `n_lv` sets a number of shared latent factors
-below the number of series, and `df` gives the innovations
+below the number of series. `df` gives the innovations
 Student-t tails. `ma = TRUE` adds a moving-average term to `RW()`,
-`AR()` and `VAR()`. The help page of each constructor lists the
-options it takes.
+`AR()` or `VAR()`. The help page of each constructor lists the
+options it takes. `hindcast()` and `forecast()` return the parts of a
+state through `component`, such as the level, slope and season of
+`LLT()`.
 
 `mvgam()` fits data in long format, one row per series and time.
 `jsdgam()` fits joint species distribution models to one row per site
@@ -107,7 +117,7 @@ and species, with phylogenetic and trait-informed loadings.
 
 `portal_data` holds monthly captures of four desert rodent species
 from the Portal Project, a long-term field study in Arizona (Ernest
-et al. 2018). Trapping follows the lunar cycle, and some months
+et al. 2018). Trapping follows the lunar cycle. Some months
 went unsampled, which leaves missing counts. Two covariates come
 with the counts: minimum temperature (`mintemp`) and a 12-month
 moving average of vegetation greenness (`ndvi_ma12`). We held out
@@ -126,8 +136,8 @@ covers the setup.
 
 ### One species
 
-The Desert Pocket Mouse (PP) is dormant through the colder months,
-and its captures run from long stretches of zeros to peaks above
+The Desert Pocket Mouse (PP) is dormant through the colder months.
+Its captures run from long stretches of zeros to peaks above
 20. `mvgam_data()` checks the counts against the family and plots
 the series, its distribution and its autocorrelation, with the
 held-out months in black:
@@ -153,7 +163,7 @@ fit_gam <- mvgam(
 ```
 
 Captures in one month carry over into the next beyond anything
-the covariates explain, and the randomised quantile residuals of
+the covariates explain. The randomised quantile residuals of
 this model remain strongly autocorrelated at lag 1:
 
 ```{r gam-resid, fig.asp = 0.5, out.width = "80%"}
@@ -180,7 +190,7 @@ summary(fit_ar)
 ```
 
 The latent state absorbs the persistence from one month to the
-next, and the residuals of this fit show no autocorrelation left:
+next. The residuals of this fit show no autocorrelation left:
 
 ```{r ar-resid, fig.asp = 0.5, out.width = "80%"}
 plot(fit_ar, type = "residuals", series = "PP")
@@ -195,8 +205,8 @@ pp_check(fit_ar, type = "rootogram")
 ```
 
 `conditional_effects()` plots each covariate's effect on the
-expected count, and the `marginaleffects` functions
-`predictions()`, `comparisons()` and `slopes()` work on the fit
+expected count. The `marginaleffects` functions, such as
+`predictions()`, `comparisons()` or `slopes()`, work on the fit
 directly:
 
 ```{r ar-effects, fig.asp = 0.5, out.width = "70%"}
@@ -205,7 +215,7 @@ plot(conditional_effects(fit_ar, type = "expected"), ask = FALSE)
 
 `forecast()` continues the latent state from its last estimated
 values into the held-out months. Without a latent state, the
-first model forecasts from the covariates alone, and its
+first model forecasts from the covariates alone. Its
 intervals miss most of the high counts:
 
 ```{r forecasts, fig.asp = 0.5, out.width = "80%"}
@@ -216,7 +226,7 @@ plot(fc_ar)
 ```
 
 `compare_scores()` scores both forecasts with the continuous
-ranked probability score (CRPS), where lower is better, and
+ranked probability score (CRPS), where lower is better.
 `summary()` sets the scores out by forecast horizon:
 
 ```{r scores, fig.asp = 0.5, out.width = "70%"}
@@ -235,7 +245,7 @@ covered <- tapply(pp_rows$in_interval, pp_rows$model, sum, na.rm = TRUE)
 ```
 
 The latent state improves the forecasts. The AR model has the lower
-CRPS in `r ar_wins` of the `r n_scored` scored months, and its CRPS
+CRPS in `r ar_wins` of the `r n_scored` scored months. Its CRPS
 sums to `r totals[["fc_ar"]]` against `r totals[["fc_gam"]]` for the
 smooth-only model. Its 90% intervals contain `r covered[["fc_ar"]]`
 of the `r n_scored` held-out counts. Those of the model without a
@@ -251,7 +261,7 @@ successively longer windows.
 The four species share the covariates but respond to them
 differently. The observation formula gives each species its own
 mean through `series`. In `trend_formula`, `by = lv_axis()` gives
-each species its own smooths of temperature and vegetation, and
+each species its own smooths of temperature and vegetation.
 `AR(cor = TRUE)` gives each species its own latent AR(1) state,
 with innovations correlated across species:
 
@@ -281,7 +291,7 @@ plot(
 )
 ```
 
-The forecasts come from one joint posterior, and each species
+The forecasts come from one joint posterior. Each species
 keeps its own scale and persistence:
 
 ```{r cor-forecast, fig.asp = 0.75, out.width = "90%"}
@@ -317,13 +327,13 @@ pb_pp <- sprintf("%.2f (95%% interval %.2f to %.2f)",
 
 The two pocket mouse species, PB and PP, share the strongest
 correlation, `r pb_pp`. `n_lv` would instead estimate a few shared
-latent factors for many species, and `VAR()` would estimate how
+latent factors for many species. `VAR()` would estimate how
 each species' state affects the others at the next time step.
 
 ### Reporting
 
 `methods_md()` writes the fitted model as Markdown equations with
-its priors, and `how_to_cite()` returns a methods paragraph and the
+its priors. `how_to_cite()` returns a methods paragraph and the
 references for the model's components:
 
 ```{r methods, results = "asis"}
@@ -349,12 +359,14 @@ how_to_cite(fit_ar)
   variance decompositions.
 - The
   [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
-  fits multispecies data with `jsdgam()`, and the
+  fits multispecies data with `jsdgam()`.
+- The
   [N-mixture article](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
   covers detection-error families.
 - The
   [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
-  compares models with `score()`, `lfo_cv()` and `ensemble()`.
+  compares models with `score()` and `lfo_cv()` and combines them
+  with `ensemble()`.
 
 ## References
 

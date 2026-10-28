@@ -7,10 +7,9 @@
 #' rise together; two (wren, finch) move opposite to them. A
 #' shared cyclic seasonal smooth is added on week-within-year.
 #'
-#' The dataset is designed so that an independent-AR fit
-#' (`trend_formula = ~ AR(p = 1)`) treats the four trajectories as
-#' unrelated, while `trend_formula = ~ AR(p = 1, cor = TRUE)`
-#' recovers the cross-species correlation that drives the coupling.
+#' An independent-AR fit (`trend_formula = ~ AR(p = 1)`) treats the
+#' four trajectories as unrelated. `trend_formula = ~ AR(p = 1, cor =
+#' TRUE)` recovers the cross-species correlation that couples them.
 #'
 #' @format A `data.frame` with 320 rows and the following fields:
 #' \describe{
@@ -31,9 +30,9 @@
 #' * Species random intercepts (centred) on the log scale.
 #' * Shared cyclic seasonal smooth (mgcv `bs = "cc"`) on
 #'   week-within-year.
-#' * Hierarchically correlated AR(1) trends with `phi = 0.7`,
-#'   innovation standard deviation 0.35, and the 4 x 4 correlation
-#'   matrix grouping `(warbler, thrush)` positively against
+#' * Hierarchically correlated AR(1) trends with `phi = 0.7` and
+#'   innovation standard deviation 0.35. The 4 x 4 innovation
+#'   correlation matrix sets `(warbler, thrush)` against
 #'   `(wren, finch)`.
 #'
 #' Recommended fit:

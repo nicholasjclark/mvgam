@@ -294,7 +294,7 @@ test_that("normalise_prior_arg_alias() renames 'priors' to 'prior'", {
     mvgam:::normalise_prior_arg_alias(
       list(prior = fake_prior, priors = other)
     ),
-    "Both 'prior' and 'priors' supplied"
+    "'prior' and 'priors' hold different values"
   )
 
   # Same value under both names is a no-op (no error).

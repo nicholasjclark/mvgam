@@ -6,10 +6,10 @@ program and data mvgam samples, in the order the code runs.
 
 ## Entry points
 
-`mvgam()`, `stancode()` and `standata()` all reach
+Each of `mvgam()`, `stancode()` or `standata()` reaches
 `generate_stan_components_mvgam_formula()` (`R/make_stan.R`), which
 wraps `build_stan_components()`. brms validates the same data frame
-several times while generating code, and the wrapper,
+several times while generating code. The wrapper,
 `warn_once_per_call()`, keeps each of its notices to one per call.
 
 ```
@@ -48,8 +48,8 @@ leaves the user's request without effect.
 `backend = "mock"` on the observation formula, the user's data, the
 observation priors and the family stanvars. It returns the brms
 Stan code, the Stan data, the priors and the brms terms. brms drops
-rows with a missing response and orders the data its own way, and
-its Stan data follow brms's row order.
+rows with a missing response and orders the data its own way. Its
+Stan data follow brms's row order.
 
 ### 4. Trend data and axes
 For a model with a trend, `extract_and_validate_trend_components()`
@@ -65,8 +65,8 @@ mapping arrays from observations to the trend:
 - `obs_trend_series[N]`: the series index of each such observation,
   found the same way against the ordered series.
 
-Only the rows with an observed response enter the arrays, and the
-arrays align with brms's Stan data as a result. The function checks
+Only the rows with an observed response enter the arrays. The
+arrays then align with brms's Stan data. The function checks
 the grid (`refuse_ragged_trend_grid()`,
 `validate_regular_time_intervals()`, `validate_gr_balanced_groups()`),
 builds the trend data with `trend_cell_frame()` and records the axes
@@ -90,12 +90,12 @@ priors with their suffix removed. Its Stan code supplies
 
 `extract_trend_stanvars_from_setup()` builds the trend stanvars.
 `extract_and_rename_stan_blocks()` takes the trend program's blocks
-and renames its variables with the `_trend` suffix, and
+and renames its variables with the `_trend` suffix.
 `extract_mu_construction_with_classification()`
 (`R/mu_expression_analysis.R`) finds the statements that construct
 its `mu`, which become `mu_trend`. `filter_block_content()` drops the
-declarations the observation program already makes, and the trend
-program's `Y`, `prior_only` and `N` never enter.
+declarations the observation program already makes. Three trend
+program variables never enter: `Y`, `prior_only`, `N`.
 `create_times_trend_matrix()` builds `times_trend`, the
 `[N_time_trend, N_series_trend]` array of rows of the trend data.
 The mapping arrays from step 4 become data stanvars with a response
@@ -152,8 +152,9 @@ not separately identified.
 
 brms writes a GLM likelihood for several families.
 `glm_call_roles` (`R/glm_analysis.R`) records the argument roles
-of `normal_id_glm`, `poisson_log_glm`, `neg_binomial_2_log_glm`,
-`bernoulli_logit_glm` and `ordered_logistic_glm`.
+of five GLM functions: `normal_id_glm`, `poisson_log_glm`,
+`neg_binomial_2_log_glm`, `bernoulli_logit_glm`,
+`ordered_logistic_glm`.
 `categorical_logit_glm` has no entry because mvgam refuses
 `brms::categorical()`. `parse_glm_parameters_from_line()` maps each
 argument of a call to its role. Stan's GLM densities take the

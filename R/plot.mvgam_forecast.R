@@ -112,13 +112,18 @@ plot.mvgam_forecast <- function(
     NA_real_
   }
 
-  # The axis names the scale the draws are on
-  y_label <- switch(x$type %||% "response",
-    link = "Linear predictor",
-    expected = "Expected value",
-    trend = "Latent trend",
-    "Predictions"
-  )
+  # The axis names the scale of the draws. A trend's state component
+  # names itself.
+  y_label <- if (!is.null(x$component)) {
+    paste0("Latent ", component_label(x$component))
+  } else {
+    switch(x$type %||% "response",
+      link = "Linear predictor",
+      expected = "Expected value",
+      trend = "Latent trend",
+      "Predictions"
+    )
+  }
   # A plot of one series out of several names it on the axis. A fit
   # with one series has nothing to tell apart.
   if (length(plotted_series) == 1L && length(series_levels) > 1L) {

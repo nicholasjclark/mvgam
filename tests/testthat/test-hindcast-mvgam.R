@@ -80,7 +80,7 @@ test_that("hindcast.mvgam returns mvgam_forecast with NULL forecast slots", {
   required <- c("family", "family_pars", "type", "series_names",
                 "train_observations", "train_times",
                 "test_observations", "test_times",
-                "hindcasts", "forecasts", "site_units")
+                "hindcasts", "forecasts", "site_units", "component")
   expect_equal(sort(names(hc)), sort(required))
   expect_null(hc$forecasts)
   expect_null(hc$test_times)
@@ -319,8 +319,7 @@ test_that("Multi-series hindcast returns one matrix per series", {
   )
   testthat::local_mocked_bindings(
     extract_trend_latent_states = function(mvgam_fit, newdata,
-                                             full_draws,
-                                             resp = NULL) {
+                                             full_draws, ...) {
       matrix(0, nrow = 2L, ncol = nrow(newdata))
     },
     extract_component_linpred = function(mvgam_fit, newdata,

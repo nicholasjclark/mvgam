@@ -228,8 +228,8 @@ ordinate_trait_arrows <- function(traits, loadings_2d,
 
 #' Trait arrow layers of an ordination biplot
 #'
-#' Draws a steelblue segment and label for each trait. The species
-#' loading arrows are dark red.
+#' Draws a segment and label for each trait in the Okabe-Ito blue. The
+#' species loading arrows are dark red.
 #'
 #' @param trait_dat Data frame from `ordinate_trait_arrows()`, or
 #'   `NULL`
@@ -238,6 +238,7 @@ ordinate_trait_arrows <- function(traits, loadings_2d,
 #' @noRd
 ordinate_trait_layers <- function(trait_dat) {
   if (is.null(trait_dat)) return(NULL)
+  trait_colour <- okabe_ito_palette()[2L]
   list(
     ggplot2::geom_segment(
       data = trait_dat,
@@ -245,13 +246,13 @@ ordinate_trait_layers <- function(trait_dat) {
       arrow = grid::arrow(
         length = grid::unit(0.12, "cm"), type = "closed"
       ),
-      alpha = 0.85, color = "steelblue", linewidth = 0.6
+      alpha = 0.85, color = trait_colour, linewidth = 0.6
     ),
     mvgam_repel_layer(
       data = trait_dat,
       mapping = ggplot2::aes(label = trait_name),
       type = "label",
-      color = "steelblue", box.padding = 0.15, label.size = 0.1,
+      color = trait_colour, box.padding = 0.15, label.size = 0.1,
       alpha = 0.85, max.overlaps = 20
     )
   )
@@ -427,6 +428,7 @@ resolve_auto_traits <- function(traits, object) {
 #' @return List of ggplot2 layers
 #' @noRd
 ordinate_biplot_layers <- function(sp_dat, sp_names) {
+  species_colour <- mvgam_colour("dark", "red")
   has_arrow <- requireNamespace("ggarrow", quietly = TRUE) &&
     requireNamespace("ggpp", quietly = TRUE)
   if (has_arrow) {
@@ -448,7 +450,7 @@ ordinate_biplot_layers <- function(sp_dat, sp_names) {
         ggplot2::aes(
           x = x, y = y, group = group, linewidth = lw
         ),
-        colour = "darkred", stroke_colour = "white",
+        colour = species_colour, stroke_colour = "white",
         stroke_width = 0.1, alpha = 0.5, show.legend = FALSE
       ),
       ggplot2::scale_linewidth(range = c(0.45, 1.75)),
@@ -456,7 +458,7 @@ ordinate_biplot_layers <- function(sp_dat, sp_names) {
         data = sp_dat,
         mapping = ggplot2::aes(label = sp_names),
         type = "label",
-        color = "darkred", box.padding = 0.1, label.size = 0.1,
+        color = species_colour, box.padding = 0.1, label.size = 0.1,
         alpha = 0.75, max.overlaps = 20, segment.color = NA,
         position = ggpp::position_nudge_center(
           0.025, 0.025, 0, 0
@@ -471,13 +473,13 @@ ordinate_biplot_layers <- function(sp_dat, sp_names) {
         arrow = grid::arrow(
           length = grid::unit(0.1, "cm"), type = "closed"
         ),
-        alpha = 0.5, color = "darkred"
+        alpha = 0.5, color = species_colour
       ),
       mvgam_repel_layer(
         data = sp_dat,
         mapping = ggplot2::aes(label = sp_names),
         type = "label",
-        color = "darkred", box.padding = 0.1, label.size = 0.1,
+        color = species_colour, box.padding = 0.1, label.size = 0.1,
         alpha = 0.75, max.overlaps = 20
       )
     )

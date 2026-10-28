@@ -22,7 +22,8 @@
 #'   sampler parameters such as `"divergent__"` for `nuts_params()`.
 #'   `NULL` takes all of them.
 #' @param variable Parameter names for `posterior_summary()`, the
-#'   \pkg{brms} name of the argument. It takes precedence over `pars`.
+#'   \pkg{brms} name of the argument. There `pars` is its deprecated
+#'   alias.
 #' @param summary Logical. `TRUE` (the default) returns a summary.
 #'   `FALSE` returns the draws. `coef()` summarises to posterior means.
 #' @param robust Logical. `TRUE` summarises by the median and the median
@@ -435,7 +436,8 @@ posterior_summary.mvgam <- function(x, pars = NULL, variable = NULL,
   checkmate::assert_character(pars, null.ok = TRUE)
   checkmate::assert_character(variable, null.ok = TRUE)
   rlang::check_dots_empty()
-  mat <- as_draws_matrix(x, variable = variable %||% pars)
+  variable <- mvgam_use_alias(variable, pars, c("variable", "pars"))
+  mat <- as_draws_matrix(x, variable = variable)
   mvgam_post_summary(mat, robust = robust, probs = probs)
 }
 

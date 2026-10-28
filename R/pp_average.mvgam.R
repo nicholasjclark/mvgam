@@ -95,8 +95,8 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
                                      seed = NULL) {
   checkmate::assert_class(x, "mvgam")
   local_seed(seed)
-  variable <- mvgam_use_alias(variable, pars)
-  ndraws <- mvgam_use_alias(ndraws, nsamples)
+  variable <- mvgam_use_alias(variable, pars, c("variable", "pars"))
+  ndraws <- mvgam_use_alias(ndraws, nsamples, c("ndraws", "nsamples"))
   split <- mvgam_split_models(x, ..., model_names = model_names)
   refuse_unread_dots(split$other, character(0L), "posterior_average")
   models <- split$models
@@ -225,7 +225,7 @@ pp_average.mvgam <- function(x, ..., weights = "stacking",
   checkmate::assert_flag(summary)
   local_seed(seed)
   method <- mvgam_validate_pp_method(method)
-  ndraws <- mvgam_use_alias(ndraws, nsamples)
+  ndraws <- mvgam_use_alias(ndraws, nsamples, c("ndraws", "nsamples"))
   split <- mvgam_split_models(x, ..., model_names = model_names)
   models <- split$models
   # Draws come straight off each `$fit` below. An unfitted stub has

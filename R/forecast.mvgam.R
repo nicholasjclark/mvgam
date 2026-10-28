@@ -36,6 +36,16 @@
 #'     `trials * p` and a zero-inflated mean is `(1 - zi) * mu`.
 #'   * `"link"` returns the linear predictor on the link scale.
 #'   * `"trend"` returns the latent trend on the link scale.
+#' @param component `NULL` (the default) for the summed trend, or the
+#'   names of state components of the trend, with `type = "trend"`.
+#'   Several names give the sum of their components. [LLT()] has
+#'   `"level"`, the stochastic level, and `"slope"`, its growth per time
+#'   step. A seasonal [LLT()] adds `"season"`. `"predictor"` holds the
+#'   effects of the trend formula's covariates. `c("level",
+#'   "predictor")` gives the level with those effects. A factor model
+#'   projects each component through its loadings, as it projects the
+#'   trend. The result is an ordinary [mvgam_forecast-class][mvgam]
+#'   with the components in its `component` slot.
 #' @param coef_uncertainty Logical. When `FALSE`, every forecast
 #'   draw uses the first of the draws `ndraws` or `draw_ids` select
 #'   for every coefficient in the
@@ -104,6 +114,7 @@ forecast.mvgam <- function(object,
                            ...,
                            type = c("response", "link",
                                     "expected", "trend"),
+                           component = NULL,
                            ndraws = NULL,
                            draw_ids = NULL,
                            coef_uncertainty = TRUE,
@@ -141,6 +152,7 @@ forecast.mvgam <- function(object,
                  "or 'type = \"response\"' (the default).")
     )), call. = FALSE)
   }
+  component <- resolve_trend_component(object, component, type)
   # The trend-type guard below refuses anything unsupported
   trend_model <- if (is_trendless) NULL else trend_spec_head(trend_specs)
   meta <- if (is_trendless) NULL else object$trend_metadata
@@ -179,7 +191,8 @@ forecast.mvgam <- function(object,
   # `process_error = FALSE`. The two then agree on the training grid.
   hindcasts <- build_hindcast_arms(
     object, training, type, draw_idx, obs_uncertainty,
-    process_error = FALSE, resp = resp, series_levels = reported
+    process_error = FALSE, resp = resp, series_levels = reported,
+    component = component
   )
 
   forecasts <- if (is.null(fc_grid)) {
@@ -209,7 +222,8 @@ forecast.mvgam <- function(object,
       obs_uncertainty = obs_uncertainty,
       series_levels = series_levels,
       resp = resp,
-      reported = reported
+      reported = reported,
+      component = component
     )
   }
 
@@ -222,7 +236,7 @@ forecast.mvgam <- function(object,
   new_mvgam_forecast(
     object, type, resp, reported, training,
     hindcasts = hindcasts, forecasts = forecasts, fc_grid = fc_grid,
-    family_pars = family_pars
+    family_pars = family_pars, component = component
   )
 }
 
@@ -259,11 +273,14 @@ reported_series <- function(object, resp, series_levels) {
 #' @param hindcasts,forecasts Lists of draws matrices, one per series
 #' @param fc_grid The forecast grid, or NULL
 #' @param family_pars Family parameter draws for `type = "link"`
+#' @param component The state components the draws hold, or `NULL` for
+#'   the summed trend
 #' @return An `mvgam_forecast`
 #' @noRd
 new_mvgam_forecast <- function(object, type, resp, reported, training,
                                hindcasts, forecasts = NULL,
-                               fc_grid = NULL, family_pars = NULL) {
+                               fc_grid = NULL, family_pars = NULL,
+                               component = NULL) {
   pick <- function(x) if (is.null(x)) NULL else x[reported]
   structure(
     list(
@@ -281,7 +298,8 @@ new_mvgam_forecast <- function(object, type, resp, reported, training,
       },
       hindcasts = hindcasts,
       forecasts = forecasts,
-      site_units = inherits(object, "jsdgam")
+      site_units = inherits(object, "jsdgam"),
+      component = component
     ),
     class = "mvgam_forecast"
   )
@@ -322,7 +340,8 @@ response_axis_forecast <- function(x) {
       test_times = arms("test_times"),
       hindcasts = arms("hindcasts"),
       forecasts = arms("forecasts"),
-      site_units = isTRUE(x[[1L]]$site_units)
+      site_units = isTRUE(x[[1L]]$site_units),
+      component = x[[1L]]$component
     ),
     class = "mvgam_forecast"
   )
@@ -699,6 +718,8 @@ build_training_tail_data <- function(object, training, max_lag) {
 #' @param process_error Whether to draw fresh trend innovations
 #' @param resp A response name, or NULL
 #' @param series_levels The series to report
+#' @param component State components of the trend, or `NULL` for the
+#'   summed trend
 #' @return Named list of draws matrices, one per series
 #' @noRd
 build_hindcast_arms <- function(object, training, type, draw_idx,
@@ -706,7 +727,8 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
                                 process_error = FALSE,
                                 resp = NULL,
                                 series_levels =
-                                  names(training$observations)) {
+                                  names(training$observations),
+                                component = NULL) {
   checkmate::assert_list(training)
   checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
   checkmate::assert_flag(obs_uncertainty)
@@ -715,7 +737,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
   no_columns <- matrix(NA_real_, nrow = length(draw_idx), ncol = 0L)
   predict_rows <- function(frame, arm_resp) {
     hindcast_draws(object, frame, type, draw_idx, obs_uncertainty,
-                   process_error, resp = arm_resp)
+                   process_error, resp = arm_resp, component = component)
   }
 
   # A simplex family's expectation is a softmax across the rows of a
@@ -764,9 +786,9 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 
 #' The hindcast draws of the given training rows
 #'
-#' `extract_trend_latent_states()` gives the fitted `trend[t, s]` of
-#' each draw. The observation predictor added to it gives the `link`
-#' hindcast. A fit without a trend takes a zero trend. A closure-unit
+#' `trend_state_rows()` gives the fitted `trend[t, s]` of each draw, or
+#' the state component `component` names. The observation predictor
+#' added to the trend gives the `link` hindcast. A fit without a trend takes a zero trend. A closure-unit
 #' family's `expected` and `response` marginalise over the latent state
 #' of each unit. `posterior_epred()` and `posterior_predict()` give
 #' those per visit row. `process_error = TRUE` takes the marginal draws
@@ -777,9 +799,10 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 #' @return Draws matrix, one column per row of `sub_data`
 #' @noRd
 hindcast_draws <- function(object, sub_data, type, draw_idx,
-                                obs_uncertainty,
-                                process_error = FALSE,
-                                resp = NULL) {
+                           obs_uncertainty,
+                           process_error = FALSE,
+                           resp = NULL,
+                           component = NULL) {
   checkmate::assert_data_frame(sub_data)
   checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
   sample_family <- type == "response" && obs_uncertainty
@@ -804,12 +827,8 @@ hindcast_draws <- function(object, sub_data, type, draw_idx,
       )
     }
   } else {
-    fitted_states <- extract_trend_latent_states(
-      mvgam_fit = object, newdata = sub_data,
-      full_draws = subset_draws_rows(
-        fit_draws(object$fit, "trend"), draw_ids = draw_idx
-      ),
-      resp = resp
+    fitted_states <- trend_state_rows(
+      object, sub_data, draw_idx, resp = resp, component = component
     ) %||% matrix(0, nrow = length(draw_idx), ncol = nrow(sub_data))
     full <- if (type == "trend") {
       fitted_states
@@ -915,6 +934,8 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
 #'   trend quantities vary over draws
 #' @param series_levels Every fitted series
 #' @param reported The series to report
+#' @param component State components of the trend, or `NULL` for the
+#'   summed trend. A component needs `type = "trend"`.
 #' @return Named list of draws matrices, one per reported series
 #' @noRd
 build_forecast_arms <- function(object, trend_model, meta,
@@ -925,7 +946,8 @@ build_forecast_arms <- function(object, trend_model, meta,
                                 obs_uncertainty,
                                 series_levels,
                                 resp = NULL,
-                                reported = series_levels) {
+                                reported = series_levels,
+                                component = NULL) {
   checkmate::assert_list(fc_grid)
   checkmate::assert_integerish(draw_idx, lower = 1L, min.len = 1L)
   checkmate::assert_flag(coef_uncertainty)
@@ -1008,6 +1030,8 @@ build_forecast_arms <- function(object, trend_model, meta,
     NULL
   }
 
+  components <- if (is.null(component)) list() else trend_components(object)
+
   # `trend_flat[i, j]` is the trend of draw `draw_idx[i]` at row `j`
   # of the forecast grid, in the order of `obs_struct_fc`.
   trend_flat <- matrix(NA_real_, nrow = ndraws_use, ncol = nobs_fc)
@@ -1031,7 +1055,9 @@ build_forecast_arms <- function(object, trend_model, meta,
       obs_struct_tail = obs_struct_tail,
       obs_struct_fc = obs_struct_fc,
       context = context,
-      Z_slice = Z_slice
+      Z_slice = Z_slice,
+      component = component,
+      components = components
     )
     trend_flat[i, ] <- flatten_grid_to_obs_order(fc_trend, obs_struct_fc)
   }
@@ -1047,7 +1073,7 @@ build_forecast_arms <- function(object, trend_model, meta,
   # draw take their parameters at those same draws. A second
   # subsample would pair `mu` with a `zi` or `shape` from another
   # draw.
-  if (type == "expected" || isTRUE(!obs_uncertainty)) {
+  if (type == "expected" || !obs_uncertainty) {
     return(arms_of(expected_from_linpred(
       object, eta_full, newdata = fc_grid$data, draw_ids = draw_idx,
       resp = resp
@@ -1069,6 +1095,10 @@ build_forecast_arms <- function(object, trend_model, meta,
 #' `extract_component_linpred()` returns that mean projected. The sum
 #' is linear, which makes the two orders equal.
 #'
+#' A state component comes from the summed trend and the paths the
+#' propagator records in its `components` attribute. The loadings
+#' project each path as they project the state.
+#'
 #' @param object A fitted `mvgam` object
 #' @param trend_model The trend specification
 #' @param meta The fit's trend metadata
@@ -1083,17 +1113,22 @@ build_forecast_arms <- function(object, trend_model, meta,
 #' @param obs_struct_tail,obs_struct_fc Their observation structures
 #' @param context What the kernel takes from the forecast times
 #' @param Z_slice The draw's `[n_series, n_lv]` loadings, or NULL
+#' @param component State components of the trend, or `NULL` for the
+#'   summed trend
+#' @param components Named list from `trend_components()`
 #' @return Numeric matrix `[h_max, n_series]`
 #' @noRd
 propagate_one_draw <- function(object, trend_model, meta, state, d,
                                h_max, n_series,
                                trend_lp_tail, trend_lp_fc,
                                obs_struct_tail, obs_struct_fc,
-                               context = list(), Z_slice = NULL) {
+                               context = list(), Z_slice = NULL,
+                               component = NULL, components = list()) {
   checkmate::assert_list(state)
   checkmate::assert_int(d, lower = 1L)
   checkmate::assert_int(h_max, lower = 1L)
   checkmate::assert_matrix(Z_slice, nrows = n_series, null.ok = TRUE)
+  checkmate::assert_character(component, null.ok = TRUE)
   max_lag <- as.integer(meta$max_lag %||% 0L)
   lp_forecast <- trend_linpred_grid(
     trend_lp_fc, obs_struct_fc, d, h_max, n_series
@@ -1116,10 +1151,21 @@ propagate_one_draw <- function(object, trend_model, meta, state, d,
          last_state = state$last_state),
     context
   ))
-  if (in_factor_mode) {
-    fc_state <- fc_state %*% t(Z_slice)
+  # The paths are taken first. Each projected grid is a plain matrix.
+  paths <- attr(fc_state, "components")
+  project <- function(x) {
+    if (in_factor_mode) {
+      return(x %*% t(Z_slice))
+    }
+    attr(x, "components") <- NULL
+    x
   }
-  fc_state + lp_forecast
+  parts <- lapply(
+    stats::setNames(nm = component_parts(components, component)),
+    function(nm) project(paths[[nm]])
+  )
+  trend_component_values(project(fc_state) + lp_forecast, parts,
+                         component, components)
 }
 
 

@@ -4,7 +4,7 @@
 \alias{posterior_interval.mvgam}
 \title{Posterior credible intervals on a fitted \pkg{mvgam} model}
 \usage{
-\method{posterior_interval}{mvgam}(object, pars = NA, variable = NULL, prob = 0.95, ...)
+\method{posterior_interval}{mvgam}(object, pars = NULL, variable = NULL, prob = 0.95, ...)
 }
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}

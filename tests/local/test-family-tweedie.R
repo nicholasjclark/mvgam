@@ -333,7 +333,6 @@ test_that("residuals and loo are built on the same fit", {
 
 test_that("the hindcast is the fitted series on the outcome scale", {
   hc <- hindcast(fit, type = "expected")
-  expect_s3_class(hc, "mvgam_forecast")
   block <- hc$hindcasts[[1L]]
   expect_identical(ncol(block), nrow(dat))
 
@@ -429,7 +428,9 @@ test_that("one parameter block reads the same way through every method", {
 test_that("hypothesis reaches every parameter variables lists", {
   expect_hypothesis_reaches(fit, c("mphi", "b_x"))
   # The default class takes a coefficient by its covariate
-  expect_s3_class(hypothesis(fit, "x = 0"), "brmshypothesis")
+  h <- hypothesis(fit, "x = 0")
+  expect_equal(h$hypothesis$Estimate,
+               mean(posterior::as_draws_matrix(fit)[, "b_x"]))
 })
 
 

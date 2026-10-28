@@ -44,8 +44,7 @@ time, the state \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns. The ELP
 the series that was observed. \code{FALSE} keeps only the trend's
 deterministic terms and leaves the autocorrelation out.}
 
-\item{process_error}{Superseded by \code{incl_autocor} and still
-accepted. \code{incl_autocor} takes precedence when both are given.}
+\item{process_error}{Deprecated alias for \code{incl_autocor}.}
 
 \item{allow_new_levels}{Logical. \code{TRUE} scores rows whose grouping
 level the training data lacked, as \code{\link[=kfold.mvgam]{kfold.mvgam()}} needs when a

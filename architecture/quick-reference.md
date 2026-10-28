@@ -1,7 +1,7 @@
 # mvgam Quick Reference
 
 Formula patterns, function names and common errors for day-to-day
-work. `architecture-decisions.md` gives the reason for each rule, and
+work. `architecture-decisions.md` gives the reason for each rule.
 `stan-data-flow-pipeline.md` follows Stan code generation step by
 step.
 
@@ -74,7 +74,7 @@ mvgam(mvbind(sp1, sp2, sp3, sp4) ~ habitat,
 ```
 
 `cbind(successes, failures)` with `family = binomial()` is one
-response with trials, and a trend on it applies to the success
+response with trials. A trend on it applies to the success
 probability. `mvbind()` is the multivariate form.
 
 ## Multiple imputation
@@ -95,8 +95,8 @@ ensure_registry_initialized()   # register the trends on first use
 list_trend_types()              # the trends and their factor support
 ```
 
-`AR()`, `RW()`, `VAR()` and `ZMVN()` take `n_lv`. `PW()` and `CAR()`
-refuse it:
+Four trends take `n_lv`: `AR()`, `RW()`, `VAR()`, `ZMVN()`. `PW()`
+and `CAR()` refuse it:
 
 - `PW(n_lv = 2)`: "Piecewise trends model changepoints separately for
   each series."

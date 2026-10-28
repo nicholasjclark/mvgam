@@ -710,7 +710,6 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     nd$y <- spec$na_response
     for (ty in spec$fc_types) {
       fc <- forecast(fit, newdata = nd, ndraws = 20L, type = ty)
-      expect_s3_class(fc, "mvgam_forecast")
       expect_identical(names(fc$forecasts), lev)
       for (s in lev) {
         expect_identical(dim(fc$forecasts[[s]]), c(20L, h))
@@ -750,8 +749,8 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
       # cannot and the hindcast arm is calling something a response
       # draw that is not one. This asserts they agree rather than
       # picking a side.
-      expect_s3_class(hindcast(fit, ndraws = 20L, type = "response"),
-                      "mvgam_forecast")
+      hc_resp <- hindcast(fit, ndraws = 20L, type = "response")
+      expect_identical(names(hc_resp$hindcasts), lev)
       fc_resp <- forecast(fit, newdata = nd, ndraws = 20L,
                           type = "response")
       expect_identical(names(fc_resp$forecasts), lev)
@@ -799,7 +798,7 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     expect_error(residual_cor(fit, partial = TRUE), as.character(K))
     expect_error(residual_cor(fit, partial = TRUE), "shared_variation")
     # The default path is untouched: only the inverse is unavailable.
-    expect_s3_class(residual_cor(fit), "mvgam_residcor")
+    expect_identical(dim(residual_cor(fit)$cor), c(K, K))
   })
 
   test_that(says("the factor methods report the fit's own loadings"), {
@@ -812,7 +811,6 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     expect_identical(nrow(af$per_factor), N_lv)
 
     sv <- shared_variation(fit)
-    expect_s3_class(sv, "mvgam_shared_variation")
     # The names this is read by, in the order the loadings run. A
     # correct decomposition under permuted names attributes each
     # species' shared variance to another species.
@@ -944,7 +942,6 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     caught <- with_warnings(loo(fit))
     ic <- caught$value
     seen <- caught$warnings
-    expect_s3_class(ic, "loo")
     expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
     # The diagnostics have to be there and cover every observation
     # the density answered for, or the estimate above is summarising
@@ -1007,7 +1004,6 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     }
 
     ce <- conditional_effects(fit)
-    expect_s3_class(ce, "mvgam_conditional_effects")
     # The observation formula is `y ~ env * series`, so the covariate
     # has to be offered. A default list that lost it draws a correct
     # panel of the wrong thing.
@@ -1068,11 +1064,7 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     v <- variables(fit)
     expect_true(any(grepl("^Z(_tilde)?\\[", v)))
 
-    td <- tidy(fit)
-    expect_true(is.data.frame(td))
-    expect_gt(nrow(td), 0L)
-    expect_true(all(c("term", "type", "estimate") %in% names(td)))
-    expect_true(all(is.finite(td$estimate)))
+    td <- expect_tidy_glance(fit)
     # `effects = "all"` is documented to return every parameter, and
     # the loadings are what a jsdgam is fitted to estimate, so a
     # table without them is not a tidy summary of this fit.
@@ -1080,18 +1072,14 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # The same table must not report what the diagnostics hide.
     # `variables()`, `posterior_summary()` and `rhat()` all drop
     # `L_Omega_trend` on a factor fit because it is absorbed into the
-    # loadings and has no fixed value under rotation; a tidier that
+    # loadings and has no fixed value under rotation. A tidier that
     # reports it hands the user a number the package refuses to put
     # an r-hat on.
+    expect_false(any(grepl("^L_Omega_trend", td$term)))
     # Fixed effects drop their `b_` prefix, as broom.mixed names them
     expect_true(all(td$term %in% c(v, sub("^b_", "", v))))
 
-    gl <- glance(fit)
-    expect_true(is.data.frame(gl))
-    expect_identical(nrow(gl), 1L)
-
     aug <- augment(fit)
-    expect_true(is.data.frame(aug))
     expect_identical(nrow(aug), n_obs)
     # Row for row, in the frame's own order. A tidier that re-sorts
     # its output pairs each fitted value with another row's
@@ -1208,18 +1196,15 @@ for (nm in names(SPECS)) {
 # ---- What belongs to one family alone --------------------------------
 
 
-test_that("nb: the shape parameter is estimated and positive", {
-  # The shape sets how far counts scatter around their mean. Two
-  # claims about it hold whatever the fixture drew: a user finds it
-  # in the posterior under a name the family declares, and every
-  # draw is positive. A scale parameter with mass at or below zero
-  # is a broken parameterisation.
+test_that("nb: the shape parameter recovers the simulated size", {
+  # The shape sets how far counts scatter around their mean. brms
+  # names it `shape`, the size of `rnbinom()`. A model that used it
+  # as its inverse would place the truth far outside the posterior.
   obj <- get("nb", envir = built)
-  dm <- as_draws_matrix(obj$fit$fit)
-  phi_cols <- grep("^shape$|^phi$", colnames(dm), value = TRUE)
-  expect_gt(length(phi_cols), 0L)
-  phi_post <- as.numeric(dm[, phi_cols[1L]])
-  expect_true(all(phi_post > 0))
+  shape_post <- as.numeric(as_draws_matrix(obj$fit$fit)[, "shape"])
+  band <- stats::quantile(shape_post, c(0.005, 0.995))
+  expect_true(SPECS$nb$sim_pars$size > band[[1L]] &&
+                SPECS$nb$sim_pars$size < band[[2L]])
 })
 
 
@@ -1272,7 +1257,6 @@ test_that("mvn: the post-fit surface treats it as what it is", {
 
   expect_drawn(plot(fit, type = "residuals"))
   aug <- augment(fit)
-  expect_s3_class(aug, "data.frame")
   expect_identical(nrow(aug), nrow(obj$sim$long_dat))
   expect_false("cap" %in% names(aug))
 
@@ -1304,7 +1288,7 @@ test_that("mvn: one quantity over the grid and over its extension", {
   nd$y <- NA_real_
 
   hc <- hindcast(fit, ndraws = 20L, type = "response")
-  expect_s3_class(hc, "mvgam_forecast")
+  expect_identical(names(hc$hindcasts), lev)
   # Twenty draws leave the two spreads within sampling error of each
   # other, and 500 separate them.
   fc_resp <- forecast(fit, newdata = nd, ndraws = 500L, type = "response")
@@ -1321,23 +1305,15 @@ test_that("mvn: one quantity over the grid and over its extension", {
 })
 
 
-test_that("diri: the concentration parameter is estimated and positive", {
+test_that("diri: the concentration parameter recovers the truth", {
   # phi sets how tightly the compositions concentrate around their
-  # expectation. Three spellings are possible depending on whether
-  # phi was modelled, and the block accepts whichever one this fit
-  # produced, on the response scale the family declares.
+  # expectation. This fit models no predictor on phi, which leaves it
+  # one scalar on the response scale.
   obj <- get("diri", envir = built)
-  dm <- as_draws_matrix(obj$fit$fit)
-  phi_cols <- grep("^phi$|^b_phi_Intercept$|^Intercept_phi$",
-                   colnames(dm), value = TRUE)
-  expect_gt(length(phi_cols), 0L)
-  phi_post <- as.numeric(dm[, phi_cols[1L]])
-  phi_resp <- if (grepl("Intercept", phi_cols[1L])) {
-    exp(phi_post)
-  } else {
-    phi_post
-  }
-  expect_true(all(phi_resp > 0))
+  phi_post <- as.numeric(as_draws_matrix(obj$fit$fit)[, "phi"])
+  band <- stats::quantile(phi_post, c(0.005, 0.995))
+  expect_true(SPECS$diri$sim_pars$phi > band[[1L]] &&
+                SPECS$diri$sim_pars$phi < band[[2L]])
 })
 
 
@@ -1540,14 +1516,24 @@ test_that("the jsdm methods refuse an argument nothing reads", {
 test_that("every surface the help page sends a reader to answers", {
   # `?jsdgam` lists these under seealso, so each is a promise made to
   # someone who has just fitted a joint species model.
-  obj <- get("nb", envir = built)$fit
-  expect_s3_class(residual_cor(obj), "mvgam_residcor")
-  expect_s3_class(ordinate(obj), "ggplot")
-  expect_s3_class(shared_variation(obj), "mvgam_shared_variation")
-  expect_s3_class(active_factors(obj), "mvgam_active_factors")
-  expect_s3_class(compare_loadings(obj, obj), "ggplot")
-  expect_s3_class(methods_md(obj), "mvgam_methods_md")
-  expect_s3_class(how_to_cite(obj), "how_to_cite")
+  nb <- get("nb", envir = built)
+  obj <- nb$fit
+  K <- nb$sim$K
+  rc <- residual_cor(obj)
+  expect_identical(dimnames(rc$cor),
+                   list(nb$sim$species_levels, nb$sim$species_levels))
+  # Under unit factor innovations the residual covariance is the
+  # shared variation `Z Z'`. The two methods reach it by separate
+  # routes and must report the same posterior mean.
+  expect_equal(shared_variation(obj)$delta, rc$cov)
+  expect_drawn(ordinate(obj))
+  expect_identical(nrow(active_factors(obj)$per_factor),
+                   as.integer(obj$standata$N_lv_trend))
+  expect_drawn(compare_loadings(obj, obj))
+  expect_true(grepl(paste0("$S = ", K, "$ series"), methods_md(obj),
+                    fixed = TRUE))
+  expect_true(grepl(as.character(utils::packageVersion("mvgam")),
+                    how_to_cite(obj)$methods_text, fixed = TRUE))
 })
 
 

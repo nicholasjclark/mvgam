@@ -2612,9 +2612,12 @@ time_subscript <- function(lag) {
 #' @param sym Character LaTeX symbol, such as `"\\eta"`
 #' @param lag Integer vector of lags
 #' @param vector Logical. `TRUE` writes the bold vector over processes.
+#' @param harmonic Logical. `TRUE` leads the subscript with the
+#'   seasonal harmonic `j`.
 #' @return Character vector along `lag`
 #' @noRd
-trend_state_symbol <- function(obj, sym, lag = 0L, vector = FALSE) {
+trend_state_symbol <- function(obj, sym, lag = 0L, vector = FALSE,
+                               harmonic = FALSE) {
   is_factor <- methods_md_has_factor_model(obj)
   time <- time_subscript(lag)
   if (vector) {
@@ -2622,8 +2625,8 @@ trend_state_symbol <- function(obj, sym, lag = 0L, vector = FALSE) {
     if (is_factor) body <- paste0("\\tilde{", body, "}")
     return(paste0(body, "_{", time, "}"))
   }
-  paste0(if (is_factor) "\\tilde", sym, "_{", if (is_factor) "k" else "i",
-         ",", time, "}")
+  paste0(if (is_factor) "\\tilde", sym, "_{", if (harmonic) "j,",
+         if (is_factor) "k" else "i", ",", time, "}")
 }
 
 #' The latent state symbol at time `t` or a lag
@@ -2939,9 +2942,17 @@ llt_symbols <- function(obj, idx) {
   sub <- if (shared || is.null(idx)) "" else paste0(",", idx)
   start <- if (methods_md_has_factor_model(obj)) "\\tilde\\beta_{k,1}" else
     "\\beta_{i,1}"
+  pair_start <- paste(
+    vapply(c("\\gamma", "\\gamma^*"), function(sym) {
+      trend_state_symbol(obj, sym, harmonic = TRUE)
+    }, character(1L)),
+    collapse = ", "
+  )
   c(sigma_slope_trend = paste0("\\sigma_{\\beta", sub, "}"),
     ar1_slope_trend = paste0("\\phi_{\\beta", sub, "}"),
-    init_slope_trend = start)
+    init_slope_trend = start,
+    sigma_season_trend = paste0("\\sigma_{\\gamma", sub, "}"),
+    init_season_trend = gsub(",t}", ",1}", pair_start, fixed = TRUE))
 }
 
 #' The index a trend's per-process parameters carry
@@ -3122,7 +3133,9 @@ llt_slope <- function(obj, lag = 0L) {
 
 #' The dynamics of a local linear trend: a level and a slope
 #'
-#' A damped trend shrinks the slope towards zero at each step.
+#' A damped trend shrinks the slope towards zero at each step. A
+#' seasonal trend writes the state as the level plus the season and
+#' adds the rotation of each harmonic's state pair.
 #'
 #' @param obj An `mvgam` object
 #' @return List of statements
@@ -3135,12 +3148,21 @@ render_latent_llt <- function(obj) {
   } else {
     ""
   }
+  seasonal <- !is.null(first_trend_spec(obj)$season)
+  level <- function(lag = 0L) {
+    if (seasonal) trend_state_symbol(obj, "\\ell", lag) else
+      trend_eta(obj, lag = lag)
+  }
   c(
+    if (seasonal) {
+      list(list(lhs = trend_eta(obj), op = "=",
+                rhs = paste0(level(), " + ", llt_season(obj))))
+    },
     list(
       list(
-        lhs = trend_eta(obj), op = "=",
-        rhs = paste(trend_eta(obj, lag = 1L), llt_slope(obj, lag = 1L),
-                    trend_eps(obj), sep = " + ")
+        lhs = level(), op = "=",
+        rhs = paste(level(1L), llt_slope(obj, lag = 1L), trend_eps(obj),
+                    sep = " + ")
       ),
       list(
         lhs = llt_slope(obj), op = "=",
@@ -3148,7 +3170,52 @@ render_latent_llt <- function(obj) {
       ),
       llt_slope_shock_row(obj, zeta)
     ),
+    if (seasonal) llt_season_rows(obj, sym),
     innovation_rows(obj, is_vector = FALSE)
+  )
+}
+
+#' The season of a local linear trend, or one harmonic's state
+#'
+#' @inheritParams trend_state_symbol
+#' @param state `NULL` for the season, `"first"` or `"second"` for a
+#'   state of harmonic `j`
+#' @noRd
+llt_season <- function(obj, state = NULL, lag = 0L) {
+  if (is.null(state)) {
+    return(trend_state_symbol(obj, "\\gamma", lag))
+  }
+  sym <- if (identical(state, "first")) "\\gamma" else "\\gamma^*"
+  trend_state_symbol(obj, sym, lag, harmonic = TRUE)
+}
+
+#' The rotation of each seasonal harmonic and the law of its shocks
+#'
+#' @param obj An `mvgam` object
+#' @param sym The model's `trend_symbols()`
+#' @return List of statements
+#' @noRd
+llt_season_rows <- function(obj, sym) {
+  shock <- function(state) {
+    trend_state_symbol(obj, if (identical(state, "first")) "\\omega" else
+      "\\omega^*", harmonic = TRUE)
+  }
+  turn <- function(state, other, sign) {
+    paste0("\\cos(\\lambda_j) ", llt_season(obj, state, 1L), " ", sign,
+           " \\sin(\\lambda_j) ", llt_season(obj, other, 1L), " + ",
+           shock(state))
+  }
+  list(
+    list(lhs = llt_season(obj), op = "=",
+         rhs = paste0("\\sum_{j=1}^{K} ", llt_season(obj, "first"))),
+    list(lhs = llt_season(obj, "first"), op = "=",
+         rhs = turn("first", "second", "+")),
+    list(lhs = llt_season(obj, "second"), op = "=",
+         rhs = turn("second", "first", "-")),
+    list(lhs = paste0(shock("first"), ", ", shock("second")),
+         op = "\\sim",
+         rhs = paste0("\\text{Normal}(0, ", sym[["sigma_season_trend"]],
+                      ")"))
   )
 }
 
@@ -3168,7 +3235,7 @@ llt_slope_shock_row <- function(obj, zeta) {
   )
 }
 
-#' The glossary entries for a local linear trend's slope
+#' The glossary entries for a local linear trend's slope and season
 #'
 #' @param obj An `mvgam` object
 #' @return Character vector of Markdown bullets
@@ -3188,8 +3255,28 @@ glossary_llt <- function(obj) {
       "- $", sym[["ar1_slope_trend"]], "$: slope damping"
     ))
   }
-  c(out, paste0("- $", sym[["init_slope_trend"]], "$: initial slope, ",
-                "estimated"))
+  out <- c(out, paste0("- $", sym[["init_slope_trend"]],
+                       "$: initial slope, estimated"))
+  spec <- first_trend_spec(obj)
+  if (is.null(spec$season)) {
+    return(out)
+  }
+  periods <- paste0("$j = 1, \\dots, ", spec$harmonics, "$ of period ",
+                    spec$season, collapse = "; ")
+  c(
+    out,
+    paste0("- $", trend_state_symbol(obj, "\\ell"), "$: level"),
+    paste0("- $", llt_season(obj), "$: season, the sum of the first ",
+           "states of $K = ", sum(spec$harmonics), "$ harmonics"),
+    paste0("- $", llt_season(obj, "first"), ", ",
+           llt_season(obj, "second"), "$: state pair of harmonic $j$"),
+    paste0("- $\\lambda_j$: frequency of harmonic $j$, ",
+           "$2 \\pi j / s$ radians per time step for ", periods),
+    paste0("- $", sym[["sigma_season_trend"]], "$: SD of the seasonal ",
+           "shocks, shared by every harmonic"),
+    paste0("- $", sym[["init_season_trend"]], "$: starting state pair, ",
+           "estimated")
+  )
 }
 
 #' The states of a ZMVN trend, drawn afresh at each time

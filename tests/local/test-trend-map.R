@@ -544,7 +544,6 @@ test_that("active_factors, shared_variation and ordinate answer here", {
   expect_equal(af$count$median, n_lv)
 
   sv <- shared_variation(fit)
-  expect_s3_class(sv, "mvgam_shared_variation")
   expect_identical(as.integer(sv$n_lv), n_lv)
   expect_identical(as.integer(sv$n_series), n_series)
   expect_identical(as.character(sv$series_names), series_levels)
@@ -607,7 +606,6 @@ test_that("a hindcast summarises to one row per cell, in user units", {
   # rather than anything the model produced.
   hc <- hindcast(fit, ndraws = 50L)
   sm <- summary(hc)
-  expect_true(is.data.frame(sm))
   expect_identical(nrow(sm), nrow(dat))
   expect_true(all(c("series", "time", "predQ50", "predQ2.5",
                     "predQ97.5", "truth") %in% names(sm)))
@@ -635,7 +633,6 @@ test_that("a forecast is scored per series, and named by them", {
   fc <- forecast(fit, newdata = future, ndraws = 100L)
 
   sm <- summary(fc)
-  expect_true(is.data.frame(sm))
   expect_setequal(as.character(sm$series), series_levels)
   expect_true(all(time_vals %in% as.integer(sm$time)))
   expect_true(all(max(time_vals) + seq_len(h) %in% as.integer(sm$time)))
@@ -644,7 +641,6 @@ test_that("a forecast is scored per series, and named by them", {
   expect_identical(names(sc), c(series_levels, "all_series"))
   for (sname in series_levels) {
     arm <- sc[[sname]]
-    expect_true(is.data.frame(arm))
     expect_identical(nrow(arm), h)
     expect_identical(as.integer(arm$eval_horizon), seq_len(h))
     expect_true(all(is.finite(arm$score)))

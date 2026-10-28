@@ -1,8 +1,8 @@
 # Column names that reach the code through data masking:
 # dplyr and data.table expressions, ggplot2 aesthetics, and the
-# posterior-summary helpers. Declared so `R CMD check` does not
-# report them as undefined globals. One list, so a name added
-# for one surface is visible to every other.
+# posterior-summary helpers. The declaration stops `R CMD check`
+# reporting them as undefined globals. One list serves every
+# surface, which makes a name added for one visible to all.
 #' @noRd
 utils::globalVariables(c(
   ".", ".data", ".fitted", ".resid", ".resid.se", ".se.fit",
@@ -18,7 +18,7 @@ utils::globalVariables(c(
   "pred_Qupper", "pred_median", "preds", "q025", "q100", "q250",
   "q750", "q900", "q975", "resids", "resp_var", "row_number",
   "rowid", "sample__", "season", "series", "shock", "subgr",
-  "target", "term", "threshold", "total", "trait_name", "trend",
+  "target", "term", "threshold", "time", "total", "trait_name", "trend",
   "trend_model", "trend_y", "trial", "unit", "upper", "upper__",
   "value", "weight", "x", "y", "year"
 ))

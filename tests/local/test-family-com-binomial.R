@@ -291,14 +291,16 @@ test_that("post-fit methods accept a forecast frame with zero trials", {
     n_trials = 0L,
     y = NA_integer_
   )
-  expect_no_error(SM(forecast(fit, newdata = fut, ndraws = 20L)))
-  expect_no_error(hindcast(fit))
+  fc <- SM(forecast(fit, newdata = fut, ndraws = 20L))
+  expect_identical(names(fc$forecasts), series_levels)
+  expect_identical(dim(fc$forecasts[[1L]]), c(20L, h))
+  expect_identical(names(hindcast(fit)$hindcasts), series_levels)
   # The residual panel omits the missing responses and says so once
   withr::local_envvar(TESTTHAT = "")
   rlang::reset_message_verbosity("mvgam_pp_check_missing_response")
   expect_message(plot(fit, type = "residuals"),
                  "missing response are omitted")
-  expect_no_error(plot(fit, type = "trend"))
+  expect_drawn(plot(fit, type = "trend"))
 })
 
 

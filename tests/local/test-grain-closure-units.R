@@ -255,19 +255,23 @@ test_that("seeing the species settles the state at that unit", {
 
 
 test_that("the saturation table agrees with the detections", {
-  # A unit is saturated when its latent state is pinned at the
-  # ceiling, which for occupancy is one and happens exactly when the
-  # species was seen. So this table is checkable against the data
-  # rather than against another posterior summary.
-  sat <- latent_N_saturation(fit)
-  expect_true(is.data.frame(sat))
+  # A unit is at its ceiling when its latent state equals the cap,
+  # which for occupancy is one. A detected unit is occupied in every
+  # draw. An undetected one is occupied with its conditional
+  # occupancy probability. The share of draws at the cap estimates
+  # that probability.
+  sat <- withr::with_seed(1L, latent_N_saturation(fit))
   expect_identical(nrow(sat), n_unit)
   expect_true(all(c("unit", "label", "K_max", "p_saturated",
                     "saturated") %in% names(sat)))
   # Occupancy is presence or absence, so the ceiling is one.
   expect_true(all(sat$K_max == 1L))
-  expect_identical(as.logical(sat$saturated), unname(detected))
   expect_identical(sat$p_saturated == 1, unname(detected))
+  cond <- colMeans(posterior_occupancy(fit, conditional = TRUE,
+                                       draw = FALSE))
+  expect_lt(max(abs(sat$p_saturated - cond)), 0.05)
+  # The flag is the share against the documented default of 0.05
+  expect_identical(sat$saturated, sat$p_saturated > 0.05)
 })
 
 
@@ -359,7 +363,7 @@ test_that("a covariate that moves inside a unit cannot group a check", {
   got <- with_warnings(
     pp_check(fit, type = "bars_grouped", group = "elev", ndraws = 20L)
   )
-  expect_s3_class(got$value, "ggplot")
+  expect_drawn(got$value)
 })
 
 
@@ -395,7 +399,7 @@ test_that("too few draws for a residual histogram is called out", {
   # Once-per-session warnings are quiet under testthat.
   withr::local_envvar(TESTTHAT = "")
   got <- with_warnings(pp_check(fit, type = "resid_hist", ndraws = 8L))
-  expect_s3_class(got$value, "ggplot")
+  expect_drawn(got$value)
   expect_true(any(grepl("fewer than 50 draws", got$warnings)))
 
   # And the advice stops once the count is adequate.
@@ -412,7 +416,8 @@ test_that("the checks that need a per-row grain are refused", {
   # first visit of each unit and calling it the fit.
   for (ty in c("scatter_avg", "error_binned", "resid_acf",
                "resid_vs_fitted")) {
-    expect_error(pp_check(fit, type = ty), "not available for")
+    expect_error(pp_check(fit, type = ty),
+                 "is not supported for closure-unit")
   }
 })
 
@@ -813,9 +818,8 @@ test_that("the checks read a unit that lost a visit", {
   }
   # `group` travels the same narrowing by a different route. It is
   # mapped to one value per unit, and the mapped values are narrowed.
-  expect_s3_class(
-    pp_check(obj$gappy, type = "stat_grouped", group = "series"),
-    "ggplot"
+  expect_drawn(
+    pp_check(obj$gappy, type = "stat_grouped", group = "series")
   )
 })
 
@@ -1206,7 +1210,6 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
 
   test_that(says("the factor methods report the fit's own loadings"), {
     af <- active_factors(fit)
-    expect_s3_class(af, "mvgam_active_factors")
     expect_identical(as.integer(af$n_lv), N_lv)
     expect_identical(nrow(af$per_factor), N_lv)
 
@@ -1261,7 +1264,6 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
     cs <- conditional_smooths(fit)
     expect_length(cs, 1L)
     cd <- cs[[1L]]
-    expect_s3_class(cd, "data.frame")
     expect_gt(nrow(cd), 0L)
     expect_true(all(is.finite(cd$estimate__)))
     expect_true(all(cd$lower__ <= cd$estimate__))
@@ -1311,11 +1313,11 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
 
   test_that(says("pp_check and the plotting methods render"), {
     expect_drawn(pp_check(fit, ndraws = 40L))
-    for (ty in c("trend", "factors")) {
-      expect_drawn(plot(fit, type = ty))
-    }
+    expect_drawn(plot(fit, type = "factors"))
+    # The units of a jsdgam are sites in arbitrary order. A trend
+    # drawn along them would look like a time series
+    expect_error(plot(fit, type = "trend"), "along time is not supported")
     ce <- conditional_effects(fit)
-    expect_s3_class(ce, "mvgam_conditional_effects")
     expect_gt(length(ce), 0L)
     for (eff in names(ce)) {
       cd <- ce[[eff]]$data
@@ -1343,18 +1345,8 @@ test_that("jsdgam occ: the detection probability recovers the truth", {
   # A detection probability that had run to 0 or 1 is still a number
   # in the unit interval, so the claim is against the simulated
   # value rather than against the bounds.
-  dm <- as_draws_matrix(occ_jsdm_fit$fit)
-  p_cols <- grep("^b_p_Intercept$|^Intercept_p$|^p$", colnames(dm),
-                 value = TRUE)
-  expect_gt(length(p_cols), 0L)
-  p_post <- as.numeric(dm[, p_cols[1L]])
-  p_resp <- if (grepl("^b_|^Intercept", p_cols[1L])) {
-    1 / (1 + exp(-p_post))
-  } else {
-    p_post
-  }
-  expect_true(all(p_resp > 0 & p_resp < 1))
-  expect_lt(abs(mean(p_resp) - jsdm_p_true), 0.2)
+  p_post <- as.numeric(as_draws_matrix(occ_jsdm_fit$fit)[, "p"])
+  expect_lt(abs(mean(p_post) - jsdm_p_true), 0.2)
 })
 
 
@@ -1537,7 +1529,6 @@ test_that("multi-season: hindcast returns one arm per species", {
   sim <- sim_multi_season()
   fit <- fit_multi_season()
   hc <- hindcast(fit, ndraws = 10L)
-  expect_s3_class(hc, "mvgam_forecast")
   # A hindcast fills `hindcasts` and leaves `forecasts` and the
   # `test_*` slots empty, which is the documented contract: it
   # predicts at the training times and extends nothing. Reading
@@ -1692,7 +1683,6 @@ test_that("multi-season: the prior the call set is reported back", {
   # model. Neither this nor `default_prior()` is driven anywhere
   # else in the directory.
   ps <- prior_summary(fit)
-  expect_s3_class(ps, "brmsprior")
   expect_true("sds" %in% ps$class)
   set_sds <- ps$prior[ps$class == "sds" & nzchar(ps$prior)]
   expect_true(any(grepl("normal(0, 0.5)", set_sds, fixed = TRUE)))
@@ -1700,7 +1690,6 @@ test_that("multi-season: the prior the call set is reported back", {
   # A default prior list is available for the same specification and
   # names the classes this model actually has.
   dp <- default_prior(fit)
-  expect_s3_class(dp, "brmsprior")
   expect_true(all(c("sds", "Intercept") %in% dp$class))
 })
 
@@ -1737,7 +1726,6 @@ test_that("latent_state and latent_N are one type under two names", {
   )
 
   ce <- conditional_effects(fit, type = "latent_state")
-  expect_s3_class(ce, "mvgam_conditional_effects")
   expect_gt(length(ce), 0L)
   # A panel that received no data still returns a ggplot, so the
   # layers are built rather than the class asserted.

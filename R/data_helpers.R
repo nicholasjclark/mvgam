@@ -42,7 +42,7 @@
 #' Pivot a detection array to mvgam long-format
 #'
 #' Convert the multi-dimensional detection histories used by
-#' `unmarked`, `ubms`, `flocker`, and `spOccupancy` into the
+#' `unmarked`, `ubms`, `flocker` and `spOccupancy` into the
 #' long-format closure-unit layout `mvgam(family = occ() / nmix())`
 #' and `jsdgam(family = occ() / nmix())` expect. One row per
 #' `(species, site, season, visit)` tuple. Single-species data
@@ -62,9 +62,9 @@
 #'     (e.g. `s(site, bs = "re")`) so per-site variation enters the
 #'     observation model while the trend pipeline operates on the
 #'     season axis. See `?occ` for the multi-season scope and
-#'     identification caveats (the model parameterizes joint
-#'     cross-species occupancy dynamics, NOT explicit colonization
-#'     and extinction rates).
+#'     identification caveats. The model parameterizes joint
+#'     cross-species occupancy dynamics. It has no explicit
+#'     colonization or extinction rates.
 #' }
 #'
 #' @param y One of four layouts:
@@ -92,13 +92,13 @@
 #'   `NA` entries mark missing visits / seasons and are dropped
 #'   from the output.
 #' @param site_covs Optional `data.frame` of site-level covariates
-#'   with `nrow == J_sites`. Broadcast across visits, seasons, and
+#'   with `nrow == J_sites`. Broadcast across visits, seasons and
 #'   species. The `unmarked::unmarkedFrameOccu` `siteCovs` slot,
-#'   the spOccupancy `occ.covs`, and the `flocker` `unit_covs` map
+#'   the spOccupancy `occ.covs` and the `flocker` `unit_covs` map
 #'   here.
 #' @param season_covs Optional `data.frame` of season-level
 #'   covariates with `nrow == T_seasons`. Broadcast across sites,
-#'   visits, and species. Use for year-of-study effects,
+#'   visits and species. Use for year-of-study effects,
 #'   season-of-year covariates, or any covariate that varies across
 #'   primary periods but is constant within a season.
 #' @param site_season_covs Optional named list of
@@ -183,8 +183,8 @@ pivot_detection_array <- function(y,
   multi_season <- match.arg(multi_season)
 
   # Each of these arguments names a separate output column. A name
-  # used twice overwrites one column with another, and the frame
-  # comes back without it.
+  # used twice overwrites one column with another. The returned
+  # frame then lacks the overwritten column.
   out_cols <- c(series = series_col, site = site_col,
                  season = season_col, visit = visit_col,
                  time = time_col, y = y_col)
@@ -264,14 +264,14 @@ pivot_detection_array <- function(y,
   out[[season_col]] <- grid$season
   out[[visit_col]]  <- grid$visit
   # Two branches. Hierarchical multi-season puts site on its own
-  # axis: `time = season`, so the 3-axis closure-unit grouping
+  # axis with `time = season`. The 3-axis closure-unit grouping
   # `(series, site, time)` inside `occ(multi_season = TRUE)` /
-  # `nmix(multi_season = TRUE)` reads site separately for the
-  # obs-formula. The other branch fuses (site, season) into a
-  # single closure-unit time slot via `(site - 1) * T + season`,
-  # which automatically reduces to `time = site` when T = 1
-  # because season = 1 there. So single-season inputs and
-  # fused-multi-season inputs share one branch.
+  # `nmix(multi_season = TRUE)` then takes site from its own column
+  # for the obs-formula. The other branch fuses (site, season) into
+  # a single closure-unit time slot via `(site - 1) * T + season`.
+  # Because season = 1 when T = 1, that slot reduces to
+  # `time = site`, the single-season layout. Single-season and
+  # fused multi-season inputs share one branch.
   out[[time_col]] <- if (is_multi_season &&
                           identical(multi_season, "hierarchical")) {
     grid$season
@@ -318,8 +318,8 @@ pivot_detection_array <- function(y,
 
 # Resolve any of the four accepted `y` layouts to a canonical
 # `[N, J, T, K]` 4D array. Returns the array, the resolved species
-# vector, and a flag for whether the species axis should be dropped
-# from the output.
+# vector and a logical that is `TRUE` when the output drops the
+# species axis.
 #
 # @noRd
 resolve_y_layout <- function(y, species) {
@@ -514,7 +514,7 @@ assert_no_reserved_cols <- function(nms, reserved, arg_name) {
 #'
 #' @return A long-format `data.frame` with `J * N` rows, each
 #'   carrying `series`, `time`, `y`, site covariates broadcast
-#'   across species, and species traits broadcast across sites.
+#'   across species and species traits broadcast across sites.
 #'
 #' @author Nicholas J Clark
 #' @family model fitting
@@ -528,9 +528,9 @@ pivot_species_matrix <- function(Y,
   checkmate::assert_string(site_id_name)
   checkmate::assert_string(series_name)
   checkmate::assert_string(values_to)
-  # Validate input shape BEFORE coercing data.frame -> matrix so a
-  # malformed input fails with a clear message instead of being
-  # silently widened.
+  # Validate the input shape before coercing a data.frame to a
+  # matrix. A malformed input then fails with a clear message. Coercion
+  # alone would widen it silently.
   checkmate::assert(
     checkmate::check_data_frame(Y, min.rows = 1L, min.cols = 1L),
     checkmate::check_matrix(Y, min.rows = 1L, min.cols = 1L)

@@ -36,7 +36,7 @@ Defaults to \code{"time"}.}
 \value{
 A long-format \code{data.frame} with \code{J * N} rows, each
 carrying \code{series}, \code{time}, \code{y}, site covariates broadcast
-across species, and species traits broadcast across sites.
+across species and species traits broadcast across sites.
 }
 \description{
 Convert the wide \verb{[J sites, N species]} response matrix used by

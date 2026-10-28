@@ -25,7 +25,8 @@
 #' The matrix has a column for every parameter of the fit. It adds
 #' columns for the states the extractors below take: the trend or
 #' factor path, the innovations of an MA trend, a VARMA's starting
-#' states and the slope of a local linear trend.
+#' states, the slope of a local linear trend and its last seasonal
+#' state pairs.
 #'
 #' @param fit Fitted `mvgam` object
 #' @param draw_ids Integer draw indices, or `NULL` for every draw
@@ -37,7 +38,7 @@ forecast_draws <- function(fit, draw_ids = NULL) {
     as_plain_matrix(fit_parameter_draws(
       fit$fit,
       states = c("trend", "lv_trend", "scaled_innovations_trend",
-                 "init_trend", "slope_trend")
+                 "init_trend", "slope_trend", "season_state_trend")
     )),
     draw_ids = draw_ids
   )
@@ -657,7 +658,9 @@ extract_last_observed_times <- function(fit, n_series) {
 #' slope scales and the slope damping. The slope shocks share the
 #' correlation of the level shocks. `cov2cor()` recovers it from the
 #' level covariance, grouped or not. Sampled factor loadings give one
-#' slope scale and one damping, broadcast to every factor.
+#' slope scale and one damping, broadcast to every factor. A season
+#' adds its shock scale and the last state pair of each harmonic,
+#' `[2 K, n_series]` per draw, rows `1:K` holding the first states.
 #'
 #' @inheritParams extract_rw_state
 #' @return List holding `params` and `last_state`
@@ -696,17 +699,29 @@ extract_llt_state <- function(draws, meta, n_series, n_lv, fit,
   }
   slope <- read_draws_matrix(draws, "slope_trend", n_time, n_series,
                              rows = n_time)
+  n_states <- 2L * length(llt_season_frequencies(first_trend_spec(fit)))
+  seasonal <- n_states > 0L
   list(
     params = list(
       sigma = scov$sigma, Sigma = scov$Sigma, sigma_slope = sigma_slope,
-      Sigma_slope = Sigma_slope, phi_slope = phi_slope
+      Sigma_slope = Sigma_slope, phi_slope = phi_slope,
+      sigma_season = if (seasonal) {
+        broadcast_to_series(
+          read_draws_vector(draws, "sigma_season_trend",
+                            n_par("sigma_season_trend")),
+          n_series
+        )
+      }
     ),
     last_state = list(
       trends = extract_trend_history(draws, n_series, max_lag = 1L,
                                      n_time = n_time,
                                      state_var = state_var),
       errors = NULL,
-      slope = matrix(slope, nrow = nrow(draws), ncol = n_series)
+      slope = matrix(slope, nrow = nrow(draws), ncol = n_series),
+      season = if (seasonal) {
+        read_draws_matrix(draws, "season_state_trend", n_states, n_series)
+      }
     )
   )
 }

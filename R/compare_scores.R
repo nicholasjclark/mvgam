@@ -59,8 +59,8 @@ compare_scores <- function(..., score = "crps", model_names = NULL,
       mvgam::score,
       c(list(forecasts[[i]], score = score), score_args)
     )
-    # Joint scores keep their per-series rows, with `NA` scores, and
-    # every model's frame has the same series levels to facet on.
+    # Joint scores keep their per-series rows with `NA` scores. Every
+    # model's frame then has the same series levels to facet on.
     rows <- lapply(names(sc), function(s) {
       df <- sc[[s]]
       if (nrow(df) == 0L) return(NULL)
@@ -226,7 +226,7 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
                  colour = .data$model)
   ) +
     # A held-out occasion with a missing response has no score. The
-    # line breaks there, and the gap is drawn without a notice.
+    # line breaks at that occasion without a notice.
     ggplot2::geom_line(na.rm = TRUE) +
     ggplot2::geom_point(size = 1.6, na.rm = TRUE) +
     scale_x_steps("Forecast horizon") +

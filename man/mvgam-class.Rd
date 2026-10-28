@@ -9,10 +9,10 @@ Run \code{methods(class = "mvgam")} to see an overview of available methods.
 }
 \details{
 A fit from \code{\link[=mvgam]{mvgam()}} has class \code{c("mvgam", "brmsfit")}. The
-accessors are the supported way in: \code{variables()}, \code{as_draws_df()}
-and \code{as.data.frame()} return the posterior, \code{stancode()} and
-\code{standata()} return the program and its data, and
-\code{prior_summary()} returns the prior table. The elements are listed
+accessors are the supported way in. \code{variables()}, \code{as_draws_df()}
+and \code{as.data.frame()} return the posterior. \code{stancode()} and
+\code{standata()} return the program and its data. \code{prior_summary()}
+returns the prior table. The elements are listed
 below.
 
 The fit and its inputs:
@@ -83,7 +83,7 @@ time gaps in this unit
 \item \code{axes$factor$n_lv} The number of latent factors, equal to the
 number of columns of the loadings and of \code{lv_trend}
 \item \code{axes$grain} \code{lv} when a \code{by = lv_axis()} term puts the trend
-design on the factor axis, and \code{series} otherwise
+design on the factor axis, otherwise \code{series}
 \item \code{axes$vars} The column names for time, series, \code{gr} and
 \code{subgr}: \code{time_var}, \code{series_var}, \code{gr_var} and \code{subgr_var}
 \item \code{axes$group_levels} The training levels of the \code{gr} and
@@ -123,7 +123,7 @@ columns copied from the \code{unit} and \code{species} columns:
 \itemize{
 \item \code{jsdgam_args} The arguments of the \code{jsdgam()} call, with \code{unit}
 and \code{species} as column names. \code{\link[=update]{update()}} refits through
-\code{jsdgam()} with them, and prediction accepts a frame naming the
+\code{jsdgam()} with them. Prediction accepts a frame naming the
 \code{unit} and \code{species} columns alone
 }
 }

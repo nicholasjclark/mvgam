@@ -21,6 +21,13 @@ knitr::opts_chunk$set(
   warning = FALSE,
   eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
+# Inline results come from chunks a build without NOT_CRAN skips. Such a
+# build prints each inline expression as code.
+if (!isTRUE(knitr::opts_chunk$get("eval"))) {
+  knitr::knit_hooks$set(evaluate.inline = function(code, envir) {
+    paste0("`", code, "`")
+  })
+}
 ```
 
 ```{r setup, include = FALSE}
@@ -38,9 +45,9 @@ theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 ```
 
 Series measured together often move together. Sites in one habitat
-share weather, and species in one guild share resource pulses. A
+share weather. Species in one guild share resource pulses. A
 dynamic factor model describes that common variation with a small
-number of latent trends, and writes each series as a weighted sum of
+number of latent trends. It writes each series as a weighted sum of
 them (Zuur et al. [2003](https://doi.org/10.1002/env.611); Holmes et
 al. [2012](https://doi.org/10.32614/RJ-2012-002)). In mvgam the
 `trend_map` argument sets which series load on which trend. This
@@ -64,14 +71,14 @@ z_{k, t}      & \sim \text{AR}(1) \text{ or any other trend model}
 $Z$ is the loading matrix, with one row per series and one column per
 trend. Row $j$ gives the weight of each trend in series $j$. Every
 series with a non-zero weight on trend $k$ uses the same latent path
-$z_{k, 1:T}$, and all of those series inform its posterior. With fewer
+$z_{k, 1:T}$. All of those series inform its posterior. With fewer
 trends than series, the model reduces the dimension of the problem.
 
 ## Three ways to write `trend_map`
 
 `trend_map` supplies $Z$ in one of three forms:
 
-- A keyword. `"identity"` gives each series its own trend, and
+- A keyword. `"identity"` gives each series its own trend.
   `"shared"` gives every series the same trend.
 - A `data.frame` with columns `series` and `trend`. Series given the
   same trend number share that trend with a loading of one.
@@ -93,7 +100,7 @@ Z_partial <- rbind(
 ```
 
 Passed as `trend_map = Z_partial`, the fit estimates the three `NA`
-entries, and `summary()` lists them under `Factor Loadings`. A matrix
+entries. `summary()` lists them under `Factor Loadings`. A matrix
 of all `NA` estimates every loading, as shown later in this vignette.
 
 ## Simulated data
@@ -162,10 +169,10 @@ tm_known <- data.frame(
 tm_known
 ```
 
-The observation formula holds an intercept alone, and `AR(p = 1)`
+The observation formula holds an intercept alone. `AR(p = 1)`
 gives each of the three trends its own AR(1) process. Passing
-`newdata = test` stores the held-out data on the fit, and `forecast()`
-uses it later.
+`newdata = test` stores the held-out data on the fit for `forecast()`
+to use later.
 
 ```{r fit-known, results = "hide"}
 fit_known <- mvgam(
@@ -188,7 +195,7 @@ summary(fit_known)
 
 `summary()` reports one AR coefficient and one innovation SD per
 trend. The 95% intervals of all six parameters contain the simulated
-values, and the observation SD is estimated at its true value of 0.2.
+values. The observation SD is estimated at its true value of 0.2.
 
 `plot(type = "factors")` draws each latent trend with the share of
 the series-level variance it explains. Because three of the six
@@ -202,7 +209,7 @@ plot(fit_known, type = "factors")
 `forecast()` extends each trend over the held-out times and maps the
 draws back to the series through $Z$. Series on the same trend receive
 the same latent forecast. The forecast for the weakly autocorrelated
-trend returns to its mean within a few steps, and the forecast for the
+trend returns to its mean within a few steps. The forecast for the
 strongly autocorrelated trend returns slowly.
 
 ```{r plot-forecast-known, fig.cap = "Forecasts from the model given the true loadings. Points are observations, and those after the dashed line were held out."}
@@ -213,10 +220,10 @@ plot(fc_known)
 ## Estimating the loadings
 
 When the grouping is unknown, a matrix of `NA` asks mvgam to estimate
-every loading. The loadings take a Student-t prior, and the innovation
+every loading. The loadings take a Student-t prior. The innovation
 SD of every factor is fixed at one to set the scale of the loadings.
 Because each factor has its own AR coefficient, the model
-distinguishes the factors by their dynamics, and only their order and
+distinguishes the factors by their dynamics. Only their order and
 signs are arbitrary. mvgam orders the factors by the variance they
 explain and gives each a positive largest loading.
 
@@ -243,9 +250,9 @@ summary(fit_free)
 where `Z[i, k]` is the loading of series `i` on factor `k`. Series 1
 to 3 load on the first factor and series 6 on the second. Series 4
 and 5 load on the third. The 95% intervals of all other loadings
-contain zero. The model recovered the simulated grouping, which it was never
-given, and the interval of each AR coefficient contains the simulated
-value of the trend its factor matches.
+contain zero. The model recovered the simulated grouping without
+being given it. The interval of each AR coefficient contains the
+simulated value of the trend its factor matches.
 
 ```{r plot-factors-free, fig.cap = "The three latent factors of the model that estimates its loadings. Factors 1, 2 and 3 match trends 1, 3 and 2 of the simulation."}
 plot(fit_free, type = "factors")
@@ -263,11 +270,11 @@ plot(residual_cor(fit_free))
 ```
 
 The correlations show the same grouping. Series 1 to 3 are strongly
-correlated with one another, as are series 4 and 5, and series 6 is
+correlated with one another, as are series 4 and 5. Series 6 is
 weakly correlated with the rest.
 
 `ordinate()` shows the same structure as a biplot. Each arrow is the
-loading of one series on the first two factors, and each numbered
+loading of one series on the first two factors. Each numbered
 point is a time. Series that share a trend point in the same
 direction.
 
@@ -301,7 +308,7 @@ plot(fc_pooled)
 ```
 
 One trend cannot follow three different sets of dynamics. The model
-assigns the remaining variation to observation noise, and its
+assigns the remaining variation to observation noise. Its
 intervals over the training period are several times wider than those
 of the first model.
 
@@ -309,7 +316,7 @@ of the first model.
 
 `compare_scores()` scores the three forecasts against the held-out
 data. The continuous ranked probability score (CRPS) and the log
-score are computed for each series and horizon, and the energy score
+score are computed for each series and horizon. The energy score
 is computed across all series at each horizon. Lower values are
 better for all three. The chunk below sums each score over the
 held-out period.
@@ -340,7 +347,7 @@ model that estimates its loadings scores `r txt("free", "crps")` on
 CRPS and `r txt("free", "logs")` on the log score, close to the
 `r txt("known", "crps")` and `r txt("known", "logs")` of the model
 given the true loadings. In this simulation, estimating the loadings
-cost little forecast accuracy, and a wrong grouping cost much more.
+cost little forecast accuracy. A wrong grouping cost much more.
 
 A held-out forecast score is a practical check on a proposed
 grouping. Where two candidate `trend_map` structures are plausible,
@@ -353,7 +360,7 @@ fit both and compare their scores.
 - `?compare_scores` and `?score` list the available scoring rules.
 - `?residual_cor` and `?shared_variation` give the correlations and
   covariances among series, with their intervals.
-- `?ordinate` describes the biplot, and `?active_factors` helps
+- `?ordinate` describes the biplot. `?active_factors` helps
   choose the number of factors.
 - The
   [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)

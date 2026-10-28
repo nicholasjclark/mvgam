@@ -100,7 +100,8 @@ deviation.}
 \item{resp}{Optional name of one response of a multivariate model.}
 
 \item{variable}{Parameter names for \code{posterior_summary()}, the
-\pkg{brms} name of the argument. It takes precedence over \code{pars}.}
+\pkg{brms} name of the argument. There \code{pars} is its deprecated
+alias.}
 
 \item{correlation}{Logical. \code{TRUE} returns the correlation matrix of
 the coefficients. Defaults to \code{FALSE}, the covariance matrix.}

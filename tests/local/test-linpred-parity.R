@@ -248,7 +248,8 @@ test_that("the trend's predictor and its smooth are brms's own", {
     full <- subset_draws_rows(posterior::as_draws_matrix(fit$fit),
                               draw_ids = ids)
     mine <- extract_linpred_from_prep(prepare_linpred_data(
-      side_draws(fit, full, "trend"), fit$trend_model, newdata = frame
+      side_draws(full, side_parameters(fit, "trend"), "trend"),
+      fit$trend_model, newdata = frame
     ))
     theirs <- brms::posterior_linpred(b, newdata = frame, draw_ids = ids,
                                       incl_autocor = FALSE)

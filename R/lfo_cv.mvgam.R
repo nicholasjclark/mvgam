@@ -26,7 +26,7 @@
 #'   the training data. Every series must share its observed times,
 #'   except under `CAR()`, whose series may be observed at their own
 #'   times.
-#' @param data Deprecated. Use `newdata` instead.
+#' @param data Deprecated alias for `newdata`.
 #' @param min_t The time at which the first training window ends. It
 #'   must be a time present in the data, which need not be whole for an
 #'   irregular `CAR()` grid. `NULL` (the default) takes the 30th
@@ -158,22 +158,7 @@ lfo_cv.mvgam <- function(object,
   score <- unique(score)
   rlang::check_dots_empty()
 
-  # The `data` argument of mvgam 1.x
-  if (!is.null(data)) {
-    if (is.null(newdata)) {
-      insight::format_warning(c(
-        "'data' is deprecated in favour of 'newdata'.",
-        i = "The supplied value was passed on to 'newdata'."
-      ))
-      newdata <- data
-    } else {
-      insight::format_warning(c(
-        "Both 'data' and 'newdata' were supplied.",
-        i = "Using 'newdata'.",
-        i = "'data' is deprecated."
-      ))
-    }
-  }
+  newdata <- mvgam_use_alias(newdata, data, c("newdata", "data"))
 
   all_data <- prediction_frame(object, newdata)
 

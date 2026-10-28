@@ -186,6 +186,10 @@ sim_mvgam <- function(type = 1L,
     )
   }
 
+  # A propagator's state components describe the unscaled path. The
+  # rescale below would leave them out of step with the true trend.
+  attr(trend_mat, "components") <- NULL
+
   # Both components are centred. The mean of eta is then the family's
   # intercept. Each is rescaled to its share of the link-scale
   # variance. A scalar rescale keeps the shape of the trend: a random

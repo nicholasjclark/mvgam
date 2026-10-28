@@ -383,10 +383,8 @@ test_that("the hindcast and forecast blocks keep the model's series", {
 
 
 test_that("the reporting methods return on a correlated AR(2)", {
-  expect_s3_class(summary(fit), "mvgam_summary")
   expect_identical(nobs(fit), nrow(dat))
-  expect_gt(nrow(tidy(fit)), 0L)
-  expect_identical(nrow(glance(fit)), 1L)
+  expect_tidy_glance(fit, nrow(dat))
   # Each series' trend parameters are named by the series
   first <- paste0("[", fitted_series_levels(fit)[1L], "]")
   expect_true(all(paste0(c("sigma_trend", "ar1_trend", "ar2_trend"), first)

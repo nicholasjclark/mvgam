@@ -1,9 +1,8 @@
 # The Stan source brms generated.
 #
 # mvgam splices its trend machinery into a program brms wrote. That
-# means locating blocks and statements in the text. The rules for
-# doing so are collected here, because they were written more than
-# once and the copies were free to disagree.
+# means locating blocks and statements in the text. Every caller
+# locates them with the rules in this file.
 
 
 # The blocks of a Stan program, in the order one declares them.
@@ -110,7 +109,7 @@ stan_line_indent <- function(line) {
 #'
 #' The count starts at the first `{` of `start_line`. A brace that
 #' closes on the same line (`for (i in 1:N) {x += 1; }`) returns
-#' `start_line`, and a `} else {` line opens one brace.
+#' `start_line`. A `} else {` line opens one brace.
 #'
 #' @param lines Character vector of Stan source lines.
 #' @param start_line Line number holding the opening brace.
@@ -140,11 +139,11 @@ find_matching_closing_brace <- function(lines, start_line) {
 
 #' Stan source lines with their block comments removed
 #'
-#' A block comment opens on one line and closes on another, which a
-#' per-line substitution cannot follow: `.` matches no newline, and
-#' each line is substituted on its own. The scan here carries its
-#' state across the vector. A `/*` inside a string literal opens
-#' nothing, and neither does one that follows a line comment's `//`.
+#' A block comment opens on one line and closes on another. A per-line
+#' substitution cannot follow it. It treats each line on its own. Its
+#' `.` matches no newline. The scan here carries its state across
+#' the vector. A `/*` inside a string literal opens nothing. Nor does
+#' one that follows a line comment's `//`.
 #'
 #' @param lines Character vector of Stan source lines.
 #' @return `lines` with every block comment removed. String literals
@@ -240,7 +239,7 @@ stan_drop_line_comment <- function(line) {
 #'
 #' `prior_only_bounds()` locates the guard in a whole program, taking
 #' the model block's bounds. A block body carries no header of its
-#' own. One is supplied here, and the line numbers are shifted back
+#' own. This function supplies one and shifts the line numbers back
 #' onto the body's own numbering.
 #'
 #' @param lines Character vector of a block body's lines.
@@ -286,8 +285,8 @@ count_stan_braces <- function(line) {
 #'
 #' A statement is top level when every brace opened before it has
 #' closed and no header written without a brace governs it. A nested
-#' statement can reference a loop variable or belong to its block, and
-#' moving it breaks the program.
+#' statement can reference a loop variable or belong to its block.
+#' Moving it breaks the program.
 #'
 #' @param lines Character vector of Stan source lines.
 #' @param bounds A list of the block's `start` and `end` lines, as
@@ -339,10 +338,10 @@ stan_statements <- function(lines, bounds) {
 
 #' Statements with the comments written above them
 #'
-#' A run of comment lines directly above a statement describes it, and
-#' joins it: the row's `start` moves up to the first comment line. A
-#' blank line ends the run, and a comment that no statement follows
-#' stays a row of its own with an empty head.
+#' A run of comment lines directly above a statement describes it.
+#' The run joins the statement's row, whose `start` moves up to the
+#' first comment line. A blank line ends the run. A comment that no
+#' statement follows stays a row of its own with an empty head.
 #'
 #' @inheritParams stan_statements
 #' @return The rows of `stan_statements()`, comment runs merged into
@@ -379,8 +378,8 @@ statement_lines <- function(statements) {
 
 #' Headers left governing nothing
 #'
-#' A `for` or `if` whose every statement goes takes its own header with
-#' it, and the brace closing it where the source kept one. Headers are
+#' A `for` or `if` whose every statement goes loses its own header too.
+#' The brace closing it goes with it where the source kept one. Headers are
 #' examined last one first. A loop emptied by an inner loop leaving is
 #' then emptied itself.
 #'
@@ -397,7 +396,7 @@ emptied_blocks <- function(lines, statements, removed) {
     inner <- which(statements$start > statements$end[i] &
                      statements$start < last)
     # A blank line and a comment have an empty head. Neither computes
-    # anything. Neither keeps a block alive, and both leave with the
+    # anything. Neither keeps a block alive. Both go with the
     # statements they described.
     code <- inner[nzchar(statements$head[inner])]
     if (length(code) == 0L || !all(removed[code])) next
@@ -414,7 +413,7 @@ emptied_blocks <- function(lines, statements, removed) {
 #' brms declares a group-level effect or a smooth coefficient in the
 #' transformed parameters block and assigns it there. `mu_trend`'s
 #' construction repeats that pair. Both then precede the predictor
-#' using them, and the block written second drops what the first wrote.
+#' using them. The block written second drops what the first wrote.
 #' Comparison is by statement, since brms splits a density and its
 #' normalising constant over two lines.
 #'

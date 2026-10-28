@@ -37,8 +37,8 @@ A pooled fit that ignores both the latent state and the
 lake-level slope variation reports a near-zero aggregate
 treatment effect with wide credible intervals. The state-space
 fit (\code{trend_formula = ~ RW(cor = TRUE)}) with random treatment
-slopes recovers the heterogeneity, exposing the wide aggregate
-CI as hidden lake-level variation rather than absence of effect.
+slopes recovers the heterogeneity. The wide aggregate CI comes
+from lake-level variation in the treatment effect.
 
 True generative components:
 \itemize{

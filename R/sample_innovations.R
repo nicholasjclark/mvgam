@@ -666,13 +666,21 @@ fit_parameter_draws <- function(fit, states = character(0L)) {
 #' @param fit A stanfit
 #' @param pars Character vector of parameter names, with or without
 #'   indices. `lp__` is always kept. Names the fit lacks are skipped.
-#' @return A numeric array, as `as.array()` gives for a stanfit
+#' @return A numeric array, as `as.array()` gives for a stanfit. A fit
+#'   holding none of `pars` and no `lp__` gives its first parameter,
+#'   which keeps the draws' shape.
 #' @noRd
 stanfit_pars_array <- function(fit, pars) {
   checkmate::assert_class(fit, "stanfit")
   checkmate::assert_character(pars, any.missing = FALSE)
   base <- unique(c(sub("\\[.*$", "", pars), "lp__"))
-  as.array(fit, pars = intersect(base, fit@model_pars))
+  kept <- intersect(base, fit@model_pars)
+  # A variational or Laplace fit converted by brms can lack `lp__`.
+  # rstan refuses an empty selection.
+  if (length(kept) == 0L) {
+    kept <- fit@model_pars[1L]
+  }
+  as.array(fit, pars = kept)
 }
 
 
@@ -1170,7 +1178,7 @@ draw_innovation_grid <- function(cov_structure, n_times) {
       n_lv = n_series,
       basis = "model"
     )
-    innovations_flat <- map_lv_to_series_innovations(
+    innovations_flat <- project_lv_grid(
       innovations_flat, Z, n_times, n_lv = n_series,
       n_obs_series = cov_structure$n_obs_series
     )
@@ -1397,17 +1405,17 @@ extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv,
 }
 
 
-#' Latent-factor innovations mapped to the observed series
+#' A time-by-factor grid of every draw projected onto the series
 #'
 #' For draw `d`, time `t` and series `s` the output holds
-#' `sum_lv Z[d, s, lv] * lv_innov[d, t + (lv - 1) * n_times]` in column
+#' `sum_lv Z[d, s, lv] * grid[d, t + (lv - 1) * n_times]` in column
 #' `t + (s - 1) * n_times`. Time varies fastest within each factor on
-#' input, as `transform_diagonal_innovations()` lays it out. Time
-#' varies fastest within each series on output, as
-#' `map_innovations_to_obs()` expects.
+#' input. That is the order of a Stan `matrix[N_time, N_lv]` and of
+#' `transform_diagonal_innovations()`. Time varies fastest within each
+#' series on output, the order of a `matrix[N_time, N_series]`. The
+#' grid can hold innovations or a state path.
 #'
-#' @param lv_innov Numeric matrix of factor innovations with dimensions
-#'   `[ndraws, n_times * n_lv]`
+#' @param grid Numeric matrix with dimensions `[ndraws, n_times * n_lv]`
 #' @param Z Numeric loading array with dimensions
 #'   `[ndraws, n_obs_series, n_lv]`
 #' @param n_times Integer number of time points
@@ -1416,25 +1424,20 @@ extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv,
 #' @return Numeric matrix with dimensions
 #'   `[ndraws, n_times * n_obs_series]`
 #' @noRd
-map_lv_to_series_innovations <- function(lv_innov, Z, n_times,
-                                          n_lv, n_obs_series) {
+project_lv_grid <- function(grid, Z, n_times, n_lv, n_obs_series) {
   checkmate::assert_int(n_times, lower = 1L)
   checkmate::assert_int(n_lv, lower = 1L)
   checkmate::assert_int(n_obs_series, lower = 1L)
-  ndraws <- nrow(lv_innov)
-  checkmate::assert_matrix(lv_innov,
-                            ncols = n_times * n_lv)
+  checkmate::assert_matrix(grid, ncols = n_times * n_lv)
   checkmate::assert_array(Z, d = 3L)
+  ndraws <- nrow(grid)
   out <- matrix(0, ndraws, n_times * n_obs_series)
   for (d in seq_len(ndraws)) {
-    # [n_times x n_lv] for this draw, time varies fastest
-    lv_d <- matrix(lv_innov[d, ], nrow = n_times, ncol = n_lv,
-                    byrow = FALSE)
-    # [n_obs_series x n_lv] for this draw
-    Z_d <- Z[d, , , drop = TRUE]
-    # [n_times x n_obs_series] per-series innovations
-    series_d <- lv_d %*% t(Z_d)
-    out[d, ] <- as.numeric(series_d)
+    # A single factor would drop `Z[d, , ]` to a vector. The reshape
+    # keeps the `[n_obs_series, n_lv]` matrix.
+    Z_d <- matrix(Z[d, , ], nrow = n_obs_series, ncol = n_lv)
+    lv_d <- matrix(grid[d, ], nrow = n_times, ncol = n_lv)
+    out[d, ] <- as.numeric(tcrossprod(lv_d, Z_d))
   }
   out
 }

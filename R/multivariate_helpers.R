@@ -1,7 +1,7 @@
 # Utilities for multivariate (mvbind / mvbrmsformula) fits. They
 # cover:
 #
-#   1. which responses a model has, keyed as brms keys them, and
+#   1. which responses a model has, keyed as brms keys them, with
 #      the data column of each
 #   2. detection of `set_rescor(TRUE)`
 #   3. per-response fan-out: when a method receives no `resp`

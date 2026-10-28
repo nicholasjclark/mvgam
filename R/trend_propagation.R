@@ -394,9 +394,24 @@ sample_horizon_changepoints <- function(delta_train_s, t_change_train,
 #' scale given, `sigma * sqrt(3) / h` gives the slope and the level
 #' shocks equal variance over the horizon.
 #'
+#' Row `t` of the slope path is the slope after step `t`, as
+#' `slope_trend[t]` is in the Stan program.
+#'
+#' A season turns each harmonic's state pair by its frequency and adds
+#' shocks of scale `sigma_season`. The fitted state holds the last
+#' pairs. The fitted trend holds the level plus the season, which the
+#' level start subtracts. A simulation draws each starting pair from
+#' `normal(0, 1 / sqrt(K))` over `K` harmonics. With no season scale
+#' given, `sigma / sqrt(K h)` moves the season over the horizon as far
+#' as one level shock.
+#'
 #' @inheritParams propagate_trend
 #' @param context Unused, for the shared propagator signature
-#' @return Numeric matrix `[h, n_series]`
+#' @return Numeric matrix `[h, n_series]` of the level plus any season.
+#'   Its `components` attribute holds a `level` path equal to the
+#'   returned matrix, the slope path and any season path, keyed as
+#'   `trend_components_llt()` names them. The level path includes any
+#'   season, as `lv_trend` does.
 #' @noRd
 propagate_llt <- function(trend_model, params, h, n_series, last_state,
                           context) {
@@ -424,12 +439,47 @@ propagate_llt <- function(trend_model, params, h, n_series, last_state,
   }
   level_shocks <- rmvn(h, rep(0, n_series), Sigma, df = df)
   slope_shocks <- rmvn(h, rep(0, n_series), Sigma_slope)
+  freq <- llt_season_frequencies(trend_model)
+  n_harm <- length(freq)
+  if (n_harm > 0L) {
+    sigma_season <- rep_len(
+      as.numeric(params$sigma_season %||% (sigma / sqrt(n_harm * h))),
+      n_series
+    )
+    pair <- function(sd) {
+      matrix(stats::rnorm(n_harm * n_series, 0, sd), n_harm, n_series)
+    }
+    if (is.null(last_state)) {
+      g <- pair(1 / sqrt(n_harm))
+      g_star <- pair(1 / sqrt(n_harm))
+    } else {
+      g <- matrix(last_state$season[seq_len(n_harm), ], n_harm, n_series)
+      g_star <- matrix(last_state$season[n_harm + seq_len(n_harm), ],
+                       n_harm, n_series)
+      level <- level - colSums(g)
+    }
+    shock_sd <- rep(sigma_season, each = n_harm)
+  }
   out <- matrix(NA_real_, nrow = h, ncol = n_series)
+  slopes <- out
+  seasons <- out
   for (step in seq_len(h)) {
     level <- level + slope + level_shocks[step, ]
     slope <- phi * slope + slope_shocks[step, ]
+    slopes[step, ] <- slope
     out[step, ] <- level
+    if (n_harm > 0L) {
+      g_last <- g
+      g <- cos(freq) * g_last + sin(freq) * g_star + pair(shock_sd)
+      g_star <- cos(freq) * g_star - sin(freq) * g_last + pair(shock_sd)
+      seasons[step, ] <- colSums(g)
+      out[step, ] <- level + seasons[step, ]
+    }
   }
+  attr(out, "components") <- c(
+    list(level = out, slope = slopes),
+    if (n_harm > 0L) list(season = seasons)
+  )
   out
 }
 

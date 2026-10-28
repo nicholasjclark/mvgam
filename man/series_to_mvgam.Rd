@@ -87,6 +87,11 @@ data carry \code{frequency = 12} in a \code{ts}. A fable
 steps. Both take \code{freq = 12}. Daily data with
 \code{seasonal.periods = c(7, 365.25)} in an \code{msts} take
 \code{freq = c(7, 365.25)}.
+
+A \code{season} column feeds a fixed seasonal shape, such as
+\code{s(season, bs = "cc")}. The same periods give \code{\link[=LLT]{LLT()}} a season
+whose shape drifts over the years, as
+\code{trend_formula = ~ LLT(season = 12)}.
 }
 \examples{
 # Monthly airline passengers, holding out the final year
@@ -113,7 +118,8 @@ head(series_to_mvgam(wide))
 \seealso{
 The
 \href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data article} covers the long format
-and its conversion in more depth.
+and its conversion in more depth. \code{\link[=LLT]{LLT()}} takes the same periods
+for a season that drifts.
 
 Other model fitting: 
 \code{\link{check_newdata}()},

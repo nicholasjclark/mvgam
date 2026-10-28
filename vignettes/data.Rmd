@@ -61,11 +61,11 @@ str(birdsong)
 head(birdsong, 4)
 ```
 
-Each `(series, time)` cell has one row, `series` is a factor and
+Each `(series, time)` cell has one row. `series` is a factor and
 `time` an integer week. A fit uses the series and time columns,
 the response its formula names and any covariates the formulas
 refer to. The `species` and `week` columns duplicate `series` and
-`time`, and `RW(time = week, series = species)` would use them
+`time`. `RW(time = week, series = species)` would use them
 instead.
 
 `sim_mvgam()` returns data in the same format:
@@ -86,7 +86,7 @@ likelihood and still estimates the latent state at that time.
 A model with a latent trend places every row on one series. Its data
 needs a series column: `series` by default, or any column named
 through `AR(series = ...)` or `jsdgam(species = ...)`. That column
-must be a `factor`, and its levels fix the order of the series in
+must be a `factor`. Its levels fix the order of the series in
 every summary, plot and forecast. A `character` column looks the
 same in `head()` and fails the check:
 
@@ -114,7 +114,7 @@ levels(one$series)
 A model without a trend has no series axis and needs no series
 column.
 
-`mvgam()` drops a level that no row holds, and `droplevels()` does
+`mvgam()` drops a level that no row holds. `droplevels()` does
 the same before fitting:
 
 ```{r dropping-levels}
@@ -130,10 +130,10 @@ levels(extra_level$series)
 
 ## The `time` variable
 
-The time column must be numeric. `RW()`, `AR()`, `VAR()`, `LLT()`
-and `PW()` advance the latent state one time step at a time. They need
-evenly spaced times within each series, although the response may
-be missing at any time.
+The time column must be numeric. A trend that advances the latent
+state one time step at a time, such as `RW()`, `AR()`, `VAR()`,
+`LLT()` or `PW()`, needs evenly spaced times within each series. The
+response may still be missing at any time.
 
 ```{r time-range}
 range(birdsong$time)
@@ -174,7 +174,7 @@ gives a worked example.
 forecasting packages work with: a `ts`, `mts` or `msts` from base R
 and forecast, a `tsibble` from the tidyverts packages or a wide
 `data.frame` holding a date column and one column per series. Each
-column of an `mts` becomes a series, and `h` holds out the final
+column of an `mts` becomes a series. `h` holds out the final
 time steps as test data:
 
 ```{r series-to-mvgam-ts}
@@ -213,7 +213,9 @@ forecast frame aligned with the training frame.
 for a `ts` and `seasonal.periods` for an `msts`. A period above 1
 adds a column holding the position of each row within it, named
 `season` for a single period and `season_7`, `season_365.25` and so
-on for several.
+on for several. The same periods give `LLT()` a season whose shape
+drifts over the years, `trend_formula = ~ LLT(season = 12)`, where a
+cyclic smooth of `season` holds one shape fixed.
 
 ## The response and family compatibility
 
@@ -241,10 +243,10 @@ offending row.
 A formula names more columns than its covariates. brms builds the
 model frame from the variable inside an `offset()`, the grouping
 factor of a random effect and the columns of addition terms such
-as `trials()`, `weights()` and `cens()`, and each of them must be
-in the data. To show the checks, the chunk below adds survey
-minutes as an exposure and an observer as a grouping factor to
-`birdsong`, and then drops the observer column:
+as `trials()`, `weights()` or `cens()`. Each of them must be in
+the data. To show the checks, the chunk below adds survey minutes
+as an exposure and an observer as a grouping factor to
+`birdsong`. It then drops the observer column:
 
 ```{r check-absent-column, error = TRUE}
 surveys <- birdsong
@@ -265,7 +267,7 @@ covariate, counts as present when `data2` is passed to
 A binomial response counts successes out of the number of trials
 that `trials()` names. A count above its trials lies outside the
 family's support. Here each week records how many of 12 listening
-points detected the species, and one row claims 14:
+points detected the species. One row claims 14:
 
 ```{r check-trials, error = TRUE}
 set.seed(2)
@@ -282,8 +284,8 @@ A hierarchical trend shares its dynamics among the series of a
 group. The constructor's `gr` argument names the column holding
 each series' group. Its `subgr` argument names the column holding
 the series within that group. The two columns together identify each
-series, and the data need no `series` column. Here the four
-`birdsong` species are split into two habitats:
+series, which leaves the data no need of a `series` column. Here the
+four `birdsong` species are split into two habitats:
 
 ```{r check-grouped, message = TRUE}
 grouped <- birdsong[, names(birdsong) != "series"]
@@ -296,7 +298,7 @@ mvgam_data(grouped, family = poisson(),
            plot = FALSE)
 ```
 
-Every group must hold the same number of series, and each series
+Every group must hold the same number of series. Each series
 must stay in one group. The check refuses an unbalanced design:
 
 ```{r check-grouped-uneven, error = TRUE}
@@ -326,7 +328,7 @@ mvgam_data(
 
 The check reports the family, the number of series, the time
 range and the number of rows. `series = 1L` draws the first
-species, and `series = "all"` draws every species in one faceted
+species. `series = "all"` draws every species in one faceted
 plot. The call returns an `mvgam_data` object invisibly.
 
 Data that fail a check raise an error. Three common cases:
@@ -338,9 +340,9 @@ mvgam_data(bad_y, family = poisson(), plot = FALSE)
 ```
 
 Subtracting 0.5 left the counts fractional and some negative.
-`?brmsfamily` gives the support of each brms family, and
-`?tweedie`, `?beta_nb`, `?com_binomial`, `?nmix` and `?occ` give
-those of the families mvgam adds.
+`?brmsfamily` gives the support of each brms family. Each family
+mvgam adds gives its support on its own help page: `?tweedie`,
+`?beta_nb`, `?com_binomial`, `?nmix` or `?occ`.
 
 ```{r check-missing-times, error = TRUE}
 gap <- birdsong[birdsong$time != 5L, ]
@@ -368,7 +370,7 @@ mvgam_data(miss_cov, formula = y ~ temp,
 
 `mvgam()` runs the same check before compiling. Without a
 `formula`, `mvgam_data()` cannot tell which columns the model
-uses, and it does not check `temp`.
+uses. It then leaves `temp` unchecked.
 
 ## Newdata for forecasts: `check_newdata()`
 
@@ -388,8 +390,8 @@ future_df <- data.frame(
 str(check_newdata(future_df, birdsong, trend_formula = ~ AR()))
 ```
 
-A series the model never saw has no fitted trend to forecast from,
-and the check refuses it:
+A series the model never saw has no fitted trend to forecast from.
+The check refuses it:
 
 ```{r check-newdata-bad, error = TRUE}
 bad_future <- data.frame(
@@ -399,13 +401,13 @@ bad_future <- data.frame(
 check_newdata(bad_future, birdsong, trend_formula = ~ AR())
 ```
 
-`mvgam(newdata = )` runs the same check on held-out data, and also
+`mvgam(newdata = )` runs the same check on held-out data. It also
 refuses a frame missing a column the formulas use.
 
 ## Closure-unit data shape
 
-Closure-unit families (`occ()`, `nmix()` and its variants) add a
-`visit` column to the long format above. Each row records one
+Closure-unit families add a `visit` column to the long format above.
+They are `occ()` and the variants of `nmix()`. Each row records one
 visit to a sampling unit. The `sim_closure_unit_data()` helper
 builds this layout:
 
@@ -433,7 +435,7 @@ mvgam_data(occ_dat$data_train, family = occ(),
            formula = bf(y ~ env, p ~ tod_c), plot = FALSE)
 ```
 
-`nmix()` models counts, and its `cap` column sets the upper bound
+`nmix()` models counts. Its `cap` column sets the upper bound
 on the latent abundance of each unit. The bound must be constant
 within a unit and at least as large as every count observed there:
 
@@ -476,7 +478,7 @@ mvgam_data(jsdm_dat, y = "present", formula = present ~ elev,
 ## Custom column names
 
 The `time` and `series` arguments of a trend constructor name other
-columns, and a fit to `birdsong` can use `week` and `species`
+columns. A fit to `birdsong` can use `week` and `species`
 directly:
 
 ```{r custom-names, results = "hide"}
@@ -489,8 +491,7 @@ mvgam(
 )
 ```
 
-`RW()`, `AR()`, `VAR()`, `LLT()`, `CAR()`, `PW()` and `ZMVN()` all
-take these arguments.
+Every trend constructor takes these arguments.
 
 ## A pre-fit checklist
 
@@ -498,8 +499,9 @@ Before calling `mvgam()`, check that:
 
 1. The series column is a factor. A hierarchical trend takes its
    series from the `gr` and `subgr` columns instead.
-2. The time column is numeric, and evenly spaced within each
-   series for `RW()`, `AR()`, `VAR()`, `LLT()` and `PW()`.
+2. The time column is numeric. It is evenly spaced within each
+   series for a trend that steps one time at a time (`RW()`, `AR()`,
+   `VAR()`, `LLT()`, `PW()`).
 3. Every column the formulas use is in the data: covariates,
    offsets, random-effect grouping factors and addition terms.
 4. No such column has missing values.
@@ -515,9 +517,9 @@ checks all five.
 - `?check_newdata` for the check on forecast frames.
 - `?series_to_mvgam` for the conversion of a `ts`, a `tsibble` or a
   wide frame.
-- `?brmsfamily` for the brms family library, plus `?tweedie`,
-  `?beta_nb`, `?com_binomial`, `?nmix` and `?occ` for the
-  response-shape rules of the families mvgam adds.
+- `?brmsfamily` for the brms family library, plus the help page of
+  each family mvgam adds (`?tweedie`, `?beta_nb`, `?com_binomial`,
+  `?nmix`, `?occ`) for its response-shape rules.
 - `?CAR` for irregularly spaced times.
 - The
   [overview vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)

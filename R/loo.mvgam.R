@@ -20,10 +20,7 @@
 #'   trend state the model inferred at that time. The ELPD then
 #'   describes the series that was observed. `FALSE` scores the
 #'   deterministic submodel alone.
-#' @param incl_dynamics Superseded by `incl_autocor` and still
-#'   accepted. `TRUE` maps to `incl_autocor = TRUE` and `FALSE` to
-#'   `incl_autocor = FALSE`. `incl_autocor` takes precedence when both
-#'   are given.
+#' @param incl_dynamics Deprecated alias for `incl_autocor`.
 #'
 #' @param by_series Logical, default `FALSE`. `TRUE` returns a data
 #'   frame with one row per series and columns `series`, `elpd`,
@@ -136,8 +133,9 @@ loo.mvgam <- function(x, ...,
   require_fitted_model(x, "loo")
   incl_autocor <- resolve_incl_autocor(
     incl_autocor = incl_autocor,
-    legacy = incl_dynamics,
-    autocor_supplied = !missing(incl_autocor)
+    alias = incl_dynamics,
+    autocor_supplied = !missing(incl_autocor),
+    alias_name = "incl_dynamics"
   )
   # `moment_match` and `reloo` refit the model at each high-k
   # observation. The other brms arguments configure those refits,
@@ -213,8 +211,9 @@ loo_compare.mvgam <- function(
 ) {
   incl_autocor <- resolve_incl_autocor(
     incl_autocor = incl_autocor,
-    legacy = incl_dynamics,
-    autocor_supplied = !missing(incl_autocor)
+    alias = incl_dynamics,
+    autocor_supplied = !missing(incl_autocor),
+    alias_name = "incl_dynamics"
   )
   criterion <- match.arg(criterion)
   models <- list(x, ...)

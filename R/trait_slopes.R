@@ -47,8 +47,8 @@ trait_slopes_fixed_terms <- function(obs_formula) {
 }
 
 
-# One place that decides the nlpar layout of the rewrite. Given the
-# original obs formula, returns the list both
+# Decides the nlpar layout of the rewrite. Given the original obs
+# formula, returns the list both
 # build_trait_slopes_formula() and default_trait_slopes_priors()
 # consume:
 #   $has_intercept  -- whether the wrapper emits the intercept nlpar
@@ -117,8 +117,8 @@ validate_trait_slopes <- function(trait_slopes, obs_formula, data,
       )
     )))
   }
-  # Trait values must vary only across species, not within. A trait
-  # that varies within a species is a per-observation covariate and
+  # Trait values must be constant within each species. A trait that
+  # varies within a species is a per-observation covariate and
   # belongs in obs_formula directly.
   for (v in trait_vars) {
     by_species <- vapply(
@@ -168,10 +168,10 @@ validate_trait_slopes <- function(trait_slopes, obs_formula, data,
 
 
 # Rewrite (obs_formula, trait_slopes, species_var) into the nl
-# brmsformula described above. The species_var is read from the
-# jsdgam wrapper after data_train has been aligned to use 'series'
-# as the species index, so the RE grouping factor on every nlpar
-# is consistently '(1 | sp | series)'.
+# brmsformula described above. The jsdgam wrapper supplies
+# species_var after aligning data_train to use 'series' as the
+# species index. With that index, every nlpar takes the RE grouping
+# factor '(1 | sp | series)'.
 build_trait_slopes_formula <- function(obs_formula, trait_slopes,
                                        species_var = "series") {
   spec <- trait_slopes_nlpar_spec(obs_formula)

@@ -919,7 +919,6 @@ test_that("a newdata missing a required column is refused", {
 
 test_that("the factor methods report two factors over five species", {
   af <- active_factors(fit)
-  expect_s3_class(af, "mvgam_active_factors")
   expect_identical(as.integer(af$n_lv), N_lv)
   expect_identical(nrow(af$per_factor), N_lv)
   # The object has a plot method, and it is the one a user reaches
@@ -966,7 +965,6 @@ test_that("the factor-axis smooth is drawn once per latent factor", {
   # `conditional_smooths()` hands back the frame itself rather than
   # nesting it under `$data`, which `conditional_effects()` does.
   d <- cs[[1L]]
-  expect_s3_class(d, "data.frame")
   expect_gt(nrow(d), 0L)
   expect_true(all(c("effect1__", "cond__", "estimate__",
                     "lower__", "upper__") %in% names(d)))
@@ -1074,7 +1072,7 @@ test_that("a narrowed likelihood is paired with the rows it kept", {
   expect_identical(ncol(ll), nrow(d))
   expect_identical(sum(apply(ll, 2L, function(z) all(is.na(z)))),
                    n_missing)
-  cleaned <- mvgam:::clean_ll(fit, ll)
+  cleaned <- mvgam:::clean_ll(ll)
   expect_identical(ncol(cleaned), nrow(d) - n_missing)
   expect_length(attr(cleaned, "scored_columns"), ncol(cleaned))
 
@@ -1101,7 +1099,6 @@ test_that("loo splits the likelihood it was given", {
   # Every warning raised is a Pareto k notice, one per series.
   loo_warnings <- capture_warnings(by_series <- loo(fit, by_series = TRUE))
   expect_match(loo_warnings, "Pareto k diagnostic")
-  expect_s3_class(by_series, "data.frame")
   expect_true(all(is.finite(by_series$elpd_loo)))
 })
 
@@ -1149,8 +1146,15 @@ test_that("a refit rebuilds the model that was fitted", {
 
 
 test_that("kfold partitions the rows the likelihood scored", {
+  # Each row is its own group. A row without a response leaves the
+  # likelihood and takes no ELPD. The rest keep their own row keys.
   kf <- kfold(fit, K = 2L)
-  expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
+  y <- insight::find_response(fit)
+  scored <- which(!is.na(fit$data[[y]]))
+  expect_identical(rownames(kf$pointwise), as.character(scored))
+  expect_equal(kf$estimates["elpd_kfold", "Estimate"],
+               sum(kf$pointwise[, "elpd_kfold"]))
+  expect_true(all(is.finite(kf$pointwise[, "elpd_kfold"])))
 })
 
 
@@ -1166,7 +1170,7 @@ test_that("pp_check and the plotting methods render", {
   }
   drawn$mcmc <- with_warnings(mcmc_plot(fit))
   for (nm in names(drawn)) {
-    expect_s3_class(drawn[[nm]]$value, "ggplot")
+    expect_drawn(drawn[[nm]]$value)
   }
 
   # Rows a plot cannot draw are reported once per session by

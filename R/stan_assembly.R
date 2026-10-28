@@ -2032,11 +2032,12 @@ z_is_identity <- function(is_factor_model, fixed_Z = NULL) {
 #' @param data_info Data information list
 #' @param prior A `brmsprior` or NULL
 #' @param rotated The factor-indexed quantities a trend adds to
-#'   `lv_trend`, rotated with it. A list of `paths`, `[N_time, N_lv]`
-#'   matrices rotated as `lv_trend`; `vectors`, `[N_lv]` vectors
+#'   `lv_trend`, rotated with it. A list of `paths`, `[rows, N_lv]`
+#'   matrices rotated as `lv_trend`, named by matrix with the Stan
+#'   expression of the row count as value; `vectors`, `[N_lv]` vectors
 #'   rotated as `Q v`; and `transitions`, arrays of `[N_lv, N_lv]`
 #'   matrices over the lags rotated as `Q A Q'`. A VAR passes its
-#'   coefficients and a local linear trend its slope.
+#'   coefficients and a local linear trend its slope and season.
 #' @return A stanvars object. NULL for a model without factors and for
 #'   a `trend_map` that supplies `Z`.
 #' @references
@@ -2090,12 +2091,13 @@ generate_factor_model <- function(trend_specs, data_info, prior = NULL,
   # The rotation `Q` is a working matrix of a local block and is not
   # stored. Stan requires a data expression for a top-level array
   # size, which `N_lags_trend` gives the transition arrays.
-  paths <- c("lv_trend", rotated$paths)
+  paths <- c(lv_trend = "N_time_trend", rotated$paths)
+  checkmate::assert_character(paths, names = "unique")
   vectors <- rotated$vectors
   transitions <- rotated$transitions
   qr_lines <- c(
     "matrix[N_series_trend, N_lv_trend] Z_tilde = qr_thin_R(Z')';",
-    paste0("matrix[N_time_trend, N_lv_trend] ", paths, "_tilde;"),
+    paste0("matrix[", paths, ", N_lv_trend] ", names(paths), "_tilde;"),
     if (length(vectors)) paste0("vector[N_lv_trend] ", vectors, "_tilde;"),
     if (length(transitions)) {
       paste0("array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] ",
@@ -2104,7 +2106,7 @@ generate_factor_model <- function(trend_specs, data_info, prior = NULL,
     if (!is.null(groups)) "vector[K_trend] b_trend_tilde = b_trend;",
     "{",
     "  matrix[N_lv_trend, N_lv_trend] Q = qr_thin_Q(Z')';",
-    paste0("  ", paths, "_tilde = ", paths, " * Q';"),
+    paste0("  ", names(paths), "_tilde = ", names(paths), " * Q';"),
     if (length(vectors)) paste0("  ", vectors, "_tilde = Q * ", vectors, ";"),
     if (length(transitions)) {
       c("  for (lag in 1:N_lags_trend) {",
@@ -2825,8 +2827,11 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info,
 #' `ar1_slope_trend` when `damped = TRUE`. The slope starts at the
 #' free `init_slope_trend` either way. The slope shocks take the
 #' level's correlation factor with their own scales. Under sampled
-#' loadings the factors share one slope scale and one damping.
-#' `assemble_shared_innovation_trend()` adds the rest.
+#' loadings the factors share one slope scale and one damping. The
+#' level and an undamped slope are cumulative sums down each process,
+#' vectorised over time. A damped slope recurses one step at a time.
+#' `llt_season_stanvars()` adds any season and
+#' `assemble_shared_innovation_trend()` the rest.
 #'
 #' @param trend_specs Trend specification from `LLT()`
 #' @param data_info Data information list
@@ -2853,7 +2858,8 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
   # integrated twice over the series, would put the predictor far
   # outside the data.
   scales <- llt_prior_scales(data_info$n_time, damped, shared,
-                             trend_prior_unit_of(trend_specs))
+                             trend_prior_unit_of(trend_specs),
+                             length(llt_season_frequencies(trend_specs)))
 
   data <- combine_stanvars(
     data_stanvar(scales$sigma, "slope_scale_trend", "real<lower=0>"),
@@ -2913,15 +2919,27 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
       "      matrix[N_time_trend - 1, N_lv_trend] slope_shocks;\n",
       scale_shocks, "\n",
       "      slope_trend[1] = init_slope_trend';\n",
-      "      // The level adds the last slope, and the slope its shock\n",
-      "      lv_trend[1] = scaled_innovations_trend[1];\n",
-      "      for (i in 2:N_time_trend) {\n",
-      "        lv_trend[i] = lv_trend[i - 1] + slope_trend[i - 1]\n",
-      "                      + scaled_innovations_trend[i];\n",
-      "        slope_trend[i] = ",
-      if (damped) "(slope_phi .* slope_trend[i - 1]')'" else
-        "slope_trend[i - 1]",
-      " + slope_shocks[i - 1];\n",
+      if (damped) {
+        paste0(
+          "      // The damped slope shrinks its last value by slope_phi\n",
+          "      for (i in 2:N_time_trend) {\n",
+          "        slope_trend[i] = (slope_phi .* slope_trend[i - 1]')'\n",
+          "                         + slope_shocks[i - 1];\n",
+          "      }\n"
+        )
+      } else {
+        "      slope_trend[2:N_time_trend] = slope_shocks;\n"
+      },
+      "      // The level adds the last slope and its shock. Each state is a\n",
+      "      // cumulative sum down its process.\n",
+      "      for (k in 1:N_lv_trend) {\n",
+      if (!damped) {
+        "        slope_trend[ : , k] = cumulative_sum(slope_trend[ : , k]);\n"
+      },
+      "        lv_trend[ : , k] = cumulative_sum(append_row(\n",
+      "          scaled_innovations_trend[1, k],\n",
+      "          scaled_innovations_trend[2:N_time_trend, k]\n",
+      "            + slope_trend[1:(N_time_trend - 1), k]));\n",
       "      }\n",
       "    }"
     ),
@@ -2944,9 +2962,160 @@ generate_llt_trend_stanvars <- function(trend_specs, data_info,
     )
   )
 
+  season <- llt_season_stanvars(trend_specs, scales, n_par, per_process,
+                                prior)
   assemble_shared_innovation_trend(
-    list(data, parameters, dynamics, model), trend_specs, data_info, prior,
-    rotated = list(paths = "slope_trend", vectors = "init_slope_trend")
+    c(list(data, parameters, dynamics, model), season$stanvars),
+    trend_specs, data_info, prior,
+    rotated = list(paths = c(slope_trend = "N_time_trend", season$paths),
+                   vectors = "init_slope_trend")
+  )
+}
+
+#' Stanvars of the season of an LLT trend
+#'
+#' Each harmonic holds a state pair that turns by its frequency at
+#' every step and takes two shocks of scale `sigma_season_trend`. The
+#' season is the sum of the first states. It runs after the level
+#' recursion and adds to `lv_trend`, which then holds the level plus
+#' the season. The program stores the season and the last pair of each
+#' harmonic, which starts a forecast.
+#'
+#' The pair `z = g + i g*` of a harmonic at angular frequency `lambda`
+#' follows `z_t = exp(-i lambda) z_{t-1} + w_t`, with the starting pair
+#' as `w_1`. That solves to `z_t = exp(-i lambda t) C_t`, where `C_t`
+#' sums `exp(i lambda s) w_s` over `s <= t`. The program turns every
+#' shock by its angle, takes one cumulative sum down each state and
+#' turns the sums forward again. Every step is vectorised over time.
+#' The cosines and sines of the angles are transformed data.
+#' `innovations_season_trend` holds a row per step after the first.
+#' Its first `N_harm_trend * N_lv_trend` columns shock the first
+#' states, harmonic within process, and the rest the second states.
+#'
+#' @param trend_specs Trend specification from `LLT()`
+#' @param scales List from `llt_prior_scales()`
+#' @param n_par Stan size of a per-process parameter
+#' @param per_process Function writing a parameter's value at every
+#'   process
+#' @param prior A `brmsprior` or NULL
+#' @return List of `stanvars` and `paths`. `paths` names the season's
+#'   factor-indexed matrices with their row counts. Both are empty
+#'   without a season.
+#' @noRd
+llt_season_stanvars <- function(trend_specs, scales, n_par, per_process,
+                                prior = NULL) {
+  freq <- llt_season_frequencies(trend_specs)
+  if (!length(freq)) {
+    return(list(stanvars = list(), paths = character(0L)))
+  }
+  t_by_hp <- "[N_time_trend, N_harm_trend * N_lv_trend]"
+  first <- "1:N_harm_trend"
+  second <- "(N_harm_trend + 1):(2 * N_harm_trend)"
+  data <- combine_stanvars(
+    data_stanvar(length(freq), "N_harm_trend", "int<lower=1>"),
+    data_stanvar(freq, "freq_season_trend", "vector[N_harm_trend]"),
+    data_stanvar(scales$season_sigma, "season_scale_trend",
+                 "real<lower=0>"),
+    data_stanvar(scales$season_init, "init_season_scale_trend",
+                 "real<lower=0>"),
+    brms::stanvar(
+      name = "llt_season_tdata",
+      scode = paste0(
+        "// The cosine and sine of each harmonic's angle at each time,\n",
+        "// harmonic within process\n",
+        "matrix", t_by_hp, " cos_season_trend;\n",
+        "matrix", t_by_hp, " sin_season_trend;\n",
+        "for (t in 1:N_time_trend) {\n",
+        "  vector[N_harm_trend] angle = t * freq_season_trend;\n",
+        "  cos_season_trend[t] = to_row_vector(rep_matrix(cos(angle), ",
+        "N_lv_trend));\n",
+        "  sin_season_trend[t] = to_row_vector(rep_matrix(sin(angle), ",
+        "N_lv_trend));\n",
+        "}"
+      ),
+      block = "tdata"
+    )
+  )
+  parameters <- brms::stanvar(
+    name = "llt_season_parameters",
+    scode = paste0(
+      "// Season shock scales in units of season_scale_trend, the\n",
+      "// starting state pairs and the standard shocks of later pairs\n",
+      "vector<lower=0>[", n_par, "] sigma_season_raw_trend;\n",
+      "matrix<multiplier=init_season_scale_trend>",
+      "[2 * N_harm_trend, N_lv_trend] init_season_trend;\n",
+      "matrix[N_time_trend - 1, 2 * N_harm_trend * N_lv_trend]\n",
+      "  innovations_season_trend;"
+    ),
+    block = "parameters"
+  )
+  dynamics <- brms::stanvar(
+    name = "llt_season_tparameters",
+    scode = paste0(
+      "vector<lower=0>[", n_par, "] sigma_season_trend\n",
+      "  = season_scale_trend * sigma_season_raw_trend;\n",
+      "matrix[N_time_trend, N_lv_trend] season_trend;\n",
+      "matrix[2 * N_harm_trend, N_lv_trend] season_state_trend;\n",
+      "    {\n",
+      "      int n_hp = N_harm_trend * N_lv_trend;\n",
+      "      row_vector[n_hp] season_sd = to_row_vector(\n",
+      "        rep_matrix(", per_process("sigma_season_trend"),
+      "', N_harm_trend));\n",
+      "      // The starting pairs, then the shocks of every later step\n",
+      "      matrix", t_by_hp, " w = append_row(\n",
+      "        to_row_vector(init_season_trend[", first, "]),\n",
+      "        diag_post_multiply(innovations_season_trend[ : , 1:n_hp],\n",
+      "                           season_sd));\n",
+      "      matrix", t_by_hp, " w_star = append_row(\n",
+      "        to_row_vector(init_season_trend[", second, "]),\n",
+      "        diag_post_multiply(\n",
+      "          innovations_season_trend[ : , (n_hp + 1):(2 * n_hp)],\n",
+      "          season_sd));\n",
+      "      // Each shock turned by its angle, then summed over time\n",
+      "      matrix", t_by_hp, " re = cos_season_trend .* w\n",
+      "                                  - sin_season_trend .* w_star;\n",
+      "      matrix", t_by_hp, " im = sin_season_trend .* w\n",
+      "                                  + cos_season_trend .* w_star;\n",
+      "      for (c in 1:n_hp) {\n",
+      "        re[ : , c] = cumulative_sum(re[ : , c]);\n",
+      "        im[ : , c] = cumulative_sum(im[ : , c]);\n",
+      "      }\n",
+      "      // The sums turned forward give the first states\n",
+      "      matrix", t_by_hp, " g = cos_season_trend .* re\n",
+      "                                 + sin_season_trend .* im;\n",
+      "      for (k in 1:N_lv_trend) {\n",
+      "        season_trend[ : , k]\n",
+      "          = g[ : , ((k - 1) * N_harm_trend + 1):(k * N_harm_trend)]\n",
+      "            * rep_vector(1, N_harm_trend);\n",
+      "      }\n",
+      "      season_state_trend = append_row(\n",
+      "        to_matrix(g[N_time_trend], N_harm_trend, N_lv_trend),\n",
+      "        to_matrix(cos_season_trend[N_time_trend] .* im[N_time_trend]\n",
+      "                  - sin_season_trend[N_time_trend] .* re[N_time_trend],\n",
+      "                  N_harm_trend, N_lv_trend));\n",
+      "    }\n",
+      "// The latent state is the level plus the season\n",
+      "lv_trend += season_trend;"
+    ),
+    block = "tparameters"
+  )
+  model <- brms::stanvar(
+    name = "llt_season_model",
+    scode = paste(c(
+      "to_vector(innovations_season_trend) ~ std_normal();",
+      "// Season priors",
+      trend_prior_line("sigma_season_trend", prior,
+                       trend_obj = trend_specs),
+      trend_prior_line("to_vector(init_season_trend)", prior,
+                       class = "init_season_trend",
+                       trend_obj = trend_specs)
+    ), collapse = "\n"),
+    block = "model"
+  )
+  list(
+    stanvars = list(data, parameters, dynamics, model),
+    paths = c(season_trend = "N_time_trend",
+              init_season_trend = "2 * N_harm_trend")
   )
 }
 

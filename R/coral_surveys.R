@@ -14,8 +14,9 @@
 #' that belongs to the latent state. `trend_formula = ~ CAR()`
 #' with the supplied `time` column measures the damping over the
 #' median gap between surveys, three months here. Its `ar1_trend`
-#' is then near `0.7^3 = 0.34`, the monthly `phi` of `0.7`, and the
-#' SST smooth is identifiable.
+#' is then near `0.7^3 = 0.34`, the monthly `phi` of `0.7` cubed.
+#' With persistence assigned to the latent state, the SST smooth is
+#' identifiable.
 #'
 #' @format A `data.frame` with 150 rows and the following fields:
 #' \describe{

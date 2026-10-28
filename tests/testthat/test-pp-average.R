@@ -78,16 +78,17 @@ test_that("mvgam_round_largest_remainder preserves the total", {
 # ---- mvgam_use_alias ----------------------------------------------
 
 test_that("mvgam_use_alias returns alias when supplied, else x", {
-  expect_identical(mvgam_use_alias("primary", NULL), "primary")
-  expect_identical(mvgam_use_alias(NULL, "alias"), "alias")
-  expect_null(mvgam_use_alias(NULL, NULL))
+  nm <- c("ndraws", "nsamples")
+  expect_identical(mvgam_use_alias("primary", NULL, nm), "primary")
+  expect_identical(mvgam_use_alias(NULL, "alias", nm), "alias")
+  expect_null(mvgam_use_alias(NULL, NULL, nm))
 })
 
 
-test_that("mvgam_use_alias errors when both are supplied", {
+test_that("mvgam_use_alias names both arguments it refuses", {
   expect_error(
-    mvgam_use_alias("primary", "alias"),
-    "deprecated alias"
+    mvgam_use_alias("primary", "alias", c("ndraws", "nsamples")),
+    "'ndraws' and its deprecated alias 'nsamples'"
   )
 })
 

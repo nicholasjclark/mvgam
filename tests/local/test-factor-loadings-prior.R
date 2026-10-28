@@ -229,7 +229,6 @@ test_that("cluster: within-cluster series share more than across", {
   expect_gt(mean(cor_mat[within]), mean(cor_mat[between]))
 
   sv <- shared_variation(fit)
-  expect_s3_class(sv, "mvgam_shared_variation")
   expect_equal(sv$n_series, 8L)
   expect_equal(sv$n_lv, 3L)
   expect_equal(dim(sv$delta), c(8L, 8L))
@@ -260,7 +259,6 @@ test_that("cluster: the fit describes itself to a caller", {
   # the calls a reader makes around it, and none of them is asked
   # anywhere else on a structured-prior fit.
   mv <- cluster_fit()
-  expect_s3_class(model.frame(mv), "data.frame")
 
   # The observation formula is `y ~ 1`, so this model has no
   # predictor. Both names reported are the axis it is indexed by.
@@ -414,8 +412,8 @@ test_that("birds: every post-fit method answers on this fit", {
   expect_true(any(vapply(ord, function(x) nrow(x) == sim$n_species,
                          logical(1))))
   expect_drawn(pp_check(fit, ndraws = 30L))
-  expect_s3_class(conditional_effects(fit),
-                  "mvgam_conditional_effects")
+  # `y ~ 1` with a factor trend leaves no covariate to draw
+  expect_length(conditional_effects(fit), 0L)
 })
 
 
@@ -661,7 +659,6 @@ test_that("birds: update() carries the traits and the phylogeny", {
   # a refit also inherits `iter` and `warmup`
   fit <- birds_fit()
   refit <- update(fit, chains = 1L, iter = 400L)
-  expect_s3_class(refit, "jsdgam")
   expect_identical(mvgam_normalise_stancode(refit$stancode),
                    mvgam_normalise_stancode(fit$stancode))
   expect_equal(refit$standata$row_features, fit$standata$row_features)

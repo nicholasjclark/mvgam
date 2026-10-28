@@ -176,7 +176,9 @@ kfold.mvgam <- function(x,
   )
 
   # The column groups are narrowed to the columns `clean_ll()` keeps.
-  # `group_to_fold` has one entry per group and is left whole.
+  # `group_to_fold` keeps one entry per group, named by the group. A
+  # group whose rows all lack a response leaves no column. The
+  # surviving groups take their folds by name.
   loglik_full <- clean_ll(loglik_full)
   col_meta$col_group <- narrow_to_scored(col_meta$col_group, loglik_full)
 
@@ -189,7 +191,8 @@ kfold.mvgam <- function(x,
     pareto_k_threshold, nrow(loglik_grouped)
   )
 
-  groups_per_fold <- split(group_labels, col_meta$group_to_fold)
+  groups_per_fold <- split(group_labels,
+                           col_meta$group_to_fold[group_labels])
 
   if (exact) {
     pointwise <- rep(NA_real_, length(group_labels))

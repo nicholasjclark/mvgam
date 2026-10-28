@@ -52,7 +52,8 @@ make_draws <- function(values) {
 make_mock_fit <- function(draws, n_series, n_lv, n_time,
                             trend_metadata,
                             data = NULL,
-                            spec_n_lv = NULL) {
+                            spec_n_lv = NULL,
+                            spec = list()) {
   fit <- list(
     fit = draws,
     standata = list(
@@ -61,7 +62,7 @@ make_mock_fit <- function(draws, n_series, n_lv, n_time,
       N_time_trend = n_time
     ),
     mv_spec = list(trend_specs = structure(
-      list(n_lv = spec_n_lv), class = "mvgam_trend"
+      c(list(n_lv = spec_n_lv), spec), class = "mvgam_trend"
     )),
     trend_metadata = trend_metadata,
     data = data
@@ -390,6 +391,28 @@ test_that("LLT hands on the last level and slope and the slope covariance", {
   # The slope shocks share the level's correlation, 0.5
   expect_equal(res$params$Sigma_slope,
                matrix(c(0.01, 0.01, 0.01, 0.04), 2L))
+})
+
+
+test_that("a seasonal LLT hands on its last state pairs and scale", {
+  n_time <- 4L
+  pairs <- matrix(c(0.1, 0.2, -0.1, -0.2, 0.3, 0.4, -0.3, -0.4), 4L)
+  draws <- make_draws(list(
+    sigma_trend = c(0.5, 1),
+    sigma_slope_trend = c(0.1, 0.2),
+    sigma_season_trend = array(0.05, 1L),
+    slope_trend = matrix(0, n_time, 2L),
+    season_state_trend = pairs,
+    trend = matrix(1:8, n_time)
+  ))
+  meta <- list(trend_type = "LLT", ar_lags = 1L, ma_lags = integer(0),
+               max_lag = 1L, has_cor = FALSE)
+  fit <- make_mock_fit(draws, 2L, n_lv = 2L, n_time, meta,
+                       spec = list(season = 12, harmonics = 2L))
+  res <- last_state_of_draw(extract_last_states(fit), 1L)
+  expect_equal(res$last_state$season, pairs)
+  # One shared scale reaches both series
+  expect_equal(res$params$sigma_season, c(0.05, 0.05))
 })
 
 

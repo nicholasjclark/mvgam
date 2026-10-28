@@ -14,8 +14,8 @@
 #'       [conditional_smooths.mvgam()], with several smooths combined
 #'       into one figure.}
 #'     \item{`"trend"`}{The latent trend over the training times, from
-#'       [hindcast.mvgam()]. A [jsdgam()] fit has sites in place of
-#'       times and refuses it.}
+#'       [hindcast.mvgam()], or the state component `component` names.
+#'       A [jsdgam()] fit has sites in place of times and refuses it.}
 #'     \item{`"factors"`}{The path of each latent factor.
 #'       [active_factors()] reports the variance each factor carries.}
 #'     \item{`"series"`}{The observed data the fit carries.
@@ -59,6 +59,10 @@
 #' plot(mod, type = "smooths")
 #' plot(mod, type = "trend")
 #'
+#' # The slope of a local linear trend
+#' mod_llt <- update(mod, trend_formula = ~ LLT())
+#' plot(mod_llt, type = "trend", component = "slope")
+#'
 #' # Next, plot(forecast(mod, newdata = simdat$data_test)) carries the
 #' # trend forward
 #' }
@@ -74,12 +78,14 @@ plot.mvgam <- function(
   series = NULL,
   resp = NULL,
   ndraws = NULL,
+  component = NULL,
   ...
 ) {
   checkmate::assert_class(x, "mvgam")
   require_fitted_model(x, "plot")
   type <- match.arg(type)
   checkmate::assert_string(resp, null.ok = TRUE)
+  component <- resolve_trend_component(x, component, type)
 
   switch(
     type,
@@ -95,7 +101,8 @@ plot.mvgam <- function(
         patchwork::wrap_plots(panels)
     },
     trend = plot(
-      hindcast(x, type = "trend", ndraws = ndraws, resp = resp),
+      hindcast(x, type = "trend", component = component, ndraws = ndraws,
+               resp = resp),
       series = series,
       ...
     ),

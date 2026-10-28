@@ -700,8 +700,9 @@ mvgam_repel_layer <- function(
 #'
 #' A `scale_fill_gradient2()` centred at zero: blue for negative
 #' associations, grey at zero and red for positive ones. A diverging
-#' scale needs a warm and a cool end. The colours come from the fixed
-#' bayesplot `"red"` and `"blue"` schemes for any active scheme.
+#' scale needs a warm and a cool end. The warm end comes from the
+#' bayesplot `"red"` scheme and the cool end from the Okabe-Ito
+#' palette, for any active scheme.
 #'
 #' @param name Legend title
 #' @param limits Numeric range of the scale. Defaults to the
@@ -722,7 +723,7 @@ mvgam_diverging_scale <- function(
   checkmate::assert_numeric(breaks)
   checkmate::assert_string(na.value)
   warm <- mvgam_palette("red")[5L]
-  cool <- mvgam_palette("blue")[5L]
+  cool <- okabe_ito_palette()[2L]
   ggplot2::scale_fill_gradient2(
     name = name,
     low = cool, mid = "grey95", high = warm,

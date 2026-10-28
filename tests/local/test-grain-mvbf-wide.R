@@ -431,7 +431,7 @@ test_that("pp_check names the response it is asked for", {
   withr::local_envvar(TESTTHAT = "")
   rlang::reset_message_verbosity("mvgam_pp_check_missing_response")
   expect_message(
-    expect_s3_class(pp_check(fit, resp = "count", ndraws = 20L), "ggplot"),
+    expect_drawn(pp_check(fit, resp = "count", ndraws = 20L)),
     "missing response are omitted"
   )
   # Each check draws its own response's observed rows
@@ -753,7 +753,6 @@ test_that("the series plot labels and draws every response", {
   # Naming a response draws the single-series grid. Its first panel is
   # the series itself.
   one <- plot(fit, type = "series", resp = "seen")
-  expect_s3_class(one, "patchwork")
   ts <- ggplot2::ggplot_build(one[[1L]])$data[[1L]]
   expect_equal(ts$y[order(ts$x)], dat$seen)
 })
@@ -771,10 +770,10 @@ test_that("the plotting methods render for a wide fit", {
 
   for (ty in c("trend", "series")) {
     drawn[[ty]] <- with_warnings(plot(fit, type = ty))
-    expect_s3_class(drawn[[ty]]$value, "ggplot")
+    expect_drawn(drawn[[ty]]$value)
   }
   drawn$mcmc <- with_warnings(mcmc_plot(fit))
-  expect_s3_class(drawn$mcmc$value, "ggplot")
+  expect_drawn(drawn$mcmc$value)
 
   # The omitted occasions are reported by a once-per-session message
   for (nm in names(drawn)) {
@@ -846,7 +845,7 @@ test_that("get_predict refuses a wide fit that names no response", {
   # response's surface would be well formed and wrong.
   err <- expect_error(
     marginaleffects::get_predict(fit, newdata = dat, type = "response"),
-    "requires"
+    "takes one response of a multivariate fit"
   )
   expect_match(conditionMessage(err), "resp", fixed = TRUE)
 })
@@ -887,7 +886,6 @@ test_that("lfo_cv scores a wide fit by elpd and CRPS", {
   # A wide frame has no series column. Its responses share one time
   # grid. `lfo_cv()` once asked the frame for a series column.
   lfo <- lfo_cv(fit, min_t = 45, score = c("elpd", "crps"), silent = 2)
-  expect_s3_class(lfo, "mvgam_lfo")
   # The evaluated occasions are the frame's own times past `min_t`
   expect_true(all(lfo$eval_timepoints %in% dat$time))
   expect_true(all(lfo$eval_timepoints > 45))

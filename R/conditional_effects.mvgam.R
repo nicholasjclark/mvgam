@@ -141,9 +141,9 @@ conditional_effects.mvgam <- function(x,
   if (type %in% c("latent_state", "detection")) {
     require_closure_unit_predict_type(x$family, type)
   }
-  # `series` is polymorphic (NULL / "all" / character / integer) so a
-  # single checkmate::assert_* call cannot validate it; the resolver
-  # owns the per-branch validation and surfaces typed errors.
+  # `series` takes NULL, "all", a name or an index. One checkmate
+  # assertion cannot validate all four. `resolve_series_arg()`
+  # validates each form and raises a typed error.
   series_mode <- resolve_series_arg(series, x)
 
   # Observation rugs and overlaid points apply where the drawn

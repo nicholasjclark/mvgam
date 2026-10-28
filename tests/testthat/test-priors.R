@@ -826,6 +826,15 @@ test_that("LLT and PW growth priors scale with the number of time points", {
                           ")"))
   expect_identical(factor[["ar1_slope_trend"]], "beta(18, 2)")
 
+  # Two harmonics drift over 59 steps. Their starting pairs give the
+  # pattern a root mean square of one unit.
+  seasonal <- resolved(~ LLT(season = 12, harmonics = 2))
+  expect_identical(seasonal[["sigma_season_trend"]],
+                   paste0("student_t(3, 0, ", signif(1.3 / sqrt(2 * 59), 4),
+                          ")"))
+  expect_identical(seasonal[["init_season_trend"]],
+                   paste0("normal(0, ", signif(1 / sqrt(2), 4), ")"))
+
   # PW's base rate takes the LLT initial slope's scale, and its
   # changepoint scale is the user's own, per step
   pw <- resolved(~ PW(changepoint_scale = 0.4))

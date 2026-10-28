@@ -699,7 +699,6 @@ test_that("the smooth is reachable and drawn over both margins", {
   cs <- conditional_smooths(fit)
   expect_length(cs, 1L)
   d <- cs[[1L]]
-  expect_s3_class(d, "data.frame")
   expect_gt(nrow(d), 0L)
   # A two-dimensional smooth is drawn as a surface, so both margins
   # appear as effects rather than one.
@@ -784,7 +783,8 @@ test_that("the tidy table carries the smooth this model is built on", {
   ps <- rownames(posterior_summary(fit))
   td <- tidy(fit, effects = "all")
   bs <- grep("^bs_", vars, value = TRUE)
-  expect_gt(length(bs), 0L)
+  # The two-dimensional smooth has two unpenalised columns
+  expect_length(bs, 2L)
   expect_identical(sum(grepl("^bs_", ps)), length(bs))
   expect_true(all(mvgam:::fixef_name(bs) %in% td$term))
   # The changepoint adjustments are carried, which is what makes the

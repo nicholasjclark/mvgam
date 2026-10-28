@@ -23,7 +23,10 @@ factor_axis_column <- ".trend"
 #' @noRd
 expand_factor_axis <- function(n_lv, ...) {
   checkmate::assert_count(n_lv, positive = TRUE)
-  tidyr::expand_grid(..., !!factor_axis_column := factor(seq_len(n_lv)))
+  factor_col <- stats::setNames(
+    list(factor(seq_len(n_lv))), factor_axis_column
+  )
+  tidyr::expand_grid(..., !!!factor_col)
 }
 
 #' Vary a trend effect along the trend's axis

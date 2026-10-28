@@ -44,6 +44,50 @@ test_that("LLT refuses a short series and warns on a time term", {
   )
 })
 
+test_that("LLT takes seasonal periods it can identify", {
+  # The default is the most harmonics below half the period, up to 10
+  expect_identical(LLT(season = 12)$harmonics, 5L)
+  expect_identical(LLT(season = c(7, 365.25))$harmonics, c(3L, 10L))
+  expect_identical(LLT(season = 2.5)$harmonics, 1L)
+  expect_error(LLT(harmonics = 2), "'harmonics' requires 'season'")
+  expect_error(LLT(season = 2), "must exceed 2 time steps")
+  expect_error(LLT(season = 12, harmonics = 6), "Period 12 allows 5")
+  expect_error(LLT(season = c(7, 12), harmonics = 2),
+               "one value per 'season' period")
+  # Harmonic 2 of period 12 turns as fast as harmonic 1 of period 6
+  expect_error(LLT(season = c(6, 12), harmonics = c(2L, 2L)),
+               "share a harmonic")
+  dat <- expand.grid(time = 1:30, series = factor("a"), y = 1L)
+  expect_warning(
+    get_prior(mvgam_formula(y ~ 1, ~ LLT(season = 40)), data = dat,
+              family = poisson()),
+    "period of 40 exceeds the 30 time points"
+  )
+})
+
+test_that("a seasonal LLT turns each harmonic in vectorised Stan code", {
+  dat <- expand.grid(time = 1:30, series = factor(paste0("s", 1:3)))
+  dat$y <- rpois(nrow(dat), 4)
+  build <- function(trend) {
+    mvgam(y ~ 1, trend_formula = trend, data = dat, family = poisson(),
+          run_model = FALSE, silent = 2)
+  }
+  mod <- build(~ LLT(season = 12, harmonics = 2))
+  expect_identical(standata(mod)$freq_season_trend, 2 * pi * (1:2) / 12)
+  code <- stancode(mod)
+  expect_match(code, "re[ : , c] = cumulative_sum(re[ : , c]);",
+               fixed = TRUE)
+  expect_match(code, "lv_trend += season_trend;", fixed = TRUE)
+  # A factor model rotates the season and its starting pairs with the
+  # factors
+  fac <- stancode(build(~ LLT(n_lv = 2, season = 12, harmonics = 2)))
+  expect_match(fac, "season_trend_tilde = season_trend * Q';",
+               fixed = TRUE)
+  expect_match(fac, "init_season_trend_tilde = init_season_trend * Q';",
+               fixed = TRUE)
+  expect_no_match(stancode(build(~ LLT())), "season", fixed = TRUE)
+})
+
 test_that("ZMVN constructor works for zero-mean multivariate normal", {
   # Basic ZMVN creation
   # Suppress expected default warnings
