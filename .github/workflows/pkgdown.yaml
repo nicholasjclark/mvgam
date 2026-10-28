@@ -57,6 +57,8 @@ jobs:
               future
               bridgesampling
               V8
+              WDI
+              tsibble
 
       - name: Build Cmdstan and install development brms version
         run: |
