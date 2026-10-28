@@ -5,70 +5,50 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<meta name="description" content="mvgam">
 <title>N-mixture models with mvgam • mvgam</title>
-<!-- favicons --><link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
-<link rel="apple-touch-icon" type="image/png" sizes="180x180" href="../apple-touch-icon.png">
-<link rel="apple-touch-icon" type="image/png" sizes="120x120" href="../apple-touch-icon-120x120.png">
-<link rel="apple-touch-icon" type="image/png" sizes="76x76" href="../apple-touch-icon-76x76.png">
-<link rel="apple-touch-icon" type="image/png" sizes="60x60" href="../apple-touch-icon-60x60.png">
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="icon" sizes="any" href="../favicon.ico">
+<link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
-<!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js" integrity="sha512-7O5pXpc0oCRrxk8RUfDYFgn0nO1t+jLuIOQdOMRp4APB7uZ4vSjspzp5y6YDtDs4VzUSTbWzBFZ/LKJhnyFOKw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
 <meta property="og:title" content="N-mixture models with mvgam">
-<meta property="og:description" content="mvgam">
-<meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png">
 <meta name="robots" content="noindex">
-<!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
-<script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
-<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-<![endif]-->
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
-    
 
-    <nav class="navbar fixed-top navbar-dark navbar-expand-lg bg-primary" data-bs-theme="dark"><div class="container">
-    
+
+    <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
+
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
     <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">2.0.0</small>
 
-    
+
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="active nav-item">
-  <a class="nav-link" href="../articles/index.html">Articles</a>
-</li>
-<li class="nav-item">
-  <a class="nav-link" href="../reference/index.html">Reference</a>
-</li>
-<li class="nav-item">
-  <a class="nav-link" href="../news/index.html">Changelog</a>
-</li>
+<li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
-<form class="form-inline my-2 my-lg-0" role="search">
-        <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off">
-</form>
-
-      <ul class="navbar-nav">
-<li class="nav-item">
-  <a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="github">
-    <span class="fab fa fab fa-github fa-lg"></span>
-     
-  </a>
-</li>
+<ul class="navbar-nav">
+<li class="nav-item"><form class="form-inline" role="search">
+ <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
+</form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
 
-    
+
   </div>
 </nav><div class="container template-article">
 
@@ -83,7 +63,7 @@ Clark</h4>
             
             <h4 data-toc-skip class="date">2026-10-28</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/articles/nmix.Rmd" class="external-link"><code>vignettes/articles/nmix.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/vignettes/articles/nmix.Rmd" class="external-link"><code>vignettes/articles/nmix.Rmd</code></a></small>
       <div class="d-none name"><code>nmix.Rmd</code></div>
     </div>
 
@@ -107,25 +87,38 @@ counts.</p>
 <div class="section level2">
 <h2 id="the-model">The model<a class="anchor" aria-label="anchor" href="#the-model"></a>
 </h2>
-<p>Species <span class="math inline">\(s\)</span> is counted on visit
-<span class="math inline">\(r\)</span> in year <span class="math inline">\(t\)</span>. Each count is a binomial draw from the
-<span class="math inline">\(N_{s,t}\)</span> individuals present:</p>
-<p><span class="math display">\[\begin{align*}
+<p>Species
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>
+is counted on visit
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>r</mi><annotation encoding="application/x-tex">r</annotation></semantics></math>
+in year
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>.
+Each count is a binomial draw from the
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">N_{s,t}</annotation></semantics></math>
+individuals present:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>y</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi><mo>,</mo><mi>r</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">Binomial</mtext><mo stretchy="false" form="prefix">(</mo><msub><mi>N</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>,</mo><msub><mi>p</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi><mo>,</mo><mi>r</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>N</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">Poisson</mtext><mo stretchy="false" form="prefix">(</mo><msub><mi>λ</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><mrow><mi mathvariant="normal">log</mi><mo>⁡</mo></mrow><msub><mi>λ</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>=</mo><msub><mi>α</mi><mi>s</mi></msub><mo>+</mo><msub><mi>f</mi><mi>s</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mtext mathvariant="normal">temp</mtext><mi>t</mi></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><msub><mi>z</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>z</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mo stretchy="false" form="prefix">(</mo><msub><mi>ϕ</mi><mi>s</mi></msub><msub><mi>z</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><msub><mi>σ</mi><mi>s</mi></msub><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><mtext mathvariant="normal">logit</mtext><mo stretchy="false" form="prefix">(</mo><msub><mi>p</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi><mo>,</mo><mi>r</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>=</mo><msub><mi>γ</mi><mi>s</mi></msub><mo>+</mo><mi>δ</mi><mspace width="0.167em"></mspace><msub><mtext mathvariant="normal">wind</mtext><mrow><mi>s</mi><mo>,</mo><mi>t</mi><mo>,</mo><mi>r</mi></mrow></msub></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
 y_{s,t,r} &amp; \sim \text{Binomial}(N_{s,t}, p_{s,t,r}) \\
 N_{s,t} &amp; \sim \text{Poisson}(\lambda_{s,t}) \\
 \log \lambda_{s,t} &amp; = \alpha_s + f_s(\text{temp}_t) + z_{s,t} \\
 z_{s,t} &amp; \sim \text{Normal}(\phi_s z_{s,t-1}, \sigma_s) \\
 \text{logit}(p_{s,t,r}) &amp; = \gamma_s + \delta \, \text{wind}_{s,t,r}
-\end{align*}\]</span></p>
-<p>Each species has its own smooth response <span class="math inline">\(f_s\)</span> to temperature. Its AR(1) state <span class="math inline">\(z_s\)</span> absorbs the year-to-year change that
-temperature leaves unexplained. Each species also has its own detection
-intercept <span class="math inline">\(\gamma_s\)</span>. All species
-share one wind effect <span class="math inline">\(\delta\)</span> on
-detection.</p>
-<p>Because Hamiltonian Monte Carlo cannot sample the integer <span class="math inline">\(N_{s,t}\)</span>, mvgam sums the likelihood over
-every value of <span class="math inline">\(N\)</span> from the largest
-count up to a cap. Stan then samples only continuous parameters. The
-Stan User’s Guide chapter on <a href="https://mc-stan.org/docs/stan-users-guide/latent-discrete.html" class="external-link">latent
+\end{align*}</annotation></semantics></math></p>
+<p>Each species has its own smooth response
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>f</mi><mi>s</mi></msub><annotation encoding="application/x-tex">f_s</annotation></semantics></math>
+to temperature. Its AR(1) state
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>z</mi><mi>s</mi></msub><annotation encoding="application/x-tex">z_s</annotation></semantics></math>
+absorbs the year-to-year change that temperature leaves unexplained.
+Each species also has its own detection intercept
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>γ</mi><mi>s</mi></msub><annotation encoding="application/x-tex">\gamma_s</annotation></semantics></math>.
+All species share one wind effect
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>δ</mi><annotation encoding="application/x-tex">\delta</annotation></semantics></math>
+on detection.</p>
+<p>Because Hamiltonian Monte Carlo cannot sample the integer
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>N</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">N_{s,t}</annotation></semantics></math>,
+mvgam sums the likelihood over every value of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math>
+from the largest count up to a cap. Stan then samples only continuous
+parameters. The Stan User’s Guide chapter on <a href="https://mc-stan.org/docs/stan-users-guide/latent-discrete.html" class="external-link">latent
 discrete parameters</a> describes the technique.</p>
 </div>
 <div class="section level2">
@@ -193,13 +186,16 @@ speed.</p>
 <span><span class="co">#&gt; 6     1    2   sp_1 1.56 0.20 48 21  80</span></span></code></pre></div>
 <p>Each row is one visit. <code>series</code> names the species and
 <code>time</code> the year. The visits that share a
-<code>(series, time)</code> pair form one closure unit, over which <span class="math inline">\(N\)</span> is fixed. <code>cap</code> bounds the
-sum over <span class="math inline">\(N\)</span> in each unit. It must be
-at least the unit’s largest count. The model cannot estimate an
-abundance above it. The simulated abundances peak at 64, which leaves
-room below a cap of 80. Each unit of cap adds a term to the sum in every
-closure unit at every iteration. The <code>N</code> column holds the
-simulated abundance for comparison. The model never sees it.</p>
+<code>(series, time)</code> pair form one closure unit, over which
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math>
+is fixed. <code>cap</code> bounds the sum over
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math>
+in each unit. It must be at least the unit’s largest count. The model
+cannot estimate an abundance above it. The simulated abundances peak at
+64, which leaves room below a cap of 80. Each unit of cap adds a term to
+the sum in every closure unit at every iteration. The <code>N</code>
+column holds the simulated abundance for comparison. The model never
+sees it.</p>
 <p>The last three years are held out to score a forecast:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">train</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">dat</span>, <span class="va">time</span> <span class="op">&lt;=</span> <span class="fl">17</span><span class="op">)</span></span>
@@ -292,16 +288,17 @@ state:</p>
 <span><span class="co">#&gt;   - `conditional_effects(fit)`: covariate effects</span></span>
 <span><span class="co">#&gt; Use `how_to_cite(fit)` for a methods paragraph and `methods_md(fit)` for its equations.</span></span></code></pre></div>
 <p>The wind coefficient <code>p_wind</code> is -1.38 [-1.64, -1.15] on
-the logit scale, against the simulated value of <span class="math inline">\(-1.5\)</span>.</p>
+the logit scale, against the simulated value of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>−</mi><mn>1.5</mn></mrow><annotation encoding="application/x-tex">-1.5</annotation></semantics></math>.</p>
 </div>
 <div class="section level2">
 <h2 id="latent-abundance">Latent abundance<a class="anchor" aria-label="anchor" href="#latent-abundance"></a>
 </h2>
 <p><code>hindcast(type = "latent_state")</code> returns the posterior of
-<span class="math inline">\(N\)</span> in each closure unit, conditional
-on the counts observed there. Its <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> method returns a
-<code>ggplot</code>, to which we add the simulated abundances and the
-largest count of each year:</p>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math>
+in each closure unit, conditional on the counts observed there. Its
+<code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> method returns a <code>ggplot</code>, to which we
+add the simulated abundances and the largest count of each year:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hindcast.html">hindcast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"latent_state"</span><span class="op">)</span></span>
 <span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">train</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"series"</span>, <span class="st">"time"</span>, <span class="st">"N"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
@@ -311,17 +308,18 @@ largest count of each year:</p>
 <span>             fill <span class="op">=</span> <span class="st">"white"</span>, colour <span class="op">=</span> <span class="st">"grey30"</span>, size <span class="op">=</span> <span class="fl">1.6</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">truth</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">N</span><span class="op">)</span>, size <span class="op">=</span> <span class="fl">1.6</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="nmix_files/figure-html/latent-plot-1.png" alt="Posterior medians with 50% and 95% credible intervals of each species' abundance. Black points are the simulated abundances. Open circles are the largest count in each year." width="85%"><p class="caption">
+<img src="nmix_files/figure-html/latent-plot-1.png" class="r-plt" alt="Posterior medians with 50% and 95% credible intervals of each species' abundance. Black points are the simulated abundances. Open circles are the largest count in each year." width="85%"><p class="caption">
 Posterior medians with 50% and 95% credible intervals of each species’
 abundance. Black points are the simulated abundances. Open circles are
 the largest count in each year.
 </p>
 </div>
 <p>Because detection is imperfect, every count falls below the abundance
-it came from. The posterior median of <span class="math inline">\(N\)</span> exceeds the largest count in 65 of the
-68 species-years. Its 95% intervals contain the simulated abundance in
-68 of them. A model of the counts alone would report every population as
-smaller than it is.</p>
+it came from. The posterior median of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math>
+exceeds the largest count in 65 of the 68 species-years. Its 95%
+intervals contain the simulated abundance in 68 of them. A model of the
+counts alone would report every population as smaller than it is.</p>
 </div>
 <div class="section level2">
 <h2 id="covariate-effects">Covariate effects<a class="anchor" aria-label="anchor" href="#covariate-effects"></a>
@@ -337,7 +335,7 @@ species its own panel:</p>
 <span>  ask <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="nmix_files/figure-html/temp-effects-1.png" alt="Expected abundance of each species against temperature, with 95% credible intervals." width="85%"><p class="caption">
+<img src="nmix_files/figure-html/temp-effects-1.png" class="r-plt" alt="Expected abundance of each species against temperature, with 95% credible intervals." width="85%"><p class="caption">
 Expected abundance of each species against temperature, with 95%
 credible intervals.
 </p>
@@ -350,7 +348,7 @@ against wind speed:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, effects <span class="op">=</span> <span class="st">"wind"</span>, type <span class="op">=</span> <span class="st">"detection"</span><span class="op">)</span>,</span>
 <span>     ask <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="nmix_files/figure-html/wind-effect-1.png" alt="Detection probability against wind speed, with its 95% credible interval." width="70%"><p class="caption">
+<img src="nmix_files/figure-html/wind-effect-1.png" class="r-plt" alt="Detection probability against wind speed, with its 95% credible interval." width="70%"><p class="caption">
 Detection probability against wind speed, with its 95% credible
 interval.
 </p>
@@ -367,14 +365,14 @@ each held-out visit:</p>
 <code class="sourceCode R"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="nmix_files/figure-html/forecast-1.png" alt="Counts predicted on each visit over the training years and the three held-out years. Points are the observed counts." width="85%"><p class="caption">
+<img src="nmix_files/figure-html/forecast-1.png" class="r-plt" alt="Counts predicted on each visit over the training years and the three held-out years. Points are the observed counts." width="85%"><p class="caption">
 Counts predicted on each visit over the training years and the three
 held-out years. Points are the observed counts.
 </p>
 </div>
 <p><code><a href="../reference/score.html">score()</a></code> evaluates the forecast against the held-out
-counts. The <a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">forecast
-evaluation article</a> compares models on such scores.</p>
+counts. The <a href="forecast_evaluation.html">forecast evaluation
+article</a> compares models on such scores.</p>
 </div>
 <div class="section level2">
 <h2 id="checking-the-fit">Checking the fit<a class="anchor" aria-label="anchor" href="#checking-the-fit"></a>
@@ -396,8 +394,9 @@ calculation on counts replicated from the posterior:</p>
 <p>A Bayesian p-value near 0 would mean the replicates rarely reach the
 discrepancy of the observed counts. The value here, 0.45, gives no sign
 of lack of fit. <code><a href="../reference/latent_N_saturation.html">latent_N_saturation()</a></code> reports the posterior
-probability that <span class="math inline">\(N\)</span> reaches the cap
-in each unit:</p>
+probability that
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math>
+reaches the cap in each unit:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/latent_N_saturation.html">latent_N_saturation</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">sat</span><span class="op">$</span><span class="va">p_saturated</span><span class="op">)</span></span>
@@ -430,26 +429,30 @@ each of them.</p>
 <tr class="odd">
 <td>Poisson-binomial (Royle 2004)</td>
 <td><code><a href="../reference/nmix.html">nmix()</a></code></td>
-<td>Counts that cannot exceed <span class="math inline">\(N\)</span>
+<td>Counts that cannot exceed
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math>
 </td>
-<td>Probability <span class="math inline">\(p\)</span> per individual
-and visit, logit link</td>
+<td>Probability
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math>
+per individual and visit, logit link</td>
 </tr>
 <tr class="even">
 <td>Royle-Nichols (Royle and Nichols 2003)</td>
 <td><code>nmix("royle_nichols")</code></td>
 <td>Detection or non-detection</td>
-<td>Probability <span class="math inline">\(r\)</span> per individual. A
-visit detects the species with probability <span class="math inline">\(1
-- (1 - r)^N\)</span>
+<td>Probability
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>r</mi><annotation encoding="application/x-tex">r</annotation></semantics></math>
+per individual. A visit detects the species with probability
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mo>−</mo><mo stretchy="false" form="prefix">(</mo><mn>1</mn><mo>−</mo><mi>r</mi><msup><mo stretchy="false" form="postfix">)</mo><mi>N</mi></msup></mrow><annotation encoding="application/x-tex">1 - (1 - r)^N</annotation></semantics></math>
 </td>
 </tr>
 <tr class="odd">
 <td>Poisson-Poisson</td>
 <td><code>nmix("poisson_poisson")</code></td>
 <td>Counts that can record one individual more than once</td>
-<td>Encounter rate <span class="math inline">\(p\)</span> per individual
-and visit, log link</td>
+<td>Encounter rate
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math>
+per individual and visit, log link</td>
 </tr>
 </tbody>
 </table>
@@ -482,17 +485,14 @@ writes out its equations.</p>
 <p>Related articles:</p>
 <ul>
 <li>
-<a href="https://nicholasjclark.github.io/mvgam/articles/jsdgam.html">Joint
-species distribution models</a> share latent factors among many
-species.</li>
+<a href="jsdgam.html">Joint species distribution models</a> share
+latent factors among many species.</li>
 <li>
-<a href="https://nicholasjclark.github.io/mvgam/articles/idm.html">Integrated
-distribution models</a> combine several survey protocols that observe
-one population.</li>
+<a href="idm.html">Integrated distribution models</a> combine
+several survey protocols that observe one population.</li>
 <li>
-<a href="https://nicholasjclark.github.io/mvgam/articles/data.html">Formatting
-data for mvgam</a> covers the checks <code><a href="../reference/mvgam_data.html">mvgam_data()</a></code> runs on
-closure-unit data.</li>
+<a href="data.html">Formatting data for mvgam</a> covers the checks
+<code><a href="../reference/mvgam_data.html">mvgam_data()</a></code> runs on closure-unit data.</li>
 </ul>
 </div>
 <div class="section level2">
@@ -507,7 +507,7 @@ spatially replicated counts. <em>Biometrics</em> 60(1), 108-115. <a href="https:
 presence-absence data or point counts. <em>Ecology</em> 84(3), 777-790.
 <a href="https://doi.org/10.1890/0012-9658(2003)084%5B0777:EAFRPA%5D2.0.CO;2" class="external-link">doi:10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2</a></p>
 </div>
-  </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>
 
@@ -518,15 +518,15 @@ presence-absence data or point counts. <em>Ecology</em> 84(3), 777-790.
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.9.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>
 </div>
 
-  
 
-  
+
+
 
   </body>
 </html>

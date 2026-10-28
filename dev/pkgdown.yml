@@ -1,19 +1,18 @@
 pandoc: 3.8.3
-pkgdown: 2.0.9
+pkgdown: 2.2.0
 pkgdown_sha: ~
 articles:
   data: data.html
   dfm: dfm.html
-  forecast_evaluation: forecast_evaluation.html
-  hierarchical_var: hierarchical_var.html
-  idm: idm.html
-  jsdgam: jsdgam.html
-  mvbf: mvbf.html
+  articles/forecast_evaluation: forecast_evaluation.html
+  articles/hierarchical_var: hierarchical_var.html
+  articles/idm: idm.html
+  articles/jsdgam: jsdgam.html
+  articles/mvbf: mvbf.html
   mvgam_overview: mvgam_overview.html
-  nmix: nmix.html
-  var: var.html
-last_built: 2026-10-28T05:10Z
+  articles/nmix: nmix.html
+  articles/var: var.html
+last_built: 2026-10-28T10:11Z
 urls:
   reference: https://nicholasjclark.github.io/mvgam/reference
   article: https://nicholasjclark.github.io/mvgam/articles
-

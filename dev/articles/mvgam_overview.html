@@ -5,70 +5,50 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<meta name="description" content="mvgam">
 <title>Overview of the mvgam package • mvgam</title>
-<!-- favicons --><link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
-<link rel="apple-touch-icon" type="image/png" sizes="180x180" href="../apple-touch-icon.png">
-<link rel="apple-touch-icon" type="image/png" sizes="120x120" href="../apple-touch-icon-120x120.png">
-<link rel="apple-touch-icon" type="image/png" sizes="76x76" href="../apple-touch-icon-76x76.png">
-<link rel="apple-touch-icon" type="image/png" sizes="60x60" href="../apple-touch-icon-60x60.png">
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="icon" sizes="any" href="../favicon.ico">
+<link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
-<!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js" integrity="sha512-7O5pXpc0oCRrxk8RUfDYFgn0nO1t+jLuIOQdOMRp4APB7uZ4vSjspzp5y6YDtDs4VzUSTbWzBFZ/LKJhnyFOKw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
 <meta property="og:title" content="Overview of the mvgam package">
-<meta property="og:description" content="mvgam">
-<meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png">
 <meta name="robots" content="noindex">
-<!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
-<script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
-<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-<![endif]-->
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
-    
 
-    <nav class="navbar fixed-top navbar-dark navbar-expand-lg bg-primary" data-bs-theme="dark"><div class="container">
-    
+
+    <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
+
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
     <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">2.0.0</small>
 
-    
+
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="active nav-item">
-  <a class="nav-link" href="../articles/index.html">Articles</a>
-</li>
-<li class="nav-item">
-  <a class="nav-link" href="../reference/index.html">Reference</a>
-</li>
-<li class="nav-item">
-  <a class="nav-link" href="../news/index.html">Changelog</a>
-</li>
+<li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
-<form class="form-inline my-2 my-lg-0" role="search">
-        <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off">
-</form>
-
-      <ul class="navbar-nav">
-<li class="nav-item">
-  <a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="github">
-    <span class="fab fa fab fa-github fa-lg"></span>
-     
-  </a>
-</li>
+<ul class="navbar-nav">
+<li class="nav-item"><form class="form-inline" role="search">
+ <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
+</form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
 
-    
+
   </div>
 </nav><div class="container template-article">
 
@@ -83,7 +63,7 @@ Clark</h4>
             
             <h4 data-toc-skip class="date">2026-10-28</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/mvgam_overview.Rmd" class="external-link"><code>vignettes/mvgam_overview.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/vignettes/mvgam_overview.Rmd" class="external-link"><code>vignettes/mvgam_overview.Rmd</code></a></small>
       <div class="d-none name"><code>mvgam_overview.Rmd</code></div>
     </div>
 
@@ -99,22 +79,35 @@ structure forward. Stan fits the model. The fitted object works with the
 post-processing tools of four packages: <code>brms</code>,
 <code>marginaleffects</code>, <code>loo</code>,
 <code>bayesplot</code>.</p>
-<p>For an observation <span class="math inline">\(y_{i,t}\)</span> on
-series <span class="math inline">\(i\)</span> at time <span class="math inline">\(t\)</span>, with link function <span class="math inline">\(g\)</span> and a response distribution <span class="math inline">\(\mathcal{F}\)</span>:</p>
-<p><span class="math display">\[\begin{align*}
+<p>For an observation
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>y</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">y_{i,t}</annotation></semantics></math>
+on series
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>
+at time
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>,
+with link function
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>g</mi><annotation encoding="application/x-tex">g</annotation></semantics></math>
+and a response distribution
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>ℱ</mi><annotation encoding="application/x-tex">\mathcal{F}</annotation></semantics></math>:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>y</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mi>ℱ</mi><mo stretchy="false" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>,</mo><mi>θ</mi><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><mi>g</mi><mo stretchy="false" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>=</mo><msub><mi>α</mi><mi>i</mi></msub><mo>+</mo><munder><mo>∑</mo><mi>j</mi></munder><msub><mi>f</mi><mi>j</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>j</mi><mo>,</mo><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><msub><mi>Z</mi><mrow><mi>i</mi><mo>,</mo><mi>⋅</mi></mrow></msub><mspace width="0.167em"></mspace><msub><mi>η</mi><mrow><mi>⋅</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>η</mi><mrow><mi>⋅</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">trend process</mtext><mo stretchy="false" form="prefix">(</mo><msub><mi>η</mi><mrow><mi>⋅</mi><mo>,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><mi>…</mi><mo stretchy="false" form="postfix">)</mo></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
 y_{i,t} &amp; \sim \mathcal{F}(\mu_{i,t}, \theta) \\
 g(\mu_{i,t}) &amp; = \alpha_i + \textstyle\sum_j f_j(x_{j,i,t})
   + Z_{i,\cdot} \, \eta_{\cdot,t} \\
 \eta_{\cdot,t} &amp; \sim \text{trend process}(\eta_{\cdot,t-1}, \dots)
-\end{align*}\]</span></p>
-<p>The <span class="math inline">\(f_j\)</span> are any terms a
-<code>brms</code> formula accepts: linear effects, smooths (Wood 2017),
-Gaussian processes, monotonic effects and random effects. The latent
-state <span class="math inline">\(\eta\)</span> follows one of the trend
-processes below. The loadings <span class="math inline">\(Z\)</span> map
-it onto the series. Each series has its own state when <span class="math inline">\(Z\)</span> is the identity. A few shared factors
-drive many series when <span class="math inline">\(Z\)</span> has fewer
-columns than there are series.</p>
+\end{align*}</annotation></semantics></math></p>
+<p>The
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>f</mi><mi>j</mi></msub><annotation encoding="application/x-tex">f_j</annotation></semantics></math>
+are any terms a <code>brms</code> formula accepts: linear effects,
+smooths (Wood 2017), Gaussian processes, monotonic effects and random
+effects. The latent state
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>η</mi><annotation encoding="application/x-tex">\eta</annotation></semantics></math>
+follows one of the trend processes below. The loadings
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
+map it onto the series. Each series has its own state when
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
+is the identity. A few shared factors drive many series when
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
+has fewer columns than there are series.</p>
 <div class="section level2">
 <h2 id="what-mvgam-can-model">What mvgam can model<a class="anchor" aria-label="anchor" href="#what-mvgam-can-model"></a>
 </h2>
@@ -166,6 +159,8 @@ detection</td>
 </tr>
 </tbody>
 </table>
+<p><code><a href="../reference/mvgam_families.html">?mvgam_families</a></code> lists every family by the response type
+it suits.</p>
 <p><code>trend_formula</code> names the latent state with one
 constructor. It can also hold covariates and smooths that act on the
 state:</p>
@@ -229,11 +224,11 @@ correlates the innovations across series. <code>gr</code> with
 <code>n_lv</code> sets a number of shared latent factors below the
 number of series. <code>df</code> gives the innovations Student-t tails.
 <code>ma = TRUE</code> adds a moving-average term to <code><a href="../reference/trend_constructors.html">RW()</a></code>,
-<code><a href="../reference/trend_constructors.html">AR()</a></code> or <code><a href="../reference/trend_constructors.html">VAR()</a></code>. The help page of each
-constructor lists the options it takes. <code><a href="../reference/hindcast.html">hindcast()</a></code> and
-<code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> return the parts of a state through
-<code>component</code>, such as the level, slope and season of
-<code><a href="../reference/LLT.html">LLT()</a></code>.</p>
+<code><a href="../reference/trend_constructors.html">AR()</a></code> or <code><a href="../reference/trend_constructors.html">VAR()</a></code>.
+<code><a href="../reference/trend_constructors.html">?trend_constructors</a></code> lists the options each constructor
+takes. <code><a href="../reference/hindcast.html">hindcast()</a></code> and <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> return the
+parts of a state through <code>component</code>, such as the level,
+slope and season of <code><a href="../reference/LLT.html">LLT()</a></code>.</p>
 <p><code><a href="../reference/mvgam.html">mvgam()</a></code> fits data in long format, one row per series and
 time. <code><a href="../reference/jsdgam.html">jsdgam()</a></code> fits joint species distribution models to
 one row per site and species, with phylogenetic and trait-informed
@@ -269,7 +264,7 @@ months in black:</p>
 <span><span class="va">pp_test</span>  <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/droplevels.html" class="external-link">droplevels</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">test</span>, <span class="va">series</span> <span class="op">==</span> <span class="st">"PP"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/mvgam_data.html">mvgam_data</a></span><span class="op">(</span><span class="va">pp_train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>, y <span class="op">=</span> <span class="st">"captures"</span>,</span>
 <span>           newdata <span class="op">=</span> <span class="va">pp_test</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/pp-data-1.png" alt="" width="85%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/pp-data-1.png" class="r-plt" alt="" width="85%" style="display: block; margin: auto;"></p>
 <p>The first model relates captures to smooth functions of the two
 covariates, with no latent state:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
@@ -285,7 +280,7 @@ covariates explain. The randomised quantile residuals of this model
 remain strongly autocorrelated at lag 1:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_gam</span>, type <span class="op">=</span> <span class="st">"residuals"</span>, series <span class="op">=</span> <span class="st">"PP"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/gam-resid-1.png" alt="" width="80%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/gam-resid-1.png" class="r-plt" alt="" width="80%" style="display: block; margin: auto;"></p>
 <p>The second model moves both smooths into <code>trend_formula</code>,
 where they act on a latent state that follows an AR(1) process. The
 observation formula keeps the intercept:</p>
@@ -343,20 +338,20 @@ observation formula keeps the intercept:</p>
 The residuals of this fit show no autocorrelation left:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit_ar</span>, type <span class="op">=</span> <span class="st">"residuals"</span>, series <span class="op">=</span> <span class="st">"PP"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/ar-resid-1.png" alt="" width="80%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/ar-resid-1.png" class="r-plt" alt="" width="80%" style="display: block; margin: auto;"></p>
 <p><code><a href="../reference/pp_check.mvgam.html">pp_check()</a></code> compares the observed counts with counts
 drawn from the fitted model. The rootogram shows the model reproducing
 the distribution of captures, zeros included:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">fit_ar</span>, type <span class="op">=</span> <span class="st">"rootogram"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/ar-ppc-1.png" alt="" width="70%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/ar-ppc-1.png" class="r-plt" alt="" width="70%" style="display: block; margin: auto;"></p>
 <p><code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects()</a></code> plots each covariate’s effect on
 the expected count. The <code>marginaleffects</code> functions, such as
 <code><a href="https://rdrr.io/pkg/marginaleffects/man/predictions.html" class="external-link">predictions()</a></code>, <code><a href="https://rdrr.io/pkg/marginaleffects/man/comparisons.html" class="external-link">comparisons()</a></code> or
 <code><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">slopes()</a></code>, work on the fit directly:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">fit_ar</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span>, ask <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/ar-effects-1.png" alt="" width="70%" style="display: block; margin: auto;"><img src="mvgam_overview_files/figure-html/ar-effects-2.png" alt="" width="70%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/ar-effects-1.png" class="r-plt" alt="" width="70%" style="display: block; margin: auto;"><img src="mvgam_overview_files/figure-html/ar-effects-2.png" class="r-plt" alt="" width="70%" style="display: block; margin: auto;"></p>
 <p><code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> continues the latent state from its last
 estimated values into the held-out months. Without a latent state, the
 first model forecasts from the covariates alone. Its intervals miss most
@@ -365,18 +360,19 @@ of the high counts:</p>
 <code class="sourceCode R"><span><span class="va">fc_gam</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">fit_gam</span><span class="op">)</span></span>
 <span><span class="va">fc_ar</span>  <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">fit_ar</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_gam</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/forecasts-1.png" alt="" width="80%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/forecasts-1.png" class="r-plt" alt="" width="80%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_ar</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/forecasts-2.png" alt="" width="80%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/forecasts-2.png" class="r-plt" alt="" width="80%" style="display: block; margin: auto;"></p>
 <p><code><a href="../reference/compare_scores.html">compare_scores()</a></code> scores both forecasts with the
 continuous ranked probability score (CRPS), where lower is better.
 <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> sets the scores out by forecast horizon:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">scores</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compare_scores.html">compare_scores</a></span><span class="op">(</span><span class="va">fc_gam</span>, <span class="va">fc_ar</span>, score <span class="op">=</span> <span class="st">"crps"</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">scores</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compare_scores.html">compare_scores</a></span><span class="op">(</span><span class="va">fc_gam</span>, <span class="va">fc_ar</span>, score <span class="op">=</span> <span class="st">"crps"</span>,</span>
+<span>                         model_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"GAM"</span>, <span class="st">"AR"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">scores</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 12 × 4</span></span></span>
-<span><span class="co">#&gt;    series eval_horizon fc_gam  fc_ar</span></span>
+<span><span class="co">#&gt;    series eval_horizon    GAM     AR</span></span>
 <span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> PP                1  8.38   4.82 </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> PP                2 14.4    9.67 </span></span>
@@ -390,8 +386,8 @@ continuous ranked probability score (CRPS), where lower is better.
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> PP               10  4.43   3.42 </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">11</span> PP               11  9.80   7.22 </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">12</span> PP               12  9.15   6.64</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">scores</span>, relative <span class="op">=</span> <span class="st">"fc_gam"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/scores-1.png" alt="" width="70%" style="display: block; margin: auto;"></p>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">scores</span>, relative <span class="op">=</span> <span class="st">"GAM"</span><span class="op">)</span></span></code></pre></div>
+<p><img src="mvgam_overview_files/figure-html/scores-1.png" class="r-plt" alt="" width="70%" style="display: block; margin: auto;"></p>
 <p>The latent state improves the forecasts. The AR model has the lower
 CRPS in 8 of the 11 scored months. Its CRPS sums to 45.2 against 61.2
 for the smooth-only model. Its 90% intervals contain 11 of the 11
@@ -433,13 +429,13 @@ captures of the two kangaroo rats, DM and DO, fall slightly:</p>
 <span>                      type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span>,</span>
 <span>  ask <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/cor-effects-1.png" alt="" width="85%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/cor-effects-1.png" class="r-plt" alt="" width="85%" style="display: block; margin: auto;"></p>
 <p>The forecasts come from one joint posterior. Each species keeps its
 own scale and persistence:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fc_cor</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">fit_cor</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_cor</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/cor-forecast-1.png" alt="" width="90%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/cor-forecast-1.png" class="r-plt" alt="" width="90%" style="display: block; margin: auto;"></p>
 <p>The forecasts track the held-out counts of all four species. Their
 90% intervals contain 43 of the 44 held-out counts.</p>
 <p><code><a href="../reference/residual_cor.html">residual_cor()</a></code> returns the correlations among the
@@ -448,7 +444,7 @@ fall together once temperature and vegetation are accounted for:</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/residual_cor.html">residual_cor</a></span><span class="op">(</span><span class="va">fit_cor</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">rc</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/cor-resid-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/cor-resid-1.png" class="r-plt" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>The two pocket mouse species, PB and PP, share the strongest
 correlation, 0.55 (95% interval 0.13 to 0.84). <code>n_lv</code> would
 instead estimate a few shared latent factors for many species.
@@ -466,94 +462,106 @@ paragraph and the references for the model’s components:</p>
 <div class="section level4">
 <h4 id="data">Data<a class="anchor" aria-label="anchor" href="#data"></a>
 </h4>
-<p><span class="math inline">\(\mathrm{captures}\)</span>: non-negative
-integer counts</p>
-<p><span class="math inline">\(N = 68\)</span> observations, <span class="math inline">\(S = 1\)</span> series, <span class="math inline">\(T = 68\)</span> time points</p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">c</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">p</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">s</mi></mrow><annotation encoding="application/x-tex">\mathrm{captures}</annotation></semantics></math>:
+non-negative integer counts</p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>=</mo><mn>68</mn></mrow><annotation encoding="application/x-tex">N = 68</annotation></semantics></math>
+observations,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">S = 1</annotation></semantics></math>
+series,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mo>=</mo><mn>68</mn></mrow><annotation encoding="application/x-tex">T = 68</annotation></semantics></math>
+time points</p>
 <p>Predictors:</p>
 <ul>
 <li>
-<span class="math inline">\(\mathrm{ndvi\_ma12}\)</span>: continuous
-covariate</li>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><annotation encoding="application/x-tex">\mathrm{ndvi\_ma12}</annotation></semantics></math>:
+continuous covariate</li>
 <li>
-<span class="math inline">\(\mathrm{mintemp}\)</span>: continuous
-covariate</li>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><annotation encoding="application/x-tex">\mathrm{mintemp}</annotation></semantics></math>:
+continuous covariate</li>
 </ul>
 </div>
 <div class="section level4">
 <h4 id="model">Model<a class="anchor" aria-label="anchor" href="#model"></a>
 </h4>
-<p><span class="math display">\[
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><mi>t</mi></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∈</mo><mo stretchy="false" form="prefix">{</mo><mn>1</mn><mo>,</mo><mi>…</mi><mo>,</mo><mn>68</mn><mo stretchy="false" form="postfix">}</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mrow><mi mathvariant="normal">c</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">p</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">s</mi></mrow><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">Poisson</mtext><mo stretchy="false" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><mrow><mi mathvariant="normal">log</mi><mo>⁡</mo></mrow><msub><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>=</mo><mi>α</mi><mo>+</mo><msubsup><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><mo>+</mo><msub><mi>η</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msubsup><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>=</mo><msubsup><mi>f</mi><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><mo stretchy="false" form="prefix">(</mo><msub><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><msubsup><mi>f</mi><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><mo stretchy="false" form="prefix">(</mo><msub><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msubsup><mi>f</mi><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><mo stretchy="false" form="prefix">(</mo><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mo stretchy="false" form="postfix">)</mo></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>=</mo><munderover><mo>∑</mo><mrow><mi>m</mi><mo>=</mo><mn>1</mn></mrow><msub><mi>K</mi><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow></msub></munderover><msubsup><mi>β</mi><mi>m</mi><mrow><mo stretchy="false" form="prefix">(</mo><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mo>,</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><msub><mi>B</mi><mi>m</mi></msub><mo stretchy="false" form="prefix">(</mo><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msubsup><mi>f</mi><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><mo stretchy="false" form="prefix">(</mo><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><mo stretchy="false" form="postfix">)</mo></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>=</mo><munderover><mo>∑</mo><mrow><mi>m</mi><mo>=</mo><mn>1</mn></mrow><msub><mi>K</mi><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow></msub></munderover><msubsup><mi>β</mi><mi>m</mi><mrow><mo stretchy="false" form="prefix">(</mo><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><mo>,</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><msub><mi>B</mi><mi>m</mi></msub><mo stretchy="false" form="prefix">(</mo><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>η</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>=</mo><msub><mi>ϕ</mi><mn>1</mn></msub><msub><mi>η</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msubsup><mi>ϵ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msubsup><mi>ϵ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mo stretchy="false" form="prefix">(</mo><mn>0</mn><mo>,</mo><msub><mi>σ</mi><mi>η</mi></msub><mo stretchy="false" form="postfix">)</mo></mtd></mtr></mtable><annotation encoding="application/x-tex">
 \begin{aligned}
 t &amp;\in \{1, \ldots, 68\} \\
 \mathrm{captures}_{i,t} &amp;\sim \text{Poisson}(\mu_{i,t}) \\
 \log \mu_{i,t} &amp;= \alpha + \mu^{(\eta)}_{i,t} + \eta_{i,t} \\
-\mu^{(\eta)}_{i,t} &amp;=
-f^{(\eta)}_{\mathrm{mintemp}}(\mathrm{mintemp}_{i,t}) +
-f^{(\eta)}_{\mathrm{ndvi\_ma12}}(\mathrm{ndvi\_ma12}_{i,t}) \\
-f^{(\eta)}_{\mathrm{mintemp}}(\mathrm{mintemp}) &amp;=
-\sum_{m=1}^{K_{\mathrm{mintemp}}} \beta^{(\mathrm{mintemp}, \eta)}_m
-B_m(\mathrm{mintemp}) \\
-f^{(\eta)}_{\mathrm{ndvi\_ma12}}(\mathrm{ndvi\_ma12}) &amp;=
-\sum_{m=1}^{K_{\mathrm{ndvi\_ma12}}} \beta^{(\mathrm{ndvi\_ma12},
-\eta)}_m B_m(\mathrm{ndvi\_ma12}) \\
+\mu^{(\eta)}_{i,t} &amp;= f^{(\eta)}_{\mathrm{mintemp}}(\mathrm{mintemp}_{i,t}) + f^{(\eta)}_{\mathrm{ndvi\_ma12}}(\mathrm{ndvi\_ma12}_{i,t}) \\
+f^{(\eta)}_{\mathrm{mintemp}}(\mathrm{mintemp}) &amp;= \sum_{m=1}^{K_{\mathrm{mintemp}}} \beta^{(\mathrm{mintemp}, \eta)}_m B_m(\mathrm{mintemp}) \\
+f^{(\eta)}_{\mathrm{ndvi\_ma12}}(\mathrm{ndvi\_ma12}) &amp;= \sum_{m=1}^{K_{\mathrm{ndvi\_ma12}}} \beta^{(\mathrm{ndvi\_ma12}, \eta)}_m B_m(\mathrm{ndvi\_ma12}) \\
 \eta_{i,t} &amp;= \phi_{1} \eta_{i,t-1} + \epsilon^{(\eta)}_{i,t} \\
 \epsilon^{(\eta)}_{i,t} &amp;\sim \text{Normal}(0, \sigma_\eta)
 \end{aligned}
-\]</span></p>
+</annotation></semantics></math></p>
 <p>where:</p>
 <ul>
 <li>
-<span class="math inline">\(i\)</span> indexes series, <span class="math inline">\(t\)</span> indexes time</li>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>
+indexes series,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>
+indexes time</li>
 <li>
-<span class="math inline">\(\mu_{i,t}\)</span>: conditional mean of
-<span class="math inline">\(\mathrm{captures}_{i,t}\)</span>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">\mu_{i,t}</annotation></semantics></math>:
+conditional mean of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mrow><mi mathvariant="normal">c</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">p</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">s</mi></mrow><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">\mathrm{captures}_{i,t}</annotation></semantics></math>
 </li>
 <li>
-<span class="math inline">\(\alpha\)</span>: population
-intercept</li>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math>:
+population intercept</li>
 <li>
-<span class="math inline">\(\eta_{i,t}\)</span>: latent state at
-series <span class="math inline">\(i\)</span> time <span class="math inline">\(t\)</span>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>η</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">\eta_{i,t}</annotation></semantics></math>:
+latent state at series
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>
+time
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>
 </li>
 <li>
-<span class="math inline">\(\mu^{(\eta)}_{i,t}\)</span>: trend
-predictor from ‘trend_formula’</li>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><annotation encoding="application/x-tex">\mu^{(\eta)}_{i,t}</annotation></semantics></math>:
+trend predictor from ‘trend_formula’</li>
 <li>
-<span class="math inline">\(f^{(\eta)}_{\mathrm{mintemp}}\)</span>:
-thin plate regression spline in <span class="math inline">\(\mathrm{mintemp}\)</span>, basis size <span class="math inline">\(K_{\mathrm{mintemp}} = 6\)</span>, smoothing SD
-<span class="math inline">\(\sigma^{(s,
-\eta)}_{\mathrm{mintemp}}\)</span>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>f</mi><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><annotation encoding="application/x-tex">f^{(\eta)}_{\mathrm{mintemp}}</annotation></semantics></math>:
+thin plate regression spline in
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><annotation encoding="application/x-tex">\mathrm{mintemp}</annotation></semantics></math>,
+basis size
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>K</mi><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow></msub><mo>=</mo><mn>6</mn></mrow><annotation encoding="application/x-tex">K_{\mathrm{mintemp}} = 6</annotation></semantics></math>,
+smoothing SD
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>σ</mi><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>s</mi><mo>,</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><annotation encoding="application/x-tex">\sigma^{(s, \eta)}_{\mathrm{mintemp}}</annotation></semantics></math>
 </li>
 <li>
-<span class="math inline">\(f^{(\eta)}_{\mathrm{ndvi\_ma12}}\)</span>: thin
-plate regression spline in <span class="math inline">\(\mathrm{ndvi\_ma12}\)</span>, basis size <span class="math inline">\(K_{\mathrm{ndvi\_ma12}} = 6\)</span>, smoothing SD
-<span class="math inline">\(\sigma^{(s,
-\eta)}_{\mathrm{ndvi\_ma12}}\)</span>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>f</mi><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><annotation encoding="application/x-tex">f^{(\eta)}_{\mathrm{ndvi\_ma12}}</annotation></semantics></math>:
+thin plate regression spline in
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><annotation encoding="application/x-tex">\mathrm{ndvi\_ma12}</annotation></semantics></math>,
+basis size
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>K</mi><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow></msub><mo>=</mo><mn>6</mn></mrow><annotation encoding="application/x-tex">K_{\mathrm{ndvi\_ma12}} = 6</annotation></semantics></math>,
+smoothing SD
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>σ</mi><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>s</mi><mo>,</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><annotation encoding="application/x-tex">\sigma^{(s, \eta)}_{\mathrm{ndvi\_ma12}}</annotation></semantics></math>
 </li>
 <li>
-<span class="math inline">\(\epsilon^{(\eta)}_{i,t}\)</span>:
-process innovation, SD <span class="math inline">\(\sigma_\eta\)</span>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msubsup><mi>ϵ</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup><annotation encoding="application/x-tex">\epsilon^{(\eta)}_{i,t}</annotation></semantics></math>:
+process innovation, SD
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>σ</mi><mi>η</mi></msub><annotation encoding="application/x-tex">\sigma_\eta</annotation></semantics></math>
 </li>
 <li>
-<span class="math inline">\(\phi_{l}\)</span>: autoregressive
-coefficient at lag <span class="math inline">\(l\)</span>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>ϕ</mi><mi>l</mi></msub><annotation encoding="application/x-tex">\phi_{l}</annotation></semantics></math>:
+autoregressive coefficient at lag
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>l</mi><annotation encoding="application/x-tex">l</annotation></semantics></math>
 </li>
 </ul>
 </div>
 <div class="section level4">
 <h4 id="priors">Priors<a class="anchor" aria-label="anchor" href="#priors"></a>
 </h4>
-<p><span class="math display">\[
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><mi>α</mi></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">StudentT</mtext><mo stretchy="false" form="prefix">(</mo><mn>3</mn><mo>,</mo><mn>1.2</mn><mo>,</mo><mn>2.5</mn><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msubsup><mi>σ</mi><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>s</mi><mo>,</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">StudentT</mtext><mo stretchy="false" form="prefix">(</mo><mn>3</mn><mo>,</mo><mn>0</mn><mo>,</mo><mn>2.5</mn><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msubsup><mi>σ</mi><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">v</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">_</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mn mathvariant="normal">12</mn></mrow><mrow><mo stretchy="false" form="prefix">(</mo><mi>s</mi><mo>,</mo><mi>η</mi><mo stretchy="false" form="postfix">)</mo></mrow></msubsup></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">StudentT</mtext><mo stretchy="false" form="prefix">(</mo><mn>3</mn><mo>,</mo><mn>0</mn><mo>,</mo><mn>2.5</mn><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>σ</mi><mi>η</mi></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">Exponential</mtext><mo stretchy="false" form="prefix">(</mo><mn>2</mn><mo stretchy="false" form="postfix">)</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>ϕ</mi><mn>1</mn></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mo stretchy="false" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>0.5</mn><mo stretchy="false" form="postfix">)</mo></mtd></mtr></mtable><annotation encoding="application/x-tex">
 \begin{aligned}
 \alpha &amp;\sim \text{StudentT}(3, 1.2, 2.5) \\
-\sigma^{(s, \eta)}_{\mathrm{mintemp}} &amp;\sim \text{StudentT}(3, 0,
-2.5) \\
-\sigma^{(s, \eta)}_{\mathrm{ndvi\_ma12}} &amp;\sim \text{StudentT}(3, 0,
-2.5) \\
+\sigma^{(s, \eta)}_{\mathrm{mintemp}} &amp;\sim \text{StudentT}(3, 0, 2.5) \\
+\sigma^{(s, \eta)}_{\mathrm{ndvi\_ma12}} &amp;\sim \text{StudentT}(3, 0, 2.5) \\
 \sigma_\eta &amp;\sim \text{Exponential}(2) \\
 \phi_{1} &amp;\sim \text{Normal}(0, 0.5)
 \end{aligned}
-\]</span></p>
+</annotation></semantics></math></p>
 <p>Every other parameter takes an improper flat prior on its
 support.</p>
 </div>
@@ -580,12 +588,13 @@ iterations per chain.</p>
 <span><span class="co">#&gt;   construct, fit and interrogate the model. mvgam fits Bayesian</span></span>
 <span><span class="co">#&gt;   state-space models that combine flexible predictor effects in both the</span></span>
 <span><span class="co">#&gt;   process and observation components, using functionality from the brms</span></span>
-<span><span class="co">#&gt;   (Burkner 2017) and mgcv (Wood 2017) packages. The mvgam-constructed</span></span>
-<span><span class="co">#&gt;   model and data were passed to Stan (Carpenter et al. 2017) via the</span></span>
-<span><span class="co">#&gt;   cmdstanr interface (Gabry et al. 2024). We ran 4 Hamiltonian Monte Carlo</span></span>
-<span><span class="co">#&gt;   chains for 1000 warmup iterations and 1000 sampling iterations.</span></span>
-<span><span class="co">#&gt;   Rank-normalised split Rhat and effective sample sizes (Vehtari et al.</span></span>
-<span><span class="co">#&gt;   2021) were used to monitor convergence.</span></span>
+<span><span class="co">#&gt;   (Burkner 2017) and mgcv (Wood 2017) packages. Observations followed the</span></span>
+<span><span class="co">#&gt;   poisson family with a log link. The latent process followed AR(1)</span></span>
+<span><span class="co">#&gt;   dynamics. The mvgam-constructed model and data were passed to Stan</span></span>
+<span><span class="co">#&gt;   (Carpenter et al. 2017) via the cmdstanr interface (Gabry et al. 2024).</span></span>
+<span><span class="co">#&gt;   We ran 4 Hamiltonian Monte Carlo chains for 1000 warmup iterations and</span></span>
+<span><span class="co">#&gt;   1000 sampling iterations. Rank-normalised split Rhat and effective</span></span>
+<span><span class="co">#&gt;   sample sizes (Vehtari et al. 2021) were used to monitor convergence.</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Primary references</span></span>
 <span><span class="co">#&gt; Burkner PC (2017). brms: An R Package for Bayesian Multilevel Models</span></span>
@@ -664,7 +673,7 @@ of a Chihuahuan desert ecosystem. <em>bioRxiv</em> 332783. <a href="https://doi.
 <p>Wood, S. N. (2017). <em>Generalized Additive Models: An Introduction
 with R</em> (2nd edition). Chapman and Hall/CRC. <a href="https://doi.org/10.1201/9781315370279" class="external-link">doi:10.1201/9781315370279</a></p>
 </div>
-  </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>
 
@@ -675,15 +684,15 @@ with R</em> (2nd edition). Chapman and Hall/CRC. <a href="https://doi.org/10.120
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.9.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>
 </div>
 
-  
 
-  
+
+
 
   </body>
 </html>

@@ -5,70 +5,50 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<meta name="description" content="mvgam">
 <title>State-space vector autoregressions with mvgam • mvgam</title>
-<!-- favicons --><link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
-<link rel="apple-touch-icon" type="image/png" sizes="180x180" href="../apple-touch-icon.png">
-<link rel="apple-touch-icon" type="image/png" sizes="120x120" href="../apple-touch-icon-120x120.png">
-<link rel="apple-touch-icon" type="image/png" sizes="76x76" href="../apple-touch-icon-76x76.png">
-<link rel="apple-touch-icon" type="image/png" sizes="60x60" href="../apple-touch-icon-60x60.png">
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="icon" sizes="any" href="../favicon.ico">
+<link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
-<!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js" integrity="sha512-7O5pXpc0oCRrxk8RUfDYFgn0nO1t+jLuIOQdOMRp4APB7uZ4vSjspzp5y6YDtDs4VzUSTbWzBFZ/LKJhnyFOKw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
 <meta property="og:title" content="State-space vector autoregressions with mvgam">
-<meta property="og:description" content="mvgam">
-<meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png">
 <meta name="robots" content="noindex">
-<!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
-<script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
-<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-<![endif]-->
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
-    
 
-    <nav class="navbar fixed-top navbar-dark navbar-expand-lg bg-primary" data-bs-theme="dark"><div class="container">
-    
+
+    <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
+
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
     <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="In-development version">2.0.0</small>
 
-    
+
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="active nav-item">
-  <a class="nav-link" href="../articles/index.html">Articles</a>
-</li>
-<li class="nav-item">
-  <a class="nav-link" href="../reference/index.html">Reference</a>
-</li>
-<li class="nav-item">
-  <a class="nav-link" href="../news/index.html">Changelog</a>
-</li>
+<li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
+<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
-<form class="form-inline my-2 my-lg-0" role="search">
-        <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off">
-</form>
-
-      <ul class="navbar-nav">
-<li class="nav-item">
-  <a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="github">
-    <span class="fab fa fab fa-github fa-lg"></span>
-     
-  </a>
-</li>
+<ul class="navbar-nav">
+<li class="nav-item"><form class="form-inline" role="search">
+ <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
+</form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
 
-    
+
   </div>
 </nav><div class="container template-article">
 
@@ -83,7 +63,7 @@ Clark</h4>
             
             <h4 data-toc-skip class="date">2026-10-28</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/articles/var.Rmd" class="external-link"><code>vignettes/articles/var.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/feature/brms-integration/vignettes/articles/var.Rmd" class="external-link"><code>vignettes/articles/var.Rmd</code></a></small>
       <div class="d-none name"><code>var.Rmd</code></div>
     </div>
 
@@ -93,15 +73,18 @@ Clark</h4>
 or do they rise and fall with the same seasons and nutrients? A vector
 autoregression (VAR) separates the two. It lets the state of each taxon
 this month depend on the state of every taxon last month. The
-coefficients of that dependence form a matrix <span class="math inline">\(A\)</span>. Its off-diagonal cells are the lagged
-interactions between taxa (Lütkepohl <a href="https://doi.org/10.1007/978-3-540-27752-1" class="external-link">2005</a>).</p>
+coefficients of that dependence form a matrix
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>.
+Its off-diagonal cells are the lagged interactions between taxa
+(Lütkepohl <a href="https://doi.org/10.1007/978-3-540-27752-1" class="external-link">2005</a>).</p>
 <p>mvgam fits the VAR to latent states. Because each measurement carries
 observation error of its own (Auger-Méthé et al. <a href="https://doi.org/10.1002/ecm.1470" class="external-link">2021</a>), a separate
 observation model links those states to the data. This article fits that
 model to five plankton taxa from Lake Washington, then works through
-what a fitted VAR offers: the interactions in <span class="math inline">\(A\)</span>, the correlation of the taxa’s shocks,
-impulse responses, variance decompositions, stability metrics and
-forecasts.</p>
+what a fitted VAR offers: the interactions in
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>,
+the correlation of the taxa’s shocks, impulse responses, variance
+decompositions, stability metrics and forecasts.</p>
 <div class="section level2">
 <h2 id="the-data">The data<a class="anchor" aria-label="anchor" href="#the-data"></a>
 </h2>
@@ -155,7 +138,7 @@ requirements and plots each series, with the held-out months marked:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/mvgam_data.html">mvgam_data</a></span><span class="op">(</span><span class="va">train</span>, family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>, newdata <span class="op">=</span> <span class="va">test</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/plot-data-1.png" alt="Monthly log densities of the five taxa, z-scored over 1962 to 1994. The final year is held out." width="85%"><p class="caption">
+<img src="var_files/figure-html/plot-data-1.png" class="r-plt" alt="Monthly log densities of the five taxa, z-scored over 1962 to 1994. The final year is held out." width="85%"><p class="caption">
 Monthly log densities of the five taxa, z-scored over 1962 to 1994. The
 final year is held out.
 </p>
@@ -169,29 +152,43 @@ that decline.</p>
 <h2 id="the-model">The model<a class="anchor" aria-label="anchor" href="#the-model"></a>
 </h2>
 <p>The model has two layers. The observation layer says that each log
-density <span class="math inline">\(y_{s,t}\)</span> measures a latent
-state <span class="math inline">\(x_{s,t}\)</span> with observation
-error, whose standard deviation <span class="math inline">\(\sigma_s\)</span> differs by taxon:</p>
-<p><span class="math display">\[
+density
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>y</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">y_{s,t}</annotation></semantics></math>
+measures a latent state
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>x</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">x_{s,t}</annotation></semantics></math>
+with observation error, whose standard deviation
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>σ</mi><mi>s</mi></msub><annotation encoding="application/x-tex">\sigma_s</annotation></semantics></math>
+differs by taxon:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>y</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>∼</mo><mrow><mi mathvariant="normal">N</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">l</mi></mrow><mo stretchy="false" form="prefix">(</mo><msub><mi>x</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>,</mo><mspace width="0.222em"></mspace><msub><mi>σ</mi><mi>s</mi></msub><mo stretchy="false" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
 y_{s,t} \sim \mathrm{Normal}(x_{s,t},\ \sigma_s).
-\]</span></p>
+</annotation></semantics></math></p>
 <p>The latent state is a mean set by the covariates plus a deviation
-<span class="math inline">\(z_{s,t}\)</span> that follows the VAR:</p>
-<p><span class="math display">\[
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>z</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">z_{s,t}</annotation></semantics></math>
+that follows the VAR:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>x</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>=</mo><msub><mi>α</mi><mi>s</mi></msub><mo>+</mo><msub><mi>β</mi><mi>s</mi></msub><mspace width="0.167em"></mspace><msub><mrow><mi mathvariant="normal">T</mi><mi mathvariant="normal">P</mi></mrow><mi>t</mi></msub><mo>+</mo><msub><mi>γ</mi><mi>s</mi></msub><mspace width="0.167em"></mspace><msub><mrow><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">p</mi></mrow><mi>t</mi></msub><mo>+</mo><msub><mi>f</mi><mi>s</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">h</mi></mrow><mi>t</mi></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><msub><mi>z</mi><mrow><mi>s</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>,</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right; padding-right: 0"><msub><mi>𝐳</mi><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left; padding-left: 0"><mo>∼</mo><mrow><mi mathvariant="normal">M</mi><mi mathvariant="normal">V</mi><mi mathvariant="normal">N</mi></mrow><mo stretchy="false" form="prefix">(</mo><mi>A</mi><mspace width="0.167em"></mspace><msub><mi>𝐳</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><mspace width="0.222em"></mspace><mi mathvariant="normal">Σ</mi><mo stretchy="false" form="postfix">)</mo><mi>.</mi></mtd></mtr></mtable><annotation encoding="application/x-tex">
 \begin{aligned}
 x_{s,t} &amp;= \alpha_s + \beta_s\,\mathrm{TP}_t
   + \gamma_s\,\mathrm{temp}_t + f_s(\mathrm{month}_t) + z_{s,t}, \\
 \mathbf{z}_t &amp;\sim \mathrm{MVN}(A\,\mathbf{z}_{t-1},\ \Sigma).
 \end{aligned}
-\]</span></p>
-<p>Each taxon has its own level <span class="math inline">\(\alpha_s\)</span> and seasonal smooth <span class="math inline">\(f_s\)</span>, with its own slopes on phosphorus
-loading and on the temperature anomaly. <span class="math inline">\(A\)</span> holds the lagged effects among the
-deviations. <span class="math inline">\(\Sigma\)</span> holds the
-covariance of the monthly shocks. The VAR describes how taxa push one
-another away from their seasonal and nutrient-driven means. Seasonality
-itself stays out of <span class="math inline">\(A\)</span>.</p>
+</annotation></semantics></math></p>
+<p>Each taxon has its own level
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>α</mi><mi>s</mi></msub><annotation encoding="application/x-tex">\alpha_s</annotation></semantics></math>
+and seasonal smooth
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>f</mi><mi>s</mi></msub><annotation encoding="application/x-tex">f_s</annotation></semantics></math>,
+with its own slopes on phosphorus loading and on the temperature
+anomaly.
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+holds the lagged effects among the deviations.
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi mathvariant="normal">Σ</mi><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>
+holds the covariance of the monthly shocks. The VAR describes how taxa
+push one another away from their seasonal and nutrient-driven means.
+Seasonality itself stays out of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>.</p>
 <p>mvgam’s <code><a href="../reference/trend_constructors.html">VAR()</a></code> keeps the process stationary: after a
-disturbance, every deviation returns towards zero. The prior on <span class="math inline">\(A\)</span> enforces this (Heaps <a href="https://doi.org/10.1080/10618600.2022.2079648" class="external-link">2023</a>). A
+disturbance, every deviation returns towards zero. The prior on
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+enforces this (Heaps <a href="https://doi.org/10.1080/10618600.2022.2079648" class="external-link">2023</a>). A
 stationary VAR cannot absorb a slow drift in a taxon’s mean. When we
 fitted the model without phosphorus, the four chains disagreed about the
 level of the unicellular algae, whose decline nothing in that model
@@ -200,12 +197,16 @@ VAR.</p>
 <p>The observation and process variances both describe scatter around
 the same latent state. Fourteen years of data from one lake separate
 them poorly: a month’s departure could be observation error or real
-change. The prior on <span class="math inline">\(\log\sigma_s\)</span>
-supplies the missing information. We centred it on <span class="math inline">\(\log 0.25\)</span> with a standard deviation of
-<span class="math inline">\(0.2\)</span>, which places observation error
-near a quarter of a standard deviation of log density, below the change
-in the populations from month to month. The data still move each taxon’s
-observation standard deviation away from that prior.</p>
+change. The prior on
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mi mathvariant="normal">log</mi><mo>⁡</mo></mrow><msub><mi>σ</mi><mi>s</mi></msub></mrow><annotation encoding="application/x-tex">\log\sigma_s</annotation></semantics></math>
+supplies the missing information. We centred it on
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mi mathvariant="normal">log</mi><mo>⁡</mo></mrow><mn>0.25</mn></mrow><annotation encoding="application/x-tex">\log 0.25</annotation></semantics></math>
+with a standard deviation of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mn>0.2</mn><annotation encoding="application/x-tex">0.2</annotation></semantics></math>,
+which places observation error near a quarter of a standard deviation of
+log density, below the change in the populations from month to month.
+The data still move each taxon’s observation standard deviation away
+from that prior.</p>
 <p>In mvgam the trend formula holds the latent model.
 <code><a href="../reference/lv_axis.html">lv_axis()</a></code> gives a term a separate effect for each taxon.
 <code><a href="https://paulbuerkner.com/brms/reference/brmsformula.html" class="external-link">bf()</a></code> gives the observation standard deviation a formula of
@@ -233,8 +234,9 @@ latent state.</p>
 <p><code>bs = "cc"</code> makes each seasonal smooth cyclic. December
 then joins January, at the boundary that <code>knots</code> places
 between them. <code>cor = TRUE</code> estimates the correlations among
-the shocks in <span class="math inline">\(\Sigma\)</span>. Passing
-<code>newdata</code> stores the held-out year on the model for
+the shocks in
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi mathvariant="normal">Σ</mi><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>.
+Passing <code>newdata</code> stores the held-out year on the model for
 forecasting. <code>seed</code> makes the sampling reproducible.</p>
 </div>
 <div class="section level2">
@@ -248,7 +250,7 @@ taxon:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"dens_overlay_grouped"</span>, group <span class="op">=</span> <span class="st">"series"</span>,</span>
 <span>         ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/ppc-1.png" alt="Density of the observed values (dark line) and of 50 replicate data sets drawn from the posterior (light lines), one panel per taxon." width="85%"><p class="caption">
+<img src="var_files/figure-html/ppc-1.png" class="r-plt" alt="Density of the observed values (dark line) and of 50 replicate data sets drawn from the posterior (light lines), one panel per taxon." width="85%"><p class="caption">
 Density of the observed values (dark line) and of 50 replicate data sets
 drawn from the posterior (light lines), one panel per taxon.
 </p>
@@ -290,14 +292,15 @@ phosphorus slopes span zero.</p>
 <p>mvgam computes effects on the outcome scale through the
 marginaleffects package (Arel-Bundock et al. <a href="https://doi.org/10.18637/jss.v111.i09" class="external-link">2024</a>). Every call here
 passes <code>type = "expected"</code>, which predicts the expected log
-density <span class="math inline">\(E[y]\)</span> and leaves observation
-error out of the interval drawn around it. The marginaleffects default,
-<code>type = "response"</code>, draws new observations with their
-observation error. A contrast between two such predictions carries that
-error twice. Slopes and comparisons come from the expected log density
-under either setting. <code><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">avg_slopes()</a></code> averages the slope of
-the expected log density over the data, here separately for each
-taxon:</p>
+density
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi><mo stretchy="false" form="prefix">[</mo><mi>y</mi><mo stretchy="false" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">E[y]</annotation></semantics></math>
+and leaves observation error out of the interval drawn around it. The
+marginaleffects default, <code>type = "response"</code>, draws new
+observations with their observation error. A contrast between two such
+predictions carries that error twice. Slopes and comparisons come from
+the expected log density under either setting. <code><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">avg_slopes()</a></code>
+averages the slope of the expected log density over the data, here
+separately for each taxon:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">avg_slopes</a></span><span class="op">(</span><span class="va">fit</span>, variables <span class="op">=</span> <span class="st">"TP_annual"</span>,</span>
 <span>                            by <span class="op">=</span> <span class="st">"series"</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span></span>
@@ -322,7 +325,7 @@ covariates held at their means:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">fit</span>, effects <span class="op">=</span> <span class="st">"TP_annual"</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/ce-tp-1.png" alt="Expected log density against twelve-month total phosphorus for each taxon, with 95% credible intervals." width="85%"><p class="caption">
+<img src="var_files/figure-html/ce-tp-1.png" class="r-plt" alt="Expected log density against twelve-month total phosphorus for each taxon, with 95% credible intervals." width="85%"><p class="caption">
 Expected log density against twelve-month total phosphorus for each
 taxon, with 95% credible intervals.
 </p>
@@ -332,7 +335,7 @@ plot:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">fit</span>, effects <span class="op">=</span> <span class="st">"month"</span>, type <span class="op">=</span> <span class="st">"expected"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/ce-month-1.png" alt="Seasonal smooths of expected log density by calendar month, with 95% credible intervals." width="85%"><p class="caption">
+<img src="var_files/figure-html/ce-month-1.png" class="r-plt" alt="Seasonal smooths of expected log density by calendar month, with 95% credible intervals." width="85%"><p class="caption">
 Seasonal smooths of expected log density by calendar month, with 95%
 credible intervals.
 </p>
@@ -346,8 +349,15 @@ Its largest slope, for the diatoms, is -0.57 [-1.17, 0.02].</p>
 <h2 id="interactions-among-the-taxa">Interactions among the taxa<a class="anchor" aria-label="anchor" href="#interactions-among-the-taxa"></a>
 </h2>
 <p><code><a href="../reference/posterior_transition_matrix.html">posterior_transition_matrix()</a></code> summarises the transition
-matrix cell by cell. Row <span class="math inline">\(i\)</span>, column
-<span class="math inline">\(j\)</span> is the effect of taxon <span class="math inline">\(j\)</span>’s deviation last month on taxon <span class="math inline">\(i\)</span>’s deviation this month:</p>
+matrix cell by cell. Row
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>,
+column
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>
+is the effect of taxon
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>’s
+deviation last month on taxon
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>’s
+deviation this month:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">A</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/posterior_transition_matrix.html">posterior_transition_matrix</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="va">A</span></span>
@@ -369,7 +379,7 @@ outlines each cell whose 95% interval excludes zero:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/plot-A-1.png" alt="Posterior mean of the transition matrix. Rows are the taxa at month t and columns the taxa at month t - 1. Outlined cells have 95% credible intervals that exclude zero." width="85%"><p class="caption">
+<img src="var_files/figure-html/plot-A-1.png" class="r-plt" alt="Posterior mean of the transition matrix. Rows are the taxa at month t and columns the taxa at month t - 1. Outlined cells have 95% credible intervals that exclude zero." width="85%"><p class="caption">
 Posterior mean of the transition matrix. Rows are the taxa at month t
 and columns the taxa at month t - 1. Outlined cells have 95% credible
 intervals that exclude zero.
@@ -388,14 +398,17 @@ with more <em>Cryptomonas</em> than expected is followed by more
 diatoms, with a coefficient of 0.32 [0.01, 0.84]. Because no feeding
 link runs between two phytoplankton groups, the likelier source is a
 driver the model omits, such as a change in mixing that favours one
-group before the other. A coefficient in <span class="math inline">\(A\)</span> records that one deviation predicts
-another without naming a mechanism.</p>
+group before the other. A coefficient in
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+records that one deviation predicts another without naming a
+mechanism.</p>
 </div>
 <div class="section level2">
 <h2 id="shocks-and-states">Shocks and states<a class="anchor" aria-label="anchor" href="#shocks-and-states"></a>
 </h2>
 <p>The transition matrix describes how taxa push one another over time.
-The innovation covariance <span class="math inline">\(\Sigma\)</span>
+The innovation covariance
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi mathvariant="normal">Σ</mi><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>
 describes which taxa receive the same unmodelled push in the same month.
 A change in light or mixing that the covariates miss would appear as a
 correlation between the shocks of the taxa it affects.
@@ -423,23 +436,28 @@ correlate most strongly, at 0.48 [0.26, 0.69]. The model holds no
 covariate that would explain the shared rise.</p>
 <p>The default, <code>covariance = "stationary"</code>, correlates the
 deviations themselves. Each deviation accumulates the shocks of many
-months, passed through <span class="math inline">\(A\)</span>:</p>
+months, passed through
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/residual_cor.html">residual_cor</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">rc</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/rc-stat-1.png" alt="Posterior mean correlations among the deviations of the five taxa. Outlined pairs have 95% credible intervals that exclude zero." width="85%"><p class="caption">
+<img src="var_files/figure-html/rc-stat-1.png" class="r-plt" alt="Posterior mean correlations among the deviations of the five taxa. Outlined pairs have 95% credible intervals that exclude zero." width="85%"><p class="caption">
 Posterior mean correlations among the deviations of the five taxa.
 Outlined pairs have 95% credible intervals that exclude zero.
 </p>
 </div>
-<p>The two correlations differ where <span class="math inline">\(A\)</span> couples the taxa. The shocks of
-<em>Cryptomonas</em> and <em>Daphnia</em> correlate at 0.24 [0.02,
-0.44]. Their deviations correlate at 0.21 [-0.02, 0.42]. Grazing passes
-each shock to the other taxon over the following months, which changes
-the correlation the shared shocks create. <span class="math inline">\(A\)</span> barely couples the unicellular algae
-and <em>Cryptomonas</em>. Their correlations are 0.48 [0.26, 0.69] for
-the shocks and 0.50 [0.26, 0.70] for the deviations.</p>
+<p>The two correlations differ where
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+couples the taxa. The shocks of <em>Cryptomonas</em> and
+<em>Daphnia</em> correlate at 0.24 [0.02, 0.44]. Their deviations
+correlate at 0.21 [-0.02, 0.42]. Grazing passes each shock to the other
+taxon over the following months, which changes the correlation the
+shared shocks create.
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+barely couples the unicellular algae and <em>Cryptomonas</em>. Their
+correlations are 0.48 [0.26, 0.69] for the shocks and 0.50 [0.26, 0.70]
+for the deviations.</p>
 </div>
 <div class="section level2">
 <h2 id="impulse-responses">Impulse responses<a class="anchor" aria-label="anchor" href="#impulse-responses"></a>
@@ -449,8 +467,9 @@ single shock to one of them (Lütkepohl <a href="https://doi.org/10.1007/978-3-5
 <code><a href="../reference/irf.mvgam.html">irf()</a></code> computes the generalised impulse response by default
 (Pesaran and Shin <a href="https://doi.org/10.1016/S0165-1765(97)00214-0" class="external-link">1998</a>). The
 shock to one taxon brings with it the shocks that its correlated taxa
-receive in the same month, in the proportions <span class="math inline">\(\Sigma\)</span> implies. Horizon 1 is the month of
-the shock.</p>
+receive in the same month, in the proportions
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi mathvariant="normal">Σ</mi><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>
+implies. Horizon 1 is the month of the shock.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">irfs</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/irf.mvgam.html">irf</a></span><span class="op">(</span><span class="va">fit</span>, h <span class="op">=</span> <span class="fl">12</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> with <code>series = 5</code> draws the responses
@@ -458,7 +477,7 @@ to a shock in the fifth taxon, <em>Daphnia</em>:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">irfs</span>, series <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/plot-irf-1.png" alt="Generalised impulse responses of each taxon to a one standard deviation shock in Daphnia, with 95% credible intervals. Horizon 1 is the month of the shock." width="85%"><p class="caption">
+<img src="var_files/figure-html/plot-irf-1.png" class="r-plt" alt="Generalised impulse responses of each taxon to a one standard deviation shock in Daphnia, with 95% credible intervals. Horizon 1 is the month of the shock." width="85%"><p class="caption">
 Generalised impulse responses of each taxon to a one standard deviation
 shock in Daphnia, with 95% credible intervals. Horizon 1 is the month of
 the shock.
@@ -468,10 +487,12 @@ the shock.
 month. The rise falls below 0.05 by month 4. Because the shocks of
 <em>Daphnia</em> and <em>Cryptomonas</em> are correlated,
 <em>Cryptomonas</em> moves with <em>Daphnia</em> in the first month, by
-0.10 [0.01, 0.19]. Grazing then acts through <span class="math inline">\(A\)</span>. In the third month
-<em>Cryptomonas</em> is at -0.09 [-0.17, 0.00] relative to its expected
-level. The unicellular algae change by -0.13 [-0.24, -0.03] in the
-second month. Every response stays within 0.01 of zero from month 7.</p>
+0.10 [0.01, 0.19]. Grazing then acts through
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>.
+In the third month <em>Cryptomonas</em> is at -0.09 [-0.17, 0.00]
+relative to its expected level. The unicellular algae change by -0.13
+[-0.24, -0.03] in the second month. Every response stays within 0.01 of
+zero from month 7.</p>
 </div>
 <div class="section level2">
 <h2 id="variance-decompositions">Variance decompositions<a class="anchor" aria-label="anchor" href="#variance-decompositions"></a>
@@ -479,15 +500,17 @@ second month. Every response stays within 0.01 of zero from month 7.</p>
 <p>A forecast error variance decomposition (FEVD) splits the variance of
 each taxon’s forecast among the taxa whose shocks generate it, at each
 horizon. <code><a href="../reference/fevd.mvgam.html">fevd()</a></code> splits the variance with the Cholesky
-factor of <span class="math inline">\(\Sigma\)</span>, taken in the
-order of the levels of <code>series</code>. Where the shocks of two taxa
-correlate, the factor assigns the shared part to whichever taxon comes
-first. The diatoms come first and keep all of their own shock.</p>
+factor of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi mathvariant="normal">Σ</mi><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>,
+taken in the order of the levels of <code>series</code>. Where the
+shocks of two taxa correlate, the factor assigns the shared part to
+whichever taxon comes first. The diatoms come first and keep all of
+their own shock.</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fevds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fevd.mvgam.html">fevd</a></span><span class="op">(</span><span class="va">fit</span>, h <span class="op">=</span> <span class="fl">12</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fevds</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/fevd-1.png" alt="Median share of each taxon's forecast error variance that each source of shocks generates, by forecast horizon. Panels are the taxa forecast. Colours are the taxa whose shocks generate the variance." width="85%"><p class="caption">
+<img src="var_files/figure-html/fevd-1.png" class="r-plt" alt="Median share of each taxon's forecast error variance that each source of shocks generates, by forecast horizon. Panels are the taxa forecast. Colours are the taxa whose shocks generate the variance." width="85%"><p class="caption">
 Median share of each taxon’s forecast error variance that each source of
 shocks generates, by forecast horizon. Panels are the taxa forecast.
 Colours are the taxa whose shocks generate the variance.
@@ -509,20 +532,23 @@ above are the same in any order.</p>
 <div class="section level2">
 <h2 id="stability-of-the-community">Stability of the community<a class="anchor" aria-label="anchor" href="#stability-of-the-community"></a>
 </h2>
-<p><code><a href="../reference/stability.mvgam.html">stability()</a></code> summarises the dynamics in <span class="math inline">\(A\)</span> as community stability metrics (Ives et
-al. <a href="https://doi.org/10.1890/0012-9615(2003)073%5B0301:ECSAEI%5D2.0.CO;2" class="external-link">2003</a>).
-Reactivity is the log of the largest singular value of <span class="math inline">\(A\)</span>. Above zero, some perturbation grows in
-the month after it occurs before the community returns towards its means
-(Neubert et al. <a href="https://doi.org/10.1890/08-2014.1" class="external-link">2009</a>).
-The mean return rate is the largest modulus of the eigenvalues of <span class="math inline">\(A\)</span>. Once the slowest mode dominates, the
-distance from the means shrinks by about this factor each month. The
-variance return rate is its square. It describes how fast the forecast
-variance settles.</p>
+<p><code><a href="../reference/stability.mvgam.html">stability()</a></code> summarises the dynamics in
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+as community stability metrics (Ives et al. <a href="https://doi.org/10.1890/0012-9615(2003)073%5B0301:ECSAEI%5D2.0.CO;2" class="external-link">2003</a>).
+Reactivity is the log of the largest singular value of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>.
+Above zero, some perturbation grows in the month after it occurs before
+the community returns towards its means (Neubert et al. <a href="https://doi.org/10.1890/08-2014.1" class="external-link">2009</a>). The mean return rate
+is the largest modulus of the eigenvalues of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>.
+Once the slowest mode dominates, the distance from the means shrinks by
+about this factor each month. The variance return rate is its square. It
+describes how fast the forecast variance settles.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">stab</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/stability.mvgam.html">stability</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">stab</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/stability-1.png" alt="Posterior distributions of reactivity and of the mean and variance return rates. The dashed line marks zero reactivity." width="85%"><p class="caption">
+<img src="var_files/figure-html/stability-1.png" class="r-plt" alt="Posterior distributions of reactivity and of the mean and variance return rates. The dashed line marks zero reactivity." width="85%"><p class="caption">
 Posterior distributions of reactivity and of the mean and variance
 return rates. The dashed line marks zero reactivity.
 </p>
@@ -544,7 +570,7 @@ twelve months and adds observation error:</p>
 <code class="sourceCode R"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="var_files/figure-html/forecast-1.png" alt="Fitted values to the end of 1993 and forecasts for 1994 (right of the dashed line), with observations as points." width="85%"><p class="caption">
+<img src="var_files/figure-html/forecast-1.png" class="r-plt" alt="Fitted values to the end of 1993 and forecasts for 1994 (right of the dashed line), with observations as points." width="85%"><p class="caption">
 Fitted values to the end of 1993 and forecasts for 1994 (right of the
 dashed line), with observations as points.
 </p>
@@ -574,9 +600,8 @@ observation, in the units of the data. Lower is better.
 <p>Of the 60 observations in 1994, 57 fell inside their 90% intervals,
 close to the coverage the intervals claim. The CRPS compares models
 scored on the same data, such as this VAR against an independent
-autoregression for each taxon. The <a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">forecast
-evaluation article</a> works through that comparison with
-leave-future-out cross-validation.</p>
+autoregression for each taxon. The <a href="forecast_evaluation.html">forecast evaluation article</a> works
+through that comparison with leave-future-out cross-validation.</p>
 <p>The plankton of Lake Washington rise and fall mostly with the seasons
 and with phosphorus. In this fit, 2 of the twenty lagged interactions
 among the taxa separate from zero. The community damps a perturbation
@@ -593,24 +618,24 @@ model, with its references.</p>
 <p>Related articles:</p>
 <ul>
 <li>
-<a href="https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html">Hierarchical
-VARs</a> fit one VAR per group of series, such as one per lake. Each
-group’s <span class="math inline">\(A\)</span> and <span class="math inline">\(\Sigma\)</span> are drawn towards a shared
-mean.</li>
+<a href="hierarchical_var.html">Hierarchical VARs</a> fit one VAR
+per group of series, such as one per lake. Each group’s
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi mathvariant="normal">Σ</mi><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>
+are drawn towards a shared mean.</li>
 <li>
-<a href="https://nicholasjclark.github.io/mvgam/articles/dfm.html">Dynamic
-factor models</a> describe many series with fewer latent processes than
-series.</li>
+<a href="dfm.html">Dynamic factor models</a> describe many series
+with fewer latent processes than series.</li>
 <li>
-<a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">Forecast
-evaluation</a> covers scoring rules and leave-future-out
-cross-validation.</li>
+<a href="forecast_evaluation.html">Forecast evaluation</a> covers
+scoring rules and leave-future-out cross-validation.</li>
 <li>
-<a href="https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html">mvgam
-overview</a> introduces the observation and trend formulas.</li>
+<a href="mvgam_overview.html">mvgam overview</a> introduces the
+observation and trend formulas.</li>
 <li>
-<a href="https://nicholasjclark.github.io/mvgam/articles/data.html">Formatting
-data</a> covers the long data format and <code><a href="../reference/mvgam_data.html">mvgam_data()</a></code>.</li>
+<a href="data.html">Formatting data</a> covers the long data format
+and <code><a href="../reference/mvgam_data.html">mvgam_data()</a></code>.</li>
 </ul>
 <p>Chapter 8 of the <a href="https://atsa-es.github.io/atsa-labs/chap-msscov.html" class="external-link">Applied Time
 Series Analysis</a> lab book fits multivariate autoregressive
@@ -646,7 +671,7 @@ Analysis</em>. Springer, Berlin. <a href="https://doi.org/10.1007/978-3-540-2775
 in linear multivariate models. <em>Economics Letters</em> 58(1), 17-29.
 <a href="https://doi.org/10.1016/S0165-1765(97)00214-0" class="external-link">doi:10.1016/S0165-1765(97)00214-0</a></p>
 </div>
-  </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>
 
@@ -657,15 +682,15 @@ in linear multivariate models. <em>Economics Letters</em> 58(1), 17-29.
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.9.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>
 </div>
 
-  
 
-  
+
+
 
   </body>
 </html>
