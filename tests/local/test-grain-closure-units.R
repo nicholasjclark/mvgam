@@ -382,6 +382,10 @@ test_that("the checks that read a unit's count all render", {
   expect_drawn(
     pp_check(fit, type = "stat", stat = function(x) mean(x == 0))
   )
+  # A statistic named as a string resolves where it was defined. A test
+  # body is a local environment, as an example page is.
+  prop_zero <- function(x) mean(x == 0)
+  expect_drawn(pp_check(fit, type = "stat", stat = "prop_zero"))
   # The coarse-PIT notice is owed once per session, and nothing else
   # is owed at all.
   other <- grep("coarse PIT support", got$warnings, value = TRUE,

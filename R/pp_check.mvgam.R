@@ -526,7 +526,11 @@ pp_check.mvgam <- function(
     if ("lw" %in% ppc_formals) ppc_args$lw <- stats::weights(psis_obj)
   }
 
-  out_plot <- do_call(ppc_fun, c(ppc_args, dots[!for_pred]))
+  # bayesplot resolves a `stat` given by name from the frame that calls
+  # its kernel. That frame encloses the caller's environment, where the
+  # user defined the statistic.
+  out_plot <- do_call(ppc_fun, c(ppc_args, dots[!for_pred]),
+                      envir = parent.frame())
   if ("x" %in% ppc_formals && !is.null(x)) {
     out_plot <- out_plot + ggplot2::labs(x = x)
   }
