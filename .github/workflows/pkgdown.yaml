@@ -61,6 +61,11 @@ jobs:
           remotes::install_version("pkgdown", version = "2.0.9")
         shell: Rscript {0}
 
+      # pkgdown renders every top-level .md file. CLAUDE.md holds
+      # development instructions for the repository.
+      - name: Keep development notes off the site
+        run: rm -f CLAUDE.md
+
       - name: Build site
         run: pkgdown::build_site_github_pages(lazy = TRUE, new_process = FALSE, install = FALSE)
         shell: Rscript {0}

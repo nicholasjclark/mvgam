@@ -1,5 +1,10 @@
 url: https://nicholasjclark.github.io/mvgam/
 
+# The 2.0 site builds into /dev/ and the CRAN 1.x site stays at the
+# root. Switch to `mode: release` when 2.0 reaches CRAN.
+development:
+  mode: devel
+
 authors:
   Nicholas J Clark:
     href: https://ecogambler.netlify.app/
@@ -63,7 +68,6 @@ reference:
   - update.mvgam
   - mvgam-class
   - print.mvgam
-  - print.mvgam_prefit
   - inits.mvgam
   - control_params.mvgam
   - mvgam_use_cases
@@ -139,9 +143,9 @@ reference:
   - sim_closure_unit_data
   - summary.mvgam_sim_closure_unit
   - print.mvgam_sim_closure_unit_summary
-  - sim_jsdm
-  - summary.mvgam_sim_jsdm
-  - print.mvgam_sim_jsdm_summary
+  - sim_jsdgam
+  - summary.mvgam_sim_jsdgam
+  - print.mvgam_sim_jsdgam_summary
 
 - title: Prediction and forecasting
   desc: >
@@ -222,15 +226,24 @@ reference:
   - ngrps.mvgam
   - nobs.mvgam
   - model.frame.mvgam
+  - terms.mvgam
   - smooths.mvgam
   - posterior_smooths.mvgam
   - conditional_smooths.mvgam
   - hypothesis.mvgam
+  - stancode.mvgam_formula
+  - stancode.formula
+  - print.mvgamstancode
+
+- title: Reporting a model
+  desc: >
+    Methods text for a fitted model. Each tool writes one part: the
+    paragraph with its references, the equations with their priors or
+    the BibTeX file.
+  contents:
   - how_to_cite.mvgam
   - methods_md
   - bibtex
-  - stancode.mvgam_formula
-  - print.mvgamstancode
 
 - title: Marginal and conditional effects
   desc: >
@@ -271,8 +284,7 @@ reference:
     Ordinations, loading comparisons, factor activity and the
     residual correlations a factor model implies.
   contents:
-  - ordinate.mvgam
-  - ordinate.jsdgam
+  - ordinate
   - active_factors
   - plot.mvgam_active_factors
   - compare_loadings
@@ -307,14 +319,9 @@ reference:
   - lake_chemistry
   - glm_analysis
 
-- title: Re-exports and internals
+- title: Re-exports
   desc: >
     Generics re-exported from brms, posterior, loo and
-    marginaleffects, plus internal helpers documented for
-    completeness.
+    marginaleffects.
   contents:
   - reexports
-  - "%>%"
-  - as_draws_matrix.mock_stanfit
-  - dimnames.mock_stanfit
-  - prepare_predictions.mock_stanfit

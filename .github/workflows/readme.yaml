@@ -46,12 +46,9 @@ jobs:
       - name: Render README
         run: Rscript -e 'rmarkdown::render("README.Rmd", output_format = "md_document")'
 
-      - name: Render pkgdown index
-        run: Rscript -e 'rmarkdown::render("index.Rmd", output_format = "md_document")'
-
       - name: Commit results
         run: |
           git config --local user.name "$GITHUB_ACTOR"
           git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
-          git commit README.md index.md man/figures/README*.png -m 'Re-build README.Rmd' || echo "No changes to commit"
+          git commit README.md man/figures/README*.png -m 'Re-build README.Rmd' || echo "No changes to commit"
           git push origin || echo "No changes to commit"
