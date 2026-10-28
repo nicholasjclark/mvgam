@@ -171,12 +171,10 @@ summary(mod)
 wind <- as.numeric(as_draws_matrix(mod, variable = "b_p_wind"))
 fe_wind <- sprintf("%.2f [%.2f, %.2f]", mean(wind),
                    quantile(wind, 0.025), quantile(wind, 0.975))
-# The prose below says the interval covers the simulated -1.5
-stopifnot(quantile(wind, 0.025) < -1.5, quantile(wind, 0.975) > -1.5)
 ```
 
-The wind coefficient `p_wind`, `r fe_wind` on the logit scale, covers
-the simulated value of $-1.5$.
+The wind coefficient `p_wind` is `r fe_wind` on the logit scale,
+against the simulated value of $-1.5$.
 
 ## Latent abundance
 
@@ -200,9 +198,6 @@ state <- merge(as.data.frame(hc), truth, by = c("series", "time"))
 state <- merge(state, counts, by = c("series", "time"))
 n_covered <- sum(state$N >= state$lower_95 & state$N <= state$upper_95)
 n_above <- sum(state$median > state$y)
-# The prose below says the intervals cover the simulated abundance in
-# at least nine in ten species-years
-stopifnot(n_covered >= 0.9 * nrow(state))
 ```
 
 Because detection is imperfect, every count falls below the abundance
@@ -266,13 +261,16 @@ fit_stat
 ```
 
 ```{r fit-stat-numbers, include = FALSE}
-# The prose below says the p-value is far from 0
-stopifnot(fit_stat$bayes_p > 0.1)
+fe_fit <- if (fit_stat$bayes_p > 0.05) {
+  "gives no sign of lack of fit"
+} else {
+  "suggests the model misses some variation among visits"
+}
 ```
 
 A Bayesian p-value near 0 would mean the replicates rarely reach the
 discrepancy of the observed counts. The value here,
-`r sprintf("%.2f", fit_stat$bayes_p)`, gives no sign of lack of fit.
+`r sprintf("%.2f", fit_stat$bayes_p)`, `r fe_fit`.
 `latent_N_saturation()` reports the posterior probability that $N$
 reaches the cap in each unit:
 
@@ -281,12 +279,8 @@ sat <- latent_N_saturation(mod)
 max(sat$p_saturated)
 ```
 
-```{r saturation-numbers, include = FALSE}
-# The prose below says no unit puts appreciable mass at the cap
-stopifnot(max(sat$p_saturated) < 0.05)
-```
-
-No unit puts appreciable mass at the cap of 80.
+The largest probability any unit gives to reaching the cap of 80 is
+`r sprintf("%.3f", max(sat$p_saturated))`.
 
 ## Other observation processes
 

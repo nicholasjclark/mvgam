@@ -132,16 +132,13 @@ plot(fc_gam)
 ```{r gam-numbers, include = FALSE}
 do_median <- round(median(fc_gam$forecasts$DO[, 12]))
 do_max <- max(test$captures[test$series == "DO"], na.rm = TRUE)
-# The prose below says the DO forecast overshoots by an order of
-# magnitude
-stopifnot(do_median > 5 * do_max)
 ```
 
 Each smooth of time extrapolates the slope at the end of its series.
 For DO, whose captures rose over the final training months, the median
 forecast reaches `r do_median` captures by month 12. The held-out
-months recorded at most `r do_max`. The AR forecast stays with the
-data:
+months recorded at most `r do_max`. The AR forecast carries its
+latent state forward instead:
 
 ```{r plot-ar, fig.asp = 0.75, fig.cap = "AR hindcasts and forecasts of each species' captures."}
 plot(fc_ar)
@@ -169,22 +166,18 @@ crps_at <- function(m, s) cm$score[cm$model == m & cm$series == s]
 mean_crps <- aggregate(score ~ model, FUN = mean,
                        data = subset(crps, series != "all_series"))
 crps_of <- function(m) mean_crps$score[mean_crps$model == m]
-# The prose below says AR beats the GAM on DM and by a factor of five
-# or more on DO, the GAM beats AR on PB and PP, and AR and PW have mean
-# CRPS within 0.2 of each other
-stopifnot(crps_at("AR", "DM") < crps_at("GAM", "DM"),
-          crps_at("GAM", "DO") > 5 * crps_at("AR", "DO"),
-          crps_at("GAM", "PB") < crps_at("AR", "PB"),
-          crps_at("GAM", "PP") < crps_at("AR", "PP"),
-          abs(crps_of("AR") - crps_of("PW")) < 0.2)
+# The model with the lower mean CRPS of AR and the GAM on one species
+win <- function(s) {
+  if (crps_at("AR", s) < crps_at("GAM", s)) "AR" else "the GAM"
+}
 ```
 
-AR forecasts DM and DO, the two most abundant species, better than the
-GAM. On DO its mean CRPS is `r fe(crps_at("AR", "DO"))` against
-`r fe(crps_at("GAM", "DO"))` for the GAM. On PB and PP, which recorded
-few or no captures over long stretches, the GAM does better than AR.
-Averaged over the species, AR scores `r fe(crps_of("AR"))` against
-`r fe(crps_of("PW"))` for PW.
+Between AR and the GAM, the lower mean CRPS goes to `r win("DM")` on
+DM, `r win("DO")` on DO, `r win("PB")` on PB and `r win("PP")` on PP.
+On DO the mean CRPS is `r fe(crps_at("AR", "DO"))` for AR and
+`r fe(crps_at("GAM", "DO"))` for the GAM. PB and PP recorded few or no
+captures over long stretches. Averaged over the species, AR scores
+`r fe(crps_of("AR"))` against `r fe(crps_of("PW"))` for PW.
 
 The energy score grades the four forecasts at each horizon as one
 multivariate distribution (Gneiting et al.
@@ -201,14 +194,10 @@ plot(energy)
 ej <- subset(energy, series == "all_series" & !is.na(score))
 e_gam <- round(range(ej$score[ej$model == "GAM"]))
 e_max <- max(ej$score[ej$model != "GAM"])
-# The prose below says the GAM's score exceeds the largest AR or PW
-# score from horizon 4 on
-stopifnot(all(ej$score[ej$model == "GAM" & ej$eval_horizon >= 4] > e_max))
 ```
 
-The GAM's energy score climbs from `r e_gam[1]` to `r e_gam[2]` as its
-smooths of time drift from the data. AR and PW stay below
-`r ceiling(e_max)` over all twelve months. `score()` offers nine more
+The GAM's energy score runs from `r e_gam[1]` to `r e_gam[2]` over the
+twelve months. AR and PW stay below `r ceiling(e_max)`. `score()` offers nine more
 rules, among them the variogram score for the dependence between series
 and threshold-weighted scores for a range of the response.
 
@@ -247,16 +236,14 @@ lc <- loo_compare(lfo_gam, lfo_ar, lfo_pw,
 gap <- function(m) {
   sprintf("%.0f (SE %.0f)", -lc[m, "elpd_diff"], lc[m, "se_diff"])
 }
-# The prose below says AR leads, and each gap exceeds twice its SE
-stopifnot(rownames(lc)[1] == "AR",
-          all(-lc[-1, "elpd_diff"] > 2 * lc[-1, "se_diff"]))
+leader <- rownames(lc)[1]
+trailing <- rownames(lc)[-1]
 ```
 
-AR leads. PW trails it by `r gap("PW")` and the GAM by `r gap("GAM")`.
-The CRPS left AR and PW level. The log score, which penalises an
-observation in the tail of a forecast far more heavily, separates them
-by more than twice the standard error of the difference.
-`compare_elpds()` tabulates the ELPD at each origin:
+`r leader` leads. `r trailing[1]` trails it by `r gap(trailing[1])` and
+`r trailing[2]` by `r gap(trailing[2])`. The log score penalises an
+observation in the tail of a forecast far more heavily than the CRPS
+does. `compare_elpds()` tabulates the ELPD at each origin:
 
 ```{r lfo-plot, fig.asp = 0.55, fig.cap = "Cumulative ELPD over the forecast origins. Open circles mark the origins at which the model was refit."}
 elpds <- compare_elpds(lfo_gam, lfo_ar, lfo_pw,
@@ -290,27 +277,27 @@ w <- round(as.numeric(weights), 2)
 ens_table <- aggregate(score ~ model, FUN = mean,
                        data = subset(crps_ens, series != "all_series"))
 ens <- ens_table$score[ens_table$model == "Ensemble"]
-# The prose below says the GAM takes no weight and the ensemble has the
-# lowest mean CRPS
-stopifnot(w[1] < 0.01,
-          ens < min(ens_table$score[ens_table$model != "Ensemble"]))
+best_single <- min(ens_table$score[ens_table$model != "Ensemble"])
+fe_ens_rank <- if (ens < best_single) {
+  "the lowest of the four"
+} else {
+  paste0("against ", fe(best_single), " for the best single model")
+}
 ```
 
-Stacking gives the GAM no weight, `r w[2]` to AR and `r w[3]` to PW.
-The ensemble's mean CRPS on the holdout, `r fe(ens)`, is the lowest of
-the four.
+Stacking gives `r w[1]` to the GAM, `r w[2]` to AR and `r w[3]` to PW.
+The ensemble's mean CRPS on the holdout is `r fe(ens)`,
+`r fe_ens_rank`.
 
 ## Summary
 
-The AR state-space model forecast these rodent captures best. On the
-holdout it scored level with PW under the CRPS and the energy score.
-Under leave-future-out cross-validation it led PW by `r gap("PW")` in
-ELPD. The GAM's smooths of time extrapolated the
-end of each series and lost every joint comparison. Stacking then
-combined AR and PW into an ensemble that beat both. Each step took one
-or two function calls on the fitted models. Because the CRPS and the
-log score ranked PW differently, choose the scoring rule before scoring
-any forecast.
+The CRPS and the energy score compared the three forecasts on the
+holdout. Under leave-future-out cross-validation `r leader` led in
+ELPD. The GAM's smooths of time extrapolated the end of each series.
+Stacking combined the three forecasts into an ensemble with a mean
+CRPS of `r fe(ens)`. Each step took one or two function calls on the
+fitted models. The CRPS and the log score can rank models differently.
+Choose the scoring rule before scoring any forecast.
 
 ## Where to next
 

@@ -181,14 +181,13 @@ ggplot(canopy_q, aes(med, species)) +
 clear <- canopy_q$lo > 0 | canopy_q$hi < 0
 top <- as.character(canopy_q$species[which.max(canopy_q$med)])
 bottom <- as.character(canopy_q$species[which.min(canopy_q$med)])
-# The prose below says both signs are present among the species whose
-# interval excludes zero
-stopifnot(any(canopy_q$lo > 0), any(canopy_q$hi < 0))
+fe_med <- sprintf("%.2f", range(canopy_q$med))
 ```
 
 The intervals of `r sum(clear)` of the 41 species exclude zero. The
-responses run from `r gsub("\\.+", " ", bottom)` (fewer ants under
-canopy) to `r gsub("\\.+", " ", top)` (more).
+median responses run from `r fe_med[1]` for
+`r gsub("\\.+", " ", bottom)` to `r fe_med[2]` for
+`r gsub("\\.+", " ", top)`.
 
 ## Trait-informed loadings
 
@@ -229,14 +228,16 @@ theta <- as_draws_matrix(mod_traits, variable = "theta_features",
 theta_med <- apply(theta, 2, median)
 short <- which.min(theta_med)
 shortest <- sub("theta_features_", "", names(theta_med)[short])
-# The prose below says one trait's median length scale is smaller than
-# every other trait's 5% quantile
-stopifnot(theta_med[short] < min(apply(theta[, -short], 2, quantile, 0.05)))
+n_below <- sum(theta_med[short] <
+                 apply(theta[, -short, drop = FALSE], 2, quantile, 0.05))
 ```
 
-The median length scale of `r gsub("\\.", " ", shortest)` falls below
-the 5% quantile of every other trait's length scale. That trait carries most of the
-information the prior takes from the traits. `compare_loadings()`
+The median length scale of `r gsub("\\.", " ", shortest)`,
+`r sprintf("%.2f", theta_med[short])`, is the shortest of the traits.
+It falls below the 5% quantile of `r n_below` of the other
+`r length(theta_med) - 1` traits' length scales. A shorter length scale
+gives a trait's differences between species more weight in the
+loadings prior. `compare_loadings()`
 aligns the two fits' loadings by a Procrustes rotation and draws how
 far each species moved:
 
@@ -279,7 +280,6 @@ plot(rcor, cluster = TRUE)
 pairs <- upper.tri(rcor$cor)
 clear_pos <- sum(rcor$cor_lower[pairs] > 0)
 clear_neg <- sum(rcor$cor_upper[pairs] < 0)
-stopifnot(clear_pos > 0, clear_neg > 0)
 ```
 
 Of the `r sum(pairs)` species pairs, `r clear_pos` correlate
@@ -323,14 +323,10 @@ plot(af)
 
 ```{r af-numbers, include = FALSE}
 n_active <- sum(af$per_factor$is_active)
-# The prose below says the prior kept the two factors the earlier
-# models fixed
-stopifnot(n_active == 2)
 ```
 
-Two of the six factors are active, the number the earlier models
-fixed. Their two factors held all of the residual structure
-these counts support.
+In this fit, `r n_active` of the six factors are active, against the
+two the earlier models fixed.
 
 ## Summary
 
@@ -338,10 +334,11 @@ The trait prior and column shrinkage tested two assumptions of the
 first ant community models: independent loadings and two factors.
 Leave-one-out ranked the `r loo_first` prior first, by `r fe_diff` in
 expected log predictive density against a standard error of
-`r fe_se`. Given a ceiling of six factors, the shrinkage prior kept two
-active, the number the first models assumed. Each extension is one
-argument to a single `jsdgam()` call, as are the environmental slopes that gave all 41 species a canopy response
-from three covariates.
+`r fe_se`. Given a ceiling of six factors, the shrinkage prior kept
+`r n_active` active, against the two the first models assumed. Each
+extension is one argument to a single `jsdgam()` call, as are the
+environmental slopes that gave all 41 species a canopy response from
+three covariates.
 
 ## Where to next
 

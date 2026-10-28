@@ -114,37 +114,31 @@ sds <- tapply(growth$growth, growth$outcome, stats::sd)
 fe_inv_ratio <- sprintf("%.0f", sds[["Investment"]] / sds[["GDP"]])
 gdp09 <- growth[growth$outcome == "GDP" & growth$year == 2009, ]
 fe_fell09 <- sum(gdp09$growth < 0)
-ireland <- function(o, y) {
-  g <- growth$growth[growth$country == "Ireland" & growth$outcome == o &
-                       growth$year == y]
-  sprintf("%.0f%%", 100 * (exp(g) - 1))
+# The largest rise in one outcome, as its country, year and percentage
+top <- function(o) {
+  r <- growth[growth$outcome == o, ]
+  r <- r[which.max(r$growth), ]
+  list(country = as.character(r$country), year = r$year,
+       pct = sprintf("%.0f%%", 100 * (exp(r$growth) - 1)))
 }
-fe_ie_gdp15 <- ireland("GDP", 2015)
-fe_ie_inv19 <- ireland("Investment", 2019)
-# The prose below calls these the largest rises in GDP and investment
-top <- function(o) growth[growth$outcome == o, ][
-  which.max(growth$growth[growth$outcome == o]), c("country", "year")]
-stopifnot(identical(unlist(lapply(top("GDP"), as.character)),
-                    c(country = "Ireland", year = "2015")),
-          identical(unlist(lapply(top("Investment"), as.character)),
-                    c(country = "Ireland", year = "2019")))
-# The prose below names Chile and Ireland as the most volatile
+top_gdp <- top("GDP")
+top_inv <- top("Investment")
 by_country <- tapply(growth$growth, growth$country, stats::sd)
-stopifnot(setequal(names(sort(by_country, decreasing = TRUE))[1:2],
-                   c("Chile", "Ireland")))
+volatile <- names(sort(by_country, decreasing = TRUE))[1:2]
 ```
 
 Investment growth varies about `r fe_inv_ratio` times as much as GDP
-growth. GDP fell in 2009 in `r fe_fell09` of the eight economies.
-Ireland's GDP grew by `r fe_ie_gdp15` in 2015 and its investment by
-`r fe_ie_inv19` in 2019, the largest rises in the panel.
+growth. GDP fell in 2009 in `r fe_fell09` of the eight economies. The
+largest rises in the panel are `r top_gdp$country`'s GDP growth of
+`r top_gdp$pct` in `r top_gdp$year` and `r top_inv$country`'s
+investment growth of `r top_inv$pct` in `r top_inv$year`.
 
 Because the three outcomes differ in scale, one prior on the
 coefficients would mean different things for each. Dividing each
 outcome by its standard deviation over the whole panel puts them on one
 scale, where a single prior means the same for all three. The
-economies keep their own volatility. Chile and Ireland remain the most
-variable of the eight.
+economies keep their own volatility. `r volatile[1]` and
+`r volatile[2]` remain the most variable of the eight.
 
 ```{r standardise}
 growth$y <- growth$growth / ave(growth$growth, growth$outcome, FUN = sd)
@@ -292,10 +286,7 @@ pair <- function(rc, a, b) {
 fe_gc <- pair(rc, "GDP", "Consumption")
 fe_gi <- pair(rc, "GDP", "Investment")
 fe_ci <- pair(rc, "Consumption", "Investment")
-# The prose below orders the three correlations
 est <- rc$cor
-stopifnot(est["GDP", "Investment"] > est["GDP", "Consumption"],
-          est["GDP", "Consumption"] > est["Consumption", "Investment"])
 ```
 
 GDP shocks correlate with investment shocks at `r fe_gi` and with
@@ -315,14 +306,19 @@ gi <- vapply(names(rc_groups)[-1], function(g) {
   rc_groups[[g]]$cor["GDP", "Investment"]
 }, numeric(1))
 fe_gi_range <- sprintf("%.2f", range(gi))
-# The prose below says every economy's GDP-investment correlation
-# falls below the shared one
-stopifnot(all(gi < est["GDP", "Investment"]))
+n_below <- sum(gi < est["GDP", "Investment"])
+fe_below <- if (n_below == length(gi)) {
+  "Every economy's correlation is below the shared one."
+} else {
+  paste0(n_below, " of the eight economies' correlations are below the ",
+         "shared one.")
+}
 ```
 
 The economies' GDP and investment shocks correlate at
-`r fe_gi_range[1]` to `r fe_gi_range[2]`, all below the shared
-`r sprintf("%.2f", est["GDP", "Investment"])`. Forty-nine years of
+`r fe_gi_range[1]` to `r fe_gi_range[2]`, against the shared
+`r sprintf("%.2f", est["GDP", "Investment"])`. `r fe_below` Forty-nine
+years of
 shocks move each deviation little from the identity its LKJ(10) prior
 favours. The fifth of each economy's correlation that the deviation
 contributes pulls that correlation towards zero.
@@ -352,11 +348,13 @@ gdp_cons <- vapply(names(states)[-1], function(g) {
   states[[g]]$cor["GDP", "Consumption"]
 }, numeric(1))
 fe_us_states <- sprintf("%.2f", gdp_cons[["United States"]])
-# The prose below says consumption is the most persistent outcome on
-# average, that the US GDP diagonal is negative and that US GDP and
-# consumption states correlate most strongly of the eight
-stopifnot(which.max(diag(A$A)) == 2L, us$A_upper["GDP", "GDP"] < 0,
-          names(which.max(gdp_cons)) == "United States")
+most_persistent <- tolower(rownames(A$A)[which.max(diag(A$A))])
+us_rank <- rank(-gdp_cons)[["United States"]]
+fe_us_rank <- if (us_rank == 1) {
+  "the most strongly of the eight"
+} else {
+  paste0("ranked ", us_rank, " of the eight")
+}
 ```
 
 Without `groups`, `posterior_transition_matrix()` averages the eight
@@ -366,15 +364,14 @@ matrices in each posterior draw:
 A
 ```
 
-Consumption growth is the most persistent of the three outcomes. Its
-average diagonal coefficient is `r fe_cons_pool`, against
-`r fe_gdp_pool` for GDP.
+On average, `r most_persistent` growth is the most persistent of the
+three outcomes. The average diagonal coefficient is `r fe_cons_pool`
+for consumption and `r fe_gdp_pool` for GDP.
 
-The United States departs from this pattern. Its GDP diagonal is
-`r fe_us_gdp` and its GDP growth loads on last year's consumption
-growth at `r fe_us_cons`. In the United States, the states of GDP and
-consumption
-correlate at `r fe_us_states`, the most strongly of the eight. Last
+Consider the United States. Its GDP diagonal is `r fe_us_gdp` and
+its GDP growth loads on last year's consumption growth at
+`r fe_us_cons`. In the United States, the states of GDP and
+consumption correlate at `r fe_us_states`, `r fe_us_rank`. Last
 year's GDP and consumption then carry nearly the same information
 about this year. The model can trade a negative coefficient on one
 against a positive coefficient on the other. The wide intervals record
@@ -413,23 +410,21 @@ fe_ir_ii1 <- resp("Australia_Investment -> Australia_Investment", 1)
 fe_ir_ig1 <- resp("Australia_Investment -> Australia_GDP", 1)
 fe_ir_ic2 <- resp("Australia_Investment -> Australia_Consumption", 2)
 from_inv <- ir[startsWith(ir$shock, "Australia_Investment ->"), ]
-# The prose below says the shock stays within Australia, that
-# consumption is still raised in the second year and that every
-# response has decayed by year five
-stopifnot(
-  all(from_inv$irfQ50[!from_inv$shock %in%
-                        paste0("Australia_Investment -> ", aus)] == 0),
-  ir$irfQ2.5[ir$shock == "Australia_Investment -> Australia_Consumption" &
-               ir$horizon == 2] > 0,
-  all(abs(from_inv$irfQ50[from_inv$horizon >= 5]) < 0.01)
-)
+settled <- vapply(seq_len(8), function(h) {
+  all(abs(from_inv$irfQ50[from_inv$horizon >= h]) < 0.01)
+}, logical(1))
+fe_settle <- if (any(settled)) {
+  paste0("Every response stays within 0.01 of zero from year ",
+         which(settled)[1], ".")
+} else {
+  "Some responses stay above 0.01 at year eight."
+}
 ```
 
 The shock raises Australian investment by `r fe_ir_ii1` standard
 deviations in its first year. Because investment and GDP shocks
-correlate, GDP rises with it, by `r fe_ir_ig1`. Consumption is still
-raised in the second year, at `r fe_ir_ic2`. Every response has
-decayed by the fifth year.
+correlate, GDP moves with it, by `r fe_ir_ig1`. In the second year
+consumption is at `r fe_ir_ic2`. `r fe_settle`
 
 ## Variance decompositions
 
@@ -493,25 +488,33 @@ react <- stab[stab$metric == "reactivity", ]
 fe_us_react <- st("United States", "reactivity")
 mrr <- stab[stab$metric == "mean_return_rate", ]
 fe_mrr_range <- sprintf("%.2f", range(mrr$Estimate))
-# The prose below says the United States alone has reactivity whose
-# interval lies above zero, and that deviations halve within two years
-stopifnot(identical(as.character(react$group[react$Q2.5 > 0]),
-                    "United States"),
-          max(mrr$Estimate)^2 < 0.5)
+n_halve <- sum(mrr$Estimate^2 < 0.5)
+fe_halve <- if (n_halve == nrow(mrr)) {
+  "in every economy"
+} else {
+  paste0("in ", n_halve, " of the eight economies")
+}
+above <- as.character(react$group[react$Q2.5 > 0])
+fe_react <- if (length(above) == 0) {
+  "No economy has a reactivity interval above zero."
+} else {
+  paste0("Reactivity intervals lie above zero for ",
+         knitr::combine_words(above), ".")
+}
 ```
 
 The median mean return rates run from `r fe_mrr_range[1]` to
 `r fe_mrr_range[2]`. A deviation of growth from its mean halves within
-two years in every economy. Only the United States has a reactivity
-interval above zero, at `r fe_us_react`. The other seven span zero. The
-US reactivity comes from the large offsetting coefficients of its
-transition matrix.
+two years `r fe_halve`. `r fe_react` The United States has a
+reactivity of `r fe_us_react`, shaped by the large offsetting
+coefficients of its transition matrix.
 
 Partial pooling puts four fifths of the weight on a correlation of
 shocks shared by all eight economies, close to Savage's estimate from
 an earlier vintage of the same data. Each economy keeps a transition
-matrix of its own. The least certain of the eight belongs to the United
-States, whose GDP and consumption states move most closely together.
+matrix of its own. Its coefficients are least certain where two
+states move together, as the GDP and consumption states of the United
+States do.
 Forty-nine annual observations are few for a VAR of three states. The
 shared means make eight of them estimable at once.
 

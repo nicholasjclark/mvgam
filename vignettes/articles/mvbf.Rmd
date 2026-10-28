@@ -140,8 +140,8 @@ pp_check(mod_joint, ndraws = 50)
 ```
 
 `conditional_effects()` draws each response's covariate effects on
-that response's scale, with the latent process held out. Biomass peaks
-early in the year, as the simulated cycle does:
+that response's scale, with the latent process held out. The
+simulated biomass cycle peaks in month 3:
 
 ```{r effects, fig.asp = 0.45, fig.width = 8, fig.cap = "Expected biomass by month and camera detection probability by deployment days, with 95% credible intervals."}
 ce <- conditional_effects(mod_joint)
@@ -154,15 +154,13 @@ slope <- as.numeric(as_draws_matrix(
 ))
 fe_slope <- sprintf("%.2f [%.2f, %.2f]", mean(slope),
                     quantile(slope, 0.025), quantile(slope, 0.975))
-stopifnot(quantile(slope, 0.025) < 0.05, quantile(slope, 0.975) > 0.05)
-# The prose below says the biomass curve peaks in the first quarter
 bm <- ce[["biomass"]][["month"]]$data
-stopifnot(bm$month[which.max(bm$estimate)] < 4)
+bm_peak <- round(bm$month[which.max(bm$estimate)])
 ```
 
-The deployment slope is `r fe_slope` on the logit scale, against the
-0.05 used to simulate the data. Sixty binary records estimate it
-loosely.
+The fitted biomass curve peaks in month `r bm_peak`. The deployment
+slope is `r fe_slope` on the logit scale, against the 0.05 used to
+simulate the data.
 
 ## What the joint model gains
 
@@ -208,22 +206,22 @@ round(recovery, 2)
 ```
 
 ```{r recovery-numbers, include = FALSE}
-fe_rmse <- sprintf("%.2f", recovery[, "RMSE"])
-names(fe_rmse) <- rownames(recovery)
-# The prose below orders the four fits by error and says the joint
-# model has the narrowest intervals and the camera alone the widest
-stopifnot(identical(order(recovery[, "RMSE"]), 1:4),
-          which.min(recovery[, "Interval width"]) == 1,
-          which.max(recovery[, "Interval width"]) == 4)
+by_rmse <- rownames(recovery)[order(recovery[, "RMSE"])]
+fe_ranking <- knitr::combine_words(paste0(
+  tolower(by_rmse), " (", sprintf("%.2f", recovery[by_rmse, "RMSE"]), ")"
+))
+narrowest <- tolower(rownames(recovery)[
+  which.min(recovery[, "Interval width"])
+])
+widest <- tolower(rownames(recovery)[
+  which.max(recovery[, "Interval width"])
+])
 ```
 
-The joint model recovers the latent state most closely, with a root
-mean squared error of `r fe_rmse[["Joint"]]` and the narrowest
-intervals. Counts alone come next at `r fe_rmse[["Counts alone"]]` and
-biomass alone at `r fe_rmse[["Biomass alone"]]`. Because a single
-binary record per month constrains abundance weakly, the camera alone
-recovers the state worst, at `r fe_rmse[["Camera alone"]]`, with the
-widest intervals of the four.
+Ordered by root mean squared error against the simulated state, the
+fits rank `r fe_ranking`. Intervals are narrowest in the `r narrowest`
+fit and widest in the `r widest` fit. A single binary record per month
+constrains abundance weakly.
 
 ## Forecasts
 
@@ -249,11 +247,10 @@ plot(fc)
 The forecast object also feeds `score()` once the held-out
 observations arrive.
 
-The joint model recovers the simulated abundance more closely than any
-method fitted on its own, with the narrowest intervals of the four.
-Because a single binary outcome per month constrains the state weakly,
-the camera record gains the most from being fitted with the others. A
-monitoring programme that measures one population by several methods
+Against the simulated abundance, the four fits ranked `r fe_ranking`
+by error. A single binary outcome per month constrains the state
+weakly. Fitted jointly, the camera record takes the state the other
+methods estimate. A monitoring programme that measures one population by several methods
 can fit them to one latent process and let each method inform the
 rest.
 

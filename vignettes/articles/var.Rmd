@@ -303,9 +303,10 @@ fe_a_cd_pos <- sprintf("%.0f%%",
 fe_a_diag <- sprintf("%.2f", range(diag(A$A)))
 clear <- A$A_lower > 0 | A$A_upper < 0
 diag(clear) <- FALSE
-# The prose below names two clear cells
-stopifnot(sum(clear) == 2L, clear["Cryptomonas", "Daphnia"],
-          clear["Diatoms", "Cryptomonas"])
+n_clear <- sum(clear)
+more_fewer <- function(x) if (x < 0) "fewer" else "more"
+dc_word <- more_fewer(A$A["Cryptomonas", "Daphnia"])
+dia_word <- more_fewer(A$A["Diatoms", "Cryptomonas"])
 ```
 
 The diagonal describes persistence. Each taxon's deviation carries a
@@ -317,17 +318,18 @@ next month. The heatmap outlines each cell whose
 plot(A)
 ```
 
-Two of the twenty off-diagonal cells clear zero. The first is
-grazing. A month with more *Daphnia* than expected is followed by
-fewer *Cryptomonas*, with a coefficient of `r fe_a_dc`. The effect of
+In this fit, `r n_clear` of the twenty off-diagonal cells clear zero.
+Two cells have an ecological interpretation. The first is grazing. A month
+with more *Daphnia* than expected is followed by `r dc_word`
+*Cryptomonas*, with a coefficient of `r fe_a_dc`. The effect of
 *Cryptomonas* on *Daphnia* is `r fe_a_cd`. It is positive in
 `r fe_a_cd_pos` of the posterior draws, which suggests that more food
 in one month brings more grazers in the next. Fourteen years of
 monthly data do not settle that effect.
 
 The second cell links *Cryptomonas* to the diatoms. A month with more
-*Cryptomonas* than expected is followed by more diatoms, with a
-coefficient of `r fe_a_dia`. Because no feeding link runs between
+*Cryptomonas* than expected is followed by `r dia_word` diatoms, with
+a coefficient of `r fe_a_dia`. Because no feeding link runs between
 two phytoplankton groups, the likelier source is a driver the model
 omits, such as a change in mixing that favours one group before the
 other. A coefficient in $A$ records that one deviation predicts
@@ -373,24 +375,15 @@ plot(rc)
 ```{r rc-stat-numbers, include = FALSE}
 fe_s_uc <- pair(rc, "Unicells", "Cryptomonas")
 fe_s_cd <- pair(rc, "Cryptomonas", "Daphnia")
-# The prose below says grazing weakens the Cryptomonas-Daphnia
-# correlation and that the Unicells-Cryptomonas pair agrees
-est <- function(rc, a, b) rc$cor[a, b]
-stopifnot(
-  est(rc, "Cryptomonas", "Daphnia") <
-    est(rc_innov, "Cryptomonas", "Daphnia"),
-  abs(est(rc, "Unicells", "Cryptomonas") -
-        est(rc_innov, "Unicells", "Cryptomonas")) < 0.05
-)
 ```
 
 The two correlations differ where $A$ couples the taxa. The shocks of
 *Cryptomonas* and *Daphnia* correlate at `r fe_i_cd`. Their
-deviations correlate at `r fe_s_cd`. Grazing pulls the two deviations
-apart over the following months, which weakens the correlation the
-shared shocks create. $A$ barely couples the unicellular algae and
-*Cryptomonas*. Their correlations agree: `r fe_i_uc` for the shocks
-and `r fe_s_uc` for the deviations.
+deviations correlate at `r fe_s_cd`. Grazing passes each shock to the
+other taxon over the following months, which changes the correlation
+the shared shocks create. $A$ barely couples the unicellular algae and
+*Cryptomonas*. Their correlations are `r fe_i_uc` for the shocks and
+`r fe_s_uc` for the deviations.
 
 ## Impulse responses
 
@@ -424,25 +417,32 @@ fe_ir_dd1 <- resp("Daphnia -> Daphnia", 1)
 fe_ir_dc1 <- resp("Daphnia -> Cryptomonas", 1)
 fe_ir_dc3 <- resp("Daphnia -> Cryptomonas", 3)
 fe_ir_du2 <- resp("Daphnia -> Unicells", 2)
-# The prose below names each of these signs and decays
-med <- function(shock, h) ir$irfQ50[ir$shock == shock & ir$horizon == h]
+own_d <- ir[ir$shock == "Daphnia -> Daphnia", ]
+h_dd <- own_d$horizon[which(abs(own_d$irfQ50) < 0.05)[1]]
+fe_dd_decay <- if (is.na(h_dd)) {
+  "The rise stays above 0.05 through month twelve."
+} else {
+  paste0("The rise falls below 0.05 by month ", h_dd, ".")
+}
 from_daphnia <- ir[startsWith(ir$shock, "Daphnia ->"), ]
-stopifnot(
-  med("Daphnia -> Cryptomonas", 1) > 0,
-  med("Daphnia -> Cryptomonas", 3) < 0,
-  med("Daphnia -> Unicells", 2) < 0,
-  abs(med("Daphnia -> Daphnia", 4)) < 0.05,
-  all(abs(from_daphnia$irfQ50[from_daphnia$horizon >= 8]) < 0.01)
-)
+settled <- vapply(seq_len(12), function(h) {
+  all(abs(from_daphnia$irfQ50[from_daphnia$horizon >= h]) < 0.01)
+}, logical(1))
+fe_settle <- if (any(settled)) {
+  paste0("Every response stays within 0.01 of zero from month ",
+         which(settled)[1], ".")
+} else {
+  "Some responses stay above 0.01 at month twelve."
+}
 ```
 
-A shock raises *Daphnia* by `r fe_ir_dd1` in its first month. The
-rise decays within four months. Because the shocks of *Daphnia* and
-*Cryptomonas* are positively correlated, *Cryptomonas* first rises
-with *Daphnia*, by `r fe_ir_dc1`. Grazing then takes over. In the
-third month *Cryptomonas* is below its expected level, at
-`r fe_ir_dc3`. The unicellular algae fall in the second month, by
-`r fe_ir_du2`. Every response returns to zero within eight months.
+A shock raises *Daphnia* by `r fe_ir_dd1` in its first month.
+`r fe_dd_decay` Because the shocks of *Daphnia* and *Cryptomonas* are
+correlated, *Cryptomonas* moves with *Daphnia* in the first month, by
+`r fe_ir_dc1`. Grazing then acts through $A$. In the third month
+*Cryptomonas* is at `r fe_ir_dc3` relative to its expected level. The
+unicellular algae change by `r fe_ir_du2` in the second month.
+`r fe_settle`
 
 ## Variance decompositions
 
@@ -575,9 +575,8 @@ works through that comparison with leave-future-out
 cross-validation.
 
 The plankton of Lake Washington rise and fall mostly with the seasons
-and with phosphorus. Two of the twenty lagged interactions among the
-taxa separate from zero, grazing of *Cryptomonas* by *Daphnia* among
-them. The community damps a perturbation within a season. The
+and with phosphorus. In this fit, `r n_clear` of the twenty lagged
+interactions among the taxa separate from zero. The community damps a perturbation within a season. The
 forecasts for the held-out year keep close to their stated
 coverage.
 

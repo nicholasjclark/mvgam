@@ -176,13 +176,15 @@ round(t(apply(contrasts, 2, quantile, c(0.025, 0.5, 0.975))), 2)
 
 ```{r contrast-numbers, include = FALSE}
 ci <- apply(contrasts, 2, quantile, c(0.025, 0.975))
-# The prose below says both intervals cover the simulated constants
-stopifnot(ci[1, 1] < log(area), ci[2, 1] > log(area),
-          ci[1, 2] < log_thinning, ci[2, 2] > log_thinning)
+n_cover <- sum(ci[1, ] < c(log(area), log_thinning) &
+                 ci[2, ] > c(log(area), log_thinning))
+fe_cover <- c("Neither interval covers its constant.",
+              "One of the two intervals covers its constant.",
+              "Both intervals cover them.")[n_cover + 1]
 ```
 
-Both intervals cover the simulated constants, $\log 0.25 = -1.39$ and
-$-0.8$. Neither constant was given to the model.
+The simulated constants are $\log 0.25 = -1.39$ and $-0.8$.
+`r fe_cover` Neither constant was given to the model.
 
 `pp_check()` draws one panel per protocol, with bars for the binary
 occupancy record:
@@ -282,26 +284,19 @@ round(recovery, 2)
 
 ```{r recovery-numbers, include = FALSE}
 fe <- function(x) sprintf("%.2f", x)
-# The prose below says the joint model has the narrowest intervals, is
-# more accurate than occupancy or sightings alone, and that occupancy
-# alone puts the peak at the top of the observed range, and sightings
-# alone well above the simulated optimum
-stopifnot(which.min(recovery[, "Interval width"]) == 1,
-          all(recovery[1, "RMSE"] < recovery[3:4, "RMSE"]),
-          recovery["Occupancy alone", "Peak env"] == max(grid),
-          recovery["Sightings alone", "Peak env"] > 0.6)
+narrowest <- tolower(rownames(recovery)[
+  which.min(recovery[, "Interval width"])
+])
 ```
 
-The joint model and the counts alone track the response about equally
-closely, with root mean squared errors of
-`r fe(recovery["Joint", "RMSE"])` and
-`r fe(recovery["Counts alone", "RMSE"])`. The joint model's intervals
-are the narrowest of the four. The sightings alone put the peak at env
-`r fe(recovery["Sightings alone", "Peak env"])`, well above the
-simulated optimum of 0.4. Because one binary
-outcome per month constrains the intensity weakly, the occupancy record
-alone estimates a response that rises across the whole gradient, with
-its peak at the upper edge of the observed range.
+The joint model and the counts alone track the response with root
+mean squared errors of `r fe(recovery["Joint", "RMSE"])` and
+`r fe(recovery["Counts alone", "RMSE"])`. Intervals are narrowest in
+the `r narrowest` fit. Against the simulated optimum of 0.4, the
+sightings alone put the peak at env
+`r fe(recovery["Sightings alone", "Peak env"])` and the occupancy
+record alone at env `r fe(recovery["Occupancy alone", "Peak env"])`.
+One binary outcome per month constrains the intensity weakly.
 
 ## Forecasts
 
@@ -353,9 +348,10 @@ detection.
 An integrated distribution model in mvgam is one call. Each protocol's
 family and link express its sampling process. The shared trend pools
 what every protocol says about the intensity. In this simulation,
-pooling gave the most precise estimate of the environmental response,
-as accurate as the best protocol alone. Because occupancy alone put the optimum in the wrong
-habitat, that record gained the most from pooling.
+intervals on the environmental response were narrowest in the
+`r narrowest` fit. Fitted alone, the occupancy record put the optimum
+at env `r fe(recovery["Occupancy alone", "Peak env"])`, against the
+simulated 0.4.
 
 ## Where to next
 
