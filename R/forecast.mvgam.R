@@ -13,22 +13,25 @@
 #' @inheritParams posterior_epred.mvgam
 #' @param object A fitted [mvgam][mvgam::mvgam] object.
 #' @param newdata Optional `data.frame` with the columns of the
-#'   training data, holding the time and series cells to forecast.
-#'   Rows with times beyond the training grid set the horizon. When
-#'   `NULL`, `forecast()` uses the held-out data given to
+#'   training data, one row per series and future time to forecast.
+#'   When `NULL`, `forecast()` uses the held-out data given to
 #'   `mvgam(newdata = )`. A fit without held-out data needs `newdata`.
 #'
-#'   Five trends step once per time point: AR(), RW(), VAR(), LLT()
-#'   and PW(). Their forecast times must continue the training series
-#'   at its own spacing, without a gap. After training ends at
-#'   `t = 30`, a request for `t = 41:42` is refused: two rows would
-#'   report a two-step spread for a twelve-step horizon. Supply every
-#'   intervening time, whether or not the response is observed there.
-#'   `CAR()` takes the elapsed gap into its kernel. Each series may
-#'   have its own forecast times, all after the last fitted time.
-#'   `ZMVN()` has no temporal dynamics and takes any later times.
-#'   `ZMVN()` and `PW()` need one set of forecast times shared by
-#'   every series.
+#'   The trend decides which future times are allowed:
+#'   \itemize{
+#'     \item `AR()`, `RW()`, `VAR()`, `LLT()` and `PW()` step once per
+#'       time point. Their forecast times must continue each series at
+#'       its own spacing, with no gap. After training ends at `t = 30`,
+#'       rows for `t = 41:42` alone are refused. The trend would step
+#'       once and twice, though those times are 11 and 12 steps past the
+#'       end of training. Supply every time in between, with or without
+#'       a response.
+#'     \item `CAR()` allows for the gap between times. Each series may
+#'       have its own forecast times, all after the last fitted time.
+#'     \item `ZMVN()` has no time dynamics and takes any later times.
+#'   }
+#'   `ZMVN()` and `PW()` need the same forecast times for every
+#'   series.
 #' @param ... Unused. Anything passed here is refused.
 #' @param type The scale of the draws:
 #'   * `"response"` (the default) samples from the observation family.
@@ -44,32 +47,31 @@
 #'   effects of the trend formula's covariates. `c("level",
 #'   "predictor")` gives the level with those effects. A factor model
 #'   projects each component through its loadings, as it projects the
-#'   trend. The result is an ordinary [mvgam_forecast-class][mvgam]
-#'   with the components in its `component` slot.
-#' @param coef_uncertainty Logical. When `FALSE`, every forecast
-#'   draw uses the first of the draws `ndraws` or `draw_ids` select
-#'   for every coefficient in the
-#'   observation and trend formulas: population-level effects, smooth
-#'   bases, random effect levels and Hilbert-space `gp(x, k)` bases.
-#'   Defaults to `TRUE`.
-#' @param trend_uncertainty Logical. When `FALSE`, every forecast
-#'   draw uses the first of the selected draws for the trend dynamics
-#'   parameters (`sigma`, AR, MA and VAR coefficients), the last
-#'   fitted state and the trend formula's predictor `mu_trend`. Each
-#'   draw still takes fresh innovations. The spread then shows
-#'   innovation noise alone. Defaults to `TRUE`.
-#' @param obs_uncertainty Logical. When `FALSE`, skips
-#'   observation-family sampling for `type = "response"`,
-#'   returning the family mean instead.
-#'   Defaults to `TRUE`.
+#'   trend.
+#' @param coef_uncertainty Logical, `TRUE` by default. `FALSE` holds
+#'   the coefficients of the observation and trend formulas at one
+#'   posterior draw, the first that `ndraws` or `draw_ids` selects. That
+#'   includes smooth, random-effect and Hilbert-space `gp(x, k)`
+#'   coefficients. The forecast then leaves out their uncertainty.
+#'   Turning off one source of uncertainty at a time shows how much each
+#'   contributes to a forecast.
+#' @param trend_uncertainty Logical, `TRUE` by default. `FALSE` holds
+#'   the parameters of the trend dynamics (`sigma`, AR, MA and VAR
+#'   coefficients), the last fitted state and the trend formula's
+#'   predictor at that same draw. Each draw still takes new
+#'   innovations. The spread then shows innovation noise alone.
+#' @param obs_uncertainty Logical, `TRUE` by default. `FALSE` returns
+#'   the family's mean under `type = "response"`, in place of a sampled
+#'   observation.
 #'
 #' @return An object of class [mvgam_forecast-class][mvgam].
 #'   Hindcasts and forecasts are returned as named lists of
-#'   `[ndraws, n_times]` matrices, one per series.
+#'   `[ndraws, n_times]` matrices, one per series. A forecast of state
+#'   components names them in its `component` slot.
 #'
 #' @seealso [hindcast.mvgam()] returns the fitted latent states.
 #'   [posterior_predict.mvgam()] and [posterior_epred.mvgam()] predict
-#'   by integrating over the trend's stochastic dynamics. `forecast()`
+#'   from the covariate part of the model. `forecast()`
 #'   extrapolates the fitted latent state. [score.mvgam_forecast()]
 #'   scores a forecast against held-out data. The
 #'   `r mvgam_article("forecast_evaluation", "forecast evaluation article")`
@@ -83,7 +85,7 @@
 #'                      proportional_train = 0.75)
 #'
 #' mod <- mvgam(
-#'   y ~ s(x),
+#'   y ~ s(x, k = 5),
 #'   trend_formula = ~ AR(p = 1),
 #'   data    = simdat$data_train,
 #'   newdata = simdat$data_test,
@@ -788,9 +790,9 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 #'
 #' `trend_state_rows()` gives the fitted `trend[t, s]` of each draw, or
 #' the state component `component` names. The observation predictor
-#' added to the trend gives the `link` hindcast. A fit without a trend takes a zero trend. A closure-unit
-#' family's `expected` and `response` marginalise over the latent state
-#' of each unit. `posterior_epred()` and `posterior_predict()` give
+#' added to the trend gives the `link` hindcast. A fit without a trend
+#' takes a zero trend. A closure-unit family's `expected` and `response`
+#' marginalise over the latent state of each unit. `posterior_epred()` and `posterior_predict()` give
 #' those per visit row. `process_error = TRUE` takes the marginal draws
 #' of those functions for every family.
 #'

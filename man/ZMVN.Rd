@@ -2,7 +2,7 @@
 % Please edit documentation in R/trend_system.R
 \name{ZMVN}
 \alias{ZMVN}
-\title{Specify correlated residual processes in \pkg{mvgam}}
+\title{Correlated latent effects with no time dependence}
 \usage{
 ZMVN(
   time = NA,
@@ -17,33 +17,30 @@ ZMVN(
 }
 \arguments{
 \item{time}{The unquoted name of the \code{numeric} or \code{integer} variable
-in \code{data} that indexes the units whose latent residuals are
-correlated. Defaults to \code{time}, as for the other trends. The units
-can be sites, plots or any other replicate.
+in \code{data} that indexes the units, such as sites, plots or times.
+Defaults to \code{time}, as for the other trends.
 
-ZMVN takes these values at any spacing. The likelihood is
-\eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma} indexed by
-series alone. The gap between two units enters nowhere. Use ZMVN
-for spatial or otherwise non-temporal units, where gaps are
-natural: dropped sites, stratified k-fold refits or irregular
-sampling grids.}
+The values may have any spacing. Each unit's effects follow
+\eqn{x_{u, :} \sim MVN(0, \Sigma)}, with \eqn{\Sigma} indexed by
+series alone. The gap between two units plays no part. That suits
+sites, dropped units, k-fold refits and irregular sampling.}
 
 \item{series}{The unquoted name of the \code{factor} variable in \code{data} that
 names each row's series. Its levels fix the order of the series. A
 trend needs this column even for a single series. Defaults to \code{series}.}
 
-\item{gr}{An optional grouping \code{factor} in \code{data} that sets up
-hierarchical residual correlations. Each level's correlation matrix
+\item{gr}{An optional grouping \code{factor} in \code{data}. Each of its levels
+takes its own correlation matrix among the latent effects. Each matrix
 shrinks toward a global one by the weight \code{alpha_cor_trend}, as
 \link{trend_constructors} sets out. Without \code{subgr}, the series column
-names the units within each level.}
+names the series within each level.}
 
 \item{subgr}{A subgrouping \code{factor} in \code{data} naming the units within
 each level of \code{gr}, from which the series are built as
 \link{trend_constructors} describes. For species (\code{species}) counted at
 sites (\code{site}) in regions (\code{region}), \code{time = site}, \code{gr = region}
-and \code{subgr = species} correlate the species' residuals within each
-region.}
+and \code{subgr = species} correlate the species' latent effects within
+each region.}
 
 \item{n_lv}{The number of latent factors to estimate for dynamic
 factor models. When \code{n_lv} is smaller than the number of series,
@@ -51,18 +48,15 @@ the latent processes are modelled as \code{n_lv} factors with estimated
 loadings onto the series. Defaults to \code{NULL}, in which case one
 latent process is used per series.}
 
-\item{cor}{\code{Logical}. Include correlated process errors as part of a
-multivariate normal process model? If \code{TRUE} and if
-\code{n_series > 1} in the supplied data, a fully structured covariance
-matrix will be estimated for the process errors. \code{AR()} and
-\code{RW()} default to \code{NULL}, which resolves to \code{FALSE}
-for an ungrouped trend and to \code{TRUE} whenever \code{gr} names
-a grouping variable: a grouped trend estimates correlations among
-the \code{subgr} units within each level of \code{gr}, which is
-the model \code{gr} exists to specify. \code{VAR()} and
-\code{ZMVN()} always estimate correlations and refuse
-\code{cor = FALSE}, as do \code{AR(gr = ...)} and
-\code{RW(gr = ...)}. \code{CAR()} defaults to \code{FALSE}.}
+\item{cor}{\code{Logical}. Correlate the innovations of different
+series? \code{TRUE} estimates a full covariance matrix of the
+innovations when the data hold more than one series. \code{AR()}
+and \code{RW()} default to \code{NULL}. That means \code{FALSE}
+for an ungrouped trend and \code{TRUE} when \code{gr} names a
+grouping variable. \code{VAR()}, \code{ZMVN()} and grouped
+\code{AR()} and \code{RW()} trends always estimate correlations.
+They refuse \code{cor = FALSE}. \code{CAR()} defaults to
+\code{FALSE}.}
 
 \item{trend_map}{Optional specification of which latent process each
 series maps onto. It fixes the loadings of a dynamic factor model.
@@ -94,25 +88,29 @@ When \code{df = NA} the degrees of freedom are estimated as
 \code{\link{get_prior}} lists \code{nu_trend} with the other trend
 classes.
 
-Three caveats apply. The bound of \code{2} is required. Below it
-the innovations have no finite variance. An autoregressive trend
-then has no stationary covariance to start from. Above it, the
-first states of an autoregressive trend take the stationary mean
-and covariance. Their distribution matches the stationary law
-exactly under Gaussian innovations alone. A finite mix of t
-variates has heavier tails than the infinite sum that defines that
-law. The degrees of freedom are informed only through the tail of
-the latent process. They are weakly identified in short series:
-below roughly 200 time points, the posterior stays close to its
-prior. \code{VAR()} samples its states directly and \code{PW()}
-has no innovations. Neither takes \code{df}.}
+Three caveats apply:
+\itemize{
+\item A fixed value must exceed \code{2}. Below it the innovations
+have no finite variance. An autoregressive trend then has no
+stationary covariance to start from.
+\item The first states of an autoregressive trend take the
+stationary mean and covariance. Under t innovations the true
+stationary distribution has heavier tails than that.
+\item Only the tails of the latent process inform the degrees of
+freedom. Below roughly 200 time points their posterior stays
+close to the prior.
+}
+\code{VAR()} samples its states directly and \code{PW()} has no
+innovations. Neither takes \code{df}.}
 }
 \value{
 An object of class \code{mvgam_trend}.
 }
 \description{
-Set up latent correlated multivariate Gaussian residual processes in
-\pkg{mvgam}. The constructor records its arguments. The model
+A latent effect for each unit, such as a site, plot or time point,
+drawn from a multivariate normal that correlates the series. Unlike
+the other trends, the effect at one unit does not depend on the
+previous one. The constructor records its arguments. The model
 evaluates them against the data.
 }
 \section{Identification}{
@@ -203,9 +201,9 @@ models. \emph{Statistics and Computing}, 34:143.
 \code{\link[=jsdgam]{jsdgam()}} fits \code{ZMVN()} factors across species.
 \code{\link[=residual_cor]{residual_cor()}} and \code{\link[=ordinate]{ordinate()}} interpret the fitted
 correlations. The
-\href{https://nicholasjclark.github.io/mvgam/articles/dfm.html}{dynamic factor vignette} builds factor
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html}{dynamic factor vignette} builds factor
 models with a partial \code{trend_map}. The
-\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated distribution model article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/idm.html}{integrated distribution model article}
 shares one latent process across several observation families.
 
 Other trend models: 

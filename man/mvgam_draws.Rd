@@ -91,7 +91,7 @@ of the \verb{posterior::draws_*} classes. Parameters take their brms
 names, such as \code{b_x} and \code{sd_grp__Intercept}. A trend parameter
 indexed by series takes the series name, as in
 \code{sigma_trend[series_1]}. The
-\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated data model article} contrasts
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/idm.html}{integrated data model article} contrasts
 intercepts drawn with \code{as_draws_df()}.
 }
 \examples{
@@ -99,7 +99,7 @@ intercepts drawn with \code{as_draws_df()}.
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)

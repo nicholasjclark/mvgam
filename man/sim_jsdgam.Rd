@@ -118,7 +118,7 @@ rowSums(comp$y_array)[1:3]
 \code{\link[=jsdgam]{jsdgam()}} fits the model these data come from.
 \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} simulates occupancy and N-mixture data.
 \code{\link[=sim_mvgam]{sim_mvgam()}} simulates time series. The
-\href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{joint species distribution article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{joint species distribution article}
 fits and interprets models of this kind.
 
 Other simulation: 

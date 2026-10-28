@@ -34,10 +34,11 @@ hindcast <- function(object, ...) {
 #'   `as.data.frame()` and `plot()` methods.
 #' @param process_error Logical. `FALSE` (the default) takes the
 #'   fitted latent state of each draw. `type = "response"` then adds
-#'   the observation noise alone. `TRUE` adds fresh trend innovations
-#'   to the linear predictor, as [posterior_epred.mvgam()] does with
-#'   the same argument. A `component` is a fitted state and needs
-#'   `FALSE`.
+#'   the observation noise alone. `TRUE` replaces the fitted states
+#'   with the covariate part plus newly drawn innovations, as
+#'   [posterior_epred.mvgam()] gives with the same argument. The
+#'   hindcast then shows what the model predicts without the observed
+#'   history. A `component` is a fitted state and needs `FALSE`.
 #'
 #' @return An [mvgam_forecast-class][mvgam] object. Its hindcasts are a
 #'   named list of `[ndraws, n_times]` matrices, one per series. Its
@@ -45,7 +46,7 @@ hindcast <- function(object, ...) {
 #'
 #' @seealso [forecast.mvgam()] extrapolates the fitted state.
 #'   [posterior_predict.mvgam()] and [posterior_epred.mvgam()] predict
-#'   by integrating over the trend's dynamics. The
+#'   from the covariate part of the model. The
 #'   `r mvgam_article("mvbf", "multivariate article")` compares
 #'   `type = "trend"` hindcasts of one latent state from a joint model
 #'   and from each data source alone. The
@@ -58,7 +59,7 @@ hindcast <- function(object, ...) {
 #'                      n_timepoints = 120L, trend_model = AR())
 #'
 #' mod <- mvgam(
-#'   y ~ s(x),
+#'   y ~ s(x, k = 5),
 #'   trend_formula = ~ AR(p = 1),
 #'   data    = simdat$data_train,
 #'   family  = poisson(),

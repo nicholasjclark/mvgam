@@ -1,9 +1,11 @@
 #' Residual correlations between the series of a fitted model
 #'
+#' @description
 #' Posterior correlations, covariances and optional partial correlations
-#' between series, from the trend's covariance. Three trend structures
-#' carry one:
-#'
+#' between the series' latent trends. Residual here means the
+#' co-variation of the trends left once the covariate effects are
+#' accounted for. [residuals.mvgam()] returns the observation
+#' residuals. Three kinds of trend estimate these correlations:
 #' \itemize{
 #'   \item A factor trend (`n_lv` on the trend constructor). Each draw
 #'     gives the series covariance `Z Omega Z'`, with `Z` the loadings
@@ -16,21 +18,26 @@
 #' }
 #'
 #' @inheritParams predict.mvgam
+#' @param probs Two probabilities for the lower and upper bounds of the
+#'   credible interval. Default `c(0.025, 0.975)`, a 95% interval.
 #' @param object A fitted `mvgam` object.
 #' @param covariance Which covariance to summarise. `"stationary"` (the
 #'   default) gives the covariance of the latent states over the whole
 #'   series. `"innovation"` gives the covariance of one time step's
-#'   shocks. The two coincide for a trend whose states keep no memory
+#'   innovations. The two coincide for a trend whose states keep no memory
 #'   between times.
 #' @param by_group Logical, for a hierarchical trend. `FALSE` (the
-#'   default) returns the population correlation of the shocks,
+#'   default) returns the population correlation of the innovations,
 #'   `tcrossprod(L_Omega_global)`, under either `covariance`. `TRUE`
 #'   also returns each group's correlation,
 #'   `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev[g])`.
 #' @param partial Logical. `TRUE` also computes partial correlations,
-#'   `P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)`, for the `prec*`
-#'   fields. A factor fit with fewer factors than series has a singular
-#'   covariance of rank `n_lv` and is refused. [shared_variation()]
+#'   `P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)`. A partial
+#'   correlation measures the association of two series once every
+#'   other series is held fixed. The result stores them in the fields
+#'   whose names start with `prec`. A factor fit with fewer factors
+#'   than series has a singular covariance of rank `n_lv` and is
+#'   refused. [shared_variation()]
 #'   reports the variation its series share. The residual variances of
 #'   [mvn()] and [mvt()] make their covariance full rank.
 #' @param summary Logical. `TRUE` (the default) summarises each entry:
@@ -51,16 +58,16 @@
 #' `Theta_trend`.
 #'
 #' The stationary covariance describes the states over the whole series.
-#' An `AR(cor = TRUE)` trend takes the leading block of the stationary
-#' covariance of its companion state, a moving-average term included. At
-#' one lag that block is `Sigma[a, b] / (1 - ar_a * ar_b)`. A `CAR()`
+#' An `AR(cor = TRUE)` trend reports the stationary covariance of its
+#' states, including any moving-average term. With one lag it is
+#' `Sigma[a, b] / (1 - ar_a * ar_b)`. A `CAR()`
 #' trend holds it at every time of an irregular grid. A draw whose
 #' autoregression is explosive has no stationary covariance and keeps
 #' its innovation covariance. A warning gives the count once per session.
 #' `ZMVN()` keeps no memory between times and `RW()` has no stationary
 #' distribution. Both report their innovation covariance. A hierarchical
-#' `AR()` lifts each group's scales the same way before the global and
-#' group factors are mixed.
+#' `AR()` converts each group's scales to stationary scales in the same
+#' way, before its global and group correlations are mixed.
 #'
 #' Under `covariance = "innovation"` a `VAR()` fit reports the
 #' contemporaneous shocks. Its transition matrix spreads each shock
@@ -76,15 +83,16 @@
 #' matrices are valid correlation matrices. `prob_positive` and
 #' `prob_negative` are posterior sign probabilities. `prob_nonzero` is
 #' the larger of the two. `sig_cor` keeps the correlations whose
-#' `prob_nonzero` exceeds `prob_threshold`, 0.95. Its other entries are
-#' zero.
+#' `prob_nonzero` exceeds `prob_threshold`, fixed at 0.95. Its other
+#' entries are zero.
 #'
 #' [jsdgam()] fits the same factor model. Its species covariance follows
 #' the factor rule above.
 #'
 #' @seealso [plot.mvgam_residcor()] draws the matrix as a heatmap.
 #'   [summary.mvgam_residcor()] lists the pairs. [ordinate()] draws the
-#'   loadings as a biplot. The
+#'   loadings as a biplot. The example of [trend_constructors] takes
+#'   the correlations of a `CAR(cor = TRUE)` trend. The
 #'   `r mvgam_article("jsdgam", "joint species distribution article")`
 #'   interprets species correlations from a factor model.
 #'

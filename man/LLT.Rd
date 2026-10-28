@@ -29,40 +29,29 @@ trend needs this column even for a single series. Defaults to \code{series}.}
 \item{damped}{Logical. Estimate a damping coefficient for the
 slope? Default \code{FALSE}.}
 
-\item{cor}{\code{Logical}. Include correlated process errors as part of a
-multivariate normal process model? If \code{TRUE} and if
-\code{n_series > 1} in the supplied data, a fully structured covariance
-matrix will be estimated for the process errors. \code{AR()} and
-\code{RW()} default to \code{NULL}, which resolves to \code{FALSE}
-for an ungrouped trend and to \code{TRUE} whenever \code{gr} names
-a grouping variable: a grouped trend estimates correlations among
-the \code{subgr} units within each level of \code{gr}, which is
-the model \code{gr} exists to specify. \code{VAR()} and
-\code{ZMVN()} always estimate correlations and refuse
-\code{cor = FALSE}, as do \code{AR(gr = ...)} and
-\code{RW(gr = ...)}. \code{CAR()} defaults to \code{FALSE}.}
+\item{cor}{\code{Logical}. Correlate the innovations of different
+series? \code{TRUE} estimates a full covariance matrix of the
+innovations when the data hold more than one series. \code{AR()}
+and \code{RW()} default to \code{NULL}. That means \code{FALSE}
+for an ungrouped trend and \code{TRUE} when \code{gr} names a
+grouping variable. \code{VAR()}, \code{ZMVN()} and grouped
+\code{AR()} and \code{RW()} trends always estimate correlations.
+They refuse \code{cor = FALSE}. \code{CAR()} defaults to
+\code{FALSE}.}
 
-\item{gr}{An optional grouping variable, which must be a \code{factor} in the
-supplied \code{data}, for setting up hierarchical residual correlation
-structures. If specified, this sets up a model where the residual
-correlations for a specific level of \code{gr} are modelled
-hierarchically:
+\item{gr}{An optional \code{factor} in \code{data} that groups the series, such
+as region. Each level of \code{gr} takes its own correlation matrix among
+the innovations of its series. The matrices are pooled toward one
+global matrix:
 
 \eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} +
-  (1 - \alpha_{cor})\Omega_{group, local}},
+  (1 - \alpha_{cor})\Omega_{group, local}}
 
-where \eqn{\Omega_{global}} is a \emph{global} correlation matrix,
-\eqn{\Omega_{group, local}} is a \emph{local deviation} correlation matrix and
-\eqn{\alpha_{cor}} is a weighting parameter controlling how strongly the
-local correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
-correlation matrix \eqn{\Omega_{global}} (larger values of
-\eqn{\alpha_{cor}} indicate a greater degree of shrinkage, i.e. a greater
-degree of partial pooling).
-
-A grouped trend estimates correlations among the \code{subgr} units
-within each level of \code{gr}. Without \code{subgr}, the series column names
-those units. \code{cor} defaults to \code{TRUE} for such a trend. An explicit
-\code{cor = FALSE} is refused.
+Here \eqn{\Omega_{global}} is shared by every group,
+\eqn{\Omega_{group, local}} is the deviation of one group and
+\eqn{\alpha_{cor}} sets the weight on the global matrix. An
+\eqn{\alpha_{cor}} near 1 pools the groups strongly. Without
+\code{subgr}, the series column names the series within each group.
 
 Within a \code{VAR()} it sets up a hierarchical panel vector
 autoregression. Each group learns its autoregressive, moving-average
@@ -71,9 +60,8 @@ not interact.
 
 Two constraints apply to hierarchical trend models:
 \itemize{
-\item \code{gr} must be constant within each series (each series belongs to
-a single group). Models with \code{gr} varying within a series are
-rejected at validation time.
+\item Each series belongs to one group. \code{mvgam()} refuses a \code{gr}
+that varies within a series.
 \item Every group must hold the same number of series. The Stan
 program sizes each group's correlation block from one shared
 count. Validation refuses unbalanced groups before fitting.
@@ -85,7 +73,7 @@ hierarchical correlations builds its series from \code{gr} and \code{subgr},
 and \code{data} then needs no \code{series} column.
 
 For example, to model counts of several species (\code{species} in
-\code{data}) across three regions (\code{region}) with residuals correlated
+\code{data}) across three regions (\code{region}) with innovations correlated
 within regions, specify \code{gr = region} and \code{subgr = species}.
 \code{mvgam()} then builds the series as
 
@@ -133,18 +121,20 @@ When \code{df = NA} the degrees of freedom are estimated as
 \code{\link{get_prior}} lists \code{nu_trend} with the other trend
 classes.
 
-Three caveats apply. The bound of \code{2} is required. Below it
-the innovations have no finite variance. An autoregressive trend
-then has no stationary covariance to start from. Above it, the
-first states of an autoregressive trend take the stationary mean
-and covariance. Their distribution matches the stationary law
-exactly under Gaussian innovations alone. A finite mix of t
-variates has heavier tails than the infinite sum that defines that
-law. The degrees of freedom are informed only through the tail of
-the latent process. They are weakly identified in short series:
-below roughly 200 time points, the posterior stays close to its
-prior. \code{VAR()} samples its states directly and \code{PW()}
-has no innovations. Neither takes \code{df}.}
+Three caveats apply:
+\itemize{
+\item A fixed value must exceed \code{2}. Below it the innovations
+have no finite variance. An autoregressive trend then has no
+stationary covariance to start from.
+\item The first states of an autoregressive trend take the
+stationary mean and covariance. Under t innovations the true
+stationary distribution has heavier tails than that.
+\item Only the tails of the latent process inform the degrees of
+freedom. Below roughly 200 time points their posterior stays
+close to the prior.
+}
+\code{VAR()} samples its states directly and \code{PW()} has no
+innovations. Neither takes \code{df}.}
 
 \item{season}{Optional numeric vector of seasonal periods in time
 steps, each above 2, such as \code{12} for monthly data or \code{c(7, 365.25)} for daily data. Periods need not be whole. Default \code{NULL}
@@ -162,20 +152,20 @@ An object of class \code{mvgam_trend}.
 A latent level that moves with a latent growth rate, the local
 linear trend of Harvey (1989). Each latent process carries a level
 and a slope:
-}
-\details{
+
 \deqn{\mu_t = \mu_{t-1} + \beta_{t-1} + \eta_t}
 \deqn{\beta_t = \phi \beta_{t-1} + \zeta_t}
 
-The level shocks \eqn{\eta_t} have scale \code{sigma_trend} and the slope
-shocks \eqn{\zeta_t} scale \code{sigma_slope_trend}. A small
+The level innovations \eqn{\eta_t} have scale \code{sigma_trend} and the
+slope innovations \eqn{\zeta_t} scale \code{sigma_slope_trend}. A small
 \code{sigma_slope_trend} gives a trend that keeps its direction. A zero
 scale gives a random walk with a fixed drift. \code{damped = TRUE}
 estimates \eqn{\phi} on (0, 1) as \code{ar1_slope_trend}, which pulls
 the growth rate back toward zero over the horizon (Gardner and
 McKenzie 1985). The undamped trend has \eqn{\phi = 1}. Its
 forecasts extend the current growth rate.
-
+}
+\details{
 The level shocks take the innovation structure of \code{RW()}: \code{cor}
 correlates them across series, \code{gr} and \code{subgr} pool their
 correlations hierarchically and \code{df} gives them a multivariate t.
@@ -190,25 +180,26 @@ distribution. The level starts at its first shock. The observation
 intercept carries its mean.
 
 Default priors scale with the number of time points \eqn{N} and
-widen by the factor \eqn{s} that brms applies to its own default
-scales, as \code{\link[=get_prior]{get_prior()}} describes. The shock scales \code{sigma_trend}
-and \code{sigma_slope_trend} take \code{gamma(2, .)} priors. At their prior
-medians, the level shocks and the slope shocks each move the trend
-over the series by a standard deviation of \eqn{s}. The slope's
-median accounts for the damping at the median of its prior. A
-\code{gamma(2, .)} density rises from zero. It keeps a nearly fixed level
-or slope within reach and steers the sampler away from the boundary
-at zero.
-\code{init_slope_trend ~ normal(0, 2 / r)}, where
+with the factor \eqn{s} that brms uses to widen its own default
+scales, as \code{\link[=get_prior]{get_prior()}} describes:
+\itemize{
+\item \code{sigma_trend} and \code{sigma_slope_trend} take \code{gamma(2, .)}
+priors. At its prior median, each kind of shock alone moves the
+trend by a standard deviation of \eqn{s} over the series. The
+slope prior allows for damping at the prior median of
+\code{ar1_slope_trend}. A \code{gamma(2, .)} density is zero at zero. It
+allows a nearly fixed level or slope and keeps the sampler off
+that boundary.
+\item \code{init_slope_trend} takes \code{normal(0, 2 / r)}. Here
 \eqn{r = 1 + \phi + \dots + \phi^{N - 2}} is how far a unit
-initial slope moves the level by the end of the series, gives the
-initial slope \eqn{2 s} of growth over the series at one prior
-standard deviation. An undamped slope has \eqn{r = N - 1}. A factor
-model with every loading sampled measures both in units of its
-level's spread over the series,
-\eqn{\sqrt{N}}. Its loadings carry \eqn{s}. \code{ar1_slope_trend} takes
-\code{beta(18, 2)}, with median 0.91. \code{get_prior()} prints the resolved
-values.
+initial slope moves the level by the end of the series. It is
+\eqn{N - 1} without damping. One prior standard deviation then
+gives growth of \eqn{2 s} over the series.
+\item \code{ar1_slope_trend} takes \code{beta(18, 2)}, with median 0.91.
+}
+A factor model with every loading sampled measures these scales in
+units of \eqn{\sqrt{N}}, the spread of its level over the series.
+Its loadings carry \eqn{s}. \code{get_prior()} prints the resolved values.
 
 A smooth or linear function of time in either formula competes with
 the slope for the same variation. \code{mvgam()} warns when the time
@@ -220,20 +211,19 @@ in \code{\link[=mvgam]{mvgam()}} starts every chain from Stan's Pathfinder
 approximation.
 
 In a factor model with every loading sampled, the loadings set
-each factor's scale and the level shocks take unit scale. The
-factors share one \code{sigma_slope_trend} and one \code{ar1_slope_trend}.
-The model is then unchanged under a rotation of the factors. The QR
-rotation that \code{RW()} factors take identifies the loadings. A trend
-with no level noise would need an infinite slope scale. A factor
-model always keeps some level noise. A
-\code{trend_map} that fixes loadings keeps one slope scale per factor.
+each factor's scale. The level shocks take a fixed scale of one.
+Every factor keeps its level noise. The factors share one
+\code{sigma_slope_trend} and one \code{ar1_slope_trend}. A rotation of the
+factors then leaves the model unchanged. The QR rotation of \code{RW()}
+factors identifies the loadings. A \code{trend_map} that fixes loadings
+keeps one slope scale per factor.
 
 \emph{Seasonality}:
 \code{season} adds a stochastic season \eqn{\gamma_t} to the level, the
 trigonometric form of Harvey (1989) with the non-integer and multiple
 periods of De Livera et al. (2011). The latent state is
-\eqn{\mu_t + \gamma_t}. Harmonic \eqn{j} of period \eqn{s}
-holds a state pair that turns by \eqn{\lambda_j = 2 \pi j / s} at
+\eqn{\mu_t + \gamma_t}. Harmonic \eqn{j} of period \eqn{m}
+holds a state pair that turns by \eqn{\lambda_j = 2 \pi j / m} at
 each step and takes Gaussian shocks of scale \code{sigma_season_trend}:
 
 \deqn{\gamma_{j,t} = \cos\lambda_j \gamma_{j,t-1} +
@@ -243,8 +233,8 @@ each step and takes Gaussian shocks of scale \code{sigma_season_trend}:
 
 Common periods are 4 for quarterly data, 12 for monthly data, 52.18
 for weekly data over years, 7 and 365.25 for daily data and 24 and
-168 for hourly data. \code{LLT(season = 12, harmonics = K)} states the
-season that \code{AddTrig(period = 12, frequencies = 1:K)} states in
+168 for hourly data. \code{LLT(season = 12, harmonics = K)} fits the
+season that \code{AddTrig(period = 12, frequencies = 1:K)} specifies in
 \pkg{bsts}.
 
 The season is the sum of the first states over the harmonics. A
@@ -257,9 +247,8 @@ season from the level and the observation intercept. Two periods
 sharing a harmonic, such as 6 and 12 with three or more harmonics,
 are refused. A period longer than the data overlaps the slope and
 draws a warning. The starting pairs \code{init_season_trend} are
-estimated under one prior for both states of every harmonic. A
-rotation of a pair leaves that prior unchanged, which places the
-phase at the first time point with no further choice. Seasonal
+estimated under one prior for both states of every harmonic. That
+prior treats every phase at the first time point alike. Seasonal
 shocks are independent across series. In a factor model each factor
 has its own season, mapped to the series through the loadings.
 

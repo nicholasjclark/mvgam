@@ -245,11 +245,20 @@ mvgam_imputation_forwarded <- c(
 #' Fit a Bayesian multivariate state-space model
 #'
 #' @description
-#' Fits the model in Stan. The observation `formula` takes brms syntax,
-#' and `trend_formula` adds a latent dynamic process, such as a random
-#' walk or an autoregression, with predictors of its own. A list of
-#' multiply imputed data frames fits the model to each frame and pools
-#' the draws.
+#' Fits a state-space model in Stan. Each observation follows the
+#' observation `family`. On the link scale its mean is the sum of the
+#' effects in `formula` and a latent trend \eqn{z_{t,s}} for series
+#' \eqn{s} at time \eqn{t}. The data never record the trend directly.
+#' `trend_formula` names how it moves from one time to the next, through
+#' a trend constructor such as `AR()`. It also takes predictors of the
+#' trend. With an `AR(p = 1)` trend:
+#' \deqn{g(\mu_{t,s}) = \eta_{t,s} + \eta^{(z)}_{t,s} + z_{t,s},
+#'   \qquad z_{t,s} = \phi_s z_{t-1,s} + \epsilon_{t,s}}
+#' Here \eqn{g} is the link, \eqn{\eta} the predictor from `formula`,
+#' \eqn{\eta^{(z)}} the predictor from `trend_formula` and
+#' \eqn{\epsilon} the trend's innovation at each time. The
+#' `r mvgam_article("mvgam_overview", "overview article")` walks through
+#' a full analysis.
 #'
 #' @param formula Main observation model formula (supports brms syntax).
 #'   Smooth specials `s()`, `t2()`, `gp()`, varying intercepts and
@@ -265,21 +274,22 @@ mvgam_imputation_forwarded <- c(
 #'   latent state. Write [lv_axis()] in a term to vary its effect by
 #'   latent factor, or by series in a model without factors, as in
 #'   `~ x:lv_axis() + AR()`. The series column itself is not
-#'   supported in a term of this formula. An exact `gp()` term here
-#'   also predicts in-sample alone. Forecasting a model that holds one
-#'   requires the approximate form.
-#' @param data Data frame, or a list of multiply imputed data frames
-#'   or a `mids` object from \pkg{mice}. [mvgam_multiple()] describes
-#'   the imputation path.
+#'   supported in a term of this formula. Forecasting requires the
+#'   approximate form of any `gp()` term here.
+#' @param data Data frame in long format, one row per series and time.
+#'   A model with a trend needs a numeric `time` column and a factor
+#'   `series` column, or the columns a trend constructor names through
+#'   its `time` and `series` arguments. [mvgam_data()] checks a frame
+#'   against a family before fitting. A list of multiply imputed data
+#'   frames, or a `mids` object from \pkg{mice}, is also accepted.
+#'   [mvgam_multiple()] describes the imputation path.
 #' @param newdata Optional held-out `data.frame`, stored on the fit
-#'   as `object$test_data`. `forecast()` forecasts to it when called
-#'   without `newdata`. `plot(fit, type = "series")` overlays it.
-#'   The fit itself draws no forecasts. `forecast()` propagates the
-#'   fitted latent state forward in time per posterior draw.
-#'   `posterior_predict(mod, newdata = mod$test_data)` marginalises
-#'   over the trend's stochastic dynamics at the supplied design
-#'   points. Use `forecast()` for time-series forecasting and
-#'   `posterior_predict()` for marginal predictive checks.
+#'   as `object$test_data`. Fitting draws no forecasts. `forecast()`
+#'   called without `newdata` forecasts these times, carrying the fitted
+#'   latent state forward. `plot(fit, type = "series")` overlays them.
+#'   `posterior_predict()` on these data uses the covariate part alone.
+#'   The section 'Which prediction function?' of [predict.mvgam()]
+#'   compares the two.
 #' @param trend_map Optional fixed factor loadings, in one of three
 #'   forms:
 #'   \itemize{
@@ -295,103 +305,14 @@ mvgam_imputation_forwarded <- c(
 #'   A factor model without a `trend_map` samples every loading. It
 #'   identifies `Z` after sampling by a thin QR rotation (Heaps and
 #'   Jermyn 2024). A `trend_map` with any fixed entry takes no
-#'   rotation. The argument requires a `trend_formula`. It is an
-#'   alternative to the `trend_map` argument of the trend constructor,
-#'   and supplying both is an error. `loadings_prior` lists the
+#'   rotation. The argument requires a `trend_formula`. The trend
+#'   constructor takes a `trend_map` argument too. Supplying both is an
+#'   error. `loadings_prior` lists the
 #'   `trend_map` forms a structured loadings prior accepts.
-#' @param loadings_prior Optional named list specifying a
-#'   structured prior on the unconstrained factor loadings
-#'   matrix following Heaps & Jermyn (2024). The loadings belong
-#'   to a trend with latent factors. The argument requires a
-#'   `trend_formula`. Supplying it without one is an error. When
-#'   supplied, the
-#'   default iid `to_vector(Z) ~ student_t(3, 0, 0.5)` prior is
-#'   replaced with a per-column matrix-normal prior of the form
-#'   `Z[, i] ~ multi_normal_cholesky(0, L_Phi)`, where the
-#'   among-row scale matrix `Phi` is assembled
-#'   multiplicatively from any combination of:
-#'   \itemize{
-#'     \item a per-series feature matrix (`features`), expanded
-#'       into an ARD exponential kernel via `gp_exponential_cov()`
-#'     \item one or more pairwise distance matrices
-#'       (`distances`), each contributing an `exp(-d / theta)`
-#'       factor
-#'   }
-#'
-#'   Accepted fields:
-#'   \itemize{
-#'     \item `features`: string lookup into `data2`, a numeric
-#'       matrix, or a data.frame. Columns are encoded by type
-#'       (numeric/integer/logical: z-score; ordered factor:
-#'       z-score after `as.numeric()`; unordered factor /
-#'       character: one-hot with all levels retained, following
-#'       Heaps Sect. 6.2). Each encoded column receives its own
-#'       ARD length-scale.
-#'     \item `distances`: string name (or character vector of
-#'       names) of pairwise distance matrices in `data2`, or a
-#'       single matrix / named list of matrices passed inline.
-#'       Each matrix is rescaled to maximum entry one so the
-#'       default length-scale prior is interpretable on a unit
-#'       scale (matching Heaps Supps S4.2.1).
-#'     \item `column_shrinkage`: `"iid"` (default; no shrinkage)
-#'       or `"mgp"` (multiplicative-gamma-process increasing
-#'       shrinkage of Bhattacharya & Dunson 2011, used in
-#'       Heaps Eq. (9)). `"mgp"` applies its column scale through
-#'       the shared innovation scale. It is available for `AR()`,
-#'       `RW()` and `ZMVN()` trends. `VAR()` builds its own innovation
-#'       covariance and has no shared scale for it; pair a `VAR()`
-#'       factor model with `"iid"` instead.
-#'     \item `mgp_a1`, `mgp_a2`: numeric MGP hyperparameters,
-#'       only used when `column_shrinkage = "mgp"`. Default
-#'       `(2, 4)` lies within the `a2 in [3, 5]` range
-#'       recommended for moderate-n ecology / community panels
-#'       by Legramanti, Durante and Dunson (2020, JRSS-B) and
-#'       Schiavon, Canale and Dunson (2022, Biometrics 78:995).
-#'       Heaps Sect. 6.3.1 used `(2, 3)` for the gas-demand
-#'       application; Sect. 6.2.2 used `(2, 6)` for the
-#'       Finnish-bird JSDM. Lower `a2` for less shrinkage when
-#'       the data weakly identify the active rank.
-#'   }
-#'
-#'   Length-scales receive a `lognormal(0, 1)` prior in the
-#'   model block. This prior is set on the standardised distance
-#'   scale. Pairwise distance matrices are rescaled to
-#'   `max(d) = 1` inside the normaliser. A length-scale of 1 then
-#'   corresponds to correlation `exp(-1)` between the two most
-#'   distant series. Heaps' Finnish-birds application (Sect.
-#'   6.2.2) used the wider `lognormal(0, sqrt(10))` instead;
-#'   override the default by passing a `prior()` for
-#'   `theta_features` / `theta_dist_<name>` if your data weakly
-#'   identify length-scales and you want less regularisation.
-#'   Note: the `max(d) = 1` rule is the natural generic
-#'   standardisation. Heaps Supps S4.2.1 used "root-to-tip
-#'   distance = 1" for ultrametric phylogenies, which corresponds
-#'   to `max(d) = 2` (twice the per-leaf depth); pre-standardise
-#'   your distance matrix to match if exact parity matters.
-#'   Identification. The structured prior applies to the sampled
-#'   columns of `Z`. Where the QR rotation gives the reported
-#'   loadings `Z_tilde`, each of its columns mixes the sampled
-#'   columns. `shared_variation()` and `residual_cor()` use
-#'   `Z Z'`, which is the same before and after the rotation. See
-#'   the Identification section of the trend constructors.
-#'
-#'   Compatibility with `trend_map`:
-#'   \itemize{
-#'     \item `trend_map = NULL` (default): compatible. `n_lv` alone
-#'       triggers the free-Z factor model; `loadings_prior` applies
-#'       to the sampled `Z` column-wise.
-#'     \item `trend_map = matrix(NA_real_, n_series, n_lv)`
-#'       (all-NA mask, used internally by `jsdgam()`): compatible.
-#'       Treated as a free-Z trigger upstream; `loadings_prior`
-#'       applies as if `trend_map` were `NULL`.
-#'     \item `trend_map` with a mix of fixed entries and `NA`s:
-#'       incompatible. Partial-Z parameterises the free entries
-#'       as a vector under an iid `student_t(3, 0, 1)` prior,
-#'       which would overlap with the matrix-normal structure
-#'       and double-count regularisation.
-#'     \item Fully-fixed `trend_map` (no `NA`s): incompatible.
-#'       The structured prior has no free parameters to act on.
-#'   }
+#' @param loadings_prior Optional named list giving a structured prior
+#'   on the loadings of a factor model, such as species traits or a
+#'   phylogeny. Most models leave it `NULL`. The section 'Structured
+#'   loadings priors' of [mvgam()] describes its fields.
 #' @param backend `"cmdstanr"` or `"rstan"`. Defaults to
 #'   `getOption("brms.backend", "cmdstanr")`.
 #' @param combine Logical. With imputed `data`, `TRUE` (default) pools
@@ -439,14 +360,9 @@ mvgam_imputation_forwarded <- c(
 #'   brms family without a `trend_formula` uses the threading brms
 #'   writes.
 #'
-#'   A brms-native family with a `trend_formula` samples serially
-#'   whatever `threads` says. When it threads, brms moves the `mu`
-#'   assignment inside `partial_log_lik_lpmf`, where mvgam cannot add
-#'   the trend to it. The program is then built without threading.
-#'   This applies to every trend model under a brms-native family:
-#'   `RW()`, `AR()`, `VAR()`, `LLT()`, `ZMVN()`, `CAR()` and
-#'   `PW()`. Each fit that drops the request warns. A batch script
-#'   that fits repeatedly shows it every time.
+#'   A brms family with a `trend_formula` samples each chain on one
+#'   thread whatever `threads` says. The threaded likelihood brms
+#'   writes leaves no place to add the trend. Each such fit warns.
 #' @param run_model Logical. `FALSE` builds the model without parsing,
 #'   compiling or sampling it. The result holds `$stancode`,
 #'   `$standata` and the prior table, with `$fit` set to `NULL`.
@@ -473,10 +389,20 @@ mvgam_imputation_forwarded <- c(
 #'   suffix. The plural `priors` is accepted as well.
 #'
 #'   `chains`, `iter`, `warmup`, `thin`, `seed` and `control` reach
-#'   Stan as in [brms::brm()]. `cores` sets how many chains sample at
-#'   once. It defaults to `getOption("mc.cores")` when that option is
-#'   set and otherwise to one fewer than the machine's cores, up to
-#'   `chains`.
+#'   Stan as in [brms::brm()]. `chains` defaults to 4, each running
+#'   2000 iterations of which the first half are warmup. Results for
+#'   publication should use at least four. The examples use two for
+#'   speed. If the
+#'   sampler reports divergent transitions, refit with
+#'   `control = list(adapt_delta = 0.95)` or simplify the model.
+#'   [mvgam_diagnostics] describes the checks. `cores` sets how many
+#'   chains sample at once. It defaults to `getOption("mc.cores")`
+#'   when that option is set and otherwise to one fewer than the
+#'   machine's cores, up to `chains`.
+#'
+#'   `silent` sets how much the fit prints. `0` shows everything,
+#'   Stan's own messages included. `1`, the default, shows the
+#'   sampler's progress and mvgam's notices. `2` prints warnings alone.
 #'
 #'   `algorithm` selects how the posterior is explored. It accepts
 #'   `"sampling"` (the default), `"meanfield"`, `"fullrank"` or
@@ -487,10 +413,9 @@ mvgam_imputation_forwarded <- c(
 #'   default), `"0"`, a numeric value, a list or a function. With
 #'   `backend = "cmdstanr"` it also accepts `"pathfinder"`. That
 #'   keyword runs Stan's Pathfinder approximation on the compiled model
-#'   and draws one starting value per chain from it. The requested
-#'   algorithm still explores the posterior. The fit stays exact.
-#'   It helps a model whose chains stall at a poor starting point or
-#'   fill warmup with divergences. On a model that already warms up
+#'   and draws one starting value per chain from it. Sampling then
+#'   proceeds as usual from those values. It helps a model whose chains
+#'   stall at a poor starting point or fill warmup with divergences. On a model that already warms up
 #'   cleanly it adds about a second and lowers effective samples per
 #'   second.
 #'
@@ -511,6 +436,106 @@ mvgam_imputation_forwarded <- c(
 #'   }
 #' @return An object of class `mvgam`.
 #'
+#' @section Structured loadings priors:
+#' A factor trend loads each series on a few latent factors through the
+#' matrix `Z`. By default each entry of `Z` takes an independent
+#' `student_t(3, 0, 0.5)` prior. `loadings_prior` replaces it with the
+#' structured prior of Heaps and Jermyn (2024). Each column of `Z`
+#' then follows a multivariate normal whose covariance `Phi` makes
+#' similar series load alike. `Phi` is the product of a kernel over
+#' series features and one factor `exp(-d / theta)` per distance
+#' matrix. The argument requires a `trend_formula` whose trend has
+#' latent factors.
+#'
+#' The list takes these fields:
+#' \describe{
+#'   \item{`features`}{Per-series features, as a numeric matrix, a data
+#'     frame or the name of an element of `data2`. Numeric, integer and
+#'     logical columns are z-scored. An ordered factor is z-scored on
+#'     its codes. An unordered factor or character column is one-hot
+#'     encoded with every level kept (Heaps and Jermyn 2024, Section
+#'     6.2). Each encoded column takes its own length-scale.}
+#'   \item{`distances`}{Pairwise distance matrices, as the names of
+#'     elements of `data2`, a matrix or a named list of matrices. Each is
+#'     rescaled to a largest entry of 1.}
+#'   \item{`column_shrinkage`}{`"iid"`, the default, shrinks no column.
+#'     `"mgp"` shrinks later columns more strongly through the
+#'     multiplicative gamma process of Bhattacharya and Dunson (2011),
+#'     applied to the shared innovation scale. `AR()`, `RW()` and
+#'     `ZMVN()` trends accept it. A `VAR()` trend builds its own
+#'     innovation covariance. It takes `"iid"`.}
+#'   \item{`mgp_a1`, `mgp_a2`}{The hyperparameters of `"mgp"`, by
+#'     default 2 and 4. Heaps and Jermyn used an `mgp_a2` of 3 and 6 in
+#'     their two applications. A lower `mgp_a2` shrinks less, for data
+#'     that weakly identify the number of active factors.}
+#' }
+#'
+#' Each length-scale takes a `lognormal(0, 1)` prior. Distances are
+#' rescaled to a largest entry of 1. A length-scale of 1 then gives a
+#' correlation of `exp(-1)` between the two most distant series. Heaps
+#' and Jermyn used the wider `lognormal(0, sqrt(10))`. A `prior()` on
+#' `theta_features` or `theta_dist_<name>` replaces the default. They
+#' rescaled a phylogeny to a root-to-tip distance of 1, which gives a
+#' largest pairwise distance of 2. Rescale a distance matrix before
+#' fitting to match their scale.
+#'
+#' The prior applies to the sampled columns of `Z`. The reported
+#' loadings `Z_tilde` come from a QR rotation of them. Each column of
+#' `Z_tilde` mixes the sampled columns. [shared_variation()] and
+#' [residual_cor()] use `Z Z'`, which the rotation leaves unchanged. The
+#' Identification section of [trend_constructors] describes the
+#' rotation.
+#'
+#' A `trend_map` with no fixed entries, `NULL` or a matrix of `NA`, is
+#' compatible. [jsdgam()] passes the second form. A `trend_map` that
+#' fixes any loading is refused. Its free entries take the default
+#' prior of class `Z`, which the structured prior would duplicate.
+#'
+#' @section Terms used in this documentation:
+#' \describe{
+#'   \item{Latent trend, latent state}{The unobserved value
+#'     \eqn{z_{t,s}} that the trend constructor evolves over time.}
+#'   \item{Innovation}{The random change the trend takes at each time
+#'     step, \eqn{\epsilon_{t,s}} above. Other texts call it a process
+#'     error or a shock. `cor = TRUE` correlates the innovations of
+#'     different series.}
+#'   \item{Fitted state, covariate part}{The two versions of the trend
+#'     a prediction can use. The section 'Which prediction function?'
+#'     of [predict.mvgam()] defines them.}
+#'   \item{Prior}{A distribution stating which values of a parameter
+#'     are plausible before the data are seen.
+#'     [get_prior.mvgam_formula()] lists the defaults.}
+#'   \item{Posterior draw}{One joint sample of every parameter from the
+#'     posterior distribution. Summaries and predictions average over
+#'     the draws.}
+#'   \item{Hindcast, forecast}{Predictions at the training times and
+#'     after them. See [hindcast.mvgam()] and [forecast.mvgam()].}
+#'   \item{Closure unit}{A site, or a site in one season, whose true
+#'     occupancy or abundance holds across its repeat visits. See
+#'     [occ()] and [nmix()].}
+#'   \item{ELPD, Pareto k}{The expected log predictive density scores
+#'     predictions of held-out data. Higher is better. A Pareto k
+#'     above 0.7 marks an observation whose leave-one-out approximation
+#'     is unreliable. See [loo.mvgam()].}
+#' }
+#'
+#' @section Workflow:
+#' A typical analysis takes these steps:
+#' \enumerate{
+#'   \item Check the data with [mvgam_data()].
+#'   \item Choose a family ([mvgam_families]) and a trend
+#'     ([trend_constructors]). Inspect the default priors with
+#'     [get_prior.mvgam_formula()].
+#'   \item Fit with `mvgam()`, then check convergence with
+#'     [summary.mvgam()] and [mvgam_diagnostics].
+#'   \item Check the fit against the data with [pp_check.mvgam()] and
+#'     `plot(fit, type = "residuals")`.
+#'   \item Interpret effects with [conditional_effects.mvgam()].
+#'   \item Forecast with [forecast.mvgam()]. Compare models with
+#'     [lfo_cv.mvgam()] or [loo.mvgam()].
+#'   \item Report the model with [how_to_cite()] and [methods_md()].
+#' }
+#'
 #' @examples
 #' \dontrun{
 #' # One count series with a smooth effect of a covariate x and an
@@ -523,7 +548,7 @@ mvgam_imputation_forwarded <- c(
 #' # The parameters a model takes, with their default priors, before
 #' # any fitting. A `prior` argument to mvgam() replaces any of them
 #' get_prior(
-#'   mvgam_formula(y ~ s(x), trend_formula = ~ AR(p = 1)),
+#'   mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1)),
 #'   data   = simdat$data_train,
 #'   family = poisson()
 #' )
@@ -531,7 +556,7 @@ mvgam_imputation_forwarded <- c(
 #' # A smooth of x in the observation model and an AR(1) latent trend.
 #' # The test data are stored on the fit for forecasting
 #' mod <- mvgam(
-#'   y ~ s(x),
+#'   y ~ s(x, k = 5),
 #'   trend_formula = ~ AR(p = 1),
 #'   data          = simdat$data_train,
 #'   newdata       = simdat$data_test,
@@ -574,16 +599,17 @@ mvgam_imputation_forwarded <- c(
 #' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
 #' distributions for the covariance matrix in latent factor
 #' models. \emph{Statistics and Computing}, 34:143.
-#' \doi{10.1007/s11222-024-10454-0} (post-hoc QR identification
-#' of latent factor loadings; structured \code{loadings_prior}
-#' construction.)
+#' \doi{10.1007/s11222-024-10454-0}
+#'
+#' Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian infinite
+#' factor models. \emph{Biometrika}, 98(2):291-306.
+#' \doi{10.1093/biomet/asr013}
 #'
 #' Riutort-Mayol, G., Burkner, P.-C., Andersen, M. R., Solin, A.
 #' and Vehtari, A. (2023). Practical Hilbert space approximate
 #' Bayesian Gaussian processes for probabilistic programming.
 #' \emph{Statistics and Computing}, 33:1.
-#' \doi{10.1007/s11222-022-10167-2} (used when \code{formula}
-#' or \code{trend_formula} contains \code{gp()} terms.)
+#' \doi{10.1007/s11222-022-10167-2}
 #'
 #' @seealso [trend_constructors] lists the latent trends.
 #'   [mvgam_families] lists the observation families mvgam adds to

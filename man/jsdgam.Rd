@@ -59,14 +59,12 @@ species. \code{\link[=pivot_species_matrix]{pivot_species_matrix()}} converts a 
 composition matrix.}
 
 \item{newdata}{Optional held-out \code{data.frame}, stored on the fit
-as \code{object$test_data}. \code{forecast()} forecasts to it when called
-without \code{newdata}. \code{plot(fit, type = "series")} overlays it.
-The fit itself draws no forecasts. \code{forecast()} propagates the
-fitted latent state forward in time per posterior draw.
-\code{posterior_predict(mod, newdata = mod$test_data)} marginalises
-over the trend's stochastic dynamics at the supplied design
-points. Use \code{forecast()} for time-series forecasting and
-\code{posterior_predict()} for marginal predictive checks.}
+as \code{object$test_data}. Fitting draws no forecasts. \code{forecast()}
+called without \code{newdata} forecasts these times, carrying the fitted
+latent state forward. \code{plot(fit, type = "series")} overlays them.
+\code{posterior_predict()} on these data uses the covariate part alone.
+The section 'Which prediction function?' of \code{\link[=predict.mvgam]{predict.mvgam()}}
+compares the two.}
 
 \item{family}{The observation family every species shares, as a
 family object. \link{mvgam_families} lists them. Defaults to
@@ -159,14 +157,9 @@ sample slower, the threading overhead outweighing the gain. A
 brms family without a \code{trend_formula} uses the threading brms
 writes.
 
-A brms-native family with a \code{trend_formula} samples serially
-whatever \code{threads} says. When it threads, brms moves the \code{mu}
-assignment inside \code{partial_log_lik_lpmf}, where mvgam cannot add
-the trend to it. The program is then built without threading.
-This applies to every trend model under a brms-native family:
-\code{RW()}, \code{AR()}, \code{VAR()}, \code{LLT()}, \code{ZMVN()}, \code{CAR()} and
-\code{PW()}. Each fit that drops the request warns. A batch script
-that fits repeatedly shows it every time.}
+A brms family with a \code{trend_formula} samples each chain on one
+thread whatever \code{threads} says. The threaded likelihood brms
+writes leaves no place to add the trend. Each such fit warns.}
 
 \item{run_model}{Logical. \code{FALSE} builds the model without parsing,
 compiling or sampling it. The result holds \verb{$stancode},
@@ -189,13 +182,16 @@ describe the factors. \code{update(fit, n_lv = 3)} refits it through
 \code{jsdgam()} with the arguments given changed.
 }
 \description{
-Fits a joint species distribution model (JSDM). The residual
-associations among species are modelled at reduced rank with a set
-of latent factors. The observation model takes the smooths,
-Gaussian processes and random effects of any mvgam model. The
-factors take their own predictors through \code{factor_formula}. Write
-\code{\link[=lv_axis]{lv_axis()}} in one of its terms to give each factor its own effect
-of a covariate, a constrained ordination.
+Fits a joint species distribution model (JSDM) to the presences,
+detections or counts of many species across many sampling units.
+Species often co-occur more or less often than their responses to
+the measured covariates predict. A few latent factors capture that
+residual association. They need far fewer parameters than a full
+correlation matrix among species. The observation model takes the
+smooths, Gaussian processes and random effects of any mvgam model.
+The factors take their own predictors through \code{factor_formula}.
+Write \code{\link[=lv_axis]{lv_axis()}} in one of its terms to give each factor its own
+effect of a covariate, a constrained ordination.
 }
 \examples{
 \dontrun{
@@ -274,7 +270,7 @@ case. \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=ordinate]{ordina
 factors. \code{\link[=lv_axis]{lv_axis()}} gives each factor its own covariate effect.
 \code{\link[=how_to_cite]{how_to_cite()}} drafts a methods paragraph for the fit and
 \code{\link[=methods_md]{methods_md()}} writes its equations.
-The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits a negative
+The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits a negative
 binomial model with a trait-informed loadings prior, ordination
 biplots and multiplicative gamma process shrinkage.
 

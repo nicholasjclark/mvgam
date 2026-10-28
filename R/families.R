@@ -77,7 +77,7 @@
 #' simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
 #' mod <- mvgam(
-#'   y ~ s(x),
+#'   y ~ s(x, k = 5),
 #'   trend_formula = ~ AR(p = 1),
 #'   data          = simdat$data_train,
 #'   family        = tweedie(),
@@ -411,7 +411,7 @@ tweedie_stan_funs <- function() {
 #' set.seed(3)
 #' simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = tweedie(),
 #'              chains = 2, silent = 2)
 #'
@@ -422,6 +422,7 @@ tweedie_stan_funs <- function() {
 #' # as family = tweedie(M = 60)
 #' }
 #'
+#' @seealso [tweedie()] for the family and its argument `M`.
 #' @export
 check_tweedie_truncation <- function(object, resp = NULL) {
   checkmate::assert_class(object, "mvgam")
@@ -2566,8 +2567,9 @@ build_closure_unit_arrays <- function(data,
 #' A `cap` column, constant within each unit and at least its largest
 #' count, sets the cap `K_max`. Without one, `"poisson_binomial"` and
 #' `"poisson_poisson"` take each unit's largest count plus 100, as
-#' `unmarked::pcount()` does. `"royle_nichols"` takes 25, as
-#' `unmarked::occuRN()` does. A detection gives no floor on `N`.
+#' `unmarked::pcount()` does. `"royle_nichols"` takes a fixed 25, as
+#' `unmarked::occuRN()` does. Its 0 / 1 detections carry no count to
+#' build a cap from.
 #' A lower cap shortens the sum and speeds sampling. A cap that binds
 #' biases abundance down. [latent_N_saturation()] reports, for each
 #' unit, the posterior probability that `N` equals its cap. A

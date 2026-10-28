@@ -887,7 +887,9 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @description
 #' Draws from the posterior predictive distribution: the family's
 #' observation noise around the parameters of each posterior draw.
-#' They suit posterior predictive checks and predictions for new data.
+#' They predict new observations, for the training data or new data.
+#' [pp_check.mvgam()] draws them under the fitted state to check a fit
+#' against its data.
 #'
 #' @param object A fitted mvgam object from [mvgam()].
 #' @inheritParams posterior_epred.mvgam
@@ -902,12 +904,13 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' [posterior_linpred.mvgam()] and [posterior_epred.mvgam()] use. A
 #' `trunc()` term restricts the draws to its bounds.
 #'
-#' Under `incl_autocor = FALSE` the trend contributes its deterministic
-#' submodel. [hindcast.mvgam()] draws under the fitted latent states at
-#' the training times. [forecast.mvgam()] propagates them to future
-#' times.
+#' [hindcast.mvgam()] draws under the fitted latent states at the
+#' training times. [forecast.mvgam()] propagates them to future times.
 #'
-#' @seealso [pp_check.mvgam()] compares these draws with the data.
+#' @template prediction-trend-state
+#'
+#' @seealso [pp_check.mvgam()] compares draws taken under the fitted
+#'   state with the data.
 #'   [forecast.mvgam()] predicts future times from the fitted state.
 #'
 #' @examples
@@ -915,7 +918,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)
 #'

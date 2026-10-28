@@ -95,7 +95,10 @@ score_label <- function(score) {
 #' @param object An `mvgam_forecast` object whose `type` is
 #'   `"response"` or `"expected"`. The held-out observations are then
 #'   on the scale of the forecasts.
-#' @param score Character; one of the names above.
+#' @param score Character; one of the names under 'Available scores'.
+#'   `"drps"` suits counts, `"crps"` continuous data and `"brier"`
+#'   binary data. `"energy"` and `"variogram"` score several series
+#'   jointly. Lower scores are better.
 #' @param interval_width Width of the central interval that sets the
 #'   per-series `in_interval` indicator and the `"sis"` penalty. The
 #'   indicator is computed for `"crps"`, `"drps"`, `"sis"` and the joint
@@ -134,18 +137,19 @@ score_label <- function(score) {
 #' @references Gneiting, T. and Raftery, A. E. (2007). Strictly
 #'   Proper Scoring Rules, Prediction, and Estimation.
 #'   *Journal of the American Statistical Association*,
-#'   102(477), 359-378.
+#'   102(477), 359-378. \doi{10.1198/016214506000001437}
 #'
 #'   Scheuerer, M. and Hamill, T. M. (2015). Variogram-based proper
 #'   scoring rules for probabilistic forecasts of multivariate
 #'   quantities. *Monthly Weather Review*, 143(4), 1321-1334.
+#'   \doi{10.1175/MWR-D-14-00269.1}
 #'
 #' @examples
 #' \dontrun{
 #' set.seed(11)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 2L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x),
+#' mod <- mvgam(y ~ s(x, k = 5),
 #'              trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train,
 #'              family = poisson(),

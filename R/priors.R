@@ -1420,107 +1420,69 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
 # `mvgam_formula()` pairs an observation formula with a trend formula
 # for `get_prior()`, `stancode()` and `standata()`.
 
-#' Create an mvgam formula object
+#' Pair an observation formula with a trend formula
 #'
 #' @description
-#' Constructs a lightweight mvgam formula object that combines
-#' observation and trend model formulas. The inspection functions
-#' \code{get_prior()}, \code{stancode()} and \code{standata()} take it.
+#' Holds the two formulas of a model before it is fitted.
+#' [get_prior.mvgam_formula()], [stancode()] and [standata()] take the
+#' pair, with the data and family, to show the priors, the Stan program
+#' and the data a fit would use. Nothing is compiled or sampled.
 #'
-#' @param formula An object of class \code{formula}, \code{brmsformula}, or
-#'   \code{mvbrmsformula} describing the observation model.
-#' @param trend_formula An optional formula describing trend dynamics. Default
-#'   NULL results in pure brms equivalent model. See Details for trend syntax.
+#' @param formula A `formula`, `brmsformula` or `mvbrmsformula` for the
+#'   observation model.
+#' @param trend_formula A one-sided formula for the latent trend, such
+#'   as `~ AR(p = 1)`. `NULL`, the default, gives a model without a
+#'   trend, the model brms itself would fit.
 #'
 #' @details
-#' The mvgam_formula object is a minimal container that pairs an observation
-#' formula with an optional trend formula. Data, family, and other model
-#' specifications are provided when calling inspection or fitting functions:
+#' A trend formula holds one trend constructor ([trend_constructors]).
+#' It can also hold covariates of the trend, smooths such as `s()` and
+#' `t2()`, random effects such as `(1 | group)` and Gaussian processes
+#' through `gp()`.
 #'
-#' \code{get_prior(mvgam_formula(y ~ x, ~ AR()), data = dat,
-#'   family = poisson())}
-#'
-#' When \code{trend_formula = NULL}, the model reduces to a pure brms
-#' observation model. When specified, the trend_formula can include:
+#' Some terms describe how the response was observed. They belong in
+#' the observation formula. A trend formula refuses them:
 #' \itemize{
-#'   \item Trend constructors: \code{RW()}, \code{AR()}, \code{CAR()},
-#'     \code{ZMVN()}, \code{VAR()}, \code{LLT()}, \code{PW()}
-#'   \item Covariates that affect trend dynamics
-#'   \item Smooth terms using mgcv syntax: \code{s()}, \code{t2()}
-#'   \item Random effects: \code{(1|group)}, \code{(slope|group)}
-#'   \item Gaussian processes: \code{gp()}
+#'   \item addition terms such as `weights()`, `se()`, `cens()`,
+#'     `trunc()`, `trials()`, `rate()`, `subset()` and `thres()`
+#'   \item `offset()`
+#'   \item `mi()`, which brms imputes as a response of the model
+#'   \item the brms autocorrelation terms `ar()`, `ma()`, `arma()`,
+#'     `cosy()`, `unstr()` and `autocor()`. The trend constructor
+#'     models dependence over time in their place.
 #' }
 #'
-#' @section Trend formula restrictions:
-#' The trend_formula has specific restrictions to maintain compatibility with
-#' State-Space dynamics and prevent conflicts between observation-level and
-#' trend-level modeling:
+#' @section Multivariate models:
+#' A multivariate model, written with `mvbind()` or `bf() + bf()`, takes
+#' one trend constructor for all of its responses. Each response can
+#' take its own family and its own observation terms, as in
+#' `bf(count ~ x, family = poisson()) + bf(biomass ~ x, family =
+#' Gamma(link = "log"))`. The `gr` argument of the trend constructor
+#' pools the trends of groups. Responses that need different trend
+#' types need separate models.
 #'
-#' \strong{Forbidden Terms:}
-#' \itemize{
-#'   \item brms addition-terms: \code{weights()}, \code{se()},
-#'     \code{cens()}, \code{trunc()}, \code{trials()}, \code{rate()},
-#'     \code{vreal()}, \code{vint()}, \code{subset()}, \code{index()},
-#'     \code{dec()}, \code{cat()}, \code{thres()}
-#'   \item Missing-value imputation: \code{mi()}
-#'   \item brms autocorrelation: \code{ar()}, \code{ma()}, \code{arma()},
-#'     \code{cosy()}, \code{unstr()}, \code{autocor()}
-#'   \item Offset terms: \code{offset()}
-#' }
+#' @return An object of class `mvgam_formula` holding `formula` and
+#'   `trend_formula`.
 #'
-#' \strong{Rationale:}
-#' Addition terms change the observation model, through weights,
-#' censoring or exposure. They belong in the observation formula.
-#' Autocorrelation terms conflict with the trend's state-space
-#' dynamics. brms imputes a \code{mi()} predictor as a response of the
-#' model. A trend formula holds no response.
+#' @seealso [get_prior.mvgam_formula()] lists the priors of the pair.
+#'   [stancode()] and [standata()] return its Stan program and data.
+#'   [mvgam()] fits it.
 #'
-#' @section Multivariate models, single shared trend type:
-#' For multivariate observation models (\code{mvbind()} or
-#' \code{bf() + bf()}), \strong{a single trend constructor applies to
-#' all responses}. Different trend types per response (e.g.
-#' \code{RW()} for one response and \code{AR(p = 3)} for another) are
-#' \strong{not supported and will not be added}. mvgam stores latent
-#' trend states in a single \code{lv_trend} matrix with shared dynamics
-#' parameters; mixing trend types per response would require parallel
-#' dynamics machinery throughout the codegen, sampling, and prediction
-#' pipelines.
+#' @examples
+#' f <- mvgam_formula(y ~ s(x), trend_formula = ~ AR(p = 1))
+#' f
 #'
-#' What multivariate models support:
-#' \itemize{
-#'   \item Different observation families per response (e.g.
-#'     \code{bf(count ~ x, family = poisson()) +
-#'     bf(biomass ~ x, family = Gamma())}).
-#'   \item Different fixed-effect, smooth, or GP terms per response in
-#'     the observation formulas.
-#'   \item Hierarchical / grouped trends via the \code{gr} argument on
-#'     the (single) trend constructor.
-#' }
-#'
-#' If you need different dynamics per response, fit
-#' independent univariate \code{mvgam()} models for each response.
-#'
-#' \strong{Examples:}
-#' \preformatted{
-#' # Correct usage
+#' # Observation weights belong in the observation formula
 #' mvgam_formula(y ~ x + weights(w), trend_formula = ~ AR(p = 1))
-#' mvgam_formula(count ~ offset(log_exposure), trend_formula = ~ RW())
+#' try(mvgam_formula(y ~ x, trend_formula = ~ AR() + weights(w)))
 #'
-#' # Incorrect usage (will error)
-#' mvgam_formula(y ~ x, trend_formula = ~ AR() + weights(w))
-#' mvgam_formula(y ~ x, trend_formula = ~ RW() + offset(z))
+#' \dontrun{
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                     trend_model = AR())
+#' # The priors and the Stan program a fit would use
+#' get_prior(f, data = simdat$data_train, family = poisson())
+#' stancode(f, data = simdat$data_train, family = poisson())
 #' }
-#'
-#' @return An object of class \code{c("mvgam_formula", base_class)} where
-#'   base_class is the class of the input formula, containing:
-#' \itemize{
-#'   \item \code{formula}: The observation model formula
-#'   \item \code{trend_formula}: The trend model formula (or NULL)
-#' }
-#'
-#' @seealso
-#' \code{\link{get_prior.mvgam_formula}}, \code{\link[brms]{stancode}},
-#' \code{\link[brms]{standata}}, \code{\link{mvgam}}
 #'
 #' @family model fitting
 #' @export
@@ -1600,6 +1562,14 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 #' }
 #' `default_prior()` is the same generic under the newer brms name.
 #'
+#' A prior states the plausible values of a parameter before the data
+#' are seen. Each row of the table gives the prior of one parameter
+#' class. A `_trend` suffix marks the classes of the latent trend. The
+#' defaults are weakly informative. Change one when outside knowledge
+#' narrows a parameter, or when the sampler struggles in a region the
+#' data cannot inform. Pass the new rows, built with [brms::prior()],
+#' to the `prior` argument of [mvgam()].
+#'
 #' @param object An [mvgam_formula()], an `mvgam` model, or a model
 #'   formula.
 #' @param ... Arguments of the method.
@@ -1607,6 +1577,31 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 #' @return A `brmsprior` data frame.
 #'
 #' @seealso [mvgam_formula()], [brms::get_prior()]
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                     n_timepoints = 120L, trend_model = AR())
+#'
+#' # The default priors of a Poisson GAM with an AR(1) trend, before
+#' # any fitting
+#' get_prior(
+#'   mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1)),
+#'   data = simdat$data_train,
+#'   family = poisson()
+#' )
+#'
+#' # Outside knowledge that the series is strongly persistent narrows
+#' # the AR(1) coefficient
+#' persistent <- prior(normal(0.7, 0.15), class = ar1_trend)
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              prior = persistent, chains = 2, silent = 2)
+#'
+#' # The fitted model's prior table records the change
+#' get_prior(mod)
+#' }
 #' @export
 get_prior <- function(object, ...) {
   UseMethod("get_prior")
@@ -1771,11 +1766,10 @@ default_prior.mvgam <- function(object, ...) {
 #'     \code{exponential(2 / s)}, with mean \eqn{s / 2}.
 #'   \item The factor loadings \code{Z} take
 #'     \code{student_t(3, 0, 0.5 s)}.
-#'   \item The shock scales and starting states of \code{\link{LLT}()}
-#'     scale with the number of time points. Its \code{sigma_trend}
-#'     takes one of them. The growth priors of a linear
-#'     \code{\link{PW}()} also scale with it. Their help pages give the
-#'     forms.
+#'   \item \code{\link{LLT}()} is the exception. Its shock scales
+#'     (\code{sigma_trend} among them) and its starting states also
+#'     scale with the number of time points. So do the growth priors of
+#'     a linear \code{\link{PW}()}. Their help pages give the forms.
 #' }
 #' A count model on the log link rarely spreads past 2.5. Its
 #' defaults keep their link-scale values. Coefficients without
@@ -1819,6 +1813,12 @@ default_prior.mvgam <- function(object, ...) {
 #'
 #' # Next, drop `run_model = FALSE` to fit the model under these priors
 #' }
+#'
+#' @references
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#'   distributions for the covariance matrix in latent factor models.
+#'   *Statistics and Computing*, 34, 143.
+#'   \doi{10.1007/s11222-024-10454-0}
 #'
 #' @seealso [mvgam_formula()], [brms::prior()] and
 #'   [brms::set_prior()]. The

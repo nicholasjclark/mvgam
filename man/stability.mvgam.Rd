@@ -156,9 +156,9 @@ Statistics}, 32, 74-83.
 }
 \seealso{
 \code{\link[=irf]{irf()}} and \code{\link[=fevd]{fevd()}} summarise the same VAR dynamics.
-The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{stability()} on
+The \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{VAR article} runs \code{stability()} on
 a plankton community. The
-\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html}{hierarchical VAR article}
 reports the metrics for each group of a hierarchical VAR.
 
 Other latent dynamics: 

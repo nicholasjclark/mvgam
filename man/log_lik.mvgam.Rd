@@ -75,10 +75,10 @@ Hurdle and zero-inflated families mix a mass at zero with their base
 family. The \code{weights()}, \code{cens()} and \code{trunc()} addition terms change
 each row's contribution as they do in the Stan model.
 
-The \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} family of methods integrates over the
-trend dynamics. A covariate effect then has the same meaning at every
-time. Those predictions describe no particular observed series and
-do not give an ELPD.
+The \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} family of methods uses the covariate
+part of the model by default. A covariate effect then has the same
+meaning at every time. Those predictions describe no particular
+observed series and do not give an ELPD.
 }
 \examples{
 \dontrun{
@@ -86,7 +86,7 @@ set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
 
-mod <- mvgam(y ~ s(x),
+mod <- mvgam(y ~ s(x, k = 5),
               trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
@@ -109,7 +109,7 @@ c(with_trend = mean(rowSums(ll)), without = mean(rowSums(ll_fixed)))
 \code{\link[=loo.mvgam]{loo.mvgam()}} and \code{\link[=waic.mvgam]{waic.mvgam()}} estimate the ELPD from this
 matrix. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the latent states it conditions
 on. The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by cross-validation.
 
 Other model comparison: 

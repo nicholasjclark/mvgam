@@ -31,14 +31,28 @@
 #'   The hindcast band is light grey, which separates in-sample
 #'   uncertainty from the nested forecast bands.
 #'
-#'   For state-extrapolating prediction over arbitrary newdata
-#'   see [forecast.mvgam()] and [hindcast.mvgam()]; for
-#'   marginal-MC prediction see [posterior_predict.mvgam()] /
+#'   [forecast.mvgam()] and [hindcast.mvgam()] return the objects this
+#'   method draws. Predictions that leave out the fitted trend state
+#'   come from [posterior_predict.mvgam()] and
 #'   [posterior_epred.mvgam()].
 #'
 #' @seealso [forecast.mvgam()], [hindcast.mvgam()],
-#'   [score.mvgam_forecast()], [summary.mvgam_forecast()],
-#'   [irf()], [fevd()], [stability()]
+#'   [score.mvgam_forecast()], [summary.mvgam_forecast()]
+#'
+#' @template ex-forecast-models
+#' @templateVar seed 1
+#' @examples
+#' \dontrun{
+#' fc <- forecast(mod_ar, newdata = simdat$data_test)
+#'
+#' # The grey hindcast band covers the training times. The red bands
+#' # are the 80% and 95% forecast intervals, with the held-out counts
+#' # as points
+#' plot(fc, probs = c(0.8, 0.95))
+#'
+#' # The forecast alone
+#' plot(fc, hindcast = FALSE)
+#' }
 #'
 #' @author Nicholas J Clark
 #'

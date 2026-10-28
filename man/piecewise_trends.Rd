@@ -126,7 +126,7 @@ Taylor, S. J. and Letham, B. (2018). Forecasting at scale.
 \seealso{
 \code{\link[=LLT]{LLT()}} for a trend whose growth changes continuously.
 \code{\link[=get_prior]{get_prior()}} lists the default priors. The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 compares a piecewise trend with other trends out of sample.
 
 Other trend models: 

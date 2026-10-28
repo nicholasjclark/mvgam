@@ -37,10 +37,10 @@
 #' family. The `weights()`, `cens()` and `trunc()` addition terms change
 #' each row's contribution as they do in the Stan model.
 #'
-#' The [posterior_epred.mvgam()] family of methods integrates over the
-#' trend dynamics. A covariate effect then has the same meaning at every
-#' time. Those predictions describe no particular observed series and
-#' do not give an ELPD.
+#' The [posterior_epred.mvgam()] family of methods uses the covariate
+#' part of the model by default. A covariate effect then has the same
+#' meaning at every time. Those predictions describe no particular
+#' observed series and do not give an ELPD.
 #'
 #' @seealso [loo.mvgam()] and [waic.mvgam()] estimate the ELPD from this
 #'   matrix. [hindcast.mvgam()] returns the latent states it conditions
@@ -54,7 +54,7 @@
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
 #'
-#' mod <- mvgam(y ~ s(x),
+#' mod <- mvgam(y ~ s(x, k = 5),
 #'               trend_formula = ~ AR(p = 1),
 #'               data    = simdat$data_train,
 #'               family  = poisson(),

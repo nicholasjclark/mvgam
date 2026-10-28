@@ -22,9 +22,8 @@ a trend constructor such as \code{AR()} with any predictors of the
 latent state. Write \code{\link[=lv_axis]{lv_axis()}} in a term to vary its effect by
 latent factor, or by series in a model without factors, as in
 \code{~ x:lv_axis() + AR()}. The series column itself is not
-supported in a term of this formula. An exact \code{gp()} term here
-also predicts in-sample alone. Forecasting a model that holds one
-requires the approximate form.}
+supported in a term of this formula. Forecasting requires the
+approximate form of any \code{gp()} term here.}
 
 \item{data_list}{A list of at least two imputed data frames, or a
 \code{mids} object from \pkg{mice}.}

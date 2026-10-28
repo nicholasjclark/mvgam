@@ -57,7 +57,7 @@ A trend-side component is named with the \verb{_trend} suffix, as
 set.seed(14)
 simdat <- sim_mvgam(family = poisson(), n_series = 4L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x) + (1 | series),
+mod <- mvgam(y ~ s(x, k = 5) + (1 | series),
              trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)

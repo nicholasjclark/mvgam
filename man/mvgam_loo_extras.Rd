@@ -116,8 +116,8 @@ the rest.}
 
 \item{resp}{Optional name of one response of a multivariate model.}
 
-\item{model_names}{Optional character vector of model labels;
-overrides the names inferred from the call.}
+\item{model_names}{Optional character vector of model names, one per
+forecast. It replaces the names taken from the call.}
 
 \item{summary}{Logical. \code{TRUE} (the default) returns the summary
 matrix with \code{Estimate}, \code{Est.Error} and interval columns. \code{FALSE}
@@ -128,8 +128,7 @@ deviation for summaries. If \code{TRUE}, uses median and median absolute
 deviation (MAD).}
 
 \item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals.}
 
 \item{seed}{Optional integer seed. The session's random state is
 restored when the call returns.}

@@ -17,6 +17,10 @@
 #' Vehtari (2020), as in the
 #' [loo PSIS-LFO vignette](https://mc-stan.org/loo/articles/loo2-lfo.html).
 #'
+#' The ELPD of each fold is higher for the better model. CRPS and the
+#' other scores of [score.mvgam_forecast()] are lower for the better
+#' model. [loo.mvgam()] explains the ELPD and the Pareto k diagnostic.
+#'
 #' @name lfo_cv.mvgam
 #' @importFrom stats update logLik quantile
 #'
@@ -71,15 +75,15 @@
 #'     otherwise `NULL`.
 #'
 #' @references
-#' Paul-Christian Burkner, Jonah Gabry and Aki Vehtari (2020).
-#' Approximate leave-future-out cross-validation for Bayesian time
-#' series models. *Journal of Statistical Computation and
-#' Simulation*. 90:14, 2499-2523.
+#' Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
+#' leave-future-out cross-validation for Bayesian time series models.
+#' *Journal of Statistical Computation and Simulation*,
+#' 90(14):2499-2523.
 #' \doi{10.1080/00949655.2020.1783262}
 #'
-#' Aki Vehtari, Daniel Simpson, Andrew Gelman, Yuling Yao and
-#' Jonah Gabry (2024). Pareto smoothed importance sampling.
-#' *Journal of Machine Learning Research*. 25(72), 1-58.
+#' Vehtari, A., Simpson, D., Gelman, A., Yao, Y. and Gabry, J.
+#' (2024). Pareto smoothed importance sampling. *Journal of Machine
+#' Learning Research*, 25(72):1-58.
 #' <https://jmlr.org/papers/v25/19-556.html>
 #'
 #' @seealso [loo_compare.mvgam_lfo()] ranks models by their
@@ -97,7 +101,7 @@
 #'                      n_timepoints = 120L, trend_model = AR())
 #'
 #' mod <- mvgam(
-#'   y ~ s(x),
+#'   y ~ s(x, k = 5),
 #'   trend_formula = ~ AR(p = 1),
 #'   data    = simdat$data_train,
 #'   family  = poisson(),

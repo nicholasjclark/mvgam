@@ -413,3 +413,11 @@ test_that(
   expect_identical(out$visit, real$visit)
   expect_identical(out$cap, real$cap)
 })
+
+test_that("pp_check() refuses the covariate part for loo_* types", {
+  obj <- mock_pp_check_object(make_pp_check_grid(), family = gaussian())
+  expect_error(
+    pp_check(obj, type = "loo_pit_overlay", incl_autocor = FALSE),
+    "not supported for the 'loo_\\*' types"
+  )
+})

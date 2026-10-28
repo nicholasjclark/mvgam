@@ -137,7 +137,7 @@ distributions for the covariance matrix in latent factor models.
 \code{\link[=plot.mvgam]{plot.mvgam()}} with \code{type = "factors"} plots each factor's
 path. \code{\link[=residual_cor]{residual_cor()}} gives the correlations among series the
 factors imply. The
-\href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} interprets a biplot
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} interprets a biplot
 of species loadings.
 
 Other latent dynamics: 

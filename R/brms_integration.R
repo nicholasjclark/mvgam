@@ -1003,7 +1003,7 @@ brms_declared_params <- function(stancode) {
 #' brms's `validate_prior()` only sees priors that flow through its
 #' own prior pipeline. mvgam emits several additional priors via
 #' stanvars that bypass that pipeline:
-#'   - partial-Z loadings (`Z_free_vec ~ student_t(3, 0, 1)`)
+#'   - partial-Z loadings (`Z_free_vec` under the class `Z` prior)
 #'   - loadings_prior features kernel
 #'     (`theta_features ~ lognormal(0, 1)`)
 #'   - loadings_prior distance kernels (one `theta_dist_<NAME>` per

@@ -2,14 +2,16 @@
 \alias{mvgam_use_cases}
 \title{Example use cases for \pkg{mvgam}}
 \description{
-\pkg{mvgam} is a package for fitting dynamic generalized additive models (GAMs) to univariate or multivariate data. It combines the flexibility of smooth functions with latent temporal processes to model autocorrelation, seasonality, and uncertainty. The package supports both univariate and multivariate time series, making it especially useful for ecological and environmental forecasting. Bayesian inference via Stan allows for full uncertainty quantification and forecasting in complex, non-Gaussian settings.
+New to \pkg{mvgam}? Start with \code{\link{mvgam}}, whose Workflow section lists the steps of an analysis and whose Terms section defines the vocabulary these pages use. \code{\link{mvgam_data}} checks a data frame before fitting. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} walks through a full analysis.
 
-This help page provides external links to example applications and discussions relevant to the use of \pkg{mvgam} models. These examples span non-Gaussian time series modelling, multivariate abundance forecasting, and the use of complex predictors such as time-varying seasonality, monotonic nonlinear effects and Gaussian processes.
+\pkg{mvgam} fits dynamic generalized additive models (GAMs) to one or many time series. Smooth functions of covariates sit beside a latent time-series process that carries the autocorrelation the covariates leave behind. Stan samples the posterior. Every prediction and forecast then carries the uncertainty of every parameter.
+
+The links below lead to questions, blog posts, articles and videos where these models answered a practical problem. They cover counts and other non-Gaussian series, several series modelled together, and predictors such as seasonality that changes over time, monotonic effects and Gaussian processes.
 }
 \details{
 \strong{Non-Gaussian time series modelling and forecasting}
 
-\pkg{mvgam} is designed for real-world time series data that include discrete, zero-inflated, or overdispersed observations. It supports latent dynamic components and smooth terms to model autocorrelation, trends, and uncertainty.
+Counts, proportions and binary outcomes rarely suit a Gaussian model. A latent trend on the link scale handles their autocorrelation.
 
 \itemize{
   \item \href{https://stats.stackexchange.com/questions/657495}{Uncertain serial autocorrelation in GAM count model residuals}
@@ -20,13 +22,13 @@ This help page provides external links to example applications and discussions r
   \item \href{https://discourse.mc-stan.org/t/autocorrelation-for-unevenly-spaced-time-series/10001}{Autocorrelation for unevenly spaced time series}
   \item \href{https://stats.stackexchange.com/questions/664160}{Visualising autocorrelation in irregularly spaced count data}
   \item \href{https://ecogambler.netlify.app/blog/vector-autoregressions/}{Blog post: State-Space Vector Autoregressions in \code{mvgam}}
-  \item \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{Article: State-space vector autoregressions with \code{mvgam}}
+  \item \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{Article: State-space vector autoregressions with \code{mvgam}}
   \item \href{https://www.youtube.com/watch?v=0zZopLlomsQ&t=4s}{Video tutorial: Ecological forecasting with Dynamic Generalized Additive Models}
 }
 
 \strong{Multivariate time series modelling and forecasting}
 
-\pkg{mvgam} supports multivariate models with shared or correlated latent trends, making it suitable for a broad range of applications that gather data on multiple time series simultaneously.
+Series measured together, such as several species at one site, can share latent trends or have trends that are correlated.
 
 \itemize{
   \item \href{https://stats.stackexchange.com/questions/172645}{Ecological modelling: multivariate abundance time-series data}
@@ -34,13 +36,13 @@ This help page provides external links to example applications and discussions r
   \item \href{https://discourse.mc-stan.org/t/confirmatory-factor-analysis-using-brms/23139}{Confirmatory factor analysis using \code{brms}}
   \item \href{https://discourse.mc-stan.org/t/chains-stuck-in-a-local-optimum-correlated-poisson-distributions/37414}{Chains stuck in a local optimum: correlated Poisson distributions}
   \item \href{https://ecogambler.netlify.app/blog/distributed-lags-mgcv/}{Blog post: Hierarchical distributed lag models in \code{mgcv} and \code{mvgam}}
-  \item \href{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}{Article: One shared process, many sensors: multi-response \code{mvgam}}
+  \item \href{https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html}{Article: One shared process, many sensors: multi-response \code{mvgam}}
   \item \href{https://www.youtube.com/watch?v=2POK_FVwCHk}{Video tutorial: Time series in R and Stan using the \code{mvgam} package: hierarchical GAMs}
 }
 
 \strong{Seasonality and other complex predictors}
 
-\pkg{mvgam} allows for flexible modelling of seasonal patterns and nonlinear effects using cyclic smooths, Gaussian processes, monotonic smooths and hierarchical structures.
+Cyclic smooths model seasonal patterns. Gaussian processes, monotonic smooths and hierarchical smooths model other nonlinear effects.
 
 \itemize{
   \item \href{https://stats.stackexchange.com/questions/478384}{Gaussian process smoothers (\code{bs = "gp"}) in GAMs}
@@ -50,6 +52,9 @@ This help page provides external links to example applications and discussions r
   \item \href{https://ecogambler.netlify.app/blog/time-varying-seasonality/}{Blog post: Incorporating time-varying seasonality in forecast models}
   \item \href{https://www.youtube.com/watch?v=fzPJUW8x6DU}{Video tutorial: Time series in R and Stan using the \code{mvgam} package: an introduction}
 }
+}
+\seealso{
+\code{\link{mvgam}}, \code{\link{mvgam_data}}, \code{\link{trend_constructors}}
 }
 \author{
 Nicholas J Clark

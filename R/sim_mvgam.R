@@ -18,7 +18,9 @@
 #' @param trend_model A trend constructor such as `AR(p = 1)`,
 #'   `AR(p = c(1, 12))`, `VAR(cor = TRUE)`, `CAR()`, `ZMVN()` or
 #'   `PW()`. `NULL` (the default) takes the type's own trend. `"None"`
-#'   simulates no trend.
+#'   simulates no trend. To fit the simulated data, name the same
+#'   trend inside `trend_formula`, as in `mvgam(y ~ s(x), trend_formula =
+#'   ~ AR())`. [mvgam()] refuses a `trend_model` argument.
 #' @param prop_trend Share of the link-scale variance given to the
 #'   trend, in `[0, 1]`. `NULL` takes the type's default: 0.2 for type
 #'   5, 0.6 for types 2, 3, 4 and 7, and 0.5 for types 1 and 6.

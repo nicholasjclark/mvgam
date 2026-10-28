@@ -8,12 +8,11 @@
 #' month 31, with heterogeneous slopes across lakes: two lakes
 #' respond positively and three respond negatively.
 #'
-#' A pooled fit that ignores both the latent state and the
-#' lake-level slope variation reports a near-zero aggregate
-#' treatment effect with wide credible intervals. The state-space
-#' fit (`trend_formula = ~ RW(cor = TRUE)`) with random treatment
-#' slopes recovers the heterogeneity. The wide aggregate CI comes
-#' from lake-level variation in the treatment effect.
+#' A pooled fit with one treatment slope for all lakes reports an
+#' effect near zero with a wide credible interval. The positive and
+#' negative responses cancel. A state-space fit
+#' (`trend_formula = ~ RW(cor = TRUE)`) with a treatment slope for each
+#' lake recovers the response of every lake.
 #'
 #' @format A `data.frame` with 300 rows and the following fields:
 #' \describe{
@@ -41,16 +40,23 @@
 #'   delta = -0.7, estuary = -0.6)`.
 #' * Observation noise `sigma = 0.4`.
 #'
-#' Recommended fit (state-space, with treatment on the observation
-#' equation and the correlated drift on the latent state):
-#' ```r
-#' mvgam(
+#' @seealso [RW()] for the trend, [residual_cor()] to extract the fitted
+#'   correlations between lakes, [ranef.mvgam()] for the lake slopes,
+#'   [mvgam_data()] to check the data.
+#'
+#' @examples
+#' data(lake_chemistry)
+#' mvgam_data(lake_chemistry, family = gaussian())
+#'
+#' \dontrun{
+#' # A model with the structure the data were simulated from
+#' mod <- mvgam(
 #'   formula = y ~ treated + (treated || lake),
 #'   trend_formula = ~ RW(cor = TRUE),
 #'   data = lake_chemistry,
-#'   family = gaussian()
+#'   family = gaussian(),
+#'   chains = 2, silent = 2
 #' )
-#' ```
-#'
-#' Built by `data-raw/build_lake_chemistry.R`.
+#' summary(mod)
+#' }
 "lake_chemistry"

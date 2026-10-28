@@ -281,12 +281,11 @@ has_stochastic_trend <- function(object) {
 }
 
 
-#' Sampled process errors of a fitted model
+#' Sampled innovations of a fitted model
 #'
-#' Top-level entry point for innovation sampling. Combines the
-#' observation structure, the trend covariance structure and the
-#' pattern-specific transform. The result is one matrix of
-#' process-error draws aligned with the observation grid.
+#' Draws the trend's innovations, its random change at each time step,
+#' from the fitted innovation covariance. The result is one matrix of
+#' innovation draws aligned with the observation grid.
 #'
 #' @param object A fitted `mvgam` object.
 #' @param ndraws Optional number of posterior draws to use. Mutually

@@ -49,6 +49,30 @@
 #'   long data frames of \pkg{bayesplot}. The counting methods return
 #'   an integer.
 #'
+#' @section Checking a fit:
+#' Three checks come before any interpretation of a fit. Vehtari et al.
+#' (2021) give the thresholds for the first two.
+#' \enumerate{
+#'   \item Every Rhat should be below 1.01. `max(rhat(mod))` gives the
+#'     largest. A higher value means the chains disagree about the
+#'     posterior. Longer chains, such as `update(mod, iter = 4000)`,
+#'     often resolve it.
+#'   \item The bulk and tail effective sample sizes should exceed 400.
+#'     [summary.mvgam()] prints them as `Bulk_ESS` and `Tail_ESS`.
+#'     Longer chains raise them.
+#'   \item There should be no divergent transitions. The fit warns when
+#'     there are any. `sum(nuts_params(mod, pars = "divergent__")$Value)`
+#'     counts them. A divergence marks a region of the posterior the
+#'     sampler could not explore. Its draws may then be biased. Refit
+#'     with smaller sampler steps,
+#'     `update(mod, control = list(adapt_delta = 0.95))`.
+#' }
+#' Divergences that persist at a higher `adapt_delta` usually mean the
+#' data cannot separate some of the parameters. A common cause is a
+#' smooth with more flexibility than the series supports, competing
+#' with the trend for the same variation. A smaller basis, such as
+#' `s(x, k = 5)`, or a more informative prior then helps.
+#'
 #' @seealso [summary.mvgam()] prints these summaries for every
 #'   parameter. [mcmc_plot.mvgam()] plots the draws. [mvgam_draws]
 #'   extracts them. [loo_R2.mvgam()] is the leave-one-out R^2.
@@ -69,7 +93,7 @@
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
@@ -77,7 +101,8 @@
 #' # The population coefficients with 95% intervals
 #' fixef(mod)
 #'
-#' # Rhat near 1 and effective sample ratios above 0.1 indicate mixing
+#' # Rhat below 1.01 and effective sample ratios above 0.1 suggest the
+#' # chains mixed
 #' rhat(mod, pars = c("ar1_trend", "sigma_trend"))
 #' neff_ratio(mod, pars = c("ar1_trend", "sigma_trend"))
 #'

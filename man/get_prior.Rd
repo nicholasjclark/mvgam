@@ -28,6 +28,39 @@ before it is fitted.
 with the arguments of \code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}}.
 }
 \code{default_prior()} is the same generic under the newer brms name.
+
+A prior states the plausible values of a parameter before the data
+are seen. Each row of the table gives the prior of one parameter
+class. A \verb{_trend} suffix marks the classes of the latent trend. The
+defaults are weakly informative. Change one when outside knowledge
+narrows a parameter, or when the sampler struggles in a region the
+data cannot inform. Pass the new rows, built with \code{\link[brms:set_prior]{brms::prior()}},
+to the \code{prior} argument of \code{\link[=mvgam]{mvgam()}}.
+}
+\examples{
+\dontrun{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+
+# The default priors of a Poisson GAM with an AR(1) trend, before
+# any fitting
+get_prior(
+  mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1)),
+  data = simdat$data_train,
+  family = poisson()
+)
+
+# Outside knowledge that the series is strongly persistent narrows
+# the AR(1) coefficient
+persistent <- prior(normal(0.7, 0.15), class = ar1_trend)
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             prior = persistent, chains = 2, silent = 2)
+
+# The fitted model's prior table records the change
+get_prior(mod)
+}
 }
 \seealso{
 \code{\link[=mvgam_formula]{mvgam_formula()}}, \code{\link[brms:default_prior]{brms::get_prior()}}

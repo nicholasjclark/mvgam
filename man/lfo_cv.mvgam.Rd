@@ -93,6 +93,10 @@ origin. The model is refitted only where the Pareto k exceeds
 \code{pareto_k_threshold}. The algorithm is that of Burkner, Gabry and
 Vehtari (2020), as in the
 \href{https://mc-stan.org/loo/articles/loo2-lfo.html}{loo PSIS-LFO vignette}.
+
+The ELPD of each fold is higher for the better model. CRPS and the
+other scores of \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} are lower for the better
+model. \code{\link[=loo.mvgam]{loo.mvgam()}} explains the ELPD and the Pareto k diagnostic.
 }
 \examples{
 \dontrun{
@@ -101,7 +105,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
 
 mod <- mvgam(
-  y ~ s(x),
+  y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
   data    = simdat$data_train,
   family  = poisson(),
@@ -125,15 +129,15 @@ summary(lfo)
 
 }
 \references{
-Paul-Christian Burkner, Jonah Gabry and Aki Vehtari (2020).
-Approximate leave-future-out cross-validation for Bayesian time
-series models. \emph{Journal of Statistical Computation and
-Simulation}. 90:14, 2499-2523.
+Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
+leave-future-out cross-validation for Bayesian time series models.
+\emph{Journal of Statistical Computation and Simulation},
+90(14):2499-2523.
 \doi{10.1080/00949655.2020.1783262}
 
-Aki Vehtari, Daniel Simpson, Andrew Gelman, Yuling Yao and
-Jonah Gabry (2024). Pareto smoothed importance sampling.
-\emph{Journal of Machine Learning Research}. 25(72), 1-58.
+Vehtari, A., Simpson, D., Gelman, A., Yao, Y. and Gabry, J.
+(2024). Pareto smoothed importance sampling. \emph{Journal of Machine
+Learning Research}, 25(72):1-58.
 \url{https://jmlr.org/papers/v25/19-556.html}
 }
 \seealso{
@@ -141,7 +145,7 @@ Jonah Gabry (2024). Pareto smoothed importance sampling.
 leave-future-out ELPD. \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}} weights
 them. \code{\link[=loo.mvgam]{loo.mvgam()}} approximates leave-one-out cross-validation.
 \code{\link[=kfold.mvgam]{kfold.mvgam()}} runs grouped k-fold cross-validation. The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 runs \code{lfo_cv()} on rodent counts, with its Pareto k refits and
 stacking weights.
 

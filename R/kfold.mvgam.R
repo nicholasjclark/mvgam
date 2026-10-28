@@ -3,8 +3,11 @@
 
 #' K-fold cross-validation for `mvgam` fits
 #'
-#' Estimates the expected log predictive density of held-out groups of
-#' rows. A fold that importance sampling approximates well takes the
+#' @description
+#' Measures how well a model predicts groups of data it was not fitted
+#' to, such as sites or species. Each fold of groups is held out in
+#' turn and scored by its expected log predictive density (ELPD).
+#' Higher is better. A fold that importance sampling approximates well takes the
 #' PSIS estimate of [loo::loo()] on the fold's summed log likelihood.
 #' The rest are refitted without the fold, as [lfo_cv.mvgam()] refits
 #' the time blocks it cannot approximate. Three settings cover the
@@ -70,15 +73,15 @@
 #'   }
 #'
 #' @references
-#' Burkner P-C, Gabry J, Vehtari A (2020). Approximate
+#' Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
 #'   leave-future-out cross-validation for Bayesian time series
 #'   models. *Journal of Statistical Computation and Simulation*,
-#'   90(14), 2499--2523. \doi{10.1080/00949655.2020.1783262}.
+#'   90(14):2499-2523. \doi{10.1080/00949655.2020.1783262}
 #'
-#' Vehtari A, Gelman A, Gabry J (2017). Practical Bayesian model
-#'   evaluation using leave-one-out cross-validation and WAIC.
-#'   *Statistics and Computing*, 27, 1413--1432.
-#'   \doi{10.1007/s11222-016-9696-4}.
+#' Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical Bayesian
+#'   model evaluation using leave-one-out cross-validation and WAIC.
+#'   *Statistics and Computing*, 27:1413-1432.
+#'   \doi{10.1007/s11222-016-9696-4}
 #'
 #' @seealso [loo.mvgam()] approximates leave-one-out cross-validation.
 #'   [lfo_cv.mvgam()] scores forecasts from rolling origins.

@@ -2,7 +2,7 @@
 % Please edit documentation in R/fitted.R
 \name{fitted.mvgam}
 \alias{fitted.mvgam}
-\title{Expected Values from the Posterior Distribution}
+\title{Expected values of an mvgam model}
 \usage{
 \method{fitted}{mvgam}(
   object,
@@ -41,22 +41,21 @@ on the link scale via \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mv
 \code{components} is not \code{"response"}.}
 
 \item{components}{Character; one of \code{"response"} (default),
-\code{"latent_state"}, or \code{"detection"}. Selects which posterior
-component to return.
+\code{"latent_state"}, or \code{"detection"}. The quantity to return:
 \itemize{
-\item \code{"response"} keeps the brms-default behaviour: marginal
-expected values at the per-row grain, scaled via \code{scale}.
-\item \code{"latent_state"} (closure-unit families only) routes through
-\code{\link[=predict.mvgam]{predict.mvgam()}} with \code{type = "latent_state"}, returning the
-conditional latent state per closure unit (\code{P(z = 1 | y)} for
-\code{occ()}, posterior \code{N} for \code{nmix()} variants).
-\item \code{"detection"} (closure-unit families only) routes through
-\code{\link[=predict.mvgam]{predict.mvgam()}} with \code{type = "detection"}, returning per-
-visit detection probabilities.
+\item \code{"response"}: the expected value of each row of the data, on
+the scale \code{scale} sets.
+\item \code{"latent_state"}, for \code{nmix()} and \code{occ()} only: the latent
+state of each closure unit given its detections. That is the
+abundance \code{N} for \code{nmix()} and the probability of occupancy
+\code{P(z = 1 | y)} for \code{occ()}. \code{\link[=predict.mvgam]{predict.mvgam()}} returns the same
+with \code{type = "latent_state"}.
+\item \code{"detection"}, for \code{nmix()} and \code{occ()} only: the detection
+probability of each visit, as \code{type = "detection"} of
+\code{\link[=predict.mvgam]{predict.mvgam()}} returns it.
 }
 
-Modelled on the \code{flocker::fitted_flocker(components = ...)}
-argument so flocker users have a one-call equivalent.}
+The argument matches \code{components} of \code{flocker::fitted_flocker()}.}
 
 \item{unit_level}{Logical or \code{NULL} (default). When \code{TRUE} for a
 closure-unit detection family and \code{components = "response"},
@@ -83,26 +82,24 @@ deviation for summaries. If \code{TRUE}, uses median and median absolute
 deviation (MAD).}
 
 \item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals.}
 
-\item{process_error}{Logical; if \code{TRUE}, the trend adds a sampled
-innovation to its deterministic submodel. Each posterior draw
-takes one innovation from the distribution the trend settles
-into. An autoregressive trend settles into its stationary
-distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}. The
-Jensen correction on a log link is
-\eqn{\sigma^2/(2(1-\rho^2))}. A random walk lacks a stationary
-distribution and a \code{ZMVN()} trend lacks dynamics. Both draw their
-innovations directly. \code{CAR()} uses one stationary covariance at
-every time of an irregular grid and draws from it. If \code{FALSE},
-the default, the trend contributes its deterministic submodel
-alone, at its own per-draw values. The argument applies under
-\code{incl_autocor = FALSE}. Conditioning on the fitted state already
-fixes every innovation.
+\item{process_error}{Logical. \code{FALSE}, the default, leaves the
+trend's innovations out of the prediction. \code{TRUE} adds a random
+deviation at each time and series, drawn anew for every posterior
+draw from the spread the trend shows over the long run. For an
+AR(1) trend with innovation SD \eqn{\sigma} and coefficient
+\eqn{\rho} that spread has variance \eqn{\sigma^2/(1-\rho^2)}. On a
+log link the deviations raise the average prediction by the factor
+\eqn{\exp(\sigma^2/(2(1-\rho^2)))}. A random walk has no long-run
+spread. A \code{ZMVN()} trend has no dynamics. These two draw from the
+innovation covariance itself. \code{CAR()} draws from one long-run
+covariance at every time of an irregular grid. The argument applies
+under \code{incl_autocor = FALSE}. The fitted state already holds every
+innovation.
 
-Each call draws new innovations. Two calls on one fit give different
-results. Set a seed to reproduce a result.}
+Each call draws new innovations. Two calls on one fit give
+different results. Set a seed to reproduce a result.}
 
 \item{incl_autocor}{Logical; whether the fitted values include the
 latent trend state the model inferred at each time. Defaults to
@@ -118,8 +115,8 @@ it has no latent state to propagate. Predict for levels the fit
 knows, or refit with the new levels included.}
 
 \item{sample_new_levels}{Character; accepted for brms
-compatibility and not used, since new levels are refused. See
-\code{allow_new_levels}.}
+compatibility. It has no effect, because new levels are refused.
+See \code{allow_new_levels}.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }
@@ -151,9 +148,9 @@ predictive draws.
 For the training data the fitted values include the trend state the
 model inferred at each time. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the same
 state. With \code{newdata}, or under \code{incl_autocor = FALSE}, the fitted
-values describe the covariate structure. \code{process_error} then sets
-the trend's part. \code{FALSE} keeps its deterministic submodel. \code{TRUE}
-samples a state per draw from the trend's dynamics.
+values describe the covariate part of the model. \code{process_error} then
+sets the trend's part. \code{FALSE} keeps the trend's covariate effects.
+\code{TRUE} also samples a state per draw from the trend's dynamics.
 
 The brms arguments \code{dpar}, \code{nlpar} and \code{sort} are refused.
 \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} returns a distributional parameter
@@ -164,7 +161,7 @@ through its own \code{dpar}. Rows come back in the order of the frame.
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)

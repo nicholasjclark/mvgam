@@ -12,8 +12,8 @@ and counts whose dispersion a negative binomial cannot reach.
 
 Pass a family as you would to \code{brms::brm()} or \code{stats::glm()}, for
 example \code{mvgam(y ~ x, trend_formula = ~ AR(p = 1), family = nmix())}.
-The \href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} fits \code{\link[=nmix]{nmix()}}.
-The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits a joint species
+The \href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article} fits \code{\link[=nmix]{nmix()}}.
+The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits a joint species
 distribution model.
 }
 \section{Families mvgam adds}{
@@ -31,9 +31,9 @@ compound Poisson sum \cr
 \code{"poisson_binomial"}, \code{"royle_nichols"} or
 \code{"poisson_poisson"}; \code{multi_season} \cr
 \code{\link[=occ]{occ()}} \tab logit (state and detection) \tab \code{multi_season} \cr
-\code{\link[=diri]{diri()}} \tab identity \tab none \cr
-\code{\link[=multi]{multi()}} \tab identity \tab none \cr
-\code{\link[=categ]{categ()}} \tab identity \tab none \cr
+\code{\link[=diri]{diri()}} \tab softmax over each unit's categories \tab none \cr
+\code{\link[=multi]{multi()}} \tab softmax over each unit's categories \tab none \cr
+\code{\link[=categ]{categ()}} \tab softmax over each unit's categories \tab none \cr
 \code{\link[=mvn]{mvn()}} \tab identity \tab none \cr
 \code{\link[=mvt]{mvt()}} \tab identity \tab none
 }
@@ -91,14 +91,16 @@ structure.}
 
 A \pkg{brms} or \pkg{stats} family takes a \code{link} argument as
 usual. \code{poisson(link = "sqrt")} and \code{Gamma(link = "log")} both
-work. mvgam writes the Stan code for the families in the table
-against one scale. Those families fix their link.
+work. The families mvgam adds each have the one link the table
+gives.
 }
 
 \section{Data layout}{
 
-\code{\link[=nmix]{nmix()}} and \code{\link[=occ]{occ()}} are closure-unit families. They expect several
-rows per closure unit, one per visit. They model the state and the
+\code{\link[=nmix]{nmix()}} and \code{\link[=occ]{occ()}} are closure-unit families. A closure unit is a
+site, or a site in one season, whose true occupancy or abundance
+holds across its repeat visits. The families expect several rows
+per closure unit, one per visit. They model the state and the
 detection process with separate linear predictors. \code{bf()} supplies
 the second, as in \code{bf(y ~ elev, p ~ tod)}.
 \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} simulates the layout they take.

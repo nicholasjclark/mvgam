@@ -6,6 +6,7 @@
 #' one.
 #'
 #' @name glm_analysis
+#' @noRd
 NULL
 
 

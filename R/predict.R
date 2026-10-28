@@ -1,10 +1,9 @@
-#' Draws from the Posterior Distribution of an mvgam Model
+#' Posterior predictions from an mvgam model
 #'
-#' Posterior predictions for mvgam models. `type` selects the
-#' quantity: [posterior_predict.mvgam()] for `"response"` (the
-#' default), [posterior_linpred.mvgam()] for `"link"` and
-#' [posterior_epred.mvgam()] for `"expected"`. `"variance"` gives the
-#' family's conditional variance.
+#' Predicts new outcomes, their expectation or the linear predictor
+#' from every posterior draw, for the training data or for new data.
+#' The section 'Which prediction function?' compares `predict()` with
+#' [fitted.mvgam()], [hindcast.mvgam()] and [forecast.mvgam()].
 #'
 #' @param object An object of class `mvgam`.
 #' @param type Character; one of `"response"` (default), `"link"`,
@@ -17,8 +16,7 @@
 #'   deviation for summaries. If `TRUE`, uses median and median absolute
 #'   deviation (MAD).
 #' @param probs Numeric vector of probabilities for quantile computation.
-#'   Default is `c(0.025, 0.975)` for 95% credible intervals. Can be a
-#'   single value or multiple values.
+#'   Default is `c(0.025, 0.975)` for 95% credible intervals.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return With `summary = FALSE`, an `[ndraws, nobs]` matrix of
@@ -49,7 +47,7 @@
 #'     gaussian, student, lognormal, poisson, bernoulli, binomial,
 #'     negbinomial, gamma and beta families. Other families raise an
 #'     error. By default the variance is the observation noise around
-#'     the mean of the two submodels. `process_error = TRUE` also
+#'     the mean of the covariate part. `process_error = TRUE` also
 #'     conditions on each draw's sampled trend innovation.
 #'   \item `"terms"`: refused with a pointer to the functions that
 #'     decompose a prediction. [posterior_smooths.mvgam()] returns
@@ -67,6 +65,37 @@
 #'     detection probability \eqn{p_{g,j}} on the response scale.
 #' }
 #'
+#' @section Which prediction function?:
+#' Every prediction adds the latent trend to the observation model. The
+#' functions differ in the version of the trend they use and in whether
+#' they add observation noise.
+#'
+#' | Function | Times | Trend by default | Observation noise |
+#' |:---------|:------|:-----------------|:------------------|
+#' | `fitted()` | training data | fitted state | no |
+#' | `predict()` | any | covariate part | under `type = "response"` |
+#' | `posterior_predict()` | any | covariate part | yes |
+#' | `posterior_epred()`, `posterior_linpred()` | any | covariate part | no |
+#' | `hindcast()` | training data | fitted state | under `type = "response"` |
+#' | `forecast()` | after the training data | fitted state, carried forward | under `type = "response"` |
+#' | `residuals()`, `pp_check()` | training data | fitted state | yes |
+#'
+#' The fitted state is the value the trend took at each observed time,
+#' as the model inferred it. The covariate part keeps the effects of the
+#' observation and trend formulas and leaves out the trend's
+#' innovations. Questions about covariates use it, as
+#' [conditional_effects.mvgam()] and the \pkg{marginaleffects} functions
+#' do. `incl_autocor = TRUE` switches `predict()` and the
+#' `posterior_*()` methods to the fitted state, the default of their
+#' \pkg{brms} counterparts. `fitted()` uses the covariate part for
+#' `newdata`.
+#'
+#' @references
+#' Royle, J. A. (2004). N-mixture models for estimating
+#'   population size from spatially replicated counts.
+#'   *Biometrics*, 60, 108-115.
+#'   \doi{10.1111/j.0006-341X.2004.00142.x}
+#'
 #' @seealso [fitted.mvgam()] returns expected values with the inferred
 #'   trend state. [forecast.mvgam()] predicts future times from the
 #'   fitted state. [conditional_effects.mvgam()] plots predictions
@@ -77,7 +106,7 @@
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)

@@ -1,36 +1,35 @@
 #' Tidy comparison of forecast scores across mvgam models
 #'
-#' @description Bundles per-series-per-horizon scores from several
-#'   `mvgam_forecast` objects into one long-format `tibble`, with
-#'   one row per model x series x horizon combination. For joint
-#'   scores (`"energy"`, `"variogram"`, `"twenergy"`) the per-series
-#'   scores are `NA` and the joint score is the row with
-#'   `series == "all_series"`.
+#' @description Scores the forecasts of several models of the same
+#'   held-out data with one rule, then stacks the results in one table
+#'   for comparison. Lower scores are better. The table has one row per
+#'   model, series and forecast horizon. A joint score (`"energy"`,
+#'   `"variogram"` or `"twenergy"`) scores all series together. Its
+#'   per-series rows hold `NA`. The rows with `series == "all_series"`
+#'   hold its value.
 #'
-#' @param ... Two or more `mvgam_forecast` objects (the same shape
-#'   `score.mvgam_forecast()` consumes). Argument names are taken
-#'   from the call and used as the `model` column. Bare expressions
-#'   like `compare_scores(fc1, fc2)` produce `model` levels
-#'   `"fc1"` and `"fc2"`.
-#' @param score Character. Which proper scoring rule to evaluate.
-#'   Forwarded to [score.mvgam_forecast()]; see its documentation
-#'   for the supported values.
-#' @param model_names Optional character vector of model labels;
-#'   overrides the names inferred from the call.
-#' @param score_args Optional named list of extra arguments passed
-#'   to [score.mvgam_forecast()] (for example
-#'   `score_args = list(interval_width = 0.6)`).
+#' @param ... Two or more `mvgam_forecast` objects from
+#'   [forecast.mvgam()]. A named argument, as in
+#'   `compare_scores(GAM = fc1, AR = fc2)`, names its model. An unnamed
+#'   one takes the expression passed, such as `"fc1"`.
+#' @param score Character name of the scoring rule. The section
+#'   'Available scores' of [score.mvgam_forecast()] lists them.
+#' @param model_names Optional character vector of model names, one per
+#'   forecast. It replaces the names taken from the call.
+#' @param score_args Optional named list of further arguments of
+#'   [score.mvgam_forecast()], such as
+#'   `score_args = list(interval_width = 0.6)`.
 #'
-#' @return A `tibble` with columns:
+#' @return A `tibble` of class `mvgam_compare_scores`, with columns:
 #' \itemize{
-#'   \item `model` -- factor with one level per supplied forecast.
-#'   \item `series` -- factor of series names (plus an
-#'     `"all_series"` level when a joint score is requested).
-#'   \item `eval_horizon` -- integer horizon within the test
-#'     window (1, 2, ...).
-#'   \item `score` -- the requested score value.
-#'   \item `in_interval` -- coverage indicator carried through
-#'     from [score.mvgam_forecast()].
+#'   \item `model`: a factor with one level per forecast.
+#'   \item `series`: a factor of series names, with an `"all_series"`
+#'     level for a joint score.
+#'   \item `eval_horizon`: the forecast horizon, 1 for the first
+#'     held-out time.
+#'   \item `score`: the value of the score.
+#'   \item `in_interval`: whether the observation fell in the central
+#'     interval, as [score.mvgam_forecast()] reports it.
 #' }
 #'
 #' @author Nicholas J Clark

@@ -34,7 +34,10 @@ expand_factor_axis <- function(n_lv, ...) {
 #' Use `lv_axis()` in a `trend_formula` in any position that takes a
 #' factor variable, to give each latent factor its own effect. In a
 #' model with no latent factors it gives each series its own effect.
+#' Use it when a covariate should act differently on different series,
+#' such as temperature raising one species and lowering another.
 #'
+#' For example:
 #' \preformatted{
 #' trend_formula = ~ s(elev, by = lv_axis()) + AR(n_lv = 2)
 #' trend_formula = ~ temp:lv_axis() + AR(n_lv = 2)
@@ -59,8 +62,8 @@ expand_factor_axis <- function(n_lv, ...) {
 #' in `formula`. `by = trend` is deprecated and is treated as
 #' `by = lv_axis()`.
 #'
-#' @return `NULL` (invisibly). The function exists solely as a
-#'   formula sentinel.
+#' @return `NULL` (invisibly). The function only marks a term in a
+#'   formula.
 #'
 #' @section What each form estimates:
 #' With no latent factors, `lv_axis()` is each series:
@@ -76,10 +79,10 @@ expand_factor_axis <- function(n_lv, ...) {
 #' With `n_lv` latent factors, each of these is estimated once per
 #' factor. The coefficient of one factor has no scale of its own. The
 #' loadings and the factor effects trade scale. The data identify
-#' their product. [conditional_effects()] and [predict()]
-#' report that product, the effect of the covariate on each series,
-#' and [conditional_effects()] draws a panel per series. When every
-#' `lv_axis()` term is a slope or a level, [summary()] reports the
+#' their product. [conditional_effects.mvgam()] and [predict.mvgam()]
+#' report that product, the effect of the covariate on each series.
+#' [conditional_effects.mvgam()] draws a panel per series. When every
+#' `lv_axis()` term is a slope or a level, [summary.mvgam()] reports the
 #' per-factor coefficients in the basis of the identified loadings
 #' `Z_tilde`.
 #'

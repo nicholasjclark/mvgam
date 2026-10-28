@@ -34,7 +34,8 @@ Defaults to \code{80L}.}
 \item{trend_model}{A trend constructor such as \code{AR(p = 1)},
 \code{AR(p = c(1, 12))}, \code{VAR(cor = TRUE)}, \code{CAR()}, \code{ZMVN()} or
 \code{PW()}. \code{NULL} (the default) takes the type's own trend. \code{"None"}
-simulates no trend.}
+simulates no trend. To fit the simulated data, name the same
+trend inside \code{trend_formula}, as in \code{mvgam(y ~ s(x), trend_formula = ~ AR())}. \code{\link[=mvgam]{mvgam()}} refuses a \code{trend_model} argument.}
 
 \item{prop_trend}{Share of the link-scale variance given to the
 trend, in \verb{[0, 1]}. \code{NULL} takes the type's default: 0.2 for type
@@ -134,7 +135,7 @@ plot(f_true ~ x, data = simdat$true_smooths$`s(x)`, type = "l")
 \code{\link[=mvgam]{mvgam()}} fits the simulated data. \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}}
 simulates occupancy and N-mixture data. \code{\link[=sim_jsdgam]{sim_jsdgam()}} simulates
 site-by-species data. The
-\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview article} fits a
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} fits a
 model to data from \code{sim_mvgam()}.
 
 Other simulation: 

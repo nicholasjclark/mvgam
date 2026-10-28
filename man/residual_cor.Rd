@@ -28,19 +28,22 @@ residual_cor(object, ...)
 \item{covariance}{Which covariance to summarise. \code{"stationary"} (the
 default) gives the covariance of the latent states over the whole
 series. \code{"innovation"} gives the covariance of one time step's
-shocks. The two coincide for a trend whose states keep no memory
+innovations. The two coincide for a trend whose states keep no memory
 between times.}
 
 \item{by_group}{Logical, for a hierarchical trend. \code{FALSE} (the
-default) returns the population correlation of the shocks,
+default) returns the population correlation of the innovations,
 \code{tcrossprod(L_Omega_global)}, under either \code{covariance}. \code{TRUE}
 also returns each group's correlation,
 \code{alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev[g])}.}
 
 \item{partial}{Logical. \code{TRUE} also computes partial correlations,
-\verb{P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)}, for the \verb{prec*}
-fields. A factor fit with fewer factors than series has a singular
-covariance of rank \code{n_lv} and is refused. \code{\link[=shared_variation]{shared_variation()}}
+\verb{P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)}. A partial
+correlation measures the association of two series once every
+other series is held fixed. The result stores them in the fields
+whose names start with \code{prec}. A factor fit with fewer factors
+than series has a singular covariance of rank \code{n_lv} and is
+refused. \code{\link[=shared_variation]{shared_variation()}}
 reports the variation its series share. The residual variances of
 \code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}} make their covariance full rank.}
 
@@ -52,9 +55,8 @@ probabilities. \code{FALSE} returns the arrays of draws.}
 deviation for summaries. If \code{TRUE}, uses median and median absolute
 deviation (MAD).}
 
-\item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+\item{probs}{Two probabilities for the lower and upper bounds of the
+credible interval. Default \code{c(0.025, 0.975)}, a 95\% interval.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}
@@ -71,10 +73,10 @@ matrix as \code{"_global"} and one per group.
 }
 \description{
 Posterior correlations, covariances and optional partial correlations
-between series, from the trend's covariance. Three trend structures
-carry one:
-}
-\details{
+between the series' latent trends. Residual here means the
+co-variation of the trends left once the covariate effects are
+accounted for. \code{\link[=residuals.mvgam]{residuals.mvgam()}} returns the observation
+residuals. Three kinds of trend estimate these correlations:
 \itemize{
 \item A factor trend (\code{n_lv} on the trend constructor). Each draw
 gives the series covariance \verb{Z Omega Z'}, with \code{Z} the loadings
@@ -85,7 +87,8 @@ and \code{Omega} the covariance of the latent states. \code{\link[=mvn]{mvn()}} 
 or \code{ZMVN()} with \code{cor = TRUE}, or \code{VAR()}.
 \item A hierarchical trend (\code{gr} on the trend constructor).
 }
-
+}
+\details{
 A correlated-innovation trend gives each draw the covariance
 \verb{diag(sigma) L_Omega L_Omega' diag(sigma)}. A \code{VAR()} trend takes the
 leading block of \code{Omega_trend}, the stationary covariance the Stan
@@ -93,16 +96,16 @@ model derives from \code{Phi_trend}, \code{Sigma_trend} and, under \code{ma = TR
 \code{Theta_trend}.
 
 The stationary covariance describes the states over the whole series.
-An \code{AR(cor = TRUE)} trend takes the leading block of the stationary
-covariance of its companion state, a moving-average term included. At
-one lag that block is \code{Sigma[a, b] / (1 - ar_a * ar_b)}. A \code{CAR()}
+An \code{AR(cor = TRUE)} trend reports the stationary covariance of its
+states, including any moving-average term. With one lag it is
+\code{Sigma[a, b] / (1 - ar_a * ar_b)}. A \code{CAR()}
 trend holds it at every time of an irregular grid. A draw whose
 autoregression is explosive has no stationary covariance and keeps
 its innovation covariance. A warning gives the count once per session.
 \code{ZMVN()} keeps no memory between times and \code{RW()} has no stationary
 distribution. Both report their innovation covariance. A hierarchical
-\code{AR()} lifts each group's scales the same way before the global and
-group factors are mixed.
+\code{AR()} converts each group's scales to stationary scales in the same
+way, before its global and group correlations are mixed.
 
 Under \code{covariance = "innovation"} a \code{VAR()} fit reports the
 contemporaneous shocks. Its transition matrix spreads each shock
@@ -118,8 +121,8 @@ matrix, such as \code{\link[=chol]{chol()}}, takes \code{summary = FALSE}, whose
 matrices are valid correlation matrices. \code{prob_positive} and
 \code{prob_negative} are posterior sign probabilities. \code{prob_nonzero} is
 the larger of the two. \code{sig_cor} keeps the correlations whose
-\code{prob_nonzero} exceeds \code{prob_threshold}, 0.95. Its other entries are
-zero.
+\code{prob_nonzero} exceeds \code{prob_threshold}, fixed at 0.95. Its other
+entries are zero.
 
 \code{\link[=jsdgam]{jsdgam()}} fits the same factor model. Its species covariance follows
 the factor rule above.
@@ -153,8 +156,9 @@ Regression Analysis of Multivariate Abundance Data in R.
 \seealso{
 \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} draws the matrix as a heatmap.
 \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}} lists the pairs. \code{\link[=ordinate]{ordinate()}} draws the
-loadings as a biplot. The
-\href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{joint species distribution article}
+loadings as a biplot. The example of \link{trend_constructors} takes
+the correlations of a \code{CAR(cor = TRUE)} trend. The
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{joint species distribution article}
 interprets species correlations from a factor model.
 
 Other latent dynamics: 

@@ -36,23 +36,24 @@ a trend constructor such as \code{AR()} with any predictors of the
 latent state. Write \code{\link[=lv_axis]{lv_axis()}} in a term to vary its effect by
 latent factor, or by series in a model without factors, as in
 \code{~ x:lv_axis() + AR()}. The series column itself is not
-supported in a term of this formula. An exact \code{gp()} term here
-also predicts in-sample alone. Forecasting a model that holds one
-requires the approximate form.}
+supported in a term of this formula. Forecasting requires the
+approximate form of any \code{gp()} term here.}
 
-\item{data}{Data frame, or a list of multiply imputed data frames
-or a \code{mids} object from \pkg{mice}. \code{\link[=mvgam_multiple]{mvgam_multiple()}} describes
-the imputation path.}
+\item{data}{Data frame in long format, one row per series and time.
+A model with a trend needs a numeric \code{time} column and a factor
+\code{series} column, or the columns a trend constructor names through
+its \code{time} and \code{series} arguments. \code{\link[=mvgam_data]{mvgam_data()}} checks a frame
+against a family before fitting. A list of multiply imputed data
+frames, or a \code{mids} object from \pkg{mice}, is also accepted.
+\code{\link[=mvgam_multiple]{mvgam_multiple()}} describes the imputation path.}
 
 \item{newdata}{Optional held-out \code{data.frame}, stored on the fit
-as \code{object$test_data}. \code{forecast()} forecasts to it when called
-without \code{newdata}. \code{plot(fit, type = "series")} overlays it.
-The fit itself draws no forecasts. \code{forecast()} propagates the
-fitted latent state forward in time per posterior draw.
-\code{posterior_predict(mod, newdata = mod$test_data)} marginalises
-over the trend's stochastic dynamics at the supplied design
-points. Use \code{forecast()} for time-series forecasting and
-\code{posterior_predict()} for marginal predictive checks.}
+as \code{object$test_data}. Fitting draws no forecasts. \code{forecast()}
+called without \code{newdata} forecasts these times, carrying the fitted
+latent state forward. \code{plot(fit, type = "series")} overlays them.
+\code{posterior_predict()} on these data uses the covariate part alone.
+The section 'Which prediction function?' of \code{\link[=predict.mvgam]{predict.mvgam()}}
+compares the two.}
 
 \item{trend_map}{Optional fixed factor loadings, in one of three
 forms:
@@ -69,104 +70,15 @@ process for every series
 A factor model without a \code{trend_map} samples every loading. It
 identifies \code{Z} after sampling by a thin QR rotation (Heaps and
 Jermyn 2024). A \code{trend_map} with any fixed entry takes no
-rotation. The argument requires a \code{trend_formula}. It is an
-alternative to the \code{trend_map} argument of the trend constructor,
-and supplying both is an error. \code{loadings_prior} lists the
+rotation. The argument requires a \code{trend_formula}. The trend
+constructor takes a \code{trend_map} argument too. Supplying both is an
+error. \code{loadings_prior} lists the
 \code{trend_map} forms a structured loadings prior accepts.}
 
-\item{loadings_prior}{Optional named list specifying a
-structured prior on the unconstrained factor loadings
-matrix following Heaps & Jermyn (2024). The loadings belong
-to a trend with latent factors. The argument requires a
-\code{trend_formula}. Supplying it without one is an error. When
-supplied, the
-default iid \code{to_vector(Z) ~ student_t(3, 0, 0.5)} prior is
-replaced with a per-column matrix-normal prior of the form
-\code{Z[, i] ~ multi_normal_cholesky(0, L_Phi)}, where the
-among-row scale matrix \code{Phi} is assembled
-multiplicatively from any combination of:
-\itemize{
-\item a per-series feature matrix (\code{features}), expanded
-into an ARD exponential kernel via \code{gp_exponential_cov()}
-\item one or more pairwise distance matrices
-(\code{distances}), each contributing an \code{exp(-d / theta)}
-factor
-}
-
-Accepted fields:
-\itemize{
-\item \code{features}: string lookup into \code{data2}, a numeric
-matrix, or a data.frame. Columns are encoded by type
-(numeric/integer/logical: z-score; ordered factor:
-z-score after \code{as.numeric()}; unordered factor /
-character: one-hot with all levels retained, following
-Heaps Sect. 6.2). Each encoded column receives its own
-ARD length-scale.
-\item \code{distances}: string name (or character vector of
-names) of pairwise distance matrices in \code{data2}, or a
-single matrix / named list of matrices passed inline.
-Each matrix is rescaled to maximum entry one so the
-default length-scale prior is interpretable on a unit
-scale (matching Heaps Supps S4.2.1).
-\item \code{column_shrinkage}: \code{"iid"} (default; no shrinkage)
-or \code{"mgp"} (multiplicative-gamma-process increasing
-shrinkage of Bhattacharya & Dunson 2011, used in
-Heaps Eq. (9)). \code{"mgp"} applies its column scale through
-the shared innovation scale. It is available for \code{AR()},
-\code{RW()} and \code{ZMVN()} trends. \code{VAR()} builds its own innovation
-covariance and has no shared scale for it; pair a \code{VAR()}
-factor model with \code{"iid"} instead.
-\item \code{mgp_a1}, \code{mgp_a2}: numeric MGP hyperparameters,
-only used when \code{column_shrinkage = "mgp"}. Default
-\verb{(2, 4)} lies within the \verb{a2 in [3, 5]} range
-recommended for moderate-n ecology / community panels
-by Legramanti, Durante and Dunson (2020, JRSS-B) and
-Schiavon, Canale and Dunson (2022, Biometrics 78:995).
-Heaps Sect. 6.3.1 used \verb{(2, 3)} for the gas-demand
-application; Sect. 6.2.2 used \verb{(2, 6)} for the
-Finnish-bird JSDM. Lower \code{a2} for less shrinkage when
-the data weakly identify the active rank.
-}
-
-Length-scales receive a \code{lognormal(0, 1)} prior in the
-model block. This prior is set on the standardised distance
-scale. Pairwise distance matrices are rescaled to
-\code{max(d) = 1} inside the normaliser. A length-scale of 1 then
-corresponds to correlation \code{exp(-1)} between the two most
-distant series. Heaps' Finnish-birds application (Sect.
-6.2.2) used the wider \code{lognormal(0, sqrt(10))} instead;
-override the default by passing a \code{prior()} for
-\code{theta_features} / \verb{theta_dist_<name>} if your data weakly
-identify length-scales and you want less regularisation.
-Note: the \code{max(d) = 1} rule is the natural generic
-standardisation. Heaps Supps S4.2.1 used "root-to-tip
-distance = 1" for ultrametric phylogenies, which corresponds
-to \code{max(d) = 2} (twice the per-leaf depth); pre-standardise
-your distance matrix to match if exact parity matters.
-Identification. The structured prior applies to the sampled
-columns of \code{Z}. Where the QR rotation gives the reported
-loadings \code{Z_tilde}, each of its columns mixes the sampled
-columns. \code{shared_variation()} and \code{residual_cor()} use
-\verb{Z Z'}, which is the same before and after the rotation. See
-the Identification section of the trend constructors.
-
-Compatibility with \code{trend_map}:
-\itemize{
-\item \code{trend_map = NULL} (default): compatible. \code{n_lv} alone
-triggers the free-Z factor model; \code{loadings_prior} applies
-to the sampled \code{Z} column-wise.
-\item \code{trend_map = matrix(NA_real_, n_series, n_lv)}
-(all-NA mask, used internally by \code{jsdgam()}): compatible.
-Treated as a free-Z trigger upstream; \code{loadings_prior}
-applies as if \code{trend_map} were \code{NULL}.
-\item \code{trend_map} with a mix of fixed entries and \code{NA}s:
-incompatible. Partial-Z parameterises the free entries
-as a vector under an iid \code{student_t(3, 0, 1)} prior,
-which would overlap with the matrix-normal structure
-and double-count regularisation.
-\item Fully-fixed \code{trend_map} (no \code{NA}s): incompatible.
-The structured prior has no free parameters to act on.
-}}
+\item{loadings_prior}{Optional named list giving a structured prior
+on the loadings of a factor model, such as species traits or a
+phylogeny. Most models leave it \code{NULL}. The section 'Structured
+loadings priors' of \code{\link[=mvgam]{mvgam()}} describes its fields.}
 
 \item{backend}{\code{"cmdstanr"} or \code{"rstan"}. Defaults to
 \code{getOption("brms.backend", "cmdstanr")}.}
@@ -217,14 +129,9 @@ sample slower, the threading overhead outweighing the gain. A
 brms family without a \code{trend_formula} uses the threading brms
 writes.
 
-A brms-native family with a \code{trend_formula} samples serially
-whatever \code{threads} says. When it threads, brms moves the \code{mu}
-assignment inside \code{partial_log_lik_lpmf}, where mvgam cannot add
-the trend to it. The program is then built without threading.
-This applies to every trend model under a brms-native family:
-\code{RW()}, \code{AR()}, \code{VAR()}, \code{LLT()}, \code{ZMVN()}, \code{CAR()} and
-\code{PW()}. Each fit that drops the request warns. A batch script
-that fits repeatedly shows it every time.}
+A brms family with a \code{trend_formula} samples each chain on one
+thread whatever \code{threads} says. The threaded likelihood brms
+writes leaves no place to add the trend. Each such fit warns.}
 
 \item{save_pars}{A \code{\link[brms:save_pars]{brms::save_pars()}} object naming which
 parameters the posterior keeps. A model is built from working
@@ -254,10 +161,20 @@ every class a model takes, with trend classes carrying a \verb{_trend}
 suffix. The plural \code{priors} is accepted as well.
 
 \code{chains}, \code{iter}, \code{warmup}, \code{thin}, \code{seed} and \code{control} reach
-Stan as in \code{\link[brms:brm]{brms::brm()}}. \code{cores} sets how many chains sample at
-once. It defaults to \code{getOption("mc.cores")} when that option is
-set and otherwise to one fewer than the machine's cores, up to
-\code{chains}.
+Stan as in \code{\link[brms:brm]{brms::brm()}}. \code{chains} defaults to 4, each running
+2000 iterations of which the first half are warmup. Results for
+publication should use at least four. The examples use two for
+speed. If the
+sampler reports divergent transitions, refit with
+\code{control = list(adapt_delta = 0.95)} or simplify the model.
+\link{mvgam_diagnostics} describes the checks. \code{cores} sets how many
+chains sample at once. It defaults to \code{getOption("mc.cores")}
+when that option is set and otherwise to one fewer than the
+machine's cores, up to \code{chains}.
+
+\code{silent} sets how much the fit prints. \code{0} shows everything,
+Stan's own messages included. \code{1}, the default, shows the
+sampler's progress and mvgam's notices. \code{2} prints warnings alone.
 
 \code{algorithm} selects how the posterior is explored. It accepts
 \code{"sampling"} (the default), \code{"meanfield"}, \code{"fullrank"} or
@@ -268,10 +185,9 @@ set and otherwise to one fewer than the machine's cores, up to
 default), \code{"0"}, a numeric value, a list or a function. With
 \code{backend = "cmdstanr"} it also accepts \code{"pathfinder"}. That
 keyword runs Stan's Pathfinder approximation on the compiled model
-and draws one starting value per chain from it. The requested
-algorithm still explores the posterior. The fit stays exact.
-It helps a model whose chains stall at a poor starting point or
-fill warmup with divergences. On a model that already warms up
+and draws one starting value per chain from it. Sampling then
+proceeds as usual from those values. It helps a model whose chains
+stall at a poor starting point or fill warmup with divergences. On a model that already warms up
 cleanly it adds about a second and lowers effective samples per
 second.
 
@@ -295,12 +211,127 @@ is unchanged.
 An object of class \code{mvgam}.
 }
 \description{
-Fits the model in Stan. The observation \code{formula} takes brms syntax,
-and \code{trend_formula} adds a latent dynamic process, such as a random
-walk or an autoregression, with predictors of its own. A list of
-multiply imputed data frames fits the model to each frame and pools
-the draws.
+Fits a state-space model in Stan. Each observation follows the
+observation \code{family}. On the link scale its mean is the sum of the
+effects in \code{formula} and a latent trend \eqn{z_{t,s}} for series
+\eqn{s} at time \eqn{t}. The data never record the trend directly.
+\code{trend_formula} names how it moves from one time to the next, through
+a trend constructor such as \code{AR()}. It also takes predictors of the
+trend. With an \code{AR(p = 1)} trend:
+\deqn{g(\mu_{t,s}) = \eta_{t,s} + \eta^{(z)}_{t,s} + z_{t,s},
+  \qquad z_{t,s} = \phi_s z_{t-1,s} + \epsilon_{t,s}}
+Here \eqn{g} is the link, \eqn{\eta} the predictor from \code{formula},
+\eqn{\eta^{(z)}} the predictor from \code{trend_formula} and
+\eqn{\epsilon} the trend's innovation at each time. The
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} walks through
+a full analysis.
 }
+\section{Structured loadings priors}{
+
+A factor trend loads each series on a few latent factors through the
+matrix \code{Z}. By default each entry of \code{Z} takes an independent
+\code{student_t(3, 0, 0.5)} prior. \code{loadings_prior} replaces it with the
+structured prior of Heaps and Jermyn (2024). Each column of \code{Z}
+then follows a multivariate normal whose covariance \code{Phi} makes
+similar series load alike. \code{Phi} is the product of a kernel over
+series features and one factor \code{exp(-d / theta)} per distance
+matrix. The argument requires a \code{trend_formula} whose trend has
+latent factors.
+
+The list takes these fields:
+\describe{
+\item{\code{features}}{Per-series features, as a numeric matrix, a data
+frame or the name of an element of \code{data2}. Numeric, integer and
+logical columns are z-scored. An ordered factor is z-scored on
+its codes. An unordered factor or character column is one-hot
+encoded with every level kept (Heaps and Jermyn 2024, Section
+6.2). Each encoded column takes its own length-scale.}
+\item{\code{distances}}{Pairwise distance matrices, as the names of
+elements of \code{data2}, a matrix or a named list of matrices. Each is
+rescaled to a largest entry of 1.}
+\item{\code{column_shrinkage}}{\code{"iid"}, the default, shrinks no column.
+\code{"mgp"} shrinks later columns more strongly through the
+multiplicative gamma process of Bhattacharya and Dunson (2011),
+applied to the shared innovation scale. \code{AR()}, \code{RW()} and
+\code{ZMVN()} trends accept it. A \code{VAR()} trend builds its own
+innovation covariance. It takes \code{"iid"}.}
+\item{\code{mgp_a1}, \code{mgp_a2}}{The hyperparameters of \code{"mgp"}, by
+default 2 and 4. Heaps and Jermyn used an \code{mgp_a2} of 3 and 6 in
+their two applications. A lower \code{mgp_a2} shrinks less, for data
+that weakly identify the number of active factors.}
+}
+
+Each length-scale takes a \code{lognormal(0, 1)} prior. Distances are
+rescaled to a largest entry of 1. A length-scale of 1 then gives a
+correlation of \code{exp(-1)} between the two most distant series. Heaps
+and Jermyn used the wider \code{lognormal(0, sqrt(10))}. A \code{prior()} on
+\code{theta_features} or \verb{theta_dist_<name>} replaces the default. They
+rescaled a phylogeny to a root-to-tip distance of 1, which gives a
+largest pairwise distance of 2. Rescale a distance matrix before
+fitting to match their scale.
+
+The prior applies to the sampled columns of \code{Z}. The reported
+loadings \code{Z_tilde} come from a QR rotation of them. Each column of
+\code{Z_tilde} mixes the sampled columns. \code{\link[=shared_variation]{shared_variation()}} and
+\code{\link[=residual_cor]{residual_cor()}} use \verb{Z Z'}, which the rotation leaves unchanged. The
+Identification section of \link{trend_constructors} describes the
+rotation.
+
+A \code{trend_map} with no fixed entries, \code{NULL} or a matrix of \code{NA}, is
+compatible. \code{\link[=jsdgam]{jsdgam()}} passes the second form. A \code{trend_map} that
+fixes any loading is refused. Its free entries take the default
+prior of class \code{Z}, which the structured prior would duplicate.
+}
+
+\section{Terms used in this documentation}{
+
+\describe{
+\item{Latent trend, latent state}{The unobserved value
+\eqn{z_{t,s}} that the trend constructor evolves over time.}
+\item{Innovation}{The random change the trend takes at each time
+step, \eqn{\epsilon_{t,s}} above. Other texts call it a process
+error or a shock. \code{cor = TRUE} correlates the innovations of
+different series.}
+\item{Fitted state, covariate part}{The two versions of the trend
+a prediction can use. The section 'Which prediction function?'
+of \code{\link[=predict.mvgam]{predict.mvgam()}} defines them.}
+\item{Prior}{A distribution stating which values of a parameter
+are plausible before the data are seen.
+\code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}} lists the defaults.}
+\item{Posterior draw}{One joint sample of every parameter from the
+posterior distribution. Summaries and predictions average over
+the draws.}
+\item{Hindcast, forecast}{Predictions at the training times and
+after them. See \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}}.}
+\item{Closure unit}{A site, or a site in one season, whose true
+occupancy or abundance holds across its repeat visits. See
+\code{\link[=occ]{occ()}} and \code{\link[=nmix]{nmix()}}.}
+\item{ELPD, Pareto k}{The expected log predictive density scores
+predictions of held-out data. Higher is better. A Pareto k
+above 0.7 marks an observation whose leave-one-out approximation
+is unreliable. See \code{\link[=loo.mvgam]{loo.mvgam()}}.}
+}
+}
+
+\section{Workflow}{
+
+A typical analysis takes these steps:
+\enumerate{
+\item Check the data with \code{\link[=mvgam_data]{mvgam_data()}}.
+\item Choose a family (\link{mvgam_families}) and a trend
+(\link{trend_constructors}). Inspect the default priors with
+\code{\link[=get_prior.mvgam_formula]{get_prior.mvgam_formula()}}.
+\item Fit with \code{mvgam()}, then check convergence with
+\code{\link[=summary.mvgam]{summary.mvgam()}} and \link{mvgam_diagnostics}.
+\item Check the fit against the data with \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} and
+\code{plot(fit, type = "residuals")}.
+\item Interpret effects with \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}}.
+\item Forecast with \code{\link[=forecast.mvgam]{forecast.mvgam()}}. Compare models with
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} or \code{\link[=loo.mvgam]{loo.mvgam()}}.
+\item Report the model with \code{\link[=how_to_cite]{how_to_cite()}} and \code{\link[=methods_md]{methods_md()}}.
+}
+}
+
 \examples{
 \dontrun{
 # One count series with a smooth effect of a covariate x and an
@@ -313,7 +344,7 @@ head(simdat$data_train)
 # The parameters a model takes, with their default priors, before
 # any fitting. A `prior` argument to mvgam() replaces any of them
 get_prior(
-  mvgam_formula(y ~ s(x), trend_formula = ~ AR(p = 1)),
+  mvgam_formula(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1)),
   data   = simdat$data_train,
   family = poisson()
 )
@@ -321,7 +352,7 @@ get_prior(
 # A smooth of x in the observation model and an AR(1) latent trend.
 # The test data are stored on the fit for forecasting
 mod <- mvgam(
-  y ~ s(x),
+  y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
   data          = simdat$data_train,
   newdata       = simdat$data_test,
@@ -365,16 +396,17 @@ Introduction with R} (2nd edition). Chapman and Hall/CRC.
 Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
 distributions for the covariance matrix in latent factor
 models. \emph{Statistics and Computing}, 34:143.
-\doi{10.1007/s11222-024-10454-0} (post-hoc QR identification
-of latent factor loadings; structured \code{loadings_prior}
-construction.)
+\doi{10.1007/s11222-024-10454-0}
+
+Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian infinite
+factor models. \emph{Biometrika}, 98(2):291-306.
+\doi{10.1093/biomet/asr013}
 
 Riutort-Mayol, G., Burkner, P.-C., Andersen, M. R., Solin, A.
 and Vehtari, A. (2023). Practical Hilbert space approximate
 Bayesian Gaussian processes for probabilistic programming.
 \emph{Statistics and Computing}, 33:1.
-\doi{10.1007/s11222-022-10167-2} (used when \code{formula}
-or \code{trend_formula} contains \code{gp()} terms.)
+\doi{10.1007/s11222-022-10167-2}
 }
 \seealso{
 \link{trend_constructors} lists the latent trends.
@@ -382,14 +414,14 @@ or \code{trend_formula} contains \code{gp()} terms.)
 those of brms. \code{\link[=how_to_cite]{how_to_cite()}} writes a methods paragraph for a
 fitted model. \code{\link[=methods_md]{methods_md()}} writes its equations. \code{\link[=jsdgam]{jsdgam()}} fits
 joint species distribution models. The
-\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview vignette} introduces
-the package. The \href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data vignette} sets out
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview vignette} introduces
+the package. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/data.html}{data vignette} sets out
 the data format. The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 scores and compares forecasts. The
-\href{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}{multivariate formula article} fits
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html}{multivariate formula article} fits
 several responses at once. The
-\href{https://nicholasjclark.github.io/mvgam/articles/idm.html}{integrated distribution model article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/idm.html}{integrated distribution model article}
 ties several observation families to one latent process.
 
 Other model fitting: 

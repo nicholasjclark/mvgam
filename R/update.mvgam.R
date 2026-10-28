@@ -93,8 +93,9 @@
 #' upd <- update(mod, family = negbinomial())
 #'
 #' # Compare the two fits by approximate leave-one-out cross-validation.
-#' # The better model has elpd_diff = 0. A difference smaller than about
-#' # two of its standard errors favours neither model
+#' # The better model comes first, with elpd_diff = 0. An elpd_diff
+#' # smaller than 4 in size means the two predict about equally well.
+#' # p_worse is the probability that a model predicts worse than the best
 #' loo_compare(mod, upd)
 #'
 #' # A change of sampler settings alone reuses the compiled model

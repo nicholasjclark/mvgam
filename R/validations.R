@@ -4486,12 +4486,9 @@ normalise_loadings_prior <- function(input, data2, data,
   shrinkage <- input$column_shrinkage %||% "iid"
   checkmate::assert_choice(shrinkage, c("iid", "mgp"))
   mgp_a1 <- if (shrinkage == "mgp") input$mgp_a1 %||% 2 else NA_real_
-  # `mgp_a2 = 4` lies in the [3, 5] range Schiavon, Canale and
-  # Dunson (2022, Biometrics 78:995) and Legramanti, Durante and
-  # Dunson (2020, JRSS-B) recommend for moderate-n ecological
-  # community data (n in the tens to low hundreds). The
-  # Bhattacharya-Dunson (2011) `a2 = 2.1` was calibrated for `p >> n`.
-  # It is too weak to produce visible truncation at those sizes.
+  # `mgp_a2 = 4` shrinks later factors hard enough to truncate them
+  # at the tens to low hundreds of series of an ecological community.
+  # Weaker settings leave the extra factors active at those sizes.
   # `loadings_prior = list(mgp_a2 = ...)` sets `a2` for sensitivity
   # work.
   mgp_a2 <- if (shrinkage == "mgp") input$mgp_a2 %||% 4 else NA_real_

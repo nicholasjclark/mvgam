@@ -9,6 +9,8 @@
 #' parameters, trend parameters and factor loadings).
 #'
 #' @inheritParams predict.mvgam
+#' @param probs Two probabilities for the lower and upper bounds of the
+#'   credible interval. Default `c(0.025, 0.975)`, a 95% interval.
 #' @param object An object of class \code{mvgam}.
 #' @param matrices Logical; if \code{TRUE}, also print every cell of
 #'   the matrices a correlated, VAR or hierarchical trend derives
@@ -64,12 +66,24 @@
 #'     sample sizes.}
 #' }
 #'
+#' Vehtari et al. (2021) recommend an Rhat below 1.01 and bulk and
+#' tail effective sample sizes above 400 before a summary is used. A
+#' fit should also have no divergent transitions. The section
+#' 'Checking a fit' of [mvgam_diagnostics] says what to do when one of
+#' these checks fails.
+#'
+#' @references
+#' Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and Burkner,
+#' P.-C. (2021). Rank-normalization, folding, and localization: an
+#' improved Rhat for assessing convergence of MCMC. \emph{Bayesian
+#' Analysis}, 16(2):667-718. \doi{10.1214/20-BA1221}
+#'
 #' @examples
 #' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'               data = simdat$data_train,
 #'               family = poisson(),
 #'               chains = 2, silent = 2)
@@ -79,10 +93,12 @@
 #' # Each block is a data frame, such as the trend's dynamics
 #' round(summary(mod)$trend_spec, 2)
 #'
-#' # Next: how_to_cite() drafts the methods paragraph
+#' # Next: pp_check(mod) compares draws from the model with the data
 #' }
 #'
-#' @seealso [how_to_cite()] drafts a methods paragraph for the model.
+#' @seealso [mvgam_diagnostics] checks convergence. [pp_check.mvgam()]
+#'   checks the fit against the data.
+#'   [how_to_cite()] drafts a methods paragraph for the model.
 #'   [methods_md()] writes its equations, glossary and priors.
 #'   [mcmc_plot.mvgam()] plots the draws of these parameters.
 #'
@@ -378,8 +394,9 @@ summary_blocks <- function() {
 #' `moord1[1]` and `elev`.
 #' A hyperparameter keeps its class around the rest, as `sds(sx_1)`.
 #' A group-level block becomes one table per grouping factor. The rows
-#' of each factor are those named `sd_<g>__` or `cor_<g>__`, with that prefix dropped and
-#' the coefficient pair of a correlation joined by a comma.
+#' of each factor are those named `sd_<g>__` or `cor_<g>__`, with that
+#' prefix dropped. The coefficient pair of a correlation is joined by a
+#' comma.
 #' `sd_g__Intercept` and `cor_g__Intercept__x` print as `sd(Intercept)`
 #' and `cor(Intercept,x)` under `g`.
 #'

@@ -1,4 +1,4 @@
-#' Expected Values from the Posterior Distribution
+#' Expected values of an mvgam model
 #'
 #' Expected values E\[Y | X\] of an mvgam model, or its linear
 #' predictor with `scale = "linear"`, at the training observations by
@@ -12,21 +12,20 @@
 #'   on the link scale via [posterior_linpred.mvgam()]. Ignored when
 #'   `components` is not `"response"`.
 #' @param components Character; one of `"response"` (default),
-#'   `"latent_state"`, or `"detection"`. Selects which posterior
-#'   component to return.
+#'   `"latent_state"`, or `"detection"`. The quantity to return:
 #'
-#'   * `"response"` keeps the brms-default behaviour: marginal
-#'     expected values at the per-row grain, scaled via `scale`.
-#'   * `"latent_state"` (closure-unit families only) routes through
-#'     [predict.mvgam()] with `type = "latent_state"`, returning the
-#'     conditional latent state per closure unit (`P(z = 1 | y)` for
-#'     `occ()`, posterior `N` for `nmix()` variants).
-#'   * `"detection"` (closure-unit families only) routes through
-#'     [predict.mvgam()] with `type = "detection"`, returning per-
-#'     visit detection probabilities.
+#'   * `"response"`: the expected value of each row of the data, on
+#'     the scale `scale` sets.
+#'   * `"latent_state"`, for `nmix()` and `occ()` only: the latent
+#'     state of each closure unit given its detections. That is the
+#'     abundance `N` for `nmix()` and the probability of occupancy
+#'     `P(z = 1 | y)` for `occ()`. [predict.mvgam()] returns the same
+#'     with `type = "latent_state"`.
+#'   * `"detection"`, for `nmix()` and `occ()` only: the detection
+#'     probability of each visit, as `type = "detection"` of
+#'     [predict.mvgam()] returns it.
 #'
-#'   Modelled on the `flocker::fitted_flocker(components = ...)`
-#'   argument so flocker users have a one-call equivalent.
+#'   The argument matches `components` of `flocker::fitted_flocker()`.
 #' @param unit_level Logical or `NULL` (default). When `TRUE` for a
 #'   closure-unit detection family and `components = "response"`,
 #'   sums the per-visit response matrix over the visits of each unit.
@@ -52,9 +51,9 @@
 #' For the training data the fitted values include the trend state the
 #' model inferred at each time. [hindcast.mvgam()] returns the same
 #' state. With `newdata`, or under `incl_autocor = FALSE`, the fitted
-#' values describe the covariate structure. `process_error` then sets
-#' the trend's part. `FALSE` keeps its deterministic submodel. `TRUE`
-#' samples a state per draw from the trend's dynamics.
+#' values describe the covariate part of the model. `process_error` then
+#' sets the trend's part. `FALSE` keeps the trend's covariate effects.
+#' `TRUE` also samples a state per draw from the trend's dynamics.
 #'
 #' The brms arguments `dpar`, `nlpar` and `sort` are refused.
 #' [posterior_linpred.mvgam()] returns a distributional parameter
@@ -69,7 +68,7 @@
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
@@ -186,7 +185,8 @@ fitted.mvgam <- function(object,
     if (!is_closure_unit_family(object$family)) {
       insight::format_warning(c(
         "'unit_level = TRUE' ignored for this family.",
-        i = "Per-unit aggregation applies to detection families (occ() / nmix())."
+        i = paste0("Per-unit aggregation applies to the detection ",
+                   "families occ() and nmix().")
       ))
     } else if (is_per_response(draws)) {
       stop(insight::format_error(c(

@@ -29,7 +29,7 @@ these labels.
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x) + s(time, k = 6),
+mod <- mvgam(y ~ s(x, k = 5) + s(time, k = 6),
              trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
@@ -37,7 +37,8 @@ mod <- mvgam(y ~ s(x) + s(time, k = 6),
 # The labels posterior_smooths() takes
 smooths(mod)
 
-# Next, posterior_smooths(mod, smooth = "s(x)") draws one of them
+# Next, posterior_smooths(mod, smooth = "s(x, k = 5)") draws one of
+# them
 }
 
 }

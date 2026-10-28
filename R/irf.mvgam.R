@@ -1,7 +1,11 @@
 #' Calculate latent VAR impulse response functions
 #'
 #' Compute Generalized or Orthogonalized Impulse Response Functions (IRFs) from
-#' \code{mvgam} models with Vector Autoregressive dynamics
+#' \code{mvgam} models with Vector Autoregressive dynamics. An impulse
+#' response traces how the latent trend of every series moves over `h`
+#' time steps after a one-standard-deviation innovation to one series.
+#' The default generalised responses suit most analyses. Orthogonalised
+#' responses need a causal ordering of the series.
 #'
 #' @name irf.mvgam
 #' @inheritParams posterior_epred.mvgam

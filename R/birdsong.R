@@ -35,16 +35,23 @@
 #'   correlation matrix sets `(warbler, thrush)` against
 #'   `(wren, finch)`.
 #'
-#' Recommended fit:
-#' ```r
-#' mvgam(
+#' @seealso [AR()] for the trend, [residual_cor()] to extract the fitted
+#'   correlations between species, [mvgam_data()] to check the data.
+#'
+#' @examples
+#' data(birdsong)
+#' mvgam_data(birdsong, family = poisson())
+#'
+#' \dontrun{
+#' # A model with the structure the data were simulated from
+#' mod <- mvgam(
 #'   formula = y ~ s(week_in_year, bs = "cc", k = 8) +
 #'                 s(species, bs = "re"),
 #'   trend_formula = ~ AR(p = 1, cor = TRUE),
 #'   data = birdsong,
-#'   family = poisson()
+#'   family = poisson(),
+#'   chains = 2, silent = 2
 #' )
-#' ```
-#'
-#' Built by `data-raw/build_birdsong.R`.
+#' summary(mod)
+#' }
 "birdsong"

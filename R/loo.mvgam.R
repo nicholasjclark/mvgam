@@ -1,6 +1,10 @@
-#' LOO information criteria for \pkg{mvgam} models
+#' Approximate leave-one-out cross-validation for \pkg{mvgam} models
 #'
-#' Extract the LOOIC (leave-one-out information criterion) using [loo::loo()].
+#' Estimates the expected log predictive density (ELPD) of each
+#' observation had it been left out of the fit, with [loo::loo()]. The
+#' ELPD measures how well a model predicts data it has not seen. Higher
+#' is better. Each observation also takes a Pareto \eqn{k} diagnostic.
+#' Above 0.7 the approximation is unreliable for that observation.
 #'
 #' @importFrom loo loo is.loo
 #'
@@ -8,18 +12,15 @@
 #' @param compare,resp,pointwise,moment_match,reloo,k_threshold,save_psis,moment_match_args,reloo_args
 #'   The arguments of [brms::loo.brmsfit]. mvgam uses two of them.
 #'   `resp` scopes a multivariate fit to one response. `save_psis`
-#'   keeps the smoothing object. `pointwise` would stream the density.
-#'   `moment_match` and `reloo` would refit the model, configured by
-#'   `k_threshold` and the `*_args` lists. `compare` and `model_names`
-#'   would rank several models, which [loo_compare.mvgam()] does.
-#'   mvgam runs none of these. Supplying one raises an error naming
-#'   it.
+#'   keeps the smoothing object. Supplying any of the others raises an
+#'   error. To compare several models, pass the fits to
+#'   [loo_compare.mvgam()].
 #'
 #' @param incl_autocor Logical, default `TRUE`. Passed to
 #'   [log_lik.mvgam()]. `TRUE` scores each observation under the latent
 #'   trend state the model inferred at that time. The ELPD then
 #'   describes the series that was observed. `FALSE` scores the
-#'   deterministic submodel alone.
+#'   covariate part of the model alone.
 #' @param incl_dynamics Deprecated alias for `incl_autocor`.
 #'
 #' @param by_series Logical, default `FALSE`. `TRUE` returns a data
@@ -38,26 +39,39 @@
 #'   `diag_diff` and `diag_elpd` columns follow Sivula et al. (2025).
 #'
 #' @details
-#' When comparing two (or more) fitted `mvgam` models, we can estimate the
-#' difference in their in-sample predictive accuracies using the Expected Log
-#' Predictive Density (ELPD). This metric can be approximated using Pareto
-#' Smoothed Importance Sampling (PSIS), which re-weights posterior draws to
-#' approximate predictions for a datapoint had it not been included in the
-#' original model fit (i.e. leave-one-out cross-validation).
+#' Exact leave-one-out cross-validation would refit the model once per
+#' observation. Pareto smoothed importance sampling (PSIS) avoids the
+#' refits. It re-weights the posterior draws of the one fit to
+#' approximate the posterior without each observation (Vehtari et al.
+#' 2017). [loo::loo()] describes the method.
 #'
-#' See [loo::loo()] and [loo::loo_compare()] for further details on how this
-#' importance sampling works.
-#'
-#' A fit with a latent trend routinely strains this approximation.
-#' Leaving an observation out keeps its influence on the state the
-#' model inferred at that time. The re-weighted density still
-#' conditions on a state estimated from that observation. The ELPD
-#' then measures conditional in-sample fit. The effective number of
-#' parameters climbs towards the number of observations. Check the
-#' Pareto \eqn{k} diagnostics before trusting a comparison.
+#' The approximation often fails for a fit with a latent trend. Each
+#' observation strongly informs the state at its own time. Removing it
+#' changes that part of the posterior a great deal. The importance
+#' weights then vary widely. Many observations get a Pareto \eqn{k}
+#' above 0.7. The effective number of parameters also climbs
+#' towards the number of observations. Check the Pareto \eqn{k}
+#' diagnostics before trusting a comparison.
 #' [lfo_cv.mvgam()] refits along the time axis and scores each window
 #' against data the model has not seen. [forecast.mvgam()] with
 #' [score.mvgam_forecast()] scores a held-out horizon.
+#'
+#' @section Which comparison tool?:
+#' \describe{
+#'   \item{Fit to the observed data}{`loo()` or [waic.mvgam()], ranked
+#'     with [loo_compare.mvgam()]. Trust it for a model without a trend,
+#'     or once the Pareto \eqn{k} diagnostics are low.}
+#'   \item{Skill at forecasting}{[lfo_cv.mvgam()] on each model, ranked
+#'     with [loo_compare.mvgam_lfo()] and plotted with
+#'     [compare_elpds()].}
+#'   \item{Accuracy over one held-out horizon}{[forecast.mvgam()] with
+#'     [score.mvgam_forecast()], several models at once with
+#'     [compare_scores()].}
+#'   \item{Prediction for held-out sites or species}{[kfold.mvgam()]
+#'     with `group`.}
+#' }
+#' The ELPD is higher for the better model. CRPS, DRPS and the other
+#' scores of [score.mvgam_forecast()] are lower for the better model.
 #'
 #' @references
 #' Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical

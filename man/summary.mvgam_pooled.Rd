@@ -12,9 +12,8 @@
 \arguments{
 \item{object}{A fit of class \code{mvgam_pooled}.}
 
-\item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+\item{probs}{Two probabilities for the lower and upper bounds of the
+credible interval. Default \code{c(0.025, 0.975)}, a 95\% interval.}
 
 \item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
 deviation for summaries. If \code{TRUE}, uses median and median absolute

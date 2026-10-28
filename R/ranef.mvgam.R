@@ -5,6 +5,8 @@
 #' `r_<group>[<level>,<coef>]`, as [variables.mvgam()] lists it.
 #'
 #' @inheritParams predict.mvgam
+#' @param probs Two probabilities for the lower and upper bounds of the
+#'   credible interval. Default `c(0.025, 0.975)`, a 95% interval.
 #' @param object A fitted `mvgam` object.
 #' @param summary Logical. `TRUE` (the default) summarises each
 #'   coefficient's draws. `FALSE` returns the draws.
@@ -39,7 +41,7 @@
 #' set.seed(14)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 4L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x) + (1 | series),
+#' mod <- mvgam(y ~ s(x, k = 5) + (1 | series),
 #'              trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)
@@ -182,7 +184,7 @@ brms::ranef
 #' set.seed(14)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 4L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x) + (1 | series),
+#' mod <- mvgam(y ~ s(x, k = 5) + (1 | series),
 #'              trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)

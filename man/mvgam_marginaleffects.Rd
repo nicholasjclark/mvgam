@@ -8,9 +8,9 @@ These methods let \code{\link[marginaleffects:predictions]{marginaleffects::pred
 \code{\link[marginaleffects:slopes]{marginaleffects::slopes()}} and \code{\link[marginaleffects:comparisons]{marginaleffects::comparisons()}}
 take an mvgam fit. \code{get_predict()} returns the posterior draws in
 the \code{posterior_draws} attribute. marginaleffects computes every
-summary from those draws. \code{get_coef()}, \code{get_vcov()} and
-\code{set_coef()} complete the methods marginaleffects calls. The draws
-carry the uncertainty. None of the three changes a result.
+summary from those draws. The uncertainty comes from the draws
+alone. marginaleffects also calls \code{get_coef()}, \code{get_vcov()} and
+\code{set_coef()}. Their output leaves every result unchanged.
 }
 \section{Prediction scale}{
 
@@ -35,28 +35,56 @@ the median falls below the mean.
 
 \section{The latent trend}{
 
-With \code{process_error = FALSE}, the default, the trend contributes its
-deterministic submodel. Each draw keeps its own coefficients. The
-result is a covariate effect with the latent process held out. Its
-credible band excludes the uncertainty of the latent state.
+By default (\code{process_error = FALSE}) each prediction takes the
+covariate part of the trend: the effects in its formula, without
+its innovations. Each posterior draw keeps its own coefficients. The
+result shows the effect of the covariates with the latent process
+at its mean. Its credible band leaves out the uncertainty of the
+latent state.
 
-A slope or comparison taken this way is biased low against the
-model's own \code{E[Y]}. Its expectation leaves out the trend's
-stationary spread. Under a log link and an AR(1) trend the factor
-is \eqn{\exp(\sigma^2 / (2(1 - \rho^2)))}. \code{process_error = TRUE}
-gives the unbiased effect. Its band is wider because it includes
-the uncertainty of the latent state.
+Under a nonlinear link this falls short of the model's own \code{E[Y]}.
+Averaging over the innovations of an AR(1) trend raises a log-link
+expectation by the factor
+\eqn{\exp(\sigma^2 / (2(1 - \rho^2)))}. \code{process_error = TRUE} adds
+the innovations. Slopes and comparisons then describe \code{E[Y]}, with
+wider bands.
 
-When an autoregressive process carries most of the series-level
-variation, a covariate effect shows little under either setting.
+When the trend explains most of the variation in a series, the
+covariates have little left to explain under either setting.
 \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} return the state the
 model inferred.
 }
 
+\examples{
+\dontrun{
+library(marginaleffects)
+set.seed(1)
+simdat <- sim_mvgam(n_series = 1L, n_timepoints = 60L,
+                    trend_model = AR())
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+             data = simdat$data_train, family = poisson(),
+             chains = 2, silent = 2)
+
+# Average change in the expected count per unit of x
+avg_slopes(mod, variables = "x", type = "expected")
+
+# The same slope with the trend's innovations averaged in
+avg_slopes(mod, variables = "x", type = "expected",
+           process_error = TRUE)
+
+# Expected counts across the range of x
+plot_predictions(mod, condition = "x", type = "expected")
+}
+
+}
 \references{
 Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to
 interpret statistical models using marginaleffects for R and
 Python. \emph{Journal of Statistical Software}, 111(9):1-32.
 \doi{10.18637/jss.v111.i09}
+}
+\seealso{
+\code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} for quick effect plots,
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for the predictions these methods take.
 }
 \keyword{internal}

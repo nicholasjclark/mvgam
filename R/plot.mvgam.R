@@ -5,9 +5,12 @@
 #' @param x A fitted `mvgam` object.
 #' @param type The plot to draw:
 #'   \describe{
-#'     \item{`"residuals"` (default)}{Dunn-Smyth residuals of one
-#'       series against the fitted values, their Q-Q plot, ACF and
-#'       partial ACF, as [pp_check.mvgam()] draws them. A series
+#'     \item{`"residuals"` (default)}{Randomised quantile (Dunn-Smyth)
+#'       residuals of one series, defined in [residuals.mvgam()]. The
+#'       grid plots them against the fitted values, with their Q-Q
+#'       plot, ACF and partial ACF, as [pp_check.mvgam()] draws them.
+#'       For a model that fits, they look like independent standard
+#'       normal draws. A series
 #'       observed at unevenly spaced times shows a semivariogram in
 #'       place of the ACF and partial ACF. An [occ()] or
 #'       [nmix()] fit has one residual per closure unit and draws the
@@ -49,7 +52,7 @@
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)

@@ -1,7 +1,8 @@
 url: https://nicholasjclark.github.io/mvgam/
 
 # The 2.0 site builds into /dev/ and the CRAN 1.x site stays at the
-# root. Switch to `mode: release` when 2.0 reaches CRAN.
+# root. Switch to `mode: release` when 2.0 reaches CRAN, along with the
+# article address in `mvgam_article()` (R/utils-docs.R).
 development:
   mode: devel
 
@@ -21,15 +22,15 @@ navbar:
 articles:
 - title: Getting started
   desc: >
-    Shape your data, then meet the modelling surface that consumes it.
+    Prepare your data and fit a first state-space model.
   contents:
   - data
   - mvgam_overview
 
 - title: Latent dynamics
   desc: >
-    Trend processes that carry temporal structure the observation model
-    cannot see, and the post-fit tools that interrogate them.
+    Latent trends that model dependence over time. The articles also
+    interpret a fitted trend.
   contents:
   - articles/var
   - articles/hierarchical_var
@@ -93,8 +94,8 @@ reference:
 
 - title: Observation families
   desc: >
-    Likelihoods mvgam adds on top of the brms family library, for
-    counts, compositions, occupancy and abundance.
+    Families mvgam adds to those of brms, for counts, compositions,
+    occupancy and abundance.
   contents:
   - mvgam_families
   - tweedie
@@ -149,8 +150,8 @@ reference:
 
 - title: Prediction and forecasting
   desc: >
-    Propagating the fitted latent state forward, and marginalising
-    over it for covariate-driven prediction.
+    Forecasts carry the fitted trend forward in time. Predictions
+    from covariates leave the fitted trend out.
   contents:
   - predict.mvgam
   - fitted.mvgam
@@ -175,8 +176,8 @@ reference:
 
 - title: Model criticism and cross-validation
   desc: >
-    Posterior predictive checks, residuals, information criteria and
-    the forecast-honest alternatives to them.
+    Posterior predictive checks, residuals, leave-one-out criteria and
+    cross-validation of forecasts.
   contents:
   - pp_check.mvgam
   - print.mvgam_ppc_fit_stat
@@ -208,8 +209,8 @@ reference:
 
 - title: Posterior summaries and diagnostics
   desc: >
-    Reading parameters off a fit, checking convergence, and
-    recovering the Stan program that produced it.
+    Parameter summaries and convergence checks for a fit. The Stan
+    program and data that produced it.
   contents:
   - summary.mvgam
   - print.mvgam_summary
@@ -256,9 +257,8 @@ reference:
 
 - title: Interrogating a fitted VAR
   desc: >
-    Impulse responses, variance decompositions and stability metrics
-    read off the posterior for the transition matrix and innovation
-    covariance.
+    Impulse responses, variance decompositions and stability measures
+    computed from the posterior of a VAR trend.
   contents:
   - irf.mvgam
   - mvgam_irf-class
@@ -301,8 +301,8 @@ reference:
 
 - title: Plotting
   desc: >
-    The general-purpose plot methods for a fitted model, and the
-    theme they are drawn with.
+    Plot methods for a fitted model. mvgam_theme() styles every
+    figure.
   contents:
   - plot.mvgam
   - mcmc_plot.mvgam
@@ -317,7 +317,6 @@ reference:
   - portal_data
   - coral_surveys
   - lake_chemistry
-  - glm_analysis
 
 - title: Re-exports
   desc: >

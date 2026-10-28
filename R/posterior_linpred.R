@@ -25,8 +25,8 @@ autocor_to_trend_state <- function(incl_autocor) {
 #'
 #' @param mvgam_fit mvgam object from mvgam()
 #' @param newdata data.frame with prediction covariates
-#' @param process_error Logical. `TRUE` adds one sampled innovation to
-#'   the trend's deterministic submodel. Used under
+#' @param process_error Logical. `TRUE` adds sampled innovations, one
+#'   per time and series, to the trend's covariate part. Used under
 #'   `trend_state = "marginal"` alone.
 #' @param trend_state Which surface the trend contribution comes from.
 #'   `"marginal"` takes the deterministic submodel, as the
@@ -221,10 +221,12 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' @details
 #' The observation predictor holds the fixed, group-level, smooth and
 #' Gaussian process terms of `formula`. The trend predictor holds the
-#' terms of `trend_formula`. `process_error = TRUE` adds one sampled
-#' innovation per posterior draw, on the link scale.
+#' terms of `trend_formula`. `process_error = TRUE` adds a sampled
+#' deviation at each time and series, on the link scale.
 #' [posterior_epred.mvgam()] and [posterior_predict.mvgam()] apply the
 #' family's mean and noise to that same predictor.
+#'
+#' @template prediction-trend-state
 #'
 #' @seealso [posterior_epred.mvgam()] returns expected values.
 #'   [posterior_predict.mvgam()] returns predictive draws.
@@ -238,7 +240,7 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)
 #'

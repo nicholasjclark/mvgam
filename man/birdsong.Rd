@@ -45,18 +45,26 @@ innovation standard deviation 0.35. The 4 x 4 innovation
 correlation matrix sets \verb{(warbler, thrush)} against
 \verb{(wren, finch)}.
 }
+}
+\examples{
+data(birdsong)
+mvgam_data(birdsong, family = poisson())
 
-Recommended fit:
-
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(
+\dontrun{
+# A model with the structure the data were simulated from
+mod <- mvgam(
   formula = y ~ s(week_in_year, bs = "cc", k = 8) +
                 s(species, bs = "re"),
   trend_formula = ~ AR(p = 1, cor = TRUE),
   data = birdsong,
-  family = poisson()
+  family = poisson(),
+  chains = 2, silent = 2
 )
-}\if{html}{\out{</div>}}
-
-Built by \code{data-raw/build_birdsong.R}.
+summary(mod)
+}
+}
+\seealso{
+\code{\link[=AR]{AR()}} for the trend, \code{\link[=residual_cor]{residual_cor()}} to extract the fitted
+correlations between species, \code{\link[=mvgam_data]{mvgam_data()}} to check the data.
 }
 \keyword{datasets}

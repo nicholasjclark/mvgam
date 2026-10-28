@@ -35,16 +35,11 @@ such as a count, defaults to \code{"rootogram"}. A continuous response
 defaults to \code{"dens_overlay"}. Multi-response families take the
 defaults under "Multi-response families".}
 
-\item{ndraws}{Positive integer indicating how many
-posterior draws should be used.
-If \code{NULL} all draws are used. If not specified,
-the number of posterior draws is chosen automatically.
-Ignored if \code{draw_ids} is not \code{NULL}.}
+\item{ndraws}{Number of posterior draws to plot. \code{NULL} (the default)
+takes the default of the type, listed under Details.}
 
-\item{prefix}{The prefix of the \pkg{bayesplot} function to be applied.
-Either `"ppc"` (posterior predictive check; the default)
-or `"ppd"` (posterior predictive distribution), the latter being the same
-as the former except that the observed data is not shown for `"ppd"`.}
+\item{prefix}{\code{"ppc"} (the default) plots the observed data with the
+replicates. \code{"ppd"} plots the replicates alone.}
 
 \item{group}{Optional name of a factor variable in the model
 by which to stratify the ppc plot. This argument is required for
@@ -61,8 +56,8 @@ describe the training data and refuse \code{newdata}.}
 \item{resp}{Optional names of response variables. If specified, predictions
 are performed only for the specified response variables.}
 
-\item{draw_ids}{An integer vector specifying the posterior draws to be used.
-If \code{NULL} (the default), all draws are used.}
+\item{draw_ids}{Optional integer vector naming the posterior draws to
+plot. \code{NULL} (the default) lets \code{ndraws} choose them.}
 
 \item{per_obs}{Logical. For \code{type = "resid_vs_fitted"}, \code{TRUE} (the
 default) draws each observation at its posterior median on both
@@ -99,10 +94,9 @@ Replicates of the training data are drawn under the latent trend
 state the model inferred at each time, as \code{\link[=residuals.mvgam]{residuals.mvgam()}} and
 \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} use. The check then compares the fitted
 trajectory with the series that produced it. Replicates of \code{newdata}
-take the covariate surface of \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}. Passing
-\code{incl_autocor} sets the surface explicitly. The \verb{loo_*} types always
-take the fitted state, which is the state their importance weights
-come from.
+use the covariate part of the model, as \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}
+does. Passing \code{incl_autocor} chooses between the two. The \verb{loo_*}
+types use the fitted state. Their importance weights come from it.
 
 Overlay types default to 10 draws. Interval, ribbon and statistic
 types use every draw. The residual histograms and ribbons default to
@@ -155,13 +149,15 @@ sums.
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
 
-# Observed counts against the predictive distribution. A bar
-# hanging below zero marks a count the model under-predicts
-pp_check(mod, type = "rootogram")
+# A hanging rootogram, on the square-root scale. Each bar shows how
+# often a count was observed. It hangs from the curve of its expected
+# frequency under the model. A bar ending below zero marks a count the
+# model under-predicts
+pp_check(mod, type = "rootogram", style = "hanging")
 
 # Randomised quantile residuals over time. A trend the model missed
 # shows as serial structure
@@ -193,8 +189,8 @@ assessment of model fitness via realized discrepancies.
 \code{\link[=residuals.mvgam]{residuals.mvgam()}} returns the residuals the residual types
 plot. \code{\link[=CAR]{CAR()}} models series observed at unevenly spaced times.
 \code{\link[=loo.mvgam]{loo.mvgam()}} scores the fit. The
-\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview article} explains a
-rootogram. The \href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} runs
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} explains a
+rootogram. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article} runs
 the discrepancy check.
 
 Other model checking: 

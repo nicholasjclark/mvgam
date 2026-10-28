@@ -13,13 +13,16 @@
 
 #' Fit Joint Species Distribution Models in mvgam
 #'
-#' Fits a joint species distribution model (JSDM). The residual
-#' associations among species are modelled at reduced rank with a set
-#' of latent factors. The observation model takes the smooths,
-#' Gaussian processes and random effects of any mvgam model. The
-#' factors take their own predictors through `factor_formula`. Write
-#' [lv_axis()] in one of its terms to give each factor its own effect
-#' of a covariate, a constrained ordination.
+#' Fits a joint species distribution model (JSDM) to the presences,
+#' detections or counts of many species across many sampling units.
+#' Species often co-occur more or less often than their responses to
+#' the measured covariates predict. A few latent factors capture that
+#' residual association. They need far fewer parameters than a full
+#' correlation matrix among species. The observation model takes the
+#' smooths, Gaussian processes and random effects of any mvgam model.
+#' The factors take their own predictors through `factor_formula`.
+#' Write [lv_axis()] in one of its terms to give each factor its own
+#' effect of a covariate, a constrained ordination.
 #'
 #' @inheritParams mvgam
 #' @param factor_formula A one-sided formula for the latent factors'

@@ -7,15 +7,18 @@
 lv_axis()
 }
 \value{
-\code{NULL} (invisibly). The function exists solely as a
-formula sentinel.
+\code{NULL} (invisibly). The function only marks a term in a
+formula.
 }
 \description{
 Use \code{lv_axis()} in a \code{trend_formula} in any position that takes a
 factor variable, to give each latent factor its own effect. In a
 model with no latent factors it gives each series its own effect.
+Use it when a covariate should act differently on different series,
+such as temperature raising one species and lowering another.
 }
 \details{
+For example:
 \preformatted{
 trend_formula = ~ s(elev, by = lv_axis()) + AR(n_lv = 2)
 trend_formula = ~ temp:lv_axis() + AR(n_lv = 2)
@@ -55,10 +58,10 @@ smoothness penalty.
 With \code{n_lv} latent factors, each of these is estimated once per
 factor. The coefficient of one factor has no scale of its own. The
 loadings and the factor effects trade scale. The data identify
-their product. \code{\link[=conditional_effects]{conditional_effects()}} and \code{\link[=predict]{predict()}}
-report that product, the effect of the covariate on each series,
-and \code{\link[=conditional_effects]{conditional_effects()}} draws a panel per series. When every
-\code{lv_axis()} term is a slope or a level, \code{\link[cmdstanr:fit-method-summary]{cmdstanr::summary()}} reports the
+their product. \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} and \code{\link[=predict.mvgam]{predict.mvgam()}}
+report that product, the effect of the covariate on each series.
+\code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} draws a panel per series. When every
+\code{lv_axis()} term is a slope or a level, \code{\link[=summary.mvgam]{summary.mvgam()}} reports the
 per-factor coefficients in the basis of the identified loadings
 \code{Z_tilde}.
 }
@@ -104,8 +107,8 @@ get_prior(
 \seealso{
 \code{\link[=jsdgam]{jsdgam()}} fits per-factor effects across species.
 \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}} plots the effect on each series. The
-\href{https://nicholasjclark.github.io/mvgam/articles/dfm.html}{dynamic factor vignette} fits factor
-models. The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html}{dynamic factor vignette} fits factor
+models. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits
 per-factor trait and covariate effects.
 
 Other trend models: 

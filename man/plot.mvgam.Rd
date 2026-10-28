@@ -19,9 +19,12 @@
 
 \item{type}{The plot to draw:
 \describe{
-\item{\code{"residuals"} (default)}{Dunn-Smyth residuals of one
-series against the fitted values, their Q-Q plot, ACF and
-partial ACF, as \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} draws them. A series
+\item{\code{"residuals"} (default)}{Randomised quantile (Dunn-Smyth)
+residuals of one series, defined in \code{\link[=residuals.mvgam]{residuals.mvgam()}}. The
+grid plots them against the fitted values, with their Q-Q
+plot, ACF and partial ACF, as \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} draws them.
+For a model that fits, they look like independent standard
+normal draws. A series
 observed at unevenly spaced times shows a semivariogram in
 place of the ACF and partial ACF. An \code{\link[=occ]{occ()}} or
 \code{\link[=nmix]{nmix()}} fit has one residual per closure unit and draws the
@@ -62,8 +65,7 @@ Several names give the sum of their components. \code{\link[=LLT]{LLT()}} has
 step. A seasonal \code{\link[=LLT]{LLT()}} adds \code{"season"}. \code{"predictor"} holds the
 effects of the trend formula's covariates. \code{c("level", "predictor")} gives the level with those effects. A factor model
 projects each component through its loadings, as it projects the
-trend. The result is an ordinary \link[=mvgam]{mvgam_forecast-class}
-with the components in its \code{component} slot.}
+trend.}
 
 \item{...}{Further arguments to the function that draws the plot,
 such as \code{smooths} for \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.}
@@ -79,7 +81,7 @@ Draws one of the standard views of a fitted model, chosen by \code{type}.
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)

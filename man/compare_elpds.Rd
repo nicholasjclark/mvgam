@@ -10,8 +10,8 @@ compare_elpds(..., model_names = NULL)
 \item{...}{Two or more \code{mvgam_lfo} objects from \code{\link[=lfo_cv]{lfo_cv()}}.
 Argument names are taken from the call.}
 
-\item{model_names}{Optional character vector of model labels;
-overrides the names inferred from the call.}
+\item{model_names}{Optional character vector of model names, one per
+forecast. It replaces the names taken from the call.}
 }
 \value{
 A \code{tibble} with columns:
@@ -35,12 +35,15 @@ set.seed(1)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
 # Two models of one count series: a smooth of x with and without
-# an AR(1) trend
-mod_gam <- mvgam(y ~ s(x), data = simdat$data_train,
+# an AR(1) trend. The trend model samples with smaller steps
+# (adapt_delta = 0.95). That avoids divergent transitions when
+# lfo_cv() refits it to shorter stretches of the series
+mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
                  family = poisson(), chains = 2, silent = 2)
-mod_ar <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
                 data = simdat$data_train, family = poisson(),
-                chains = 2, silent = 2)
+                chains = 2, silent = 2,
+                control = list(adapt_delta = 0.95))
 }
 \dontrun{
 # Each origin after t = 70 forecasts the next time step. The

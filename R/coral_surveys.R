@@ -42,16 +42,22 @@
 #'   a thin-plate basis.
 #' * Observation noise `sigma_obs = 0.3`.
 #'
-#' Recommended fit (state-space; SST on the observation equation,
-#' CAR(1) on the latent state):
-#' ```r
-#' mvgam(
+#' @seealso [CAR()] for the trend, [AR()] for evenly spaced surveys,
+#'   [mvgam_data()] to check the data.
+#'
+#' @examples
+#' data(coral_surveys)
+#' mvgam_data(coral_surveys, family = gaussian())
+#'
+#' \dontrun{
+#' # A model with the structure the data were simulated from
+#' mod <- mvgam(
 #'   formula = y ~ s(sst, k = 8),
 #'   trend_formula = ~ CAR(),
 #'   data = coral_surveys,
-#'   family = gaussian()
+#'   family = gaussian(),
+#'   chains = 2, silent = 2
 #' )
-#' ```
-#'
-#' Built by `data-raw/build_coral_surveys.R`.
+#' summary(mod)
+#' }
 "coral_surveys"

@@ -65,7 +65,11 @@ and \code{\link[=summary.mvgam_irf]{summary.mvgam_irf()}} take it.
 }
 \description{
 Compute Generalized or Orthogonalized Impulse Response Functions (IRFs) from
-\code{mvgam} models with Vector Autoregressive dynamics
+\code{mvgam} models with Vector Autoregressive dynamics. An impulse
+response traces how the latent trend of every series moves over \code{h}
+time steps after a one-standard-deviation innovation to one series.
+The default generalised responses suit most analyses. Orthogonalised
+responses need a causal ordering of the series.
 }
 \details{
 See \code{\link{mvgam_irf-class}} for the quantities computed and
@@ -101,9 +105,9 @@ in linear multivariate models. Economics Letters 58, 17-29.
 }
 \seealso{
 \code{\link[=fevd]{fevd()}} and \code{\link[=stability]{stability()}} summarise the same VAR dynamics.
-The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{irf()} on a
+The \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{VAR article} runs \code{irf()} on a
 plankton community. The
-\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html}{hierarchical VAR article}
 runs it on each group of a hierarchical VAR.
 
 Other latent dynamics: 

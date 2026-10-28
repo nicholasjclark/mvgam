@@ -1,5 +1,6 @@
 #' Posterior draws of residuals from \pkg{mvgam} models
 #'
+#' @description
 #' Posterior draws of the residuals of a fitted `mvgam` model, of two
 #' types:
 #'
@@ -15,8 +16,9 @@
 #' In sample, both types compare each observation with predictions that
 #' condition on the latent trend state the model inferred at that time,
 #' the state [hindcast.mvgam()] returns. For `newdata` the fit has no
-#' such state. The prediction then integrates over the trend dynamics,
-#' which widens the residuals. [pp_check.mvgam()] and
+#' such state. The predictions then use the covariate part of the
+#' model, without the trend's innovations. Passing
+#' `process_error = TRUE` adds them. [pp_check.mvgam()] and
 #' [predictive_error.mvgam()] use the same predictions.
 #'
 #' Pearson residuals are not supported. A Pearson residual of a count or
@@ -68,6 +70,8 @@
 #'   `"ordinary"`.
 #' @param summary Logical. `TRUE` (the default) returns a summary per
 #'   observation. `FALSE` returns the residual draws.
+#' @param probs Two probabilities for the lower and upper quantile
+#'   columns of the summary. Default `c(0.025, 0.975)`, a 95% interval.
 #' @param ... Further arguments of [posterior_predict.mvgam()], such as
 #'   `resp` or `re_formula`.
 #'
@@ -105,9 +109,9 @@
 #'   can place an observation beyond that bound. Such isolated values
 #'   describe that draw. A misfit shifts the residual across most draws.
 #'   The empirical route reaches the clamp whenever an observation lies
-#'   outside every simulated value, which few draws make common. Use
-#'   `ndraws >= 500` there, the default of the residual histograms and
-#'   ribbons of [pp_check.mvgam()].
+#'   outside every simulated value. With few draws that happens often.
+#'   Use `ndraws >= 500` there, the default of the residual histograms
+#'   and ribbons of [pp_check.mvgam()].
 #'
 #' @return With `summary = FALSE`, an `[ndraws, nobs]` matrix of residual
 #'   draws. A continuous family on the empirical route has one interval
@@ -123,7 +127,7 @@
 #'
 #' Hartig, F. (2024). DHARMa: Residual diagnostics for
 #'   hierarchical (multi-level / mixed) regression models.
-#'   R package.
+#'   R package. \url{https://CRAN.R-project.org/package=DHARMa}
 #'
 #' @seealso [augment.mvgam()], [posterior_predict.mvgam()],
 #'   [pp_check.mvgam()]
@@ -135,7 +139,7 @@
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)
 #'

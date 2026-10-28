@@ -54,15 +54,43 @@ The forecast takes the shades of the red bayesplot scheme.
 The hindcast band is light grey, which separates in-sample
 uncertainty from the nested forecast bands.
 
-For state-extrapolating prediction over arbitrary newdata
-see \code{\link[=forecast.mvgam]{forecast.mvgam()}} and \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}; for
-marginal-MC prediction see \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} /
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} and \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} return the objects this
+method draws. Predictions that leave out the fitted trend state
+come from \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}.
+}
+\examples{
+\dontrun{
+set.seed(1)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                    n_timepoints = 120L, trend_model = AR())
+# Two models of one count series: a smooth of x with and without
+# an AR(1) trend. The trend model samples with smaller steps
+# (adapt_delta = 0.95). That avoids divergent transitions when
+# lfo_cv() refits it to shorter stretches of the series
+mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
+                 family = poisson(), chains = 2, silent = 2)
+mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+                data = simdat$data_train, family = poisson(),
+                chains = 2, silent = 2,
+                control = list(adapt_delta = 0.95))
+}
+\dontrun{
+fc <- forecast(mod_ar, newdata = simdat$data_test)
+
+# The grey hindcast band covers the training times. The red bands
+# are the 80\% and 95\% forecast intervals, with the held-out counts
+# as points
+plot(fc, probs = c(0.8, 0.95))
+
+# The forecast alone
+plot(fc, hindcast = FALSE)
+}
+
 }
 \seealso{
 \code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}},
-\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}, \code{\link[=summary.mvgam_forecast]{summary.mvgam_forecast()}},
-\code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}}, \code{\link[=stability]{stability()}}
+\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}, \code{\link[=summary.mvgam_forecast]{summary.mvgam_forecast()}}
 }
 \author{
 Nicholas J Clark

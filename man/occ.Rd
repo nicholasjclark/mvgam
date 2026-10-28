@@ -117,9 +117,9 @@ and Inference in Ecology}. Academic Press.
 \seealso{
 \code{\link[=nmix]{nmix()}} for the related N-mixture family and
 \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for closure-unit goodness-of-fit checks. The
-\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} fits occupancy and
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article} fits occupancy and
 N-mixture models from data preparation to inference. The
-\href{https://nicholasjclark.github.io/mvgam/articles/data.html}{data article} sets out the row layout
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/data.html}{data article} sets out the row layout
 that \code{occ()} expects.
 
 Other observation families: 

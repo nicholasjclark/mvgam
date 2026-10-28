@@ -7,7 +7,7 @@
 \method{mcmc_plot}{mvgam}(object, type = "intervals", variable = NULL, regex = FALSE, ...)
 }
 \arguments{
-\item{object}{An \R object typically of class \code{brmsfit}}
+\item{object}{A fitted \code{mvgam} object.}
 
 \item{type}{The plot type, the name of a bayesplot \verb{mcmc_*()} function
 without its prefix. \code{bayesplot::available_mcmc()} lists them. The
@@ -15,12 +15,31 @@ default \code{"intervals"} shows posterior intervals. \code{"trace"} and
 \code{"rank_overlay"} check mixing. \code{"nuts_energy"} and the other
 \code{"nuts_*"} types diagnose the sampler.}
 
-\item{variable}{Names of the variables (parameters) to plot, as given by a
-character vector or a regular expression (if \code{regex = TRUE}). By
-default, a hopefully not too large selection of variables is plotted.}
+\item{variable}{Either a keyword shortcut, a character vector of
+parameter names, or (when \code{regex = TRUE}) a vector of regular
+expressions. Recognised keywords:
+\itemize{
+\item \code{"betas"}: population-level coefficients, the set
+\code{\link[brms:fixef.brmsfit]{brms::fixef()}} reports (\verb{b_*}, \verb{bs_*} and \verb{bsp_*}).
+\item \code{"obs_params"}: observation-family distributional
+parameters (\code{sigma}, \code{phi}, \code{shape}, ...).
+\item \code{"smooth_params"}: smooth-term standard deviations
+(\verb{sds_*}).
+\item \code{"trend_betas"}: the trend formula's population-level
+coefficients (\verb{b_*_trend}, \verb{bs_*_trend} and \verb{bsp_*_trend}).
+\item \code{"trend_params"}: trend-dynamics parameters
+(autoregressive coefficients, innovation SDs, ...).
+\item \code{"trend_smooth_params"}: trend-side smooth SDs.
+}
+\code{NULL} (the default) returns every parameter. A bare vector name,
+such as \code{"sigma_trend"}, selects every element. Group-level
+effects, factor loadings and latent states have no keyword. Select
+them by name. \code{\link[=variables.mvgam]{variables.mvgam()}} lists the names a fit holds.}
 
-\item{regex}{Logical; Indicates whether \code{variable} should
-be treated as regular expressions. Defaults to \code{FALSE}.}
+\item{regex}{Logical. When \code{TRUE}, each entry of \code{variable} is
+treated as a regular expression and any parameter matching at
+least one pattern is selected. Keyword shortcuts are still
+honoured. Defaults to \code{FALSE}.}
 
 \item{...}{Further arguments to the bayesplot function, such as
 \code{prob} for \code{"intervals"} or \code{true} for the \code{"recover_*"} types.}
@@ -40,7 +59,7 @@ trend parameters and the family parameters.
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)

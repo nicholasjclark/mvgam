@@ -7,43 +7,42 @@
 compare_scores(..., score = "crps", model_names = NULL, score_args = list())
 }
 \arguments{
-\item{...}{Two or more \code{mvgam_forecast} objects (the same shape
-\code{score.mvgam_forecast()} consumes). Argument names are taken
-from the call and used as the \code{model} column. Bare expressions
-like \code{compare_scores(fc1, fc2)} produce \code{model} levels
-\code{"fc1"} and \code{"fc2"}.}
+\item{...}{Two or more \code{mvgam_forecast} objects from
+\code{\link[=forecast.mvgam]{forecast.mvgam()}}. A named argument, as in
+\code{compare_scores(GAM = fc1, AR = fc2)}, names its model. An unnamed
+one takes the expression passed, such as \code{"fc1"}.}
 
-\item{score}{Character. Which proper scoring rule to evaluate.
-Forwarded to \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}; see its documentation
-for the supported values.}
+\item{score}{Character name of the scoring rule. The section
+'Available scores' of \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} lists them.}
 
-\item{model_names}{Optional character vector of model labels;
-overrides the names inferred from the call.}
+\item{model_names}{Optional character vector of model names, one per
+forecast. It replaces the names taken from the call.}
 
-\item{score_args}{Optional named list of extra arguments passed
-to \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} (for example
-\code{score_args = list(interval_width = 0.6)}).}
+\item{score_args}{Optional named list of further arguments of
+\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}, such as
+\code{score_args = list(interval_width = 0.6)}.}
 }
 \value{
-A \code{tibble} with columns:
+A \code{tibble} of class \code{mvgam_compare_scores}, with columns:
 \itemize{
-\item \code{model} -- factor with one level per supplied forecast.
-\item \code{series} -- factor of series names (plus an
-\code{"all_series"} level when a joint score is requested).
-\item \code{eval_horizon} -- integer horizon within the test
-window (1, 2, ...).
-\item \code{score} -- the requested score value.
-\item \code{in_interval} -- coverage indicator carried through
-from \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}.
+\item \code{model}: a factor with one level per forecast.
+\item \code{series}: a factor of series names, with an \code{"all_series"}
+level for a joint score.
+\item \code{eval_horizon}: the forecast horizon, 1 for the first
+held-out time.
+\item \code{score}: the value of the score.
+\item \code{in_interval}: whether the observation fell in the central
+interval, as \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} reports it.
 }
 }
 \description{
-Bundles per-series-per-horizon scores from several
-\code{mvgam_forecast} objects into one long-format \code{tibble}, with
-one row per model x series x horizon combination. For joint
-scores (\code{"energy"}, \code{"variogram"}, \code{"twenergy"}) the per-series
-scores are \code{NA} and the joint score is the row with
-\code{series == "all_series"}.
+Scores the forecasts of several models of the same
+held-out data with one rule, then stacks the results in one table
+for comparison. Lower scores are better. The table has one row per
+model, series and forecast horizon. A joint score (\code{"energy"},
+\code{"variogram"} or \code{"twenergy"}) scores all series together. Its
+per-series rows hold \code{NA}. The rows with \code{series == "all_series"}
+hold its value.
 }
 \examples{
 \dontrun{
@@ -51,12 +50,15 @@ set.seed(1)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
 # Two models of one count series: a smooth of x with and without
-# an AR(1) trend
-mod_gam <- mvgam(y ~ s(x), data = simdat$data_train,
+# an AR(1) trend. The trend model samples with smaller steps
+# (adapt_delta = 0.95). That avoids divergent transitions when
+# lfo_cv() refits it to shorter stretches of the series
+mod_gam <- mvgam(y ~ s(x, k = 5), data = simdat$data_train,
                  family = poisson(), chains = 2, silent = 2)
-mod_ar <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod_ar <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
                 data = simdat$data_train, family = poisson(),
-                chains = 2, silent = 2)
+                chains = 2, silent = 2,
+                control = list(adapt_delta = 0.95))
 }
 \dontrun{
 fc_gam <- forecast(mod_gam, newdata = simdat$data_test)

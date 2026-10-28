@@ -39,9 +39,8 @@ observation. \code{FALSE} returns the residual draws.}
 deviation for summaries. If \code{TRUE}, uses median and median absolute
 deviation (MAD).}
 
-\item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+\item{probs}{Two probabilities for the lower and upper quantile
+columns of the summary. Default \code{c(0.025, 0.975)}, a 95\% interval.}
 
 \item{...}{Further arguments of \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, such as
 \code{resp} or \code{re_formula}.}
@@ -57,8 +56,6 @@ standard deviation, or the MAD) and one quantile per \code{probs}.
 \description{
 Posterior draws of the residuals of a fitted \code{mvgam} model, of two
 types:
-}
-\details{
 \itemize{
 \item \code{"quantile"} (default): randomised quantile residuals (Dunn and
 Smyth 1996), also called Dunn-Smyth or PIT residuals. Each
@@ -73,14 +70,16 @@ independent N(0, 1) draws for any response family.
 In sample, both types compare each observation with predictions that
 condition on the latent trend state the model inferred at that time,
 the state \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns. For \code{newdata} the fit has no
-such state. The prediction then integrates over the trend dynamics,
-which widens the residuals. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} and
+such state. The predictions then use the covariate part of the
+model, without the trend's innovations. Passing
+\code{process_error = TRUE} adds them. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} and
 \code{\link[=predictive_error.mvgam]{predictive_error.mvgam()}} use the same predictions.
 
 Pearson residuals are not supported. A Pearson residual of a count or
 a bounded response is skewed and discrete even under a correctly
 specified model.
-
+}
+\details{
 Each draw places an observation in a PIT interval
 \verb{[lower, upper]}. The residual is \code{qnorm(u)} for a \code{u} drawn
 uniformly from that interval. Two routes give the interval.
@@ -115,9 +114,9 @@ bounds a residual at about +/-8.13. On the analytic route one draw
 can place an observation beyond that bound. Such isolated values
 describe that draw. A misfit shifts the residual across most draws.
 The empirical route reaches the clamp whenever an observation lies
-outside every simulated value, which few draws make common. Use
-\code{ndraws >= 500} there, the default of the residual histograms and
-ribbons of \code{\link[=pp_check.mvgam]{pp_check.mvgam()}}.
+outside every simulated value. With few draws that happens often.
+Use \code{ndraws >= 500} there, the default of the residual histograms
+and ribbons of \code{\link[=pp_check.mvgam]{pp_check.mvgam()}}.
 }
 \section{Multivariate families (\code{mvn()}, \code{mvt()}, \code{diri()})}{
 
@@ -165,7 +164,7 @@ Compare QQ-plots with envelopes simulated from N(0, 1) in that case.
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
 
@@ -191,7 +190,7 @@ Statistics}, 5(3), 236-244.
 
 Hartig, F. (2024). DHARMa: Residual diagnostics for
 hierarchical (multi-level / mixed) regression models.
-R package.
+R package. \url{https://CRAN.R-project.org/package=DHARMa}
 }
 \seealso{
 \code{\link[=augment.mvgam]{augment.mvgam()}}, \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}},

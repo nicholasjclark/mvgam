@@ -66,8 +66,8 @@ refuses a name outside them. A list keyed by parameter name gives
 each parameter its own value. A single number fills every
 parameter a fit lacks.}
 
-\item{model_names}{Optional character vector of model labels;
-overrides the names inferred from the call.}
+\item{model_names}{Optional character vector of model names, one per
+forecast. It replaces the names taken from the call.}
 
 \item{control}{A list of extra arguments passed to
 \code{\link[loo:loo_model_weights]{loo::loo_model_weights()}} when computing stacking /
@@ -86,8 +86,7 @@ summarises the averaged predictions with
 \code{FALSE} returns the averaged draws.}
 
 \item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals.}
 
 \item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
 deviation for summaries. If \code{TRUE}, uses median and median absolute
@@ -139,7 +138,7 @@ head(pp_average(mod, mod_lin, method = "posterior_epred"))
 \seealso{
 \code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}} computes the weights.
 \code{\link[=ensemble]{ensemble()}} averages forecasts. The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 weights and combines competing models.
 
 Other model comparison: 

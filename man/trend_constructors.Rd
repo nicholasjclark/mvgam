@@ -6,7 +6,7 @@
 \alias{AR}
 \alias{CAR}
 \alias{VAR}
-\title{Trend Model Constructors for \pkg{mvgam}}
+\title{Latent trend models for \pkg{mvgam}}
 \usage{
 RW(
   time = NA,
@@ -66,40 +66,29 @@ trend needs this column even for a single series. Defaults to \code{series}.}
 \item{ma}{\code{Logical}. Include moving average terms of order \code{1}?
 Default is \code{FALSE}.}
 
-\item{cor}{\code{Logical}. Include correlated process errors as part of a
-multivariate normal process model? If \code{TRUE} and if
-\code{n_series > 1} in the supplied data, a fully structured covariance
-matrix will be estimated for the process errors. \code{AR()} and
-\code{RW()} default to \code{NULL}, which resolves to \code{FALSE}
-for an ungrouped trend and to \code{TRUE} whenever \code{gr} names
-a grouping variable: a grouped trend estimates correlations among
-the \code{subgr} units within each level of \code{gr}, which is
-the model \code{gr} exists to specify. \code{VAR()} and
-\code{ZMVN()} always estimate correlations and refuse
-\code{cor = FALSE}, as do \code{AR(gr = ...)} and
-\code{RW(gr = ...)}. \code{CAR()} defaults to \code{FALSE}.}
+\item{cor}{\code{Logical}. Correlate the innovations of different
+series? \code{TRUE} estimates a full covariance matrix of the
+innovations when the data hold more than one series. \code{AR()}
+and \code{RW()} default to \code{NULL}. That means \code{FALSE}
+for an ungrouped trend and \code{TRUE} when \code{gr} names a
+grouping variable. \code{VAR()}, \code{ZMVN()} and grouped
+\code{AR()} and \code{RW()} trends always estimate correlations.
+They refuse \code{cor = FALSE}. \code{CAR()} defaults to
+\code{FALSE}.}
 
-\item{gr}{An optional grouping variable, which must be a \code{factor} in the
-supplied \code{data}, for setting up hierarchical residual correlation
-structures. If specified, this sets up a model where the residual
-correlations for a specific level of \code{gr} are modelled
-hierarchically:
+\item{gr}{An optional \code{factor} in \code{data} that groups the series, such
+as region. Each level of \code{gr} takes its own correlation matrix among
+the innovations of its series. The matrices are pooled toward one
+global matrix:
 
 \eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} +
-  (1 - \alpha_{cor})\Omega_{group, local}},
+  (1 - \alpha_{cor})\Omega_{group, local}}
 
-where \eqn{\Omega_{global}} is a \emph{global} correlation matrix,
-\eqn{\Omega_{group, local}} is a \emph{local deviation} correlation matrix and
-\eqn{\alpha_{cor}} is a weighting parameter controlling how strongly the
-local correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
-correlation matrix \eqn{\Omega_{global}} (larger values of
-\eqn{\alpha_{cor}} indicate a greater degree of shrinkage, i.e. a greater
-degree of partial pooling).
-
-A grouped trend estimates correlations among the \code{subgr} units
-within each level of \code{gr}. Without \code{subgr}, the series column names
-those units. \code{cor} defaults to \code{TRUE} for such a trend. An explicit
-\code{cor = FALSE} is refused.
+Here \eqn{\Omega_{global}} is shared by every group,
+\eqn{\Omega_{group, local}} is the deviation of one group and
+\eqn{\alpha_{cor}} sets the weight on the global matrix. An
+\eqn{\alpha_{cor}} near 1 pools the groups strongly. Without
+\code{subgr}, the series column names the series within each group.
 
 Within a \code{VAR()} it sets up a hierarchical panel vector
 autoregression. Each group learns its autoregressive, moving-average
@@ -108,9 +97,8 @@ not interact.
 
 Two constraints apply to hierarchical trend models:
 \itemize{
-\item \code{gr} must be constant within each series (each series belongs to
-a single group). Models with \code{gr} varying within a series are
-rejected at validation time.
+\item Each series belongs to one group. \code{mvgam()} refuses a \code{gr}
+that varies within a series.
 \item Every group must hold the same number of series. The Stan
 program sizes each group's correlation block from one shared
 count. Validation refuses unbalanced groups before fitting.
@@ -122,7 +110,7 @@ hierarchical correlations builds its series from \code{gr} and \code{subgr},
 and \code{data} then needs no \code{series} column.
 
 For example, to model counts of several species (\code{species} in
-\code{data}) across three regions (\code{region}) with residuals correlated
+\code{data}) across three regions (\code{region}) with innovations correlated
 within regions, specify \code{gr = region} and \code{subgr = species}.
 \code{mvgam()} then builds the series as
 
@@ -170,18 +158,20 @@ When \code{df = NA} the degrees of freedom are estimated as
 \code{\link{get_prior}} lists \code{nu_trend} with the other trend
 classes.
 
-Three caveats apply. The bound of \code{2} is required. Below it
-the innovations have no finite variance. An autoregressive trend
-then has no stationary covariance to start from. Above it, the
-first states of an autoregressive trend take the stationary mean
-and covariance. Their distribution matches the stationary law
-exactly under Gaussian innovations alone. A finite mix of t
-variates has heavier tails than the infinite sum that defines that
-law. The degrees of freedom are informed only through the tail of
-the latent process. They are weakly identified in short series:
-below roughly 200 time points, the posterior stays close to its
-prior. \code{VAR()} samples its states directly and \code{PW()}
-has no innovations. Neither takes \code{df}.}
+Three caveats apply:
+\itemize{
+\item A fixed value must exceed \code{2}. Below it the innovations
+have no finite variance. An autoregressive trend then has no
+stationary covariance to start from.
+\item The first states of an autoregressive trend take the
+stationary mean and covariance. Under t innovations the true
+stationary distribution has heavier tails than that.
+\item Only the tails of the latent process inform the degrees of
+freedom. Below roughly 200 time points their posterior stays
+close to the prior.
+}
+\code{VAR()} samples its states directly and \code{PW()} has no
+innovations. Neither takes \code{df}.}
 
 \item{p}{The autoregressive lags. The accepted form depends on the
 trend type:
@@ -196,12 +186,9 @@ AR with no intermediate lags. \code{p = c(2, 4)} declares only
 \code{ar2_trend} and \code{ar4_trend}.
 \item For \code{VAR()} models: a positive integer. \code{p = k} is the
 VAR(k), with one coefficient matrix for each of the lags
-\code{1:k}. A sparse lag vector is not supported. The stationary
-initialisation of Heaps (2023) is defined on the companion form
-of consecutive lags. A sparse lag set has no companion form with
-the same identified stationary covariance. Use
-\code{AR(p = c(...))} for sparse-lag autoregression on a single
-series.
+\code{1:k}. The stationarity prior of Heaps (2023) needs
+consecutive lags. A sparse lag vector is not supported. Use
+\code{AR(p = c(...))} for sparse lags.
 }}
 
 \item{coef_sharing}{How the coefficients of \code{AR()} vary across the
@@ -214,15 +201,30 @@ The section on AR coefficient sharing lists the parameters each
 setting samples.}
 }
 \value{
-An object of class \code{mvgam_trend}, which contains a list of
-arguments to be interpreted by the parsing functions in \pkg{mvgam}.
+An object of class \code{mvgam_trend} holding the
+constructor's arguments. \code{\link[=mvgam]{mvgam()}} builds the trend from it.
 }
 \description{
-Specify trend models for multivariate State-Space models in \pkg{mvgam}.
-These constructor functions create trend specifications for various temporal
-dynamics including random walks (RW), autoregressive models (AR, VAR, CAR),
-local linear trends (LLT) and piecewise trends (PW). A constructor
-records its arguments. The model evaluates them against the data.
+Specify the latent trend of a state-space model. Each constructor
+goes inside \code{trend_formula}, as in \code{trend_formula = ~ AR(p = 1)}. A
+constructor records its arguments. The model evaluates them against
+the data. The trends suit different series:
+\describe{
+\item{\code{RW()}}{A level that wanders with no pull back to a mean.}
+\item{\code{AR()}}{Movement around a mean, with memory of the previous
+\code{p} times. It is a common first choice.}
+\item{\code{VAR()}}{Series whose past values drive one another, such as
+predators and prey.}
+\item{\code{CAR()}}{An AR(1) for series observed at irregular times.}
+\item{\code{ZMVN()}}{Correlated effects with no dependence on time,
+such as among sites or species.}
+\item{\code{LLT()}}{A level with a slope that changes over time, with
+an optional season.}
+\item{\code{PW()}}{Linear or logistic growth with changepoints.}
+}
+Each trend moves by a random innovation at every time step. Other
+texts call it a process error or a shock. The innovations are
+independent across series unless \code{cor = TRUE}.
 }
 \details{
 A \code{trend_formula} takes one trend constructor. The arguments of that
@@ -394,8 +396,12 @@ AR(p = c(1, 12))
 VAR(p = 2, ma = TRUE)
 RW(gr = region, subgr = species)
 
-# Three Poisson series, each surveyed at its own irregular times.
-# Every series keeps about 60 percent of the occasions
+# A regularly spaced series usually starts with AR(p = 1). ?mvgam
+# fits one. The rest of this example handles irregular sampling.
+
+# Three Poisson series with a seasonal cycle, each surveyed at its
+# own irregular times. sim_mvgam(type = 6L) draws the gaps between
+# occasions. Every series keeps about 60 percent of the occasions
 set.seed(11)
 simdat <- sim_mvgam(type = 6L, family = poisson(), n_series = 3L,
                     n_timepoints = 80L)
@@ -446,26 +452,23 @@ models. \emph{Statistics and Computing}, 34:143.
 
 Heaps, S. E. (2023). Enforcing stationarity through the prior
 in vector autoregressions. \emph{Journal of Computational and
-Graphical Statistics}, 32:74-83. (VAR stationarity prior used
-for \code{VAR()} trends.)
+Graphical Statistics}, 32(1):74-83.
+\doi{10.1080/10618600.2022.2079648}
 
-Clark, N. J., Ernest, S. K. M., Senyondo, H., Simonis, J.,
-White, E. P., Yenni, G. M. and Karunarathna, K. A. N. K.
-(2025). Beyond single-species models: multispecies forecasts
-for ecological predictability. \emph{PeerJ}, 13:e18929.
+Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM and Karunarathna KANK (2025). Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability. PeerJ, 13, e18929. https://doi.org/10.7717/peerj.18929
 }
 \seealso{
 \code{\link[=get_prior]{get_prior()}} lists the parameters a trend adds and their
 default priors. \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}} and
 \code{\link[=stability]{stability()}} interpret fitted latent dynamics. \code{\link[=forecast]{forecast()}}
 propagates them forward. The
-\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview vignette} compares
-the trend types. The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview vignette} compares
+the trend types. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{VAR article}
 interprets a fitted \code{VAR()} with \code{irf()}, \code{fevd()} and
 \code{stability()}. The
-\href{https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html}{hierarchical VAR article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/hierarchical_var.html}{hierarchical VAR article}
 fits \code{gr} and \code{subgr}. The
-\href{https://nicholasjclark.github.io/mvgam/articles/dfm.html}{dynamic factor vignette} fits \code{n_lv} and
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/dfm.html}{dynamic factor vignette} fits \code{n_lv} and
 \code{trend_map}.
 
 Other trend models: 

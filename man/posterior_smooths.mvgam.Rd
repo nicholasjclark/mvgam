@@ -66,14 +66,14 @@ taken from the observation formula.
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
 
 # Twenty draws of s(x) over a grid of x
 grid <- data.frame(x = seq(-2, 2, length.out = 50))
-sm <- posterior_smooths(mod, smooth = "s(x)", newdata = grid)
+sm <- posterior_smooths(mod, smooth = "s(x, k = 5)", newdata = grid)
 draws <- data.frame(x = rep(grid$x, each = 20),
                     value = as.vector(sm[1:20, ]),
                     draw = rep(1:20, times = 50))

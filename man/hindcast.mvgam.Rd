@@ -35,8 +35,7 @@ Several names give the sum of their components. \code{\link[=LLT]{LLT()}} has
 step. A seasonal \code{\link[=LLT]{LLT()}} adds \code{"season"}. \code{"predictor"} holds the
 effects of the trend formula's covariates. \code{c("level", "predictor")} gives the level with those effects. A factor model
 projects each component through its loadings, as it projects the
-trend. The result is an ordinary \link[=mvgam]{mvgam_forecast-class}
-with the components in its \code{component} slot.}
+trend.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}
@@ -45,17 +44,17 @@ use. NULL (default) uses all available draws.}
 draw indices to use. NULL (default) uses all draws (subject to
 \code{ndraws}).}
 
-\item{obs_uncertainty}{Logical. When \code{FALSE}, skips
-observation-family sampling for \code{type = "response"},
-returning the family mean instead.
-Defaults to \code{TRUE}.}
+\item{obs_uncertainty}{Logical, \code{TRUE} by default. \code{FALSE} returns
+the family's mean under \code{type = "response"}, in place of a sampled
+observation.}
 
 \item{process_error}{Logical. \code{FALSE} (the default) takes the
 fitted latent state of each draw. \code{type = "response"} then adds
-the observation noise alone. \code{TRUE} adds fresh trend innovations
-to the linear predictor, as \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} does with
-the same argument. A \code{component} is a fitted state and needs
-\code{FALSE}.}
+the observation noise alone. \code{TRUE} replaces the fitted states
+with the covariate part plus newly drawn innovations, as
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} gives with the same argument. The
+hindcast then shows what the model predicts without the observed
+history. A \code{component} is a fitted state and needs \code{FALSE}.}
 
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
@@ -80,7 +79,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
 
 mod <- mvgam(
-  y ~ s(x),
+  y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
   data    = simdat$data_train,
   family  = poisson(),
@@ -109,11 +108,11 @@ plot(hindcast(mod_llt, type = "trend", component = "slope"))
 \seealso{
 \code{\link[=forecast.mvgam]{forecast.mvgam()}} extrapolates the fitted state.
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} predict
-by integrating over the trend's dynamics. The
-\href{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}{multivariate article} compares
+from the covariate part of the model. The
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvbf.html}{multivariate article} compares
 \code{type = "trend"} hindcasts of one latent state from a joint model
 and from each data source alone. The
-\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} summarises
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article} summarises
 \code{type = "latent_state"} hindcasts of abundance.
 
 Other predictions: 

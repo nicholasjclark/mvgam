@@ -31,8 +31,7 @@ deviation for summaries. If \code{TRUE}, uses median and median absolute
 deviation (MAD).}
 
 \item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+Default is \code{c(0.025, 0.975)} for 95\% credible intervals.}
 
 \item{lag}{The lag of the matrix, at most the order \code{p} of the
 fitted \code{VAR(p)}.}

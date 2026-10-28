@@ -24,42 +24,47 @@
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
 
-\item{process_error}{Logical; if \code{TRUE}, the trend adds a sampled
-innovation to its deterministic submodel. Each posterior draw
-takes one innovation from the distribution the trend settles
-into. An autoregressive trend settles into its stationary
-distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}. The
-Jensen correction on a log link is
-\eqn{\sigma^2/(2(1-\rho^2))}. A random walk lacks a stationary
-distribution and a \code{ZMVN()} trend lacks dynamics. Both draw their
-innovations directly. \code{CAR()} uses one stationary covariance at
-every time of an irregular grid and draws from it. If \code{FALSE},
-the default, the trend contributes its deterministic submodel
-alone, at its own per-draw values. The argument applies under
-\code{incl_autocor = FALSE}. Conditioning on the fitted state already
-fixes every innovation.
+\item{process_error}{Logical. \code{FALSE}, the default, leaves the
+trend's innovations out of the prediction. \code{TRUE} adds a random
+deviation at each time and series, drawn anew for every posterior
+draw from the spread the trend shows over the long run. For an
+AR(1) trend with innovation SD \eqn{\sigma} and coefficient
+\eqn{\rho} that spread has variance \eqn{\sigma^2/(1-\rho^2)}. On a
+log link the deviations raise the average prediction by the factor
+\eqn{\exp(\sigma^2/(2(1-\rho^2)))}. A random walk has no long-run
+spread. A \code{ZMVN()} trend has no dynamics. These two draw from the
+innovation covariance itself. \code{CAR()} draws from one long-run
+covariance at every time of an irregular grid. The argument applies
+under \code{incl_autocor = FALSE}. The fitted state already holds every
+innovation.
 
-Each call draws new innovations. Two calls on one fit give different
-results. Set a seed to reproduce a result.}
+Each call draws new innovations. Two calls on one fit give
+different results. Set a seed to reproduce a result.}
 
-\item{incl_autocor}{Logical; which prediction surface the trend
-contribution comes from. \code{FALSE}, the default, omits the fitted
-\code{trend[t, s]} and uses the two submodels' covariate structure. The
-effect is the same at the first time point as at the fiftieth. \code{TRUE}
-uses the latent state the model inferred at each time. That is the
-quantity \code{\link[=hindcast]{hindcast()}} returns. The ELPD is computed from it.
-\code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} request this surface. An R^2
-describes the observed series. A row whose time falls outside the
-fitted grid is refused under \code{TRUE}. \code{\link[=forecast.mvgam]{forecast.mvgam()}} predicts
-those times. An in-sample interval under \code{TRUE} conditions on
-states estimated from the same observations. It covers them more
-often than its nominal level. Calibration is judged out of sample,
-with \code{\link[=forecast.mvgam]{forecast.mvgam()}} or \code{\link[=lfo_cv]{lfo_cv()}}.
+\item{incl_autocor}{Logical. Chooses which version of the trend each
+prediction uses. \code{FALSE}, the default, uses the covariate part of
+the model: the effects in the observation formula and the trend
+formula, without the trend's innovations. A prediction then depends
+on the covariates alone. It is the same at the first time point as
+at the fiftieth. Questions about covariate effects use this
+version. \code{TRUE} uses the fitted state, the value the trend took at
+each observed time as \code{\link[=hindcast]{hindcast()}} returns it. The section 'Which
+prediction function?' of \code{\link[=predict.mvgam]{predict.mvgam()}} compares the
+functions.
+
+An ELPD or an \eqn{R^2} describes the observed series. \code{\link[=log_lik]{log_lik()}},
+\code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} use \code{TRUE} for that reason.
+A time outside the training data is refused under \code{TRUE}.
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} predicts those times. An in-sample interval
+under \code{TRUE} conditions on states estimated from the same
+observations. It covers them more often than its nominal level.
+Calibration is judged out of sample, with \code{\link[=forecast.mvgam]{forecast.mvgam()}} or
+\code{\link[=lfo_cv]{lfo_cv()}}.
 
 The default suits a model whose covariates explain most of the
 signal. When most of the series-level variation lies in the trend,
 as in a fit with few covariates and a strong autoregressive process,
-this surface has little to say. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
+the covariate part has little to say. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
 \code{\link[=forecast.mvgam]{forecast.mvgam()}} are more informative there.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
@@ -80,8 +85,8 @@ it has no latent state to propagate. Predict for levels the fit
 knows, or refit with the new levels included.}
 
 \item{sample_new_levels}{Character; accepted for brms
-compatibility and not used, since new levels are refused. See
-\code{allow_new_levels}.}
+compatibility. It has no effect, because new levels are refused.
+See \code{allow_new_levels}.}
 
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
@@ -115,12 +120,22 @@ The mean of an \code{nmix()} or \code{occ()} visit thins the latent abundance
 or occupancy by that visit's detection probability. A composition
 family normalises its means across the components of each unit.
 }
+\section{Trend state}{
+
+By default the trend enters through its covariate part, without the
+state it took at each observed time. The \pkg{brms} counterparts of
+this method use that fitted state. \code{incl_autocor = TRUE} uses it
+here too, as \code{\link[=fitted.mvgam]{fitted.mvgam()}} and \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} do on the
+training data. The section 'Which prediction function?' of
+\code{\link[=predict.mvgam]{predict.mvgam()}} compares the prediction functions.
+}
+
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
 
@@ -128,8 +143,8 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
 ep <- posterior_epred(mod)
 dim(ep)
 
-# The covariate surface and the surface that follows the fitted
-# trend, against the observed counts
+# Expected counts from the covariate part and from the fitted state,
+# against the observed counts
 ep_state <- posterior_epred(mod, incl_autocor = TRUE)
 library(ggplot2)
 ggplot(simdat$data_train, aes(time, y)) +
@@ -140,8 +155,8 @@ ggplot(simdat$data_train, aes(time, y)) +
   labs(y = "Count") +
   mvgam_theme()
 
-# Sampling trend innovations raises a log-link mean by the Jensen
-# correction
+# Sampling the trend's innovations raises the average of a log-link
+# prediction
 c(fixed = mean(ep),
   innovations = mean(posterior_epred(mod, process_error = TRUE)))
 
@@ -153,7 +168,7 @@ c(fixed = mean(ep),
 \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} returns the predictor on the
 link scale. \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} take the
 trend from its fitted state, in and beyond the training times. The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 scores predictions of held-out times.
 
 Other predictions: 

@@ -15,9 +15,8 @@ includes latent factors (\code{n_lv < n_series}).}
 
 \item{...}{Unused. Anything passed here is refused.}
 
-\item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+\item{probs}{Two probabilities for the lower and upper bounds of the
+credible interval. Default \code{c(0.025, 0.975)}, a 95\% interval.}
 
 \item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
 deviation for summaries. If \code{TRUE}, uses median and median absolute
@@ -117,7 +116,7 @@ models. \emph{Statistics and Computing}, 34:143.
 \code{\link[=residual_cor]{residual_cor()}} for the implied correlation matrix,
 \code{cov2cor(Delta)}. Under \code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}} it adds each series'
 residual variance to the diagonal of \code{Delta} first. The
-\href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{joint species distribution article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{joint species distribution article}
 interprets both for a community of species.
 
 Other latent dynamics: 

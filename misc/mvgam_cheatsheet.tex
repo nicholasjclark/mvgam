@@ -13,10 +13,10 @@
 
 \definecolor{fgcolor}{rgb}{0.345, 0.345, 0.345}
 \newcommand{\hlnum}[1]{\textcolor[rgb]{0.686,0.059,0.569}{#1}}%
-\newcommand{\hlstr}[1]{\textcolor[rgb]{0.192,0.494,0.8}{#1}}%
+\newcommand{\hlsng}[1]{\textcolor[rgb]{0.192,0.494,0.8}{#1}}%
 \newcommand{\hlcom}[1]{\textcolor[rgb]{0.678,0.584,0.686}{\textit{#1}}}%
 \newcommand{\hlopt}[1]{\textcolor[rgb]{0,0,0}{#1}}%
-\newcommand{\hlstd}[1]{\textcolor[rgb]{0.345,0.345,0.345}{#1}}%
+\newcommand{\hldef}[1]{\textcolor[rgb]{0.345,0.345,0.345}{#1}}%
 \newcommand{\hlkwa}[1]{\textcolor[rgb]{0.161,0.373,0.58}{\textbf{#1}}}%
 \newcommand{\hlkwb}[1]{\textcolor[rgb]{0.69,0.353,0.396}{#1}}%
 \newcommand{\hlkwc}[1]{\textcolor[rgb]{0.333,0.667,0.333}{#1}}%
@@ -51,7 +51,7 @@
 \usepackage{alltt}
 \input{BeamOptions.tex}
 
-\setbeamertemplate{footline}{\hfill {\footnotesize \href{https://creativecommons.org/licenses/by-sa/4.0/}{CC BY-SA 4.0} $\circ$ Nicholas J. Clark $\circ$ Learn more at \href{https://nicholasjclark.github.io/mvgam/index.html}{https://nicholasjclark.github.io/mvgam/index.html} $\circ$ package version $1.0.9$ $\circ$ updated: \today} \hspace {0.1in} \vspace{0.1in}}
+\setbeamertemplate{footline}{\hfill {\footnotesize \href{https://creativecommons.org/licenses/by-sa/4.0/}{CC BY-SA 4.0} $\circ$ Nicholas J. Clark $\circ$ Learn more at \href{https://nicholasjclark.github.io/mvgam/dev/}{https://nicholasjclark.github.io/mvgam/dev/} $\circ$ package version $2.0.0$ $\circ$ updated: \today} \hspace {0.1in} \vspace{0.1in}}
 \IfFileExists{upquote.sty}{\usepackage{upquote}}{}
 \begin{document}
 
@@ -80,36 +80,36 @@ The \texttt{mvgam} package provides tools for fitting and interrogating univaria
 \end{block}
 
 \begin{block}{{\fontsize{21}{21} \selectfont \color{BrickRed} Modelling with \texttt{\color{Orchid} mvgam()}}}
-Usage: \texttt{\color{Orchid} mvgam(formula, trend\_formula, data, trend\_model, family, ...)}
+Usage: \texttt{\color{Orchid} mvgam(formula, trend\_formula, data, family, ...)}
 
 \medskip
-\texttt{\color{Orchid} formula}: observation model regression formula, built off the \texttt{mgcv} package. See \texttt{\color{Orchid}?mvgam\_formulae} for more guidance
+\texttt{\color{Orchid} formula}: observation model regression formula, in \texttt{brms} syntax with \texttt{mgcv} smooths. See \texttt{\color{Orchid}?mvgam} for more guidance
 
 \medskip
-\texttt{\color{Orchid} trend\_formula}: optional process model formula (see \href{https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html}{the State-Space model vignette} and \href{https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html}{the shared latent states vignette} for guidance on using trend formulae)
+\texttt{\color{Orchid} trend\_formula}: optional process model formula. It names the latent dynamic process with a trend constructor, such as \texttt{\color{Orchid} \textasciitilde{} RW()}. It can also hold covariates of the process
 
 \medskip
-\texttt{\color{Orchid} data}: a \texttt{data.frame} or \texttt{list} containing the response variable(s) and optional predictor variables. See \href{https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html}{the data formatting vignette} for guidance on data preparation
+\texttt{\color{Orchid} data}: a \texttt{data.frame} or \texttt{list} containing the response variable(s) and optional predictor variables. See \href{https://nicholasjclark.github.io/mvgam/dev/articles/data.html}{the data formatting vignette} for guidance on data preparation
 
 \medskip
-\texttt{\color{Orchid} trend\_model}: optional latent dynamic process. Options include (among others):
+Trend constructors for \texttt{\color{Orchid} trend\_formula}. Options include (among others):
 \begin{itemize}
 
-\item\texttt{\color{Orchid} None}: default, no dynamic process
+\item No \texttt{\color{Orchid} trend\_formula}: default, no dynamic process
 
 \item\texttt{\color{Orchid} RW(ma = FALSE, cor = FALSE)}: random walk
 
 \item\texttt{\color{Orchid} AR(p = 1, ma = FALSE, cor = FALSE)}: autoregressive
 
-\item\texttt{\color{Orchid} VAR(ma = FALSE, cor = FALSE)}: vector autoregressive
+\item\texttt{\color{Orchid} VAR(ma = FALSE)}: vector autoregressive
 
 \item\texttt{\color{Orchid} PW(growth = 'linear')}: piecewise linear
 
 \item\texttt{\color{Orchid} PW(growth = 'logistic')}: piecewise logistic, with max saturation
 
-\item\texttt{\color{Orchid} GP()}: squared exponential Gaussian Process
+\item\texttt{\color{Orchid} CAR()}: continuous-time autoregressive, for irregular sampling times
 \end{itemize}
-For autoregressive processes (\texttt{\color{Orchid} RW(), AR() or VAR()}), moving average and correlated process errors can also be specified by changing the \texttt{\color{Orchid} ma} and \texttt{\color{Orchid} cor} arguments
+For autoregressive processes (\texttt{\color{Orchid} RW(), AR() or VAR()}), moving average and correlated process errors can also be specified with the \texttt{\color{Orchid} ma} and \texttt{\color{Orchid} cor} arguments
 
 \medskip
 \texttt{\color{Orchid} family}: observation distribution. Options include (among others):
@@ -117,21 +117,21 @@ For autoregressive processes (\texttt{\color{Orchid} RW(), AR() or VAR()}), movi
 
 \item\texttt{\color{Orchid} gaussian()}: Gaussian with identity link
 
-\item\texttt{\color{Orchid} student-t()}: Student's T with identity link
+\item\texttt{\color{Orchid} student()}: Student's T with identity link
 
 \item\texttt{\color{Orchid} lognormal()}: LogNormal with identity link
 
-\item\texttt{\color{Orchid} Gamma()}: Gamma with log link
+\item\texttt{\color{Orchid} Gamma(link = 'log')}: Gamma with log link
 
-\item\texttt{\color{Orchid} betar()}: Beta with logit link
+\item\texttt{\color{Orchid} Beta()}: Beta with logit link
 
 \item\texttt{\color{Orchid} poisson()}: Poisson with log link
 
-\item\texttt{\color{Orchid} nb()}: Negative Binomial with log link
+\item\texttt{\color{Orchid} negbinomial()}: Negative Binomial with log link
 \end{itemize}
 
 \medskip
-See \href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{the introductory vignette} for more guidance on supported families and dynamic processes
+See \href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{the introductory vignette} for more guidance on supported families and dynamic processes
 
 \medskip
 \texttt{\color{Orchid} ...}: other arguments such as user-specified \texttt{\color{Orchid} priors}, \texttt{\color{Orchid} newdata} for generating probabilistic forecasts and options to control \texttt{\color{Orchid} Stan} MCMC parameters
@@ -140,11 +140,11 @@ See \href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{t
 \textbf{\color{BrickRed} Prior to modelling}, it is useful to:
 \begin{itemize}
 
-\item Inspect features of the data with \texttt{\color{Orchid} plot\_mvgam\_series()}
+\item Check the data and plot each series with \texttt{\color{Orchid} mvgam\_data()}
 
-\item Ensure there are no \texttt{\color{Orchid} NA}'s in predictors (though \texttt{\color{Orchid} NA}'s are allowed in response variables). See \href{https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html}{the data formatting vignette} for guidance on data preparation
+\item Ensure there are no \texttt{\color{Orchid} NA}'s in predictors (though \texttt{\color{Orchid} NA}'s are allowed in response variables). See \href{https://nicholasjclark.github.io/mvgam/dev/articles/data.html}{the data formatting vignette} for guidance on data preparation
 
-\item Inspect default priors with \texttt{\color{Orchid} get\_mvgam\_priors()}
+\item Inspect default priors with \texttt{\color{Orchid} get\_prior()}
 
 \item Make any necessary changes to default priors with \texttt{\color{Orchid} prior()}
 
@@ -155,9 +155,9 @@ See \href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{t
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{simdat} \hlkwb{<-} \hlkwd{sim_mvgam}\hlstd{(}\hlkwc{n_series} \hlstd{=} \hlnum{1}\hlstd{)}
-\hlstd{model} \hlkwb{<-} \hlkwd{mvgam}\hlstd{(}\hlkwc{formula} \hlstd{= y} \hlopt{~} \hlkwd{s}\hlstd{(season,} \hlkwc{bs} \hlstd{=} \hlstr{'cc'}\hlstd{),}
-               \hlkwc{trend_model} \hlstd{=} \hlkwd{RW}\hlstd{(),} \hlkwc{data} \hlstd{= simdat}\hlopt{$}\hlstd{data_train)}
+\hldef{simdat} \hlkwb{<-} \hlkwd{sim_mvgam}\hldef{(}\hlkwc{family} \hldef{=} \hlkwd{poisson}\hldef{(),} \hlkwc{trend_model} \hldef{=} \hlkwd{RW}\hldef{())}
+\hldef{model} \hlkwb{<-} \hlkwd{mvgam}\hldef{(}\hlkwc{formula} \hldef{= y} \hlopt{~} \hlkwd{s}\hldef{(x,} \hlkwc{k} \hldef{=} \hlnum{5}\hldef{),} \hlkwc{trend_formula} \hldef{=} \hlopt{~} \hlkwd{RW}\hldef{(),}
+               \hlkwc{data} \hldef{= simdat}\hlopt{$}\hldef{data_train,} \hlkwc{family} \hldef{=} \hlkwd{poisson}\hldef{())}
 \end{alltt}
 \end{kframe}
 \end{knitrout}
@@ -190,7 +190,7 @@ Use \texttt{\color{Orchid} stancode(model)} to see the auto-generated \texttt{St
 \texttt{\color{Orchid} loo(model)} and \texttt{\color{Orchid} loo\_compare(model1, model2, ...)}: calculate approximate leave-one-out information criteria for model comparisons
 
 \medskip
-\texttt{\color{Orchid} mcmc\_plot(model)}: visualize posterior summaries, pairs plots and a wide range of MCMC diagnostics using functionality from the \texttt{Bayesplot} package
+\texttt{\color{Orchid} mcmc\_plot(model)}: visualize posterior summaries, pairs plots and a wide range of MCMC diagnostics using functionality from the \texttt{bayesplot} package
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}
@@ -206,7 +206,7 @@ Use \texttt{\color{Orchid} stancode(model)} to see the auto-generated \texttt{St
 Use \texttt{\color{Orchid} as.data.frame(model)}, \texttt{\color{Orchid} as.matrix(model)}, or \texttt{\color{Orchid} as.array(model)} to extract posterior parameter estimates. Use \texttt{\color{Orchid} variables(model)} to determine what parameters are available for extraction
 
 \medskip
-The \texttt{S3} \texttt{\color{Orchid} plot()} function applied to models can visualise smooth functions (\texttt{\color{Orchid} type = 'smooths'}), random effects (\texttt{\color{Orchid} type = 're'}), conditional predictions and trend estimates (\texttt{\color{Orchid} type = 'forecast'} or \texttt{\color{Orchid} type = 'trend'}), uncertainty contributions (\texttt{\color{Orchid} type = 'uncertainty'}) or randomized quantile residual diagnostics (\texttt{\color{Orchid} type = 'residuals'}). Use \texttt{\color{Orchid} trend\_effects = TRUE} to visualise effects from any process model formulae
+The \texttt{S3} \texttt{\color{Orchid} plot()} function applied to models can visualise smooth functions (\texttt{\color{Orchid} type = 'smooths'}), trend estimates (\texttt{\color{Orchid} type = 'trend'}), the observed series (\texttt{\color{Orchid} type = 'series'}), latent factors (\texttt{\color{Orchid} type = 'factors'}) or randomized quantile residual diagnostics (\texttt{\color{Orchid} type = 'residuals'})
 
 \medskip
 \texttt{\color{Orchid} conditional\_effects(model)} gives useful conditional effect plots on either the response or the link scale
@@ -250,13 +250,13 @@ For most \texttt{mvgam} models, functions from the \texttt{marginaleffects} pack
 {{\fontsize{11}{11} \selectfont \color{mygray} How good are model predictions?}}
 
 \medskip
-Use \texttt{\color{Orchid} predict(model)} with \texttt{\color{Orchid} newdata} to make predictions for inference purposes. Change the \texttt{\color{Orchid} type} argument for different types of predictions (link scale, expectation or response scale). Or use the \texttt{brms} package equivalents \texttt{\color{Orchid} posterior\_predict(model)}, \texttt{\color{Orchid} posterior\_linpred(model)} or \texttt{\color{Orchid} posterior\_epred(model)}. If generating forecasts for future timepoints, use the \texttt{\color{Orchid} forecast()} function (see below)
+Use \texttt{\color{Orchid} predict(model)} with \texttt{\color{Orchid} newdata} to make predictions for inference purposes. Change the \texttt{\color{Orchid} type} argument for different types of predictions (link scale, expectation or response scale). Or use the \texttt{brms} package equivalents \texttt{\color{Orchid} posterior\_predict(model)}, \texttt{\color{Orchid} posterior\_linpred(model)} or \texttt{\color{Orchid} posterior\_epred(model)}, which omit the fitted trend unless \texttt{\color{Orchid} incl\_autocor = TRUE}. If generating forecasts for future timepoints, use the \texttt{\color{Orchid} forecast()} function (see below)
 
 \medskip
-Use \texttt{\color{Orchid} ppc(model)} and \texttt{\color{Orchid} pp\_check(model)} to compute conditional or unconditional posterior predictive checks and compare model predictions against the true observations
+Use \texttt{\color{Orchid} pp\_check(model)} to compute posterior predictive checks and compare model predictions against the true observations
 
 \medskip
-Extract in-sample posterior predictions with \texttt{\color{Orchid} hindcast(model)}. If validation data exist, generate forecast predictions with \texttt{\color{Orchid} forecast(model, newdata = newdata)}. As above, change the \texttt{\color{Orchid} type} argument for predictions on different scales. Both functions generate an object of class \texttt{mvgam\_forecast}, that can be plotted with an \texttt{S3} \texttt{\color{Orchid} plot()} function. See \href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{the forecasting vignette} for more details about how to produce forecasts.
+Extract in-sample posterior predictions with \texttt{\color{Orchid} hindcast(model)}. If validation data exist, generate forecast predictions with \texttt{\color{Orchid} forecast(model, newdata = newdata)}. As above, change the \texttt{\color{Orchid} type} argument for predictions on different scales. Both functions generate an object of class \texttt{mvgam\_forecast}, that can be plotted with an \texttt{S3} \texttt{\color{Orchid} plot()} function. See \href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{the forecasting vignette} for more details about how to produce forecasts.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}
@@ -273,9 +273,9 @@ Compute probabilistic forecast scores using proper scoring rules with the \textt
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{fc} \hlkwb{<-} \hlkwd{forecast}\hlstd{(model,} \hlkwc{newdata} \hlstd{= simdat}\hlopt{$}\hlstd{data_test,} \hlkwc{type} \hlstd{=} \hlstr{'response'}\hlstd{)}
-\hlstd{crps} \hlkwb{<-} \hlkwd{score}\hlstd{(fc,} \hlkwc{score} \hlstd{=} \hlstr{'crps'}\hlstd{)}
-\hlstd{dplyr}\hlopt{::}\hlkwd{glimpse}\hlstd{(crps}\hlopt{$}\hlstd{series_1)}
+\hldef{fc} \hlkwb{<-} \hlkwd{forecast}\hldef{(model,} \hlkwc{newdata} \hldef{= simdat}\hlopt{$}\hldef{data_test,} \hlkwc{type} \hldef{=} \hlsng{'response'}\hldef{)}
+\hldef{crps} \hlkwb{<-} \hlkwd{score}\hldef{(fc,} \hlkwc{score} \hldef{=} \hlsng{'crps'}\hldef{)}
+\hldef{dplyr}\hlopt{::}\hlkwd{glimpse}\hldef{(crps}\hlopt{$}\hldef{series_1)}
 \end{alltt}
 \end{kframe}
 \end{knitrout}
@@ -283,10 +283,10 @@ Compute probabilistic forecast scores using proper scoring rules with the \textt
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
 \begin{verbatim}
-## Rows: 25
+## Rows: 20
 ## Columns: 5
-## $ score          <dbl> 0.2315, 0.3944, 0.7198, 0~
-## $ in_interval    <dbl> 1, 1, 1, 1, 1, 1, 1, 0, 1~
+## $ score          <dbl> 1.120, 1.024, 1.795, 2.88~
+## $ in_interval    <dbl> 1, 1, 1, 1, 1, 1, 0, 1, 1~
 ## $ interval_width <dbl> 0.9, 0.9, 0.9, 0.9, 0.9, ~
 ## $ eval_horizon   <int> 1, 2, 3, 4, 5, 6, 7, 8, 9~
 ## $ score_type     <chr> "crps", "crps", "crps", "~
@@ -297,12 +297,12 @@ Compute probabilistic forecast scores using proper scoring rules with the \textt
 Available proper scoring rules in the \texttt{\color{Orchid} score()} function include:
 \begin{itemize}
 
-\item \texttt{\color{Orchid} type = 'crps'}: Continuous Rank Probability Score (univariate)
-\item \texttt{\color{Orchid} type = 'drps'}: Discrete Rank Probability Score (univariate)
-\item \texttt{\color{Orchid} type = 'elpd'}: Expected Log Predictive Density (univariate)
-\item \texttt{\color{Orchid} type = 'sis'}: Scaled Interval Score (univariate)
-\item \texttt{\color{Orchid} type = 'energy'}: Energy Score (multivariate)
-\item \texttt{\color{Orchid} type = 'variogram'}: Variogram Score (multivariate)
+\item \texttt{\color{Orchid} score = 'crps'}: Continuous Rank Probability Score (univariate)
+\item \texttt{\color{Orchid} score = 'drps'}: Discrete Rank Probability Score (univariate)
+\item \texttt{\color{Orchid} score = 'logs'}: Logarithmic Score (univariate)
+\item \texttt{\color{Orchid} score = 'sis'}: Scaled Interval Score (univariate)
+\item \texttt{\color{Orchid} score = 'energy'}: Energy Score (multivariate)
+\item \texttt{\color{Orchid} score = 'variogram'}: Variogram Score (multivariate)
 \end{itemize}
 
 \medskip

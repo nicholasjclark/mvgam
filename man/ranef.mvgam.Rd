@@ -24,9 +24,8 @@ coefficient's draws. \code{FALSE} returns the draws.}
 deviation for summaries. If \code{TRUE}, uses median and median absolute
 deviation (MAD).}
 
-\item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+\item{probs}{Two probabilities for the lower and upper bounds of the
+credible interval. Default \code{c(0.025, 0.975)}, a 95\% interval.}
 
 \item{pars}{Optional character vector of coefficient names, such as
 \code{"Intercept"}. \code{NULL} (the default) keeps every coefficient.}
@@ -61,7 +60,7 @@ draws.
 set.seed(14)
 simdat <- sim_mvgam(family = poisson(), n_series = 4L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x) + (1 | series),
+mod <- mvgam(y ~ s(x, k = 5) + (1 | series),
              trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)

@@ -1,7 +1,10 @@
 #' Calculate latent VAR forecast error variance decompositions
 #'
 #' Compute forecast error variance decompositions from
-#' \code{mvgam} models with Vector Autoregressive dynamics
+#' \code{mvgam} models with Vector Autoregressive dynamics. A
+#' decomposition gives the share of each series' forecast uncertainty
+#' at horizons up to `h` that comes from the innovations of each
+#' series.
 #'
 #' @name fevd.mvgam
 #'

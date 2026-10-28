@@ -15,6 +15,10 @@ mvgam_article <- function(name, text) {
     "hierarchical_var", "idm", "jsdgam", "mvbf", "nmix", "var"
   ))
   checkmate::assert_string(text, min.chars = 1L)
-  paste0("[", text, "](https://nicholasjclark.github.io/mvgam/articles/",
+  # The 2.0 site builds into /dev/ and the CRAN 1.x site holds the root.
+  # The address moves to the root when 2.0 reaches CRAN, with the
+  # site's development mode.
+  paste0("[", text,
+         "](https://nicholasjclark.github.io/mvgam/dev/articles/",
          name, ".html)")
 }

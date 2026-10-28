@@ -16,7 +16,8 @@
 \item{recompile}{Logical. Bridge sampling evaluates the density
 through a compiled rstan model. A fit without one, sampled by
 cmdstanr or loaded with \code{\link[=readRDS]{readRDS()}} in a new session, has one
-compiled, with its draws kept. \code{TRUE} compiles one for any fit. Defaults to \code{FALSE}.}
+compiled, with its draws kept. \code{TRUE} compiles one for any fit.
+Defaults to \code{FALSE}.}
 
 \item{...}{Arguments of \code{bridgesampling::bridge_sampler()}, such as
 \code{method}, \code{repetitions} or \code{cores}.}
@@ -94,7 +95,7 @@ constants. \emph{Journal of Statistical Software}. 92(10).
 }
 \seealso{
 \code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}}. The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by their forecasts.
 
 Other model comparison: 

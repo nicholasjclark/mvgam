@@ -22,22 +22,25 @@
 \item{object}{A fitted \link[=mvgam]{mvgam} object.}
 
 \item{newdata}{Optional \code{data.frame} with the columns of the
-training data, holding the time and series cells to forecast.
-Rows with times beyond the training grid set the horizon. When
-\code{NULL}, \code{forecast()} uses the held-out data given to
+training data, one row per series and future time to forecast.
+When \code{NULL}, \code{forecast()} uses the held-out data given to
 \code{mvgam(newdata = )}. A fit without held-out data needs \code{newdata}.
 
-Five trends step once per time point: AR(), RW(), VAR(), LLT()
-and PW(). Their forecast times must continue the training series
-at its own spacing, without a gap. After training ends at
-\code{t = 30}, a request for \code{t = 41:42} is refused: two rows would
-report a two-step spread for a twelve-step horizon. Supply every
-intervening time, whether or not the response is observed there.
-\code{CAR()} takes the elapsed gap into its kernel. Each series may
+The trend decides which future times are allowed:
+\itemize{
+\item \code{AR()}, \code{RW()}, \code{VAR()}, \code{LLT()} and \code{PW()} step once per
+time point. Their forecast times must continue each series at
+its own spacing, with no gap. After training ends at \code{t = 30},
+rows for \code{t = 41:42} alone are refused. The trend would step
+once and twice, though those times are 11 and 12 steps past the
+end of training. Supply every time in between, with or without
+a response.
+\item \code{CAR()} allows for the gap between times. Each series may
 have its own forecast times, all after the last fitted time.
-\code{ZMVN()} has no temporal dynamics and takes any later times.
-\code{ZMVN()} and \code{PW()} need one set of forecast times shared by
-every series.}
+\item \code{ZMVN()} has no time dynamics and takes any later times.
+}
+\code{ZMVN()} and \code{PW()} need the same forecast times for every
+series.}
 
 \item{...}{Unused. Anything passed here is refused.}
 
@@ -57,8 +60,7 @@ Several names give the sum of their components. \code{\link[=LLT]{LLT()}} has
 step. A seasonal \code{\link[=LLT]{LLT()}} adds \code{"season"}. \code{"predictor"} holds the
 effects of the trend formula's covariates. \code{c("level", "predictor")} gives the level with those effects. A factor model
 projects each component through its loadings, as it projects the
-trend. The result is an ordinary \link[=mvgam]{mvgam_forecast-class}
-with the components in its \code{component} slot.}
+trend.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}
@@ -67,24 +69,23 @@ use. NULL (default) uses all available draws.}
 draw indices to use. NULL (default) uses all draws (subject to
 \code{ndraws}).}
 
-\item{coef_uncertainty}{Logical. When \code{FALSE}, every forecast
-draw uses the first of the draws \code{ndraws} or \code{draw_ids} select
-for every coefficient in the
-observation and trend formulas: population-level effects, smooth
-bases, random effect levels and Hilbert-space \code{gp(x, k)} bases.
-Defaults to \code{TRUE}.}
+\item{coef_uncertainty}{Logical, \code{TRUE} by default. \code{FALSE} holds
+the coefficients of the observation and trend formulas at one
+posterior draw, the first that \code{ndraws} or \code{draw_ids} selects. That
+includes smooth, random-effect and Hilbert-space \code{gp(x, k)}
+coefficients. The forecast then leaves out their uncertainty.
+Turning off one source of uncertainty at a time shows how much each
+contributes to a forecast.}
 
-\item{trend_uncertainty}{Logical. When \code{FALSE}, every forecast
-draw uses the first of the selected draws for the trend dynamics
-parameters (\code{sigma}, AR, MA and VAR coefficients), the last
-fitted state and the trend formula's predictor \code{mu_trend}. Each
-draw still takes fresh innovations. The spread then shows
-innovation noise alone. Defaults to \code{TRUE}.}
+\item{trend_uncertainty}{Logical, \code{TRUE} by default. \code{FALSE} holds
+the parameters of the trend dynamics (\code{sigma}, AR, MA and VAR
+coefficients), the last fitted state and the trend formula's
+predictor at that same draw. Each draw still takes new
+innovations. The spread then shows innovation noise alone.}
 
-\item{obs_uncertainty}{Logical. When \code{FALSE}, skips
-observation-family sampling for \code{type = "response"},
-returning the family mean instead.
-Defaults to \code{TRUE}.}
+\item{obs_uncertainty}{Logical, \code{TRUE} by default. \code{FALSE} returns
+the family's mean under \code{type = "response"}, in place of a sampled
+observation.}
 
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
@@ -93,7 +94,8 @@ responses.}
 \value{
 An object of class \link[=mvgam]{mvgam_forecast-class}.
 Hindcasts and forecasts are returned as named lists of
-\verb{[ndraws, n_times]} matrices, one per series.
+\verb{[ndraws, n_times]} matrices, one per series. A forecast of state
+components names them in its \code{component} slot.
 }
 \description{
 Posterior forecasts at future time points, with posterior hindcasts
@@ -109,7 +111,7 @@ simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      proportional_train = 0.75)
 
 mod <- mvgam(
-  y ~ s(x),
+  y ~ s(x, k = 5),
   trend_formula = ~ AR(p = 1),
   data    = simdat$data_train,
   newdata = simdat$data_test,
@@ -135,10 +137,10 @@ head(score(fc, score = "crps")[[1]])
 \seealso{
 \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns the fitted latent states.
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} and \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} predict
-by integrating over the trend's stochastic dynamics. \code{forecast()}
+from the covariate part of the model. \code{forecast()}
 extrapolates the fitted latent state. \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}
 scores a forecast against held-out data. The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 scores, compares and combines the forecasts of three models of
 rodent counts.
 

@@ -65,6 +65,11 @@ target="_blank"><code>rstan</code></a> or
 <a href="https://mc-stan.org/cmdstanr/"
 target="_blank"><code>cmdstanr</code></a>.
 
+## Cheatsheet
+
+[![`mvgam` usage
+cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+
 ## A state-space model of rodent captures
 
 The `portal_data` from

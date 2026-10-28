@@ -190,41 +190,46 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if `TRUE`, the trend adds a sampled
-#'   innovation to its deterministic submodel. Each posterior draw
-#'   takes one innovation from the distribution the trend settles
-#'   into. An autoregressive trend settles into its stationary
-#'   distribution: an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)}. The
-#'   Jensen correction on a log link is
-#'   \eqn{\sigma^2/(2(1-\rho^2))}. A random walk lacks a stationary
-#'   distribution and a `ZMVN()` trend lacks dynamics. Both draw their
-#'   innovations directly. `CAR()` uses one stationary covariance at
-#'   every time of an irregular grid and draws from it. If `FALSE`,
-#'   the default, the trend contributes its deterministic submodel
-#'   alone, at its own per-draw values. The argument applies under
-#'   `incl_autocor = FALSE`. Conditioning on the fitted state already
-#'   fixes every innovation.
+#' @param process_error Logical. `FALSE`, the default, leaves the
+#'   trend's innovations out of the prediction. `TRUE` adds a random
+#'   deviation at each time and series, drawn anew for every posterior
+#'   draw from the spread the trend shows over the long run. For an
+#'   AR(1) trend with innovation SD \eqn{\sigma} and coefficient
+#'   \eqn{\rho} that spread has variance \eqn{\sigma^2/(1-\rho^2)}. On a
+#'   log link the deviations raise the average prediction by the factor
+#'   \eqn{\exp(\sigma^2/(2(1-\rho^2)))}. A random walk has no long-run
+#'   spread. A `ZMVN()` trend has no dynamics. These two draw from the
+#'   innovation covariance itself. `CAR()` draws from one long-run
+#'   covariance at every time of an irregular grid. The argument applies
+#'   under `incl_autocor = FALSE`. The fitted state already holds every
+#'   innovation.
 #'
-#'   Each call draws new innovations. Two calls on one fit give different
-#'   results. Set a seed to reproduce a result.
-#' @param incl_autocor Logical; which prediction surface the trend
-#'   contribution comes from. `FALSE`, the default, omits the fitted
-#'   `trend[t, s]` and uses the two submodels' covariate structure. The
-#'   effect is the same at the first time point as at the fiftieth. `TRUE`
-#'   uses the latent state the model inferred at each time. That is the
-#'   quantity [hindcast()] returns. The ELPD is computed from it.
-#'   [loo_R2.mvgam()] and [bayes_R2.mvgam()] request this surface. An R^2
-#'   describes the observed series. A row whose time falls outside the
-#'   fitted grid is refused under `TRUE`. [forecast.mvgam()] predicts
-#'   those times. An in-sample interval under `TRUE` conditions on
-#'   states estimated from the same observations. It covers them more
-#'   often than its nominal level. Calibration is judged out of sample,
-#'   with [forecast.mvgam()] or [lfo_cv()].
+#'   Each call draws new innovations. Two calls on one fit give
+#'   different results. Set a seed to reproduce a result.
+#' @param incl_autocor Logical. Chooses which version of the trend each
+#'   prediction uses. `FALSE`, the default, uses the covariate part of
+#'   the model: the effects in the observation formula and the trend
+#'   formula, without the trend's innovations. A prediction then depends
+#'   on the covariates alone. It is the same at the first time point as
+#'   at the fiftieth. Questions about covariate effects use this
+#'   version. `TRUE` uses the fitted state, the value the trend took at
+#'   each observed time as [hindcast()] returns it. The section 'Which
+#'   prediction function?' of [predict.mvgam()] compares the
+#'   functions.
+#'
+#'   An ELPD or an \eqn{R^2} describes the observed series. [log_lik()],
+#'   [loo_R2.mvgam()] and [bayes_R2.mvgam()] use `TRUE` for that reason.
+#'   A time outside the training data is refused under `TRUE`.
+#'   [forecast.mvgam()] predicts those times. An in-sample interval
+#'   under `TRUE` conditions on states estimated from the same
+#'   observations. It covers them more often than its nominal level.
+#'   Calibration is judged out of sample, with [forecast.mvgam()] or
+#'   [lfo_cv()].
 #'
 #'   The default suits a model whose covariates explain most of the
 #'   signal. When most of the series-level variation lies in the trend,
 #'   as in a fit with few covariates and a strong autoregressive process,
-#'   this surface has little to say. [hindcast.mvgam()] and
+#'   the covariate part has little to say. [hindcast.mvgam()] and
 #'   [forecast.mvgam()] are more informative there.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
@@ -240,8 +245,8 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   it has no latent state to propagate. Predict for levels the fit
 #'   knows, or refit with the new levels included.
 #' @param sample_new_levels Character; accepted for brms
-#'   compatibility and not used, since new levels are refused. See
-#'   `allow_new_levels`.
+#'   compatibility. It has no effect, because new levels are refused.
+#'   See `allow_new_levels`.
 #' @param resp Character specifying which response variable for
 #'   multivariate models. NULL (default) returns predictions for all
 #'   responses.
@@ -265,6 +270,8 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' or occupancy by that visit's detection probability. A composition
 #' family normalises its means across the components of each unit.
 #'
+#' @template prediction-trend-state
+#'
 #' @seealso [posterior_linpred.mvgam()] returns the predictor on the
 #'   link scale. [hindcast.mvgam()] and [forecast.mvgam()] take the
 #'   trend from its fitted state, in and beyond the training times. The
@@ -276,7 +283,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)
 #'
@@ -284,8 +291,8 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' ep <- posterior_epred(mod)
 #' dim(ep)
 #'
-#' # The covariate surface and the surface that follows the fitted
-#' # trend, against the observed counts
+#' # Expected counts from the covariate part and from the fitted state,
+#' # against the observed counts
 #' ep_state <- posterior_epred(mod, incl_autocor = TRUE)
 #' library(ggplot2)
 #' ggplot(simdat$data_train, aes(time, y)) +
@@ -296,8 +303,8 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   labs(y = "Count") +
 #'   mvgam_theme()
 #'
-#' # Sampling trend innovations raises a log-link mean by the Jensen
-#' # correction
+#' # Sampling the trend's innovations raises the average of a log-link
+#' # prediction
 #' c(fixed = mean(ep),
 #'   innovations = mean(posterior_epred(mod, process_error = TRUE)))
 #'

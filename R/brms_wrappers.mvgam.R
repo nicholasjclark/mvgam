@@ -30,7 +30,7 @@
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)
 #'
@@ -84,7 +84,7 @@ rstantools::posterior_interval
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)
 #'
@@ -241,7 +241,8 @@ hypothesis.mvgam <- function(x, hypothesis, class = "b", group = "",
 #' @param recompile Logical. Bridge sampling evaluates the density
 #'   through a compiled rstan model. A fit without one, sampled by
 #'   cmdstanr or loaded with [readRDS()] in a new session, has one
-#'   compiled, with its draws kept. `TRUE` compiles one for any fit. Defaults to `FALSE`.
+#'   compiled, with its draws kept. `TRUE` compiles one for any fit.
+#'   Defaults to `FALSE`.
 #' @param x1,x2 `mvgam` fits, or `bridge` objects returned by
 #'   `bridge_sampler()`, to compare.
 #' @param log Logical. `TRUE` returns the log Bayes factor.
@@ -318,7 +319,8 @@ bridge_sampler.mvgam <- function(samples, recompile = FALSE, ...) {
   }
   # bridgesampling evaluates the density through the fit's compiled
   # rstan model. A cmdstanr fit has none, nor does one loaded with
-  # `readRDS()` in a new session. As in brms, one is compiled and the draws are kept.
+  # `readRDS()` in a new session. As in brms, one is compiled and the
+  # draws are kept.
   fit <- samples$fit
   if (recompile || !has_rstan_model(fit)) {
     fit <- with_rstan_model(fit, samples$stancode, samples$standata)
@@ -458,7 +460,8 @@ brms::ngrps
 #' The errors are those [residuals.mvgam()] returns with
 #' `type = "ordinary"`. In sample, each prediction carries the latent
 #' trend state the model inferred at that time. A prediction for
-#' `newdata` integrates over the trend dynamics.
+#' `newdata` uses the covariate part of the model, without the trend's
+#' innovations.
 #'
 #' @author Nicholas J Clark
 #'
@@ -470,7 +473,7 @@ brms::ngrps
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)
 #'
@@ -609,13 +612,28 @@ prediction_frame <- function(object, newdata = NULL) {
 #' Sampler control settings of a fitted mvgam model
 #'
 #' The NUTS settings the model was sampled with, such as
-#' `adapt_delta`, `max_treedepth` and `stepsize`.
+#' `adapt_delta`, `max_treedepth` and `stepsize`. A fit that reported
+#' divergent transitions can be refitted with a higher `adapt_delta`,
+#' such as `update(fit, control = list(adapt_delta = 0.95))`. The
+#' sampler then takes smaller steps.
 #'
 #' @param x A fitted `mvgam` model.
 #' @param ... Unused. Anything passed here is refused.
 #' @return A named list, as [brms::control_params()] returns for a
 #'   `brmsfit`. A fit with no NUTS settings, such as a variational
 #'   fit, gives an empty list.
+#' @seealso [mvgam_diagnostics] for the divergence counts,
+#'   [summary.mvgam()] for convergence checks.
+#' @examples
+#' \dontrun{
+#' set.seed(1)
+#' simdat <- sim_mvgam(n_series = 1L, n_timepoints = 60L,
+#'                     trend_model = AR())
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
+#'              data = simdat$data_train, family = poisson(),
+#'              chains = 2, silent = 2)
+#' control_params(mod)$adapt_delta
+#' }
 #' @method control_params mvgam
 #' @export
 control_params.mvgam <- function(x, ...) {

@@ -77,14 +77,15 @@ it.
 }
 }
 \description{
-Estimates the expected log predictive density of held-out groups of
-rows. A fold that importance sampling approximates well takes the
+Measures how well a model predicts groups of data it was not fitted
+to, such as sites or species. Each fold of groups is held out in
+turn and scored by its expected log predictive density (ELPD).
+Higher is better. A fold that importance sampling approximates well takes the
 PSIS estimate of \code{\link[loo:loo]{loo::loo()}} on the fold's summed log likelihood.
 The rest are refitted without the fold, as \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} refits
 the time blocks it cannot approximate. Three settings cover the
 range:
-}
-\details{
+
 \itemize{
 \item \code{pareto_k_threshold = Inf} refits nothing. Pareto-k
 warnings mark folds the approximation fits poorly.
@@ -123,22 +124,22 @@ plot(k)
 
 }
 \references{
-Burkner P-C, Gabry J, Vehtari A (2020). Approximate
+Burkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
 leave-future-out cross-validation for Bayesian time series
 models. \emph{Journal of Statistical Computation and Simulation},
-90(14), 2499--2523. \doi{10.1080/00949655.2020.1783262}.
+90(14):2499-2523. \doi{10.1080/00949655.2020.1783262}
 
-Vehtari A, Gelman A, Gabry J (2017). Practical Bayesian model
-evaluation using leave-one-out cross-validation and WAIC.
-\emph{Statistics and Computing}, 27, 1413--1432.
-\doi{10.1007/s11222-016-9696-4}.
+Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical Bayesian
+model evaluation using leave-one-out cross-validation and WAIC.
+\emph{Statistics and Computing}, 27:1413-1432.
+\doi{10.1007/s11222-016-9696-4}
 }
 \seealso{
 \code{\link[=loo.mvgam]{loo.mvgam()}} approximates leave-one-out cross-validation.
 \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} scores forecasts from rolling origins.
 \code{\link[=summary.mvgam_kfold]{summary.mvgam_kfold()}} and \code{\link[=plot.mvgam_kfold]{plot.mvgam_kfold()}} report each group.
 The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by cross-validation.
 
 Other model comparison: 

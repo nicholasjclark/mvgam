@@ -54,7 +54,10 @@ the quantities computed, with references.
 }
 \description{
 Compute forecast error variance decompositions from
-\code{mvgam} models with Vector Autoregressive dynamics
+\code{mvgam} models with Vector Autoregressive dynamics. A
+decomposition gives the share of each series' forecast uncertainty
+at horizons up to \code{h} that comes from the innovations of each
+series.
 }
 \examples{
 \dontrun{
@@ -81,7 +84,7 @@ Analysis. Springer, Berlin. \doi{10.1007/978-3-540-27752-1}
 }
 \seealso{
 \code{\link[=irf]{irf()}} and \code{\link[=stability]{stability()}} summarise the same VAR dynamics.
-The \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{VAR article} runs \code{fevd()} on a
+The \href{https://nicholasjclark.github.io/mvgam/dev/articles/var.html}{VAR article} runs \code{fevd()} on a
 plankton community.
 
 Other latent dynamics: 

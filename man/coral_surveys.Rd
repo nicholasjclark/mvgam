@@ -52,18 +52,25 @@ True generative components:
 a thin-plate basis.
 \item Observation noise \code{sigma_obs = 0.3}.
 }
+}
+\examples{
+data(coral_surveys)
+mvgam_data(coral_surveys, family = gaussian())
 
-Recommended fit (state-space; SST on the observation equation,
-CAR(1) on the latent state):
-
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(
+\dontrun{
+# A model with the structure the data were simulated from
+mod <- mvgam(
   formula = y ~ s(sst, k = 8),
   trend_formula = ~ CAR(),
   data = coral_surveys,
-  family = gaussian()
+  family = gaussian(),
+  chains = 2, silent = 2
 )
-}\if{html}{\out{</div>}}
-
-Built by \code{data-raw/build_coral_surveys.R}.
+summary(mod)
+}
+}
+\seealso{
+\code{\link[=CAR]{CAR()}} for the trend, \code{\link[=AR]{AR()}} for evenly spaced surveys,
+\code{\link[=mvgam_data]{mvgam_data()}} to check the data.
 }
 \keyword{datasets}

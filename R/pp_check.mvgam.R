@@ -28,6 +28,15 @@
 #'   defaults to `"dens_overlay"`. Multi-response families take the
 #'   defaults under "Multi-response families".
 #'
+#' @param ndraws Number of posterior draws to plot. `NULL` (the default)
+#'   takes the default of the type, listed under Details.
+#'
+#' @param draw_ids Optional integer vector naming the posterior draws to
+#'   plot. `NULL` (the default) lets `ndraws` choose them.
+#'
+#' @param prefix `"ppc"` (the default) plots the observed data with the
+#'   replicates. `"ppd"` plots the replicates alone.
+#'
 #' @param newdata Optional data frame of the variables in the model.
 #'   `NULL` (the default) checks the training data. The residual types
 #'   describe the training data and refuse `newdata`.
@@ -60,10 +69,9 @@
 #' state the model inferred at each time, as [residuals.mvgam()] and
 #' [hindcast.mvgam()] use. The check then compares the fitted
 #' trajectory with the series that produced it. Replicates of `newdata`
-#' take the covariate surface of [posterior_predict.mvgam()]. Passing
-#' `incl_autocor` sets the surface explicitly. The `loo_*` types always
-#' take the fitted state, which is the state their importance weights
-#' come from.
+#' use the covariate part of the model, as [posterior_predict.mvgam()]
+#' does. Passing `incl_autocor` chooses between the two. The `loo_*`
+#' types use the fitted state. Their importance weights come from it.
 #'
 #' Overlay types default to 10 draws. Interval, ribbon and statistic
 #' types use every draw. The residual histograms and ribbons default to
@@ -138,13 +146,15 @@
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                     n_timepoints = 120L, trend_model = AR())
-#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#' mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
 #'              data = simdat$data_train, family = poisson(),
 #'              chains = 2, silent = 2)
 #'
-#' # Observed counts against the predictive distribution. A bar
-#' # hanging below zero marks a count the model under-predicts
-#' pp_check(mod, type = "rootogram")
+#' # A hanging rootogram, on the square-root scale. Each bar shows how
+#' # often a count was observed. It hangs from the curve of its expected
+#' # frequency under the model. A bar ending below zero marks a count the
+#' # model under-predicts
+#' pp_check(mod, type = "rootogram", style = "hanging")
 #'
 #' # Randomised quantile residuals over time. A trend the model missed
 #' # shows as serial structure
@@ -204,6 +214,15 @@ pp_check.mvgam <- function(
     stop(insight::format_error(c(
       "The residual types describe the training data.",
       i = "Drop 'newdata' from this call."
+    )), call. = FALSE)
+  }
+  # A `loo_*` check weights its replicates by importance weights from
+  # the fitted latent state. Replicates of the covariate part would not
+  # match those weights.
+  if (startsWith(type, "loo_") && isFALSE(dots$incl_autocor)) {
+    stop(insight::format_error(c(
+      "'incl_autocor = FALSE' is not supported for the 'loo_*' types.",
+      i = "The 'loo_*' importance weights come from the fitted latent state."
     )), call. = FALSE)
   }
   if (!is.null(series)) {

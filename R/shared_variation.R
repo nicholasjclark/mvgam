@@ -35,6 +35,8 @@
 #' variance of the latent states. Compare its pattern with `Phi`.
 #'
 #' @inheritParams predict.mvgam
+#' @param probs Two probabilities for the lower and upper bounds of the
+#'   credible interval. Default `c(0.025, 0.975)`, a 95% interval.
 #' @param object A fitted `mvgam` object whose trend model
 #'   includes latent factors (`n_lv < n_series`).
 #' @param ... Unused. Anything passed here is refused.

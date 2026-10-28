@@ -27,9 +27,9 @@
 #'     `"poisson_binomial"`, `"royle_nichols"` or
 #'     `"poisson_poisson"`; `multi_season` \cr
 #'   [occ()] \tab logit (state and detection) \tab `multi_season` \cr
-#'   [diri()] \tab identity \tab none \cr
-#'   [multi()] \tab identity \tab none \cr
-#'   [categ()] \tab identity \tab none \cr
+#'   [diri()] \tab softmax over each unit's categories \tab none \cr
+#'   [multi()] \tab softmax over each unit's categories \tab none \cr
+#'   [categ()] \tab softmax over each unit's categories \tab none \cr
 #'   [mvn()] \tab identity \tab none \cr
 #'   [mvt()] \tab identity \tab none
 #' }
@@ -83,12 +83,14 @@
 #' @section Link functions:
 #' A \pkg{brms} or \pkg{stats} family takes a `link` argument as
 #' usual. `poisson(link = "sqrt")` and `Gamma(link = "log")` both
-#' work. mvgam writes the Stan code for the families in the table
-#' against one scale. Those families fix their link.
+#' work. The families mvgam adds each have the one link the table
+#' gives.
 #'
 #' @section Data layout:
-#' [nmix()] and [occ()] are closure-unit families. They expect several
-#' rows per closure unit, one per visit. They model the state and the
+#' [nmix()] and [occ()] are closure-unit families. A closure unit is a
+#' site, or a site in one season, whose true occupancy or abundance
+#' holds across its repeat visits. The families expect several rows
+#' per closure unit, one per visit. They model the state and the
 #' detection process with separate linear predictors. `bf()` supplies
 #' the second, as in `bf(y ~ elev, p ~ tod)`.
 #' [sim_closure_unit_data()] simulates the layout they take.

@@ -26,7 +26,9 @@
 \method{as.data.frame}{mvgam_conditional_effects}(x, row.names = NULL, optional = FALSE, ...)
 }
 \arguments{
-\item{x}{An object of class \code{mvgam_conditional_effects}.}
+\item{x}{A fitted \code{mvgam} object. The \code{plot()}, \code{print()} and
+\code{as.data.frame()} methods take the \code{mvgam_conditional_effects}
+object that \code{conditional_effects()} returns.}
 
 \item{effects}{Optional character vector of effects to plot. If
 \code{NULL} (the default), all main effects and interactions in the
@@ -52,10 +54,10 @@ axes, on the same scales the points overlay applies to.}
 
 \item{process_error}{Logical. Passed to \code{plot_predictions()} /
 \code{get_predict.mvgam}. With the default \code{FALSE} the trend
-contributes its deterministic submodel. The panel then shows the
-covariate effect with the latent process held out. \code{TRUE}
-integrates over the trend's dynamics, which widens the band by
-the latent state's own spread.}
+contributes its covariate part. The panel then shows the
+covariate effect with the latent process held out. \code{TRUE} adds
+innovations drawn from the trend's long-run spread. The band then
+widens by that spread.}
 
 \item{series}{Which series the panels show. \code{NULL} (the default)
 draws one panel per effect at the reference series, as brms does
@@ -69,7 +71,10 @@ the prediction grid to its observations.}
 multivariate models. NULL (default) returns predictions for all
 responses.}
 
-\item{...}{Ignored.}
+\item{...}{For \code{conditional_effects()}, further arguments of
+\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}}. A name that function does
+not take is refused. The \code{plot()} and \code{print()} methods ignore
+them. \code{as.data.frame()} refuses them.}
 
 \item{plot}{Logical. If \code{TRUE} (default), draws each plot;
 otherwise returns the list invisibly so callers can post-process.}
@@ -83,39 +88,36 @@ An object of class \code{mvgam_conditional_effects}: a named
 list with one \code{ggplot} per effect, drawn by the \code{plot} and
 \code{print} methods.
 
-Invisibly, a flat named list of ggplot objects, as
+The \code{plot()} method returns, invisibly, a flat named list of
+ggplot objects, as
 \code{brms::conditional_effects()} plots return one. A multivariate
 fit's panels are named \verb{<response>.<effect>}, response by
 response.
 }
 \description{
-Plot the conditional effects of one or more numeric / categorical
-predictors in fitted \code{mvgam} models, including up-to-three-way
-interactions. A thin wrapper around
-\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}} that auto-enumerates the
-model's term labels (across both observation and trend submodels)
-and produces one ggplot per term.
+Plots how the prediction changes with each predictor, holding the
+other predictors at typical values. Predictors of the observation
+and trend formulas both count, as do interactions of up to three
+terms. Each effect gets one panel, drawn by
+\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}}.
 
-\code{as.data.frame.mvgam_conditional_effects()} returns the underlying
-prediction grid as a long-format \code{data.frame} (one row per grid
-point, per effect, per response). Columns are \code{resp} (present only
-when the fit is multivariate), \code{effect} (the primary conditioning
-variable name), \code{estimate__}, \code{lower__}, \code{upper__}, followed by
-whichever additional grid columns marginaleffects populated. The
-three estimate columns take brms's names, as in the frame
-\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}} returns.
-
-Use this to reach the raw numbers when you want to build a custom
-plot, overlay several fits, or compare against a known truth. It
-removes the need to know whether the fit was univariate or
-multivariate before extracting.
+\code{as.data.frame()} returns the numbers the panels plot, one row per
+grid point of each effect. Use it to build a custom plot, overlay
+several fits or compare with a known truth. The columns are:
+\itemize{
+\item \code{resp}, the response, for a multivariate fit alone.
+\item \code{effect}, the predictor the panel varies.
+\item \code{estimate__}, \code{lower__} and \code{upper__}, the prediction and its
+interval, named as in brms and \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.
+\item The other grid columns that marginaleffects filled.
+}
 }
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
@@ -146,7 +148,7 @@ values as a data frame. \code{\link[marginaleffects:slopes]{marginaleffects::avg
 \code{\link[marginaleffects:comparisons]{marginaleffects::avg_comparisons()}} summarise effects as numbers.
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} computes the expected values the panels
 draw. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} checks the fit against the data. The
-\href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{overview vignette} interprets
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview vignette} interprets
 effects in both formulas.
 
 Other predictions: 

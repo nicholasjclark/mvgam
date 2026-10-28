@@ -21,7 +21,10 @@
 \code{"response"} or \code{"expected"}. The held-out observations are then
 on the scale of the forecasts.}
 
-\item{score}{Character; one of the names above.}
+\item{score}{Character; one of the names under 'Available scores'.
+\code{"drps"} suits counts, \code{"crps"} continuous data and \code{"brier"}
+binary data. \code{"energy"} and \code{"variogram"} score several series
+jointly. Lower scores are better.}
 
 \item{interval_width}{Width of the central interval that sets the
 per-series \code{in_interval} indicator and the \code{"sis"} penalty. The
@@ -95,7 +98,7 @@ jointly (Scheuerer and Hamill 2015).}
 set.seed(11)
 simdat <- sim_mvgam(family = poisson(), n_series = 2L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x),
+mod <- mvgam(y ~ s(x, k = 5),
              trend_formula = ~ AR(p = 1),
              data = simdat$data_train,
              family = poisson(),
@@ -125,17 +128,18 @@ head(score(fc, score = "energy")$all_series)
 Gneiting, T. and Raftery, A. E. (2007). Strictly
 Proper Scoring Rules, Prediction, and Estimation.
 \emph{Journal of the American Statistical Association},
-102(477), 359-378.
+102(477), 359-378. \doi{10.1198/016214506000001437}
 
 Scheuerer, M. and Hamill, T. M. (2015). Variogram-based proper
 scoring rules for probabilistic forecasts of multivariate
 quantities. \emph{Monthly Weather Review}, 143(4), 1321-1334.
+\doi{10.1175/MWR-D-14-00269.1}
 }
 \seealso{
 \code{\link[=forecast.mvgam]{forecast.mvgam()}} produces the forecast.
 \code{\link[=compare_scores]{compare_scores()}} scores several forecasts with one rule.
 \code{\link[=ensemble.mvgam_forecast]{ensemble.mvgam_forecast()}} combines forecasts. The
-\href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{forecast evaluation article}
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/forecast_evaluation.html}{forecast evaluation article}
 compares models by their scores at each horizon.
 
 Other forecasting: 

@@ -8,10 +8,12 @@
 A \code{data.frame} containing the following fields:
 \describe{
 \item{time}{time of sampling, in lunar monthly cycles}
-\item{series}{factor indicator of the time series, i.e. the species}
-\item{captures}{total captures across all control plots at each time point}
-\item{ndvi_ma12}{12-month moving average of the mean Normalised Difference Vegetation Index}
-\item{mintemp}{monthly mean of minimum temperature}
+\item{series}{factor identifying the species}
+\item{captures}{total captures across all control plots at each
+time}
+\item{ndvi_ma12}{12-month moving average of the mean Normalised
+Difference Vegetation Index, a measure of plant greenness}
+\item{mintemp}{monthly mean of the minimum temperature}
 }
 }
 \source{
@@ -21,6 +23,17 @@ A \code{data.frame} containing the following fields:
 portal_data
 }
 \description{
-A dataset containing time series of total captures (across all control plots) for select rodent species from the Portal Project
+Monthly time series of rodent captures for selected species of the
+Portal Project, a long-term study of a Chihuahuan Desert ecosystem
+near Portal, Arizona. Captures are summed across all control plots.
+}
+\examples{
+data(portal_data)
+mvgam_data(portal_data, y = "captures", family = poisson())
+}
+\seealso{
+\code{\link[=mvgam]{mvgam()}} for a state-space model of these counts and
+\code{\link[=mvgam_data]{mvgam_data()}} to check the data. The
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/mvgam_overview.html}{overview article} fits one.
 }
 \keyword{datasets}

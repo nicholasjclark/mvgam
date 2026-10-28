@@ -154,7 +154,7 @@ summary(simdat)
 \code{\link[=sim_mvgam]{sim_mvgam()}} simulates state-space time series.
 \code{\link[=sim_jsdgam]{sim_jsdgam()}} simulates site-by-species data without a detection
 process. The
-\href{https://nicholasjclark.github.io/mvgam/articles/nmix.html}{N-mixture article} fits occupancy and
+\href{https://nicholasjclark.github.io/mvgam/dev/articles/nmix.html}{N-mixture article} fits occupancy and
 N-mixture models to data of this layout.
 
 Other simulation: 

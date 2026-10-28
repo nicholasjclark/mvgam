@@ -126,7 +126,7 @@ infinite factor models. \emph{Biometrika}, 98(2), 291-306.
 \seealso{
 \code{\link[=shared_variation]{shared_variation()}} reports the covariance the factors
 give the series. \code{\link[=compare_loadings]{compare_loadings()}} compares the loadings under
-two priors. The \href{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}{JSDM article} fits
+two priors. The \href{https://nicholasjclark.github.io/mvgam/dev/articles/jsdgam.html}{JSDM article} fits
 an MGP prior and counts its active factors.
 
 Other latent dynamics: 

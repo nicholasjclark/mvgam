@@ -9,9 +9,8 @@
 \arguments{
 \item{object}{An object of class \code{mvgam}.}
 
-\item{probs}{Numeric vector of probabilities for quantile computation.
-Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
-single value or multiple values.}
+\item{probs}{Two probabilities for the lower and upper bounds of the
+credible interval. Default \code{c(0.025, 0.975)}, a 95\% interval.}
 
 \item{robust}{Logical. If \code{FALSE} (the default), uses mean and standard
 deviation for summaries. If \code{TRUE}, uses median and median absolute
@@ -77,13 +76,19 @@ chains, 1 at convergence.}
 \item{\code{Bulk_ESS}, \code{Tail_ESS}}{Bulk and tail effective
 sample sizes.}
 }
+
+Vehtari et al. (2021) recommend an Rhat below 1.01 and bulk and
+tail effective sample sizes above 400 before a summary is used. A
+fit should also have no divergent transitions. The section
+'Checking a fit' of \link{mvgam_diagnostics} says what to do when one of
+these checks fails.
 }
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
               data = simdat$data_train,
               family = poisson(),
               chains = 2, silent = 2)
@@ -93,11 +98,19 @@ summary(mod)
 # Each block is a data frame, such as the trend's dynamics
 round(summary(mod)$trend_spec, 2)
 
-# Next: how_to_cite() drafts the methods paragraph
+# Next: pp_check(mod) compares draws from the model with the data
 }
 
 }
+\references{
+Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and Burkner,
+P.-C. (2021). Rank-normalization, folding, and localization: an
+improved Rhat for assessing convergence of MCMC. \emph{Bayesian
+Analysis}, 16(2):667-718. \doi{10.1214/20-BA1221}
+}
 \seealso{
+\link{mvgam_diagnostics} checks convergence. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}}
+checks the fit against the data.
 \code{\link[=how_to_cite]{how_to_cite()}} drafts a methods paragraph for the model.
 \code{\link[=methods_md]{methods_md()}} writes its equations, glossary and priors.
 \code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} plots the draws of these parameters.

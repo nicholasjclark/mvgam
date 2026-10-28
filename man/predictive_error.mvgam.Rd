@@ -62,14 +62,15 @@ of \code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}}
 The errors are those \code{\link[=residuals.mvgam]{residuals.mvgam()}} returns with
 \code{type = "ordinary"}. In sample, each prediction carries the latent
 trend state the model inferred at that time. A prediction for
-\code{newdata} integrates over the trend dynamics.
+\code{newdata} uses the covariate part of the model, without the trend's
+innovations.
 }
 \examples{
 \dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                     n_timepoints = 120L, trend_model = AR())
-mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+mod <- mvgam(y ~ s(x, k = 5), trend_formula = ~ AR(p = 1),
              data = simdat$data_train, family = poisson(),
              chains = 2, silent = 2)
 
