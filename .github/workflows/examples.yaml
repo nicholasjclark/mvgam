@@ -1,17 +1,12 @@
-# Runs the examples that `R CMD check` skips.
+# Runs the examples that `R CMD check` skips. The first error fails
+# the job.
 #
-# Every example that fits a model sits inside `\dontrun{}`, which is
-# what brms does and what keeps the check tractable: 168 `mvgam()` and
-# `jsdgam()` calls across 59 help files would otherwise sample on every
-# run, and CRAN executes `\donttest{}` blocks. The cost is that nothing
-# runs example code at all, since the test suite does not either, so an
-# example can drift out of date without anything noticing. This job is
-# that safety net, on a schedule rather than per-commit because it
-# fits Stan models and takes hours.
+# `\dontrun{}` wraps every example that fits a model. 168 `mvgam()`
+# and `jsdgam()` calls across 59 help files would otherwise sample on
+# every check. The pkgdown build runs these blocks to show
+# their output. It renders an error and carries on. This job stops on
+# one. It fits Stan models for hours and runs only when dispatched.
 on:
-  schedule:
-    # Sundays, 04:00 UTC.
-    - cron: '0 4 * * 0'
   workflow_dispatch:
 
 name: examples

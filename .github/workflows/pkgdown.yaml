@@ -52,6 +52,11 @@ jobs:
               rmarkdown
               stan-dev/cmdstanr
               usethis
+              ape
+              mvabund
+              future
+              bridgesampling
+              V8
 
       - name: Build Cmdstan and install development brms version
         run: |
@@ -67,7 +72,7 @@ jobs:
         run: rm -f CLAUDE.md
 
       - name: Build site
-        run: pkgdown::build_site_github_pages(lazy = TRUE, new_process = FALSE, install = FALSE)
+        run: pkgdown::build_site_github_pages(lazy = TRUE, run_dont_run = TRUE, new_process = FALSE, install = FALSE)
         shell: Rscript {0}
 
       - name: Deploy to GitHub pages 🚀
